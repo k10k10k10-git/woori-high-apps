@@ -1,6 +1,6 @@
 import { ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, runTransaction, DataSnapshot } from "firebase/database";
 import { db } from "./firebase";
-import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, SuppliesBudget, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog } from "./types";
+import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, SuppliesBudget, MealCountData, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog } from "./types";
 import { paths } from "./paths";
 
 // Helper: DataSnapshot → typed list (injects id from Firebase key)
@@ -551,6 +551,18 @@ export async function getSuppliesBudget(retreatId: string): Promise<SuppliesBudg
 
 export async function updateSuppliesBudget(retreatId: string, data: SuppliesBudget): Promise<void> {
   await set(ref(db, paths.suppliesBudget(retreatId)), data);
+}
+
+// ── Meal Count (식수 계산) ────────────────────────────────
+
+export async function getMealCount(retreatId: string): Promise<MealCountData | null> {
+  const snap = await get(ref(db, paths.mealCount(retreatId)));
+  if (!snap.exists()) return null;
+  return snap.val() as MealCountData;
+}
+
+export async function saveMealCount(retreatId: string, data: MealCountData): Promise<void> {
+  await set(ref(db, paths.mealCount(retreatId)), stripUndefined({ ...data, updatedAt: Date.now() }));
 }
 
 // ── Brainstorm (브레인스토밍 보드 — 전역 공유, 수련회 무관) ──

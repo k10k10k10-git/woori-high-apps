@@ -191,6 +191,37 @@ export interface SuppliesBudget {
   snackBudgets?: Record<string, number>; // 간식 카테고리별 예산 (첫째날 야식/둘째날 야식/스탭 간식/GBS 간식)
 }
 
+// ── 식수 계산 (끼니별 식사 인원 — 수련원 통보용) ─────────────────
+
+export const MEAL_ROLES = ["staff", "teacher", "student", "extra"] as const;
+export type MealRole = typeof MEAL_ROLES[number];
+export type MealRoleCounts = Record<MealRole, number>; // 스탭/교사·교역자/학생/기타(음향·조명 등)
+
+export interface MealSlot {
+  id: string;
+  date: string;   // YYYY-MM-DD
+  name: string;   // "아침" | "점심" | "저녁" (자유 입력 가능)
+}
+
+// 후발/선복귀 조정 그룹 — 의미 필드는 라벨이 아니라 "첫 식사"/"마지막 식사" 끼니.
+// 같은 그룹이라도 마지막 식사가 다르면(예: "학생은 저녁 먹고") 항목을 나눠 입력한다.
+export interface MealAdjustment {
+  id: string;
+  type: "후발" | "선복귀";
+  label: string;            // 예: "금 저녁 후발"
+  counts: MealRoleCounts;
+  mealId: string;           // 후발=첫 식사 끼니 id, 선복귀=마지막 식사 끼니 id
+  note?: string;
+}
+
+export interface MealCountData {
+  base?: MealRoleCounts;        // 기준 인원 (전원 참석 시)
+  extraLabel?: string;          // 기타 인원 설명 (예: "음향/조명")
+  meals?: MealSlot[];           // 끼니 목록 (기간에서 기본 생성 + 수동 편집)
+  adjustments?: MealAdjustment[];
+  updatedAt?: number;
+}
+
 // ── 입금 미매칭 ────────────────────────────────────────────
 
 export interface UnmatchedPayment {

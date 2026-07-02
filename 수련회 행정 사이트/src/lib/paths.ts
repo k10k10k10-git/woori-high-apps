@@ -41,6 +41,9 @@ export const paths = {
   // ── 물품/간식 예산 ──
   suppliesBudget: (id: string) => `retreats/${id}/suppliesBudget`,
 
+  // ── 식수 계산 ──
+  mealCount: (id: string) => `retreats/${id}/mealCount`,
+
   // ── 브레인스토밍 (전역 — 수련회와 무관하게 공유, prepMilestones와 동일 패턴) ──
   brainstorm: () => "brainstorm",
   brainstormNote: (nid: string) => `brainstorm/${nid}`,
