@@ -1,0 +1,207 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { ref, get, update, set } from 'firebase/database';
+import { db } from '@/lib/firebase/client';
+import { useApp } from '@/store/AppContext';
+import { showToast } from '@/utils/toast';
+import {
+  extractSheetId, fetchClassTabs,
+  buildSyncPlan, buildSyncPayload, type SyncPlan, type ParsedClass,
+} from '@/lib/sheetSync';
+import type { Student } from '@/types';
+
+type CurrentClasses = Record<string, { teacher?: string; students?: Record<string, Student> }>;
+
+const ckLabel = (ck: string) => {
+  const [p, g, c] = ck.split('-');
+  return `${p}부 ${g}학년 ${c}반`;
+};
+
+export default function SheetSyncSection() {
+  const { state } = useApp();
+  const { curYear } = state;
+
+  const [bu1Url, setBu1Url] = useState('');
+  const [bu2Url, setBu2Url] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<SyncPlan | null>(null);
+  const [currentRef, setCurrentRef] = useState<CurrentClasses | null>(null);
+  const [removeMissing, setRemoveMissing] = useState(false);
+
+  // 저장된 시트 URL 로드
+  useEffect(() => {
+    get(ref(db, 'config/sheetSync')).then(snap => {
+      if (snap.exists()) {
+        const v = snap.val() as { bu1Url?: string; bu2Url?: string };
+        setBu1Url(v.bu1Url ?? '');
+        setBu2Url(v.bu2Url ?? '');
+      }
+    }).catch(() => { /* 설정 없음 — 무시 */ });
+  }, []);
+
+  async function saveUrls() {
+    try {
+      await set(ref(db, 'config/sheetSync'), { bu1Url: bu1Url.trim(), bu2Url: bu2Url.trim() });
+      showToast('시트 주소를 저장했습니다.', 'success');
+    } catch {
+      showToast('시트 주소 저장에 실패했습니다.', 'error');
+    }
+  }
+
+  async function loadPreview() {
+    setError(null);
+    setPlan(null);
+    const id1 = extractSheetId(bu1Url);
+    const id2 = extractSheetId(bu2Url);
+    if (!id1 && !id2) { setError('1부 또는 2부 시트 주소를 입력해주세요.'); return; }
+
+    setLoading(true);
+    setProgress('');
+    try {
+      const curSnap = await get(ref(db, `classes/${curYear}`));
+      const current: CurrentClasses = curSnap.exists() ? curSnap.val() : {};
+
+      const classes: ParsedClass[] = [];
+      if (id1) {
+        setProgress('1부 불러오는 중…');
+        classes.push(...await fetchClassTabs(id1, '1', curYear,
+          (d, t) => setProgress(`1부 ${d}/${t}개 탭`)));
+      }
+      if (id2) {
+        setProgress('2부 불러오는 중…');
+        classes.push(...await fetchClassTabs(id2, '2', curYear,
+          (d, t) => setProgress(`2부 ${d}/${t}개 탭`)));
+      }
+
+      if (classes.length === 0) {
+        setError('반 탭을 찾지 못했습니다. 시트 공유 설정(링크가 있는 모든 사용자 — 뷰어)을 확인해주세요.');
+        return;
+      }
+      setCurrentRef(current);
+      setPlan(buildSyncPlan(classes, current));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '시트를 불러오지 못했습니다.');
+    } finally {
+      setLoading(false);
+      setProgress('');
+    }
+  }
+
+  async function applySync() {
+    if (!plan || !currentRef) return;
+    setRunning(true);
+    try {
+      const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing);
+      await update(ref(db), payload);
+      showToast(`${plan.classCount}개 반 · ${plan.totalStudents}명 동기화 완료`, 'success');
+      setPlan(null);
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '동기화 적용에 실패했습니다.', 'error');
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow)', padding: '14px 16px', marginTop: 16 }}>
+      <div className="admin-section-title">🔄 구글 시트 동기화 ({curYear}년)</div>
+      <div style={{ fontSize: 11, color: 'var(--text3)', margin: '6px 0 12px' }}>
+        출석부 구글 시트의 명단·출석을 불러옵니다. <strong>1부·2부 주소를 함께 넣고 한 번에</strong> 미리보기하세요
+        (한 부만 넣으면 다른 부로 이동한 학생이 “제외”로 잘못 보입니다).
+        <strong> 반드시 미리보기로 변경 내용을 확인한 뒤</strong> 적용하세요. 시트 공유는 “링크가 있는 모든 사용자 — 뷰어”여야 합니다.
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+        <input className="form-input" placeholder="1부 출석부 시트 URL" value={bu1Url} onChange={e => setBu1Url(e.target.value)} />
+        <input className="form-input" placeholder="2부 출석부 시트 URL" value={bu2Url} onChange={e => setBu2Url(e.target.value)} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={saveUrls}>주소 저장</button>
+          <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12, marginLeft: 'auto' }} disabled={loading} onClick={loadPreview}>
+            {loading ? (progress || '불러오는 중…') : '동기화 미리보기'}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--red-text)' }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {plan && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 12, marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+            미리보기: {plan.classCount}개 반 · {plan.totalStudents}명
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, fontSize: 11 }}>
+            <span style={{ background: 'var(--green-bg, #dcfce7)', color: 'var(--green-text, #15803d)', borderRadius: 6, padding: '3px 8px' }}>신규 {plan.added.length}명</span>
+            <span style={{ background: 'var(--amber-bg)', color: 'var(--amber-text)', borderRadius: 6, padding: '3px 8px' }}>반 이동 {plan.moved.length}명</span>
+            <span style={{ background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 6, padding: '3px 8px' }}>제외 {plan.removed.length}명</span>
+            <span style={{ background: 'var(--surface2)', color: 'var(--text2)', borderRadius: 6, padding: '3px 8px' }}>장결자 {plan.jangCount}명</span>
+            {plan.ambiguous.length > 0 && (
+              <span style={{ background: 'var(--amber-bg)', color: 'var(--amber-text)', borderRadius: 6, padding: '3px 8px' }}>확인 필요 {plan.ambiguous.length}명</span>
+            )}
+            <span style={{ background: 'var(--primary-bg)', color: 'var(--primary-text, #1d4ed8)', borderRadius: 6, padding: '3px 8px' }}>출석 {plan.attendanceChanges}건</span>
+          </div>
+
+          {plan.ambiguous.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber-text)', marginBottom: 4 }}>확인 필요 (동명이인 — 일치 정보 부족으로 신규 등록됨)</div>
+              <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 12, color: 'var(--text2)' }}>
+                {plan.ambiguous.map((a, i) => <span key={i} style={{ marginRight: 8 }}>{a.name}({ckLabel(a.ck)})</span>)}
+              </div>
+            </div>
+          )}
+
+          {plan.moved.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>반 이동</div>
+              <div style={{ maxHeight: 140, overflowY: 'auto' }}>
+                {plan.moved.map((m, i) => (
+                  <div key={i} style={{ fontSize: 12, padding: '2px 0', color: 'var(--text2)' }}>
+                    {m.name}: {ckLabel(m.fromCk)} → <strong>{ckLabel(m.toCk)}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {plan.added.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>신규 등록</div>
+              <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 12, color: 'var(--text2)' }}>
+                {plan.added.map((a, i) => <span key={i} style={{ marginRight: 8 }}>{a.name}({ckLabel(a.ck)})</span>)}
+              </div>
+            </div>
+          )}
+
+          {plan.removed.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red-text)', marginBottom: 4 }}>
+                제외 후보 (시트에 없는 학생 — 기본은 <strong>유지</strong>됨)
+              </div>
+              <div style={{ maxHeight: 100, overflowY: 'auto', fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>
+                {plan.removed.map((r, i) => <span key={i} style={{ marginRight: 8 }}>{r.name}({ckLabel(r.ck)})</span>)}
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--red-text)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={removeMissing} onChange={e => setRemoveMissing(e.target.checked)} />
+                이 학생들을 해당 반에서 삭제 (1부·2부를 모두 동기화했고, 정말 떠난 학생일 때만 체크)
+              </label>
+            </div>
+          )}
+
+          <div className="btn-row" style={{ marginTop: 10 }}>
+            <button className="btn-secondary" onClick={() => setPlan(null)} disabled={running}>취소</button>
+            <button className="btn-primary" onClick={applySync} disabled={running}>
+              {running ? '적용 중…' : '동기화 적용'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

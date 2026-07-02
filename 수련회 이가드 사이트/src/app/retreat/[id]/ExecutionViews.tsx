@@ -1,0 +1,604 @@
+"use client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IguardStaff, IguardScheduleBlock, IguardPost, IguardMovement, Retreat, RetreatPeriod } from "@/lib/types";
+
+interface Data {
+  staff: IguardStaff[];
+  schedule: IguardScheduleBlock[];
+  posts: IguardPost[];
+  movements: IguardMovement[];
+  retreat?: Retreat;
+  periods?: RetreatPeriod[];   // 준비일정의 "수련회 기간" — 오늘이 며칠차인지 계산용
+}
+
+function nowHHMM(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function diffDays(fromYMD: string, toYMD: string): number {
+  const a = fromYMD.match(/^(\d{4})-(\d{2})-(\d{2})$/), b = toYMD.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!a || !b) return NaN;
+  return Math.round((Date.UTC(+b[1], +b[2] - 1, +b[3]) - Date.UTC(+a[1], +a[2] - 1, +a[3])) / 86400000);
+}
+function addDays(ymd: string, days: number): string | null {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + days));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+function formatShortDate(ymd: string): string {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? `${Number(m[2])}/${Number(m[3])}` : ymd;
+}
+function normalizeText(value?: string): string {
+  return (value || "").toLowerCase().replace(/[\s_~\-·()[\]{}.,!?:/\\|'"“”‘’]+/g, "");
+}
+function periodMatchesRetreat(p: RetreatPeriod, retreat?: Retreat): boolean {
+  const retreatName = normalizeText(retreat?.name);
+  if (!retreatName) return false;
+  return [p.theme, p.label]
+    .map(normalizeText)
+    .filter(text => text.length >= 3)
+    .some(text => retreatName.includes(text) || text.includes(retreatName));
+}
+function activePeriod(periods?: RetreatPeriod[], retreat?: Retreat): RetreatPeriod | null {
+  const today = todayStr();
+  const sorted = [...(periods || [])].filter(p => p.startDate && p.endDate).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  const matched = sorted.filter(p => periodMatchesRetreat(p, retreat));
+  if (matched.length) {
+    return matched.find(p => p.startDate <= today && today <= p.endDate) ?? matched[0];
+  }
+  if (retreat?.startDate && retreat?.endDate) {
+    return {
+      id: "__retreat_period",
+      startDate: retreat.startDate,
+      endDate: retreat.endDate,
+      label: retreat.name,
+    };
+  }
+  return sorted.find(p => p.startDate <= today && today <= p.endDate) ?? sorted[0] ?? null;
+}
+function retreatDateForDay(periods: RetreatPeriod[] | undefined, retreat: Retreat | undefined, day: number): string | null {
+  const p = activePeriod(periods, retreat);
+  if (!p) return null;
+  const date = addDays(p.startDate, day - 1);
+  return date && date <= p.endDate ? date : null;
+}
+function periodRangeLabel(periods?: RetreatPeriod[], retreat?: Retreat): string {
+  const p = activePeriod(periods, retreat);
+  if (!p) return "수련회 기간 미설정";
+  return `${formatShortDate(p.startDate)}~${formatShortDate(p.endDate)}`;
+}
+function useClock() {
+  const [clock, setClock] = useState(() => ({ today: todayStr(), time: nowHHMM() }));
+  useEffect(() => {
+    const id = window.setInterval(() => setClock({ today: todayStr(), time: nowHHMM() }), 30000);
+    return () => window.clearInterval(id);
+  }, []);
+  return clock;
+}
+/** 오늘이 수련회 며칠차인지(1부터). 오늘을 포함하는 기간이 없으면 null */
+function currentRetreatDay(periods?: RetreatPeriod[], retreat?: Retreat): number | null {
+  const primary = activePeriod(periods, retreat);
+  const today = todayStr();
+  if (primary && primary.startDate <= today && today <= primary.endDate) {
+    const diff = diffDays(primary.startDate, today);
+    if (!isNaN(diff) && diff >= 0) return diff + 1;
+  }
+  return null;
+}
+function isOpenEndedBlock(b: IguardScheduleBlock): boolean {
+  return b.end === "~";
+}
+function toMinutes(value?: string): number | null {
+  if (!value || value === "~") return null;
+  const match = value.match(/^([0-2]?\d|3[0-5]):([0-5]\d)$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+function compareBlocks(a: IguardScheduleBlock, b: IguardScheduleBlock): number {
+  return a.day - b.day || (toMinutes(a.start) ?? 0) - (toMinutes(b.start) ?? 0);
+}
+/** 그 블록이 "지금"인가 — 시간대 일치 + (현재 일자를 알면) 일자도 일치 */
+function isNowOn(b: IguardScheduleBlock, curDay: number | null, currentTime = nowHHMM()): boolean {
+  if (!b.end) return false;
+  if (curDay == null || b.day !== curDay) return false;
+  const start = toMinutes(b.start);
+  const end = toMinutes(b.end);
+  const now = toMinutes(currentTime);
+  if (start == null || now == null) return false;
+  if (isOpenEndedBlock(b)) return start <= now;
+  return end != null && start <= now && now < end;
+}
+function currentBlockFor(schedule: IguardScheduleBlock[], curDay: number | null, currentTime = nowHHMM()): IguardScheduleBlock | null {
+  if (curDay == null) return null;
+  const todayBlocks = schedule.filter(b => b.day === curDay).sort(compareBlocks);
+  const current = todayBlocks.find(b => isNowOn(b, curDay, currentTime));
+  if (current) return current;
+  const firstToday = todayBlocks[0];
+  const previousOpen = schedule
+    .filter(b => b.day === curDay - 1 && isOpenEndedBlock(b))
+    .sort((a, b) => (toMinutes(b.start) ?? 0) - (toMinutes(a.start) ?? 0))[0] ?? null;
+  const now = toMinutes(currentTime) ?? 0;
+  const firstStart = toMinutes(firstToday?.start);
+  if (previousOpen && (firstStart == null || now < firstStart)) return previousOpen;
+  return null;
+}
+function nextBlockFor(blocks: IguardScheduleBlock[], currentTime: string): IguardScheduleBlock | null {
+  const now = toMinutes(currentTime) ?? 0;
+  return blocks.find(b => (toMinutes(b.start) ?? 0) > now) ?? null;
+}
+function timeRangeLabel(b: IguardScheduleBlock): string {
+  if (!b.end) return b.start;
+  return isOpenEndedBlock(b) ? `${b.start}~` : `${b.start}~${b.end}`;
+}
+function textLines(value?: string | null): string[] {
+  return (value || "").split(/\n+/).map(line => line.trim()).filter(Boolean);
+}
+function visibleNoticeLines(value?: string | null): string[] {
+  const lines = textLines(value);
+  const visible: string[] = [];
+  let inRosterMemo = false;
+
+  for (const line of lines) {
+    const compact = line.replace(/\s+/g, "");
+    if (/^스탭명단/.test(compact)) {
+      inRosterMemo = true;
+      continue;
+    }
+    if (/^\*\s*(볼드체|밑줄|파란색|빨간색)/.test(line)) continue;
+    if (inRosterMemo) continue;
+    visible.push(line);
+  }
+  return visible;
+}
+function dutyLinesForStaff(block: IguardScheduleBlock, staffName?: string): string[] {
+  if (!staffName) return [];
+  const all = [...textLines(block.owner), ...visibleNoticeLines(block.notice)];
+  const picked: string[] = [];
+  all.forEach((line, index) => {
+    if (!line.includes(staffName)) return;
+    const prev = all[index - 1];
+    if (prev && !prev.includes(staffName) && /[:：]$/.test(prev.trim()) && !picked.includes(prev)) picked.push(prev);
+    if (!picked.includes(line)) picked.push(line);
+  });
+  return picked;
+}
+function TextBlock({ title, children, tone = "slate" }: { title: string; children: string; tone?: "slate" | "fuchsia" | "amber" }) {
+  const cls = tone === "fuchsia"
+    ? "bg-fuchsia-50 border-fuchsia-100 text-fuchsia-800"
+    : tone === "amber"
+      ? "bg-amber-50 border-amber-100 text-amber-800"
+      : "bg-white border-slate-100 text-slate-700";
+  return (
+    <div className={`rounded-lg border p-3 ${cls}`}>
+      <div className="text-[11px] font-semibold mb-1 opacity-70">{title}</div>
+      <div className="text-xs whitespace-pre-line leading-relaxed">{children}</div>
+    </div>
+  );
+}
+function BlockTextSummary({ block }: { block: IguardScheduleBlock }) {
+  const notice = visibleNoticeLines(block.notice).join("\n");
+  const hasAny = block.detail || block.owner || notice;
+  if (!hasAny) return null;
+  return (
+    <div className="grid gap-2">
+      {block.detail && <TextBlock title="진행 내용">{block.detail}</TextBlock>}
+      {block.owner && <TextBlock title="담당자 / 역할" tone="fuchsia">{block.owner}</TextBlock>}
+      {notice && <TextBlock title="특이사항" tone="amber">{notice}</TextBlock>}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// 개인 큐카드 (스탭 1인의 시간순 동선) — 모바일
+// ════════════════════════════════════════════════════════════
+export function CueCardView({ staff, schedule, posts, movements, retreat, periods }: Data) {
+  const clock = useClock();
+  const curDay = currentRetreatDay(periods, retreat);
+  const [staffId, setStaffId] = useState<string>(staff[0]?.id ?? "");
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const sortedStaff = useMemo(() => [...staff].sort((a, b) => a.name.localeCompare(b.name, "ko")), [staff]);
+  const toggleOpen = (id: string) => setOpen(p => {
+    const n = new Set(p);
+    if (n.has(id)) n.delete(id);
+    else n.add(id);
+    return n;
+  });
+  const postName = useMemo(() => {
+    const m = new Map(posts.map(p => [p.id, p.area ? `[${p.area}] ${p.name}` : p.name]));
+    return (id: string) => m.get(id) || "(삭제된 포스트)";
+  }, [posts]);
+  const myMoves = useMemo(() => {
+    const m = new Map<string, IguardMovement>();
+    movements.filter(mv => mv.staffId === staffId).forEach(mv => m.set(mv.blockId, mv));
+    return m;
+  }, [movements, staffId]);
+  const sortedSchedule = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
+
+  useEffect(() => {
+    if (!sortedStaff.length) return;
+    if (!sortedStaff.some(s => s.id === staffId)) setStaffId(sortedStaff[0].id);
+  }, [sortedStaff, staffId]);
+
+  if (staff.length === 0 || schedule.length === 0) return (
+    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🪪</div>
+      <p>스탭·스탭 전체 큐싯·동선 매트릭스를 먼저 입력하면<br />여기에 개인 큐카드가 자동 생성됩니다.</p></div>
+  );
+
+  const days = [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b);
+  const todayBlocks = curDay == null ? [] : sortedSchedule.filter(b => b.day === curDay);
+  const currentBlock = currentBlockFor(schedule, curDay, clock.time);
+  const nextBlock = currentBlock ? null : nextBlockFor(todayBlocks, clock.time);
+  const currentMove = currentBlock ? myMoves.get(currentBlock.id) : null;
+  const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
+  const selectedStaff = staff.find(s => s.id === staffId);
+  const currentDutyLines = currentBlock ? dutyLinesForStaff(currentBlock, selectedStaff?.name) : [];
+
+  return (
+    <div>
+      <div className="mb-4">
+        <label className="mb-1 block text-xs font-semibold text-slate-500">스탭 선택 · 가나다순</label>
+        <select
+          className="input h-12 w-full border-fuchsia-300 bg-white text-base font-semibold text-slate-800 shadow-sm focus:border-fuchsia-500"
+          value={staffId}
+          onChange={e => setStaffId(e.target.value)}
+        >
+          {sortedStaff.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className={`card p-4 mb-4 border-2 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/50" : "border-slate-200"}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <div className="text-xs font-semibold text-fuchsia-700 mb-1">지금 해야 할 일</div>
+            <div className="text-lg font-bold text-slate-800">
+              {currentBlock ? currentBlock.label : curDay == null ? "수련회 기간 밖입니다" : nextBlock ? "다음 일정 대기" : "오늘 일정이 종료되었습니다"}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
+            <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+          </div>
+        </div>
+        {currentBlock ? (
+          <div className="space-y-2">
+            <div className="text-xs text-slate-500">{timeRangeLabel(currentBlock)}</div>
+            <div className="rounded-lg bg-white border border-fuchsia-100 p-3">
+              {currentMove ? (
+                <>
+                  <div className="text-sm font-semibold text-slate-800">📍 {postName(currentMove.postId)}</div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {currentMove.round && <span className={`px-2 py-0.5 rounded-full text-xs ${currentMove.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{currentMove.round}</span>}
+                    {currentMove.note && <span className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">{currentMove.note}</span>}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm font-semibold text-slate-500">배치 없음 · 조와 함께 움직이면 됩니다.</div>
+              )}
+            </div>
+
+            {currentDutyLines.length > 0 && (
+              <TextBlock title="내 담당" tone="fuchsia">{currentDutyLines.join("\n")}</TextBlock>
+            )}
+            {currentBlock.detail && <div className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{currentBlock.detail}</div>}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">
+            {curDay == null ? "오늘 날짜가 이 수련회 기간에 포함되지 않습니다." : nextBlock ? `${timeRangeLabel(nextBlock)} · ${nextBlock.label}` : "현재 시간 이후로 등록된 시간 블록이 없습니다."}
+          </div>
+        )}
+      </div>
+      {days.map(day => (
+        <div key={day} className="mb-4">
+          <div className="text-xs font-semibold text-slate-400 mb-2">
+            {(() => {
+              const date = retreatDateForDay(periods, retreat, day);
+              return `${day}일차${date ? ` · ${formatShortDate(date)}${curDay === day ? " · 오늘" : ""}` : ""}`;
+            })()}
+          </div>
+          <div className="space-y-2">
+            {schedule.filter(b => b.day === day).map(b => {
+              const mv = myMoves.get(b.id);
+              const now = isNowOn(b, curDay, clock.time);
+              const isOpen = open.has(b.id);
+              const dutyLines = dutyLinesForStaff(b, selectedStaff?.name);
+              return (
+                <div key={b.id} className={`card p-3 ${now ? "ring-2 ring-fuchsia-400" : ""}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="text-center shrink-0 w-14 pt-0.5">
+                      <div className="font-mono text-xs text-slate-500">{b.start}</div>
+                      {now && <div className="text-[10px] text-fuchsia-700 font-bold">지금</div>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-slate-500 truncate">{b.label}</div>
+                      {mv ? (
+                        <div className="font-semibold text-slate-800">
+                          📍 {postName(mv.postId)}
+                          {mv.round && <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${mv.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{mv.round}</span>}
+                        </div>
+                      ) : <div className="text-sm text-slate-300">배치 없음 (조와 함께)</div>}
+                      {mv?.note && <div className="text-xs text-fuchsia-700 mt-0.5">• {mv.note}</div>}
+                      {dutyLines.length > 0 && (
+                        <div className="mt-1 rounded-lg bg-fuchsia-50 border border-fuchsia-100 px-2 py-1.5 text-xs text-fuchsia-800 whitespace-pre-line leading-relaxed">
+                          {dutyLines.join("\n")}
+                        </div>
+                      )}
+                    </div>
+                    {(b.detail || b.owner || b.notice) && (
+                      <button onClick={() => toggleOpen(b.id)} className="text-xs text-slate-400 hover:text-fuchsia-600 shrink-0 whitespace-nowrap">
+                        {isOpen ? "접기" : "상세 ▾"}
+                      </button>
+                    )}
+                  </div>
+                  {(b.detail || b.owner || b.notice) && isOpen && (
+                    <div className="mt-2 ml-14">
+                      <BlockTextSummary block={b} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// 현재시각 포스트 보드 — "그 시간에 누가 어디" (안전 핵심)
+// ════════════════════════════════════════════════════════════
+export function PostBoardView({ staff, schedule, posts, movements, retreat, periods }: Data) {
+  const clock = useClock();
+  const curDay = currentRetreatDay(periods, retreat);
+  const days = useMemo(() => [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b), [schedule]);
+  const sorted = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
+
+  const [day, setDay] = useState<number>(() => (curDay != null && days.includes(curDay)) ? curDay : (days[0] ?? 1));
+  const userPicked = useRef(false);
+  // 데이터 로드/날짜 변화 시 오늘 일자로 자동 스냅 (사용자가 직접 고르기 전까지)
+  useEffect(() => {
+    if (userPicked.current) return;
+    if (curDay != null && days.includes(curDay)) setDay(curDay);
+    else if (days.length && !days.includes(day)) setDay(days[0]);
+  }, [curDay, days, day]);
+
+  const dayBlocks = useMemo(() => sorted.filter(b => b.day === day), [sorted, day]);
+  const selectedDate = retreatDateForDay(periods, retreat, day);
+  const selectedDateLabel = selectedDate ? formatShortDate(selectedDate) : null;
+  const [blockId, setBlockId] = useState<string>("");
+  // 일자가 바뀌면 그 일자의 "지금" 블록(없으면 첫 블록) 자동 선택
+  useEffect(() => {
+    const target = dayBlocks.find(b => isNowOn(b, curDay, clock.time)) ?? dayBlocks[0];
+    setBlockId(target?.id ?? "");
+  }, [day, dayBlocks, curDay, clock.time]);
+
+  const block = sorted.find(b => b.id === blockId);
+  const staffName = useMemo(() => new Map(staff.map(s => [s.id, s.name])), [staff]);
+  const assignmentFor = useCallback((targetBlockId: string) => {
+    const byPost = new Map<string, { name: string; round?: string }[]>();
+    const assignedStaff = new Set<string>();
+    movements.filter(mv => mv.blockId === targetBlockId).forEach(mv => {
+      const arr = byPost.get(mv.postId) || [];
+      arr.push({ name: staffName.get(mv.staffId) || "?", round: mv.round });
+      byPost.set(mv.postId, arr);
+      assignedStaff.add(mv.staffId);
+    });
+    return { byPost, idle: staff.filter(s => !assignedStaff.has(s.id)) };
+  }, [movements, staff, staffName]);
+  const assigned = useMemo(() => assignmentFor(blockId), [assignmentFor, blockId]);
+  const todayBlocks = curDay == null ? [] : sorted.filter(b => b.day === curDay);
+  const currentBlock = currentBlockFor(schedule, curDay, clock.time);
+  const currentBlockId = currentBlock?.id ?? "";
+  const nextBlock = currentBlock ? null : nextBlockFor(todayBlocks, clock.time);
+  const currentAssigned = currentBlockId ? assignmentFor(currentBlockId) : null;
+  const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
+
+  if (schedule.length === 0) return (
+    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">📡</div><p>스탭 전체 큐싯·동선을 먼저 입력해주세요.</p></div>
+  );
+
+  return (
+    <div>
+      <div className={`card p-4 mb-4 border-2 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/50" : "border-slate-200"}`}>
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <div className="text-xs font-semibold text-fuchsia-700 mb-1">현재 포스트 상황</div>
+            <div className="text-lg font-bold text-slate-800">
+              {currentBlock ? currentBlock.label : curDay == null ? "수련회 기간 밖입니다" : nextBlock ? "다음 일정 대기" : "오늘 일정이 종료되었습니다"}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
+            <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+          </div>
+        </div>
+        {currentBlock ? (
+          <>
+            <div className="text-xs text-slate-500 mb-2">{timeRangeLabel(currentBlock)}</div>
+            <div className="mb-3">
+              <BlockTextSummary block={currentBlock} />
+            </div>
+            {currentAssigned && currentAssigned.byPost.size > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {posts.filter(p => currentAssigned.byPost.has(p.id)).map(p => (
+                  <div key={p.id} className="rounded-lg bg-white border border-fuchsia-100 p-3">
+                    <div className="text-sm font-semibold text-slate-700 mb-1">📍 {p.area ? `[${p.area}] ` : ""}{p.name}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {currentAssigned.byPost.get(p.id)!.map((x, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">
+                          {x.name}{x.round ? ` (${x.round})` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg bg-white border border-slate-100 p-3 text-sm text-slate-500">현재 블록에 배치된 포스트가 없습니다.</div>
+            )}
+            {currentAssigned && currentAssigned.idle.length > 0 && (
+              <div className="mt-3 text-xs text-slate-400">미배치 스탭 · {currentAssigned.idle.map(s => s.name).join(", ")}</div>
+            )}
+          </>
+        ) : (
+          <div className="text-sm text-slate-500">
+            {curDay == null ? "오늘 날짜가 이 수련회 기간에 포함되지 않습니다." : nextBlock ? `${timeRangeLabel(nextBlock)} · ${nextBlock.label}` : "현재 시간 이후로 등록된 시간 블록이 없습니다."}
+          </div>
+        )}
+      </div>
+      {/* 일자 선택 */}
+      <div className="flex gap-1 mb-3 flex-wrap">
+        {days.map(d => (
+          <button key={d} onClick={() => { userPicked.current = true; setDay(d); }}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium ${day === d ? "bg-fuchsia-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+            {(() => {
+              const date = retreatDateForDay(periods, retreat, d);
+              return `${d}일차${date ? ` · ${formatShortDate(date)}${curDay === d ? " · 오늘" : ""}` : ""}`;
+            })()}
+          </button>
+        ))}
+      </div>
+      <div className="text-xs text-slate-400 mb-3">
+        시간 블록 · {selectedDateLabel ? `${selectedDateLabel} (${day}일차)` : periodRangeLabel(periods, retreat)}
+        {curDay === day ? <span className="text-fuchsia-700"> · 현재 날짜</span> : null}
+      </div>
+      <div className="mb-3">
+        <label className="text-xs text-slate-500 block mb-1">
+          시간 블록
+          {curDay != null && day === curDay ? <span className="text-fuchsia-700"> · 현재 일자·시각 자동선택</span>
+            : curDay == null ? <span className="text-slate-400"> · 오늘이 수련회 기간이 아니에요 — 일자를 직접 선택하세요</span> : null}
+        </label>
+        <select className="input" value={blockId} onChange={e => setBlockId(e.target.value)}>
+          {dayBlocks.map(b => <option key={b.id} value={b.id}>{b.start} {b.label}{isNowOn(b, curDay, clock.time) ? " ← 지금" : ""}</option>)}
+        </select>
+      </div>
+      {block && (
+        <>
+          {(block.detail || block.owner || block.notice) && block.id !== currentBlockId && (
+            <div className="mb-4">
+              <BlockTextSummary block={block} />
+            </div>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2 mb-4">
+            {posts.filter(p => assigned.byPost.has(p.id)).map(p => (
+              <div key={p.id} className="card p-3">
+                <div className="text-sm font-semibold text-slate-700 mb-1">📍 {p.area ? `[${p.area}] ` : ""}{p.name}</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {assigned.byPost.get(p.id)!.map((x, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">
+                      {x.name}{x.round ? ` (${x.round})` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          {[...assigned.byPost.keys()].length === 0 && (
+            <div className="card p-6 text-center text-slate-400 mb-4">이 시간 블록에 배치된 포스트가 없습니다.</div>
+          )}
+          {assigned.idle.length > 0 && (
+            <div className="card p-3">
+              <div className="text-xs font-semibold text-slate-400 mb-1.5">미배치 스탭 (조와 함께) · {assigned.idle.length}명</div>
+              <div className="flex flex-wrap gap-1.5">
+                {assigned.idle.map(s => <span key={s.id} className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-500">{s.name}</span>)}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// 조장 큐싯 — 조장이 시간대별로 해야 할 일 (모바일, 읽기 전용)
+// ════════════════════════════════════════════════════════════
+export function LeaderCueView({ schedule, retreat, periods }: {
+  schedule: IguardScheduleBlock[];
+  retreat?: Retreat;
+  periods?: RetreatPeriod[];
+}) {
+  const clock = useClock();
+  const curDay = currentRetreatDay(periods, retreat);
+  const sortedSchedule = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
+
+  if (schedule.length === 0) return (
+    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🧑‍🏫</div>
+      <p>타임테이블을 먼저 입력하면<br />여기에 조장 큐싯이 자동 생성됩니다.</p></div>
+  );
+
+  const days = [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b);
+  const currentBlock = currentBlockFor(schedule, curDay, clock.time);
+  const todayBlocks = curDay == null ? [] : sortedSchedule.filter(b => b.day === curDay);
+  const nextBlock = currentBlock ? null : nextBlockFor(todayBlocks, clock.time);
+  const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
+
+  return (
+    <div>
+      <div className={`card p-4 mb-4 border-2 ${currentBlock ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div>
+            <div className="text-xs font-semibold text-emerald-700 mb-1">조장 — 지금 할 일</div>
+            <div className="text-lg font-bold text-slate-800">
+              {currentBlock ? currentBlock.label : curDay == null ? "수련회 기간 밖입니다" : nextBlock ? "다음 일정 대기" : "오늘 일정이 종료되었습니다"}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
+            <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+          </div>
+        </div>
+        {currentBlock ? (
+          <div className="space-y-2">
+            <div className="text-xs text-slate-500">{timeRangeLabel(currentBlock)}</div>
+            {currentBlock.leaderNote
+              ? <div className="rounded-lg bg-white border border-emerald-100 p-3 text-sm text-slate-700 whitespace-pre-line leading-relaxed">{currentBlock.leaderNote}</div>
+              : <div className="rounded-lg bg-white border border-slate-100 p-3 text-sm text-slate-400">이 시간대 조장 안내가 없습니다. 조와 함께 움직이세요.</div>}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-500">
+            {curDay == null ? "오늘 날짜가 이 수련회 기간에 포함되지 않습니다." : nextBlock ? `${timeRangeLabel(nextBlock)} · ${nextBlock.label}` : "현재 시간 이후로 등록된 시간 블록이 없습니다."}
+          </div>
+        )}
+      </div>
+      {days.map(day => (
+        <div key={day} className="mb-4">
+          <div className="text-xs font-semibold text-slate-400 mb-2">
+            {(() => {
+              const date = retreatDateForDay(periods, retreat, day);
+              return `${day}일차${date ? ` · ${formatShortDate(date)}${curDay === day ? " · 오늘" : ""}` : ""}`;
+            })()}
+          </div>
+          <div className="space-y-2">
+            {schedule.filter(b => b.day === day).map(b => {
+              const now = isNowOn(b, curDay, clock.time);
+              return (
+                <div key={b.id} className={`card p-3 ${now ? "ring-2 ring-emerald-400" : ""}`}>
+                  <div className="flex items-start gap-3">
+                    <div className="text-center shrink-0 w-14 pt-0.5">
+                      <div className="font-mono text-xs text-slate-500">{b.start}</div>
+                      {now && <div className="text-[10px] text-emerald-700 font-bold">지금</div>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-slate-500">{b.label}</div>
+                      {b.leaderNote
+                        ? <div className="text-sm text-slate-700 whitespace-pre-line leading-relaxed mt-0.5">{b.leaderNote}</div>
+                        : <div className="text-sm text-slate-300 mt-0.5">조장 안내 없음 (조와 함께)</div>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

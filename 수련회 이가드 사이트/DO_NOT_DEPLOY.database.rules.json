@@ -1,0 +1,49 @@
+{
+  "rules": {
+    "retreats": {
+      ".read": "auth != null",
+      "$retreatId": {
+        "iguard": {
+          ".write": "auth != null && (root.child('iguardMembers/' + auth.uid).exists() || root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)"
+        },
+        "groups": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" },
+        "rooms": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" },
+        "teachers": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" },
+        "participants": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" },
+        "partialAttendances": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" },
+        "cellColors": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" },
+        "periods": { ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)" }
+      }
+    },
+    "classes": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)"
+    },
+    "admins": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins/' + auth.uid).val() === true"
+    },
+    "retreatAdmins": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins/' + auth.uid).val() === true"
+    },
+    "iguardMembers": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins/' + auth.uid).val() === true"
+    },
+    "iguardRoles": {
+      ".read": "auth != null",
+      ".write": "auth != null && root.child('admins/' + auth.uid).val() === true"
+    },
+    "iguardPending": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).val() === true)"
+      }
+    },
+    "prepMilestones": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('iguardMembers/' + auth.uid).exists() || root.child('retreatAdmins/' + auth.uid).exists() || root.child('admins/' + auth.uid).val() === true)"
+    }
+  }
+}

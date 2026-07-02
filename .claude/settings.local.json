@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__visualize__read_me",
+      "mcp__visualize__show_widget",
+      "Bash(npx next *)",
+      "Bash(npm install *)",
+      "Bash(npx vitest *)",
+      "Bash(npx firebase *)",
+      "Bash(npx vercel *)"
+    ]
+  }
+}

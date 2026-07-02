@@ -1,0 +1,390 @@
+# retreat-app — 수련회 관리 웹앱
+
+교회 수련회 운영에 필요한 전체 데이터(신청자, 조편성, 방배정, 카풀, 취소, 물품 등)를 관리하는 내부 웹 도구.
+
+---
+
+## 기술 스택
+
+| 항목 | 내용 |
+|---|---|
+| 프레임워크 | Next.js 16.1.7 (App Router) |
+| UI | React 19, Tailwind CSS 4 |
+| 언어 | TypeScript 5 (strict mode) |
+| 데이터베이스 | Firebase Realtime Database |
+| 인증 | Firebase Auth (Google OAuth) |
+| 시트 연동 | Google Sheets CSV (공개 게시) |
+| 엑셀 내보내기 | xlsx 라이브러리 |
+| 테스트 | Vitest 4 (`npm test` = `vitest run`) |
+| 배포 | Vercel (`npx vercel --prod --yes`) |
+| 의존성 | firebase, next, react, react-dom, xlsx, vitest(dev) — 최소화 유지 |
+
+---
+
+## 디렉터리 구조
+
+```
+src/
+├── app/
+│   ├── page.tsx                    # 홈 (수련회 목록 + 준비 일정 캘린더 패널, md 기준 모바일/데스크탑 분기)
+│   ├── RetreatCalendarPanel.tsx    # 메인 준비 일정 패널 (수련회 기간 + 마일스톤 달력) — 기간은 전체 수련회 합쳐서 표시
+│   ├── FormGuideModal.tsx          # 구글폼 작성 가이드 모달
+│   ├── UpdateBanner.tsx            # 새 배포 감지 배너 (NEXT_PUBLIC_BUILD_ID 폴링)
+│   ├── api/version/route.ts        # 현재 배포 빌드 ID 반환 (UpdateBanner가 폴링)
+│   ├── layout.tsx / providers.tsx
+│   └── retreat/[id]/
+│       ├── page.tsx                # 서버 컴포넌트 entry
+│       ├── RetreatPageClient.tsx   # 탭 라우터 (TAB_IDX 상수 + 15개 탭 관리, keep-alive 패턴)
+│       ├── GroupComponents.tsx     # 조편성 UI 컴포넌트 (GroupCard, UnassignedBySection, StudentChip, TeacherChip)
+│       ├── ParticipantsTab.tsx     # 신청자 취합 (시트 연동)
+│       ├── GroupsTab.tsx           # 조편성 (GroupComponents 사용)
+│       ├── RoomsTab.tsx            # 방배정 (실시간 구독)
+│       ├── ClassRosterTab.tsx      # 반 명단(신청자 취합) — 장결자(jang)는 메인 그리드/집계에서 빼고 하단 별도 구역에 표시
+│       ├── TeachersTab.tsx         # 교사 참석
+│       ├── NotesTab.tsx            # 특이사항
+│       ├── CarpoolTab.tsx          # 카풀
+│       ├── PartialAttendanceTab.tsx # 부분참
+│       ├── InsuranceTab.tsx        # 여행자 보험
+│       ├── CancellationTab.tsx     # 취소명단
+│       ├── SuppliesTab.tsx         # 물품/간식
+│       ├── OnSiteRegistrationTab.tsx # 현장 등록
+│       ├── UnmatchedPaymentsTab.tsx  # 입금 미매칭
+│       ├── TshirtTab.tsx           # 단체티 신청
+│       ├── MedicalLogTab.tsx       # 의료 일지 (약 처방 기록, 프리셋 편집, 부서→학년→반 + 참가자 이름 자동완성)
+│       └── AutoAssignPanel.tsx     # 자동 조편성 패널
+├── context/
+│   ├── AuthContext.tsx             # Google OAuth, accessLevel 관리
+│   ├── UIContext.tsx               # toast(), uiConfirm() 전역 UI 유틸
+│   └── RetreatDataContext.tsx      # ⚠ 참가자/학생/셀색상 공유 Context (존재하나 현재 미사용 — 아래 주의사항 참조)
+└── lib/
+    ├── types.ts                    # 전체 타입 정의 (RetreatPeriod, RetreatAdminMember 포함)
+    ├── db.ts                       # Firebase CRUD 함수 전체 (유일한 Firebase 접근 레이어)
+    ├── firebase.ts                 # Firebase 초기화 (db, auth, googleProvider)
+    ├── sheetsParser.ts             # Google Sheets CSV 파싱 (parseCSV: 따옴표 내 줄바꿈 처리)
+    ├── sheetsParser.test.ts        # sheetsParser 단위 테스트
+    ├── studentMatcher.ts           # 신청자↔출석부 학생 9단계 매칭 (findStudent, normalizeName, stripSuffix)
+    ├── studentMatcher.test.ts      # studentMatcher 단위 테스트
+    ├── groupNumber.ts              # 조 전역 번호 표시 (groupDisplayName: 2부는 1부 조 개수만큼 이어서)
+    ├── groupNumber.test.ts         # groupNumber 단위 테스트
+    ├── exportUtils.ts              # xlsx 내보내기, printAsPDF
+    ├── exportUtils.test.ts         # exportUtils 단위 테스트
+    └── constants.ts                # 공통 상수 (TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS)
+
+루트 파일:
+- DO_NOT_DEPLOY.database.rules.json # 보관용 규칙 사본 (배포 금지 — 배포용 원천은 학생 앱)
+- vitest.config.ts                  # Vitest 설정 (globals: true, @ alias → src/)
+```
+
+---
+
+## Firebase DB 구조
+
+```
+retreats/
+  {retreatId}/
+    participants/         # Record<string, Participant> — 시트에서 가져온 신청자
+    groups/               # 조편성
+    rooms/                # 방배정
+    teachers/             # 교사 참석 현황
+    carpools/             # 카풀 요청
+    partialAttendances/   # 부분참 목록
+    supplies/             # 물품 목록
+    snacks/               # 간식 목록
+    onSiteReg/            # 현장 등록 (체크인 + 워크인)
+    tshirtOrders/         # 단체티 신청
+                          # ⚠ 민감 노드(cancellations/unmatchedPayments/medicalLogs)는 retreatsPrivate/{id}/ 로 이동됨
+    cellColors/           # 참가자 명단 셀 색상
+    milestones/           # 준비 일정 마일스톤 (공유 To-do) — { title, targetDate, done, note?, createdAt?, updatedAt?, sourceSite? }
+                          #   sourceSite: "retreat-admin"(행정) | "move-guide"(이가드). 이가드 사이트와 실시간 공유
+    iguard/               # 이가드 사이트 전용 데이터 (meals 등) — 행정 앱은 안 씀
+    periods/              # 수련회 기간 목록 (RetreatPeriod, 다부제 지원) — DB는 수련회별 소유지만
+                          #   화면(준비 일정 패널)은 모든 수련회의 기간을 항상 합쳐서 표시(아래 패턴 9 참조)
+
+classes/
+  {year}/
+    {classKey}/           # classKey 형식: "{부}-{학년}-{반}" (예: "1-2-3" = 1부 2학년 3반)
+      teacher: string
+      students: Record<studentId, { name, num?, phone?, jang? }>
+                          # jang: true = 장결자(장기결석) — 출석부 앱 시트동기화가 채움. ClassRosterTab이 분리 표시
+                          # ⚠ classes/attendance는 "출석부 앱"과 공유 노드 (보안규칙 admins/teacherClasses 기반)
+
+retreatsPrivate/          # 🔒 민감 데이터 — 이가드 멤버는 접근 불가 (admins/retreatAdmins만)
+  {retreatId}/            #    이가드가 retreats/{id} 전체를 읽으므로, 민감 노드는 이 형제 트리에 둔다.
+    cancellations/        #      취소명단(환불계좌)
+    unmatchedPayments/    #      입금 미매칭
+    medicalLogs/          #      의료 일지(증상·처방약)
+                          #    ⚠ teacherStaff/teachers의 idNumber(주민번호)는 아직 잔여 — 후속 분리 대상
+
+brainstorm/               # 💡 브레인스토밍 보드 (전역 공유, 수련회 무관 — 홈 화면 하단 캔버스)
+                          #   { title?, text, color, author, createdAt, updatedAt?, x?, y?, comments? }
+                          #   admins/retreatAdmins만 읽기/쓰기. 실시간 onValue 구독, 드래그 좌표는 가상 캔버스(1400x760) 기준
+admins/                   # uid → true (마스터 관리자, 멤버 승인/관리 권한)
+retreatAdmins/            # uid → { email, name?, approvedAt? } (행정 사이트 멤버) — 구버전 문자열도 normalize 처리
+retreatPending/           # uid → { email, name, requestedAt } (행정 승인 대기)
+iguardMembers/            # uid → true (이가드 사이트 멤버)
+iguardRoles/              # uid → "team" | "staff" (이가드 역할: staff=실행 탭만, 기획·정보 숨김)
+iguardPending/            # uid → { ... } (이가드 승인 대기)
+attendance/{year}/        # 출석 기록 (출석부 앱 소유)
+```
+
+### classKey / studentId 중요 규칙
+- classKey 파싱: `parts = classKey.split("-")` → `[buNum, grade, class]`
+- 1부/2부에 동일한 studentId가 존재할 수 있으므로, 컴포넌트에서 쓰는 uniqueKey = `"{buNum}_{studentId}"`
+- `getClassesByYear(year)` 를 통해 classes 노드 접근 (직접 Firebase 쿼리 금지)
+
+### 다중 사이트 연동 (행정 ↔ 이가드)
+- 행정 사이트(이 레포)와 **이가드 사이트(별도 레포)가 같은 Firebase 프로젝트를 공유**.
+- 공유 지점: `retreats/{id}/milestones`(준비일정 To-do, 양방향), `groups`/`rooms`(이가드는 읽기 전용 소비).
+- 이가드 고유 데이터는 `retreats/{id}/iguard/*` 네임스페이스에만 기록 — 행정 노드에 쓰지 말 것.
+- 멤버: 같은 `admins`/`retreatAdmins` 허용목록 재사용. 이가드는 `iguardMembers` + `iguardRoles`(team/staff).
+- ⚠ **Rules 배포는 학생 앱(`고등부 학생 출석부/database.rules.json`)에서만 실행한다.**
+  이 앱의 `firebase.json`은 학생 앱 rules 파일을 참조하도록 설정되어 있다.
+  `DO_NOT_DEPLOY.database.rules.json`은 보관용 사본이며 배포에 사용하지 않는다.
+- `classes`/`attendance`의 read 규칙은 admin·retreatAdmins·iguardMembers(전체) + 출석부 앱 교사는 본인 반만 — 이 앱은 `retreatAdmins`로 분류되므로 영향 없지만, 규칙 변경 시 이 분류가 깨지면 `getClassesByYear` 등 이 앱의 모든 학생 데이터 조회가 막힌다.
+
+### database.rules.json 주요 패턴
+- `teacherExtra` 규칙: classKey의 하이픈(`-`)을 언더스코어로 치환하기 위해 `.replace('-','_')` 3회 체인 사용 (Firebase RTDB는 정규식 replace 미지원)
+- `iguardRoles/$uid`: `.validate` 규칙으로 값을 `'staff'` 또는 `'team'`으로 제한
+- `partialAttendances/$studentKey`: `.validate`로 `type` 필수 + `'선복귀'`/`'후발대'` 값 제한, 알 수 없는 자식 키 차단(`$other: .validate: false`)
+- `milestones/$milestoneId`: 각 필드별 타입·길이·형식 validate 규칙 적용
+
+---
+
+## 핵심 코드 패턴
+
+### 1. snapToList — Firebase 역직렬화 헬퍼 (db.ts 내부 사용)
+```typescript
+function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
+  if (!snap.exists()) return [];
+  return Object.entries(snap.val()).map(([id, data]) => ({ id, ...(data as object) } as T));
+}
+```
+`Object.entries(snap.val()).map(...)` 패턴을 직접 쓰지 않고 이 헬퍼 사용.
+
+### 2. 에러 처리 패턴 (모든 탭 공통)
+```typescript
+const [loadError, setLoadError] = useState<string | null>(null);
+
+async function load() {
+  setLoading(true);
+  setLoadError(null);
+  try {
+    // 데이터 로드
+  } catch (e) {
+    setLoadError(e instanceof Error ? e.message : String(e));
+  } finally {
+    setLoading(false);
+  }
+}
+
+// JSX 상단에 에러 배너
+{loadError && (
+  <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+    ⚠ 로드 오류: {loadError}
+  </div>
+)}
+```
+
+### 3. 특이사항 저장 — race condition 방지
+```typescript
+// ✅ 올바른 방법: 경로 지정 업데이트
+await updateParticipantExtra(retreat.id, key, extraValue);
+
+// ❌ 잘못된 방법: 전체 덮어쓰기 → 동시 접근 시 race condition
+await saveParticipants(retreatId, updatedParticipants);
+```
+
+### 4. Auth 접근 레벨
+```typescript
+type AccessLevel = "none" | "member" | "admin";
+// "none"  → 접근 불가 (승인 요청 화면)
+// "member" → 수련회 데이터 읽기/쓰기 가능
+// "admin"  → 멤버 관리 (승인/거절) 추가 가능
+```
+
+### 5. Keep-alive 탭 패턴 (RetreatPageClient.tsx)
+자주 사용하는 탭(PARTICIPANTS, GROUPS, ROOMS, ROSTER)은 한 번 마운트되면 언마운트하지 않고 CSS `display` 토글로 보여주기/숨기기:
+```typescript
+const KEEP_ALIVE_TABS = new Set([0, 1, 2, 7]); // PARTICIPANTS, GROUPS, ROOMS, ROSTER
+const [mountedTabs, setMountedTabs] = useState<Set<number>>(new Set());
+
+// 탭 전환 시 mountedTabs에 추가 (한 번 추가되면 제거 안 함)
+// JSX: mountedTabs.has(idx) && <div style={{ display: tab === idx ? "block" : "none" }}>
+
+// 기타 탭: 기존 conditional render (tab === idx && <Component />)
+```
+이를 통해 Firebase 실시간 구독 재설정과 상태 초기화를 방지합니다.
+
+### 6. GroupComponents.tsx — 조편성 컴포넌트 분리
+GroupsTab에서 추출한 순수 UI 컴포넌트:
+- **GroupCard**: 조 카드 (교사/조장/스탭/GBS 편집, 학생 드래그앤드롭, 반별 그룹화 표시)
+- **UnassignedBySection**: 미배정 학생/교사를 부-학년-반별로 그룹화하여 표시
+- **StudentChip**: 드래그 가능한 학생 칩 (셀 색상 반영)
+- **TeacherChip**: 드래그 가능한 교사 칩 (참석 상태 색상 반영)
+- **StudentInfo**: Student 확장 인터페이스 (bu, participantKey 추가)
+
+### 7. 접근성(A11y) 패턴
+- **탭 네비게이션**: `role="tablist"` + `role="tab"` + `aria-selected` (대그룹·소그룹 탭 모두 적용)
+- **탭 패널**: `role="tabpanel"` + `id="tab-content-panel"` (탭 `aria-controls`와 연결)
+- **모달**: `role="dialog"` + `aria-modal="true"` + `aria-label` + ESC 키 닫기 (`onKeyDown`)
+- **아이콘 버튼**: `aria-label` 필수 (예: `aria-label="조 편집"`, `aria-label="조 삭제"`, `aria-label="교사명 제거"`)
+
+### 8. MAIN_ADMIN 환경변수 (page.tsx)
+```typescript
+const MAIN_ADMIN = {
+  name: process.env.NEXT_PUBLIC_MAIN_ADMIN_NAME ?? "관리자",
+  email: process.env.NEXT_PUBLIC_MAIN_ADMIN_EMAIL ?? "",
+};
+```
+하드코딩 대신 환경변수에서 읽음. Vercel 및 `.env.local`에 설정 필요.
+
+### 9. 수련회 기간(periods) — DB는 수련회별 소유, 화면은 전체 합산 표시
+
+`retreats/{retreatId}/periods`는 DB 구조상 수련회별로 분리(다부제 지원)돼 있지만, "준비 일정" 패널은 **어느 수련회를 선택했든 모든 수련회의 기간을 항상 같이** 보여준다(마일스톤과 동일 패턴). `db.ts`의 `subscribeToAllRetreatPeriods(retreatIds, cb)`가 전체 수련회 ID에 대해 각각 구독 후 merge하고, 각 기간에 `retreatId`(소유 수련회) 태그를 붙인 `RetreatPeriodWithOwner` 타입으로 반환한다.
+
+```typescript
+// "+ 기간 추가"는 사이드바에서 선택된 수련회 쪽에 씀(retreat.id)
+// 수정/삭제는 그 기간이 원래 속한 period.retreatId를 써야 함
+// 선택된 수련회 ID로 잘못 쓰면 다른 수련회에 기간이 복제되는 버그가 됨
+await updateRetreatPeriod(period.retreatId, period.id, data);  // ✅
+await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — period가 다른 수련회 소유일 수 있음
+```
+
+`getEarliestPeriodDateByRetreat(retreatIds)`(일회성 `get()`)는 각 수련회의 가장 이른 기간 시작일을 구해, 홈 화면의 수련회 목록을 **행사 날짜 최신순**(생성일이 아니라 실제 열리는 날짜 기준)으로 정렬하는 데 쓴다. 기간이 아직 없는 수련회는 `createdAt`으로 폴백.
+
+### 10. UpdateBanner — 새 배포 감지 (서비스워커 없이)
+
+학생 출석부 앱과 달리 이 앱은 PWA가 아니라 서비스워커를 새로 도입하는 리스크를 피하고, **빌드 ID 폴링** 방식을 쓴다:
+- `next.config.ts`가 `process.env.VERCEL_GIT_COMMIT_SHA`(로컬은 `Date.now()` 폴백)를 `NEXT_PUBLIC_BUILD_ID`로 빌드 시점에 클라이언트 번들에 박아넣음
+- `/api/version`(`force-dynamic`)이 **현재 배포 중인** 빌드의 ID를 매 요청마다 반환
+- `UpdateBanner`가 5분마다 + 탭 visibility 변경 시 `/api/version`을 폴링해, 페이지 로드 시점 ID와 다르면 "새 버전이 있습니다" 배너 표시
+
+---
+
+## 테스트
+
+```bash
+# 전체 테스트 실행
+npm test          # = vitest run
+
+# watch 모드
+npx vitest
+```
+
+테스트 파일 위치: `src/lib/*.test.ts` (순수 로직 유닛 테스트)
+- `studentMatcher.test.ts` — 이름 정규화, 9단계 매칭 로직
+- `sheetsParser.test.ts` — CSV 파싱 (따옴표 내 줄바꿈 등)
+- `exportUtils.test.ts` — xlsx 내보내기 유틸
+- `groupNumber.test.ts` — 조 번호 연속 표시 로직
+
+설정: `vitest.config.ts` — `globals: true`, `@` alias → `src/`
+
+---
+
+## ⚠ RetreatDataContext.tsx — 미사용 상태 (향후 최적화 대상)
+
+`src/context/RetreatDataContext.tsx`는 참가자/학생/셀 색상을 공유하는 Context로 작성되었으나, **현재 RetreatPageClient에서 사용하지 않습니다.** Permission denied 문제로 제거되었으며, 각 탭이 독립적으로 데이터를 로드합니다.
+
+향후 최적화 시 이 Context를 다시 연결하면 탭 간 중복 Firebase 구독을 줄일 수 있습니다.
+
+---
+
+## 절대 하지 말 것
+
+1. **컴포넌트에서 Firebase 직접 import 금지**
+   ```typescript
+   // ❌ 금지
+   import { db } from "@/lib/firebase";
+   import { get, ref } from "firebase/database";
+   
+   // ✅ 반드시 db.ts 함수만 사용
+   import { getClassesByYear } from "@/lib/db";
+   ```
+
+2. **saveParticipants()로 전체 participants 덮어쓰기 금지**
+   → 단일 필드 수정은 항상 `updateParticipantExtra()` 또는 경로 지정 업데이트 사용
+
+3. **TypeScript 에러 있는 상태로 배포 금지**
+   → 배포 전 `npx tsc --noEmit` 으로 0 errors 확인 필수
+
+4. **불필요한 패키지 추가 금지**
+   → 현재 의존성 최소화 유지
+   → 새 패키지 추가 전 기존 라이브러리로 해결 가능한지 먼저 검토
+
+5. **Object.entries(snap.val()).map(...)** 직접 사용 금지 → `snapToList<T>(snap)` 사용
+
+---
+
+## 구글 시트 연동 규칙
+
+시트 열 순서 (A~D는 고정, 변경 불가):
+| 열 | 내용 |
+|---|---|
+| A | 타임스탬프 (자동 생성) |
+| B | 이름 |
+| C | 성별 (`남` / `여` 정확히 두 글자) |
+| D | 부서 (`1부` / `2부`) |
+| E+ | 학년, 반, 연락처 등 (키워드로 자동 인식) |
+
+- 시트는 "웹에 게시" (File → Share → Publish to web → CSV) 필요
+- `fetchSheetCSV(sheetId, gid)` → raw rows 반환
+- `fetchSheetParticipants(sheetId, gid)` → `Participant[]` 반환
+
+---
+
+## 개발 & 배포
+
+```bash
+# 개발 서버
+npm run dev
+
+# TypeScript 타입 체크 (배포 전 필수)
+npx tsc --noEmit
+
+# 테스트
+npm test
+
+# 프로덕션 배포
+npx vercel --prod --yes
+```
+
+배포 URL: **https://retreat-app-theta.vercel.app**
+
+---
+
+## 탭 구조 (RetreatPageClient.tsx)
+
+탭 인덱스는 `TAB_IDX` 상수로 관리 (`RetreatPageClient.tsx` 상단):
+
+```typescript
+const TAB_IDX = {
+  PARTICIPANTS: 0, GROUPS: 1, ROOMS: 2, NOTES: 3, TEACHERS: 4,
+  CARPOOL: 5, PARTIAL: 6, ROSTER: 7, INSURANCE: 8, CANCELLATION: 9,
+  SUPPLIES: 10, ONSITE: 11, PAYMENTS: 12, TSHIRT: 13, MEDICAL: 14,
+} as const;
+```
+
+탭 그룹 구조 (`TAB_GROUPS`): 대그룹 → 소그룹 2계층. 대그룹 탭은 `role="tablist" aria-label="탭 그룹"`, 소그룹 탭은 `role="tablist" aria-label="세부 탭"`.
+
+| 그룹 | 탭 | TAB_IDX 키 | keep-alive |
+|---|---|---|---|
+| 사전 준비 | 시트 연동 | PARTICIPANTS (0) | ✅ |
+| | 신청자 취합 | ROSTER (7) | ✅ |
+| | 미납자 현황 | PAYMENTS (12) | |
+| | 단체티 신청 | TSHIRT (13) | |
+| | 취소명단 | CANCELLATION (9) | |
+| | 여행자 보험 | INSURANCE (8) | |
+| | 조편성 | GROUPS (1) | ✅ |
+| | 방배정 | ROOMS (2) | ✅ |
+| | 교사 참석 | TEACHERS (4) | |
+| | 물품/간식 | SUPPLIES (10) | |
+| 현장 준비 | 카풀 | CARPOOL (5) | |
+| | 부분 참석 | PARTIAL (6) | |
+| | 현장 등록 | ONSITE (11) | |
+| | 의료 일지 | MEDICAL (14) | |
+| | 특이사항 | NOTES (3) | |
+
+(이전엔 "참가자 명단"이 별도 "사이트 셋팅" 그룹이었으나, 실제 사전 준비의 첫 단계(시트 연동·DB 매칭)라 "신청자 취합"과 헷갈리지 않도록 이름을 "시트 연동"으로 바꾸고 "사전 준비" 그룹 맨 앞으로 옮김.)
+
+### layout.tsx — dangerouslySetInnerHTML
+`<head>`에 인라인 스크립트(`dangerouslySetInnerHTML`)가 있음. 카카오톡/네이버 등 인앱 브라우저에서 Firebase Auth가 작동하지 않으므로, 페이지 로드 즉시 외부 브라우저로 리다이렉트합니다. 정적 문자열이며 사용자 입력을 포함하지 않습니다.

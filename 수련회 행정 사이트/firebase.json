@@ -1,0 +1,5 @@
+{
+  "database": {
+    "rules": "../고등부 학생 출석부/database.rules.json"
+  }
+}
