@@ -1,8 +1,25 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Retreat, MealCountData, MealSlot, MealAdjustment, MealRoleCounts, RetreatPeriod } from "@/lib/types";
-import { getMealCount, saveMealCount, getParticipants, getCellColors, getTeachers, subscribeToRetreatPeriods } from "@/lib/db";
+import {
+  Retreat, MealCountData, MealSlot, MealAdjustment, MealRoleCounts, MealPersonAssignment, MealRole,
+  RetreatPeriod, TeacherAttendance, Participant,
+} from "@/lib/types";
+import {
+  getMealCount, saveMealCount, getParticipants, getCellColors, getTeachers,
+  getPartialAttendances, subscribeToRetreatPeriods,
+} from "@/lib/db";
 import { useUI } from "@/context/UIContext";
+
+// DB에서 끌어온 후발/선복귀 대상자 한 명 (교사 부분참 · 스탭 후발대/부분참 · 학생 부분참)
+interface DbPerson {
+  key: string;          // "t_{teacherId}" | "s_{studentKey}"
+  role: MealRole;       // staff | teacher | student
+  bu: string;           // "1부" | "2부" | "스탭"
+  name: string;
+  affiliation: string;  // 반/직함 표시용
+  detail: string;       // 일정 텍스트 (arrivalInfo / lateArrival / 부분참 note)
+  defaultKind: "후발" | "선복귀";
+}
 
 interface Props { retreat: Retreat; }
 
@@ -64,11 +81,32 @@ export default function MealCountTab({ retreat }: Props) {
   const [extraLabel, setExtraLabel] = useState("음향/조명");
   const [meals, setMeals] = useState<MealSlot[]>([]);
   const [adjustments, setAdjustments] = useState<MealAdjustment[]>([]);
+  const [personAssignments, setPersonAssignments] = useState<Record<string, MealPersonAssignment>>({});
   const [periods, setPeriods] = useState<RetreatPeriod[]>([]);
   const [suggesting, setSuggesting] = useState(false);
 
+  // DB 명단 원본 (교사/스탭 + 학생 부분참)
+  const [dbTeachers, setDbTeachers] = useState<TeacherAttendance[]>([]);
+  const [dbParticipants, setDbParticipants] = useState<Record<string, Participant>>({});
+  const [dbPartials, setDbPartials] = useState<{ id: string; type: "선복귀" | "후발대"; note?: string }[]>([]);
+  const [dbListError, setDbListError] = useState<string | null>(null);
+
   // 새 끼니 추가 입력
   const [newMeal, setNewMeal] = useState({ date: "", name: "점심" });
+
+  const loadDbList = useCallback(async () => {
+    setDbListError(null);
+    try {
+      const [teachers, parts, partials] = await Promise.all([
+        getTeachers(retreat.id), getParticipants(retreat.id), getPartialAttendances(retreat.id),
+      ]);
+      setDbTeachers(teachers);
+      setDbParticipants(parts);
+      setDbPartials(partials);
+    } catch (e) {
+      setDbListError(e instanceof Error ? e.message : String(e));
+    }
+  }, [retreat.id]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,13 +118,15 @@ export default function MealCountTab({ retreat }: Props) {
         setExtraLabel(data.extraLabel ?? "음향/조명");
         setMeals(sortMeals(data.meals || []));
         setAdjustments(data.adjustments || []);
+        setPersonAssignments(data.personAssignments || {});
       }
+      await loadDbList();
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [retreat.id]);
+  }, [retreat.id, loadDbList]);
 
   useEffect(() => {
     void load();
@@ -97,7 +137,7 @@ export default function MealCountTab({ retreat }: Props) {
   async function handleSave() {
     setSaving(true);
     try {
-      await saveMealCount(retreat.id, { base, extraLabel, meals, adjustments });
+      await saveMealCount(retreat.id, { base, extraLabel, meals, adjustments, personAssignments });
       setDirty(false);
       toast("식수 계산을 저장했습니다.", "success");
     } catch (e) {
@@ -173,11 +213,54 @@ export default function MealCountTab({ retreat }: Props) {
     setDirty(true);
   }
 
+  // ── DB 명단 (교사 부분참 · 스탭 후발대/부분참 · 학생 부분참) ──
+  const dbPersons = useMemo<DbPerson[]>(() => {
+    const out: DbPerson[] = [];
+    // 교사/스탭 — 교사 참석 탭의 "부분 참석/후발대 일정 요약"과 동일 기준
+    dbTeachers.forEach(t => {
+      const isStaff = t.bu === "스탭";
+      const isTarget = t.status === "부분참" || (isStaff && t.corps === "후발대" && t.status !== "불참");
+      if (!isTarget || !t.name?.trim()) return;
+      const detail = [t.arrivalInfo, t.lateArrival && `입소 ${t.lateArrival}`].filter(Boolean).join(" · ");
+      out.push({
+        key: `t_${t.id}`,
+        role: isStaff ? "staff" : "teacher",
+        bu: t.bu, name: t.name.trim(), affiliation: t.classKey || (isStaff ? "스탭" : ""),
+        detail, defaultKind: "후발",
+      });
+    });
+    // 학생 — 부분 참석 탭 데이터
+    dbPartials.forEach(p => {
+      const part = dbParticipants[p.id];
+      out.push({
+        key: `s_${p.id}`,
+        role: "student",
+        bu: part?.bu || "?", name: part?.name || `(명단 미매칭: ${p.id})`,
+        affiliation: part ? `${part.grade}학년 ${part.class}반` : "",
+        detail: p.note || "",
+        defaultKind: p.type === "선복귀" ? "선복귀" : "후발",
+      });
+    });
+    // 부(1부→2부→스탭) → 이름순 정렬
+    const buOrder = (b: string) => b === "1부" ? 0 : b === "2부" ? 1 : b === "스탭" ? 2 : 3;
+    return out.sort((a, b) => buOrder(a.bu) - buOrder(b.bu) || a.name.localeCompare(b.name, "ko"));
+  }, [dbTeachers, dbParticipants, dbPartials]);
+
+  function getAssignment(p: DbPerson): MealPersonAssignment {
+    return personAssignments[p.key] ?? { kind: p.defaultKind };
+  }
+
+  function updateAssignment(p: DbPerson, patch: Partial<MealPersonAssignment>) {
+    setPersonAssignments(prev => ({ ...prev, [p.key]: { ...getAssignment(p), ...patch } }));
+    setDirty(true);
+  }
+
   // ── 끼니별 계산 ────────────────────────────────────────
   const mealIndexById = useMemo(() => new Map(meals.map((m, i) => [m.id, i])), [meals]);
 
   const mealRows = useMemo(() => meals.map((meal, idx) => {
     const counts: MealRoleCounts = { ...base };
+    // 수동 조정 그룹
     adjustments.forEach(adj => {
       const refIdx = mealIndexById.get(adj.mealId);
       if (refIdx === undefined) return; // 참조 끼니가 삭제됨 — 계산에서 제외 (아래 경고 표시)
@@ -189,8 +272,17 @@ export default function MealCountTab({ retreat }: Props) {
         counts.extra -= adj.counts.extra || 0;
       }
     });
+    // DB 명단 개인별 지정 (현재 명단에 있는 사람만 반영 — 삭제된 대상의 잔여 지정은 무시)
+    dbPersons.forEach(p => {
+      const a = personAssignments[p.key];
+      if (!a || a.skip || !a.mealId) return;
+      const refIdx = mealIndexById.get(a.mealId);
+      if (refIdx === undefined) return;
+      const excluded = a.kind === "후발" ? idx < refIdx : idx > refIdx;
+      if (excluded) counts[p.role] -= 1;
+    });
     return { meal, counts, total: sumCounts(counts) };
-  }), [meals, base, adjustments, mealIndexById]);
+  }), [meals, base, adjustments, mealIndexById, dbPersons, personAssignments]);
 
   const orphanAdjustments = adjustments.filter(a => !mealIndexById.has(a.mealId));
   const baseTotal = sumCounts(base);
@@ -301,6 +393,76 @@ export default function MealCountTab({ retreat }: Props) {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-slate-700">③ 후발 · 선복귀 조정</h3>
+          <button onClick={() => void loadDbList().then(() => toast("명단을 새로고침했습니다.", "success"))}
+            className="btn-secondary text-xs px-3 py-1.5">🔄 DB 명단 새로고침</button>
+        </div>
+
+        {/* ③-a DB 명단 — 교사 참석·부분 참석 탭의 데이터를 자동으로 끌어옴 */}
+        <div className="mb-5">
+          <h4 className="text-sm font-semibold text-slate-600 mb-1">
+            DB 명단 <span className="font-normal text-slate-400">(교사 부분참 · 스탭 후발대 · 학생 부분참 — {dbPersons.length}명)</span>
+          </h4>
+          <p className="text-xs text-slate-400 mb-2">
+            각 사람의 <strong>{`후발=첫 식사 / 선복귀=마지막 식사`}</strong> 끼니를 지정하면 표에서 1명씩 자동 차감됩니다.
+            식사에 영향 없으면 &ldquo;제외&rdquo;를 체크하세요. 여기 반영한 사람은 아래 수동 그룹에 중복으로 넣지 마세요.
+          </p>
+          {dbListError && (
+            <div className="mb-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">⚠ 명단 로드 오류: {dbListError}</div>
+          )}
+          {dbPersons.length === 0 ? (
+            <p className="text-sm text-slate-400">대상자가 없습니다. (교사 참석 탭의 부분참/후발대, 부분 참석 탭의 학생이 여기 나타납니다)</p>
+          ) : (
+            <>
+              {(() => {
+                const unassigned = dbPersons.filter(p => { const a = personAssignments[p.key]; return !a?.skip && !a?.mealId; }).length;
+                return unassigned > 0 && (
+                  <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-700">
+                    ⚠ 끼니 미지정 {unassigned}명은 아직 계산에 반영되지 않았습니다.
+                  </div>
+                );
+              })()}
+              <div className="space-y-1">
+                {dbPersons.map(p => {
+                  const a = getAssignment(p);
+                  const applied = !a.skip && !!a.mealId && mealIndexById.has(a.mealId);
+                  return (
+                    <div key={p.key}
+                      className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 text-xs ${
+                        a.skip ? "border-slate-100 bg-slate-50 opacity-60" : applied ? "border-emerald-100 bg-emerald-50/40" : "border-amber-200 bg-amber-50/40"
+                      }`}>
+                      <span className={`tag text-[10px] ${p.bu === "1부" ? "tag-green" : p.bu === "2부" ? "tag-purple" : "tag-blue"}`}>{p.bu}</span>
+                      <span className="font-medium text-slate-700">{p.name}</span>
+                      <span className="text-slate-400">{p.affiliation}</span>
+                      {p.detail && <span className="text-slate-400">· {p.detail}</span>}
+                      <div className="ml-auto flex items-center gap-1.5">
+                        <select className="input text-xs py-0.5 w-[76px]" value={a.kind} aria-label={`${p.name} 유형`}
+                          onChange={e => updateAssignment(p, { kind: e.target.value as "후발" | "선복귀" })}>
+                          <option value="후발">후발</option>
+                          <option value="선복귀">선복귀</option>
+                        </select>
+                        <select className="input text-xs py-0.5 w-[150px]" value={a.mealId ?? ""} aria-label={`${p.name} 기준 끼니`}
+                          disabled={a.skip}
+                          onChange={e => updateAssignment(p, { mealId: e.target.value || undefined })}>
+                          <option value="">{a.kind === "후발" ? "첫 식사 선택…" : "마지막 식사 선택…"}</option>
+                          {meals.map(m => <option key={m.id} value={m.id}>{fmtDate(m.date)} {m.name}</option>)}
+                        </select>
+                        <label className="flex items-center gap-1 text-slate-400 whitespace-nowrap">
+                          <input type="checkbox" checked={!!a.skip}
+                            onChange={e => updateAssignment(p, { skip: e.target.checked })} />
+                          제외
+                        </label>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ③-b 수동 그룹 — DB에 없는 인원(외부 인력 등)용 */}
+        <div className="flex items-center justify-between mb-2 border-t border-slate-100 pt-4">
+          <h4 className="text-sm font-semibold text-slate-600">수동 그룹 <span className="font-normal text-slate-400">(DB에 없는 인원용)</span></h4>
           <div className="flex gap-1.5">
             <button onClick={() => addAdjustment("후발")} className="btn-secondary text-xs px-3 py-1.5">＋ 후발 그룹</button>
             <button onClick={() => addAdjustment("선복귀")} className="btn-secondary text-xs px-3 py-1.5">＋ 선복귀 그룹</button>
@@ -313,7 +475,7 @@ export default function MealCountTab({ retreat }: Props) {
         )}
         {adjustments.length === 0 ? (
           <p className="text-sm text-slate-400">
-            조정 항목이 없습니다. 예: &ldquo;금 저녁 후발&rdquo; 그룹을 추가하고 첫 식사를 토 아침으로 지정하면 금요일 끼니에서 자동 차감됩니다.
+            수동 그룹이 없습니다. 예: &ldquo;금 저녁 후발&rdquo; 그룹을 추가하고 첫 식사를 토 아침으로 지정하면 금요일 끼니에서 자동 차감됩니다.
             같은 그룹이라도 마지막 식사가 다르면(예: 학생은 저녁 먹고 감) 항목을 나눠 입력하세요.
           </p>
         ) : (

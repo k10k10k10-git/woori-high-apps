@@ -214,11 +214,19 @@ export interface MealAdjustment {
   note?: string;
 }
 
+// DB 명단(교사 부분참·스탭 후발대·학생 부분참) 개인별 끼니 지정 — 키: "t_{teacherId}" | "s_{studentKey}"
+export interface MealPersonAssignment {
+  kind: "후발" | "선복귀";
+  mealId?: string;   // 후발=첫 식사, 선복귀=마지막 식사 끼니 id — 미지정이면 계산에 반영 안 됨
+  skip?: boolean;    // 식수 계산에서 제외 (식사 영향 없음)
+}
+
 export interface MealCountData {
   base?: MealRoleCounts;        // 기준 인원 (전원 참석 시)
   extraLabel?: string;          // 기타 인원 설명 (예: "음향/조명")
   meals?: MealSlot[];           // 끼니 목록 (기간에서 기본 생성 + 수동 편집)
   adjustments?: MealAdjustment[];
+  personAssignments?: Record<string, MealPersonAssignment>;
   updatedAt?: number;
 }
 
