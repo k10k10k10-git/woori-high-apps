@@ -10,7 +10,7 @@ const mockWrite = vi.fn();
 const mockClose = vi.fn();
 const mockAddEventListener = vi.fn();
 
-import { saveWorkbook, printAsPDF } from "./exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG, rowsToHtmlTable } from "./exportUtils";
 
 describe("exportUtils", () => {
   it("saveWorkbook is a function", () => {
@@ -43,5 +43,24 @@ describe("exportUtils", () => {
     expect(mockWrite).toHaveBeenCalled();
     expect(mockClose).toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it("exportAsJPG is a function", () => {
+    expect(typeof exportAsJPG).toBe("function");
+  });
+
+  it("rowsToHtmlTable renders a header row per object key", () => {
+    const html = rowsToHtmlTable("제목", "부제", [{ 이름: "김철수", 나이: 17 }]);
+    expect(html).toContain("<th");
+    expect(html).toContain("이름");
+    expect(html).toContain("나이");
+    expect(html).toContain("김철수");
+    expect(html).toContain("17");
+  });
+
+  it("rowsToHtmlTable handles an empty row list without throwing", () => {
+    const html = rowsToHtmlTable("제목", "부제", []);
+    expect(html).toContain("제목");
+    expect(html).not.toContain("<table");
   });
 });

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
 import { getTeachers, getTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
 import * as XLSX from "xlsx";
-import { saveWorkbook, printAsPDF } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 
@@ -117,11 +117,11 @@ export default function InsuranceTab({ retreat }: Props) {
     saveWorkbook(wb, `${retreat.name}_여행자보험`);
   }
 
-  function exportPDF() {
+  function buildInsuranceHtml() {
     const rows = filteredInsured.map((e, i) =>
       `<tr><td>${i + 1}</td><td>${e.type}</td><td>${e.name}</td><td>${e.bu}</td><td>${e.grade > 0 ? `${e.grade}학년 ${e.cls}반` : "-"}</td><td>${e.idNumber}</td></tr>`
     ).join("");
-    const html = `
+    return `
       <h1>${retreat.name} 여행자 보험 신청자 명단</h1>
       <p class="subtitle">총 ${filteredInsured.length}명 · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
       <table>
@@ -129,8 +129,17 @@ export default function InsuranceTab({ retreat }: Props) {
         <tbody>${rows}</tbody>
       </table>
     `;
-    if (!printAsPDF(html, `${retreat.name}_여행자보험`)) {
+  }
+
+  function exportPDF() {
+    if (!printAsPDF(buildInsuranceHtml(), `${retreat.name}_여행자보험`)) {
       toast("팝업이 차단되어 PDF를 열 수 없습니다. 브라우저 팝업 허용을 확인해주세요.", "error");
+    }
+  }
+
+  async function exportJPG() {
+    if (!await exportAsJPG(buildInsuranceHtml(), `${retreat.name}_여행자보험`)) {
+      toast("JPG 저장에 실패했습니다.", "error");
     }
   }
 
@@ -156,6 +165,7 @@ export default function InsuranceTab({ retreat }: Props) {
         <div className="flex gap-2">
           <button onClick={exportXLSX} disabled={allInsured.length === 0} className="btn-secondary text-xs">📥 XLSX</button>
           <button onClick={exportPDF} disabled={allInsured.length === 0} className="btn-secondary text-xs">🖨️ PDF</button>
+          <button onClick={exportJPG} disabled={allInsured.length === 0} className="btn-secondary text-xs">🖼️ JPG</button>
           <button onClick={loadData} className="btn-secondary text-xs">🔄 새로고침</button>
         </div>
       </div>

@@ -4,7 +4,7 @@ import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/t
 import { saveGroups, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook, printAsPDF } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
 import AutoAssignPanel from "./AutoAssignPanel";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName } from "@/lib/groupNumber";
@@ -345,7 +345,7 @@ export default function GroupsTab({ retreat }: Props) {
     saveWorkbook(wb, `${retreat.name}_조편성`);
   }
 
-  function exportGroupsPDF() {
+  function buildGroupsHtml() {
     const buList = [...new Set(groups.map(g => g.bu))].sort();
     const studentByName = Object.fromEntries(Object.values(students).map(s => [s.name, s]));
 
@@ -549,8 +549,18 @@ export default function GroupsTab({ retreat }: Props) {
       html += `</div>`; // .pg
     });
 
-    if (!printAsPDF(html, `${retreat.name}_조편성`)) {
+    return html;
+  }
+
+  function exportGroupsPDF() {
+    if (!printAsPDF(buildGroupsHtml(), `${retreat.name}_조편성`)) {
       toast("팝업이 차단되어 PDF를 열 수 없습니다. 브라우저 팝업 허용을 확인해주세요.", "error");
+    }
+  }
+
+  async function exportGroupsJPG() {
+    if (!await exportAsJPG(buildGroupsHtml(), `${retreat.name}_조편성`)) {
+      toast("JPG 저장에 실패했습니다.", "error");
     }
   }
 
@@ -654,6 +664,7 @@ export default function GroupsTab({ retreat }: Props) {
           >취소자 제거</button>
           <button onClick={exportGroupsXLSX} disabled={groups.length === 0} className="btn-secondary btn-sm">📥 XLSX</button>
           <button onClick={exportGroupsPDF} disabled={groups.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
+          <button onClick={exportGroupsJPG} disabled={groups.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
           <button onClick={() => setShowAddGroup(true)} className="btn-secondary btn-sm">＋ 조 추가</button>
           <span className={`text-xs font-medium px-2 hidden sm:inline ${saving ? "text-blue-500" : isDirty ? "text-amber-500" : "text-green-500"}`}>
             {saving ? "저장 중..." : isDirty ? "편집 중..." : "✓ 저장됨"}

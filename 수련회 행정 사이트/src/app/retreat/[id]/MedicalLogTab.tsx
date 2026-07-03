@@ -6,7 +6,7 @@ import {
   getMedicinePresets, saveMedicinePresets, getParticipants,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook } from "@/lib/exportUtils";
+import { saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
 import * as XLSX from "xlsx";
 
 const OUTCOME_PRESETS = ["약 처방 후 복귀", "휴식 권고", "보호자 연락", "병원 이송", "관찰 중"];
@@ -290,9 +290,8 @@ export default function MedicalLogTab({ retreat }: Props) {
     }
   }, [retreat.id, toast]);
 
-  function handleExport() {
-    if (logs.length === 0) return toast("내보낼 기록이 없습니다.", "warning");
-    const rows = logs.map(l => ({
+  function buildMedicalLogRows() {
+    return logs.map(l => ({
       "시각":      formatTime(l.createdAt),
       "이름":      l.name,
       "부서":      l.bu ?? "",
@@ -303,11 +302,23 @@ export default function MedicalLogTab({ retreat }: Props) {
       "처리 결과": l.outcome,
       "메모":      l.note ?? "",
     }));
-    const ws = XLSX.utils.json_to_sheet(rows);
+  }
+
+  function handleExport() {
+    if (logs.length === 0) return toast("내보낼 기록이 없습니다.", "warning");
+    const ws = XLSX.utils.json_to_sheet(buildMedicalLogRows());
     ws["!cols"] = [10, 8, 6, 4, 4, 30, 20, 12, 20].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "의료일지");
     saveWorkbook(wb, `${retreat.name}_의료일지`);
+  }
+
+  async function handleExportJPG() {
+    if (logs.length === 0) return toast("내보낼 기록이 없습니다.", "warning");
+    const html = rowsToHtmlTable(`${retreat.name} 의료 일지`, `총 ${logs.length}건 · 출력일: ${new Date().toLocaleDateString("ko-KR")}`, buildMedicalLogRows());
+    if (!await exportAsJPG(html, `${retreat.name}_의료일지`, true)) {
+      toast("JPG 저장에 실패했습니다.", "error");
+    }
   }
 
   async function handleSave() {
@@ -422,7 +433,10 @@ export default function MedicalLogTab({ retreat }: Props) {
         </div>
         <div className="flex gap-2">
           {logs.length > 0 && (
-            <button onClick={handleExport} className="btn-secondary text-sm">↓ 엑셀</button>
+            <>
+              <button onClick={handleExport} className="btn-secondary text-sm">↓ 엑셀</button>
+              <button onClick={handleExportJPG} className="btn-secondary text-sm">🖼️ JPG</button>
+            </>
           )}
           <button onClick={() => { setForm(EMPTY_FORM); setShowForm(true); }} className="btn-primary text-sm">
             ＋ 기록 추가

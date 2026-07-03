@@ -9,7 +9,7 @@ import {
   replaceSheetTshirtOrders,
 } from "@/lib/db";
 import * as XLSX from "xlsx";
-import { saveWorkbook } from "@/lib/exportUtils";
+import { saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 
@@ -189,8 +189,8 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
   }
 
   // ── 엑셀 다운로드 ─────────────────────────────────────────
-  function exportXLSX() {
-    const data = filtered.map((o, i) => ({
+  function buildTshirtRows() {
+    return filtered.map((o, i) => ({
       "번호": i + 1,
       "이름": o.name,
       "부":   o.bu,
@@ -201,7 +201,10 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
       "메모":   o.note || "",
       "출처":   o.source === "sheet" ? "시트" : "수동",
     }));
-    const ws = XLSX.utils.json_to_sheet(data);
+  }
+
+  function exportXLSX() {
+    const ws = XLSX.utils.json_to_sheet(buildTshirtRows());
     ws["!cols"] = [
       { wch: 5 }, { wch: 10 }, { wch: 5 }, { wch: 7 }, { wch: 5 },
       { wch: 8 }, { wch: 10 }, { wch: 16 }, { wch: 6 },
@@ -209,6 +212,14 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "단체티 신청");
     saveWorkbook(wb, `${retreat.name}_단체티신청`);
+  }
+
+  async function exportJPG() {
+    if (filtered.length === 0) return toast("내보낼 항목이 없습니다.", "warning");
+    const html = rowsToHtmlTable(`${retreat.name} 단체티 신청`, `총 ${filtered.length}건 · 출력일: ${new Date().toLocaleDateString("ko-KR")}`, buildTshirtRows());
+    if (!await exportAsJPG(html, `${retreat.name}_단체티신청`, true)) {
+      toast("JPG 저장에 실패했습니다.", "error");
+    }
   }
 
   if (loading) return <div className="text-center text-slate-400 py-10">로딩 중...</div>;
@@ -241,6 +252,13 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
             className="btn-secondary text-xs"
           >
             📥 엑셀 다운로드
+          </button>
+          <button
+            onClick={exportJPG}
+            disabled={filtered.length === 0}
+            className="btn-secondary text-xs"
+          >
+            🖼️ JPG
           </button>
         </div>
       </div>

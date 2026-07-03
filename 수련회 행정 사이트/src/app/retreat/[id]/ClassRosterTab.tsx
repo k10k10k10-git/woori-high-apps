@@ -4,7 +4,7 @@ import { Retreat, Participant } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
 import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear } from "@/lib/db";
 import * as XLSX from "xlsx";
-import { saveWorkbook, printAsPDF } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
@@ -399,7 +399,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     saveWorkbook(wb, `${retreat.name}_신청자취합_${bu}`);
   }
 
-  function exportRosterPDF() {
+  function buildRosterHtml() {
     const isGreenBu = bu === "1부";
 
     // 학년 그룹별 colspan 계산
@@ -459,7 +459,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       <span style="width:12px;height:12px;background:${l.bg};border-radius:2px;display:inline-block"></span>${l.label}
     </span>`).join("");
 
-    const html = `
+    return `
       <h1 style="margin:0 0 2px;font-size:14px">${retreat.name} 신청자 취합 (${bu})</h1>
       <p style="font-size:10px;color:#888;margin:0 0 6px">총 ${stats.total}명 (남 ${stats.male} / 여 ${stats.female}) · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
       <div style="margin-bottom:8px">${legendItems}</div>
@@ -472,8 +472,17 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
         <tbody>${bodyRows}</tbody>
       </table>
     `;
-    if (!printAsPDF(html, `${retreat.name}_신청자취합_${bu}`, true)) {
+  }
+
+  function exportRosterPDF() {
+    if (!printAsPDF(buildRosterHtml(), `${retreat.name}_신청자취합_${bu}`, true)) {
       toast("팝업이 차단되어 PDF를 열 수 없습니다. 브라우저 팝업 허용을 확인해주세요.", "error");
+    }
+  }
+
+  async function exportRosterJPG() {
+    if (!await exportAsJPG(buildRosterHtml(), `${retreat.name}_신청자취합_${bu}`, true)) {
+      toast("JPG 저장에 실패했습니다.", "error");
     }
   }
 
@@ -576,6 +585,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
         <div className="flex gap-2 ml-auto">
           <button onClick={exportRosterXLSX} disabled={visibleClasses.length === 0} className="btn-secondary text-xs">📥 XLSX</button>
           <button onClick={exportRosterPDF} disabled={visibleClasses.length === 0} className="btn-secondary text-xs">🖨️ PDF</button>
+          <button onClick={exportRosterJPG} disabled={visibleClasses.length === 0} className="btn-secondary text-xs">🖼️ JPG</button>
         </div>
       </div>
 

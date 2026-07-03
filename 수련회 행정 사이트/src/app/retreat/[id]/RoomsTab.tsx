@@ -4,7 +4,7 @@ import { Retreat, Room, Student, Participant, TeacherAttendance } from "@/lib/ty
 import { saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook, printAsPDF } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
 interface Props {
@@ -320,7 +320,7 @@ export default function RoomsTab({ retreat }: Props) {
     saveWorkbook(wb, `${retreat.name}_방배정`);
   }
 
-  function exportRoomsPDF() {
+  function buildRoomsHtml() {
     const typeList = [...new Set(rooms.map(r => r.type))].sort();
     const chip = (text: string, bg = "#eff6ff", border = "#bfdbfe", color = "#1e40af") =>
       `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:9999px;padding:1px 8px;font-size:10px;color:${color};margin:2px 2px 2px 0">${text}</span>`;
@@ -363,8 +363,18 @@ export default function RoomsTab({ retreat }: Props) {
       html += `</div>`;
     });
 
-    if (!printAsPDF(html, `${retreat.name}_방배정`)) {
+    return html;
+  }
+
+  function exportRoomsPDF() {
+    if (!printAsPDF(buildRoomsHtml(), `${retreat.name}_방배정`)) {
       toast("팝업이 차단되어 PDF를 열 수 없습니다. 브라우저 팝업 허용을 확인해주세요.", "error");
+    }
+  }
+
+  async function exportRoomsJPG() {
+    if (!await exportAsJPG(buildRoomsHtml(), `${retreat.name}_방배정`)) {
+      toast("JPG 저장에 실패했습니다.", "error");
     }
   }
 
@@ -460,6 +470,7 @@ export default function RoomsTab({ retreat }: Props) {
           >취소자 제거</button>
           <button onClick={exportRoomsXLSX} disabled={rooms.length === 0} className="btn-secondary btn-sm">📥 XLSX</button>
           <button onClick={exportRoomsPDF} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
+          <button onClick={exportRoomsJPG} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
           <button onClick={() => setShowAddRoom(true)} className="btn-secondary btn-sm">＋ 방 추가</button>
           <span className={`text-xs font-medium px-2 ${saving ? "text-blue-500" : isDirty ? "text-amber-500" : "text-green-500"}`}>
             {saving ? "저장 중..." : isDirty ? "편집 중..." : "✓ 저장됨"}
