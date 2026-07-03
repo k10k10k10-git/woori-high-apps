@@ -17,6 +17,16 @@ export function rowsToHtmlTable(title: string, subtitle: string, rows: Record<st
   `;
 }
 
+// SVG foreignObject는 내용이 well-formed XML이어야 한다 — &nbsp; 같은 HTML 전용 named entity가 있으면
+// (XML 기본 엔티티는 &amp; &lt; &gt; &apos; &quot; 뿐) 이미지 로딩이 조용히 실패한다(GroupsTab의 &nbsp; 사례).
+// 브라우저의 관대한 HTML 파서로 한 번 해석한 뒤 XMLSerializer로 다시 직렬화해 임의의 html이 들어와도 안전하게 만든다.
+function toXhtmlSafe(html: string): string {
+  const doc = new DOMParser().parseFromString(`<div xmlns="http://www.w3.org/1999/xhtml">${html}</div>`, "text/html");
+  const root = doc.body.firstElementChild;
+  if (!root) return html;
+  return new XMLSerializer().serializeToString(root);
+}
+
 // htmlContent(printAsPDF와 동일한 인라인 스타일 HTML 문자열)를 캔버스로 렌더링해 JPG로 저장.
 // html2canvas 등 외부 라이브러리 없이 SVG foreignObject + Canvas로 처리(의존성 최소화 유지).
 export async function exportAsJPG(htmlContent: string, filename: string, landscape = false): Promise<boolean> {
@@ -49,12 +59,14 @@ export async function exportAsJPG(htmlContent: string, filename: string, landsca
     idoc.open();
     idoc.write(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0">${wrapped}</body></html>`);
     idoc.close();
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    // scrollHeight를 읽으면 브라우저가 그 자리에서 강제로 동기 레이아웃을 계산한다 — 페인트(rAF)를 기다릴 필요 없음.
+    // 탭이 백그라운드/비활성 상태면 requestAnimationFrame이 아예 발동하지 않아 무한 대기에 빠질 수 있어 사용하지 않는다.
     const height = Math.max(100, Math.ceil(idoc.documentElement.scrollHeight));
     document.body.removeChild(iframe);
 
-    // 2) SVG(foreignObject)로 감싸 이미지로 로드
-    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${wrapped}</foreignObject></svg>`;
+    // 2) SVG(foreignObject)로 감싸 이미지로 로드 — XML로 파싱되므로 XHTML-safe 버전을 사용
+    const xmlSafeWrapped = toXhtmlSafe(wrapped);
+    const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><foreignObject width="100%" height="100%">${xmlSafeWrapped}</foreignObject></svg>`;
     const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
 
     const img = new Image();
