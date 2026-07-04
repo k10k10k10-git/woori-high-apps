@@ -66,8 +66,14 @@ export async function fetchSheetParticipants(
 
     const participant = extractParticipant(row, headers, values);
     // raw: 시트의 모든 열 원본 — 주민등록번호 등 고정 필드로 못 뽑아낸 값도 중복신청 검토 시 볼 수 있게.
+    // {h,v} 쌍 배열로 담는다(헤더에 Firebase 키 금지 문자 './/' 등이 흔해 Record 키로는 저장 실패).
+    // A~D열(타임스탬프/이름/성별/부)은 표에 이미 고정 표시되므로 제외, 빈 값도 제외.
     // ⚠ 참가자 저장(saveParticipants) 시에는 반드시 제외해야 한다 — 그쪽은 이가드도 읽는 공용 경로.
-    if (participant) participants.push({ ...participant, raw: row });
+    const rawPairs = headers
+      .map((h, idx) => ({ h: h.trim(), v: values[idx]?.trim() || "" }))
+      .slice(4)
+      .filter(pair => pair.h && pair.v);
+    if (participant) participants.push({ ...participant, raw: rawPairs });
   }
 
   return participants;

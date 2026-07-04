@@ -1,5 +1,5 @@
 "use client";
-import { Fragment, useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
 import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant } from "@/lib/db";
@@ -16,6 +16,22 @@ function stripRaw(p: Participant): Omit<Participant, "raw"> {
   return rest;
 }
 
+/** raw를 {h,v} 쌍 배열로 정규화 — 배열(현행) 외에 구버전 Record 형태가 저장돼 있어도 안전하게 처리 */
+function rawPairsOf(raw: unknown): { h: string; v: string }[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return (raw as { h?: string; v?: string }[])
+      .filter(p => p?.h && p?.v)
+      .map(p => ({ h: p.h!, v: p.v! }));
+  }
+  if (typeof raw === "object") {
+    return Object.entries(raw as Record<string, string>)
+      .filter(([h, v]) => h && v)
+      .map(([h, v]) => ({ h, v: String(v) }));
+  }
+  return [];
+}
+
 export default function ParticipantsTab({ retreat }: Props) {
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [students, setStudents] = useState<Record<string, Student>>({});
@@ -30,7 +46,6 @@ export default function ParticipantsTab({ retreat }: Props) {
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState<SyncDuplicateGroup[]>([]);
   const [showDuplicates, setShowDuplicates] = useState(true);
-  const [expandedRawKeys, setExpandedRawKeys] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -161,14 +176,6 @@ export default function ParticipantsTab({ retreat }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "선택을 반영하지 못했습니다.");
     }
-  }
-
-  function toggleRawExpanded(key: string) {
-    setExpandedRawKeys(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
   }
 
   async function rematch() {
@@ -436,80 +443,63 @@ export default function ParticipantsTab({ retreat }: Props) {
               <span className="text-sm font-bold text-purple-800">{d.name}</span>
               <span className="text-xs text-purple-500 ml-2">{d.bu} · {d.entries.length}회 신청</span>
             </div>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-purple-50/30">
-                  <th className="px-4 py-1.5 text-center text-purple-600 font-medium">유지</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">#</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">신청일시</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">성별</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">부</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">학년/반</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">연락처</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">특이사항</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium">상태</th>
-                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-purple-50">
-                {(() => {
-                  const resolvedIndex = d.resolvedIndex ?? 0;
-                  return d.entries.map((e, j) => {
-                    const rawKey = `${i}-${j}`;
-                    const rawEntries = Object.entries(e.raw || {}).filter(([, v]) => v?.trim());
-                    const isExpanded = expandedRawKeys.has(rawKey);
-                    return (
-                      <Fragment key={rawKey}>
-                        <tr className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
-                          <td className="px-4 py-2 text-center">
-                            <input
-                              type="radio"
-                              name={`dup-${i}`}
-                              checked={j === resolvedIndex}
-                              disabled={!d.participantKey}
-                              onChange={() => chooseDuplicateEntry(i, j)}
-                              aria-label={`${d.name}의 ${j + 1}번째 신청을 유지`}
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-slate-400">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
-                          <td className="px-4 py-2 text-slate-700 font-medium">{e.registeredAt || "—"}</td>
-                          <td className="px-4 py-2 text-slate-500">{e.gender || "—"}</td>
-                          <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
-                          <td className="px-4 py-2 text-slate-600">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
-                          <td className="px-4 py-2 text-slate-500">{e.phone || "—"}</td>
-                          <td className="px-4 py-2 text-slate-500 max-w-[200px] truncate" title={e.extra || ""}>{e.extra || "—"}</td>
-                          <td className="px-4 py-2">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
-                          <td className="px-4 py-2">
-                            {rawEntries.length > 0 && (
-                              <button
-                                onClick={() => toggleRawExpanded(rawKey)}
-                                className="text-purple-400 hover:text-purple-600 whitespace-nowrap"
-                              >
-                                {isExpanded ? "▲ 접기" : "▼ 전체 신청 내용"}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr className="bg-purple-50/20">
-                            <td colSpan={10} className="px-4 py-3">
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-                                {rawEntries.map(([col, val]) => (
-                                  <div key={col} className="min-w-0">
-                                    <span className="text-purple-400">{col}: </span>
-                                    <span className="text-slate-700 font-medium break-words">{val}</span>
-                                  </div>
-                                ))}
-                              </div>
+            {(() => {
+              const resolvedIndex = d.resolvedIndex ?? 0;
+              // 그룹 내 모든 신청의 시트 열 헤더 합집합 — 첫 등장 순서 유지 (같은 시트라 대부분 동일)
+              const rawHeaders: string[] = [];
+              d.entries.forEach(e => rawPairsOf(e.raw).forEach(({ h }) => { if (!rawHeaders.includes(h)) rawHeaders.push(h); }));
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-purple-50/30">
+                        <th className="px-4 py-1.5 text-center text-purple-600 font-medium">유지</th>
+                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium">#</th>
+                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium whitespace-nowrap">신청일시</th>
+                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium">성별</th>
+                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium">부</th>
+                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium whitespace-nowrap">학년/반</th>
+                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium whitespace-nowrap">상태</th>
+                        {rawHeaders.map(h => (
+                          <th key={h} className="px-4 py-1.5 text-left text-purple-600 font-medium max-w-[220px] truncate" title={h}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-purple-50">
+                      {d.entries.map((e, j) => {
+                        const pairs = new Map(rawPairsOf(e.raw).map(({ h, v }) => [h, v]));
+                        return (
+                          <tr key={j} className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
+                            <td className="px-4 py-2 text-center">
+                              <input
+                                type="radio"
+                                name={`dup-${i}`}
+                                checked={j === resolvedIndex}
+                                disabled={!d.participantKey}
+                                onChange={() => chooseDuplicateEntry(i, j)}
+                                aria-label={`${d.name}의 ${j + 1}번째 신청을 유지`}
+                              />
                             </td>
+                            <td className="px-4 py-2 text-slate-400 whitespace-nowrap">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
+                            <td className="px-4 py-2 text-slate-700 font-medium whitespace-nowrap">{e.registeredAt || "—"}</td>
+                            <td className="px-4 py-2 text-slate-500">{e.gender || "—"}</td>
+                            <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
+                            <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
+                            <td className="px-4 py-2 whitespace-nowrap">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
+                            {rawHeaders.map(h => {
+                              const v = pairs.get(h) || "";
+                              return (
+                                <td key={h} className="px-4 py-2 text-slate-500 whitespace-nowrap max-w-[220px] truncate" title={v}>{v || "—"}</td>
+                              );
+                            })}
                           </tr>
-                        )}
-                      </Fragment>
-                    );
-                  });
-                })()}
-              </tbody>
-            </table>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         ))}
       </div>
