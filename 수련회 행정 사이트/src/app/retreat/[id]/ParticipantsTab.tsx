@@ -12,6 +12,7 @@ interface Props {
 
 /** raw(시트 전체 열, 민감정보 포함 가능)를 제거 — 공용 participants 경로에 저장하기 전 항상 거쳐야 함 */
 function stripRaw(p: Participant): Omit<Participant, "raw"> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- raw는 의도적으로 버림
   const { raw: _raw, ...rest } = p;
   return rest;
 }

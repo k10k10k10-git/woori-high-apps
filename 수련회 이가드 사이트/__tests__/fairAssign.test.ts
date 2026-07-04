@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeFairAssignment } from "@/lib/fairAssign";
-import { Group, IguardMeal, IguardSeating } from "@/lib/types";
+import { Group, IguardMeal, IguardSeating, IguardSeatingZone } from "@/lib/types";
 
 function makeGroup(id: string, name: string): Group {
   return { id, name, bu: "1부", teachers: [], leader: "", studentIds: [] };
@@ -66,5 +66,50 @@ describe("computeFairAssignment — 맨앞 고정 조 (pinnedFront)", () => {
     const r = computeFairAssignment(mixed, [makeMeal("m1", "1조")], [], 0);
     const front = r.meals[0].entries.find(e => e.seq === 0);
     expect(front?.groupId).toBe("bu1_1"); // 1부의 "1조" — 2부의 내부 "1조"(bu2_1, 화면상 7조)가 아님
+  });
+});
+
+function zonesOf(names: string[]): IguardSeatingZone[] {
+  return names.map(name => ({ name, groupIds: [] }));
+}
+
+describe("computeFairAssignment — 붙이면 안 되는 조 (avoidPairs)", () => {
+  it("같은 구역에 배정된 avoidPairs 조를 서로 다른 구역으로 분리한다", () => {
+    // g1~g4가 2구역(구역당 2명)에 배정되면 g1,g2가 같은 구역(1열)에 들어간다 — avoidPairs로 분리돼야 함
+    const fourGroups = [makeGroup("g1", "1조"), makeGroup("g2", "2조"), makeGroup("g3", "3조"), makeGroup("g4", "4조")];
+    const seat: IguardSeating = {
+      id: "s1", label: "s1", day: 1, order: 0,
+      avoidPairs: "1조-2조",
+      zones: zonesOf(["1열", "2열"]),
+    };
+    const r = computeFairAssignment(fourGroups, [], [seat], 0);
+    const zone0 = r.seatings[0].zones[0].groupIds;
+    const zone1 = r.seatings[0].zones[1].groupIds;
+    const sameZone = (zone0.includes("g1") && zone0.includes("g2")) || (zone1.includes("g1") && zone1.includes("g2"));
+    expect(sameZone).toBe(false);
+  });
+
+  it("1부/2부에 내부 이름이 같은 조가 있어도 avoidPairs가 전역 표시 번호로 정확히 매칭된다 (pinnedFront와 동일한 버그 패턴 회귀)", () => {
+    // 1부: 1조·2조(내부 name) / 2부: 1조·2조(내부 name, 화면상 3조·4조) — 이름만 보면 충돌 가능
+    const bu1 = [makeGroup("bu1_1", "1조"), makeGroup("bu1_2", "2조")];
+    const bu2 = [
+      { ...makeGroup("bu2_1", "1조"), bu: "2부" },
+      { ...makeGroup("bu2_2", "2조"), bu: "2부" },
+    ];
+    const mixed = [...bu1, ...bu2];
+    const seat: IguardSeating = {
+      id: "s1", label: "s1", day: 1, order: 0,
+      avoidPairs: "1조,2조", // 화면에 보이는 "1조"/"2조" = 1부 그룹을 가리켜야 함
+      zones: zonesOf(["1열", "2열"]),
+    };
+    const r = computeFairAssignment(mixed, [], [seat], 0);
+    const zone0 = r.seatings[0].zones[0].groupIds;
+    const zone1 = r.seatings[0].zones[1].groupIds;
+    // 1부의 1조·2조는 avoidPairs 대상이므로 같은 구역에 남아있으면 안 된다
+    // (매칭이 내부 name으로 잘못됐다면 2부의 동명 그룹과 충돌해 이 분리가 일어나지 않거나 엉뚱한 조가 분리됨)
+    const bu1SameZone = (zone0.includes("bu1_1") && zone0.includes("bu1_2")) || (zone1.includes("bu1_1") && zone1.includes("bu1_2"));
+    expect(bu1SameZone).toBe(false);
+    // 모든 조가 정확히 한 번씩만 배정됨 (분리 과정에서 유실/중복 없음)
+    expect([...zone0, ...zone1].sort()).toEqual(["bu1_1", "bu1_2", "bu2_1", "bu2_2"].sort());
   });
 });

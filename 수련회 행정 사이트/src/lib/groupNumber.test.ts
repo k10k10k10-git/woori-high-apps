@@ -50,4 +50,12 @@ describe("groupDisplayName", () => {
     const group = makeGroup({ id: "g8", name: " 2 조 ", bu: "2부" });
     expect(groupDisplayName(group, allGroups)).toBe("5조");
   });
+
+  it("offsets correctly when 1부 has 12 groups", () => {
+    const groups12: Group[] = [
+      ...Array.from({ length: 12 }, (_, i) => makeGroup({ id: `a${i}`, name: `${i + 1}조`, bu: "1부" })),
+      makeGroup({ id: "b0", name: "1조", bu: "2부" }),
+    ];
+    expect(groupDisplayName(groups12[12], groups12)).toBe("13조");
+  });
 });

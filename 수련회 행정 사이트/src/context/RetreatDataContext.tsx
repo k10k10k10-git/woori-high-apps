@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import {
   subscribeToParticipants,
   subscribeToCellColors,
@@ -39,18 +39,21 @@ export function RetreatDataProvider({ retreatId, year, children }: Props) {
   const [students, setStudents] = useState<Record<string, Student>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const studentsLoaded = useRef(false);
 
-  useEffect(() => {
+  // retreatId/year가 바뀌면 렌더 중에 loading/error를 리셋 (effect 내 동기 setState 대신)
+  const scopeKey = `${retreatId}:${year}`;
+  const [prevScopeKey, setPrevScopeKey] = useState(scopeKey);
+  if (scopeKey !== prevScopeKey) {
+    setPrevScopeKey(scopeKey);
     setLoading(true);
     setError(null);
-    studentsLoaded.current = false;
+  }
 
+  useEffect(() => {
     // One-time fetch of students
     getStudentsByYear(year)
       .then((stds) => {
         setStudents(stds);
-        studentsLoaded.current = true;
         setLoading(false);
       })
       .catch((e) => {
