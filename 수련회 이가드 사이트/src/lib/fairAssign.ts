@@ -1,4 +1,5 @@
 import { Group, IguardMeal, IguardMealEntry, IguardSeating, IguardSeatingZone } from "./types";
+import { groupDisplayName } from "./groupNumber";
 
 // ════════════════════════════════════════════════════════════
 // 공정 배분 알고리즘
@@ -24,21 +25,26 @@ export interface FairResult {
   counts: { meals: number; seatings: number };
 }
 
-function groupKeys(group: Group): string[] {
+// 매칭용 키 목록 — 화면에 실제 보이는 "전역 표시 번호"(groupDisplayName)를 기준으로 매칭한다.
+// 주의: group.name(내부 저장 이름)은 1부/2부가 각각 "1조"부터 독립적으로 매기므로 그대로 키로 쓰면
+// 서로 다른 부의 그룹이 충돌한다(예: 2부 "1조"의 내부 name도 "1조" — 화면엔 "7조"로 표시됨).
+// 전역 표시 번호는 부 오프셋이 적용돼 항상 고유하므로 이 충돌이 없다.
+function groupKeys(group: Group, groups: Group[]): string[] {
+  const display = groupDisplayName(group, groups);
   return [
     group.id,
-    group.name,
+    display,
     `${group.bu} ${group.name}`,
     `${group.bu}${group.name}`,
   ].map(v => v.replace(/\s+/g, "").toLowerCase());
 }
 
 // 맨 앞 고정 조 파싱 — "1조, 3조" 또는 줄바꿈 구분. 쉼표/줄바꿈 순서 그대로 앞순서(첫 조가 맨 앞).
-// avoidPairs와 같은 groupKeys 매칭(조 id/이름/부+이름) 재사용. 매칭 안 되는 이름은 무시.
+// avoidPairs와 같은 groupKeys 매칭(조 id/전역표시번호/부+이름) 재사용. 매칭 안 되는 이름은 무시.
 function parsePinnedFront(value: string | null | undefined, groups: Group[]): string[] {
   if (!value) return [];
   const byKey = new Map<string, string>();
-  groups.forEach(g => groupKeys(g).forEach(key => byKey.set(key, g.id)));
+  groups.forEach(g => groupKeys(g, groups).forEach(key => byKey.set(key, g.id)));
   const seen = new Set<string>();
   const ids: string[] = [];
   value.split(/[\n,，]+/).map(v => v.replace(/\s+/g, "").toLowerCase()).filter(Boolean).forEach(token => {
@@ -62,7 +68,7 @@ function applyPinnedFront(ordered: Group[], pinnedIds: string[]): Group[] {
 function parseAvoidPairs(value: string | null | undefined, groups: Group[]): [string, string][] {
   if (!value) return [];
   const byKey = new Map<string, string>();
-  groups.forEach(g => groupKeys(g).forEach(key => byKey.set(key, g.id)));
+  groups.forEach(g => groupKeys(g, groups).forEach(key => byKey.set(key, g.id)));
   return value
     .split(/\n+/)
     .map(line => line.split(/[-–—,，/]+/).map(v => v.replace(/\s+/g, "").toLowerCase()).filter(Boolean))

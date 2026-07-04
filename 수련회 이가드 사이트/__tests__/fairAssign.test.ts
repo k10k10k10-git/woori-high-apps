@@ -55,4 +55,16 @@ describe("computeFairAssignment — 맨앞 고정 조 (pinnedFront)", () => {
     const secondFront = r.meals[1].entries.find(e => e.seq === 0);
     expect(secondFront?.groupId).not.toBe("g2");
   });
+
+  it("1부/2부에 내부 이름이 같은 조가 있어도 화면에 보이는 전역 번호로 정확히 매칭된다 (실사용 버그 회귀)", () => {
+    // 1부: 1조~6조(내부 name), 2부: 1조~5조(내부 name) — 2부 그룹은 전역 표시 시 6이 더해져 "7조"~"11조"로 보임.
+    // 사용자가 화면에 보이는 대로 "1조"를 입력했을 때, 내부 name이 같은 2부의 "1조"(화면상 7조)가 아니라
+    // 실제 화면에 "1조"로 보이는 1부 그룹이 고정돼야 한다.
+    const bu1 = Array.from({ length: 6 }, (_, i) => makeGroup(`bu1_${i + 1}`, `${i + 1}조`));
+    const bu2 = Array.from({ length: 5 }, (_, i) => ({ ...makeGroup(`bu2_${i + 1}`, `${i + 1}조`), bu: "2부" }));
+    const mixed = [...bu1, ...bu2];
+    const r = computeFairAssignment(mixed, [makeMeal("m1", "1조")], [], 0);
+    const front = r.meals[0].entries.find(e => e.seq === 0);
+    expect(front?.groupId).toBe("bu1_1"); // 1부의 "1조" — 2부의 내부 "1조"(bu2_1, 화면상 7조)가 아님
+  });
 });
