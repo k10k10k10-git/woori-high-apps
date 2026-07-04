@@ -12,7 +12,9 @@ export const paths = {
   participantExtra: (id: string, key: string) => `retreats/${id}/participants/${key}/extra`,
   participantsBackups: (id: string) => `retreats/${id}/participantsBackups`,
   participantsBackup: (id: string, backupKey: string) => `retreats/${id}/participantsBackups/${backupKey}`,
-  syncDuplicates: (id: string) => `retreats/${id}/syncMeta/duplicates`,
+  // 중복 신청 원본 데이터는 시트의 모든 열(주민등록번호 등 민감정보 포함 가능)을 담을 수 있어
+  // retreatsPrivate(행정 관리자만 접근, 이가드 멤버는 못 봄)에 둔다. retreats/{id}/syncMeta는 구버전 경로(폐기).
+  syncDuplicates: (id: string) => `retreatsPrivate/${id}/syncDuplicates`,
 
   // ── 교사/스탭 ──
   teachers: (id: string) => `retreats/${id}/teachers`,

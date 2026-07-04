@@ -29,6 +29,10 @@ export interface Participant {
   phone?: string | null;
   pPhone?: string | null;
   extra?: string; // 특이사항
+  // 시트 원본 전체 열(주민등록번호 등 고정 필드로 못 뽑아낸 값 포함) — 시트 파싱 직후에만 존재.
+  // ⚠ 참가자 저장(retreats/{id}/participants, 이가드도 읽는 공용 경로)에는 절대 넣지 말 것 —
+  //   민감정보는 retreatsPrivate/{id}/syncDuplicates(중복신청 검토용)에서만 다룬다.
+  raw?: Record<string, string>;
 }
 
 // 시트 동기화 중 발견된 중복 신청 그룹 — 기본은 최초 신청 유지, 관리자가 다른 신청을 선택할 수 있음

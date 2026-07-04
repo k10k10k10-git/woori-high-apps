@@ -65,7 +65,9 @@ export async function fetchSheetParticipants(
     });
 
     const participant = extractParticipant(row, headers, values);
-    if (participant) participants.push(participant);
+    // raw: 시트의 모든 열 원본 — 주민등록번호 등 고정 필드로 못 뽑아낸 값도 중복신청 검토 시 볼 수 있게.
+    // ⚠ 참가자 저장(saveParticipants) 시에는 반드시 제외해야 한다 — 그쪽은 이가드도 읽는 공용 경로.
+    if (participant) participants.push({ ...participant, raw: row });
   }
 
   return participants;

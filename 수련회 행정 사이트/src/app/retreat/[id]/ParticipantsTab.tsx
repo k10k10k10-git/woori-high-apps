@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { Fragment, useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
 import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant } from "@/lib/db";
@@ -8,6 +8,12 @@ import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
 interface Props {
   retreat: Retreat;
+}
+
+/** raw(시트 전체 열, 민감정보 포함 가능)를 제거 — 공용 participants 경로에 저장하기 전 항상 거쳐야 함 */
+function stripRaw(p: Participant): Omit<Participant, "raw"> {
+  const { raw: _raw, ...rest } = p;
+  return rest;
 }
 
 export default function ParticipantsTab({ retreat }: Props) {
@@ -24,6 +30,7 @@ export default function ParticipantsTab({ retreat }: Props) {
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState<SyncDuplicateGroup[]>([]);
   const [showDuplicates, setShowDuplicates] = useState(true);
+  const [expandedRawKeys, setExpandedRawKeys] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -103,8 +110,9 @@ export default function ParticipantsTab({ retreat }: Props) {
       const dedupKeyToParticipantKey = new Map<string, string>();
       sorted.forEach(({ p, ms, dedupKey }, idx) => {
         const key = `p_${idx}`;
+        // raw(시트 전체 열, 민감정보 포함 가능)는 공용 participants 경로에 절대 저장하지 않는다 — stripRaw로 제외.
         matched[key] = {
-          ...p,
+          ...stripRaw(p),
           studentId: ms?.id ?? null,
           phone: p.phone || ms?.phone || null,
           pPhone: ms?.pPhone ?? null,
@@ -139,7 +147,7 @@ export default function ParticipantsTab({ retreat }: Props) {
     if (!chosen) return;
     const ms = findStudent(chosen, students);
     const updated: Participant = {
-      ...chosen,
+      ...stripRaw(chosen),
       studentId: ms?.id ?? null,
       phone: chosen.phone || ms?.phone || null,
       pPhone: ms?.pPhone ?? null,
@@ -153,6 +161,14 @@ export default function ParticipantsTab({ retreat }: Props) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "선택을 반영하지 못했습니다.");
     }
+  }
+
+  function toggleRawExpanded(key: string) {
+    setExpandedRawKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   }
 
   async function rematch() {
@@ -432,33 +448,65 @@ export default function ParticipantsTab({ retreat }: Props) {
                   <th className="px-4 py-1.5 text-left text-purple-600 font-medium">연락처</th>
                   <th className="px-4 py-1.5 text-left text-purple-600 font-medium">특이사항</th>
                   <th className="px-4 py-1.5 text-left text-purple-600 font-medium">상태</th>
+                  <th className="px-4 py-1.5 text-left text-purple-600 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-purple-50">
                 {(() => {
                   const resolvedIndex = d.resolvedIndex ?? 0;
-                  return d.entries.map((e, j) => (
-                    <tr key={j} className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
-                      <td className="px-4 py-2 text-center">
-                        <input
-                          type="radio"
-                          name={`dup-${i}`}
-                          checked={j === resolvedIndex}
-                          disabled={!d.participantKey}
-                          onChange={() => chooseDuplicateEntry(i, j)}
-                          aria-label={`${d.name}의 ${j + 1}번째 신청을 유지`}
-                        />
-                      </td>
-                      <td className="px-4 py-2 text-slate-400">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
-                      <td className="px-4 py-2 text-slate-700 font-medium">{e.registeredAt || "—"}</td>
-                      <td className="px-4 py-2 text-slate-500">{e.gender || "—"}</td>
-                      <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
-                      <td className="px-4 py-2 text-slate-600">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
-                      <td className="px-4 py-2 text-slate-500">{e.phone || "—"}</td>
-                      <td className="px-4 py-2 text-slate-500 max-w-[200px] truncate" title={e.extra || ""}>{e.extra || "—"}</td>
-                      <td className="px-4 py-2">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
-                    </tr>
-                  ));
+                  return d.entries.map((e, j) => {
+                    const rawKey = `${i}-${j}`;
+                    const rawEntries = Object.entries(e.raw || {}).filter(([, v]) => v?.trim());
+                    const isExpanded = expandedRawKeys.has(rawKey);
+                    return (
+                      <Fragment key={rawKey}>
+                        <tr className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
+                          <td className="px-4 py-2 text-center">
+                            <input
+                              type="radio"
+                              name={`dup-${i}`}
+                              checked={j === resolvedIndex}
+                              disabled={!d.participantKey}
+                              onChange={() => chooseDuplicateEntry(i, j)}
+                              aria-label={`${d.name}의 ${j + 1}번째 신청을 유지`}
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-slate-400">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
+                          <td className="px-4 py-2 text-slate-700 font-medium">{e.registeredAt || "—"}</td>
+                          <td className="px-4 py-2 text-slate-500">{e.gender || "—"}</td>
+                          <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
+                          <td className="px-4 py-2 text-slate-600">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
+                          <td className="px-4 py-2 text-slate-500">{e.phone || "—"}</td>
+                          <td className="px-4 py-2 text-slate-500 max-w-[200px] truncate" title={e.extra || ""}>{e.extra || "—"}</td>
+                          <td className="px-4 py-2">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
+                          <td className="px-4 py-2">
+                            {rawEntries.length > 0 && (
+                              <button
+                                onClick={() => toggleRawExpanded(rawKey)}
+                                className="text-purple-400 hover:text-purple-600 whitespace-nowrap"
+                              >
+                                {isExpanded ? "▲ 접기" : "▼ 전체 신청 내용"}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-purple-50/20">
+                            <td colSpan={10} className="px-4 py-3">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+                                {rawEntries.map(([col, val]) => (
+                                  <div key={col} className="min-w-0">
+                                    <span className="text-purple-400">{col}: </span>
+                                    <span className="text-slate-700 font-medium break-words">{val}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  });
                 })()}
               </tbody>
             </table>
