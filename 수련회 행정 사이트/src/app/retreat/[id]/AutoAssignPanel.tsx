@@ -82,18 +82,19 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const bu1Count = classUnits1.reduce((acc, u) => acc + u.studentIds.length, 0);
   const bu2Count = classUnits2.reduce((acc, u) => acc + u.studentIds.length, 0);
 
-  // maxGroupSize 변경 시 조 수 자동 계산
-  useEffect(() => {
-    if (rules.maxGroupSize <= 0) return;
-    if (bu1Count > 0) {
-      const auto1 = Math.max(1, Math.ceil(bu1Count / rules.maxGroupSize));
-      setGroupCount1bu(auto1);
+  // maxGroupSize/인원수 변경 시 조 수 자동 계산 (렌더 중 조정 — effect 대신)
+  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count });
+  if (
+    rules.maxGroupSize !== prevAutoCalc.maxGroupSize ||
+    bu1Count !== prevAutoCalc.bu1Count ||
+    bu2Count !== prevAutoCalc.bu2Count
+  ) {
+    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count });
+    if (rules.maxGroupSize > 0) {
+      if (bu1Count > 0) setGroupCount1bu(Math.max(1, Math.ceil(bu1Count / rules.maxGroupSize)));
+      if (bu2Count > 0) setGroupCount2bu(Math.max(1, Math.ceil(bu2Count / rules.maxGroupSize)));
     }
-    if (bu2Count > 0) {
-      const auto2 = Math.max(1, Math.ceil(bu2Count / rules.maxGroupSize));
-      setGroupCount2bu(auto2);
-    }
-  }, [rules.maxGroupSize, bu1Count, bu2Count]);
+  }
 
   function run() {
     setRunning(true);

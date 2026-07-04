@@ -68,7 +68,8 @@ src/
     ├── groupNumber.test.ts         # groupNumber 단위 테스트
     ├── exportUtils.ts              # xlsx 내보내기, printAsPDF
     ├── exportUtils.test.ts         # exportUtils 단위 테스트
-    └── constants.ts                # 공통 상수 (TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS)
+    ├── constants.ts                # 공통 상수 (TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS)
+    └── constants.test.ts           # constants 단위 테스트
 
 루트 파일:
 - DO_NOT_DEPLOY.database.rules.json # 보관용 규칙 사본 (배포 금지 — 배포용 원천은 학생 앱)
@@ -113,7 +114,7 @@ retreatsPrivate/          # 🔒 민감 데이터 — 이가드 멤버는 접근
     cancellations/        #      취소명단(환불계좌)
     unmatchedPayments/    #      입금 미매칭
     medicalLogs/          #      의료 일지(증상·처방약)
-                          #    ⚠ teacherStaff/teachers의 idNumber(주민번호)는 아직 잔여 — 후속 분리 대상
+    teacherIdNumbers/     #      교사 주민번호(paths.teacherIdNumbers) — teachers 노드에서 분리 완료
 
 brainstorm/               # 💡 브레인스토밍 보드 (전역 공유, 수련회 무관 — 홈 화면 하단 캔버스)
                           #   { title?, text, color, author, createdAt, updatedAt?, x?, y?, comments? }

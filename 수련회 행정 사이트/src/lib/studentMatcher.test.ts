@@ -122,4 +122,76 @@ describe("findStudent", () => {
     const p = makeParticipant({ name: "홍길동", grade: 1, class: 1, bu: "2부" });
     expect(findStudent(p, studentsRecord(s1, s2))).toEqual(s2);
   });
+
+  it("falls back to name + grade when class is wrong", () => {
+    const s = makeStudent({ id: "s1", name: "이영희", grade: 1, class: 1, buNum: 1 });
+    const p = makeParticipant({ name: "이영희", grade: 1, class: 9, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s))?.id).toBe("s1");
+  });
+
+  it("falls back to name only when grade is wrong but name is unique", () => {
+    const s = makeStudent({ id: "s1", name: "이영희", grade: 1, class: 1, buNum: 1 });
+    const p = makeParticipant({ name: "이영희", grade: 3, class: 1, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s))?.id).toBe("s1");
+  });
+
+  it("matches suffix-duplicate names by class", () => {
+    const s1 = makeStudent({ id: "s1", name: "박지민A", grade: 2, class: 1, buNum: 1 });
+    const s2 = makeStudent({ id: "s2", name: "박지민B", grade: 2, class: 2, buNum: 1 });
+    const p = makeParticipant({ name: "박지민", grade: 2, class: 1, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s1, s2))?.id).toBe("s1");
+  });
+
+  it("BUG-1: rejects suffix-duplicate names when class is also wrong (non-deterministic match)", () => {
+    const s1 = makeStudent({ id: "s1", name: "박지민A", grade: 2, class: 1, buNum: 1 });
+    const s2 = makeStudent({ id: "s2", name: "박지민B", grade: 2, class: 2, buNum: 1 });
+    const p = makeParticipant({ name: "박지민", grade: 2, class: 9, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s1, s2))).toBeUndefined();
+  });
+
+  it("BUG-1: match rejection is independent of DB record order", () => {
+    const s1 = makeStudent({ id: "s1", name: "박지민A", grade: 2, class: 1, buNum: 1 });
+    const s2 = makeStudent({ id: "s2", name: "박지민B", grade: 2, class: 2, buNum: 1 });
+    const p = makeParticipant({ name: "박지민", grade: 2, class: 9, bu: "1부" });
+    const reversed = studentsRecord(s2, s1);
+    expect(findStudent(p, reversed)).toBeUndefined();
+  });
+
+  it("matches when DB name has a student-number prefix but form name is clean", () => {
+    const s = makeStudent({ id: "s1", name: "215최수아", grade: 3, class: 4, buNum: 1 });
+    const p = makeParticipant({ name: "최수아", grade: 3, class: 4, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s))?.id).toBe("s1");
+  });
+
+  it("matches when DB name has internal whitespace but form name does not", () => {
+    const s = makeStudent({ id: "s1", name: "한 별", grade: 1, class: 2, buNum: 1 });
+    const p = makeParticipant({ name: "한별", grade: 1, class: 2, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s))?.id).toBe("s1");
+  });
+
+  it("searches across all bu when participant has no bu info", () => {
+    const s = makeStudent({ id: "s1", name: "이영희", grade: 1, class: 1, buNum: 1 });
+    const p = makeParticipant({ name: "이영희", grade: 1, class: 1, bu: "" });
+    expect(findStudent(p, studentsRecord(s))?.id).toBe("s1");
+  });
+
+  it("matches by name only when grade/class are both unfilled (0) and name is unique", () => {
+    const s = makeStudent({ id: "s1", name: "이영희", grade: 1, class: 1, buNum: 1 });
+    const p = makeParticipant({ name: "이영희", grade: 0, class: 0, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s))?.id).toBe("s1");
+  });
+
+  it("disambiguates same-bu duplicate names by grade", () => {
+    const s1 = makeStudent({ id: "s1", name: "정다은", grade: 1, class: 1, buNum: 1 });
+    const s2 = makeStudent({ id: "s2", name: "정다은", grade: 2, class: 3, buNum: 1 });
+    const p = makeParticipant({ name: "정다은", grade: 2, class: 3, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s1, s2))?.id).toBe("s2");
+  });
+
+  it("fails to match same-bu duplicate names when no disambiguating info is given", () => {
+    const s1 = makeStudent({ id: "s1", name: "정다은", grade: 1, class: 1, buNum: 1 });
+    const s2 = makeStudent({ id: "s2", name: "정다은", grade: 2, class: 3, buNum: 1 });
+    const p = makeParticipant({ name: "정다은", grade: 0, class: 0, bu: "1부" });
+    expect(findStudent(p, studentsRecord(s1, s2))).toBeUndefined();
+  });
 });

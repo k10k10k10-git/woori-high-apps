@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Retreat, MealCountData, MealSlot, MealAdjustment, MealRoleCounts, MealPersonAssignment, MealRole,
+  Retreat, MealSlot, MealAdjustment, MealRoleCounts, MealPersonAssignment, MealRole,
   RetreatPeriod, TeacherAttendance, Participant,
 } from "@/lib/types";
 import {
