@@ -31,6 +31,15 @@ export interface Participant {
   extra?: string; // 특이사항
 }
 
+// 시트 동기화 중 발견된 중복 신청 그룹 — 기본은 최초 신청 유지, 관리자가 다른 신청을 선택할 수 있음
+export interface SyncDuplicateGroup {
+  name: string;
+  bu: string;
+  entries: Participant[];
+  resolvedIndex?: number;   // 유지할 entries 인덱스 (기본 0 = 최초 신청)
+  participantKey?: string;  // 이 그룹이 저장된 participants 키 — 선택 변경 시 갱신 대상
+}
+
 export interface Group {
   id: string;
   name: string; // "1조", "2조"...

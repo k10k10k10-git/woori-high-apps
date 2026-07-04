@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState, useMemo } from "react";
-import { Retreat, Participant, Student } from "@/lib/types";
+import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
-import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates } from "@/lib/db";
+import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant } from "@/lib/db";
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
@@ -22,7 +22,7 @@ export default function ParticipantsTab({ retreat }: Props) {
   const [sortBy, setSortBy] = useState<"name" | "registeredAt">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [error, setError] = useState("");
-  const [duplicates, setDuplicates] = useState<{ name: string; bu: string; entries: Participant[] }[]>([]);
+  const [duplicates, setDuplicates] = useState<SyncDuplicateGroup[]>([]);
   const [showDuplicates, setShowDuplicates] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -36,7 +36,21 @@ export default function ParticipantsTab({ retreat }: Props) {
       ]);
       setParticipants(pData);
       setStudents(sData);
-      setDuplicates(savedDups);
+      // participantKey가 없는 옛 형식 중복 데이터(이번 기능 추가 이전 동기화분)는
+      // 현재 유지된 항목을 participants에서 역으로 찾아 보정 — 재동기화 없이도 바로 선택 가능하게.
+      const resolvedDups = savedDups.map(d => {
+        if (d.participantKey) return d;
+        const targetEntry = d.entries[d.resolvedIndex ?? 0];
+        if (!targetEntry) return d;
+        const ms = findStudent(targetEntry, sData);
+        const foundKey = Object.entries(pData).find(([, p]) => {
+          if (ms?.id && p.studentId) return p.studentId === ms.id;
+          return p.name === targetEntry.name && p.bu === targetEntry.bu
+            && p.grade === targetEntry.grade && p.class === targetEntry.class;
+        })?.[0];
+        return foundKey ? { ...d, participantKey: foundKey } : d;
+      });
+      setDuplicates(resolvedDups);
     } catch (e) {
       setError(e instanceof Error ? e.message : "참가자 데이터를 불러오지 못했습니다.");
     } finally {
@@ -65,7 +79,7 @@ export default function ParticipantsTab({ retreat }: Props) {
       // 학생 DB 매칭 + 중복 제거 (동일 studentId는 최초 신청만 유지, 미매칭은 name+bu+grade 기준)
       const seenStudentIds = new Set<string>();
       const dupEntries = new Map<string, { name: string; bu: string; entries: Participant[] }>();
-      const deduped: { p: Participant; ms: Student | undefined }[] = [];
+      const deduped: { p: Participant; ms: Student | undefined; dedupKey: string }[] = [];
       list.forEach(p => {
         const ms = findStudent(p, students);
         const dedupKey = ms?.id ?? `name:${p.name.trim()}:${p.bu ?? ""}:${p.grade}`;
@@ -76,36 +90,68 @@ export default function ParticipantsTab({ retreat }: Props) {
           return;
         }
         seenStudentIds.add(dedupKey);
-        deduped.push({ p, ms });
+        deduped.push({ p, ms, dedupKey });
       });
       // 첫 번째 신청도 entries에 포함
       dupEntries.forEach((v, k) => {
-        const first = deduped.find(d => {
-          const fk = d.ms?.id ?? `name:${d.p.name.trim()}:${d.p.bu ?? ""}:${d.p.grade}`;
-          return fk === k;
-        });
+        const first = deduped.find(d => d.dedupKey === k);
         if (first) v.entries.unshift(first.p);
       });
-      const dupList = [...dupEntries.values()];
-      setDuplicates(dupList);
-      await saveSyncDuplicates(retreat.id, dupList);
 
       const sorted = [...deduped].sort((a, b) => a.p.name.localeCompare(b.p.name, "ko"));
       const matched: Record<string, Participant> = {};
-      sorted.forEach(({ p, ms }, idx) => {
-        matched[`p_${idx}`] = {
+      const dedupKeyToParticipantKey = new Map<string, string>();
+      sorted.forEach(({ p, ms, dedupKey }, idx) => {
+        const key = `p_${idx}`;
+        matched[key] = {
           ...p,
           studentId: ms?.id ?? null,
           phone: p.phone || ms?.phone || null,
           pPhone: ms?.pPhone ?? null,
         };
+        dedupKeyToParticipantKey.set(dedupKey, key);
       });
+
+      // 각 중복 그룹이 어느 participants 키에 저장됐는지 연결해둬야, 관리자가 다른 신청을 선택했을 때
+      // 정확히 그 키만 갱신할 수 있다(전체 participants 재저장 없이).
+      const dupList: SyncDuplicateGroup[] = [...dupEntries.entries()].map(([k, v]) => ({
+        ...v,
+        resolvedIndex: 0,
+        participantKey: dedupKeyToParticipantKey.get(k),
+      }));
+      setDuplicates(dupList);
+      await saveSyncDuplicates(retreat.id, dupList);
+
       await saveParticipants(retreat.id, matched);
       setParticipants(matched);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
     } finally {
       setSyncing(false);
+    }
+  }
+
+  /** 중복 신청 중 다른 항목을 "유지"로 선택 — 기본은 최초 신청(index 0)이지만 관리자가 바꿀 수 있다. */
+  async function chooseDuplicateEntry(dupIndex: number, entryIndex: number) {
+    const dup = duplicates[dupIndex];
+    if (!dup || !dup.participantKey) return;
+    const chosen = dup.entries[entryIndex];
+    if (!chosen) return;
+    const ms = findStudent(chosen, students);
+    const updated: Participant = {
+      ...chosen,
+      studentId: ms?.id ?? null,
+      phone: chosen.phone || ms?.phone || null,
+      pPhone: ms?.pPhone ?? null,
+    };
+    try {
+      await updateParticipant(retreat.id, dup.participantKey, updated);
+      setParticipants(prev => ({ ...prev, [dup.participantKey!]: updated }));
+      const nextDuplicates = duplicates.map((d, i) => i === dupIndex ? { ...d, resolvedIndex: entryIndex } : d);
+      setDuplicates(nextDuplicates);
+      await saveSyncDuplicates(retreat.id, nextDuplicates);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "선택을 반영하지 못했습니다.");
     }
   }
 
@@ -364,7 +410,7 @@ export default function ParticipantsTab({ retreat }: Props) {
             🔁 중복 신청 {duplicates.length}명
             {duplicates.length === 0
               ? <span className="ml-2 font-normal text-green-500 text-xs">— 중복 없음 ✓</span>
-              : <span className="ml-2 font-normal text-purple-500 text-xs">— 최초 신청만 유지, 이후 신청은 자동 제거됨</span>}
+              : <span className="ml-2 font-normal text-purple-500 text-xs">— 기본은 최초 신청 유지, 필요 시 아래에서 다른 신청 선택 가능</span>}
           </span>
           <span className="text-purple-400 text-xs">{showDuplicates ? "▲ 접기" : "▼ 펼치기"}</span>
         </button>
@@ -377,6 +423,7 @@ export default function ParticipantsTab({ retreat }: Props) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-purple-50/30">
+                  <th className="px-4 py-1.5 text-center text-purple-600 font-medium">유지</th>
                   <th className="px-4 py-1.5 text-left text-purple-600 font-medium">#</th>
                   <th className="px-4 py-1.5 text-left text-purple-600 font-medium">신청일시</th>
                   <th className="px-4 py-1.5 text-left text-purple-600 font-medium">부</th>
@@ -386,16 +433,29 @@ export default function ParticipantsTab({ retreat }: Props) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-purple-50">
-                {d.entries.map((e, j) => (
-                  <tr key={j} className={j === 0 ? "bg-green-50/40" : "bg-white"}>
-                    <td className="px-4 py-2 text-slate-400">{j + 1}{j === 0 && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
-                    <td className="px-4 py-2 text-slate-700 font-medium">{e.registeredAt || "—"}</td>
-                    <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
-                    <td className="px-4 py-2 text-slate-600">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
-                    <td className="px-4 py-2 text-slate-500">{e.phone || "—"}</td>
-                    <td className="px-4 py-2">{j > 0 && <span className="text-red-400 font-medium">제거됨</span>}</td>
-                  </tr>
-                ))}
+                {(() => {
+                  const resolvedIndex = d.resolvedIndex ?? 0;
+                  return d.entries.map((e, j) => (
+                    <tr key={j} className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
+                      <td className="px-4 py-2 text-center">
+                        <input
+                          type="radio"
+                          name={`dup-${i}`}
+                          checked={j === resolvedIndex}
+                          disabled={!d.participantKey}
+                          onChange={() => chooseDuplicateEntry(i, j)}
+                          aria-label={`${d.name}의 ${j + 1}번째 신청을 유지`}
+                        />
+                      </td>
+                      <td className="px-4 py-2 text-slate-400">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
+                      <td className="px-4 py-2 text-slate-700 font-medium">{e.registeredAt || "—"}</td>
+                      <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
+                      <td className="px-4 py-2 text-slate-600">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
+                      <td className="px-4 py-2 text-slate-500">{e.phone || "—"}</td>
+                      <td className="px-4 py-2">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
+                    </tr>
+                  ));
+                })()}
               </tbody>
             </table>
           </div>

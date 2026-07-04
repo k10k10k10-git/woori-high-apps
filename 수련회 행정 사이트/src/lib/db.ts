@@ -1,6 +1,6 @@
 import { ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, runTransaction, DataSnapshot } from "firebase/database";
 import { db } from "./firebase";
-import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, AdminSupplyItem, SuppliesBudget, MealCountData, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog } from "./types";
+import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, AdminSupplyItem, SuppliesBudget, MealCountData, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog, SyncDuplicateGroup } from "./types";
 import { paths } from "./paths";
 
 // Helper: DataSnapshot → typed list (injects id from Firebase key)
@@ -102,10 +102,10 @@ export async function restoreParticipantsBackup(retreatId: string, backupKey: st
 }
 
 // ── Sync Meta (중복 신청 등 동기화 결과 저장) ─────────────
-export async function saveSyncDuplicates(retreatId: string, duplicates: { name: string; bu: string; entries: Participant[] }[]): Promise<void> {
-  await set(ref(db, paths.syncDuplicates(retreatId)), duplicates.length > 0 ? duplicates : null);
+export async function saveSyncDuplicates(retreatId: string, duplicates: SyncDuplicateGroup[]): Promise<void> {
+  await set(ref(db, paths.syncDuplicates(retreatId)), duplicates.length > 0 ? stripUndefined(duplicates) : null);
 }
-export async function getSyncDuplicates(retreatId: string): Promise<{ name: string; bu: string; entries: Participant[] }[]> {
+export async function getSyncDuplicates(retreatId: string): Promise<SyncDuplicateGroup[]> {
   const snap = await get(ref(db, paths.syncDuplicates(retreatId)));
   if (!snap.exists()) return [];
   const val = snap.val();
@@ -115,6 +115,11 @@ export async function getSyncDuplicates(retreatId: string): Promise<{ name: stri
 export async function getParticipants(retreatId: string): Promise<Record<string, Participant>> {
   const snap = await get(ref(db, paths.participants(retreatId)));
   return snap.exists() ? snap.val() : {};
+}
+
+/** 특정 참가자 1명의 경로만 덮어쓰기 — 중복 신청 중 다른 항목을 선택했을 때 사용 (전체 participants 덮어쓰기 금지) */
+export async function updateParticipant(retreatId: string, key: string, data: Participant): Promise<void> {
+  await set(ref(db, paths.participant(retreatId, key)), stripUndefined(data));
 }
 
 /** 특이사항만 경로 지정 업데이트 — 전체 participants 덮어쓰기 방지 */
