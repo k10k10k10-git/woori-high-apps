@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "수련회 행정 사이트"],
       "port": 3000
+    },
+    {
+      "name": "iguard-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "수련회 이가드 사이트", "--", "-p", "3001"],
+      "port": 3001
     }
   ]
 }

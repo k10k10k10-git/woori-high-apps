@@ -9,6 +9,7 @@ import FairAssignButton from "./FairAssignButton";
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const SLOT_LABELS = ["아침", "점심", "저녁", "야식"] as const;
 const EMPTY = { label: "", day: 1, slot: 1, weight: 1 };
+type PinnedInputs = Record<string, string>;
 const WEIGHT_PRESETS = [
   { label: "기본", value: 1 },
   { label: "저녁 중요", value: 1.5 },
@@ -21,6 +22,12 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<{ label: string; day: number; slot: number; weight: number }>(EMPTY);
+  const [pinnedInputs, setPinnedInputs] = useState<PinnedInputs>({});
+
+  async function savePinnedFront(meal: IguardMeal, value: string) {
+    try { await updateIguardMeal(retreatId, meal.id, { pinnedFront: value.trim() || null }); }
+    catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+  }
 
   function orderedFor(meal: IguardMeal) {
     const map = new Map((meal.entries || []).map(e => [e.groupId, e]));
@@ -112,6 +119,16 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                   </h3>
                   <div className="flex gap-2"><button onClick={() => { setForm({ label: meal.label, day: meal.day, slot: meal.slot, weight: meal.weight ?? 1 }); setEditId(meal.id); setShow(true); }} className="text-xs text-slate-400 hover:text-fuchsia-600">수정</button>
                     <button onClick={() => delMeal(meal)} className="text-xs text-slate-300 hover:text-red-400">삭제</button></div>
+                </div>
+                <div className="px-4 py-2.5 bg-white border-b border-slate-100 flex items-center gap-2">
+                  <label className="text-xs text-slate-400 whitespace-nowrap">맨앞 고정 조</label>
+                  <input
+                    className="input flex-1 text-xs py-1"
+                    placeholder="예: 1조 또는 1조, 3조 (이 끼니만 자동배정 시 맨 앞으로)"
+                    value={pinnedInputs[meal.id] ?? meal.pinnedFront ?? ""}
+                    onChange={e => setPinnedInputs(p => ({ ...p, [meal.id]: e.target.value }))}
+                    onBlur={e => savePinnedFront(meal, e.target.value)}
+                  />
                 </div>
                 {ordered.length === 0 ? <div className="p-6 text-center text-slate-300 text-xs">조편성 데이터가 없습니다.</div> : (
                   <table className="w-full text-sm">

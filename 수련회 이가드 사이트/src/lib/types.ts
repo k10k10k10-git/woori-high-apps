@@ -112,6 +112,7 @@ export interface IguardMeal {
   day: number;     // 일자 정렬용 (1/2/3)
   slot: number;    // 같은 날 내 끼니 순서 (아침0 점심1 저녁2 야식3)
   weight?: number | null; // 공정 배정 가중치. 중요한 끼니는 더 크게 줄 수 있음
+  pinnedFront?: string | null; // 이 끼니만 맨 앞 순서로 고정할 조. 예: "1조" 또는 "1조, 3조"(쉼표 순서대로 앞순서)
   entries: IguardMealEntry[];
 }
 
@@ -198,6 +199,7 @@ export interface IguardSeating {
   order: number;
   avoidPairs?: string | null; // 같이 붙이면 안 되는 조 조건. 예: "1조-2조"
   layoutPattern?: string | null; // 열별 조 수. 예: "4*4", "333322", "3 3 4 4"
+  pinnedFront?: string | null; // 이 집회만 맨 앞자리(첫 구역)로 고정할 조. 예: "1조" 또는 "1조, 3조"(쉼표 순서대로 앞자리)
   zoneWeights?: number[] | null; // 앞열부터 자리 효용 점수. 값이 클수록 좋은 자리로 계산.
   zones: IguardSeatingZone[];
 }

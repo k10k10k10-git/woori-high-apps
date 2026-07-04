@@ -33,6 +33,32 @@ function groupKeys(group: Group): string[] {
   ].map(v => v.replace(/\s+/g, "").toLowerCase());
 }
 
+// 맨 앞 고정 조 파싱 — "1조, 3조" 또는 줄바꿈 구분. 쉼표/줄바꿈 순서 그대로 앞순서(첫 조가 맨 앞).
+// avoidPairs와 같은 groupKeys 매칭(조 id/이름/부+이름) 재사용. 매칭 안 되는 이름은 무시.
+function parsePinnedFront(value: string | null | undefined, groups: Group[]): string[] {
+  if (!value) return [];
+  const byKey = new Map<string, string>();
+  groups.forEach(g => groupKeys(g).forEach(key => byKey.set(key, g.id)));
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  value.split(/[\n,，]+/).map(v => v.replace(/\s+/g, "").toLowerCase()).filter(Boolean).forEach(token => {
+    const id = byKey.get(token);
+    if (id && !seen.has(id)) { seen.add(id); ids.push(id); }
+  });
+  return ids;
+}
+
+// 공정 배분 순서(ordered)에 맨 앞 고정 조를 앞으로 끌어와 최종 순서를 만든다.
+// 고정 조도 앞자리 점수를 그대로 받으므로, 다음 비고정 세션에서는 공정하게 뒤로 밀린다.
+function applyPinnedFront(ordered: Group[], pinnedIds: string[]): Group[] {
+  if (pinnedIds.length === 0) return ordered;
+  const byId = new Map(ordered.map(g => [g.id, g]));
+  const pinned = pinnedIds.map(id => byId.get(id)).filter((g): g is Group => !!g);
+  const pinnedSet = new Set(pinned.map(g => g.id));
+  const rest = ordered.filter(g => !pinnedSet.has(g.id));
+  return [...pinned, ...rest];
+}
+
 function parseAvoidPairs(value: string | null | undefined, groups: Group[]): [string, string][] {
   if (!value) return [];
   const byKey = new Map<string, string>();
@@ -153,14 +179,15 @@ export function computeFairAssignment(groups: Group[], meals: IguardMeal[], seat
     if (item.kind === "meal") {
       const meal = item.ref as IguardMeal;
       const mealWeight = meal.weight && meal.weight > 0 ? meal.weight : 1;
+      const finalOrder = applyPinnedFront(ordered, parsePinnedFront(meal.pinnedFront, groups));
       const prevRound = new Map((meal.entries || []).map(e => [e.groupId, e.round]));
-      const entries: IguardMealEntry[] = ordered.map((g, i) => {
+      const entries: IguardMealEntry[] = finalOrder.map((g, i) => {
         const r = prevRound.get(g.id);
         return { groupId: g.id, seq: i, ...(r ? { round: r } : {}) };
       });
       mealsOut.push({ id: meal.id, entries });
       const t1 = N / 3, t2 = (2 * N) / 3; // 앞/중간/뒤 3구간 경계
-      ordered.forEach((g, i) => {
+      finalOrder.forEach((g, i) => {
         score.set(g.id, score.get(g.id)! + (N > 1 ? (N - 1 - i) / (N - 1) : 1) * mealWeight); // 앞=1, 뒤=0
         if (i < t1) mealFront.set(g.id, mealFront.get(g.id)! + 1);
         else if (i < t2) mealMid.set(g.id, mealMid.get(g.id)! + 1);
@@ -180,8 +207,9 @@ export function computeFairAssignment(groups: Group[], meals: IguardMeal[], seat
           : Z > 1 ? (Z - 1 - z) / (Z - 1) : 1;
       });
       const newZones: IguardSeatingZone[] = zones.map(z => ({ name: z.name, groupIds: [] }));
+      const finalOrder = applyPinnedFront(ordered, parsePinnedFront(seat.pinnedFront, groups));
       let targetZone = 0;
-      ordered.forEach((g, idx) => {
+      finalOrder.forEach((g, idx) => {
         let z: number;
         if (capacities.length > 0) {
           while (targetZone < Z - 1 && newZones[targetZone].groupIds.length >= (capacities[targetZone] || 0)) targetZone++;

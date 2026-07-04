@@ -29,6 +29,7 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
   const [zoneInputs, setZoneInputs] = useState<Record<string, string>>({});
   const [patternInputs, setPatternInputs] = useState<Record<string, string>>({});
   const [avoidInputs, setAvoidInputs] = useState<Record<string, string>>({});
+  const [pinnedInputs, setPinnedInputs] = useState<Record<string, string>>({});
 
   async function addSession() {
     if (!label.trim()) return toast("집회/세션 이름을 입력해주세요.", "warning");
@@ -55,6 +56,9 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
   async function saveAvoidPairs(s: IguardSeating) {
     const value = (avoidInputs[s.id] ?? s.avoidPairs ?? "").trim();
     try { await updateIguardSeating(retreatId, s.id, { avoidPairs: value || null }); } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
+  }
+  async function savePinnedFront(s: IguardSeating, value: string) {
+    try { await updateIguardSeating(retreatId, s.id, { pinnedFront: value.trim() || null }); } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
   }
   function addZone(s: IguardSeating) {
     const name = (zoneInputs[s.id] || "").trim();
@@ -150,6 +154,17 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
                     onBlur={() => saveAvoidPairs(s)}
                   />
                   <p className="mt-1 text-[11px] text-slate-400">공정배정 시 같은 열에 들어가지 않도록 최대한 분리합니다.</p>
+                </div>
+                <div className="rounded-lg border border-slate-100 bg-white p-3">
+                  <label className="text-xs font-semibold text-slate-500 block mb-1">맨앞 고정 조</label>
+                  <input
+                    className="input"
+                    placeholder="예: 1조 또는 1조, 3조 (이 집회만 자동배정 시 맨 앞자리로)"
+                    value={pinnedInputs[s.id] ?? s.pinnedFront ?? ""}
+                    onChange={e => setPinnedInputs(p => ({ ...p, [s.id]: e.target.value }))}
+                    onBlur={e => savePinnedFront(s, e.target.value)}
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">쉼표로 여러 조 입력 시 적힌 순서대로 앞자리부터 배정됩니다. &ldquo;붙이면 안 되는 조&rdquo; 조건이 우선될 수 있어 드물게 밀릴 수 있습니다.</p>
                 </div>
                 {(s.zones || []).map((z, zi) => (
                   <div key={zi} className="border border-slate-100 rounded-lg p-3">
