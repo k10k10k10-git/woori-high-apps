@@ -16,18 +16,19 @@ function stripRaw(p: Participant): Omit<Participant, "raw"> {
   return rest;
 }
 
-/** raw를 {h,v} 쌍 배열로 정규화 — 배열(현행) 외에 구버전 Record 형태가 저장돼 있어도 안전하게 처리 */
+/** raw를 {h,v} 쌍 배열로 정규화 — 배열(현행) 외에 구버전 Record 형태가 저장돼 있어도 안전하게 처리.
+ *  값이 빈 열도 유지한다(예: "기타 사항" — 안 적은 사람이 많아도 열은 항상 표시). */
 function rawPairsOf(raw: unknown): { h: string; v: string }[] {
   if (!raw) return [];
   if (Array.isArray(raw)) {
     return (raw as { h?: string; v?: string }[])
-      .filter(p => p?.h && p?.v)
-      .map(p => ({ h: p.h!, v: p.v! }));
+      .filter(p => p?.h)
+      .map(p => ({ h: p.h!, v: p.v ?? "" }));
   }
   if (typeof raw === "object") {
     return Object.entries(raw as Record<string, string>)
-      .filter(([h, v]) => h && v)
-      .map(([h, v]) => ({ h, v: String(v) }));
+      .filter(([h]) => h)
+      .map(([h, v]) => ({ h, v: String(v ?? "") }));
   }
   return [];
 }

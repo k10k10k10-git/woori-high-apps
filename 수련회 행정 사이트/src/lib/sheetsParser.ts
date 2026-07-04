@@ -69,10 +69,11 @@ export async function fetchSheetParticipants(
     // {h,v} 쌍 배열로 담는다(헤더에 Firebase 키 금지 문자 './/' 등이 흔해 Record 키로는 저장 실패).
     // A~D열(타임스탬프/이름/성별/부)은 표에 이미 고정 표시되므로 제외, 빈 값도 제외.
     // ⚠ 참가자 저장(saveParticipants) 시에는 반드시 제외해야 한다 — 그쪽은 이가드도 읽는 공용 경로.
+    // 값이 비어 있어도 열은 유지한다 — 예: "기타 사항" 열은 안 적은 사람이 많아도 표에 항상 보여야 함.
     const rawPairs = headers
       .map((h, idx) => ({ h: h.trim(), v: values[idx]?.trim() || "" }))
       .slice(4)
-      .filter(pair => pair.h && pair.v);
+      .filter(pair => pair.h);
     if (participant) participants.push({ ...participant, raw: rawPairs });
   }
 
