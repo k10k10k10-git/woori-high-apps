@@ -483,7 +483,7 @@ export default function ParticipantsTab({ retreat }: Props) {
                             <td className="px-4 py-2 text-slate-400 whitespace-nowrap">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
                             <td className="px-4 py-2 text-slate-700 font-medium whitespace-nowrap">{e.registeredAt || "—"}</td>
                             <td className="px-4 py-2 text-slate-500">{e.gender || "—"}</td>
-                            <td className="px-4 py-2"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
+                            <td className="px-4 py-2 whitespace-nowrap"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
                             <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
                             <td className="px-4 py-2 whitespace-nowrap">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
                             {rawHeaders.map(h => {
