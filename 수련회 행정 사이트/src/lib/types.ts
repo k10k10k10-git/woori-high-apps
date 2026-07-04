@@ -188,10 +188,14 @@ export interface BrainstormNote {
 
 // ── 행정물품 체크리스트 (구매가 아닌 현재 재고·준비 여부 관리) ──────
 
+export const ADMIN_SUPPLY_KINDS = ["행정물품", "의약품"] as const;
+export type AdminSupplyKind = typeof ADMIN_SUPPLY_KINDS[number];
+
 export interface AdminSupplyItem {
   id: string;
+  kind: AdminSupplyKind; // "행정물품" | "의약품" — 상위 분류(내부 탭)
   name: string;
-  category?: string;   // 예: "사무용품", "의료용품", "행사용품" — 자유 입력
+  category?: string;   // 예: "사무용품", "감기약" — 같은 kind 내 세부 분류(자유 입력)
   neededQty?: string;  // 필요 수량 (예: "20개")
   stockQty?: string;   // 현재 재고
   checked: boolean;    // 준비 완료 여부
