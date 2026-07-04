@@ -125,7 +125,16 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
 
   async function handleUnresolve(payment: UnmatchedPayment) {
     try {
-      await unresolveUnmatchedPayment(retreat.id, payment.id);
+      // 연결 시 markPaid로 세팅했던 cellColors(입금완료 파란색)도 함께 지워서
+      // 신청자 취합 화면에 해제된 상태가 정확히 반영되게 한다.
+      await unresolveUnmatchedPayment(retreat.id, payment.id, payment.resolvedStudentId);
+      if (payment.resolvedStudentId) {
+        setCellColors_(prev => {
+          const next = { ...prev };
+          delete next[payment.resolvedStudentId!];
+          return next;
+        });
+      }
     } catch (e) {
       toast(e instanceof Error ? e.message : "입금 연결을 해제하지 못했습니다.", "error");
     }

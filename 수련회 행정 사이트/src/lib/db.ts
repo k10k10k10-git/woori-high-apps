@@ -737,16 +737,31 @@ export async function resolveUnmatchedPayment(
 
 export async function unresolveUnmatchedPayment(
   retreatId: string,
-  paymentId: string
+  paymentId: string,
+  paidCellKey?: string
 ): Promise<void> {
-  await update(ref(db, paths.unmatchedPayment(retreatId, paymentId)), {
+  const fields = {
     resolvedStudentKey: null,
     resolvedStudentName: null,
     resolvedStudentGrade: null,
     resolvedStudentClass: null,
     resolvedStudentId: null,
     resolvedAt: null,
-  });
+  };
+
+  if (paidCellKey) {
+    // 연결 시 markPaid로 cellColors를 "blue"로 세팅했다면, 해제 시 그 표시도 함께 지운다.
+    // (unmatchedPayments는 retreatsPrivate, cellColors는 retreats — 루트 멀티패스로 동시 갱신)
+    const payload: Record<string, unknown> = {};
+    Object.entries(fields).forEach(([key, value]) => {
+      payload[`${paths.unmatchedPayment(retreatId, paymentId)}/${key}`] = value;
+    });
+    payload[paths.cellColor(retreatId, paidCellKey)] = null;
+    await update(ref(db), payload);
+    return;
+  }
+
+  await update(ref(db, paths.unmatchedPayment(retreatId, paymentId)), fields);
 }
 
 export async function deleteUnmatchedPayment(
