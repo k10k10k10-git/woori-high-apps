@@ -22,6 +22,7 @@ import UnmatchedPaymentsTab from "./UnmatchedPaymentsTab";
 import TshirtTab from "./TshirtTab";
 import MedicalLogTab from "./MedicalLogTab";
 import MealCountTab from "./MealCountTab";
+import AdminSuppliesTab from "./AdminSuppliesTab";
 
 // 자주 사용하는 탭은 한번 마운트되면 CSS display로 보여주기/숨기기 (keep-alive).
 // 이를 통해 탭 전환 시 Firebase 재구독과 상태 초기화를 방지합니다.
@@ -49,6 +50,7 @@ const TAB_IDX = {
   TSHIRT:       13,
   MEDICAL:      14,
   MEALCOUNT:    15,
+  ADMINSUPPLIES: 16,
 } as const;
 
 // ── 탭 그룹 구조 (대그룹 → 소그룹) ─────────────────────────────
@@ -67,6 +69,7 @@ const TAB_GROUPS = [
       { label: "교사 참석",   idx: 4 },
       { label: "물품/간식",   idx: 10 },
       { label: "식수 계산",   idx: 15 },
+      { label: "행정물품",   idx: 16 },
     ],
   },
   {
@@ -403,6 +406,7 @@ export default function RetreatPageClient() {
           {tab === TAB_IDX.PAYMENTS    && <UnmatchedPaymentsTab   retreat={retreat} />}
           {tab === TAB_IDX.TSHIRT      && <TshirtTab             retreat={retreat} />}
           {tab === TAB_IDX.MEALCOUNT   && <MealCountTab          retreat={retreat} />}
+          {tab === TAB_IDX.ADMINSUPPLIES && <AdminSuppliesTab    retreat={retreat} />}
           {tab === TAB_IDX.MEDICAL     && <MedicalLogTab         retreat={retreat} />}
         </main>
     </div>

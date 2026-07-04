@@ -186,6 +186,18 @@ export interface BrainstormNote {
   comments?: Record<string, Omit<BrainstormComment, "id">>;
 }
 
+// ── 행정물품 체크리스트 (구매가 아닌 현재 재고·준비 여부 관리) ──────
+
+export interface AdminSupplyItem {
+  id: string;
+  name: string;
+  category?: string;   // 예: "사무용품", "의료용품", "행사용품" — 자유 입력
+  neededQty?: string;  // 필요 수량 (예: "20개")
+  stockQty?: string;   // 현재 재고
+  checked: boolean;    // 준비 완료 여부
+  note?: string;
+}
+
 export interface SuppliesBudget {
   supplyBudget?: number;              // 물품(행정물품 비용) 예산
   snackBudgets?: Record<string, number>; // 간식 카테고리별 예산 (첫째날 야식/둘째날 야식/스탭 간식/GBS 간식)

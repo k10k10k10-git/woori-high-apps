@@ -1,6 +1,6 @@
 import { ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, runTransaction, DataSnapshot } from "firebase/database";
 import { db } from "./firebase";
-import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, SuppliesBudget, MealCountData, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog } from "./types";
+import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, AdminSupplyItem, SuppliesBudget, MealCountData, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog } from "./types";
 import { paths } from "./paths";
 
 // Helper: DataSnapshot → typed list (injects id from Firebase key)
@@ -518,6 +518,27 @@ export async function updateSupply(retreatId: string, sId: string, data: Partial
 
 export async function deleteSupply(retreatId: string, sId: string): Promise<void> {
   await remove(ref(db, paths.supply(retreatId, sId)));
+}
+
+// ── Admin Supplies (행정물품 체크리스트) ────────────────────
+
+export async function getAdminSupplies(retreatId: string): Promise<AdminSupplyItem[]> {
+  const snap = await get(ref(db, paths.adminSupplies(retreatId)));
+  return snapToList<AdminSupplyItem>(snap);
+}
+
+export async function saveAdminSupply(retreatId: string, data: Omit<AdminSupplyItem, "id">): Promise<string> {
+  const newRef = push(ref(db, paths.adminSupplies(retreatId)));
+  await set(newRef, stripUndefined(data));
+  return newRef.key!;
+}
+
+export async function updateAdminSupply(retreatId: string, sId: string, data: Partial<AdminSupplyItem>): Promise<void> {
+  await update(ref(db, paths.adminSupply(retreatId, sId)), stripUndefined(data));
+}
+
+export async function deleteAdminSupply(retreatId: string, sId: string): Promise<void> {
+  await remove(ref(db, paths.adminSupply(retreatId, sId)));
 }
 
 // ── Snacks ────────────────────────────────────────────────

@@ -34,6 +34,10 @@ export const paths = {
   supplies: (id: string) => `retreats/${id}/supplies`,
   supply: (id: string, sid: string) => `retreats/${id}/supplies/${sid}`,
 
+  // ── 행정물품 체크리스트 (구매 리스트인 supplies와 별개 — 재고/준비 여부 관리) ──
+  adminSupplies: (id: string) => `retreats/${id}/adminSupplies`,
+  adminSupply: (id: string, sid: string) => `retreats/${id}/adminSupplies/${sid}`,
+
   // ── 간식 ──
   snacks: (id: string) => `retreats/${id}/snacks`,
   snack: (id: string, sid: string) => `retreats/${id}/snacks/${sid}`,
