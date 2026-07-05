@@ -18,18 +18,22 @@ firebase deploy --only hosting
 
 ### 행정 앱 (Vercel)
 ```bash
-cd "수련회 행정 사이트"
+cd "retreat-app"
 npx vercel --prod
 ```
 - 또는 로컬 빌드 후 배포: `npx vercel build --yes --prod && npx vercel deploy --prebuilt --prod --yes`
 - 배포 URL: https://retreat-app-theta.vercel.app
+- GitHub 연동: main 브랜치 머지 시 자동 배포 (Root Directory: `retreat-app`)
+  ⚠ 폴더명에 공백이 있으면 Git 배포 시 서버리스 함수 이름 검증에 걸려 실패한다(로컬 CLI 배포는 영향 없음) —
+  그래서 폴더명을 영문/공백없음으로 유지해야 한다.
 
 ### 이가드 앱 (Vercel)
 ```bash
-cd "수련회 이가드 사이트"
+cd "iguard-app"
 npx vercel --prod
 ```
-- 배포 URL: Vercel 대시보드에서 확인
+- 배포 URL: https://iguard-app.vercel.app
+- GitHub 연동: main 브랜치 머지 시 자동 배포 (Root Directory: `iguard-app`)
 
 ### 교사·스탭 앱
 - 아직 배포 설정 없음 (로컬 개발만)

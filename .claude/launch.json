@@ -4,13 +4,13 @@
     {
       "name": "retreat-admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "수련회 행정 사이트"],
+      "runtimeArgs": ["run", "dev", "--prefix", "retreat-app"],
       "port": 3000
     },
     {
       "name": "iguard-app",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "수련회 이가드 사이트", "--", "-p", "3001"],
+      "runtimeArgs": ["run", "dev", "--prefix", "iguard-app", "--", "-p", "3001"],
       "port": 3001
     }
   ]
