@@ -214,11 +214,11 @@ export default function ParticipantsTab({ retreat }: Props) {
         };
       });
 
-      const sortedEntries = Object.values(rematched).sort((a, b) => a.name.localeCompare(b.name, "ko"));
-      const sortedRematched: Record<string, Participant> = {};
-      sortedEntries.forEach((p, idx) => { sortedRematched[`p_${idx}`] = p; });
-      await saveParticipants(retreat.id, sortedRematched);
-      setParticipants(sortedRematched);
+      // 기존 키를 그대로 유지 — 이름순 재정렬은 화면 표시(list useMemo)에서만 하면 되고,
+      // 여기서 키를 새로 매기면 중복 신청 "유지" 선택이 참조하는 participantKey가 어긋나
+      // 다른 사람 데이터를 가리키게 되는 버그가 생긴다.
+      await saveParticipants(retreat.id, rematched);
+      setParticipants(rematched);
       setStudents(freshStudents);
 
       const total = Object.keys(participants).length;
