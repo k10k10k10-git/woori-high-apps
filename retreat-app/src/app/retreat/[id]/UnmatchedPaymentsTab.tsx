@@ -6,7 +6,7 @@ import {
   subscribeToParticipants, getClassesByYear, subscribeToCellColors,
   subscribeToUnmatchedPayments,
   addUnmatchedPayment, resolveUnmatchedPayment,
-  unresolveUnmatchedPayment, deleteUnmatchedPayment,
+  unresolveUnmatchedPayment, deleteUnmatchedPayment, updateUnmatchedPayment,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 
@@ -31,6 +31,12 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   const [studentSearch, setStudentSearch] = useState("");
   const [markPaid, setMarkPaid]         = useState(true);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // 미해결 항목 수정 UI
+  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [editPayerName, setEditPayerName] = useState("");
+  const [editNote, setEditNote]         = useState("");
+  const [savingEdit, setSavingEdit]     = useState(false);
 
   // 이름 → cellColor 키 맵 (이름변형 → "${buNum}_${studentId}")
   const [nameToColorKey, setNameToColorKey] = useState<Map<string, string>>(new Map());
@@ -137,6 +143,29 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       }
     } catch (e) {
       toast(e instanceof Error ? e.message : "입금 연결을 해제하지 못했습니다.", "error");
+    }
+  }
+
+  function startEdit(payment: UnmatchedPayment) {
+    setEditingId(payment.id);
+    setEditPayerName(payment.payerName);
+    setEditNote(payment.note ?? "");
+    setLinkingId(null);
+  }
+
+  async function handleSaveEdit(payment: UnmatchedPayment) {
+    if (!editPayerName.trim() || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      await updateUnmatchedPayment(retreat.id, payment.id, {
+        payerName: editPayerName.trim(),
+        note: editNote.trim() || undefined,
+      });
+      setEditingId(null);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "입금 항목을 수정하지 못했습니다.", "error");
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -393,6 +422,41 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
             {unresolved.map(payment => (
               <div key={payment.id} className="card overflow-hidden">
                 {/* 항목 행 */}
+                {editingId === payment.id ? (
+                  <div className="px-3 sm:px-4 py-3">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        className="input flex-1"
+                        placeholder="입금자 성함"
+                        value={editPayerName}
+                        onChange={e => setEditPayerName(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleSaveEdit(payment)}
+                      />
+                      <input
+                        className="input flex-1"
+                        placeholder="메모 (입금액, 참고사항 등)"
+                        value={editNote}
+                        onChange={e => setEditNote(e.target.value)}
+                        onKeyDown={e => e.key === "Enter" && handleSaveEdit(payment)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={() => handleSaveEdit(payment)}
+                        disabled={savingEdit || !editPayerName.trim()}
+                        className="btn-primary btn-sm text-xs"
+                      >
+                        {savingEdit ? "저장 중..." : "저장"}
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="btn-secondary btn-sm text-xs"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <div className="flex items-start sm:items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3">
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 font-bold text-xs sm:text-sm flex-shrink-0 mt-0.5 sm:mt-0">
                     ?
@@ -405,7 +469,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                     <div className="text-xs text-slate-300 mt-0.5">
                       {new Date(payment.createdAt).toLocaleDateString("ko-KR")} 등록
                     </div>
-                    <div className="flex items-center gap-2 mt-2 sm:hidden">
+                    <div className="flex items-center gap-2 mt-2 sm:hidden flex-wrap">
                       <button
                         onClick={() => {
                           setLinkingId(linkingId === payment.id ? null : payment.id);
@@ -414,6 +478,12 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                         className="btn-primary btn-sm text-xs"
                       >
                         학생 연결
+                      </button>
+                      <button
+                        onClick={() => startEdit(payment)}
+                        className="btn-secondary btn-sm text-xs"
+                      >
+                        수정
                       </button>
                       <button
                         onClick={() => handleDelete(payment)}
@@ -434,6 +504,12 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                       학생 연결
                     </button>
                     <button
+                      onClick={() => startEdit(payment)}
+                      className="btn-secondary btn-sm"
+                    >
+                      수정
+                    </button>
+                    <button
                       onClick={() => handleDelete(payment)}
                       className="btn-danger btn-sm"
                     >
@@ -441,6 +517,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                     </button>
                   </div>
                 </div>
+                )}
 
                 {/* 학생 검색 패널 */}
                 {linkingId === payment.id && (

@@ -776,6 +776,14 @@ export async function deleteUnmatchedPayment(
   await remove(ref(db, paths.unmatchedPayment(retreatId, paymentId)));
 }
 
+export async function updateUnmatchedPayment(
+  retreatId: string,
+  paymentId: string,
+  fields: Partial<Pick<UnmatchedPayment, "payerName" | "note">>
+): Promise<void> {
+  await update(ref(db, paths.unmatchedPayment(retreatId, paymentId)), stripUndefined(fields));
+}
+
 // ── 단체티 신청 ────────────────────────────────────────────
 
 export function subscribeToTshirtOrders(
