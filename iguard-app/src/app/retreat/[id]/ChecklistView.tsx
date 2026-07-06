@@ -1,9 +1,10 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
-import { Group, Student, IguardBus, IguardScheduleBlock } from "@/lib/types";
+import { Group, Student, IguardBus, IguardScheduleBlock, IguardAttendanceInfo } from "@/lib/types";
 import { clearIguardAttendance, updateIguardAttendance } from "@/lib/db";
 import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
+import { useAuth } from "@/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isPresentOnDay } from "@/lib/partialAttendance";
 
@@ -59,10 +60,13 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
   return map;
 }
 
-export default function ChecklistView({ retreatId, groups, students, buses, retreatName, year, checkedKeys, partial, schedule }: {
-  retreatId: string; groups: Group[]; students: Record<string, Student>; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; partial: Record<string, "선복귀" | "후발대">; schedule: IguardScheduleBlock[];
+export default function ChecklistView({ retreatId, groups, students, buses, retreatName, year, checkedKeys, attendanceInfo, partial, schedule }: {
+  retreatId: string; groups: Group[]; students: Record<string, Student>; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; attendanceInfo: Record<string, IguardAttendanceInfo>; partial: Record<string, "선복귀" | "후발대">; schedule: IguardScheduleBlock[];
 }) {
   const { toast, uiConfirm } = useUI();
+  const { user } = useAuth();
+  // 체크자 기록용 — 동시 사용 시 "누가 체크했는지" 대조 가능하게
+  const byName = user?.displayName?.trim() || user?.email?.split("@")[0] || undefined;
   const [mode, setMode] = useState<"조별" | "호차별">("조별");
   const [day, setDay] = useState<"1일차" | "3일차">("1일차"); // 1일차/3일차 인원이 달라 독립 체크
   const keyOf = (sid: string) => `${selectedBusDay}:${sid}`;
@@ -142,12 +146,28 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
   const total = units.reduce((a, u) => a + u.members.length, 0);
   const checkedCount = units.reduce((a, u) => a + u.members.filter(m => checkedKeys.has(keyOf(m.id))).length, 0);
 
-  async function toggle(sid: string) {
+  // 멱등 체크: 탭 = "출석 확인"(항상 present=true). 여러 스탭이 같은 학생을 동시에/중복
+  // 눌러도 결과가 "출석"으로 수렴한다. 해제는 아래 uncheck로만 — 실수로 present를 푸는 사고 방지.
+  async function check(sid: string) {
     const k = keyOf(sid);
+    if (checkedKeys.has(k)) return; // 이미 체크됨 — 멱등, 아무 것도 안 함
     try {
-      await updateIguardAttendance(retreatId, k, !checkedKeys.has(k));
+      await updateIguardAttendance(retreatId, k, true, byName);
     } catch (e) {
       toast(`체크 저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  // 해제는 확인을 거친다 — "확인하려다 오히려 해제"되는 동시 사용 사고를 막는 핵심.
+  async function uncheck(m: CheckMember) {
+    const k = keyOf(m.id);
+    if (!checkedKeys.has(k)) return;
+    const ok = await uiConfirm(`${m.name} 체크를 해제할까요?`);
+    if (!ok) return;
+    try {
+      await updateIguardAttendance(retreatId, k, false, byName);
+    } catch (e) {
+      toast(`해제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 
@@ -157,7 +177,7 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
     const ok = await uiConfirm(`${u.title} 체크 ${keys.length}개를 해제할까요? (재점호용)`);
     if (!ok) return;
     try {
-      await clearIguardAttendance(retreatId, keys);
+      await clearIguardAttendance(retreatId, keys, byName);
       toast(`${u.title} 체크 ${keys.length}개를 해제했습니다.`, "success");
     } catch (e) {
       toast(`초기화 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -170,7 +190,7 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
     const ok = await uiConfirm(`${day} 체크 ${keys.length}개를 모두 해제할까요? 도착 후 재점호 등 새로 체크할 때 사용하세요.`);
     if (!ok) return;
     try {
-      await clearIguardAttendance(retreatId, keys);
+      await clearIguardAttendance(retreatId, keys, byName);
       toast(`${day} 체크 ${keys.length}개를 모두 해제했습니다.`, "success");
     } catch (e) {
       toast(`초기화 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -215,6 +235,7 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
           <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
         </div>
       </div>
+      <p className="text-xs text-slate-400 mb-3">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 — 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
 
       {mode === "호차별" && units.length === 0 ? (
         <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🚌</div><p>{day} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>
@@ -245,12 +266,14 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
                   {u.members.length === 0 ? <li className="px-4 py-3 text-center text-slate-300 text-xs">없음</li> :
                     u.members.map((m, i) => {
                       const on = checkedKeys.has(keyOf(m.id));
+                      const by = on ? attendanceInfo[keyOf(m.id)]?.by : undefined;
                       return (
                         <li key={m.id}>
-                          <button onClick={() => toggle(m.id)} className={`w-full flex items-center gap-3 px-4 py-3 text-left ${on ? "bg-fuchsia-50" : "hover:bg-slate-50"}`}>
+                          <button onClick={() => on ? uncheck(m) : check(m.id)} className={`w-full flex items-center gap-3 px-4 py-3 text-left ${on ? "bg-fuchsia-50" : "hover:bg-slate-50"}`}>
                             <span className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm shrink-0 ${on ? "bg-green-500 border-green-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
                             <span className="text-slate-400 text-xs w-5">{i + 1}</span>
                             <span className={`font-medium ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{m.name === "(명단 미상)" ? <span className="text-amber-500">{m.name}</span> : m.name}</span>
+                            {by && <span className="text-[10px] text-fuchsia-400 shrink-0" title={`${by} 체크`}>✓{by}</span>}
                             <span className="ml-auto text-xs text-slate-400">{m.meta}</span>
                           </button>
                         </li>

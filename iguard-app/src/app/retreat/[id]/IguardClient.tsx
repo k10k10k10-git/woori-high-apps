@@ -100,7 +100,7 @@ export default function IguardClient() {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, adminTeachers,
     meals, schedule, posts, movements, buses, seating,
-    todos, guide, periods, attendanceKeys, partial, cellColors, groupStaff,
+    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff,
     connected,
   } = useRetreatData(id);
 
@@ -246,7 +246,7 @@ export default function IguardClient() {
           </div>
         )}
 
-        {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} partial={partial} schedule={schedule} />}
+        {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} schedule={schedule} />}
         {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} retreatName={retreat.name} year={retreat.year} />}
         {!dataLoading && view === "cue" && <CueCardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}

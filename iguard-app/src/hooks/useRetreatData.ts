@@ -12,7 +12,7 @@ import {
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
   IguardPost, IguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
-  TeacherAttendance,
+  TeacherAttendance, IguardAttendanceInfo,
 } from "@/lib/types";
 
 export interface RetreatData {
@@ -34,6 +34,7 @@ export interface RetreatData {
   guide: string[];
   periods: RetreatPeriod[];
   attendanceKeys: Set<string>;
+  attendanceInfo: Record<string, IguardAttendanceInfo>;
   partial: Record<string, "선복귀" | "후발대">;
   cellColors: Record<string, string>;
   groupStaff: Record<string, string[]>;
@@ -64,6 +65,7 @@ export function useRetreatData(id: string): RetreatData {
   const [guide, setGuide] = useState<string[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriod[]>([]);
   const [attendanceKeys, setAttendanceKeys] = useState<Set<string>>(new Set());
+  const [attendanceInfo, setAttendanceInfo] = useState<Record<string, IguardAttendanceInfo>>({});
   const [partial, setPartial] = useState<Record<string, "선복귀" | "후발대">>({});
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
@@ -115,7 +117,7 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToMilestones(value => { setTodos(value); ready("todos"); }),
       subscribeToIguardGuide(id, value => { setGuide(value); ready("guide"); }, fail("guide")),
       subscribeToRetreatPeriods(id, value => { setPeriods(value); ready("periods"); }, fail("periods")),
-      subscribeToIguardAttendance(id, value => { setAttendanceKeys(value); ready("attendance"); }, fail("attendance")),
+      subscribeToIguardAttendance(id, (value, info) => { setAttendanceKeys(value); setAttendanceInfo(info); ready("attendance"); }, fail("attendance")),
       subscribeToPartialAttendances(id, value => { setPartial(value); ready("partial"); }, fail("partial")),
       subscribeToCellColors(id, value => { setCellColors(value); ready("cellColors"); }, fail("cellColors")),
       subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }, fail("groupStaff")),
@@ -130,7 +132,7 @@ export function useRetreatData(id: string): RetreatData {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, adminTeachers,
     meals, schedule, posts, movements, buses, seating,
-    todos, guide, periods, attendanceKeys, partial, cellColors, groupStaff,
+    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff,
     connected,
   };
 }

@@ -1,9 +1,9 @@
-import { ref, get, set, update, push, remove, onValue, DataSnapshot } from "firebase/database";
+import { ref, get, set, update, push, remove, onValue, runTransaction, DataSnapshot } from "firebase/database";
 import { db } from "./firebase";
 import { paths } from "./paths";
 import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardPost, IguardMovement, IguardBus, IguardSeating,
-  RetreatPeriod, Milestone, IguardAttendance, TeacherAttendance } from "./types";
+  RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance } from "./types";
 export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
 
@@ -311,28 +311,50 @@ export async function deleteIguardBus(retreatId: string, id: string): Promise<vo
 function attendancePathKey(key: string): string {
   return encodeURIComponent(key);
 }
-export function subscribeToIguardAttendance(retreatId: string, cb: (checkedKeys: Set<string>) => void, onError?: (error: Error) => void): () => void {
+export function subscribeToIguardAttendance(
+  retreatId: string,
+  cb: (checkedKeys: Set<string>, info: Record<string, IguardAttendanceInfo>) => void,
+  onError?: (error: Error) => void,
+): () => void {
   return onValue(ref(db, paths.iguardAttendance(retreatId)), (snap) => {
-    if (!snap.exists()) return cb(new Set());
-    const keys = Object.entries(snap.val() as Record<string, IguardAttendance | boolean>)
-      .filter(([, value]) => value === true || (typeof value === "object" && value?.checked))
-      .map(([key]) => decodeURIComponent(key));
-    cb(new Set(keys));
+    if (!snap.exists()) return cb(new Set(), {});
+    const keys: string[] = [];
+    const info: Record<string, IguardAttendanceInfo> = {};
+    Object.entries(snap.val() as Record<string, IguardAttendance | boolean>).forEach(([rawKey, value]) => {
+      const key = decodeURIComponent(rawKey);
+      // 하위호환: 구버전 `true` / 신버전 `{checked, updatedAt?, by?}` 모두 지원.
+      // checked:false는 해제 톰스톤 — 체크 목록에서 제외하되 info에는 남긴다(누가 해제했는지 표시용).
+      if (value === true) { keys.push(key); info[key] = { checked: true }; return; }
+      if (typeof value === "object" && value !== null) {
+        info[key] = { checked: !!value.checked, updatedAt: value.updatedAt, by: value.by };
+        if (value.checked) keys.push(key);
+      }
+    });
+    cb(new Set(keys), info);
   }, (error) => { console.warn("subscribeToIguardAttendance error:", error); onError?.(error); });
 }
-export async function updateIguardAttendance(retreatId: string, key: string, checked: boolean): Promise<void> {
+/**
+ * 인원체크 설정/해제 — 동시 사용 안전 버전.
+ * - 트랜잭션으로 updatedAt을 비교해, 오프라인에서 늦게 도착한 낡은 쓰기가
+ *   더 최신 기록을 덮어쓰지 못하게 한다(재연결 시 서버 값 기준으로 재실행됨).
+ * - 해제는 삭제 대신 checked:false 톰스톤을 남긴다 — 삭제하면 낡은 체크가 되살아날 수 있음.
+ */
+export async function updateIguardAttendance(retreatId: string, key: string, checked: boolean, by?: string): Promise<void> {
   const r = ref(db, paths.iguardAttendanceEntry(retreatId, attendancePathKey(key)));
-  if (!checked) {
-    await remove(r);
-    return;
-  }
-  await set(r, { checked: true, updatedAt: Date.now() });
+  const now = Date.now();
+  await runTransaction(r, (cur: IguardAttendance | boolean | null) => {
+    const curTs = cur && typeof cur === "object" && typeof cur.updatedAt === "number" ? cur.updatedAt : 0;
+    if (curTs > now) return undefined; // 서버에 더 최신 기록 — 이 쓰기는 폐기(abort)
+    return stripUndefined({ checked, updatedAt: now, by });
+  });
 }
-/** 여러 체크를 한 번의 multi-path update로 해제 — 재점호용 초기화 */
-export async function clearIguardAttendance(retreatId: string, keys: string[]): Promise<void> {
+/** 여러 체크를 한 번의 multi-path update로 해제 — 재점호용 초기화.
+ *  개별 해제와 같은 이유로 삭제 대신 톰스톤을 기록한다(초기화 직전 오프라인 체크의 부활 방지). */
+export async function clearIguardAttendance(retreatId: string, keys: string[], by?: string): Promise<void> {
   if (keys.length === 0) return;
-  const updates: Record<string, null> = {};
-  keys.forEach(key => { updates[attendancePathKey(key)] = null; });
+  const now = Date.now();
+  const updates: Record<string, IguardAttendance | Omit<IguardAttendance, "id">> = {};
+  keys.forEach(key => { updates[attendancePathKey(key)] = stripUndefined({ checked: false, updatedAt: now, by }); });
   await update(ref(db, paths.iguardAttendance(retreatId)), updates);
 }
 

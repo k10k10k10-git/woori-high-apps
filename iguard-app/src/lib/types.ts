@@ -183,8 +183,16 @@ export interface IguardBus {
 // ── 인원체크 저장 상태 ─────────────────────────────────────
 export interface IguardAttendance {
   id: string;            // encodeURIComponent(`${day}:${memberId}`)
+  checked: boolean;      // false = 해제 톰스톤(삭제 대신 기록 — 오프라인 낡은 체크가 최신 해제를 덮지 못하게)
+  updatedAt?: number;
+  by?: string;           // 체크/해제한 사람 (스탭 이름 — 동시 사용 시 대조용)
+}
+
+/** 인원체크 상세 (구독에서 키별로 내려주는 부가 정보) */
+export interface IguardAttendanceInfo {
   checked: boolean;
   updatedAt?: number;
+  by?: string;
 }
 
 // ── 집회 자리배치: 세션별 구역 → 조 ────────────────────────
