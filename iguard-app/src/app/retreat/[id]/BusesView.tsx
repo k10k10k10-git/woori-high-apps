@@ -28,7 +28,11 @@ function parseBusStaffNames(value?: string): string[] {
     .replace(/^선탑\/동승\s*[:：]?\s*/g, "")
     .replace(/선탑\s*[:：]/g, "")
     .replace(/동승\s*[:：]/g, "");
-  return raw.split(/[,\n/]+/).map(s => s.trim()).filter(Boolean);
+  // 큐싯에는 "박혜원sf"처럼 스탭 표시 꼬리표가 붙는 관행이 있어, 버스배정 필드의
+  // "박혜원"과 다른 사람으로 인식돼 명단에 두 번 나오던 문제 — 꼬리표를 떼고 통일한다.
+  return raw.split(/[,\n/]+/)
+    .map(s => s.trim().replace(/sf$/i, "").trim())
+    .filter(Boolean);
 }
 
 function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 3): Map<number, string[]> {
