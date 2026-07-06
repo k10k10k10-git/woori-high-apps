@@ -100,6 +100,20 @@ export default function ParticipantsTab({ retreat }: Props) {
       await backupParticipants(retreat.id);
       const list = await fetchSheetParticipants(retreat.sheetId, retreat.sheetGid);
 
+      // 특이사항 보존: 시트에도 특이사항 열이 있어서 전체 재생성 시 관리자가 특이사항 탭에서
+      // 수정한 내용([분류] 태그, 문구 수정, 추가 메모)이 시트 원문으로 되돌아가는 버그가 있었다.
+      // 키(p_N)는 매 동기화마다 재배열되므로 studentId(없으면 이름+부+학년+반)로 사람을 맞춰
+      // 기존 extra를 우선 유지한다. 기존 값이 없을 때만 시트의 특이사항을 새로 채운다.
+      // (로컬 state는 stale할 수 있어 DB에서 새로 읽는다.)
+      const existing = await getParticipants(retreat.id);
+      const extraByStudentId = new Map<string, string>();
+      const extraByIdentity = new Map<string, string>();
+      Object.values(existing).forEach(prev => {
+        if (!prev.extra) return;
+        if (prev.studentId) extraByStudentId.set(prev.studentId, prev.extra);
+        extraByIdentity.set(`${prev.name.trim()}|${prev.bu ?? ""}|${prev.grade}|${prev.class}`, prev.extra);
+      });
+
       // 학생 DB 매칭 + 중복 제거 (동일 studentId는 최초 신청만 유지, 미매칭은 name+bu+grade 기준)
       const seenStudentIds = new Set<string>();
       const dupEntries = new Map<string, { name: string; bu: string; entries: Participant[] }>();
@@ -127,12 +141,15 @@ export default function ParticipantsTab({ retreat }: Props) {
       const dedupKeyToParticipantKey = new Map<string, string>();
       sorted.forEach(({ p, ms, dedupKey }, idx) => {
         const key = `p_${idx}`;
+        const preservedExtra = (ms?.id ? extraByStudentId.get(ms.id) : undefined)
+          ?? extraByIdentity.get(`${p.name.trim()}|${p.bu ?? ""}|${p.grade}|${p.class}`);
         // raw(시트 전체 열, 민감정보 포함 가능)는 공용 participants 경로에 절대 저장하지 않는다 — stripRaw로 제외.
         matched[key] = {
           ...stripRaw(p),
           studentId: ms?.id ?? null,
           phone: p.phone || ms?.phone || null,
           pPhone: ms?.pPhone ?? null,
+          ...(preservedExtra ? { extra: preservedExtra } : {}),
         };
         dedupKeyToParticipantKey.set(dedupKey, key);
       });
@@ -163,11 +180,14 @@ export default function ParticipantsTab({ retreat }: Props) {
     const chosen = dup.entries[entryIndex];
     if (!chosen) return;
     const ms = findStudent(chosen, students);
+    // 다른 신청 항목을 선택해도 관리자가 특이사항 탭에서 수정한 extra는 유지
+    const prevExtra = participants[dup.participantKey]?.extra;
     const updated: Participant = {
       ...stripRaw(chosen),
       studentId: ms?.id ?? null,
       phone: chosen.phone || ms?.phone || null,
       pPhone: ms?.pPhone ?? null,
+      ...(prevExtra ? { extra: prevExtra } : {}),
     };
     try {
       await updateParticipant(retreat.id, dup.participantKey, updated);
