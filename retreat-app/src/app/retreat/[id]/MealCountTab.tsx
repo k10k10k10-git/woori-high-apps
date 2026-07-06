@@ -259,9 +259,14 @@ export default function MealCountTab({ retreat }: Props) {
         defaultKind: p.type === "선복귀" ? "선복귀" : "후발",
       });
     });
-    // 부(1부→2부→스탭) → 이름순 정렬
+    // 역할(교사·스탭 → 학생) → 부(1부→2부→스탭) → 이름순 정렬 — 교사/스탭과 학생이 섞여 헷갈리지 않도록 역할을 우선 그룹화
+    const roleOrder = (r: MealRole) => r === "teacher" ? 0 : r === "staff" ? 1 : 2;
     const buOrder = (b: string) => b === "1부" ? 0 : b === "2부" ? 1 : b === "스탭" ? 2 : 3;
-    return out.sort((a, b) => buOrder(a.bu) - buOrder(b.bu) || a.name.localeCompare(b.name, "ko"));
+    return out.sort((a, b) =>
+      roleOrder(a.role) - roleOrder(b.role) ||
+      buOrder(a.bu) - buOrder(b.bu) ||
+      a.name.localeCompare(b.name, "ko")
+    );
   }, [dbTeachers, dbParticipants, dbPartials]);
 
   function getAssignment(p: DbPerson): MealPersonAssignment {
@@ -440,15 +445,26 @@ export default function MealCountTab({ retreat }: Props) {
                 );
               })()}
               <div className="space-y-1">
-                {dbPersons.map(p => {
+                {dbPersons.map((p, i) => {
                   const a = getAssignment(p);
                   const applied = !a.skip && !!a.mealId && mealIndexById.has(a.mealId);
+                  const prevRole = i > 0 ? dbPersons[i - 1].role : null;
+                  const showDivider = p.role !== prevRole;
                   return (
-                    <div key={p.key}
+                    <div key={p.key}>
+                    {showDivider && (
+                      <div className="pt-2 pb-1 text-[11px] font-semibold text-slate-400 first:pt-0">
+                        {p.role === "student" ? "— 학생 —" : "— 교사·스탭 —"}
+                      </div>
+                    )}
+                    <div
                       className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-2.5 py-1.5 text-xs ${
                         a.skip ? "border-slate-100 bg-slate-50 opacity-60" : applied ? "border-emerald-100 bg-emerald-50/40" : "border-amber-200 bg-amber-50/40"
                       }`}>
                       <span className={`tag text-[10px] ${p.bu === "1부" ? "tag-green" : p.bu === "2부" ? "tag-purple" : "tag-blue"}`}>{p.bu}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {p.role === "student" ? "학생" : p.role === "teacher" ? "교사" : "스탭"}
+                      </span>
                       <span className="font-medium text-slate-700">{p.name}</span>
                       <span className="text-slate-400">{p.affiliation}</span>
                       {p.detail && <span className="text-slate-400">· {p.detail}</span>}
@@ -470,6 +486,7 @@ export default function MealCountTab({ retreat }: Props) {
                           제외
                         </label>
                       </div>
+                    </div>
                     </div>
                   );
                 })}
