@@ -33,6 +33,19 @@ const ROLE_LABELS: { key: keyof MealRoleCounts; label: string }[] = [
 const MEAL_NAME_ORDER: Record<string, number> = { "아침": 0, "점심": 1, "저녁": 2 };
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
 
+function buToNum(bu: string): number {
+  return bu === "2부" ? 2 : 1;
+}
+
+// 부분참 레코드(id = "{buNum}_{studentId}")로 참가자를 찾으려면, 참가자 쪽도 같은 형식의
+// 키를 만들어 대조해야 한다 — participants는 "p_0" 같은 별개 키 체계라 직접 조회 불가.
+// (PartialAttendanceTab.makeStudentKey와 동일 로직)
+function makeStudentKey(p: Participant): string | null {
+  if (!p.studentId) return null;
+  const sid = String(p.studentId);
+  return /^[12]_/.test(sid) ? sid : `${buToNum(p.bu)}_${sid}`;
+}
+
 function sumCounts(c: MealRoleCounts): number {
   return (c.staff || 0) + (c.teacher || 0) + (c.student || 0) + (c.extra || 0);
 }
@@ -230,8 +243,13 @@ export default function MealCountTab({ retreat }: Props) {
       });
     });
     // 학생 — 부분 참석 탭 데이터
+    const participantsByStudentKey = new Map<string, Participant>();
+    Object.values(dbParticipants).forEach(part => {
+      const key = makeStudentKey(part);
+      if (key) participantsByStudentKey.set(key, part);
+    });
     dbPartials.forEach(p => {
-      const part = dbParticipants[p.id];
+      const part = participantsByStudentKey.get(p.id);
       out.push({
         key: `s_${p.id}`,
         role: "student",
