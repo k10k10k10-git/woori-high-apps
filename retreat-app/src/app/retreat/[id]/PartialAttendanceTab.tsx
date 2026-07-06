@@ -105,12 +105,17 @@ export default function PartialAttendanceTab({ retreat }: Props) {
           partial: recordMap.get(studentKey),
         }];
       })
-      .sort((a, b) =>
-        a.buNum - b.buNum ||
-        a.grade - b.grade ||
-        a.classNum - b.classNum ||
-        a.name.localeCompare(b.name, "ko")
-      );
+      .sort((a, b) => {
+        // 부분참(선복귀/후발대)을 맨 위로 — 본대 사이에 묻혀 찾기 어렵다는 피드백 반영
+        const priority = (r: ParticipantRow) => r.partial?.type === "선복귀" ? 0 : r.partial?.type === "후발대" ? 1 : 2;
+        return (
+          priority(a) - priority(b) ||
+          a.buNum - b.buNum ||
+          a.grade - b.grade ||
+          a.classNum - b.classNum ||
+          a.name.localeCompare(b.name, "ko")
+        );
+      });
   }, [participants, cellColors, recordMap]);
 
   const unmatchedCount = useMemo(
@@ -307,8 +312,15 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                           {status}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-500 max-w-[16rem] truncate">
-                        {row.partial?.note || "—"}
+                      <td className="px-4 py-2.5 text-xs max-w-[16rem]">
+                        <button
+                          onClick={() => openEditor(row)}
+                          disabled={disabled}
+                          className="w-full text-left truncate text-slate-500 hover:text-slate-800 hover:underline disabled:opacity-40"
+                          title="클릭해서 메모 수정"
+                        >
+                          {row.partial?.note || "메모 추가"}
+                        </button>
                       </td>
                       <td className="px-4 py-2.5">
                         <div className="flex flex-wrap gap-1.5">
