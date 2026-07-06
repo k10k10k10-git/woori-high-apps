@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Room, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers } from "@/lib/db";
+import { saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
 interface Props {
@@ -323,14 +324,14 @@ export default function RoomsTab({ retreat }: Props) {
   function buildRoomsHtml() {
     const typeList = [...new Set(rooms.map(r => r.type))].sort();
     const chip = (text: string, bg = "#eff6ff", border = "#bfdbfe", color = "#1e40af") =>
-      `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:9999px;padding:1px 8px;font-size:10px;color:${color};margin:2px 2px 2px 0">${text}</span>`;
+      `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:9999px;padding:1px 8px;font-size:10px;color:${color};margin:2px 2px 2px 0">${escapeHtml(text)}</span>`;
 
-    let html = `<h1 style="margin:0 0 4px">${retreat.name} 방배정</h1>
+    let html = `<h1 style="margin:0 0 4px">${escapeHtml(retreat.name)} 방배정</h1>
       <p style="font-size:11px;color:#888;margin:0 0 16px">총 ${rooms.length}개 방 · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>`;
 
     typeList.forEach(type => {
       const typeRooms = rooms.filter(r => r.type === type);
-      html += `<h2 style="font-size:13px;margin:0 0 8px;border-bottom:2px solid #e2e8f0;padding-bottom:4px">${type}생 방 (${typeRooms.length}개)</h2>
+      html += `<h2 style="font-size:13px;margin:0 0 8px;border-bottom:2px solid #e2e8f0;padding-bottom:4px">${escapeHtml(type)}생 방 (${typeRooms.length}개)</h2>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">`;
 
       typeRooms.forEach(r => {
@@ -350,8 +351,8 @@ export default function RoomsTab({ retreat }: Props) {
 
         html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;page-break-inside:avoid;font-size:11px">
           <div style="font-weight:700;font-size:13px;margin-bottom:4px">
-            ${r.roomNumber}호
-            <span style="font-size:10px;background:#f1f5f9;color:#475569;border-radius:4px;padding:1px 6px;margin-left:4px">${r.type}생</span>
+            ${escapeHtml(r.roomNumber)}호
+            <span style="font-size:10px;background:#f1f5f9;color:#475569;border-radius:4px;padding:1px 6px;margin-left:4px">${escapeHtml(r.type)}생</span>
             <span style="font-size:10px;color:#94a3b8;margin-left:4px">정원 ${r.capacity}명</span>
           </div>
           ${teacherChips ? `<div style="margin-bottom:5px"><span style="color:#64748b;font-size:10px">👨‍🏫 교사: </span>${teacherChips}</div>` : ""}
@@ -471,6 +472,7 @@ export default function RoomsTab({ retreat }: Props) {
           <button onClick={exportRoomsXLSX} disabled={rooms.length === 0} className="btn-secondary btn-sm">📥 XLSX</button>
           <button onClick={exportRoomsPDF} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
           <button onClick={exportRoomsJPG} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
+          <BackupRestoreButton label="방배정" loadBackups={() => getRoomsBackups(retreat.id)} restore={key => restoreRoomsBackup(retreat.id, key)} />
           <button onClick={() => setShowAddRoom(true)} className="btn-secondary btn-sm">＋ 방 추가</button>
           <span className={`text-xs font-medium px-2 ${saving ? "text-blue-500" : isDirty ? "text-amber-500" : "text-green-500"}`}>
             {saving ? "저장 중..." : isDirty ? "편집 중..." : "✓ 저장됨"}

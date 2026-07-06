@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { saveGroups, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff } from "@/lib/db";
+import { saveGroups, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
+import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import AutoAssignPanel from "./AutoAssignPanel";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName } from "@/lib/groupNumber";
@@ -433,13 +434,13 @@ export default function GroupsTab({ retreat }: Props) {
     </style>`;
 
     let html = style;
-    html += `<h1>${retreat.name} 조편성</h1>
+    html += `<h1>${escapeHtml(retreat.name)} 조편성</h1>
       <p class="doc-sub">총 ${groups.length}조 &nbsp;·&nbsp; 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>`;
 
     pages.forEach(({ bu, pageGroups, showBuLabel, isLast }) => {
       if (showBuLabel) {
         const buTotal = groups.filter(g => g.bu === bu).length;
-        html += `<div class="bu-lbl">${bu} (${buTotal}조)</div>`;
+        html += `<div class="bu-lbl">${escapeHtml(bu)} (${buTotal}조)</div>`;
       }
       html += `<div class="pg${isLast ? "" : " pb"}">`;
 
@@ -465,8 +466,8 @@ export default function GroupsTab({ retreat }: Props) {
 
         html += `<div class="gc">
           <div class="gc-head">
-            <div><span class="gc-name">${groupDisplayName(g, groups)}</span><span class="gc-bu">${g.bu}</span></div>
-            ${g.gbs ? `<div class="gc-gbs">📍 ${g.gbs}</div>` : ""}
+            <div><span class="gc-name">${escapeHtml(groupDisplayName(g, groups))}</span><span class="gc-bu">${escapeHtml(g.bu)}</span></div>
+            ${g.gbs ? `<div class="gc-gbs">📍 ${escapeHtml(g.gbs)}</div>` : ""}
           </div>
           <table>
             <thead><tr>
@@ -485,7 +486,7 @@ export default function GroupsTab({ retreat }: Props) {
           html += `<tr class="r-teacher">
             <td class="t-num">—</td>
             <td class="t-cls">교사</td>
-            <td class="t-name">${name}</td>
+            <td class="t-name">${escapeHtml(name)}</td>
             <td class="t-sex"></td>
             <td class="t-chk"></td>
           </tr>`;
@@ -497,8 +498,8 @@ export default function GroupsTab({ retreat }: Props) {
           html += `<tr class="r-leader">
             <td class="t-num">${num++}</td>
             <td class="t-cls">${s ? `${s.grade}학년 ${s.class}반` : "조장"}</td>
-            <td class="t-name">${name}<span class="badge">조장</span></td>
-            <td class="t-sex">${(s as {gender?:string})?.gender ?? ""}</td>
+            <td class="t-name">${escapeHtml(name)}<span class="badge">조장</span></td>
+            <td class="t-sex">${escapeHtml((s as {gender?:string})?.gender ?? "")}</td>
             <td class="t-chk"><span class="chk"></span></td>
           </tr>`;
         });
@@ -509,8 +510,8 @@ export default function GroupsTab({ retreat }: Props) {
           html += `<tr class="r-staff">
             <td class="t-num">${num++}</td>
             <td class="t-cls">${s ? `${s.grade}학년 ${s.class}반` : "스탭"}</td>
-            <td class="t-name">${name}<span class="badge">스탭</span></td>
-            <td class="t-sex">${(s as {gender?:string})?.gender ?? ""}</td>
+            <td class="t-name">${escapeHtml(name)}<span class="badge">스탭</span></td>
+            <td class="t-sex">${escapeHtml((s as {gender?:string})?.gender ?? "")}</td>
             <td class="t-chk"><span class="chk"></span></td>
           </tr>`;
         });
@@ -535,8 +536,8 @@ export default function GroupsTab({ retreat }: Props) {
           html += `<tr class="${[rowCls, isDiv ? "cls-div" : ""].filter(Boolean).join(" ")}">
             <td class="t-num">${num++}</td>
             <td class="t-cls">${s.grade}학년 ${s.class}반</td>
-            <td class="t-name">${s.name}${badge}</td>
-            <td class="t-sex">${(s as {gender?:string})?.gender ?? ""}</td>
+            <td class="t-name">${escapeHtml(s.name)}${badge}</td>
+            <td class="t-sex">${escapeHtml((s as {gender?:string})?.gender ?? "")}</td>
             <td class="t-chk">${color !== "red" ? '<span class="chk"></span>' : ""}</td>
           </tr>`;
         });
@@ -665,6 +666,7 @@ export default function GroupsTab({ retreat }: Props) {
           <button onClick={exportGroupsXLSX} disabled={groups.length === 0} className="btn-secondary btn-sm">📥 XLSX</button>
           <button onClick={exportGroupsPDF} disabled={groups.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
           <button onClick={exportGroupsJPG} disabled={groups.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
+          <BackupRestoreButton label="조편성" loadBackups={() => getGroupsBackups(retreat.id)} restore={key => restoreGroupsBackup(retreat.id, key)} />
           <button onClick={() => setShowAddGroup(true)} className="btn-secondary btn-sm">＋ 조 추가</button>
           <span className={`text-xs font-medium px-2 hidden sm:inline ${saving ? "text-blue-500" : isDirty ? "text-amber-500" : "text-green-500"}`}>
             {saving ? "저장 중..." : isDirty ? "편집 중..." : "✓ 저장됨"}

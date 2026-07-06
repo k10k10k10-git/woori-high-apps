@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
 import { getTeachers, getTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
 import * as XLSX from "xlsx";
-import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 
@@ -119,10 +119,10 @@ export default function InsuranceTab({ retreat }: Props) {
 
   function buildInsuranceHtml() {
     const rows = filteredInsured.map((e, i) =>
-      `<tr><td>${i + 1}</td><td>${e.type}</td><td>${e.name}</td><td>${e.bu}</td><td>${e.grade > 0 ? `${e.grade}학년 ${e.cls}반` : "-"}</td><td>${e.idNumber}</td></tr>`
+      `<tr><td>${i + 1}</td><td>${escapeHtml(e.type)}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.bu)}</td><td>${e.grade > 0 ? `${e.grade}학년 ${e.cls}반` : "-"}</td><td>${escapeHtml(e.idNumber)}</td></tr>`
     ).join("");
     return `
-      <h1>${retreat.name} 여행자 보험 신청자 명단</h1>
+      <h1>${escapeHtml(retreat.name)} 여행자 보험 신청자 명단</h1>
       <p class="subtitle">총 ${filteredInsured.length}명 · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
       <table>
         <thead><tr><th>번호</th><th>구분</th><th>이름</th><th>부</th><th>학년·반</th><th>주민등록번호</th></tr></thead>

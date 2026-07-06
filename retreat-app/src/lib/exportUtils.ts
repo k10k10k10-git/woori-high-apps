@@ -1,18 +1,32 @@
 import * as XLSX from "xlsx";
 
+/**
+ * HTML 이스케이프 — 인쇄/JPG 출력 HTML에 사용자 입력(이름·특이사항 등)을 넣기 전 반드시 통과시킨다.
+ * 신청폼에 <img src=x onerror=...> 같은 값을 넣으면 관리자가 인쇄하는 순간 관리자 컨텍스트에서
+ * 스크립트가 실행되는 저장형 XSS가 되므로, 데이터가 HTML에 삽입되는 모든 지점에서 이 함수로 감싼다.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function saveWorkbook(wb: XLSX.WorkBook, filename: string) {
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
 // 순수 데이터 배열을 간단한 표 HTML로 변환 — XLSX만 있던 탭(의료일지/단체티)에서 JPG 저장용으로 재사용.
 export function rowsToHtmlTable(title: string, subtitle: string, rows: Record<string, string | number>[]): string {
-  if (rows.length === 0) return `<h1 style="margin:0 0 4px">${title}</h1><p style="font-size:11px;color:#888">${subtitle}</p>`;
+  if (rows.length === 0) return `<h1 style="margin:0 0 4px">${escapeHtml(title)}</h1><p style="font-size:11px;color:#888">${escapeHtml(subtitle)}</p>`;
   const cols = Object.keys(rows[0]);
-  const head = cols.map(c => `<th style="border:1px solid #cbd5e1;padding:5px 8px;background:#f1f5f9;text-align:left;font-size:11px">${c}</th>`).join("");
-  const body = rows.map(r => `<tr>${cols.map(c => `<td style="border:1px solid #e2e8f0;padding:4px 8px;font-size:11px">${r[c] ?? ""}</td>`).join("")}</tr>`).join("");
+  const head = cols.map(c => `<th style="border:1px solid #cbd5e1;padding:5px 8px;background:#f1f5f9;text-align:left;font-size:11px">${escapeHtml(c)}</th>`).join("");
+  const body = rows.map(r => `<tr>${cols.map(c => `<td style="border:1px solid #e2e8f0;padding:4px 8px;font-size:11px">${escapeHtml(r[c] ?? "")}</td>`).join("")}</tr>`).join("");
   return `
-    <h1 style="margin:0 0 4px">${title}</h1>
-    <p style="font-size:11px;color:#888;margin:0 0 12px">${subtitle}</p>
+    <h1 style="margin:0 0 4px">${escapeHtml(title)}</h1>
+    <p style="font-size:11px;color:#888;margin:0 0 12px">${escapeHtml(subtitle)}</p>
     <table style="border-collapse:collapse;width:100%"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
   `;
 }
@@ -107,7 +121,7 @@ export function printAsPDF(htmlContent: string, title: string, landscape = false
   if (!win) return false;
   const orientation = landscape ? "landscape" : "portrait";
   win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="utf-8"><title>${title}</title>
+    <meta charset="utf-8"><title>${escapeHtml(title)}</title>
     <style>
       * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 12px; margin: 0; padding: 20px; color: #222; }

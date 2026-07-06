@@ -156,13 +156,56 @@ export async function getGroups(retreatId: string): Promise<Group[]> {
   return snapToList<Group>(snap);
 }
 
+/**
+ * 노드 전체 덮어쓰기(set) 직전, 현재 상태를 롤링 백업(최근 5개)한다.
+ * groups/rooms는 participants와 달리 전체 set으로 저장돼 저장 버그·실수 시 복구 수단이 없었다.
+ * 편집 중 저장이 잦으므로 마지막 백업이 minIntervalMs 이내면 건너뛰어 쓰기 폭주를 막는다.
+ * 백업 실패가 본 저장을 막지 않도록 베스트 에포트로 동작한다.
+ */
+async function backupNodeBeforeOverwrite(
+  currentPath: string,
+  backupsBasePath: string,
+  minIntervalMs = 10 * 60 * 1000,
+): Promise<void> {
+  try {
+    const curSnap = await get(ref(db, currentPath));
+    if (!curSnap.exists()) return; // 백업할 현재 데이터 없음
+    const backupsSnap = await get(ref(db, backupsBasePath));
+    const existingKeys = backupsSnap.exists() ? Object.keys(backupsSnap.val()) : [];
+    const now = Date.now();
+    const lastTs = existingKeys.map(Number).filter(n => !isNaN(n)).sort((a, b) => b - a)[0];
+    if (lastTs && now - lastTs < minIntervalMs) return; // 최근 백업이 있으면 스킵
+    const payload: Record<string, unknown> = {};
+    const sorted = [...existingKeys].sort();
+    if (sorted.length >= 5) sorted.slice(0, sorted.length - 4).forEach(k => { payload[`${backupsBasePath}/${k}`] = null; });
+    payload[`${backupsBasePath}/${now}`] = curSnap.val();
+    await update(ref(db), payload);
+  } catch {
+    // 베스트 에포트 — 백업 실패는 저장을 막지 않는다
+  }
+}
+
 export async function saveGroups(retreatId: string, groups: Group[]): Promise<void> {
+  await backupNodeBeforeOverwrite(paths.groups(retreatId), paths.groupsBackups(retreatId));
   const data: Record<string, Omit<Group, "id">> = {};
   groups.forEach((g) => {
     const { id, ...rest } = g;
     data[id] = rest;
   });
   await set(ref(db, paths.groups(retreatId)), stripUndefined(data));
+}
+
+export async function getGroupsBackups(retreatId: string): Promise<Record<string, Record<string, Omit<Group, "id">>>> {
+  const snap = await get(ref(db, paths.groupsBackups(retreatId)));
+  return snap.exists() ? snap.val() : {};
+}
+
+export async function restoreGroupsBackup(retreatId: string, backupKey: string): Promise<void> {
+  const snap = await get(ref(db, paths.groupsBackup(retreatId, backupKey)));
+  if (!snap.exists()) throw new Error("조편성 백업을 찾을 수 없습니다.");
+  // 복구도 되돌릴 수 있도록 현재 상태를 강제 백업(스로틀 무시)한 뒤 덮어쓴다.
+  await backupNodeBeforeOverwrite(paths.groups(retreatId), paths.groupsBackups(retreatId), 0);
+  await set(ref(db, paths.groups(retreatId)), snap.val());
 }
 
 export async function updateGroup(retreatId: string, groupId: string, data: Partial<Group>): Promise<void> {
@@ -184,12 +227,26 @@ export async function getRooms(retreatId: string): Promise<Room[]> {
 }
 
 export async function saveRooms(retreatId: string, rooms: Room[]): Promise<void> {
+  await backupNodeBeforeOverwrite(paths.rooms(retreatId), paths.roomsBackups(retreatId));
   const data: Record<string, Omit<Room, "id">> = {};
   rooms.forEach((r) => {
     const { id, ...rest } = r;
     data[id] = rest;
   });
   await set(ref(db, paths.rooms(retreatId)), stripUndefined(data));
+}
+
+export async function getRoomsBackups(retreatId: string): Promise<Record<string, Record<string, Omit<Room, "id">>>> {
+  const snap = await get(ref(db, paths.roomsBackups(retreatId)));
+  return snap.exists() ? snap.val() : {};
+}
+
+export async function restoreRoomsBackup(retreatId: string, backupKey: string): Promise<void> {
+  const snap = await get(ref(db, paths.roomsBackup(retreatId, backupKey)));
+  if (!snap.exists()) throw new Error("방배정 백업을 찾을 수 없습니다.");
+  // 복구도 되돌릴 수 있도록 현재 상태를 강제 백업(스로틀 무시)한 뒤 덮어쓴다.
+  await backupNodeBeforeOverwrite(paths.rooms(retreatId), paths.roomsBackups(retreatId), 0);
+  await set(ref(db, paths.rooms(retreatId)), snap.val());
 }
 
 export async function updateRoom(retreatId: string, roomId: string, data: Partial<Room>): Promise<void> {

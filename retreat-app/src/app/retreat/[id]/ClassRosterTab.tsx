@@ -4,7 +4,7 @@ import { Retreat, Participant } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
 import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear } from "@/lib/db";
 import * as XLSX from "xlsx";
-import { saveWorkbook, printAsPDF, exportAsJPG } from "@/lib/exportUtils";
+import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
@@ -418,7 +418,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     ).join("");
 
     const teacherHeader = visibleClasses.map(cls =>
-      `<th style="${C};padding:2px 3px;background:#f8fafc;font-size:8px;font-weight:400;text-align:center;color:#64748b;white-space:nowrap;overflow:hidden;max-width:48px">${cls.teacher || "—"}</th>`
+      `<th style="${C};padding:2px 3px;background:#f8fafc;font-size:8px;font-weight:400;text-align:center;color:#64748b;white-space:nowrap;overflow:hidden;max-width:48px">${escapeHtml(cls.teacher || "—")}</th>`
     ).join("");
 
     const buildRow = (cols: typeof regularClasses, rowIdx: number) => {
@@ -439,7 +439,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
                  : isParticipant ? (isGreenBu ? "#bbf7d0" : "#e9d5ff")
                  : "transparent";
         const fw = (color || isParticipant) ? "600" : "400";
-        return `<td style="${C};padding:1px 3px;text-align:center;font-size:9px;background:${bg};font-weight:${fw};white-space:nowrap">${student.name}</td>`;
+        return `<td style="${C};padding:1px 3px;text-align:center;font-size:9px;background:${bg};font-weight:${fw};white-space:nowrap">${escapeHtml(student.name)}</td>`;
       }).join("");
       return `<tr>${numCell}${cells}</tr>`;
     };
@@ -460,7 +460,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     </span>`).join("");
 
     return `
-      <h1 style="margin:0 0 2px;font-size:14px">${retreat.name} 신청자 취합 (${bu})</h1>
+      <h1 style="margin:0 0 2px;font-size:14px">${escapeHtml(retreat.name)} 신청자 취합 (${escapeHtml(bu)})</h1>
       <p style="font-size:10px;color:#888;margin:0 0 6px">총 ${stats.total}명 (남 ${stats.male} / 여 ${stats.female}) · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
       <div style="margin-bottom:8px">${legendItems}</div>
       <table style="border-collapse:collapse;width:100%;table-layout:auto">

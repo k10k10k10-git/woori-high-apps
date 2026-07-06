@@ -23,10 +23,14 @@ export const paths = {
   // ── 조편성 ──
   groups: (id: string) => `retreats/${id}/groups`,
   group: (id: string, gid: string) => `retreats/${id}/groups/${gid}`,
+  groupsBackups: (id: string) => `retreats/${id}/groupsBackups`,
+  groupsBackup: (id: string, backupKey: string) => `retreats/${id}/groupsBackups/${backupKey}`,
 
   // ── 숙소 ──
   rooms: (id: string) => `retreats/${id}/rooms`,
   room: (id: string, rid: string) => `retreats/${id}/rooms/${rid}`,
+  roomsBackups: (id: string) => `retreats/${id}/roomsBackups`,
+  roomsBackup: (id: string, backupKey: string) => `retreats/${id}/roomsBackups/${backupKey}`,
 
   // ── 차량 ──
   carpools: (id: string) => `retreats/${id}/carpools`,
