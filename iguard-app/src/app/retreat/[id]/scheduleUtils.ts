@@ -368,13 +368,15 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
 
   dataRows.forEach((row, index) => {
     const whole = row.join(" ").trim();
-    const maybeDay = parseDayCell(whole);
+    const timeCell = row[timeIdx] ?? "";
+    const range = parseTimeRange(timeCell);
+    // 시간이 있는 행은 일정 블록 — "첫째날/둘째날" 같은 단어가 제목·내용에 섞여 있어도
+    // 날짜 구분행으로 삼키면 안 된다 (기도회·둘째날 오전 프로그램 행이 통째로 사라졌던 버그).
+    const maybeDay = range ? null : parseDayCell(whole);
     if (maybeDay != null) {
       day = maybeDay;
       return;
     }
-    const timeCell = row[timeIdx] ?? "";
-    const range = parseTimeRange(timeCell);
     if (!range) {
       if (whole && !/담당|구분|시간|내용/.test(whole)) warnings.push(`${index + headerRowIndex + 2}행: 시간을 찾지 못해 건너뜀`);
       return;
