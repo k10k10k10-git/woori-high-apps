@@ -86,7 +86,7 @@ export function subscribeToStudentsByYear(year: number, cb: (students: Record<st
 
 // 부분참(본대/선복귀/후발대) — 행정 소유, 이가드는 읽기 전용 소비
 // 노드: retreats/{id}/partialAttendances/{uniqueKey} = { type: "선복귀"|"후발대", note?, updatedAt? }
-export function subscribeToPartialAttendances(retreatId: string, cb: (map: Record<string, "선복귀" | "후발대">) => void): () => void {
+export function subscribeToPartialAttendances(retreatId: string, cb: (map: Record<string, "선복귀" | "후발대">) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.partialAttendances(retreatId)), (snap) => {
     if (!snap.exists()) return cb({});
     const out: Record<string, "선복귀" | "후발대"> = {};
@@ -95,19 +95,21 @@ export function subscribeToPartialAttendances(retreatId: string, cb: (map: Recor
       if (t === "선복귀" || t === "후발대") out[key] = t;
     });
     cb(out);
-  });
+  }, (error) => { console.warn("subscribeToPartialAttendances error:", error); onError?.(error); });
 }
 
 // 참가자 명단 셀 색상 — 행정 소유, 이가드는 읽기 전용 소비.
 // red = 취소/불참 학생. 키는 uniqueKey("${buNum}_${studentId}") 또는 raw studentId.
-export function subscribeToCellColors(retreatId: string, cb: (colors: Record<string, string>) => void): () => void {
-  return onValue(ref(db, paths.cellColors(retreatId)), (snap) => cb(snap.exists() ? snap.val() : {}));
+export function subscribeToCellColors(retreatId: string, cb: (colors: Record<string, string>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.cellColors(retreatId)), (snap) => cb(snap.exists() ? snap.val() : {}),
+    (error) => { console.warn("subscribeToCellColors error:", error); onError?.(error); });
 }
 
 // 수련회 기간(periods)은 수련회 고유 — 수련회별 노드 유지
-export function subscribeToRetreatPeriods(retreatId: string, cb: (periods: RetreatPeriod[]) => void): () => void {
+export function subscribeToRetreatPeriods(retreatId: string, cb: (periods: RetreatPeriod[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.periods(retreatId)), (snap) =>
-    cb(snapToList<RetreatPeriod>(snap).sort((a, b) => a.startDate.localeCompare(b.startDate))));
+    cb(snapToList<RetreatPeriod>(snap).sort((a, b) => a.startDate.localeCompare(b.startDate))),
+    (error) => { console.warn("subscribeToRetreatPeriods error:", error); onError?.(error); });
 }
 
 export type RetreatPeriodWithOwner = RetreatPeriod & { retreatId: string };
@@ -191,11 +193,11 @@ export async function deleteMilestone(id: string): Promise<void> {
 
 // ── 식사 세션 (MVP-A) ──────────────────────────────────────
 
-export function subscribeToIguardMeals(retreatId: string, callback: (meals: IguardMeal[]) => void): () => void {
+export function subscribeToIguardMeals(retreatId: string, callback: (meals: IguardMeal[]) => void, onError?: (error: Error) => void): () => void {
   const r = ref(db, paths.iguardMeals(retreatId));
   return onValue(r, (snap) => callback(
     snapToList<IguardMeal>(snap).sort((a, b) => a.day - b.day || a.slot - b.slot)
-  ));
+  ), (error) => { console.warn("subscribeToIguardMeals error:", error); onError?.(error); });
 }
 
 export async function saveIguardMeal(retreatId: string, data: Omit<IguardMeal, "id">): Promise<string> {
@@ -221,9 +223,10 @@ function stripUndefined<T extends object>(obj: T): T {
 // (레거시 iguard/staff 쓰기 함수는 제거됨 — migrateMovementStaffIds 만 옛 데이터 복구용으로 직접 읽음.)
 
 // ── 타임테이블 (iguard/schedule) ───────────────────────────
-export function subscribeToIguardSchedule(retreatId: string, cb: (list: IguardScheduleBlock[]) => void): () => void {
+export function subscribeToIguardSchedule(retreatId: string, cb: (list: IguardScheduleBlock[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardSchedule(retreatId)), (snap) =>
-    cb(snapToList<IguardScheduleBlock>(snap).sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))));
+    cb(snapToList<IguardScheduleBlock>(snap).sort((a, b) => a.day - b.day || a.start.localeCompare(b.start))),
+    (error) => { console.warn("subscribeToIguardSchedule error:", error); onError?.(error); });
 }
 export async function saveIguardScheduleBlock(retreatId: string, data: Omit<IguardScheduleBlock, "id">): Promise<string> {
   const r = push(ref(db, paths.iguardSchedule(retreatId)));
@@ -244,11 +247,12 @@ export async function deleteIguardScheduleBlock(retreatId: string, id: string): 
 }
 
 // ── 포스트 (iguard/posts) ──────────────────────────────────
-export function subscribeToIguardPosts(retreatId: string, cb: (list: IguardPost[]) => void): () => void {
+export function subscribeToIguardPosts(retreatId: string, cb: (list: IguardPost[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardPosts(retreatId)), (snap) =>
     cb(snapToList<IguardPost>(snap)
       .filter(post => !!post.name)
-      .sort((a, b) => (a.area || "").localeCompare(b.area || "", "ko") || (a.name || "").localeCompare(b.name || "", "ko"))));
+      .sort((a, b) => (a.area || "").localeCompare(b.area || "", "ko") || (a.name || "").localeCompare(b.name || "", "ko"))),
+    (error) => { console.warn("subscribeToIguardPosts error:", error); onError?.(error); });
 }
 export async function saveIguardPost(retreatId: string, data: Omit<IguardPost, "id">): Promise<string> {
   const r = push(ref(db, paths.iguardPosts(retreatId)));
@@ -269,9 +273,10 @@ export async function deleteIguardPost(retreatId: string, id: string): Promise<v
 }
 
 // ── 동선 매트릭스 (iguard/movements) — 복합키 staffId__blockId ──
-export function subscribeToIguardMovements(retreatId: string, cb: (list: IguardMovement[]) => void): () => void {
+export function subscribeToIguardMovements(retreatId: string, cb: (list: IguardMovement[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardMovements(retreatId)), (snap) =>
-    cb(snapToList<IguardMovement>(snap)));
+    cb(snapToList<IguardMovement>(snap)),
+    (error) => { console.warn("subscribeToIguardMovements error:", error); onError?.(error); });
 }
 /** 한 스탭×블록 셀을 설정(postId 지정) 또는 해제(null) */
 export async function setIguardMovement(
@@ -285,9 +290,10 @@ export async function setIguardMovement(
 }
 
 // ── 버스(호차) 배정 (iguard/buses) ─────────────────────────
-export function subscribeToIguardBuses(retreatId: string, cb: (list: IguardBus[]) => void): () => void {
+export function subscribeToIguardBuses(retreatId: string, cb: (list: IguardBus[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardBuses(retreatId)), (snap) =>
-    cb(snapToList<IguardBus>(snap).sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || a.busNo - b.busNo)));
+    cb(snapToList<IguardBus>(snap).sort((a, b) => (a.day ?? 1) - (b.day ?? 1) || a.busNo - b.busNo)),
+    (error) => { console.warn("subscribeToIguardBuses error:", error); onError?.(error); });
 }
 export async function saveIguardBus(retreatId: string, data: Omit<IguardBus, "id">): Promise<string> {
   const r = push(ref(db, paths.iguardBuses(retreatId)));
@@ -305,14 +311,14 @@ export async function deleteIguardBus(retreatId: string, id: string): Promise<vo
 function attendancePathKey(key: string): string {
   return encodeURIComponent(key);
 }
-export function subscribeToIguardAttendance(retreatId: string, cb: (checkedKeys: Set<string>) => void): () => void {
+export function subscribeToIguardAttendance(retreatId: string, cb: (checkedKeys: Set<string>) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardAttendance(retreatId)), (snap) => {
     if (!snap.exists()) return cb(new Set());
     const keys = Object.entries(snap.val() as Record<string, IguardAttendance | boolean>)
       .filter(([, value]) => value === true || (typeof value === "object" && value?.checked))
       .map(([key]) => decodeURIComponent(key));
     cb(new Set(keys));
-  });
+  }, (error) => { console.warn("subscribeToIguardAttendance error:", error); onError?.(error); });
 }
 export async function updateIguardAttendance(retreatId: string, key: string, checked: boolean): Promise<void> {
   const r = ref(db, paths.iguardAttendanceEntry(retreatId, attendancePathKey(key)));
@@ -331,9 +337,10 @@ export async function clearIguardAttendance(retreatId: string, keys: string[]): 
 }
 
 // ── 집회 자리배치 (iguard/seating) ─────────────────────────
-export function subscribeToIguardSeating(retreatId: string, cb: (list: IguardSeating[]) => void): () => void {
+export function subscribeToIguardSeating(retreatId: string, cb: (list: IguardSeating[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardSeating(retreatId)), (snap) =>
-    cb(snapToList<IguardSeating>(snap).sort((a, b) => a.day - b.day || a.order - b.order)));
+    cb(snapToList<IguardSeating>(snap).sort((a, b) => a.day - b.day || a.order - b.order)),
+    (error) => { console.warn("subscribeToIguardSeating error:", error); onError?.(error); });
 }
 export async function saveIguardSeating(retreatId: string, data: Omit<IguardSeating, "id">): Promise<string> {
   const r = push(ref(db, paths.iguardSeating(retreatId)));
@@ -349,9 +356,10 @@ export async function deleteIguardSeating(retreatId: string, id: string): Promis
 // ── 조스탭 배정 (iguard/groupStaff) ─────────────────────────
 // 이가드가 조별 조스탭을 배정(teacher.id 기준). 행정은 이 노드를 읽어 조편성 탭에 공유 표시.
 // 키 = groupId(행정 groups 노드 id), 값 = staffId[](= 행정 teachers 노드 id).
-export function subscribeToIguardGroupStaff(retreatId: string, cb: (map: Record<string, string[]>) => void): () => void {
+export function subscribeToIguardGroupStaff(retreatId: string, cb: (map: Record<string, string[]>) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardGroupStaff(retreatId)), (snap) =>
-    cb(snap.exists() ? (snap.val() as Record<string, string[]>) : {}));
+    cb(snap.exists() ? (snap.val() as Record<string, string[]>) : {}),
+    (error) => { console.warn("subscribeToIguardGroupStaff error:", error); onError?.(error); });
 }
 export async function setIguardGroupStaff(retreatId: string, groupId: string, staffIds: string[]): Promise<void> {
   const path = paths.iguardGroupStaffEntry(retreatId, groupId);
@@ -406,9 +414,10 @@ export const DEFAULT_GUIDE = [
   "언어 조심. 복음의 언어를 사용하는 참된 하나님의 자녀가 됩시다",
   "학생한테 해도 되는 말인지 한 번 필터링을 거치기",
 ];
-export function subscribeToIguardGuide(retreatId: string, cb: (items: string[]) => void): () => void {
+export function subscribeToIguardGuide(retreatId: string, cb: (items: string[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardGuide(retreatId)), (snap) =>
-    cb(snap.exists() && Array.isArray(snap.val()) ? snap.val() : DEFAULT_GUIDE));
+    cb(snap.exists() && Array.isArray(snap.val()) ? snap.val() : DEFAULT_GUIDE),
+    (error) => { console.warn("subscribeToIguardGuide error:", error); onError?.(error); });
 }
 export async function saveIguardGuide(retreatId: string, items: string[]): Promise<void> {
   await set(ref(db, paths.iguardGuide(retreatId)), items);

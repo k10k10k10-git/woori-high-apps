@@ -94,24 +94,31 @@ export function useRetreatData(id: string): RetreatData {
       pending.delete(key);
       if (alive && pending.size === 0) setDataLoading(false);
     };
+    // 구독 에러(권한 거부·규칙 변경 등) 시: 에러 배너를 띄우고 해당 키를 ready 처리해
+    // dataLoading이 영원히 true로 남는 "무한 스피너"를 방지한다.
+    // (이 전파가 없던 시절엔 loadError가 선언만 되고 설정되는 곳이 없었다.)
+    const fail = (key: string) => (error: Error) => {
+      if (alive) setLoadError(prev => prev ?? `${key} 구독 실패 — ${error.message}`);
+      ready(key);
+    };
     const unsubs = [
-      subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }),
-      subscribeToTeacherAttendances(id, value => { setAdminTeachers(value); ready("adminTeachers"); }),
-      subscribeToGroups(id, value => { setGroups(value); ready("groups"); }),
-      subscribeToRooms(id, value => { setRooms(value); ready("rooms"); }),
-      subscribeToIguardMeals(id, value => { setMeals(value); ready("meals"); }),
-      subscribeToIguardSchedule(id, value => { setSchedule(value); ready("schedule"); }),
-      subscribeToIguardPosts(id, value => { setPosts(value); ready("posts"); }),
-      subscribeToIguardMovements(id, value => { setMovements(value); ready("movements"); }),
-      subscribeToIguardBuses(id, value => { setBuses(value); ready("buses"); }),
-      subscribeToIguardSeating(id, value => { setSeating(value); ready("seating"); }),
+      subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }, fail("students")),
+      subscribeToTeacherAttendances(id, value => { setAdminTeachers(value); ready("adminTeachers"); }, fail("adminTeachers")),
+      subscribeToGroups(id, value => { setGroups(value); ready("groups"); }, fail("groups")),
+      subscribeToRooms(id, value => { setRooms(value); ready("rooms"); }, fail("rooms")),
+      subscribeToIguardMeals(id, value => { setMeals(value); ready("meals"); }, fail("meals")),
+      subscribeToIguardSchedule(id, value => { setSchedule(value); ready("schedule"); }, fail("schedule")),
+      subscribeToIguardPosts(id, value => { setPosts(value); ready("posts"); }, fail("posts")),
+      subscribeToIguardMovements(id, value => { setMovements(value); ready("movements"); }, fail("movements")),
+      subscribeToIguardBuses(id, value => { setBuses(value); ready("buses"); }, fail("buses")),
+      subscribeToIguardSeating(id, value => { setSeating(value); ready("seating"); }, fail("seating")),
       subscribeToMilestones(value => { setTodos(value); ready("todos"); }),
-      subscribeToIguardGuide(id, value => { setGuide(value); ready("guide"); }),
-      subscribeToRetreatPeriods(id, value => { setPeriods(value); ready("periods"); }),
-      subscribeToIguardAttendance(id, value => { setAttendanceKeys(value); ready("attendance"); }),
-      subscribeToPartialAttendances(id, value => { setPartial(value); ready("partial"); }),
-      subscribeToCellColors(id, value => { setCellColors(value); ready("cellColors"); }),
-      subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }),
+      subscribeToIguardGuide(id, value => { setGuide(value); ready("guide"); }, fail("guide")),
+      subscribeToRetreatPeriods(id, value => { setPeriods(value); ready("periods"); }, fail("periods")),
+      subscribeToIguardAttendance(id, value => { setAttendanceKeys(value); ready("attendance"); }, fail("attendance")),
+      subscribeToPartialAttendances(id, value => { setPartial(value); ready("partial"); }, fail("partial")),
+      subscribeToCellColors(id, value => { setCellColors(value); ready("cellColors"); }, fail("cellColors")),
+      subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }, fail("groupStaff")),
     ];
     return () => {
       alive = false;
