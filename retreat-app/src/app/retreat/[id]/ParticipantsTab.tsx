@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
-import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant } from "@/lib/db";
+import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
@@ -187,33 +187,35 @@ export default function ParticipantsTab({ retreat }: Props) {
       // 덮어쓰기 전 현재 상태 백업
       await backupParticipants(retreat.id);
       const freshStudents = await getStudentsByYear(retreat.year);
-      const rematched: Record<string, Participant> = {};
       let matchedCount = 0;
       const debugMissed: string[] = [];
 
 
-      // 중복 제거는 "구글시트 동기화" 시점에 이미 끝난 일이라 재매칭에서 또 하지 않는다.
-      // 여기서 studentId 충돌로 참가자를 건너뛰면(return) 그 사람 레코드 전체(특이사항 등 포함)가
-      // saveParticipants의 전체 덮어쓰기로 영구 삭제되는 위험한 버그였다 — 특히 "새가족반"처럼
-      // 매칭이 애매한 경우 재매칭할 때마다 매칭 결과가 달라져 다른 사람과 충돌하며 삭제될 수 있었다.
-      // 재매칭은 오직 studentId/phone/pPhone만 최신화하고, 모든 기존 키를 그대로 보존한다.
+      // studentId/phone/pPhone만 경로 지정 업데이트 — extra(특이사항) 등 나머지 필드는 DB에서 보존.
+      // 이전에 saveParticipants(전체 덮어쓰기)를 쓰다가 로컬 상태가 stale하면 extra가 날아가는
+      // 버그가 있었다. applyRematch는 update()로 3개 필드만 건드려 이 문제를 원천 차단한다.
+      const rematchUpdates: Record<string, { studentId: string | null; phone: string | null; pPhone: string | null }> = {};
       Object.entries(participants).forEach(([key, p]) => {
         const found = findStudent(p, freshStudents);
         if (found) matchedCount++;
         else debugMissed.push(`${p.name}(${p.grade}학년${p.class}반)`);
-        rematched[key] = {
-          ...p,
+        rematchUpdates[key] = {
           studentId: found?.id ?? null,
           phone: found?.phone ?? p.phone ?? null,
           pPhone: found?.pPhone ?? p.pPhone ?? null,
         };
       });
 
-      // 기존 키를 그대로 유지 — 이름순 재정렬은 화면 표시(list useMemo)에서만 하면 되고,
-      // 여기서 키를 새로 매기면 중복 신청 "유지" 선택이 참조하는 participantKey가 어긋나
-      // 다른 사람 데이터를 가리키게 되는 버그가 생긴다.
-      await saveParticipants(retreat.id, rematched);
-      setParticipants(rematched);
+      await applyRematch(retreat.id, rematchUpdates);
+
+      // 로컬 상태: 변경된 3개 필드만 병합 (extra 등 나머지는 그대로 유지)
+      setParticipants(prev => {
+        const next = { ...prev };
+        for (const [key, upd] of Object.entries(rematchUpdates)) {
+          if (next[key]) next[key] = { ...next[key], ...upd };
+        }
+        return next;
+      });
       setStudents(freshStudents);
 
       const total = Object.keys(participants).length;

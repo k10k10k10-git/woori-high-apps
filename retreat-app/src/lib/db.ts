@@ -122,6 +122,20 @@ export async function updateParticipant(retreatId: string, key: string, data: Pa
   await set(ref(db, paths.participant(retreatId, key)), stripUndefined(data));
 }
 
+/** 재매칭 전용 — studentId/phone/pPhone만 경로 지정 업데이트, extra 등 나머지 필드는 건드리지 않음 */
+export async function applyRematch(
+  retreatId: string,
+  updates: Record<string, { studentId: string | null; phone: string | null; pPhone: string | null }>
+): Promise<void> {
+  const flatUpdates: Record<string, string | null> = {};
+  for (const [key, upd] of Object.entries(updates)) {
+    flatUpdates[`${paths.participant(retreatId, key)}/studentId`] = upd.studentId;
+    flatUpdates[`${paths.participant(retreatId, key)}/phone`] = upd.phone;
+    flatUpdates[`${paths.participant(retreatId, key)}/pPhone`] = upd.pPhone;
+  }
+  await update(ref(db), flatUpdates);
+}
+
 /** 특이사항만 경로 지정 업데이트 — 전체 participants 덮어쓰기 방지 */
 export async function updateParticipantExtra(
   retreatId: string,
