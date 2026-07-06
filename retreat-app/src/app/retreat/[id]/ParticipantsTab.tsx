@@ -192,18 +192,13 @@ export default function ParticipantsTab({ retreat }: Props) {
       const debugMissed: string[] = [];
 
 
-      const seenIds = new Set<string>();
+      // 중복 제거는 "구글시트 동기화" 시점에 이미 끝난 일이라 재매칭에서 또 하지 않는다.
+      // 여기서 studentId 충돌로 참가자를 건너뛰면(return) 그 사람 레코드 전체(특이사항 등 포함)가
+      // saveParticipants의 전체 덮어쓰기로 영구 삭제되는 위험한 버그였다 — 특히 "새가족반"처럼
+      // 매칭이 애매한 경우 재매칭할 때마다 매칭 결과가 달라져 다른 사람과 충돌하며 삭제될 수 있었다.
+      // 재매칭은 오직 studentId/phone/pPhone만 최신화하고, 모든 기존 키를 그대로 보존한다.
       Object.entries(participants).forEach(([key, p]) => {
         const found = findStudent(p, freshStudents);
-        // 중복 제거: 같은 studentId는 최초 항목만 유지, 미매칭은 name+bu+grade 기준
-        if (found?.id) {
-          if (seenIds.has(found.id)) return;
-          seenIds.add(found.id);
-        } else {
-          const nameKey = `name:${p.name.trim()}:${p.bu ?? ""}:${p.grade}`;
-          if (seenIds.has(nameKey)) return;
-          seenIds.add(nameKey);
-        }
         if (found) matchedCount++;
         else debugMissed.push(`${p.name}(${p.grade}학년${p.class}반)`);
         rematched[key] = {
