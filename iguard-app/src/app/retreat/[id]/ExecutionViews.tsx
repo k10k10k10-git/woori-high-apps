@@ -385,8 +385,15 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
   const selectedDate = retreatDateForDay(periods, retreat, day);
   const selectedDateLabel = selectedDate ? formatShortDate(selectedDate) : null;
   const [blockId, setBlockId] = useState<string>("");
-  // 일자가 바뀌면 그 일자의 "지금" 블록(없으면 첫 블록) 자동 선택
+  const blockPicked = useRef(false);
+  // 일자가 바뀌면 자동 선택 플래그 리셋 — 새 일자에선 다시 "지금" 블록으로 자동 스냅.
+  // (이 effect가 아래 자동 선택 effect보다 먼저 선언돼야 같은 day 변경에서 리셋이 선행됨)
+  useEffect(() => { blockPicked.current = false; }, [day]);
+  // 일자 변경/시각 경과 시 "지금" 블록(없으면 첫 블록) 자동 선택.
+  // ⚠ 사용자가 드롭다운으로 직접 고른 뒤엔 유지 — 이 가드가 없으면 30초 시계 tick마다
+  //   선택이 첫 블록(1일차 기도회)으로 되돌아가던 버그가 됨.
   useEffect(() => {
+    if (blockPicked.current) return;
     const target = dayBlocks.find(b => isNowOn(b, curDay, clock.time)) ?? dayBlocks[0];
     setBlockId(target?.id ?? "");
   }, [day, dayBlocks, curDay, clock.time]);
@@ -487,7 +494,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
           {curDay != null && day === curDay ? <span className="text-fuchsia-700"> · 현재 일자·시각 자동선택</span>
             : curDay == null ? <span className="text-slate-400"> · 오늘이 수련회 기간이 아니에요 — 일자를 직접 선택하세요</span> : null}
         </label>
-        <select className="input" value={blockId} onChange={e => setBlockId(e.target.value)}>
+        <select className="input" value={blockId} onChange={e => { blockPicked.current = true; setBlockId(e.target.value); }}>
           {dayBlocks.map(b => <option key={b.id} value={b.id}>{b.start} {b.label}{isNowOn(b, curDay, clock.time) ? " ← 지금" : ""}</option>)}
         </select>
       </div>
