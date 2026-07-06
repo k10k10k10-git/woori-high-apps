@@ -7,6 +7,7 @@ import {
   subscribeToIguardSeating, subscribeToMilestones, subscribeToIguardGuide,
   subscribeToRetreatPeriods, subscribeToIguardAttendance, subscribeToPartialAttendances,
   subscribeToTeacherAttendances, subscribeToIguardGroupStaff, subscribeToCellColors,
+  subscribeToConnection,
 } from "@/lib/db";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
@@ -36,6 +37,7 @@ export interface RetreatData {
   partial: Record<string, "선복귀" | "후발대">;
   cellColors: Record<string, string>;
   groupStaff: Record<string, string[]>;
+  connected: boolean;
 }
 
 /**
@@ -65,6 +67,7 @@ export function useRetreatData(id: string): RetreatData {
   const [partial, setPartial] = useState<Record<string, "선복귀" | "후발대">>({});
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
+  const [connected, setConnected] = useState(true);
 
   // 수련회 메타 구독
   useEffect(() => {
@@ -72,6 +75,9 @@ export function useRetreatData(id: string): RetreatData {
     const unsub = subscribeToRetreat(id, r => { setRetreat(r); setRetreatLoading(false); });
     return unsub;
   }, [id]);
+
+  // 연결 상태 구독 — 수련회와 무관한 앱 전역 상태라 별도 useEffect
+  useEffect(() => subscribeToConnection(setConnected), []);
 
   // 데이터 구독은 id·연도에만 의존 — 메타(이름/날짜) 실시간 변경 시 재구독하지 않도록
   const retreatYear = retreat?.year;
@@ -118,5 +124,6 @@ export function useRetreatData(id: string): RetreatData {
     groups, rooms, students, adminTeachers,
     meals, schedule, posts, movements, buses, seating,
     todos, guide, periods, attendanceKeys, partial, cellColors, groupStaff,
+    connected,
   };
 }

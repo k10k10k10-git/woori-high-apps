@@ -2,7 +2,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Group, Student, IguardBus, IguardScheduleBlock } from "@/lib/types";
 import { clearIguardAttendance, updateIguardAttendance } from "@/lib/db";
-import { printAsPDF } from "@/lib/exportUtils";
+import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isPresentOnDay } from "@/lib/partialAttendance";
@@ -176,12 +176,12 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
   function print() {
     if (units.length === 0) return toast("데이터가 없습니다.", "warning");
     let html = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${day}</h1>
-      <div class="subtitle">${retreatName} · ${year}년 · ${mode} · ${day} · 출력 ${new Date().toLocaleString("ko-KR")}</div>`;
+      <div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · ${mode} · ${day} · 출력 ${new Date().toLocaleString("ko-KR")}</div>`;
     units.forEach(u => {
       const rows = u.members.map((m, i) => {
-        return `<tr><td style="text-align:center">${i + 1}</td><td>${m.name}</td><td>${m.meta || ""}</td><td style="text-align:center;font-size:14px">☐</td></tr>`;
+        return `<tr><td style="text-align:center">${i + 1}</td><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.meta || "")}</td><td style="text-align:center;font-size:14px">☐</td></tr>`;
       }).join("");
-      html += `<div class="section"><h2>${u.title} <span style="font-weight:400;color:#888">· ${u.members.length}명${u.sub ? ` · ${u.sub}` : ""}</span></h2>
+      html += `<div class="section"><h2>${escapeHtml(u.title)} <span style="font-weight:400;color:#888">· ${u.members.length}명${u.sub ? ` · ${escapeHtml(u.sub)}` : ""}</span></h2>
         <table><thead><tr><th style="width:36px">#</th><th>이름</th><th style="width:90px">구분/반</th><th style="width:50px">체크</th></tr></thead>
         <tbody>${rows || `<tr><td colspan="4" style="text-align:center;color:#aaa">없음</td></tr>`}</tbody></table></div>`;
     });

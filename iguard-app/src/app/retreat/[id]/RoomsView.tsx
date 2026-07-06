@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import { Group, Room, IguardBus, IguardMeal } from "@/lib/types";
-import { printAsPDF } from "@/lib/exportUtils";
+import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 
@@ -63,11 +63,11 @@ export default function RoomsView({ groups, rooms, buses, meals, retreatName, ye
 
   function print() {
     if (data.length === 0) return toast("조편성 데이터가 없습니다.", "warning");
-    const chips = (arr: RoomChip[]) => arr.length ? arr.map(c => `${c.roomNumber}(${c.count})`).join(", ") : "—";
-    let html = `<h1>조장용 방배정표</h1><div class="subtitle">${retreatName} · ${year}년 · 출력 ${new Date().toLocaleString("ko-KR")}</div>
+    const chips = (arr: RoomChip[]) => arr.length ? escapeHtml(arr.map(c => `${c.roomNumber}(${c.count})`).join(", ")) : "—";
+    let html = `<h1>조장용 방배정표</h1><div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · 출력 ${new Date().toLocaleString("ko-KR")}</div>
       <table><thead><tr><th>조</th><th>교사</th><th>조장</th><th>스탭</th><th>GBS 장소</th><th>남자 숙소</th><th>여자 숙소</th></tr></thead><tbody>`;
     data.forEach(d => {
-      html += `<tr><td>${d.group.bu} ${groupDisplayName(d.group, groups)}</td><td>${d.teachers.join(", ") || "—"}</td><td>${d.leader.join(", ") || "—"}</td><td>${d.staff.join(", ") || "—"}</td><td>${d.gbs || "—"}</td><td>${chips(d.nam)}${d.etc.length ? " / " + chips(d.etc) : ""}</td><td>${chips(d.yeo)}</td></tr>`;
+      html += `<tr><td>${escapeHtml(d.group.bu)} ${escapeHtml(groupDisplayName(d.group, groups))}</td><td>${escapeHtml(d.teachers.join(", ") || "—")}</td><td>${escapeHtml(d.leader.join(", ") || "—")}</td><td>${escapeHtml(d.staff.join(", ") || "—")}</td><td>${escapeHtml(d.gbs || "—")}</td><td>${chips(d.nam)}${d.etc.length ? " / " + chips(d.etc) : ""}</td><td>${chips(d.yeo)}</td></tr>`;
     });
     html += `</tbody></table>`;
     printAsPDF(html, "조장용-방배정표", true);

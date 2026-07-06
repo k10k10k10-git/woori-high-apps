@@ -1,3 +1,16 @@
+/**
+ * HTML 이스케이프 — 인쇄 HTML에 사용자 입력(이름·특이사항 등)을 넣기 전 반드시 통과시킨다.
+ * 학생이 신청폼에 넣은 값이 관리자 인쇄 화면에서 스크립트로 실행되는 저장형 XSS 방지.
+ */
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** 인쇄용 HTML을 새 창에 띄워 브라우저 인쇄(PDF 저장 포함)로 출력.
  *  retreat-app 의 printAsPDF 와 동일 동작 (xlsx 의존성 없음). */
 export function printAsPDF(htmlContent: string, title: string, landscape = false) {
@@ -5,7 +18,7 @@ export function printAsPDF(htmlContent: string, title: string, landscape = false
   if (!win) { alert("팝업을 허용해주세요."); return; }
   const orientation = landscape ? "landscape" : "portrait";
   win.document.write(`<!DOCTYPE html><html><head>
-    <meta charset="utf-8"><title>${title}</title>
+    <meta charset="utf-8"><title>${escapeHtml(title)}</title>
     <style>
       * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; font-size: 12px; margin: 0; padding: 20px; color: #222; }

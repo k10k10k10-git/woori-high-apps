@@ -101,6 +101,7 @@ export default function IguardClient() {
     groups, rooms, students, adminTeachers,
     meals, schedule, posts, movements, buses, seating,
     todos, guide, periods, attendanceKeys, partial, cellColors, groupStaff,
+    connected,
   } = useRetreatData(id);
 
   useEffect(() => {
@@ -213,6 +214,12 @@ export default function IguardClient() {
       </header>
 
       <main className="max-w-6xl mx-auto px-3 py-4 sm:px-4 sm:py-6">
+        {!connected && (
+          <div className="mb-4 bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700 flex items-center gap-2 animate-pulse" role="alert">
+            <span className="text-lg" aria-hidden="true">📡</span>
+            <span><strong>네트워크 연결이 끊겼습니다.</strong> 인원체크·동선 변경이 서버에 저장되지 않을 수 있어요. 와이파이를 확인한 뒤, 연결이 돌아오면 방금 한 작업이 반영됐는지 다시 확인해주세요.</span>
+          </div>
+        )}
         {loadError && <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
 
         {!dataLoading && !compatDismissed && compatWarnings.length > 0 && (
