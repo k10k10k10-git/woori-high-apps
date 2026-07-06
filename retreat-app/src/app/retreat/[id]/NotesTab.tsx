@@ -6,12 +6,13 @@ import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
 
-const CATEGORIES = ["건강/알레르기", "이동/카풀", "기타"] as const;
+const CATEGORIES = ["건강/알레르기", "이동/카풀", "부분참", "기타"] as const;
 type Category = typeof CATEGORIES[number];
 
 const CAT_COLORS: Record<Category, string> = {
   "건강/알레르기": "tag-red",
   "이동/카풀": "tag-purple",
+  "부분참": "tag-blue",
   "기타": "tag-yellow",
 };
 
@@ -139,10 +140,10 @@ export default function NotesTab({ retreat }: Props) {
               {participants[editKey]?.name} · {participants[editKey]?.grade}학년 {participants[editKey]?.class}반
             </p>
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {CATEGORIES.map(cat => (
                   <button key={cat} onClick={() => setEditCategory(cat)}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    className={`py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                       editCategory === cat ? "bg-blue-100 border-blue-400 text-blue-700" : "border-slate-200 text-slate-500"
                     }`}>
                     {cat}
