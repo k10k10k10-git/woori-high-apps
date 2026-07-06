@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
 import { Group, Student, IguardBus, IguardScheduleBlock } from "@/lib/types";
-import { updateIguardAttendance } from "@/lib/db";
+import { clearIguardAttendance, updateIguardAttendance } from "@/lib/db";
 import { printAsPDF } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
@@ -58,7 +58,7 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
 export default function ChecklistView({ retreatId, groups, students, buses, retreatName, year, checkedKeys, partial, schedule }: {
   retreatId: string; groups: Group[]; students: Record<string, Student>; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; partial: Record<string, "선복귀" | "후발대">; schedule: IguardScheduleBlock[];
 }) {
-  const { toast } = useUI();
+  const { toast, uiConfirm } = useUI();
   const [mode, setMode] = useState<"조별" | "호차별">("조별");
   const [day, setDay] = useState<"1일차" | "3일차">("1일차"); // 1일차/3일차 인원이 달라 독립 체크
   const keyOf = (sid: string) => `${selectedBusDay}:${sid}`;
@@ -147,6 +147,32 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
     }
   }
 
+  async function resetUnit(u: Unit) {
+    const keys = u.members.map(m => keyOf(m.id)).filter(k => checkedKeys.has(k));
+    if (keys.length === 0) return toast("해제할 체크가 없습니다.", "warning");
+    const ok = await uiConfirm(`${u.title} 체크 ${keys.length}개를 해제할까요? (재점호용)`);
+    if (!ok) return;
+    try {
+      await clearIguardAttendance(retreatId, keys);
+      toast(`${u.title} 체크 ${keys.length}개를 해제했습니다.`, "success");
+    } catch (e) {
+      toast(`초기화 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async function resetDay() {
+    const keys = units.flatMap(u => u.members.map(m => keyOf(m.id))).filter(k => checkedKeys.has(k));
+    if (keys.length === 0) return toast("해제할 체크가 없습니다.", "warning");
+    const ok = await uiConfirm(`${day} 체크 ${keys.length}개를 모두 해제할까요? 도착 후 재점호 등 새로 체크할 때 사용하세요.`);
+    if (!ok) return;
+    try {
+      await clearIguardAttendance(retreatId, keys);
+      toast(`${day} 체크 ${keys.length}개를 모두 해제했습니다.`, "success");
+    } catch (e) {
+      toast(`초기화 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
   function print() {
     if (units.length === 0) return toast("데이터가 없습니다.", "warning");
     let html = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${day}</h1>
@@ -180,7 +206,10 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
           </div>
         </div>
         <div className="text-sm"><span className="text-slate-500">체크 </span><strong className="text-fuchsia-700">{checkedCount}</strong><span className="text-slate-400"> / {total}명</span></div>
-        <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
+        <div className="flex gap-2">
+          <button onClick={resetDay} className="btn-secondary btn-sm" aria-label={`${day} 체크 전체 초기화`}>↺ 초기화</button>
+          <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
+        </div>
       </div>
 
       {mode === "호차별" && units.length === 0 ? (
@@ -193,9 +222,14 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
             const c = u.members.filter(m => checkedKeys.has(keyOf(m.id))).length;
             return (
               <div key={u.key} className="card overflow-hidden">
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
                   <h3 className="font-semibold text-slate-700">{u.title}</h3>
-                  <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
+                  <div className="flex items-center gap-2">
+                    {c > 0 && (
+                      <button onClick={() => resetUnit(u)} className="text-xs text-slate-400 hover:text-slate-600 underline" aria-label={`${u.title} 체크 초기화`}>초기화</button>
+                    )}
+                    <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
+                  </div>
                 </div>
                 {(u.summary || u.sub) && (
                   <div className="space-y-1 border-b border-slate-50 px-4 py-2">

@@ -103,21 +103,33 @@ function toMinutes(value?: string): number | null {
 function compareBlocks(a: IguardScheduleBlock, b: IguardScheduleBlock): number {
   return a.day - b.day || (toMinutes(a.start) ?? 0) - (toMinutes(b.start) ?? 0);
 }
-/** 그 블록이 "지금"인가 — 시간대 일치 + (현재 일자를 알면) 일자도 일치 */
+/** 그 블록이 "지금"인가 — 시간대 일치 + (현재 일자를 알면) 일자도 일치.
+ *  큐싯의 24시+ 표기(예: 24:30~25:30 샐브)는 달력상 다음날 새벽이므로,
+ *  전날 블록 중 자정을 넘겨 끝나는 닫힌 블록은 오늘 새벽 시각(now+24h)과 비교한다. */
 function isNowOn(b: IguardScheduleBlock, curDay: number | null, currentTime = nowHHMM()): boolean {
   if (!b.end) return false;
-  if (curDay == null || b.day !== curDay) return false;
+  if (curDay == null) return false;
   const start = toMinutes(b.start);
-  const end = toMinutes(b.end);
   const now = toMinutes(currentTime);
   if (start == null || now == null) return false;
-  if (isOpenEndedBlock(b)) return start <= now;
-  return end != null && start <= now && now < end;
+  if (b.day === curDay) {
+    if (isOpenEndedBlock(b)) return start <= now;
+    const end = toMinutes(b.end);
+    return end != null && start <= now && now < end;
+  }
+  if (b.day === curDay - 1 && !isOpenEndedBlock(b)) {
+    const end = toMinutes(b.end);
+    const lateNow = now + 24 * 60;
+    return end != null && end > 24 * 60 && start <= lateNow && lateNow < end;
+  }
+  return false;
 }
 function currentBlockFor(schedule: IguardScheduleBlock[], curDay: number | null, currentTime = nowHHMM()): IguardScheduleBlock | null {
   if (curDay == null) return null;
   const todayBlocks = schedule.filter(b => b.day === curDay).sort(compareBlocks);
-  const current = todayBlocks.find(b => isNowOn(b, curDay, currentTime));
+  // 전날의 새벽(24시+) 블록도 후보에 포함 — 예: 2일차 24:30~25:30은 3일차 00:30에 "지금"
+  const candidates = schedule.filter(b => b.day === curDay || b.day === curDay - 1).sort(compareBlocks);
+  const current = candidates.find(b => isNowOn(b, curDay, currentTime));
   if (current) return current;
   const firstToday = todayBlocks[0];
   const previousOpen = schedule

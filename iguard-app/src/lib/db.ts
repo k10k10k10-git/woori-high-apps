@@ -322,6 +322,13 @@ export async function updateIguardAttendance(retreatId: string, key: string, che
   }
   await set(r, { checked: true, updatedAt: Date.now() });
 }
+/** 여러 체크를 한 번의 multi-path update로 해제 — 재점호용 초기화 */
+export async function clearIguardAttendance(retreatId: string, keys: string[]): Promise<void> {
+  if (keys.length === 0) return;
+  const updates: Record<string, null> = {};
+  keys.forEach(key => { updates[attendancePathKey(key)] = null; });
+  await update(ref(db, paths.iguardAttendance(retreatId)), updates);
+}
 
 // ── 집회 자리배치 (iguard/seating) ─────────────────────────
 export function subscribeToIguardSeating(retreatId: string, cb: (list: IguardSeating[]) => void): () => void {
