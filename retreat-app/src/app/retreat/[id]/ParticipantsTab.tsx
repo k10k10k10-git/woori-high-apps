@@ -469,7 +469,14 @@ export default function ParticipantsTab({ retreat }: Props) {
                     </thead>
                     <tbody className="divide-y divide-purple-50">
                       {d.entries.map((e, j) => {
-                        const pairs = new Map(rawPairsOf(e.raw).map(({ h, v }) => [h, v]));
+                        // 구글폼이 1부/2부 등으로 분기되면 같은 질문 텍스트("몇 학년 인가요?" 등)의 열이
+                        // 시트에 중복으로 존재할 수 있다 — 응답자가 실제로 답한 분기의 값이 먼저 나와도
+                        // 뒤에 나오는 미응답 분기의 빈 값에 덮여 "—"로 보이는 문제가 있었다.
+                        // 값이 있는 쪽을 우선하도록(빈 값이 이미 채워진 값을 덮지 않도록) 처리.
+                        const pairs = new Map<string, string>();
+                        rawPairsOf(e.raw).forEach(({ h, v }) => {
+                          if (!pairs.has(h) || (!pairs.get(h) && v)) pairs.set(h, v);
+                        });
                         return (
                           <tr key={j} className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
                             <td className="px-4 py-2 text-center">
