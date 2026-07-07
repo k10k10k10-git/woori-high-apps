@@ -24,8 +24,20 @@ function parseBusStaffNames(value?: string): string[] {
     .filter(Boolean);
 }
 
+// 큐싯 시트 "선탑/동승" 칸에 안내 문장이 섞이면 쉼표로 잘린 조각이 사람 이름처럼 체크 항목이 된다
+// (1호차에서 실제 발생). BusesView와 동일한 신호로 오염을 감지해 경고만 띄운다(데이터는 안 지움).
+const NON_NAME_WORDS = new Set([
+  "부터", "간격으로", "이동", "시작", "순차", "순차적으", "순차적으로", "카톡방", "카톡방에",
+  "인원", "인원보고", "보고", "하기", "통과", "후에", "선발대", "동선", "대기",
+  "출발", "도착", "등록", "준비", "확인", "완료", "탑승", "하차",
+]);
+function hasSuspiciousBusStaff(names: string[]): boolean {
+  if (names.length > 8) return true;
+  return names.some(n => NON_NAME_WORDS.has(n.trim()));
+}
+
 interface CheckMember { id: string; name: string; meta?: string; sortRank?: number; }
-interface Unit { key: string; title: string; sub?: string; summary?: string; members: CheckMember[]; }
+interface Unit { key: string; title: string; sub?: string; summary?: string; warning?: string; members: CheckMember[]; }
 
 function memberSortRank(meta?: string): number {
   if (!meta) return 90;
@@ -138,6 +150,9 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
         key: b.id, title: `${b.busNo}호차`,
         sub: mergedStaff.length > 0 ? `선탑/동승: ${mergedStaff.join(", ")}` : undefined,
         summary,
+        warning: hasSuspiciousBusStaff(mergedStaff)
+          ? "선탑/동승에 이름 아닌 문장 조각이 섞인 것 같아요 — 큐싯 시트의 이 호차 칸을 확인하세요. (체크 인원이 부풀 수 있어요)"
+          : undefined,
         members: allMembers,
       };
     });
@@ -261,6 +276,9 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
                     {u.summary && <div className="text-xs font-semibold text-slate-600">{u.summary}</div>}
                     {u.sub && <div className="text-xs text-slate-500">{u.sub}</div>}
                   </div>
+                )}
+                {u.warning && (
+                  <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[11px] leading-relaxed text-amber-700">⚠ {u.warning}</div>
                 )}
                 <ul className="divide-y divide-slate-100">
                   {u.members.length === 0 ? <li className="px-4 py-3 text-center text-slate-300 text-xs">없음</li> :

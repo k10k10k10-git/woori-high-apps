@@ -35,6 +35,20 @@ function parseBusStaffNames(value?: string): string[] {
     .filter(Boolean);
 }
 
+// 큐싯 시트의 "선탑/동승" 칸에 안내 문장이 섞이면(예: "…순차적으로 카톡방에 인원보고…")
+// 쉼표로 잘린 문장 조각이 사람 이름처럼 표시된다(1호차에서 실제로 발생). 아래 단어들은
+// 사람 이름이 아닌 게 확실한 진행/안내 어휘 — 이름과 구조가 겹칠 위험이 없어 안전하게 신호로 쓴다.
+// ⚠ 데이터를 지우지는 않는다(진짜 이름 오삭제 위험). 오염이 의심되면 경고만 띄워 시트 수정을 유도.
+const NON_NAME_WORDS = new Set([
+  "부터", "간격으로", "이동", "시작", "순차", "순차적으", "순차적으로", "카톡방", "카톡방에",
+  "인원", "인원보고", "보고", "하기", "통과", "후에", "선발대", "동선", "대기",
+  "출발", "도착", "등록", "준비", "확인", "완료", "탑승", "하차",
+]);
+function hasSuspiciousBusStaff(names: string[]): boolean {
+  if (names.length > 8) return true;                       // 45인승 선탑/동승이 8명 초과면 비정상(오염 의심)
+  return names.some(n => NON_NAME_WORDS.has(n.trim()));     // 이름 아닌 진행 어휘가 섞임
+}
+
 function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 3): Map<number, string[]> {
   const day = busDay === 3 ? 3 : 1;
   const map = new Map<number, string[]>();
@@ -348,6 +362,11 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
                   <div className="text-xs text-slate-500">
                     선탑/동승: {mergedStaff.join(", ")}
                     {cueStaff.length > 0 && !b.staff && <span className="text-sky-500 ml-1">(큐싯)</span>}
+                  </div>
+                )}
+                {hasSuspiciousBusStaff(mergedStaff) && (
+                  <div className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] leading-relaxed text-amber-700">
+                    ⚠ 선탑/동승에 이름이 아닌 문장 조각이 섞인 것 같아요. 큐싯 시트의 이 호차 <strong>선탑/동승 칸</strong>에 안내 문장이 들어갔는지 확인하고, 이름만 남긴 뒤 다시 가져오기 하세요. (인원수도 이 때문에 부풀 수 있어요)
                   </div>
                 )}
               </div>

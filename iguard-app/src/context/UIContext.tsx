@@ -130,7 +130,8 @@ export function UIProvider({ children }: { children: ReactNode }) {
       {children}
 
       {/* ── Toast 컨테이너 ── */}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none" aria-live="polite" role="status">
+      {/* 모바일에선 하단 고정 네비(실행 뷰 탐색, ~64px)를 가리지 않도록 위로 띄운다. sm+에선 기존 위치. */}
+      <div className="fixed bottom-20 right-4 z-[100] flex flex-col gap-2 pointer-events-none sm:bottom-4" aria-live="polite" role="status">
         {toasts.map(t => (
           <div
             key={t.id}
