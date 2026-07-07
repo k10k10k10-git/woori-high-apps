@@ -51,7 +51,8 @@ src/
 │       ├── UnmatchedPaymentsTab.tsx  # 입금 미매칭
 │       ├── TshirtTab.tsx           # 단체티 신청
 │       ├── MedicalLogTab.tsx       # 의료 일지 (약 처방 기록, 프리셋 편집, 부서→학년→반 + 참가자 이름 자동완성)
-│       └── AutoAssignPanel.tsx     # 자동 조편성 패널
+│       ├── AutoAssignPanel.tsx     # 자동 조편성 패널
+│       └── BackupRestoreButton.tsx # 조편성/방배정 롤링 백업 복구 버튼 (공용 — GroupsTab·RoomsTab 툴바에서 사용)
 ├── context/
 │   ├── AuthContext.tsx             # Google OAuth, accessLevel 관리
 │   ├── UIContext.tsx               # toast(), uiConfirm() 전역 UI 유틸
@@ -66,7 +67,7 @@ src/
     ├── studentMatcher.test.ts      # studentMatcher 단위 테스트
     ├── groupNumber.ts              # 조 전역 번호 표시 (groupDisplayName: 2부는 1부 조 개수만큼 이어서)
     ├── groupNumber.test.ts         # groupNumber 단위 테스트
-    ├── exportUtils.ts              # xlsx 내보내기, printAsPDF
+    ├── exportUtils.ts              # xlsx 내보내기, printAsPDF, escapeHtml(인쇄 XSS 방지)
     ├── exportUtils.test.ts         # exportUtils 단위 테스트
     ├── constants.ts                # 공통 상수 (TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS)
     └── constants.test.ts           # constants 단위 테스트
@@ -84,8 +85,11 @@ src/
 retreats/
   {retreatId}/
     participants/         # Record<string, Participant> — 시트에서 가져온 신청자
+    participantsBackups/  # participants 전체덮어쓰기 직전 롤링 백업 (최근 5개)
     groups/               # 조편성
+    groupsBackups/        # groups 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveGroups가 자동 기록
     rooms/                # 방배정
+    roomsBackups/         # rooms 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveRooms가 자동 기록
     teachers/             # 교사 참석 현황
     carpools/             # 카풀 요청
     partialAttendances/   # 부분참 목록
@@ -194,6 +198,14 @@ await updateParticipantExtra(retreat.id, key, extraValue);
 // ❌ 잘못된 방법: 전체 덮어쓰기 → 동시 접근 시 race condition
 await saveParticipants(retreatId, updatedParticipants);
 ```
+
+⚠ **시트 동기화도 이 원칙을 우회할 수 있다** — 시트 자체에 특이사항 열이 있어서, `syncFromSheet()`가 participants를 전체 재생성하면 관리자가 특이사항 탭에서 저장한 `[분류]` 태그·수정 문구가 시트 원문으로 되돌아가는 버그가 있었다(2026-07-06 수정). `ParticipantsTab.tsx`의 `syncFromSheet`/`chooseDuplicateEntry`는 재생성 전 기존 participants를 읽어 `studentId`(폴백: 이름+부+학년+반) 기준으로 extra를 찾아 **우선 보존**하고, 기존 값이 없을 때만 시트 값을 채운다. 시트 연동 관련 코드를 고칠 땐 이 보존 로직이 깨지지 않는지 확인할 것. 단, 특이사항 탭에서 메모를 **삭제**했는데 시트 원문이 남아있으면 다음 동기화 때 되살아난다(기존값 없음 취급) — 완전 삭제하려면 시트 응답도 지워야 함.
+
+### 3b. 전체 덮어쓰기 노드의 자동 백업 — groups/rooms
+`saveGroups`/`saveRooms`는 구조상 전체 `set()` 덮어쓰기가 불가피한데(배열 순서·삭제 반영), participants와 달리 백업이 없어 저장 버그·실수 시 복구 수단이 없었다(2026-07-06 수정). `db.ts`의 `backupNodeBeforeOverwrite()`가 저장 직전 현재 상태를 롤링 백업(최근 5개)한다. 편집 중 저장이 잦으므로 **마지막 백업 후 10분 이내면 스킵**해 쓰기 폭주를 막는다(복구 시엔 `minIntervalMs=0`으로 강제 백업). 각 탭 툴바의 `BackupRestoreButton`이 시점 선택 복구 UI를 제공한다. 새로 전체 덮어쓰기 노드를 추가할 땐 이 패턴(백업 헬퍼 + 복구 버튼)을 재사용할 것.
+
+### 3c. 인쇄/JPG 출력 — escapeHtml 필수
+`printAsPDF`/`exportAsJPG`/`rowsToHtmlTable`은 조립된 HTML 문자열을 그대로 `document.write`한다. 학생이 신청폼에 입력한 이름·특이사항 등이 이스케이프 없이 삽입되면, `<img src=x onerror=...>` 같은 값이 관리자가 인쇄하는 순간 관리자 컨텍스트에서 실행되는 저장형 XSS가 된다(2026-07-06 수정). **HTML 문자열에 사용자 입력을 삽입하는 모든 지점은 `exportUtils.ts`의 `escapeHtml()`로 감쌀 것.** 새 인쇄/내보내기 기능을 추가할 때 반드시 적용.
 
 ### 4. Auth 접근 레벨
 ```typescript
@@ -350,6 +362,8 @@ npx vercel --prod --yes
 ```
 
 배포 URL: **https://retreat-app-theta.vercel.app**
+
+⚠ **Git 자동배포 미작동(2026-07-06 기준, 원인 미확인)**: 이 프로젝트는 Vercel과 GitHub main 브랜치가 연동돼 있지만, `git push`해도 새 배포가 트리거되지 않는 경우가 있었다(iguard-app은 정상 트리거됨). push 후에는 `npx vercel ls`로 새 배포가 실제로 큐잉됐는지 확인하고, 안 됐으면 레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사한 뒤(Root Directory가 retreat-app이라 레포 루트에서 실행해야 함) `npx vercel --prod --yes`로 수동 배포할 것. 작업 후 임시 복사한 `.vercel/`은 삭제.
 
 ---
 

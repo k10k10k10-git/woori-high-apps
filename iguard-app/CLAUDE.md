@@ -38,7 +38,7 @@ src/
 │       ├── ChecklistView.tsx       # 인원체크 (조별 학생+교사 체크, 버스별 체크)
 │       ├── RoomsView.tsx           # 조별 정보 (방배정·학생·교사 조회)
 │       ├── ExecutionViews.tsx      # 개인 큐카드 + 포스트 보드 (현장 모바일용)
-│       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트)
+│       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트, scheduleUtils.ts의 parseCueSheetText 사용)
 │       ├── LeaderCueManageView.tsx # 조장 큐싯 관리
 │       ├── PostsView.tsx           # 포스트(통제 지점) CRUD
 │       ├── StaffView.tsx           # 스탭 명단 (읽기 전용, 행정 teachers 기반)
@@ -51,7 +51,7 @@ src/
 │       ├── FairAssignButton.tsx    # 공정 배분 버튼 (식사+자리 통합 배정)
 │       └── InfoViews.tsx           # 조스탭 가이드 + 준비 할일
 ├── hooks/
-│   └── useRetreatData.ts           # 데이터 허브 — 17개 Firebase 실시간 구독 중앙 관리
+│   └── useRetreatData.ts           # 데이터 허브 — 17개 Firebase 실시간 구독 + 연결 상태(.info/connected) 중앙 관리
 ├── components/
 │   ├── InAppBrowserGuard.tsx       # 인앱 브라우저 감지 → 외부 브라우저 유도
 │   └── CenterSpinner.tsx           # 공용 로딩 스피너
@@ -67,7 +67,7 @@ src/
     ├── fairAssign.ts               # 공정 배분 알고리즘 (식사 순서 + 집회 자리 통합 누적 점수)
     ├── groupNumber.ts              # 조 전역 번호 표시 (2부는 1부 조 수만큼 오프셋)
     ├── partialAttendance.ts        # 부분참(선복귀/후발대) 일자별 참석 공식
-    └── exportUtils.ts              # printAsPDF (인쇄용 HTML → 새 창 인쇄)
+    └── exportUtils.ts              # printAsPDF (인쇄용 HTML → 새 창 인쇄), escapeHtml(인쇄 XSS 방지)
 
 루트 파일:
 ├── DO_NOT_DEPLOY.database.rules.json  # 보관용 규칙 사본 (배포 금지 — 배포용 원천은 학생 앱)
@@ -114,7 +114,10 @@ retreats/{retreatId}/iguard/
   movements/                        # 동선 매트릭스 (IguardMovement — 키: staffId__blockId)
   buses/                            # 버스 배정 (IguardBus)
   seating/                          # 집회 자리배치 (IguardSeating)
-  attendance/                       # 인원체크 상태 (checked: boolean)
+  attendance/                       # 인원체크 상태 ({ checked, updatedAt?, by? } — 키는 encodeURIComponent(원본키))
+                                     #   checked:false = 해제 톰스톤(삭제 대신 기록 — 오프라인 낡은 체크 부활 방지)
+                                     #   by = 체크/해제한 스탭 이름. 하위호환: 구버전 true/{checked:true}도 구독에서 지원
+                                     #   동시 사용 안전화(패턴 15) 적용 노드
   groupStaff/                       # 조스탭 배정 (groupId → staffId[])
   guide/                            # 조스탭 가이드 (string[])
   cueSheet/                         # 큐싯 시트 연동 설정 (url, sheetId, gid 등)
@@ -147,6 +150,7 @@ prepMilestones/                     # 🌐 전역 공유 — 준비 일정 (행�
 - 수련회 메타 구독(`subscribeToRetreat`)이 먼저 완료되어야 `retreatYear`를 알 수 있고, 이후 17개 데이터 구독이 시작됨
 - `pending` Set으로 모든 구독의 첫 콜백을 추적 → 전부 도착하면 `dataLoading = false`
 - cleanup에서 모든 unsubscribe 호출
+- **모든 데이터 구독은 `onError` 콜백을 받는다** — `fail(key)` 핸들러가 `loadError`를 설정하고 해당 키를 `ready` 처리한다. 이게 없으면 구독 실패 시 `pending`이 안 비워져 무한 스피너가 된다(패턴 16). `db.ts`에 새 구독을 추가할 땐 시그니처에 `onError?: (error: Error) => void`를 포함하고 여기서 `fail(...)`을 넘길 것.
 
 ### 2. Auth + 접근 레벨 (`src/context/AuthContext.tsx`)
 
@@ -199,6 +203,48 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 행정 사이트와 동일한 빌드 ID 폴링 방식. `next.config.ts`가 `NEXT_PUBLIC_BUILD_ID`(Vercel 커밋 SHA, 로컬은 타임스탬프)를 빌드 시점에 클라이언트 번들에 박아넣고, `/api/version`(`force-dynamic`)이 현재 배포의 빌드 ID를 반환한다. `UpdateBanner`가 5분마다 + 탭 visibility 변경 시 폴링해 불일치하면 새로고침 배너를 띄운다.
 
+### 10. 큐싯 시트 임포트 — 날짜 구분행 오인식 주의 (`scheduleUtils.ts`)
+
+`parseCueSheetText`가 각 행이 "날짜 구분행"인지 "시간 블록 행"인지 판정할 때, **시간이 있는 행을 먼저 걸러낸 뒤에만** 날짜 마커(`parseDayCell`)를 검사해야 한다. "첫째날/둘째날" 같은 날짜 단어가 시간이 있는 행의 제목·내용에 섞여 있으면(예: "둘째날 오전 프로그램" 09:00~) 과거엔 날짜 구분행으로 오인해 그 블록 자체가 통째로 사라졌다(2026-07-06 수정). 큐싯 파싱 로직을 고칠 땐 반드시 이 순서(시간 유무 → 날짜 판정)를 유지할 것.
+
+### 11. 시간 블록의 "지금" 판정 — 24시+ 표기(새벽) 처리 (`ExecutionViews.tsx`)
+
+큐싯은 자정 넘는 일정을 `24:30~25:30` 같은 24시+ 표기로 쓰는 관행이 있다. `isNowOn`/`currentBlockFor`는 이런 블록을 **전날(day-1) 블록**으로 취급하고, 실제 시각 + 24시간을 더한 값으로 비교한다(예: 2일차 24:30~25:30 블록은 3일차 00:30 실제 시각에 "지금"으로 판정됨). 이 로직 없이 단순 시:분 비교만 하면 새벽 시간대 큐카드·포스트 보드가 전부 "일정 없음"으로 잘못 뜬다(2026-07-06 수정). 새 시간 관련 뷰를 추가할 때 이 헬퍼를 재사용할 것 — 직접 시:분 비교를 새로 짜지 말 것.
+
+### 12. 오프라인 연결 배너 (`useRetreatData.ts` / `IguardClient.tsx`)
+
+`.info/connected`를 구독해(`subscribeToConnection`) `IguardClient` 전역에 배너를 띄운다. 현장 와이파이가 끊긴 상태에서도 RTDB는 로컬 큐에 쓰기를 쌓고 성공한 것처럼 보이므로, 배너 없이는 인원체크·동선 변경이 조용히 유실될 수 있다(2026-07-06 추가). 새 현장용 뷰를 만들 때 이 배너가 감싸는 레이아웃 밖에 두지 말 것.
+
+### 13. 인쇄 출력 — escapeHtml 필수 (`exportUtils.ts`)
+
+`printAsPDF`는 조립된 HTML 문자열을 그대로 `document.write`한다. 학생 이름·특이사항 등 사용자 입력을 이스케이프 없이 삽입하면 관리자 인쇄 시 저장형 XSS가 될 수 있다(2026-07-06 수정, ChecklistView·RoomsView 적용 완료). 인쇄 HTML을 새로 조립할 때 사용자 데이터가 들어가는 자리는 반드시 `escapeHtml()`로 감쌀 것.
+
+### 14. 버스 선탑/동승 이름 매칭 — "sf" 꼬리표 정규화 (`ChecklistView.tsx` / `BusesView.tsx`)
+
+선탑/동승 명단은 두 소스를 합친다 — 버스배정(`iguard/buses`)의 `staff` 필드와 큐싯 notice의 "N호차: 이름, …" 줄. 큐싯 쪽엔 "박혜원sf"처럼 스탭 표시 꼬리표가 붙는 관행이 있어, `parseBusStaffNames`가 꼬리표를 떼지 않으면 두 소스의 같은 사람이 다른 사람으로 인식돼 명단에 중복 표시된다(2026-07-06 수정 — `.replace(/sf$/i, "")` 추가). 이름 비교/중복 판정 로직을 건드릴 땐 이 정규화가 유지되는지 확인할 것.
+
+### 15. 인원체크 동시 사용 안전화 (`ChecklistView.tsx` / `db.ts`)
+
+현장에서 여러 스탭이 동시에 인원체크할 때의 사고를 막는 3중 설계(2026-07-06 적용):
+- **멱등 체크(A)**: 이름 탭 = "출석 확인"(항상 `checked=true`). 여러 명이 같은 학생을 동시에/중복으로 눌러도 결과가 "출석"으로 수렴한다. **해제는 별도** — 체크된 이름을 다시 누르면 `uiConfirm`을 거친다. (기존 토글 방식은 "확인하려다 오히려 해제"돼 출석 학생이 결석 처리되던 사고가 있었음.)
+- **트랜잭션 + 톰스톤(B)**: `updateIguardAttendance`는 `runTransaction`으로 `updatedAt`을 비교해, 오프라인에서 늦게 도착한 낡은 쓰기가 최신 기록을 덮지 못하게 한다(재연결 시 서버값 기준 재실행). 해제는 삭제가 아니라 `checked:false` 톰스톤을 남긴다 — 삭제하면 큐에 남은 낡은 체크가 부활할 수 있음. `clearIguardAttendance`(재점호 초기화)도 같은 이유로 톰스톤을 쓴다.
+- **체크자 기록(C)**: `by` 필드에 체크/해제한 스탭 이름(`user.displayName` 폴백 `email` 앞부분)을 저장하고, 체크된 이름 옆에 표시해 숫자 대조를 가능하게 한다.
+
+⚠ 인원체크 저장 로직을 건드릴 때: ①토글로 되돌리지 말 것(멱등 유지), ②`set`/`remove` 직접 쓰지 말고 트랜잭션·톰스톤 경로를 유지할 것, ③`by` 필드는 배포된 보안규칙이 허용함(attendance 노드에 `$other` 거부 없음)을 확인함 — 규칙 변경 시 재확인.
+
+### 16. 구독 에러 전파 — 무한 스피너 방지 (`db.ts` / `useRetreatData.ts`)
+
+권한 거부·규칙 변경 등으로 구독이 실패하면, `onError`가 없을 때 `pending`이 안 비워져 `dataLoading`이 영원히 `true`(에러 안내 없는 무한 스피너)로 남는다. 이를 막기 위해(2026-07-06 수정):
+- `db.ts`의 데이터 구독은 세 번째 인자로 `onError?: (error: Error) => void`를 받아 `onValue`의 에러 콜백으로 넘긴다.
+- `useRetreatData`의 `fail(key)` 핸들러가 `loadError`를 설정하고 `ready(key)`를 호출 → `IguardClient`의 기존 에러 배너가 즉시 뜬다.
+- 새 구독을 추가할 땐 반드시 이 `onError` 파라미터를 포함하고 훅에서 `fail(...)`을 넘길 것. (참고: `loadError` state·배너 UI는 오래전부터 있었으나 정작 설정하는 코드가 없어 죽은 상태였음 — "선언만 있고 연결 안 됨"의 전형.)
+
+### 17. 현장용 뷰의 시계 tick vs 사용자 선택 (`ExecutionViews.tsx`)
+
+`useClock()`은 30초마다 `clock.time`을 갱신한다. 이 값을 의존성으로 갖는 `useEffect`가 사용자 선택 상태를 `setState`하면, **30초마다 사용자의 선택이 자동값으로 리셋된다.** 포스트 현황(PostBoardView)에서 사용자가 고른 시간 블록이 30초 뒤 첫 블록(1일차 기도회)으로 되돌아가던 버그가 이것이었다(2026-07-06 수정). 
+- 자동 선택 effect에는 **"사용자가 직접 골랐으면 유지"** 가드(`blockPicked` ref)를 두고, 일자(`day`)가 바뀔 때만 플래그를 리셋해 당일 자동 스냅을 살린다(일자 탭의 `userPicked` 패턴과 동일).
+- 시계에 의존하는 계산·표시(`isNowOn`, `currentBlockFor`, 시각 표시)는 문제없다 — `setState`로 사용자 선택을 덮어쓰는 effect만 주의. 새 현장용 뷰에 "선택 상태 + 자동 추종"을 넣을 땐 이 패턴을 따를 것.
+
 ---
 
 ## API 라우트
@@ -241,6 +287,8 @@ npm run test:watch    # vitest (watch 모드)
 # 프로덕션 배포 (Vercel)
 npx vercel --prod --yes
 ```
+
+이 프로젝트는 GitHub main 브랜치 push 시 Vercel 자동배포가 정상 트리거된다(2026-07-06 확인). 같은 모노레포의 `retreat-app`은 자동배포가 안 되는 경우가 있었으니, 두 앱을 동시에 고칠 땐 각각 `npx vercel ls`로 배포 여부를 따로 확인할 것.
 
 ### 환경변수 (`.env.local`)
 
