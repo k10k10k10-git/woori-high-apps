@@ -105,14 +105,27 @@ export default function ParticipantsTab({ retreat }: Props) {
       // 키(p_N)는 매 동기화마다 재배열되므로 studentId(없으면 이름+부+학년+반)로 사람을 맞춰
       // 기존 extra를 우선 유지한다. 기존 값이 없을 때만 시트의 특이사항을 새로 채운다.
       // (로컬 state는 stale할 수 있어 DB에서 새로 읽는다.)
+      // ⚠ studentId·identity가 두 명 이상에게 겹치면(매칭 애매 등으로 DB에 일시적으로 중복 매핑된 경우)
+      // 그 키는 누구 것인지 신뢰할 수 없으므로 보존 후보에서 제외한다 — 안 그러면 엉뚱한 사람의
+      // 특이사항이 studentId를 공유하는 다른 사람에게 옮겨붙어("복사")버리고, 이후 재동기화마다
+      // 그 잘못된 값이 "기존값 우선 보존"되어 영구화된다(실제 사례: 서로 다른 6쌍/12명 오염 확인, 2026-07-08).
       const existing = await getParticipants(retreat.id);
       const extraByStudentId = new Map<string, string>();
       const extraByIdentity = new Map<string, string>();
+      const ambiguousStudentIds = new Set<string>();
+      const ambiguousIdentities = new Set<string>();
       Object.values(existing).forEach(prev => {
         if (!prev.extra) return;
-        if (prev.studentId) extraByStudentId.set(prev.studentId, prev.extra);
-        extraByIdentity.set(`${prev.name.trim()}|${prev.bu ?? ""}|${prev.grade}|${prev.class}`, prev.extra);
+        if (prev.studentId) {
+          if (extraByStudentId.has(prev.studentId)) ambiguousStudentIds.add(prev.studentId);
+          extraByStudentId.set(prev.studentId, prev.extra);
+        }
+        const identityKey = `${prev.name.trim()}|${prev.bu ?? ""}|${prev.grade}|${prev.class}`;
+        if (extraByIdentity.has(identityKey)) ambiguousIdentities.add(identityKey);
+        extraByIdentity.set(identityKey, prev.extra);
       });
+      ambiguousStudentIds.forEach(id => extraByStudentId.delete(id));
+      ambiguousIdentities.forEach(key => extraByIdentity.delete(key));
 
       // 학생 DB 매칭 + 중복 제거 (동일 studentId는 최초 신청만 유지, 미매칭은 name+bu+grade 기준)
       const seenStudentIds = new Set<string>();
