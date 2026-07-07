@@ -23,10 +23,11 @@ interface DbPerson {
 
 interface Props { retreat: Retreat; }
 
-const EMPTY_COUNTS: MealRoleCounts = { staff: 0, teacher: 0, student: 0, extra: 0 };
+const EMPTY_COUNTS: MealRoleCounts = { staff: 0, teacher: 0, minister: 0, student: 0, extra: 0 };
 const ROLE_LABELS: { key: keyof MealRoleCounts; label: string }[] = [
   { key: "staff", label: "스탭" },
-  { key: "teacher", label: "교사·교역자" },
+  { key: "teacher", label: "교사" },
+  { key: "minister", label: "교역자" },
   { key: "student", label: "학생" },
   { key: "extra", label: "기타" },
 ];
@@ -47,7 +48,7 @@ function makeStudentKey(p: Participant): string | null {
 }
 
 function sumCounts(c: MealRoleCounts): number {
-  return (c.staff || 0) + (c.teacher || 0) + (c.student || 0) + (c.extra || 0);
+  return (c.staff || 0) + (c.teacher || 0) + (c.minister || 0) + (c.student || 0) + (c.extra || 0);
 }
 
 function fmtDate(date: string): string {
@@ -291,6 +292,7 @@ export default function MealCountTab({ retreat }: Props) {
       if (excluded) {
         counts.staff -= adj.counts.staff || 0;
         counts.teacher -= adj.counts.teacher || 0;
+        counts.minister -= adj.counts.minister || 0;
         counts.student -= adj.counts.student || 0;
         counts.extra -= adj.counts.extra || 0;
       }
@@ -360,7 +362,7 @@ export default function MealCountTab({ retreat }: Props) {
             {suggesting ? "불러오는 중…" : "DB에서 자동 제안"}
           </button>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 items-end">
           {ROLE_LABELS.map(({ key, label }) => (
             <div key={key}>
               <label className="text-xs text-slate-500 mb-1 block">
@@ -539,7 +541,7 @@ export default function MealCountTab({ retreat }: Props) {
                     <button onClick={() => removeAdjustment(adj.id)} aria-label="조정 항목 삭제"
                       className="text-slate-300 hover:text-red-400 text-lg leading-none">×</button>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 mt-2">
+                  <div className="grid grid-cols-5 gap-2 mt-2">
                     {ROLE_LABELS.map(({ key, label }) => (
                       <label key={key} className="text-[11px] text-slate-400">
                         {key === "extra" ? extraLabel || "기타" : label}
@@ -570,7 +572,8 @@ export default function MealCountTab({ retreat }: Props) {
                 <th className="px-4 py-2 text-left">날짜</th>
                 <th className="px-4 py-2 text-left">끼니</th>
                 <th className="px-4 py-2 text-right">스탭</th>
-                <th className="px-4 py-2 text-right">교사·교역자</th>
+                <th className="px-4 py-2 text-right">교사</th>
+                <th className="px-4 py-2 text-right">교역자</th>
                 <th className="px-4 py-2 text-right">학생</th>
                 <th className="px-4 py-2 text-right">{extraLabel || "기타"}</th>
                 <th className="px-4 py-2 text-right">합계</th>
@@ -579,13 +582,14 @@ export default function MealCountTab({ retreat }: Props) {
             <tbody className="divide-y divide-slate-100">
               {mealRows.map(({ meal, counts, total }, i) => {
                 const firstOfDate = i === 0 || mealRows[i - 1].meal.date !== meal.date;
-                const hasNegative = counts.staff < 0 || counts.teacher < 0 || counts.student < 0 || counts.extra < 0;
+                const hasNegative = counts.staff < 0 || counts.teacher < 0 || counts.minister < 0 || counts.student < 0 || counts.extra < 0;
                 return (
                   <tr key={meal.id} className={firstOfDate ? "border-t-2 border-slate-200" : ""}>
                     <td className="px-4 py-2 font-medium text-slate-700">{firstOfDate ? fmtDate(meal.date) : ""}</td>
                     <td className="px-4 py-2 text-slate-600">{meal.name}</td>
                     <td className="px-4 py-2 text-right text-slate-500 text-xs">{counts.staff}</td>
                     <td className="px-4 py-2 text-right text-slate-500 text-xs">{counts.teacher}</td>
+                    <td className="px-4 py-2 text-right text-slate-500 text-xs">{counts.minister}</td>
                     <td className="px-4 py-2 text-right text-slate-500 text-xs">{counts.student}</td>
                     <td className="px-4 py-2 text-right text-slate-500 text-xs">{counts.extra}</td>
                     <td className={`px-4 py-2 text-right font-bold ${hasNegative ? "text-red-500" : "text-blue-600"}`}>

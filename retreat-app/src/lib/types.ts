@@ -223,9 +223,9 @@ export interface SuppliesBudget {
 
 // ── 식수 계산 (끼니별 식사 인원 — 수련원 통보용) ─────────────────
 
-export const MEAL_ROLES = ["staff", "teacher", "student", "extra"] as const;
+export const MEAL_ROLES = ["staff", "teacher", "minister", "student", "extra"] as const;
 export type MealRole = typeof MEAL_ROLES[number];
-export type MealRoleCounts = Record<MealRole, number>; // 스탭/교사·교역자/학생/기타(음향·조명 등)
+export type MealRoleCounts = Record<MealRole, number>; // 스탭/교사/교역자/학생/기타(음향·조명 등)
 
 export interface MealSlot {
   id: string;
