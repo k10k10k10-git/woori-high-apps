@@ -1,5 +1,8 @@
 {
-  "dday": { "label": "여름수련회", "date": "2026-07-24" },
+  "dday": {
+    "label": "여름수련회",
+    "date": "2026-07-24"
+  },
   "skills": [
     {
       "id": "deploy-status",
@@ -55,6 +58,14 @@
       "label": "출시전 감사 (/launch-audit)",
       "desc": "보안·데이터 안전·오류 처리 진단 (읽기 전용)",
       "prompt": "/launch-audit all",
+      "danger": false
+    },
+    {
+      "id": "db-audit",
+      "domain": "QA·감사",
+      "label": "DB 정합성 진단 (/db-audit)",
+      "desc": "특이사항·버스·조편성 전수 대조 — 읽기 전용, 복구는 별도 승인",
+      "prompt": "/db-audit all",
       "danger": false
     },
     {
