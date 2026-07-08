@@ -215,9 +215,10 @@ export async function updateGroup(retreatId: string, groupId: string, data: Part
 
 // 조스탭 배정 — 이가드가 소유(retreats/{id}/iguard/groupStaff). 행정은 읽기 전용으로 공유 표시.
 // 키 = groupId, 값 = staffId[](= teacher.id).
-export function subscribeToIguardGroupStaff(retreatId: string, callback: (map: Record<string, string[]>) => void): () => void {
+export function subscribeToIguardGroupStaff(retreatId: string, callback: (map: Record<string, string[]>) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardGroupStaff(retreatId)), (snap) =>
-    callback(snap.exists() ? (snap.val() as Record<string, string[]>) : {}));
+    callback(snap.exists() ? (snap.val() as Record<string, string[]>) : {}),
+    (error) => { console.warn("subscribeToIguardGroupStaff error:", error); onError?.(error); });
 }
 
 // ── Rooms ─────────────────────────────────────────────────
@@ -309,16 +310,19 @@ export async function getTeachers(retreatId: string): Promise<TeacherAttendance[
   return snapToList<TeacherAttendance>(snap);
 }
 
-export function subscribeToParticipants(retreatId: string, callback: (parts: Record<string, Participant>) => void): () => void {
-  return onValue(ref(db, paths.participants(retreatId)), (snap) => callback(snap.exists() ? snap.val() : {}));
+export function subscribeToParticipants(retreatId: string, callback: (parts: Record<string, Participant>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.participants(retreatId)), (snap) => callback(snap.exists() ? snap.val() : {}),
+    (error) => { console.warn("subscribeToParticipants error:", error); onError?.(error); });
 }
 
-export function subscribeToCellColors(retreatId: string, callback: (colors: Record<string, string>) => void): () => void {
-  return onValue(ref(db, paths.cellColors(retreatId)), (snap) => callback(snap.exists() ? snap.val() : {}));
+export function subscribeToCellColors(retreatId: string, callback: (colors: Record<string, string>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.cellColors(retreatId)), (snap) => callback(snap.exists() ? snap.val() : {}),
+    (error) => { console.warn("subscribeToCellColors error:", error); onError?.(error); });
 }
 
-export function subscribeToTeachers(retreatId: string, callback: (teachers: TeacherAttendance[]) => void): () => void {
-  return onValue(ref(db, paths.teachers(retreatId)), (snap) => callback(snapToList<TeacherAttendance>(snap)));
+export function subscribeToTeachers(retreatId: string, callback: (teachers: TeacherAttendance[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.teachers(retreatId)), (snap) => callback(snapToList<TeacherAttendance>(snap)),
+    (error) => { console.warn("subscribeToTeachers error:", error); onError?.(error); });
 }
 
 export async function saveTeacher(retreatId: string, teacher: Omit<TeacherAttendance, "id">): Promise<string> {
@@ -663,9 +667,10 @@ export async function saveMealCount(retreatId: string, data: MealCountData): Pro
 
 // ── Brainstorm (브레인스토밍 보드 — 전역 공유, 수련회 무관) ──
 
-export function subscribeToBrainstormNotes(callback: (notes: BrainstormNote[]) => void) {
+export function subscribeToBrainstormNotes(callback: (notes: BrainstormNote[]) => void, onError?: (error: Error) => void) {
   const r = ref(db, paths.brainstorm());
-  return onValue(r, (snap) => callback(snapToList<BrainstormNote>(snap)));
+  return onValue(r, (snap) => callback(snapToList<BrainstormNote>(snap)),
+    (error) => { console.warn("subscribeToBrainstormNotes error:", error); onError?.(error); });
 }
 
 export async function saveBrainstormNote(data: Omit<BrainstormNote, "id">): Promise<string> {
@@ -694,29 +699,34 @@ export async function deleteBrainstormComment(noteId: string, commentId: string)
 
 // ── Real-time listeners ───────────────────────────────────
 
-export function subscribeToGroups(retreatId: string, callback: (groups: Group[]) => void) {
+export function subscribeToGroups(retreatId: string, callback: (groups: Group[]) => void, onError?: (error: Error) => void) {
   const r = ref(db, paths.groups(retreatId));
-  return onValue(r, (snap) => callback(snapToList<Group>(snap)));
+  return onValue(r, (snap) => callback(snapToList<Group>(snap)),
+    (error) => { console.warn("subscribeToGroups error:", error); onError?.(error); });
 }
 
-export function subscribeToRooms(retreatId: string, callback: (rooms: Room[]) => void) {
+export function subscribeToRooms(retreatId: string, callback: (rooms: Room[]) => void, onError?: (error: Error) => void) {
   const r = ref(db, paths.rooms(retreatId));
-  return onValue(r, (snap) => callback(snapToList<Room>(snap)));
+  return onValue(r, (snap) => callback(snapToList<Room>(snap)),
+    (error) => { console.warn("subscribeToRooms error:", error); onError?.(error); });
 }
 
-export function subscribeToRetreat(id: string, callback: (retreat: Retreat | null) => void) {
+export function subscribeToRetreat(id: string, callback: (retreat: Retreat | null) => void, onError?: (error: Error) => void) {
   const r = ref(db, paths.retreat(id));
-  return onValue(r, (snap) => callback(snap.exists() ? { id, ...snap.val() } : null));
+  return onValue(r, (snap) => callback(snap.exists() ? { id, ...snap.val() } : null),
+    (error) => { console.warn("subscribeToRetreat error:", error); onError?.(error); });
 }
 
 // ── On-Site Registration ──────────────────────────────────
 
 export function subscribeToOnSiteReg(
   retreatId: string,
-  callback: (reg: Record<string, OnSiteEntry>) => void
+  callback: (reg: Record<string, OnSiteEntry>) => void,
+  onError?: (error: Error) => void
 ): () => void {
   const r = ref(db, paths.onSiteReg(retreatId));
-  return onValue(r, (snap) => callback(snap.exists() ? snap.val() : {}));
+  return onValue(r, (snap) => callback(snap.exists() ? snap.val() : {}),
+    (error) => { console.warn("subscribeToOnSiteReg error:", error); onError?.(error); });
 }
 
 /** 기존 신청자 체크인 토글 (key = participant key, e.g. "p_0") */
@@ -768,12 +778,13 @@ export async function addWalkIn(retreatId: string, entry: Omit<OnSiteEntry, "isO
 
 export function subscribeToUnmatchedPayments(
   retreatId: string,
-  cb: (list: UnmatchedPayment[]) => void
+  cb: (list: UnmatchedPayment[]) => void,
+  onError?: (error: Error) => void
 ) {
   const r = ref(db, paths.unmatchedPayments(retreatId));
   return onValue(r, snap => {
     cb(snapToList<UnmatchedPayment>(snap).sort((a, b) => b.createdAt - a.createdAt));
-  });
+  }, (error) => { console.warn("subscribeToUnmatchedPayments error:", error); onError?.(error); });
 }
 
 export async function addUnmatchedPayment(
@@ -858,7 +869,8 @@ export async function updateUnmatchedPayment(
 
 export function subscribeToTshirtOrders(
   retreatId: string,
-  cb: (orders: TshirtOrder[]) => void
+  cb: (orders: TshirtOrder[]) => void,
+  onError?: (error: Error) => void
 ): () => void {
   const r = ref(db, paths.tshirtOrders(retreatId));
   return onValue(r, snap => {
@@ -870,7 +882,7 @@ export function subscribeToTshirtOrders(
       a.name.localeCompare(b.name, "ko")
     );
     cb(orders);
-  });
+  }, (error) => { console.warn("subscribeToTshirtOrders error:", error); onError?.(error); });
 }
 
 export async function addTshirtOrder(
@@ -957,7 +969,7 @@ export async function deleteMilestone(id: string): Promise<void> {
   await remove(ref(db, `${GLOBAL_MILESTONES_PATH}/${id}`));
 }
 
-export function subscribeToMilestones(callback: (milestones: Milestone[]) => void): () => void {
+export function subscribeToMilestones(callback: (milestones: Milestone[]) => void, onError?: (error: Error) => void): () => void {
   const r = ref(db, GLOBAL_MILESTONES_PATH);
   return onValue(
     r,
@@ -965,15 +977,17 @@ export function subscribeToMilestones(callback: (milestones: Milestone[]) => voi
     (error) => {
       console.warn(`Failed to subscribe ${GLOBAL_MILESTONES_PATH}:`, error);
       callback([]);
+      onError?.(error);
     }
   );
 }
 
 // ── RetreatPeriods ────────────────────────────────────────
 
-export function subscribeToRetreatPeriods(retreatId: string, callback: (periods: RetreatPeriod[]) => void): () => void {
+export function subscribeToRetreatPeriods(retreatId: string, callback: (periods: RetreatPeriod[]) => void, onError?: (error: Error) => void): () => void {
   const r = ref(db, retreatSharedSchedulePaths.periods(retreatId));
-  return onValue(r, (snap) => callback(snapToList<RetreatPeriod>(snap).sort((a, b) => a.startDate.localeCompare(b.startDate))));
+  return onValue(r, (snap) => callback(snapToList<RetreatPeriod>(snap).sort((a, b) => a.startDate.localeCompare(b.startDate))),
+    (error) => { console.warn("subscribeToRetreatPeriods error:", error); onError?.(error); });
 }
 
 export type RetreatPeriodWithOwner = RetreatPeriod & { retreatId: string };
@@ -994,7 +1008,8 @@ export async function getEarliestPeriodDateByRetreat(retreatIds: string[]): Prom
 /** 모든 수련회의 기간을 합쳐서 구독 — "준비 일정" 패널은 수련회 선택과 무관하게 항상 전체 표시 */
 export function subscribeToAllRetreatPeriods(
   retreatIds: string[],
-  callback: (periods: RetreatPeriodWithOwner[]) => void
+  callback: (periods: RetreatPeriodWithOwner[]) => void,
+  onError?: (error: Error) => void
 ): () => void {
   if (retreatIds.length === 0) { callback([]); return () => {}; }
   const byRetreat = new Map<string, RetreatPeriodWithOwner[]>();
@@ -1006,7 +1021,7 @@ export function subscribeToAllRetreatPeriods(
     subscribeToRetreatPeriods(id, list => {
       byRetreat.set(id, list.map(p => ({ ...p, retreatId: id })));
       emit();
-    })
+    }, onError)
   );
   return () => unsubs.forEach(u => u());
 }
@@ -1027,9 +1042,10 @@ export async function deleteRetreatPeriod(retreatId: string, id: string): Promis
 
 // ── MedicalLog ────────────────────────────────────────────
 
-export function subscribeToMedicalLogs(retreatId: string, callback: (logs: MedicalLog[]) => void): () => void {
+export function subscribeToMedicalLogs(retreatId: string, callback: (logs: MedicalLog[]) => void, onError?: (error: Error) => void): () => void {
   const r = ref(db, paths.medicalLogs(retreatId));
-  return onValue(r, (snap) => callback(snapToList<MedicalLog>(snap).sort((a, b) => b.createdAt - a.createdAt)));
+  return onValue(r, (snap) => callback(snapToList<MedicalLog>(snap).sort((a, b) => b.createdAt - a.createdAt)),
+    (error) => { console.warn("subscribeToMedicalLogs error:", error); onError?.(error); });
 }
 
 function stripUndefined<T>(value: T): T {
