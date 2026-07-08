@@ -4,14 +4,35 @@
     {
       "name": "retreat-admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "retreat-app"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "retreat-app"
+      ],
       "port": 3000
     },
     {
       "name": "iguard-app",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "iguard-app", "--", "-p", "3001"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "iguard-app",
+        "--",
+        "-p",
+        "3001"
+      ],
       "port": 3001
+    },
+    {
+      "name": "agent-os",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "agent-os/server.js"
+      ],
+      "port": 5599
     }
   ]
 }

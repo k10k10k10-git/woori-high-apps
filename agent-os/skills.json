@@ -1,0 +1,85 @@
+{
+  "dday": { "label": "여름수련회", "date": "2026-07-24" },
+  "skills": [
+    {
+      "id": "deploy-status",
+      "domain": "배포·운영",
+      "label": "배포 상태 브리핑",
+      "desc": "두 앱의 Vercel 최신 배포를 확인해 짧게 보고",
+      "prompt": "retreat-app과 iguard-app 폴더에서 각각 npx vercel ls를 실행해 최신 배포의 상태(Ready/Error)와 커밋을 확인하고, 한국어 3~4줄로 요약 보고해줘. 코드·설정은 절대 변경하지 마.",
+      "danger": false
+    },
+    {
+      "id": "ship-retreat",
+      "domain": "배포·운영",
+      "label": "행정 앱 배포 (/ship retreat)",
+      "desc": "타입체크·테스트 통과 시 커밋·푸시·Ready 확인",
+      "prompt": "/ship retreat",
+      "danger": true
+    },
+    {
+      "id": "ship-iguard",
+      "domain": "배포·운영",
+      "label": "이가드 앱 배포 (/ship iguard)",
+      "desc": "타입체크·테스트 통과 시 커밋·푸시·Ready 확인",
+      "prompt": "/ship iguard",
+      "danger": true
+    },
+    {
+      "id": "ship-all",
+      "domain": "배포·운영",
+      "label": "전체 배포 (/ship all)",
+      "desc": "두 앱 모두 검증 후 배포",
+      "prompt": "/ship all",
+      "danger": true
+    },
+    {
+      "id": "tests",
+      "domain": "QA·감사",
+      "label": "테스트 일괄 실행",
+      "desc": "양쪽 앱 tsc + vitest, 결과 요약만",
+      "prompt": "retreat-app과 iguard-app에서 각각 npx tsc --noEmit과 npm test를 실행하고, 앱별로 '타입 에러 N개 / 테스트 N개 통과' 형식으로 요약 보고해줘. 코드는 절대 변경하지 마.",
+      "danger": false
+    },
+    {
+      "id": "qa-iguard",
+      "domain": "QA·감사",
+      "label": "이가드 리허설 QA (/retreat-qa)",
+      "desc": "스탭 시점 화면 전수 점검, 심각도별 리포트",
+      "prompt": "/retreat-qa iguard",
+      "danger": false
+    },
+    {
+      "id": "audit-all",
+      "domain": "QA·감사",
+      "label": "출시전 감사 (/launch-audit)",
+      "desc": "보안·데이터 안전·오류 처리 진단 (읽기 전용)",
+      "prompt": "/launch-audit all",
+      "danger": false
+    },
+    {
+      "id": "backlog",
+      "domain": "계획·리포트",
+      "label": "백로그 브리핑",
+      "desc": "미해결 백로그를 코드와 대조, 다음 할 일 3개 추천",
+      "prompt": "메모리의 '미해결·보류 백로그'(project_pending_backlog)를 읽고, 현재 코드 상태와 대조해서 다음에 하면 좋을 일 3개를 근거와 함께 짧게 추천해줘. 코드는 절대 변경하지 마.",
+      "danger": false
+    },
+    {
+      "id": "daily-deep",
+      "domain": "계획·리포트",
+      "label": "일일 보고서 심층판",
+      "desc": "커밋·배포·백로그 종합 리포트 생성",
+      "prompt": "어제와 오늘의 git 커밋, 두 앱의 Vercel 배포 상태, 메모리의 미해결 백로그를 종합해 한국어 일일 보고서를 작성해줘. 읽기 전용 — 아무것도 변경하지 마.",
+      "danger": false
+    },
+    {
+      "id": "refactor-plan",
+      "domain": "계획·리포트",
+      "label": "리팩토링 계획 수립 (/refactor-plan)",
+      "desc": "코드 무변경, 실행자용 계획서 작성",
+      "prompt": "/refactor-plan retreat-app iguard-app",
+      "danger": false
+    }
+  ]
+}

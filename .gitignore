@@ -17,3 +17,6 @@ backups/
 
 # OS
 .DS_Store
+
+# 에이전트 OS 실행 로그 (트랜스크립트 포함)
+agent-os/runs/
