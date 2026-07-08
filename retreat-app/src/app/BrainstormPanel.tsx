@@ -54,6 +54,7 @@ export default function BrainstormPanel({ authorName }: Props) {
   const { toast, uiConfirm } = useUI();
   const [notes, setNotes] = useState<BrainstormNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // 새 카드 작성 (캔버스 위 지정 좌표에 composer 카드 표시)
   const [composerPos, setComposerPos] = useState<{ x: number; y: number } | null>(null);
@@ -81,7 +82,7 @@ export default function BrainstormPanel({ authorName }: Props) {
       // 최근에 만진 카드가 위에 오도록 (렌더 순서 = z 순서)
       setNotes([...list].sort((a, b) => (a.updatedAt ?? a.createdAt) - (b.updatedAt ?? b.createdAt)));
       setLoading(false);
-    });
+    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
     return unsubscribe;
   }, []);
 
@@ -241,6 +242,11 @@ export default function BrainstormPanel({ authorName }: Props) {
 
   return (
     <div className="mt-6">
+      {loadError && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+          ⚠ 로드 오류: {loadError}
+        </div>
+      )}
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="min-w-0">
           <h2 className="text-base font-bold text-slate-700">

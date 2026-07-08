@@ -144,7 +144,8 @@ export default function MealCountTab({ retreat }: Props) {
 
   useEffect(() => {
     void load();
-    const unsub = subscribeToRetreatPeriods(retreat.id, setPeriods);
+    const unsub = subscribeToRetreatPeriods(retreat.id, setPeriods,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     return unsub;
   }, [load, retreat.id]);
 

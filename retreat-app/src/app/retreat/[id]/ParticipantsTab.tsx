@@ -85,7 +85,8 @@ export default function ParticipantsTab({ retreat }: Props) {
 
   useEffect(() => {
     void loadData();
-    const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState);
+    const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState,
+      e => setError(prev => prev || `구독 실패 — ${e.message}`));
     return () => unsubColors();
   }, [loadData, retreat.id]);
 

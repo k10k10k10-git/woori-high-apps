@@ -74,6 +74,7 @@ export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: 
 
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // 달력 표시 연/월 — 가장 가까운 기간 기준으로 초기화
   const [calYear,  setCalYear]  = useState(() => new Date().getFullYear());
@@ -105,7 +106,8 @@ export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: 
   // 마일스톤(준비 일정)은 전역 공유 — 선택된 수련회와 무관하게 항상 구독.
   useEffect(() => {
     const unsubM = subscribeToMilestones(list =>
-      setMilestones(list.sort((a, b) => a.targetDate.localeCompare(b.targetDate)))
+      setMilestones(list.sort((a, b) => a.targetDate.localeCompare(b.targetDate))),
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)
     );
     return () => unsubM();
   }, []);
@@ -123,7 +125,7 @@ export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: 
         setCalYear(d.getFullYear());
         setCalMonth(d.getMonth());
       }
-    });
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     return () => unsubP();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retreatIds.join(",")]);
@@ -263,6 +265,11 @@ export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: 
 
   return (
     <div className="flex flex-col gap-4">
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
+          ⚠ 로드 오류: {loadError}
+        </div>
+      )}
 
       {/* 수련회 기간 목록 */}
       <div className="card p-4">

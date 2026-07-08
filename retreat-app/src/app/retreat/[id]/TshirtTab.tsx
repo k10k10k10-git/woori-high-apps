@@ -94,7 +94,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
       const unsub = subscribeToTshirtOrders(retreat.id, list => {
         setOrders(list);
         setLoading(false);
-      });
+      }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
       return unsub;
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));

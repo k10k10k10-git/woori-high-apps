@@ -95,10 +95,14 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       }
     }
     loadData();
-    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants);
-    const unsubCellColors = subscribeToCellColors(retreat.id, setCellColors);
-    const unsubOnSite = subscribeToOnSiteReg(retreat.id, setOnSiteReg);
-    const unsubGroups = subscribeToGroups(retreat.id, setGroups);
+    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    const unsubCellColors = subscribeToCellColors(retreat.id, setCellColors,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    const unsubOnSite = subscribeToOnSiteReg(retreat.id, setOnSiteReg,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    const unsubGroups = subscribeToGroups(retreat.id, setGroups,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     const unsubConn = subscribeToConnection(setConnected);
     return () => { unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups(); unsubConn(); };
   }, [retreat.id, retreat.year]);

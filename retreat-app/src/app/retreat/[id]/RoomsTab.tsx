@@ -158,15 +158,15 @@ export default function RoomsTab({ retreat }: Props) {
         setUnassigned(ids.filter(id => !assigned.has(id)));
         return prev;
       });
-    }));
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: cell colors
-    unsubs.push(subscribeToCellColors(retreat.id, setCellColors));
+    unsubs.push(subscribeToCellColors(retreat.id, setCellColors, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: teachers
     unsubs.push(subscribeToTeachers(retreat.id, (teachers) => {
       setAllTeachers(teachers);
-    }));
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: rooms
     unsubs.push(subscribeToRooms(retreat.id, (newRooms) => {
@@ -191,7 +191,7 @@ export default function RoomsTab({ retreat }: Props) {
         latestRemoteRoomsRef.current = newRooms;
         setRemoteUpdated(true);
       }
-    }));
+    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); }));
 
     return () => { unsubs.forEach(fn => fn()); initialLoaded.current = false; };
   }, [retreat.id, retreat.year]);

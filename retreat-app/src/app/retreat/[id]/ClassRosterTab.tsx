@@ -116,10 +116,11 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
 
   useEffect(() => {
     void load();
-    const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState);
+    const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     const unsubParts = subscribeToParticipants(retreat.id, (parts) => {
       setParticipants(Object.values(parts));
-    });
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     return () => { unsubColors(); unsubParts(); };
   }, [load, retreat.id]);
 

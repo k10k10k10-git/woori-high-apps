@@ -69,12 +69,14 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       setLoadError(e instanceof Error ? e.message : String(e));
     });
 
-    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants);
-    const unsubColors   = subscribeToCellColors(retreat.id, setCellColors_);
+    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    const unsubColors   = subscribeToCellColors(retreat.id, setCellColors_,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     const unsubPayments = subscribeToUnmatchedPayments(retreat.id, list => {
       setPayments(list);
       setLoading(false);
-    });
+    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
     return () => { unsubParticipants(); unsubColors(); unsubPayments(); };
   }, [retreat.id, retreat.year]);
 

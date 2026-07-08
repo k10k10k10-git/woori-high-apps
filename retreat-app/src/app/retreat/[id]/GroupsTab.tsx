@@ -155,10 +155,10 @@ export default function GroupsTab({ retreat }: Props) {
         setUnassigned(ids.filter(id => !assigned.has(id)));
         return prev;
       });
-    }));
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: cell colors
-    unsubs.push(subscribeToCellColors(retreat.id, setCellColors));
+    unsubs.push(subscribeToCellColors(retreat.id, setCellColors, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: teachers
     unsubs.push(subscribeToTeachers(retreat.id, (teachers) => {
@@ -166,7 +166,7 @@ export default function GroupsTab({ retreat }: Props) {
       const sm: Record<string, string> = {};
       teachers.forEach(t => { sm[t.name] = t.status; });
       setTeacherStatusMap(sm);
-    }));
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: groups
     unsubs.push(subscribeToGroups(retreat.id, (newGroups) => {
@@ -191,9 +191,9 @@ export default function GroupsTab({ retreat }: Props) {
         latestRemoteGroupsRef.current = newGroups;
         setRemoteUpdated(true);
       }
-    }));
+    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); }));
 
-    unsubs.push(subscribeToIguardGroupStaff(retreat.id, setIguardGroupStaff));
+    unsubs.push(subscribeToIguardGroupStaff(retreat.id, setIguardGroupStaff, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     return () => { unsubs.forEach(fn => fn()); initialLoaded.current = false; };
   }, [retreat.id, retreat.year]);
