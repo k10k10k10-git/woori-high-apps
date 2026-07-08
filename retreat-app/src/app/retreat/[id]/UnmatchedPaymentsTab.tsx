@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Retreat, Participant, UnmatchedPayment } from "@/lib/types";
 import { parseClassKey } from "@/lib/classKey";
+import { normalizeName } from "@/lib/studentMatcher";
 type BuTab = "1부" | "2부";
 import {
   subscribeToParticipants, getClassesByYear, subscribeToCellColors,
@@ -49,7 +50,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       // 이름 변형 → cellColor키 맵 구성
       // ClassRosterTab과 동일한 키 형식: "${buNum}_${studentId}"
       const map = new Map<string, string>();
-      const norm = (n: string) => n.replace(/^\d+/, "").replace(/\s+/g, "").trim();
+      // studentMatcher.stripSuffix와 다름(영문 꼬리 전부 제거) — 통합하지 말 것
       const strip = (n: string) => n.replace(/[A-Za-z]+$/, "").trim();
 
       Object.entries(classesRaw).forEach(([classKey, cd]) => {
@@ -59,7 +60,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
         Object.entries(cd.students || {}).forEach(([sid, s]) => {
           const colorKey = `${buNum}_${sid}`;
           const name = s.name;
-          [name, norm(name), strip(name), norm(strip(name))].forEach(v => {
+          [name, normalizeName(name), strip(name), normalizeName(strip(name))].forEach(v => {
             if (v) map.set(`${buNum}_${v}`, colorKey);
           });
         });
@@ -186,7 +187,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   const unpaidByBu = useMemo(() => {
     const seen = new Set<string>();
     const result: { pKey: string; p: Participant; buNum: number; status: "none" | "orange" | "blue" | "red" }[] = [];
-    const norm  = (n: string) => n.replace(/^\d+/, "").replace(/\s+/g, "").trim();
+    // studentMatcher.stripSuffix와 다름(영문 꼬리 전부 제거) — 통합하지 말 것
     const strip = (n: string) => n.replace(/[A-Za-z]+$/, "").trim();
 
     Object.entries(participants).forEach(([pKey, p]) => {
@@ -202,9 +203,9 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       const name = p.name;
       const colorKey =
         nameToColorKey.get(`${buNum}_${name}`) ??
-        nameToColorKey.get(`${buNum}_${norm(name)}`) ??
+        nameToColorKey.get(`${buNum}_${normalizeName(name)}`) ??
         nameToColorKey.get(`${buNum}_${strip(name)}`) ??
-        nameToColorKey.get(`${buNum}_${norm(strip(name))}`) ??
+        nameToColorKey.get(`${buNum}_${normalizeName(strip(name))}`) ??
         p.studentId ?? null;  // p.studentId는 이미 "${buNum}_${rawId}" 형식
 
       const color = colorKey ? cellColors[colorKey] : undefined;
