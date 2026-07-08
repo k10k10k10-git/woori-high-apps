@@ -4,6 +4,7 @@ import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
 import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
+import { buildExtraPreservationMaps, dedupeSheetParticipants, identityKeyOf } from "@/lib/syncParticipants";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 
 interface Props {
@@ -110,44 +111,10 @@ export default function ParticipantsTab({ retreat }: Props) {
       // 특이사항이 studentId를 공유하는 다른 사람에게 옮겨붙어("복사")버리고, 이후 재동기화마다
       // 그 잘못된 값이 "기존값 우선 보존"되어 영구화된다(실제 사례: 서로 다른 6쌍/12명 오염 확인, 2026-07-08).
       const existing = await getParticipants(retreat.id);
-      const extraByStudentId = new Map<string, string>();
-      const extraByIdentity = new Map<string, string>();
-      const ambiguousStudentIds = new Set<string>();
-      const ambiguousIdentities = new Set<string>();
-      Object.values(existing).forEach(prev => {
-        if (!prev.extra) return;
-        if (prev.studentId) {
-          if (extraByStudentId.has(prev.studentId)) ambiguousStudentIds.add(prev.studentId);
-          extraByStudentId.set(prev.studentId, prev.extra);
-        }
-        const identityKey = `${prev.name.trim()}|${prev.bu ?? ""}|${prev.grade}|${prev.class}`;
-        if (extraByIdentity.has(identityKey)) ambiguousIdentities.add(identityKey);
-        extraByIdentity.set(identityKey, prev.extra);
-      });
-      ambiguousStudentIds.forEach(id => extraByStudentId.delete(id));
-      ambiguousIdentities.forEach(key => extraByIdentity.delete(key));
+      const { extraByStudentId, extraByIdentity } = buildExtraPreservationMaps(existing);
 
       // 학생 DB 매칭 + 중복 제거 (동일 studentId는 최초 신청만 유지, 미매칭은 name+bu+grade 기준)
-      const seenStudentIds = new Set<string>();
-      const dupEntries = new Map<string, { name: string; bu: string; entries: Participant[] }>();
-      const deduped: { p: Participant; ms: Student | undefined; dedupKey: string }[] = [];
-      list.forEach(p => {
-        const ms = findStudent(p, students);
-        const dedupKey = ms?.id ?? `name:${p.name.trim()}:${p.bu ?? ""}:${p.grade}`;
-        if (seenStudentIds.has(dedupKey)) {
-          const prev = dupEntries.get(dedupKey);
-          if (prev) prev.entries.push(p);
-          else dupEntries.set(dedupKey, { name: p.name, bu: p.bu, entries: [p] });
-          return;
-        }
-        seenStudentIds.add(dedupKey);
-        deduped.push({ p, ms, dedupKey });
-      });
-      // 첫 번째 신청도 entries에 포함
-      dupEntries.forEach((v, k) => {
-        const first = deduped.find(d => d.dedupKey === k);
-        if (first) v.entries.unshift(first.p);
-      });
+      const { deduped, dupEntries } = dedupeSheetParticipants(list, students);
 
       const sorted = [...deduped].sort((a, b) => a.p.name.localeCompare(b.p.name, "ko"));
       const matched: Record<string, Participant> = {};
@@ -155,7 +122,7 @@ export default function ParticipantsTab({ retreat }: Props) {
       sorted.forEach(({ p, ms, dedupKey }, idx) => {
         const key = `p_${idx}`;
         const preservedExtra = (ms?.id ? extraByStudentId.get(ms.id) : undefined)
-          ?? extraByIdentity.get(`${p.name.trim()}|${p.bu ?? ""}|${p.grade}|${p.class}`);
+          ?? extraByIdentity.get(identityKeyOf(p));
         // raw(시트 전체 열, 민감정보 포함 가능)는 공용 participants 경로에 절대 저장하지 않는다 — stripRaw로 제외.
         matched[key] = {
           ...stripRaw(p),
