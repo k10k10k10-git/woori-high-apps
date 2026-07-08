@@ -1,9 +1,0 @@
-- [사용자 개발 습관](user_dev_preferences.md) — DB 안전성 최우선, 설명 후 진행, 배포까지 한번에
-- [DB 안전성 피드백](feedback_db_safety_first.md) — 모든 작업 전 DB 영향 여부를 먼저 답할 것
-- [DB ownership doc](project_db_ownership_doc.md) — DB_OWNERSHIP.md: 4개 앱의 Firebase 경로 소유권/의존관계 지도
-- [Firebase Rules unified](project_firebase_rules_unified.md) — Rules 배포 원천을 학생 앱 하나로 단일화
-- [DB paths centralized](project_db_paths_centralized.md) — 행정/이가드 앱에 paths.ts 도입, 경로 문자열 중앙화
-- [운영 절차서](project_operations_doc.md) — OPERATIONS.md: 배포/백업/복구/장애대응 문서
-- [교사·스탭 앱 후순위](project_teacher_staff_deferred.md) — 여름수련회 이후 진행, 현재 제외
-- [2026-06-23 세션 요약](project_session_2026_06_23.md) — 운영 안정화 대세션: DB계약, 모바일UX, 에러처리, 컴포넌트분할 등
-- [구글시트 동기화 기능](project_sheet_sync_feature.md) — 학생 출석부 AdminTab의 시트→Firebase 동기화 (미리보기 게이트)

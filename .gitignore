@@ -2,7 +2,11 @@
 node_modules/
 .next/
 out/
+out 2/
 tsconfig.tsbuildinfo
+
+# Claude 메모리 스냅샷 — 리포에 커밋하지 않음 (원천은 ~/.claude/projects/*/memory/)
+.context/
 
 # 비밀키 / 환경변수 — 절대 커밋 금지
 .env*
