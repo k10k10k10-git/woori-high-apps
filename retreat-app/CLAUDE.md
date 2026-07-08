@@ -55,8 +55,7 @@ src/
 │       └── BackupRestoreButton.tsx # 조편성/방배정 롤링 백업 복구 버튼 (공용 — GroupsTab·RoomsTab 툴바에서 사용)
 ├── context/
 │   ├── AuthContext.tsx             # Google OAuth, accessLevel 관리
-│   ├── UIContext.tsx               # toast(), uiConfirm() 전역 UI 유틸
-│   └── RetreatDataContext.tsx      # ⚠ 참가자/학생/셀색상 공유 Context (존재하나 현재 미사용 — 아래 주의사항 참조)
+│   └── UIContext.tsx               # toast(), uiConfirm() 전역 UI 유틸
 └── lib/
     ├── types.ts                    # 전체 타입 정의 (RetreatPeriod, RetreatAdminMember 포함)
     ├── db.ts                       # Firebase CRUD 함수 전체 (유일한 Firebase 접근 레이어)
@@ -305,11 +304,7 @@ npx vitest
 
 ---
 
-## ⚠ RetreatDataContext.tsx — 미사용 상태 (향후 최적화 대상)
-
-`src/context/RetreatDataContext.tsx`는 참가자/학생/셀 색상을 공유하는 Context로 작성되었으나, **현재 RetreatPageClient에서 사용하지 않습니다.** Permission denied 문제로 제거되었으며, 각 탭이 독립적으로 데이터를 로드합니다.
-
-향후 최적화 시 이 Context를 다시 연결하면 탭 간 중복 Firebase 구독을 줄일 수 있습니다.
+> RetreatDataContext는 미사용으로 2026-07 삭제됨(git 히스토리에 있음). 탭 간 구독 공유가 필요해지면 새로 설계할 것.
 
 ---
 
