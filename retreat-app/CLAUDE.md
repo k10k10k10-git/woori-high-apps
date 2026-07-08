@@ -201,6 +201,10 @@ await saveParticipants(retreatId, updatedParticipants);
 
 ⚠ **시트 동기화도 이 원칙을 우회할 수 있다** — 시트 자체에 특이사항 열이 있어서, `syncFromSheet()`가 participants를 전체 재생성하면 관리자가 특이사항 탭에서 저장한 `[분류]` 태그·수정 문구가 시트 원문으로 되돌아가는 버그가 있었다(2026-07-06 수정). `ParticipantsTab.tsx`의 `syncFromSheet`/`chooseDuplicateEntry`는 재생성 전 기존 participants를 읽어 `studentId`(폴백: 이름+부+학년+반) 기준으로 extra를 찾아 **우선 보존**하고, 기존 값이 없을 때만 시트 값을 채운다. 시트 연동 관련 코드를 고칠 땐 이 보존 로직이 깨지지 않는지 확인할 것. 단, 특이사항 탭에서 메모를 **삭제**했는데 시트 원문이 남아있으면 다음 동기화 때 되살아난다(기존값 없음 취급) — 완전 삭제하려면 시트 응답도 지워야 함.
 
+⚠ **보존 맵에는 studentId 충돌 가드가 필수** (2026-07-08 수정) — 과거 학생 매칭이 애매해 두 사람이 잠깐 같은 studentId(또는 같은 이름+부+학년+반)로 매핑되면, 한 사람의 extra가 그 키에 저장된 뒤 "기존값 우선 보존" 로직이 그 잘못된 값을 재동기화마다 영구 반복 보존해 **엉뚱한 사람에게 특이사항이 복사**된다(실제 6쌍/12명 오염 발생). `syncFromSheet`는 `extraByStudentId`/`extraByIdentity` 맵을 만들 때 **같은 키가 2명 이상에게 나타나면 그 키를 보존 후보에서 제외**한다(`ambiguousStudentIds`/`ambiguousIdentities`). 이 가드를 제거하면 오염이 조용히 영구화되니 유지할 것.
+
+**특이사항 오염 진단·복구 방법** (재발 시 재사용) — extra는 `[분류]` 태그가 붙으므로 단순 문자열 비교로는 태그 유무 차이 때문에 오염을 놓친다(2026-07-08 실측). 반드시 **DB의 모든 extra에서 `^\[.+?\]\s*` 태그를 떼고 → 시트 원문(기타사항 열, 이름 접두숫자 제거 후)과 전수 대조**해, 시트에 그 사람 본인 값이 없는 항목을 오염으로 판정한다. 복구는 `participants/{key}/extra`만 경로 지정으로 수정(시트에 원문 있으면 복원, 없으면 삭제) — 전체 덮어쓰기 금지, 진행 전 스냅샷 확보.
+
 ### 3b. 전체 덮어쓰기 노드의 자동 백업 — groups/rooms
 `saveGroups`/`saveRooms`는 구조상 전체 `set()` 덮어쓰기가 불가피한데(배열 순서·삭제 반영), participants와 달리 백업이 없어 저장 버그·실수 시 복구 수단이 없었다(2026-07-06 수정). `db.ts`의 `backupNodeBeforeOverwrite()`가 저장 직전 현재 상태를 롤링 백업(최근 5개)한다. 편집 중 저장이 잦으므로 **마지막 백업 후 10분 이내면 스킵**해 쓰기 폭주를 막는다(복구 시엔 `minIntervalMs=0`으로 강제 백업). 각 탭 툴바의 `BackupRestoreButton`이 시점 선택 복구 UI를 제공한다. 새로 전체 덮어쓰기 노드를 추가할 땐 이 패턴(백업 헬퍼 + 복구 버튼)을 재사용할 것.
 
@@ -271,6 +275,13 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 - `next.config.ts`가 `process.env.VERCEL_GIT_COMMIT_SHA`(로컬은 `Date.now()` 폴백)를 `NEXT_PUBLIC_BUILD_ID`로 빌드 시점에 클라이언트 번들에 박아넣음
 - `/api/version`(`force-dynamic`)이 **현재 배포 중인** 빌드의 ID를 매 요청마다 반환
 - `UpdateBanner`가 5분마다 + 탭 visibility 변경 시 `/api/version`을 폴링해, 페이지 로드 시점 ID와 다르면 "새 버전이 있습니다" 배너 표시
+
+### 11. 식수 계산 역할(MealRole) — 스키마 확장 시 하위호환 (`MealCountTab.tsx`)
+
+식수 인원 역할은 `types.ts`의 `MEAL_ROLES = ["staff","teacher","minister","student","extra"]`(스탭/교사/교역자/학생/기타)이고, 이 카운트가 `retreats/{id}/mealCount`의 `base`와 각 후발/선복귀 `adjustments[].counts`에 저장된다. `교역자(minister)`는 2026-07-08에 `교사·교역자` 한 칸을 분리하며 추가됨.
+- **역할 추가는 DB 저장 형태 변경**이지만, 로드 시 `{ ...EMPTY_COUNTS, ...(data.base||{}) }` + 계산부의 `|| 0` 덕분에 **기존 데이터에 새 키가 없어도 0으로 안전하게 읽힌다** — 마이그레이션 불필요, 총원·기존 값 유지.
+- 새 역할을 추가할 땐 반드시 6곳을 함께 갱신: `MEAL_ROLES`, `EMPTY_COUNTS`, `ROLE_LABELS`, `sumCounts`, adjustments 차감 루프, 끼니별 표(헤더/셀/hasNegative). 하드코딩된 `counts.staff/teacher/...` 나열을 빠뜨리면 그 역할이 계산에서 누락된다.
+- **자동 제안 한계**: 교사 참석 데이터(`teachers`)의 `bu`는 `1부/2부/스탭`뿐이라 교역자(목사·전도사) 구분이 없다. "DB에서 자동 제안"은 교사/스탭/학생만 채우고 **교역자는 수동 입력**으로 남긴다.
 
 ---
 
