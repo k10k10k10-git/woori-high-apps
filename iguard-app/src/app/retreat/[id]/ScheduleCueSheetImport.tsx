@@ -15,7 +15,7 @@ import {
   autoAssignmentsForBlock,
   venueForBlock,
   timeRangeLabel,
-} from "./scheduleUtils";
+} from "@/lib/cueSheet";
 
 function CueSheetLinkModal({ retreatId, retreatName, current, onClose, onSaved, children }: {
   retreatId: string;

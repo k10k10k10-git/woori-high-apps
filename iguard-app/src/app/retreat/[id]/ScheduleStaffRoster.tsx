@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
 import { groupDisplayName } from "@/lib/groupNumber";
-import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "./scheduleUtils";
+import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "@/lib/cueSheet";
 
 export default function StaffRosterBar({ staff, groups, schedule, posts, movements, absentStaffNames = [] }: {
   staff: IguardStaff[];

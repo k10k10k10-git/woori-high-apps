@@ -14,7 +14,7 @@ import {
   timeRangeLabel,
   looksLikeMeal,
   type ScheduleDraft,
-} from "./scheduleUtils";
+} from "@/lib/cueSheet";
 import { CollapsiblePanel, BlockAssignmentSection, DetailEditor, FreeTextEditor } from "./ScheduleBlockAssignment";
 import StaffRosterBar from "./ScheduleStaffRoster";
 import CueSheetImportPanel from "./ScheduleCueSheetImport";

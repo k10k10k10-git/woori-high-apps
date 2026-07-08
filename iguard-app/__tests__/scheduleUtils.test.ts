@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseCueSheetText, parseSheetUrl, normalizeTime, scheduleTimeError, venueForBlock,
   isValidTime, toMinutes, timeRangeLabel, parseNames, scheduleSortValue,
-} from "@/app/retreat/[id]/scheduleUtils";
+} from "@/lib/cueSheet";
 
 const HEADER = "구분\t시간\t내용\t담당\t기타";
 

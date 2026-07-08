@@ -38,7 +38,7 @@ src/
 │       ├── ChecklistView.tsx       # 인원체크 (조별 학생+교사 체크, 버스별 체크)
 │       ├── RoomsView.tsx           # 조별 정보 (방배정·학생·교사 조회)
 │       ├── ExecutionViews.tsx      # 개인 큐카드 + 포스트 보드 (현장 모바일용)
-│       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트, scheduleUtils.ts의 parseCueSheetText 사용)
+│       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트, src/lib/cueSheet.ts의 parseCueSheetText 사용)
 │       ├── LeaderCueManageView.tsx # 조장 큐싯 관리
 │       ├── PostsView.tsx           # 포스트(통제 지점) CRUD
 │       ├── StaffView.tsx           # 스탭 명단 (읽기 전용, 행정 teachers 기반)
@@ -203,7 +203,7 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 행정 사이트와 동일한 빌드 ID 폴링 방식. `next.config.ts`가 `NEXT_PUBLIC_BUILD_ID`(Vercel 커밋 SHA, 로컬은 타임스탬프)를 빌드 시점에 클라이언트 번들에 박아넣고, `/api/version`(`force-dynamic`)이 현재 배포의 빌드 ID를 반환한다. `UpdateBanner`가 5분마다 + 탭 visibility 변경 시 폴링해 불일치하면 새로고침 배너를 띄운다.
 
-### 10. 큐싯 시트 임포트 — 날짜 구분행 오인식 주의 (`scheduleUtils.ts`)
+### 10. 큐싯 시트 임포트 — 날짜 구분행 오인식 주의 (`src/lib/cueSheet.ts`)
 
 `parseCueSheetText`가 각 행이 "날짜 구분행"인지 "시간 블록 행"인지 판정할 때, **시간이 있는 행을 먼저 걸러낸 뒤에만** 날짜 마커(`parseDayCell`)를 검사해야 한다. "첫째날/둘째날" 같은 날짜 단어가 시간이 있는 행의 제목·내용에 섞여 있으면(예: "둘째날 오전 프로그램" 09:00~) 과거엔 날짜 구분행으로 오인해 그 블록 자체가 통째로 사라졌다(2026-07-06 수정). 큐싯 파싱 로직을 고칠 땐 반드시 이 순서(시간 유무 → 날짜 판정)를 유지할 것.
 
@@ -223,7 +223,7 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 선탑/동승 명단은 두 소스를 합친다 — 버스배정(`iguard/buses`)의 `staff` 필드와 큐싯 notice의 "N호차: 이름, …" 줄. 큐싯 쪽엔 "박혜원sf"처럼 스탭 표시 꼬리표가 붙는 관행이 있어, `parseBusStaffNames`가 꼬리표를 떼지 않으면 두 소스의 같은 사람이 다른 사람으로 인식돼 명단에 중복 표시된다(2026-07-06 수정 — `.replace(/sf$/i, "")` 추가). 이름 비교/중복 판정 로직을 건드릴 땐 이 정규화가 유지되는지 확인할 것.
 
-2026-07-08 보강: 파싱 기준은 `src/lib/busStaff.ts`로 공통화했다. 큐싯 선탑/동승 칸에 "부터, 이동, 카톡방에, 인원보고" 같은 안내 문장 조각이 섞여도 실제 이름만 `names`로 통과시키고, 제외된 조각은 `rejected` 경고로 표시한다. `BusesView`와 `ChecklistView`는 유효 이름만 버스 스탭 수와 호차별 체크 대상에 포함하며, `scheduleUtils.ts`의 큐싯 임포트도 같은 기준으로 새 오염 데이터 저장을 막는다. 이 경로를 수정할 때는 `parseBusStaff()`/`mergeBusStaffNames()`를 재사용하고 화면별 임시 파서를 다시 만들지 말 것.
+2026-07-08 보강: 파싱 기준은 `src/lib/busStaff.ts`로 공통화했다. 큐싯 선탑/동승 칸에 "부터, 이동, 카톡방에, 인원보고" 같은 안내 문장 조각이 섞여도 실제 이름만 `names`로 통과시키고, 제외된 조각은 `rejected` 경고로 표시한다. `BusesView`와 `ChecklistView`는 유효 이름만 버스 스탭 수와 호차별 체크 대상에 포함하며, `src/lib/cueSheet.ts`의 큐싯 임포트도 같은 기준으로 새 오염 데이터 저장을 막는다. 이 경로를 수정할 때는 `parseBusStaff()`/`mergeBusStaffNames()`를 재사용하고 화면별 임시 파서를 다시 만들지 말 것.
 
 2026-07-08 추가 보강: 큐싯에서 넘어오는 "스탭 0명", "스탭 4명" 같은 요약 라벨은 이름이 아니므로 `parseBusStaff()`에서 제외해야 한다. 이 값이 명단에 섞이면 화면에는 `선탑/동승: 스탭 0명, 최현우...`처럼 보이고, 호차별 체크 대상/스탭 카운트도 오염된다. 또한 큐싯 임포트가 선탑/동승만 있는 1호차를 먼저 만든 상태에서 버스 자동배정을 눌러도, 전체 학생+교사 수에 필요한 최소 버스 수보다 기존 호차가 적으면 부족한 호차를 새로 생성해야 한다. 기존 호차의 `staff` 필드는 `busNo` 기준으로 보존하고 `groupIds`만 자동배정 결과로 갱신한다.
 

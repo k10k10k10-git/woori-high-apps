@@ -6,7 +6,7 @@ import { ref, update } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { useUI } from "@/context/UIContext";
-import { postLabel, isValidTime, normalizeTime } from "./scheduleUtils";
+import { postLabel, isValidTime, normalizeTime } from "@/lib/cueSheet";
 
 export function CollapsiblePanel({ title, count, defaultOpen = false, children }: {
   title: string;
