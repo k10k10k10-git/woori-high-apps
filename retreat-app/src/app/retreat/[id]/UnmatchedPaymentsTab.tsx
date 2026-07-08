@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Retreat, Participant, UnmatchedPayment } from "@/lib/types";
+import { parseClassKey } from "@/lib/classKey";
 type BuTab = "1부" | "2부";
 import {
   subscribeToParticipants, getClassesByYear, subscribeToCellColors,
@@ -52,9 +53,9 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       const strip = (n: string) => n.replace(/[A-Za-z]+$/, "").trim();
 
       Object.entries(classesRaw).forEach(([classKey, cd]) => {
-        const parts = classKey.split("-");
-        const buNum = parseInt(parts[0]);
-        if (!buNum) return;
+        const parsed = parseClassKey(classKey);
+        if (!parsed) return;
+        const { buNum } = parsed;
         Object.entries(cd.students || {}).forEach(([sid, s]) => {
           const colorKey = `${buNum}_${sid}`;
           const name = s.name;

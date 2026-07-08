@@ -2,6 +2,7 @@ import { ref, get, set, update, push, remove, onValue, query, orderByChild, equa
 import { db } from "./firebase";
 import { Retreat, Group, Room, Participant, Student, ClassData, TeacherAttendance, CarPool, PartialAttendance, Cancellation, SupplyItem, SnackItem, AdminSupplyItem, SuppliesBudget, MealCountData, BrainstormNote, BrainstormComment, OnSiteEntry, UnmatchedPayment, TshirtOrder, Milestone, RetreatPeriod, MedicalLog, SyncDuplicateGroup } from "./types";
 import { paths } from "./paths";
+import { parseClassKey } from "./classKey";
 
 // Helper: DataSnapshot → typed list (injects id from Firebase key)
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
@@ -263,11 +264,11 @@ export async function getStudentsByYear(year: number): Promise<Record<string, St
   const classesData = snap.val() as Record<string, ClassData>;
 
   Object.entries(classesData).forEach(([classKey, classData]) => {
-    // classKey 형식: {부}-{학년}-{반} (예: "1-2-3" = 1부 2학년 3반)
-    const parts = classKey.split("-");
-    const buNum = parseInt(parts[0]);   // 부 (1/2)
-    const grade = parseInt(parts[1]);   // 학년 (1/2/3)
-    const cls   = parseInt(parts[2]);   // 반 번호
+    // 기존 동작 보존: 이 지점은 원래 가드 없이 NaN을 흘려보냈다 — 스킵하지 않는다
+    const parsed = parseClassKey(classKey) ?? { buNum: NaN, grade: NaN, classNum: NaN };
+    const buNum = parsed.buNum;   // 부 (1/2)
+    const grade = parsed.grade;   // 학년 (1/2/3)
+    const cls   = parsed.classNum; // 반 번호
 
     if (classData.students) {
       Object.entries(classData.students).forEach(([studentId, student]) => {
@@ -434,11 +435,9 @@ export async function loadTeachersFromDB(year: number): Promise<LoadTeachersResu
   if (classSnap.exists()) {
     const classesData = classSnap.val() as Record<string, { teacher?: string }>;
     Object.entries(classesData).forEach(([classKey, cd]) => {
-      const parts = classKey.split("-");
-      const buNum = parseInt(parts[0]);
-      const grade = parseInt(parts[1]);
-      const cls = parseInt(parts[2]);
-      if (!buNum || !grade || !cls) return;
+      const parsed = parseClassKey(classKey);
+      if (!parsed) return;
+      const { buNum, grade, classNum: cls } = parsed;
       const extraKey = classKey.replaceAll("-", "_");
       const extra = extraData[String(buNum)]?.[extraKey];
       const teacherName = extra?.name?.trim() || cd.teacher?.trim();

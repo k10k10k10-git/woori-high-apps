@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
+import { parseClassKey } from "@/lib/classKey";
 
 interface StudentInfo {
   id: string;
@@ -74,11 +75,9 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
 
       const infos: ClassInfo[] = [];
       Object.entries(classesRaw).forEach(([classKey, cd]) => {
-        const parts = classKey.split("-");
-        const buNum    = parseInt(parts[0]);
-        const grade    = parseInt(parts[1]);
-        const classNum = parseInt(parts[2]);
-        if (!buNum || !grade || !classNum) return;
+        const parsed = parseClassKey(classKey);
+        if (!parsed) return;
+        const { buNum, grade, classNum } = parsed;
         const studs: StudentInfo[] = Object.entries(cd.students || {})
           .map(([id, s]) => ({ id, grade, classNum, name: s.name, num: s.num ?? 0, phone: s.phone, jang: !!s.jang }))
           .sort((a, b) => a.name.localeCompare(b.name, "ko"));

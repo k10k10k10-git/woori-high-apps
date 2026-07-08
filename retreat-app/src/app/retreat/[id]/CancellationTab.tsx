@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Cancellation } from "@/lib/types";
 import { getCancellations, saveCancellation, updateCancellation, deleteCancellation, getCellColors, getClassesByYear } from "@/lib/db";
+import { parseClassKey } from "@/lib/classKey";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -44,11 +45,9 @@ export default function CancellationTab({ retreat }: Props) {
         // studentId → { name, grade, classNum, buNum } 맵 생성
         const studentMap = new Map<string, { name: string; grade: number; classNum: number; buNum: number }>();
         Object.entries(classesRaw).forEach(([classKey, cd]) => {
-          const parts = classKey.split("-");
-          const buNum = parseInt(parts[0]);
-          const grade = parseInt(parts[1]);
-          const classNum = parseInt(parts[2]);
-          if (!buNum || !grade || !classNum) return;
+          const parsed = parseClassKey(classKey);
+          if (!parsed) return;
+          const { buNum, grade, classNum } = parsed;
           Object.entries(cd.students || {}).forEach(([sid, s]) => {
             studentMap.set(`${buNum}_${sid}`, { name: s.name, grade, classNum, buNum });
           });

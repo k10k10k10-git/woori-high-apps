@@ -8,6 +8,7 @@ import {
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
+import { parseClassKey } from "@/lib/classKey";
 
 type BuTab = "1부" | "2부";
 
@@ -75,8 +76,9 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
         const students: ClassStudent[] = [];
         const map = new Map<string, ClassStudent>();
         Object.entries(classesRaw).forEach(([classKey, cd]) => {
-          const [b, g, c] = classKey.split("-").map(Number);
-          if (!b || !g || !c) return;
+          const parsed = parseClassKey(classKey);
+          if (!parsed) return;
+          const { buNum: b, grade: g, classNum: c } = parsed;
           Object.entries(cd.students || {}).forEach(([rawId, s]) => {
             const studentId = `${b}_${rawId}`;
             const cs: ClassStudent = { rawId, buNum: b, grade: g, classNum: c, name: s.name };
