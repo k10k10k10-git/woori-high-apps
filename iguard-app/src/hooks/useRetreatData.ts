@@ -74,7 +74,9 @@ export function useRetreatData(id: string): RetreatData {
   // 수련회 메타 구독
   useEffect(() => {
     if (!id) return;
-    const unsub = subscribeToRetreat(id, r => { setRetreat(r); setRetreatLoading(false); });
+    const unsub = subscribeToRetreat(id,
+      r => { setRetreat(r); setRetreatLoading(false); },
+      e => { setLoadError(prev => prev ?? `retreat 구독 실패 — ${e.message}`); setRetreatLoading(false); });
     return unsub;
   }, [id]);
 
