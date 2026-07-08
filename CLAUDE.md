@@ -107,6 +107,10 @@
 8. 문서(CLAUDE.md·메모리)와 코드가 다르면 **코드가 진실** — 코드 기준으로 진행하고, 문서 갱신을 같은 커밋에 포함하거나 발견 메모로 보고.
 9. 계획에 없는 개선이 눈에 띄면 수행하지 말고 "발견 메모"로만 보고.
 
+## 학습 법칙 (learning law)
+
+**사소하지 않은 문제를 해결할 때마다, 다음 작업으로 넘어가기 전에 `extract-approach` 스킬을 실행한다.** 물어보지 않고 알아서 실행한다 — 학습 메모 없는 해결책은 미완성 작업이다(a solution without its learnings note is unfinished work). "사소하지 않음"의 기준: 3회 이상 시도 / 비직관적 원인 / 우회로 발견 / 도구·환경의 함정. 저장 위치와 형식은 `.claude/skills/extract-approach/SKILL.md`를 따른다.
+
 ## 배포
 
 - 배포·커밋·푸시·Ready 확인은 `/ship` 스킬 절차를 따른다.
