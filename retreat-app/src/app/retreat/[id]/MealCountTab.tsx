@@ -8,6 +8,7 @@ import {
   getMealCount, saveMealCount, getParticipants, getCellColors, getTeachers,
   getPartialAttendances, subscribeToRetreatPeriods,
 } from "@/lib/db";
+import { toYMD } from "@/lib/dateFormat";
 import { useUI } from "@/context/UIContext";
 
 // DB에서 끌어온 후발/선복귀 대상자 한 명 (교사 부분참 · 스탭 후발대/부분참 · 학생 부분참)
@@ -73,7 +74,7 @@ function generateMealsFromPeriods(periods: RetreatPeriod[]): MealSlot[] {
   const endD = new Date(`${end}T00:00:00`);
   let i = 0;
   while (d <= endD && i < 14) {
-    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const date = toYMD(d);
     const isFirst = date === start;
     const isLast = date === end;
     const names = isFirst ? ["점심", "저녁"] : isLast ? ["아침", "점심"] : ["아침", "점심", "저녁"];

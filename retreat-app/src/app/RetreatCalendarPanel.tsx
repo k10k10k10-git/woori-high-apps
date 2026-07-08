@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import { Retreat, Milestone } from "@/lib/types";
+import { toYMD } from "@/lib/dateFormat";
 import {
   subscribeToMilestones, saveMilestone, updateMilestone, deleteMilestone,
   subscribeToAllRetreatPeriods, saveRetreatPeriod, updateRetreatPeriod, deleteRetreatPeriod,
@@ -11,12 +12,6 @@ import { useUI } from "@/context/UIContext";
 /* ── 유틸 ── */
 const WEEK_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
-function toYMD(date: Date): string {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
 function parseYMD(value: string): Date {
   const [yyyy, mm, dd] = value.split("-").map(Number);
   return new Date(yyyy, (mm || 1) - 1, dd || 1);
