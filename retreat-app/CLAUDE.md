@@ -58,7 +58,11 @@ src/
 │   └── UIContext.tsx               # toast(), uiConfirm() 전역 UI 유틸
 └── lib/
     ├── types.ts                    # 전체 타입 정의 (RetreatPeriod, RetreatAdminMember 포함)
-    ├── db.ts                       # Firebase CRUD 함수 전체 (유일한 Firebase 접근 레이어)
+    ├── db.ts                       # Firebase 접근 배럴 — 본문은 db/ 도메인 모듈 10개 (2026-07 R5 분할, import 경로는 @/lib/db 유지)
+    ├── db/                         # core(공용 헬퍼)·retreats·participants·groupsRooms·students·teachers·access·retreatOps·private·shared
+    ├── classKey.ts                 # parseClassKey — "{부}-{학년}-{반}" 파싱 단일 원천 (+테스트)
+    ├── syncParticipants.ts         # 시트 동기화 보존·중복제거 순수 로직 (충돌 가드 포함, +특성화 테스트)
+    ├── dateFormat.ts               # toYMD — YYYY-MM-DD 포맷 단일 원천
     ├── firebase.ts                 # Firebase 초기화 (db, auth, googleProvider)
     ├── sheetsParser.ts             # Google Sheets CSV 파싱 (parseCSV: 따옴표 내 줄바꿈 처리)
     ├── sheetsParser.test.ts        # sheetsParser 단위 테스트
@@ -132,7 +136,7 @@ attendance/{year}/        # 출석 기록 (출석부 앱 소유)
 ```
 
 ### classKey / studentId 중요 규칙
-- classKey 파싱: `parts = classKey.split("-")` → `[buNum, grade, class]`
+- classKey 파싱: `parseClassKey(classKey)` (`src/lib/classKey.ts`) 사용 — `split("-")` 직접 파싱 금지 (2026-07 R2 공통화)
 - 1부/2부에 동일한 studentId가 존재할 수 있으므로, 컴포넌트에서 쓰는 uniqueKey = `"{buNum}_{studentId}"`
 - `getClassesByYear(year)` 를 통해 classes 노드 접근 (직접 Firebase 쿼리 금지)
 

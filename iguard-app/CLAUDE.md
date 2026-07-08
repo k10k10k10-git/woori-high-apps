@@ -67,6 +67,8 @@ src/
     ├── fairAssign.ts               # 공정 배분 알고리즘 (식사 순서 + 집회 자리 통합 누적 점수)
     ├── groupNumber.ts              # 조 전역 번호 표시 (2부는 1부 조 수만큼 오프셋)
     ├── partialAttendance.ts        # 부분참(선복귀/후발대) 일자별 참석 공식
+    ├── scheduleTime.ts             # 현장 시간·일차 판정 순수 로직 (isNowOn/currentBlockFor, 24시+ 블록 — 패턴 11) ExecutionViews에서 추출(2026-07 I2)
+    ├── cueSheet.ts                 # 큐싯 파서 (구 scheduleUtils.ts — 2026-07 I4 이동, 특성화 테스트 15개)
     └── exportUtils.ts              # printAsPDF (인쇄용 HTML → 새 창 인쇄), escapeHtml(인쇄 XSS 방지)
 
 루트 파일:
