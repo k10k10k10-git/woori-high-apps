@@ -3,11 +3,8 @@ import { useState } from "react";
 import { Milestone } from "@/lib/types";
 import { saveIguardGuide, saveMilestone, updateMilestone, deleteMilestone } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
+import { todayStr } from "@/lib/scheduleTime";
 
-function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 function todoCheckClass(t: Milestone): string {
   if (!t.done) return "border-slate-300 text-transparent";
   return t.sourceSite === "move-guide"
