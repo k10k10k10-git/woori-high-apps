@@ -1,14 +1,17 @@
 "use client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus } from "@/lib/types";
-import { saveIguardScheduleBlock, deleteIguardScheduleBlock, saveIguardPost, setIguardMovement, saveIguardBus, updateIguardBus, subscribeToIguardCueSheet, saveIguardCueSheet, IguardCueSheet } from "@/lib/db";
+import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock, saveIguardPost, setIguardMovement, saveIguardBus, updateIguardBus, subscribeToIguardCueSheet, saveIguardCueSheet, markCueSheetImported, IguardCueSheet } from "@/lib/db";
 import { ref, update } from "firebase/database";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
+import { fetchSheetCsv } from "@/lib/sheetClient";
+import { reconcileScheduleImport, hashCsv } from "@/lib/scheduleReconcile";
 import { useUI } from "@/context/UIContext";
 import {
   parseSheetUrl,
   parseCueSheetText,
+  type ImportedBlock,
   staffWithAutoDrafts,
   postsWithAutoDrafts,
   collectAutoPostDrafts,
@@ -16,6 +19,20 @@ import {
   venueForBlock,
   timeRangeLabel,
 } from "@/lib/cueSheet";
+
+/** 시트가 소유하는 블록 필드만 추림 — 갱신 시 이 필드만 덮고, 앱 소유 필드(noMovement)와 동선(별도 노드)은 건드리지 않는다.
+ *  빈 값은 null로 지정해 시트에서 지워진 내용이 앱에도 반영되게 한다(update가 null 키를 삭제). */
+function sheetOwnedFields(b: ImportedBlock, leaderNote?: string): Record<string, unknown> {
+  return {
+    label: b.label,
+    end: b.end ?? null,
+    meal: b.meal ?? null,
+    detail: b.detail ?? null,
+    owner: b.owner ?? null,
+    notice: b.notice ?? null,
+    ...(leaderNote !== undefined ? { leaderNote } : {}),
+  };
+}
 
 function CueSheetLinkModal({ retreatId, retreatName, current, onClose, onSaved, children }: {
   retreatId: string;
@@ -111,16 +128,6 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
 
   useEffect(() => subscribeToIguardCueSheet(retreatId, setSheet), [retreatId]);
 
-  async function fetchSheetCsv(query: string): Promise<string> {
-    const token = await auth.currentUser?.getIdToken();
-    const res = await fetch(`/api/sheet-import?${query}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.error || "불러오기 실패");
-    return data.csv || "";
-  }
-
   async function loadFromSheet() {
     if (!sheet) return;
     setLoadingSheet(true);
@@ -187,19 +194,24 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
     [autoCreatePosts, autoPostPreview.posts, parsed.blocks, staff, posts]
   );
 
-  async function importBlocks(replace: boolean) {
+  // mode "merge": 시트 내용 반영(삭제 없음) / "replace": 시트에 없는 블록까지 삭제.
+  // 두 모드 모두 day__start가 같은 기존 블록은 ID를 유지한 채 내용만 갱신 → 스탭 배정(동선)이 보존된다.
+  async function importBlocks(mode: "merge" | "replace") {
     if (!parsed.blocks.length) return toast("가져올 시간 블록이 없습니다.", "warning");
-    if (replace) {
-      const ok = await uiConfirm(`기존 스탭 전체 큐싯 ${schedule.length}개를 삭제하고 ${parsed.blocks.length}개를 새로 가져올까요? 동선 매트릭스 배정도 함께 정리됩니다.`);
-      if (!ok) return;
-    }
+    const { updates, creates, deletes } = reconcileScheduleImport(schedule, parsed.blocks);
+    const confirmMsg = mode === "replace"
+      ? `시트 기준으로 맞춥니다:\n· 유지·갱신 ${updates.length}개 (스탭 배정·동선 보존)\n· 신규 ${creates.length}개 추가\n· 시트에 없는 ${deletes.length}개 삭제 (그 동선 배정도 함께 삭제)\n진행할까요?`
+      : `시트 내용을 반영합니다 (삭제 없음):\n· 유지·갱신 ${updates.length}개 (스탭 배정·동선 보존)\n· 신규 ${creates.length}개 추가\n진행할까요?`;
+    if (!await uiConfirm(confirmMsg)) return;
     try {
-      if (replace) {
-        for (const block of schedule) await deleteIguardScheduleBlock(retreatId, block.id);
+      // 1) 시트에서 사라진 블록 삭제 (replace만). deleteIguardScheduleBlock가 그 블록의 동선도 함께 정리.
+      let deletedCount = 0;
+      if (mode === "replace") {
+        for (const b of deletes) { await deleteIguardScheduleBlock(retreatId, b.id); deletedCount++; }
       }
+
       // 스탭은 행정 teachers가 단일 원천 — 이가드는 스탭을 생성하지 않는다(권한도 없음).
       // 시트에 있으나 행정 명단에 없는 이름은 생성 대신 경고로만 안내.
-      // (이전엔 죽은 iguard/staff 노드에 만들어 매트릭스에 안 뜨는 '고아 동선'을 양산했음.)
       const workingStaff = [...staff];
       const unmatchedStaffNames = [...new Set(autoStaffPreview.drafts.map(d => d.name))];
       const workingPosts = [...posts];
@@ -211,12 +223,23 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
           createdPostCount++;
         }
       }
-      let assignmentCount = 0;
-      let busStaffCount = 0;
+
       let leaderNoteCount = 0;
-      for (const block of parsed.blocks) {
-        const leaderNote = leaderMap.get(`${block.day}__${block.start}`);
-        if (leaderNote) leaderNoteCount++;
+      const leaderNoteFor = (b: ImportedBlock) => {
+        const note = leaderMap.get(`${b.day}__${b.start}`);
+        if (note) leaderNoteCount++;
+        return note;
+      };
+
+      // 2) 기존 블록 내용 갱신 — ID 유지 → 스탭 배정(동선)·noMovement 보존. 자동배정은 다시 돌리지 않는다(수기 배정 보호).
+      for (const u of updates) {
+        await updateIguardScheduleBlock(retreatId, u.id, sheetOwnedFields(u.imported, leaderNoteFor(u.imported)));
+      }
+
+      // 3) 신규 블록 생성 + (autoAssign 시) 그 블록에만 자동 배정. 새 블록엔 기존 동선이 없으므로 안전.
+      let assignmentCount = 0;
+      for (const block of creates) {
+        const leaderNote = leaderNoteFor(block);
         const blockId = await saveIguardScheduleBlock(retreatId, leaderNote ? { ...block, leaderNote } : block);
         if (!autoAssign) continue;
         const assignments = autoAssignmentsForBlock(block, workingStaff, workingPosts, venueForBlock(block, parsed.blocks));
@@ -229,6 +252,9 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
           assignmentCount++;
         }
       }
+
+      // 4) 버스 선탑/동승 반영 (busNo 기준 보존/갱신)
+      let busStaffCount = 0;
       if (autoApplyBusStaff) {
         for (const draft of parsed.busDrafts) {
           const existing = buses.find(bus => (bus.day === 3 ? 3 : 1) === draft.day && bus.busNo === draft.busNo);
@@ -240,7 +266,11 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
           busStaffCount++;
         }
       }
-      toast(`${parsed.blocks.length}개 시간 블록${autoCreatePosts ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign ? `, 스탭 배정 ${assignmentCount}건` : ""}${autoApplyBusStaff ? `, 버스 선탑/동승 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""}을 가져왔습니다.`, "success");
+
+      // 5) 스냅샷 마커 기록 — 이후 원본 시트가 바뀌면 신선도 배너가 뜨도록.
+      await markCueSheetImported(retreatId, { hash: hashCsv(text), blockCount: parsed.blocks.length });
+
+      toast(`갱신 ${updates.length}개, 신규 ${creates.length}개${mode === "replace" && deletedCount ? `, 삭제 ${deletedCount}개` : ""}${autoCreatePosts && createdPostCount ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign && assignmentCount ? `, 신규 배정 ${assignmentCount}건` : ""}${autoApplyBusStaff && busStaffCount ? `, 버스 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""} 반영했습니다.`, "success");
       if (unmatchedStaffNames.length > 0) {
         toast(`행정 명단에 없는 스탭 ${unmatchedStaffNames.length}명은 배정에서 제외됐습니다: ${unmatchedStaffNames.join(", ")} — 행정 사이트에 먼저 추가해주세요.`, "warning");
       }
@@ -363,9 +393,12 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
               ))}
             </div>
           )}
-          <div className="flex justify-end gap-2 mt-3">
-            <button type="button" onClick={() => importBlocks(false)} className="btn-secondary">추가로 가져오기</button>
-            <button type="button" onClick={() => importBlocks(true)} className="btn-primary">교체 후 가져오기</button>
+          <p className="mt-3 text-[11px] text-slate-400 leading-relaxed">
+            두 방식 모두 같은 시간대(일자·시작) 블록은 <strong>스탭 배정·동선을 그대로 두고 내용만 갱신</strong>합니다. 기존 블록의 자동배정은 다시 돌리지 않아요(수기 배정 보호) — 자동배정을 새로 하려면 그 블록을 삭제 후 가져오세요.
+          </p>
+          <div className="flex justify-end gap-2 mt-2">
+            <button type="button" onClick={() => importBlocks("merge")} className="btn-secondary">시트 반영 (삭제 없음)</button>
+            <button type="button" onClick={() => importBlocks("replace")} className="btn-primary">시트 기준 정리 (없는 블록 삭제)</button>
           </div>
         </div>
       )}

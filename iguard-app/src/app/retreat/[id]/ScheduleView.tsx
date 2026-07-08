@@ -18,6 +18,7 @@ import {
 import { CollapsiblePanel, BlockAssignmentSection, DetailEditor, FreeTextEditor } from "./ScheduleBlockAssignment";
 import StaffRosterBar from "./ScheduleStaffRoster";
 import CueSheetImportPanel from "./ScheduleCueSheetImport";
+import CueSheetFreshnessBanner from "./CueSheetFreshnessBanner";
 
 export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, movements, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
   retreatId: string;
@@ -68,6 +69,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
 
   return (
     <div>
+      <CueSheetFreshnessBanner retreatId={retreatId} />
       <div className="mb-3 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-2.5 text-xs text-fuchsia-700">
         ℹ️ 일자별 시간 블록(전환 시점)입니다. 이 블록들이 <strong>동선 매트릭스의 열</strong>이자 <strong>개인 큐카드의 타임라인</strong>이 됩니다.
       </div>

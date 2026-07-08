@@ -411,13 +411,27 @@ export interface IguardCueSheet {
   url: string; sheetId: string; gid: string; name?: string; updatedAt?: number;
   // 같은 스프레드시트 내 조장 큐싯 탭 이름. 있으면 불러올 때 함께 가져와 leaderNote를 채움(기본 "조장 큐싯")
   leaderTabName?: string;
+  // 마지막 임포트 마커 — 원본 시트가 임포트 이후 바뀌었는지(스냅샷 어긋남) 판정용.
+  // lastImportHash = 마지막으로 가져온 CSV 텍스트의 해시(hashCsv). markCueSheetImported가 경로 지정으로 기록한다.
+  lastImportHash?: string;
+  lastImportedAt?: number;
+  lastImportBlockCount?: number;
 }
 export function subscribeToIguardCueSheet(retreatId: string, cb: (sheet: IguardCueSheet | null) => void): () => void {
   return onValue(ref(db, paths.iguardCueSheet(retreatId)), (snap) =>
     cb(snap.exists() ? (snap.val() as IguardCueSheet) : null));
 }
-export async function saveIguardCueSheet(retreatId: string, data: Omit<IguardCueSheet, "updatedAt">): Promise<void> {
+export async function saveIguardCueSheet(retreatId: string, data: Omit<IguardCueSheet, "updatedAt" | "lastImportHash" | "lastImportedAt" | "lastImportBlockCount">): Promise<void> {
+  // set()으로 노드 전체 교체 — 설정(URL 등)을 바꾸면 임포트 마커도 자연히 초기화된다(원본이 바뀌었으니 재임포트가 안전한 기본값).
   await set(ref(db, paths.iguardCueSheet(retreatId)), stripUndefined({ ...data, updatedAt: Date.now() }));
+}
+/** 임포트 성공 직후 마커만 경로 지정으로 기록 — 설정(url/gid 등)은 건드리지 않는다(set 아님, update). */
+export async function markCueSheetImported(retreatId: string, meta: { hash: string; blockCount: number }): Promise<void> {
+  await update(ref(db, paths.iguardCueSheet(retreatId)), {
+    lastImportHash: meta.hash,
+    lastImportedAt: Date.now(),
+    lastImportBlockCount: meta.blockCount,
+  });
 }
 export async function deleteIguardCueSheet(retreatId: string): Promise<void> {
   await remove(ref(db, paths.iguardCueSheet(retreatId)));
