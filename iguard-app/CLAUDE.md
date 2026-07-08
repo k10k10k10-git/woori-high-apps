@@ -251,6 +251,21 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 - 자동 선택 effect에는 **"사용자가 직접 골랐으면 유지"** 가드(`blockPicked` ref)를 두고, 일자(`day`)가 바뀔 때만 플래그를 리셋해 당일 자동 스냅을 살린다(일자 탭의 `userPicked` 패턴과 동일).
 - 시계에 의존하는 계산·표시(`isNowOn`, `currentBlockFor`, 시각 표시)는 문제없다 — `setState`로 사용자 선택을 덮어쓰는 effect만 주의. 새 현장용 뷰에 "선택 상태 + 자동 추종"을 넣을 땐 이 패턴을 따를 것.
 
+### 18. 큐싯 재임포트는 블록 ID를 보존해야 한다 — 동선 유실 방지 (`scheduleReconcile.ts` / `ScheduleCueSheetImport.tsx`)
+
+시트 재가져오기가 과거엔 "기존 블록 전체 삭제 → 새 push ID로 재생성"이었다. 동선(`movements`)은 `staffId__blockId` 복합키라, 블록 ID가 바뀌면 **손으로 짠 동선 배정이 통째로 유실**된다(자동배정분은 임포트가 재생성해 살아남지만 수기 배정은 못 살아남음). 2026-07-08 수정:
+- `reconcileScheduleImport(existing, imported)`가 **day__start 키로 대조**해 `updates`(ID 유지·내용만 갱신) / `creates`(신규) / `deletes`(시트에서 사라짐)로 분류한다. 살아남는 블록은 ID를 유지하므로 동선이 보존된다.
+- `updateIguardScheduleBlock`으로 갱신할 땐 **시트 소유 필드만**(`label/end/meal/detail/owner/notice/leaderNote`) 덮고, 앱 소유 필드(`noMovement`)와 동선(별도 노드)은 건드리지 않는다. 빈 값은 `null`로 지정해 시트에서 지운 내용을 반영한다.
+- **자동배정은 신규 블록(`creates`)에만 실행** — 기존 블록에 재실행하면 수기 배정을 덮으므로 금지. 재생성이 필요하면 그 블록을 삭제 후 가져와야 한다.
+- 두 버튼: "시트 반영(삭제 없음)"=merge(updates+creates), "시트 기준 정리"=replace(+deletes). 확인창에 유지/신규/삭제 건수를 정직하게 표시한다. `scheduleReconcile.test.ts`가 분류 로직을 고정한다.
+
+### 19. 시트↔앱 스냅샷 어긋남은 해시로 감지한다 (`markCueSheetImported` / `CueSheetFreshnessBanner`)
+
+시트 연동은 "마지막으로 불러오기 누른 순간"의 스냅샷이라, 시트를 고치고 재임포트를 잊으면 시트와 앱이 다른 큐싯을 말한다(겨울↔여름 큐싯 혼동 실사례). 2026-07-08 추가:
+- 임포트 성공 직후 `markCueSheetImported`가 CSV 텍스트 해시(`hashCsv`)를 `iguard/cueSheet`에 **경로 지정 update**로 기록한다(설정 `set()`을 안 지우도록). `saveIguardCueSheet`(설정 저장)는 `set()`이라 URL을 바꾸면 마커가 초기화되는데, 원본이 바뀌었으니 재임포트가 안전한 기본값이라 의도된 동작이다.
+- `CueSheetFreshnessBanner`(기획>스탭 전체 큐싯 상단, team/admin만)가 원본 시트를 배경 재조회해 해시를 비교 → ✓동기화됨 / ⚠변경됨 / 아직 안 가져옴을 상시 표시. 조회 실패 시 조용히 숨긴다(오탐 방지).
+- 해시는 CRLF/CR/LF·앞뒤 공백을 정규화해 사소한 차이로 오탐하지 않는다.
+
 ---
 
 ## API 라우트
