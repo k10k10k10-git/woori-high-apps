@@ -374,7 +374,7 @@ npx vercel --prod --yes
 
 배포 URL: **https://retreat-app-theta.vercel.app**
 
-⚠ **Git 자동배포 미작동(2026-07-06 기준, 원인 미확인)**: 이 프로젝트는 Vercel과 GitHub main 브랜치가 연동돼 있지만, `git push`해도 새 배포가 트리거되지 않는 경우가 있었다(iguard-app은 정상 트리거됨). push 후에는 `npx vercel ls`로 새 배포가 실제로 큐잉됐는지 확인하고, 안 됐으면 레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사한 뒤(Root Directory가 retreat-app이라 레포 루트에서 실행해야 함) `npx vercel --prod --yes`로 수동 배포할 것. 작업 후 임시 복사한 `.vercel/`은 삭제.
+✅ **Git 자동배포 정상(2026-07-08 확인)**: 07-06에 "push해도 배포가 안 잡힌다"는 이슈가 있었으나, Vercel API 배포 이력 검증 결과 07-06 `git connect`+Root Directory 세팅 완료 이후의 모든 push가 정상적으로 자동 배포됨(git 소스, READY). push 후 `npx vercel ls`로 Ready 확인은 계속 할 것(/ship 스킬 절차). 만약 다시 트리거가 안 되면 비상 폴백: 레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사한 뒤(Root Directory가 retreat-app이라 레포 루트에서 실행) `npx vercel --prod --yes`로 수동 배포, 작업 후 임시 `.vercel/` 삭제.
 
 ---
 

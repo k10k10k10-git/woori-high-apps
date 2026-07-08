@@ -35,5 +35,5 @@
 ## 배포
 
 - 배포·커밋·푸시·Ready 확인은 `/ship` 스킬 절차를 따른다.
-- retreat-app은 GitHub push 자동배포가 미작동한 이력이 있음 — push 후 `npx vercel ls`로 반드시 확인 (상세: retreat-app/CLAUDE.md).
+- retreat-app 자동배포는 2026-07-08 정상 확인됨(과거 미작동은 07-06 세팅 전 증상). 그래도 push 후 `npx vercel ls`로 Ready 확인 (상세: retreat-app/CLAUDE.md).
 - 배포 전 `npx tsc --noEmit` 0 errors + `npm test` 통과 필수.
