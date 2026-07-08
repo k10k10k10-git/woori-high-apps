@@ -1,4 +1,5 @@
 import { IguardScheduleBlock, IguardStaff, IguardPost } from "@/lib/types";
+import { parseBusStaff } from "@/lib/busStaff";
 
 export type ScheduleDraft = {
   day: number;
@@ -257,8 +258,9 @@ function extractLooseStaffNames(line: string): string[] {
   return matches.map(cleanStaffName).filter(usableStaffName);
 }
 
-function extractBusStaffDraftsFromRows(rows: string[][]): AutoBusDraft[] {
+function extractBusStaffDraftsFromRows(rows: string[][]): { drafts: AutoBusDraft[]; warnings: string[] } {
   const byKey = new Map<string, AutoBusDraft>();
+  const warnings: string[] = [];
   let currentDay: 1 | 3 = 1;
 
   rows.forEach(row => {
@@ -279,12 +281,16 @@ function extractBusStaffDraftsFromRows(rows: string[][]): AutoBusDraft[] {
       const source = afterBus.includes(":") || afterBus.includes("：")
         ? afterBus.split(/[:：]/).slice(1).join(":")
         : afterBus;
-      const names = Array.from(new Set([
+      const parsed = parseBusStaff(source);
+      const names = parsed.names.length ? parsed.names : Array.from(new Set([
         ...extractStaffNamesWithSf(source),
         ...extractLooseStaffNames(source),
-      ]));
+      ])).filter(name => parseBusStaff(name).names.length > 0);
       if (!names.length) return;
       const day: 1 | 3 = /퇴소|귀가|복귀|3일차|셋째/.test(compact) ? 3 : currentDay === 3 ? 3 : 1;
+      if (parsed.rejected.length > 0) {
+        warnings.push(`${day}일차 ${busNo}호차 선탑/동승에서 이름 아닌 조각 제외: ${parsed.rejected.slice(0, 6).join(", ")}${parsed.rejected.length > 6 ? "…" : ""}`);
+      }
       const key = `${day}-${busNo}`;
       const existing = byKey.get(key);
       const merged = Array.from(new Set([...(existing?.staff.split(",").map(s => s.trim()).filter(Boolean) ?? []), ...names])).join(", ");
@@ -292,7 +298,7 @@ function extractBusStaffDraftsFromRows(rows: string[][]): AutoBusDraft[] {
     });
   });
 
-  return [...byKey.values()].sort((a, b) => a.day - b.day || a.busNo - b.busNo);
+  return { drafts: [...byKey.values()].sort((a, b) => a.day - b.day || a.busNo - b.busNo), warnings };
 }
 
 function extractStaffDraftsFromRows(rows: string[][]): AutoStaffDraft[] {
@@ -332,7 +338,9 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
   const emptyStats = { detailCount: 0, ownerCount: 0, noticeCount: 0 };
   if (rows.length === 0) return { blocks: [], staffDrafts: [], busDrafts: [], importStats: emptyStats, warnings: ["붙여넣은 내용이 비어있습니다."], dayCounts: {} };
   const staffDrafts = extractStaffDraftsFromRows(rows);
-  const busDrafts = extractBusStaffDraftsFromRows(rows);
+  const busDraftResult = extractBusStaffDraftsFromRows(rows);
+  const busDrafts = busDraftResult.drafts;
+  warnings.push(...busDraftResult.warnings);
 
   const headerRowIndex = rows.findIndex(isRepeatedHeader);
   if (headerRowIndex < 0) {

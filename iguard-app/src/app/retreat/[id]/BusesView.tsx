@@ -5,6 +5,7 @@ import { saveIguardBus, updateIguardBus, deleteIguardBus } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isPresentOnDay } from "@/lib/partialAttendance";
+import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 
 const BUS_CAPACITY = 45;
 const RESERVED_STAFF_SEATS = 3;
@@ -22,32 +23,6 @@ const shuffle = <T,>(arr: T[]) => {
   }
   return copy;
 };
-
-function parseBusStaffNames(value?: string): string[] {
-  const raw = (value || "")
-    .replace(/^선탑\/동승\s*[:：]?\s*/g, "")
-    .replace(/선탑\s*[:：]/g, "")
-    .replace(/동승\s*[:：]/g, "");
-  // 큐싯에는 "박혜원sf"처럼 스탭 표시 꼬리표가 붙는 관행이 있어, 버스배정 필드의
-  // "박혜원"과 다른 사람으로 인식돼 명단에 두 번 나오던 문제 — 꼬리표를 떼고 통일한다.
-  return raw.split(/[,\n/]+/)
-    .map(s => s.trim().replace(/sf$/i, "").trim())
-    .filter(Boolean);
-}
-
-// 큐싯 시트의 "선탑/동승" 칸에 안내 문장이 섞이면(예: "…순차적으로 카톡방에 인원보고…")
-// 쉼표로 잘린 문장 조각이 사람 이름처럼 표시된다(1호차에서 실제로 발생). 아래 단어들은
-// 사람 이름이 아닌 게 확실한 진행/안내 어휘 — 이름과 구조가 겹칠 위험이 없어 안전하게 신호로 쓴다.
-// ⚠ 데이터를 지우지는 않는다(진짜 이름 오삭제 위험). 오염이 의심되면 경고만 띄워 시트 수정을 유도.
-const NON_NAME_WORDS = new Set([
-  "부터", "간격으로", "이동", "시작", "순차", "순차적으", "순차적으로", "카톡방", "카톡방에",
-  "인원", "인원보고", "보고", "하기", "통과", "후에", "선발대", "동선", "대기",
-  "출발", "도착", "등록", "준비", "확인", "완료", "탑승", "하차",
-]);
-function hasSuspiciousBusStaff(names: string[]): boolean {
-  if (names.length > 8) return true;                       // 45인승 선탑/동승이 8명 초과면 비정상(오염 의심)
-  return names.some(n => NON_NAME_WORDS.has(n.trim()));     // 이름 아닌 진행 어휘가 섞임
-}
 
 function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 3): Map<number, string[]> {
   const day = busDay === 3 ? 3 : 1;
@@ -251,13 +226,27 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
 
   async function autoAssign() {
     if (sortedGroups.length === 0) return toast("조 데이터가 없습니다.", "warning");
-    if (dayBuses.length > 0 && !await uiConfirm(`${day}일차 기존 버스 배정을 자동배정 결과로 바꿀까요?`)) return;
+    const totalPassengerCount = sortedGroups.reduce((sum, group) => sum + groupPassengerCount(group), 0);
+    const minRequiredBusCount = Math.max(1, Math.ceil(totalPassengerCount / BUS_CAPACITY));
+    const fixedBusCount = dayBuses.length >= minRequiredBusCount ? dayBuses.length : undefined;
+    const willCreateMoreBuses = dayBuses.length > 0 && !fixedBusCount;
+    if (dayBuses.length > 0) {
+      const message = willCreateMoreBuses
+        ? `${day}일차 기존 ${dayBuses.length}대만으로는 전체 인원을 태울 수 없어 부족한 호차를 추가하고 자동배정할까요?`
+        : `${day}일차 기존 버스 배정을 자동배정 결과로 바꿀까요?`;
+      if (!await uiConfirm(message)) return;
+    }
 
     try {
-      const assigned = makeAutoAssignment(dayBuses.length || undefined);
+      const assigned = makeAutoAssignment(fixedBusCount);
       if (dayBuses.length > 0) {
-        const slots = shuffle(dayBuses);
-        await Promise.all(slots.map((bus, idx) => updateIguardBus(retreatId, bus.id, { groupIds: assigned[idx]?.groupIds || [] })));
+        const existingByBusNo = new Map(dayBuses.map(bus => [bus.busNo, bus]));
+        await Promise.all(assigned.map(item => {
+          const existing = existingByBusNo.get(item.busNo);
+          return existing
+            ? updateIguardBus(retreatId, existing.id, { groupIds: item.groupIds })
+            : saveIguardBus(retreatId, item);
+        }));
       } else {
         await Promise.all(assigned.map(b => saveIguardBus(retreatId, b)));
       }
@@ -271,8 +260,7 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
   const totalStaffCount = dayBuses.reduce((sum, b) => {
     const busFieldStaff = parseBusStaffNames(b.staff);
     const cueStaff = cueStaffByBus.get(b.busNo) || [];
-    const busFieldSet = new Set(busFieldStaff.map(n => n.toLowerCase()));
-    return sum + busFieldStaff.length + cueStaff.filter(n => !busFieldSet.has(n.toLowerCase())).length;
+    return sum + mergeBusStaffNames(busFieldStaff, cueStaff).length;
   }, 0);
   const totalHeadcount = totalPassengers + totalStaffCount;
 
@@ -338,12 +326,13 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
         <div className="grid gap-3 sm:grid-cols-2">
           {dayBuses.map(b => {
             const count = headcount(b.groupIds || []);
-            const busFieldStaff = parseBusStaffNames(b.staff);
+            const busFieldParse = parseBusStaff(b.staff);
+            const busFieldStaff = busFieldParse.names;
             const cueStaff = cueStaffByBus.get(b.busNo) || [];
-            const busFieldSet = new Set(busFieldStaff.map(n => n.toLowerCase()));
-            const mergedStaff = [...busFieldStaff, ...cueStaff.filter(n => !busFieldSet.has(n.toLowerCase()))];
+            const mergedStaff = mergeBusStaffNames(busFieldStaff, cueStaff);
             const totalStaff = mergedStaff.length;
             const remain = BUS_CAPACITY - count - totalStaff;
+            const rejectedTokens = busFieldParse.rejected;
             return (
               <div key={b.id} className={`card p-4 ${remain < 0 ? "border-red-300" : count > ASSIGN_TARGET ? "border-amber-300" : ""}`}>
                 <div className="flex items-center justify-between mb-2">
@@ -364,9 +353,11 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
                     {cueStaff.length > 0 && !b.staff && <span className="text-sky-500 ml-1">(큐싯)</span>}
                   </div>
                 )}
-                {hasSuspiciousBusStaff(mergedStaff) && (
+                {(busFieldParse.suspicious || mergedStaff.length > 8) && (
                   <div className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] leading-relaxed text-amber-700">
-                    ⚠ 선탑/동승에 이름이 아닌 문장 조각이 섞인 것 같아요. 큐싯 시트의 이 호차 <strong>선탑/동승 칸</strong>에 안내 문장이 들어갔는지 확인하고, 이름만 남긴 뒤 다시 가져오기 하세요. (인원수도 이 때문에 부풀 수 있어요)
+                    ⚠ 선탑/동승에 이름이 아닌 문장 조각이 섞인 것 같아요.
+                    {rejectedTokens.length > 0 && <> 제외됨: {rejectedTokens.slice(0, 8).join(", ")}{rejectedTokens.length > 8 ? "…" : ""}</>}
+                    {" "}큐싯 시트의 이 호차 <strong>선탑/동승 칸</strong>에 안내 문장이 들어갔는지 확인하고, 이름만 남긴 뒤 다시 가져오기 하세요.
                   </div>
                 )}
               </div>

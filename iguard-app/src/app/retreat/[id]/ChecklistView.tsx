@@ -7,34 +7,11 @@ import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isPresentOnDay } from "@/lib/partialAttendance";
+import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
-
-function parseBusStaffNames(value?: string): string[] {
-  const raw = (value || "")
-    .replace(/^선탑\/동승\s*[:：]?\s*/g, "")
-    .replace(/선탑\s*[:：]/g, "")
-    .replace(/동승\s*[:：]/g, "");
-  // 큐싯에는 "박혜원sf"처럼 스탭 표시 꼬리표가 붙는 관행이 있어, 버스배정 필드의
-  // "박혜원"과 다른 사람으로 인식돼 명단에 두 번 나오던 문제 — 꼬리표를 떼고 통일한다.
-  return raw.split(/[,\n/]+/)
-    .map(s => s.trim().replace(/sf$/i, "").trim())
-    .filter(Boolean);
-}
-
-// 큐싯 시트 "선탑/동승" 칸에 안내 문장이 섞이면 쉼표로 잘린 조각이 사람 이름처럼 체크 항목이 된다
-// (1호차에서 실제 발생). BusesView와 동일한 신호로 오염을 감지해 경고만 띄운다(데이터는 안 지움).
-const NON_NAME_WORDS = new Set([
-  "부터", "간격으로", "이동", "시작", "순차", "순차적으", "순차적으로", "카톡방", "카톡방에",
-  "인원", "인원보고", "보고", "하기", "통과", "후에", "선발대", "동선", "대기",
-  "출발", "도착", "등록", "준비", "확인", "완료", "탑승", "하차",
-]);
-function hasSuspiciousBusStaff(names: string[]): boolean {
-  if (names.length > 8) return true;
-  return names.some(n => NON_NAME_WORDS.has(n.trim()));
-}
 
 interface CheckMember { id: string; name: string; meta?: string; sortRank?: number; }
 interface Unit { key: string; title: string; sub?: string; summary?: string; warning?: string; members: CheckMember[]; }
@@ -125,10 +102,10 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
         return sum + teacherNames.size;
       }, 0);
       // 스탭: 버스 자체 staff 필드 + 큐싯 notice에서 파싱한 호차별 스탭 (중복 제거)
-      const busFieldStaff = parseBusStaffNames(b.staff);
+      const busFieldParse = parseBusStaff(b.staff);
+      const busFieldStaff = busFieldParse.names;
       const cueStaff = cueStaffByBus.get(b.busNo) || [];
-      const busFieldSet = new Set(busFieldStaff.map(n => n.toLowerCase()));
-      const mergedStaff = [...busFieldStaff, ...cueStaff.filter(n => !busFieldSet.has(n.toLowerCase()))];
+      const mergedStaff = mergeBusStaffNames(busFieldStaff, cueStaff);
 
       const summary = `학생 ${studentCount} · 교사 ${teacherCount} · 스탭 ${mergedStaff.length} · 총 ${studentCount + teacherCount + mergedStaff.length}`;
       const staffMembers: CheckMember[] = mergedStaff.map((name, idx) => ({
@@ -150,8 +127,8 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
         key: b.id, title: `${b.busNo}호차`,
         sub: mergedStaff.length > 0 ? `선탑/동승: ${mergedStaff.join(", ")}` : undefined,
         summary,
-        warning: hasSuspiciousBusStaff(mergedStaff)
-          ? "선탑/동승에 이름 아닌 문장 조각이 섞인 것 같아요 — 큐싯 시트의 이 호차 칸을 확인하세요. (체크 인원이 부풀 수 있어요)"
+        warning: busFieldParse.suspicious || mergedStaff.length > 8
+          ? `선탑/동승에 이름 아닌 문장 조각이 섞인 것 같아요${busFieldParse.rejected.length ? ` — 제외됨: ${busFieldParse.rejected.slice(0, 8).join(", ")}${busFieldParse.rejected.length > 8 ? "…" : ""}` : ""}. 큐싯 시트의 이 호차 칸을 확인하세요.`
           : undefined,
         members: allMembers,
       };
