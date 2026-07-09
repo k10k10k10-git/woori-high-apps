@@ -9,6 +9,12 @@ const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).fi
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 // 동(건물)이 있으면 "동 호수", 없으면 호수만 — 행정 앱 roomLabel과 동일 규칙
 const roomLabel = (r: Room) => { const d = (r.dong ?? "").trim(); return d ? `${d} ${r.roomNumber}` : r.roomNumber; };
+// 동별 → 호수 숫자순 (행정 앱 sortRooms와 동일 규칙)
+const roomSort = (a: Room, b: Room) => {
+  const ad = (a.dong ?? "").trim(), bd = (b.dong ?? "").trim();
+  if (ad !== bd) return ad.localeCompare(bd, "ko", { numeric: true });
+  return a.roomNumber.localeCompare(b.roomNumber, "ko", { numeric: true });
+};
 
 interface RoomChip { roomNumber: string; count: number; }
 interface BusInfo { day: 1 | 3; busNo: number; staff?: string; }
@@ -27,7 +33,7 @@ export default function RoomsView({ groups, rooms, buses, meals, retreatName, ye
       const memberSet = new Set(g.studentIds || []);
       const assigned = new Set<string>();
       const nam: RoomChip[] = [], yeo: RoomChip[] = [], etc: RoomChip[] = [];
-      rooms.forEach(r => {
+      [...rooms].sort(roomSort).forEach(r => {
         const mine = (r.studentIds || []).filter(id => memberSet.has(id));
         if (mine.length === 0) return;
         mine.forEach(id => assigned.add(id));
