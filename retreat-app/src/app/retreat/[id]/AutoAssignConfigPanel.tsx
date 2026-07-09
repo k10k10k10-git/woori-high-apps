@@ -499,50 +499,50 @@ export default function AutoAssignConfigPanel({
             </div>
           ))}
         </div>
-        {/* 반A — 부서·학년·반 */}
+        {/* 반A — 부서·학년·반 (3개 동일 폭) */}
         <div className="flex gap-1 mb-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
             value={newCC.a.bu}
             onChange={e => setNewCC(p => ({ ...p, a: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
             <option value="1부">1부</option>
             <option value="2부">2부</option>
           </select>
-          <select style={{ width: 52, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
             value={newCC.a.grade}
             onChange={e => setNewCC(p => ({ ...p, a: { ...p.a, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCC.a.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
             value={newCC.a.cls}
             onChange={e => setNewCC(p => ({ ...p, a: { ...p.a, cls: e.target.value } }))}>
             <option value="">반A</option>
             {getClasses(newCC.a.bu, newCC.a.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
           </select>
         </div>
-        {/* 반B — 부서·학년·반 */}
+        {/* 반B — 부서·학년·반 (3개 동일 폭) */}
         <div className="flex gap-1 items-stretch">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
             value={newCC.b.bu}
             onChange={e => setNewCC(p => ({ ...p, b: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
             <option value="1부">1부</option>
             <option value="2부">2부</option>
           </select>
-          <select style={{ width: 52, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
             value={newCC.b.grade}
             onChange={e => setNewCC(p => ({ ...p, b: { ...p.b, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCC.b.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
             value={newCC.b.cls}
             onChange={e => setNewCC(p => ({ ...p, b: { ...p.b, cls: e.target.value } }))}>
             <option value="">반B</option>
