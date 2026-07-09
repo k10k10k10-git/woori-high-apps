@@ -3,7 +3,9 @@
 이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 4개 앱을 담는다.
 **이 문서는 "이 저장소에서 일하는 방법" 전체를 규정한다.** 개별 앱의 코드 패턴은 각 앱의 CLAUDE.md가 원천이며, 충돌 시 이 문서의 안전 규칙이 우선한다.
 
-작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md`.
+작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md`.
+
+세션 시작 시 `.claude/HANDOFF.md`가 존재하면 사용자가 시키지 않아도 먼저 읽는다 — 직전 세션의 미완 작업·함정·대기 중 질문이 거기 있다.
 
 ## 🔒 DB 안전 4문답 — 모든 작업 시작 시 먼저 답할 것
 
@@ -16,6 +18,10 @@
 
 이 4문답 없이 작업을 시작하지 말 것. 사용자가 별도 안전 헤더를 붙이지 않아도 항상 적용된다.
 
+**답변 형식(고정):** 첫 응답의 첫머리에 정확히 아래 형태로 쓴다 — 각 항목 한 줄 이내, 총 4줄을 넘기지 않는다.
+
+> **DB 안전 4문답:** ① DB 쓰기: 없음 *(있으면: 경로·건수·백업 계획)* ② 배포: 없음 *(있으면: 대상 앱)* ③ Rules 배포: 아니오 ④ 주의 경로: 없음 *(있으면: 경로명과 이유)*
+
 ## 데이터 소유권 요약
 
 | 앱 | 소유 (쓰기 가능) | 다른 앱 노드 |
@@ -25,7 +31,7 @@
 | iguard-app | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
 | 교사·스탭 출석부 | `staff_*` | — (여름수련회 이후까지 작업 보류) |
 
-- 공유 쓰기 노드는 단 하나: `prepMilestones/` (행정↔이가드 양방향).
+- 공유 쓰기 노드는 단 하나: `prepMilestones/` (행정↔이가드 양방향). 하위 문서(DB_OWNERSHIP.md·retreat-app CLAUDE.md)에 `retreats/{id}/milestones`가 공유로 적혀 있는 것은 이관 전 낡은 서술이다 — 코드(`paths.ts`) 기준으로 이 문장이 진실.
 - 민감 데이터(환불계좌·의료일지·주민번호·시트 raw)는 `retreatsPrivate/{id}/` 아래에만. 이가드 멤버는 `retreats/{id}` 전체를 읽으므로 그 아래 두면 노출이다.
 
 ## 컨벤션
@@ -35,7 +41,7 @@
 - Firebase 접근은 각 앱 `src/lib/db.ts`(retreat-app은 `db/` 모듈+배럴)만. 경로 문자열은 `paths.ts`만. 컴포넌트에서 firebase 직접 import 금지.
 - `snapToList<T>` 사용 — `Object.entries(snap.val()).map` 직접 금지.
 - 의존성 최소(firebase/next/react/react-dom + retreat만 xlsx). 새 패키지 추가는 사용자 승인 필요.
-- UI 색상은 파스텔(100단계) 선호, 같은 의미의 자동/수동 표시는 같은 색.
+- UI 색상은 파스텔(Tailwind `*-100` 계열, 예: `bg-blue-100`) 선호, 같은 의미의 자동/수동 표시는 같은 색.
 - 기능 완료 = 검증 + 커밋 + 푸시 + (배포 대상이면) Ready 확인까지 한 세트(/ship).
 - 모달은 포커스 트랩+ESC+`role="dialog"`, 토스트는 `aria-live`, 아이콘 버튼은 `aria-label`.
 
@@ -74,6 +80,8 @@
 - [ ] `/verify` 또는 dev 서버에서 해당 플로우를 실제 구동해 확인했다
 - [ ] 대상 앱 `npx tsc --noEmit` 0 errors + `npm test` 전체 통과
 - [ ] 배포가 필요하면 Ready 확인 **후에만** 사용자에게 확인 요청
+
+로그인 벽 뒤 프로덕션 화면 검증이 필요할 때(dev preview는 Google OAuth 헤드리스 통과 불가): ① 배포 확정은 `/api/version`의 buildId를 `git rev-parse HEAD`와 대조, ② 파괴적 플로우는 "매칭 안 되는 더미 1행 입력 → 확인창 카운트 확인 → **취소**"로 DB 무쓰기 검증. 실제 확정 버튼은 절대 누르지 않는다(상세: `LEARNINGS.md`).
 
 **기능 추가**:
 - [ ] 4문답 + 영향 경로(paths.ts 함수명)를 작업 전에 보고했다
@@ -114,7 +122,7 @@
 ## 배포
 
 - 배포·커밋·푸시·Ready 확인은 `/ship` 스킬 절차를 따른다.
-- retreat-app 자동배포는 2026-07-08 정상 확인됨(과거 미작동은 07-06 세팅 전 증상). 그래도 push 후 `npx vercel ls`로 Ready 확인 (상세: retreat-app/CLAUDE.md).
+- retreat-app 자동배포는 2026-07-08 정상 확인됨(과거 미작동은 07-06 세팅 전 증상). `OPERATIONS.md`의 07-06 "자동배포 안 잡힘" 경고는 낡은 서술이니 따르지 말 것 — 이 문장이 최신. 그래도 push 후 `npx vercel ls`로 Ready 확인 (상세: retreat-app/CLAUDE.md).
 - 학생 앱은 Firebase Hosting(`firebase deploy --only hosting`, predeploy가 SW 캐시명 갱신). 교사·스탭 앱은 미배포·작업 보류.
 - 배포 전 `npx tsc --noEmit` 0 errors + `npm test` 통과 필수.
 
