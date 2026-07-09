@@ -2,6 +2,18 @@
 
 This workspace contains four related apps that share the Firebase Realtime Database project `woori-high`.
 
+**This file is a summary. The authoritative operating manual is the root `CLAUDE.md` (Korean) — read it first; if this file and `CLAUDE.md` disagree, `CLAUDE.md` wins.**
+
+## DB Safety 4 Questions — answer before starting ANY task
+
+Before any work (including code changes, investigation, or documentation), answer these four in a fixed 4-line block at the top of your first response:
+
+> **DB 안전 4문답:** ① DB writes: none *(if any: paths, count, backup plan)* ② Deployment: none *(if any: which app)* ③ Rules deployment: no ④ Paths to watch: none *(if any: path and why)*
+
+Rules for the answers: production DB writes require explicit user approval plus a snapshot backup; Rules deployment must always be "no" (single source: `고등부 학생 출석부/database.rules.json`); deployment only when requested or as part of the /ship procedure.
+
+Also: after solving any non-trivial problem, run the `extract-approach` skill before moving on (learning law — see root `CLAUDE.md`).
+
 Before changing code, always check whether the change can affect Firebase paths shared by another app. If a task touches data shape, database paths, Firebase Rules, imports/sync, or deployment, explain the DB impact first.
 
 ## Apps
