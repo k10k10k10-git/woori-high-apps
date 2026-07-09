@@ -47,8 +47,9 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const [newSC, setNewSC] = useState({ a: emptyPicker(), b: emptyPicker() });
   const [newTC, setNewTC] = useState({ a: emptyTpicker(), b: emptyTpicker() });
   const [newTSC, setNewTSC] = useState({ teacher: emptyTpicker(), student: emptyPicker() });
-  // 반 고려 관계 입력: 선택된 반의 unitKey("${bu}_${grade}_${classNum}") 쌍
-  const [newCC, setNewCC] = useState<{ a: string; b: string }>({ a: "", b: "" });
+  // 반 고려 관계 입력: 부서·학년·반 3단 선택 (unitKey는 추가 시점에 조합)
+  const emptyClsPick = () => ({ bu: "", grade: "", cls: "" });
+  const [newCC, setNewCC] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
   // 조장 설정 (이름+학년+반, 동명이인 구분용)
   const emptyEntry = (): LeaderEntry => ({ name: "", grade: "", cls: "" });
   const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
