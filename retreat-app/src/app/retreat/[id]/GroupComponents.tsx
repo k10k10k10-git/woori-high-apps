@@ -447,7 +447,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                           </span>
                         )}
                       </div>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 items-start">
                         {sids.map(sid => <StudentChipInner key={sid} sid={sid} />)}
                       </div>
                     </div>
@@ -455,7 +455,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                 })}
               </div>
               {unknownIds.length > 0 && (
-                <div className="flex flex-col gap-1 mt-2">
+                <div className="flex flex-col gap-1 items-start mt-2">
                   {unknownIds.map(sid => <StudentChipInner key={sid} sid={sid} />)}
                 </div>
               )}
