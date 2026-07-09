@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { TeacherAttendance } from "@/lib/types";
 import { ClassUnit, ConflictPair, RuleFlags, LeaderEntry, parseClassKey } from "./autoAssignUtils";
 
@@ -6,6 +7,91 @@ import { ClassUnit, ConflictPair, RuleFlags, LeaderEntry, parseClassKey } from "
 
 interface StudentPicker { bu: string; grade: string; cls: string; name: string; }
 interface TeacherPicker { bu: string; name: string; }
+
+interface StudentCandidate { name: string; bu: string; grade: number; cls: number; }
+interface TeacherCandidate { name: string; bu: string; }
+
+// ── 이름 우선 선택 컴포넌트 ─────────────────────────────────────────────
+// 부서·학년·반을 먼저 고르지 않고, 이름을 입력하면 하단에 후보(부·학년·반)가 떠서 고르는 방식.
+// 저장은 이름만(기존 로직과 동일) — 후보의 부/학년/반은 동명이인 확인·표시용.
+
+function StudentNamePicker({ value, candidates, placeholder, onPick }: {
+  value: StudentPicker;
+  candidates: StudentCandidate[];
+  placeholder: string;
+  onPick: (p: StudentPicker) => void;
+}) {
+  const [query, setQuery] = useState("");
+  if (value.name) {
+    return (
+      <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-white border border-green-300 rounded-lg px-2 py-1 text-xs">
+        <span className="font-semibold text-slate-700 truncate">{value.name}</span>
+        <span className="text-slate-400 shrink-0">{value.bu} {value.grade}학년 {value.cls}반</span>
+        <button type="button" aria-label="선택 취소" onClick={() => { onPick({ bu: "", grade: "", cls: "", name: "" }); setQuery(""); }}
+          className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none shrink-0">×</button>
+      </div>
+    );
+  }
+  const q = query.trim();
+  const matches = q ? candidates.filter(c => c.name.includes(q)).slice(0, 8) : [];
+  return (
+    <div className="relative flex-1 min-w-0">
+      <input className="input w-full text-xs py-0.5" placeholder={placeholder}
+        value={query} onChange={e => setQuery(e.target.value)} />
+      {matches.length > 0 && (
+        <div className="absolute z-10 left-0 right-0 mt-0.5 rounded-lg border border-slate-200 bg-white shadow-lg max-h-40 overflow-y-auto">
+          {matches.map((c, i) => (
+            <button type="button" key={`${c.bu}_${c.grade}_${c.cls}_${c.name}_${i}`}
+              onClick={() => { onPick({ bu: c.bu, grade: String(c.grade), cls: String(c.cls), name: c.name }); setQuery(""); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 text-xs">
+              <span className="font-semibold text-slate-700">{c.name}</span>
+              <span className="text-slate-400 ml-auto">{c.bu} {c.grade}학년 {c.cls}반</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeacherNamePicker({ value, candidates, placeholder, onPick }: {
+  value: TeacherPicker;
+  candidates: TeacherCandidate[];
+  placeholder: string;
+  onPick: (p: TeacherPicker) => void;
+}) {
+  const [query, setQuery] = useState("");
+  if (value.name) {
+    return (
+      <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-white border border-green-300 rounded-lg px-2 py-1 text-xs">
+        <span className="font-semibold text-slate-700 truncate">{value.name}</span>
+        <span className="text-slate-400 shrink-0">{value.bu}</span>
+        <button type="button" aria-label="선택 취소" onClick={() => { onPick({ bu: "", name: "" }); setQuery(""); }}
+          className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none shrink-0">×</button>
+      </div>
+    );
+  }
+  const q = query.trim();
+  const matches = q ? candidates.filter(c => c.name.includes(q)).slice(0, 8) : [];
+  return (
+    <div className="relative flex-1 min-w-0">
+      <input className="input w-full text-xs py-0.5" placeholder={placeholder}
+        value={query} onChange={e => setQuery(e.target.value)} />
+      {matches.length > 0 && (
+        <div className="absolute z-10 left-0 right-0 mt-0.5 rounded-lg border border-slate-200 bg-white shadow-lg max-h-40 overflow-y-auto">
+          {matches.map((c, i) => (
+            <button type="button" key={`${c.bu}_${c.name}_${i}`}
+              onClick={() => { onPick({ bu: c.bu, name: c.name }); setQuery(""); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 text-xs">
+              <span className="font-semibold text-slate-700">{c.name}</span>
+              <span className="text-slate-400 ml-auto">{c.bu}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export interface AutoAssignConfigPanelProps {
   // 조 수
@@ -23,6 +109,8 @@ export interface AutoAssignConfigPanelProps {
   setTeacherConflicts: React.Dispatch<React.SetStateAction<ConflictPair[]>>;
   teacherStudentConflicts: ConflictPair[];
   setTeacherStudentConflicts: React.Dispatch<React.SetStateAction<ConflictPair[]>>;
+  classConflicts: ConflictPair[];
+  setClassConflicts: React.Dispatch<React.SetStateAction<ConflictPair[]>>;
   // 드롭다운 입력 상태
   newSC: { a: StudentPicker; b: StudentPicker };
   setNewSC: React.Dispatch<React.SetStateAction<{ a: StudentPicker; b: StudentPicker }>>;
@@ -30,6 +118,8 @@ export interface AutoAssignConfigPanelProps {
   setNewTC: React.Dispatch<React.SetStateAction<{ a: TeacherPicker; b: TeacherPicker }>>;
   newTSC: { teacher: TeacherPicker; student: StudentPicker };
   setNewTSC: React.Dispatch<React.SetStateAction<{ teacher: TeacherPicker; student: StudentPicker }>>;
+  newCC: { a: string; b: string };
+  setNewCC: React.Dispatch<React.SetStateAction<{ a: string; b: string }>>;
   // 조장
   leaderEntries1: LeaderEntry[];
   setLeaderEntries1: (v: LeaderEntry[]) => void;
@@ -38,6 +128,8 @@ export interface AutoAssignConfigPanelProps {
   // 반 구성 정보
   classUnits1: ClassUnit[];
   classUnits2: ClassUnit[];
+  maxGroups1: number; // 조 수 상한 (최소2반 규칙 반영)
+  maxGroups2: number;
   bu1Count: number;
   bu2Count: number;
   // 교사
@@ -62,21 +154,27 @@ export default function AutoAssignConfigPanel({
   studentConflicts, setStudentConflicts,
   teacherConflicts, setTeacherConflicts,
   teacherStudentConflicts, setTeacherStudentConflicts,
-  newSC, setNewSC, newTC, setNewTC, newTSC, setNewTSC,
+  classConflicts, setClassConflicts,
+  newSC, setNewSC, newTC, setNewTC, newTSC, setNewTSC, newCC, setNewCC,
   leaderEntries1, setLeaderEntries1, leaderEntries2, setLeaderEntries2,
-  classUnits1, classUnits2, bu1Count, bu2Count,
+  classUnits1, classUnits2, maxGroups1, maxGroups2, bu1Count, bu2Count,
   teachers, running, onRun, onCollapse,
 }: AutoAssignConfigPanelProps) {
 
-  // 드롭다운 헬퍼
-  const getUnitsForBu = (bu: string) => bu === "1부" ? classUnits1 : bu === "2부" ? classUnits2 : [];
-  const getGrades = (bu: string) => bu ? [...new Set(getUnitsForBu(bu).map(u => u.grade))].sort() : [];
-  const getClasses = (bu: string, grade: string) =>
-    bu && grade ? [...new Set(getUnitsForBu(bu).filter(u => u.grade === Number(grade)).map(u => u.classNum))].sort((a, b) => a - b) : [];
-  const getStudentNames = (bu: string, grade: string, cls: string) =>
-    bu && grade && cls ? getUnitsForBu(bu).filter(u => u.grade === Number(grade) && u.classNum === Number(cls)).flatMap(u => u.names) : [];
-  const getTeacherNames = (bu: string) =>
-    bu ? [...new Set(teachers.filter(t => t.bu === bu && parseClassKey(t.classKey) !== null).map(t => t.name))].sort() : [];
+  // 이름 우선 선택용 후보 목록 (부·학년·반 표시)
+  const studentCandidates: StudentCandidate[] = [...classUnits1, ...classUnits2]
+    .flatMap(u => u.names.map(name => ({ name, bu: u.bu, grade: u.grade, cls: u.classNum })));
+  const teacherCandidates: TeacherCandidate[] = [
+    ...new Map(
+      teachers.filter(t => parseClassKey(t.classKey) !== null).map(t => [`${t.bu}_${t.name}`, { name: t.name, bu: t.bu }])
+    ).values(),
+  ];
+  // 반 고려용 전체 반 목록 (unitKey + 표시 라벨)
+  const allClassUnits = [...classUnits1, ...classUnits2];
+  const classLabel = (key: string) => {
+    const u = allClassUnits.find(cu => cu.key === key);
+    return u ? `${u.bu} ${u.grade}학년 ${u.classNum}반` : key;
+  };
 
   // 반 담당 전참 교사 수 체크 (스탭/부장/회계 제외)
   const fullTimer1 = teachers.filter(t => t.bu === "1부" && t.status === "전참" && parseClassKey(t.classKey) !== null).length;
@@ -99,6 +197,16 @@ export default function AutoAssignConfigPanel({
     setTeacherStudentConflicts(p => [...p, { a: newTSC.teacher.name, b: newTSC.student.name }]);
     setNewTSC({ teacher: emptyTpicker(), student: emptyPicker() });
   }
+  function addCC() {
+    if (!newCC.a || !newCC.b || newCC.a === newCC.b) return;
+    // 이미 있는 쌍(순서 무관) 중복 방지
+    if (classConflicts.some(c => (c.a === newCC.a && c.b === newCC.b) || (c.a === newCC.b && c.b === newCC.a))) {
+      setNewCC({ a: "", b: "" });
+      return;
+    }
+    setClassConflicts(p => [...p, { a: newCC.a, b: newCC.b }]);
+    setNewCC({ a: "", b: "" });
+  }
 
   return (
     <div className="card p-4 space-y-4 text-sm sticky top-4 max-h-[calc(100vh-5rem)] overflow-y-auto">
@@ -118,10 +226,10 @@ export default function AutoAssignConfigPanel({
             "반 담당 교사를 해당 반이 속한 조에 자동 배치",
             "전참 교사가 있는 조에 우선 배정",
             "조장 지정 시 해당 반 전체를 그 조에 고정",
-            "고려 관계 설정 시 해당 인원이 같은 조에 배정되지 않도록 회피",
+            "고려 관계(학생·교사·교사학생·반) 설정 시 반드시 다른 조로 분리",
             "모든 조의 인원 수를 최대한 균등하게 배분",
             "특정 학년이 한 조에 몰리지 않도록 분산 배정",
-            "8회 반복 실행 후 최적 결과 자동 선택",
+            "16회 반복 실행 후 최적 결과 자동 선택",
           ].map(label => (
             <div key={label} className="flex items-start gap-1.5">
               <span className="text-slate-400 shrink-0 mt-px">·</span>
@@ -154,7 +262,18 @@ export default function AutoAssignConfigPanel({
               </label>
             );
           })}
+          {/* 최소 2반 (독립 규칙) */}
+          <label className="flex items-start gap-2 cursor-pointer pt-1 border-t border-blue-100 mt-1">
+            <input type="checkbox" checked={rules.minTwoClasses} className="rounded shrink-0 mt-0.5"
+              onChange={e => setRules(r => ({ ...r, minTwoClasses: e.target.checked }))} />
+            <span className={rules.minTwoClasses ? "" : "line-through opacity-50"}>
+              한 조에 2개 이상 다른 반 (조 수는 반 수의 절반까지만)
+            </span>
+          </label>
         </div>
+        <p className="text-[10px] text-blue-400 mt-2 leading-relaxed">
+          ※ 선택 규칙과 고려 관계는 <b>반드시 지켜지도록</b> 동일한 최우선순위로 배정됩니다. 동시에 만족할 수 없을 때만 위반이 최소화됩니다.
+        </p>
       </div>
 
       {/* 조당 최대 인원 */}
@@ -188,19 +307,22 @@ export default function AutoAssignConfigPanel({
         <p className="text-xs font-semibold text-slate-500 mb-2">📊 조 수 설정{rules.maxGroupSize > 0 && <span className="text-blue-400 font-normal ml-1">(자동 계산됨)</span>}</p>
         <div className="space-y-2">
           {([
-            { bu: "1부", total: bu1Count, classes: classUnits1.length, val: groupCount1bu, set: setGroupCount1bu, cls: "tag-green", fullT: fullTimer1, warn: warn1 },
-            { bu: "2부", total: bu2Count, classes: classUnits2.length, val: groupCount2bu, set: setGroupCount2bu, cls: "tag-purple", fullT: fullTimer2, warn: warn2 },
+            { bu: "1부", total: bu1Count, classes: classUnits1.length, maxG: maxGroups1, val: groupCount1bu, set: setGroupCount1bu, cls: "tag-green", fullT: fullTimer1, warn: warn1 },
+            { bu: "2부", total: bu2Count, classes: classUnits2.length, maxG: maxGroups2, val: groupCount2bu, set: setGroupCount2bu, cls: "tag-purple", fullT: fullTimer2, warn: warn2 },
           ] as const).map(row => (
             <div key={row.bu} className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className={`tag ${row.cls} text-xs w-10 text-center shrink-0`}>{row.bu}</span>
                 <span className="text-xs text-slate-400">{row.classes}개반 / {row.total}명</span>
-                <input type="number" min={1} max={row.classes} value={row.val}
-                  onChange={e => row.set(Math.min(row.classes, Math.max(1, parseInt(e.target.value) || 1)))}
+                <input type="number" min={1} max={row.maxG} value={row.val}
+                  onChange={e => row.set(Math.min(row.maxG, Math.max(1, parseInt(e.target.value) || 1)))}
                   className="input w-14 text-center text-sm py-1 ml-auto"
                   disabled={rules.maxGroupSize > 0} />
                 <span className="text-xs text-slate-500">조</span>
               </div>
+              {rules.minTwoClasses && row.classes > 0 && (
+                <p className="text-xs text-blue-500">ℹ 최소 2반 규칙: 최대 {row.maxG}조까지 ({row.classes}개반 ÷ 2)</p>
+              )}
               {row.val > row.classes && (
                 <p className="text-xs text-orange-500">⚠ 조 수({row.val})가 반 수({row.classes})보다 많습니다</p>
               )}
@@ -319,10 +441,10 @@ export default function AutoAssignConfigPanel({
         ))}
       </div>
 
-      {/* 학생 고려 */}
-      {/* 학생 고려 */}
+      {/* 학생 고려 관계 — 이름 입력 → 후보(부·학년·반) 선택 */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 mb-2">🙅 학생 고려 관계</p>
+        <p className="text-xs font-semibold text-slate-500 mb-1">🙅 학생 고려 관계</p>
+        <p className="text-[10px] text-slate-400 mb-2">이름을 입력하면 아래에 후보가 떠요. 두 학생은 다른 조로 분리됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
           {studentConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
           {studentConflicts.map((c, i) => (
@@ -335,76 +457,22 @@ export default function AutoAssignConfigPanel({
             </div>
           ))}
         </div>
-        {/* A */}
         <div className="flex gap-1 mb-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newSC.a.bu}
-            onChange={e => setNewSC(p => ({ ...p, a: { bu: e.target.value, grade: "", cls: "", name: "" } }))}>
-            <option value="">부서</option>
-            <option value="1부">1부</option>
-            <option value="2부">2부</option>
-          </select>
-          <select style={{ width: 52, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newSC.a.grade}
-            onChange={e => setNewSC(p => ({ ...p, a: { ...p.a, grade: e.target.value, cls: "", name: "" } }))}>
-            <option value="">학년</option>
-            {getGrades(newSC.a.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
-          </select>
-          <select style={{ width: 40, minWidth: 0, padding: "2px 0px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newSC.a.cls}
-            onChange={e => setNewSC(p => ({ ...p, a: { ...p.a, cls: e.target.value, name: "" } }))}>
-            <option value="">반</option>
-            {getClasses(newSC.a.bu, newSC.a.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
-          </select>
-          <select className="input flex-1 min-w-0 text-xs py-0.5"
-            value={newSC.a.name}
-            onChange={e => setNewSC(p => ({ ...p, a: { ...p.a, name: e.target.value } }))}>
-            <option value="">이름A</option>
-            {getStudentNames(newSC.a.bu, newSC.a.grade, newSC.a.cls).map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <StudentNamePicker value={newSC.a} candidates={studentCandidates} placeholder="이름A 입력"
+            onPick={p => setNewSC(prev => ({ ...prev, a: p }))} />
         </div>
-        {/* B */}
-        <div className="flex gap-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newSC.b.bu}
-            onChange={e => setNewSC(p => ({ ...p, b: { bu: e.target.value, grade: "", cls: "", name: "" } }))}>
-            <option value="">부서</option>
-            <option value="1부">1부</option>
-            <option value="2부">2부</option>
-          </select>
-          <select style={{ width: 52, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newSC.b.grade}
-            onChange={e => setNewSC(p => ({ ...p, b: { ...p.b, grade: e.target.value, cls: "", name: "" } }))}>
-            <option value="">학년</option>
-            {getGrades(newSC.b.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
-          </select>
-          <select style={{ width: 40, minWidth: 0, padding: "2px 0px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newSC.b.cls}
-            onChange={e => setNewSC(p => ({ ...p, b: { ...p.b, cls: e.target.value, name: "" } }))}>
-            <option value="">반</option>
-            {getClasses(newSC.b.bu, newSC.b.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
-          </select>
-          <div className="relative flex-1 min-w-0">
-            <select className="input w-full text-xs py-0.5"
-              value={newSC.b.name}
-              onChange={e => setNewSC(p => ({ ...p, b: { ...p.b, name: e.target.value } }))}>
-              <option value="">이름B</option>
-              {getStudentNames(newSC.b.bu, newSC.b.grade, newSC.b.cls).map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <button onClick={addSC} className="absolute right-0 top-0 bottom-0 px-2 text-slate-500 hover:text-slate-700 font-bold text-sm border-l border-slate-200 bg-white rounded-r-lg">+</button>
-          </div>
+        <div className="flex gap-1 items-stretch">
+          <StudentNamePicker value={newSC.b} candidates={studentCandidates} placeholder="이름B 입력"
+            onPick={p => setNewSC(prev => ({ ...prev, b: p }))} />
+          <button onClick={addSC} disabled={!newSC.a.name || !newSC.b.name}
+            className="btn-secondary btn-sm text-xs px-2 shrink-0 disabled:opacity-40">추가</button>
         </div>
       </div>
 
-      {/* 교사 고려 */}
+      {/* 교사 고려 관계 */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 mb-2">🙅 교사 고려 관계</p>
+        <p className="text-xs font-semibold text-slate-500 mb-1">🙅 교사 고려 관계</p>
+        <p className="text-[10px] text-slate-400 mb-2">이름을 입력하면 아래에 후보가 떠요. 두 교사는 다른 조로 분리됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
           {teacherConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
           {teacherConflicts.map((c, i) => (
@@ -418,41 +486,21 @@ export default function AutoAssignConfigPanel({
           ))}
         </div>
         <div className="flex gap-1 mb-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newTC.a.bu}
-            onChange={e => setNewTC(p => ({ ...p, a: { bu: e.target.value, name: "" } }))}>
-            <option value="">부서</option>
-            <option value="1부">1부</option>
-            <option value="2부">2부</option>
-          </select>
-          <select className="input flex-1 text-xs py-0.5" value={newTC.a.name}
-            onChange={e => setNewTC(p => ({ ...p, a: { ...p.a, name: e.target.value } }))}>
-            <option value="">선생님A</option>
-            {getTeacherNames(newTC.a.bu).map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <TeacherNamePicker value={newTC.a} candidates={teacherCandidates} placeholder="선생님A 입력"
+            onPick={p => setNewTC(prev => ({ ...prev, a: p }))} />
         </div>
-        <div className="flex gap-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newTC.b.bu}
-            onChange={e => setNewTC(p => ({ ...p, b: { bu: e.target.value, name: "" } }))}>
-            <option value="">부서</option>
-            <option value="1부">1부</option>
-            <option value="2부">2부</option>
-          </select>
-          <select className="input flex-1 text-xs py-0.5" value={newTC.b.name}
-            onChange={e => setNewTC(p => ({ ...p, b: { ...p.b, name: e.target.value } }))}>
-            <option value="">선생님B</option>
-            {getTeacherNames(newTC.b.bu).map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
-          <button onClick={addTC} className="btn-secondary btn-sm text-xs px-2">+</button>
+        <div className="flex gap-1 items-stretch">
+          <TeacherNamePicker value={newTC.b} candidates={teacherCandidates} placeholder="선생님B 입력"
+            onPick={p => setNewTC(prev => ({ ...prev, b: p }))} />
+          <button onClick={addTC} disabled={!newTC.a.name || !newTC.b.name}
+            className="btn-secondary btn-sm text-xs px-2 shrink-0 disabled:opacity-40">추가</button>
         </div>
       </div>
 
-      {/* 교사-학생 고려 */}
+      {/* 교사-학생 고려 관계 */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 mb-2">🙅 교사-학생 고려 관계</p>
+        <p className="text-xs font-semibold text-slate-500 mb-1">🙅 교사-학생 고려 관계</p>
+        <p className="text-[10px] text-slate-400 mb-2">교사·학생 이름을 각각 입력해 후보를 고르면, 둘은 다른 조로 분리됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
           {teacherStudentConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
           {teacherStudentConflicts.map((c, i) => (
@@ -465,55 +513,48 @@ export default function AutoAssignConfigPanel({
             </div>
           ))}
         </div>
-        {/* 교사 */}
         <div className="flex gap-1 mb-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newTSC.teacher.bu}
-            onChange={e => setNewTSC(p => ({ ...p, teacher: { bu: e.target.value, name: "" } }))}>
-            <option value="">부서</option>
-            <option value="1부">1부</option>
-            <option value="2부">2부</option>
-          </select>
-          <select className="input flex-1 text-xs py-0.5" value={newTSC.teacher.name}
-            onChange={e => setNewTSC(p => ({ ...p, teacher: { ...p.teacher, name: e.target.value } }))}>
-            <option value="">선생님</option>
-            {getTeacherNames(newTSC.teacher.bu).map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+          <TeacherNamePicker value={newTSC.teacher} candidates={teacherCandidates} placeholder="선생님 입력"
+            onPick={p => setNewTSC(prev => ({ ...prev, teacher: p }))} />
         </div>
-        {/* 학생 */}
-        <div className="flex gap-1">
-          <select style={{ width: 44, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newTSC.student.bu}
-            onChange={e => setNewTSC(p => ({ ...p, student: { bu: e.target.value, grade: "", cls: "", name: "" } }))}>
-            <option value="">부서</option>
-            <option value="1부">1부</option>
-            <option value="2부">2부</option>
+        <div className="flex gap-1 items-stretch">
+          <StudentNamePicker value={newTSC.student} candidates={studentCandidates} placeholder="학생 이름 입력"
+            onPick={p => setNewTSC(prev => ({ ...prev, student: p }))} />
+          <button onClick={addTSC} disabled={!newTSC.teacher.name || !newTSC.student.name}
+            className="btn-secondary btn-sm text-xs px-2 shrink-0 disabled:opacity-40">추가</button>
+        </div>
+      </div>
+
+      {/* 반 고려 관계 — 두 반을 같은 조에서 분리 */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 mb-1">🙅 반 고려 관계</p>
+        <p className="text-[10px] text-slate-400 mb-2">선택한 두 반은 같은 조에 배정되지 않습니다.</p>
+        <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
+          {classConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {classConflicts.map((c, i) => (
+            <div key={i} className="flex items-center gap-1 text-xs bg-teal-50 rounded px-2 py-1">
+              <span className="text-teal-700 font-medium">{classLabel(c.a)}</span>
+              <span className="text-slate-400">↔</span>
+              <span className="text-teal-700 font-medium">{classLabel(c.b)}</span>
+              <button onClick={() => setClassConflicts(p => p.filter((_, j) => j !== i))}
+                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-1 items-center">
+          <select className="input flex-1 min-w-0 text-xs py-0.5" value={newCC.a}
+            onChange={e => setNewCC(p => ({ ...p, a: e.target.value }))}>
+            <option value="">반A</option>
+            {allClassUnits.map(u => <option key={u.key} value={u.key}>{u.bu} {u.grade}학년 {u.classNum}반</option>)}
           </select>
-          <select style={{ width: 52, minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newTSC.student.grade}
-            onChange={e => setNewTSC(p => ({ ...p, student: { ...p.student, grade: e.target.value, cls: "", name: "" } }))}>
-            <option value="">학년</option>
-            {getGrades(newTSC.student.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
+          <span className="text-slate-400 text-xs shrink-0">↔</span>
+          <select className="input flex-1 min-w-0 text-xs py-0.5" value={newCC.b}
+            onChange={e => setNewCC(p => ({ ...p, b: e.target.value }))}>
+            <option value="">반B</option>
+            {allClassUnits.map(u => <option key={u.key} value={u.key}>{u.bu} {u.grade}학년 {u.classNum}반</option>)}
           </select>
-          <select style={{ width: 40, minWidth: 0, padding: "2px 0px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700"
-            value={newTSC.student.cls}
-            onChange={e => setNewTSC(p => ({ ...p, student: { ...p.student, cls: e.target.value, name: "" } }))}>
-            <option value="">반</option>
-            {getClasses(newTSC.student.bu, newTSC.student.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
-          </select>
-          <div className="relative flex-1 min-w-0">
-            <select className="input w-full text-xs py-0.5"
-              value={newTSC.student.name}
-              onChange={e => setNewTSC(p => ({ ...p, student: { ...p.student, name: e.target.value } }))}>
-              <option value="">학생이름</option>
-              {getStudentNames(newTSC.student.bu, newTSC.student.grade, newTSC.student.cls).map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-            <button onClick={addTSC} className="absolute right-0 top-0 bottom-0 px-2 text-slate-500 hover:text-slate-700 font-bold text-sm border-l border-slate-200 bg-white rounded-r-lg">+</button>
-          </div>
+          <button onClick={addCC} disabled={!newCC.a || !newCC.b || newCC.a === newCC.b}
+            className="btn-secondary btn-sm text-xs px-2 shrink-0 disabled:opacity-40">추가</button>
         </div>
       </div>
 

@@ -34,17 +34,21 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
     sameGender:       false,
     balanceGrade:     true,
     balanceSize:      true,
+    minTwoClasses:    false,
     maxGroupSize:     0,
   });
   const [studentConflicts, setStudentConflicts] = useState<ConflictPair[]>([]);
   const [teacherConflicts, setTeacherConflicts] = useState<ConflictPair[]>([]);
   const [teacherStudentConflicts, setTeacherStudentConflicts] = useState<ConflictPair[]>([]);
+  const [classConflicts, setClassConflicts] = useState<ConflictPair[]>([]);
   // 드롭다운 입력 상태
   const emptyPicker = () => ({ bu: "", grade: "", cls: "", name: "" });
   const emptyTpicker = () => ({ bu: "", name: "" });
   const [newSC, setNewSC] = useState({ a: emptyPicker(), b: emptyPicker() });
   const [newTC, setNewTC] = useState({ a: emptyTpicker(), b: emptyTpicker() });
   const [newTSC, setNewTSC] = useState({ teacher: emptyTpicker(), student: emptyPicker() });
+  // 반 고려 관계 입력: 선택된 반의 unitKey("${bu}_${grade}_${classNum}") 쌍
+  const [newCC, setNewCC] = useState<{ a: string; b: string }>({ a: "", b: "" });
   // 조장 설정 (이름+학년+반, 동명이인 구분용)
   const emptyEntry = (): LeaderEntry => ({ name: "", grade: "", cls: "" });
   const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
@@ -82,17 +86,29 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const bu1Count = classUnits1.reduce((acc, u) => acc + u.studentIds.length, 0);
   const bu2Count = classUnits2.reduce((acc, u) => acc + u.studentIds.length, 0);
 
-  // maxGroupSize/인원수 변경 시 조 수 자동 계산 (렌더 중 조정 — effect 대신)
-  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count });
+  // 조 수 상한: 최소 2반 규칙이 켜지면 조당 서로 다른 반이 2개 이상 필요 → 반 수의 절반까지만 가능.
+  const maxGroups1 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits1.length / 2)) : classUnits1.length;
+  const maxGroups2 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits2.length / 2)) : classUnits2.length;
+
+  // maxGroupSize/인원수/최소2반 변경 시 조 수 자동 계산·클램프 (렌더 중 조정 — effect 대신)
+  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length });
   if (
     rules.maxGroupSize !== prevAutoCalc.maxGroupSize ||
     bu1Count !== prevAutoCalc.bu1Count ||
-    bu2Count !== prevAutoCalc.bu2Count
+    bu2Count !== prevAutoCalc.bu2Count ||
+    rules.minTwoClasses !== prevAutoCalc.minTwoClasses ||
+    classUnits1.length !== prevAutoCalc.cls1 ||
+    classUnits2.length !== prevAutoCalc.cls2
   ) {
-    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count });
+    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length });
     if (rules.maxGroupSize > 0) {
-      if (bu1Count > 0) setGroupCount1bu(Math.max(1, Math.ceil(bu1Count / rules.maxGroupSize)));
-      if (bu2Count > 0) setGroupCount2bu(Math.max(1, Math.ceil(bu2Count / rules.maxGroupSize)));
+      // 조당 최대 인원으로 조 수를 역산하되, 최소2반 상한을 넘지 않게 클램프
+      if (bu1Count > 0) setGroupCount1bu(Math.min(maxGroups1, Math.max(1, Math.ceil(bu1Count / rules.maxGroupSize))));
+      if (bu2Count > 0) setGroupCount2bu(Math.min(maxGroups2, Math.max(1, Math.ceil(bu2Count / rules.maxGroupSize))));
+    } else if (rules.minTwoClasses) {
+      // 최소2반만 켠 경우: 현재 조 수가 상한을 넘으면 상한으로 내림
+      if (groupCount1bu > maxGroups1) setGroupCount1bu(maxGroups1);
+      if (groupCount2bu > maxGroups2) setGroupCount2bu(maxGroups2);
     }
   }
 
@@ -110,7 +126,7 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
       const leaderNames2 = leaderEntries2.map(e => e.name);
       const groups = runAutoAssign(
         groupCount1bu, groupCount2bu, rules,
-        studentConflicts, teacherConflicts, teacherStudentConflicts, participants, teachers, students,
+        studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, participants, teachers, students,
         pinnedKeys1, pinnedKeys2, leaderNames1, leaderNames2,
       );
       setPreview({ groups, units1: classUnits1, units2: classUnits2 });
@@ -144,18 +160,24 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
         setTeacherConflicts={setTeacherConflicts}
         teacherStudentConflicts={teacherStudentConflicts}
         setTeacherStudentConflicts={setTeacherStudentConflicts}
+        classConflicts={classConflicts}
+        setClassConflicts={setClassConflicts}
         newSC={newSC}
         setNewSC={setNewSC}
         newTC={newTC}
         setNewTC={setNewTC}
         newTSC={newTSC}
         setNewTSC={setNewTSC}
+        newCC={newCC}
+        setNewCC={setNewCC}
         leaderEntries1={leaderEntries1}
         setLeaderEntries1={setLeaderEntries1}
         leaderEntries2={leaderEntries2}
         setLeaderEntries2={setLeaderEntries2}
         classUnits1={classUnits1}
         classUnits2={classUnits2}
+        maxGroups1={maxGroups1}
+        maxGroups2={maxGroups2}
         bu1Count={bu1Count}
         bu2Count={bu2Count}
         teachers={teachers}

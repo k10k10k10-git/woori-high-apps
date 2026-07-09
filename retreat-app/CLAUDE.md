@@ -286,6 +286,13 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 - 새 역할을 추가할 땐 반드시 6곳을 함께 갱신: `MEAL_ROLES`, `EMPTY_COUNTS`, `ROLE_LABELS`, `sumCounts`, adjustments 차감 루프, 끼니별 표(헤더/셀/hasNegative). 하드코딩된 `counts.staff/teacher/...` 나열을 빠뜨리면 그 역할이 계산에서 누락된다.
 - **자동 제안 한계**: 교사 참석 데이터(`teachers`)의 `bu`는 `1부/2부/스탭`뿐이라 교역자(목사·전도사) 구분이 없다. "DB에서 자동 제안"은 교사/스탭/학생만 채우고 **교역자는 수동 입력**으로 남긴다.
 
+### 12. 자동 조편성 알고리즘 — 반 단위 배정 + 하드/소프트 2계층 페널티 (`autoAssignUtils.ts`)
+
+조편성 자동배정은 **학생 1명이 아니라 반(`ClassUnit`) 전체를 한 조에 통째로** 배정한다(같은 반은 절대 안 쪼개짐). UI는 `AutoAssignPanel.tsx`(state)→`AutoAssignConfigPanel.tsx`(입력)이고 순수 로직은 `autoAssignUtils.ts`에 격리(테스트: `autoAssign.test.ts`). 흐름: Phase0 조장 반 고정 → Phase1 반을 인원 많은 순으로 점수 기반 그리디 배정(최고점 ±`SCORE_TOLERANCE=50` 후보 중 무작위) → Phase2 교사 배정. 이걸 **16회 반복해 `scoreGroups` 최고점 채택**.
+- **페널티 2계층**: 이분법(위반/준수) 규칙 — 최대인원·고려관계(학생·교사·교사학생·**반**)·혼성·동성·**최소2반** — 은 전부 동일한 `HARD_PENALTY(1_000_000)`. 동일 크기라 best-of-16이 하드 위반 '건수'를 최소화한다(동시 충족 불가 시 덜 어기는 쪽). 인원 균등·학년 분산은 '정도(gradient)' 목표라 수천 규모로 유지 → 하드를 절대 못 이긴다. **새 이분법 규칙을 추가하면 `HARD_PENALTY`를 쓰고, tryAssign(중간 유도)·scoreGroups(최종 판정) 두 곳에 모두 반영**할 것(한 곳만 넣으면 그리디는 피하는데 최종 평가엔 안 잡히거나 그 반대가 된다).
+- **하드는 보장이 아니라 최우선순위**다 — 그리디+제한 반복이라 입력이 실현 불가(예: 조 수 > 전참 교사 수, 최소2반인데 조 수 > 반÷2)면 위반이 남을 수 있다. 그래서 `minTwoClasses`는 조 수 상한을 `floor(반÷2)`로 클램프하고(`AutoAssignPanel`), UI가 전참 부족을 경고한다.
+- **고려 관계 저장 형태**: 학생·교사는 이름 문자열 쌍, 반은 `unitKey`(`${bu}_${grade}_${classNum}`) 쌍. 이름 기반이라 동명이인은 구분 못 한다(입력 UI는 이름 타이핑→후보(부·학년·반) 선택으로 확인만 돕고, 저장은 이름). 고려 관계는 DB에 저장되지 않고 패널 state로만 존재(실행 시점 1회성).
+
 ---
 
 ## 테스트
