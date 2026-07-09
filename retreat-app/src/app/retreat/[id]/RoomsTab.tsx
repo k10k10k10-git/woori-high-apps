@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
-import { roomLabel } from "@/lib/roomLabel";
+import { roomLabel, sortRooms } from "@/lib/roomLabel";
 
 interface Props {
   retreat: Retreat;
@@ -306,7 +306,7 @@ export default function RoomsTab({ retreat }: Props) {
 
   function exportRoomsXLSX() {
     const rows: Record<string, string | number>[] = [];
-    rooms.forEach(r => {
+    sortRooms(rooms).forEach(r => {
       (r.teachers || []).forEach(t => {
         rows.push({ "동": r.dong || "", "방번호": r.roomNumber, "유형": r.type, "정원": r.capacity, "역할": "교사", "이름": t, "부": "", "학년": "", "반": "" });
       });
@@ -331,7 +331,7 @@ export default function RoomsTab({ retreat }: Props) {
       <p style="font-size:11px;color:#888;margin:0 0 16px">총 ${rooms.length}개 방 · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>`;
 
     typeList.forEach(type => {
-      const typeRooms = rooms.filter(r => r.type === type);
+      const typeRooms = sortRooms(rooms.filter(r => r.type === type));
       html += `<h2 style="font-size:13px;margin:0 0 8px;border-bottom:2px solid #e2e8f0;padding-bottom:4px">${escapeHtml(type)}생 방 (${typeRooms.length}개)</h2>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">`;
 
@@ -411,8 +411,9 @@ export default function RoomsTab({ retreat }: Props) {
     ? allUnassigned
     : allUnassigned.filter(id => students[id]?.gender === genderFilter);
 
-  const maleRooms = rooms.filter(r => r.type === "남");
-  const femaleRooms = rooms.filter(r => r.type === "여");
+  // 표시용 정렬: 동(건물)별 → 호수 숫자순 (저장 순서는 그대로)
+  const maleRooms = sortRooms(rooms.filter(r => r.type === "남"));
+  const femaleRooms = sortRooms(rooms.filter(r => r.type === "여"));
 
   if (loading) return <div className="text-center text-slate-400 py-10">로딩 중...</div>;
   if (loadError) return (

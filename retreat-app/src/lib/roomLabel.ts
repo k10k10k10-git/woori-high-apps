@@ -4,3 +4,16 @@ export function roomLabel(room: { dong?: string | null; roomNumber: string }): s
   const dong = (room.dong ?? "").trim();
   return dong ? `${dong} ${room.roomNumber}` : room.roomNumber;
 }
+
+/**
+ * 방 목록 정렬 — ① 동(건물)별로 묶고 ② 각 동 안에서 호수를 숫자순으로.
+ *   예) 101,102,…,110,201  (문자열 정렬의 "110<99" 문제를 numeric 옵션으로 방지)
+ * 동이 없는(단일 건물) 방은 앞쪽에 모인다. 저장 순서는 그대로 두고 표시용으로만 정렬한다.
+ */
+export function sortRooms<T extends { dong?: string | null; roomNumber: string }>(rooms: T[]): T[] {
+  return [...rooms].sort((a, b) => {
+    const ad = (a.dong ?? "").trim(), bd = (b.dong ?? "").trim();
+    if (ad !== bd) return ad.localeCompare(bd, "ko", { numeric: true });
+    return a.roomNumber.localeCompare(b.roomNumber, "ko", { numeric: true });
+  });
+}
