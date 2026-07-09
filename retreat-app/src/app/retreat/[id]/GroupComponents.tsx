@@ -241,13 +241,22 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
           <span className="font-bold text-slate-800">{displayName}</span>
           <span className={`tag ${group.bu === "1부" ? "tag-green" : "tag-purple"} text-[10px]`}>{group.bu}</span>
         </div>
-        <div className="flex gap-1">
+        {/* 윈도우 창 컨트롤 느낌 — 평소엔 납작한 아이콘, 호버 시에만 강조(삭제는 빨강 채움) */}
+        <div className="flex items-center -mr-1 -mt-0.5">
           <button onClick={toggleEditing}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 text-base transition-colors"
-            aria-label="조 편집">✏</button>
+            className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            title="조 편집" aria-label="조 편집">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
           <button onClick={onRemoveGroup}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 text-lg leading-none transition-colors"
-            aria-label="조 삭제">×</button>
+            className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:bg-red-500 hover:text-white transition-colors"
+            title="조 삭제" aria-label="조 삭제">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+            </svg>
+          </button>
         </div>
       </div>
 
