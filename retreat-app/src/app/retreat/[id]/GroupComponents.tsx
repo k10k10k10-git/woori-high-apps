@@ -422,37 +422,43 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
 
         return (
           <>
-            <div className="min-h-8 border-t border-slate-100 pt-2 space-y-2"
+            <div className="min-h-8 border-t border-slate-100 pt-2"
               onDragOver={e => e.preventDefault()}
             >
               {sortedClasses.length === 0 && unknownIds.length === 0 && (
                 <p className="text-xs text-slate-300 py-1">여기에 드래그하세요</p>
               )}
-              {sortedClasses.map(classKey => {
-                const [gradeStr, classNumStr] = classKey.split("-");
-                const teacher = classTeacherMap.get(classKey);
-                const sids = classBuckets.get(classKey) || [];
-                const isEven = parseInt(classNumStr) % 2 === 0;
-                return (
-                  <div key={classKey}>
-                    <div className="flex items-center gap-1 mb-1">
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isEven ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
-                        {gradeStr}학년 {classNumStr}반
-                      </span>
-                      {teacher && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${TEACHER_STATUS_CLS[teacher.status] || "bg-slate-50 text-slate-500 border-slate-200"}`}>
-                          {teacher.name}{teacher.status !== "전참" ? ` (${teacher.status})` : ""}
+              {/* 학교 자리표처럼 반마다 하나의 분단(열) — 반이 좌우로 나란히, 학생은 그 아래 세로 한 줄 */}
+              <div className="grid grid-cols-2 gap-x-3 gap-y-3 items-start">
+                {sortedClasses.map(classKey => {
+                  const [gradeStr, classNumStr] = classKey.split("-");
+                  const teacher = classTeacherMap.get(classKey);
+                  const sids = classBuckets.get(classKey) || [];
+                  const isEven = parseInt(classNumStr) % 2 === 0;
+                  return (
+                    <div key={classKey} className="min-w-0">
+                      <div className="flex items-center gap-1 mb-1 flex-wrap">
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isEven ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
+                          {gradeStr}학년 {classNumStr}반
                         </span>
-                      )}
+                        {teacher && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${TEACHER_STATUS_CLS[teacher.status] || "bg-slate-50 text-slate-500 border-slate-200"}`}>
+                            {teacher.name}{teacher.status !== "전참" ? ` (${teacher.status})` : ""}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {sids.map(sid => <StudentChipInner key={sid} sid={sid} />)}
+                      </div>
                     </div>
-                    {/* 학교 자리표처럼 반별로 2열(분단) 세로 배치 — 왼쪽 줄/오른쪽 줄로 채움 */}
-                    <div className="grid grid-cols-2 gap-1">
-                      {sids.map(sid => <StudentChipInner key={sid} sid={sid} />)}
-                    </div>
-                  </div>
-                );
-              })}
-              {unknownIds.map(sid => <StudentChipInner key={sid} sid={sid} />)}
+                  );
+                })}
+              </div>
+              {unknownIds.length > 0 && (
+                <div className="flex flex-col gap-1 mt-2">
+                  {unknownIds.map(sid => <StudentChipInner key={sid} sid={sid} />)}
+                </div>
+              )}
             </div>
             <div className="text-xs text-slate-400 mt-1.5 text-right">
               {(() => {
