@@ -54,6 +54,12 @@ export async function getPartialAttendances(retreatId: string): Promise<PartialA
     .filter(r => r.type === "선복귀" || r.type === "후발대");
 }
 
+export function subscribeToPartialAttendances(retreatId: string, callback: (list: PartialAttendance[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.partialAttendances(retreatId)),
+    (snap) => callback(snapToList<PartialAttendance>(snap).filter(r => r.type === "선복귀" || r.type === "후발대")),
+    (error) => { console.warn("subscribeToPartialAttendances error:", error); onError?.(error); });
+}
+
 export async function savePartialAttendance(retreatId: string, studentKey: string, data: Omit<PartialAttendance, "id">): Promise<string> {
   await set(ref(db, paths.partialAttendance(retreatId, studentKey)), stripUndefined({
     type: data.type,

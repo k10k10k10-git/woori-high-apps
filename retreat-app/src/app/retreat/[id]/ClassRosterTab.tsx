@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
-import { Retreat, Participant } from "@/lib/types";
+import { Retreat, Participant, PartialAttendance } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
-import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear } from "@/lib/db";
+import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear, getPartialAttendances, subscribeToPartialAttendances } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { parseClassKey } from "@/lib/classKey";
+import { resolveEffectiveColor } from "@/lib/rosterColor";
 
 interface StudentInfo {
   id: string;
@@ -57,21 +58,32 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [bu, setBu] = useState<BuTab>("1부");
   const [cellColors, setCellColorsState] = useState<Record<string, string>>({});
+  // 부분참(선복귀/후발대) 지정 — 부분참석 탭이 partialAttendances에 기록. 키는 cellColors와 동일한 "${buNum}_${studentId}".
+  const [partialMap, setPartialMap] = useState<Map<string, PartialAttendance["type"]>>(new Map());
   const [pickerKey, setPickerKey] = useState<string | null>(null);
   const autoSyncedRef = useRef(false);
+
+  // partialAttendances 목록 → key→type 맵
+  const buildPartialMap = (list: PartialAttendance[]): Map<string, PartialAttendance["type"]> => {
+    const m = new Map<string, PartialAttendance["type"]>();
+    list.forEach(r => { if (r.id && (r.type === "선복귀" || r.type === "후발대")) m.set(r.id, r.type); });
+    return m;
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const [classesRaw, partsMap, colors, existingCancellations] = await Promise.all([
+      const [classesRaw, partsMap, colors, existingCancellations, partials] = await Promise.all([
         getClassesByYear(retreat.year),
         getParticipants(retreat.id),
         getCellColors(retreat.id),
         getCancellations(retreat.id),
+        getPartialAttendances(retreat.id),
       ]);
       setParticipants(Object.values(partsMap));
       setCellColorsState(colors);
+      setPartialMap(buildPartialMap(partials));
 
       const infos: ClassInfo[] = [];
       Object.entries(classesRaw).forEach(([classKey, cd]) => {
@@ -121,7 +133,10 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     const unsubParts = subscribeToParticipants(retreat.id, (parts) => {
       setParticipants(Object.values(parts));
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
-    return () => { unsubColors(); unsubParts(); };
+    const unsubPartial = subscribeToPartialAttendances(retreat.id, (list) => {
+      setPartialMap(buildPartialMap(list));
+    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    return () => { unsubColors(); unsubParts(); unsubPartial(); };
   }, [load, retreat.id]);
 
   // 선택한 부의 클래스만
@@ -288,13 +303,19 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     { total: 0, matched: 0, male: 0, female: 0 }
   ), [uniqueParts]);
 
-  // 색상별 인원 (입금완료/부분참/신청취소/잔여) — cellColors 실시간 반영
+  // 표시용 실효 색상: 빨강(취소)이 최우선, 그다음 부분참(선복귀/후발대) 지정이 있으면 주황,
+  // 아니면 수동 지정 색(cellColors). 부분참석 탭의 지정을 신청자 취합 화면·집계·인쇄에 함께 반영한다.
+  const effectiveColorOf = useCallback((colorKey: string): CellColor | undefined => {
+    return resolveEffectiveColor(cellColors[colorKey] as CellColor | undefined, partialMap.has(colorKey));
+  }, [cellColors, partialMap]);
+
+  // 색상별 인원 (입금완료/부분참/신청취소/잔여) — cellColors + 부분참 지정 실시간 반영
   // 후기 신청자(색칠된 비참가자)도 포함
   const colorStats = useMemo(() => {
     const buNum = bu === "1부" ? 1 : 2;
     let formBlue = 0, formOrange = 0, formRed = 0;
     participantByStudentId.forEach((_, studentId) => {
-      const color = cellColors[`${buNum}_${studentId}`];
+      const color = effectiveColorOf(`${buNum}_${studentId}`);
       if (color === "blue") formBlue++;
       else if (color === "orange") formOrange++;
       else if (color === "red") formRed++;
@@ -302,7 +323,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     let lateBlue = 0, lateOrange = 0, lateParticipant = 0;
     allStudents.forEach(s => {
       if (participantByStudentId.has(s.id)) return;
-      const color = cellColors[`${buNum}_${s.id}`];
+      const color = effectiveColorOf(`${buNum}_${s.id}`);
       if (color === "blue") lateBlue++;
       else if (color === "orange") lateOrange++;
       else if (color === "green" || color === "purple") lateParticipant++;
@@ -318,7 +339,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       lateCount,
       total,
     };
-  }, [participantByStudentId, allStudents, uniqueParts, cellColors, bu]);
+  }, [participantByStudentId, allStudents, uniqueParts, effectiveColorOf, bu]);
 
   async function setColorDirectly(
     buNum: number, studentId: string, studentName: string,
@@ -369,7 +390,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
 
   function getStatus(buNum: number, studentId: string, isParticipant: boolean): string {
     const key = `${buNum}_${studentId}`;
-    const color = cellColors[key];
+    const color = effectiveColorOf(key);
     if (color === "blue") return "입금완료";
     if (color === "orange") return "부분참";
     if (color === "red") return "신청취소";
@@ -429,7 +450,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
         const isParticipant = participantByStudentId.has(student.id);
         const isMismatch = mismatchedStudentIds.has(student.id);
         const colorKey = `${cls.buNum}_${student.id}`;
-        const color = cellColors[colorKey] as CellColor | undefined;
+        const color = effectiveColorOf(colorKey);
         const bg = color === "blue"   ? "#bfdbfe"
                  : color === "orange" ? "#fed7aa"
                  : color === "red"    ? "#fecaca"
@@ -500,7 +521,8 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     const isParticipant = participantByStudentId.has(student.id);
     const isMismatch = mismatchedStudentIds.has(student.id);
     const colorKey = `${cls.buNum}_${student.id}`;
-    const color = cellColors[colorKey] as CellColor | undefined;
+    const color = effectiveColorOf(colorKey);
+    const partialType = partialMap.get(colorKey); // 선복귀/후발대 — title 안내용
     const isCandidate = !isMismatch && mismatchCandidateIds.has(student.id);
     const cellClass = color
       ? COLOR_CLASSES[color]
@@ -510,7 +532,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
           ? `${cellActive} cursor-pointer`
           : "border-slate-100 text-slate-600 cursor-pointer hover:bg-slate-50";
     const titleText = color
-      ? `${student.name} [${COLOR_LABELS[color]}] (클릭하여 변경)`
+      ? `${student.name} [${COLOR_LABELS[color]}${color === "orange" && partialType ? ` · ${partialType}` : ""}] (클릭하여 변경)`
       : isMismatch
         ? `${student.name} ⚠ 신청서 불일치 — 클릭하여 색 지정`
       : isCandidate
