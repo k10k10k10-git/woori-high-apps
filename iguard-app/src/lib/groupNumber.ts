@@ -17,3 +17,22 @@ export function groupDisplayName(group: Group, groups: Group[]): string {
   }
   return `${local}조`;
 }
+
+/**
+ * 조 목록을 이름의 숫자 기준 오름차순으로 정렬(1조, 2조, 3조 … 순, 행정 앱과 동일 규칙).
+ * localeCompare 문자열 정렬은 "10조" < "1조"로 취급해(자릿수 비교라) 10·11·12조가 1조보다 앞에 오는
+ * 문제가 있었다 — 숫자를 뽑아 수치 비교한다. 숫자가 없는 커스텀 이름은 숫자 조들 뒤에 이름순으로 붙인다.
+ */
+export function sortGroupsByNumber<T extends { name: string }>(groups: T[]): T[] {
+  const numOf = (g: T): number | null => {
+    const m = g.name.match(/^\s*(\d+)\s*조?\s*$/);
+    return m ? parseInt(m[1]) : null;
+  };
+  return [...groups].sort((a, b) => {
+    const an = numOf(a), bn = numOf(b);
+    if (an !== null && bn !== null) return an - bn;
+    if (an !== null) return -1;
+    if (bn !== null) return 1;
+    return a.name.localeCompare(b.name, "ko");
+  });
+}

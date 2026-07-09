@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { Group, IguardStaff, Student, TeacherAttendance } from "@/lib/types";
 import { setIguardGroupStaff, updateIguardGroupStaffEntries } from "@/lib/db";
-import { groupDisplayName } from "@/lib/groupNumber";
+import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { useUI } from "@/context/UIContext";
 
 interface Props {
@@ -62,10 +62,12 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
     return m;
   }, [adminTeachers]);
 
-  const sortedGroups = useMemo(
-    () => [...groups].sort((a, b) => (a.bu || "").localeCompare(b.bu || "", "ko") || a.name.localeCompare(b.name, "ko")),
-    [groups]
-  );
+  const sortedGroups = useMemo(() => {
+    const bu1 = sortGroupsByNumber(groups.filter(g => g.bu === "1부"));
+    const bu2 = sortGroupsByNumber(groups.filter(g => g.bu === "2부"));
+    const others = sortGroupsByNumber(groups.filter(g => g.bu !== "1부" && g.bu !== "2부"));
+    return [...bu1, ...bu2, ...others];
+  }, [groups]);
   const staffById = useMemo(() => new Map(staff.map(s => [s.id, s])), [staff]);
   // 스탭 풀: 조스탭 예외 인력(행정/이가드/삼별초 등) 제외
   const assignableStaff = useMemo(() => staff.filter(s => !isGroupStaffException(s)), [staff]);
