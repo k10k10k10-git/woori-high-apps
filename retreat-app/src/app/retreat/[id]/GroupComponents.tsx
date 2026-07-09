@@ -242,8 +242,12 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
           <span className={`tag ${group.bu === "1부" ? "tag-green" : "tag-purple"} text-[10px]`}>{group.bu}</span>
         </div>
         <div className="flex gap-1">
-          <button onClick={toggleEditing} className="text-slate-400 hover:text-blue-500 text-xs" aria-label="조 편집">✏</button>
-          <button onClick={onRemoveGroup} className="text-slate-400 hover:text-red-500 text-xs" aria-label="조 삭제">×</button>
+          <button onClick={toggleEditing}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50 text-base transition-colors"
+            aria-label="조 편집">✏</button>
+          <button onClick={onRemoveGroup}
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 text-lg leading-none transition-colors"
+            aria-label="조 삭제">×</button>
         </div>
       </div>
 
