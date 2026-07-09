@@ -52,8 +52,15 @@
 | `retreats/{id}/onSiteReg` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/participantsBackups` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/syncMeta` | 행정 | - | 행정만 | 없음 |
-| `retreats/{id}/periods` | 행정(추정) | 이가드 | 행정(추정) | 이가드 교시 표시 |
+| `retreats/{id}/periods` | 행정 | 이가드 | 행정만 | 이가드 홈 기간 표시·수련회 정렬 |
+| `retreats/{id}/mealCount` | 행정 | - | 행정만 | 없음 (식수 계산) |
+| `retreats/{id}/tshirtOrders` | 행정 | - | 행정만 | 없음 (단체티 신청) |
+| `retreats/{id}/groupsBackups` | 행정 | - | 행정만 | 없음 (groups 전체 덮어쓰기 직전 롤링 백업) |
+| `retreats/{id}/roomsBackups` | 행정 | - | 행정만 | 없음 (rooms 전체 덮어쓰기 직전 롤링 백업) |
 | `retreatsPrivate/{id}/cancellations` | 행정 | - | 행정만 | 없음 (민감정보) |
+| `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |
+| `retreatsPrivate/{id}/medicalLogs` | 행정 | - | 행정만 | 없음 (민감정보) |
+| `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
 | `retreatAdmins` | 행정 | 이가드 | 행정만 | 이가드 관리자 인증 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
@@ -71,8 +78,8 @@
 | `retreats/{id}/iguard/groupStaff` | 이가드 | **행정** | 이가드만 | **행정 GroupsTab 조스탭 표시** |
 | `retreats/{id}/iguard/cueSheet` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/guide` | 이가드 | - | 이가드만 | 없음 |
-| `retreats/{id}/milestones` | 공유 | - | 행정+이가드 | 마일스톤 표시 |
-| `prepMilestones` | 이가드 | - | 이가드+행정 | 준비 마일스톤 |
+| `retreats/{id}/milestones` | (레거시) | - | 없음 | **미사용** — 전역 `prepMilestones`로 이관됨(코드에 쓰기 함수 없음) |
+| `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 (유일한 공유 쓰기 노드) |
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |
 | `iguardMembers` | 이가드 | - | 이가드만 | 이가드 멤버 인증 |
 | `iguardRoles` | 이가드 | - | 이가드만 | 이가드 권한 분류 |
