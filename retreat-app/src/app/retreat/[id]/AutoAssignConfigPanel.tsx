@@ -499,10 +499,11 @@ export default function AutoAssignConfigPanel({
             </div>
           ))}
         </div>
-        {/* 반A — 부서·학년·반 (3개 동일 폭) */}
-        <div className="flex gap-1 mb-1">
+        {/* 반A/반B — 부서·학년·반·(추가버튼) 4트랙 grid로 두 줄 폭을 고정 통일
+            (각 줄을 독립 flex로 두면 B줄만 버튼 때문에 select가 좁아져 A줄과 어긋난다) */}
+        <div className="grid gap-1 mb-1" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
             value={newCC.a.bu}
             onChange={e => setNewCC(p => ({ ...p, a: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
@@ -510,24 +511,25 @@ export default function AutoAssignConfigPanel({
             <option value="2부">2부</option>
           </select>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
             value={newCC.a.grade}
             onChange={e => setNewCC(p => ({ ...p, a: { ...p.a, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCC.a.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
             value={newCC.a.cls}
             onChange={e => setNewCC(p => ({ ...p, a: { ...p.a, cls: e.target.value } }))}>
             <option value="">반A</option>
             {getClasses(newCC.a.bu, newCC.a.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
           </select>
+          {/* 4번째 트랙 폭 확보용 빈 칸 (B줄 버튼과 같은 폭) */}
+          <div />
         </div>
-        {/* 반B — 부서·학년·반 (3개 동일 폭) */}
-        <div className="flex gap-1 items-stretch">
+        <div className="grid gap-1 items-stretch" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
             value={newCC.b.bu}
             onChange={e => setNewCC(p => ({ ...p, b: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
@@ -535,21 +537,21 @@ export default function AutoAssignConfigPanel({
             <option value="2부">2부</option>
           </select>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
             value={newCC.b.grade}
             onChange={e => setNewCC(p => ({ ...p, b: { ...p.b, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCC.b.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
           <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 flex-1 basis-0"
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
             value={newCC.b.cls}
             onChange={e => setNewCC(p => ({ ...p, b: { ...p.b, cls: e.target.value } }))}>
             <option value="">반B</option>
             {getClasses(newCC.b.bu, newCC.b.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
           </select>
           <button onClick={addCC} disabled={!ccKey(newCC.a) || !ccKey(newCC.b) || ccKey(newCC.a) === ccKey(newCC.b)}
-            className="btn-secondary btn-sm text-xs px-2 shrink-0 disabled:opacity-40">추가</button>
+            className="btn-secondary btn-sm text-xs px-1 disabled:opacity-40 w-full">추가</button>
         </div>
       </div>
 
