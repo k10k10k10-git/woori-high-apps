@@ -8,20 +8,15 @@ import FairAssignButton from "./FairAssignButton";
 
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const SLOT_LABELS = ["아침", "점심", "저녁", "야식"] as const;
-const EMPTY = { label: "", day: 1, slot: 1, weight: 1 };
+const EMPTY = { label: "", day: 1, slot: 1 };
 type PinnedInputs = Record<string, string>;
-const WEIGHT_PRESETS = [
-  { label: "기본", value: 1 },
-  { label: "저녁 중요", value: 1.5 },
-  { label: "매우 중요", value: 2 },
-];
 
 export default function MealsView({ retreatId, meals, groups, seatings }: { retreatId: string; meals: IguardMeal[]; groups: Group[]; seatings: IguardSeating[] }) {
   const { toast, uiConfirm } = useUI();
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ label: string; day: number; slot: number; weight: number }>(EMPTY);
+  const [form, setForm] = useState<{ label: string; day: number; slot: number }>(EMPTY);
   const [pinnedInputs, setPinnedInputs] = useState<PinnedInputs>({});
 
   async function savePinnedFront(meal: IguardMeal, value: string) {
@@ -45,7 +40,7 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
   }
   async function saveMeal() {
     if (!form.label.trim()) return toast("식사 이름을 입력해주세요.", "warning");
-    const payload = { ...form, weight: form.weight > 0 ? form.weight : null };
+    const payload = { ...form };
     try {
       if (editId) await updateIguardMeal(retreatId, editId, payload);
       else await saveIguardMeal(retreatId, { ...payload, entries: [] });
@@ -76,26 +71,10 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                 <div><label className="text-sm font-medium text-slate-600 block mb-1">일자</label>
                   <select className="input" value={form.day} onChange={e => setForm(p => ({ ...p, day: parseInt(e.target.value) }))}>{[1, 2, 3].map(d => <option key={d} value={d}>{d}일차</option>)}</select></div>
                 <div><label className="text-sm font-medium text-slate-600 block mb-1">끼니</label>
-                  <select className="input" value={form.slot} onChange={e => { const slot = parseInt(e.target.value); setForm(p => ({ ...p, slot, label: p.label || `${p.day}일차 ${SLOT_LABELS[slot]}`, weight: p.weight === 1 && slot === 2 ? 1.5 : p.weight })); }}>{SLOT_LABELS.map((s, i) => <option key={s} value={i}>{s}</option>)}</select></div>
+                  <select className="input" value={form.slot} onChange={e => { const slot = parseInt(e.target.value); setForm(p => ({ ...p, slot, label: p.label || `${p.day}일차 ${SLOT_LABELS[slot]}` })); }}>{SLOT_LABELS.map((s, i) => <option key={s} value={i}>{s}</option>)}</select></div>
               </div>
               <div><label className="text-sm font-medium text-slate-600 block mb-1">표시 이름</label>
                 <input className="input" placeholder="예: 토요일 점심" value={form.label} onChange={e => setForm(p => ({ ...p, label: e.target.value }))} /></div>
-              <div><label className="text-sm font-medium text-slate-600 block mb-1">앞순서 효용 가중치</label>
-                <input className="input" type="number" min={0.1} step={0.1} value={form.weight} onChange={e => setForm(p => ({ ...p, weight: Number(e.target.value) || 1 }))} />
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {WEIGHT_PRESETS.map(preset => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setForm(p => ({ ...p, weight: preset.value }))}
-                      className={`rounded-full border px-2.5 py-1 text-xs ${form.weight === preset.value ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700" : "border-slate-200 bg-white text-slate-500"}`}
-                    >
-                      {preset.label} {preset.value}
-                    </button>
-                  ))}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">저녁처럼 앞순서 체감 효용이 큰 끼니는 값을 높이면 공정배정 점수에 더 크게 반영됩니다.</p>
-              </div>
             </div>
             <div className="flex gap-2 mt-5"><button onClick={saveMeal} className="btn-primary flex-1 justify-center">저장</button>
               <button onClick={() => { setShow(false); setEditId(null); }} className="btn-secondary flex-1 justify-center">취소</button></div>
@@ -115,9 +94,8 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                   <h3 className="font-semibold text-slate-700 flex items-center gap-2 flex-wrap">
                     <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-600">{meal.day}일차 {SLOT_LABELS[meal.slot]}</span>
                     <span>{meal.label}</span>
-                    <span className="px-2 py-0.5 rounded text-xs bg-slate-100 text-slate-500">앞순서 효용 {meal.weight ?? 1}</span>
                   </h3>
-                  <div className="flex gap-2"><button onClick={() => { setForm({ label: meal.label, day: meal.day, slot: meal.slot, weight: meal.weight ?? 1 }); setEditId(meal.id); setShow(true); }} className="text-xs text-slate-400 hover:text-fuchsia-600">수정</button>
+                  <div className="flex gap-2"><button onClick={() => { setForm({ label: meal.label, day: meal.day, slot: meal.slot }); setEditId(meal.id); setShow(true); }} className="text-xs text-slate-400 hover:text-fuchsia-600">수정</button>
                     <button onClick={() => delMeal(meal)} className="text-xs text-slate-300 hover:text-red-400">삭제</button></div>
                 </div>
                 <div className="px-4 py-2.5 bg-white border-b border-slate-100 flex items-center gap-2">

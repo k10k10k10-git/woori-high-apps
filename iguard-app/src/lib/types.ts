@@ -112,7 +112,7 @@ export interface IguardMeal {
   label: string;   // 예: "토요일 점심"
   day: number;     // 일자 정렬용 (1/2/3)
   slot: number;    // 같은 날 내 끼니 순서 (아침0 점심1 저녁2 야식3)
-  weight?: number | null; // 공정 배정 가중치. 중요한 끼니는 더 크게 줄 수 있음
+  weight?: number | null; // (미사용·하위호환) 예전 '앞순서 효용 가중치'. 평균순위 편차를 키워 공정배정에서 제거됨(fairAssign.ts ⚖ 참조)
   pinnedFront?: string | null; // 이 끼니만 맨 앞 순서로 고정할 조. 예: "1조" 또는 "1조, 3조"(쉼표 순서대로 앞순서)
   entries: IguardMealEntry[];
 }

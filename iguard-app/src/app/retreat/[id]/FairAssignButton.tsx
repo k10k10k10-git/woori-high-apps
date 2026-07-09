@@ -70,7 +70,7 @@ export default function FairAssignButton({ retreatId, groups, meals, seatings }:
             <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
               식사 <strong>{result.counts.meals}</strong>개 · 집회 <strong>{result.counts.seatings}</strong>개 재배정 완료.
               조별 <strong>앞순서 식사 횟수</strong>가 <strong>{minF}~{maxF}회</strong>로 균등하고, <strong>평균 순위</strong>도 조마다 비슷합니다.
-              (식사 앞순서 효용 가중치와 집회 열별 점수를 함께 반영합니다)
+              (식사는 평균 순위가 고르도록 모든 끼니를 동등하게 배분하고, 집회 앞자리를 받은 조는 밥에서 뒤로 밀려 연계됩니다)
             </div>
             <table className="w-full text-sm">
               <thead><tr className="table-header">

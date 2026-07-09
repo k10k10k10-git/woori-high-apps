@@ -69,6 +69,32 @@ describe("computeFairAssignment — 맨앞 고정 조 (pinnedFront)", () => {
   });
 });
 
+describe("computeFairAssignment — 식사 평균순위 균등화(하이브리드 A)", () => {
+  const four: Group[] = [makeGroup("g1", "1조"), makeGroup("g2", "2조"), makeGroup("g3", "3조"), makeGroup("g4", "4조")];
+  const seqOf = (res: ReturnType<typeof computeFairAssignment>) =>
+    res.meals.map(m => [...m.entries].sort((a, b) => a.seq - b.seq).map(e => e.groupId));
+
+  it("끼니 가중치는 식사 순서에 영향을 주지 않는다 (가중치 유무 결과 동일)", () => {
+    // 무거운 첫 끼니(weight 5)가 있어도, 가중치 없는 배정과 식사 순서가 같아야 한다.
+    const weighted: IguardMeal[] = [
+      { ...makeMeal("m1"), slot: 0, weight: 5 },
+      { ...makeMeal("m2"), slot: 1, weight: 1 },
+      { ...makeMeal("m3"), slot: 2, weight: 1 },
+    ];
+    const flat: IguardMeal[] = weighted.map(m => ({ ...m, weight: 1 }));
+    expect(seqOf(computeFairAssignment(four, weighted, [], 0)))
+      .toEqual(seqOf(computeFairAssignment(four, flat, [], 0)));
+  });
+
+  it("집회 앞자리를 받은 조는 이어지는 식사에서 뒤로 밀린다 (집회↔식사 연계 유지)", () => {
+    const seat: IguardSeating = { ...makeSeating("s1", "2조"), day: 1, order: 0 }; // 2조를 앞 구역 고정
+    const meal: IguardMeal = { ...makeMeal("m1"), day: 1, slot: 1 };               // 집회 다음에 진행
+    const r = computeFairAssignment(groups, [meal], [seat], 0);
+    const mealFront = r.meals[0].entries.find(e => e.seq === 0);
+    expect(mealFront?.groupId).not.toBe("g2"); // 집회 앞을 받았으니 밥 맨 앞은 아님
+  });
+});
+
 function zonesOf(names: string[]): IguardSeatingZone[] {
   return names.map(name => ({ name, groupIds: [] }));
 }

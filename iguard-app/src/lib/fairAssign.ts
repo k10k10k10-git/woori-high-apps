@@ -10,6 +10,12 @@ import { groupDisplayName } from "./groupNumber";
 //   - 좋은 자리를 받으면 점수가 오른다 → 다음엔 뒤로 밀린다.
 //   - 식사·집회 점수를 공유하므로 "집회 앞자리 받으면 밥은 뒷순서"가 자연히 성립.
 // 시간순(일자·끼니/순서)으로 전 세션을 처리해 전체를 균등화.
+//
+// ⚖ 식사 평균순위 균등화(하이브리드 A): 식사의 혜택 점수는 끼니 가중치(meal.weight)를 곱하지 않고
+//   순위 노출(앞=1, 뒤=0)만 더한다. 가중치를 곱하면 "저녁(1.5) 앞자리 한 번 = 가벼운 끼니 여러 번 뒤"로
+//   교환돼 평균 '순위'가 조마다 크게 벌어졌다(9.4~14.8 실측). 가중치를 빼면 모든 끼니의 앞순서 노출이
+//   동일하게 균등화돼 평균순위 편차가 준다. 집회 점수는 그대로 더해지므로(아래) 집회↔식사 연계는 유지된다.
+//   (meal.weight 필드는 데이터 하위호환으로 남기되 식사 순서 계산엔 쓰지 않는다.)
 // ════════════════════════════════════════════════════════════
 
 export interface FairResult {
@@ -184,7 +190,6 @@ export function computeFairAssignment(groups: Group[], meals: IguardMeal[], seat
 
     if (item.kind === "meal") {
       const meal = item.ref as IguardMeal;
-      const mealWeight = meal.weight && meal.weight > 0 ? meal.weight : 1;
       const finalOrder = applyPinnedFront(ordered, parsePinnedFront(meal.pinnedFront, groups));
       const prevRound = new Map((meal.entries || []).map(e => [e.groupId, e.round]));
       const entries: IguardMealEntry[] = finalOrder.map((g, i) => {
@@ -194,7 +199,8 @@ export function computeFairAssignment(groups: Group[], meals: IguardMeal[], seat
       mealsOut.push({ id: meal.id, entries });
       const t1 = N / 3, t2 = (2 * N) / 3; // 앞/중간/뒤 3구간 경계
       finalOrder.forEach((g, i) => {
-        score.set(g.id, score.get(g.id)! + (N > 1 ? (N - 1 - i) / (N - 1) : 1) * mealWeight); // 앞=1, 뒤=0
+        // 끼니 가중치를 곱하지 않는다(위 ⚖ 주석) — 앞=1, 뒤=0의 순위 노출만 균등 누적
+        score.set(g.id, score.get(g.id)! + (N > 1 ? (N - 1 - i) / (N - 1) : 1));
         if (i < t1) mealFront.set(g.id, mealFront.get(g.id)! + 1);
         else if (i < t2) mealMid.set(g.id, mealMid.get(g.id)! + 1);
         else mealBack.set(g.id, mealBack.get(g.id)! + 1);
