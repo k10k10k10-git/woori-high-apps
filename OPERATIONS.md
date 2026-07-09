@@ -24,10 +24,10 @@ npx vercel --prod
 - 또는 로컬 빌드 후 배포: `npx vercel build --yes --prod && npx vercel deploy --prebuilt --prod --yes`
 - 배포 URL: https://retreat-app-theta.vercel.app
 - GitHub 연동: main 브랜치 머지 시 자동 배포 설정 (Root Directory: `retreat-app`)
-  ⚠ **2026-07-06 기준 retreat-app은 git push 후 자동배포가 트리거되지 않는 사례가 반복됨**(iguard-app은 정상).
-  push 후 반드시 `npx vercel ls`로 새 배포가 잡혔는지 확인하고, 안 잡혔으면 위 `npx vercel --prod`로 수동 배포할 것.
-  (수동 배포 시 Root Directory가 `retreat-app`이라 레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사해 실행 →
-  작업 후 임시 `.vercel/` 삭제. 상세: retreat-app/CLAUDE.md 배포 섹션.)
+  ✅ **자동배포 정상 (2026-07-08 확인)** — 07-06의 "push해도 배포가 안 잡힌다" 이슈는 07-06 `git connect`+Root Directory 세팅 전 증상이었고, 세팅 이후 모든 push가 정상 자동 배포됨(Vercel API 배포 이력으로 검증).
+  push 후 `npx vercel ls`로 Ready 확인은 계속 할 것. 만약 다시 트리거가 안 되면 비상 폴백:
+  레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사해 `npx vercel --prod`로 수동 배포 →
+  작업 후 임시 `.vercel/` 삭제. (상세: retreat-app/CLAUDE.md 배포 섹션)
   ⚠ 폴더명에 공백이 있으면 Git 배포 시 서버리스 함수 이름 검증에 걸려 실패한다(로컬 CLI 배포는 영향 없음) —
   그래서 폴더명을 영문/공백없음으로 유지해야 한다.
 
