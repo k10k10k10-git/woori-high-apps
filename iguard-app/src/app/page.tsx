@@ -83,7 +83,7 @@ export default function HomePage() {
       setMilestones([]);
       return;
     }
-    const u = subscribeToMilestones(setMilestones);
+    const u = subscribeToMilestones(setMilestones, e => setLoadError(prev => prev ?? `준비 일정 구독 실패 — ${e.message}`));
     return () => u();
   }, [user, accessLevel]);
 

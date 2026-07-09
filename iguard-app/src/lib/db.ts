@@ -151,13 +151,14 @@ export function subscribeToAllRetreatPeriods(
 //    행정·이가드 홈 캘린더 + 이가드 준비할일이 한 노드를 공유.
 const GLOBAL_MILESTONES_PATH = paths.prepMilestones();
 
-export function subscribeToMilestones(cb: (milestones: Milestone[]) => void): () => void {
+export function subscribeToMilestones(cb: (milestones: Milestone[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(
     ref(db, GLOBAL_MILESTONES_PATH),
     (snap) => cb(snapToList<Milestone>(snap).sort((a, b) => a.targetDate.localeCompare(b.targetDate))),
     (error) => {
       console.warn(`Failed to subscribe ${GLOBAL_MILESTONES_PATH}:`, error);
       cb([]);
+      onError?.(error);
     }
   );
 }

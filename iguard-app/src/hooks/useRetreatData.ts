@@ -116,7 +116,7 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToIguardMovements(id, value => { setMovements(value); ready("movements"); }, fail("movements")),
       subscribeToIguardBuses(id, value => { setBuses(value); ready("buses"); }, fail("buses")),
       subscribeToIguardSeating(id, value => { setSeating(value); ready("seating"); }, fail("seating")),
-      subscribeToMilestones(value => { setTodos(value); ready("todos"); }),
+      subscribeToMilestones(value => { setTodos(value); ready("todos"); }, fail("todos")),
       subscribeToIguardGuide(id, value => { setGuide(value); ready("guide"); }, fail("guide")),
       subscribeToRetreatPeriods(id, value => { setPeriods(value); ready("periods"); }, fail("periods")),
       subscribeToIguardAttendance(id, (value, info) => { setAttendanceKeys(value); setAttendanceInfo(info); ready("attendance"); }, fail("attendance")),
