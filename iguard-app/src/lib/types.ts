@@ -73,6 +73,7 @@ export interface Group {
 
 export interface Room {
   id: string;
+  dong?: string;       // 동/건물 (숙소 건물 여러 개 — 행정에서 기록, 없으면 단일 건물)
   roomNumber: string;
   capacity: number;
   type: string;        // "남" | "여"

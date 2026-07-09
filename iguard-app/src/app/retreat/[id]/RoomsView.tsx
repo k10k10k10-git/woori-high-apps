@@ -7,6 +7,8 @@ import { groupDisplayName } from "@/lib/groupNumber";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
+// 동(건물)이 있으면 "동 호수", 없으면 호수만 — 행정 앱 roomLabel과 동일 규칙
+const roomLabel = (r: Room) => { const d = (r.dong ?? "").trim(); return d ? `${d} ${r.roomNumber}` : r.roomNumber; };
 
 interface RoomChip { roomNumber: string; count: number; }
 interface BusInfo { day: 1 | 3; busNo: number; staff?: string; }
@@ -29,7 +31,7 @@ export default function RoomsView({ groups, rooms, buses, meals, retreatName, ye
         const mine = (r.studentIds || []).filter(id => memberSet.has(id));
         if (mine.length === 0) return;
         mine.forEach(id => assigned.add(id));
-        const chip = { roomNumber: r.roomNumber, count: mine.length };
+        const chip = { roomNumber: roomLabel(r), count: mine.length };
         if ((r.type || "").includes("남")) nam.push(chip);
         else if ((r.type || "").includes("여")) yeo.push(chip);
         else etc.push(chip);
