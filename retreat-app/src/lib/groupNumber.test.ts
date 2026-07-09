@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupDisplayName } from "./groupNumber";
+import { groupDisplayName, sortGroupsByNumber } from "./groupNumber";
 import type { Group } from "./types";
 
 function makeGroup(overrides: Partial<Group> & { id: string; name: string; bu: string }): Group {
@@ -57,5 +57,27 @@ describe("groupDisplayName", () => {
       makeGroup({ id: "b0", name: "1조", bu: "2부" }),
     ];
     expect(groupDisplayName(groups12[12], groups12)).toBe("13조");
+  });
+});
+
+describe("sortGroupsByNumber", () => {
+  it("regression: 저장 순서가 10,11,12,1,2,3이어도 1,2,3,10,11,12로 수치 정렬", () => {
+    const groups: Group[] = [
+      makeGroup({ id: "a", name: "10조", bu: "1부" }),
+      makeGroup({ id: "b", name: "11조", bu: "1부" }),
+      makeGroup({ id: "c", name: "12조", bu: "1부" }),
+      makeGroup({ id: "d", name: "1조", bu: "1부" }),
+      makeGroup({ id: "e", name: "2조", bu: "1부" }),
+    ];
+    expect(sortGroupsByNumber(groups).map(g => g.name)).toEqual(["1조", "2조", "10조", "11조", "12조"]);
+  });
+
+  it("숫자 없는 커스텀 이름은 숫자 조들 뒤에 이름순으로 붙는다", () => {
+    const groups: Group[] = [
+      makeGroup({ id: "a", name: "독수리조", bu: "1부" }),
+      makeGroup({ id: "b", name: "2조", bu: "1부" }),
+      makeGroup({ id: "c", name: "1조", bu: "1부" }),
+    ];
+    expect(sortGroupsByNumber(groups).map(g => g.name)).toEqual(["1조", "2조", "독수리조"]);
   });
 });

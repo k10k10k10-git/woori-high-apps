@@ -17,3 +17,22 @@ export function groupDisplayName(group: Group, groups: Group[]): string {
   }
   return `${local}조`;
 }
+
+/**
+ * 조 목록을 이름의 숫자 기준 오름차순으로 정렬(1조, 2조, 3조 … 순).
+ * 저장 순서(생성 순서)가 뒤섞여 "10조, 11조, 12조, 1조"처럼 보이는 문제를 화면 표시에서만 바로잡는다.
+ * 숫자가 없는 커스텀 이름(예: "독수리조")은 숫자 조들 뒤에 이름순으로 붙인다.
+ */
+export function sortGroupsByNumber<T extends { name: string }>(groups: T[]): T[] {
+  const numOf = (g: T): number | null => {
+    const m = g.name.match(/^\s*(\d+)\s*조?\s*$/);
+    return m ? parseInt(m[1]) : null;
+  };
+  return [...groups].sort((a, b) => {
+    const an = numOf(a), bn = numOf(b);
+    if (an !== null && bn !== null) return an - bn;
+    if (an !== null) return -1;
+    if (bn !== null) return 1;
+    return a.name.localeCompare(b.name, "ko");
+  });
+}

@@ -8,7 +8,7 @@ import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import AutoAssignPanel from "./AutoAssignPanel";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
-import { groupDisplayName } from "@/lib/groupNumber";
+import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -317,7 +317,11 @@ export default function GroupsTab({ retreat }: Props) {
   function exportGroupsXLSX() {
     const studentByName = Object.fromEntries(Object.values(students).map(s => [s.name, s]));
     const rows: Record<string, string | number>[] = [];
-    groups.forEach(g => {
+    const orderedGroups = [
+      ...sortGroupsByNumber(groups.filter(g => g.bu === "1부")),
+      ...sortGroupsByNumber(groups.filter(g => g.bu === "2부")),
+    ];
+    orderedGroups.forEach(g => {
       const jo = groupDisplayName(g, groups);
       (g.teachers || []).forEach(t => {
         rows.push({ "부": g.bu, "조": jo, "역할": "교사", "이름": t, "학년": "", "반": "", "GBS": g.gbs || "" });
@@ -354,7 +358,7 @@ export default function GroupsTab({ retreat }: Props) {
     interface PdfPage { bu: string; pageGroups: Group[]; showBuLabel: boolean; isLast: boolean }
     const pages: PdfPage[] = [];
     buList.forEach(bu => {
-      const bg = groups.filter(g => g.bu === bu);
+      const bg = sortGroupsByNumber(groups.filter(g => g.bu === bu));
       if (!bg.length) return;
       for (let i = 0; i < bg.length; i += 4) {
         pages.push({ bu, pageGroups: bg.slice(i, i + 4), showBuLabel: i === 0, isLast: false });
@@ -604,8 +608,8 @@ export default function GroupsTab({ retreat }: Props) {
     </div>
   );
 
-  const bu1Groups = groups.filter(g => g.bu === "1부");
-  const bu2Groups = groups.filter(g => g.bu === "2부");
+  const bu1Groups = sortGroupsByNumber(groups.filter(g => g.bu === "1부"));
+  const bu2Groups = sortGroupsByNumber(groups.filter(g => g.bu === "2부"));
 
   return (
     <div>
