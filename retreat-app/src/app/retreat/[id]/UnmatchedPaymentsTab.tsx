@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { Retreat, Participant, UnmatchedPayment } from "@/lib/types";
 import { parseClassKey } from "@/lib/classKey";
 import { normalizeName } from "@/lib/studentMatcher";
+import { resolvePaymentColorKey } from "@/lib/paymentColorKey";
 type BuTab = "1부" | "2부";
 import {
   subscribeToParticipants, getClassesByYear, subscribeToCellColors,
@@ -187,8 +188,6 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   const unpaidByBu = useMemo(() => {
     const seen = new Set<string>();
     const result: { pKey: string; p: Participant; buNum: number; status: "none" | "orange" | "blue" | "red" }[] = [];
-    // studentMatcher.stripSuffix와 다름(영문 꼬리 전부 제거) — 통합하지 말 것
-    const strip = (n: string) => n.replace(/[A-Za-z]+$/, "").trim();
 
     Object.entries(participants).forEach(([pKey, p]) => {
       const buNum = p.bu?.includes("1") ? 1 : p.bu?.includes("2") ? 2 : 0;
@@ -199,14 +198,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       if (seen.has(dedupKey)) return;
       seen.add(dedupKey);
 
-      // 색상 키 결정: 이름 매칭 우선, 없으면 studentId fallback
-      const name = p.name;
-      const colorKey =
-        nameToColorKey.get(`${buNum}_${name}`) ??
-        nameToColorKey.get(`${buNum}_${normalizeName(name)}`) ??
-        nameToColorKey.get(`${buNum}_${strip(name)}`) ??
-        nameToColorKey.get(`${buNum}_${normalizeName(strip(name))}`) ??
-        p.studentId ?? null;  // p.studentId는 이미 "${buNum}_${rawId}" 형식
+      const colorKey = resolvePaymentColorKey(p.name, p.studentId, buNum, nameToColorKey);
 
       const color = colorKey ? cellColors[colorKey] : undefined;
 
