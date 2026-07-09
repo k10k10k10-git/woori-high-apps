@@ -96,6 +96,7 @@ export interface CarPool {
 
 export interface Room {
   id: string;
+  dong?: string; // 동/건물 (숙소 건물이 여러 개인 수련회장 — 없으면 단일 건물로 간주)
   roomNumber: string;
   capacity: number;
   type: string; // "남" | "여"

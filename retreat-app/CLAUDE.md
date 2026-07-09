@@ -91,7 +91,7 @@ retreats/
     participantsBackups/  # participants 전체덮어쓰기 직전 롤링 백업 (최근 5개)
     groups/               # 조편성
     groupsBackups/        # groups 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveGroups가 자동 기록
-    rooms/                # 방배정
+    rooms/                # 방배정 (Room: dong?·roomNumber·capacity·type·studentIds·teachers) — dong은 숙소 건물 여러 개일 때만, 없으면 단일 건물. 표시는 lib/roomLabel.ts로 "동 호수" 합성(이가드도 동일 규칙)
     roomsBackups/         # rooms 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveRooms가 자동 기록
     teachers/             # 교사 참석 현황
     carpools/             # 카풀 요청

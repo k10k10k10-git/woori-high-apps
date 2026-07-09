@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
+import { roomLabel } from "@/lib/roomLabel";
 
 interface Props {
   retreat: Retreat;
@@ -41,7 +42,7 @@ export default function RoomsTab({ retreat }: Props) {
   const [dragItem, setDragItem] = useState<string | null>(null);
   const [dragFrom, setDragFrom] = useState<string | null>(null);
   const [showAddRoom, setShowAddRoom] = useState(false);
-  const [newRoom, setNewRoom] = useState({ roomNumber: "", capacity: "4", type: "남" });
+  const [newRoom, setNewRoom] = useState({ dong: "", roomNumber: "", capacity: "4", type: "남" });
   const [genderFilter, setGenderFilter] = useState<string>("전체");
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
 
@@ -271,7 +272,7 @@ export default function RoomsTab({ retreat }: Props) {
       }
     }
     if (targetRoom && (targetRoom.studentIds || []).length >= (targetRoom.capacity ?? 99)) {
-      if (!await uiConfirm(`${targetRoom.roomNumber}호가 정원(${targetRoom.capacity}명)을 초과합니다. 계속할까요?`)) {
+      if (!await uiConfirm(`${roomLabel(targetRoom)}호가 정원(${targetRoom.capacity}명)을 초과합니다. 계속할까요?`)) {
         setDragItem(null);
         setDragFrom(null);
         return;
@@ -307,15 +308,15 @@ export default function RoomsTab({ retreat }: Props) {
     const rows: Record<string, string | number>[] = [];
     rooms.forEach(r => {
       (r.teachers || []).forEach(t => {
-        rows.push({ "방번호": r.roomNumber, "유형": r.type, "정원": r.capacity, "역할": "교사", "이름": t, "부": "", "학년": "", "반": "" });
+        rows.push({ "동": r.dong || "", "방번호": r.roomNumber, "유형": r.type, "정원": r.capacity, "역할": "교사", "이름": t, "부": "", "학년": "", "반": "" });
       });
       (r.studentIds || []).forEach(sid => {
         const s = students[sid];
-        rows.push({ "방번호": r.roomNumber, "유형": r.type, "정원": r.capacity, "역할": "학생", "이름": s?.name || sid, "부": s?.buNum === 1 ? "1부" : s?.buNum === 2 ? "2부" : "", "학년": s ? `${s.grade}학년` : "", "반": s ? `${s.class}반` : "" });
+        rows.push({ "동": r.dong || "", "방번호": r.roomNumber, "유형": r.type, "정원": r.capacity, "역할": "학생", "이름": s?.name || sid, "부": s?.buNum === 1 ? "1부" : s?.buNum === 2 ? "2부" : "", "학년": s ? `${s.grade}학년` : "", "반": s ? `${s.class}반` : "" });
       });
     });
     const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 8 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 10 }, { wch: 6 }, { wch: 8 }, { wch: 6 }];
+    ws["!cols"] = [{ wch: 6 }, { wch: 8 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 10 }, { wch: 6 }, { wch: 8 }, { wch: 6 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "방배정");
     saveWorkbook(wb, `${retreat.name}_방배정`);
@@ -351,7 +352,7 @@ export default function RoomsTab({ retreat }: Props) {
 
         html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;page-break-inside:avoid;font-size:11px">
           <div style="font-weight:700;font-size:13px;margin-bottom:4px">
-            ${escapeHtml(r.roomNumber)}호
+            ${escapeHtml(roomLabel(r))}호
             <span style="font-size:10px;background:#f1f5f9;color:#475569;border-radius:4px;padding:1px 6px;margin-left:4px">${escapeHtml(r.type)}생</span>
             <span style="font-size:10px;color:#94a3b8;margin-left:4px">정원 ${r.capacity}명</span>
           </div>
@@ -381,15 +382,18 @@ export default function RoomsTab({ retreat }: Props) {
 
   function addRoom() {
     const id = `r_${Date.now()}`;
+    const dong = newRoom.dong.trim();
     setRooms(prev => [...prev, {
       id,
+      // 동은 입력했을 때만 저장 — 미입력 시 기존 단일 건물 방과 동일하게 필드 없음
+      ...(dong ? { dong } : {}),
       roomNumber: newRoom.roomNumber,
       capacity: parseInt(newRoom.capacity) || 4,
       type: newRoom.type,
       studentIds: [],
       teachers: [],
     }]);
-    setNewRoom({ roomNumber: "", capacity: "4", type: "남" });
+    setNewRoom({ dong: "", roomNumber: "", capacity: "4", type: "남" });
     setShowAddRoom(false);
     markDirty();
   }
@@ -485,6 +489,8 @@ export default function RoomsTab({ retreat }: Props) {
           <div className="card p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold mb-4">방 추가</h3>
             <div className="space-y-3">
+              <input className="input" placeholder="동/건물 (예: 5동 · 여러 건물일 때만)" value={newRoom.dong}
+                onChange={e => setNewRoom(p => ({...p, dong: e.target.value}))} />
               <input className="input" placeholder="방 호수 (예: 5012호)" value={newRoom.roomNumber}
                 onChange={e => setNewRoom(p => ({...p, roomNumber: e.target.value}))} />
               <select className="input" value={newRoom.type}
@@ -732,7 +738,7 @@ function RoomCard({ room, students, cellColors, onDrop, onDragStart, onRemoveStu
     >
       <div className="flex items-center justify-between mb-2">
         <div>
-          <span className="font-bold text-slate-800">{room.roomNumber}</span>
+          <span className="font-bold text-slate-800">{roomLabel(room)}</span>
           <span className={`tag ${room.type === "남" ? "tag-blue" : "tag-red"} ml-1.5 text-[10px]`}>{room.type}</span>
         </div>
         <div className="flex items-center gap-1">
