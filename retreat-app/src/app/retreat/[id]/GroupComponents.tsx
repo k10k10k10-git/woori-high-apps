@@ -445,7 +445,8 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1">
+                    {/* 학교 자리표처럼 반별로 2열(분단) 세로 배치 — 왼쪽 줄/오른쪽 줄로 채움 */}
+                    <div className="grid grid-cols-2 gap-1">
                       {sids.map(sid => <StudentChipInner key={sid} sid={sid} />)}
                     </div>
                   </div>
