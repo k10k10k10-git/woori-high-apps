@@ -437,17 +437,18 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                   const isEven = parseInt(classNumStr) % 2 === 0;
                   return (
                     <div key={classKey} className="min-w-0">
-                      <div className="flex items-center gap-1 mb-1 flex-wrap">
+                      <div className="mb-1">
                         <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${isEven ? "bg-pink-50 text-pink-600" : "bg-blue-50 text-blue-600"}`}>
                           {gradeStr}학년 {classNumStr}반
                         </span>
+                      </div>
+                      {/* 교사도 학생과 통일성 있게 반 라벨 아래 세로 줄 맨 위에 배치 */}
+                      <div className="flex flex-col gap-1 items-start">
                         {teacher && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${TEACHER_STATUS_CLS[teacher.status] || "bg-slate-50 text-slate-500 border-slate-200"}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded border ${TEACHER_STATUS_CLS[teacher.status] || "bg-slate-50 text-slate-500 border-slate-200"}`}>
                             {teacher.name}{teacher.status !== "전참" ? ` (${teacher.status})` : ""}
                           </span>
                         )}
-                      </div>
-                      <div className="flex flex-col gap-1 items-start">
                         {sids.map(sid => <StudentChipInner key={sid} sid={sid} />)}
                       </div>
                     </div>
