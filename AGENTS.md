@@ -4,6 +4,8 @@ This workspace contains four related apps that share the Firebase Realtime Datab
 
 **This file is a summary. The authoritative operating manual is the root `CLAUDE.md` (Korean) — read it first; if this file and `CLAUDE.md` disagree, `CLAUDE.md` wins.**
 
+**Continuing prior work?** Read `.claude/HANDOFF.md` first — it captures the latest session's state, what's done/pending, and gotchas.
+
 ## DB Safety 4 Questions — answer before starting ANY task
 
 Before any work (including code changes, investigation, or documentation), answer these four in a fixed 4-line block at the top of your first response:
