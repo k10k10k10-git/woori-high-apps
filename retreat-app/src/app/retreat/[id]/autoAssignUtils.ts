@@ -37,6 +37,10 @@ const HARD_PENALTY = 1_000_000;
 // 최소 2반 규칙을 켰을 때 그리디를 유도하는 중간 가중치(반이 적게 든 조부터 채우게).
 // 하드보다 훨씬 작고, 균등류 gradient보다 큼 → 하드는 못 이기되 균등류보단 우선.
 const CLASS_SPREAD_GUIDE = 40_000;
+// 전참 교사 보장(requireFullTimer)의 그리디 유도 가중치 — 판정은 하드(scoreGroups)지만
+// 유도는 중간 가중치로 둔다. 균등류 gradient보다 크고 하드보다 훨씬 작아 하드를 못 이긴다.
+// (과거 +5000은 gradient에 묻혀 유도가 약했다 → 빡빡한 입력에서 위반 잔존 확률↑.)
+const FULLTIMER_SPREAD_GUIDE = 30_000;
 
 export interface LeaderEntry {
   name: string;
@@ -206,13 +210,15 @@ function tryAssign(
   }
 
   // ── Phase 1: 나머지 반 단위 학생 배정 ──
-  const remaining = [...units]
-    .filter(u => !pinnedKeys.has(u.key))
-    .sort((a, b) =>
-      b.studentIds.length !== a.studentIds.length
-        ? b.studentIds.length - a.studentIds.length
-        : Math.random() - 0.5
-    );
+  // 인원 많은 순으로 배정하되, 같은 크기끼리는 무작위 순서.
+  // comparator에 Math.random()을 넣으면 정렬 일관성이 깨지므로(엔진 의존·비균등),
+  // Fisher-Yates로 먼저 균등 셔플한 뒤 안정 정렬(ES2019+ 보장)로 크기순만 재배열한다.
+  const remaining = [...units].filter(u => !pinnedKeys.has(u.key));
+  for (let i = remaining.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+  }
+  remaining.sort((a, b) => b.studentIds.length - a.studentIds.length);
 
   // 점수 허용 오차: 이 범위 안의 후보들은 "동등하게 좋음"으로 보고 무작위 선택
   // (하드 위반 페널티는 HARD_PENALTY 단위라 50 이내로는 절대 들어오지 않음 → 하드 규칙은 항상 우선 보장)
@@ -245,10 +251,11 @@ function tryAssign(
         const classConflict = gData[i].unitKeys.some(k => hasConflict(unit.key, k, classConflicts));
         if (classConflict) score -= HARD_PENALTY;
       }
-      // 전참 교사 보장 (soft 가점)
+      // 전참 교사 보장 (중간 유도) — 전참 반은 아직 전참이 없는 조로 유도(빈 조 포함).
+      // 빈 조를 제외하면 전참 반이 빈 조로 못 가 전참이 한쪽에 뭉치는 편향이 생겨 total>0 조건을 뺀다.
       if (ruleFlags.requireFullTimer) {
         const unitHasFullTimer = unitKeyToHasFullTimer.get(unit.key) ?? false;
-        if (unitHasFullTimer && gData[i].fullTimerCount === 0 && gData[i].total > 0) score += 5000;
+        if (unitHasFullTimer && gData[i].fullTimerCount === 0) score += FULLTIMER_SPREAD_GUIDE;
       }
       // 최소 2반 유도: 반이 적게 든 조부터 채우도록 (반 개수 × 중간 가중치만큼 감점 → 0반·1반 조 우선)
       if (ruleFlags.minTwoClasses) {
@@ -313,9 +320,9 @@ function tryAssign(
   return groups;
 }
 
-function scoreGroups(
+export function scoreGroups(
   groups: Group[], units: ClassUnit[],
-  studentConflicts: ConflictPair[], teacherStudentConflicts: ConflictPair[], classConflicts: ConflictPair[],
+  studentConflicts: ConflictPair[], teacherConflicts: ConflictPair[], teacherStudentConflicts: ConflictPair[], classConflicts: ConflictPair[],
   ruleFlags: RuleFlags,
   teachers: TeacherAttendance[],
 ): number {
@@ -331,6 +338,19 @@ function scoreGroups(
     if (!g) return;
     unitKeysInGroup[groupIdxById.get(g.id)!].push(u.key);
     u.names.forEach(n => nameToGroup.set(n, g.id));
+  });
+
+  // 교사 → 소속 조 맵. tryAssign과 동일하게 "반 담당 교사는 그 반이 배정된 조 소속"으로 본다
+  // (assignTeachers=false여서 g.teachers가 비어도 교사 고려 관계를 판정할 수 있게 units 기준으로 도출).
+  const bu = units[0]?.bu ?? "";
+  const unitKeyToGroupIdx = new Map<string, number>();
+  unitKeysInGroup.forEach((keys, i) => keys.forEach(k => unitKeyToGroupIdx.set(k, i)));
+  const teacherToGroup = new Map<string, string>();
+  teachers.forEach(t => {
+    const parsed = parseClassKey(t.classKey);
+    if (!parsed) return;
+    const gi = unitKeyToGroupIdx.get(`${bu}_${parsed.grade}_${parsed.classNum}`);
+    if (gi !== undefined) teacherToGroup.set(t.name, groups[gi].id);
   });
 
   // 조당 최대 인원 초과 (하드)
@@ -356,8 +376,11 @@ function scoreGroups(
     studentConflicts.forEach(({ a, b }) => {
       if (nameToGroup.get(a) && nameToGroup.get(a) === nameToGroup.get(b)) score -= HARD_PENALTY;
     });
-    const teacherToGroup = new Map<string, string>();
-    groups.forEach(g => g.teachers.forEach(tn => teacherToGroup.set(tn, g.id)));
+    // 교사 ↔ 교사 (tryAssign 236-239와 대칭 — 두 교사가 같은 조면 하드)
+    teacherConflicts.forEach(({ a, b }) => {
+      const ga = teacherToGroup.get(a), gb = teacherToGroup.get(b);
+      if (ga && gb && ga === gb) score -= HARD_PENALTY;
+    });
     teacherStudentConflicts.forEach(({ a, b }) => {
       const tGroupA = teacherToGroup.get(a), sGroupB = nameToGroup.get(b);
       if (tGroupA && sGroupB && tGroupA === sGroupB) score -= HARD_PENALTY;
@@ -443,7 +466,7 @@ export function runAutoAssign(
     // 하드 제약이 많을수록 그리디가 첫 시도에서 막힐 수 있어 반복 횟수를 늘려 위반 0 해를 찾을 확률을 높인다.
     for (let i = 0; i < 16; i++) {
       const g = tryAssign(groupCount, bu, units, buTeachers, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, ruleFlags, pinnedKeys);
-      const s = scoreGroups(g, units, studentConflicts, teacherStudentConflicts, classConflicts, ruleFlags, buTeachers);
+      const s = scoreGroups(g, units, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, ruleFlags, buTeachers);
       if (s > bestScore) { bestScore = s; bestGroups = g; }
     }
     if (bestGroups) {
