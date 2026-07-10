@@ -14,6 +14,7 @@ import {
 } from "@/lib/db";
 import { Application, SemesterMeta, Session, Team } from "@/lib/types";
 import IntakeTab from "./IntakeTab";
+import LoginButton from "@/components/LoginButton";
 import AssignTab from "./AssignTab";
 import AttendanceTab from "./AttendanceTab";
 import CompletionTab from "./CompletionTab";
@@ -54,9 +55,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4">
         <p className="text-sm text-gray-500">로그인이 필요합니다</p>
-        <button onClick={() => void signIn()} className="px-5 py-2.5 rounded-lg bg-blue-100 hover:bg-blue-200 font-medium">
-          Google로 로그인
-        </button>
+        <LoginButton signIn={signIn} />
       </main>
     );
   }

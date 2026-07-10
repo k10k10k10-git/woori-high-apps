@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import { getSemesters, createSemester } from "@/lib/db";
 import { Semester } from "@/lib/types";
+import LoginButton from "@/components/LoginButton";
 
 export default function HomePage() {
   const { user, loading, accessLevel, signIn, signOut } = useAuth();
@@ -67,12 +68,7 @@ export default function HomePage() {
       <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
         <h1 className="text-2xl font-bold">학기 사역 허브</h1>
         <p className="text-sm text-gray-500">분당우리교회 고등부 · 훈련·사역팀 관리</p>
-        <button
-          onClick={() => void signIn()}
-          className="px-5 py-2.5 rounded-lg bg-blue-100 hover:bg-blue-200 font-medium"
-        >
-          Google로 로그인
-        </button>
+        <LoginButton signIn={signIn} />
       </main>
     );
   }
