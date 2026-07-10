@@ -85,6 +85,16 @@
 | `iguardRoles` | 이가드 | - | 이가드만 | 이가드 권한 분류 |
 | `iguardPending` | 이가드 | - | 이가드만 | 없음 |
 
+## 학기 사역 도메인 (소유: semester-app)
+
+| 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
+|------|-----------|-----------|-----------|----------------|
+| `semesters/{sid}` (meta·teams·sessions·applications·attendance·completion·curriculum·archiveLinks) | semester-app | - | semester-app만 | 없음 (독립) |
+| `semestersPrivate/{sid}/applicationsPrivate` | semester-app | - | semester-app만 | 없음 (민감정보 — 지원 동기·연락처) |
+
+> semester-app은 `classes/{year}`(현장 접수 반 명단)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
+> ⚠ Rules 미배포 상태에서는 `semesters/*` 접근이 거부됨 — 학생 앱 rules에 노드 추가 필요 (변경안은 semester-app/CLAUDE.md 참조).
+
 ---
 
 ## 꼬임 위험이 높은 경로 (기능 추가 시 반드시 확인)

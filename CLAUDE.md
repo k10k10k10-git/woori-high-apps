@@ -1,6 +1,6 @@
-# 워크스페이스 운영 매뉴얼 (4개 앱 모노레포)
+# 워크스페이스 운영 매뉴얼 (5개 앱 모노레포)
 
-이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 4개 앱을 담는다.
+이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 5개 앱(학생 출석부·retreat·iguard·교사스탭·semester)을 담는다.
 **이 문서는 "이 저장소에서 일하는 방법" 전체를 규정한다.** 개별 앱의 코드 패턴은 각 앱의 CLAUDE.md가 원천이며, 충돌 시 이 문서의 안전 규칙이 우선한다.
 
 작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md`.
@@ -30,6 +30,7 @@
 | retreat-app | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용 |
 | iguard-app | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
 | 교사·스탭 출석부 | `staff_*` | — (여름수련회 이후까지 작업 보류) |
+| semester-app | `semesters/`, `semestersPrivate/` | `classes/`·`retreatAdmins` 읽기 전용 (⚠ Rules 미배포 — semester-app/CLAUDE.md) |
 
 - 공유 쓰기 노드는 단 하나: `prepMilestones/` (행정↔이가드 양방향). 하위 문서(DB_OWNERSHIP.md·retreat-app CLAUDE.md)에 `retreats/{id}/milestones`가 공유로 적혀 있는 것은 이관 전 낡은 서술이다 — 코드(`paths.ts`) 기준으로 이 문장이 진실.
 - 민감 데이터(환불계좌·의료일지·주민번호·시트 raw)는 `retreatsPrivate/{id}/` 아래에만. 이가드 멤버는 `retreats/{id}` 전체를 읽으므로 그 아래 두면 노출이다.
