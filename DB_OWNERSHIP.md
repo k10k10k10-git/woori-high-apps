@@ -93,7 +93,7 @@
 | `semestersPrivate/{sid}/applicationsPrivate` | semester-app | - | semester-app만 | 없음 (민감정보 — 지원 동기·연락처) |
 
 > semester-app은 `classes/{year}`(현장 접수 반 명단)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
-> ⚠ Rules 미배포 상태에서는 `semesters/*` 접근이 거부됨 — 학생 앱 rules에 노드 추가 필요 (변경안은 semester-app/CLAUDE.md 참조).
+> Rules는 2026-07-10 학생 앱에서 추가·배포 완료 (admins·retreatAdmins만 접근).
 
 ---
 

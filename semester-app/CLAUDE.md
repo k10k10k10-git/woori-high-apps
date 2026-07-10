@@ -54,18 +54,9 @@ semestersPrivate/{sid}/applicationsPrivate/{appKey} { motive, wish, phone?, pare
 5. **민감정보 분리** — 지원 동기·연락처는 `semestersPrivate` 아래만. 신규 민감 필드도 동일.
 6. 접수 화면의 학기↔연도 규칙: `sid.split("-")[0]` → `classes/{year}`.
 
-## ⚠ Rules 배포 필요 (미완 — 사용자 승인 대기)
+## Rules 현황
 
-`semesters`/`semestersPrivate` 노드가 학생 앱 `database.rules.json`에 없으면 **모든 화면이 permission denied**가 된다.
-변경안(승인 후 학생 앱에서만 배포 — 이 앱에서 firebase deploy 금지):
-
-```json
-"semesters": {
-  ".read":  "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).exists())",
-  ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).exists())"
-},
-"semestersPrivate": { /* 동일 규칙 */ }
-```
+`semesters`/`semestersPrivate` 노드는 2026-07-10 학생 앱 rules에 추가·배포 완료 (admins·retreatAdmins만 읽기/쓰기 — brainstorm과 동일 규칙). 규칙 변경이 또 필요하면 **학생 앱 `database.rules.json`에서만** 수정·배포한다 (이 앱에서 firebase deploy 금지).
 
 ## 개발·배포
 
@@ -73,7 +64,10 @@ semestersPrivate/{sid}/applicationsPrivate/{appKey} { motive, wish, phone?, pare
 npm run dev        # localhost:3002
 npx tsc --noEmit   # 배포 전 0 errors 필수
 npm test           # completion 테스트
-npm run build
+npx vercel --prod --yes   # 프로덕션 배포 (CLI — Git 자동배포 미연결)
 ```
 
-Vercel 프로젝트 미생성 상태 — 생성 시 Root Directory를 `semester-app`으로, 환경변수는 retreat-app과 동일한 `NEXT_PUBLIC_FIREBASE_*` 세트.
+- 배포 URL: **https://semester-app.vercel.app** (Vercel 프로젝트 `semester-app`, 2026-07-10 생성)
+- 환경변수: `NEXT_PUBLIC_FIREBASE_*` + `NEXT_PUBLIC_MAIN_ADMIN_*` production 등록 완료 (retreat-app과 동일 값)
+- ⚠ **Git 자동배포 미연결** — push해도 이 앱은 배포되지 않는다. 배포는 `npx vercel --prod --yes`를 semester-app 폴더에서 실행. (연결하려면 Vercel 대시보드에서 repo 연결 + Root Directory `semester-app` 설정)
+- ⚠ **Firebase Auth 승인 도메인**: `semester-app.vercel.app`이 Firebase Console → Authentication → Settings → Authorized domains에 있어야 Google 로그인이 된다.

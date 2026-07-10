@@ -30,7 +30,7 @@
 | retreat-app | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용 |
 | iguard-app | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
 | 교사·스탭 출석부 | `staff_*` | — (여름수련회 이후까지 작업 보류) |
-| semester-app | `semesters/`, `semestersPrivate/` | `classes/`·`retreatAdmins` 읽기 전용 (⚠ Rules 미배포 — semester-app/CLAUDE.md) |
+| semester-app | `semesters/`, `semestersPrivate/` | `classes/`·`retreatAdmins` 읽기 전용 |
 
 - 공유 쓰기 노드는 단 하나: `prepMilestones/` (행정↔이가드 양방향). 하위 문서(DB_OWNERSHIP.md·retreat-app CLAUDE.md)에 `retreats/{id}/milestones`가 공유로 적혀 있는 것은 이관 전 낡은 서술이다 — 코드(`paths.ts`) 기준으로 이 문장이 진실.
 - 민감 데이터(환불계좌·의료일지·주민번호·시트 raw)는 `retreatsPrivate/{id}/` 아래에만. 이가드 멤버는 `retreats/{id}` 전체를 읽으므로 그 아래 두면 노출이다.
