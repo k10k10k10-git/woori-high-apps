@@ -7,7 +7,9 @@ import { useUI } from "@/context/UIContext";
 interface Props { retreat: Retreat; }
 
 type PartialType = PartialAttendance["type"];
-type Filter = "부분참" | "전체" | "본대" | PartialType;
+// 작업 목록은 "신청자 취합에서 주황(부분참)으로 칠한 학생 ∪ 이미 선복귀/후발대로 지정된 학생"만 담는다.
+// 전체/본대 전수 목록은 여기서 다루지 않는다(부분참 대상은 신청자 취합에서 주황으로 칠해 넘긴다).
+type Filter = "전체" | "미지정" | PartialType;
 
 interface ParticipantRow {
   sourceKey: string;
@@ -25,8 +27,8 @@ interface ParticipantRow {
 
 const TYPE_OPTIONS: PartialType[] = ["선복귀", "후발대"];
 
-const TYPE_COLORS: Record<PartialType | "본대", string> = {
-  "본대": "bg-slate-100 text-slate-600 border-slate-200",
+const TYPE_COLORS: Record<PartialType | "미지정", string> = {
+  "미지정": "bg-slate-100 text-slate-600 border-slate-200",
   "선복귀": "bg-orange-100 text-orange-700 border-orange-200",
   "후발대": "bg-sky-100 text-sky-700 border-sky-200",
 };
@@ -43,8 +45,8 @@ function makeStudentKey(p: Participant): string | null {
   return /^[12]_/.test(sid) ? sid : `${buToNum(p.bu)}_${sid}`;
 }
 
-function getStatus(row: ParticipantRow): PartialType | "본대" {
-  return row.partial?.type ?? "본대";
+function getStatus(row: ParticipantRow): PartialType | "미지정" {
+  return row.partial?.type ?? "미지정";
 }
 
 export default function PartialAttendanceTab({ retreat }: Props) {
@@ -55,7 +57,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("부분참");
+  const [filter, setFilter] = useState<Filter>("전체");
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingType, setEditingType] = useState<PartialType>("선복귀");
   const [editingNote, setEditingNote] = useState("");
@@ -132,19 +134,26 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     return { total: rows.length, 본대, 선복귀, 후발대, day1Rows, day3Rows };
   }, [rows]);
 
-  const filteredRows = useMemo(() => {
-    if (filter === "전체") return rows;
-    if (filter === "부분참") return rows.filter(r => !!r.partial);
-    if (filter === "본대") return rows.filter(r => !r.partial);
-    return rows.filter(r => r.partial?.type === filter);
-  }, [rows, filter]);
-
-  const partialCandidates = useMemo(() => {
-    return rows.filter(row => {
-      const color = cellColors[row.studentKey] || cellColors[row.studentId];
-      return color === "orange" && !row.partial;
-    });
+  // 작업 대상 풀: 신청자 취합에서 주황(부분참)으로 칠한 학생 ∪ 이미 선복귀/후발대로 지정된 학생.
+  // 주황 색칠이 곧 "이 학생을 부분참석 탭으로 넘긴다"는 신호 — 신청자 취합과 유기적으로 연동된다.
+  const poolRows = useMemo(() => {
+    return rows.filter(r =>
+      !!r.partial || cellColors[r.studentKey] === "orange" || cellColors[r.studentId] === "orange",
+    );
   }, [rows, cellColors]);
+
+  const poolStats = useMemo(() => {
+    const 선복귀 = poolRows.filter(r => r.partial?.type === "선복귀").length;
+    const 후발대 = poolRows.filter(r => r.partial?.type === "후발대").length;
+    const 미지정 = poolRows.filter(r => !r.partial).length;
+    return { total: poolRows.length, 선복귀, 후발대, 미지정 };
+  }, [poolRows]);
+
+  const filteredRows = useMemo(() => {
+    if (filter === "전체") return poolRows;
+    if (filter === "미지정") return poolRows.filter(r => !r.partial);
+    return poolRows.filter(r => r.partial?.type === filter);
+  }, [poolRows, filter]);
 
   function openEditor(row: ParticipantRow, nextType?: PartialType) {
     setEditingKey(row.studentKey);
@@ -181,7 +190,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
       await deletePartialAttendance(retreat.id, row.studentKey);
       setRecords(prev => prev.filter(r => r.id !== row.studentKey));
       setEditingKey(null);
-      toast(`${row.name} 본대 처리 완료`, "success");
+      toast(`${row.name} 미지정으로 되돌림 (선복귀·후발대 해제)`, "success");
     } catch (e) {
       toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
@@ -229,48 +238,25 @@ export default function PartialAttendanceTab({ retreat }: Props) {
           <span className="text-slate-500">선복귀 <strong className="text-orange-600">{stats.선복귀}</strong></span>
           <span className="text-slate-300">·</span>
           <span className="text-slate-500">후발대 <strong className="text-sky-700">{stats.후발대}</strong></span>
-          {partialCandidates.length > 0 && (
+          {poolStats.미지정 > 0 && (
             <>
               <span className="text-slate-300">·</span>
-              <span className="text-slate-500">부분참 후보 <strong className="text-orange-600">{partialCandidates.length}</strong></span>
+              <span className="text-slate-500">미지정 <strong className="text-orange-600">{poolStats.미지정}</strong></span>
             </>
           )}
           {unmatchedCount > 0 && <span className="text-xs text-slate-400 ml-auto">DB 미매칭 {unmatchedCount}명 제외</span>}
         </div>
       </div>
 
-      {partialCandidates.length > 0 && (
-        <div className="card p-4 border border-orange-200 bg-orange-50/60">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <div className="text-sm font-semibold text-orange-700">신청자 취합의 부분참 후보</div>
-              <div className="text-xs text-orange-600 mt-1">신청자 취합에서 주황색으로 표시된 인원입니다. 여기서 선복귀/후발대로 세부 구분해 주세요.</div>
-            </div>
-            <span className="tag tag-yellow">{partialCandidates.length}명</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {partialCandidates.map(row => (
-              <button
-                key={row.studentKey}
-                onClick={() => openEditor(row)}
-                className="rounded-full border border-orange-200 bg-white px-3 py-1.5 text-sm font-medium text-orange-700 hover:bg-orange-100"
-              >
-                {row.name}
-                <span className="ml-1 text-xs text-orange-500">
-                  {row.bu} {row.grade}-{row.classNum}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-3 text-xs text-orange-700">
+        📋 <strong>신청자 취합에서 부분참(주황)으로 칠한 학생</strong>만 아래에 나옵니다. 여기서 <strong>선복귀 / 후발대</strong>를 지정하고 메모를 남기세요. 대상을 추가·제외하려면 신청자 취합에서 주황색을 켜고 끄면 됩니다.
+      </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["부분참", "전체", "본대", "선복귀", "후발대"] as Filter[]).map(f => {
-          const count = f === "부분참" ? stats.선복귀 + stats.후발대
-            : f === "전체" ? stats.total
-            : f === "본대" ? stats.본대
-            : f === "선복귀" ? stats.선복귀 : stats.후발대;
+        {(["전체", "선복귀", "후발대", "미지정"] as Filter[]).map(f => {
+          const count = f === "전체" ? poolStats.total
+            : f === "선복귀" ? poolStats.선복귀
+            : f === "후발대" ? poolStats.후발대 : poolStats.미지정;
           return (
             <button
               key={f}
@@ -290,12 +276,12 @@ export default function PartialAttendanceTab({ retreat }: Props) {
           {filteredRows.length === 0 ? (
             <div className="p-8 text-center text-slate-400">
               <div className="text-3xl mb-2">⏰</div>
-              {filter === "부분참" ? (
-                <p>아직 선복귀·후발대로 지정된 학생이 없습니다.<br />
-                  <span className="text-xs">위 후보에서 지정하거나, <strong className="text-slate-500">전체</strong>·<strong className="text-slate-500">본대</strong> 필터에서 학생을 찾아 지정하세요.</span>
+              {filter === "전체" ? (
+                <p>부분참 대상 학생이 아직 없습니다.<br />
+                  <span className="text-xs"><strong className="text-slate-500">신청자 취합</strong> 탭에서 부분참 학생을 <strong className="text-orange-500">주황색</strong>으로 칠하면 여기에 나타납니다.</span>
                 </p>
               ) : (
-                <p>표시할 학생이 없습니다.</p>
+                <p>이 구분에 해당하는 학생이 없습니다.</p>
               )}
             </div>
           ) : (
@@ -340,9 +326,10 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                           <button
                             onClick={() => resetToMain(row)}
                             disabled={disabled || !row.partial}
+                            title="선복귀·후발대 지정을 해제 (미지정으로)"
                             className="px-2.5 py-1 rounded-md border border-slate-200 text-xs text-slate-500 disabled:opacity-40 hover:bg-slate-50"
                           >
-                            본대
+                            미지정
                           </button>
                           {TYPE_OPTIONS.map(type => (
                             <button
