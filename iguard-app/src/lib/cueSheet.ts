@@ -70,6 +70,40 @@ export function toMinutes(value: string): number {
   return hour * 60 + minute;
 }
 
+/** 자정 넘김·새벽 일정 정규화 — 24시+ 표기(패턴 11)로 통일한다.
+ *  ① 종료<시작인 닫힌 블록: 종료를 +24h (예: 23:30~02:00 → 23:30~26:00). 시트에 사람이 읽는 02:00으로 적어도
+ *     앱은 자정 넘김을 26:00으로 다뤄야 "지금" 판정(scheduleTime)이 새벽에도 맞는다.
+ *  ② N일차(N≥2)의 새벽(<05:00) 블록: 전날(N-1)의 24시+ 표기로 이동
+ *     (예: 2일차 00:30~03:00 → 1일차 24:30~27:00). 밤 프로그램은 전날 큐싯에 이어 붙는 현장 관행과 일치.
+ *  05:00 경계: 수련회 기상은 06~07시라, 05시 이전 시작만 "전날 새벽"으로 본다(05:00+ 새벽기도 등은 당일 유지). */
+export function resolveOvernight(
+  day: number, start: string, end?: string,
+): { day: number; start: string; end?: string; converted: boolean } {
+  const s0 = toMinutes(start);
+  if (!Number.isFinite(s0)) return { day, start, end, converted: false };
+  let s = s0;
+  const hasClosedEnd = !!end && end !== OPEN_END && Number.isFinite(toMinutes(end));
+  let e = hasClosedEnd ? toMinutes(end!) : null;
+  // ① 종료<시작 → 자정 넘김
+  if (e != null && e < s) e += 24 * 60;
+  // ② N일차 새벽 → 전날로 (start·end 모두 +24h, day-1)
+  let d = day;
+  let dawnShift = false;
+  if (day >= 2 && s < 5 * 60) {
+    d = day - 1;
+    s += 24 * 60;
+    if (e != null) e += 24 * 60;
+    dawnShift = true;
+  }
+  // 표현 한계(36:00) 초과 = 비정상 입력 → 변환 취소하고 원본 유지(적어도 임포트는 되게)
+  if (s >= 36 * 60 || (e != null && e >= 36 * 60)) return { day, start, end, converted: false };
+  const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+  const outStart = fmt(s);
+  const outEnd = e != null ? fmt(e) : end;
+  const converted = dawnShift || (e != null && outEnd !== end);
+  return { day: d, start: outStart, end: outEnd, converted };
+}
+
 export function scheduleTimeError(start: string, end?: string): string | null {
   if (!isValidTime(start)) return "시작 시간은 HH:MM 형식으로 입력해주세요. 예: 09:30";
   if (end === OPEN_END) return null;
@@ -373,6 +407,7 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
   });
   let day = 1;
   const blocks: ImportedBlock[] = [];
+  const overnightNotes: string[] = [];
 
   dataRows.forEach((row, index) => {
     const whole = row.join(" ").trim();
@@ -393,10 +428,15 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
     const detail = compactText(row[detailIdx] || "");
     const owner = ownerIdx >= 0 ? compactText(row[ownerIdx] || "") : "";
     const notice = noticeIdx >= 0 ? compactText(row[noticeIdx] || "") : "";
+    // 자정 넘김·새벽 일정을 전날 24시+ 표기로 정규화 (아래 resolveOvernight 주석 참조)
+    const resolved = resolveOvernight(day, range.start, range.end);
+    if (resolved.converted) {
+      overnightNotes.push(`${day}일차 ${timeRangeLabel(range.start, range.end)} → ${resolved.day}일차 ${timeRangeLabel(resolved.start, resolved.end)}`);
+    }
     blocks.push({
-      day,
-      start: range.start,
-      end: range.end,
+      day: resolved.day,
+      start: resolved.start,
+      end: resolved.end,
       label,
       meal: looksLikeMeal(label, detail) || undefined,
       detail: detail || undefined,
@@ -405,6 +445,9 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
     });
   });
 
+  if (overnightNotes.length) {
+    warnings.push(`자정 넘김/새벽 ${overnightNotes.length}개를 전날 24시+ 표기로 정리: ${overnightNotes.slice(0, 4).join(" · ")}${overnightNotes.length > 4 ? " …" : ""}`);
+  }
   if (!blocks.length) warnings.push("가져올 수 있는 시간 블록이 없습니다. 시간 칸이 08:30~09:00 형태인지 확인해주세요.");
   const dayCounts = blocks.reduce<Record<number, number>>((acc, block) => {
     acc[block.day] = (acc[block.day] || 0) + 1;

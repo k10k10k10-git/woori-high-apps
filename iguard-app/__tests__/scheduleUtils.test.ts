@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseCueSheetText, parseSheetUrl, normalizeTime, scheduleTimeError, venueForBlock,
-  isValidTime, toMinutes, timeRangeLabel, parseNames, scheduleSortValue,
+  isValidTime, toMinutes, timeRangeLabel, parseNames, scheduleSortValue, resolveOvernight,
 } from "@/lib/cueSheet";
 
 const HEADER = "구분\t시간\t내용\t담당\t기타";
@@ -78,6 +78,56 @@ describe("parseCueSheetText — 사양 D", () => {
     ].join("\n");
     const r = parseCueSheetText(raw);
     expect(r.importStats).toEqual({ detailCount: 1, ownerCount: 1, noticeCount: 1 });
+  });
+});
+
+describe("resolveOvernight — 자정 넘김·새벽 정규화 (문제① 보완)", () => {
+  it("종료<시작인 닫힌 블록은 종료를 +24h (23:30~02:00 → 23:30~26:00)", () => {
+    const r = resolveOvernight(1, "23:30", "02:00");
+    expect(r).toMatchObject({ day: 1, start: "23:30", end: "26:00", converted: true });
+  });
+
+  it("N일차(N≥2) 새벽(<05:00) 블록은 전날 24시+ 표기로 (2일차 00:30~03:00 → 1일차 24:30~27:00)", () => {
+    const r = resolveOvernight(2, "00:30", "03:00");
+    expect(r).toMatchObject({ day: 1, start: "24:30", end: "27:00", converted: true });
+  });
+
+  it("2일차 새벽 open-ended(01:00~)도 전날로, end는 ~ 유지", () => {
+    const r = resolveOvernight(2, "01:00", "~");
+    expect(r).toMatchObject({ day: 1, start: "25:00", end: "~", converted: true });
+  });
+
+  it("05:00 이상은 당일 아침으로 그대로 (2일차 05:30 새벽기도는 유지)", () => {
+    expect(resolveOvernight(2, "05:30", "06:30")).toMatchObject({ day: 2, start: "05:30", converted: false });
+    expect(resolveOvernight(2, "07:30", "08:30")).toMatchObject({ day: 2, converted: false });
+  });
+
+  it("1일차 낮 정상 블록은 변환 없음", () => {
+    expect(resolveOvernight(1, "09:00", "10:00")).toMatchObject({ day: 1, start: "09:00", end: "10:00", converted: false });
+  });
+
+  it("36:00 초과가 되는 비정상 입력은 변환 취소하고 원본 유지", () => {
+    // 2일차 04:00~03:00 → ①로 end 27:00, ②로 +24 = start 28:00·end 51:00(초과) → 취소
+    expect(resolveOvernight(2, "04:00", "03:00")).toMatchObject({ day: 2, start: "04:00", end: "03:00", converted: false });
+  });
+});
+
+describe("parseCueSheetText — 새벽 일정 일차 귀속 (문제① 회귀)", () => {
+  it("2일차 섹션의 00:30 블록을 1일차 24:30으로 정리 + 경고", () => {
+    const raw = [
+      HEADER,
+      "1일차\t\t\t\t",
+      "취침\t23:30~24:30\t밤\t\t",
+      "2일차\t\t\t\t",
+      "간식 및 취침\t00:30~03:00\t새벽\t\t",
+      "아침 식사\t07:30~08:30\t조식\t\t",
+    ].join("\n");
+    const r = parseCueSheetText(raw);
+    const dawn = r.blocks.find(b => b.label === "간식 및 취침");
+    expect(dawn).toMatchObject({ day: 1, start: "24:30", end: "27:00" });
+    const breakfast = r.blocks.find(b => b.label === "아침 식사");
+    expect(breakfast).toMatchObject({ day: 2, start: "07:30" }); // 아침은 2일차 유지
+    expect(r.warnings.some(w => w.includes("24시+"))).toBe(true);
   });
 });
 

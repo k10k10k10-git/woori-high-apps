@@ -63,9 +63,27 @@ describe("reconcileScheduleImport — 재임포트 대조 (동선 보존)", () =
   });
 });
 
-describe("blockKey", () => {
-  it("day__start 형식", () => {
-    expect(blockKey(2, "14:30")).toBe("2__14:30");
+describe("blockKey — 실제 시각 정규 키", () => {
+  it("day·start를 1일차 00:00 기준 절대 분으로 정규화", () => {
+    expect(blockKey(2, "14:30")).toBe(`t${1440 + 14 * 60 + 30}`); // t2310
+    expect(blockKey(1, "09:00")).toBe("t540");
+  });
+
+  it("2일차 00:30 ≡ 1일차 24:30 — 같은 실제 시각은 같은 키 (새벽 표기 흡수)", () => {
+    expect(blockKey(2, "00:30")).toBe(blockKey(1, "24:30"));
+  });
+
+  it("파싱 불가한 start는 폴백(day__start)", () => {
+    expect(blockKey(1, "미정")).toBe("1__미정");
+  });
+
+  it("정규화 덕분에 표기만 바뀐 새벽 블록은 update로 매칭돼 동선이 보존된다", () => {
+    const existing = [{ id: "dawn", day: 2, start: "00:30", label: "간식 및 취침" }];
+    const imported = [{ day: 1, start: "24:30", label: "간식 및 취침" }]; // 재임포트 시 정규화된 표기
+    const r = reconcileScheduleImport(existing, imported);
+    expect(r.updates.map(u => u.id)).toEqual(["dawn"]); // 삭제+생성 아님 → blockId 유지 → 동선 보존
+    expect(r.creates).toHaveLength(0);
+    expect(r.deletes).toHaveLength(0);
   });
 });
 
