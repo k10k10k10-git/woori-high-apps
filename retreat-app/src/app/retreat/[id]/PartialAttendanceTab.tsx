@@ -7,7 +7,7 @@ import { useUI } from "@/context/UIContext";
 interface Props { retreat: Retreat; }
 
 type PartialType = PartialAttendance["type"];
-type Filter = "전체" | "본대" | PartialType;
+type Filter = "부분참" | "전체" | "본대" | PartialType;
 
 interface ParticipantRow {
   sourceKey: string;
@@ -55,7 +55,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("전체");
+  const [filter, setFilter] = useState<Filter>("부분참");
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editingType, setEditingType] = useState<PartialType>("선복귀");
   const [editingNote, setEditingNote] = useState("");
@@ -134,6 +134,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
 
   const filteredRows = useMemo(() => {
     if (filter === "전체") return rows;
+    if (filter === "부분참") return rows.filter(r => !!r.partial);
     if (filter === "본대") return rows.filter(r => !r.partial);
     return rows.filter(r => r.partial?.type === filter);
   }, [rows, filter]);
@@ -265,17 +266,23 @@ export default function PartialAttendanceTab({ retreat }: Props) {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {(["전체", "본대", "선복귀", "후발대"] as Filter[]).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-              filter === f ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-500 hover:bg-slate-50"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
+        {(["부분참", "전체", "본대", "선복귀", "후발대"] as Filter[]).map(f => {
+          const count = f === "부분참" ? stats.선복귀 + stats.후발대
+            : f === "전체" ? stats.total
+            : f === "본대" ? stats.본대
+            : f === "선복귀" ? stats.선복귀 : stats.후발대;
+          return (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                filter === f ? "bg-slate-800 text-white border-slate-800" : "border-slate-200 text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              {f} <span className={filter === f ? "text-slate-300" : "text-slate-400"}>{count}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
@@ -283,7 +290,13 @@ export default function PartialAttendanceTab({ retreat }: Props) {
           {filteredRows.length === 0 ? (
             <div className="p-8 text-center text-slate-400">
               <div className="text-3xl mb-2">⏰</div>
-              <p>표시할 학생이 없습니다.</p>
+              {filter === "부분참" ? (
+                <p>아직 선복귀·후발대로 지정된 학생이 없습니다.<br />
+                  <span className="text-xs">위 후보에서 지정하거나, <strong className="text-slate-500">전체</strong>·<strong className="text-slate-500">본대</strong> 필터에서 학생을 찾아 지정하세요.</span>
+                </p>
+              ) : (
+                <p>표시할 학생이 없습니다.</p>
+              )}
             </div>
           ) : (
             <table className="w-full text-sm">
