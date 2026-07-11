@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import {
   ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildClassUnits, findLeaderUnit, runAutoAssign,
+  buildClassUnits, findLeaderUnit, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -41,6 +41,7 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const [teacherConflicts, setTeacherConflicts] = useState<ConflictPair[]>([]);
   const [teacherStudentConflicts, setTeacherStudentConflicts] = useState<ConflictPair[]>([]);
   const [classConflicts, setClassConflicts] = useState<ConflictPair[]>([]);
+  const [classAffinities, setClassAffinities] = useState<ConflictPair[]>([]); // 반 붙임(결합) — 같은 조 보장
   // 드롭다운 입력 상태
   const emptyPicker = () => ({ bu: "", grade: "", cls: "", name: "" });
   const emptyTpicker = () => ({ bu: "", name: "" });
@@ -50,6 +51,7 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   // 반 고려 관계 입력: 부서·학년·반 3단 선택 (unitKey는 추가 시점에 조합)
   const emptyClsPick = () => ({ bu: "", grade: "", cls: "" });
   const [newCC, setNewCC] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
+  const [newCA, setNewCA] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
   // 조장 설정 (이름+학년+반, 동명이인 구분용)
   const emptyEntry = (): LeaderEntry => ({ name: "", grade: "", cls: "" });
   const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
@@ -83,6 +85,14 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   // 반 구성 미리보기 (students DB 기준으로 반 단위 구성)
   const classUnits1 = useMemo(() => buildClassUnits(participants, "1부", students), [participants, students]);
   const classUnits2 = useMemo(() => buildClassUnits(participants, "2부", students), [participants, students]);
+
+  // 반 결합·분리 모순 검증 — 에러가 있으면 실행 차단 (고려 관계 반영이 켜진 경우만)
+  const relationErrors = useMemo(
+    () => rules.applyConflicts
+      ? validateClassRelations([...classUnits1, ...classUnits2], classConflicts, classAffinities, rules)
+      : [],
+    [classUnits1, classUnits2, classConflicts, classAffinities, rules],
+  );
 
   const bu1Count = classUnits1.reduce((acc, u) => acc + u.studentIds.length, 0);
   const bu2Count = classUnits2.reduce((acc, u) => acc + u.studentIds.length, 0);
@@ -127,7 +137,7 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
       const leaderNames2 = leaderEntries2.map(e => e.name);
       const groups = runAutoAssign(
         groupCount1bu, groupCount2bu, rules,
-        studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, participants, teachers, students,
+        studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, participants, teachers, students,
         pinnedKeys1, pinnedKeys2, leaderNames1, leaderNames2,
       );
       setPreview({ groups, units1: classUnits1, units2: classUnits2 });
@@ -163,6 +173,9 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
         setTeacherStudentConflicts={setTeacherStudentConflicts}
         classConflicts={classConflicts}
         setClassConflicts={setClassConflicts}
+        classAffinities={classAffinities}
+        setClassAffinities={setClassAffinities}
+        relationErrors={relationErrors}
         newSC={newSC}
         setNewSC={setNewSC}
         newTC={newTC}
@@ -171,6 +184,8 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
         setNewTSC={setNewTSC}
         newCC={newCC}
         setNewCC={setNewCC}
+        newCA={newCA}
+        setNewCA={setNewCA}
         leaderEntries1={leaderEntries1}
         setLeaderEntries1={setLeaderEntries1}
         leaderEntries2={leaderEntries2}

@@ -112,6 +112,9 @@ export interface AutoAssignConfigPanelProps {
   setTeacherStudentConflicts: React.Dispatch<React.SetStateAction<ConflictPair[]>>;
   classConflicts: ConflictPair[];
   setClassConflicts: React.Dispatch<React.SetStateAction<ConflictPair[]>>;
+  classAffinities: ConflictPair[];
+  setClassAffinities: React.Dispatch<React.SetStateAction<ConflictPair[]>>;
+  relationErrors: string[]; // 반 결합·분리 모순 — 있으면 실행 차단
   // 드롭다운 입력 상태
   newSC: { a: StudentPicker; b: StudentPicker };
   setNewSC: React.Dispatch<React.SetStateAction<{ a: StudentPicker; b: StudentPicker }>>;
@@ -121,6 +124,8 @@ export interface AutoAssignConfigPanelProps {
   setNewTSC: React.Dispatch<React.SetStateAction<{ teacher: TeacherPicker; student: StudentPicker }>>;
   newCC: { a: ClassPicker; b: ClassPicker };
   setNewCC: React.Dispatch<React.SetStateAction<{ a: ClassPicker; b: ClassPicker }>>;
+  newCA: { a: ClassPicker; b: ClassPicker };
+  setNewCA: React.Dispatch<React.SetStateAction<{ a: ClassPicker; b: ClassPicker }>>;
   // 조장
   leaderEntries1: LeaderEntry[];
   setLeaderEntries1: (v: LeaderEntry[]) => void;
@@ -156,7 +161,8 @@ export default function AutoAssignConfigPanel({
   teacherConflicts, setTeacherConflicts,
   teacherStudentConflicts, setTeacherStudentConflicts,
   classConflicts, setClassConflicts,
-  newSC, setNewSC, newTC, setNewTC, newTSC, setNewTSC, newCC, setNewCC,
+  classAffinities, setClassAffinities, relationErrors,
+  newSC, setNewSC, newTC, setNewTC, newTSC, setNewTSC, newCC, setNewCC, newCA, setNewCA,
   leaderEntries1, setLeaderEntries1, leaderEntries2, setLeaderEntries2,
   classUnits1, classUnits2, maxGroups1, maxGroups2, bu1Count, bu2Count,
   teachers, running, onRun, onCollapse,
@@ -215,6 +221,18 @@ export default function AutoAssignConfigPanel({
     setClassConflicts(p => [...p, { a, b }]);
     reset();
   }
+  function addCA() {
+    const a = ccKey(newCA.a), b = ccKey(newCA.b);
+    if (!a || !b || a === b) return;
+    const reset = () => setNewCA({ a: { bu: "", grade: "", cls: "" }, b: { bu: "", grade: "", cls: "" } });
+    if (classAffinities.some(c => (c.a === a && c.b === b) || (c.a === b && c.b === a))) {
+      reset();
+      return;
+    }
+    // 분리 목록과의 모순은 여기서 막지 않는다 — validateClassRelations가 사유와 함께 실행을 차단
+    setClassAffinities(p => [...p, { a, b }]);
+    reset();
+  }
 
   return (
     <div className="card p-4 space-y-4 text-sm sticky top-4 max-h-[calc(100vh-5rem)] overflow-y-auto">
@@ -235,6 +253,7 @@ export default function AutoAssignConfigPanel({
             "전참 교사가 있는 조에 우선 배정",
             "조장 지정 시 해당 반 전체를 그 조에 고정",
             "고려 관계(학생·교사·교사학생·반) 설정 시 반드시 다른 조로 분리",
+            "반 붙임 관계 설정 시 해당 반들을 반드시 같은 조로 묶음",
             "모든 조의 인원 수를 최대한 균등하게 배분",
             "특정 학년이 한 조에 몰리지 않도록 분산 배정",
             "16회 반복 실행 후 최적 결과 자동 선택",
@@ -555,9 +574,87 @@ export default function AutoAssignConfigPanel({
         </div>
       </div>
 
-      <button onClick={onRun} disabled={running || (bu1Count === 0 && bu2Count === 0)}
+      {/* 반 붙임 관계 — 두 반을 반드시 같은 조로 (붙임끼리 연쇄되면 한 묶음) */}
+      <div>
+        <p className="text-xs font-semibold text-slate-500 mb-1">🤝 반 붙임 관계</p>
+        <p className="text-[10px] text-slate-400 mb-2">선택한 두 반은 반드시 같은 조에 배정됩니다. 붙임끼리 이어지면(A+B, B+C) 전부 한 조가 됩니다.</p>
+        <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
+          {classAffinities.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {classAffinities.map((c, i) => (
+            <div key={i} className="flex items-center gap-1 text-xs bg-amber-50 rounded px-2 py-1">
+              <span className="text-amber-700 font-medium">{classLabel(c.a)}</span>
+              <span className="text-slate-400">+</span>
+              <span className="text-amber-700 font-medium">{classLabel(c.b)}</span>
+              <button onClick={() => setClassAffinities(p => p.filter((_, j) => j !== i))}
+                aria-label="붙임 관계 삭제"
+                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+            </div>
+          ))}
+        </div>
+        <div className="grid gap-1 mb-1" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+            value={newCA.a.bu}
+            onChange={e => setNewCA(p => ({ ...p, a: { bu: e.target.value, grade: "", cls: "" } }))}>
+            <option value="">부서</option>
+            <option value="1부">1부</option>
+            <option value="2부">2부</option>
+          </select>
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+            value={newCA.a.grade}
+            onChange={e => setNewCA(p => ({ ...p, a: { ...p.a, grade: e.target.value, cls: "" } }))}>
+            <option value="">학년</option>
+            {getGrades(newCA.a.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
+          </select>
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+            value={newCA.a.cls}
+            onChange={e => setNewCA(p => ({ ...p, a: { ...p.a, cls: e.target.value } }))}>
+            <option value="">반A</option>
+            {getClasses(newCA.a.bu, newCA.a.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
+          </select>
+          <div />
+        </div>
+        <div className="grid gap-1 items-stretch" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+            value={newCA.b.bu}
+            onChange={e => setNewCA(p => ({ ...p, b: { bu: e.target.value, grade: "", cls: "" } }))}>
+            <option value="">부서</option>
+            <option value="1부">1부</option>
+            <option value="2부">2부</option>
+          </select>
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+            value={newCA.b.grade}
+            onChange={e => setNewCA(p => ({ ...p, b: { ...p.b, grade: e.target.value, cls: "" } }))}>
+            <option value="">학년</option>
+            {getGrades(newCA.b.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
+          </select>
+          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
+            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+            value={newCA.b.cls}
+            onChange={e => setNewCA(p => ({ ...p, b: { ...p.b, cls: e.target.value } }))}>
+            <option value="">반B</option>
+            {getClasses(newCA.b.bu, newCA.b.grade).map(c => <option key={c} value={String(c)}>{c}반</option>)}
+          </select>
+          <button onClick={addCA} disabled={!ccKey(newCA.a) || !ccKey(newCA.b) || ccKey(newCA.a) === ccKey(newCA.b)}
+            className="btn-secondary btn-sm text-xs px-1 disabled:opacity-40 w-full">추가</button>
+        </div>
+      </div>
+
+      {/* 반 결합·분리 모순 — 실행 차단 사유 */}
+      {relationErrors.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 space-y-1">
+          <p className="font-semibold">⚠ 붙임·분리 설정에 모순이 있어 실행할 수 없습니다</p>
+          {relationErrors.map((e, i) => <p key={i}>· {e}</p>)}
+        </div>
+      )}
+
+      <button onClick={onRun} disabled={running || (bu1Count === 0 && bu2Count === 0) || relationErrors.length > 0}
         className="btn-primary w-full justify-center text-sm">
-        {running ? "⏳ 계산 중..." : "🎲 자동 배정 실행"}
+        {running ? "⏳ 계산 중..." : relationErrors.length > 0 ? "🚫 모순을 해결해주세요" : "🎲 자동 배정 실행"}
       </button>
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runAutoAssign, scoreGroups, RuleFlags, ConflictPair, ClassUnit } from "./autoAssignUtils";
+import { runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -26,15 +26,15 @@ function run(
   participants: Record<string, Participant>,
   rules: RuleFlags,
   opts: {
-    studentConflicts?: ConflictPair[]; classConflicts?: ConflictPair[];
-    teacherConflicts?: ConflictPair[]; teachers?: TeacherAttendance[];
+    studentConflicts?: ConflictPair[]; classConflicts?: ConflictPair[]; classAffinities?: ConflictPair[];
+    teacherConflicts?: ConflictPair[]; teachers?: TeacherAttendance[]; pinned?: (string | null)[];
   } = {},
 ) {
   const empty: string[] = Array(groupCount).fill("");
-  const pinned: (string | null)[] = Array(groupCount).fill(null);
+  const pinned: (string | null)[] = opts.pinned ?? Array(groupCount).fill(null);
   return runAutoAssign(
     groupCount, 0, rules,
-    opts.studentConflicts ?? [], opts.teacherConflicts ?? [], [], opts.classConflicts ?? [],
+    opts.studentConflicts ?? [], opts.teacherConflicts ?? [], [], opts.classConflicts ?? [], opts.classAffinities ?? [],
     participants, opts.teachers ?? [], {},
     pinned, [], empty, empty,
   );
@@ -167,13 +167,137 @@ describe("scoreGroups — 교사 고려 관계 하드 판정", () => {
 
   it("두 교사 반이 같은 조면 하드 페널티", () => {
     const groups = [mkG("gA", ["s1", "s2"]), mkG("gB", [])];
-    const score = scoreGroups(groups, units, [], conflict, [], [], rules, teachers);
+    const score = scoreGroups(groups, units, [], conflict, [], [], [], rules, teachers);
     expect(score).toBeLessThanOrEqual(-1_000_000);
   });
 
   it("두 교사 반이 다른 조면 페널티 없음", () => {
     const groups = [mkG("gA", ["s1"]), mkG("gB", ["s2"])];
-    const score = scoreGroups(groups, units, [], conflict, [], [], rules, teachers);
+    const score = scoreGroups(groups, units, [], conflict, [], [], [], rules, teachers);
     expect(score).toBe(0);
+  });
+
+  it("붙임 관계: 두 반이 서로 다른 조면 하드 페널티 (방어망)", () => {
+    const groups = [mkG("gA", ["s1"]), mkG("gB", ["s2"])];
+    const affinity: ConflictPair[] = [{ a: "1부_1_1", b: "1부_1_2" }];
+    const score = scoreGroups(groups, units, [], [], [], [], affinity, rules, []);
+    expect(score).toBeLessThanOrEqual(-1_000_000);
+  });
+});
+
+// ── 반 붙임(결합) 관계 — 번들 배정으로 구조 보장 ──────────────────────
+describe("runAutoAssign — 반 붙임 관계", () => {
+  it("붙임 쌍은 항상 같은 조에 배정된다", () => {
+    // 남학생 반 4개(1·3·5·7반), 조 2 — 1반+5반 결합
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s3: mkP("s3", "나", 1, 3),
+      s5: mkP("s5", "다", 1, 5), s7: mkP("s7", "라", 1, 7),
+    };
+    const groups = run(2, participants, mkRules({ applyConflicts: true, balanceSize: true }), {
+      classAffinities: [{ a: "1부_1_1", b: "1부_1_5" }],
+    });
+    expect(groupOf(groups, "s1")!.id).toBe(groupOf(groups, "s5")!.id);
+  });
+
+  it("연쇄 붙임(A+B, B+C)은 세 반 모두 한 조가 된다", () => {
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s3: mkP("s3", "나", 1, 3),
+      s5: mkP("s5", "다", 1, 5), s7: mkP("s7", "라", 1, 7),
+    };
+    const groups = run(2, participants, mkRules({ applyConflicts: true, balanceSize: true }), {
+      classAffinities: [{ a: "1부_1_1", b: "1부_1_3" }, { a: "1부_1_3", b: "1부_1_5" }],
+    });
+    const g1 = groupOf(groups, "s1")!.id;
+    expect(groupOf(groups, "s3")!.id).toBe(g1);
+    expect(groupOf(groups, "s5")!.id).toBe(g1);
+  });
+
+  it("붙임과 분리가 공존: A+B는 함께, A−C는 따로", () => {
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s3: mkP("s3", "나", 1, 3), s5: mkP("s5", "다", 1, 5),
+    };
+    const groups = run(2, participants, mkRules({ applyConflicts: true }), {
+      classAffinities: [{ a: "1부_1_1", b: "1부_1_3" }],
+      classConflicts: [{ a: "1부_1_1", b: "1부_1_5" }],
+    });
+    expect(groupOf(groups, "s1")!.id).toBe(groupOf(groups, "s3")!.id);
+    expect(groupOf(groups, "s1")!.id).not.toBe(groupOf(groups, "s5")!.id);
+  });
+
+  it("조장 반 고정 시 붙임 반이 고정 조를 따라간다", () => {
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s3: mkP("s3", "나", 1, 3),
+      s5: mkP("s5", "다", 1, 5), s7: mkP("s7", "라", 1, 7),
+    };
+    // 1반을 2번째 조(idx 1)에 고정 + 1반↔5반 붙임 → 5반도 2번째 조
+    const groups = run(2, participants, mkRules({ applyConflicts: true, pinLeaders: true }), {
+      classAffinities: [{ a: "1부_1_1", b: "1부_1_5" }],
+      pinned: [null, "1부_1_1"],
+    });
+    const g1 = groupOf(groups, "s1")!;
+    expect(g1.name).toBe("2조");
+    expect(groupOf(groups, "s5")!.id).toBe(g1.id);
+  });
+
+  it("고려 관계 반영이 꺼져 있으면 붙임도 무시된다 (기존 동작 보존)", () => {
+    // 반 2개·조 2·인원 균등 → 붙임이 무시되면 반드시 분리 배치
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s3: mkP("s3", "나", 1, 3),
+    };
+    const groups = run(2, participants, mkRules({ applyConflicts: false, balanceSize: true }), {
+      classAffinities: [{ a: "1부_1_1", b: "1부_1_3" }],
+    });
+    expect(groupOf(groups, "s1")!.id).not.toBe(groupOf(groups, "s3")!.id);
+  });
+});
+
+// ── validateClassRelations — 모순 입력 사전 차단 ──────────────────────
+describe("validateClassRelations", () => {
+  const mkU = (bu: string, grade: number, cls: number, count = 1): ClassUnit => ({
+    key: `${bu}_${grade}_${cls}`, bu, grade, classNum: cls,
+    gender: cls % 2 === 0 ? "여" : "남",
+    studentIds: Array.from({ length: count }, (_, i) => `s${cls}_${i}`),
+    names: Array.from({ length: count }, (_, i) => `n${cls}_${i}`),
+  });
+  const units = [mkU("1부", 1, 1), mkU("1부", 1, 2), mkU("1부", 1, 3), mkU("2부", 1, 1)];
+
+  it("같은 쌍이 붙임+분리에 있으면 모순", () => {
+    const errors = validateClassRelations(units,
+      [{ a: "1부_1_1", b: "1부_1_3" }], [{ a: "1부_1_3", b: "1부_1_1" }], mkRules({}));
+    expect(errors.some(e => e.includes("동시에"))).toBe(true);
+  });
+
+  it("연쇄 붙임 묶음 안의 분리 쌍도 모순으로 잡는다", () => {
+    // 1반+2반, 2반+3반 결합 → 1·2·3반 한 묶음인데 1반−3반 분리
+    const errors = validateClassRelations(units,
+      [{ a: "1부_1_1", b: "1부_1_3" }],
+      [{ a: "1부_1_1", b: "1부_1_2" }, { a: "1부_1_2", b: "1부_1_3" }],
+      mkRules({}));
+    expect(errors.some(e => e.includes("묶음"))).toBe(true);
+  });
+
+  it("동성 규칙 + 남녀 혼성 묶음은 모순", () => {
+    const errors = validateClassRelations(units,
+      [], [{ a: "1부_1_1", b: "1부_1_2" }], mkRules({ sameGender: true }));
+    expect(errors.some(e => e.includes("동성"))).toBe(true);
+  });
+
+  it("묶음 인원이 조당 최대를 초과하면 실현 불가", () => {
+    const bigUnits = [mkU("1부", 1, 1, 5), mkU("1부", 1, 3, 5)];
+    const errors = validateClassRelations(bigUnits,
+      [], [{ a: "1부_1_1", b: "1부_1_3" }], mkRules({ maxGroupSize: 8 }));
+    expect(errors.some(e => e.includes("초과"))).toBe(true);
+  });
+
+  it("서로 다른 부의 반 붙임은 불가", () => {
+    const errors = validateClassRelations(units,
+      [], [{ a: "1부_1_1", b: "2부_1_1" }], mkRules({}));
+    expect(errors.some(e => e.includes("다른 부"))).toBe(true);
+  });
+
+  it("정상 입력이면 에러 없음", () => {
+    const errors = validateClassRelations(units,
+      [{ a: "1부_1_1", b: "1부_1_2" }], [{ a: "1부_1_1", b: "1부_1_3" }], mkRules({}));
+    expect(errors).toEqual([]);
   });
 });
