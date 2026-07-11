@@ -82,7 +82,7 @@ export default function RoomsView({ groups, rooms, buses, meals, retreatName, ye
   }
 
   if (groups.length === 0) return (
-    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🛏️</div><p>조편성 데이터가 없습니다.</p></div>
+    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🛏️</div><p>조편성 데이터가 없습니다.</p><p className="text-xs mt-1.5 text-slate-300">행정 사이트에서 조편성·방배정이 완료되면 자동으로 나타납니다.</p></div>
   );
 
   return (

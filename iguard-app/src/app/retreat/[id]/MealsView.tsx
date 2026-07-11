@@ -108,7 +108,7 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                     onBlur={e => savePinnedFront(meal, e.target.value)}
                   />
                 </div>
-                {ordered.length === 0 ? <div className="p-6 text-center text-slate-300 text-xs">조편성 데이터가 없습니다.</div> : (
+                {ordered.length === 0 ? <div className="p-6 text-center text-slate-300 text-xs">조편성 데이터가 없습니다. 행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</div> : (
                   <table className="w-full text-sm">
                     <thead><tr className="table-header"><th className="px-3 py-2 text-center w-12">순서</th><th className="px-3 py-2 text-left">조</th><th className="px-3 py-2 text-center w-16">인원</th><th className="px-3 py-2 text-center w-20">이동</th></tr></thead>
                     <tbody className="divide-y divide-slate-100">

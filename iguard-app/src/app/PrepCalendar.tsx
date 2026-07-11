@@ -71,10 +71,14 @@ export default function PrepCalendar({ periods, milestones, retreats }: {
   const [editNote, setEditNote] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
-  // 기본 표시 월: 첫 마일스톤 → 첫 기간 → 오늘
+  // 기본 표시 월: "오늘 이후" 가장 가까운 마일스톤/수련회 시작일 → 없으면 오늘.
+  // (과거 첫 항목 기준이면 지난 겨울 달력(1월)이 떠서 매번 현재 달까지 넘겨야 했다 — 2026-07-12 수정)
   const initial = useMemo(() => {
-    const base = milestones[0]?.targetDate || periods[0]?.startDate || today;
-    const p = parse(base)!;
+    const upcoming = [
+      ...milestones.map(ms => ms.targetDate),
+      ...periods.map(p => p.startDate),
+    ].filter(d => !!d && d >= today).sort()[0];
+    const p = parse(upcoming || today) ?? parse(today)!;
     return { y: p.y, m: p.m };
   }, [milestones, periods, today]);
   const [ym, setYm] = useState(initial);

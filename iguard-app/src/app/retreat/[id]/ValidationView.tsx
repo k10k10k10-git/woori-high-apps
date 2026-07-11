@@ -12,13 +12,7 @@ interface Props {
   movements: IguardMovement[];
 }
 
-const toMin = (t?: string) => { if (!t) return null; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-function overlaps(a: IguardScheduleBlock, b: IguardScheduleBlock): boolean {
-  if (a.day !== b.day) return false;
-  const s1 = toMin(a.start), e1 = toMin(a.end), s2 = toMin(b.start), e2 = toMin(b.end);
-  if (s1 == null || e1 == null || s2 == null || e2 == null) return false;
-  return s1 < e2 && s2 < e1;
-}
+import { isTeleport } from "@/lib/validationRules";
 
 type Issue = { level: "error" | "warn" | "info"; text: string };
 
@@ -44,11 +38,11 @@ export default function ValidationView({ retreatId, staff, schedule, posts, move
       });
     }
 
-    // 1) 순간이동: 한 스탭이 시간 겹치는 두 블록에 서로 다른 포스트로 배치
+    // 1) 순간이동: 한 스탭이 시간 겹치는 두 블록에 "서로 다른 포스트"로 배치 (같은 포스트면 이동 없음 → 정상)
     staff.forEach(s => {
       const mvs = (byStaff.get(s.id) || []).map(mv => ({ mv, b: blockById.get(mv.blockId) })).filter(x => x.b) as { mv: IguardMovement; b: IguardScheduleBlock }[];
       for (let i = 0; i < mvs.length; i++) for (let j = i + 1; j < mvs.length; j++) {
-        if (overlaps(mvs[i].b, mvs[j].b)) {
+        if (isTeleport({ postId: mvs[i].mv.postId, block: mvs[i].b }, { postId: mvs[j].mv.postId, block: mvs[j].b })) {
           out.push({ level: "error", text: `순간이동: ${s.name} 이(가) 겹치는 시간 「${mvs[i].b.label}」(${postName.get(mvs[i].mv.postId)})와 「${mvs[j].b.label}」(${postName.get(mvs[j].mv.postId)})에 동시에 배치됨` });
         }
       }

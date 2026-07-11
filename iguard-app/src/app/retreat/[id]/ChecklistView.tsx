@@ -232,7 +232,7 @@ export default function ChecklistView({ retreatId, groups, students, buses, retr
       {mode === "호차별" && units.length === 0 ? (
         <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🚌</div><p>{day} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>
       ) : units.length === 0 ? (
-        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">✅</div><p>조편성 데이터가 없습니다.</p></div>
+        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">✅</div><p>조편성 데이터가 없습니다.</p><p className="text-xs mt-1.5 text-slate-300">행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</p></div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {units.map(u => {
