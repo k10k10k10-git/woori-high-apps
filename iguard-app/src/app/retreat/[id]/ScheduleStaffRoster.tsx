@@ -144,8 +144,8 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
         <div ref={popoverRef} className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className={`space-y-1 overflow-y-auto pr-1 ${expanded ? "max-h-[320px]" : "max-h-[120px]"}`}>
             {staffByAge.map(([ageLabel, ageStaff]) => (
-              <div key={ageLabel} className="grid grid-cols-[34px_1fr] items-start gap-1">
-                <div className="pt-0.5 text-xs font-semibold text-slate-700">{ageLabel}:</div>
+              <div key={ageLabel} className="grid grid-cols-[52px_1fr] items-start gap-1">
+                <div className="pt-0.5 text-xs font-semibold text-slate-700">{/^\d+$/.test(ageLabel) ? `${ageLabel}년생` : ageLabel}</div>
                 <div className="flex flex-wrap content-start gap-1">
                   {ageStaff.map(s => {
                     const assigned = assignedStaff.has(s.id);

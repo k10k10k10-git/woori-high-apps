@@ -153,11 +153,14 @@ describe("시간 유틸 (현재 동작 고정)", () => {
     expect(isValidTime(undefined)).toBe(true); // 빈 값 허용
   });
 
-  it("scheduleTimeError: 형식·순서 검증", () => {
+  it("scheduleTimeError: 형식·순서 검증 + 자정 넘김은 24시+ 표기 안내", () => {
     expect(scheduleTimeError("9시", "10:00")).toContain("HH:MM");
     expect(scheduleTimeError("10:00", "09:00")).toContain("늦어야");
+    expect(scheduleTimeError("10:00", "09:00")).toContain("24시+"); // 현장 수동 입력 안내 (F1)
     expect(scheduleTimeError("09:00", "~")).toBeNull();
     expect(scheduleTimeError("09:00", "10:00")).toBeNull();
+    // 폼 정규화(resolveOvernight) 후에는 자정 넘김이 유효해진다: 23:30~26:00
+    expect(scheduleTimeError("23:30", "26:00")).toBeNull();
   });
 
   it("toMinutes / timeRangeLabel / parseNames / scheduleSortValue", () => {

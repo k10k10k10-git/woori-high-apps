@@ -26,10 +26,10 @@ import GroupStaffView from "./GroupStaffView";
 
 const GROUPS = [
   { label: "실행", hint: "현장·모바일", views: [
-    { key: "check", label: "인원체크" },
-    { key: "rooms", label: "조별 정보" },
-    { key: "cue", label: "개인 큐카드" },
-    { key: "board", label: "포스트 현황" },
+    { key: "check", label: "인원체크", icon: "✅" },
+    { key: "rooms", label: "조별 정보", icon: "👥" },
+    { key: "cue", label: "개인 큐카드", icon: "📋" },
+    { key: "board", label: "포스트 현황", icon: "📍" },
   ] },
   { label: "기획", hint: "PC", views: [
     { key: "schedule", label: "스탭 전체 큐싯" },
@@ -264,27 +264,31 @@ export default function IguardClient() {
         {!dataLoading && view === "todos" && <TodosView todos={todos} />}
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden" aria-label="실행 뷰 탐색">
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-1" role="tablist">
-          {executionViews.map(v => {
-            const active = view === v.key;
-            return (
-              <button
-                key={v.key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setView(v.key)}
-                className={`min-h-12 rounded-lg px-1.5 text-[11px] font-semibold transition-colors ${
-                  active ? "bg-fuchsia-700 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
-                }`}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
+      {/* 하단 탭바는 실행 뷰에서만 — 기획·정보 화면에서는 숨겨 세로 공간 확보 + 오탐 이동 방지 (2026-07-12) */}
+      {executionViews.some(v => v.key === view) && (
+        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden" aria-label="실행 뷰 탐색">
+          <div className="mx-auto grid max-w-md grid-cols-4 gap-1" role="tablist">
+            {executionViews.map(v => {
+              const active = view === v.key;
+              return (
+                <button
+                  key={v.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setView(v.key)}
+                  className={`min-h-12 rounded-lg px-1.5 text-[11px] font-semibold transition-colors ${
+                    active ? "bg-fuchsia-700 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
+                  }`}
+                >
+                  <span aria-hidden="true" className="block text-sm leading-none mb-0.5">{v.icon}</span>
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+      )}
     </div>
   );
 }

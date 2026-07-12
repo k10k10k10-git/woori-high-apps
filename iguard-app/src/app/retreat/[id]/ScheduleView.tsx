@@ -10,6 +10,7 @@ import {
   EMPTY,
   normalizeTime,
   normalizeEnd,
+  resolveOvernight,
   scheduleTimeError,
   timeRangeLabel,
   looksLikeMeal,
@@ -40,11 +41,17 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
     const start = normalizeTime(form.start);
     const end = normalizeEnd(form.end);
     if (!start || !form.label.trim()) return toast("시작 시간과 내용을 입력해주세요.", "warning");
-    const timeError = scheduleTimeError(start, end || undefined);
+    // 자정 넘김 정규화 — 시트 임포트와 동일 규칙(24시+ 표기, 패턴 10b).
+    // 현장에서 "23:30~02:00"처럼 사람이 읽는 대로 입력해도 막히지 않게 폼에서도 적용한다(2026-07-12).
+    const resolved = resolveOvernight(form.day, start, end || undefined);
+    const timeError = scheduleTimeError(resolved.start, resolved.end || undefined);
     if (timeError) return toast(timeError, "warning");
+    if (resolved.converted) {
+      toast(`자정 넘김 일정으로 정리했습니다: ${form.day}일차 ${timeRangeLabel(start, end || undefined)} → ${resolved.day}일차 ${timeRangeLabel(resolved.start, resolved.end || undefined)}`, "info");
+    }
     try {
       await saveIguardScheduleBlock(retreatId, {
-        day: form.day, start, end: end || undefined,
+        day: resolved.day, start: resolved.start, end: resolved.end || undefined,
         label: form.label.trim(),
         meal: form.meal || looksLikeMeal(form.label, form.detail) || undefined,
         detail: form.detail.trim() || undefined,

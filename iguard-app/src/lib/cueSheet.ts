@@ -108,7 +108,7 @@ export function scheduleTimeError(start: string, end?: string): string | null {
   if (!isValidTime(start)) return "시작 시간은 HH:MM 형식으로 입력해주세요. 예: 09:30";
   if (end === OPEN_END) return null;
   if (end && !isValidTime(end)) return "종료 시간은 HH:MM 형식으로 입력해주세요. 예: 10:30";
-  if (end && toMinutes(end) <= toMinutes(start)) return "종료 시간은 시작 시간보다 늦어야 합니다.";
+  if (end && toMinutes(end) <= toMinutes(start)) return "종료 시간은 시작 시간보다 늦어야 합니다. 자정을 넘는 일정은 26:00처럼 24시+ 표기를 사용해주세요.";
   return null;
 }
 
