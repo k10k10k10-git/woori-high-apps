@@ -157,8 +157,10 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   const hasJang = useMemo(() => jangClasses.some(c => c.students.length > 0), [jangClasses]);
   const jangMaxRows = useMemo(() => Math.max(0, ...jangClasses.map(c => c.students.length)), [jangClasses]);
 
-  // 통계·매칭은 평시 학생 기준(장결자는 집계 제외)
-  const allStudents = useMemo(() => regularClasses.flatMap(c => c.students), [regularClasses]);
+  // 매칭 풀은 장결자 포함(visibleClasses) — 장결자도 신청하면 매칭·자동 색칠되어야 한다.
+  // (평시만 넣으면 신청한 장결자가 영원히 미매칭 → 색칠 안 되는 버그, 2026-07-12 수정.
+  //  통계 모수는 buParts(신청자) 기준이라 미신청 장결자가 집계를 오염시키지 않는다.)
+  const allStudents = useMemo(() => visibleClasses.flatMap(c => c.students), [visibleClasses]);
 
   // 선택한 부의 참가자를 Firebase studentId에 매핑
   const participantByStudentId = useMemo(() => {
