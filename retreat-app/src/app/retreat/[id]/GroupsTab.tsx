@@ -350,61 +350,63 @@ export default function GroupsTab({ retreat }: Props) {
     saveWorkbook(wb, `${retreat.name}_조편성`);
   }
 
-  function buildGroupsHtml() {
-    const buList = [...new Set(groups.map(g => g.bu))].sort();
+  function buildGroupsHtml(onlyBu?: string) {
+    const exportGroups = onlyBu ? groups.filter(g => g.bu === onlyBu) : groups;
+    const buList = [...new Set(exportGroups.map(g => g.bu))].sort();
     const studentByName = Object.fromEntries(Object.values(students).map(s => [s.name, s]));
 
-    // ── 4조/페이지 페이지 목록 사전 계산 ──────────────────────
-    interface PdfPage { bu: string; pageGroups: Group[]; showBuLabel: boolean; isLast: boolean }
+    // ── 한 부서/페이지: 디지털 공유용 긴 세로 페이지 2×6 그리드 ──
+    interface PdfPage { bu: string; pageGroups: Group[]; columns: number; rows: number; isLast: boolean }
     const pages: PdfPage[] = [];
     buList.forEach(bu => {
-      const bg = sortGroupsByNumber(groups.filter(g => g.bu === bu));
+      const bg = sortGroupsByNumber(exportGroups.filter(g => g.bu === bu));
       if (!bg.length) return;
-      for (let i = 0; i < bg.length; i += 4) {
-        pages.push({ bu, pageGroups: bg.slice(i, i + 4), showBuLabel: i === 0, isLast: false });
-      }
+      const columns = bg.length <= 12 ? 2 : 3;
+      pages.push({ bu, pageGroups: bg, columns, rows: Math.ceil(bg.length / columns), isLast: false });
     });
     if (pages.length) pages[pages.length - 1].isLast = true;
 
     // ── CSS ───────────────────────────────────────────────────
     const style = `<style>
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      body { padding: 6px 8px; font-size: 10px; }
-      h1 { font-size: 14px; font-weight: 800; margin: 0 0 1px; }
-      .doc-sub { font-size: 9px; color: #888; margin: 0 0 6px; }
-      .bu-lbl { font-size: 11px; font-weight: 700; color: #1e293b; border-bottom: 2px solid #1e293b; padding-bottom: 3px; margin: 4px 0 6px; }
+      body { padding: 0; font-size: 10px; background: #fff; }
+      .dept-page { width: 100%; aspect-ratio: 287 / 590; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+      .doc-head { height: 36px; flex-shrink: 0; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 2px solid #0f172a; margin-bottom: 5px; }
+      h1 { font-size: 16px; line-height: 1.2; font-weight: 800; margin: 0 0 2px; color: #0f172a; }
+      .doc-sub { font-size: 9px; color: #64748b; margin: 0; }
+      .doc-bu { font-size: 13px; font-weight: 800; color: #fff; background: #0f172a; border-radius: 4px; padding: 4px 10px; }
 
-      /* 한 페이지 = 2×2 그리드 */
+      /* 한 페이지 = 한 부서. 12조 이하는 넓은 카드 2열로 휴대폰 가독성을 유지 */
       .pg {
+        flex: 1;
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
+        grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+        grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
         gap: 5px;
         min-height: 0;
       }
       .pb { page-break-after: always; break-after: page; }
 
-      /* 조 카드 — overflow:hidden 제거(인쇄 시 테두리 클리핑 방지) */
-      .gc { border: 1.5px solid #64748b; border-radius: 5px; display: flex; flex-direction: column; }
-      .gc-head { background: #0f172a; color: #fff; padding: 4px 8px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border-radius: 3px 3px 0 0; }
-      .gc-name { font-size: 16px; font-weight: 800; letter-spacing: -0.5px; }
-      .gc-bu   { font-size: 8.5px; background: rgba(255,255,255,0.25); border-radius: 3px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
-      .gc-gbs  { font-size: 8.5px; color: #93c5fd; }
+      .gc { min-width: 0; min-height: 0; border: 1.5px solid #64748b; border-radius: 5px; display: flex; flex-direction: column; break-inside: avoid; }
+      .gc-head { background: #0f172a; color: #fff; padding: 3px 6px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; border-radius: 3px 3px 0 0; }
+      .gc-name { font-size: 15px; font-weight: 800; letter-spacing: -0.5px; }
+      .gc-bu   { font-size: 8px; background: rgba(255,255,255,0.25); border-radius: 3px; padding: 1px 4px; margin-left: 4px; vertical-align: middle; }
+      .gc-gbs  { font-size: 8px; color: #93c5fd; }
 
       /* 테이블 */
       table { width: 100%; border-collapse: collapse; flex: 1; }
       thead tr { background: #e2e8f0; }
-      thead th { padding: 3px 5px; font-size: 8.5px; font-weight: 700; color: #475569; text-align: left; border: none; border-bottom: 2px solid #94a3b8; }
-      tbody td { padding: 3px 5px; font-size: 10.5px; border: none; border-bottom: 1px solid #e2e8f0; }
+      thead th { padding: 2.5px 5px; font-size: 8px; line-height: 1.1; font-weight: 700; color: #475569; text-align: left; border: none; border-bottom: 1.5px solid #94a3b8; }
+      tbody td { padding: 1.5px 5px; font-size: 10px; line-height: 1.1; border: none; border-bottom: 1px solid #e2e8f0; }
       tr:last-child td { border-bottom: none; }
 
-      .t-num { width: 16px; text-align: center; color: #94a3b8; font-size: 8.5px; }
-      .t-cls { width: 62px; color: #475569; font-size: 9px; white-space: nowrap; }
+      .t-num { width: 16px; text-align: center; color: #94a3b8; font-size: 8px; }
+      .t-cls { width: 64px; color: #475569; font-size: 9px; white-space: nowrap; }
       .t-name { font-weight: 700; color: #1e293b; }
-      .t-sex  { width: 14px; text-align: center; font-size: 8.5px; color: #64748b; }
+      .t-sex  { width: 14px; text-align: center; font-size: 8px; color: #64748b; }
       .t-chk  { width: 18px; text-align: center; }
-      .chk    { display: inline-block; width: 11px; height: 11px; border: 1.5px solid #64748b; border-radius: 2px; }
-      .badge  { font-size: 7.5px; font-weight: 600; background: rgba(0,0,0,0.08); border-radius: 2px; padding: 0 3px; margin-left: 3px; color: #475569; vertical-align: middle; }
+      .chk    { display: inline-block; width: 10px; height: 10px; border: 1.2px solid #64748b; border-radius: 2px; }
+      .badge  { font-size: 7px; font-weight: 600; background: rgba(0,0,0,0.08); border-radius: 2px; padding: 0 2px; margin-left: 2px; color: #475569; vertical-align: middle; }
 
       /* 반 구분선 — 반이 바뀌는 첫 행에 두꺼운 위쪽 테두리 */
       tr.cls-div td { border-top: 2px solid #64748b !important; }
@@ -423,10 +425,11 @@ export default function GroupsTab({ retreat }: Props) {
       .r-red td     { background: #fecaca; }
       .r-red .t-name     { color: #dc2626; text-decoration: line-through; }
 
-      .gc-foot { padding: 2px 8px; text-align: right; font-size: 8.5px; color: #475569; background: #f1f5f9; border-top: 1.5px solid #94a3b8; flex-shrink: 0; border-radius: 0 0 3px 3px; }
+      .gc-foot { padding: 2px 6px; text-align: right; font-size: 8px; color: #475569; background: #f1f5f9; border-top: 1.5px solid #94a3b8; flex-shrink: 0; border-radius: 0 0 3px 3px; }
       @media print {
-        @page { margin: 6mm; size: A4 portrait; }
+        @page { margin: 5mm; size: 297mm 600mm; }
         body { padding: 0; }
+        .dept-page { width: auto; height: 589mm; aspect-ratio: auto; }
         /* 인쇄 시 테두리 강제 출력 */
         .gc { border: 1.5px solid #64748b !important; }
         tbody td { border-bottom: 1px solid #d1d5db !important; }
@@ -438,15 +441,16 @@ export default function GroupsTab({ retreat }: Props) {
     </style>`;
 
     let html = style;
-    html += `<h1>${escapeHtml(retreat.name)} 조편성</h1>
-      <p class="doc-sub">총 ${groups.length}조 &nbsp;·&nbsp; 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>`;
+    const printedAt = new Date().toLocaleDateString("ko-KR");
 
-    pages.forEach(({ bu, pageGroups, showBuLabel, isLast }) => {
-      if (showBuLabel) {
-        const buTotal = groups.filter(g => g.bu === bu).length;
-        html += `<div class="bu-lbl">${escapeHtml(bu)} (${buTotal}조)</div>`;
-      }
-      html += `<div class="pg${isLast ? "" : " pb"}">`;
+    pages.forEach(({ bu, pageGroups, columns, rows, isLast }) => {
+      html += `<section class="dept-page${isLast ? "" : " pb"}">
+        <header class="doc-head">
+          <div><h1>${escapeHtml(retreat.name)} ${escapeHtml(bu)} 조편성</h1>
+          <p class="doc-sub">총 ${pageGroups.length}조 &nbsp;·&nbsp; 출력일: ${printedAt}</p></div>
+          <div class="doc-bu">${escapeHtml(bu)}</div>
+        </header>
+        <div class="pg" style="--cols:${columns};--rows:${rows}">`;
 
       pageGroups.forEach(g => {
         const leaderNames = new Set(parseNames(g.leader || ""));
@@ -551,7 +555,7 @@ export default function GroupsTab({ retreat }: Props) {
         </div>`;
       });
 
-      html += `</div>`; // .pg
+      html += `</div></section>`; // .pg, .dept-page
     });
 
     return html;
@@ -564,8 +568,12 @@ export default function GroupsTab({ retreat }: Props) {
   }
 
   async function exportGroupsJPG() {
-    if (!await exportAsJPG(buildGroupsHtml(), `${retreat.name}_조편성`)) {
-      toast("JPG 저장에 실패했습니다.", "error");
+    const buList = [...new Set(groups.map(group => group.bu))].sort();
+    for (const bu of buList) {
+      if (!await exportAsJPG(buildGroupsHtml(bu), `${retreat.name}_조편성_${bu}`)) {
+        toast(`${bu} JPG 저장에 실패했습니다.`, "error");
+        return;
+      }
     }
   }
 

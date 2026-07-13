@@ -217,6 +217,8 @@ await saveParticipants(retreatId, updatedParticipants);
 ### 3c. 인쇄/JPG 출력 — escapeHtml 필수
 `printAsPDF`/`exportAsJPG`/`rowsToHtmlTable`은 조립된 HTML 문자열을 그대로 `document.write`한다. 학생이 신청폼에 입력한 이름·특이사항 등이 이스케이프 없이 삽입되면, `<img src=x onerror=...>` 같은 값이 관리자가 인쇄하는 순간 관리자 컨텍스트에서 실행되는 저장형 XSS가 된다(2026-07-06 수정). **HTML 문자열에 사용자 입력을 삽입하는 모든 지점은 `exportUtils.ts`의 `escapeHtml()`로 감쌀 것.** 새 인쇄/내보내기 기능을 추가할 때 반드시 적용.
 
+조편성 공유물은 교사방에서 휴대폰으로 읽는 용도를 기준으로 한다(2026-07-13 수정). `GroupsTab.tsx`의 PDF는 표준 A4에 여러 조를 축소하지 않고 **한 부서를 긴 세로 1페이지**로 구성한다. JPG는 부서별로 `...조편성_1부.jpg`, `...조편성_2부.jpg`를 각각 생성한다. 카드 행 수를 바꾸거나 출력 CSS를 수정할 때는 교사·조장·학생이 모두 든 최대 행 카드로 PDF를 렌더해 격자 겹침·잘림을 시각 검증할 것.
+
 ### 4. Auth 접근 레벨
 ```typescript
 type AccessLevel = "none" | "member" | "admin";
