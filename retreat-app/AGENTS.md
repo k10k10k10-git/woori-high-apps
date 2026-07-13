@@ -60,6 +60,12 @@ The app may read `retreats/{id}/iguard/groupStaff` for display, but IGuard owns 
 - **판단 질문**: `cellColors` 키에서 접두를 떼 `students[rawId]`로 조회하지 않는다. 테스트 fixture가 raw id 키를 쓰면 실제 데이터에서만 실패하는 구현을 잘못 통과시키기 때문이다.
 - **재사용 규칙**: `getStudentsByYear()`를 쓰는 로직·테스트에서는 항상 `{ "2_rid9": { id: "2_rid9", ... } }` 형태를 유지하고, 셀색상·부분참 키 해석은 `resolveStudentKey()`만 사용한다.
 
+### 본인 반 없이 파송되는 학생 조장 모델링 (2026-07-13)
+
+- **접근법**: 1→ `AutoAssignConfigPanel.tsx`의 `중복`이 인물 중복이 아니라 앞 조장과 같은 반을 선택한 경고인지 확인한다. 2→ `autoAssignUtils.ts` Phase 0의 `assignedKeys`가 두 번째 같은 반 고정을 건너뛰면서 조장 이름과 학생 소속을 갈라놓는지 추적한다. 3→ 조장 입력에 기본 `본인반 동반`과 예외 `파송(본인반 없이)` 모드를 명시하고, 파송 조장의 `studentId`만 반 단위에서 분리해 조장 역할로만 목표 조에 둔다.
+- **판단 질문**: 같은 반 두 번째 조장의 `pinnedUnitKey`만 null로 만들지 않는다. 그러면 조장 이름은 새 조에 있지만 본인 학생 레코드는 원래 반 조에 남아 두 조에 동시에 보이는 역할 중복이 생기기 때문이다. 반 전체 쪼개기를 허용하거나 이름만으로 학생을 제거하는 방식도 기존 불변식과 동명이인 안전성을 깨므로 사용하지 않는다.
+- **재사용 규칙**: 조장 예외는 `LeaderEntry`에 `studentId`와 `mode: "withClass" | "sent"`로 표현하고, `sent`만 해당 학생 한 명을 ClassUnit에서 제외하며 같은 반 중복 검사는 `withClass`끼리만 하드 오류로 판정한다.
+
 ## Commands
 
 ```bash
