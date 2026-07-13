@@ -46,15 +46,15 @@ export function buildPartialPool(
   return [...keys]
     .flatMap<PartialPoolRow>(studentKey => {
       if (cellColors[studentKey] === "red") return [];
-      const rosterId = studentKey.slice(studentKey.indexOf("_") + 1);
-      const s = students[rosterId];
+      // studentKey는 이미 "${buNum}_${rawId}" 유니크키 = getStudentsByYear의 키. 접두를 떼면 안 된다.
+      const s = students[studentKey];
       const p = participantByKey.get(studentKey);
       const name = s?.name ?? p?.name;
       if (!name) return []; // 반 명단·참가자 어디에도 없으면 표시 불가(이론상 없음)
-      const buNum = studentKey.startsWith("2_") ? 2 : 1;
+      const buNum = s?.buNum ?? (studentKey.startsWith("2_") ? 2 : 1);
       return [{
         studentKey,
-        studentId: rosterId,
+        studentId: studentKey,
         name,
         bu: buNum === 2 ? "2부" : "1부",
         buNum,

@@ -298,6 +298,8 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 
 ### 13. 학생 식별 키는 반드시 `resolveStudentKey`로 — 화면마다 다른 기준 금지 (`studentMatcher.ts`)
 
+> ⚠ `getStudentsByYear`는 반환 `Record`의 키와 각 `Student.id` 둘 다 이미 `"${buNum}_${rawId}"` 형태로 만든다. `cellColors`의 `studentKey`로 학생을 찾을 때는 `students[studentKey]`로 직접 조회하고, 접두를 떼서 `students[rawId]`로 찾지 말 것. `findStudent`가 반환한 `s.id`에도 접두를 다시 붙이면 이중접두가 된다. 테스트 fixture도 `{ "2_rid9": { id: "2_rid9", ... } }` 형태로 실제 반환값을 재현한다.
+
 셀 색상(`cellColors`)과 부분참(`partialAttendances`)은 학생을 **`${buNum}_${반명단(classes/)의 studentId}`** 키로 식별한다. 신청자 취합(`ClassRosterTab`)은 반 명단을 순회하며 이 키로 색을 저장하므로, **참가자(participants)의 `studentId` 영속 여부와 무관하게** 아무나 색칠할 수 있다.
 
 ⚠ **버그(2026-07-13)**: 부분참석 탭이 목록을 `participants`에서 만들며 참가자에 **저장된 `p.studentId`가 있어야만** 행을 만들었다(`if (!p.studentId) return []`). 자동 매칭이 반 명단에서 못 찾은 신청자는 `studentId=null`로 저장되는데(`ParticipantsTab`의 `studentId: ms?.id ?? null`), 그런 학생은 신청자 취합에서 주황(부분참)으로 칠해도 부분참석 탭에 **영영 안 떴다**. 두 화면이 학생을 다른 기준(로스터 id vs 참가자 저장 studentId)으로 식별한 게 원인.

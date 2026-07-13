@@ -212,10 +212,11 @@ describe("resolveStudentKey", () => {
 
   // 핵심 회귀: studentId가 null이어도(자동 매칭 실패) 반 명단에서 이름으로 찾아
   // 신청자 취합 셀색상과 동일한 키를 돌려줘야 부분참석 탭에 뜬다.
+  // getStudentsByYear는 Student.id를 "${buNum}_${rawId}" 유니크키로 넣으므로 s.id를 그대로 쓴다.
   it("falls back to findStudent when studentId is missing (2026-07-13 버그)", () => {
-    const s = makeStudent({ id: "rid9", name: "김민하", grade: 3, class: 2, buNum: 2 });
+    const s = makeStudent({ id: "2_rid9", name: "김민하", grade: 3, class: 2, buNum: 2 });
     const p = makeParticipant({ name: "김민하", grade: 3, class: 2, bu: "2부", studentId: null });
-    // ClassRosterTab이 색칠 때 쓰는 키(`${cls.buNum}_${student.id}`)와 일치해야 한다.
+    // ClassRosterTab이 색칠 때 쓰는 키(`${cls.buNum}_${rawId}`) = getStudentsByYear 유니크키와 일치.
     expect(resolveStudentKey(p, studentsRecord(s))).toBe("2_rid9");
   });
 

@@ -77,6 +77,6 @@ export function resolveStudentKey(p: Participant, students: Record<string, Stude
   }
   const s = findStudent(p, students);
   if (!s) return null;
-  const b = s.buNum ?? buNum;
-  return b > 0 ? `${b}_${s.id}` : s.id;
+  // getStudentsByYear의 Student.id는 이미 "${buNum}_${rawId}" 유니크키 — 접두를 또 붙이지 않는다.
+  return String(s.id);
 }
