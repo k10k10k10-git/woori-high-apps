@@ -124,13 +124,14 @@
 
 | 파일 위치 | 상태 | 비고 |
 |----------|------|------|
-| 학생 앱/database.rules.json | **완전한 규칙** | 모든 경로 포함, 역할 기반 제한 |
-| 행정 앱/database.rules.json | **학생 앱과 동일** | 같은 내용 |
+| 학생 앱/database.rules.json | **유일한 배포 원천** | 모든 경로 포함, 역할 기반 제한 |
+| 행정 앱/firebase.json | **학생 앱 규칙을 참조** | `../고등부 학생 출석부/database.rules.json`을 가리킴 |
+| 행정 앱/DO_NOT_DEPLOY.database.rules.json | **보관 전용** | 절대 배포하지 않음 |
 | 교사·스탭 앱 | **없음** | firebase.json 자체가 없음 |
-| 이가드 앱/database.rules.json | **느슨한 규칙** | `retreats` 전체 `auth != null` 읽기, `staff_*` 규칙 없음 |
+| 이가드 앱/DO_NOT_DEPLOY.database.rules.json | **보관 전용** | 절대 배포하지 않음 |
 
-> **경고:** 이가드 rules가 배포되면 `retreats` 읽기 보호와 `staff_*` 쓰기 보호가 사라집니다.
-> 배포용 rules는 학생 앱(또는 행정 앱) 파일을 단일 원천으로 사용해야 합니다.
+> **경고:** `DO_NOT_DEPLOY` 파일을 배포하면 경로 보호가 약해질 수 있습니다.
+> 배포용 Rules의 단일 원천은 학생 앱 `database.rules.json`이며, 행정 앱도 이 파일을 참조합니다.
 
 ---
 

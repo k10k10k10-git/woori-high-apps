@@ -25,6 +25,7 @@ import {
   SessionAttendance,
   Team,
 } from "./types";
+import { buildTeamRemovalUpdates } from "./teamRemoval";
 
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
   if (!snap.exists()) return [];
@@ -91,7 +92,11 @@ export async function updateTeam(sid: string, teamId: string, partial: Partial<O
 }
 
 export async function removeTeam(sid: string, teamId: string): Promise<void> {
-  await remove(ref(db, paths.team(sid, teamId)));
+  const applicationsSnap = await get(ref(db, paths.applications(sid)));
+  const applications = applicationsSnap.exists()
+    ? applicationsSnap.val() as Record<string, Omit<Application, "id">>
+    : {};
+  await update(ref(db), buildTeamRemovalUpdates(sid, teamId, applications));
 }
 
 // ── 회차 ──────────────────────────────────────────────────────────────

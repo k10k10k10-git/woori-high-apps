@@ -1,8 +1,7 @@
 'use client';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ref, get } from 'firebase/database';
-import { db } from '@/lib/firebase/client';
+import { db, ref, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { getSundaysForYear, buildHolidayRanges, buildEvents, evKey, getWindowYears } from '@/utils/dates';
 import type { Student } from '@/types';

@@ -235,6 +235,8 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 
 ### 학생 데이터 쓰기 패턴 — 단일 경로만 수정 (전체 덮어쓰기 금지)
 
+Firebase Realtime Database SDK와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다.
+
 `StudentModal`(저장/삭제), `MoveStudentModal`(이동)은 반 전체 명단(`classes/{year}/{ck}/students`)을 통째로 `set()`하지 않고, 항상 **해당 학생 1명의 경로만** `update()`한다:
 ```typescript
 // ✅ 올바른 방법 — 단일 학생 경로만 갱신

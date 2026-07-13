@@ -109,7 +109,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
         )}
         {tab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} sessions={sessions} />}
         {tab === "아카이브" && <ArchiveTab sid={semesterId} />}
-        {tab === "설정" && <SettingsTab sid={semesterId} meta={meta} teams={teams} sessions={sessions} />}
+        {tab === "설정" && <SettingsTab sid={semesterId} meta={meta} teams={teams} sessions={sessions} applications={applications} />}
       </div>
     </main>
   );

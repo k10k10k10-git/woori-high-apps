@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ref, onValue, off, remove } from 'firebase/database';
-import { db } from '@/lib/firebase/client';
+import { db, ref, onValue, off, remove } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 
 type Suggestion = { id: string; text: string; createdAt: number; author: string };

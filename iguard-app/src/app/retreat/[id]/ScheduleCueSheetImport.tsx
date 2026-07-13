@@ -2,9 +2,6 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus, IguardMovement } from "@/lib/types";
 import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock, saveIguardPost, setIguardMovement, saveIguardBus, updateIguardBus, subscribeToIguardCueSheet, saveIguardCueSheet, markCueSheetImported, IguardCueSheet } from "@/lib/db";
-import { ref, update } from "firebase/database";
-import { db } from "@/lib/firebase";
-import { paths } from "@/lib/paths";
 import { fetchSheetCsv } from "@/lib/sheetClient";
 import { reconcileScheduleImport, hashCsv, blockKey } from "@/lib/scheduleReconcile";
 import { useUI } from "@/context/UIContext";
@@ -158,7 +155,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
         for (const b of schedule) {
           const note = map.get(blockKey(b.day, b.start));
           if (note && note !== (b.leaderNote || "")) {
-            await update(ref(db, paths.iguardScheduleBlock(retreatId, b.id)), { leaderNote: note });
+            await updateIguardScheduleBlock(retreatId, b.id, { leaderNote: note });
             leaderApplied++;
           }
         }

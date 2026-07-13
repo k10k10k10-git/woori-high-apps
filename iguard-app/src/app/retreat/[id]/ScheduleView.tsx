@@ -1,10 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement, IguardBus } from "@/lib/types";
-import { saveIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
-import { ref, update } from "firebase/database";
-import { db } from "@/lib/firebase";
-import { paths } from "@/lib/paths";
+import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import {
   EMPTY,
@@ -67,7 +64,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
   }
   async function setNoMovement(b: IguardScheduleBlock, checked: boolean) {
     try {
-      await update(ref(db, paths.iguardScheduleBlock(retreatId, b.id)), { noMovement: checked ? true : null });
+      await updateIguardScheduleBlock(retreatId, b.id, { noMovement: checked ? true : null });
     } catch (e) {
       toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

@@ -1,0 +1,7 @@
+{
+  "name": "woori-highschool-apps",
+  "private": true,
+  "scripts": {
+    "verify": "node scripts/verify-all.mjs"
+  }
+}

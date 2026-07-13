@@ -54,6 +54,11 @@ semestersPrivate/{sid}/applicationsPrivate/{appKey} { motive, wish, phone?, pare
 5. **민감정보 분리** — 지원 동기·연락처는 `semestersPrivate` 아래만. 신규 민감 필드도 동일.
 6. 접수 화면의 학기↔연도 규칙: `sid.split("-")[0]` → `classes/{year}`.
 
+### 팀 삭제 뒤 신청자에 유령 배치가 남는 문제 (2026-07-14)
+- **접근법**: 1) `applications`에서 삭제 팀의 `teamId`·`choice1`·`choice2` 참조를 찾는다 → 2) 팀·커리큘럼 삭제와 신청자 참조 초기화를 `buildTeamRemovalUpdates()`로 만든다 → 3) DB 루트 `update()` 한 번으로 커밋하고 순수 함수 테스트로 payload를 고정한다.
+- **판단 질문**: 팀 노드만 `remove()`한 뒤 화면에서 누락 참조를 숨기는 방식은 DB에 유령 배치가 남고 이후 집계가 다시 깨지므로 기각한다.
+- **재사용 규칙**: 다른 노드가 ID로 참조하는 엔티티를 삭제할 때는 참조 영향도를 먼저 집계하고, 삭제·참조 정리를 하나의 루트 다중 경로 `update()`로 수행한다.
+
 ## Rules 현황
 
 `semesters`/`semestersPrivate` 노드는 2026-07-10 학생 앱 rules에 추가·배포 완료 (admins·retreatAdmins만 읽기/쓰기 — brainstorm과 동일 규칙). 규칙 변경이 또 필요하면 **학생 앱 `database.rules.json`에서만** 수정·배포한다 (이 앱에서 firebase deploy 금지).

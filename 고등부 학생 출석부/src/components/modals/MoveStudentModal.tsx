@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { ref, update } from 'firebase/database';
-import { db } from '@/lib/firebase/client';
+import { db, ref, update } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import type { MoveTarget } from '@/types';

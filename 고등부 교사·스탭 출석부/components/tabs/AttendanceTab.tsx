@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useApp, calcStats, effectiveKey } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
-import { saveAttToFirebase } from '@/hooks/useFirebaseData';
+import { saveAttendance } from '@/lib/db';
 import GroupNav from '@/components/GroupNav';
 import AttModal from '@/components/modals/AttModal';
 import type { GroupKey, AttEditTarget, AttValue } from '@/types';
@@ -70,11 +70,10 @@ export default function AttendanceTab() {
   function handleQuickToggle(mid: string, k: string) {
     const cur = (attData[gk]?.[mid]?.[k] ?? '') as AttValue;
     const next = nextAtt(cur);
-    saveAttToFirebase(
-      curYear, gk, mid, k, next,
-      () => dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' }),
-      () => dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' }),
-    );
+    dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
+    void saveAttendance(curYear, gk, mid, k, next)
+      .then(() => dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' }))
+      .catch(() => dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' }));
   }
 
   function openAttModal(mid: string, k: string) {

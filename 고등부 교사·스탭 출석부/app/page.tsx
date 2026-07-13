@@ -104,6 +104,7 @@ export default function Page() {
 }
 
 function FirebaseDataLoader() {
-  useFirebaseData();
-  return null;
+  const loadError = useFirebaseData();
+  if (!loadError) return null;
+  return <div className="offline-banner" role="alert">⚠ {loadError}</div>;
 }

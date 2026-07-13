@@ -1,10 +1,7 @@
 "use client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
-import { setIguardMovement } from "@/lib/db";
-import { ref, update } from "firebase/database";
-import { db } from "@/lib/firebase";
-import { paths } from "@/lib/paths";
+import { setIguardMovement, updateIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { postLabel, isValidTime, normalizeTime } from "@/lib/cueSheet";
 
@@ -227,7 +224,7 @@ export function DetailEditor({ retreatId, block }: { retreatId: string; block: I
     const trimmed = nextDetail.trim();
     if (trimmed === (block.detail || "")) return;
     try {
-      await update(ref(db, paths.iguardScheduleBlock(retreatId, block.id)), { detail: trimmed || null });
+      await updateIguardScheduleBlock(retreatId, block.id, { detail: trimmed || null });
     } catch (e) {
       toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
@@ -303,7 +300,7 @@ export function FreeTextEditor({ retreatId, block, field, title, placeholder }: 
     const trimmed = text.trim();
     if (trimmed === value) return;
     try {
-      await update(ref(db, paths.iguardScheduleBlock(retreatId, block.id)), { [field]: trimmed || null });
+      await updateIguardScheduleBlock(retreatId, block.id, { [field]: trimmed || null });
     } catch (e) {
       toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

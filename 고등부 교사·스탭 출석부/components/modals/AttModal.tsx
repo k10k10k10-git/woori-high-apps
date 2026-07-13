@@ -1,7 +1,7 @@
 'use client';
 
 import { useApp } from '@/store/AppContext';
-import { saveAttToFirebase } from '@/hooks/useFirebaseData';
+import { saveAttendance } from '@/lib/db';
 import type { AttEditTarget, AttValue } from '@/types';
 
 const VALUES: { v: AttValue; label: string; cls: string }[] = [
@@ -28,11 +28,10 @@ export default function AttModal({
   const cur = (attData[gk]?.[mid]?.[k] ?? '') as AttValue;
 
   function handleSelect(v: AttValue) {
-    saveAttToFirebase(
-      curYear, gk, mid, k, v,
-      () => dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' }),
-      () => dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' }),
-    );
+    dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
+    void saveAttendance(curYear, gk, mid, k, v)
+      .then(() => dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' }))
+      .catch(() => dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' }));
     onClose();
   }
 

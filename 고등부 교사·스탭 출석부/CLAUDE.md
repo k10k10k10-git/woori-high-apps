@@ -43,9 +43,12 @@
 │       └── AdminTab.tsx            # 설정 탭 (교사 동기화 현황, 스탭 멤버 CRUD, 계정 관리, 이벤트 관리)
 ├── hooks/
 │   ├── useAuth.ts                  # doLogin (이메일/비밀번호), doLogout
-│   └── useFirebaseData.ts          # Firebase 실시간 구독 훅 + CRUD 함수 (유일한 Firebase 접근 레이어)
+│   └── useFirebaseData.ts          # Firebase 실시간 구독 조립 + 화면 오류 상태
 ├── lib/
-│   └── firebase.ts                 # Firebase 초기화 (db, auth) — 환경변수로 설정
+│   ├── firebase.ts                 # Firebase 초기화 (db, auth) — 환경변수로 설정
+│   ├── paths.ts                    # DB 경로 단일 원천
+│   ├── db.ts                       # 구독·CRUD 유일 접근 레이어
+│   └── staffMove.ts                # 팀 이동 원자 update payload (+ 테스트)
 ├── store/
 │   └── AppContext.tsx              # 전역 상태 (useReducer) + calcStats, effectiveKey 헬퍼
 ├── types/
@@ -233,17 +236,14 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 
 ## 절대 하지 말 것
 
-1. **`useFirebaseData.ts` 외부에서 Firebase 직접 import 금지**
+1. **`lib/db.ts` 외부에서 Realtime Database 직접 import 금지**
    ```typescript
-   // AdminTab.tsx는 예외적으로 staff_roles, staff_events에 직접 접근
-   // 그 외 컴포넌트는 반드시 useFirebaseData.ts 함수를 통해 접근
-
-   // ❌ 금지 (일반 컴포넌트)
+   // ❌ 금지 (컴포넌트·훅)
    import { db } from '@/lib/firebase';
    import { set, ref } from 'firebase/database';
 
-   // ✅ 반드시 훅/함수 사용
-   import { saveAttToFirebase, addStaffMember } from '@/hooks/useFirebaseData';
+   // ✅ 반드시 DB 접근 함수 사용
+   import { saveAttendance, addStaffMember } from '@/lib/db';
    ```
 
 2. **`classes/` 노드에 쓰기 금지**
@@ -294,7 +294,12 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 
 ## 최근 변경 사항
 
-- 스탭 멤버 팀 이동 기능: `moveStaffMemberToTeam()` — 출석 기록도 함께 이동
+- 스탭 멤버 팀 이동 기능: `moveStaffMemberToTeam()` — 명단·출석 이동/기존 경로 삭제를 루트 `update()` 한 번으로 적용
 - 커스텀 이벤트: 특별 이벤트(수련회 등) 등록 시 해당 주일 출석 집계에서 제외
 - 연휴 자동 처리: 설/추석 연휴 주일은 자동으로 이벤트 표시 (2024~2030년 하드코딩)
 - CSS 변수 기반 디자인 시스템: 보라색 계열 테마 (`--blue: #9B8DD4`)
+
+### 스탭 팀 이동 중간 실패로 명단·출석이 갈라질 수 있는 문제 (2026-07-14)
+- **접근법**: 1) 모든 `staff_*` 경로를 `lib/paths.ts`에 모은다 → 2) `buildStaffMoveUpdates()`로 대상 명단·출석과 원본 삭제를 하나의 payload로 만든다 → 3) `lib/db.ts`에서 루트 `update()` 한 번만 실행하고 payload를 단위 테스트한다.
+- **판단 질문**: 대상 팀 저장 → 출석 복사 → 원본 삭제를 순차 `set()`하는 방식은 네트워크 실패 시 중복 또는 유실 상태가 생기므로 기각한다.
+- **재사용 규칙**: RTDB에서 엔티티를 경로 간 이동할 때는 복사와 원본 삭제를 반드시 하나의 다중 경로 원자 업데이트로 묶는다.

@@ -1,14 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ref, set, get } from 'firebase/database';
-import { db } from '@/lib/firebase';
 import { useApp } from '@/store/AppContext';
 import { emailToKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
 import {
-  addStaffMember, updateStaffMember, deleteStaffMember, swapStaffOrder, moveStaffMemberToTeam,
-} from '@/hooks/useFirebaseData';
+  addStaffMember,
+  deleteStaffEvent,
+  deleteStaffMember,
+  deleteUserRole,
+  getAllUserRoles,
+  moveStaffMemberToTeam,
+  saveStaffEvent,
+  saveUserRole,
+  swapStaffOrder,
+  updateStaffMember,
+} from '@/lib/db';
 import type { UserRole, Member, StaffTeam } from '@/types';
 import { GROUP_KEYS, GROUP_LABELS, STAFF_TEAMS } from '@/types';
 
@@ -45,7 +52,6 @@ export default function AdminTab() {
           await moveStaffMemberToTeam(
             curYear, selectedTeam, mTargetTeam,
             memberModal.editId, mName, mPhone,
-            existing?.num ?? 999,
             targetMembers.length,
           );
           setSelectedTeam(mTargetTeam);
@@ -96,8 +102,7 @@ export default function AdminTab() {
 
   useEffect(() => {
     async function loadRoles() {
-      const snap = await get(ref(db, 'staff_roles'));
-      dispatch({ type: 'SET_ALL_USER_ROLES', payload: snap.exists() ? snap.val() : {} });
+      dispatch({ type: 'SET_ALL_USER_ROLES', payload: await getAllUserRoles() });
     }
     loadRoles();
   }, [dispatch]);
@@ -116,9 +121,8 @@ export default function AdminTab() {
     if (!aEmail.trim()) { showToast('이메일을 입력하세요'); return; }
     setASaving(true);
     const key = accountModal.editKey || emailToKey(aEmail.trim());
-    await set(ref(db, `staff_roles/${key}`), { email: aEmail.trim(), role: aRole, name: aName.trim() || null });
-    const snap = await get(ref(db, 'staff_roles'));
-    dispatch({ type: 'SET_ALL_USER_ROLES', payload: snap.exists() ? snap.val() : {} });
+    await saveUserRole(key, { email: aEmail.trim(), role: aRole, name: aName.trim() || undefined });
+    dispatch({ type: 'SET_ALL_USER_ROLES', payload: await getAllUserRoles() });
     setASaving(false);
     setAccountModal({ open: false, editKey: null });
     showToast('저장되었습니다', 'success');
@@ -127,9 +131,8 @@ export default function AdminTab() {
   async function deleteAccount() {
     if (!accountModal.editKey || !window.confirm('이 계정을 삭제하시겠습니까?')) return;
     setASaving(true);
-    await set(ref(db, `staff_roles/${accountModal.editKey}`), null);
-    const snap = await get(ref(db, 'staff_roles'));
-    dispatch({ type: 'SET_ALL_USER_ROLES', payload: snap.exists() ? snap.val() : {} });
+    await deleteUserRole(accountModal.editKey);
+    dispatch({ type: 'SET_ALL_USER_ROLES', payload: await getAllUserRoles() });
     setASaving(false);
     setAccountModal({ open: false, editKey: null });
     showToast('삭제되었습니다', 'success');
@@ -143,14 +146,14 @@ export default function AdminTab() {
   async function addEvent() {
     if (!evMonth || !evDay || !evLabel) { showToast('월, 일, 이름을 모두 입력하세요'); return; }
     const key = `ev_${Date.now()}`;
-    await set(ref(db, `staff_events/${curYear}/${key}`), { month: evMonth, day: evDay, label: evLabel });
+    await saveStaffEvent(curYear, key, { month: evMonth, day: evDay, label: evLabel });
     setEvMonth(''); setEvDay(''); setEvLabel('');
     showToast('이벤트가 추가되었습니다', 'success');
   }
 
   async function deleteEvent(key: string) {
     if (!window.confirm('이 이벤트를 삭제하시겠습니까?')) return;
-    await set(ref(db, `staff_events/${curYear}/${key}`), null);
+    await deleteStaffEvent(curYear, key);
     showToast('삭제되었습니다', 'success');
   }
 

@@ -2,7 +2,7 @@
 
 // 설정 — 학기 메타(제목·기간·수료 기준), 팀 CRUD, 회차 CRUD.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUI } from "@/context/UIContext";
 import {
   addSession,
@@ -13,7 +13,9 @@ import {
   updateSession,
   updateTeam,
 } from "@/lib/db";
-import { SemesterMeta, Session, SessionType, Team } from "@/lib/types";
+import { Application, SemesterMeta, Session, SessionType, Team } from "@/lib/types";
+import { createSettingsDraft, editSettingsDraft, syncSettingsDraft } from "@/lib/settingsDraft";
+import { teamRemovalImpact } from "@/lib/teamRemoval";
 
 const PASTEL_COLORS = [
   "bg-blue-100",
@@ -31,22 +33,26 @@ interface Props {
   meta: SemesterMeta | null;
   teams: Team[];
   sessions: Session[];
+  applications: Application[];
 }
 
-export default function SettingsTab({ sid, meta, teams, sessions }: Props) {
+export default function SettingsTab({ sid, meta, teams, sessions, applications }: Props) {
   const { toast, uiConfirm } = useUI();
-  const [title, setTitle] = useState(meta?.title ?? "");
-  const [minRatePct, setMinRatePct] = useState(Math.round((meta?.completionRule?.minRate ?? 0.7) * 100));
+  const [draft, setDraft] = useState(() => createSettingsDraft(sid, meta));
   const [teamName, setTeamName] = useState("");
   const [sessDate, setSessDate] = useState("");
   const [sessLabel, setSessLabel] = useState("");
   const [sessType, setSessType] = useState<SessionType>("정규");
 
+  useEffect(() => {
+    setDraft((current) => syncSettingsDraft(current, sid, meta));
+  }, [sid, meta]);
+
   async function saveMeta() {
     try {
       await updateSemesterMeta(sid, {
-        ...(title.trim() ? { title: title.trim() } : {}),
-        completionRule: { minRate: Math.min(100, Math.max(0, minRatePct)) / 100 },
+        ...(draft.title.trim() ? { title: draft.title.trim() } : {}),
+        completionRule: { minRate: Math.min(100, Math.max(0, draft.minRatePct)) / 100 },
       });
       toast("설정이 저장되었습니다", "success");
     } catch (e) {
@@ -89,8 +95,8 @@ export default function SettingsTab({ sid, meta, teams, sessions }: Props) {
           <label className="text-sm flex-1 w-full">
             <span className="text-xs text-gray-500">제목</span>
             <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={draft.title}
+              onChange={(e) => setDraft((current) => editSettingsDraft(current, { title: e.target.value }))}
               placeholder={meta?.title ?? ""}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-0.5"
             />
@@ -101,8 +107,8 @@ export default function SettingsTab({ sid, meta, teams, sessions }: Props) {
               type="number"
               min={0}
               max={100}
-              value={minRatePct}
-              onChange={(e) => setMinRatePct(Number(e.target.value))}
+              value={draft.minRatePct}
+              onChange={(e) => setDraft((current) => editSettingsDraft(current, { minRatePct: Number(e.target.value) }))}
               className="w-full sm:w-28 border border-gray-300 rounded-lg px-3 py-2 mt-0.5"
             />
           </label>
@@ -133,8 +139,18 @@ export default function SettingsTab({ sid, meta, teams, sessions }: Props) {
               <button
                 aria-label={`${t.name} 삭제`}
                 onClick={async () => {
-                  if (await uiConfirm(`'${t.name}' 팀을 삭제할까요? 배치·커리큘럼 표시가 사라집니다.`)) {
-                    await removeTeam(sid, t.id);
+                  const impact = teamRemovalImpact(applications, t.id);
+                  if (await uiConfirm(
+                    `'${t.name}' 팀을 삭제할까요?\n\n`
+                    + `배치 ${impact.assigned}명·1지망 ${impact.firstChoice}명·2지망 ${impact.secondChoice}명의 참조가 함께 정리되고, `
+                    + "배치 인원은 미배정으로 돌아갑니다.",
+                  )) {
+                    try {
+                      await removeTeam(sid, t.id);
+                      toast("팀을 삭제하고 연결된 배치·지망을 정리했습니다", "success");
+                    } catch (e) {
+                      toast(`팀 삭제 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+                    }
                   }
                 }}
                 className="text-xs text-gray-300 hover:text-red-500 ml-auto"

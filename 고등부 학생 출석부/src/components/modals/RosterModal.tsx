@@ -1,7 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { ref, set } from 'firebase/database';
-import { db } from '@/lib/firebase/client';
+import { db, ref, set } from '@/lib/db';
 import { useApp, useClassKey } from '@/store/AppContext';
 import { sortAndRenumber } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
