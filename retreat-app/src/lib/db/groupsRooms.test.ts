@@ -23,7 +23,7 @@ vi.mock("./core", () => ({
   backupNodeBeforeOverwrite: mocks.backupNodeBeforeOverwrite,
 }));
 
-import { clearGroups } from "./groupsRooms";
+import { clearGroups, clearRooms } from "./groupsRooms";
 
 describe("clearGroups", () => {
   beforeEach(() => {
@@ -47,6 +47,32 @@ describe("clearGroups", () => {
     mocks.backupNodeBeforeOverwrite.mockResolvedValue(false);
 
     await expect(clearGroups("retreat-1")).rejects.toThrow("백업에 실패");
+    expect(mocks.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearRooms", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("스로틀 없는 백업을 만든 뒤 rooms 노드만 삭제한다", async () => {
+    mocks.backupNodeBeforeOverwrite.mockResolvedValue(true);
+
+    await clearRooms("retreat-1");
+
+    expect(mocks.backupNodeBeforeOverwrite).toHaveBeenCalledWith(
+      "retreats/retreat-1/rooms",
+      "retreats/retreat-1/roomsBackups",
+      0,
+    );
+    expect(mocks.remove).toHaveBeenCalledWith("retreats/retreat-1/rooms");
+  });
+
+  it("백업이 실패하면 삭제하지 않는다", async () => {
+    mocks.backupNodeBeforeOverwrite.mockResolvedValue(false);
+
+    await expect(clearRooms("retreat-1")).rejects.toThrow("백업에 실패");
     expect(mocks.remove).not.toHaveBeenCalled();
   });
 });

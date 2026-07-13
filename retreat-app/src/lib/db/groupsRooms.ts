@@ -74,6 +74,17 @@ export async function saveRooms(retreatId: string, rooms: Room[]): Promise<void>
   await set(ref(db, paths.rooms(retreatId)), stripUndefined(data));
 }
 
+/** 전체 방 삭제는 스로틀을 무시한 백업이 성공한 경우에만 실행한다. */
+export async function clearRooms(retreatId: string): Promise<void> {
+  const backedUp = await backupNodeBeforeOverwrite(
+    paths.rooms(retreatId),
+    paths.roomsBackups(retreatId),
+    0,
+  );
+  if (!backedUp) throw new Error("방배정 백업에 실패하여 전체 삭제를 중단했습니다.");
+  await remove(ref(db, paths.rooms(retreatId)));
+}
+
 export async function getRoomsBackups(retreatId: string): Promise<Record<string, Record<string, Omit<Room, "id">>>> {
   const snap = await get(ref(db, paths.roomsBackups(retreatId)));
   return snap.exists() ? snap.val() : {};

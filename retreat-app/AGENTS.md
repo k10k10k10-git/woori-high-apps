@@ -50,7 +50,7 @@ The app may read `retreats/{id}/iguard/groupStaff` for display, but IGuard owns 
 
 ### 백업 스로틀이 있는 노드의 전체 삭제 (2026-07-13)
 
-- **접근법**: 조 전체 삭제는 미저장 편집을 먼저 `saveGroups()`로 저장하고, `clearGroups()`가 `minIntervalMs=0` 강제 백업 성공을 확인한 뒤 `retreats/{id}/groups`만 삭제한다.
+- **접근법**: 조/방 전체 삭제는 미저장 편집을 먼저 `saveGroups()`/`saveRooms()`로 저장하고, `clearGroups()`/`clearRooms()`가 `minIntervalMs=0` 강제 백업 성공을 확인한 뒤 각 소유 노드만 삭제한다.
 - **판단 질문**: 일반 자동저장의 10분 백업 스로틀을 그대로 쓰거나 `rooms`·`iguard/groupStaff`를 함께 삭제하지 않는다. 전자는 삭제 직전 상태를 놓칠 수 있고, 후자는 요청 범위와 앱 소유권을 침범하기 때문이다.
 - **재사용 규칙**: 전체 삭제처럼 되돌리기 어려운 동작은 백업 함수의 성공 여부를 확인해 실패 시 쓰기를 중단하고, 확인창에 유지되는 연관 데이터와 끊길 참조를 명시한다.
 

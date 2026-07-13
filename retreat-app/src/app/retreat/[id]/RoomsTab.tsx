@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Room, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { clearRooms, saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
@@ -407,6 +407,45 @@ export default function RoomsTab({ retreat }: Props) {
     markDirty();
   }
 
+  async function removeAllRooms() {
+    const currentRooms = roomsRef.current;
+    if (currentRooms.length === 0 || isSavingRef.current) return;
+    const assignedCount = new Set(currentRooms.flatMap(room => room.studentIds || [])).size;
+    const confirmed = await uiConfirm(
+      `현재 ${currentRooms.length}개 방과 배정 학생 ${assignedCount}명의 방배정을 모두 삭제하시겠습니까?\n\n` +
+      "삭제 직전 방배정은 강제 백업되며 복구 버튼에서 되돌릴 수 있습니다. " +
+      "이가드의 숙소 정보에서도 모든 방과 배정이 즉시 사라집니다."
+    );
+    if (!confirmed) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaving(true);
+    setSaveError(null);
+    isSavingRef.current = true;
+    try {
+      // 화면에만 남은 편집이 있으면 먼저 저장해, 강제 백업에 현재 보이는 상태가 담기게 한다.
+      if (isDirtyRef.current) {
+        await saveRooms(retreat.id, roomsRef.current);
+        markClean();
+      }
+      await clearRooms(retreat.id);
+      roomsRef.current = [];
+      latestRemoteRoomsRef.current = [];
+      setRooms([]);
+      setUnassigned(participantIds);
+      markClean();
+      toast(`${currentRooms.length}개 방을 모두 삭제했습니다.`, "success");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "전체 방 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+      isSavingRef.current = false;
+    }
+  }
+
   const filteredUnassigned = genderFilter === "전체"
     ? allUnassigned
     : allUnassigned.filter(id => students[id]?.gender === genderFilter);
@@ -448,14 +487,14 @@ export default function RoomsTab({ retreat }: Props) {
           </button>
         </div>
       )}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
         <div className="text-sm text-slate-500 flex items-center gap-2">
           총 {rooms.length}개 방 · 미배정 {allUnassigned.length}명
           <span className="text-[10px] text-green-500 flex items-center gap-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>실시간
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={async () => {
               const cancelled = new Set(Object.entries(cellColors).filter(([,c]) => c === "red").map(([k]) => k));
@@ -478,6 +517,11 @@ export default function RoomsTab({ retreat }: Props) {
           <button onClick={exportRoomsPDF} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
           <button onClick={exportRoomsJPG} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
           <BackupRestoreButton label="방배정" loadBackups={() => getRoomsBackups(retreat.id)} restore={key => restoreRoomsBackup(retreat.id, key)} />
+          <button
+            onClick={removeAllRooms}
+            disabled={rooms.length === 0 || saving}
+            className="btn-secondary btn-sm text-red-600"
+          >방 전체 삭제</button>
           <button onClick={() => setShowAddRoom(true)} className="btn-secondary btn-sm">＋ 방 추가</button>
           <span className={`text-xs font-medium px-2 ${saving ? "text-blue-500" : isDirty ? "text-amber-500" : "text-green-500"}`}>
             {saving ? "저장 중..." : isDirty ? "편집 중..." : "✓ 저장됨"}

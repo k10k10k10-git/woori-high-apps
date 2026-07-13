@@ -211,7 +211,7 @@ await saveParticipants(retreatId, updatedParticipants);
 ### 3b. 전체 덮어쓰기 노드의 자동 백업 — groups/rooms
 `saveGroups`/`saveRooms`는 구조상 전체 `set()` 덮어쓰기가 불가피한데(배열 순서·삭제 반영), participants와 달리 백업이 없어 저장 버그·실수 시 복구 수단이 없었다(2026-07-06 수정). `db.ts`의 `backupNodeBeforeOverwrite()`가 저장 직전 현재 상태를 롤링 백업(최근 5개)한다. 편집 중 저장이 잦으므로 **마지막 백업 후 10분 이내면 스킵**해 쓰기 폭주를 막는다(복구 시엔 `minIntervalMs=0`으로 강제 백업). 각 탭 툴바의 `BackupRestoreButton`이 시점 선택 복구 UI를 제공한다. 새로 전체 덮어쓰기 노드를 추가할 땐 이 패턴(백업 헬퍼 + 복구 버튼)을 재사용할 것.
 
-조편성의 `clearGroups()`는 전면 삭제 전용 예외다(2026-07-13 추가). 최근 자동 백업이 있어도 `minIntervalMs=0`으로 현재 조편성을 다시 강제 백업하며, 백업 결과가 `false`면 삭제 자체를 중단한다. UI는 미저장 편집을 먼저 `saveGroups()`로 반영한 다음 `clearGroups()`를 호출해야 복구 시점에 사용자가 보고 있던 조편성이 담긴다. 방배정과 이가드 소유 `iguard/groupStaff`는 소유권 경계상 함께 삭제하지 않는다.
+조편성의 `clearGroups()`와 방배정의 `clearRooms()`는 전면 삭제 전용 예외다(2026-07-13 추가). 최근 자동 백업이 있어도 `minIntervalMs=0`으로 현재 상태를 다시 강제 백업하며, 백업 결과가 `false`면 삭제 자체를 중단한다. UI는 미저장 편집을 먼저 `saveGroups()`/`saveRooms()`로 반영한 다음 전용 삭제 함수를 호출해야 복구 시점에 사용자가 보고 있던 상태가 담긴다. 조 삭제 시 방배정과 이가드 소유 `iguard/groupStaff`는 소유권 경계상 함께 삭제하지 않으며, 방 삭제 시에도 `rooms` 외 다른 노드는 건드리지 않는다.
 
 ### 3c. 인쇄/JPG 출력 — escapeHtml 필수
 `printAsPDF`/`exportAsJPG`/`rowsToHtmlTable`은 조립된 HTML 문자열을 그대로 `document.write`한다. 학생이 신청폼에 입력한 이름·특이사항 등이 이스케이프 없이 삽입되면, `<img src=x onerror=...>` 같은 값이 관리자가 인쇄하는 순간 관리자 컨텍스트에서 실행되는 저장형 XSS가 된다(2026-07-06 수정). **HTML 문자열에 사용자 입력을 삽입하는 모든 지점은 `exportUtils.ts`의 `escapeHtml()`로 감쌀 것.** 새 인쇄/내보내기 기능을 추가할 때 반드시 적용.
