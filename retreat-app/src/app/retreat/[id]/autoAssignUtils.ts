@@ -64,6 +64,14 @@ export interface CombinedGroupCounts {
   groupCount2bu: number;
 }
 
+export interface MaxSizeGroupCountInput {
+  maxGroupSize: number;
+  maxGroups1: number;
+  maxGroups2: number;
+  studentCount1bu: number;
+  studentCount2bu: number;
+}
+
 interface ResolvedLeader {
   groupIdx: number;
   name: string;
@@ -115,6 +123,27 @@ export function ensureEvenCombinedGroupCounts({
     groupCount1bu: rows[0].count,
     groupCount2bu: rows[1].count,
   };
+}
+
+/** 조당 최대 인원으로 부별 조 수를 계산한 뒤, 화면에 표시하기 전 합계를 짝수로 보정한다. */
+export function calculateEvenGroupCountsForMaxSize({
+  maxGroupSize, maxGroups1, maxGroups2, studentCount1bu, studentCount2bu,
+}: MaxSizeGroupCountInput): CombinedGroupCounts {
+  const rawCount1 = maxGroupSize > 0 && studentCount1bu > 0
+    ? Math.min(maxGroups1, Math.max(1, Math.ceil(studentCount1bu / maxGroupSize)))
+    : 0;
+  const rawCount2 = maxGroupSize > 0 && studentCount2bu > 0
+    ? Math.min(maxGroups2, Math.max(1, Math.ceil(studentCount2bu / maxGroupSize)))
+    : 0;
+
+  return ensureEvenCombinedGroupCounts({
+    groupCount1bu: rawCount1,
+    groupCount2bu: rawCount2,
+    maxGroups1,
+    maxGroups2,
+    studentCount1bu,
+    studentCount2bu,
+  });
 }
 
 /** 참가자 목록 → 반 단위 ClassUnit 목록 생성

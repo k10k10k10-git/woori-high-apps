@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ensureEvenCombinedGroupCounts, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
+import { calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -56,6 +56,16 @@ const groupOf = (groups: ReturnType<typeof run>, sid: string) =>
   groups.find(g => g.studentIds.includes(sid));
 
 describe("1·2부 합산 조 수 짝수 보정", () => {
+  it("조당 최대 12명 자동 계산은 11+10을 화면 표시 전 12+10으로 보정한다", () => {
+    expect(calculateEvenGroupCountsForMaxSize({
+      maxGroupSize: 12,
+      maxGroups1: 25,
+      maxGroups2: 25,
+      studentCount1bu: 123,
+      studentCount2bu: 111,
+    })).toEqual({ groupCount1bu: 12, groupCount2bu: 10 });
+  });
+
   it("합계가 홀수면 더 붐비고 상한 여유가 있는 부서의 조를 하나 늘린다", () => {
     expect(ensureEvenCombinedGroupCounts({
       groupCount1bu: 10, groupCount2bu: 9,

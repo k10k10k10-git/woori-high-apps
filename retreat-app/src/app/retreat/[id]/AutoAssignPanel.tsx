@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import {
   ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildClassUnits, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
+  buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -113,9 +113,16 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   ) {
     setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length });
     if (rules.maxGroupSize > 0) {
-      // 조당 최대 인원으로 조 수를 역산하되, 최소2반 상한을 넘지 않게 클램프
-      if (bu1Count > 0) setGroupCount1bu(Math.min(maxGroups1, Math.max(1, Math.ceil(bu1Count / rules.maxGroupSize))));
-      if (bu2Count > 0) setGroupCount2bu(Math.min(maxGroups2, Math.max(1, Math.ceil(bu2Count / rules.maxGroupSize))));
+      // 조당 최대 인원으로 조 수를 역산하고, 화면에 표시하기 전에 합계를 짝수로 보정한다.
+      const autoCounts = calculateEvenGroupCountsForMaxSize({
+        maxGroupSize: rules.maxGroupSize,
+        maxGroups1,
+        maxGroups2,
+        studentCount1bu: bu1Count,
+        studentCount2bu: bu2Count,
+      });
+      setGroupCount1bu(autoCounts.groupCount1bu);
+      setGroupCount2bu(autoCounts.groupCount2bu);
     } else if (rules.minTwoClasses) {
       // 최소2반만 켠 경우: 현재 조 수가 상한을 넘으면 상한으로 내림
       if (groupCount1bu > maxGroups1) setGroupCount1bu(maxGroups1);

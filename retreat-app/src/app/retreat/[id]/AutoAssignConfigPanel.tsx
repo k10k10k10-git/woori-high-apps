@@ -353,8 +353,8 @@ export default function AutoAssignConfigPanel({
         {rules.maxGroupSize > 0 && (
           <p className="text-xs text-blue-500 mt-1.5">
             → 조 수가 자동 계산됩니다
-            {bu1Count > 0 && <span className="ml-1">(1부: {Math.ceil(bu1Count / rules.maxGroupSize)}조</span>}
-            {bu2Count > 0 && <span>{bu1Count > 0 ? ", " : "("}2부: {Math.ceil(bu2Count / rules.maxGroupSize)}조)</span>}
+            {bu1Count > 0 && <span className="ml-1">(1부: {groupCount1bu}조</span>}
+            {bu2Count > 0 && <span>{bu1Count > 0 ? ", " : "("}2부: {groupCount2bu}조)</span>}
           </p>
         )}
       </div>
