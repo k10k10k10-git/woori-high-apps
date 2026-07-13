@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
+import { calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, improveGroupsByWholeUnitMoves, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -334,6 +334,54 @@ describe("scoreGroups — 교사 고려 관계 하드 판정", () => {
     const affinity: ConflictPair[] = [{ a: "1부_1_1", b: "1부_1_2" }];
     const score = scoreGroups(groups, units, [], [], [], [], affinity, rules, []);
     expect(score).toBeLessThanOrEqual(-1_000_000);
+  });
+
+  it("파송 조장의 성별은 혼성 판정에 포함하되 반 개수에는 포함하지 않는다", () => {
+    const femaleUnit: ClassUnit = {
+      key: "1부_1_2", bu, grade: 1, classNum: 2, gender: "여",
+      studentIds: ["female"], names: ["여학생"],
+    };
+    const groups = [mkG("gA", ["sent-leader", "female"])];
+    const mixRules = mkRules({ mixGender: true });
+    const withoutLeaderGender = scoreGroups(groups, [femaleUnit], [], [], [], [], [], mixRules, []);
+    const withLeaderGender = scoreGroups(
+      groups, [femaleUnit], [], [], [], [], [], mixRules, [],
+      [{ groupIdx: 0, unitKey: "1부_1_1", gender: "남" }],
+    );
+
+    expect(withoutLeaderGender).toBeLessThanOrEqual(-1_000_000);
+    expect(withLeaderGender).toBe(0);
+  });
+});
+
+describe("자동배정 후 반 묶음 이동 보정", () => {
+  const makeUnit = (key: string, gender: ClassUnit["gender"], count: number): ClassUnit => ({
+    key, bu: "1부", grade: 1, classNum: Number(key.split("_").at(-1)), gender,
+    studentIds: Array.from({ length: count }, (_, i) => `${key}_${i}`),
+    names: Array.from({ length: count }, (_, i) => `${key}학생${i}`),
+  });
+
+  it("고정 반은 유지하면서 4명 조에 이동 가능한 반을 보태 인원 편차를 줄인다", () => {
+    const fixedSmall = makeUnit("1부_1_1", "남", 4);
+    const fixedLarge = makeUnit("1부_1_3", "남", 4);
+    const movableMale = makeUnit("1부_2_5", "남", 3);
+    const movableFemale = makeUnit("1부_2_6", "여", 4);
+    const units = [fixedSmall, fixedLarge, movableMale, movableFemale];
+    const groups: Group[] = [
+      { id: "g1", name: "1조", bu: "1부", teachers: [], leader: "조장1", staff: "", studentIds: [...fixedSmall.studentIds] },
+      { id: "g2", name: "2조", bu: "1부", teachers: [], leader: "조장2", staff: "", studentIds: [...fixedLarge.studentIds, ...movableMale.studentIds, ...movableFemale.studentIds] },
+    ];
+
+    const improved = improveGroupsByWholeUnitMoves(
+      groups, units, [], [], [], [], [],
+      mkRules({ minTwoClasses: true, mixGender: true, balanceSize: true, maxGroupSize: 12 }),
+      [], [fixedSmall.key, fixedLarge.key], [],
+    );
+
+    expect(improved.map(group => group.studentIds.length).sort((a, b) => a - b)).toEqual([7, 8]);
+    expect(improved[0].studentIds).toEqual(expect.arrayContaining(fixedSmall.studentIds));
+    expect(improved[1].studentIds).toEqual(expect.arrayContaining(fixedLarge.studentIds));
+    improved.forEach(group => expect(group.studentIds.length).toBeLessThanOrEqual(12));
   });
 });
 
