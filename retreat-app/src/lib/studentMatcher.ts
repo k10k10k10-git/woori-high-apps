@@ -65,10 +65,16 @@ export function findStudent(p: Participant, students: Record<string, Student>): 
  * 없으면(자동 매칭 실패로 studentId=null) findStudent로 반 명단에서 다시 찾아 보강한다.
  * 이 보강이 없으면 studentId 없이 신청자 취합에서 주황(부분참)으로만 칠한 학생이
  * 부분참석 탭에 영영 안 뜬다(2026-07-13 버그).
+ *
+ * ⚠ studentId가 이미 "${buNum}_..." 형식으로 저장된 데이터가 있다 — 접두를 또 붙이면
+ *   "2_2_..." 이중접두가 되어 셀색상 키와 어긋난다. 반드시 정규식으로 방어한다.
  */
 export function resolveStudentKey(p: Participant, students: Record<string, Student>): string | null {
   const buNum = p.bu?.includes("1") ? 1 : p.bu?.includes("2") ? 2 : 0;
-  if (p.studentId) return buNum > 0 ? `${buNum}_${p.studentId}` : String(p.studentId);
+  if (p.studentId) {
+    const sid = String(p.studentId);
+    return /^[12]_/.test(sid) ? sid : buNum > 0 ? `${buNum}_${sid}` : sid;
+  }
   const s = findStudent(p, students);
   if (!s) return null;
   const b = s.buNum ?? buNum;

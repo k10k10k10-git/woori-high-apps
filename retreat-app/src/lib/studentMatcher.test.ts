@@ -203,6 +203,13 @@ describe("resolveStudentKey", () => {
     expect(resolveStudentKey(p, {})).toBe("2_abc123");
   });
 
+  // 회귀: 이미 "${buNum}_..." 형식으로 저장된 studentId에 접두를 또 붙이면
+  // "2_2_abc" 이중접두가 되어 셀색상 키와 어긋나 주황 학생이 통째로 사라졌다(2026-07-13).
+  it("does not double-prefix a studentId already in bu-prefixed form", () => {
+    const p = makeParticipant({ name: "김민하", grade: 3, class: 2, bu: "2부", studentId: "2_abc123" });
+    expect(resolveStudentKey(p, {})).toBe("2_abc123");
+  });
+
   // 핵심 회귀: studentId가 null이어도(자동 매칭 실패) 반 명단에서 이름으로 찾아
   // 신청자 취합 셀색상과 동일한 키를 돌려줘야 부분참석 탭에 뜬다.
   it("falls back to findStudent when studentId is missing (2026-07-13 버그)", () => {

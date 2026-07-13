@@ -303,6 +303,7 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 ⚠ **버그(2026-07-13)**: 부분참석 탭이 목록을 `participants`에서 만들며 참가자에 **저장된 `p.studentId`가 있어야만** 행을 만들었다(`if (!p.studentId) return []`). 자동 매칭이 반 명단에서 못 찾은 신청자는 `studentId=null`로 저장되는데(`ParticipantsTab`의 `studentId: ms?.id ?? null`), 그런 학생은 신청자 취합에서 주황(부분참)으로 칠해도 부분참석 탭에 **영영 안 떴다**. 두 화면이 학생을 다른 기준(로스터 id vs 참가자 저장 studentId)으로 식별한 게 원인.
 
 - **재사용 규칙**: 참가자를 셀색상/부분참 키로 바꿀 땐 `resolveStudentKey(p, students)`(`studentMatcher.ts`)만 쓴다 — `p.studentId`가 있으면 그대로 접두, 없으면 `findStudent`로 반 명단에서 찾아 보강해 **신청자 취합과 항상 같은 키**를 낸다. `students`는 `getStudentsByYear(retreat.year)`로 로드. 이름 매칭을 새로 짜지 말 것(canonical은 `findStudent`, 규칙 #9). 회귀 테스트: `studentMatcher.test.ts`의 `describe("resolveStudentKey")`.
+- ⚠ **이중접두 함정**: 일부 데이터는 `p.studentId`가 이미 `"2_abc"`처럼 부 접두가 붙어 저장돼 있다. 무조건 `${buNum}_${studentId}`로 만들면 `"2_2_abc"`가 되어 셀색상 키와 어긋나 **주황 학생이 통째로 사라진다**(2026-07-13 재발, 배포 후 발견). `resolveStudentKey`는 `/^[12]_/` 검사로 이미 접두된 값은 그대로 쓴다 — 이 가드를 제거하지 말 것.
 
 ---
 
