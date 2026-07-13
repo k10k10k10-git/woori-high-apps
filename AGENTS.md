@@ -1,6 +1,6 @@
 # Repository Agent Guide
 
-This workspace contains four related apps that share the Firebase Realtime Database project `woori-high`.
+This workspace contains five related apps that share the Firebase Realtime Database project `woori-high`.
 
 **This file is a summary. The authoritative operating manual is the root `CLAUDE.md` (Korean) — read it first; if this file and `CLAUDE.md` disagree, `CLAUDE.md` wins.**
 
@@ -25,6 +25,7 @@ Before changing code, always check whether the change can affect Firebase paths 
 | `고등부 학생 출석부/` | Student attendance PWA | `classes/`, `attendance/`, `events/`, `admins`, `teacherClasses` |
 | `retreat-app/` | Retreat admin site | `retreats/{id}` admin data, `retreatsPrivate/{id}`, `retreatAdmins` |
 | `iguard-app/` | On-site move-guide app | `retreats/{id}/iguard/*`, `iguardMembers`, `iguardRoles`, `iguardPending` |
+| `semester-app/` | Semester ministry and training hub | `semesters/`, `semestersPrivate/` |
 | `고등부 교사·스탭 출석부/` | Teacher/staff attendance app | `staff_*` paths only |
 
 Read these first for cross-app work:
@@ -39,7 +40,7 @@ Read these first for cross-app work:
 - Do not deploy rules from `retreat-app` or `iguard-app`; their `DO_NOT_DEPLOY.database.rules.json` files are archival only.
 - Do not write across app ownership boundaries.
 - Keep sensitive retreat data under `retreatsPrivate/{id}`.
-- For `retreat-app` and `iguard-app`, use `src/lib/paths.ts` for database paths when adding or changing paths.
+- For `retreat-app`, `iguard-app`, and `semester-app`, use `src/lib/paths.ts` for database paths when adding or changing paths.
 - Prefer single-path updates over full-node overwrites. Full overwrites require explicit backup/restore patterns where already established.
 
 ## Verification
