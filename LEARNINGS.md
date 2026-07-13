@@ -26,3 +26,8 @@
 - **접근법**: ① `PresentationFile.importPptx()`로 가져온 캡처 안내 도형을 찾아 `shape.position`을 이미지 `position`에 복사했더니 좌상단에 축소 삽입되는 현상을 렌더링으로 확인 → ② `Object.getOwnPropertyNames()`와 실제 값 출력으로 가져온 도형의 `position`은 비어 있고 `frame`/`pixelRect`에만 `{left, top, width, height}`가 있음을 확인 → ③ 안내 도형을 `delete()`한 뒤 `shape.frame`을 복사해 `slide.images.add({ position: frame, ... })`로 다시 삽입 → ④ LibreOffice 렌더링과 `check_template_fidelity.mjs`로 14장 전체를 확인.
 - **판단 질문**: 원본 PPTX를 직접 OOXML 수정하거나 `python-pptx`로 우회하지 않았다 — 프레젠테이션 스킬의 artifact-tool 단일 경로와 템플릿 복제·편집 계약을 깨고, 도형 스타일·마스터·편집 가능성을 손상할 수 있기 때문이다.
 - **재사용 규칙**: artifact-tool로 import한 PPT 도형의 실제 좌표를 재사용할 때는 `shape.position`을 믿지 말고 `shape.frame`을 실측해 이미지/도형의 `position`에 넣고, 최종 PPTX를 다시 렌더링해 위치를 검증한다.
+
+### artifact-tool로 가져온 PPT의 여러 문단과 제목을 안전하게 치환하는 법 (2026-07-13)
+- **접근법**: ① 가져온 텍스트 상자 전체의 줄바꿈 문자열을 `shape.text.replace(old, new)`로 한 번에 바꿨더니 제목만 바뀌고 글머리표 문단은 남는 현상을 렌더링으로 확인 → ② 기존·새 문구를 줄 단위로 나눈 뒤 각 줄에 `shape.text.replace(oldLine, newLine)`를 적용해 문단별 글머리표·서식을 보존 → ③ 제목 앞부분이 LibreOffice 렌더링에서 사라지는 상자는 공통 접두어 전체를 다시 쓰지 않고 바뀌는 뒷부분만 치환 → ④ artifact-tool PNG와 LibreOffice PNG를 각각 14장 전수 확인하고 `check_template_fidelity.mjs`로 구조를 검증.
+- **판단 질문**: 여러 문단 상자에 `shape.text = newText`를 사용하지 않았다 — 글머리표·문단 간격·강조색을 한꺼번에 잃을 수 있다. artifact-tool 미리보기만 믿지도 않았다 — 일부 제목의 접두어 손실은 실제 PowerPoint 계열 렌더러에서만 드러났다.
+- **재사용 규칙**: import한 PPT 텍스트는 한 줄씩 `shape.text.replace()`하고, 복합 서식 제목은 공통 접두어를 보존한 채 변하는 뒷부분만 교체한 다음 artifact-tool과 LibreOffice 두 렌더러로 확인한다.
