@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Retreat, PartialAttendance, Participant, Student } from "@/lib/types";
 import { getPartialAttendances, savePartialAttendance, deletePartialAttendance, getParticipants, getCellColors, getStudentsByYear } from "@/lib/db";
 import { resolveStudentKey } from "@/lib/studentMatcher";
+import { buildPartialPool, PartialPoolRow } from "@/lib/partialPool";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -12,19 +13,8 @@ type PartialType = PartialAttendance["type"];
 // 전체/본대 전수 목록은 여기서 다루지 않는다(부분참 대상은 신청자 취합에서 주황으로 칠해 넘긴다).
 type Filter = "전체" | "미지정" | PartialType;
 
-interface ParticipantRow {
-  sourceKey: string;
-  studentKey: string;
-  studentId: string;
-  name: string;
-  bu: string;
-  buNum: number;
-  grade: number;
-  classNum: number;
-  phone?: string | null;
-  pPhone?: string | null;
-  partial?: PartialAttendance;
-}
+// 행 타입은 pool 로직과 공유 (lib/partialPool.ts). rows(시트 신청자)·poolRows 모두 이 형태.
+type ParticipantRow = PartialPoolRow;
 
 const TYPE_OPTIONS: PartialType[] = ["선복귀", "후발대"];
 
@@ -82,14 +72,13 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const recordMap = useMemo(() => new Map(records.map(r => [r.id, r])), [records]);
 
   const rows = useMemo<ParticipantRow[]>(() => {
-    return Object.entries(participants)
-      .flatMap(([sourceKey, p]) => {
+    return Object.values(participants)
+      .flatMap(p => {
         // 신청자 취합(셀색상)과 동일 규칙으로 키 해석 — studentId가 없어도 반 명단에서 찾아 보강.
         const studentKey = resolveStudentKey(p, students);
         if (!studentKey) return [];
         if (cellColors[studentKey] === "red") return [];
         return [{
-          sourceKey,
           studentKey,
           studentId: p.studentId ?? studentKey.slice(studentKey.indexOf("_") + 1),
           name: p.name,
@@ -120,22 +109,11 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     [participants, students],
   );
 
-  const stats = useMemo(() => {
-    const 선복귀 = rows.filter(r => r.partial?.type === "선복귀").length;
-    const 후발대 = rows.filter(r => r.partial?.type === "후발대").length;
-    const 본대 = rows.length - 선복귀 - 후발대;
-    const day1Rows = rows.filter(r => r.partial?.type !== "후발대");
-    const day3Rows = rows.filter(r => r.partial?.type !== "선복귀");
-    return { total: rows.length, 본대, 선복귀, 후발대, day1Rows, day3Rows };
-  }, [rows]);
-
-  // 작업 대상 풀: 신청자 취합에서 주황(부분참)으로 칠한 학생 ∪ 이미 선복귀/후발대로 지정된 학생.
-  // 주황 색칠이 곧 "이 학생을 부분참석 탭으로 넘긴다"는 신호 — 신청자 취합과 유기적으로 연동된다.
-  const poolRows = useMemo(() => {
-    return rows.filter(r =>
-      !!r.partial || cellColors[r.studentKey] === "orange" || cellColors[r.studentId] === "orange",
-    );
-  }, [rows, cellColors]);
+  // 작업 대상 풀 — 순수 로직은 lib/partialPool.ts(buildPartialPool)에 격리, 테스트로 보호.
+  const poolRows = useMemo(
+    () => buildPartialPool(participants, students, cellColors, records),
+    [participants, students, cellColors, records],
+  );
 
   const poolStats = useMemo(() => {
     const 선복귀 = poolRows.filter(r => r.partial?.type === "선복귀").length;
@@ -143,6 +121,22 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     const 미지정 = poolRows.filter(r => !r.partial).length;
     return { total: poolRows.length, 선복귀, 후발대, 미지정 };
   }, [poolRows]);
+
+  // 요약: 본대·참가확정은 시트 신청자(rows) 기준, 부분참(선복귀/후발대)은 pool 기준(수동 추가 포함)이라
+  // 상단 카드 숫자·명단과 아래 필터칩(poolStats)이 어긋나지 않는다.
+  const stats = useMemo(() => {
+    const mainRows = rows.filter(r => !r.partial); // 시트 신청자 중 부분참 미지정 = 본대
+    const 선복귀Rows = poolRows.filter(r => r.partial?.type === "선복귀");
+    const 후발대Rows = poolRows.filter(r => r.partial?.type === "후발대");
+    return {
+      total: rows.length,
+      본대: mainRows.length,
+      선복귀: 선복귀Rows.length,
+      후발대: 후발대Rows.length,
+      day1Rows: [...mainRows, ...선복귀Rows], // 후발대만 1일차 출발에서 제외
+      day3Rows: [...mainRows, ...후발대Rows], // 선복귀만 3일차 복귀에서 제외
+    };
+  }, [rows, poolRows]);
 
   const filteredRows = useMemo(() => {
     if (filter === "전체") return poolRows;
@@ -193,7 +187,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     }
   }
 
-  const editingRow = editingKey ? rows.find(r => r.studentKey === editingKey) : null;
+  const editingRow = editingKey ? poolRows.find(r => r.studentKey === editingKey) : null;
 
   if (loading) return <div className="text-center text-slate-400 py-10">로딩 중...</div>;
 
