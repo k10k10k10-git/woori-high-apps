@@ -11,6 +11,7 @@ tsconfig.tsbuildinfo
 # 비밀키 / 환경변수 — 절대 커밋 금지
 .env*
 .vercel/
+.firebase/
 
 # 운영 DB 백업 스냅샷 (개인정보 포함 — GitHub에 올리지 않음, 모든 프로젝트 공통)
 backups/
