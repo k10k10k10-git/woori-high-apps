@@ -55,3 +55,22 @@ export function findStudent(p: Participant, students: Record<string, Student>): 
   if (stripped.length === 1 && !hasDuplInAll) return stripped[0];
   return undefined;
 }
+
+/**
+ * 참가자 → 셀색상/부분참 식별 키(`${buNum}_${studentId}`) 해석.
+ * 신청자 취합(ClassRosterTab)이 셀 색상을 이 키로 저장하고, 부분참석 탭도 같은 키로
+ * 학생을 식별해야 두 화면이 한 사람을 같은 키로 본다.
+ *
+ * 저장된 studentId가 있으면 그대로 쓰고(동기화 때 findStudent로 채워진 값이라 반 명단 id와 동일),
+ * 없으면(자동 매칭 실패로 studentId=null) findStudent로 반 명단에서 다시 찾아 보강한다.
+ * 이 보강이 없으면 studentId 없이 신청자 취합에서 주황(부분참)으로만 칠한 학생이
+ * 부분참석 탭에 영영 안 뜬다(2026-07-13 버그).
+ */
+export function resolveStudentKey(p: Participant, students: Record<string, Student>): string | null {
+  const buNum = p.bu?.includes("1") ? 1 : p.bu?.includes("2") ? 2 : 0;
+  if (p.studentId) return buNum > 0 ? `${buNum}_${p.studentId}` : String(p.studentId);
+  const s = findStudent(p, students);
+  if (!s) return null;
+  const b = s.buNum ?? buNum;
+  return b > 0 ? `${b}_${s.id}` : s.id;
+}

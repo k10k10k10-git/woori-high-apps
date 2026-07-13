@@ -296,6 +296,14 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 - **고려 관계 저장 형태**: 학생·교사는 이름 문자열 쌍, 반은 `unitKey`(`${bu}_${grade}_${classNum}`) 쌍. 이름 기반이라 동명이인은 구분 못 한다(입력 UI는 이름 타이핑→후보(부·학년·반) 선택으로 확인만 돕고, 저장은 이름). 고려 관계는 DB에 저장되지 않고 패널 state로만 존재(실행 시점 1회성).
 - **반 붙임(결합) 관계** (`classAffinities`, 2026-07-11): 분리와 반대로 두 반을 **반드시 같은 조**로. 페널티가 아니라 **구조 보장** — `buildAffinityBundles`(union-find)가 붙임으로 연결된 반들을 번들로 묶고 Phase 0.5(조장 고정 추종)·Phase 1이 **번들 단위로 배정**한다("같은 반은 안 쪼개짐" 불변식의 일반화, 연쇄 A+B·B+C → 한 묶음). 따라서 위반은 배정 결과가 아니라 **입력 모순**으로만 생기고, `validateClassRelations`(직접/연쇄 모순·혼성 번들+동성 규칙·최대 인원 초과·부 교차)가 실행 전에 UI에서 차단한다(에러 시 실행 버튼 비활성). scoreGroups에도 붙임 하드 판정이 있다(조장 고정이 번들을 쪼개는 경우의 방어망). `applyConflicts`가 꺼지면 붙임도 무시된다. 번들 수정 시 mixGender/sameGender가 "배정 후 조 구성" 기준으로 평가되는 점 유지할 것(혼성 번들이 자연 통과해야 함).
 
+### 13. 학생 식별 키는 반드시 `resolveStudentKey`로 — 화면마다 다른 기준 금지 (`studentMatcher.ts`)
+
+셀 색상(`cellColors`)과 부분참(`partialAttendances`)은 학생을 **`${buNum}_${반명단(classes/)의 studentId}`** 키로 식별한다. 신청자 취합(`ClassRosterTab`)은 반 명단을 순회하며 이 키로 색을 저장하므로, **참가자(participants)의 `studentId` 영속 여부와 무관하게** 아무나 색칠할 수 있다.
+
+⚠ **버그(2026-07-13)**: 부분참석 탭이 목록을 `participants`에서 만들며 참가자에 **저장된 `p.studentId`가 있어야만** 행을 만들었다(`if (!p.studentId) return []`). 자동 매칭이 반 명단에서 못 찾은 신청자는 `studentId=null`로 저장되는데(`ParticipantsTab`의 `studentId: ms?.id ?? null`), 그런 학생은 신청자 취합에서 주황(부분참)으로 칠해도 부분참석 탭에 **영영 안 떴다**. 두 화면이 학생을 다른 기준(로스터 id vs 참가자 저장 studentId)으로 식별한 게 원인.
+
+- **재사용 규칙**: 참가자를 셀색상/부분참 키로 바꿀 땐 `resolveStudentKey(p, students)`(`studentMatcher.ts`)만 쓴다 — `p.studentId`가 있으면 그대로 접두, 없으면 `findStudent`로 반 명단에서 찾아 보강해 **신청자 취합과 항상 같은 키**를 낸다. `students`는 `getStudentsByYear(retreat.year)`로 로드. 이름 매칭을 새로 짜지 말 것(canonical은 `findStudent`, 규칙 #9). 회귀 테스트: `studentMatcher.test.ts`의 `describe("resolveStudentKey")`.
+
 ---
 
 ## 테스트

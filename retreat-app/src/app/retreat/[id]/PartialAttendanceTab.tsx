@@ -1,7 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Retreat, PartialAttendance, Participant } from "@/lib/types";
-import { getPartialAttendances, savePartialAttendance, deletePartialAttendance, getParticipants, getCellColors } from "@/lib/db";
+import { Retreat, PartialAttendance, Participant, Student } from "@/lib/types";
+import { getPartialAttendances, savePartialAttendance, deletePartialAttendance, getParticipants, getCellColors, getStudentsByYear } from "@/lib/db";
+import { resolveStudentKey } from "@/lib/studentMatcher";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -37,14 +38,6 @@ function buToNum(bu: string): number {
   return bu === "2부" ? 2 : 1;
 }
 
-function makeStudentKey(p: Participant): string | null {
-  if (!p.studentId) return null;
-  const sid = String(p.studentId);
-  // participant.studentId는 이미 uniqueKey("${buNum}_${rawId}") 형식으로 저장됨.
-  // 부 접두를 또 붙이면 "1_1_..." 이중접두가 되어 이가드/셀색상 키와 어긋나므로 방어한다.
-  return /^[12]_/.test(sid) ? sid : `${buToNum(p.bu)}_${sid}`;
-}
-
 function getStatus(row: ParticipantRow): PartialType | "미지정" {
   return row.partial?.type ?? "미지정";
 }
@@ -53,6 +46,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const { toast } = useUI();
   const [records, setRecords] = useState<PartialAttendance[]>([]);
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
+  const [students, setStudents] = useState<Record<string, Student>>({});
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -66,20 +60,22 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     setLoading(true);
     setLoadError(null);
     try {
-      const [recs, parts, colors] = await Promise.all([
+      const [recs, parts, colors, studs] = await Promise.all([
         getPartialAttendances(retreat.id),
         getParticipants(retreat.id),
         getCellColors(retreat.id),
+        getStudentsByYear(retreat.year),
       ]);
       setRecords(recs);
       setParticipants(parts);
       setCellColors(colors);
+      setStudents(studs);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [retreat.id]);
+  }, [retreat.id, retreat.year]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -88,15 +84,14 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const rows = useMemo<ParticipantRow[]>(() => {
     return Object.entries(participants)
       .flatMap(([sourceKey, p]) => {
-        const studentKey = makeStudentKey(p);
-        if (!studentKey || !p.studentId) return [];
-        const redBySharedKey = cellColors[studentKey] === "red";
-        const redByStudentId = cellColors[p.studentId] === "red";
-        if (redBySharedKey || redByStudentId) return [];
+        // 신청자 취합(셀색상)과 동일 규칙으로 키 해석 — studentId가 없어도 반 명단에서 찾아 보강.
+        const studentKey = resolveStudentKey(p, students);
+        if (!studentKey) return [];
+        if (cellColors[studentKey] === "red") return [];
         return [{
           sourceKey,
           studentKey,
-          studentId: p.studentId,
+          studentId: p.studentId ?? studentKey.slice(studentKey.indexOf("_") + 1),
           name: p.name,
           bu: p.bu,
           buNum: buToNum(p.bu),
@@ -118,11 +113,11 @@ export default function PartialAttendanceTab({ retreat }: Props) {
           a.name.localeCompare(b.name, "ko")
         );
       });
-  }, [participants, cellColors, recordMap]);
+  }, [participants, students, cellColors, recordMap]);
 
   const unmatchedCount = useMemo(
-    () => Object.values(participants).filter(p => !p.studentId).length,
-    [participants],
+    () => Object.values(participants).filter(p => !resolveStudentKey(p, students)).length,
+    [participants, students],
   );
 
   const stats = useMemo(() => {

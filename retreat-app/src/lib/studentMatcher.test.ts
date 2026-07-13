@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeName, stripSuffix, findStudent } from "./studentMatcher";
+import { normalizeName, stripSuffix, findStudent, resolveStudentKey } from "./studentMatcher";
 import type { Participant, Student } from "./types";
 
 // ── helpers ──────────────────────────────────────────────────
@@ -193,5 +193,27 @@ describe("findStudent", () => {
     const s2 = makeStudent({ id: "s2", name: "정다은", grade: 2, class: 3, buNum: 1 });
     const p = makeParticipant({ name: "정다은", grade: 0, class: 0, bu: "1부" });
     expect(findStudent(p, studentsRecord(s1, s2))).toBeUndefined();
+  });
+});
+
+// ── resolveStudentKey (셀색상·부분참 키 해석) ──────────────────
+describe("resolveStudentKey", () => {
+  it("uses the stored studentId prefixed by bu", () => {
+    const p = makeParticipant({ name: "김민하", grade: 3, class: 2, bu: "2부", studentId: "abc123" });
+    expect(resolveStudentKey(p, {})).toBe("2_abc123");
+  });
+
+  // 핵심 회귀: studentId가 null이어도(자동 매칭 실패) 반 명단에서 이름으로 찾아
+  // 신청자 취합 셀색상과 동일한 키를 돌려줘야 부분참석 탭에 뜬다.
+  it("falls back to findStudent when studentId is missing (2026-07-13 버그)", () => {
+    const s = makeStudent({ id: "rid9", name: "김민하", grade: 3, class: 2, buNum: 2 });
+    const p = makeParticipant({ name: "김민하", grade: 3, class: 2, bu: "2부", studentId: null });
+    // ClassRosterTab이 색칠 때 쓰는 키(`${cls.buNum}_${student.id}`)와 일치해야 한다.
+    expect(resolveStudentKey(p, studentsRecord(s))).toBe("2_rid9");
+  });
+
+  it("returns null when the participant cannot be matched to any roster student", () => {
+    const p = makeParticipant({ name: "없는사람", grade: 3, class: 2, bu: "2부", studentId: null });
+    expect(resolveStudentKey(p, {})).toBeNull();
   });
 });
