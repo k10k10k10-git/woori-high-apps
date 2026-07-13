@@ -21,3 +21,8 @@
 - **접근법**: ① `npm run lint`가 수천 건을 내면 첫 오류의 경로가 `src/`인지 `.vercel/output/`인지 먼저 분리한다 → ② `npx eslint src`(테스트·스크립트가 있으면 경로 추가)로 실제 소스만 다시 검사한다 → ③ `npm run build`를 lint와 분리 실행해 빌드 가능 여부를 확인한다 → ④ `eslint.config.mjs`의 `globalIgnores`에 `.vercel/**`가 빠졌는지 대조한다.
 - **판단 질문**: 생성된 `.vercel/output`을 삭제해 검증을 통과시키지 않았다 — 사용자 산출물을 지우지 않아야 하고, 삭제는 다음 Vercel 빌드 뒤 같은 실패가 재발해 설정 결함을 가린다. 수천 건의 번들 경고도 앱 소스 결함으로 집계하지 않았다.
 - **재사용 규칙**: Vercel을 쓰는 앱의 lint가 생성물을 읽으면 소스 한정 lint로 진위를 확인하고, 근본 수정은 ESLint ignore에 `.vercel/**`를 추가하는 것으로 제안한다.
+
+### artifact-tool로 가져온 PPT 도형을 이미지로 바꿀 때 위치가 좌상단으로 튀는 문제 (2026-07-13)
+- **접근법**: ① `PresentationFile.importPptx()`로 가져온 캡처 안내 도형을 찾아 `shape.position`을 이미지 `position`에 복사했더니 좌상단에 축소 삽입되는 현상을 렌더링으로 확인 → ② `Object.getOwnPropertyNames()`와 실제 값 출력으로 가져온 도형의 `position`은 비어 있고 `frame`/`pixelRect`에만 `{left, top, width, height}`가 있음을 확인 → ③ 안내 도형을 `delete()`한 뒤 `shape.frame`을 복사해 `slide.images.add({ position: frame, ... })`로 다시 삽입 → ④ LibreOffice 렌더링과 `check_template_fidelity.mjs`로 14장 전체를 확인.
+- **판단 질문**: 원본 PPTX를 직접 OOXML 수정하거나 `python-pptx`로 우회하지 않았다 — 프레젠테이션 스킬의 artifact-tool 단일 경로와 템플릿 복제·편집 계약을 깨고, 도형 스타일·마스터·편집 가능성을 손상할 수 있기 때문이다.
+- **재사용 규칙**: artifact-tool로 import한 PPT 도형의 실제 좌표를 재사용할 때는 `shape.position`을 믿지 말고 `shape.frame`을 실측해 이미지/도형의 `position`에 넣고, 최종 PPTX를 다시 렌더링해 위치를 검증한다.
