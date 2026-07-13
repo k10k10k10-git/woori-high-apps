@@ -153,7 +153,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
           }}
         >
           {displayedStaff.map(s => (
-            <option key={s.id} value={s.id}>{s.name}{s.id === preferredStaffId ? " (나)" : ""}</option>
+            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
       </div>
