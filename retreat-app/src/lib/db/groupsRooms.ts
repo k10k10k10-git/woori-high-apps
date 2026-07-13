@@ -1,4 +1,4 @@
-import { ref, get, set, update, push, remove, onValue } from "firebase/database";
+import { ref, get, set, update, remove, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { Group, Room } from "../types";
 import { paths } from "../paths";
@@ -19,6 +19,17 @@ export async function saveGroups(retreatId: string, groups: Group[]): Promise<vo
     data[id] = rest;
   });
   await set(ref(db, paths.groups(retreatId)), stripUndefined(data));
+}
+
+/** 전체 조 삭제는 스로틀을 무시한 백업이 성공한 경우에만 실행한다. */
+export async function clearGroups(retreatId: string): Promise<void> {
+  const backedUp = await backupNodeBeforeOverwrite(
+    paths.groups(retreatId),
+    paths.groupsBackups(retreatId),
+    0,
+  );
+  if (!backedUp) throw new Error("조편성 백업에 실패하여 전체 삭제를 중단했습니다.");
+  await remove(ref(db, paths.groups(retreatId)));
 }
 
 export async function getGroupsBackups(retreatId: string): Promise<Record<string, Record<string, Omit<Group, "id">>>> {

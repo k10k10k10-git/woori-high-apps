@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { saveGroups, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
+import { clearGroups, saveGroups, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
@@ -594,6 +594,45 @@ export default function GroupsTab({ retreat }: Props) {
     markDirty();
   }
 
+  async function removeAllGroups() {
+    const currentGroups = groupsRef.current;
+    if (currentGroups.length === 0 || isSavingRef.current) return;
+    const assignedCount = new Set(currentGroups.flatMap(group => group.studentIds || [])).size;
+    const confirmed = await uiConfirm(
+      `현재 ${currentGroups.length}개 조와 배정 학생 ${assignedCount}명의 조편성을 모두 삭제하시겠습니까?\n\n` +
+      "삭제 직전 조편성은 강제 백업되며 복구 버튼에서 되돌릴 수 있습니다. " +
+      "방배정과 이가드 조스탭 배정은 삭제되지 않아 기존 조 연결이 끊길 수 있습니다."
+    );
+    if (!confirmed) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaving(true);
+    setSaveError(null);
+    isSavingRef.current = true;
+    try {
+      // 화면에만 남은 편집이 있으면 먼저 저장해, 강제 백업에 현재 보이는 상태가 담기게 한다.
+      if (isDirtyRef.current) {
+        await saveGroups(retreat.id, groupsRef.current);
+        markClean();
+      }
+      await clearGroups(retreat.id);
+      groupsRef.current = [];
+      latestRemoteGroupsRef.current = [];
+      setGroups([]);
+      setUnassigned(participantIds);
+      markClean();
+      toast(`${currentGroups.length}개 조를 모두 삭제했습니다.`, "success");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "전체 조 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+      isSavingRef.current = false;
+    }
+  }
+
   function updateGroupField(id: string, field: keyof Group, value: unknown) {
     setGroups(prev => prev.map(g => g.id === id ? { ...g, [field]: value } : g));
     markDirty();
@@ -671,6 +710,11 @@ export default function GroupsTab({ retreat }: Props) {
           <button onClick={exportGroupsPDF} disabled={groups.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
           <button onClick={exportGroupsJPG} disabled={groups.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
           <BackupRestoreButton label="조편성" loadBackups={() => getGroupsBackups(retreat.id)} restore={key => restoreGroupsBackup(retreat.id, key)} />
+          <button
+            onClick={removeAllGroups}
+            disabled={groups.length === 0 || saving}
+            className="btn-secondary btn-sm text-red-600"
+          >조 전체 삭제</button>
           <button onClick={() => setShowAddGroup(true)} className="btn-secondary btn-sm">＋ 조 추가</button>
           <span className={`text-xs font-medium px-2 hidden sm:inline ${saving ? "text-blue-500" : isDirty ? "text-amber-500" : "text-green-500"}`}>
             {saving ? "저장 중..." : isDirty ? "편집 중..." : "✓ 저장됨"}
