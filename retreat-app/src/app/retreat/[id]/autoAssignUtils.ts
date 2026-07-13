@@ -1,4 +1,7 @@
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
+import type { ConflictPair, LeaderEntry, RuleFlags } from "@/lib/autoAssignConfig";
+
+export type { ConflictPair, LeaderEntry, RuleFlags } from "@/lib/autoAssignConfig";
 
 // ── 타입 ─────────────────────────────────────────────────────────────
 
@@ -10,22 +13,6 @@ export interface ClassUnit {
   gender: "남" | "여";  // 홀수반=남, 짝수반=여
   studentIds: string[];
   names: string[];
-}
-
-// 학생·교사 고려 관계는 이름(a/b) 쌍, 반 고려(분리)·반 붙임(결합) 관계는 unitKey(`${bu}_${grade}_${classNum}`) 쌍으로 저장.
-export interface ConflictPair { a: string; b: string; }
-
-export interface RuleFlags {
-  assignTeachers:   boolean; // Rule 3: 반 담당 교사 자동 배치
-  requireFullTimer: boolean; // Rule 4: 전참 교사 최소 1명
-  pinLeaders:       boolean; // Rule 6: 조장 반 고정
-  applyConflicts:   boolean; // Rule 7: 고려 관계 반영 (학생·교사·교사학생·반)
-  mixGender:        boolean; // Rule 8: 남녀반 혼성
-  sameGender:       boolean; // Rule 9: 동성으로만 조 구성 (Rule 8과 상호배타)
-  balanceGrade:     boolean; // Rule 10: 학년 편중 방지
-  balanceSize:      boolean; // Rule 11: 인원 균등 배분
-  minTwoClasses:    boolean; // Rule 12: 한 조에 서로 다른 반 2개 이상 (조 수 ≤ 반 수/2일 때만 가능)
-  maxGroupSize:     number;  // 조당 최대 인원 (0 = 제한 없음)
 }
 
 // ── 페널티 상수 ───────────────────────────────────────────────────────
@@ -44,14 +31,6 @@ const FULLTIMER_SPREAD_GUIDE = 30_000;
 // 아직 반이 하나도 없는 조를 먼저 채우는 유도값. 하드 제약보다 작아 고려 관계 등을 깨지 않지만,
 // 일반 균등 점수보다 충분히 커 파송 조장만 있는 조에도 실제 반이 우선 배정되게 한다.
 const EMPTY_GROUP_SPREAD_GUIDE = 80_000;
-
-export interface LeaderEntry {
-  name: string;
-  grade: string; // "1" | "2" | "3" | ""
-  cls: string;   // "1" ~ "N" | ""
-  studentId: string; // 동명이인과 파송 대상을 안정적으로 식별
-  mode: "withClass" | "sent"; // 기본=본인반 동반, sent=본인반 없이 파송
-}
 
 export interface CombinedGroupCountInput {
   groupCount1bu: number;

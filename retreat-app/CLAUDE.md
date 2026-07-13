@@ -91,6 +91,7 @@ retreats/
     participantsBackups/  # participants 전체덮어쓰기 직전 롤링 백업 (최근 5개)
     groups/               # 조편성
     groupsBackups/        # groups 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveGroups가 자동 기록
+    autoAssignConfig/     # 자동 조편성 입력 설정 (조 수·규칙·조장·고려 관계, groups 결과와 분리)
     rooms/                # 방배정 (Room: dong?·roomNumber·capacity·type·studentIds·teachers) — dong은 숙소 건물 여러 개일 때만, 없으면 단일 건물. 표시는 lib/roomLabel.ts로 "동 호수" 합성(이가드도 동일 규칙)
     roomsBackups/         # rooms 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveRooms가 자동 기록
     teachers/             # 교사 참석 현황
@@ -295,7 +296,8 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 - **하드는 보장이 아니라 최우선순위**다 — 그리디+제한 반복이라 입력이 실현 불가(예: 조 수 > 전참 교사 수, 최소2반인데 조 수 > 반÷2)면 위반이 남을 수 있다. 그래서 `minTwoClasses`는 조 수 상한을 `floor(반÷2)`로 클램프하고(`AutoAssignPanel`), UI가 전참 부족을 경고한다.
 - **1·2부 합산 조 수는 짝수** (`ensureEvenCombinedGroupCounts`, 2026-07-13): 입력·조당 최대 인원 자동 계산 결과의 합이 홀수면 총합을 정확히 1만 조정한다. 상한 여유가 있으면 현재 `학생 수÷조 수`가 더 큰(더 붐비는) 부서의 조를 하나 늘리고, 양쪽 모두 상한이면 평균 인원이 더 적은 부서의 조를 하나 줄인다. 학생이 없는 부서는 합계와 보정 대상에서 제외한다. 조당 최대 인원 입력은 `calculateEvenGroupCountsForMaxSize()`가 원 계산과 보정을 함께 수행해 **화면 숫자부터 즉시 짝수 합계로 표시**하며, UI 실행부와 `runAutoAssign` 핵심 함수에도 같은 방어선을 둔다. 실행할 때만 보정하면 화면에 `11+10=21조`가 남아 사용자 기준으로는 실패다.
 - **빈 조 판정은 학생 수가 아니라 실제 반 수** (2026-07-13): 파송 조장은 목표 조의 `studentIds`·`gData.total`에는 들어가지만 `unitKeys`에는 들어가지 않는다. 따라서 혼성 규칙의 “첫 반 여부”, 빈 조 우선 배정, 최종 빈 조 하드 판정은 모두 `unitKeys.length` 기준이어야 한다. `total > 0`을 쓰면 파송 조장만 있는 조가 첫 단일 성별 반을 받을 때 혼성 하드 위반으로 오인되어 `조장 1명 + 배정 없음`이 생긴다. 또한 반 붙임은 여러 반을 한 번들로 줄이므로 조 수 상한은 원 반 수뿐 아니라 `buildAffinityBundles(...).length`도 넘지 않게 한다.
-- **고려 관계 저장 형태**: 학생·교사는 이름 문자열 쌍, 반은 `unitKey`(`${bu}_${grade}_${classNum}`) 쌍. 이름 기반이라 동명이인은 구분 못 한다(입력 UI는 이름 타이핑→후보(부·학년·반) 선택으로 확인만 돕고, 저장은 이름). 고려 관계는 DB에 저장되지 않고 패널 state로만 존재(실행 시점 1회성).
+- **설정 저장** (`retreats/{id}/autoAssignConfig`, 2026-07-13): 사용자가 `설정 저장`을 눌렀을 때 부별 조 수·전체 규칙·조장 위치/파송 여부·학생/교사/교사학생/반 분리·반 붙임을 버전 1 문서로 원자 저장하고, 패널 진입 시 한 번 불러온다. 관계 추가 전의 미완성 입력 선택기는 저장하지 않는다. 저장값은 `normalizeAutoAssignConfig()`로 누락 필드·구버전 조장 모드를 기본값으로 보정하며, 수련회 ID가 바뀌면 먼저 모든 설정을 초기화해 직전 수련회 상태가 섞이지 않게 한다. 이 노드는 입력 설정 전용이라 `groups` 결과와 이가드 소유 경로를 건드리지 않는다.
+- **고려 관계 저장 형태**: 학생·교사는 이름 문자열 쌍, 반은 `unitKey`(`${bu}_${grade}_${classNum}`) 쌍. 이름 기반이라 동명이인은 구분 못 한다(입력 UI는 이름 타이핑→후보(부·학년·반) 선택으로 확인만 돕고, 저장은 이름).
 - **반 붙임(결합) 관계** (`classAffinities`, 2026-07-11): 분리와 반대로 두 반을 **반드시 같은 조**로. 페널티가 아니라 **구조 보장** — `buildAffinityBundles`(union-find)가 붙임으로 연결된 반들을 번들로 묶고 Phase 0.5(조장 고정 추종)·Phase 1이 **번들 단위로 배정**한다("같은 반은 안 쪼개짐" 불변식의 일반화, 연쇄 A+B·B+C → 한 묶음). 따라서 위반은 배정 결과가 아니라 **입력 모순**으로만 생기고, `validateClassRelations`(직접/연쇄 모순·혼성 번들+동성 규칙·최대 인원 초과·부 교차)가 실행 전에 UI에서 차단한다(에러 시 실행 버튼 비활성). scoreGroups에도 붙임 하드 판정이 있다(조장 고정이 번들을 쪼개는 경우의 방어망). `applyConflicts`가 꺼지면 붙임도 무시된다. 번들 수정 시 mixGender/sameGender가 "배정 후 조 구성" 기준으로 평가되는 점 유지할 것(혼성 번들이 자연 통과해야 함).
 
 ### 13. 학생 식별 키는 반드시 `resolveStudentKey`로 — 화면마다 다른 기준 금지 (`studentMatcher.ts`)

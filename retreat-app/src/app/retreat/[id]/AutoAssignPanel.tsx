@@ -1,6 +1,8 @@
 "use client";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
+import { DEFAULT_AUTO_ASSIGN_RULES, emptyLeaderEntry } from "@/lib/autoAssignConfig";
+import { getAutoAssignConfig, saveAutoAssignConfig } from "@/lib/db";
 import {
   ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
   buildAffinityBundles, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
@@ -14,6 +16,7 @@ export type { LeaderEntry } from "./autoAssignUtils";
 // ── 타입 ─────────────────────────────────────────────────────────────
 
 interface Props {
+  retreatId: string;
   participants: Record<string, Participant>;
   teachers: TeacherAttendance[];
   students: Record<string, { name: string; grade: number; class: number }>;
@@ -22,21 +25,10 @@ interface Props {
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────
 
-export default function AutoAssignPanel({ participants, teachers, students, onApply }: Props) {
+export default function AutoAssignPanel({ retreatId, participants, teachers, students, onApply }: Props) {
   const [groupCount1bu, setGroupCount1bu] = useState(10);
   const [groupCount2bu, setGroupCount2bu] = useState(10);
-  const [rules, setRules] = useState<RuleFlags>({
-    assignTeachers:   true,
-    requireFullTimer: true,
-    pinLeaders:       true,
-    applyConflicts:   true,
-    mixGender:        true,
-    sameGender:       false,
-    balanceGrade:     true,
-    balanceSize:      true,
-    minTwoClasses:    false,
-    maxGroupSize:     0,
-  });
+  const [rules, setRules] = useState<RuleFlags>({ ...DEFAULT_AUTO_ASSIGN_RULES });
   const [studentConflicts, setStudentConflicts] = useState<ConflictPair[]>([]);
   const [teacherConflicts, setTeacherConflicts] = useState<ConflictPair[]>([]);
   const [teacherStudentConflicts, setTeacherStudentConflicts] = useState<ConflictPair[]>([]);
@@ -53,12 +45,82 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const [newCC, setNewCC] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
   const [newCA, setNewCA] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
   // 조장 설정 (이름+학년+반, 동명이인 구분용)
-  const emptyEntry = (): LeaderEntry => ({ name: "", grade: "", cls: "", studentId: "", mode: "withClass" });
-  const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
-  const [leaderEntries2, setLeaderEntries2] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
+  const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array.from({ length: 20 }, emptyLeaderEntry));
+  const [leaderEntries2, setLeaderEntries2] = useState<LeaderEntry[]>(Array.from({ length: 20 }, emptyLeaderEntry));
   const [preview, setPreview] = useState<{ groups: Group[]; units1: ClassUnit[]; units2: ClassUnit[] } | null>(null);
   const [running, setRunning] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configNotice, setConfigNotice] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setConfigLoading(true);
+    setConfigNotice(null);
+    setConfigError(null);
+    // 다른 수련회로 이동했을 때 직전 수련회의 설정이 잠깐이라도 섞이지 않게 먼저 초기화한다.
+    setGroupCount1bu(10);
+    setGroupCount2bu(10);
+    setRules({ ...DEFAULT_AUTO_ASSIGN_RULES });
+    setStudentConflicts([]);
+    setTeacherConflicts([]);
+    setTeacherStudentConflicts([]);
+    setClassConflicts([]);
+    setClassAffinities([]);
+    setLeaderEntries1(Array.from({ length: 20 }, emptyLeaderEntry));
+    setLeaderEntries2(Array.from({ length: 20 }, emptyLeaderEntry));
+    setNewSC({ a: emptyPicker(), b: emptyPicker() });
+    setNewTC({ a: emptyTpicker(), b: emptyTpicker() });
+    setNewTSC({ teacher: emptyTpicker(), student: emptyPicker() });
+    setNewCC({ a: emptyClsPick(), b: emptyClsPick() });
+    setNewCA({ a: emptyClsPick(), b: emptyClsPick() });
+    getAutoAssignConfig(retreatId).then(config => {
+      if (cancelled || !config) return;
+      setGroupCount1bu(config.groupCount1bu);
+      setGroupCount2bu(config.groupCount2bu);
+      setRules(config.rules);
+      setStudentConflicts(config.studentConflicts);
+      setTeacherConflicts(config.teacherConflicts);
+      setTeacherStudentConflicts(config.teacherStudentConflicts);
+      setClassConflicts(config.classConflicts);
+      setClassAffinities(config.classAffinities);
+      setLeaderEntries1(config.leaderEntries1);
+      setLeaderEntries2(config.leaderEntries2);
+      setConfigNotice("저장된 설정을 불러왔습니다.");
+    }).catch(error => {
+      if (!cancelled) setConfigError(error instanceof Error ? error.message : "설정을 불러오지 못했습니다.");
+    }).finally(() => {
+      if (!cancelled) setConfigLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [retreatId]);
+
+  async function saveConfig() {
+    setConfigSaving(true);
+    setConfigNotice(null);
+    setConfigError(null);
+    try {
+      await saveAutoAssignConfig(retreatId, {
+        groupCount1bu,
+        groupCount2bu,
+        rules,
+        studentConflicts,
+        teacherConflicts,
+        teacherStudentConflicts,
+        classConflicts,
+        classAffinities,
+        leaderEntries1,
+        leaderEntries2,
+      });
+      setConfigNotice("현재 조편성 설정을 저장했습니다.");
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : "설정을 저장하지 못했습니다.");
+    } finally {
+      setConfigSaving(false);
+    }
+  }
 
   // 버그#1: 모달 열릴 때 스크롤 위치 보존
   const closePreview = useCallback(() => {
@@ -220,6 +282,11 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
         bu2Count={bu2Count}
         teachers={teachers}
         running={running}
+        configLoading={configLoading}
+        configSaving={configSaving}
+        configNotice={configNotice}
+        configError={configError}
+        onSaveConfig={saveConfig}
         onRun={run}
         onCollapse={() => setCollapsed(true)}
       />

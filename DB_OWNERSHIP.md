@@ -43,6 +43,7 @@
 | `retreats/{id}/participants` | 행정 | 이가드 | 행정만 | **이가드 조편성, 방배정, 부분참 전부 영향** |
 | `retreats/{id}/teachers` | 행정 | 이가드 | 행정만 | **이가드 스탭 명단, 조스탭, 동선 매트릭스 영향** |
 | `retreats/{id}/groups` | 행정 | 이가드 | 행정만 | 이가드 조별 뷰 |
+| `retreats/{id}/autoAssignConfig` | 행정 | - | 행정만 | 없음 (자동 조편성 입력 설정, groups 결과와 분리) |
 | `retreats/{id}/rooms` | 행정 | 이가드 | 행정만 | 이가드 숙소 뷰 |
 | `retreats/{id}/carpools` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/supplies` | 행정 | - | 행정만 | 없음 |

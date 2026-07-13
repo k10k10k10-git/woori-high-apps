@@ -25,6 +25,7 @@ export const paths = {
   group: (id: string, gid: string) => `retreats/${id}/groups/${gid}`,
   groupsBackups: (id: string) => `retreats/${id}/groupsBackups`,
   groupsBackup: (id: string, backupKey: string) => `retreats/${id}/groupsBackups/${backupKey}`,
+  autoAssignConfig: (id: string) => `retreats/${id}/autoAssignConfig`,
 
   // ── 숙소 ──
   rooms: (id: string) => `retreats/${id}/rooms`,

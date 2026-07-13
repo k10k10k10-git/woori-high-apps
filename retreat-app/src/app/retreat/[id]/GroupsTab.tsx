@@ -751,6 +751,7 @@ export default function GroupsTab({ retreat }: Props) {
         {/* Auto Assign Panel */}
         <div className="lg:col-span-1">
           <AutoAssignPanel
+            retreatId={retreat.id}
             participants={participants}
             teachers={allTeachers}
             students={students}

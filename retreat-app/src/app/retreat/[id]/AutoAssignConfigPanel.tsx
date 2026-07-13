@@ -142,6 +142,11 @@ export interface AutoAssignConfigPanelProps {
   teachers: TeacherAttendance[];
   // 실행
   running: boolean;
+  configLoading: boolean;
+  configSaving: boolean;
+  configNotice: string | null;
+  configError: string | null;
+  onSaveConfig: () => void;
   onRun: () => void;
   onCollapse: () => void;
 }
@@ -165,7 +170,7 @@ export default function AutoAssignConfigPanel({
   newSC, setNewSC, newTC, setNewTC, newTSC, setNewTSC, newCC, setNewCC, newCA, setNewCA,
   leaderEntries1, setLeaderEntries1, leaderEntries2, setLeaderEntries2,
   classUnits1, classUnits2, maxGroups1, maxGroups2, bu1Count, bu2Count,
-  teachers, running, onRun, onCollapse,
+  teachers, running, configLoading, configSaving, configNotice, configError, onSaveConfig, onRun, onCollapse,
 }: AutoAssignConfigPanelProps) {
 
   // 이름 우선 선택용 후보 목록 (부·학년·반 표시)
@@ -268,6 +273,18 @@ export default function AutoAssignConfigPanel({
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-700 flex items-center gap-1.5">🎲 자동 조편성</h3>
         <button onClick={onCollapse} className="text-slate-300 hover:text-slate-500 text-xs">◀ 접기</button>
+      </div>
+
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2.5">
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onSaveConfig} disabled={configLoading || configSaving}
+            className="btn-secondary btn-sm text-xs disabled:opacity-50">
+            {configLoading ? "⏳ 설정 불러오는 중" : configSaving ? "⏳ 설정 저장 중" : "💾 설정 저장"}
+          </button>
+          <span className="text-[10px] text-emerald-700">조장·규칙·고려 관계를 이 수련회에 저장</span>
+        </div>
+        {configNotice && <p className="mt-1.5 text-[10px] text-emerald-700">✓ {configNotice}</p>}
+        {configError && <p className="mt-1.5 text-[10px] text-red-600">⚠ {configError}</p>}
       </div>
 
       {/* 기본 적용 알고리즘 */}
