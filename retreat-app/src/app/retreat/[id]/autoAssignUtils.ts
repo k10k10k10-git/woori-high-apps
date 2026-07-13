@@ -31,6 +31,10 @@ const FULLTIMER_SPREAD_GUIDE = 30_000;
 // 아직 반이 하나도 없는 조를 먼저 채우는 유도값. 하드 제약보다 작아 고려 관계 등을 깨지 않지만,
 // 일반 균등 점수보다 충분히 커 파송 조장만 있는 조에도 실제 반이 우선 배정되게 한다.
 const EMPTY_GROUP_SPREAD_GUIDE = 80_000;
+// 파송 조장이 조에서 유일한 동성 학생으로 남지 않도록 같은 성별 반을 먼저 붙이는 유도값.
+// 최종 판정은 scoreGroups의 하드 규칙이며, 이 값은 큰순 그리디가 반대 성별 큰 반으로
+// 정원을 먼저 채워버리는 상황을 줄인다.
+const SENT_LEADER_PEER_GUIDE = 70_000;
 
 export interface CombinedGroupCountInput {
   groupCount1bu: number;
@@ -483,15 +487,23 @@ function tryAssign(
       }
       // 모든 조에 최소 한 반 배정 유도. 파송 조장 1명만 있는 조도 unitKeys는 0개이므로 빈 조로 본다.
       if (gData[i].unitKeys.length === 0) score += EMPTY_GROUP_SPREAD_GUIDE;
+      // 파송 조장 외 같은 성별 학생이 아직 없으면 같은 성별 반을 우선 유도한다.
+      // 조장 본인 반은 별도 하드 규칙으로 이 조에 들어올 수 없으므로 다른 반만 대상이 된다.
+      const sentLeader = leaders.find(leader => leader.mode === "sent" && leader.groupIdx === i);
+      if (ruleFlags.mixGender && sentLeader) {
+        const sameGenderMembers = sentLeader.gender === "남" ? gData[i].maleMembers : gData[i].femaleMembers;
+        const bundleHasSameGender = sentLeader.gender === "남" ? bMale > 0 : bFemale > 0;
+        if (sameGenderMembers <= 1 && bundleHasSameGender) score += SENT_LEADER_PEER_GUIDE;
+      }
       // 인원 균등 배분 (gradient)
       if (ruleFlags.balanceSize) score -= gData[i].total * 100;
       // 남녀반 혼성 보장 (하드) — 배정 후에도 단일 성별로 남는 조를 회피 (혼성 번들은 자연 통과)
       if (ruleFlags.mixGender) {
         const maleAfter = gData[i].maleMembers + (bMale > 0 ? 1 : 0);
         const femaleAfter = gData[i].femaleMembers + (bFemale > 0 ? 1 : 0);
-        // 아무도 없는 조의 첫 반은 자유롭게 받는다. 파송 조장만 있는 조는 조장 성별까지
-        // 포함해 판정해야 실제로 혼성인 "파송 조장 + 반대 성별 반"을 단일 성별로 오인하지 않는다.
-        if (gData[i].total > 0 && (maleAfter === 0 || femaleAfter === 0)) {
+        // 파송 조장만 있는 조의 첫 반은 어느 성별이든 받을 수 있어야 한다. 최종 scoreGroups가
+        // 혼성과 동성 동료 존재를 함께 판정하므로, 첫 반 단계에서 미래 조합을 막지 않는다.
+        if (gData[i].unitKeys.length > 0 && (maleAfter === 0 || femaleAfter === 0)) {
           score -= HARD_PENALTY;
         }
       }
@@ -675,6 +687,12 @@ export function scoreGroups(
         if (groups[i].studentIds.length === 0) return;
         if (c.male === 0 || c.female === 0) score -= HARD_PENALTY;
       });
+      // 파송 조장 혼자만 해당 성별이고 나머지가 전부 반대 성별인 구성도 금지한다.
+      // comp에는 반별 성별 존재 수 + 파송 조장 1이 들어 있으므로 1 이하면 동성 반이 없다.
+      sentLeaderExclusions.forEach(({ groupIdx, gender }) => {
+        const sameGenderPresence = gender === "남" ? comp[groupIdx]?.male : comp[groupIdx]?.female;
+        if ((sameGenderPresence ?? 0) <= 1) score -= HARD_PENALTY;
+      });
     }
     // 동성으로만 조 구성 (하드) — 한 조에 두 성별이 섞이면 위반
     if (ruleFlags.sameGender) {
@@ -783,6 +801,14 @@ export function improveGroupsByWholeUnitMoves(
           unit.studentIds.some(id => candidate[sourceIdx].studentIds.includes(id))
         );
         if (!sourceStillHasClass) continue;
+        const removesExistingSentLeaderPeer = sentLeaderExclusions.some(exclusion => {
+          const hasPeer = (groupsToCheck: Group[]) => units.some(unit =>
+            unit.gender === exclusion.gender
+            && unit.studentIds.some(id => groupsToCheck[exclusion.groupIdx]?.studentIds.includes(id))
+          );
+          return hasPeer(current) && !hasPeer(candidate);
+        });
+        if (removesExistingSentLeaderPeer) continue;
         // 최대 인원은 후처리가 새로 위반하게 두지 않는다. 점수만 비교하면 다른 하드 위반을
         // 하나 줄이는 대신 최대 인원 위반을 하나 만드는 동률 교환이 가능하기 때문이다.
         if (ruleFlags.maxGroupSize > 0 && candidate[targetIdx].studentIds.length > ruleFlags.maxGroupSize) continue;

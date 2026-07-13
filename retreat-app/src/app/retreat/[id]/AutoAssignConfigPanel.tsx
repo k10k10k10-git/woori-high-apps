@@ -304,7 +304,7 @@ export default function AutoAssignConfigPanel({
             "모든 조의 인원 수를 최대한 균등하게 배분",
             "특정 학년이 한 조에 몰리지 않도록 분산 배정",
             "1·2부 합산 조 수를 짝수로 자동 보정",
-            "16회 반복 실행 후 최적 결과 자동 선택",
+            "16회 반복 후 상위 결과의 반 이동까지 보정해 최적 결과 선택",
           ].map(label => (
             <div key={label} className="flex items-start gap-1.5">
               <span className="text-slate-400 shrink-0 mt-px">·</span>
@@ -319,7 +319,7 @@ export default function AutoAssignConfigPanel({
         <p className="font-semibold mb-2">선택 적용 알고리즘</p>
         <div className="space-y-1.5">
           {([
-            { label: "남녀반 혼성 조 (남·여 반이 각 조에 최소 1개씩 포함)", key: "mixGender" as keyof RuleFlags },
+            { label: "남녀반 혼성 조 (파송 조장은 본인 외 동성 학생도 포함)", key: "mixGender" as keyof RuleFlags },
             { label: "동성으로만 조 구성 (남학생 반·여학생 반 분리)",       key: "sameGender" as keyof RuleFlags },
           ] as const).map(({ label, key }) => {
             const checked = !!rules[key];

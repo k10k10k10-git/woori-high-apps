@@ -336,21 +336,45 @@ describe("scoreGroups — 교사 고려 관계 하드 판정", () => {
     expect(score).toBeLessThanOrEqual(-1_000_000);
   });
 
-  it("파송 조장의 성별은 혼성 판정에 포함하되 반 개수에는 포함하지 않는다", () => {
+  it("파송 조장의 성별은 동성 판정에 포함하되 반 개수에는 포함하지 않는다", () => {
     const femaleUnit: ClassUnit = {
       key: "1부_1_2", bu, grade: 1, classNum: 2, gender: "여",
       studentIds: ["female"], names: ["여학생"],
     };
     const groups = [mkG("gA", ["sent-leader", "female"])];
-    const mixRules = mkRules({ mixGender: true });
-    const withoutLeaderGender = scoreGroups(groups, [femaleUnit], [], [], [], [], [], mixRules, []);
+    const sameGenderRules = mkRules({ sameGender: true });
+    const withoutLeaderGender = scoreGroups(groups, [femaleUnit], [], [], [], [], [], sameGenderRules, []);
     const withLeaderGender = scoreGroups(
-      groups, [femaleUnit], [], [], [], [], [], mixRules, [],
+      groups, [femaleUnit], [], [], [], [], [], sameGenderRules, [],
       [{ groupIdx: 0, unitKey: "1부_1_1", gender: "남" }],
     );
 
-    expect(withoutLeaderGender).toBeLessThanOrEqual(-1_000_000);
-    expect(withLeaderGender).toBe(0);
+    expect(withoutLeaderGender).toBe(0);
+    expect(withLeaderGender).toBeLessThanOrEqual(-1_000_000);
+  });
+
+  it("혼성 조의 파송 조장에게는 본인 외 같은 성별 반이 최소 하나 필요하다", () => {
+    const femaleUnit: ClassUnit = {
+      key: "1부_1_2", bu, grade: 1, classNum: 2, gender: "여",
+      studentIds: ["female"], names: ["여학생"],
+    };
+    const malePeerUnit: ClassUnit = {
+      key: "1부_2_3", bu, grade: 2, classNum: 3, gender: "남",
+      studentIds: ["male-peer"], names: ["남학생"],
+    };
+    const mixRules = mkRules({ mixGender: true });
+    const sentLeader = [{ groupIdx: 0, unitKey: "1부_1_1", gender: "남" as const }];
+    const leaderOnlyGender = scoreGroups(
+      [mkG("gA", ["sent-leader", "female"])], [femaleUnit],
+      [], [], [], [], [], mixRules, [], sentLeader,
+    );
+    const withMalePeer = scoreGroups(
+      [mkG("gA", ["sent-leader", "female", "male-peer"])], [femaleUnit, malePeerUnit],
+      [], [], [], [], [], mixRules, [], sentLeader,
+    );
+
+    expect(leaderOnlyGender).toBeLessThanOrEqual(-1_000_000);
+    expect(withMalePeer).toBe(0);
   });
 });
 
