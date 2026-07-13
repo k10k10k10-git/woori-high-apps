@@ -5,11 +5,11 @@ import { ClassUnit, ConflictPair, RuleFlags, LeaderEntry, parseClassKey } from "
 
 // ── 타입 ─────────────────────────────────────────────────────────────
 
-interface StudentPicker { bu: string; grade: string; cls: string; name: string; }
+interface StudentPicker { bu: string; grade: string; cls: string; name: string; studentId: string; }
 interface TeacherPicker { bu: string; name: string; }
 interface ClassPicker { bu: string; grade: string; cls: string; }
 
-interface StudentCandidate { name: string; bu: string; grade: number; cls: number; }
+interface StudentCandidate { name: string; bu: string; grade: number; cls: number; studentId: string; }
 interface TeacherCandidate { name: string; bu: string; }
 
 // ── 이름 우선 선택 컴포넌트 ─────────────────────────────────────────────
@@ -28,7 +28,7 @@ function StudentNamePicker({ value, candidates, placeholder, onPick }: {
       <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-white border border-green-300 rounded-lg px-2 py-1 text-xs">
         <span className="font-semibold text-slate-700 truncate">{value.name}</span>
         <span className="text-slate-400 shrink-0">{value.bu} {value.grade}학년 {value.cls}반</span>
-        <button type="button" aria-label="선택 취소" onClick={() => { onPick({ bu: "", grade: "", cls: "", name: "" }); setQuery(""); }}
+        <button type="button" aria-label="선택 취소" onClick={() => { onPick({ bu: "", grade: "", cls: "", name: "", studentId: "" }); setQuery(""); }}
           className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none shrink-0">×</button>
       </div>
     );
@@ -42,8 +42,8 @@ function StudentNamePicker({ value, candidates, placeholder, onPick }: {
       {matches.length > 0 && (
         <div className="absolute z-10 left-0 right-0 mt-0.5 rounded-lg border border-slate-200 bg-white shadow-lg max-h-40 overflow-y-auto">
           {matches.map((c, i) => (
-            <button type="button" key={`${c.bu}_${c.grade}_${c.cls}_${c.name}_${i}`}
-              onClick={() => { onPick({ bu: c.bu, grade: String(c.grade), cls: String(c.cls), name: c.name }); setQuery(""); }}
+            <button type="button" key={c.studentId || `${c.bu}_${c.grade}_${c.cls}_${c.name}_${i}`}
+              onClick={() => { onPick({ bu: c.bu, grade: String(c.grade), cls: String(c.cls), name: c.name, studentId: c.studentId }); setQuery(""); }}
               className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 text-xs">
               <span className="font-semibold text-slate-700">{c.name}</span>
               <span className="text-slate-400 ml-auto">{c.bu} {c.grade}학년 {c.cls}반</span>
@@ -148,9 +148,9 @@ export interface AutoAssignConfigPanelProps {
 
 // ── 헬퍼 ─────────────────────────────────────────────────────────────
 
-function emptyPicker(): StudentPicker { return { bu: "", grade: "", cls: "", name: "" }; }
+function emptyPicker(): StudentPicker { return { bu: "", grade: "", cls: "", name: "", studentId: "" }; }
 function emptyTpicker(): TeacherPicker { return { bu: "", name: "" }; }
-function emptyEntry(): LeaderEntry { return { name: "", grade: "", cls: "" }; }
+function emptyEntry(): LeaderEntry { return { name: "", grade: "", cls: "", studentId: "", mode: "withClass" }; }
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────
 
@@ -170,7 +170,7 @@ export default function AutoAssignConfigPanel({
 
   // 이름 우선 선택용 후보 목록 (부·학년·반 표시)
   const studentCandidates: StudentCandidate[] = [...classUnits1, ...classUnits2]
-    .flatMap(u => u.names.map(name => ({ name, bu: u.bu, grade: u.grade, cls: u.classNum })));
+    .flatMap(u => u.names.map((name, i) => ({ name, bu: u.bu, grade: u.grade, cls: u.classNum, studentId: u.studentIds[i] })));
   const teacherCandidates: TeacherCandidate[] = [
     ...new Map(
       teachers.filter(t => parseClassKey(t.classKey) !== null).map(t => [`${t.bu}_${t.name}`, { name: t.name, bu: t.bu }])
@@ -187,6 +187,19 @@ export default function AutoAssignConfigPanel({
     const u = allClassUnits.find(cu => cu.key === key);
     return u ? `${u.bu} ${u.grade}학년 ${u.classNum}반` : key;
   };
+  const hasLeaderClassDuplicates = ([
+    { bu: "1부", entries: leaderEntries1.slice(0, groupCount1bu) },
+    { bu: "2부", entries: leaderEntries2.slice(0, groupCount2bu) },
+  ] as const).some(row => {
+    const seen = new Set<string>();
+    return row.entries.some(entry => {
+      if (!entry.name.trim() || entry.mode === "sent" || !entry.grade || !entry.cls) return false;
+      const key = `${row.bu}_${entry.grade}_${entry.cls}`;
+      if (seen.has(key)) return true;
+      seen.add(key);
+      return false;
+    });
+  });
 
   // 반 담당 전참 교사 수 체크 (스탭/부장/회계 제외)
   const fullTimer1 = teachers.filter(t => t.bu === "1부" && t.status === "전참" && parseClassKey(t.classKey) !== null).length;
@@ -371,6 +384,7 @@ export default function AutoAssignConfigPanel({
       {/* 조장 반 설정 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-2">⭐ 조장 설정</p>
+        <p className="text-[10px] text-slate-400 mb-2">기본은 본인반 동반입니다. 본인반 없이 다른 조를 섬기는 조장만 <strong className="text-fuchsia-600">파송</strong>을 체크하세요.</p>
         {([
           { bu: "1부" as const, count: groupCount1bu, entries: leaderEntries1, setEntries: setLeaderEntries1, show: bu1Count > 0, tagCls: "tag-green", units: classUnits1 },
           { bu: "2부" as const, count: groupCount2bu, entries: leaderEntries2, setEntries: setLeaderEntries2, show: bu2Count > 0, tagCls: "tag-purple", units: classUnits2 },
@@ -384,11 +398,14 @@ export default function AutoAssignConfigPanel({
                 const clsNum   = entry.cls   ? parseInt(entry.cls)   : null;
 
                 // 이 부서 이름 후보 (이름 입력 → 후보 선택)
-                const cands = row.units.flatMap(u => u.names.map(name => ({ name, bu: row.bu, grade: u.grade, cls: u.classNum })));
+                const cands = row.units.flatMap(u => u.names.map((name, studentIndex) => ({
+                  name, bu: row.bu, grade: u.grade, cls: u.classNum, studentId: u.studentIds[studentIndex],
+                })));
 
                 // 같은 반을 다른 조장 칸에서 이미 골랐으면 중복 표시
-                const isDuplicate = entry.name.trim() && gradeNum !== null && clsNum !== null
+                const isDuplicate = entry.mode !== "sent" && entry.name.trim() && gradeNum !== null && clsNum !== null
                   ? row.entries.slice(0, i).some(e => {
+                      if (e?.mode === "sent") return false;
                       const eg = e?.grade ? parseInt(e.grade) : null;
                       const ec = e?.cls   ? parseInt(e.cls)   : null;
                       return eg === gradeNum && ec === clsNum;
@@ -399,16 +416,30 @@ export default function AutoAssignConfigPanel({
                   <div key={i} className="flex items-center gap-1">
                     <span className="text-[10px] text-slate-400 w-5 shrink-0 text-right">{i + 1}조</span>
                     <StudentNamePicker
-                      value={{ bu: row.bu, grade: entry.grade, cls: entry.cls, name: entry.name }}
+                      value={{ bu: row.bu, grade: entry.grade, cls: entry.cls, name: entry.name, studentId: entry.studentId }}
                       candidates={cands}
                       placeholder="이름 입력"
                       onPick={p => {
                         const next = row.entries.map((en, j) =>
-                          j === i ? { name: p.name, grade: p.grade, cls: p.cls } : en
+                          j === i ? { ...en, name: p.name, grade: p.grade, cls: p.cls, studentId: p.studentId } : en
                         );
                         row.setEntries(next);
                       }}
                     />
+                    {entry.name && (
+                      <label className={`flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-1 text-[10px] cursor-pointer ${entry.mode === "sent" ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700 font-semibold" : "border-slate-200 bg-white text-slate-500"}`}>
+                        <input type="checkbox" className="accent-fuchsia-600"
+                          aria-label={`${entry.name} 파송`}
+                          checked={entry.mode === "sent"}
+                          onChange={e => {
+                            const next = row.entries.map((en, j) =>
+                              j === i ? { ...en, mode: e.target.checked ? "sent" as const : "withClass" as const } : en
+                            );
+                            row.setEntries(next);
+                          }} />
+                        파송
+                      </label>
+                    )}
                     {isDuplicate && <span className="text-[10px] text-orange-500 shrink-0">중복</span>}
                   </div>
                 );
@@ -652,9 +683,16 @@ export default function AutoAssignConfigPanel({
         </div>
       )}
 
-      <button onClick={onRun} disabled={running || (bu1Count === 0 && bu2Count === 0) || relationErrors.length > 0}
+      {hasLeaderClassDuplicates && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-xs text-orange-700">
+          <p className="font-semibold">⚠ 본인반 동반 조장이 같은 반에 두 명 있습니다</p>
+          <p>둘 중 본인반 없이 섬기는 조장에 `파송`을 체크해주세요.</p>
+        </div>
+      )}
+
+      <button onClick={onRun} disabled={running || (bu1Count === 0 && bu2Count === 0) || relationErrors.length > 0 || hasLeaderClassDuplicates}
         className="btn-primary w-full justify-center text-sm">
-        {running ? "⏳ 계산 중..." : relationErrors.length > 0 ? "🚫 모순을 해결해주세요" : "🎲 자동 배정 실행"}
+        {running ? "⏳ 계산 중..." : relationErrors.length > 0 || hasLeaderClassDuplicates ? "🚫 모순을 해결해주세요" : "🎲 자동 배정 실행"}
       </button>
     </div>
   );

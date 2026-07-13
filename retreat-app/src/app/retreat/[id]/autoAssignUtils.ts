@@ -46,6 +46,16 @@ export interface LeaderEntry {
   name: string;
   grade: string; // "1" | "2" | "3" | ""
   cls: string;   // "1" ~ "N" | ""
+  studentId: string; // 동명이인과 파송 대상을 안정적으로 식별
+  mode: "withClass" | "sent"; // 기본=본인반 동반, sent=본인반 없이 파송
+}
+
+interface ResolvedLeader {
+  groupIdx: number;
+  name: string;
+  studentId: string;
+  unitKey: string;
+  mode: LeaderEntry["mode"];
 }
 
 // ── 헬퍼 ─────────────────────────────────────────────────────────────
@@ -111,6 +121,7 @@ export function findLeaderUnit(
 
   const matches = Object.values(participants).filter(p => {
     if (!p.bu?.includes(buKey) || !p.studentId) return false;
+    if (entry.studentId) return p.studentId === entry.studentId;
     const sd = students[p.studentId];
     const pName  = sd?.name  ?? p.name;
     const pGrade = sd?.grade ?? p.grade;
@@ -243,6 +254,7 @@ function tryAssign(
   classAffinities: ConflictPair[], // 반 붙임(결합) — 같은 조 보장 (unitKey 쌍)
   ruleFlags: RuleFlags,
   pinnedUnitKeys: (string | null)[], // length=groupCount, [i]=해당 조에 고정할 unitKey (없으면 null)
+  leaders: ResolvedLeader[],
 ): Group[] {
   const groups: Group[] = Array.from({ length: groupCount }, (_, i) => ({
     id: `auto_${bu}_${i + 1}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -259,6 +271,19 @@ function tryAssign(
     fullTimerCount: 0, // 전참 교사 수
     total: 0,
   }));
+
+  // 파송 조장은 본인 반 단위에서는 빠지고 목표 조의 학생/조장 역할로만 한 번 들어간다.
+  // allNames·total에도 선반영해 학생 고려 관계와 인원 균등 계산에서 빠지지 않게 한다.
+  leaders.forEach(leader => {
+    const group = groups[leader.groupIdx];
+    const data = gData[leader.groupIdx];
+    if (!group || !data) return;
+    group.leader = leader.name;
+    if (leader.mode !== "sent") return;
+    if (!group.studentIds.includes(leader.studentId)) group.studentIds.push(leader.studentId);
+    if (!data.allNames.includes(leader.name)) data.allNames.push(leader.name);
+    data.total += 1;
+  });
 
   // unitKey → 담당 교사 이름 목록 (반 담당 교사만, 이번 부)
   const unitKeyToTeachers = new Map<string, string[]>();
@@ -365,6 +390,10 @@ function tryAssign(
         const classConflict = gData[i].unitKeys.some(k => bKeys.some(bk => hasConflict(bk, k, classConflicts)));
         if (classConflict) score -= HARD_PENALTY;
       }
+      // 파송 조장의 본인 반은 파송된 조에 들어가면 안 된다(파송 의미 자체를 보장하는 하드 제약).
+      if (leaders.some(leader => leader.mode === "sent" && leader.groupIdx === i && bKeys.includes(leader.unitKey))) {
+        score -= HARD_PENALTY;
+      }
       // 전참 교사 보장 (중간 유도) — 전참 반은 아직 전참이 없는 조로 유도(빈 조 포함).
       // 빈 조를 제외하면 전참 반이 빈 조로 못 가 전참이 한쪽에 뭉치는 편향이 생겨 total>0 조건을 뺀다.
       if (ruleFlags.requireFullTimer) {
@@ -442,6 +471,7 @@ export function scoreGroups(
   classAffinities: ConflictPair[],
   ruleFlags: RuleFlags,
   teachers: TeacherAttendance[],
+  sentLeaderExclusions: { groupIdx: number; unitKey: string }[] = [],
 ): number {
   let score = 0;
 
@@ -455,6 +485,11 @@ export function scoreGroups(
     if (!g) return;
     unitKeysInGroup[groupIdxById.get(g.id)!].push(u.key);
     u.names.forEach(n => nameToGroup.set(n, g.id));
+  });
+  // 파송 조장은 ClassUnit에서 빠지므로 이름 기반 고려 관계 맵에 역할 위치를 별도로 넣는다.
+  groups.forEach(g => {
+    (g.leader || "").split(",").map(n => n.trim()).filter(Boolean)
+      .forEach(name => nameToGroup.set(name, g.id));
   });
 
   // 교사 → 소속 조 맵. tryAssign과 동일하게 "반 담당 교사는 그 반이 배정된 조 소속"으로 본다
@@ -516,6 +551,10 @@ export function scoreGroups(
       if (ga !== undefined && gb !== undefined && ga !== gb) score -= HARD_PENALTY;
     });
   }
+  // 파송 조장 본인 반이 같은 조에 들어간 결과는 하드 위반.
+  sentLeaderExclusions.forEach(({ groupIdx, unitKey }) => {
+    if (unitKeysInGroup[groupIdx]?.includes(unitKey)) score -= HARD_PENALTY;
+  });
   // 전참 교사 미배정 조 (하드)
   if (ruleFlags.requireFullTimer) {
     const teacherStatusMap = new Map(teachers.map(t => [t.name, t.status]));
@@ -571,34 +610,53 @@ export function runAutoAssign(
   participants: Record<string, Participant>,
   teachers: TeacherAttendance[],
   students: Record<string, { name: string; grade: number; class: number }>,
-  pinnedKeys1: (string | null)[], // 1부: [i] = i번째 조에 고정할 unitKey
-  pinnedKeys2: (string | null)[], // 2부: [i] = i번째 조에 고정할 unitKey
-  leaderNames1: string[], // 1부 조장 이름 (조장 배정용)
-  leaderNames2: string[], // 2부 조장 이름
+  leaderEntries1: LeaderEntry[],
+  leaderEntries2: LeaderEntry[],
 ): Group[] {
   const result: Group[] = [];
   for (const bu of ["1부", "2부"] as const) {
     const groupCount = bu === "1부" ? groupCount1bu : groupCount2bu;
     if (groupCount <= 0) continue;
-    const units = buildClassUnits(participants, bu, students);
-    if (units.length === 0) continue;
+    const rawUnits = buildClassUnits(participants, bu, students);
+    if (rawUnits.length === 0) continue;
     const buTeachers = teachers.filter(t => t.bu === bu);
-    const pinnedKeys = bu === "1부" ? pinnedKeys1 : pinnedKeys2;
+    const entries = bu === "1부" ? leaderEntries1 : leaderEntries2;
+    const leaders: ResolvedLeader[] = entries.slice(0, groupCount).flatMap((entry, groupIdx) => {
+      const found = findLeaderUnit(entry, bu, participants, students);
+      if (!entry.name.trim() || !found) return [];
+      return [{
+        groupIdx,
+        name: entry.name.trim(),
+        studentId: found.studentId,
+        unitKey: found.unitKey,
+        mode: entry.mode || "withClass",
+      }];
+    });
+    const sentLeaderIds = new Set(leaders.filter(l => l.mode === "sent").map(l => l.studentId));
+    // 파송 조장 한 명만 본인 반에서 분리한다. 나머지 학생은 기존 반 단위 불변식을 그대로 유지한다.
+    const units = rawUnits.map(unit => {
+      const kept = unit.studentIds
+        .map((studentId, i) => ({ studentId, name: unit.names[i] }))
+        .filter(item => !sentLeaderIds.has(item.studentId));
+      return { ...unit, studentIds: kept.map(item => item.studentId), names: kept.map(item => item.name) };
+    }).filter(unit => unit.studentIds.length > 0);
+    const pinnedKeys: (string | null)[] = Array(groupCount).fill(null);
+    if (ruleFlags.pinLeaders) {
+      leaders.filter(l => l.mode === "withClass").forEach(l => { pinnedKeys[l.groupIdx] = l.unitKey; });
+    }
+    const sentLeaderExclusions = leaders
+      .filter(l => l.mode === "sent")
+      .map(l => ({ groupIdx: l.groupIdx, unitKey: l.unitKey }));
 
     let bestGroups: Group[] | null = null;
     let bestScore = -Infinity;
     // 하드 제약이 많을수록 그리디가 첫 시도에서 막힐 수 있어 반복 횟수를 늘려 위반 0 해를 찾을 확률을 높인다.
     for (let i = 0; i < 16; i++) {
-      const g = tryAssign(groupCount, bu, units, buTeachers, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, ruleFlags, pinnedKeys);
-      const s = scoreGroups(g, units, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, ruleFlags.applyConflicts ? classAffinities : [], ruleFlags, buTeachers);
+      const g = tryAssign(groupCount, bu, units, buTeachers, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, ruleFlags, pinnedKeys, leaders);
+      const s = scoreGroups(g, units, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, ruleFlags.applyConflicts ? classAffinities : [], ruleFlags, buTeachers, sentLeaderExclusions);
       if (s > bestScore) { bestScore = s; bestGroups = g; }
     }
     if (bestGroups) {
-      // 조장 이름 설정
-      const leaderNames = bu === "1부" ? leaderNames1 : leaderNames2;
-      bestGroups.forEach((g, i) => {
-        if (leaderNames[i]?.trim()) g.leader = leaderNames[i].trim();
-      });
       result.push(...bestGroups);
     }
   }

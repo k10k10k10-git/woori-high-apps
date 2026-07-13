@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import {
   ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildClassUnits, findLeaderUnit, runAutoAssign, validateClassRelations,
+  buildClassUnits, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -43,7 +43,7 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const [classConflicts, setClassConflicts] = useState<ConflictPair[]>([]);
   const [classAffinities, setClassAffinities] = useState<ConflictPair[]>([]); // 반 붙임(결합) — 같은 조 보장
   // 드롭다운 입력 상태
-  const emptyPicker = () => ({ bu: "", grade: "", cls: "", name: "" });
+  const emptyPicker = () => ({ bu: "", grade: "", cls: "", name: "", studentId: "" });
   const emptyTpicker = () => ({ bu: "", name: "" });
   const [newSC, setNewSC] = useState({ a: emptyPicker(), b: emptyPicker() });
   const [newTC, setNewTC] = useState({ a: emptyTpicker(), b: emptyTpicker() });
@@ -53,7 +53,7 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const [newCC, setNewCC] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
   const [newCA, setNewCA] = useState<{ a: { bu: string; grade: string; cls: string }; b: { bu: string; grade: string; cls: string } }>({ a: emptyClsPick(), b: emptyClsPick() });
   // 조장 설정 (이름+학년+반, 동명이인 구분용)
-  const emptyEntry = (): LeaderEntry => ({ name: "", grade: "", cls: "" });
+  const emptyEntry = (): LeaderEntry => ({ name: "", grade: "", cls: "", studentId: "", mode: "withClass" });
   const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
   const [leaderEntries2, setLeaderEntries2] = useState<LeaderEntry[]>(Array(20).fill(null).map(emptyEntry));
   const [preview, setPreview] = useState<{ groups: Group[]; units1: ClassUnit[]; units2: ClassUnit[] } | null>(null);
@@ -126,19 +126,10 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   function run() {
     setRunning(true);
     setTimeout(() => {
-      // 조장 항목 → unitKey 변환
-      const pinnedKeys1 = Array.from({ length: groupCount1bu }, (_, i) =>
-        findLeaderUnit(leaderEntries1[i] ?? emptyEntry(), "1부", participants, students)?.unitKey ?? null
-      );
-      const pinnedKeys2 = Array.from({ length: groupCount2bu }, (_, i) =>
-        findLeaderUnit(leaderEntries2[i] ?? emptyEntry(), "2부", participants, students)?.unitKey ?? null
-      );
-      const leaderNames1 = leaderEntries1.map(e => e.name);
-      const leaderNames2 = leaderEntries2.map(e => e.name);
       const groups = runAutoAssign(
         groupCount1bu, groupCount2bu, rules,
         studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, participants, teachers, students,
-        pinnedKeys1, pinnedKeys2, leaderNames1, leaderNames2,
+        leaderEntries1, leaderEntries2,
       );
       setPreview({ groups, units1: classUnits1, units2: classUnits2 });
       setRunning(false);

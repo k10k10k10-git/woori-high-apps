@@ -40,9 +40,15 @@ export default function AutoAssignPreviewModal({
             // 각 조의 반 구성 계산
             const groupUnitMap = new Map<string, ClassUnit[]>();
             buGroups.forEach(g => {
-              const inThisGroup = buUnits.filter(u =>
-                u.studentIds.some(sid => g.studentIds.includes(sid))
-              );
+              const leaderNames = new Set((g.leader || "").split(",").map(name => name.trim()).filter(Boolean));
+              // 파송 조장 studentId는 목표 조에 포함되지만 본인 반을 대표하지 않는다.
+              // 조장 이름을 제외한 실제 반 학생만으로 미리보기의 반 구성을 계산한다.
+              const inThisGroup = buUnits.map(u => {
+                const members = u.studentIds
+                  .map((studentId, i) => ({ studentId, name: u.names[i] }))
+                  .filter(member => g.studentIds.includes(member.studentId) && !leaderNames.has(member.name));
+                return { ...u, studentIds: members.map(member => member.studentId), names: members.map(member => member.name) };
+              }).filter(u => u.studentIds.length > 0);
               groupUnitMap.set(g.id, inThisGroup);
             });
 
@@ -79,6 +85,11 @@ export default function AutoAssignPreviewModal({
                                 </span>
                               );
                             })}
+                          </div>
+                        )}
+                        {g.leader && (
+                          <div className="mb-2 inline-flex items-center rounded bg-yellow-50 border border-yellow-200 px-1.5 py-0.5 text-yellow-800">
+                            ⭐ 조장 {g.leader}
                           </div>
                         )}
                         {!g.teachers.some(tn => teachers.find(t => t.name === tn)?.status === "전참") && (

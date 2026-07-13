@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit } from "./autoAssignUtils";
+import { runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -28,15 +28,27 @@ function run(
   opts: {
     studentConflicts?: ConflictPair[]; classConflicts?: ConflictPair[]; classAffinities?: ConflictPair[];
     teacherConflicts?: ConflictPair[]; teachers?: TeacherAttendance[]; pinned?: (string | null)[];
+    leaders?: LeaderEntry[];
   } = {},
 ) {
-  const empty: string[] = Array(groupCount).fill("");
   const pinned: (string | null)[] = opts.pinned ?? Array(groupCount).fill(null);
+  const leaders: LeaderEntry[] = opts.leaders ?? pinned.map(key => {
+    if (!key) return { name: "", grade: "", cls: "", studentId: "", mode: "withClass" };
+    const [, grade, cls] = key.split("_");
+    const match = Object.values(participants).find(p => p.grade === Number(grade) && p.class === Number(cls));
+    return {
+      name: match?.name ?? "",
+      grade,
+      cls,
+      studentId: match?.studentId ?? "",
+      mode: "withClass",
+    };
+  });
   return runAutoAssign(
     groupCount, 0, rules,
     opts.studentConflicts ?? [], opts.teacherConflicts ?? [], [], opts.classConflicts ?? [], opts.classAffinities ?? [],
     participants, opts.teachers ?? [], {},
-    pinned, [], empty, empty,
+    leaders, [],
   );
 }
 
@@ -147,6 +159,62 @@ describe("runAutoAssign — 하드 제약", () => {
     groups.filter(g => g.studentIds.length > 0).forEach(g => {
       expect(g.teachers.some(tn => statusOf.get(tn) === "전참")).toBe(true);
     });
+  });
+});
+
+describe("runAutoAssign — 파송 조장", () => {
+  const emptyLeader = (): LeaderEntry => ({ name: "", grade: "", cls: "", studentId: "", mode: "withClass" });
+
+  it("체크하지 않은 조장은 기본으로 본인 반 전체와 목표 조에 고정된다", () => {
+    const participants: Record<string, Participant> = {
+      leader: mkP("leader", "조장", 1, 1),
+      mate: mkP("mate", "반친구", 1, 1),
+      other: mkP("other", "다른반", 1, 2),
+    };
+    const leaders = [
+      emptyLeader(),
+      { name: "조장", grade: "1", cls: "1", studentId: "leader", mode: "withClass" as const },
+    ];
+    const groups = run(2, participants, mkRules({ pinLeaders: true }), { leaders });
+    expect(groupOf(groups, "leader")?.name).toBe("2조");
+    expect(groupOf(groups, "mate")?.name).toBe("2조");
+  });
+
+  it("파송 체크한 조장만 본인 반에서 분리되고 본인 반은 파송 조에 들어가지 않는다", () => {
+    const participants: Record<string, Participant> = {
+      leader: mkP("leader", "파송조장", 1, 1),
+      mate1: mkP("mate1", "반친구1", 1, 1),
+      mate2: mkP("mate2", "반친구2", 1, 1),
+      other: mkP("other", "다른반", 1, 2),
+    };
+    const leaders = [
+      emptyLeader(),
+      { name: "파송조장", grade: "1", cls: "1", studentId: "leader", mode: "sent" as const },
+    ];
+    const groups = run(2, participants, mkRules({ pinLeaders: true, balanceSize: true }), { leaders });
+    const sentGroup = groupOf(groups, "leader")!;
+    expect(sentGroup.name).toBe("2조");
+    expect(sentGroup.leader).toBe("파송조장");
+    expect(groupOf(groups, "mate1")?.id).toBe(groupOf(groups, "mate2")?.id);
+    expect(groupOf(groups, "mate1")?.id).not.toBe(sentGroup.id);
+    expect(groups.filter(g => g.studentIds.includes("leader"))).toHaveLength(1);
+  });
+
+  it("같은 반 조장 중 한 명만 파송이면 본인반 동반 조장과 반은 함께, 파송 조장만 다른 조", () => {
+    const participants: Record<string, Participant> = {
+      withClass: mkP("withClass", "동반조장", 1, 1),
+      sent: mkP("sent", "파송조장", 1, 1),
+      mate: mkP("mate", "반친구", 1, 1),
+      other: mkP("other", "다른반", 1, 2),
+    };
+    const leaders: LeaderEntry[] = [
+      { name: "동반조장", grade: "1", cls: "1", studentId: "withClass", mode: "withClass" },
+      { name: "파송조장", grade: "1", cls: "1", studentId: "sent", mode: "sent" },
+    ];
+    const groups = run(2, participants, mkRules({ pinLeaders: true }), { leaders });
+    expect(groupOf(groups, "withClass")?.name).toBe("1조");
+    expect(groupOf(groups, "mate")?.name).toBe("1조");
+    expect(groupOf(groups, "sent")?.name).toBe("2조");
   });
 });
 
