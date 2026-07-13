@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
+import { ensureEvenCombinedGroupCounts, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
 // 1부 참가자 1명 (홀수반=남, 짝수반=여 — buildClassUnits 규칙과 일치)
-function mkP(studentId: string, name: string, grade: number, cls: number): Participant {
-  return { name, gender: cls % 2 === 0 ? "여" : "남", grade, class: cls, bu: "1부", studentId, registeredAt: "" };
+function mkP(studentId: string, name: string, grade: number, cls: number, bu = "1부"): Participant {
+  return { name, gender: cls % 2 === 0 ? "여" : "남", grade, class: cls, bu, studentId, registeredAt: "" };
 }
 
 // 1부 반 담당 교사 1명 (classKey는 "N학년 M반" — parseClassKey 규칙과 일치)
@@ -54,6 +54,45 @@ function run(
 
 const groupOf = (groups: ReturnType<typeof run>, sid: string) =>
   groups.find(g => g.studentIds.includes(sid));
+
+describe("1·2부 합산 조 수 짝수 보정", () => {
+  it("합계가 홀수면 더 붐비고 상한 여유가 있는 부서의 조를 하나 늘린다", () => {
+    expect(ensureEvenCombinedGroupCounts({
+      groupCount1bu: 10, groupCount2bu: 9,
+      maxGroups1: 25, maxGroups2: 25,
+      studentCount1bu: 123, studentCount2bu: 111,
+    })).toEqual({ groupCount1bu: 10, groupCount2bu: 10 });
+  });
+
+  it("양쪽 모두 상한이면 덜 붐비는 부서의 조를 하나 줄인다", () => {
+    expect(ensureEvenCombinedGroupCounts({
+      groupCount1bu: 10, groupCount2bu: 9,
+      maxGroups1: 10, maxGroups2: 9,
+      studentCount1bu: 100, studentCount2bu: 108,
+    })).toEqual({ groupCount1bu: 9, groupCount2bu: 9 });
+  });
+
+  it("학생이 없는 부서는 합계와 보정 대상에서 제외한다", () => {
+    expect(ensureEvenCombinedGroupCounts({
+      groupCount1bu: 9, groupCount2bu: 10,
+      maxGroups1: 12, maxGroups2: 0,
+      studentCount1bu: 90, studentCount2bu: 0,
+    })).toEqual({ groupCount1bu: 10, groupCount2bu: 0 });
+  });
+
+  it("자동배정 핵심 함수도 홀수 입력을 짝수 개 조로 보정한다", () => {
+    const participants = {
+      a1: mkP("a1", "가", 1, 1),
+      a2: mkP("a2", "나", 1, 2),
+      b1: mkP("b1", "다", 1, 1, "2부"),
+    };
+    const groups = runAutoAssign(
+      2, 1, mkRules({}), [], [], [], [], [], participants, [], {}, [], [],
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups.length % 2).toBe(0);
+  });
+});
 
 describe("runAutoAssign — 하드 제약", () => {
   it("학생 고려 관계: 두 학생은 절대 같은 조에 들어가지 않는다", () => {

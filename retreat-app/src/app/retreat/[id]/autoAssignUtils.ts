@@ -50,6 +50,20 @@ export interface LeaderEntry {
   mode: "withClass" | "sent"; // 기본=본인반 동반, sent=본인반 없이 파송
 }
 
+export interface CombinedGroupCountInput {
+  groupCount1bu: number;
+  groupCount2bu: number;
+  maxGroups1: number;
+  maxGroups2: number;
+  studentCount1bu: number;
+  studentCount2bu: number;
+}
+
+export interface CombinedGroupCounts {
+  groupCount1bu: number;
+  groupCount2bu: number;
+}
+
 interface ResolvedLeader {
   groupIdx: number;
   name: string;
@@ -62,6 +76,45 @@ interface ResolvedLeader {
 
 function hasConflict(a: string, b: string, pairs: ConflictPair[]) {
   return pairs.some(p => (p.a === a && p.b === b) || (p.a === b && p.b === a));
+}
+
+/** 1·2부 합산 조 수를 짝수로 맞춘다.
+ * 홀수면 더 붐비는 부서의 조를 하나 늘리고, 양쪽 모두 상한이면
+ * 덜 붐비는 부서의 조를 하나 줄여 총합만 1만큼 조정한다. */
+export function ensureEvenCombinedGroupCounts({
+  groupCount1bu, groupCount2bu, maxGroups1, maxGroups2, studentCount1bu, studentCount2bu,
+}: CombinedGroupCountInput): CombinedGroupCounts {
+  const rows = [
+    {
+      count: studentCount1bu > 0 ? Math.min(Math.max(1, groupCount1bu), Math.max(1, maxGroups1)) : 0,
+      max: studentCount1bu > 0 ? Math.max(1, maxGroups1) : 0,
+      students: studentCount1bu,
+    },
+    {
+      count: studentCount2bu > 0 ? Math.min(Math.max(1, groupCount2bu), Math.max(1, maxGroups2)) : 0,
+      max: studentCount2bu > 0 ? Math.max(1, maxGroups2) : 0,
+      students: studentCount2bu,
+    },
+  ];
+
+  if ((rows[0].count + rows[1].count) % 2 !== 0) {
+    const canIncrease = rows
+      .filter(row => row.count > 0 && row.count < row.max)
+      .sort((a, b) => (b.students / b.count) - (a.students / a.count));
+    if (canIncrease.length > 0) {
+      canIncrease[0].count += 1;
+    } else {
+      const canDecrease = rows
+        .filter(row => row.count > 1)
+        .sort((a, b) => (a.students / a.count) - (b.students / b.count));
+      if (canDecrease.length > 0) canDecrease[0].count -= 1;
+    }
+  }
+
+  return {
+    groupCount1bu: rows[0].count,
+    groupCount2bu: rows[1].count,
+  };
 }
 
 /** 참가자 목록 → 반 단위 ClassUnit 목록 생성
@@ -613,11 +666,26 @@ export function runAutoAssign(
   leaderEntries1: LeaderEntry[],
   leaderEntries2: LeaderEntry[],
 ): Group[] {
+  const rawUnitsByBu = {
+    "1부": buildClassUnits(participants, "1부", students),
+    "2부": buildClassUnits(participants, "2부", students),
+  };
+  const maxFor = (units: ClassUnit[]) => ruleFlags.minTwoClasses
+    ? Math.max(1, Math.floor(units.length / 2))
+    : units.length;
+  const evenCounts = ensureEvenCombinedGroupCounts({
+    groupCount1bu,
+    groupCount2bu,
+    maxGroups1: maxFor(rawUnitsByBu["1부"]),
+    maxGroups2: maxFor(rawUnitsByBu["2부"]),
+    studentCount1bu: rawUnitsByBu["1부"].reduce((sum, unit) => sum + unit.studentIds.length, 0),
+    studentCount2bu: rawUnitsByBu["2부"].reduce((sum, unit) => sum + unit.studentIds.length, 0),
+  });
   const result: Group[] = [];
   for (const bu of ["1부", "2부"] as const) {
-    const groupCount = bu === "1부" ? groupCount1bu : groupCount2bu;
+    const groupCount = bu === "1부" ? evenCounts.groupCount1bu : evenCounts.groupCount2bu;
     if (groupCount <= 0) continue;
-    const rawUnits = buildClassUnits(participants, bu, students);
+    const rawUnits = rawUnitsByBu[bu];
     if (rawUnits.length === 0) continue;
     const buTeachers = teachers.filter(t => t.bu === bu);
     const entries = bu === "1부" ? leaderEntries1 : leaderEntries2;

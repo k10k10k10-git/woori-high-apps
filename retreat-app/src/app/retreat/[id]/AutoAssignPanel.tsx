@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import {
   ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildClassUnits, runAutoAssign, validateClassRelations,
+  buildClassUnits, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -124,10 +124,20 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   }
 
   function run() {
+    const evenCounts = ensureEvenCombinedGroupCounts({
+      groupCount1bu,
+      groupCount2bu,
+      maxGroups1,
+      maxGroups2,
+      studentCount1bu: bu1Count,
+      studentCount2bu: bu2Count,
+    });
+    if (evenCounts.groupCount1bu !== groupCount1bu) setGroupCount1bu(evenCounts.groupCount1bu);
+    if (evenCounts.groupCount2bu !== groupCount2bu) setGroupCount2bu(evenCounts.groupCount2bu);
     setRunning(true);
     setTimeout(() => {
       const groups = runAutoAssign(
-        groupCount1bu, groupCount2bu, rules,
+        evenCounts.groupCount1bu, evenCounts.groupCount2bu, rules,
         studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, participants, teachers, students,
         leaderEntries1, leaderEntries2,
       );

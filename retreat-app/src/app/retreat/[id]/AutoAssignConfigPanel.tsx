@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { TeacherAttendance } from "@/lib/types";
-import { ClassUnit, ConflictPair, RuleFlags, LeaderEntry, parseClassKey } from "./autoAssignUtils";
+import { ClassUnit, ConflictPair, RuleFlags, LeaderEntry, ensureEvenCombinedGroupCounts, parseClassKey } from "./autoAssignUtils";
 
 // ── 타입 ─────────────────────────────────────────────────────────────
 
@@ -206,6 +206,22 @@ export default function AutoAssignConfigPanel({
   const fullTimer2 = teachers.filter(t => t.bu === "2부" && t.status === "전참" && parseClassKey(t.classKey) !== null).length;
   const warn1 = bu1Count > 0 && groupCount1bu > fullTimer1;
   const warn2 = bu2Count > 0 && groupCount2bu > fullTimer2;
+  const evenGroupCounts = ensureEvenCombinedGroupCounts({
+    groupCount1bu,
+    groupCount2bu,
+    maxGroups1,
+    maxGroups2,
+    studentCount1bu: bu1Count,
+    studentCount2bu: bu2Count,
+  });
+  const activeGroupCount1 = bu1Count > 0 ? groupCount1bu : 0;
+  const activeGroupCount2 = bu2Count > 0 ? groupCount2bu : 0;
+  const combinedGroupCount = activeGroupCount1 + activeGroupCount2;
+  const groupCountAdjustment = evenGroupCounts.groupCount1bu !== activeGroupCount1
+    ? `1부 ${activeGroupCount1}→${evenGroupCounts.groupCount1bu}조`
+    : evenGroupCounts.groupCount2bu !== activeGroupCount2
+      ? `2부 ${activeGroupCount2}→${evenGroupCounts.groupCount2bu}조`
+      : null;
 
   function addSC() {
     if (!newSC.a.name || !newSC.b.name || newSC.a.name === newSC.b.name) return;
@@ -269,6 +285,7 @@ export default function AutoAssignConfigPanel({
             "반 붙임 관계 설정 시 해당 반들을 반드시 같은 조로 묶음",
             "모든 조의 인원 수를 최대한 균등하게 배분",
             "특정 학년이 한 조에 몰리지 않도록 분산 배정",
+            "1·2부 합산 조 수를 짝수로 자동 보정",
             "16회 반복 실행 후 최적 결과 자동 선택",
           ].map(label => (
             <div key={label} className="flex items-start gap-1.5">
@@ -378,6 +395,12 @@ export default function AutoAssignConfigPanel({
               </p>
             </div>
           ))}
+        </div>
+        <div className={`mt-2 rounded-lg px-2.5 py-2 text-xs ${groupCountAdjustment ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
+          합계 {combinedGroupCount}조
+          {groupCountAdjustment
+            ? ` → 실행 시 ${groupCountAdjustment}로 자동 보정 (총 ${evenGroupCounts.groupCount1bu + evenGroupCounts.groupCount2bu}조)`
+            : " · 짝수 조건 충족"}
         </div>
       </div>
 
