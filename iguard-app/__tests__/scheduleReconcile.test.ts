@@ -61,6 +61,26 @@ describe("reconcileScheduleImport — 재임포트 대조 (동선 보존)", () =
     expect(r.updates.map(u => u.id)).toEqual(["dup_a"]);
     expect(r.deletes).toHaveLength(0); // importedKeys에 09:00 있으므로 dup_b도 삭제 대상 아님
   });
+
+  it("옛 파서가 전날로 잘못 옮긴 24시+ 블록을 같은 ID로 다음 논리 일차에 복구", () => {
+    const existing: E[] = [{ id: "dawn", day: 1, start: "24:30", label: "간식 및 취침" }];
+    const imported: I[] = [{ day: 2, start: "24:30", label: "간식 및 취침" }];
+    const r = reconcileScheduleImport(existing, imported);
+    expect(r.updates).toEqual([{ id: "dawn", imported: imported[0] }]);
+    expect(r.creates).toHaveLength(0);
+    expect(r.deletes).toHaveLength(0);
+  });
+
+  it("같은 전날 블록이 현재 시트에도 있으면 새 일차 블록의 마이그레이션 대상으로 쓰지 않는다", () => {
+    const existing: E[] = [{ id: "real-day1", day: 1, start: "24:30", label: "간식 및 취침" }];
+    const imported: I[] = [
+      { day: 1, start: "24:30", label: "간식 및 취침" },
+      { day: 2, start: "24:30", label: "간식 및 취침" },
+    ];
+    const r = reconcileScheduleImport(existing, imported);
+    expect(r.updates.map(u => u.id)).toEqual(["real-day1"]);
+    expect(r.creates).toEqual([imported[1]]);
+  });
 });
 
 describe("blockKey — 실제 시각 정규 키", () => {

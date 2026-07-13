@@ -29,25 +29,44 @@ export interface ReconcileResult<E, I> {
 }
 
 export function reconcileScheduleImport<
-  E extends { id: string; day: number; start: string },
-  I extends { day: number; start: string },
+  E extends { id: string; day: number; start: string; label?: string },
+  I extends { day: number; start: string; label?: string },
 >(existing: E[], imported: I[]): ReconcileResult<E, I> {
   const existingByKey = new Map<string, E>();
   for (const b of existing) {
     const k = blockKey(b.day, b.start);
     if (!existingByKey.has(k)) existingByKey.set(k, b); // 중복 키가 있으면 첫 번째만 매칭 대상
   }
-  const importedKeys = new Set<string>();
+  const importedKeys = new Set(imported.map(b => blockKey(b.day, b.start)));
+  const matchedExistingIds = new Set<string>();
   const updates: { id: string; imported: I }[] = [];
   const creates: I[] = [];
   for (const imp of imported) {
     const k = blockKey(imp.day, imp.start);
-    importedKeys.add(k);
-    const match = existingByKey.get(k);
+    let match = existingByKey.get(k);
+    // 2026-07-13 이전 파서는 둘째 날 저녁 뒤 00:30 블록도 1일차 24:30으로 잘못 옮겼다.
+    // 새 파서의 2일차 24:30과 같은 label/start인 미사용 옛 블록을 한 번만 마이그레이션해
+    // blockId와 현장 동선을 보존한다. 그 옛 시각이 현재 시트에도 실제로 있으면 건드리지 않는다.
+    if (!match) {
+      const startMinutes = startToMinutes(imp.start);
+      const label = (imp.label || "").trim();
+      if (imp.day >= 2 && startMinutes >= 24 * 60 && label) {
+        match = existing.find(b =>
+          !matchedExistingIds.has(b.id)
+          && !importedKeys.has(blockKey(b.day, b.start))
+          && b.day === imp.day - 1
+          && b.start === imp.start
+          && (b.label || "").trim() === label
+        );
+      }
+    }
     if (match) updates.push({ id: match.id, imported: imp });
     else creates.push(imp);
+    if (match) matchedExistingIds.add(match.id);
   }
-  const deletes = existing.filter(b => !importedKeys.has(blockKey(b.day, b.start)));
+  const deletes = existing.filter(b =>
+    !matchedExistingIds.has(b.id) && !importedKeys.has(blockKey(b.day, b.start))
+  );
   return { updates, creates, deletes };
 }
 

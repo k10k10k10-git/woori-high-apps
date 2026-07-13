@@ -23,7 +23,7 @@ import {
 /** 시트가 소유하는 블록 필드만 추림 — 갱신 시 이 필드만 덮고, 앱 소유 필드(noMovement)와 동선(별도 노드)은 건드리지 않는다.
  *  빈 값은 null로 지정해 시트에서 지워진 내용이 앱에도 반영되게 한다(update가 null 키를 삭제).
  *  day·start도 덮는다 — reconcile은 "실제 시각"으로 매칭하므로(blockKey), 같은 시각의 표기가 바뀌면
- *  (2일차 00:30 → 1일차 24:30 정규화) 기존 블록의 표기를 갱신해 옮긴다. 동선은 blockId 기준이라 보존된다. */
+ *  (새벽의 논리 일차·24시+ 표기 정규화) 기존 블록의 표기를 갱신해 옮긴다. 동선은 blockId 기준이라 보존된다. */
 function sheetOwnedFields(b: ImportedBlock, leaderNote?: string): Record<string, unknown> {
   return {
     day: b.day,

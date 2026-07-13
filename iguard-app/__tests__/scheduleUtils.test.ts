@@ -92,6 +92,11 @@ describe("resolveOvernight — 자정 넘김·새벽 정규화 (문제① 보완
     expect(r).toMatchObject({ day: 1, start: "24:30", end: "27:00", converted: true });
   });
 
+  it("같은 논리 일차의 저녁 뒤 새벽이면 일차를 유지하고 24시+로", () => {
+    const r = resolveOvernight(2, "00:30", "03:00", { preserveDay: true });
+    expect(r).toMatchObject({ day: 2, start: "24:30", end: "27:00", converted: true });
+  });
+
   it("2일차 새벽 open-ended(01:00~)도 전날로, end는 ~ 유지", () => {
     const r = resolveOvernight(2, "01:00", "~");
     expect(r).toMatchObject({ day: 1, start: "25:00", end: "~", converted: true });
@@ -128,6 +133,21 @@ describe("parseCueSheetText — 새벽 일정 일차 귀속 (문제① 회귀)",
     const breakfast = r.blocks.find(b => b.label === "아침 식사");
     expect(breakfast).toMatchObject({ day: 2, start: "07:30" }); // 아침은 2일차 유지
     expect(r.warnings.some(w => w.includes("24시+"))).toBe(true);
+  });
+
+  it("2일차 저녁집회 뒤 00:30 블록은 2일차 24:30으로 이어 붙인다", () => {
+    const raw = [
+      HEADER,
+      "둘째날\t\t\t\t",
+      "아침 식사\t07:30~08:30\t조식\t\t",
+      "저녁집회 2\t19:30~00:30\t집회\t\t",
+      "간식 및 취침\t00:30~03:00\t새벽\t\t",
+    ].join("\n");
+    const r = parseCueSheetText(raw);
+    expect(r.blocks.find(b => b.label === "저녁집회 2"))
+      .toMatchObject({ day: 2, start: "19:30", end: "24:30" });
+    expect(r.blocks.find(b => b.label === "간식 및 취침"))
+      .toMatchObject({ day: 2, start: "24:30", end: "27:00" });
   });
 });
 

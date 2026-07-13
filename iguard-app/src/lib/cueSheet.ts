@@ -75,9 +75,11 @@ export function toMinutes(value: string): number {
  *     앱은 자정 넘김을 26:00으로 다뤄야 "지금" 판정(scheduleTime)이 새벽에도 맞는다.
  *  ② N일차(N≥2)의 새벽(<05:00) 블록: 전날(N-1)의 24시+ 표기로 이동
  *     (예: 2일차 00:30~03:00 → 1일차 24:30~27:00). 밤 프로그램은 전날 큐싯에 이어 붙는 현장 관행과 일치.
+ *  ③ 단, 같은 논리 일차의 저녁 일정 뒤 시계가 00시대로 되감긴 경우 preserveDay=true로 호출해
+ *     일차는 유지하고 시간만 +24h 한다(2일차 저녁집회 뒤 00:30 → 2일차 24:30).
  *  05:00 경계: 수련회 기상은 06~07시라, 05시 이전 시작만 "전날 새벽"으로 본다(05:00+ 새벽기도 등은 당일 유지). */
 export function resolveOvernight(
-  day: number, start: string, end?: string,
+  day: number, start: string, end?: string, options: { preserveDay?: boolean } = {},
 ): { day: number; start: string; end?: string; converted: boolean } {
   const s0 = toMinutes(start);
   if (!Number.isFinite(s0)) return { day, start, end, converted: false };
@@ -86,11 +88,11 @@ export function resolveOvernight(
   let e = hasClosedEnd ? toMinutes(end!) : null;
   // ① 종료<시작 → 자정 넘김
   if (e != null && e < s) e += 24 * 60;
-  // ② N일차 새벽 → 전날로 (start·end 모두 +24h, day-1)
+  // ②/③ 새벽 → start·end +24h. 문맥상 같은 논리 일차의 연장이면 day는 유지한다.
   let d = day;
   let dawnShift = false;
-  if (day >= 2 && s < 5 * 60) {
-    d = day - 1;
+  if (s < 5 * 60 && (day >= 2 || options.preserveDay)) {
+    if (!options.preserveDay) d = day - 1;
     s += 24 * 60;
     if (e != null) e += 24 * 60;
     dawnShift = true;
@@ -408,6 +410,8 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
   let day = 1;
   const blocks: ImportedBlock[] = [];
   const overnightNotes: string[] = [];
+  let previousStartInSection: number | null = null;
+  let sectionRolledPastMidnight = false;
 
   dataRows.forEach((row, index) => {
     const whole = row.join(" ").trim();
@@ -418,6 +422,8 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
     const maybeDay = range ? null : parseDayCell(whole);
     if (maybeDay != null) {
       day = maybeDay;
+      previousStartInSection = null;
+      sectionRolledPastMidnight = false;
       return;
     }
     if (!range) {
@@ -428,8 +434,15 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
     const detail = compactText(row[detailIdx] || "");
     const owner = ownerIdx >= 0 ? compactText(row[ownerIdx] || "") : "";
     const notice = noticeIdx >= 0 ? compactText(row[noticeIdx] || "") : "";
-    // 자정 넘김·새벽 일정을 전날 24시+ 표기로 정규화 (아래 resolveOvernight 주석 참조)
-    const resolved = resolveOvernight(day, range.start, range.end);
+    const rawStartMinutes = toMinutes(range.start);
+    // 같은 일차 섹션에서 낮/저녁 시각 뒤 00시대로 되감기면 "다음 날 섹션의 새벽"이 아니라
+    // 그 논리 일차의 마지막 일정이다. 일차는 유지하고 24시+로 이어 붙인다.
+    if (rawStartMinutes < 5 * 60 && previousStartInSection != null && previousStartInSection >= 5 * 60) {
+      sectionRolledPastMidnight = true;
+    }
+    const preserveDay = sectionRolledPastMidnight && rawStartMinutes < 5 * 60;
+    const resolved = resolveOvernight(day, range.start, range.end, { preserveDay });
+    previousStartInSection = rawStartMinutes;
     if (resolved.converted) {
       overnightNotes.push(`${day}일차 ${timeRangeLabel(range.start, range.end)} → ${resolved.day}일차 ${timeRangeLabel(resolved.start, resolved.end)}`);
     }
@@ -446,7 +459,7 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
   });
 
   if (overnightNotes.length) {
-    warnings.push(`자정 넘김/새벽 ${overnightNotes.length}개를 전날 24시+ 표기로 정리: ${overnightNotes.slice(0, 4).join(" · ")}${overnightNotes.length > 4 ? " …" : ""}`);
+    warnings.push(`자정 넘김/새벽 ${overnightNotes.length}개를 논리 일차에 맞는 24시+ 표기로 정리: ${overnightNotes.slice(0, 4).join(" · ")}${overnightNotes.length > 4 ? " …" : ""}`);
   }
   if (!blocks.length) warnings.push("가져올 수 있는 시간 블록이 없습니다. 시간 칸이 08:30~09:00 형태인지 확인해주세요.");
   const dayCounts = blocks.reduce<Record<number, number>>((acc, block) => {
