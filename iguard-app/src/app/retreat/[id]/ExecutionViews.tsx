@@ -6,6 +6,7 @@ import {
   periodRangeLabel, currentRetreatDay, isOpenEndedBlock, toMinutes, compareBlocks, isNowOn,
   currentBlockFor, nextBlockFor, timeRangeLabel,
 } from "@/lib/scheduleTime";
+import { chooseCueCardStaffId, findPreferredStaffId } from "@/lib/staffIdentity";
 
 interface Data {
   staff: IguardStaff[];
@@ -14,6 +15,7 @@ interface Data {
   movements: IguardMovement[];
   retreat?: Retreat;
   periods?: RetreatPeriod[];   // 준비일정의 "수련회 기간" — 오늘이 며칠차인지 계산용
+  preferredStaffNames?: string[];
 }
 
 function useClock() {
@@ -85,12 +87,22 @@ function BlockTextSummary({ block }: { block: IguardScheduleBlock }) {
 // ════════════════════════════════════════════════════════════
 // 개인 큐카드 (스탭 1인의 시간순 동선) — 모바일
 // ════════════════════════════════════════════════════════════
-export function CueCardView({ staff, schedule, posts, movements, retreat, periods }: Data) {
+export function CueCardView({ staff, schedule, posts, movements, retreat, periods, preferredStaffNames = [] }: Data) {
   const clock = useClock();
   const curDay = currentRetreatDay(periods, retreat);
-  const [staffId, setStaffId] = useState<string>(staff[0]?.id ?? "");
+  const [staffId, setStaffId] = useState("");
+  const staffPicked = useRef(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const sortedStaff = useMemo(() => [...staff].sort((a, b) => a.name.localeCompare(b.name, "ko")), [staff]);
+  const preferredStaffId = useMemo(
+    () => findPreferredStaffId(sortedStaff, preferredStaffNames),
+    [sortedStaff, preferredStaffNames],
+  );
+  const displayedStaff = useMemo(() => {
+    if (!preferredStaffId) return sortedStaff;
+    const mine = sortedStaff.find(s => s.id === preferredStaffId);
+    return mine ? [mine, ...sortedStaff.filter(s => s.id !== preferredStaffId)] : sortedStaff;
+  }, [preferredStaffId, sortedStaff]);
   const toggleOpen = (id: string) => setOpen(p => {
     const n = new Set(p);
     if (n.has(id)) n.delete(id);
@@ -110,8 +122,9 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
 
   useEffect(() => {
     if (!sortedStaff.length) return;
-    if (!sortedStaff.some(s => s.id === staffId)) setStaffId(sortedStaff[0].id);
-  }, [sortedStaff, staffId]);
+    const nextStaffId = chooseCueCardStaffId(sortedStaff, staffId, preferredStaffId, staffPicked.current);
+    if (staffId !== nextStaffId) setStaffId(nextStaffId);
+  }, [preferredStaffId, sortedStaff, staffId]);
 
   if (staff.length === 0 || schedule.length === 0) return (
     <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🪪</div>
@@ -130,14 +143,17 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
   return (
     <div>
       <div className="mb-4">
-        <label className="mb-1 block text-xs font-semibold text-slate-500">스탭 선택 · 가나다순</label>
+        <label className="mb-1 block text-xs font-semibold text-slate-500">스탭 선택 · 본인 우선, 나머지 가나다순</label>
         <select
           className="input h-12 w-full border-fuchsia-300 bg-white text-base font-semibold text-slate-800 shadow-sm focus:border-fuchsia-500"
           value={staffId}
-          onChange={e => setStaffId(e.target.value)}
+          onChange={e => {
+            staffPicked.current = true;
+            setStaffId(e.target.value);
+          }}
         >
-          {sortedStaff.map(s => (
-            <option key={s.id} value={s.id}>{s.name}</option>
+          {displayedStaff.map(s => (
+            <option key={s.id} value={s.id}>{s.name}{s.id === preferredStaffId ? " (나)" : ""}</option>
           ))}
         </select>
       </div>

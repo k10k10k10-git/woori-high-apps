@@ -13,6 +13,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   accessLevel: AccessLevel;
+  memberName: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -32,10 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [accessLevel, setAccessLevel] = useState<AccessLevel>("none");
+  const [memberName, setMemberName] = useState<string | null>(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
+      setMemberName(null);
       if (u) {
         try {
           // 이가드 관리자 = 시스템 최상위 admins (팀원 승인·권한부여)
@@ -46,6 +49,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             get(ref(db, paths.iguardRole(u.uid))),
           ]);
           const isMainAdmin = await canReadAsMainAdmin(u.uid);
+          const memberValue = memberSnap.val();
+          if (memberValue && typeof memberValue === "object" && typeof memberValue.name === "string") {
+            setMemberName(memberValue.name.trim() || null);
+          }
 
           if (isMainAdmin) setAccessLevel("admin");
           else if (retreatAdminSnap.val() != null) setAccessLevel("team");           // 행정팀 = 이가드팀
@@ -53,9 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           else setAccessLevel("none");
         } catch {
           setAccessLevel("none");
+          setMemberName(null);
         }
       } else {
         setAccessLevel("none");
+        setMemberName(null);
       }
       setLoading(false);
     });
@@ -69,10 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await firebaseSignOut(auth);
     setAccessLevel("none");
+    setMemberName(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, accessLevel, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, accessLevel, memberName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

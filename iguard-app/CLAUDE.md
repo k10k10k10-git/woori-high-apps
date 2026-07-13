@@ -253,6 +253,7 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 `useClock()`은 30초마다 `clock.time`을 갱신한다. 이 값을 의존성으로 갖는 `useEffect`가 사용자 선택 상태를 `setState`하면, **30초마다 사용자의 선택이 자동값으로 리셋된다.** 포스트 현황(PostBoardView)에서 사용자가 고른 시간 블록이 30초 뒤 첫 블록(1일차 기도회)으로 되돌아가던 버그가 이것이었다(2026-07-06 수정). 
 - 자동 선택 effect에는 **"사용자가 직접 골랐으면 유지"** 가드(`blockPicked` ref)를 두고, 일자(`day`)가 바뀔 때만 플래그를 리셋해 당일 자동 스냅을 살린다(일자 탭의 `userPicked` 패턴과 동일).
 - 시계에 의존하는 계산·표시(`isNowOn`, `currentBlockFor`, 시각 표시)는 문제없다 — `setState`로 사용자 선택을 덮어쓰는 effect만 주의. 새 현장용 뷰에 "선택 상태 + 자동 추종"을 넣을 땐 이 패턴을 따를 것.
+- 개인 큐카드는 `iguardMembers/{uid}.name`(관리자 지정 이름) → Google `displayName` 순으로 `findPreferredStaffId`가 행정 스탭 명단과 유일 매칭해 본인을 최초 선택한다. 동명이인·불일치는 가나다순 첫 스탭으로 폴백하고, `staffPicked` ref가 사용자의 이후 수동 선택을 보존한다. 계정-스탭 이름 비교를 화면에서 재구현하지 말고 `src/lib/staffIdentity.ts`를 사용할 것(2026-07-13 추가).
 
 ### 18. 큐싯 재임포트는 블록 ID를 보존해야 한다 — 동선 유실 방지 (`scheduleReconcile.ts` / `ScheduleCueSheetImport.tsx`)
 

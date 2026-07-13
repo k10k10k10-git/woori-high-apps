@@ -88,7 +88,7 @@ function teachersToStaff(adminTeachers: TeacherAttendance[], groups: Group[], gr
 export default function IguardClient() {
   const router = useRouter();
   const id = (useParams().id as string);
-  const { user, loading: authLoading, accessLevel } = useAuth();
+  const { user, loading: authLoading, accessLevel, memberName } = useAuth();
 
   const [view, setView] = useState<string>("check");
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
@@ -111,6 +111,10 @@ export default function IguardClient() {
   const staffForViews = useMemo(
     () => teachersToStaff(adminTeachers, groups, groupStaff),
     [adminTeachers, groups, groupStaff]
+  );
+  const preferredStaffNames = useMemo(
+    () => [memberName, user?.displayName].filter((name): name is string => !!name?.trim()),
+    [memberName, user?.displayName],
   );
   const absentStaffNames = useMemo(
     () => adminTeachers.filter(t => t.bu === "스탭" && t.status === "불참" && t.name?.trim()).map(t => t.name.trim()),
@@ -248,7 +252,7 @@ export default function IguardClient() {
 
         {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} schedule={schedule} />}
         {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} retreatName={retreat.name} year={retreat.year} />}
-        {!dataLoading && view === "cue" && <CueCardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
+        {!dataLoading && view === "cue" && <CueCardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
         {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
         {!dataLoading && view === "schedule" && <ScheduleView retreatId={id} retreatName={retreat.name} schedule={schedule} staff={staffForViews} posts={posts} movements={movements} buses={buses} groups={groups} absentStaffNames={absentStaffNames} sheetSettingsOpen={sheetSettingsOpen} onSheetSettingsClose={() => setSheetSettingsOpen(false)} />}
@@ -292,4 +296,3 @@ export default function IguardClient() {
     </div>
   );
 }
-
