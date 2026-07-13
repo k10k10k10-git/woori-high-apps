@@ -41,6 +41,9 @@ const CLASS_SPREAD_GUIDE = 40_000;
 // 유도는 중간 가중치로 둔다. 균등류 gradient보다 크고 하드보다 훨씬 작아 하드를 못 이긴다.
 // (과거 +5000은 gradient에 묻혀 유도가 약했다 → 빡빡한 입력에서 위반 잔존 확률↑.)
 const FULLTIMER_SPREAD_GUIDE = 30_000;
+// 아직 반이 하나도 없는 조를 먼저 채우는 유도값. 하드 제약보다 작아 고려 관계 등을 깨지 않지만,
+// 일반 균등 점수보다 충분히 커 파송 조장만 있는 조에도 실제 반이 우선 배정되게 한다.
+const EMPTY_GROUP_SPREAD_GUIDE = 80_000;
 
 export interface LeaderEntry {
   name: string;
@@ -485,13 +488,17 @@ function tryAssign(
       if (ruleFlags.minTwoClasses) {
         score -= (gData[i].maleClasses + gData[i].femaleClasses) * CLASS_SPREAD_GUIDE;
       }
+      // 모든 조에 최소 한 반 배정 유도. 파송 조장 1명만 있는 조도 unitKeys는 0개이므로 빈 조로 본다.
+      if (gData[i].unitKeys.length === 0) score += EMPTY_GROUP_SPREAD_GUIDE;
       // 인원 균등 배분 (gradient)
       if (ruleFlags.balanceSize) score -= gData[i].total * 100;
       // 남녀반 혼성 보장 (하드) — 배정 후에도 단일 성별로 남는 조를 회피 (혼성 번들은 자연 통과)
       if (ruleFlags.mixGender) {
         const maleAfter = gData[i].maleClasses + bMale;
         const femaleAfter = gData[i].femaleClasses + bFemale;
-        if (gData[i].total > 0 && (maleAfter === 0 || femaleAfter === 0)) {
+        // 파송 조장만 있고 실제 반은 0개인 조는 첫 반을 자유롭게 받을 수 있어야 한다.
+        // total은 파송 조장을 포함하므로 실제 반 존재 여부는 unitKeys로 판정한다.
+        if (gData[i].unitKeys.length > 0 && (maleAfter === 0 || femaleAfter === 0)) {
           score -= HARD_PENALTY;
         }
       }
@@ -599,6 +606,10 @@ export function scoreGroups(
     const avg = sizes.reduce((a, b) => a + b, 0) / (sizes.length || 1);
     score -= sizes.reduce((acc, s) => acc + (s - avg) ** 2, 0) * 10;
   }
+  // 모든 활성 조에 최소 한 반 배정 (하드) — 파송 조장만 있는 조도 빈 조로 판정한다.
+  unitKeysInGroup.forEach(keys => {
+    if (keys.length === 0) score -= HARD_PENALTY;
+  });
   // 최소 2반 (하드) — 학생이 있는 조는 서로 다른 반이 2개 이상이어야 함
   if (ruleFlags.minTwoClasses) {
     unitKeysInGroup.forEach((keys, i) => {
@@ -699,9 +710,17 @@ export function runAutoAssign(
     "1부": buildClassUnits(participants, "1부", students),
     "2부": buildClassUnits(participants, "2부", students),
   };
-  const maxFor = (units: ClassUnit[]) => ruleFlags.minTwoClasses
-    ? Math.max(1, Math.floor(units.length / 2))
-    : units.length;
+  const maxFor = (units: ClassUnit[]) => {
+    if (units.length === 0) return 0;
+    const affinityCount = buildAffinityBundles(
+      units,
+      ruleFlags.applyConflicts ? classAffinities : [],
+    ).length;
+    const classRuleMax = ruleFlags.minTwoClasses
+      ? Math.max(1, Math.floor(units.length / 2))
+      : units.length;
+    return Math.min(affinityCount, classRuleMax);
+  };
   const evenCounts = ensureEvenCombinedGroupCounts({
     groupCount1bu,
     groupCount2bu,

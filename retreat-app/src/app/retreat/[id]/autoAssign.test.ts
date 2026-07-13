@@ -146,6 +146,16 @@ describe("runAutoAssign — 하드 제약", () => {
     expect(groupOf(groups, "s1")!.id).toBe(groupOf(groups, "s2")!.id);
   });
 
+  it("조 수만큼 배정 가능한 반 묶음이 있으면 모든 조에 최소 한 반이 들어간다", () => {
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s2: mkP("s2", "나", 1, 2),
+      s3: mkP("s3", "다", 1, 3), s4: mkP("s4", "라", 1, 4),
+    };
+    const groups = run(4, participants, mkRules({ balanceSize: true }));
+    expect(groups).toHaveLength(4);
+    groups.forEach(group => expect(group.studentIds.length).toBeGreaterThan(0));
+  });
+
   it("교사 고려 관계: 두 교사는 같은 조에 들어가지 않는다", () => {
     // 1학년1반(s1,T1) ↔ 1학년3반(s3,T3) 교사 분리 — 두 반이 다른 조로 가야 함
     const participants: Record<string, Participant> = {
@@ -265,6 +275,31 @@ describe("runAutoAssign — 파송 조장", () => {
     expect(groupOf(groups, "mate")?.name).toBe("1조");
     expect(groupOf(groups, "sent")?.name).toBe("2조");
   });
+
+  it("혼성 규칙에서도 파송 조장만 있는 조에 실제 반이 최소 하나 배정된다", () => {
+    const participants: Record<string, Participant> = {
+      withClass: mkP("withClass", "동반조장", 1, 1),
+      female1: mkP("female1", "여학생1", 1, 2),
+      female2: mkP("female2", "여학생2", 1, 2),
+      female3: mkP("female3", "여학생3", 1, 2),
+      sent: mkP("sent", "파송조장", 1, 3),
+      sentMate: mkP("sentMate", "파송반친구", 1, 3),
+      otherFemale: mkP("otherFemale", "다른여학생", 1, 4),
+      otherMale: mkP("otherMale", "다른남학생", 1, 5),
+    };
+    const leaders: LeaderEntry[] = [
+      { name: "동반조장", grade: "1", cls: "1", studentId: "withClass", mode: "withClass" },
+      { name: "파송조장", grade: "1", cls: "3", studentId: "sent", mode: "sent" },
+    ];
+
+    const groups = run(2, participants, mkRules({ pinLeaders: true, mixGender: true, balanceSize: true }), { leaders });
+    const sentGroup = groupOf(groups, "sent")!;
+    const nonLeaderStudents = sentGroup.studentIds.filter(id => id !== "sent");
+
+    expect(sentGroup.name).toBe("2조");
+    expect(nonLeaderStudents.length).toBeGreaterThan(0);
+    expect(nonLeaderStudents.some(id => participants[id].class !== 3)).toBe(true);
+  });
 });
 
 // ── scoreGroups 직접 회귀 (#1: 교사↔교사 고려 관계가 최종 판정에서 누락됐던 버그) ──
@@ -314,6 +349,18 @@ describe("runAutoAssign — 반 붙임 관계", () => {
       classAffinities: [{ a: "1부_1_1", b: "1부_1_5" }],
     });
     expect(groupOf(groups, "s1")!.id).toBe(groupOf(groups, "s5")!.id);
+  });
+
+  it("붙임으로 배정 가능한 번들이 줄면 조 수도 번들 수로 제한해 빈 조를 만들지 않는다", () => {
+    const participants: Record<string, Participant> = {
+      s1: mkP("s1", "가", 1, 1), s2: mkP("s2", "나", 1, 2),
+      s3: mkP("s3", "다", 1, 3), s4: mkP("s4", "라", 1, 4),
+    };
+    const groups = run(4, participants, mkRules({ applyConflicts: true }), {
+      classAffinities: [{ a: "1부_1_1", b: "1부_1_2" }, { a: "1부_1_3", b: "1부_1_4" }],
+    });
+    expect(groups).toHaveLength(2);
+    groups.forEach(group => expect(group.studentIds.length).toBeGreaterThan(0));
   });
 
   it("연쇄 붙임(A+B, B+C)은 세 반 모두 한 조가 된다", () => {

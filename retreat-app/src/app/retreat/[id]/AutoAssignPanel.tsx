@@ -3,7 +3,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import {
   ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
+  buildAffinityBundles, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -97,21 +97,35 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
   const bu1Count = classUnits1.reduce((acc, u) => acc + u.studentIds.length, 0);
   const bu2Count = classUnits2.reduce((acc, u) => acc + u.studentIds.length, 0);
 
-  // 조 수 상한: 최소 2반 규칙이 켜지면 조당 서로 다른 반이 2개 이상 필요 → 반 수의 절반까지만 가능.
-  const maxGroups1 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits1.length / 2)) : classUnits1.length;
-  const maxGroups2 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits2.length / 2)) : classUnits2.length;
+  // 조 수 상한: 모든 조에 최소 한 번들을 배정할 수 있어야 하며,
+  // 최소 2반 규칙이 켜지면 추가로 반 수의 절반까지만 가능하다.
+  const effectiveAffinities = rules.applyConflicts ? classAffinities : [];
+  const bundleCount1 = useMemo(
+    () => buildAffinityBundles(classUnits1, effectiveAffinities).length,
+    [classUnits1, effectiveAffinities],
+  );
+  const bundleCount2 = useMemo(
+    () => buildAffinityBundles(classUnits2, effectiveAffinities).length,
+    [classUnits2, effectiveAffinities],
+  );
+  const classRuleMax1 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits1.length / 2)) : classUnits1.length;
+  const classRuleMax2 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits2.length / 2)) : classUnits2.length;
+  const maxGroups1 = Math.min(bundleCount1, classRuleMax1);
+  const maxGroups2 = Math.min(bundleCount2, classRuleMax2);
 
   // maxGroupSize/인원수/최소2반 변경 시 조 수 자동 계산·클램프 (렌더 중 조정 — effect 대신)
-  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length });
+  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
   if (
     rules.maxGroupSize !== prevAutoCalc.maxGroupSize ||
     bu1Count !== prevAutoCalc.bu1Count ||
     bu2Count !== prevAutoCalc.bu2Count ||
     rules.minTwoClasses !== prevAutoCalc.minTwoClasses ||
     classUnits1.length !== prevAutoCalc.cls1 ||
-    classUnits2.length !== prevAutoCalc.cls2
+    classUnits2.length !== prevAutoCalc.cls2 ||
+    maxGroups1 !== prevAutoCalc.maxGroups1 ||
+    maxGroups2 !== prevAutoCalc.maxGroups2
   ) {
-    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length });
+    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
     if (rules.maxGroupSize > 0) {
       // 조당 최대 인원으로 조 수를 역산하고, 화면에 표시하기 전에 합계를 짝수로 보정한다.
       const autoCounts = calculateEvenGroupCountsForMaxSize({
@@ -123,8 +137,8 @@ export default function AutoAssignPanel({ participants, teachers, students, onAp
       });
       setGroupCount1bu(autoCounts.groupCount1bu);
       setGroupCount2bu(autoCounts.groupCount2bu);
-    } else if (rules.minTwoClasses) {
-      // 최소2반만 켠 경우: 현재 조 수가 상한을 넘으면 상한으로 내림
+    } else {
+      // 최소2반 또는 반 붙임으로 실제 배정 가능한 번들 수가 줄면 현재 조 수도 상한으로 내린다.
       if (groupCount1bu > maxGroups1) setGroupCount1bu(maxGroups1);
       if (groupCount2bu > maxGroups2) setGroupCount2bu(maxGroups2);
     }
