@@ -1,39 +1,52 @@
-# 인수인계 — 2026-07-09 (세션 종료, Codex 이관용)
+# 인수인계 — 2026-07-12 (세션 종료, Codex 이관용)
 
-> 이 문서는 에이전트 중립(Codex/Claude 공용)입니다. 새 에이전트는 **먼저 읽는 순서**를 지키세요:
-> ① 루트 `AGENTS.md`(요약·안전규칙) → ② 루트 `CLAUDE.md`(운영 매뉴얼 전체·최상위 규칙) →
-> ③ 경로 만지면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정은 `LEARNINGS.md`.
-> **모든 작업 시작 전 DB 안전 4문답(AGENTS.md/CLAUDE.md)에 먼저 답하세요.**
+> 에이전트 중립(Codex/Claude 공용). 새 에이전트는 **읽는 순서**를 지키세요:
+> ① 루트 `AGENTS.md`(요약·안전규칙) → ② 루트 `CLAUDE.md`(운영 매뉴얼 전체) →
+> ③ 경로 만지면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구 함정은 `LEARNINGS.md`.
+> **모든 작업 시작 전 DB 안전 4문답에 먼저 답하세요.** 수련회 D-12 (여름수련회 7/24~26).
 
-## 저장소 상태
-- `origin/main` = 로컬 HEAD (미푸시 0). 작업트리 클린.
-- 최신 커밋: `a904b80` (이가드 식사 공정배정 가중치 제거).
-- 배포: retreat-app·iguard-app 모두 Vercel 자동배포(main push 시). **push 후 `npx vercel ls`로 Ready 확인 + `/api/version` buildId를 `git rev-parse HEAD`와 대조**하는 절차 유지.
-  - retreat-app: https://retreat-app-theta.vercel.app  · iguard-app: https://iguard-app.vercel.app
-  - 두 앱 모두 최신 커밋으로 배포·검증 완료됨.
+## 지금 하던 일 (한 문장)
+여름수련회 직전 QA·버그수정 라운드를 마치고, 남은 작업은 대부분 "사용자가 시트/설정에서 해야 할 운영 작업"과 "미실시 검증(행정 QA·권한별 화면)"이다.
 
-## 이번 세션에 완료한 것 (전부 커밋·푸시·배포·검증됨)
-1. **지침 감사·재작성**: 루트 `CLAUDE.md`(4문답 고정형식·HANDOFF 자동읽기·LEARNINGS 편입 등), `OPERATIONS.md`(자동배포 경고 최신화), `DB_OWNERSHIP.md`(milestones 레거시·periods 확정·누락행 추가), `AGENTS.md`(4문답·학습법칙 편입).
-2. **이가드** `subscribeToMilestones`에 `onError` 배선(패턴16 준수).
-3. **행정 미납자 현황** 색상 버그: 부분참 우선순위가 뒤바뀌어 입금 연결됐는데 미납으로 남던 문제 → `lib/paymentColorKey.ts`로 분리(p.studentId 1순위)+테스트.
-4. **행정 자동 조편성** 기능 4종: `minTwoClasses`(한 조 2개+ 반, 조수 상한 반÷2)·`classConflicts`(반 고려관계)·고려관계 **이름 우선 입력** UX·이분법 규칙 **HARD_PENALTY 통일**. + UI 다듬기(반 고려 3단 셀렉트, 조장 이름picker, 셀렉트 폭 균일, 수정/삭제 창컨트롤 아이콘, 학생 반=분단 세로배치, 교사 칩 아래로). 로직은 `autoAssignUtils.ts`, 테스트 `autoAssign.test.ts`.
-5. **행정 신청자 취합**에 부분참(선복귀/후발대) 색 반영: `partialAttendances` 미구독 문제 → `subscribeToPartialAttendances` 추가 + `lib/rosterColor.ts`(취소>부분참>수동색). 이가드/행정 키 동일 `${buNum}_${studentId}`.
-6. **조 목록 1,2,3…순 정렬**(양쪽 앱): `groupNumber.ts`의 `sortGroupsByNumber`. 행정 GroupsTab·이가드 GroupStaffView 적용(다른 이가드 뷰는 이미 `{numeric:true}`라 정상).
-7. **방배정 동(건물) 기능**: `Room.dong?`(하위호환) 추가 → 방추가 모달 '동' 입력, 카드·인쇄·XLSX에 "동 호수" 표시(`lib/roomLabel.ts`). 이가드 RoomsView도 반영. `rooms` 노드는 Rules에 필드검증 없어 안전(확인함).
-8. **방 목록 정렬**: 동별→호수 숫자순 `sortRooms`(행정·이가드). `numeric:true`로 110<99 방지.
-9. **이가드 식사 공정배정 평균순위 균등화(하이브리드 A)**: 식사 점수에서 끼니 가중치 곱셈 제거(편차 실측 5.4→4.6). 집회↔식사 연계 유지. MealsView 가중치 UI 제거, `meal.weight`는 타입만 하위호환. 남은 4.6은 홀수 끼니 구조적 하한. 상세: `iguard-app/CLAUDE.md` 패턴6 ⚖.
+## 저장소 상태 (실측 2026-07-12)
+- `origin/main` = 로컬 HEAD (미푸시 0). 작업트리 클린 (`.agents/`만 untracked — 도구 아티팩트, 커밋 대상 아님).
+- 최신 커밋: `51ce838`.
+- tsc: retreat-app 0 · iguard-app 0 · semester-app 0 errors.
+- 배포: 3개 앱 모두 최신 커밋으로 Vercel Ready (buildId=HEAD 대조 확인).
+  - retreat: https://retreat-app-theta.vercel.app · iguard: https://iguard-app.vercel.app · **semester: https://semester-app.vercel.app**
 
-## 미완/후속 대기 (사용자 결정 또는 다음 작업)
-- **기존 방에 '동' 추가 편집 없음**: 이번엔 신규 방 추가 시에만 동 입력. 이미 만든 방에 동을 채우려면 삭제 후 재생성해야 함. 기존 방 편집 기능은 미구현(요청 시 추가).
-- **식사 편차 4.6 미만**은 알고리즘으로 불가(끼니 짝수화/조 분할 필요). 사용자가 원하면 B안(완화 가중치 부활)도 가능.
-- 이전 세션 백로그(컨설팅 로드맵 Move 1~5, 구역 스코핑 D 등)는 별개 — 이번 세션에서 다루지 않음.
+## 완료된 것 (전부 커밋·푸시·배포·라이브 검증됨)
+1. **semester-app 신규(5번째 앱)** 생성·배포 — 학기 훈련·사역팀 관리(접수·배치·출석·수료·커리큘럼·아카이브). Rules(`semesters`/`semestersPrivate`) 학생 앱에서 배포 완료. 커밋 `71a7286`→`0f3feed`. DB_OWNERSHIP.md·루트 CLAUDE.md 소유권 표 갱신됨.
+2. **행정 조편성 반 붙임(결합) 관계** (`aff94ec`) — `buildAffinityBundles`(union-find)로 두 반을 반드시 같은 조. 분리와 반대. `validateClassRelations`가 모순 입력 실행 차단. retreat CLAUDE.md 패턴 12 갱신.
+3. **이가드 큐싯 새벽 일정 정리** (`17abe82`) — `resolveOvernight`: 2일차 00:30→1일차 24:30, 23:30~02:00→23:30~26:00. reconcile `blockKey`를 절대분 정규키로(동선 보존). 재임포트 시 기존 블록 빈칸에 additive 자동배정. iguard CLAUDE.md 패턴 10b·18 갱신.
+4. **행정 부분참석 탭 개편** (`2681f1b`→`f634fa9`) — 이제 "신청자취합에서 주황(부분참)으로 칠한 학생 ∪ 지정된 학생"만 표시(양방향 연동). 전체 명단 로드 방식 폐기.
+5. **이가드 QA 후속** (`07d6bc6`+`51ce838`) — 순간이동 오탐(같은 포스트 제외), 홈 달력 초기 월(오늘 이후), 빈 상태 안내, 수동 폼 자정넘김 정규화, 하단 탭바 실행뷰 한정+아이콘, 연식 라벨(95→95년생).
+6. **행정 장결자 색칠 버그** (`aa4632b`) — 신청한 장결자(유하은D)가 신청자취합에서 미매칭 취급되던 것 → 매칭 풀에 장결자 포함.
 
-## 함정 (다시 밟지 않도록)
-- **로그인 벽**: dev preview는 Google OAuth 헤드리스 통과 불가 → UI 인터랙티브 검증 불가. 이번 세션은 tsc+테스트+빌드로 검증하고 배포는 buildId 대조로 확정함. 사용자 크롬 탭은 데이터 없는 다른 계정이라 라이브 검증도 제한적이었음.
-- **Codex엔 Claude 슬래시 스킬(/ship·/bugfix·/handoff) 없음**: 이 스킬들은 `~/.claude/commands/`에 있어 Codex에서 안 보임. 절차는 문서(OPERATIONS.md·각 CLAUDE.md 체크리스트)를 프로즈로 따를 것.
-- **폴더명 한글**(고등부 학생 출석부 등): 읽기/로컬 작업엔 무방. 배포 대상은 영문 폴더(retreat-app·iguard-app)뿐.
-- **Rules 배포는 학생 앱에서만**. 다른 앱의 `DO_NOT_DEPLOY.*`는 보관용.
+## 미완인 것 — 정확한 다음 단계
+### A. 사용자(사람)만 할 수 있는 운영 작업 — **수련회 전 필수**
+- [ ] **시트 데이터 정리 후 재임포트**: ①3일차 귀가 버스 선탑/동승 칸을 이름 목록으로(현재 문장 조각이라 파서 제외) ②순간이동 13건 — 밤 시간대(취침·간식) 같은 사람 다른 포스트 담당 의도 확인 ③조장 큐싯 시트 탭 존재/이름 확인. → 이가드 기획>스탭 전체 큐싯 "시트에서 불러오기 → 시트 반영".
+- [ ] **버스 자동배정 실행**(조편성 완료됨) + **행정에서 방배정 입력** → 호차별 인원체크·조별 정보 채워짐.
+- [ ] **semester-app Firebase 승인 도메인 추가**: Console→Authentication→Settings→Authorized domains에 `semester-app.vercel.app`. **안 하면 로그인 자체가 안 됨**(auth/unauthorized-domain).
 
-## 검증 상태 (세션 종료 시점)
-- retreat-app: `npx tsc --noEmit` 0 · 테스트 100 통과 · build OK.
-- iguard-app: `npx tsc --noEmit` 0 · 테스트 95 통과 · build OK.
+### B. 다음 에이전트가 할 수 있는 것 (사용자 승인 후)
+- [ ] **행정 사이트 리허설 QA** — 이가드는 심층 완료, 행정 15개 탭은 미실시. `/retreat-qa retreat`. 현장등록·의료일지·부분참석·인쇄/엑셀(XSS) 중심.
+- [ ] **권한별 화면 검증** — 지금까지 admin 계정으로만 봄. staff role 계정으로 실행 탭만 보이는지 확인 필요(스탭 테스트 계정 필요).
+- [ ] **semester-app code-review 높음 2건 수정** — ①팀 삭제 시 배치된 학생이 유령화(AssignTab 미배정/칼럼 어디에도 안 뜸) ②설정 탭이 마운트 시점 meta만 캡처해 저장 시 completionRule 덮어쓸 수 있음. 수련회 뒤에 해도 됨.
+- [ ] **Codex 전환 문서 A~D** (사용자 제안 대기): 루트 AGENTS.md 4→5개 앱 갱신, `semester-app/AGENTS.md` 신규, 스킬 절차 산문화(Codex엔 /ship 등 스킬 없음), 이 HANDOFF 활용.
+
+## 미커밋 변경
+없음.
+
+## 막힌 것 / 사용자 답변 대기 중
+- 위 B 항목들 중 무엇을 먼저 할지 사용자 선택 대기. 직전 질문 "또 해볼 만한 것?"에 목록(행정 QA·권한 검증·백업 리허설·Codex 문서)을 제시함.
+
+## 이 작업의 함정 (이번 세션에서 배운 것)
+- **claude-in-chrome 새 탭은 로그인 세션이 없을 수 있다** — 라이브 검증 중 새 탭 컨텍스트가 로그아웃 상태로 열려 로그인 벽에 막힘. 자격증명 입력 금지라 대신 로그인 불가 → 그럴 땐 배포는 buildId 대조로 확정하고 화면 확인만 사용자에게 넘긴다.
+- **모바일 뷰 검증**: `resize_window`가 outer 크기만 바꾸고 실제 뷰포트(innerWidth)는 안 바뀔 때가 있다. 우회: 페이지에 `<iframe src=현재URL width=375>`를 JS로 삽입해 모바일 레이아웃을 실측(이번에 하단 탭바·1열 재배치 확인). 검증 후 iframe 제거.
+- **구글시트/Docs 읽기**: 이름박스 셀 점프(`A40`+Enter)로, 스크롤·PageDown은 안 먹음(LEARNINGS.md 기록됨).
+- 파괴적 라이브 검증은 "저장 안 되는 입력(비정상 시간 등) → 경고 토스트 확인"으로만. DB 무쓰기.
+
+## 검증 상태
+- tsc: 3개 앱 0 errors (실측). 테스트: retreat 119 / iguard 110 / semester 5 통과.
+- 배포: 3개 앱 Ready, buildId=HEAD 대조 완료.
