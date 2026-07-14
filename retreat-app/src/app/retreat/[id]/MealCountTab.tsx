@@ -2,14 +2,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Retreat, MealSlot, MealAdjustment, MealRoleCounts, MealPersonAssignment, MealRole,
-  RetreatPeriod, TeacherAttendance, Participant,
+  RetreatPeriod, TeacherAttendance, Participant, PartialAttendance, Student,
 } from "@/lib/types";
 import {
   getMealCount, saveMealCount, getParticipants, getCellColors, getTeachers,
-  getPartialAttendances, subscribeToRetreatPeriods,
+  getPartialAttendances, getStudentsByYear, subscribeToRetreatPeriods,
 } from "@/lib/db";
 import { toYMD } from "@/lib/dateFormat";
 import { useUI } from "@/context/UIContext";
+import { buildMealPartialPeople } from "@/lib/mealCountPeople";
 
 // DB에서 끌어온 후발/선복귀 대상자 한 명 (교사 부분참 · 스탭 후발대/부분참 · 학생 부분참)
 interface DbPerson {
@@ -34,19 +35,6 @@ const ROLE_LABELS: { key: keyof MealRoleCounts; label: string }[] = [
 ];
 const MEAL_NAME_ORDER: Record<string, number> = { "아침": 0, "점심": 1, "저녁": 2 };
 const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
-
-function buToNum(bu: string): number {
-  return bu === "2부" ? 2 : 1;
-}
-
-// 부분참 레코드(id = "{buNum}_{studentId}")로 참가자를 찾으려면, 참가자 쪽도 같은 형식의
-// 키를 만들어 대조해야 한다 — participants는 "p_0" 같은 별개 키 체계라 직접 조회 불가.
-// (PartialAttendanceTab.makeStudentKey와 동일 로직)
-function makeStudentKey(p: Participant): string | null {
-  if (!p.studentId) return null;
-  const sid = String(p.studentId);
-  return /^[12]_/.test(sid) ? sid : `${buToNum(p.bu)}_${sid}`;
-}
 
 function sumCounts(c: MealRoleCounts): number {
   return (c.staff || 0) + (c.teacher || 0) + (c.minister || 0) + (c.student || 0) + (c.extra || 0);
@@ -103,7 +91,8 @@ export default function MealCountTab({ retreat }: Props) {
   // DB 명단 원본 (교사/스탭 + 학생 부분참)
   const [dbTeachers, setDbTeachers] = useState<TeacherAttendance[]>([]);
   const [dbParticipants, setDbParticipants] = useState<Record<string, Participant>>({});
-  const [dbPartials, setDbPartials] = useState<{ id: string; type: "선복귀" | "후발대"; note?: string }[]>([]);
+  const [dbStudents, setDbStudents] = useState<Record<string, Student>>({});
+  const [dbPartials, setDbPartials] = useState<PartialAttendance[]>([]);
   const [dbListError, setDbListError] = useState<string | null>(null);
 
   // 새 끼니 추가 입력
@@ -112,16 +101,18 @@ export default function MealCountTab({ retreat }: Props) {
   const loadDbList = useCallback(async () => {
     setDbListError(null);
     try {
-      const [teachers, parts, partials] = await Promise.all([
-        getTeachers(retreat.id), getParticipants(retreat.id), getPartialAttendances(retreat.id),
+      const [teachers, parts, students, partials] = await Promise.all([
+        getTeachers(retreat.id), getParticipants(retreat.id), getStudentsByYear(retreat.year),
+        getPartialAttendances(retreat.id),
       ]);
       setDbTeachers(teachers);
       setDbParticipants(parts);
+      setDbStudents(students);
       setDbPartials(partials);
     } catch (e) {
       setDbListError(e instanceof Error ? e.message : String(e));
     }
-  }, [retreat.id]);
+  }, [retreat.id, retreat.year]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -245,20 +236,14 @@ export default function MealCountTab({ retreat }: Props) {
         detail, defaultKind: "후발",
       });
     });
-    // 학생 — 부분 참석 탭 데이터
-    const participantsByStudentKey = new Map<string, Participant>();
-    Object.values(dbParticipants).forEach(part => {
-      const key = makeStudentKey(part);
-      if (key) participantsByStudentKey.set(key, part);
-    });
-    dbPartials.forEach(p => {
-      const part = participantsByStudentKey.get(p.id);
+    // 학생 — 부분 참석 탭과 동일하게 participants → classes 원장 순으로 보완
+    buildMealPartialPeople(dbParticipants, dbStudents, dbPartials).forEach(p => {
       out.push({
         key: `s_${p.id}`,
         role: "student",
-        bu: part?.bu || "?", name: part?.name || `(명단 미매칭: ${p.id})`,
-        affiliation: part ? `${part.grade}학년 ${part.class}반` : "",
-        detail: p.note || "",
+        bu: p.bu, name: p.name,
+        affiliation: p.matched ? `${p.grade}학년 ${p.classNum}반` : "",
+        detail: p.note,
         defaultKind: p.type === "선복귀" ? "선복귀" : "후발",
       });
     });
@@ -270,7 +255,7 @@ export default function MealCountTab({ retreat }: Props) {
       buOrder(a.bu) - buOrder(b.bu) ||
       a.name.localeCompare(b.name, "ko")
     );
-  }, [dbTeachers, dbParticipants, dbPartials]);
+  }, [dbTeachers, dbParticipants, dbStudents, dbPartials]);
 
   function getAssignment(p: DbPerson): MealPersonAssignment {
     return personAssignments[p.key] ?? { kind: p.defaultKind };
