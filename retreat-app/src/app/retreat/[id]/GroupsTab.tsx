@@ -10,6 +10,8 @@ import AutoAssignPanel from "./AutoAssignPanel";
 import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
+import { studentPrintRowClass, teacherPrintStatus, teacherPrintStatusSuffix } from "@/lib/groupPrint";
+import { resolveStudentKey } from "@/lib/studentMatcher";
 import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -356,6 +358,13 @@ export default function GroupsTab({ retreat }: Props) {
     const exportGroups = onlyBu ? groups.filter(g => g.bu === onlyBu) : groups;
     const buList = [...new Set(exportGroups.map(g => g.bu))].sort();
     const studentByName = Object.fromEntries(Object.values(students).map(s => [s.name, s]));
+    const participantGenderByStudentKey = new Map<string, string>();
+    Object.values(participants).forEach(participant => {
+      const studentKey = resolveStudentKey(participant, students);
+      if (studentKey && participant.gender && !participantGenderByStudentKey.has(studentKey)) {
+        participantGenderByStudentKey.set(studentKey, participant.gender);
+      }
+    });
 
     // ── 한 부서/페이지: 조를 좁은 세로 열로 만들어 가로로 나란히 배치 ──
     interface PdfPage { bu: string; pageGroups: Group[]; isLast: boolean }
@@ -416,10 +425,10 @@ export default function GroupsTab({ retreat }: Props) {
       .r-leader .t-name  { color: #92400e; font-weight: 700; }
       .r-staff td   { background: #dcfce7; }
       .r-staff .t-name   { color: #166534; font-weight: 700; }
-      .r-blue td    { background: #dbeafe; }
-      .r-blue .t-name    { color: #1d4ed8; }
-      .r-orange td  { background: #fed7aa; }
-      .r-orange .t-name  { color: #c2410c; }
+      .r-male td    { background: #dbeafe; }
+      .r-male .t-name    { color: #1d4ed8; }
+      .r-female td  { background: #fce7f3; }
+      .r-female .t-name  { color: #be185d; }
       .r-red td     { background: #fecaca; }
       .r-red .t-name     { color: #dc2626; text-decoration: line-through; }
 
@@ -485,9 +494,11 @@ export default function GroupsTab({ retreat }: Props) {
 
         // ① 교사 행 (번호 없음, 체크 없음)
         teachers.forEach(name => {
+          const status = teacherPrintStatus(allTeachers, name, g.bu);
+          const displayName = `${name}${teacherPrintStatusSuffix(status)}`;
           html += `<tr class="r-teacher">
             <td class="t-cls">교사</td>
-            <td class="t-name">${escapeHtml(name)}</td>
+            <td class="t-name">${escapeHtml(displayName)}</td>
             <td class="t-chk"></td>
           </tr>`;
         });
@@ -525,7 +536,7 @@ export default function GroupsTab({ retreat }: Props) {
           prevClassKey = classKey;
 
           const color = cellColors[sid];
-          const rowCls = color === "blue" ? "r-blue" : color === "orange" ? "r-orange" : color === "red" ? "r-red" : "";
+          const rowCls = studentPrintRowClass(participantGenderByStudentKey.get(sid), s.class, color);
           const badge  = color === "orange" ? '<span class="badge">부분참</span>'
                        : color === "red"    ? '<span class="badge">취소</span>' : "";
 
