@@ -421,9 +421,9 @@ export default function GroupsTab({ retreat }: Props) {
       /* 행 색상 */
       .r-teacher td { background: #e0f2fe; }
       .r-teacher .t-name { color: #0369a1; font-weight: 700; }
-      .teacher-info { display: flex; align-items: center; gap: 2px; min-width: 0; }
-      .teacher-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .teacher-status { flex: 0 0 auto; border-radius: 2px; padding: 1px 2px; font-size: 5.5px; line-height: 1; font-weight: 800; white-space: nowrap; }
+      .teacher-info { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; min-width: 0; height: 18px; }
+      .teacher-name { display: block; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 8px; line-height: 1; }
+      .teacher-status { display: block; flex: 0 0 auto; border-radius: 2px; padding: 0 2px; font-size: 5.5px; line-height: 1; font-weight: 800; white-space: nowrap; }
       .teacher-status-partial { background: #ffedd5; color: #c2410c; }
       .teacher-status-absent { background: #fee2e2; color: #dc2626; }
       .r-leader td  { background: #fef9c3; }
