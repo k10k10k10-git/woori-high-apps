@@ -2,6 +2,7 @@ import { ref, get, set, update, push, remove, onValue } from "firebase/database"
 import { db } from "../firebase";
 import { TeacherAttendance } from "../types";
 import { paths } from "../paths";
+import type { TeacherUpdate } from "../teacherWrite";
 import { snapToList, stripUndefined } from "./core";
 
 // ── Teacher Attendance ────────────────────────────────────
@@ -22,7 +23,7 @@ export async function saveTeacher(retreatId: string, teacher: Omit<TeacherAttend
   return newRef.key!;
 }
 
-export async function updateTeacher(retreatId: string, teacherId: string, data: Partial<TeacherAttendance>): Promise<void> {
+export async function updateTeacher(retreatId: string, teacherId: string, data: TeacherUpdate): Promise<void> {
   await update(ref(db, paths.teacher(retreatId, teacherId)), stripUndefined(data));
 }
 

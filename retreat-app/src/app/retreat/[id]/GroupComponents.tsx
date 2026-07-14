@@ -1,7 +1,8 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Group, Student, TeacherAttendance } from "@/lib/types";
 import { TEACHER_STATUS_CLS } from "@/lib/constants";
+import { resolveGroupRoleStudentId } from "@/lib/groupRoleStudent";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 
@@ -186,11 +187,6 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
   const [editStaff, setEditStaff] = useState("");
   const [editGbs, setEditGbs] = useState("");
 
-  const studentIdByName = useMemo(
-    () => Object.fromEntries(Object.entries(students).map(([id, s]) => [s.name, id])),
-    [students]
-  );
-
   function toggleEditing() {
     if (!editing) {
       setEditTeachers((group.teachers || []).join(", "));
@@ -322,7 +318,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
             <span className="text-xs text-slate-400">⭐ 조장:</span>
             {names.length === 0 && <span className="text-xs text-slate-300">—</span>}
             {names.map(name => {
-              const sid = studentIdByName[name];
+              const sid = resolveGroupRoleStudentId(students, group, name);
               const s = sid ? students[sid] : null;
               return (
                 <div key={name} className="border border-yellow-200 bg-yellow-50 rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group">
@@ -347,7 +343,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
             <span className="text-xs text-slate-400">🧑‍💼 스탭:</span>
             {names.length === 0 && iguardOnly.length === 0 && <span className="text-xs text-slate-300">—</span>}
             {names.map(name => {
-              const sid = studentIdByName[name];
+              const sid = resolveGroupRoleStudentId(students, group, name);
               return (
                 <div key={name} className="border border-slate-200 bg-slate-50 rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group">
                   <span className="text-slate-700">{name}</span>

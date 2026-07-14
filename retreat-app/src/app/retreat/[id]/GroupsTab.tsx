@@ -11,6 +11,7 @@ import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "@/lib/groupPrint";
+import { resolveGroupRoleStudent } from "@/lib/groupRoleStudent";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
 
@@ -319,7 +320,6 @@ export default function GroupsTab({ retreat }: Props) {
 
 
   function exportGroupsXLSX() {
-    const studentByName = Object.fromEntries(Object.values(students).map(s => [s.name, s]));
     const rows: Record<string, string | number>[] = [];
     const orderedGroups = [
       ...sortGroupsByNumber(groups.filter(g => g.bu === "1부")),
@@ -333,11 +333,11 @@ export default function GroupsTab({ retreat }: Props) {
       const leaderNames = new Set(parseNames(g.leader || ""));
       const staffNames  = new Set(parseNames(g.staff  || ""));
       leaderNames.forEach(n => {
-        const s = studentByName[n];
+        const s = resolveGroupRoleStudent(students, g, n);
         rows.push({ "부": g.bu, "조": jo, "역할": "조장", "이름": n, "학년": s ? `${s.grade}학년` : "", "반": s ? `${s.class}반` : "", "GBS": g.gbs || "" });
       });
       staffNames.forEach(n => {
-        const s = studentByName[n];
+        const s = resolveGroupRoleStudent(students, g, n);
         rows.push({ "부": g.bu, "조": jo, "역할": "스탭", "이름": n, "학년": s ? `${s.grade}학년` : "", "반": s ? `${s.class}반` : "", "GBS": g.gbs || "" });
       });
       (g.studentIds || []).forEach(sid => {
@@ -357,7 +357,6 @@ export default function GroupsTab({ retreat }: Props) {
   function buildGroupsHtml(onlyBu?: string) {
     const exportGroups = onlyBu ? groups.filter(g => g.bu === onlyBu) : groups;
     const buList = [...new Set(exportGroups.map(g => g.bu))].sort();
-    const studentByName = Object.fromEntries(Object.values(students).map(s => [s.name, s]));
     const participantGenderByStudentKey = new Map<string, string>();
     Object.values(participants).forEach(participant => {
       const studentKey = resolveStudentKey(participant, students);
@@ -513,7 +512,7 @@ export default function GroupsTab({ retreat }: Props) {
 
         // ② 조장 행
         [...leaderNames].forEach(name => {
-          const s = studentByName[name];
+          const s = resolveGroupRoleStudent(students, g, name);
           html += `<tr class="r-leader">
             <td class="t-cls">${s ? `${s.grade}-${s.class}` : "조장"}</td>
             <td class="t-name">${escapeHtml(name)}<span class="badge">조장</span></td>
@@ -523,7 +522,7 @@ export default function GroupsTab({ retreat }: Props) {
 
         // ③ 스탭 행
         [...staffNames].forEach(name => {
-          const s = studentByName[name];
+          const s = resolveGroupRoleStudent(students, g, name);
           html += `<tr class="r-staff">
             <td class="t-cls">${s ? `${s.grade}-${s.class}` : "스탭"}</td>
             <td class="t-name">${escapeHtml(name)}<span class="badge">스탭</span></td>

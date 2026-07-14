@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
 import { getTeachers, saveTeacher, updateTeacher, deleteTeacher, loadTeachersFromDB, getRetreats } from "@/lib/db";
+import { prepareTeacherUpdate } from "@/lib/teacherWrite";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -128,7 +129,7 @@ async function handleSave() {
     };
     try {
       if (editId) {
-        await updateTeacher(retreat.id, editId, payload);
+        await updateTeacher(retreat.id, editId, prepareTeacherUpdate(payload));
         setTeachers(prev => prev.map(t => t.id === editId ? { ...t, ...payload } : t));
       } else {
         const id = await saveTeacher(retreat.id, payload);

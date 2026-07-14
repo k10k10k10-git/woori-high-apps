@@ -221,6 +221,9 @@ await saveParticipants(retreatId, updatedParticipants);
 
 조편성 인쇄 행 색상(2026-07-14)은 역할·운영상태·성별 우선순위를 지킨다. 조장은 `r-leader` 노랑, 취소 학생은 `r-red`, 나머지 학생은 `groupPrint.ts`의 성별 판정으로 남 `r-male` 파랑·여 `r-female` 분홍을 사용한다. 부분참은 성별 배경을 덮지 않고 `부분참` 배지로 남긴다. 교사는 같은 부서의 `TeacherAttendance.status`를 우선 찾아 `부분참/불참`만 이름 아래 고정 배지로 표시하며 전참은 생략한다. 교사 이름과 상태를 한 줄에 넣으면 좁은 조 열에서 둘 중 하나가 잘리므로, 기존 20px 행 안에서 `.teacher-name`과 `.teacher-status`를 세로 배치한다. 참가자 성별이 없으면 기존 홀수반=남·짝수반=여 규칙으로 보강한다.
 
+### 3d. 선택 필드 삭제 — Firebase update에는 null 전달
+Firebase `update()`에서 `undefined`는 `stripUndefined()`가 제거하므로 기존 DB 필드 삭제가 아니다. 교사 참석 수정처럼 상태 전환으로 `note`·`arrivalInfo`·`transport` 등을 비울 때는 `teacherWrite.ts`의 `prepareTeacherUpdate()`로 **폼에 포함됐지만 빈 선택 필드만 `null`로 변환**한 뒤 `updateTeacher()`에 전달한다. 키 자체가 없는 부분 업데이트(출석부 원본 이름/반 갱신 등)는 보존해야 하므로, 모든 누락 키를 일괄 `null`로 만들지 말 것.
+
 ### 4. Auth 접근 레벨
 ```typescript
 type AccessLevel = "none" | "member" | "admin";
@@ -249,6 +252,7 @@ GroupsTab에서 추출한 순수 UI 컴포넌트:
 - **StudentChip**: 드래그 가능한 학생 칩 (셀 색상 반영)
 - **TeacherChip**: 드래그 가능한 교사 칩 (참석 상태 색상 반영)
 - **StudentInfo**: Student 확장 인터페이스 (bu, participantKey 추가)
+- **조장/스탭 학생 조회**: `groups`에는 역할이 이름 문자열로 저장되므로 전역 `name → student` 맵을 만들면 부서 간 동명이인이 충돌한다. `groupRoleStudent.ts`가 현재 `group.studentIds` → 현재 `group.bu` → 전역 유일 이름 순으로만 학생을 확정하며, 화면·XLSX·PDF/JPG가 이 단일 함수를 사용한다.
 
 ### 7. 접근성(A11y) 패턴
 - **탭 네비게이션**: `role="tablist"` + `role="tab"` + `aria-selected` (대그룹·소그룹 탭 모두 적용)
