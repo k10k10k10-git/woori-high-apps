@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePrintGender, studentPrintRowClass, teacherPrintStatus, teacherPrintStatusSuffix } from "./groupPrint";
+import { resolvePrintGender, studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "./groupPrint";
 import type { TeacherAttendance } from "./types";
 
 const teacher = (name: string, bu: string, status: TeacherAttendance["status"]): TeacherAttendance => ({
@@ -17,10 +17,10 @@ describe("조편성 인쇄 상태·색상", () => {
     expect(teacherPrintStatus(teachers, "김교사", "2부")).toBe("전참");
   });
 
-  it("부분참과 불참만 이름 옆 텍스트로 표시하고 전참은 생략한다", () => {
-    expect(teacherPrintStatusSuffix("부분참")).toBe(" (부분참)");
-    expect(teacherPrintStatusSuffix("불참")).toBe(" (불참)");
-    expect(teacherPrintStatusSuffix("전참")).toBe("");
+  it("부분참과 불참은 줄임표로 사라지지 않을 별도 배지 라벨로 반환하고 전참은 생략한다", () => {
+    expect(teacherPrintStatusLabel("부분참")).toBe("부분참");
+    expect(teacherPrintStatusLabel("불참")).toBe("불참");
+    expect(teacherPrintStatusLabel("전참")).toBe("");
   });
 
   it("참가자 성별을 우선하고 없으면 홀수반 남·짝수반 여 규칙으로 보강한다", () => {

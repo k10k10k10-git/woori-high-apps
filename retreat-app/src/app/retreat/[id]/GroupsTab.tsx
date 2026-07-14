@@ -10,7 +10,7 @@ import AutoAssignPanel from "./AutoAssignPanel";
 import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
-import { studentPrintRowClass, teacherPrintStatus, teacherPrintStatusSuffix } from "@/lib/groupPrint";
+import { studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "@/lib/groupPrint";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
 
@@ -421,6 +421,11 @@ export default function GroupsTab({ retreat }: Props) {
       /* 행 색상 */
       .r-teacher td { background: #e0f2fe; }
       .r-teacher .t-name { color: #0369a1; font-weight: 700; }
+      .teacher-info { display: flex; align-items: center; gap: 2px; min-width: 0; }
+      .teacher-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .teacher-status { flex: 0 0 auto; border-radius: 2px; padding: 1px 2px; font-size: 5.5px; line-height: 1; font-weight: 800; white-space: nowrap; }
+      .teacher-status-partial { background: #ffedd5; color: #c2410c; }
+      .teacher-status-absent { background: #fee2e2; color: #dc2626; }
       .r-leader td  { background: #fef9c3; }
       .r-leader .t-name  { color: #92400e; font-weight: 700; }
       .r-staff td   { background: #dcfce7; }
@@ -495,10 +500,13 @@ export default function GroupsTab({ retreat }: Props) {
         // ① 교사 행 (번호 없음, 체크 없음)
         teachers.forEach(name => {
           const status = teacherPrintStatus(allTeachers, name, g.bu);
-          const displayName = `${name}${teacherPrintStatusSuffix(status)}`;
+          const statusLabel = teacherPrintStatusLabel(status);
+          const statusBadge = statusLabel
+            ? `<span class="teacher-status teacher-status-${statusLabel === "불참" ? "absent" : "partial"}">${escapeHtml(statusLabel)}</span>`
+            : "";
           html += `<tr class="r-teacher">
             <td class="t-cls">교사</td>
-            <td class="t-name">${escapeHtml(displayName)}</td>
+            <td class="t-name"><div class="teacher-info"><span class="teacher-name">${escapeHtml(name)}</span>${statusBadge}</div></td>
             <td class="t-chk"></td>
           </tr>`;
         });

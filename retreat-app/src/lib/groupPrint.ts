@@ -9,8 +9,8 @@ export function teacherPrintStatus(
     ?? matches[0]?.status;
 }
 
-export function teacherPrintStatusSuffix(status?: string): string {
-  return status === "부분참" || status === "불참" ? ` (${status})` : "";
+export function teacherPrintStatusLabel(status?: string): "부분참" | "불참" | "" {
+  return status === "부분참" || status === "불참" ? status : "";
 }
 
 export function resolvePrintGender(gender: string | undefined, classNumber: number): "남" | "여" {
