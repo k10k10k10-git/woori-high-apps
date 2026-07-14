@@ -1,7 +1,10 @@
 "use client";
 import { useState } from "react";
 import { TeacherAttendance } from "@/lib/types";
-import { ClassUnit, ConflictPair, RuleFlags, LeaderEntry, ensureEvenCombinedGroupCounts, parseClassKey } from "./autoAssignUtils";
+import {
+  AutoAssignScope, ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
+  ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, parseClassKey,
+} from "./autoAssignUtils";
 
 // ── 타입 ─────────────────────────────────────────────────────────────
 
@@ -146,6 +149,10 @@ export interface AutoAssignConfigPanelProps {
   configSaving: boolean;
   configNotice: string | null;
   configError: string | null;
+  scope: AutoAssignScope;
+  setScope: (scope: AutoAssignScope) => void;
+  currentGroupCount1bu: number;
+  currentGroupCount2bu: number;
   onSaveConfig: () => void;
   onRun: () => void;
   onCollapse: () => void;
@@ -170,7 +177,9 @@ export default function AutoAssignConfigPanel({
   newSC, setNewSC, newTC, setNewTC, newTSC, setNewTSC, newCC, setNewCC, newCA, setNewCA,
   leaderEntries1, setLeaderEntries1, leaderEntries2, setLeaderEntries2,
   classUnits1, classUnits2, maxGroups1, maxGroups2, bu1Count, bu2Count,
-  teachers, running, configLoading, configSaving, configNotice, configError, onSaveConfig, onRun, onCollapse,
+  teachers, running, configLoading, configSaving, configNotice, configError,
+  scope, setScope, currentGroupCount1bu, currentGroupCount2bu,
+  onSaveConfig, onRun, onCollapse,
 }: AutoAssignConfigPanelProps) {
 
   // 이름 우선 선택용 후보 목록 (부·학년·반 표시)
@@ -195,7 +204,7 @@ export default function AutoAssignConfigPanel({
   const hasLeaderClassDuplicates = ([
     { bu: "1부", entries: leaderEntries1.slice(0, groupCount1bu) },
     { bu: "2부", entries: leaderEntries2.slice(0, groupCount2bu) },
-  ] as const).some(row => {
+  ] as const).filter(row => scope === "all" || row.bu === scope).some(row => {
     const seen = new Set<string>();
     return row.entries.some(entry => {
       if (!entry.name.trim() || entry.mode === "sent" || !entry.grade || !entry.cls) return false;
@@ -211,22 +220,43 @@ export default function AutoAssignConfigPanel({
   const fullTimer2 = teachers.filter(t => t.bu === "2부" && t.status === "전참" && parseClassKey(t.classKey) !== null).length;
   const warn1 = bu1Count > 0 && groupCount1bu > fullTimer1;
   const warn2 = bu2Count > 0 && groupCount2bu > fullTimer2;
-  const evenGroupCounts = ensureEvenCombinedGroupCounts({
-    groupCount1bu,
-    groupCount2bu,
-    maxGroups1,
-    maxGroups2,
-    studentCount1bu: bu1Count,
-    studentCount2bu: bu2Count,
-  });
-  const activeGroupCount1 = bu1Count > 0 ? groupCount1bu : 0;
-  const activeGroupCount2 = bu2Count > 0 ? groupCount2bu : 0;
+  const evenGroupCounts = scope === "all"
+    ? ensureEvenCombinedGroupCounts({
+        groupCount1bu,
+        groupCount2bu,
+        maxGroups1,
+        maxGroups2,
+        studentCount1bu: bu1Count,
+        studentCount2bu: bu2Count,
+      })
+    : scope === "1부"
+      ? {
+          groupCount1bu: ensureEvenScopedGroupCount({
+            requestedCount: groupCount1bu,
+            maxGroups: maxGroups1,
+            studentCount: bu1Count,
+            preservedOtherGroupCount: currentGroupCount2bu,
+          }),
+          groupCount2bu: currentGroupCount2bu,
+        }
+      : {
+          groupCount1bu: currentGroupCount1bu,
+          groupCount2bu: ensureEvenScopedGroupCount({
+            requestedCount: groupCount2bu,
+            maxGroups: maxGroups2,
+            studentCount: bu2Count,
+            preservedOtherGroupCount: currentGroupCount1bu,
+          }),
+        };
+  const activeGroupCount1 = scope === "2부" ? currentGroupCount1bu : bu1Count > 0 ? groupCount1bu : 0;
+  const activeGroupCount2 = scope === "1부" ? currentGroupCount2bu : bu2Count > 0 ? groupCount2bu : 0;
   const combinedGroupCount = activeGroupCount1 + activeGroupCount2;
   const groupCountAdjustment = evenGroupCounts.groupCount1bu !== activeGroupCount1
     ? `1부 ${activeGroupCount1}→${evenGroupCounts.groupCount1bu}조`
     : evenGroupCounts.groupCount2bu !== activeGroupCount2
       ? `2부 ${activeGroupCount2}→${evenGroupCounts.groupCount2bu}조`
       : null;
+  const targetHasStudents = scope === "1부" ? bu1Count > 0 : scope === "2부" ? bu2Count > 0 : bu1Count > 0 || bu2Count > 0;
 
   function addSC() {
     if (!newSC.a.name || !newSC.b.name || newSC.a.name === newSC.b.name) return;
@@ -286,6 +316,32 @@ export default function AutoAssignConfigPanel({
         {configNotice && <p className="mt-1.5 text-[10px] text-emerald-700">✓ {configNotice}</p>}
         {configError && <p className="mt-1.5 text-[10px] text-red-600">⚠ {configError}</p>}
       </div>
+
+      <fieldset className="rounded-lg border border-sky-200 bg-sky-50 p-2.5">
+        <legend className="px-1 text-xs font-semibold text-sky-800">조편성 범위</legend>
+        <div className="grid grid-cols-3 gap-1" role="group" aria-label="자동 조편성 범위">
+          {([
+            { value: "all" as const, label: "전체" },
+            { value: "1부" as const, label: "1부만" },
+            { value: "2부" as const, label: "2부만" },
+          ]).map(option => (
+            <button key={option.value} type="button" aria-pressed={scope === option.value}
+              onClick={() => setScope(option.value)}
+              className={`rounded-md border px-2 py-1.5 text-xs font-semibold transition-colors ${
+                scope === option.value
+                  ? "border-sky-500 bg-white text-sky-700 shadow-sm"
+                  : "border-transparent text-sky-500 hover:bg-white/70"
+              }`}>
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[10px] leading-relaxed text-sky-700">
+          {scope === "all"
+            ? "1부와 2부를 모두 새로 편성합니다."
+            : `${scope}만 새로 편성하고 ${scope === "1부" ? "2부" : "1부"}의 현재 조편성은 그대로 유지합니다.`}
+        </p>
+      </fieldset>
 
       {/* 기본 적용 알고리즘 */}
       <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-600">
@@ -419,6 +475,11 @@ export default function AutoAssignConfigPanel({
           {groupCountAdjustment
             ? ` → 실행 시 ${groupCountAdjustment}로 자동 보정 (총 ${evenGroupCounts.groupCount1bu + evenGroupCounts.groupCount2bu}조)`
             : " · 짝수 조건 충족"}
+          {scope !== "all" && (
+            <span className="block mt-1 opacity-80">
+              {scope === "1부" ? `2부 현재 ${currentGroupCount2bu}조 유지` : `1부 현재 ${currentGroupCount1bu}조 유지`}
+            </span>
+          )}
         </div>
       </div>
 
@@ -731,9 +792,15 @@ export default function AutoAssignConfigPanel({
         </div>
       )}
 
-      <button onClick={onRun} disabled={running || (bu1Count === 0 && bu2Count === 0) || relationErrors.length > 0 || hasLeaderClassDuplicates}
+      <button onClick={onRun} disabled={running || !targetHasStudents || relationErrors.length > 0 || hasLeaderClassDuplicates}
         className="btn-primary w-full justify-center text-sm">
-        {running ? "⏳ 계산 중..." : relationErrors.length > 0 || hasLeaderClassDuplicates ? "🚫 모순을 해결해주세요" : "🎲 자동 배정 실행"}
+        {running
+          ? "⏳ 계산 중..."
+          : relationErrors.length > 0 || hasLeaderClassDuplicates
+            ? "🚫 모순을 해결해주세요"
+            : scope === "all"
+              ? "🎲 전체 자동 배정 실행"
+              : `🎲 ${scope}만 자동 배정 실행`}
       </button>
     </div>
   );

@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import AutoAssignPanel from "./AutoAssignPanel";
+import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
@@ -305,9 +306,10 @@ export default function GroupsTab({ retreat }: Props) {
     setDragFrom(null);
   }
 
-  function handleAutoApply(newGroups: Group[]) {
-    setGroups(newGroups);
-    const assigned = new Set(newGroups.flatMap(g => g.studentIds || []));
+  function handleAutoApply(newGroups: Group[], scope: AutoAssignScope) {
+    const mergedGroups = mergeAutoAssignedGroups(groups, newGroups, scope);
+    setGroups(mergedGroups);
+    const assigned = new Set(mergedGroups.flatMap(g => g.studentIds || []));
     // 폼 참가자만 unassigned state에 반영 (후기 신청자는 allUnassigned memo가 처리)
     setUnassigned(participantIds.filter(id => !assigned.has(id)));
     markDirty();
@@ -747,6 +749,7 @@ export default function GroupsTab({ retreat }: Props) {
             participants={participants}
             teachers={allTeachers}
             students={students}
+            currentGroups={groups}
             onApply={handleAutoApply}
           />
         </div>

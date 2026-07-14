@@ -50,6 +50,15 @@ export interface CombinedGroupCounts {
   groupCount2bu: number;
 }
 
+export type AutoAssignScope = "all" | "1부" | "2부";
+
+export interface ScopedGroupCountInput {
+  requestedCount: number;
+  maxGroups: number;
+  studentCount: number;
+  preservedOtherGroupCount: number;
+}
+
 export interface MaxSizeGroupCountInput {
   maxGroupSize: number;
   maxGroups1: number;
@@ -110,6 +119,31 @@ export function ensureEvenCombinedGroupCounts({
     groupCount1bu: rows[0].count,
     groupCount2bu: rows[1].count,
   };
+}
+
+/** 한 부서만 다시 편성할 때 반대 부서 조 수는 건드리지 않고 합산 짝수를 맞춘다. */
+export function ensureEvenScopedGroupCount({
+  requestedCount, maxGroups, studentCount, preservedOtherGroupCount,
+}: ScopedGroupCountInput): number {
+  if (studentCount <= 0 || maxGroups <= 0) return 0;
+  let count = Math.min(Math.max(1, requestedCount), Math.max(1, maxGroups));
+  if ((count + Math.max(0, preservedOtherGroupCount)) % 2 !== 0) {
+    if (count < maxGroups) count += 1;
+    else if (count > 1) count -= 1;
+  }
+  return count;
+}
+
+/** 부분 자동배정 결과를 적용하되 선택하지 않은 부서의 현재 조는 그대로 보존한다. */
+export function mergeAutoAssignedGroups(
+  currentGroups: Group[], generatedGroups: Group[], scope: AutoAssignScope,
+): Group[] {
+  if (scope === "all") return generatedGroups;
+  return (["1부", "2부"] as const).flatMap(bu =>
+    bu === scope
+      ? generatedGroups.filter(group => group.bu === bu)
+      : currentGroups.filter(group => group.bu === bu)
+  );
 }
 
 /** 조당 최대 인원으로 부별 조 수를 계산한 뒤, 화면에 표시하기 전 합계를 짝수로 보정한다. */
@@ -840,6 +874,8 @@ export function runAutoAssign(
   students: Record<string, { name: string; grade: number; class: number }>,
   leaderEntries1: LeaderEntry[],
   leaderEntries2: LeaderEntry[],
+  scope: AutoAssignScope = "all",
+  preservedOtherGroupCount = 0,
 ): Group[] {
   const rawUnitsByBu = {
     "1부": buildClassUnits(participants, "1부", students),
@@ -856,16 +892,36 @@ export function runAutoAssign(
       : units.length;
     return Math.min(affinityCount, classRuleMax);
   };
-  const evenCounts = ensureEvenCombinedGroupCounts({
-    groupCount1bu,
-    groupCount2bu,
-    maxGroups1: maxFor(rawUnitsByBu["1부"]),
-    maxGroups2: maxFor(rawUnitsByBu["2부"]),
-    studentCount1bu: rawUnitsByBu["1부"].reduce((sum, unit) => sum + unit.studentIds.length, 0),
-    studentCount2bu: rawUnitsByBu["2부"].reduce((sum, unit) => sum + unit.studentIds.length, 0),
-  });
+  const maxGroups1 = maxFor(rawUnitsByBu["1부"]);
+  const maxGroups2 = maxFor(rawUnitsByBu["2부"]);
+  const studentCount1bu = rawUnitsByBu["1부"].reduce((sum, unit) => sum + unit.studentIds.length, 0);
+  const studentCount2bu = rawUnitsByBu["2부"].reduce((sum, unit) => sum + unit.studentIds.length, 0);
+  const evenCounts = scope === "all"
+    ? ensureEvenCombinedGroupCounts({
+        groupCount1bu, groupCount2bu, maxGroups1, maxGroups2, studentCount1bu, studentCount2bu,
+      })
+    : scope === "1부"
+      ? {
+          groupCount1bu: ensureEvenScopedGroupCount({
+            requestedCount: groupCount1bu,
+            maxGroups: maxGroups1,
+            studentCount: studentCount1bu,
+            preservedOtherGroupCount,
+          }),
+          groupCount2bu: 0,
+        }
+      : {
+          groupCount1bu: 0,
+          groupCount2bu: ensureEvenScopedGroupCount({
+            requestedCount: groupCount2bu,
+            maxGroups: maxGroups2,
+            studentCount: studentCount2bu,
+            preservedOtherGroupCount,
+          }),
+        };
   const result: Group[] = [];
   for (const bu of ["1부", "2부"] as const) {
+    if (scope !== "all" && bu !== scope) continue;
     const groupCount = bu === "1부" ? evenCounts.groupCount1bu : evenCounts.groupCount2bu;
     if (groupCount <= 0) continue;
     const rawUnits = rawUnitsByBu[bu];

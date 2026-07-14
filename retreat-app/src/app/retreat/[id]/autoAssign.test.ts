@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, improveGroupsByWholeUnitMoves, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
+import { calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, improveGroupsByWholeUnitMoves, mergeAutoAssignedGroups, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -101,6 +101,78 @@ describe("1·2부 합산 조 수 짝수 보정", () => {
     );
     expect(groups).toHaveLength(2);
     expect(groups.length % 2).toBe(0);
+  });
+});
+
+describe("부서별 자동 조편성", () => {
+  const group = (id: string, bu: "1부" | "2부", studentIds: string[]): Group => ({
+    id, name: id, bu, teachers: [], leader: "", staff: "", studentIds,
+  });
+
+  it("1부만 다시 편성할 때 현재 2부 조 수를 유지하며 합산 짝수를 맞춘다", () => {
+    expect(ensureEvenScopedGroupCount({
+      requestedCount: 11,
+      maxGroups: 12,
+      studentCount: 123,
+      preservedOtherGroupCount: 10,
+    })).toBe(12);
+  });
+
+  it("증가할 수 없으면 선택 부서 조 수를 하나 줄이고 반대 부서는 건드리지 않는다", () => {
+    expect(ensureEvenScopedGroupCount({
+      requestedCount: 11,
+      maxGroups: 11,
+      studentCount: 123,
+      preservedOtherGroupCount: 10,
+    })).toBe(10);
+  });
+
+  it("1부만 실행하면 결과에 2부 조를 새로 만들지 않는다", () => {
+    const participants: Record<string, Participant> = {
+      oneA: mkP("oneA", "일부가", 1, 1, "1부"),
+      oneB: mkP("oneB", "일부나", 1, 2, "1부"),
+      twoA: mkP("twoA", "이부가", 1, 1, "2부"),
+      twoB: mkP("twoB", "이부나", 1, 2, "2부"),
+    };
+    const groups = runAutoAssign(
+      2, 2, mkRules({}), [], [], [], [], [], participants, [], {}, [], [], "1부", 2,
+    );
+
+    expect(groups).toHaveLength(2);
+    expect(groups.every(item => item.bu === "1부")).toBe(true);
+    expect(groups.flatMap(item => item.studentIds).sort()).toEqual(["oneA", "oneB"]);
+  });
+
+  it("2부만 실행하면 결과에 1부 조를 새로 만들지 않는다", () => {
+    const participants: Record<string, Participant> = {
+      oneA: mkP("oneA", "일부가", 1, 1, "1부"),
+      oneB: mkP("oneB", "일부나", 1, 2, "1부"),
+      twoA: mkP("twoA", "이부가", 1, 1, "2부"),
+      twoB: mkP("twoB", "이부나", 1, 2, "2부"),
+    };
+    const groups = runAutoAssign(
+      2, 2, mkRules({}), [], [], [], [], [], participants, [], {}, [], [], "2부", 2,
+    );
+
+    expect(groups).toHaveLength(2);
+    expect(groups.every(item => item.bu === "2부")).toBe(true);
+    expect(groups.flatMap(item => item.studentIds).sort()).toEqual(["twoA", "twoB"]);
+  });
+
+  it("1부 결과를 적용해도 현재 2부의 교사·조장·학생 수정 내용은 그대로 보존한다", () => {
+    const currentOne = group("old-one", "1부", ["old-1"]);
+    const currentTwo = {
+      ...group("keep-two", "2부", ["keep-2"]),
+      teachers: ["유지교사"],
+      leader: "유지조장",
+      gbs: "유지장소",
+    };
+    const generatedOne = group("new-one", "1부", ["new-1"]);
+
+    const merged = mergeAutoAssignedGroups([currentOne, currentTwo], [generatedOne], "1부");
+
+    expect(merged).toEqual([generatedOne, currentTwo]);
+    expect(merged.find(item => item.bu === "2부")).toBe(currentTwo);
   });
 });
 

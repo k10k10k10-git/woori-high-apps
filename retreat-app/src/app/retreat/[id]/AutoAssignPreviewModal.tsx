@@ -1,7 +1,7 @@
 "use client";
 import { Group, TeacherAttendance } from "@/lib/types";
 import { groupDisplayName } from "@/lib/groupNumber";
-import { ClassUnit } from "./autoAssignUtils";
+import { AutoAssignScope, ClassUnit } from "./autoAssignUtils";
 
 // ── 타입 ─────────────────────────────────────────────────────────────
 
@@ -10,7 +10,8 @@ export interface AutoAssignPreviewModalProps {
   units1: ClassUnit[];
   units2: ClassUnit[];
   teachers: TeacherAttendance[];
-  onApply: (groups: Group[]) => void;
+  scope: AutoAssignScope;
+  onApply: (groups: Group[], scope: AutoAssignScope) => void;
   onRerun: () => void;
   onClose: () => void;
 }
@@ -18,7 +19,7 @@ export interface AutoAssignPreviewModalProps {
 // ── 컴포넌트 ─────────────────────────────────────────────────────────
 
 export default function AutoAssignPreviewModal({
-  groups, units1, units2, teachers, onApply, onRerun, onClose,
+  groups, units1, units2, teachers, scope, onApply, onRerun, onClose,
 }: AutoAssignPreviewModalProps) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
@@ -29,7 +30,12 @@ export default function AutoAssignPreviewModal({
           <h3 className="font-bold text-lg">🎲 자동 배정 결과 미리보기</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
-        <p className="text-xs text-orange-500 mb-4">⚠ 적용 시 기존 조편성이 모두 교체됩니다. 저장 후 수동 수정 가능합니다.</p>
+        <p className="text-xs text-orange-500 mb-4">
+          ⚠ {scope === "all"
+            ? "적용 시 기존 1·2부 조편성이 모두 교체됩니다."
+            : `적용 시 기존 ${scope} 조편성만 교체되고 ${scope === "1부" ? "2부" : "1부"}는 그대로 유지됩니다.`}
+          {" "}저장 후 수동 수정 가능합니다.
+        </p>
 
         <div className="overflow-y-auto flex-1 space-y-6">
           {["1부", "2부"].map(bu => {
@@ -130,8 +136,10 @@ export default function AutoAssignPreviewModal({
         </div>
 
         <div className="flex gap-2 pt-4 border-t border-slate-100 mt-4">
-          <button onClick={() => { onApply(groups); onClose(); }}
-            className="btn-primary flex-1 justify-center">✅ 이 배정으로 적용</button>
+          <button onClick={() => { onApply(groups, scope); onClose(); }}
+            className="btn-primary flex-1 justify-center">
+            ✅ {scope === "all" ? "전체 배정으로 적용" : `${scope} 배정만 적용`}
+          </button>
           <button onClick={() => { onClose(); setTimeout(onRerun, 100); }}
             className="btn-secondary flex-1 justify-center">🔄 다시 뽑기</button>
           <button onClick={onClose}

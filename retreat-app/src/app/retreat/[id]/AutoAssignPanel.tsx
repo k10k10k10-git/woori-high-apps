@@ -4,8 +4,9 @@ import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import { DEFAULT_AUTO_ASSIGN_RULES, emptyLeaderEntry } from "@/lib/autoAssignConfig";
 import { getAutoAssignConfig, saveAutoAssignConfig } from "@/lib/db";
 import {
-  ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildAffinityBundles, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, runAutoAssign, validateClassRelations,
+  AutoAssignScope, ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
+  buildAffinityBundles, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts,
+  ensureEvenScopedGroupCount, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -20,12 +21,14 @@ interface Props {
   participants: Record<string, Participant>;
   teachers: TeacherAttendance[];
   students: Record<string, { name: string; grade: number; class: number }>;
-  onApply: (groups: Group[]) => void;
+  currentGroups: Group[];
+  onApply: (groups: Group[], scope: AutoAssignScope) => void;
 }
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────
 
-export default function AutoAssignPanel({ retreatId, participants, teachers, students, onApply }: Props) {
+export default function AutoAssignPanel({ retreatId, participants, teachers, students, currentGroups, onApply }: Props) {
+  const [scope, setScope] = useState<AutoAssignScope>("all");
   const [groupCount1bu, setGroupCount1bu] = useState(10);
   const [groupCount2bu, setGroupCount2bu] = useState(10);
   const [rules, setRules] = useState<RuleFlags>({ ...DEFAULT_AUTO_ASSIGN_RULES });
@@ -47,7 +50,7 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   // 조장 설정 (이름+학년+반, 동명이인 구분용)
   const [leaderEntries1, setLeaderEntries1] = useState<LeaderEntry[]>(Array.from({ length: 20 }, emptyLeaderEntry));
   const [leaderEntries2, setLeaderEntries2] = useState<LeaderEntry[]>(Array.from({ length: 20 }, emptyLeaderEntry));
-  const [preview, setPreview] = useState<{ groups: Group[]; units1: ClassUnit[]; units2: ClassUnit[] } | null>(null);
+  const [preview, setPreview] = useState<{ groups: Group[]; units1: ClassUnit[]; units2: ClassUnit[]; scope: AutoAssignScope } | null>(null);
   const [running, setRunning] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [configLoading, setConfigLoading] = useState(true);
@@ -60,6 +63,7 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
     setConfigLoading(true);
     setConfigNotice(null);
     setConfigError(null);
+    setScope("all");
     // 다른 수련회로 이동했을 때 직전 수련회의 설정이 잠깐이라도 섞이지 않게 먼저 초기화한다.
     setGroupCount1bu(10);
     setGroupCount2bu(10);
@@ -149,12 +153,21 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   const classUnits2 = useMemo(() => buildClassUnits(participants, "2부", students), [participants, students]);
 
   // 반 결합·분리 모순 검증 — 에러가 있으면 실행 차단 (고려 관계 반영이 켜진 경우만)
-  const relationErrors = useMemo(
-    () => rules.applyConflicts
-      ? validateClassRelations([...classUnits1, ...classUnits2], classConflicts, classAffinities, rules)
-      : [],
-    [classUnits1, classUnits2, classConflicts, classAffinities, rules],
-  );
+  const relationErrors = useMemo(() => {
+    if (!rules.applyConflicts) return [];
+    if (scope === "all") {
+      return validateClassRelations([...classUnits1, ...classUnits2], classConflicts, classAffinities, rules);
+    }
+    const units = scope === "1부" ? classUnits1 : classUnits2;
+    const prefix = `${scope}_`;
+    const inScope = ({ a, b }: ConflictPair) => a.startsWith(prefix) && b.startsWith(prefix);
+    return validateClassRelations(
+      units,
+      classConflicts.filter(inScope),
+      classAffinities.filter(inScope),
+      rules,
+    );
+  }, [scope, classUnits1, classUnits2, classConflicts, classAffinities, rules]);
 
   const bu1Count = classUnits1.reduce((acc, u) => acc + u.studentIds.length, 0);
   const bu2Count = classUnits2.reduce((acc, u) => acc + u.studentIds.length, 0);
@@ -174,6 +187,8 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   const classRuleMax2 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits2.length / 2)) : classUnits2.length;
   const maxGroups1 = Math.min(bundleCount1, classRuleMax1);
   const maxGroups2 = Math.min(bundleCount2, classRuleMax2);
+  const currentGroupCount1bu = currentGroups.filter(group => group.bu === "1부").length;
+  const currentGroupCount2bu = currentGroups.filter(group => group.bu === "2부").length;
 
   // maxGroupSize/인원수/최소2반 변경 시 조 수 자동 계산·클램프 (렌더 중 조정 — effect 대신)
   const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
@@ -207,24 +222,50 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   }
 
   function run() {
-    const evenCounts = ensureEvenCombinedGroupCounts({
-      groupCount1bu,
-      groupCount2bu,
-      maxGroups1,
-      maxGroups2,
-      studentCount1bu: bu1Count,
-      studentCount2bu: bu2Count,
-    });
+    const evenCounts = scope === "all"
+      ? ensureEvenCombinedGroupCounts({
+          groupCount1bu,
+          groupCount2bu,
+          maxGroups1,
+          maxGroups2,
+          studentCount1bu: bu1Count,
+          studentCount2bu: bu2Count,
+        })
+      : scope === "1부"
+        ? {
+            groupCount1bu: ensureEvenScopedGroupCount({
+              requestedCount: groupCount1bu,
+              maxGroups: maxGroups1,
+              studentCount: bu1Count,
+              preservedOtherGroupCount: currentGroupCount2bu,
+            }),
+            groupCount2bu,
+          }
+        : {
+            groupCount1bu,
+            groupCount2bu: ensureEvenScopedGroupCount({
+              requestedCount: groupCount2bu,
+              maxGroups: maxGroups2,
+              studentCount: bu2Count,
+              preservedOtherGroupCount: currentGroupCount1bu,
+            }),
+          };
     if (evenCounts.groupCount1bu !== groupCount1bu) setGroupCount1bu(evenCounts.groupCount1bu);
     if (evenCounts.groupCount2bu !== groupCount2bu) setGroupCount2bu(evenCounts.groupCount2bu);
+    const preservedOtherGroupCount = scope === "1부"
+      ? currentGroupCount2bu
+      : scope === "2부"
+        ? currentGroupCount1bu
+        : 0;
     setRunning(true);
     setTimeout(() => {
       const groups = runAutoAssign(
         evenCounts.groupCount1bu, evenCounts.groupCount2bu, rules,
         studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, participants, teachers, students,
         leaderEntries1, leaderEntries2,
+        scope, preservedOtherGroupCount,
       );
-      setPreview({ groups, units1: classUnits1, units2: classUnits2 });
+      setPreview({ groups, units1: classUnits1, units2: classUnits2, scope });
       setRunning(false);
     }, 50);
   }
@@ -286,6 +327,10 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
         configSaving={configSaving}
         configNotice={configNotice}
         configError={configError}
+        scope={scope}
+        setScope={setScope}
+        currentGroupCount1bu={currentGroupCount1bu}
+        currentGroupCount2bu={currentGroupCount2bu}
         onSaveConfig={saveConfig}
         onRun={run}
         onCollapse={() => setCollapsed(true)}
@@ -297,6 +342,7 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
           units1={preview.units1}
           units2={preview.units2}
           teachers={teachers}
+          scope={preview.scope}
           onApply={onApply}
           onRerun={run}
           onClose={closePreview}
