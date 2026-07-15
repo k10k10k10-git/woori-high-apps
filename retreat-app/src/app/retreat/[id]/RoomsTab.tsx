@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
-import { roomLabel, sortRooms } from "@/lib/roomLabel";
+import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
 
 interface Props {
   retreat: Retreat;
@@ -322,49 +322,67 @@ export default function RoomsTab({ retreat }: Props) {
     saveWorkbook(wb, `${retreat.name}_방배정`);
   }
 
+  /** 도면형 방배정 인쇄 — 건물(동)별 한 페이지, 층별 가로 띠에 방 박스를 나란히 (숙소 도면 느낌). */
   function buildRoomsHtml() {
-    const typeList = [...new Set(rooms.map(r => r.type))].sort();
-    const chip = (text: string, bg = "#eff6ff", border = "#bfdbfe", color = "#1e40af") =>
-      `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:9999px;padding:1px 8px;font-size:10px;color:${color};margin:2px 2px 2px 0">${escapeHtml(text)}</span>`;
+    const chip = (text: string, bg: string, border: string, color: string, strike = false) =>
+      `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:4px;padding:0 5px;font-size:10px;line-height:16px;color:${color};margin:1px 2px 1px 0;${strike ? "text-decoration:line-through;" : ""}">${escapeHtml(text)}</span>`;
+
+    const roomBox = (r: Room) => {
+      const isMale = r.type === "남";
+      const headBg = isMale ? "#1e3a8a" : "#9d174d"; // 도면의 진한 박스 느낌 — 남 남색 / 여 자주
+      const assigned = (r.studentIds || []).filter(sid => cellColors[sid] !== "red").length;
+      const teacherChips = (r.teachers || []).map(t => chip(t, "#dcfce7", "#86efac", "#166534")).join("");
+      const studentChips = (r.studentIds || []).map(sid => {
+        const s = students[sid];
+        const color = cellColors[sid];
+        const name = s ? s.name : sid;
+        if (color === "red") return chip(`${name} (취소)`, "#fee2e2", "#fca5a5", "#991b1b", true);
+        if (color === "orange") return chip(`${name} (부분참)`, "#ffedd5", "#fdba74", "#9a3412");
+        return chip(name, isMale ? "#eff6ff" : "#fdf2f8", isMale ? "#bfdbfe" : "#fbcfe8", isMale ? "#1e40af" : "#9d174d");
+      }).join("");
+      return `<div style="border:1.5px solid #334155;border-radius:4px;width:132px;page-break-inside:avoid;overflow:hidden;background:#fff">
+        <div style="background:${headBg};color:#fff;padding:2px 6px;font-size:11px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700">${escapeHtml(r.roomNumber)}</span>
+          <span style="font-size:9px;opacity:.85">${escapeHtml(r.type)} ${assigned}/${r.capacity}</span>
+        </div>
+        <div style="padding:3px;min-height:22px">${teacherChips}${studentChips || '<span style="color:#cbd5e1;font-size:9px">비어있음</span>'}</div>
+      </div>`;
+    };
 
     let html = `<h1 style="margin:0 0 4px">${escapeHtml(retreat.name)} 방배정</h1>
-      <p style="font-size:11px;color:#888;margin:0 0 16px">총 ${rooms.length}개 방 · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>`;
+      <p style="font-size:11px;color:#888;margin:0 0 14px">총 ${rooms.length}개 방 · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>`;
 
-    typeList.forEach(type => {
-      const typeRooms = sortRooms(rooms.filter(r => r.type === type));
-      html += `<h2 style="font-size:13px;margin:0 0 8px;border-bottom:2px solid #e2e8f0;padding-bottom:4px">${escapeHtml(type)}생 방 (${typeRooms.length}개)</h2>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">`;
+    const dongs = [...new Set(rooms.map(r => (r.dong ?? "").trim()))]
+      .sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
 
-      typeRooms.forEach(r => {
-        const teacherChips = (r.teachers || []).map(t =>
-          chip(t, "#f1f5f9", "#cbd5e1", "#334155")
-        ).join("");
-        const studentChips = (r.studentIds || []).map(sid => {
-          const s = students[sid];
-          const color = cellColors[sid];
-          const [bg, border, fg] = color === "blue"   ? ["#dbeafe","#93c5fd","#1e40af"]
-                                  : color === "orange" ? ["#ffedd5","#fdba74","#9a3412"]
-                                  : color === "red"    ? ["#fee2e2","#fca5a5","#991b1b"]
-                                  : ["#eff6ff","#bfdbfe","#1e40af"];
-          const label = s ? `${s.name} ${s.buNum ? s.buNum+"부 " : ""}${s.grade}-${s.class}` : sid;
-          return chip(label, bg, border, fg);
-        }).join("");
+    dongs.forEach((dong, di) => {
+      const dongRooms = rooms.filter(r => (r.dong ?? "").trim() === dong);
+      // 층별 묶음 — 높은 층이 위 (도면 관례), 층 구분 없는 방은 맨 아래
+      const byFloor = new Map<string, Room[]>();
+      dongRooms.forEach(r => {
+        const f = roomFloor(r.roomNumber);
+        byFloor.set(f, [...(byFloor.get(f) ?? []), r]);
+      });
+      const floors = [...byFloor.keys()].sort((a, b) => {
+        if (a === "") return 1; if (b === "") return -1;
+        return parseInt(b) - parseInt(a);
+      });
 
-        html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;page-break-inside:avoid;font-size:11px">
-          <div style="font-weight:700;font-size:13px;margin-bottom:4px">
-            ${escapeHtml(roomLabel(r))}호
-            <span style="font-size:10px;background:#f1f5f9;color:#475569;border-radius:4px;padding:1px 6px;margin-left:4px">${escapeHtml(r.type)}생</span>
-            <span style="font-size:10px;color:#94a3b8;margin-left:4px">정원 ${r.capacity}명</span>
-          </div>
-          ${teacherChips ? `<div style="margin-bottom:5px"><span style="color:#64748b;font-size:10px">👨‍🏫 교사: </span>${teacherChips}</div>` : ""}
-          <div style="border-top:1px solid #f1f5f9;padding-top:6px">${studentChips || '<span style="color:#cbd5e1;font-size:10px">배정 없음</span>'}</div>
-          <div style="text-align:right;font-size:10px;color:#94a3b8;margin-top:4px">${(r.studentIds || []).length}명 / ${r.capacity}명</div>
+      html += `<section style="${di > 0 ? "page-break-before:always;" : ""}margin-bottom:18px">
+        <h2 style="font-size:14px;margin:0 0 8px;border-bottom:2.5px solid #334155;padding-bottom:3px">${escapeHtml(dong || "숙소동")}</h2>`;
+
+      floors.forEach(floor => {
+        const floorRooms = sortRooms(byFloor.get(floor)!);
+        html += `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:8px;page-break-inside:avoid">
+          ${floor ? `<div style="flex:none;width:34px;border:1px solid #94a3b8;border-radius:4px;text-align:center;font-size:10px;font-weight:700;color:#334155;padding:4px 0;align-self:stretch;display:flex;align-items:center;justify-content:center">${escapeHtml(floor)}</div>` : ""}
+          <div style="display:flex;flex-wrap:wrap;gap:5px;flex:1">${floorRooms.map(roomBox).join("")}</div>
         </div>`;
       });
 
-      html += `</div>`;
+      html += `</section>`;
     });
 
+    html += `<style>@media print { div, section { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>`;
     return html;
   }
 

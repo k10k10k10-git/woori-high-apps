@@ -460,9 +460,11 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
             <div className="text-xs text-slate-400 mt-1.5 text-right">
               {(() => {
                 const cancelled = filteredIds.filter(sid => cellColors[sid] === "red").length;
+                // 조장·스탭도 조 인원이다 — 학생 목록(filteredIds)에서 이름으로 빠져 있으므로 다시 더한다.
+                const total = filteredIds.length - cancelled + leaderNames.size + staffNames.size;
                 return cancelled > 0
-                  ? <>{filteredIds.length - cancelled}명 <span className="text-red-300">(취소 {cancelled}명 제외)</span></>
-                  : <>{filteredIds.length}명</>;
+                  ? <>{total}명 <span className="text-red-300">(취소 {cancelled}명 제외)</span></>
+                  : <>{total}명</>;
               })()}
             </div>
           </>

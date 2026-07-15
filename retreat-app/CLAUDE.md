@@ -14,7 +14,7 @@
 | 데이터베이스 | Firebase Realtime Database |
 | 인증 | Firebase Auth (Google OAuth) |
 | 시트 연동 | Google Sheets CSV (공개 게시) |
-| 엑셀 내보내기 | xlsx 라이브러리 |
+| 엑셀 내보내기 | xlsx-js-style (npm 별칭 `"xlsx"` — import 경로는 그대로. 셀 fill/font/border 스타일 지원 포크, 0.18.5 기반. 조편성 그리드 XLSX의 성별·역할 색이 이걸 쓴다) |
 | 테스트 | Vitest 4 (`npm test` = `vitest run`) |
 | 배포 | Vercel (`npx vercel --prod --yes`) |
 | 의존성 | firebase, next, react, react-dom, xlsx, vitest(dev) — 최소화 유지 |

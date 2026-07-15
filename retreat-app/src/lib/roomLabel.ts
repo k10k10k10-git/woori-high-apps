@@ -6,6 +6,17 @@ export function roomLabel(room: { dong?: string | null; roomNumber: string }): s
 }
 
 /**
+ * 호수에서 층 라벨 추출 — 도면형 인쇄에서 층 행(row)을 나누는 기준.
+ *   "101"→"1층", "1204"→"12층". 앞자리가 숫자 3자리 미만이거나 숫자가 아니면 ""(층 구분 없음).
+ *   (호텔식 표기: 끝 두 자리 = 호수, 나머지 앞자리 = 층)
+ */
+export function roomFloor(roomNumber: string): string {
+  const m = roomNumber.trim().match(/^(\d+)/);
+  if (!m || m[1].length < 3) return "";
+  return `${parseInt(m[1].slice(0, m[1].length - 2))}층`;
+}
+
+/**
  * 방 목록 정렬 — ① 동(건물)별로 묶고 ② 각 동 안에서 호수를 숫자순으로.
  *   예) 101,102,…,110,201  (문자열 정렬의 "110<99" 문제를 numeric 옵션으로 방지)
  * 동이 없는(단일 건물) 방은 앞쪽에 모인다. 저장 순서는 그대로 두고 표시용으로만 정렬한다.

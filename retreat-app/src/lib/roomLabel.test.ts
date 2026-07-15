@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roomLabel, sortRooms } from "./roomLabel";
+import { roomLabel, roomFloor, sortRooms } from "./roomLabel";
 
 describe("roomLabel", () => {
   it("동이 있으면 '동 호수'로 합쳐 표시", () => {
@@ -48,5 +48,24 @@ describe("sortRooms", () => {
       { roomNumber: "102" },
     ];
     expect(sortRooms(rooms).map(r => `${r.dong ?? ""}${r.roomNumber}`)).toEqual(["102", "201", "A동101"]);
+  });
+});
+
+describe("roomFloor", () => {
+  it("끝 두 자리를 호수로 보고 앞자리를 층으로 판정한다", () => {
+    expect(roomFloor("101")).toBe("1층");
+    expect(roomFloor("112")).toBe("1층");
+    expect(roomFloor("204")).toBe("2층");
+    expect(roomFloor("1204")).toBe("12층");
+  });
+
+  it("숫자 3자리 미만이거나 숫자가 아니면 층 구분 없음", () => {
+    expect(roomFloor("12")).toBe("");
+    expect(roomFloor("VIP")).toBe("");
+    expect(roomFloor("")).toBe("");
+  });
+
+  it("숫자 뒤에 문자가 붙어도 앞 숫자로 판정한다", () => {
+    expect(roomFloor("101호")).toBe("1층");
   });
 });

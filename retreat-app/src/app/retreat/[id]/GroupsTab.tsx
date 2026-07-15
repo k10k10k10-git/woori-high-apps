@@ -13,6 +13,7 @@ import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "@/lib/groupPrint";
 import { resolveGroupRoleStudent } from "@/lib/groupRoleStudent";
 import { resolveStudentKey } from "@/lib/studentMatcher";
+import { buildGroupsGridColumns, type GroupsGridCell } from "@/lib/groupsGrid";
 import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
@@ -319,51 +320,75 @@ export default function GroupsTab({ retreat }: Props) {
   }
 
 
-  function exportGroupsXLSX() {
-    const rows: Record<string, string | number>[] = [];
-    const orderedGroups = [
-      ...sortGroupsByNumber(groups.filter(g => g.bu === "1부")),
-      ...sortGroupsByNumber(groups.filter(g => g.bu === "2부")),
-    ];
-    orderedGroups.forEach(g => {
-      const jo = groupDisplayName(g, groups);
-      (g.teachers || []).forEach(t => {
-        rows.push({ "부": g.bu, "조": jo, "역할": "교사", "이름": t, "학년": "", "반": "", "GBS": g.gbs || "" });
-      });
-      const leaderNames = new Set(parseNames(g.leader || ""));
-      const staffNames  = new Set(parseNames(g.staff  || ""));
-      leaderNames.forEach(n => {
-        const s = resolveGroupRoleStudent(students, g, n);
-        rows.push({ "부": g.bu, "조": jo, "역할": "조장", "이름": n, "학년": s ? `${s.grade}학년` : "", "반": s ? `${s.class}반` : "", "GBS": g.gbs || "" });
-      });
-      staffNames.forEach(n => {
-        const s = resolveGroupRoleStudent(students, g, n);
-        rows.push({ "부": g.bu, "조": jo, "역할": "스탭", "이름": n, "학년": s ? `${s.grade}학년` : "", "반": s ? `${s.class}반` : "", "GBS": g.gbs || "" });
-      });
-      (g.studentIds || []).forEach(sid => {
-        const s = students[sid];
-        if (!s) return;
-        if (leaderNames.has(s.name) || staffNames.has(s.name)) return;
-        rows.push({ "부": g.bu, "조": jo, "역할": "학생", "이름": s.name, "학년": `${s.grade}학년`, "반": `${s.class}반`, "GBS": g.gbs || "" });
-      });
+  /** 신청폼 성별 맵 — XLSX·PDF 출력이 같은 판정(폼 성별 우선, 반 홀짝 폴백)을 쓰도록 공유 */
+  function buildGenderByStudentKey(): Map<string, string> {
+    const map = new Map<string, string>();
+    Object.values(participants).forEach(participant => {
+      const studentKey = resolveStudentKey(participant, students);
+      if (studentKey && participant.gender && !map.has(studentKey)) {
+        map.set(studentKey, participant.gender);
+      }
     });
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch: 6 }, { wch: 8 }, { wch: 6 }, { wch: 10 }, { wch: 8 }, { wch: 6 }, { wch: 10 }];
+    return map;
+  }
+
+  function exportGroupsXLSX() {
+    // 신청자 취합 그리드 느낌: 조=열, 세로 나열, 성별·역할·상태별 셀 색 (xlsx-js-style)
+    const FILL: Record<GroupsGridCell["kind"], string> = {
+      header: "E2E8F0",  // 조명 — slate-200
+      teacher: "DCFCE7", // 교사 — green-100 (화면 교사 칩과 동일 계열)
+      leader: "FEF9C3",  // 조장 — yellow-100 (조 카드 조장 노랑)
+      staff: "F3E8FF",   // 스탭 — purple-100
+      male: "DBEAFE",    // 남학생 — blue-100
+      female: "FCE7F3",  // 여학생 — pink-100
+    };
+    const STATUS_FILL: Record<NonNullable<GroupsGridCell["status"]>, string> = {
+      "취소": "FEE2E2",   // red-100
+      "부분참": "FFEDD5", // orange-100
+      "불참": "FEE2E2",
+    };
+    const thin = { style: "thin", color: { rgb: "CBD5E1" } };
+    const genderByKey = buildGenderByStudentKey();
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "조편성");
+    (["1부", "2부"] as const).forEach(bu => {
+      const buGroups = sortGroupsByNumber(groups.filter(g => g.bu === bu));
+      if (buGroups.length === 0) return;
+      const columns = buildGroupsGridColumns(buGroups, groups, students, cellColors, allTeachers, genderByKey);
+
+      // 열 배열 → 행 배열(transpose). 셀마다 스타일 지정.
+      const maxRows = Math.max(...columns.map(c => c.length));
+      const aoa: (string | null)[][] = [];
+      for (let r = 0; r < maxRows; r++) aoa.push(columns.map(col => {
+        const cell = col[r];
+        if (!cell) return null;
+        return cell.status ? `${cell.text} (${cell.status})` : cell.text;
+      }));
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      for (let r = 0; r < maxRows; r++) {
+        for (let c = 0; c < columns.length; c++) {
+          const cell = columns[c][r];
+          if (!cell) continue;
+          const addr = XLSX.utils.encode_cell({ r, c });
+          if (!ws[addr]) continue;
+          ws[addr].s = {
+            fill: { patternType: "solid", fgColor: { rgb: cell.status ? STATUS_FILL[cell.status] : FILL[cell.kind] } },
+            font: { sz: 10, bold: cell.kind === "header" || cell.kind === "leader", ...(cell.status === "취소" ? { strike: true } : {}) },
+            alignment: { horizontal: "center", vertical: "center" },
+            border: { top: thin, bottom: thin, left: thin, right: thin },
+          };
+        }
+      }
+      ws["!cols"] = columns.map(() => ({ wch: 14 }));
+      XLSX.utils.book_append_sheet(wb, ws, bu);
+    });
     saveWorkbook(wb, `${retreat.name}_조편성`);
   }
 
   function buildGroupsHtml(onlyBu?: string) {
     const exportGroups = onlyBu ? groups.filter(g => g.bu === onlyBu) : groups;
     const buList = [...new Set(exportGroups.map(g => g.bu))].sort();
-    const participantGenderByStudentKey = new Map<string, string>();
-    Object.values(participants).forEach(participant => {
-      const studentKey = resolveStudentKey(participant, students);
-      if (studentKey && participant.gender && !participantGenderByStudentKey.has(studentKey)) {
-        participantGenderByStudentKey.set(studentKey, participant.gender);
-      }
-    });
+    const participantGenderByStudentKey = buildGenderByStudentKey();
 
     // ── 한 부서/페이지: 조를 좁은 세로 열로 만들어 가로로 나란히 배치 ──
     interface PdfPage { bu: string; pageGroups: Group[]; isLast: boolean }
