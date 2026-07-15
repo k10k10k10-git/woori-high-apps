@@ -9,6 +9,7 @@ import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMa
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { parseClassKey } from "@/lib/classKey";
 import { resolveEffectiveColor } from "@/lib/rosterColor";
+import { resolvePrintGender } from "@/lib/groupPrint";
 
 interface StudentInfo {
   id: string;
@@ -315,12 +316,20 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   // 후기 신청자(색칠된 비참가자)도 포함
   const colorStats = useMemo(() => {
     const buNum = bu === "1부" ? 1 : 2;
+    const studentById = new Map(allStudents.map(s => [s.id, s]));
+    // 남/여 집계 — 합계 줄(비취소 인원)과 같은 모수: 매칭된 신청자(비취소) + 현장(late)
+    let male = 0, female = 0;
+    const countGender = (gender: string | undefined, classNum: number) => {
+      if (resolvePrintGender(gender, classNum) === "남") male++;
+      else female++;
+    };
     let formBlue = 0, formOrange = 0, formRed = 0;
-    participantByStudentId.forEach((_, studentId) => {
+    participantByStudentId.forEach((p, studentId) => {
       const color = effectiveColorOf(`${buNum}_${studentId}`);
       if (color === "blue") formBlue++;
       else if (color === "orange") formOrange++;
       else if (color === "red") formRed++;
+      if (color !== "red") countGender(p.gender, studentById.get(studentId)?.classNum ?? p.class);
     });
     let lateBlue = 0, lateOrange = 0, lateParticipant = 0;
     allStudents.forEach(s => {
@@ -329,6 +338,9 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       if (color === "blue") lateBlue++;
       else if (color === "orange") lateOrange++;
       else if (color === "green" || color === "purple") lateParticipant++;
+      if (color === "blue" || color === "orange" || color === "green" || color === "purple") {
+        countGender(undefined, s.classNum); // 반 명단만 있는 현장 인원 — 반 홀짝 규칙으로 판정
+      }
     });
     const lateCount = lateBlue + lateOrange + lateParticipant;
     const total = uniqueParts.length + lateCount;
@@ -340,6 +352,8 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       unprocessed: total - (formBlue + lateBlue) - (formOrange + lateOrange) - formRed,
       lateCount,
       total,
+      male,
+      female,
     };
   }, [participantByStudentId, allStudents, uniqueParts, effectiveColorOf, bu]);
 
@@ -648,15 +662,22 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       {/* 합계 표시 */}
       {colorStats.total > 0 && (
         <div className="text-xs text-slate-400 -mt-3 mb-4 text-right pr-1">
-          {colorStats.blue} + {colorStats.orange} + {colorStats.unprocessed}
-          {colorStats.red > 0 && <span className="text-red-400"> − {colorStats.red}(취소)</span>}
-          {" = "}
-          <span className={`font-semibold ${isGreen ? "text-green-700" : "text-purple-700"}`}>
-            {colorStats.total - colorStats.red}명
-          </span>
-          {colorStats.lateCount > 0 && (
-            <span className="text-teal-500 ml-2">(현장 {colorStats.lateCount}명 포함)</span>
-          )}
+          <div>
+            {colorStats.blue} + {colorStats.orange} + {colorStats.unprocessed}
+            {colorStats.red > 0 && <span className="text-red-400"> − {colorStats.red}(취소)</span>}
+            {" = "}
+            <span className={`font-semibold ${isGreen ? "text-green-700" : "text-purple-700"}`}>
+              {colorStats.total - colorStats.red}명
+            </span>
+            {colorStats.lateCount > 0 && (
+              <span className="text-teal-500 ml-2">(현장 {colorStats.lateCount}명 포함)</span>
+            )}
+          </div>
+          <div className="mt-0.5">
+            남학생 <span className="font-semibold text-sky-700">{colorStats.male}명</span>
+            {" · "}
+            여학생 <span className="font-semibold text-rose-600">{colorStats.female}명</span>
+          </div>
         </div>
       )}
 
