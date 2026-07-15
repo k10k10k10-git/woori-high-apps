@@ -38,6 +38,7 @@ export const paths = {
   iguardGroupStaffEntry: (id: string, groupId: string) => `retreats/${id}/iguard/groupStaff/${groupId}`,
   iguardCueSheet: (id: string) => `retreats/${id}/iguard/cueSheet`,
   iguardGuide: (id: string) => `retreats/${id}/iguard/guide`,
+  iguardAccessLock: (id: string) => `retreats/${id}/iguard/accessLock`,
 
   // ── 마일스톤 (전역 공유) ──
   prepMilestones: () => "prepMilestones",

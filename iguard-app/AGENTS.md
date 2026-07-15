@@ -39,7 +39,7 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 
 - Use `src/lib/db.ts` as the Firebase access layer. Do not import Firebase directly in components.
 - Use `src/lib/paths.ts` for database paths.
-- All live retreat subscriptions belong in `useRetreatData`; include an `onError` path so failed subscriptions do not leave infinite spinners.
+- All live retreat subscriptions belong in `useRetreatData`; include an `onError` path so failed subscriptions do not leave infinite spinners. The sole exception is `iguard/accessLock`: it must be checked before `useRetreatData` mounts, and the home lock badge uses the same metadata subscription.
 - Use `snapToList<T>()` instead of open-coded snapshot mapping.
 - For attendance checks, preserve the current safety design:
   - tapping an unchecked person is idempotent check-in (`checked: true`)
@@ -57,6 +57,12 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 ## Roles
 
 `staff` users see execution views only. `team` and `admin` can access planning and info views.
+
+### 수련회별 PIN 잠금 (2026-07-16)
+
+- **접근법**: Google 로그인·팀원 승인을 유지하고, `retreats/{id}/iguard/accessLock`에 salt와 PBKDF2-SHA256 해시만 저장한다. 관리자는 우회하고, 일반 사용자는 PIN 통과 전 `IguardWorkspace`와 `useRetreatData`를 마운트하지 않는다.
+- **판단 질문**: 홈 링크만 막고 직접 `/retreat/{id}` URL을 열면 들어갈 수 있지 않은가? PIN 변경 뒤 이전 탭의 해제가 계속 유효하지 않은가? 두 경우를 각각 라우트 경계와 해시 버전이 포함된 sessionStorage 키로 막는다.
+- **재사용 규칙**: PIN 형식·해시·검증·세션 키는 `src/lib/accessLock.ts`만 사용한다. 이 기능은 승인 사용자 대상 앱 수준 잠금이며 현재 Firebase Rules의 계정별 데이터 ACL을 대체한다고 표현하지 않는다.
 
 ### 개인 큐카드 본인 자동 선택 (2026-07-13)
 

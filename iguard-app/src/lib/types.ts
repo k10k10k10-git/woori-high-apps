@@ -196,6 +196,19 @@ export interface IguardAttendanceInfo {
   by?: string;
 }
 
+// ── 수련회별 추가 PIN 잠금 ────────────────────────────────
+// Google 로그인·팀원 승인 뒤에 적용되는 이가드 UI 진입 장벽이다.
+export interface IguardAccessLock {
+  enabled: true;
+  version: 1;
+  algorithm: "PBKDF2-SHA256";
+  iterations: number;
+  salt: string;
+  pinHash: string;
+  updatedAt: number;
+  updatedBy?: string;
+}
+
 // ── 집회 자리배치: 세션별 구역 → 조 ────────────────────────
 export interface IguardSeatingZone {
   name: string;         // 예: "5층", "앞열"

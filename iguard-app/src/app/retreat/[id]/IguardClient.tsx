@@ -2,10 +2,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { subscribeToIguardAccessLock } from "@/lib/db";
+import { hasRetreatSessionUnlock } from "@/lib/accessLock";
 import { checkAdminCompat } from "@/lib/compat";
 import { useRetreatData } from "@/hooks/useRetreatData";
 import {
-  Group, IguardStaff,
+  Group, IguardAccessLock, IguardStaff,
   TeacherAttendance,
 } from "@/lib/types";
 import CenterSpinner from "@/components/CenterSpinner";
@@ -23,6 +25,7 @@ import { CueCardView, PostBoardView } from "./ExecutionViews";
 import LeaderCueManageView from "./LeaderCueManageView";
 import { GuideView, TodosView } from "./InfoViews";
 import GroupStaffView from "./GroupStaffView";
+import RetreatPinGate from "./RetreatPinGate";
 
 const GROUPS = [
   { label: "실행", hint: "현장·모바일", views: [
@@ -88,7 +91,56 @@ function teachersToStaff(adminTeachers: TeacherAttendance[], groups: Group[], gr
 export default function IguardClient() {
   const router = useRouter();
   const id = (useParams().id as string);
-  const { user, loading: authLoading, accessLevel, memberName } = useAuth();
+  const { user, loading: authLoading, accessLevel } = useAuth();
+  const [lock, setLock] = useState<IguardAccessLock | null | undefined>(undefined);
+  const [unlocked, setUnlocked] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && (!user || accessLevel === "none")) router.push("/");
+  }, [authLoading, user, accessLevel, router]);
+
+  useEffect(() => {
+    if (authLoading || !user || accessLevel === "none") return;
+    setLockError(null);
+    if (accessLevel === "admin") {
+      setLock(null);
+      setUnlocked(true);
+      return;
+    }
+    setLock(undefined);
+    setUnlocked(false);
+    return subscribeToIguardAccessLock(id, nextLock => {
+      setLock(nextLock);
+      if (!nextLock) { setUnlocked(true); return; }
+      try { setUnlocked(hasRetreatSessionUnlock(id, nextLock, window.sessionStorage)); }
+      catch { setUnlocked(false); }
+    }, error => {
+      setLockError(`PIN 잠금 상태를 확인하지 못했습니다 — ${error.message}`);
+      setLock(undefined);
+      setUnlocked(false);
+    });
+  }, [authLoading, user, accessLevel, id]);
+
+  if (authLoading) return <CenterSpinner />;
+  if (!user || accessLevel === "none") return null;
+  if (lockError) return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <div className="mb-3 text-3xl" aria-hidden="true">⚠️</div>
+      <p className="mb-4 max-w-md text-sm text-red-700" role="alert">{lockError}</p>
+      <button onClick={() => router.push("/")} className="btn-secondary">수련회 목록으로</button>
+    </div>
+  );
+  if (lock === undefined) return <CenterSpinner />;
+  if (lock && !unlocked) return (
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={() => setUnlocked(true)} onBack={() => router.push("/")} />
+  );
+  return <IguardWorkspace id={id} />;
+}
+
+function IguardWorkspace({ id }: { id: string }) {
+  const router = useRouter();
+  const { user, accessLevel, memberName } = useAuth();
 
   const [view, setView] = useState<string>("check");
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
@@ -103,10 +155,6 @@ export default function IguardClient() {
     todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff,
     connected,
   } = useRetreatData(id);
-
-  useEffect(() => {
-    if (!authLoading && (!user || accessLevel === "none")) router.push("/");
-  }, [authLoading, user, accessLevel, router]);
 
   const staffForViews = useMemo(
     () => teachersToStaff(adminTeachers, groups, groupStaff),
@@ -152,7 +200,7 @@ export default function IguardClient() {
     return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
   }, [retreat, view]);
 
-  if (authLoading || retreatLoading) return <CenterSpinner />;
+  if (retreatLoading) return <CenterSpinner />;
   if (!user || accessLevel === "none") return null;
   if (!retreat) return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">

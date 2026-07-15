@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { getRetreats, requestIguardAccess, getMyIguardPending, subscribeToAllRetreatPeriods, subscribeToMilestones, getEarliestPeriodDateByRetreat, type RetreatPeriodWithOwner } from "@/lib/db";
-import { Retreat, Milestone } from "@/lib/types";
+import { getRetreats, requestIguardAccess, getMyIguardPending, subscribeToAllRetreatPeriods, subscribeToMilestones, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks, type RetreatPeriodWithOwner } from "@/lib/db";
+import { Retreat, Milestone, type IguardAccessLock } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
 import TeamModal from "./TeamModal";
+import AdminModal from "./AdminModal";
 import PrepCalendar from "./PrepCalendar";
 import CenterSpinner from "@/components/CenterSpinner";
 
@@ -41,6 +42,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showTeam, setShowTeam] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
   const [requested, setRequested] = useState(false);
   const [kind, setKind] = useState<"kakao" | "line" | "other" | null>(null);
 
@@ -95,6 +98,15 @@ export default function HomePage() {
     return () => u();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retreats.map(r => r.id).join(",")]);
+
+  // 승인 사용자에게 수련회별 PIN 잠금 상태를 표시한다. 실제 PIN 검증은 내부 화면 진입 전에 다시 수행한다.
+  useEffect(() => {
+    if (!user || accessLevel === "none") { setAccessLocks({}); return; }
+    const ids = retreats.map(r => r.id);
+    return subscribeToIguardAccessLocks(ids, setAccessLocks,
+      e => setLoadError(prev => prev ?? `PIN 잠금 상태 구독 실패 — ${e.message}`));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, accessLevel, retreats.map(r => r.id).join(",")]);
 
   useEffect(() => {
     if (user && accessLevel === "none") getMyIguardPending(user.uid).then(setRequested).catch(() => {});
@@ -172,16 +184,23 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             {user.displayName && <span className="text-sm hidden sm:inline" style={{ color: "#6b7280" }}>{user.displayName}</span>}
             {accessLevel === "admin" && (
-              <button onClick={() => setShowTeam(true)}
-                className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-                style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
-                👥 팀원 관리
-              </button>
+              <>
+                <button onClick={() => setShowAdmin(true)} aria-label="관리자"
+                  className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  🔐 <span className="hidden sm:inline">관리자</span>
+                </button>
+                <button onClick={() => setShowTeam(true)} aria-label="팀원 관리"
+                  className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
+                  style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
+                  👥 <span className="hidden sm:inline">팀원 관리</span>
+                </button>
+              </>
             )}
-            <button onClick={() => signOut()}
-              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
+            <button onClick={() => signOut()} aria-label="로그아웃"
+              className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
               style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
-              로그아웃
+              <span className="sm:hidden" aria-hidden="true">↪</span><span className="hidden sm:inline">로그아웃</span>
             </button>
           </div>
         </div>
@@ -218,7 +237,14 @@ export default function HomePage() {
                     {selectedRetreat.year}년
                   </div>
                   <div className="font-bold leading-snug text-slate-800">{selectedRetreat.name}</div>
-                  <div className="mt-2 text-xs font-semibold" style={{ color: "var(--color-primary)" }}>이동가이드 입장 →</div>
+                  <div className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
+                    <span>이동가이드 입장 →</span>
+                    {accessLocks[selectedRetreat.id] && (
+                      <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] text-fuchsia-700">
+                        {accessLevel === "admin" ? "🔓 관리자 우회" : "🔒 PIN"}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               )}
             </section>
@@ -256,6 +282,11 @@ export default function HomePage() {
                       <div className="mb-1.5 flex items-start justify-between gap-2">
                         <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
                             style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>{r.year}년</span>
+                        {accessLocks[r.id] && (
+                          <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
+                            {accessLevel === "admin" ? "🔓 관리자" : "🔒 PIN"}
+                          </span>
+                        )}
                       </div>
                       <h3 className="mb-2 truncate text-sm font-bold leading-tight text-slate-800">{r.name}</h3>
                       <div className="flex items-center justify-between">
@@ -286,7 +317,7 @@ export default function HomePage() {
       </main>
 
       {showTeam && <TeamModal onClose={() => setShowTeam(false)} myEmail={user.email} />}
+      {showAdmin && <AdminModal onClose={() => setShowAdmin(false)} retreats={retreats} locks={accessLocks} adminId={user.uid} />}
     </div>
   );
 }
-

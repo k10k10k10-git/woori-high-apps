@@ -3,7 +3,8 @@ import { db } from "./firebase";
 import { paths } from "./paths";
 import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardPost, IguardMovement, IguardBus, IguardSeating,
-  RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance } from "./types";
+  RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance,
+  IguardAccessLock } from "./types";
 export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
 
@@ -460,6 +461,64 @@ export function subscribeToIguardGuide(retreatId: string, cb: (items: string[]) 
 }
 export async function saveIguardGuide(retreatId: string, items: string[]): Promise<void> {
   await set(ref(db, paths.iguardGuide(retreatId)), items);
+}
+
+// ── 수련회별 PIN 잠금 (iguard/accessLock) ─────────────────
+// 승인 사용자에게 적용하는 추가 진입 장벽. 관리자 UI에서만 쓰기 함수를 호출한다.
+function accessLockFromSnapshot(snap: DataSnapshot): IguardAccessLock | null {
+  if (!snap.exists()) return null;
+  const value = snap.val() as Partial<IguardAccessLock> | null;
+  if (!value || value.enabled !== true) return null;
+  return {
+    enabled: true,
+    version: 1,
+    algorithm: "PBKDF2-SHA256",
+    iterations: typeof value.iterations === "number" ? value.iterations : 0,
+    salt: typeof value.salt === "string" ? value.salt : "",
+    pinHash: typeof value.pinHash === "string" ? value.pinHash : "",
+    updatedAt: typeof value.updatedAt === "number" ? value.updatedAt : 0,
+    updatedBy: typeof value.updatedBy === "string" ? value.updatedBy : undefined,
+  };
+}
+
+export function subscribeToIguardAccessLock(
+  retreatId: string,
+  cb: (lock: IguardAccessLock | null) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(
+    ref(db, paths.iguardAccessLock(retreatId)),
+    snap => cb(accessLockFromSnapshot(snap)),
+    error => { console.warn("subscribeToIguardAccessLock error:", error); onError?.(error); },
+  );
+}
+
+export function subscribeToIguardAccessLocks(
+  retreatIds: string[],
+  cb: (locks: Record<string, IguardAccessLock>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  if (retreatIds.length === 0) { cb({}); return () => {}; }
+  const values: Record<string, IguardAccessLock> = {};
+  const ready = new Set<string>();
+  const emit = () => {
+    if (ready.size === retreatIds.length) cb({ ...values });
+  };
+  const unsubs = retreatIds.map(retreatId => subscribeToIguardAccessLock(retreatId, lock => {
+    if (lock) values[retreatId] = lock;
+    else delete values[retreatId];
+    ready.add(retreatId);
+    emit();
+  }, onError));
+  return () => unsubs.forEach(unsub => unsub());
+}
+
+export async function saveIguardAccessLock(retreatId: string, lock: IguardAccessLock): Promise<void> {
+  await set(ref(db, paths.iguardAccessLock(retreatId)), stripUndefined(lock));
+}
+
+export async function deleteIguardAccessLock(retreatId: string): Promise<void> {
+  await remove(ref(db, paths.iguardAccessLock(retreatId)));
 }
 
 // ════════════════════════════════════════════════════════════

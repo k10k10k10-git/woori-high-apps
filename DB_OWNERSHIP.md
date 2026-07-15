@@ -79,6 +79,7 @@
 | `retreats/{id}/iguard/groupStaff` | 이가드 | **행정** | 이가드만 | **행정 GroupsTab 조스탭 표시** |
 | `retreats/{id}/iguard/cueSheet` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/guide` | 이가드 | - | 이가드만 | 없음 |
+| `retreats/{id}/iguard/accessLock` | 이가드 | - | 이가드만(admin UI) | 수련회별 PIN 진입 장벽 — 삭제 시 승인 팀원 모두 즉시 입장 |
 | `retreats/{id}/milestones` | (레거시) | - | 없음 | **미사용** — 전역 `prepMilestones`로 이관됨(코드에 쓰기 함수 없음) |
 | `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 (유일한 공유 쓰기 노드) |
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |

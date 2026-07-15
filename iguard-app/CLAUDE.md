@@ -28,6 +28,7 @@ src/
 │   ├── page.tsx                    # 홈 (수련회 목록 + 준비 일정 캘린더, 행사 날짜 최신순 정렬, md 기준 모바일/데스크탑 분기)
 │   ├── PrepCalendar.tsx            # 준비 일정 캘린더 (마일스톤·수련회 기간 표시) — 기간은 전체 수련회 합쳐서 표시
 │   ├── TeamModal.tsx               # 팀원 관리 모달 (admin 전용 — 승인/거절/역할 변경)
+│   ├── AdminModal.tsx              # 수련회별 PIN 잠금 관리 (admin 전용)
 │   ├── UpdateBanner.tsx            # 새 배포 감지 배너 (NEXT_PUBLIC_BUILD_ID 폴링)
 │   ├── api/version/route.ts        # 현재 배포 빌드 ID 반환 (UpdateBanner가 폴링)
 │   ├── layout.tsx                  # RootLayout (lang="ko", viewport 설정)
@@ -67,6 +68,7 @@ src/
     ├── fairAssign.ts               # 공정 배분 알고리즘 (식사 순서 + 집회 자리 통합 누적 점수)
     ├── groupNumber.ts              # 조 전역 번호 표시 (2부는 1부 조 수만큼 오프셋)
     ├── partialAttendance.ts        # 부분참(선복귀/후발대) 일자별 참석 공식
+    ├── accessLock.ts               # PIN 검증(PBKDF2), 세션 잠금 해제 키
     ├── scheduleTime.ts             # 현장 시간·일차 판정 순수 로직 (isNowOn/currentBlockFor, 24시+ 블록 — 패턴 11) ExecutionViews에서 추출(2026-07 I2)
     ├── cueSheet.ts                 # 큐싯 파서 (구 scheduleUtils.ts — 2026-07 I4 이동, 특성화 테스트 15개)
     └── exportUtils.ts              # printAsPDF (인쇄용 HTML → 새 창 인쇄), escapeHtml(인쇄 XSS 방지)
@@ -123,6 +125,7 @@ retreats/{retreatId}/iguard/
   groupStaff/                       # 조스탭 배정 (groupId → staffId[])
   guide/                            # 조스탭 가이드 (string[])
   cueSheet/                         # 큐싯 시트 연동 설정 (url, sheetId, gid 등)
+  accessLock/                       # 수련회별 추가 PIN 잠금 (salt+PBKDF2 hash, admin UI 관리)
 
 iguardMembers/{uid}                 # 이가드 팀원 허용목록 ({ email, name? })
 iguardRoles/{uid}                   # 역할 ("team" | "staff")
@@ -272,6 +275,15 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 - `CueSheetFreshnessBanner`(기획>스탭 전체 큐싯 상단, team/admin만)가 원본 시트를 배경 재조회해 해시를 비교 → ✓동기화됨 / ⚠변경됨 / 아직 안 가져옴을 상시 표시. 조회 실패 시 조용히 숨긴다(오탐 방지).
 - 해시는 CRLF/CR/LF·앞뒤 공백을 정규화해 사소한 차이로 오탐하지 않는다.
 
+### 20. 수련회별 PIN 잠금은 내부 구독보다 먼저 판정한다 (`accessLock.ts` / `IguardClient.tsx`)
+
+- 기존 Google 로그인과 `iguardMembers` 팀원 승인은 1차 접근 제어다. `iguard/accessLock`은 승인 사용자에게 적용하는 추가 진입 장벽이다.
+- 관리자는 홈의 `🔐 관리자`에서 수련회별 PIN을 설정·변경·해제하며 PIN 없이 우회한다. PIN 평문은 저장하지 않고 개별 salt와 PBKDF2-SHA256(120,000회) 해시만 저장한다.
+- 일반 사용자에게는 잠금 상태를 목록에 표시하고, 직접 URL로 들어와도 `IguardClient`의 바깥 경계에서 PIN을 확인한다. 잠금 해제 전에는 `IguardWorkspace`가 마운트되지 않으므로 `useRetreatData`의 내부 데이터 구독도 시작되지 않는다.
+- 성공한 잠금 해제는 현재 탭의 `sessionStorage`에 PIN 해시 버전별로만 기억한다. 관리자가 PIN을 바꾸면 저장 키가 달라져 기존 해제 기록은 자동 무효화된다.
+- `accessLock` 구독은 **내부 데이터 구독 전 접근 경계**이므로 `useRetreatData` 중앙화 규칙의 명시적 예외다. 홈 목록의 잠금 배지도 같은 메타 구독을 사용한다. 두 구독 모두 `onError`에서 실패를 표시하고, 내부 진입 경계는 실패 시 닫힌 상태(fail closed)를 유지한다.
+- 현재 Firebase Rules는 승인된 팀원에게 `retreats` 읽기를 허용한다. 따라서 이 PIN은 승인 팀원의 실수·공유 링크 진입을 막는 앱 수준 잠금이며, 계정별 Firebase 데이터 권한을 대체하지 않는다. Rules 변경·배포 없이 이 한계를 보안 경계로 과장하지 말 것.
+
 ---
 
 ## API 라우트
@@ -342,6 +354,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `compat.test.ts` | `checkAdminCompat` | 파싱 이상, 학생ID 불일치 비율, bu 값 검증 |
 | `groupNumber.test.ts` | `groupDisplayName` | 1부/2부 전역 번호, 커스텀 이름 |
 | `partialAttendance.test.ts` | `isPresentOnDay` | 본대/선복귀/후발대 일자별 참석 |
+| `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 
 ---
 
@@ -409,6 +422,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 6. **useRetreatData 훅 밖에서 새 구독 추가 금지**
    - 모든 Firebase 구독은 `useRetreatData`에서 중앙 관리
    - 새 구독이 필요하면 반드시 이 훅에 추가
+   - 예외: 내부 데이터 구독보다 먼저 판정해야 하는 `iguard/accessLock` 접근 경계와 홈 잠금 배지(패턴 20)
 
 ---
 
