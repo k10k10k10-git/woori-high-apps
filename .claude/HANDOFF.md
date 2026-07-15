@@ -1,4 +1,4 @@
-# 인수인계 — 2026-07-15 (Claude 재개용)
+# 인수인계 — 2026-07-16 (Claude 재개용)
 
 > 새 세션은 다음 순서로 읽으세요:
 > ① 루트 `AGENTS.md` → ② 루트 `CLAUDE.md` → ③ 이 문서 →
@@ -7,125 +7,111 @@
 
 ## 지금 상태 (한 문장)
 
-`retreat-app`의 2부 조장 동명이인 반 표시와 교사 메모 삭제 복구 버그를 수정하고, 회귀 테스트·전체 검증·프로덕션 배포·로그인 운영 화면 확인까지 마쳤다.
+IGuard에 Google 로그인·팀원 승인 위에 수련회별 PIN 잠금과 관리자 우회를 추가했고, 이후 행정 사이트 방배정 출력 개선까지 포함한 최신 `main`이 두 운영 앱에 배포되어 있다.
 
-## 저장소·배포 상태 (실측 2026-07-15)
+## 저장소·배포 상태 (실측 2026-07-16)
 
-- 기능 기준 `HEAD == origin/main == 127c68383ae432253cc7d8a0f11ef64adc9e5a3b`.
-- 이 HANDOFF 문서를 로컬 커밋한 뒤에는 로컬 `main`이 문서 커밋 1개만큼 `origin/main`보다 앞서는 것이 정상이다. **사용자 요청 없이 push하지 말 것** — main push는 Vercel 자동배포를 일으킨다.
+- 기능 기준 `HEAD == origin/main == 70f4a50a17ca941f5e7986b8b5392689a1d64bbf`.
+- 이 HANDOFF 문서를 로컬 커밋한 뒤에는 로컬 `main`이 문서 커밋 1개만큼 `origin/main`보다 앞서는 것이 정상이다. **사용자 요청 없이 push하지 말 것** — `main` push는 Vercel 자동 배포를 일으킨다.
 - 추적 파일 작업트리는 기능 커밋 기준 클린. `.agents/`만 untracked 도구 아티팩트이며 커밋 대상이 아니다.
-- 운영 배포:
+- 운영 주소:
   - retreat-app: `https://retreat-app-theta.vercel.app`
   - iguard-app: `https://iguard-app.vercel.app`
-  - 두 앱 `/api/version` buildId 모두 `127c68383ae432253cc7d8a0f11ef64adc9e5a3b`로 실측.
-- 마지막 retreat-app 검증:
-  - `npm test`: 18개 파일, 168개 테스트 통과
-  - `npx tsc --noEmit`: 0 errors
+- 두 앱 `/api/version`의 buildId가 모두 `70f4a50a17ca941f5e7986b8b5392689a1d64bbf`인 것을 확인했다.
+- 마지막 IGuard 기능 검증:
+  - `npm test`: 13개 파일, 124개 테스트 통과
+  - `npx tsc --noEmit`: 성공
   - `npm run build`: 성공
-  - Vercel Production: Ready, 공식 주소 HTTP 200
-- 이번 마지막 작업에서 운영 DB 직접 쓰기 없음, Firebase Rules 변경·배포 없음.
+  - `npm run lint`: 오류 0개, 기존 경고 11개
+  - 운영 관리자 로그인 화면에서 `🔐 관리자` 버튼과 PIN 관리 모달을 읽기 전용 확인
+- 이번 PIN 작업과 인수인계 작업에서 운영 DB 직접 쓰기 없음, Firebase Rules 변경·배포 없음.
 
-## 마지막 완료 작업 — 조장 동명이인과 교사 메모 삭제 (`127c683`)
+## 마지막 핵심 완료 작업 — IGuard 수련회별 PIN 잠금 (`ad6b559`)
 
-### 1. 2부 조장 이준영이 `2-9`로 표시되던 버그
+### 요구사항과 동작
 
-재현:
+- 기존 Google 로그인과 팀원 승인 절차는 그대로 유지한다.
+- 승인된 일반 팀원이 잠긴 수련회에 접근하면 전체 화면 PIN 입력 단계가 먼저 나온다.
+- 관리자는 PIN 입력 없이 우회한다.
+- 목록 상단에서 `🔐 관리자`가 `👥 팀원 관리` 왼쪽에 표시된다.
+- 관리자 모달에서 수련회별 PIN 설정·변경·해제가 가능하다.
+- 현재 운영에서 확인한 여름·겨울 수련회는 모두 `공개` 상태다. 아직 실제 PIN을 저장하지 않았다.
 
-- 운영 조편성 15조는 2부이고 이준영 학생은 2부 2학년 3반이다.
-- 기존 화면은 조장을 `이준영 2-9`로 표시했다.
+### 구현 위치
 
-원인:
+- `iguard-app/src/lib/accessLock.ts`
+  - 숫자 PIN 4~8자리, UI에서는 6자리 이상 권장
+  - PIN 원문은 저장하지 않고 PBKDF2-SHA256, 무작위 16바이트 salt, 120,000회 반복 결과만 저장
+  - sessionStorage 해제 키에 pinHash 접두를 포함해 PIN 변경 시 기존 브라우저 해제가 자동 무효화
+- `iguard-app/src/lib/types.ts`: `IguardAccessLock` 타입
+- `iguard-app/src/lib/paths.ts`: `iguardAccessLock` 경로 헬퍼
+- `iguard-app/src/lib/db.ts`: 단일·전체 잠금 구독, 저장, 삭제
+- `iguard-app/src/app/AdminModal.tsx`: 관리자 전용 PIN 관리 모달
+- `iguard-app/src/app/page.tsx`: 관리자 버튼과 잠금 상태 배지
+- `iguard-app/src/app/retreat/[id]/RetreatPinGate.tsx`: PIN 입력 게이트
+- `iguard-app/src/app/retreat/[id]/IguardClient.tsx`: 관리자 우회 및 일반 사용자 접근 경계
+- `iguard-app/__tests__/accessLock.test.ts`: PIN 생성·검증·세션 키 회귀 테스트 4개
 
-- `retreat-app/src/components/tabs/GroupComponents.tsx`와 출력 로직이 `학생 이름 → id` 전역 맵을 만들었다.
-- 동명이인이 있으면 나중 항목이 앞 항목을 덮어써 1부 2학년 9반 이준영을 선택할 수 있었다.
+### DB 경로와 데이터 흐름
 
-수정:
+- 잠금 데이터 경로: `retreats/{id}/iguard/accessLock`.
+- IGuard 소유 경로이며 `DB_OWNERSHIP.md`에도 반영했다.
+- 일반 사용자는 잠금 구독이 끝나고 PIN이 검증되기 전에는 `IguardWorkspace`가 마운트되지 않는다. 따라서 내부 `useRetreatData` 구독도 시작되지 않는다.
+- 잠금 읽기에 실패하면 공개로 간주하지 않고 실패 폐쇄(fail-closed)한다.
+- 관리자가 PIN을 설정하면 해당 수련회 노드 한 곳에 운영 DB 쓰기가 발생한다. 에이전트는 이 쓰기를 수행하지 않았다.
 
-- 신규 `retreat-app/src/lib/groupRoleStudent.ts`.
-- `resolveGroupRoleStudentId`/`resolveGroupRoleStudent`는 다음 우선순위로 조장·스탭 학생을 찾는다.
-  1. 현재 조의 `studentIds`에 포함되고 현재 부서인 유일 후보
-  2. 현재 조에 포함된 유일 후보
-  3. 현재 부서의 유일 후보
-  4. 전체에서 유일한 후보
-- 같은 우선순위 안에서 여전히 모호하면 임의 학생을 고르지 않는다.
-- 화면(`GroupComponents.tsx`)과 XLSX/PDF/JPG 출력(`GroupsTab.tsx`) 모두 동일 resolver를 사용한다.
-- `groupRoleStudent.test.ts`에 타 부서 동명이인, 같은 부서 폴백, 같은 부서 모호성 회귀 테스트 3개 추가.
+### 중요한 보안 범위
 
-운영 확인:
+- 이 기능은 승인 팀원의 공유 링크·실수 접근을 한 단계 더 막는 **앱 수준 접근 게이트**다.
+- 현재 Firebase Rules는 승인 팀원에게 `retreats` 읽기를 허용하고, 팀 역할 사용자는 `iguard` 부모 아래 쓰기가 가능하다. 그러므로 PIN만으로 Firebase 데이터 자체가 사용자별 ACL로 격리되는 것은 아니다.
+- Google 로그인·팀원 승인을 대체하지 않으며, 데이터베이스 보안 경계라고 과장하면 안 된다.
+- 이 패턴과 한계는 `iguard-app/CLAUDE.md` 패턴 20과 `iguard-app/AGENTS.md`의 `수련회별 PIN 잠금 (2026-07-16)`에 기록했다.
 
-- Chrome 로그인 세션에서 배포 후 조편성 15조를 읽기 전용 확인.
-- 실제 표시: `⭐ 조장: 이준영 2-3`.
-- DB 쓰기 없음.
+### 운영 확인
 
-### 2. 이미진 선생님을 부분참→전참으로 바꾸고 메모를 지워도 복구되던 버그
+- 배포 당시 운영 Chrome 관리자 세션에서 헤더의 `🔐 관리자` 버튼과 모달을 확인했다.
+- 모달에 수련회 2개가 표시되고 둘 다 `공개`였으며, PIN 저장 버튼은 값이 없을 때 비활성화됐다.
+- 저장·해제 버튼은 누르지 않아 DB 쓰기는 없었다.
+- 일반 팀원 계정으로 잠금 진입을 끝까지 검증하지는 못했다.
 
-원인:
+## 이후 반영된 retreat-app 개선 (현재 HEAD 포함)
 
-- `TeachersTab.handleSave`가 지울 필드를 `undefined`로 전달했다.
-- 공통 `stripUndefined()`가 Firebase `update()` 전에 그 키를 제거하여, 기존 DB 값은 삭제되지 않고 그대로 남았다.
-- 다시 구독하면 남은 기존 값이 화면에 복구된 것처럼 보였다.
-
-수정:
-
-- 신규 `retreat-app/src/lib/teacherWrite.ts`.
-- `prepareTeacherUpdate()`가 **수정 payload에 명시적으로 포함된** 빈 선택 필드만 `null`로 변환한다.
-- Firebase RTDB `update()`에서 `null`은 해당 자식 필드를 실제 삭제한다.
-- 부분 업데이트에서 아예 전달되지 않은 필드는 보존하여 무관한 데이터를 지우지 않는다.
-- 삭제 가능 필드: `note`, `arrivalInfo`, `transport`, `age`, `role`, `corps`, `lateArrival`, `programTeam`, `worship`.
-- `TeachersTab.tsx` 수정 저장 경로에만 `prepareTeacherUpdate` 적용. 신규 추가 경로는 기존 동작 유지.
-- `src/lib/db/teachers.ts`의 update 타입이 명시적 `null` 삭제를 허용한다.
-- `teacherWrite.test.ts`에 명시적 삭제, 부분 업데이트 보존, 정상 값 보존 테스트 3개 추가.
-
-운영 확인과 남은 1회 작업:
-
-- 현재 운영 이미진 행은 `전참`이지만, 구버전 저장 때 DB에 남은 부분참 일정과 메모가 아직 표시된다.
-- 운영 DB 직접 수정 승인이 없어서 에이전트가 행을 저장하거나 데이터를 삭제하지 않았다.
-- **배포된 새 코드에서 이미진 행 수정 화면을 열고 메모·부분참 값을 비운 상태로 한 번 저장하면 기존 필드가 실제 삭제되며 이후 복구되지 않는다.**
-- 이 작업은 사용자가 UI에서 수행하거나, 에이전트가 수행하려면 운영 DB 쓰기 승인 + 사전 스냅샷이 필요하다.
-
-## 최근 완료된 조편성·인쇄 기능 (모두 main·배포 반영)
-
-아래는 이전 HANDOFF(`86d3c32`) 이후 핵심 커밋이다.
-
-- `7be2788` 이가드: 자정 이후 일정을 논리 일차에 유지.
-- `2a60ecd` 행정: 조장 기본은 본인반 동반, 체크된 조장만 파송.
-- `e33d650`, `f98ceb5` 행정: 1·2부 합산 조 수를 짝수로 자동 보정하고 UI에 즉시 반영.
-- `8e20201` 행정: 파송 조장만 있는 빈 조 방지, 모든 조 최소 1개 반 배정.
-- `dd9778e` 행정: 조장·파송·고려 관계·조편성 규칙 설정 저장.
-- `9eb32bf` 행정: 자동 조편성 소수 조(예: 4명) 균형 보정.
-- `9d4c9db` 행정: 파송 조장이 조 내 유일한 동성이 되지 않도록 보정.
-- `cdbd1a3`, `0043ba2` 행정: 조편성 PDF/JPG를 부서별 한 장, 가로 스트립 형태로 압축.
-- `e2ebea4` 행정: 인쇄 학생 성별 색상과 조장 노란색 표시, 교사 참석 상태 표시.
-- `bc0d075`, `cbf9a24` 행정: 인쇄 교사 부분참/불참 상태와 이름이 말줄임 없이 보이도록 개선.
-- `b4979bc` 행정: 전체·1부만·2부만 자동 조편성 범위 선택.
-- `6bd8345` 행정: 식수 계산에서 학생 원장 `students[접두형 id]` 폴백.
-- `4b02b56` 행정: 부분참 수동 매칭에서 접두형 학생 키 조회 수정.
-- `b2c8e54` 공통: 데이터 정합성과 검증 체계 보강.
+- `c3af8d9`: 신청자 취합 합계에 남녀 인원 표시.
+- `e83e5e3`: 방배정에서 배정만 비우기 버튼 추가.
+- `81cc704`: 조편성 XLSX 그리드, 방배정 도면 인쇄, 조 인원에 조장 포함.
+- `b92d666`: 방배정 도면에 조·부서·학년·반 정보 표기.
+- `70f4a50`: 방배정 도면 정보 줄 세로 중앙 정렬.
+- `127c683`: 2부 조장 동명이인 반 표시와 교사 메모 삭제 복구 버그 수정.
+  - 운영에서 이준영 조장은 `2-3`으로 정상 표시되는 것을 확인했다.
+  - 이미진 선생님의 구버전 저장 잔여값은 새 코드에서 메모·부분참 값을 비운 뒤 UI로 한 번 저장해야 실제 삭제된다. 에이전트는 운영 DB를 직접 수정하지 않았다.
 
 ## 다음 단계
 
-### 사용자가 바로 확인할 것
+### 사용자가 바로 할 수 있는 운영 작업
 
-- [ ] 교사 참석 → 이미진 수정 → 전참 유지, 메모·부분참 일정 비움 → 저장.
-- [ ] 저장 후 탭을 이동했다 돌아와도 메모·일정이 다시 나타나지 않는지 확인.
-- [ ] 필요하면 조편성 PDF/JPG에서 15조 조장 이준영이 `2-3`으로 출력되는지 확인. 출력도 동일 resolver를 사용한다.
+- [ ] IGuard 관리자 계정으로 `🔐 관리자`를 열어 잠글 수련회의 PIN을 설정한다.
+  - 이 작업은 `retreats/{id}/iguard/accessLock` 한 노드에 운영 DB 쓰기를 발생시킨다.
+- [ ] 일반 팀원 계정으로 해당 수련회 진입 시 PIN 게이트가 뜨고, 오답 거부·정답 통과·새로고침 후 세션 유지가 되는지 확인한다.
+- [ ] 교사 참석에서 이미진 행을 열어 전참을 유지하고 메모·부분참 값을 비운 뒤 한 번 저장하여 과거 잔여값을 삭제한다.
 
 ### 다음 에이전트 작업 후보
 
-- [ ] 사용자 확인에서 이미진 값이 다시 복구되면, **추측 수정 금지**. 저장 payload와 해당 교사 레코드 구독 결과를 읽기 전용으로 추적하고 같은 실패가 3회면 에스컬레이션 규칙 6 적용.
+- [ ] 일반 팀원 또는 staff role 테스트 계정이 제공되면 PIN 잠금과 권한별 화면을 읽기 위주로 검증한다.
+- [ ] PIN을 더 강한 데이터 보안 경계로 만들려면 현재 Rules·데이터 모델 한계를 먼저 설계 검토한다. **Rules 배포는 하지 않는다.**
+- [ ] 이미진 값이 새 저장 뒤에도 복구되면 추측 수정 금지. 저장 payload와 해당 교사 레코드 구독 결과를 읽기 전용으로 추적한다.
 - [ ] 행정 사이트 리허설 QA: 현장등록·의료일지·부분참석·인쇄/엑셀(XSS) 중심.
-- [ ] 권한별 화면 검증: 지금까지 admin 계정 위주. staff role 테스트 계정 필요.
 - [ ] semester-app code-review 높음 2건:
   1. 팀 삭제 시 배치 학생이 AssignTab 어디에도 보이지 않는 유령 상태
   2. SettingsTab이 마운트 시 meta를 캡처해 최신 completionRule을 덮을 가능성
-- [ ] 시트 데이터 정리 후 이가드 재임포트, 버스 자동배정, 행정 방배정 입력은 운영 담당자 확인 후 진행.
+- [ ] 시트 데이터 정리 후 IGuard 재임포트, 버스 자동배정, 행정 방배정 입력은 운영 담당자 확인 후 진행.
 
 ## DB·배포 안전 메모
 
 - 운영 DB 쓰기는 사용자 명시 승인과 사전 스냅샷 없이는 금지.
 - Firebase Rules 배포는 항상 금지. 원천은 `고등부 학생 출석부/database.rules.json` 하나뿐이다.
 - retreat-app 소유 범위는 `retreats/{id}`, `retreatsPrivate/{id}`, `retreatAdmins`; `classes/`는 읽기 전용.
-- main push는 retreat-app과 iguard-app 양쪽에 자동 Production 배포를 생성할 수 있다. 문서만 바뀌어도 사용자 요청 없이 push하지 않는다.
+- IGuard의 신규 PIN 경로는 `retreats/{id}/iguard/accessLock`이다.
+- `main` push는 retreat-app과 iguard-app 양쪽에 자동 Production 배포를 생성할 수 있다. 문서만 바뀌어도 사용자 요청 없이 push하지 않는다.
 - `.agents/`는 도구 아티팩트로 계속 무시한다.
 - 배포 완료 판단은 Vercel Ready와 공식 `/api/version` buildId=`git rev-parse HEAD` 대조 후에만 한다.
 
@@ -133,9 +119,9 @@
 
 ```bash
 git status --short --branch
-git log -8 --oneline
+git log -10 --oneline
 curl -fsS https://retreat-app-theta.vercel.app/api/version
 curl -fsS https://iguard-app.vercel.app/api/version
 ```
 
-기능 기준 예상 buildId는 `127c68383ae432253cc7d8a0f11ef64adc9e5a3b`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞설 수 있다.
+기능 기준 배포 buildId는 `70f4a50a17ca941f5e7986b8b5392689a1d64bbf`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞서는 것이 정상이다.
