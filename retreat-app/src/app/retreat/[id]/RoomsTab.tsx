@@ -368,7 +368,7 @@ export default function RoomsTab({ retreat }: Props) {
           <span style="font-weight:700">${escapeHtml(r.roomNumber)}</span>
           <span style="font-size:9px;opacity:.85">${escapeHtml(r.type)} ${assigned}/${r.capacity}</span>
         </div>
-        ${infoLine ? `<div style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:1px 6px;font-size:8.5px;line-height:1.4;color:#475569;font-weight:600">${escapeHtml(infoLine)}</div>` : ""}
+        ${infoLine ? `<div style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:3px 6px;font-size:9px;line-height:1;color:#475569;font-weight:600;display:flex;align-items:center">${escapeHtml(infoLine)}</div>` : ""}
         <div style="padding:3px;min-height:22px">${teacherChips}${studentChips || '<span style="color:#cbd5e1;font-size:9px">비어있음</span>'}</div>
       </div>`;
     };
