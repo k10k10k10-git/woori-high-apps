@@ -130,7 +130,8 @@ export async function getEarliestPeriodDateByRetreat(retreatIds: string[]): Prom
 /** 모든 수련회의 기간을 합쳐서 구독(읽기 전용) — "준비 일정" 패널은 수련회 선택과 무관하게 항상 전체 표시 */
 export function subscribeToAllRetreatPeriods(
   retreatIds: string[],
-  cb: (periods: RetreatPeriodWithOwner[]) => void
+  cb: (periods: RetreatPeriodWithOwner[]) => void,
+  onError?: (error: Error) => void
 ): () => void {
   if (retreatIds.length === 0) { cb([]); return () => {}; }
   const byRetreat = new Map<string, RetreatPeriodWithOwner[]>();
@@ -142,7 +143,7 @@ export function subscribeToAllRetreatPeriods(
     subscribeToRetreatPeriods(id, list => {
       byRetreat.set(id, list.map(p => ({ ...p, retreatId: id })));
       emit();
-    })
+    }, onError)
   );
   return () => unsubs.forEach(u => u());
 }
@@ -418,9 +419,10 @@ export interface IguardCueSheet {
   lastImportedAt?: number;
   lastImportBlockCount?: number;
 }
-export function subscribeToIguardCueSheet(retreatId: string, cb: (sheet: IguardCueSheet | null) => void): () => void {
+export function subscribeToIguardCueSheet(retreatId: string, cb: (sheet: IguardCueSheet | null) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardCueSheet(retreatId)), (snap) =>
-    cb(snap.exists() ? (snap.val() as IguardCueSheet) : null));
+    cb(snap.exists() ? (snap.val() as IguardCueSheet) : null),
+    (error) => { console.warn("subscribeToIguardCueSheet error:", error); onError?.(error); });
 }
 export async function saveIguardCueSheet(retreatId: string, data: Omit<IguardCueSheet, "updatedAt" | "lastImportHash" | "lastImportedAt" | "lastImportBlockCount">): Promise<void> {
   // set()으로 노드 전체 교체 — 설정(URL 등)을 바꾸면 임포트 마커도 자연히 초기화된다(원본이 바뀌었으니 재임포트가 안전한 기본값).
@@ -480,12 +482,12 @@ export async function getMyIguardPending(uid: string): Promise<boolean> {
   return snap.exists();
 }
 
-export function subscribeToIguardPending(cb: (list: IguardPendingReq[]) => void): () => void {
+export function subscribeToIguardPending(cb: (list: IguardPendingReq[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardPending()), (snap) => {
     if (!snap.exists()) return cb([]);
     cb(Object.entries(snap.val()).map(([uid, v]) => ({ uid, ...(v as Omit<IguardPendingReq, "uid">) }))
       .sort((a, b) => a.requestedAt - b.requestedAt));
-  });
+  }, (error) => { console.warn("subscribeToIguardPending error:", error); onError?.(error); });
 }
 
 function normalizeIguardMembers(raw: unknown): Record<string, IguardMemberInfo> {
@@ -498,14 +500,16 @@ function normalizeIguardMembers(raw: unknown): Record<string, IguardMemberInfo> 
   return Object.fromEntries(entries.filter(([, value]) => value.email || value.name));
 }
 
-export function subscribeToIguardMembers(cb: (members: Record<string, IguardMemberInfo>) => void): () => void {
-  return onValue(ref(db, paths.iguardMembers()), (snap) => cb(normalizeIguardMembers(snap.exists() ? snap.val() : null)));
+export function subscribeToIguardMembers(cb: (members: Record<string, IguardMemberInfo>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.iguardMembers()), (snap) => cb(normalizeIguardMembers(snap.exists() ? snap.val() : null)),
+    (error) => { console.warn("subscribeToIguardMembers error:", error); onError?.(error); });
 }
 
 // 역할: iguardRoles/{uid} = "staff" | "team" (없으면 team으로 간주)
 export type IguardRole = "staff" | "team";
-export function subscribeToIguardRoles(cb: (roles: Record<string, IguardRole>) => void): () => void {
-  return onValue(ref(db, paths.iguardRoles()), (snap) => cb(snap.exists() ? snap.val() : {}));
+export function subscribeToIguardRoles(cb: (roles: Record<string, IguardRole>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.iguardRoles()), (snap) => cb(snap.exists() ? snap.val() : {}),
+    (error) => { console.warn("subscribeToIguardRoles error:", error); onError?.(error); });
 }
 export async function setIguardRole(uid: string, role: IguardRole): Promise<void> {
   await set(ref(db, paths.iguardRole(uid)), role);

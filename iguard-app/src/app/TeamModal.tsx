@@ -22,13 +22,16 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
   const [editingUid, setEditingUid] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [draftEmail, setDraftEmail] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const u1 = subscribeToIguardPending(setPending);
-    const u2 = subscribeToIguardMembers(setMembers);
-    const u3 = subscribeToIguardRoles(setRoles);
+    // onError 없으면 권한 오류 시 "대기자 0명"과 구분이 안 된다 (패턴 16)
+    const fail = (e: Error) => setLoadError(prev => prev ?? `명단 구독 실패 — ${e.message}`);
+    const u1 = subscribeToIguardPending(setPending, fail);
+    const u2 = subscribeToIguardMembers(setMembers, fail);
+    const u3 = subscribeToIguardRoles(setRoles, fail);
     return () => { u1(); u2(); u3(); };
   }, []);
 
@@ -100,6 +103,12 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
           <h3 className="font-bold text-lg">팀원 관리</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="닫기">×</button>
         </div>
+
+        {loadError && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
+            ⚠ {loadError} — 아래 명단이 비어 보여도 실제 상태가 아닐 수 있습니다.
+          </div>
+        )}
 
         <div className="mb-5">
           <h4 className="text-sm font-semibold text-fuchsia-700 mb-2">👑 관리자</h4>

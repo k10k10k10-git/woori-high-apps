@@ -25,7 +25,8 @@ export default function CueSheetFreshnessBanner({ retreatId }: { retreatId: stri
   const [state, setState] = useState<State>({ kind: "idle" });
   const [nonce, setNonce] = useState(0); // "다시 확인" 트리거
 
-  useEffect(() => subscribeToIguardCueSheet(retreatId, setSheet), [retreatId]);
+  // 구독 실패(권한 등) 시 sheet를 비워 배너를 숨긴다 — 이 배너의 실패 모드는 "조용히 숨김"(오탐 방지 설계)
+  useEffect(() => subscribeToIguardCueSheet(retreatId, setSheet, () => setSheet(null)), [retreatId]);
 
   useEffect(() => {
     if (!sheet) { setState({ kind: "idle" }); return; }

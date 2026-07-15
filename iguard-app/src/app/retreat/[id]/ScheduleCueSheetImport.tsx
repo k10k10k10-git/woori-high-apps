@@ -128,7 +128,8 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
   // 조장 큐싯: day__start → 내용 (가져오기 시 블록에 leaderNote로 기록)
   const [leaderMap, setLeaderMap] = useState<Map<string, string>>(new Map());
 
-  useEffect(() => subscribeToIguardCueSheet(retreatId, setSheet), [retreatId]);
+  useEffect(() => subscribeToIguardCueSheet(retreatId, setSheet,
+    e => toast(`시트 설정 구독 실패 — ${e.message}`, "error")), [retreatId, toast]);
 
   async function loadFromSheet() {
     if (!sheet) return;
