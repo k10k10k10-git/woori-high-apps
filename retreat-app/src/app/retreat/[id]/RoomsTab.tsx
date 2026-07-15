@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Room, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { clearRooms, saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
@@ -446,6 +446,54 @@ export default function RoomsTab({ retreat }: Props) {
     }
   }
 
+  /** 배정만 비우기 — 방 구조(동·호수·정원·성별)는 그대로 두고 사람만 전부 미배정으로. */
+  async function clearAllAssignments() {
+    const currentRooms = roomsRef.current;
+    if (currentRooms.length === 0 || isSavingRef.current) return;
+    const assignedCount = new Set(currentRooms.flatMap(room => room.studentIds || [])).size;
+    const teacherCount = new Set(currentRooms.flatMap(room => room.teachers || [])).size;
+    if (assignedCount === 0 && teacherCount === 0) {
+      toast("비울 배정이 없습니다.", "warning");
+      return;
+    }
+    const confirmed = await uiConfirm(
+      `${currentRooms.length}개 방은 그대로 두고, 배정된 학생 ${assignedCount}명` +
+      (teacherCount > 0 ? `·교사 ${teacherCount}명` : "") +
+      `을 모두 미배정으로 되돌립니다.\n\n` +
+      "직전 배정은 강제 백업되어 복구 버튼에서 되돌릴 수 있습니다. " +
+      "이가드의 숙소 정보에도 즉시 반영됩니다. 계속할까요?"
+    );
+    if (!confirmed) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    setSaving(true);
+    setSaveError(null);
+    isSavingRef.current = true;
+    try {
+      // 화면에만 남은 편집이 있으면 먼저 저장해, 강제 백업에 현재 보이는 상태가 담기게 한다.
+      if (isDirtyRef.current) {
+        await saveRooms(retreat.id, roomsRef.current);
+        markClean();
+      }
+      await clearRoomAssignments(retreat.id);
+      const cleared = currentRooms.map(room => ({ ...room, studentIds: [], teachers: [] }));
+      roomsRef.current = cleared;
+      latestRemoteRoomsRef.current = cleared;
+      setRooms(cleared);
+      setUnassigned(participantIds);
+      markClean();
+      toast(`배정 ${assignedCount + teacherCount}건을 비웠습니다. 방 ${currentRooms.length}개는 유지됩니다.`, "success");
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "배정 비우기 중 오류가 발생했습니다.");
+    } finally {
+      setSaving(false);
+      isSavingRef.current = false;
+    }
+  }
+
   const filteredUnassigned = genderFilter === "전체"
     ? allUnassigned
     : allUnassigned.filter(id => students[id]?.gender === genderFilter);
@@ -517,6 +565,12 @@ export default function RoomsTab({ retreat }: Props) {
           <button onClick={exportRoomsPDF} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
           <button onClick={exportRoomsJPG} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
           <BackupRestoreButton label="방배정" loadBackups={() => getRoomsBackups(retreat.id)} restore={key => restoreRoomsBackup(retreat.id, key)} />
+          <button
+            onClick={clearAllAssignments}
+            disabled={rooms.length === 0 || saving}
+            title="방 구조는 그대로 두고 배정된 사람만 전부 미배정으로 되돌립니다"
+            className="btn-secondary btn-sm text-amber-600"
+          >배정 비우기</button>
           <button
             onClick={removeAllRooms}
             disabled={rooms.length === 0 || saving}

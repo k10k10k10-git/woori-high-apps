@@ -85,6 +85,25 @@ export async function clearRooms(retreatId: string): Promise<void> {
   await remove(ref(db, paths.rooms(retreatId)));
 }
 
+/** 배정만 비우기 — 방 구조(동·호수·정원·성별)는 유지하고 사람(studentIds·teachers)만 전부 미배정으로.
+ *  전체 삭제와 동일하게 스로틀 무시 강제 백업이 성공한 경우에만 실행한다(패턴 3b). */
+export async function clearRoomAssignments(retreatId: string): Promise<void> {
+  const backedUp = await backupNodeBeforeOverwrite(
+    paths.rooms(retreatId),
+    paths.roomsBackups(retreatId),
+    0,
+  );
+  if (!backedUp) throw new Error("방배정 백업에 실패하여 배정 비우기를 중단했습니다.");
+  const snap = await get(ref(db, paths.rooms(retreatId)));
+  if (!snap.exists()) return;
+  const rooms = snap.val() as Record<string, Omit<Room, "id">>;
+  const cleared: Record<string, Omit<Room, "id">> = {};
+  Object.entries(rooms).forEach(([id, room]) => {
+    cleared[id] = { ...room, studentIds: [], teachers: [] };
+  });
+  await set(ref(db, paths.rooms(retreatId)), stripUndefined(cleared));
+}
+
 export async function getRoomsBackups(retreatId: string): Promise<Record<string, Record<string, Omit<Room, "id">>>> {
   const snap = await get(ref(db, paths.roomsBackups(retreatId)));
   return snap.exists() ? snap.val() : {};
