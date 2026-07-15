@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
-import { Retreat, Room, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { Retreat, Room, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
+import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { groupDisplayName } from "@/lib/groupNumber";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
@@ -28,6 +29,7 @@ const CELL_COLOR_CLS: Record<string, string> = {
 export default function RoomsTab({ retreat }: Props) {
   const { toast, uiConfirm } = useUI();
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]); // 도면 인쇄의 조 표기용 (읽기 전용)
   const [students, setStudents] = useState<Record<string, StudentInfo>>({});
   const [allTeachers, setAllTeachers] = useState<TeacherAttendance[]>([]);
   const [unassigned, setUnassigned] = useState<string[]>([]);
@@ -168,6 +170,10 @@ export default function RoomsTab({ retreat }: Props) {
     unsubs.push(subscribeToTeachers(retreat.id, (teachers) => {
       setAllTeachers(teachers);
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+
+    // Real-time: groups — 도면 인쇄에서 방별 조 표기용
+    unsubs.push(subscribeToGroups(retreat.id, setGroups,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
     // Real-time: rooms
     unsubs.push(subscribeToRooms(retreat.id, (newRooms) => {
@@ -327,10 +333,27 @@ export default function RoomsTab({ retreat }: Props) {
     const chip = (text: string, bg: string, border: string, color: string, strike = false) =>
       `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:4px;padding:0 5px;font-size:10px;line-height:16px;color:${color};margin:1px 2px 1px 0;${strike ? "text-decoration:line-through;" : ""}">${escapeHtml(text)}</span>`;
 
+    // 학생 → 소속 조 역인덱스 (도면의 조 표기용)
+    const groupByStudentId = new Map<string, Group>();
+    groups.forEach(g => (g.studentIds || []).forEach(sid => groupByStudentId.set(sid, g)));
+
     const roomBox = (r: Room) => {
       const isMale = r.type === "남";
       const headBg = isMale ? "#1e3a8a" : "#9d174d"; // 도면의 진한 박스 느낌 — 남 남색 / 여 자주
       const assigned = (r.studentIds || []).filter(sid => cellColors[sid] !== "red").length;
+
+      // 방에 배정된 학생들의 조·부서·학년·반 (중복 제거, 취소 제외)
+      const groupLabels = new Set<string>();
+      const classLabels = new Set<string>();
+      (r.studentIds || []).forEach(sid => {
+        if (cellColors[sid] === "red") return;
+        const g = groupByStudentId.get(sid);
+        if (g) groupLabels.add(groupDisplayName(g, groups));
+        const s = students[sid];
+        if (s?.buNum) classLabels.add(`${s.buNum}부 ${s.grade}-${s.class}`);
+      });
+      const infoLine = [...groupLabels, ...classLabels].join(" · ");
+
       const teacherChips = (r.teachers || []).map(t => chip(t, "#dcfce7", "#86efac", "#166534")).join("");
       const studentChips = (r.studentIds || []).map(sid => {
         const s = students[sid];
@@ -345,6 +368,7 @@ export default function RoomsTab({ retreat }: Props) {
           <span style="font-weight:700">${escapeHtml(r.roomNumber)}</span>
           <span style="font-size:9px;opacity:.85">${escapeHtml(r.type)} ${assigned}/${r.capacity}</span>
         </div>
+        ${infoLine ? `<div style="background:#f1f5f9;border-bottom:1px solid #e2e8f0;padding:1px 6px;font-size:8.5px;line-height:1.4;color:#475569;font-weight:600">${escapeHtml(infoLine)}</div>` : ""}
         <div style="padding:3px;min-height:22px">${teacherChips}${studentChips || '<span style="color:#cbd5e1;font-size:9px">비어있음</span>'}</div>
       </div>`;
     };
