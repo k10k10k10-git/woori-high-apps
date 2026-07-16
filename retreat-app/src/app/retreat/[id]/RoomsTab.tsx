@@ -328,31 +328,39 @@ export default function RoomsTab({ retreat }: Props) {
     saveWorkbook(wb, `${retreat.name}_방배정`);
   }
 
+  /** 학생 → 소속 조 역인덱스 — 도면·방 카드 인쇄의 조 표기 공용 */
+  function buildGroupIndex(): Map<string, Group> {
+    const idx = new Map<string, Group>();
+    groups.forEach(g => (g.studentIds || []).forEach(sid => idx.set(sid, g)));
+    return idx;
+  }
+
+  /** 방의 조·부서·학년·반 정보 라벨 (취소 제외, 중복 제거) — 도면·방 카드 공용 */
+  function roomInfoLine(r: Room, groupIndex: Map<string, Group>): string {
+    const groupLabels = new Set<string>();
+    const classLabels = new Set<string>();
+    (r.studentIds || []).forEach(sid => {
+      if (cellColors[sid] === "red") return;
+      const g = groupIndex.get(sid);
+      if (g) groupLabels.add(groupDisplayName(g, groups));
+      const s = students[sid];
+      if (s?.buNum) classLabels.add(`${s.buNum}부 ${s.grade}-${s.class}`);
+    });
+    return [...groupLabels, ...classLabels].join(" · ");
+  }
+
   /** 도면형 방배정 인쇄 — 건물(동)별 한 페이지, 층별 가로 띠에 방 박스를 나란히 (숙소 도면 느낌). */
   function buildRoomsHtml() {
     const chip = (text: string, bg: string, border: string, color: string, strike = false) =>
       `<span style="display:inline-block;background:${bg};border:1px solid ${border};border-radius:4px;padding:0 5px;font-size:10px;line-height:16px;color:${color};margin:1px 2px 1px 0;${strike ? "text-decoration:line-through;" : ""}">${escapeHtml(text)}</span>`;
 
-    // 학생 → 소속 조 역인덱스 (도면의 조 표기용)
-    const groupByStudentId = new Map<string, Group>();
-    groups.forEach(g => (g.studentIds || []).forEach(sid => groupByStudentId.set(sid, g)));
+    const groupIndex = buildGroupIndex();
 
     const roomBox = (r: Room) => {
       const isMale = r.type === "남";
       const headBg = isMale ? "#1e3a8a" : "#9d174d"; // 도면의 진한 박스 느낌 — 남 남색 / 여 자주
       const assigned = (r.studentIds || []).filter(sid => cellColors[sid] !== "red").length;
-
-      // 방에 배정된 학생들의 조·부서·학년·반 (중복 제거, 취소 제외)
-      const groupLabels = new Set<string>();
-      const classLabels = new Set<string>();
-      (r.studentIds || []).forEach(sid => {
-        if (cellColors[sid] === "red") return;
-        const g = groupByStudentId.get(sid);
-        if (g) groupLabels.add(groupDisplayName(g, groups));
-        const s = students[sid];
-        if (s?.buNum) classLabels.add(`${s.buNum}부 ${s.grade}-${s.class}`);
-      });
-      const infoLine = [...groupLabels, ...classLabels].join(" · ");
+      const infoLine = roomInfoLine(r, groupIndex);
 
       const teacherChips = (r.teachers || []).map(t => chip(t, "#dcfce7", "#86efac", "#166534")).join("");
       const studentChips = (r.studentIds || []).map(sid => {
@@ -408,6 +416,67 @@ export default function RoomsTab({ retreat }: Props) {
 
     html += `<style>@media print { div, section { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }</style>`;
     return html;
+  }
+
+  /** 방문 부착용 A4 카드 — 방 1개 = 1장. 호수 크게, 조·반 정보, 명단 큰 글씨. 취소자·빈 방 제외. */
+  function buildRoomCardsHtml(): string | null {
+    const groupIndex = buildGroupIndex();
+    const cards = sortRooms(rooms).filter(r =>
+      (r.studentIds || []).some(sid => cellColors[sid] !== "red") || (r.teachers || []).length > 0);
+    if (cards.length === 0) return null;
+
+    return cards.map((r, i) => {
+      const isMale = r.type === "남";
+      const headBg = isMale ? "#1e3a8a" : "#9d174d"; // 도면 인쇄와 동일 색 체계
+      const accent = isMale ? "#1e40af" : "#9d174d";
+      const softBg = isMale ? "#eff6ff" : "#fdf2f8";
+      const softBorder = isMale ? "#bfdbfe" : "#fbcfe8";
+      const assigned = (r.studentIds || []).filter(sid => cellColors[sid] !== "red").length;
+      const infoLine = roomInfoLine(r, groupIndex);
+      const dong = (r.dong ?? "").trim();
+
+      const teacherCards = (r.teachers || []).map(t =>
+        `<div style="background:#dcfce7;border:1.5px solid #86efac;border-radius:10px;padding:12px 14px;text-align:center">
+          <span style="font-size:26px;font-weight:700;color:#166534">${escapeHtml(t)}</span>
+          <div style="font-size:13px;color:#15803d;margin-top:2px">교사</div>
+        </div>`).join("");
+      const studentCards = (r.studentIds || []).flatMap(sid => {
+        if (cellColors[sid] === "red") return []; // 취소자는 문 앞 명단에서 제외
+        const s = students[sid];
+        const name = s ? s.name : sid;
+        const sub = s ? `${s.grade}-${s.class}` : "";
+        const partial = cellColors[sid] === "orange"
+          ? `<span style="font-size:14px;color:#9a3412;font-weight:600"> (부분참)</span>` : "";
+        return [`<div style="background:${softBg};border:1.5px solid ${softBorder};border-radius:10px;padding:12px 14px;text-align:center">
+          <span style="font-size:26px;font-weight:700;color:${accent}">${escapeHtml(name)}</span>${partial}
+          ${sub ? `<div style="font-size:13px;color:#64748b;margin-top:2px">${escapeHtml(sub)}</div>` : ""}
+        </div>`];
+      }).join("");
+
+      return `<section style="${i < cards.length - 1 ? "page-break-after:always;" : ""}display:flex;flex-direction:column;min-height:250mm">
+        <div style="background:${headBg};color:#fff;border-radius:14px;padding:18px 26px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            ${dong ? `<div style="font-size:16px;opacity:.85;margin-bottom:2px">${escapeHtml(dong)}</div>` : ""}
+            <div style="font-size:64px;font-weight:800;line-height:1">${escapeHtml(r.roomNumber)}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:700">${escapeHtml(r.type)}자 방</div>
+            <div style="font-size:15px;opacity:.85;margin-top:2px">${assigned}명 / 정원 ${r.capacity}명</div>
+          </div>
+        </div>
+        ${infoLine ? `<div style="margin:14px 0 0;background:#f1f5f9;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 16px;font-size:20px;font-weight:700;color:#334155;text-align:center">${escapeHtml(infoLine)}</div>` : ""}
+        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px">${teacherCards}${studentCards}</div>
+        <div style="margin-top:auto;padding-top:14px;text-align:center;font-size:12px;color:#94a3b8">${escapeHtml(retreat.name)}</div>
+      </section>`;
+    }).join("");
+  }
+
+  function exportRoomCardsPDF() {
+    const html = buildRoomCardsHtml();
+    if (!html) return toast("배정된 방이 없습니다. 배정 후 이용해주세요.", "warning");
+    if (!printAsPDF(html, `${retreat.name}_방카드`)) {
+      toast("팝업이 차단되어 PDF를 열 수 없습니다. 브라우저 팝업 허용을 확인해주세요.", "error");
+    }
   }
 
   function exportRoomsPDF() {
@@ -605,6 +674,7 @@ export default function RoomsTab({ retreat }: Props) {
           >취소자 제거</button>
           <button onClick={exportRoomsXLSX} disabled={rooms.length === 0} className="btn-secondary btn-sm">📥 XLSX</button>
           <button onClick={exportRoomsPDF} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
+          <button onClick={exportRoomCardsPDF} disabled={rooms.length === 0} title="방 1개 = A4 1장, 방문 부착용 명단" className="btn-secondary btn-sm">🚪 방 카드</button>
           <button onClick={exportRoomsJPG} disabled={rooms.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
           <BackupRestoreButton label="방배정" loadBackups={() => getRoomsBackups(retreat.id)} restore={key => restoreRoomsBackup(retreat.id, key)} />
           <button
