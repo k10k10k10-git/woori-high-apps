@@ -1,8 +1,13 @@
 "use client";
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Cancellation } from "@/lib/types";
-import { getCancellations, saveCancellation, updateCancellation, deleteCancellation, getCellColors, getClassesByYear } from "@/lib/db";
+import {
+  deleteCancellation, deleteCancellationWithRosterMarker, getCancellations, getCellColors, getClassesByYear,
+  saveCancellation, saveCancellationWithRosterMarker, setCellColor,
+  updateCancellationWithRosterMarker,
+} from "@/lib/db";
 import { parseClassKey } from "@/lib/classKey";
+import { buildCancellationRosterStudents, CancellationRosterStudent, resolveCancellationStudentKey } from "@/lib/cancellationRoster";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -25,6 +30,7 @@ export default function CancellationTab({ retreat }: Props) {
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<Omit<Cancellation, "id">>(EMPTY_FORM);
   const [filter, setFilter] = useState<"전체" | "1부" | "2부">("전체");
+  const [rosterStudents, setRosterStudents] = useState<CancellationRosterStudent[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -36,6 +42,8 @@ export default function CancellationTab({ retreat }: Props) {
         getClassesByYear(retreat.year),
         getCancellations(retreat.id),
       ]);
+      const roster = buildCancellationRosterStudents(classesRaw);
+      setRosterStudents(roster);
 
       // 2) 빨간색 셀 → 취소명단 자동 동기화
       const existingKeys = new Set(existing.map(c => c.studentKey).filter(Boolean));
@@ -69,7 +77,16 @@ export default function CancellationTab({ retreat }: Props) {
         }
       }
 
-      setRecords(existing);
+      // 과거 수동 취소는 private 명단에만 있고 cellColors가 없을 수 있다.
+      // 정확히 한 학생으로 연결되는 경우에만 공개 red 마커를 보강해 IGuard 인원체크에서도 제외한다.
+      const resolvedExisting = existing.map(record => {
+        const studentKey = resolveCancellationStudentKey(record, roster);
+        return studentKey ? { ...record, studentKey } : record;
+      });
+      await Promise.all(resolvedExisting
+        .filter((record): record is Cancellation & { studentKey: string } => !!record.studentKey && colors[record.studentKey] !== "red")
+        .map(record => setCellColor(retreat.id, record.studentKey, "red")));
+      setRecords(resolvedExisting);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -81,13 +98,17 @@ export default function CancellationTab({ retreat }: Props) {
 
   async function handleSave() {
     if (!form.name.trim()) return toast("학생 이름을 입력해주세요.", "warning");
+    const studentKey = resolveCancellationStudentKey(form, rosterStudents);
+    if (!studentKey) return toast("출석부에서 부·학년·반·이름이 정확히 일치하는 학생을 찾지 못했습니다. 학생 정보를 확인해주세요.", "warning");
+    const payload = { ...form, studentKey };
     try {
       if (editId) {
-        await updateCancellation(retreat.id, editId, form);
-        setRecords(prev => prev.map(r => r.id === editId ? { ...r, ...form } : r));
+        const previousStudentKey = records.find(record => record.id === editId)?.studentKey;
+        await updateCancellationWithRosterMarker(retreat.id, editId, payload, previousStudentKey);
+        setRecords(prev => prev.map(r => r.id === editId ? { ...r, ...payload } : r));
       } else {
-        const id = await saveCancellation(retreat.id, form);
-        setRecords(prev => [...prev, { id, ...form }]);
+        const id = await saveCancellationWithRosterMarker(retreat.id, payload);
+        setRecords(prev => [...prev, { id, ...payload }]);
       }
       setForm(EMPTY_FORM);
       setShowAdd(false);
@@ -100,7 +121,9 @@ export default function CancellationTab({ retreat }: Props) {
   async function handleDelete(id: string) {
     if (!await uiConfirm("삭제하시겠습니까?")) return;
     try {
-      await deleteCancellation(retreat.id, id);
+      const studentKey = records.find(record => record.id === id)?.studentKey;
+      if (studentKey) await deleteCancellationWithRosterMarker(retreat.id, id, studentKey);
+      else await deleteCancellation(retreat.id, id);
       setRecords(prev => prev.filter(r => r.id !== id));
     } catch (e) {
       toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -110,7 +133,7 @@ export default function CancellationTab({ retreat }: Props) {
   function startEdit(r: Cancellation) {
     setForm({ bu: r.bu, grade: r.grade, class: r.class, name: r.name,
       phone: r.phone || "", reason: r.reason || "", account: r.account || "", note: r.note || "",
-      paymentAmount: r.paymentAmount ?? null });
+      paymentAmount: r.paymentAmount ?? null, studentKey: r.studentKey });
     setEditId(r.id);
     setShowAdd(true);
   }

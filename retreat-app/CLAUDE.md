@@ -228,6 +228,12 @@ Firebase `update()`에서 `undefined`는 `stripUndefined()`가 제거하므로 �
 
 교사 참석의 `gender?: "남" | "여"`는 IGuard 남녀 분리 버스 배정의 원천이다. 담당 학생 반이 남반/여반인 것과 교사 본인 성별은 무관하므로 반 홀짝·이름·조의 다수 성별로 추론하지 않는다. 값이 없는 교사는 행정 수정 모달에서 명시적으로 지정하며, IGuard는 미확인 교사를 임의 배정하지 않고 자동배정을 중단한다.
 
+### 3e. 수동 취소명단이 IGuard 인원체크에 전달되지 않은 문제 (2026-07-17)
+
+- **접근법**: 1→ `CancellationTab.handleSave()`가 민감 `retreatsPrivate/{id}/cancellations`만 쓰고 IGuard가 읽는 `cellColors`를 갱신하지 않는지 확인한다. 2→ `cancellationRoster.ts`에서 부·학년·반·이름이 유일하게 일치할 때만 `studentKey`를 복원한다. 3→ `db/private.ts`의 취소 저장·수정·삭제가 private 레코드와 `cellColors/{studentKey}=red`를 루트 multi-path `update()` 한 번으로 동기화한다. 4→ 기존 수동 취소는 취소 탭 로드 시 같은 안전 매칭을 거쳐 red 마커를 보강한다.
+- **판단 질문**: IGuard에서 `retreatsPrivate`를 직접 읽거나 환불계좌가 든 취소 레코드를 public으로 복사하지 않는다. 전자는 앱 소유권·권한 경계를 깨고, 후자는 민감정보를 노출한다. 이름만 같거나 동명이인인 학생을 임의로 red 처리하지 않는다.
+- **재사용 규칙**: 민감 원본의 상태를 현장 앱이 알아야 하면 필요한 비민감 식별자·상태만 소유 앱의 기존 public 마커로 원자 동기화하고, 역매칭은 구획·반·이름의 유일성을 확인한다.
+
 ### 4. Auth 접근 레벨
 ```typescript
 type AccessLevel = "none" | "member" | "admin";

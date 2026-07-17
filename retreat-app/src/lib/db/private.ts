@@ -19,12 +19,46 @@ export async function saveCancellation(retreatId: string, data: Omit<Cancellatio
   return newRef.key!;
 }
 
+/** 취소 민감정보와 IGuard가 읽는 공개 취소 마커(cellColors=red)를 원자적으로 저장한다. */
+export async function saveCancellationWithRosterMarker(retreatId: string, data: Omit<Cancellation, "id"> & { studentKey: string }): Promise<string> {
+  const newRef = push(ref(db, paths.cancellations(retreatId)));
+  const id = newRef.key!;
+  await update(ref(db), {
+    [paths.cancellation(retreatId, id)]: stripUndefined(data),
+    [paths.cellColor(retreatId, data.studentKey)]: "red",
+  });
+  return id;
+}
+
 export async function updateCancellation(retreatId: string, cId: string, data: Partial<Cancellation>): Promise<void> {
   await update(ref(db, paths.cancellation(retreatId, cId)), stripUndefined(data));
 }
 
+export async function updateCancellationWithRosterMarker(
+  retreatId: string,
+  cId: string,
+  data: Omit<Cancellation, "id"> & { studentKey: string },
+  previousStudentKey?: string,
+): Promise<void> {
+  const updates: Record<string, unknown> = {
+    [paths.cancellation(retreatId, cId)]: stripUndefined(data),
+    [paths.cellColor(retreatId, data.studentKey)]: "red",
+  };
+  if (previousStudentKey && previousStudentKey !== data.studentKey) {
+    updates[paths.cellColor(retreatId, previousStudentKey)] = null;
+  }
+  await update(ref(db), updates);
+}
+
 export async function deleteCancellation(retreatId: string, cId: string): Promise<void> {
   await remove(ref(db, paths.cancellation(retreatId, cId)));
+}
+
+export async function deleteCancellationWithRosterMarker(retreatId: string, cId: string, studentKey: string): Promise<void> {
+  await update(ref(db), {
+    [paths.cancellation(retreatId, cId)]: null,
+    [paths.cellColor(retreatId, studentKey)]: null,
+  });
 }
 
 export async function getCancellationByStudentKey(retreatId: string, studentKey: string): Promise<Cancellation | null> {

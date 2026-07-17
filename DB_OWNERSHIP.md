@@ -48,7 +48,7 @@
 | `retreats/{id}/carpools` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/supplies` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/snacks` | 행정 | - | 행정만 | 없음 |
-| `retreats/{id}/cellColors` | 행정 | 이가드 | 행정만 | 이가드 셀 색상 표시 |
+| `retreats/{id}/cellColors` | 행정 | 이가드 | 행정만 | 이가드 셀 색상·취소 제외 (`red`는 private 취소명단의 공개 학생키 마커) |
 | `retreats/{id}/partialAttendances` | 행정 | 이가드 | 행정만 | 이가드 부분참 표시 |
 | `retreats/{id}/onSiteReg` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/participantsBackups` | 행정 | - | 행정만 | 없음 |
@@ -58,7 +58,7 @@
 | `retreats/{id}/tshirtOrders` | 행정 | - | 행정만 | 없음 (단체티 신청) |
 | `retreats/{id}/groupsBackups` | 행정 | - | 행정만 | 없음 (groups 전체 덮어쓰기 직전 롤링 백업) |
 | `retreats/{id}/roomsBackups` | 행정 | - | 행정만 | 없음 (rooms 전체 덮어쓰기 직전 롤링 백업) |
-| `retreatsPrivate/{id}/cancellations` | 행정 | - | 행정만 | 없음 (민감정보) |
+| `retreatsPrivate/{id}/cancellations` | 행정 | - | 행정만 | 민감 취소정보; 학생키만 `cellColors/{studentKey}=red`로 원자 동기화 |
 | `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/medicalLogs` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
