@@ -141,10 +141,8 @@ IGuard 버스·조별 명단이 행정 참석정보를 반영하도록 보완했
 - [ ] 일반 팀원 또는 staff role 테스트 계정이 제공되면 PIN 잠금과 권한별 화면을 읽기 위주로 검증한다.
 - [ ] PIN을 더 강한 데이터 보안 경계로 만들려면 현재 Rules·데이터 모델 한계를 먼저 설계 검토한다. **Rules 배포는 하지 않는다.**
 - [ ] 이미진 값이 새 저장 뒤에도 복구되면 추측 수정 금지. 저장 payload와 해당 교사 레코드 구독 결과를 읽기 전용으로 추적한다.
-- [ ] 행정 사이트 리허설 QA: 현장등록·의료일지·부분참석·인쇄/엑셀(XSS) 중심.
-- [ ] semester-app code-review 높음 2건:
-  1. 팀 삭제 시 배치 학생이 AssignTab 어디에도 보이지 않는 유령 상태
-  2. SettingsTab이 마운트 시 meta를 캡처해 최신 completionRule을 덮을 가능성
+- [x] 행정 사이트 리허설 QA (2026-07-17 코드 레벨 완료): 의료일지 통과(삭제 confirm·retreatsPrivate·이스케이프), 부분참석은 partialPool 테스트 6개로 보호, 인쇄/엑셀 XSS 전 표면 통과. **발견 2건 보고됨(미수정)**: ①현장등록 등록 해제가 확인창 없는 토글(이가드 인원체크에서 실사고 났던 "확인하려다 해제" 유형, OnSiteRegistrationTab의 toggleOnSiteCheckIn 경로) ②현장추가 모달에 role="dialog"/ESC/포커스트랩 없음(컨벤션 위반). 수정은 사용자 선택 대기.
+- [x] semester-app code-review 높음 2건 → **해소 확정(2026-07-17 검증)**: ①팀 삭제 유령화는 db.ts:99의 buildTeamRemovalUpdates(다중 경로 원자 update)+삭제 전 영향 인원 경고로, ②설정 덮어쓰기는 settingsDraft(dirty 추적, syncSettingsDraft가 편집 중 meta 미반영)로 해결. 테스트 10개 통과.
 - [ ] 시트 데이터 정리 후 IGuard 재임포트, 버스 자동배정, 행정 방배정 입력은 운영 담당자 확인 후 진행.
 
 ## DB·배포 안전 메모
