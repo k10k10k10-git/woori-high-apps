@@ -8,6 +8,12 @@ export interface MealOrderItem {
   people: number;
 }
 
+export interface MealOrderSummary {
+  id: string;
+  label: string;
+  groups: string[];
+}
+
 const groupSort = (a: Group, b: Group) =>
   a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 
@@ -29,4 +35,15 @@ export function buildMealOrderItems(meal: IguardMeal, groups: Group[]): MealOrde
     order: index + 1,
     people: group.studentIds?.length || 0,
   }));
+}
+
+/** 조별정보 상단에 보여줄 식사별 조 순서 요약을 만든다. */
+export function buildMealOrderSummaries(meals: IguardMeal[], groups: Group[]): MealOrderSummary[] {
+  return [...meals]
+    .sort((a, b) => a.day - b.day || a.slot - b.slot)
+    .map(meal => ({
+      id: meal.id,
+      label: meal.label,
+      groups: buildMealOrderItems(meal, groups).map(item => item.label),
+    }));
 }

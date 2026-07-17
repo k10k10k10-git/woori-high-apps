@@ -5,6 +5,7 @@ import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { resolveGroupStaffNames } from "@/lib/groupStaffNames";
+import { buildMealOrderSummaries } from "@/lib/mealOrder";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
@@ -19,10 +20,7 @@ const roomSort = (a: Room, b: Room) => {
 
 interface RoomChip { roomNumber: string; count: number; }
 interface BusInfo { day: 1 | 3; busNo: number; staff?: string; gender?: "남" | "여"; }
-interface MealInfo { label: string; day: number; slot: number; seq: number; }
-interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; meals: MealInfo[]; }
-
-const SLOT_LABELS = ["아침", "점심", "저녁", "야식"];
+interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; }
 
 export default function RoomsView({ groups, rooms, buses, meals, staff, groupStaff, retreatName, year }: {
   groups: Group[];
@@ -59,15 +57,6 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
           gender: b.assignmentMode === "gender" ? b.segments?.find(segment => segment.groupId === g.id)?.gender : undefined,
         }))
         .sort((a, b) => a.day - b.day);
-      const groupMeals: MealInfo[] = meals
-        .flatMap(m => {
-          const raw = m.entries;
-          const entries: IguardMeal["entries"] = Array.isArray(raw) ? raw : (raw ? Object.values(raw as Record<string, IguardMeal["entries"][number]>) : []);
-          return entries
-            .filter(e => e && e.groupId === g.id)
-            .map(e => ({ label: m.label, day: m.day, slot: m.slot, seq: e.seq + 1 }));
-        })
-        .sort((a, b) => a.day - b.day || a.slot - b.slot);
       return {
         group: g, nam, yeo, etc, gbs: g.gbs,
         unassigned: (g.studentIds || []).length - assigned.size,
@@ -75,10 +64,11 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
         leader: parseNames(g.leader || ""),
         staff: resolveGroupStaffNames(g.staff, groupStaff[g.id], staff),
         buses: groupBuses,
-        meals: groupMeals,
       };
     });
-  }, [groups, rooms, buses, meals, staff, groupStaff]);
+  }, [groups, rooms, buses, staff, groupStaff]);
+
+  const mealSummaries = useMemo(() => buildMealOrderSummaries(meals, groups), [meals, groups]);
 
   const hasRooms = rooms.length > 0;
 
@@ -103,6 +93,31 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
       <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
         ℹ️ 조별 교사·스탭·GBS·숙소입니다. <strong>행정 사이트의 방배정·조편성</strong>에서 자동으로 계산됩니다(조원이 들어있는 호실 기준). 바뀌면 실시간 반영.
       </div>
+
+      {mealSummaries.length > 0 && (
+        <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white" aria-labelledby="meal-order-summary-title">
+          <h2 id="meal-order-summary-title" className="sr-only">식사 순서</h2>
+          {mealSummaries.map((meal, mealIndex) => (
+            <div
+              key={meal.id}
+              className={`px-3 py-2 sm:flex sm:items-center sm:gap-4 ${mealIndex > 0 ? "border-t border-slate-100" : ""}`}
+            >
+              <span className="block shrink-0 text-xs font-medium text-amber-600 sm:w-24">{meal.label}</span>
+              <div className="mt-1 min-w-0 overflow-x-auto sm:mt-0">
+                <ol className="flex min-w-max items-center whitespace-nowrap text-xs text-slate-600" aria-label={`${meal.label} 조별 식사 순서`}>
+                  {meal.groups.map((groupLabel, groupIndex) => (
+                    <li key={`${meal.id}-${groupLabel}`} className="flex items-center">
+                      <span className="font-medium text-slate-700">{groupLabel}</span>
+                      {groupIndex < meal.groups.length - 1 && <span className="mx-1.5 text-slate-300" aria-hidden="true">→</span>}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-slate-500">조 <strong className="text-slate-800">{data.length}</strong></span>
         <button onClick={print} className="btn-secondary btn-sm">🖨 인쇄</button>
@@ -138,17 +153,6 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
                     {d.buses.map((b, i) => (
                       <span key={i} className="px-1.5 py-0.5 rounded text-xs bg-sky-50 text-sky-700 border border-sky-200">
                         {b.day}일차 {b.busNo}호차{b.gender ? `(${b.gender})` : ""}
-                      </span>
-                    ))}
-                  </span>
-                ) : <span className="text-slate-300">—</span>}
-              </InfoRow>
-              <InfoRow label="식사순서" cls="text-amber-600">
-                {d.meals.length ? (
-                  <span className="flex flex-wrap gap-1.5">
-                    {d.meals.map((m, i) => (
-                      <span key={i} className="px-1.5 py-0.5 rounded text-xs border bg-slate-50 text-slate-600 border-slate-200">
-                        {m.label} {m.seq}번
                       </span>
                     ))}
                   </span>
