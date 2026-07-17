@@ -40,6 +40,7 @@ The app may read `retreats/{id}/iguard/groupStaff` for display, but IGuard owns 
 - Keep `groups` and `rooms` full overwrites protected by the existing rolling backup/restore pattern.
 - Escape user-provided data in generated HTML with `escapeHtml()` before `printAsPDF`, `exportAsJPG`, `rowsToHtmlTable`, or `document.write`.
 - Sensitive information must stay in `retreatsPrivate/{id}`.
+- `teachers.gender` is the explicit source for IGuard gender-separated buses. Never infer a teacher's gender from the gender of their assigned class; leave it unset until an admin selects it.
 
 ## UI/Architecture Notes
 

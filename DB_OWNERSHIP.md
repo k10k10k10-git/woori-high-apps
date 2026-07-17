@@ -41,7 +41,7 @@
 |------|-----------|-----------|-----------|----------------|
 | `retreats` (목록) | 행정 | 이가드 | 행정만 | 이가드 수련회 선택 화면 |
 | `retreats/{id}/participants` | 행정 | 이가드 | 행정만 | **이가드 조편성, 방배정, 부분참 전부 영향** |
-| `retreats/{id}/teachers` | 행정 | 이가드 | 행정만 | **이가드 스탭 명단, 조스탭, 동선 매트릭스 영향** |
+| `retreats/{id}/teachers` | 행정 | 이가드 | 행정만 | **이가드 스탭 명단, 조스탭, 동선·버스 성별 배정 영향** (`gender?: 남\|여`는 행정이 관리) |
 | `retreats/{id}/groups` | 행정 | 이가드 | 행정만 | 이가드 조별 뷰 |
 | `retreats/{id}/autoAssignConfig` | 행정 | - | 행정만 | 없음 (자동 조편성 입력 설정, groups 결과와 분리) |
 | `retreats/{id}/rooms` | 행정 | 이가드 | 행정만 | 이가드 숙소 뷰 |
@@ -72,7 +72,7 @@
 | `retreats/{id}/iguard/schedule` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/posts` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/movements` | 이가드 | - | 이가드만 | 없음 |
-| `retreats/{id}/iguard/buses` | 이가드 | - | 이가드만 | 버스 배정 — 기존 혼합은 `groupIds`, 남녀 분리는 `assignmentMode=gender`+`segments[{groupId,gender,includeTeachers}]` |
+| `retreats/{id}/iguard/buses` | 이가드 | - | 이가드만 | 버스 배정 — 기존 혼합은 `groupIds`, 남녀 분리는 `assignmentMode=gender`+`segments[{groupId,gender,teacherNames}]`; `includeTeachers`는 구버전 읽기 전용 |
 | `retreats/{id}/iguard/attendance` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/seating` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/meals` | 이가드 | - | 이가드만 | 없음 |

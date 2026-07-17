@@ -8,7 +8,7 @@ import { isCancelledStudent, isStudentBusPassengerOnDay, isTeacherBusPassenger }
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { busCapacityOf, isValidBusCapacity, DEFAULT_BUS_CAPACITY, MIN_BUS_CAPACITY, MAX_BUS_CAPACITY } from "@/lib/busCapacity";
 import { assignBusUnits, BusAssignmentUnit } from "@/lib/busAutoAssign";
-import { activeStudentIdsForGender, buildGenderCohorts } from "@/lib/busGender";
+import { activeStudentIdsForGender, buildGenderCohorts, groupBusTeachersByGender, teacherNamesForBusSegment } from "@/lib/busGender";
 
 const RESERVED_STAFF_SEATS = 3;
 
@@ -77,7 +77,7 @@ export default function BusesView({ retreatId, buses, groups, students, particip
     const group = groupById(segment.groupId);
     if (!group) return 0;
     const students = activeStudentIdsForGender(group, segment.gender, genderData.genderMap, partial, cellColors, day).length;
-    return students + (segment.includeTeachers ? busTeacherNames(group).length : 0);
+    return students + teacherNamesForBusSegment(segment, busTeacherNames(group)).length;
   }
 
   function busPassengerCount(bus: IguardBus): number {
@@ -150,19 +150,35 @@ export default function BusesView({ retreatId, buses, groups, students, particip
     const units: BusAssignmentUnit[] = [];
     sortedGroups.forEach(group => {
       const cohorts = genderData.cohorts.filter(cohort => cohort.groupId === group.id);
-      const teachersForGroup = busTeacherNames(group).length;
-      if (cohorts.length === 0) {
-        if (teachersForGroup > 0) throw new Error(`${groupDisplayName(group, groups)}는 탑승 학생 없이 교사만 있어 남녀 분리 자동배정을 할 수 없습니다.`);
-        return;
+      const teachersByGender = groupBusTeachersByGender(group, teachers);
+      const teachersForGroup = teachersByGender.남.length + teachersByGender.여.length;
+      if (teachersByGender.unresolved.length > 0) {
+        throw new Error(`${groupDisplayName(group, groups)} 교사 ${teachersByGender.unresolved.join(", ")}의 성별을 확인할 수 없습니다. 행정 교사 참석에서 성별을 지정해주세요.`);
       }
-      const teacherCohort = [...cohorts].sort((a, b) => b.studentIds.length - a.studentIds.length || a.gender.localeCompare(b.gender, "ko"))[0];
+      if (cohorts.length === 0) {
+        if (teachersForGroup === 0) return;
+      }
       cohorts.forEach(cohort => {
         const unitId = `${cohort.groupId}::${cohort.gender}`;
-        const includeTeachers = cohort === teacherCohort && teachersForGroup > 0;
-        const segment: IguardBusSegment = { groupId: cohort.groupId, gender: cohort.gender, ...(includeTeachers ? { includeTeachers: true } : {}) };
+        const teacherNames = teachersByGender[cohort.gender];
+        const segment: IguardBusSegment = {
+          groupId: cohort.groupId,
+          gender: cohort.gender,
+          ...(teacherNames.length > 0 ? { teacherNames } : {}),
+        };
         segmentByUnitId.set(unitId, segment);
         labelByUnitId.set(unitId, `${groupDisplayName(group, groups)} ${cohort.gender}`);
-        units.push({ id: unitId, size: cohort.studentIds.length + (includeTeachers ? teachersForGroup : 0), gender: cohort.gender });
+        units.push({ id: unitId, size: cohort.studentIds.length + teacherNames.length, gender: cohort.gender });
+      });
+
+      // 해당 성별 학생은 없지만 교사는 있는 조도 교사만의 성별 묶음으로 안전하게 배정한다.
+      (["남", "여"] as const).forEach(gender => {
+        if (cohorts.some(cohort => cohort.gender === gender) || teachersByGender[gender].length === 0) return;
+        const unitId = `${group.id}::${gender}`;
+        const segment: IguardBusSegment = { groupId: group.id, gender, teacherNames: teachersByGender[gender] };
+        segmentByUnitId.set(unitId, segment);
+        labelByUnitId.set(unitId, `${groupDisplayName(group, groups)} ${gender} 교사`);
+        units.push({ id: unitId, size: teachersByGender[gender].length, gender });
       });
     });
     return { units, segmentByUnitId, labelByUnitId };

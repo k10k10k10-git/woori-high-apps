@@ -54,7 +54,7 @@ export async function getAttendanceByYear(year: number): Promise<Record<string, 
 
 // ── Teachers from DB (classes node) ──────────────────────
 
-export interface LoadableTeacher { name: string; bu: string; classKey: string; originKey: string; }
+export interface LoadableTeacher { name: string; bu: string; classKey: string; originKey: string; gender?: "남" | "여"; }
 export interface LoadTeachersResult {
   teachers: LoadableTeacher[];
   hasStaffNode: boolean; // teacherStaff/{year} 존재 여부 — 없으면 공식스탭이 비어 나옴(연도 가드용)

@@ -293,7 +293,13 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 ### 22. 버스 남녀 분리는 개인이 아니라 조+성별 묶음이다 (`busGender.ts` / `busAutoAssign.ts`)
 
-버스 자동배정의 `혼합`은 기존처럼 조 전체를 최소 단위로 사용한다. `남녀 분리`는 학생 개인을 흩뜨리지 않고 `${groupId}::남`, `${groupId}::여` 묶음을 최소 단위로 사용하며, 한 버스에는 한 성별 묶음만 들어간다. 성별은 행정 소유 `participants.gender`를 읽기 전용으로 연결하고, 시트에 없는 수동 학생은 행정 자동 조편성과 동일한 `홀수반=남·짝수반=여` 기준으로 보강한다. 그래도 성별을 찾지 못한 실제 탑승 학생이 있으면 누락시키지 말고 자동배정을 중단한다. 저장은 IGuard 소유 `iguard/buses`의 `assignmentMode="gender"`와 `segments[{groupId,gender,includeTeachers}]`에만 하며, 필드가 없는 기존 버스는 혼합 방식으로 간주한다. 조 교사는 성별 정보가 없으므로 더 큰 학생 묶음 한 곳에만 붙여 중복 집계를 막고, 호차별 인원체크도 같은 `segments`를 사용한다. 수동으로 조 목록을 수정하면 해당 호차의 성별 묶음을 지우고 혼합 방식으로 전환한다.
+버스 자동배정의 `혼합`은 기존처럼 조 전체를 최소 단위로 사용한다. `남녀 분리`는 학생 개인을 흩뜨리지 않고 `${groupId}::남`, `${groupId}::여` 묶음을 최소 단위로 사용하며, 한 버스에는 한 성별 묶음만 들어간다. 학생 성별은 행정 소유 `participants.gender`를 읽기 전용으로 연결하고, 시트에 없는 수동 학생은 행정 자동 조편성과 동일한 `홀수반=남·짝수반=여` 기준으로 보강한다. 교사 성별은 담당 학생 반과 무관하므로 절대 반 홀짝이나 조 다수 성별로 추론하지 않고, 행정 `teachers.gender`의 명시값만 사용한다. 실제 탑승 학생 또는 조 교사의 성별을 찾지 못하면 이름/건수를 알리고 자동배정을 중단한다. 저장은 IGuard 소유 `iguard/buses`의 `assignmentMode="gender"`와 `segments[{groupId,gender,teacherNames}]`에만 하며, 구버전 `includeTeachers=true` 세그먼트도 계속 읽는다. 호차별 인원체크는 같은 `teacherNames`를 사용하고, 현재 불참·자차 상태로 다시 필터링한다. 수동으로 조 목록을 수정하면 해당 호차의 성별 묶음을 지우고 혼합 방식으로 전환한다.
+
+### 23. 담당반 성별과 교사 성별을 혼동해 교사를 잘못 배정한 문제 (2026-07-17)
+
+- **접근법**: 1→ `BusesView.makeAssignmentUnits()`가 조 교사 전원을 학생이 많은 성별에 붙이는 흐름을 찾는다. 2→ 행정 `TeacherAttendance`에 명시 `gender` 입력을 추가한다. 3→ `busGender.ts`가 실제 탑승 교사를 성별별 이름 배열로 나누고 `segments[].teacherNames`에 저장한다. 4→ `ChecklistView`가 저장된 이름만 호차별 교사로 표시하는지 회귀 테스트와 전체 빌드로 확인한다.
+- **판단 질문**: 담당반 홀짝, 교사 이름, 조 학생의 다수 성별로 교사 성별을 추론하지 않는다. 여자 교사가 남학생 반을 담당할 수 있어 같은 오배정이 재발하며, 미확인 교사를 임의 호차에 넣는 것보다 이름을 보여주고 자동배정을 중단하는 편이 안전하다.
+- **재사용 규칙**: 사람 본인의 속성과 그 사람이 담당하는 집단의 속성은 분리해 모델링하고, 버스 성별 배정에서는 행정 `teachers.gender` 명시값만 사용한다.
 
 ---
 
@@ -366,7 +372,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `groupNumber.test.ts` | `groupDisplayName` | 1부/2부 전역 번호, 커스텀 이름 |
 | `partialAttendance.test.ts` | `isPresentOnDay` | 본대/선복귀/후발대 일자별 참석 |
 | `busParticipation.test.ts` | 버스 탑승 판정 | 당일참여 학생, 자차·불참 교사, 부서 동명이인 매칭 |
-| `busGender.test.ts` | 버스 성별 배정 | raw/unique 학생키 성별 연결, 조+성별 묶음, 단일 성별 호차·정원 불변식 |
+| `busGender.test.ts` | 버스 성별 배정 | raw/unique 학생키, 조+성별 묶음, 교사 명시 성별·미확인 차단, 구버전 세그먼트, 단일 성별 호차·정원 불변식 |
 | `checklistMembers.test.ts` | 인원체크 교사 명단 | 조별은 자차 포함, 호차별은 자차 제외 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 

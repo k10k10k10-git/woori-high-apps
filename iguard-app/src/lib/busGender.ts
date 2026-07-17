@@ -1,4 +1,4 @@
-import { isCancelledStudent, isStudentBusPassengerOnDay } from "./busParticipation";
+import { isCancelledStudent, isStudentBusPassengerOnDay, isTeacherBusPassenger, resolveTeacherAttendance } from "./busParticipation";
 import type {
   BusStudentGender,
   Group,
@@ -6,6 +6,7 @@ import type {
   Participant,
   PartialAttendanceMap,
   Student,
+  TeacherAttendance,
 } from "./types";
 
 export interface GenderCohort extends IguardBusSegment {
@@ -17,6 +18,41 @@ function normalizeGender(value?: string): BusStudentGender | null {
   if (text.startsWith("남")) return "남";
   if (text.startsWith("여")) return "여";
   return null;
+}
+
+/** 교사 성별은 담당 학생 반과 무관하므로 행정의 명시값만 사용한다. */
+export function resolveTeacherGender(teacher: TeacherAttendance): BusStudentGender | null {
+  return normalizeGender(teacher.gender);
+}
+
+/** 조 교사를 실제 탑승 여부와 본인 성별에 따라 나눈다. 미확인 교사는 임의 배정하지 않는다. */
+export function groupBusTeachersByGender(
+  group: Group,
+  teachers: TeacherAttendance[],
+): { 남: string[]; 여: string[]; unresolved: string[] } {
+  const result: { 남: string[]; 여: string[]; unresolved: string[] } = { 남: [], 여: [], unresolved: [] };
+  const names = [...new Set((group.teachers || []).map(name => name.trim()).filter(Boolean))]
+    .filter(name => isTeacherBusPassenger(teachers, name, group.bu));
+
+  names.forEach(name => {
+    const teacher = resolveTeacherAttendance(teachers, name, group.bu);
+    const gender = teacher ? resolveTeacherGender(teacher) : null;
+    if (gender) result[gender].push(name);
+    else result.unresolved.push(name);
+  });
+  return result;
+}
+
+/** 새 teacherNames 형식을 우선하고, 구버전 includeTeachers=true는 조 교사 전체로 읽는다. */
+export function teacherNamesForBusSegment(
+  segment: IguardBusSegment,
+  availableTeacherNames: string[],
+): string[] {
+  if (Array.isArray(segment.teacherNames)) {
+    const allowed = new Set(availableTeacherNames);
+    return [...new Set(segment.teacherNames.map(name => name.trim()).filter(name => name && allowed.has(name)))];
+  }
+  return segment.includeTeachers ? availableTeacherNames : [];
 }
 
 /** participants의 studentId가 raw/uniqueKey 어느 형태여도 classes 기반 uniqueKey로 찾을 수 있게 한다. */

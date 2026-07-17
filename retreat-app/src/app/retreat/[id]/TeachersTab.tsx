@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
 import { getTeachers, saveTeacher, updateTeacher, deleteTeacher, loadTeachersFromDB, getRetreats } from "@/lib/db";
 import { prepareTeacherUpdate } from "@/lib/teacherWrite";
+import { resolveTeacherGender } from "@/lib/teacherGender";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -53,7 +54,7 @@ function needsTransport(form: TeacherFormState) {
 
 const EMPTY_FORM: TeacherFormState = {
   name: "", bu: "1부", classKey: "", status: "전참" as TeacherAttendance["status"],
-  note: "", arrivalInfo: "", transport: "",
+  note: "", arrivalInfo: "", transport: "", gender: undefined,
   age: "",
   role: "",
   corps: "본대",
@@ -88,7 +89,7 @@ export default function TeachersTab({ retreat }: Props) {
   const [buFilter, setBuFilter] = useState("전체");
   const [statusFilter, setStatusFilter] = useState("전체");
   const [showImport, setShowImport] = useState(false);
-  const [importList, setImportList] = useState<{ name: string; bu: string; classKey: string; originKey: string; selected: boolean }[]>([]);
+  const [importList, setImportList] = useState<{ name: string; bu: string; classKey: string; originKey: string; gender?: "남" | "여"; selected: boolean }[]>([]);
   const [importing, setImporting] = useState(false);
 
   const load = useCallback(async () => {
@@ -124,6 +125,7 @@ async function handleSave() {
       worship: form.worship ? true : undefined,
       arrivalInfo: needsScheduleDetails(form) ? (form.arrivalInfo?.trim() || undefined) : undefined,
       transport: needsTransport(form) ? (form.transport?.trim() || undefined) : undefined,
+      gender: resolveTeacherGender(form) || undefined,
       source: form.source || (form.bu === "스탭" ? "manual-assistant" : "manual-retreat"),
       originType: form.originType || (form.bu === "스탭" ? "assistant-staff" : "manual-teacher"),
     };
@@ -167,6 +169,7 @@ async function handleSave() {
       note: t.note || "",
       arrivalInfo: t.arrivalInfo || "",
       transport: t.transport || "",
+      gender: resolveTeacherGender(t) || undefined,
       age: t.age || "",
       role: t.role === "조스탭" || t.role === "조스탭 외 인원" ? t.role : "",
       corps: t.bu === "스탭" ? (t.corps || "본대") : "본대",
@@ -223,6 +226,7 @@ async function handleSave() {
             bu: t.bu,
             classKey: t.classKey,
             originKey: `prev:${t.bu}-${t.classKey}-${t.name}`,
+            gender: resolveTeacherGender(t) || undefined,
           });
         });
       }
@@ -263,8 +267,9 @@ async function handleSave() {
         const existing = byOrigin.get(t.originKey) ?? byLegacy.get(teacherExactKey(t)) ?? byName.get(teacherNameKey(t));
         if (existing) {
           // 이름/부/반만 출석부 원본 기준으로 갱신, 나머지 수련회 입력값은 보존
-          await updateTeacher(retreat.id, existing.id, { name: t.name, bu: t.bu, classKey: t.classKey, originKey: t.originKey });
-          updated.push({ ...existing, name: t.name, bu: t.bu, classKey: t.classKey, originKey: t.originKey });
+          const sourceGender = t.gender || resolveTeacherGender(existing) || undefined;
+          await updateTeacher(retreat.id, existing.id, { name: t.name, bu: t.bu, classKey: t.classKey, originKey: t.originKey, ...(sourceGender ? { gender: sourceGender } : {}) });
+          updated.push({ ...existing, name: t.name, bu: t.bu, classKey: t.classKey, originKey: t.originKey, ...(sourceGender ? { gender: sourceGender } : {}) });
           continue;
         }
         const payload: TeacherFormState = {
@@ -275,6 +280,7 @@ async function handleSave() {
           note: "",
           arrivalInfo: "",
           transport: "",
+          gender: t.gender,
           source: "attendance-db",
           originType: t.bu === "스탭" ? "official-staff" : "class-teacher",
           originKey: t.originKey,
@@ -435,8 +441,20 @@ async function handleSave() {
                   <option>1부</option><option>2부</option><option>스탭</option>
                 </select>
               </div>
-              <input className="input" placeholder={form.bu === "스탭" ? "직함/구분 (예: 보조스탭, 사진팀)" : "담당 학년반 (예: 1학년 1반)"} value={form.classKey}
-                onChange={e => setForm(p => ({ ...p, classKey: e.target.value }))} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input className="input" placeholder={form.bu === "스탭" ? "직함/구분 (예: 보조스탭, 사진팀)" : "담당 학년반 (예: 1학년 1반)"} value={form.classKey}
+                  onChange={e => setForm(p => ({ ...p, classKey: e.target.value }))} />
+                <select className="input" value={form.gender || ""} onChange={e => setForm(p => ({ ...p, gender: e.target.value === "남" || e.target.value === "여" ? e.target.value : undefined }))}>
+                  <option value="">성별 선택</option>
+                  <option value="남">남</option>
+                  <option value="여">여</option>
+                </select>
+              </div>
+              {!resolveTeacherGender(form) && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  남녀 분리 버스 자동배정을 사용하려면 교사 성별을 선택해주세요.
+                </div>
+              )}
               {form.source === "manual-assistant" && (
                 <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-700">
                   이 항목은 <strong>수련회 전용 보조스탭</strong>으로 저장됩니다. 출석부 연도 원본에는 쓰지 않고, 현재 수련회 명단과 이가드에만 반영됩니다.
@@ -569,6 +587,7 @@ async function handleSave() {
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">이름</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">출처</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">부</th>
+                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">성별</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">담당반</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">참석</th>
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">이동/일정</th>
@@ -594,6 +613,7 @@ async function handleSave() {
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                     <span className={`tag ${t.bu === "1부" ? "tag-green" : t.bu === "2부" ? "tag-purple" : "tag-blue"}`}>{t.bu}</span>
                   </td>
+                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600">{resolveTeacherGender(t) || "—"}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600 whitespace-nowrap">{t.classKey || "—"}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                     <span className={`tag ${STATUS_COLORS[getVisibleAttendanceLabel(t)]}`}>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assignBusUnits } from "@/lib/busAutoAssign";
-import { buildGenderCohorts, buildStudentGenderMap } from "@/lib/busGender";
-import type { Group, Participant, Student } from "@/lib/types";
+import { buildGenderCohorts, buildStudentGenderMap, groupBusTeachersByGender, resolveTeacherGender, teacherNamesForBusSegment } from "@/lib/busGender";
+import type { Group, Participant, Student, TeacherAttendance } from "@/lib/types";
 
 const participants: Record<string, Participant> = {
   p1: { name: "남학생1", gender: "남", grade: 1, class: 1, bu: "1부", studentId: "S11_01" },
@@ -45,6 +45,39 @@ describe("조별 성별 버스 묶음", () => {
       { groupId: "g1", gender: "여", studentIds: ["1_S11_03"] },
     ]);
     expect(result.missingStudentIds).toEqual(["1_UNKNOWN"]);
+  });
+});
+
+describe("교사 성별 버스 묶음", () => {
+  const teacher = (overrides: Partial<TeacherAttendance> & Pick<TeacherAttendance, "id" | "name" | "classKey">): TeacherAttendance => ({
+    bu: "2부",
+    status: "전참",
+    ...overrides,
+  });
+
+  it("명시 성별만 사용하고 담당반 성별로 교사 성별을 추론하지 않는다", () => {
+    expect(resolveTeacherGender(teacher({ id: "t1", name: "여교사", classKey: "1학년 3반", gender: "여" }))).toBe("여");
+    expect(resolveTeacherGender(teacher({ id: "t2", name: "남학생반여교사", classKey: "담임", originKey: "class:2-1-3" }))).toBeNull();
+    expect(resolveTeacherGender(teacher({ id: "t3", name: "여학생반남교사", classKey: "2학년 4반" }))).toBeNull();
+  });
+
+  it("같은 조 교사를 각자의 성별로 나누고 자차·불참 교사는 제외한다", () => {
+    const group: Group = { id: "g", name: "14조", bu: "2부", teachers: ["김효정", "박남성", "자차교사", "미확인"], leader: "", studentIds: [] };
+    const teachers: TeacherAttendance[] = [
+      teacher({ id: "t1", name: "김효정", classKey: "1학년 3반", gender: "여" }),
+      teacher({ id: "t2", name: "박남성", classKey: "1학년 4반", gender: "남" }),
+      teacher({ id: "t3", name: "자차교사", classKey: "1학년 2반", gender: "여", transport: "자차" }),
+    ];
+    expect(groupBusTeachersByGender(group, teachers)).toEqual({
+      남: ["박남성"],
+      여: ["김효정"],
+      unresolved: ["미확인"],
+    });
+  });
+
+  it("새 teacherNames를 우선하고 구버전 includeTeachers도 계속 읽는다", () => {
+    expect(teacherNamesForBusSegment({ groupId: "g", gender: "여", teacherNames: ["김효정", "없는교사"] }, ["김효정", "박남성"])).toEqual(["김효정"]);
+    expect(teacherNamesForBusSegment({ groupId: "g", gender: "남", includeTeachers: true }, ["김효정", "박남성"])).toEqual(["김효정", "박남성"]);
   });
 });
 

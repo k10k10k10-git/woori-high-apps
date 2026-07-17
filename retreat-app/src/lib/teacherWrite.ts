@@ -4,6 +4,7 @@ const CLEARABLE_TEACHER_FIELDS = [
   "note",
   "arrivalInfo",
   "transport",
+  "gender",
   "age",
   "role",
   "corps",

@@ -48,6 +48,7 @@ export interface TeacherAttendance {
   note?: string;
   arrivalInfo?: string;
   transport?: string;
+  gender?: "남" | "여"; // 행정 교사 참석에서 관리. 없으면 반 정보로 하위호환 추론
   idNumber?: string;
   // 이가드 스탭 보강 필드 (행정에서 관리, 이가드 읽기 전용)
   age?: string | null;
@@ -58,6 +59,7 @@ export interface TeacherAttendance {
   worship?: boolean;
   source?: "attendance-db" | "manual-assistant" | "manual-retreat";
   originType?: "class-teacher" | "official-staff" | "assistant-staff" | "manual-teacher";
+  originKey?: string;
 }
 
 /** 행정 부분참석 탭의 학생별 분류 — IGuard는 버스 탑승 판정을 위해 note도 보존해 읽는다. */
@@ -187,7 +189,8 @@ export type BusStudentGender = "남" | "여";
 export interface IguardBusSegment {
   groupId: string;
   gender: BusStudentGender;
-  includeTeachers?: boolean; // 조 교사는 한 성별 묶음에만 붙여 중복 집계를 막는다.
+  teacherNames?: string[]; // 교사별 성별을 적용한 실제 탑승 명단
+  includeTeachers?: boolean; // 구버전 하위호환: true면 조 교사 전체
 }
 
 export interface IguardBus {

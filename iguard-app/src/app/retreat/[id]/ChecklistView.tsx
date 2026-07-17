@@ -9,7 +9,7 @@ import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { roleNamesForChecklist } from "@/lib/checklistMembers";
-import { activeStudentIdsForGender, buildStudentGenderMap } from "@/lib/busGender";
+import { activeStudentIdsForGender, buildStudentGenderMap, teacherNamesForBusSegment } from "@/lib/busGender";
 
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
@@ -69,7 +69,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
     [teachers],
   );
 
-  const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus", selectedStudentIds?: string[], includeTeachers = true): CheckMember[] => {
+  const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus", selectedStudentIds?: string[], selectedTeacherNames?: string[]): CheckMember[] => {
     const studentMembers = (selectedStudentIds ?? g.studentIds ?? [])
       .filter(sid => !isCancelledStudent(sid, cellColors))
       .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay))
@@ -81,7 +81,10 @@ export default function ChecklistView({ retreatId, groups, students, participant
           meta: s ? `${s.grade}-${s.class}` : "",
         };
       });
-    const teacherNames = includeTeachers ? roleNamesForGroup(g, checklistMode) : [];
+    const availableTeacherNames = roleNamesForGroup(g, checklistMode);
+    const teacherNames = selectedTeacherNames === undefined
+      ? availableTeacherNames
+      : selectedTeacherNames.filter(name => availableTeacherNames.includes(name));
     return [
       ...teacherNames.map((name, idx) => ({
         id: `teacher:${g.id}:${idx}:${name}`,
@@ -110,18 +113,18 @@ export default function ChecklistView({ retreatId, groups, students, participant
             return group ? {
               group,
               gender: segment.gender,
-              includeTeachers: segment.includeTeachers === true,
+              teacherNames: teacherNamesForBusSegment(segment, roleNamesForGroup(group, "bus")),
               studentIds: activeStudentIdsForGender(group, segment.gender, genderMap, partial, cellColors, selectedBusDay),
             } : null;
           }).filter((entry): entry is NonNullable<typeof entry> => !!entry)
         : (b.groupIds || []).map(groupId => {
             const group = sortedGroups.find(candidate => candidate.id === groupId);
-            return group ? { group, gender: undefined, includeTeachers: true, studentIds: group.studentIds || [] } : null;
+            return group ? { group, gender: undefined, teacherNames: roleNamesForGroup(group, "bus"), studentIds: group.studentIds || [] } : null;
           }).filter((entry): entry is NonNullable<typeof entry> => !!entry);
       const studentCount = busEntries.reduce((sum, entry) => sum + entry.studentIds
         .filter(sid => !isCancelledStudent(sid, cellColors))
         .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay)).length, 0);
-      const teacherCount = busEntries.reduce((sum, entry) => sum + (entry.includeTeachers ? roleNamesForGroup(entry.group, "bus").length : 0), 0);
+      const teacherCount = busEntries.reduce((sum, entry) => sum + entry.teacherNames.length, 0);
       // 스탭: 버스 자체 staff 필드 + 큐싯 notice에서 파싱한 호차별 스탭 (중복 제거)
       const busFieldParse = parseBusStaff(b.staff);
       const busFieldStaff = busFieldParse.names;
@@ -137,7 +140,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
       const allMembers = [
         ...busEntries.flatMap(entry => {
           const groupName = `${entry.group.bu} ${groupDisplayName(entry.group, groups)}${entry.gender ? ` ${entry.gender}` : ""}`;
-          return membersForGroup(entry.group, "bus", entry.studentIds, entry.includeTeachers).map(member => ({
+          return membersForGroup(entry.group, "bus", entry.studentIds, entry.teacherNames).map(member => ({
             ...member,
             meta: member.meta === "교사" ? `${groupName} · 교사` : [groupName, member.meta].filter(Boolean).join(" · "),
           }));

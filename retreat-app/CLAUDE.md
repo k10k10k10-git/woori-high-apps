@@ -226,6 +226,8 @@ await saveParticipants(retreatId, updatedParticipants);
 ### 3d. 선택 필드 삭제 — Firebase update에는 null 전달
 Firebase `update()`에서 `undefined`는 `stripUndefined()`가 제거하므로 기존 DB 필드 삭제가 아니다. 교사 참석 수정처럼 상태 전환으로 `note`·`arrivalInfo`·`transport` 등을 비울 때는 `teacherWrite.ts`의 `prepareTeacherUpdate()`로 **폼에 포함됐지만 빈 선택 필드만 `null`로 변환**한 뒤 `updateTeacher()`에 전달한다. 키 자체가 없는 부분 업데이트(출석부 원본 이름/반 갱신 등)는 보존해야 하므로, 모든 누락 키를 일괄 `null`로 만들지 말 것.
 
+교사 참석의 `gender?: "남" | "여"`는 IGuard 남녀 분리 버스 배정의 원천이다. 담당 학생 반이 남반/여반인 것과 교사 본인 성별은 무관하므로 반 홀짝·이름·조의 다수 성별로 추론하지 않는다. 값이 없는 교사는 행정 수정 모달에서 명시적으로 지정하며, IGuard는 미확인 교사를 임의 배정하지 않고 자동배정을 중단한다.
+
 ### 4. Auth 접근 레벨
 ```typescript
 type AccessLevel = "none" | "member" | "admin";

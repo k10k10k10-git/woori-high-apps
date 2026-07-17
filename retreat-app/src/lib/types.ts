@@ -65,6 +65,7 @@ export interface TeacherAttendance {
   note?: string;
   arrivalInfo?: string;
   transport?: string;
+  gender?: "남" | "여";
   idNumber?: string;
   age?: string;
   role?: string;
