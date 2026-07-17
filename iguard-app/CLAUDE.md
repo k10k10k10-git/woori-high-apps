@@ -37,7 +37,7 @@ src/
 │       ├── page.tsx                # 서버 컴포넌트 entry → IguardClient
 │       ├── IguardClient.tsx        # 탭 라우터 (실행/기획/정보 3그룹, 16개 뷰)
 │       ├── ChecklistView.tsx       # 인원체크 (조별 학생+교사 체크, 버스별 체크)
-│       ├── RoomsView.tsx           # 조별 정보 (방배정·학생·교사 조회)
+│       ├── RoomsView.tsx           # 조별 정보 (방배정·학생·교사·이가드 조스탭 조회)
 │       ├── ExecutionViews.tsx      # 개인 큐카드 + 포스트 보드 (현장 모바일용)
 │       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트, src/lib/cueSheet.ts의 parseCueSheetText 사용)
 │       ├── LeaderCueManageView.tsx # 조장 큐싯 관리
@@ -67,6 +67,7 @@ src/
     ├── compat.ts                   # 행정 데이터 형태 계약 런타임 점검 (classKey, studentId, bu 검증)
     ├── fairAssign.ts               # 공정 배분 알고리즘 (식사 순서 + 집회 자리 통합 누적 점수)
     ├── groupNumber.ts              # 조 전역 번호 표시 (2부는 1부 조 수만큼 오프셋)
+    ├── groupStaffNames.ts          # 행정 group.staff + 이가드 groupStaff ID를 이름으로 중복 없이 병합
     ├── partialAttendance.ts        # 부분참(선복귀/후발대) 일자별 참석 공식
     ├── accessLock.ts               # PIN 검증(PBKDF2), 세션 잠금 해제 키
     ├── scheduleTime.ts             # 현장 시간·일차 판정 순수 로직 (isNowOn/currentBlockFor, 24시+ 블록 — 패턴 11) ExecutionViews에서 추출(2026-07 I2)

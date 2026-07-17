@@ -1,9 +1,10 @@
 "use client";
 import { useMemo } from "react";
-import { Group, Room, IguardBus, IguardMeal } from "@/lib/types";
+import { Group, Room, IguardBus, IguardMeal, IguardStaff } from "@/lib/types";
 import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
+import { resolveGroupStaffNames } from "@/lib/groupStaffNames";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
@@ -23,8 +24,15 @@ interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: Room
 
 const SLOT_LABELS = ["아침", "점심", "저녁", "야식"];
 
-export default function RoomsView({ groups, rooms, buses, meals, retreatName, year }: {
-  groups: Group[]; rooms: Room[]; buses: IguardBus[]; meals: IguardMeal[]; retreatName: string; year: number;
+export default function RoomsView({ groups, rooms, buses, meals, staff, groupStaff, retreatName, year }: {
+  groups: Group[];
+  rooms: Room[];
+  buses: IguardBus[];
+  meals: IguardMeal[];
+  staff: IguardStaff[];
+  groupStaff: Record<string, string[]>;
+  retreatName: string;
+  year: number;
 }) {
   const { toast } = useUI();
 
@@ -60,12 +68,12 @@ export default function RoomsView({ groups, rooms, buses, meals, retreatName, ye
         unassigned: (g.studentIds || []).length - assigned.size,
         teachers: g.teachers || [],
         leader: parseNames(g.leader || ""),
-        staff: parseNames(g.staff || ""),
+        staff: resolveGroupStaffNames(g.staff, groupStaff[g.id], staff),
         buses: groupBuses,
         meals: groupMeals,
       };
     });
-  }, [groups, rooms, buses, meals]);
+  }, [groups, rooms, buses, meals, staff, groupStaff]);
 
   const hasRooms = rooms.length > 0;
 

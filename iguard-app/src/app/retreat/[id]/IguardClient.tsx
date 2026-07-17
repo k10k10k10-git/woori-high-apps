@@ -299,7 +299,7 @@ function IguardWorkspace({ id }: { id: string }) {
         )}
 
         {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} schedule={schedule} />}
-        {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} retreatName={retreat.name} year={retreat.year} />}
+        {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} staff={staffForViews} groupStaff={groupStaff} retreatName={retreat.name} year={retreat.year} />}
         {!dataLoading && view === "cue" && <CueCardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
         {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
