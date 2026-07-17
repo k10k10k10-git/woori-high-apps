@@ -58,6 +58,12 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 
 `staff` users see execution views only. `team` and `admin` can access planning and info views.
 
+### 행정 참석정보를 버스 인원에 반영하기 (2026-07-17)
+
+- **접근법**: 1→ 운영 `teachers`와 `partialAttendances`를 읽기 전용으로 좁게 대조해 교사 자차는 `transport`, 학생 당일참여는 `note`에 저장됨을 확인한다. 2→ `subscribeToPartialAttendances()`가 버리던 note를 객체형 `PartialAttendanceMap`으로 보존한다. 3→ `src/lib/busParticipation.ts`에 학생 일차·당일참여와 교사 불참·자차 판정을 모으고 `BusesView`·`ChecklistView`가 같은 함수를 사용하게 한다. 4→ 객체형/레거시 문자열형 정규화와 실제 문구를 회귀 테스트로 고정한다.
+- **판단 질문**: 조 이름 목록만 보고 세거나 `partialAttendances.type`만 남기지 않는다. 전자는 행정의 불참·자차를 무시하고, 후자는 `25일 당일참여`처럼 type만으로 구분할 수 없는 학생을 버스에 다시 포함한다. 이름이 모호한 교사를 임의 제외하거나 학생 조장에게 교사 자차 필터를 적용하지 않는다.
+- **재사용 규칙**: 단체 버스 인원은 `isStudentBusPassengerOnDay()`와 `isTeacherBusPassenger()`로만 판정하고, 행정 부분참 구독에서는 `type`과 `note`를 함께 보존한다.
+
 ### 수련회별 PIN 잠금 (2026-07-16)
 
 - **접근법**: Google 로그인·팀원 승인을 유지하고, `retreats/{id}/iguard/accessLock`에 salt와 PBKDF2-SHA256 해시만 저장한다. 관리자는 우회하고, 일반 사용자는 PIN 통과 전 `IguardWorkspace`와 `useRetreatData`를 마운트하지 않는다.

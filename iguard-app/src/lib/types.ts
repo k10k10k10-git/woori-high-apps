@@ -60,6 +60,15 @@ export interface TeacherAttendance {
   originType?: "class-teacher" | "official-staff" | "assistant-staff" | "manual-teacher";
 }
 
+/** 행정 부분참석 탭의 학생별 분류 — IGuard는 버스 탑승 판정을 위해 note도 보존해 읽는다. */
+export interface PartialAttendanceInfo {
+  type: "선복귀" | "후발대";
+  note?: string;
+  updatedAt?: number;
+}
+
+export type PartialAttendanceMap = Record<string, PartialAttendanceInfo>;
+
 export interface Group {
   id: string;
   name: string;        // "1조", "2조"...

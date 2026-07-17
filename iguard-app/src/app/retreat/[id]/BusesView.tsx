@@ -1,10 +1,10 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Group, IguardBus, IguardScheduleBlock } from "@/lib/types";
+import { Group, IguardBus, IguardScheduleBlock, PartialAttendanceMap, TeacherAttendance } from "@/lib/types";
 import { saveIguardBus, updateIguardBus, deleteIguardBus } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
-import { isPresentOnDay } from "@/lib/partialAttendance";
+import { isStudentBusPassengerOnDay, isTeacherBusPassenger } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { busCapacityOf, isValidBusCapacity, DEFAULT_BUS_CAPACITY, MIN_BUS_CAPACITY, MAX_BUS_CAPACITY } from "@/lib/busCapacity";
 
@@ -40,7 +40,7 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
   return map;
 }
 
-export default function BusesView({ retreatId, buses, groups, partial, schedule }: { retreatId: string; buses: IguardBus[]; groups: Group[]; partial: Record<string, "선복귀" | "후발대">; schedule: IguardScheduleBlock[] }) {
+export default function BusesView({ retreatId, buses, groups, teachers, partial, schedule }: { retreatId: string; buses: IguardBus[]; groups: Group[]; teachers: TeacherAttendance[]; partial: PartialAttendanceMap; schedule: IguardScheduleBlock[] }) {
   const { toast, uiConfirm } = useUI();
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const [day, setDay] = useState<1 | 3>(1);
@@ -55,9 +55,12 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
   const cueStaffByBus = useMemo(() => parseBusStaffFromSchedule(schedule, day), [schedule, day]);
 
   function groupPassengerCount(g: Group): number {
-    const teacherNames = new Set([...(g.teachers || []), ...parseNames(g.leader)].map(s => s.trim()).filter(Boolean));
+    const teacherNames = new Set([
+      ...(g.teachers || []).filter(name => isTeacherBusPassenger(teachers, name, g.bu)),
+      ...parseNames(g.leader), // 조장은 학생 역할 — 행정 교사의 자차 필터를 적용하지 않는다.
+    ].map(s => s.trim()).filter(Boolean));
     // 부분참: 선택한 일자에 실제 탑승하는 학생만 카운트 (1일차=본대+선복귀, 3일차=본대+후발대)
-    const studentCount = (g.studentIds || []).filter(sid => isPresentOnDay(partial[sid], day)).length;
+    const studentCount = (g.studentIds || []).filter(sid => isStudentBusPassengerOnDay(partial[sid], day)).length;
     return studentCount + teacherNames.size;
   }
   const groupById = (id: string) => sortedGroups.find(g => g.id === id);
@@ -285,6 +288,7 @@ export default function BusesView({ retreatId, buses, groups, partial, schedule 
     <div>
       <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
         ℹ️ 인승은 호차별로 설정할 수 있고(기본 {DEFAULT_BUS_CAPACITY}인승), 자동배정은 각 호차의 인승에 맞춰 <strong>인원 균등(정원 비례)</strong>을 우선으로 잡고, 가능하면 스탭 좌석 {RESERVED_STAFF_SEATS}석을 남깁니다. 조는 절대 쪼개지지 않고, 인원은 학생+교사 기준입니다.
+        <span className="mt-1 block text-fuchsia-600">행정의 교사 불참·자차와 학생 부분참 당일참여는 단체 버스 인원에서 제외됩니다.</span>
       </div>
 
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">

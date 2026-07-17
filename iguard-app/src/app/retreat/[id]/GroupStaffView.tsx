@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Group, IguardStaff, Student, TeacherAttendance } from "@/lib/types";
+import { Group, IguardStaff, Student, TeacherAttendance, PartialAttendanceMap } from "@/lib/types";
 import { setIguardGroupStaff, updateIguardGroupStaffEntries } from "@/lib/db";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { useUI } from "@/context/UIContext";
@@ -11,7 +11,7 @@ interface Props {
   staff: IguardStaff[];
   students: Record<string, Student>; // uniqueKey → 학생
   adminTeachers: TeacherAttendance[]; // 행정 교사 참석(부분참 색칠용)
-  partial: Record<string, "선복귀" | "후발대">; // 학생 부분참(선복귀/후발대) 색칠용
+  partial: PartialAttendanceMap; // 학생 부분참(선복귀/후발대) 색칠용
   cellColors: Record<string, string>; // 참가자 명단 셀 색상(red=취소/불참) — 행정 소유, 읽기 전용
   groupStaff: Record<string, string[]>; // groupId → staffId[]
 }
@@ -20,14 +20,14 @@ interface Props {
 //   cellColors red = 불참(취소),  partial 선복귀/후발대 = 부분참,  그 외(본대) = 전참.
 function studentStatus(
   s: Student,
-  partial: Record<string, "선복귀" | "후발대">,
+  partial: PartialAttendanceMap,
   cellColors: Record<string, string>,
 ): { status: "전참" | "부분참" | "불참"; detail?: "선복귀" | "후발대" } {
   // cellColors 키는 uniqueKey("${buNum}_${id}") 또는 raw studentId 둘 다 존재할 수 있어 양쪽 확인(행정과 동일).
   const rawId = s.id.replace(/^[12]_/, "");
   if (cellColors[s.id] === "red" || cellColors[rawId] === "red") return { status: "불참" };
   const pc = partial[s.id];
-  if (pc) return { status: "부분참", detail: pc };
+  if (pc) return { status: "부분참", detail: pc.type };
   return { status: "전참" };
 }
 

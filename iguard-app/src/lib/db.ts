@@ -3,10 +3,11 @@ import { db } from "./firebase";
 import { paths } from "./paths";
 import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardPost, IguardMovement, IguardBus, IguardSeating,
-  RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance,
+  RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
   IguardAccessLock } from "./types";
 export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
+import { normalizePartialAttendanceMap } from "./partialAttendance";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -87,15 +88,9 @@ export function subscribeToStudentsByYear(year: number, cb: (students: Record<st
 
 // 부분참(본대/선복귀/후발대) — 행정 소유, 이가드는 읽기 전용 소비
 // 노드: retreats/{id}/partialAttendances/{uniqueKey} = { type: "선복귀"|"후발대", note?, updatedAt? }
-export function subscribeToPartialAttendances(retreatId: string, cb: (map: Record<string, "선복귀" | "후발대">) => void, onError?: (error: Error) => void): () => void {
+export function subscribeToPartialAttendances(retreatId: string, cb: (map: PartialAttendanceMap) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.partialAttendances(retreatId)), (snap) => {
-    if (!snap.exists()) return cb({});
-    const out: Record<string, "선복귀" | "후발대"> = {};
-    Object.entries(snap.val() as Record<string, { type?: string } | string>).forEach(([key, value]) => {
-      const t = typeof value === "string" ? value : value?.type;
-      if (t === "선복귀" || t === "후발대") out[key] = t;
-    });
-    cb(out);
+    cb(normalizePartialAttendanceMap(snap.exists() ? snap.val() : null));
   }, (error) => { console.warn("subscribeToPartialAttendances error:", error); onError?.(error); });
 }
 

@@ -98,7 +98,7 @@ retreats/{retreatId}/
   rooms/                            # 방배정 (Room[])
   participants/                     # 참가자 (Record<string, Participant>)
   teachers/                         # 교사/스탭 참석 현황 (TeacherAttendance[])
-  partialAttendances/               # 부분참 분류 (선복귀/후발대)
+  partialAttendances/               # 부분참 분류 (선복귀/후발대 + note; 당일참여 버스 제외 판정에 note 사용)
   cellColors/                       # 참가자 셀 색상 (취소/불참 표시)
   periods/                          # 수련회 기간 (RetreatPeriod[]) — DB는 수련회별 소유지만
                                      #   홈 화면은 모든 수련회의 기간을 항상 합쳐서 표시(아래 패턴 8 참조)
@@ -284,6 +284,10 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 - `accessLock` 구독은 **내부 데이터 구독 전 접근 경계**이므로 `useRetreatData` 중앙화 규칙의 명시적 예외다. 홈 목록의 잠금 배지도 같은 메타 구독을 사용한다. 두 구독 모두 `onError`에서 실패를 표시하고, 내부 진입 경계는 실패 시 닫힌 상태(fail closed)를 유지한다.
 - 현재 Firebase Rules는 승인된 팀원에게 `retreats` 읽기를 허용한다. 따라서 이 PIN은 승인 팀원의 실수·공유 링크 진입을 막는 앱 수준 잠금이며, 계정별 Firebase 데이터 권한을 대체하지 않는다. Rules 변경·배포 없이 이 한계를 보안 경계로 과장하지 말 것.
 
+### 21. 버스 인원은 행정 참석 원본과 함께 판정한다 (`busParticipation.ts` / `BusesView.tsx` / `ChecklistView.tsx`)
+
+버스 자동배정과 인원체크는 조의 이름 목록만 세지 않는다. 학생은 `partialAttendances`의 `type`과 `note`를 함께 읽어 기존 선복귀·후발대 일차 규칙을 적용하고, `note`에 `당일참여/당일참석`이 있으면 1·3일차 단체 버스에서 모두 제외한다. 교사는 조의 `bu`와 이름으로 행정 `teachers` 레코드를 안전하게 찾아 `status=불참` 또는 `transport=자차/자가용/개인차량`이면 단체 버스에서 제외한다. 이름 매칭이 모호하거나 행정 레코드가 없으면 임의로 제외하지 않고 기존 조 명단을 보존한다. 조장은 학생 역할이므로 교사 이동수단 필터를 적용하지 않는다. 이 규칙은 `src/lib/busParticipation.ts`만 사용하고 버스 배정·인원체크가 각자 다시 구현하지 않는다.
+
 ---
 
 ## API 라우트
@@ -354,6 +358,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `compat.test.ts` | `checkAdminCompat` | 파싱 이상, 학생ID 불일치 비율, bu 값 검증 |
 | `groupNumber.test.ts` | `groupDisplayName` | 1부/2부 전역 번호, 커스텀 이름 |
 | `partialAttendance.test.ts` | `isPresentOnDay` | 본대/선복귀/후발대 일자별 참석 |
+| `busParticipation.test.ts` | 버스 탑승 판정 | 당일참여 학생, 자차·불참 교사, 부서 동명이인 매칭 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 
 ---

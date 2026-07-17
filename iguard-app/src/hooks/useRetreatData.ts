@@ -12,7 +12,7 @@ import {
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
   IguardPost, IguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
-  TeacherAttendance, IguardAttendanceInfo,
+  TeacherAttendance, IguardAttendanceInfo, PartialAttendanceMap,
 } from "@/lib/types";
 
 export interface RetreatData {
@@ -35,7 +35,7 @@ export interface RetreatData {
   periods: RetreatPeriod[];
   attendanceKeys: Set<string>;
   attendanceInfo: Record<string, IguardAttendanceInfo>;
-  partial: Record<string, "선복귀" | "후발대">;
+  partial: PartialAttendanceMap;
   cellColors: Record<string, string>;
   groupStaff: Record<string, string[]>;
   connected: boolean;
@@ -66,7 +66,7 @@ export function useRetreatData(id: string): RetreatData {
   const [periods, setPeriods] = useState<RetreatPeriod[]>([]);
   const [attendanceKeys, setAttendanceKeys] = useState<Set<string>>(new Set());
   const [attendanceInfo, setAttendanceInfo] = useState<Record<string, IguardAttendanceInfo>>({});
-  const [partial, setPartial] = useState<Record<string, "선복귀" | "후발대">>({});
+  const [partial, setPartial] = useState<PartialAttendanceMap>({});
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
   const [connected, setConnected] = useState(true);
