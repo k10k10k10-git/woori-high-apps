@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Retreat, MedicalLog, Participant } from "@/lib/types";
 import {
   subscribeToMedicalLogs, saveMedicalLog, updateMedicalLog, deleteMedicalLog,
@@ -8,6 +8,7 @@ import {
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
 import * as XLSX from "xlsx";
+import NameAutocomplete, { type NameSuggestionBase } from "./NameAutocomplete";
 
 const OUTCOME_PRESETS = ["약 처방 후 복귀", "휴식 권고", "보호자 연락", "병원 이송", "관찰 중"];
 
@@ -38,66 +39,8 @@ const EMPTY_FORM = {
   symptoms: "", medicines: [] as string[], outcome: "", note: "",
 };
 
-interface ParticipantSuggestion {
-  name: string;
-  bu: string;
-  grade: number;
-  classNum: number;
-}
-
-// ── 이름 자동완성 컴포넌트 ───────────────────────────────────
-function NameAutocomplete({
-  value, onChange, onSelect, suggestions, placeholder,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onSelect: (s: ParticipantSuggestion) => void;
-  suggestions: ParticipantSuggestion[];
-  placeholder?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  const filtered = useMemo(() => {
-    const q = value.trim();
-    if (!q) return suggestions.slice(0, 8); // 부서+학년+반 선택된 경우 전체 표시
-    return suggestions.filter(s => s.name.includes(q)).slice(0, 8);
-  }, [value, suggestions]);
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, []);
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <input
-        className="input text-sm w-full"
-        placeholder={placeholder ?? "이름 *"}
-        value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => { if (filtered.length > 0) setOpen(true); }}
-      />
-      {open && filtered.length > 0 && (
-        <ul className="absolute z-20 top-full left-0 right-0 mt-0.5 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          {filtered.map((s, i) => (
-            <li key={i}>
-              <button type="button"
-                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 flex items-center gap-2"
-                onMouseDown={e => { e.preventDefault(); onSelect(s); setOpen(false); }}>
-                <span className="font-medium">{s.name}</span>
-                <span className="text-xs text-slate-400">{s.bu} {s.grade}학년 {s.classNum}반</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
+// 자동완성 UI는 공용 컴포넌트 사용 (NameAutocomplete.tsx — 카풀 탭과 공유)
+type ParticipantSuggestion = NameSuggestionBase;
 
 // ── 폼 서브컴포넌트 (hooks 규칙 준수를 위해 분리) ──────────────
 function MedicalForm({

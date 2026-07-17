@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, CarPool, Participant } from "@/lib/types";
 import { getCarpools, saveCarpool, updateCarpool, deleteCarpool, getParticipants } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
+import NameAutocomplete from "./NameAutocomplete";
 
 interface Props { retreat: Retreat; }
 
@@ -40,20 +41,33 @@ export default function CarpoolTab({ retreat }: Props) {
 
   useEffect(() => { void load(); }, [load]);
 
-  // 참가자 자동완성
-  const participantList = useMemo(() =>
-    Object.entries(participants).map(([key, p]) => ({ key, ...p })), [participants]);
+  // 이름 자동완성 후보 — 참가자 명단 기반 (이름 + 부/학년/반 표시, 클릭 시 자동 입력)
+  const suggestions = useMemo(() =>
+    Object.entries(participants)
+      .map(([key, p]) => ({
+        key,
+        name: p.name,
+        bu: p.bu,
+        grade: p.grade,
+        classNum: p.class,
+        studentId: p.studentId ?? null,
+        phone: p.phone ?? "",
+        pPhone: p.pPhone ?? "",
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko")),
+    [participants]);
 
-  function selectParticipant(p: typeof participantList[0]) {
+  function selectParticipant(s: typeof suggestions[0]) {
     setForm(prev => ({
       ...prev,
-      studentName: p.name,
-      studentId: p.studentId || null,
-      grade: p.grade,
-      class: p.class,
-      bu: p.bu,
-      phone: p.phone || "",
-      pPhone: p.pPhone || "",
+      studentName: s.name,
+      studentId: s.studentId,
+      grade: s.grade,
+      class: s.classNum,
+      bu: s.bu,
+      // 이미 손으로 적어둔 연락처는 덮지 않는다
+      phone: prev.phone || s.phone,
+      pPhone: prev.pPhone || s.pPhone,
     }));
   }
 
@@ -154,28 +168,15 @@ export default function CarpoolTab({ retreat }: Props) {
           <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-4">{editId ? "카풀 수정" : "카풀 추가"}</h3>
 
-            {/* 참가자 빠른 선택 */}
-            {!editId && (
-              <div className="mb-4 p-3 bg-slate-50 rounded-lg">
-                <p className="text-xs text-slate-500 mb-2">참가자 목록에서 선택 (선택 시 자동 입력)</p>
-                <select className="input text-sm" onChange={e => {
-                  const p = participantList.find(p => p.key === e.target.value);
-                  if (p) selectParticipant(p);
-                }}>
-                  <option value="">— 참가자 선택 —</option>
-                  {participantList.map(p => (
-                    <option key={p.key} value={p.key}>
-                      {p.name} ({p.bu} {p.grade}학년 {p.class}반)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <input className="input" placeholder="학생 이름" value={form.studentName}
-                  onChange={e => setForm(p => ({ ...p, studentName: e.target.value }))} />
+                <NameAutocomplete
+                  value={form.studentName}
+                  onChange={v => setForm(p => ({ ...p, studentName: v }))}
+                  onSelect={selectParticipant}
+                  suggestions={suggestions}
+                  placeholder="학생 이름 (검색 후 클릭)"
+                />
                 <select className="input" value={form.bu}
                   onChange={e => setForm(p => ({ ...p, bu: e.target.value }))}>
                   <option>1부</option><option>2부</option>
