@@ -52,6 +52,19 @@ describe("parseCueSheetText — 사양 D", () => {
     expect(r.warnings.some(w => w.includes("이름 아닌 조각 제외"))).toBe(true);
   });
 
+  it("D4-1: 호차 짐 하차 보조 스탭은 선탑/동승 명단에 합치지 않는다", () => {
+    const raw = [
+      HEADER,
+      "이동\t10:00~11:00\t버스 이동\t\t* 도착 동선\n- 1호차 짐 하차 보조 스탭: 최현우sf, 김동연sf\n* 선탑 인원\n1호차: 박혜원sf\n2호차: 이선주sf",
+    ].join("\n");
+    const r = parseCueSheetText(raw);
+
+    expect(r.busDrafts).toEqual([
+      { day: 1, busNo: 1, staff: "박혜원" },
+      { day: 1, busNo: 2, staff: "이선주" },
+    ]);
+  });
+
   it("D5: 빈 입력이면 전용 경고", () => {
     const r = parseCueSheetText("");
     expect(r.warnings).toEqual(["붙여넣은 내용이 비어있습니다."]);

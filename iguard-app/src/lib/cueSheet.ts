@@ -314,6 +314,10 @@ function extractBusStaffDraftsFromRows(rows: string[][]): { drafts: AutoBusDraft
       const busNo = Number(busMatch[1]);
       if (!busNo) return;
       const afterBus = line.slice(line.search(/\d{1,2}\s*호\s*차/) + (line.match(/\d{1,2}\s*호\s*차/)?.[0].length ?? 0));
+      // "1호차 짐 하차 보조 스탭: ..."처럼 호차를 언급한 별도 업무를
+      // 선탑/동승으로 오인하지 않는다. 호차 바로 뒤가 콜론이거나 명시적 선탑·동승 역할일 때만 허용한다.
+      const rolePrefix = afterBus.split(/[:：]/, 1)[0].replace(/[*•\-]/g, "").trim();
+      if (rolePrefix && !/^(?:선탑|동승|선탑\s*[\/@·]\s*동승)(?:\s*(?:인원|스탭))?$/.test(rolePrefix)) return;
       const source = afterBus.includes(":") || afterBus.includes("：")
         ? afterBus.split(/[:：]/).slice(1).join(":")
         : afterBus;
