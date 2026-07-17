@@ -6,10 +6,10 @@ import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";
-import { isStudentBusPassengerOnDay, isTeacherBusPassenger } from "@/lib/busParticipation";
+import { isStudentBusPassengerOnDay } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
+import { roleNamesForChecklist } from "@/lib/checklistMembers";
 
-const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
 
@@ -62,12 +62,12 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const selectedBusDay = day === "3일차" ? 3 : 1;
 
-  const roleNamesForGroup = useCallback((g: Group): string[] => Array.from(new Set([
-    ...(g.teachers || []).filter(name => isTeacherBusPassenger(teachers, name, g.bu)),
-    ...parseNames(g.leader), // 조장은 학생 역할 — 교사 이동수단 필터 대상이 아니다.
-  ].map(name => name.trim()).filter(Boolean))), [teachers]);
+  const roleNamesForGroup = useCallback(
+    (g: Group, checklistMode: "group" | "bus"): string[] => roleNamesForChecklist(g, teachers, checklistMode),
+    [teachers],
+  );
 
-  const membersForGroup = useCallback((g: Group): CheckMember[] => {
+  const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus"): CheckMember[] => {
     const studentMembers = (g.studentIds || [])
       .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay))
       .map(sid => {
@@ -78,7 +78,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
           meta: s ? `${s.grade}-${s.class}` : "",
         };
       });
-    const teacherNames = roleNamesForGroup(g);
+    const teacherNames = roleNamesForGroup(g, checklistMode);
     return [
       ...teacherNames.map((name, idx) => ({
         id: `teacher:${g.id}:${idx}:${name}`,
@@ -95,15 +95,15 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
     if (mode === "조별") {
       return sortedGroups.map(g => ({
         key: g.id, title: `${g.bu} ${groupDisplayName(g, groups)}`,
-        sub: roleNamesForGroup(g).join(", ") || undefined,
-        members: membersForGroup(g),
+        sub: roleNamesForGroup(g, "group").join(", ") || undefined,
+        members: membersForGroup(g, "group"),
       }));
     }
     return buses.filter(b => busDayOf(b) === selectedBusDay).sort((a, b) => a.busNo - b.busNo).map(b => {
       const busGroups = (b.groupIds || []).map(gid => sortedGroups.find(g => g.id === gid)).filter((g): g is Group => !!g);
       const studentCount = busGroups.reduce((sum, group) => sum + (group.studentIds || []).filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay)).length, 0);
       const teacherCount = busGroups.reduce((sum, group) => {
-        return sum + roleNamesForGroup(group).length;
+        return sum + roleNamesForGroup(group, "bus").length;
       }, 0);
       // 스탭: 버스 자체 staff 필드 + 큐싯 notice에서 파싱한 호차별 스탭 (중복 제거)
       const busFieldParse = parseBusStaff(b.staff);
@@ -120,7 +120,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
       const allMembers = [
         ...busGroups.flatMap(group => {
           const groupName = `${group.bu} ${groupDisplayName(group, groups)}`;
-          return membersForGroup(group).map(member => ({
+          return membersForGroup(group, "bus").map(member => ({
             ...member,
             meta: member.meta === "교사" ? `${groupName} · 교사` : [groupName, member.meta].filter(Boolean).join(" · "),
           }));
@@ -232,7 +232,11 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
         </div>
       </div>
       <p className="text-xs text-slate-400 mb-1">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 — 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
-      <p className="text-xs text-fuchsia-600 mb-3">행정의 교사 불참·자차와 학생 부분참 당일참여는 버스 인원체크에서 제외됩니다.</p>
+      <p className="text-xs text-fuchsia-600 mb-3">
+        {mode === "호차별"
+          ? "행정의 교사 불참·자차와 학생 부분참 당일참여는 버스 인원체크에서 제외됩니다."
+          : "조별 인원체크에는 자차 교사도 포함됩니다. 이동수단 제외는 호차별에서만 적용됩니다."}
+      </p>
 
       {mode === "호차별" && units.length === 0 ? (
         <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🚌</div><p>{day} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>

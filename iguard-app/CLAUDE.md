@@ -287,7 +287,7 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 ### 21. 버스 인원은 행정 참석 원본과 함께 판정한다 (`busParticipation.ts` / `BusesView.tsx` / `ChecklistView.tsx`)
 
-버스 자동배정과 인원체크는 조의 이름 목록만 세지 않는다. 학생은 `partialAttendances`의 `type`과 `note`를 함께 읽어 기존 선복귀·후발대 일차 규칙을 적용하고, `note`에 `당일참여/당일참석`이 있으면 1·3일차 단체 버스에서 모두 제외한다. 교사는 조의 `bu`와 이름으로 행정 `teachers` 레코드를 안전하게 찾아 `status=불참` 또는 `transport=자차/자가용/개인차량`이면 단체 버스에서 제외한다. 이름 매칭이 모호하거나 행정 레코드가 없으면 임의로 제외하지 않고 기존 조 명단을 보존한다. 조장은 학생 역할이므로 교사 이동수단 필터를 적용하지 않는다. 이 규칙은 `src/lib/busParticipation.ts`만 사용하고 버스 배정·인원체크가 각자 다시 구현하지 않는다.
+버스 자동배정과 **호차별** 인원체크는 조의 이름 목록만 세지 않는다. 학생은 `partialAttendances`의 `type`과 `note`를 함께 읽어 기존 선복귀·후발대 일차 규칙을 적용하고, `note`에 `당일참여/당일참석`이 있으면 1·3일차 단체 버스에서 모두 제외한다. 교사는 조의 `bu`와 이름으로 행정 `teachers` 레코드를 안전하게 찾아 `status=불참` 또는 `transport=자차/자가용/개인차량`이면 단체 버스에서 제외한다. 이름 매칭이 모호하거나 행정 레코드가 없으면 임의로 제외하지 않고 기존 조 명단을 보존한다. 단, **조별 인원체크는 이동수단과 무관한 현장 조 점호**이므로 자차 교사를 포함한다. 조장은 학생 역할이므로 교사 이동수단 필터를 적용하지 않는다. 버스 탑승 판정은 `src/lib/busParticipation.ts`, 조별/호차별 명단 분기는 `src/lib/checklistMembers.ts`만 사용한다.
 
 ---
 
@@ -360,6 +360,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `groupNumber.test.ts` | `groupDisplayName` | 1부/2부 전역 번호, 커스텀 이름 |
 | `partialAttendance.test.ts` | `isPresentOnDay` | 본대/선복귀/후발대 일자별 참석 |
 | `busParticipation.test.ts` | 버스 탑승 판정 | 당일참여 학생, 자차·불참 교사, 부서 동명이인 매칭 |
+| `checklistMembers.test.ts` | 인원체크 교사 명단 | 조별은 자차 포함, 호차별은 자차 제외 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 
 ---
