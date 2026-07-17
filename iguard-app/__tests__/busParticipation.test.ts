@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isDayVisitOnly,
+  isCancelledStudent,
   isOwnCarTransport,
   isStudentBusPassengerOnDay,
   isTeacherBusPassenger,
@@ -16,6 +17,12 @@ const teacher = (overrides: Partial<TeacherAttendance> & Pick<TeacherAttendance,
 });
 
 describe("학생 단체 버스 탑승 판정", () => {
+  it("red 취소 셀은 uniqueKey와 raw studentId 양쪽에서 찾는다", () => {
+    expect(isCancelledStudent("2_S32_01", { "2_S32_01": "red" })).toBe(true);
+    expect(isCancelledStudent("2_S32_01", { S32_01: "red" })).toBe(true);
+    expect(isCancelledStudent("2_S32_01", { "2_S32_01": "orange" })).toBe(false);
+  });
+
   it("기존 선복귀·후발대 일차 규칙을 유지한다", () => {
     expect(isStudentBusPassengerOnDay(undefined, 1)).toBe(true);
     expect(isStudentBusPassengerOnDay({ type: "후발대" }, 1)).toBe(false);

@@ -4,7 +4,7 @@ import { Group, IguardBus, IguardScheduleBlock, PartialAttendanceMap, TeacherAtt
 import { saveIguardBus, updateIguardBus, deleteIguardBus } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
-import { isStudentBusPassengerOnDay, isTeacherBusPassenger } from "@/lib/busParticipation";
+import { isCancelledStudent, isStudentBusPassengerOnDay, isTeacherBusPassenger } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { busCapacityOf, isValidBusCapacity, DEFAULT_BUS_CAPACITY, MIN_BUS_CAPACITY, MAX_BUS_CAPACITY } from "@/lib/busCapacity";
 
@@ -40,7 +40,7 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
   return map;
 }
 
-export default function BusesView({ retreatId, buses, groups, teachers, partial, schedule }: { retreatId: string; buses: IguardBus[]; groups: Group[]; teachers: TeacherAttendance[]; partial: PartialAttendanceMap; schedule: IguardScheduleBlock[] }) {
+export default function BusesView({ retreatId, buses, groups, teachers, partial, cellColors, schedule }: { retreatId: string; buses: IguardBus[]; groups: Group[]; teachers: TeacherAttendance[]; partial: PartialAttendanceMap; cellColors: Record<string, string>; schedule: IguardScheduleBlock[] }) {
   const { toast, uiConfirm } = useUI();
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const [day, setDay] = useState<1 | 3>(1);
@@ -60,7 +60,9 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
       ...parseNames(g.leader), // 조장은 학생 역할 — 행정 교사의 자차 필터를 적용하지 않는다.
     ].map(s => s.trim()).filter(Boolean));
     // 부분참: 선택한 일자에 실제 탑승하는 학생만 카운트 (1일차=본대+선복귀, 3일차=본대+후발대)
-    const studentCount = (g.studentIds || []).filter(sid => isStudentBusPassengerOnDay(partial[sid], day)).length;
+    const studentCount = (g.studentIds || [])
+      .filter(sid => !isCancelledStudent(sid, cellColors))
+      .filter(sid => isStudentBusPassengerOnDay(partial[sid], day)).length;
     return studentCount + teacherNames.size;
   }
   const groupById = (id: string) => sortedGroups.find(g => g.id === id);

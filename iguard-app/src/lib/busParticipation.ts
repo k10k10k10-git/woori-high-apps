@@ -4,6 +4,12 @@ import type { PartialAttendanceInfo, TeacherAttendance } from "./types";
 
 export type BusDay = 1 | 3;
 
+/** 행정 참가자 셀의 red는 취소/불참. uniqueKey와 과거 raw studentId 키를 모두 지원한다. */
+export function isCancelledStudent(studentId: string, cellColors: Record<string, string>): boolean {
+  const rawId = studentId.replace(/^[12]_/, "");
+  return cellColors[studentId] === "red" || cellColors[rawId] === "red";
+}
+
 /** 행정 부분참 메모의 당일 방문 표기 — 이런 학생은 단체 입·퇴소 버스를 타지 않는다. */
 export function isDayVisitOnly(note?: string): boolean {
   return /당일\s*(?:참여|참석)/.test(note ?? "");

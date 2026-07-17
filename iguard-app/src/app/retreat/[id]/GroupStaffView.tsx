@@ -4,6 +4,7 @@ import { Group, IguardStaff, Student, TeacherAttendance, PartialAttendanceMap } 
 import { setIguardGroupStaff, updateIguardGroupStaffEntries } from "@/lib/db";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { useUI } from "@/context/UIContext";
+import { isCancelledStudent } from "@/lib/busParticipation";
 
 interface Props {
   retreatId: string;
@@ -24,8 +25,7 @@ function studentStatus(
   cellColors: Record<string, string>,
 ): { status: "전참" | "부분참" | "불참"; detail?: "선복귀" | "후발대" } {
   // cellColors 키는 uniqueKey("${buNum}_${id}") 또는 raw studentId 둘 다 존재할 수 있어 양쪽 확인(행정과 동일).
-  const rawId = s.id.replace(/^[12]_/, "");
-  if (cellColors[s.id] === "red" || cellColors[rawId] === "red") return { status: "불참" };
+  if (isCancelledStudent(s.id, cellColors)) return { status: "불참" };
   const pc = partial[s.id];
   if (pc) return { status: "부분참", detail: pc.type };
   return { status: "전참" };
@@ -303,6 +303,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
           const roster = (g.studentIds || [])
             .map(sid => students[sid])
             .filter((s): s is Student => !!s)
+            .filter(s => studentStatus(s, partial, cellColors).status !== "불참")
             .sort((a, b) => (a.grade - b.grade) || (a.class - b.class) || ((a.num ?? 0) - (b.num ?? 0)));
           return (
             <button

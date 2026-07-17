@@ -6,7 +6,7 @@ import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";
-import { isStudentBusPassengerOnDay } from "@/lib/busParticipation";
+import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { roleNamesForChecklist } from "@/lib/checklistMembers";
 
@@ -49,8 +49,8 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
   return map;
 }
 
-export default function ChecklistView({ retreatId, groups, students, teachers, buses, retreatName, year, checkedKeys, attendanceInfo, partial, schedule }: {
-  retreatId: string; groups: Group[]; students: Record<string, Student>; teachers: TeacherAttendance[]; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; attendanceInfo: Record<string, IguardAttendanceInfo>; partial: PartialAttendanceMap; schedule: IguardScheduleBlock[];
+export default function ChecklistView({ retreatId, groups, students, teachers, buses, retreatName, year, checkedKeys, attendanceInfo, partial, cellColors, schedule }: {
+  retreatId: string; groups: Group[]; students: Record<string, Student>; teachers: TeacherAttendance[]; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; attendanceInfo: Record<string, IguardAttendanceInfo>; partial: PartialAttendanceMap; cellColors: Record<string, string>; schedule: IguardScheduleBlock[];
 }) {
   const { toast, uiConfirm } = useUI();
   const { user } = useAuth();
@@ -69,6 +69,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
 
   const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus"): CheckMember[] => {
     const studentMembers = (g.studentIds || [])
+      .filter(sid => !isCancelledStudent(sid, cellColors))
       .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay))
       .map(sid => {
         const s = students[sid];
@@ -87,7 +88,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
       })),
       ...studentMembers,
     ].sort((a, b) => memberSortRank(a.meta) - memberSortRank(b.meta));
-  }, [students, partial, selectedBusDay, roleNamesForGroup]);
+  }, [students, partial, cellColors, selectedBusDay, roleNamesForGroup]);
 
   const cueStaffByBus = useMemo(() => parseBusStaffFromSchedule(schedule, selectedBusDay), [schedule, selectedBusDay]);
 
@@ -101,7 +102,9 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
     }
     return buses.filter(b => busDayOf(b) === selectedBusDay).sort((a, b) => a.busNo - b.busNo).map(b => {
       const busGroups = (b.groupIds || []).map(gid => sortedGroups.find(g => g.id === gid)).filter((g): g is Group => !!g);
-      const studentCount = busGroups.reduce((sum, group) => sum + (group.studentIds || []).filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay)).length, 0);
+      const studentCount = busGroups.reduce((sum, group) => sum + (group.studentIds || [])
+        .filter(sid => !isCancelledStudent(sid, cellColors))
+        .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay)).length, 0);
       const teacherCount = busGroups.reduce((sum, group) => {
         return sum + roleNamesForGroup(group, "bus").length;
       }, 0);
@@ -137,7 +140,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
         members: allMembers,
       };
     });
-  }, [mode, sortedGroups, buses, selectedBusDay, groups, membersForGroup, partial, cueStaffByBus, roleNamesForGroup]);
+  }, [mode, sortedGroups, buses, selectedBusDay, groups, membersForGroup, partial, cellColors, cueStaffByBus, roleNamesForGroup]);
 
   const total = units.reduce((a, u) => a + u.members.length, 0);
   const checkedCount = units.reduce((a, u) => a + u.members.filter(m => checkedKeys.has(keyOf(m.id))).length, 0);
