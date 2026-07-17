@@ -181,12 +181,23 @@ export interface IguardMovement {
 }
 
 // ── 버스(호차) 배정 ─────────────────────────────────────────
+export type BusStudentGender = "남" | "여";
+
+/** 남녀 분리 자동배정의 최소 단위 — 한 조의 같은 성별 학생은 항상 함께 이동한다. */
+export interface IguardBusSegment {
+  groupId: string;
+  gender: BusStudentGender;
+  includeTeachers?: boolean; // 조 교사는 한 성별 묶음에만 붙여 중복 집계를 막는다.
+}
+
 export interface IguardBus {
   id: string;
   busNo: number;
   day?: 1 | 3;          // 1일차 입소 / 3일차 퇴소
   capacity?: number;    // 인승 (없으면 45로 간주 — 기존 데이터 하위호환, busCapacityOf 사용)
   groupIds: string[];   // groups 노드 id (단일 원천)
+  assignmentMode?: "gender"; // 없으면 기존 혼합(조 단위) 방식
+  segments?: IguardBusSegment[]; // gender 방식일 때 조+성별 묶음
   staff?: string;       // 선탑/동승 스탭 명단 (자유 텍스트)
   note?: string;
 }

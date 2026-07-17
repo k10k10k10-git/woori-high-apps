@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useMemo, useState } from "react";
-import { Group, Student, IguardBus, IguardScheduleBlock, IguardAttendanceInfo, PartialAttendanceMap, TeacherAttendance } from "@/lib/types";
+import { Group, Student, IguardBus, IguardScheduleBlock, IguardAttendanceInfo, Participant, PartialAttendanceMap, TeacherAttendance } from "@/lib/types";
 import { clearIguardAttendance, updateIguardAttendance } from "@/lib/db";
 import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
@@ -9,6 +9,7 @@ import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { roleNamesForChecklist } from "@/lib/checklistMembers";
+import { activeStudentIdsForGender, buildStudentGenderMap } from "@/lib/busGender";
 
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
@@ -49,8 +50,8 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
   return map;
 }
 
-export default function ChecklistView({ retreatId, groups, students, teachers, buses, retreatName, year, checkedKeys, attendanceInfo, partial, cellColors, schedule }: {
-  retreatId: string; groups: Group[]; students: Record<string, Student>; teachers: TeacherAttendance[]; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; attendanceInfo: Record<string, IguardAttendanceInfo>; partial: PartialAttendanceMap; cellColors: Record<string, string>; schedule: IguardScheduleBlock[];
+export default function ChecklistView({ retreatId, groups, students, participants, teachers, buses, retreatName, year, checkedKeys, attendanceInfo, partial, cellColors, schedule }: {
+  retreatId: string; groups: Group[]; students: Record<string, Student>; participants: Record<string, Participant>; teachers: TeacherAttendance[]; buses: IguardBus[]; retreatName: string; year: number; checkedKeys: Set<string>; attendanceInfo: Record<string, IguardAttendanceInfo>; partial: PartialAttendanceMap; cellColors: Record<string, string>; schedule: IguardScheduleBlock[];
 }) {
   const { toast, uiConfirm } = useUI();
   const { user } = useAuth();
@@ -61,14 +62,15 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
   const keyOf = (sid: string) => `${selectedBusDay}:${sid}`;
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const selectedBusDay = day === "3일차" ? 3 : 1;
+  const genderMap = useMemo(() => buildStudentGenderMap(participants, students), [participants, students]);
 
   const roleNamesForGroup = useCallback(
     (g: Group, checklistMode: "group" | "bus"): string[] => roleNamesForChecklist(g, teachers, checklistMode),
     [teachers],
   );
 
-  const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus"): CheckMember[] => {
-    const studentMembers = (g.studentIds || [])
+  const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus", selectedStudentIds?: string[], includeTeachers = true): CheckMember[] => {
+    const studentMembers = (selectedStudentIds ?? g.studentIds ?? [])
       .filter(sid => !isCancelledStudent(sid, cellColors))
       .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay))
       .map(sid => {
@@ -79,7 +81,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
           meta: s ? `${s.grade}-${s.class}` : "",
         };
       });
-    const teacherNames = roleNamesForGroup(g, checklistMode);
+    const teacherNames = includeTeachers ? roleNamesForGroup(g, checklistMode) : [];
     return [
       ...teacherNames.map((name, idx) => ({
         id: `teacher:${g.id}:${idx}:${name}`,
@@ -101,13 +103,25 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
       }));
     }
     return buses.filter(b => busDayOf(b) === selectedBusDay).sort((a, b) => a.busNo - b.busNo).map(b => {
-      const busGroups = (b.groupIds || []).map(gid => sortedGroups.find(g => g.id === gid)).filter((g): g is Group => !!g);
-      const studentCount = busGroups.reduce((sum, group) => sum + (group.studentIds || [])
+      const genderSegments = b.assignmentMode === "gender" && b.segments?.length ? b.segments : null;
+      const busEntries = genderSegments
+        ? genderSegments.map(segment => {
+            const group = sortedGroups.find(candidate => candidate.id === segment.groupId);
+            return group ? {
+              group,
+              gender: segment.gender,
+              includeTeachers: segment.includeTeachers === true,
+              studentIds: activeStudentIdsForGender(group, segment.gender, genderMap, partial, cellColors, selectedBusDay),
+            } : null;
+          }).filter((entry): entry is NonNullable<typeof entry> => !!entry)
+        : (b.groupIds || []).map(groupId => {
+            const group = sortedGroups.find(candidate => candidate.id === groupId);
+            return group ? { group, gender: undefined, includeTeachers: true, studentIds: group.studentIds || [] } : null;
+          }).filter((entry): entry is NonNullable<typeof entry> => !!entry);
+      const studentCount = busEntries.reduce((sum, entry) => sum + entry.studentIds
         .filter(sid => !isCancelledStudent(sid, cellColors))
         .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay)).length, 0);
-      const teacherCount = busGroups.reduce((sum, group) => {
-        return sum + roleNamesForGroup(group, "bus").length;
-      }, 0);
+      const teacherCount = busEntries.reduce((sum, entry) => sum + (entry.includeTeachers ? roleNamesForGroup(entry.group, "bus").length : 0), 0);
       // 스탭: 버스 자체 staff 필드 + 큐싯 notice에서 파싱한 호차별 스탭 (중복 제거)
       const busFieldParse = parseBusStaff(b.staff);
       const busFieldStaff = busFieldParse.names;
@@ -121,9 +135,9 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
         meta: staffMetaLabel(name),
       }));
       const allMembers = [
-        ...busGroups.flatMap(group => {
-          const groupName = `${group.bu} ${groupDisplayName(group, groups)}`;
-          return membersForGroup(group, "bus").map(member => ({
+        ...busEntries.flatMap(entry => {
+          const groupName = `${entry.group.bu} ${groupDisplayName(entry.group, groups)}${entry.gender ? ` ${entry.gender}` : ""}`;
+          return membersForGroup(entry.group, "bus", entry.studentIds, entry.includeTeachers).map(member => ({
             ...member,
             meta: member.meta === "교사" ? `${groupName} · 교사` : [groupName, member.meta].filter(Boolean).join(" · "),
           }));
@@ -140,7 +154,7 @@ export default function ChecklistView({ retreatId, groups, students, teachers, b
         members: allMembers,
       };
     });
-  }, [mode, sortedGroups, buses, selectedBusDay, groups, membersForGroup, partial, cellColors, cueStaffByBus, roleNamesForGroup]);
+  }, [mode, sortedGroups, buses, selectedBusDay, groups, membersForGroup, partial, cellColors, cueStaffByBus, roleNamesForGroup, genderMap]);
 
   const total = units.reduce((a, u) => a + u.members.length, 0);
   const checkedCount = units.reduce((a, u) => a + u.members.filter(m => checkedKeys.has(keyOf(m.id))).length, 0);

@@ -72,7 +72,7 @@
 | `retreats/{id}/iguard/schedule` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/posts` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/movements` | 이가드 | - | 이가드만 | 없음 |
-| `retreats/{id}/iguard/buses` | 이가드 | - | 이가드만 | 없음 |
+| `retreats/{id}/iguard/buses` | 이가드 | - | 이가드만 | 버스 배정 — 기존 혼합은 `groupIds`, 남녀 분리는 `assignmentMode=gender`+`segments[{groupId,gender,includeTeachers}]` |
 | `retreats/{id}/iguard/attendance` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/seating` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/meals` | 이가드 | - | 이가드만 | 없음 |

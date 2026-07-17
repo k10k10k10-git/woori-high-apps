@@ -53,6 +53,7 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 - Escape user-provided data with `escapeHtml()` before generated print HTML.
 - Bus 선탑/동승 parsing must go through `src/lib/busStaff.ts`. This strips trailing `sf`, removes obvious instruction fragments and count summaries such as `스탭 0명` from cue sheets, and keeps rejected fragments out of bus headcounts and checklist members while still surfacing warnings.
 - Bus auto-assignment must not be trapped by staff-only imported bus rows. If existing buses are fewer than the minimum needed for all student+teacher passengers, create the missing bus rows and preserve existing bus staff fields by `busNo`.
+- Bus gender separation uses `group + gender` cohorts, never individual scattering. Read gender from admin-owned `participants`, write only `iguard/buses.assignmentMode/segments`, fail closed on missing gender, and keep legacy buses in mixed group mode.
 
 ## Roles
 
@@ -63,6 +64,12 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 - **접근법**: 1→ 운영 `teachers`와 `partialAttendances`를 읽기 전용으로 좁게 대조해 교사 자차는 `transport`, 학생 당일참여는 `note`에 저장됨을 확인한다. 2→ `subscribeToPartialAttendances()`가 버리던 note를 객체형 `PartialAttendanceMap`으로 보존한다. 3→ `src/lib/busParticipation.ts`에 학생 일차·당일참여와 교사 불참·자차 판정을 모으고 `BusesView`·`ChecklistView`가 같은 함수를 사용하게 한다. 4→ 객체형/레거시 문자열형 정규화와 실제 문구를 회귀 테스트로 고정한다.
 - **판단 질문**: 조 이름 목록만 보고 세거나 `partialAttendances.type`만 남기지 않는다. 전자는 행정의 불참·자차를 무시하고, 후자는 `25일 당일참여`처럼 type만으로 구분할 수 없는 학생을 버스에 다시 포함한다. 이름이 모호한 교사를 임의 제외하거나 학생 조장에게 교사 자차 필터를 적용하지 않는다.
 - **재사용 규칙**: 단체 버스 인원은 `isStudentBusPassengerOnDay()`와 `isTeacherBusPassenger()`로만 판정하고, 행정 부분참 구독에서는 `type`과 `note`를 함께 보존한다.
+
+### 버스 조별 성별 묶음 자동배정 (2026-07-17)
+
+- **접근법**: `혼합`은 기존 조 단위를 그대로 `busAutoAssign.ts`에 넘긴다. `남녀 분리`는 `busGender.ts`에서 취소·부분참을 먼저 제외한 뒤 `조+남`, `조+여` 묶음을 만들고, 배정기가 한 호차에 단일 성별만 허용한다. 참가자 성별을 우선하고, 시트에 없는 수동 학생은 행정 조편성과 동일한 홀수반=남·짝수반=여 기준으로 보강한다. 결과는 `iguard/buses.segments`에 저장하고 호차별 체크리스트도 같은 묶음을 읽는다.
+- **판단 질문**: 학생 개인을 무작위로 흩뜨리거나 성별 미확인 학생을 조용히 제외하지 않는다. 조 교사를 양쪽 성별 호차에 중복시키지 않고 더 큰 학생 묶음 한 곳에만 포함한다. 기존 버스는 새 필드가 없으므로 혼합으로 유지한다.
+- **재사용 규칙**: 성별 키 정규화·묶음 생성은 `busGender.ts`, 정원 비례·예약석·단일 성별 호차 불변식은 `busAutoAssign.ts`만 사용한다.
 
 ### 수련회별 PIN 잠금 (2026-07-16)
 

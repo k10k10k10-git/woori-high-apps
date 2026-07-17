@@ -291,6 +291,10 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 큐싯 자동 선탑 명단은 `N호차: 이름` 또는 `N호차 선탑/동승: 이름` 형식만 인식한다. `N호차 짐 하차 보조 스탭: 이름`처럼 호차를 언급한 별도 업무는 선탑/동승으로 합치지 않는다. 파싱은 `src/lib/cueSheet.ts`의 `extractBusStaffDraftsFromRows`만 사용한다.
 
+### 22. 버스 남녀 분리는 개인이 아니라 조+성별 묶음이다 (`busGender.ts` / `busAutoAssign.ts`)
+
+버스 자동배정의 `혼합`은 기존처럼 조 전체를 최소 단위로 사용한다. `남녀 분리`는 학생 개인을 흩뜨리지 않고 `${groupId}::남`, `${groupId}::여` 묶음을 최소 단위로 사용하며, 한 버스에는 한 성별 묶음만 들어간다. 성별은 행정 소유 `participants.gender`를 읽기 전용으로 연결하고, 시트에 없는 수동 학생은 행정 자동 조편성과 동일한 `홀수반=남·짝수반=여` 기준으로 보강한다. 그래도 성별을 찾지 못한 실제 탑승 학생이 있으면 누락시키지 말고 자동배정을 중단한다. 저장은 IGuard 소유 `iguard/buses`의 `assignmentMode="gender"`와 `segments[{groupId,gender,includeTeachers}]`에만 하며, 필드가 없는 기존 버스는 혼합 방식으로 간주한다. 조 교사는 성별 정보가 없으므로 더 큰 학생 묶음 한 곳에만 붙여 중복 집계를 막고, 호차별 인원체크도 같은 `segments`를 사용한다. 수동으로 조 목록을 수정하면 해당 호차의 성별 묶음을 지우고 혼합 방식으로 전환한다.
+
 ---
 
 ## API 라우트
@@ -362,6 +366,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `groupNumber.test.ts` | `groupDisplayName` | 1부/2부 전역 번호, 커스텀 이름 |
 | `partialAttendance.test.ts` | `isPresentOnDay` | 본대/선복귀/후발대 일자별 참석 |
 | `busParticipation.test.ts` | 버스 탑승 판정 | 당일참여 학생, 자차·불참 교사, 부서 동명이인 매칭 |
+| `busGender.test.ts` | 버스 성별 배정 | raw/unique 학생키 성별 연결, 조+성별 묶음, 단일 성별 호차·정원 불변식 |
 | `checklistMembers.test.ts` | 인원체크 교사 명단 | 조별은 자차 포함, 호차별은 자차 제외 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 

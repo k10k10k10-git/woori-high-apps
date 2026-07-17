@@ -7,12 +7,12 @@ import {
   subscribeToIguardSeating, subscribeToMilestones, subscribeToIguardGuide,
   subscribeToRetreatPeriods, subscribeToIguardAttendance, subscribeToPartialAttendances,
   subscribeToTeacherAttendances, subscribeToIguardGroupStaff, subscribeToCellColors,
-  subscribeToConnection,
+  subscribeToConnection, subscribeToParticipants,
 } from "@/lib/db";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
   IguardPost, IguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
-  TeacherAttendance, IguardAttendanceInfo, PartialAttendanceMap,
+  TeacherAttendance, IguardAttendanceInfo, PartialAttendanceMap, Participant,
 } from "@/lib/types";
 
 export interface RetreatData {
@@ -23,6 +23,7 @@ export interface RetreatData {
   groups: Group[];
   rooms: Room[];
   students: Record<string, Student>;
+  participants: Record<string, Participant>;
   adminTeachers: TeacherAttendance[];
   meals: IguardMeal[];
   schedule: IguardScheduleBlock[];
@@ -54,6 +55,7 @@ export function useRetreatData(id: string): RetreatData {
   const [groups, setGroups] = useState<Group[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [students, setStudents] = useState<Record<string, Student>>({});
+  const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [adminTeachers, setAdminTeachers] = useState<TeacherAttendance[]>([]);
   const [meals, setMeals] = useState<IguardMeal[]>([]);
   const [schedule, setSchedule] = useState<IguardScheduleBlock[]>([]);
@@ -91,7 +93,7 @@ export function useRetreatData(id: string): RetreatData {
     setDataLoading(true);
     let alive = true;
     const pending = new Set([
-      "students", "adminTeachers", "groups", "rooms", "meals", "schedule", "posts",
+      "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "posts",
       "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff",
     ]);
     const ready = (key: string) => {
@@ -107,6 +109,7 @@ export function useRetreatData(id: string): RetreatData {
     };
     const unsubs = [
       subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }, fail("students")),
+      subscribeToParticipants(id, value => { setParticipants(value); ready("participants"); }, fail("participants")),
       subscribeToTeacherAttendances(id, value => { setAdminTeachers(value); ready("adminTeachers"); }, fail("adminTeachers")),
       subscribeToGroups(id, value => { setGroups(value); ready("groups"); }, fail("groups")),
       subscribeToRooms(id, value => { setRooms(value); ready("rooms"); }, fail("rooms")),
@@ -132,7 +135,7 @@ export function useRetreatData(id: string): RetreatData {
 
   return {
     retreat, retreatLoading, dataLoading, loadError,
-    groups, rooms, students, adminTeachers,
+    groups, rooms, students, participants, adminTeachers,
     meals, schedule, posts, movements, buses, seating,
     todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff,
     connected,

@@ -297,7 +297,16 @@ export async function saveIguardBus(retreatId: string, data: Omit<IguardBus, "id
   const r = push(ref(db, paths.iguardBuses(retreatId)));
   await set(r, stripUndefined(data)); return r.key!;
 }
-export async function updateIguardBus(retreatId: string, id: string, data: Partial<Omit<IguardBus, "id" | "staff" | "note">> & { staff?: string | null; note?: string | null }): Promise<void> {
+export async function updateIguardBus(
+  retreatId: string,
+  id: string,
+  data: Partial<Omit<IguardBus, "id" | "staff" | "note" | "assignmentMode" | "segments">> & {
+    staff?: string | null;
+    note?: string | null;
+    assignmentMode?: IguardBus["assignmentMode"] | null;
+    segments?: IguardBus["segments"] | null;
+  },
+): Promise<void> {
   // null = 필드 삭제(빈 값으로 지울 때 null 사용)
   await update(ref(db, paths.iguardBus(retreatId, id)), stripUndefined(data));
 }

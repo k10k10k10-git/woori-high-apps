@@ -18,7 +18,7 @@ const roomSort = (a: Room, b: Room) => {
 };
 
 interface RoomChip { roomNumber: string; count: number; }
-interface BusInfo { day: 1 | 3; busNo: number; staff?: string; }
+interface BusInfo { day: 1 | 3; busNo: number; staff?: string; gender?: "남" | "여"; }
 interface MealInfo { label: string; day: number; slot: number; seq: number; }
 interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; meals: MealInfo[]; }
 
@@ -52,7 +52,12 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
       });
       const groupBuses: BusInfo[] = buses
         .filter(b => (b.groupIds || []).includes(g.id))
-        .map(b => ({ day: (b.day === 3 ? 3 : 1) as 1 | 3, busNo: b.busNo, staff: b.staff }))
+        .map(b => ({
+          day: (b.day === 3 ? 3 : 1) as 1 | 3,
+          busNo: b.busNo,
+          staff: b.staff,
+          gender: b.assignmentMode === "gender" ? b.segments?.find(segment => segment.groupId === g.id)?.gender : undefined,
+        }))
         .sort((a, b) => a.day - b.day);
       const groupMeals: MealInfo[] = meals
         .flatMap(m => {
@@ -132,7 +137,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
                   <span className="flex flex-wrap gap-1.5">
                     {d.buses.map((b, i) => (
                       <span key={i} className="px-1.5 py-0.5 rounded text-xs bg-sky-50 text-sky-700 border border-sky-200">
-                        {b.day}일차 {b.busNo}호차
+                        {b.day}일차 {b.busNo}호차{b.gender ? `(${b.gender})` : ""}
                       </span>
                     ))}
                   </span>

@@ -1,27 +1,20 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Group, IguardBus, IguardScheduleBlock, PartialAttendanceMap, TeacherAttendance } from "@/lib/types";
+import { BusStudentGender, Group, IguardBus, IguardBusSegment, IguardScheduleBlock, Participant, PartialAttendanceMap, Student, TeacherAttendance } from "@/lib/types";
 import { saveIguardBus, updateIguardBus, deleteIguardBus } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay, isTeacherBusPassenger } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { busCapacityOf, isValidBusCapacity, DEFAULT_BUS_CAPACITY, MIN_BUS_CAPACITY, MAX_BUS_CAPACITY } from "@/lib/busCapacity";
+import { assignBusUnits, BusAssignmentUnit } from "@/lib/busAutoAssign";
+import { activeStudentIdsForGender, buildGenderCohorts } from "@/lib/busGender";
 
 const RESERVED_STAFF_SEATS = 3;
-const BALANCE_ATTEMPTS = 400;
 
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
-const parseNames = (csv?: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
-const shuffle = <T,>(arr: T[]) => {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-};
+type AutoMode = "mixed" | "gender";
 
 function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 3): Map<number, string[]> {
   const day = busDay === 3 ? 3 : 1;
@@ -40,10 +33,11 @@ function parseBusStaffFromSchedule(schedule: IguardScheduleBlock[], busDay: 1 | 
   return map;
 }
 
-export default function BusesView({ retreatId, buses, groups, teachers, partial, cellColors, schedule }: { retreatId: string; buses: IguardBus[]; groups: Group[]; teachers: TeacherAttendance[]; partial: PartialAttendanceMap; cellColors: Record<string, string>; schedule: IguardScheduleBlock[] }) {
+export default function BusesView({ retreatId, buses, groups, students, participants, teachers, partial, cellColors, schedule }: { retreatId: string; buses: IguardBus[]; groups: Group[]; students: Record<string, Student>; participants: Record<string, Participant>; teachers: TeacherAttendance[]; partial: PartialAttendanceMap; cellColors: Record<string, string>; schedule: IguardScheduleBlock[] }) {
   const { toast, uiConfirm } = useUI();
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const [day, setDay] = useState<1 | 3>(1);
+  const [autoModeByDay, setAutoModeByDay] = useState<Partial<Record<1 | 3, AutoMode>>>({});
   const [editing, setEditing] = useState<IguardBus | null>(null);
   const [show, setShow] = useState(false);
   const [busNo, setBusNo] = useState("");
@@ -52,24 +46,46 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
   const [staffTxt, setStaffTxt] = useState("");
 
   const dayBuses = useMemo(() => buses.filter(b => busDayOf(b) === day).sort((a, b) => a.busNo - b.busNo), [buses, day]);
+  const selectedAutoMode = autoModeByDay[day] ?? (dayBuses.some(bus => bus.assignmentMode === "gender") ? "gender" : "mixed");
   const cueStaffByBus = useMemo(() => parseBusStaffFromSchedule(schedule, day), [schedule, day]);
+  const genderData = useMemo(
+    () => buildGenderCohorts(sortedGroups, participants, students, partial, cellColors, day),
+    [sortedGroups, participants, students, partial, cellColors, day],
+  );
+
+  function busTeacherNames(g: Group): string[] {
+    return [...new Set((g.teachers || [])
+      .filter(name => isTeacherBusPassenger(teachers, name, g.bu))
+      .map(name => name.trim())
+      .filter(Boolean))];
+  }
 
   function groupPassengerCount(g: Group): number {
-    const teacherNames = new Set([
-      ...(g.teachers || []).filter(name => isTeacherBusPassenger(teachers, name, g.bu)),
-      ...parseNames(g.leader), // 조장은 학생 역할 — 행정 교사의 자차 필터를 적용하지 않는다.
-    ].map(s => s.trim()).filter(Boolean));
     // 부분참: 선택한 일자에 실제 탑승하는 학생만 카운트 (1일차=본대+선복귀, 3일차=본대+후발대)
     const studentCount = (g.studentIds || [])
       .filter(sid => !isCancelledStudent(sid, cellColors))
       .filter(sid => isStudentBusPassengerOnDay(partial[sid], day)).length;
-    return studentCount + teacherNames.size;
+    return studentCount + busTeacherNames(g).length;
   }
   const groupById = (id: string) => sortedGroups.find(g => g.id === id);
   const headcount = (ids: string[]) => ids.reduce((sum, id) => {
     const g = groupById(id);
     return sum + (g ? groupPassengerCount(g) : 0);
   }, 0);
+
+  function segmentPassengerCount(segment: IguardBusSegment): number {
+    const group = groupById(segment.groupId);
+    if (!group) return 0;
+    const students = activeStudentIdsForGender(group, segment.gender, genderData.genderMap, partial, cellColors, day).length;
+    return students + (segment.includeTeachers ? busTeacherNames(group).length : 0);
+  }
+
+  function busPassengerCount(bus: IguardBus): number {
+    if (bus.assignmentMode === "gender" && bus.segments?.length) {
+      return bus.segments.reduce((sum, segment) => sum + segmentPassengerCount(segment), 0);
+    }
+    return headcount(bus.groupIds || []);
+  }
 
 
   function openNew() {
@@ -99,7 +115,10 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
     if (count > cap - RESERVED_STAFF_SEATS) toast(`스탭 좌석 여유가 ${cap - count}석뿐입니다.`, "warning");
     const staffValue = staffTxt.trim();
     try {
-      if (editing) await updateIguardBus(retreatId, editing.id, { day, busNo: n, capacity: cap, groupIds, staff: staffValue || null });
+      if (editing) await updateIguardBus(retreatId, editing.id, {
+        day, busNo: n, capacity: cap, groupIds, staff: staffValue || null,
+        assignmentMode: null, segments: null,
+      });
       else await saveIguardBus(retreatId, { day, busNo: n, capacity: cap, groupIds, staff: staffValue || undefined });
       setShow(false);
     } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
@@ -110,155 +129,95 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
   }
   const toggle = (id: string) => setGroupIds(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
 
-  /** 호차별 인승(capacities) 기반 자동배정 — 결과 배열의 i번째가 capacities[i] 버스에 대응한다(순서 보존).
-   *  혼합 인승 지원: 각 버스 목표 인원을 정원 비례로 잡고, 정원·조 단위 불변식을 지킨다. */
-  function makeAutoAssignment(capacities: number[]) {
-    interface Bin { groupIds: string[]; count: number; capacity: number; target: number }
-    const baseUnits = sortedGroups.map(g => ({ group: g, size: groupPassengerCount(g) }));
-    const totalPassengers = baseUnits.reduce((sum, unit) => sum + unit.size, 0);
-    const maxCapacity = Math.max(...capacities);
-    baseUnits.forEach(unit => {
-      if (unit.size > maxCapacity) throw new Error(`${groupDisplayName(unit.group, groups)} 인원이 ${unit.size}명이라 최대 ${maxCapacity}인승 버스에 배정할 수 없습니다.`);
+  function makeAssignmentUnits(mode: AutoMode): {
+    units: BusAssignmentUnit[];
+    segmentByUnitId: Map<string, IguardBusSegment>;
+    labelByUnitId: Map<string, string>;
+  } {
+    if (mode === "mixed") {
+      return {
+        units: sortedGroups.map(group => ({ id: group.id, size: groupPassengerCount(group) })),
+        segmentByUnitId: new Map(),
+        labelByUnitId: new Map(sortedGroups.map(group => [group.id, groupDisplayName(group, groups)])),
+      };
+    }
+    if (genderData.missingStudentIds.length > 0) {
+      throw new Error(`성별을 확인할 수 없는 탑승 학생이 ${genderData.missingStudentIds.length}명 있습니다. 행정 참가자 매칭·성별을 확인한 뒤 다시 시도해주세요.`);
+    }
+
+    const segmentByUnitId = new Map<string, IguardBusSegment>();
+    const labelByUnitId = new Map<string, string>();
+    const units: BusAssignmentUnit[] = [];
+    sortedGroups.forEach(group => {
+      const cohorts = genderData.cohorts.filter(cohort => cohort.groupId === group.id);
+      const teachersForGroup = busTeacherNames(group).length;
+      if (cohorts.length === 0) {
+        if (teachersForGroup > 0) throw new Error(`${groupDisplayName(group, groups)}는 탑승 학생 없이 교사만 있어 남녀 분리 자동배정을 할 수 없습니다.`);
+        return;
+      }
+      const teacherCohort = [...cohorts].sort((a, b) => b.studentIds.length - a.studentIds.length || a.gender.localeCompare(b.gender, "ko"))[0];
+      cohorts.forEach(cohort => {
+        const unitId = `${cohort.groupId}::${cohort.gender}`;
+        const includeTeachers = cohort === teacherCohort && teachersForGroup > 0;
+        const segment: IguardBusSegment = { groupId: cohort.groupId, gender: cohort.gender, ...(includeTeachers ? { includeTeachers: true } : {}) };
+        segmentByUnitId.set(unitId, segment);
+        labelByUnitId.set(unitId, `${groupDisplayName(group, groups)} ${cohort.gender}`);
+        units.push({ id: unitId, size: cohort.studentIds.length + (includeTeachers ? teachersForGroup : 0), gender: cohort.gender });
+      });
     });
-    const sumCapacity = capacities.reduce((a, b) => a + b, 0);
+    return { units, segmentByUnitId, labelByUnitId };
+  }
+
+  /** 결과 배열의 i번째는 capacities[i] 호차에 대응한다. 혼합은 조, 분리는 조+성별 묶음이 최소 단위다. */
+  function makeAutoAssignment(capacities: number[], mode: AutoMode) {
+    const { units, segmentByUnitId, labelByUnitId } = makeAssignmentUnits(mode);
+    const totalPassengers = units.reduce((sum, unit) => sum + unit.size, 0);
+    const maxCapacity = Math.max(...capacities);
+    units.forEach(unit => {
+      if (unit.size > maxCapacity) throw new Error(`${labelByUnitId.get(unit.id) ?? unit.id} 인원이 ${unit.size}명이라 최대 ${maxCapacity}인승 버스에 배정할 수 없습니다.`);
+    });
+    const sumCapacity = capacities.reduce((sum, capacity) => sum + capacity, 0);
     if (totalPassengers > sumCapacity) {
       throw new Error(`전체 ${totalPassengers}명이 총 좌석 ${sumCapacity}석을 초과합니다. 호차를 추가하거나 인승을 조정한 뒤 다시 자동배정해주세요.`);
     }
-    // 혼합 인승 대응: 버스별 목표 인원 = 전체 인원의 정원 비례 배분 (동일 인승이면 기존 균등 목표와 동일)
-    const targets = capacities.map(cap => totalPassengers * (cap / sumCapacity));
-
-    const makeOrder = () => {
-      const units = shuffle(baseUnits).map(unit => ({ ...unit, jitter: Math.random() }));
-      const strategy = Math.random();
-      if (strategy < 0.4) return units;
-      if (strategy < 0.75) return units.sort((a, b) => (b.size + b.jitter * 10) - (a.size + a.jitter * 10));
-      return units.sort((a, b) => (a.size + a.jitter * 8) - (b.size + b.jitter * 8));
-    };
-
-    const score = (bins: Bin[]) => {
-      // 목표 대비 편차 기준 — 동일 인승이면 절대 인원 기준(기존 점수식)과 동등
-      const devs = bins.map(bin => bin.count - bin.target);
-      const range = Math.max(...devs) - Math.min(...devs);
-      const variance = devs.reduce((sum, d) => sum + d * d, 0);
-      const overReserve = bins.reduce((sum, bin) => sum + Math.max(0, bin.count - (bin.capacity - RESERVED_STAFF_SEATS)), 0);
-      const emptyCount = bins.filter(bin => bin.count === 0).length;
-      return range * 10000 + variance * 100 + overReserve * 80 + emptyCount * 1000 + Math.random();
-    };
-    const sizeOf = new Map(baseUnits.map(unit => [unit.group.id, unit.size]));
-    const newBins = (): Bin[] => capacities.map((cap, i) => ({ groupIds: [], count: 0, capacity: cap, target: targets[i] }));
-    const cloneBins = (bins: Bin[]): Bin[] => bins.map(bin => ({ ...bin, groupIds: [...bin.groupIds] }));
-
-    const improve = (bins: Bin[]) => {
-      let current = cloneBins(bins);
-      let currentScore = score(current);
-
-      for (let pass = 0; pass < 80; pass++) {
-        let best: { bins: Bin[]; score: number } | null = null;
-
-        for (let from = 0; from < current.length; from++) {
-          for (let to = 0; to < current.length; to++) {
-            if (from === to) continue;
-            for (const gid of current[from].groupIds) {
-              const size = sizeOf.get(gid) ?? 0;
-              if (current[to].count + size <= current[to].capacity) {
-                const next = cloneBins(current);
-                next[from].groupIds = next[from].groupIds.filter(id => id !== gid);
-                next[from].count -= size;
-                next[to].groupIds.push(gid);
-                next[to].count += size;
-                const nextScore = score(next);
-                if (nextScore < currentScore && (!best || nextScore < best.score)) best = { bins: next, score: nextScore };
-              }
-
-              for (const otherGid of current[to].groupIds) {
-                const otherSize = sizeOf.get(otherGid) ?? 0;
-                const nextFrom = current[from].count - size + otherSize;
-                const nextTo = current[to].count - otherSize + size;
-                if (nextFrom > current[from].capacity || nextTo > current[to].capacity) continue;
-                const next = cloneBins(current);
-                next[from].groupIds = next[from].groupIds.map(id => id === gid ? otherGid : id);
-                next[to].groupIds = next[to].groupIds.map(id => id === otherGid ? gid : id);
-                next[from].count = nextFrom;
-                next[to].count = nextTo;
-                const nextScore = score(next);
-                if (nextScore < currentScore && (!best || nextScore < best.score)) best = { bins: next, score: nextScore };
-              }
-            }
-          }
-        }
-
-        if (!best) break;
-        current = best.bins;
-        currentScore = best.score;
-      }
-      return current;
-    };
-
-    const pack = () => {
-      const bins = newBins();
-      let failed = false;
-      makeOrder().forEach(unit => {
-        if (failed) return;
-        const feasible = bins
-          .map((bin, idx) => {
-            const nextCount = bin.count + unit.size;
-            return {
-              idx,
-              nextCount,
-              remaining: bin.capacity - nextCount,
-              balanceGap: Math.abs(nextCount - bin.target),
-            };
-          })
-          .filter(x => x.remaining >= 0)
-          .sort((a, b) => a.balanceGap - b.balanceGap || a.nextCount - b.nextCount);
-
-        if (feasible.length === 0) { failed = true; return; }
-
-        const candidates = feasible.slice(0, Math.min(feasible.length, 4));
-        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-        bins[chosen.idx].groupIds.push(unit.group.id);
-        bins[chosen.idx].count += unit.size;
-      });
-      return failed ? null : improve(bins);
-    };
-
-    const attempts = Array.from({ length: BALANCE_ATTEMPTS }, pack).filter((bins): bins is Bin[] => !!bins);
-    if (attempts.length === 0) throw new Error(`${capacities.length}대 안에 배정할 수 있는 조합을 찾지 못했습니다. 호차를 추가하거나 수동으로 조정해주세요.`);
-    const rankedAttempts = attempts
-      .map(bins => ({ bins, score: score(bins) }))
-      .sort((a, b) => a.score - b.score);
-    const bestScore = rankedAttempts[0].score;
-    const bestAttempts = rankedAttempts.filter(item => item.score <= bestScore + 1000).slice(0, 6);
-    const selectedBins = shuffle(bestAttempts)[0].bins;
-
-    // ⚠ bins 순서 = capacities 순서 = 호차 대응 — 인승이 제각각일 수 있으므로 순서를 섞지 않는다
-    return selectedBins.map(bin => ({ groupIds: shuffle(bin.groupIds) }));
+    const bins = assignBusUnits(capacities, units, {
+      separateGenders: mode === "gender",
+      reservedSeats: RESERVED_STAFF_SEATS,
+    });
+    if (!bins) throw new Error(`${capacities.length}대 안에 배정할 수 있는 조합을 찾지 못했습니다. 호차를 추가하거나 수동으로 조정해주세요.`);
+    return bins.map(bin => {
+      if (mode === "mixed") return { groupIds: bin.unitIds, segments: undefined, gender: undefined as BusStudentGender | undefined };
+      const segments = bin.unitIds.map(unitId => segmentByUnitId.get(unitId)).filter((segment): segment is IguardBusSegment => !!segment);
+      return { groupIds: [...new Set(segments.map(segment => segment.groupId))], segments, gender: bin.gender };
+    });
   }
 
   async function autoAssign() {
     if (sortedGroups.length === 0) return toast("조 데이터가 없습니다.", "warning");
-    const totalPassengerCount = sortedGroups.reduce((sum, group) => sum + groupPassengerCount(group), 0);
-    // 좌석 합계 기준으로 부족분 판정 — 호차별 인승이 제각각이어도 정확하다
-    const existingCapacities = dayBuses.map(busCapacityOf);
-    const capacities = [...existingCapacities];
-    while (capacities.reduce((a, b) => a + b, 0) < totalPassengerCount || capacities.length === 0) {
-      capacities.push(DEFAULT_BUS_CAPACITY);
-    }
-    const willCreateMoreBuses = capacities.length > dayBuses.length;
-    if (dayBuses.length > 0) {
-      const message = willCreateMoreBuses
-        ? `${day}일차 기존 ${dayBuses.length}대(총 ${existingCapacities.reduce((a, b) => a + b, 0)}석)로는 전체 ${totalPassengerCount}명을 태울 수 없어 ${DEFAULT_BUS_CAPACITY}인승 ${capacities.length - dayBuses.length}대를 추가하고 자동배정할까요?`
-        : `${day}일차 기존 버스 배정을 자동배정 결과로 바꿀까요?`;
-      if (!await uiConfirm(message)) return;
-    }
-
+    const mode = selectedAutoMode;
     try {
+      const assignmentUnits = makeAssignmentUnits(mode).units;
+      const totalPassengerCount = assignmentUnits.reduce((sum, unit) => sum + unit.size, 0);
+      const existingCapacities = dayBuses.map(busCapacityOf);
+      const capacities = [...existingCapacities];
+      while (capacities.reduce((sum, capacity) => sum + capacity, 0) < totalPassengerCount || capacities.length === 0) {
+        capacities.push(DEFAULT_BUS_CAPACITY);
+      }
+      const willCreateMoreBuses = capacities.length > dayBuses.length;
+      if (dayBuses.length > 0) {
+        const modeLabel = mode === "gender" ? "남녀 분리" : "혼합";
+        const message = willCreateMoreBuses
+          ? `${day}일차 기존 ${dayBuses.length}대(총 ${existingCapacities.reduce((a, b) => a + b, 0)}석)로는 전체 ${totalPassengerCount}명을 태울 수 없어 ${DEFAULT_BUS_CAPACITY}인승 ${capacities.length - dayBuses.length}대를 추가하고 ${modeLabel} 자동배정할까요?`
+          : `${day}일차 기존 버스 배정을 ${modeLabel} 자동배정 결과로 바꿀까요?`;
+        if (!await uiConfirm(message)) return;
+      }
+
       // 좌석 합계는 충분해도 조 단위(안 쪼개짐) 때문에 배정 조합이 없을 수 있다 — 기본 인승 1대씩, 최대 2대까지 늘려 재시도
-      let assignedBins: { groupIds: string[] }[] | null = null;
+      let assignedBins: ReturnType<typeof makeAutoAssignment> | null = null;
       let lastError: unknown = null;
       for (let extra = 0; extra <= 2 && !assignedBins; extra++) {
         try {
-          assignedBins = makeAutoAssignment([...capacities, ...Array(extra).fill(DEFAULT_BUS_CAPACITY)]);
+          assignedBins = makeAutoAssignment([...capacities, ...Array(extra).fill(DEFAULT_BUS_CAPACITY)], mode);
           if (extra > 0) toast(`좌석 조합상 ${DEFAULT_BUS_CAPACITY}인승 ${extra}대를 추가로 만들어 배정했습니다.`, "warning");
         } catch (e) { lastError = e; }
       }
@@ -268,17 +227,22 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
       const maxBusNo = dayBuses.reduce((m, b) => Math.max(m, b.busNo), 0);
       await Promise.all(assignedBins.map((bin, idx) => {
         const existing = dayBuses[idx];
-        return existing
-          ? updateIguardBus(retreatId, existing.id, { groupIds: bin.groupIds })
+        if (existing) {
+          return mode === "gender"
+            ? updateIguardBus(retreatId, existing.id, { groupIds: bin.groupIds, assignmentMode: "gender", segments: bin.segments })
+            : updateIguardBus(retreatId, existing.id, { groupIds: bin.groupIds, assignmentMode: null, segments: null });
+        }
+        return mode === "gender"
+          ? saveIguardBus(retreatId, { day, busNo: maxBusNo + (idx - dayBuses.length + 1), capacity: DEFAULT_BUS_CAPACITY, groupIds: bin.groupIds, assignmentMode: "gender", segments: bin.segments })
           : saveIguardBus(retreatId, { day, busNo: maxBusNo + (idx - dayBuses.length + 1), capacity: DEFAULT_BUS_CAPACITY, groupIds: bin.groupIds });
       }));
-      toast(`${day}일차 버스 자동배정을 적용했습니다.`, "success");
+      toast(`${day}일차 ${mode === "gender" ? "남녀 분리" : "혼합"} 자동배정을 적용했습니다.`, "success");
     } catch (e) {
       toast(e instanceof Error ? e.message : String(e), "error");
     }
   }
 
-  const totalPassengers = headcount(dayBuses.flatMap(b => b.groupIds || []));
+  const totalPassengers = dayBuses.reduce((sum, bus) => sum + busPassengerCount(bus), 0);
   const totalStaffCount = dayBuses.reduce((sum, b) => {
     const busFieldStaff = parseBusStaffNames(b.staff);
     const cueStaff = cueStaffByBus.get(b.busNo) || [];
@@ -289,7 +253,8 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
   return (
     <div>
       <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
-        ℹ️ 인승은 호차별로 설정할 수 있고(기본 {DEFAULT_BUS_CAPACITY}인승), 자동배정은 각 호차의 인승에 맞춰 <strong>인원 균등(정원 비례)</strong>을 우선으로 잡고, 가능하면 스탭 좌석 {RESERVED_STAFF_SEATS}석을 남깁니다. 조는 절대 쪼개지지 않고, 인원은 학생+교사 기준입니다.
+        ℹ️ 인승은 호차별로 설정할 수 있고(기본 {DEFAULT_BUS_CAPACITY}인승), 자동배정은 각 호차의 인승에 맞춰 <strong>인원 균등(정원 비례)</strong>을 우선으로 잡고, 가능하면 스탭 좌석 {RESERVED_STAFF_SEATS}석을 남깁니다.
+        <span className="mt-1 block text-fuchsia-600"><strong>혼합</strong>은 기존처럼 조 전체를 유지하고, <strong>남녀 분리</strong>는 한 조의 같은 성별 학생을 한 묶음으로 유지해 성별 호차에 배정합니다.</span>
         <span className="mt-1 block text-fuchsia-600">행정의 교사 불참·자차와 학생 부분참 당일참여는 단체 버스 인원에서 제외됩니다.</span>
       </div>
 
@@ -301,7 +266,17 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
           ))}
         </div>
         <span className="text-sm text-slate-500">버스 <strong className="text-slate-800">{dayBuses.length}</strong>대 · 총 탑승 <strong className="text-fuchsia-700">{totalHeadcount}</strong>명</span>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <label className="sr-only" htmlFor={`bus-auto-mode-${day}`}>자동배정 방식</label>
+          <select
+            id={`bus-auto-mode-${day}`}
+            className="input min-w-40"
+            value={selectedAutoMode}
+            onChange={event => setAutoModeByDay(previous => ({ ...previous, [day]: event.target.value as AutoMode }))}
+          >
+            <option value="mixed">혼합 · 기존 조 유지</option>
+            <option value="gender">남녀 분리 · 조별 성별 묶음</option>
+          </select>
           <button onClick={autoAssign} className="btn-secondary">✨ 자동배정</button>
           <button onClick={openNew} className="btn-primary">＋ 호차 추가</button>
         </div>
@@ -327,6 +302,9 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
               </div>
               <div>
                 <label className="text-xs text-slate-500 block mb-1">탑승 조 선택 (학생+교사 {headcount(groupIds)}명)</label>
+                {editing?.assignmentMode === "gender" && (
+                  <p className="mb-2 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-700">이 화면에서 조를 수동 수정해 저장하면 해당 호차는 혼합 방식으로 전환됩니다.</p>
+                )}
                 <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1">
                   {sortedGroups.map(g => (
                     <button key={g.id} onClick={() => toggle(g.id)}
@@ -350,7 +328,7 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {dayBuses.map(b => {
-            const count = headcount(b.groupIds || []);
+            const count = busPassengerCount(b);
             const busFieldParse = parseBusStaff(b.staff);
             const busFieldStaff = busFieldParse.names;
             const cueStaff = cueStaffByBus.get(b.busNo) || [];
@@ -359,19 +337,27 @@ export default function BusesView({ retreatId, buses, groups, teachers, partial,
             const cap = busCapacityOf(b);
             const remain = cap - count - totalStaff;
             const rejectedTokens = busFieldParse.rejected;
+            const genderSegments = b.assignmentMode === "gender" ? (b.segments || []) : [];
+            const busGender = genderSegments[0]?.gender;
             return (
               <div key={b.id} className={`card p-4 ${remain < 0 ? "border-red-300" : count > cap - RESERVED_STAFF_SEATS ? "border-amber-300" : ""}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-slate-800">{b.busNo}호차 <span className="text-xs font-normal text-slate-400">{cap}인승</span> <span className="text-sm font-normal text-fuchsia-700">· {count + totalStaff}명</span></h3>
+                  <h3 className="font-bold text-slate-800">{b.busNo}호차 <span className="text-xs font-normal text-slate-400">{cap}인승</span> {busGender && <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${busGender === "남" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"}`}>{busGender}</span>} <span className="text-sm font-normal text-fuchsia-700">· {count + totalStaff}명</span></h3>
                   <div className="flex gap-2"><button onClick={() => openEdit(b)} className="text-xs text-slate-400 hover:text-fuchsia-600">수정</button>
                     <button onClick={() => del(b)} className="text-xs text-slate-300 hover:text-red-400">삭제</button></div>
                 </div>
                 <div className="mb-2 text-xs text-slate-400">학생+교사 {count} · 스탭 {totalStaff} · 잔여 {remain}석</div>
                 <div className="flex flex-wrap gap-1 mb-2">
-                  {(b.groupIds || []).map(id => {
-                    const g = sortedGroups.find(x => x.id === id);
-                    return g ? <span key={id} className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-600">{groupDisplayName(g, groups)}({groupPassengerCount(g)})</span> : null;
-                  })}
+                  {genderSegments.length > 0
+                    ? genderSegments.map(segment => {
+                        const group = groupById(segment.groupId);
+                        if (!group) return null;
+                        return <span key={`${segment.groupId}:${segment.gender}`} className={`px-1.5 py-0.5 rounded text-xs ${segment.gender === "남" ? "bg-blue-50 text-blue-700" : "bg-pink-50 text-pink-700"}`}>{groupDisplayName(group, groups)} {segment.gender}({segmentPassengerCount(segment)})</span>;
+                      })
+                    : (b.groupIds || []).map(id => {
+                        const group = groupById(id);
+                        return group ? <span key={id} className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-600">{groupDisplayName(group, groups)}({groupPassengerCount(group)})</span> : null;
+                      })}
                 </div>
                 {mergedStaff.length > 0 && (
                   <div className="text-xs text-slate-500">
