@@ -1,4 +1,4 @@
-# 인수인계 — 2026-07-16 (Claude 재개용)
+# 인수인계 — 2026-07-17 (Claude 재개용)
 
 > 새 세션은 다음 순서로 읽으세요:
 > ① 루트 `AGENTS.md` → ② 루트 `CLAUDE.md` → ③ 이 문서 →
@@ -7,24 +7,61 @@
 
 ## 지금 상태 (한 문장)
 
-IGuard에 Google 로그인·팀원 승인 위에 수련회별 PIN 잠금과 관리자 우회를 추가했고, 이후 행정 사이트 방배정 출력 개선까지 포함한 최신 `main`이 두 운영 앱에 배포되어 있다.
+IGuard 버스·조별 명단이 행정 참석정보를 반영하도록 보완했고, 취소 학생과 조장 중복을 제거한 최신 `main`이 운영에 배포되어 있다.
 
-## 저장소·배포 상태 (실측 2026-07-16)
+## 저장소·배포 상태 (실측 2026-07-17 16:57 KST)
 
-- 기능 기준 `HEAD == origin/main == 70f4a50a17ca941f5e7986b8b5392689a1d64bbf`.
+- 기능 기준 `HEAD == origin/main == feaebbb01b76efb59f93a85a6c5e61c0141666ea`.
 - 이 HANDOFF 문서를 로컬 커밋한 뒤에는 로컬 `main`이 문서 커밋 1개만큼 `origin/main`보다 앞서는 것이 정상이다. **사용자 요청 없이 push하지 말 것** — `main` push는 Vercel 자동 배포를 일으킨다.
 - 추적 파일 작업트리는 기능 커밋 기준 클린. `.agents/`만 untracked 도구 아티팩트이며 커밋 대상이 아니다.
 - 운영 주소:
   - retreat-app: `https://retreat-app-theta.vercel.app`
   - iguard-app: `https://iguard-app.vercel.app`
-- 두 앱 `/api/version`의 buildId가 모두 `70f4a50a17ca941f5e7986b8b5392689a1d64bbf`인 것을 확인했다.
+- IGuard Vercel Production 배포 `iguard-lgaa2xckp-smilegate1108-9038s-projects.vercel.app`이 Ready이고, 공식 `https://iguard-app.vercel.app/api/version`의 buildId가 `feaebbb01b76efb59f93a85a6c5e61c0141666ea`인 것을 확인했다.
 - 마지막 IGuard 기능 검증:
-  - `npm test`: 13개 파일, 124개 테스트 통과
+  - `npm test`: 17개 파일, 141개 테스트 통과
   - `npx tsc --noEmit`: 성공
   - `npm run build`: 성공
   - `npm run lint`: 오류 0개, 기존 경고 11개
-  - 운영 관리자 로그인 화면에서 `🔐 관리자` 버튼과 PIN 관리 모달을 읽기 전용 확인
-- 이번 PIN 작업과 인수인계 작업에서 운영 DB 직접 쓰기 없음, Firebase Rules 변경·배포 없음.
+  - 운영 수련회 `-Ov_SQVKmfIcnPSlPGDC`의 조 22개를 읽기 전용 감사했고, 조장 22명 모두 각 조 `studentIds`에 포함됨을 확인
+- 최근 버스·명단 작업과 인수인계 작업에서 운영 DB 직접 쓰기 없음, Firebase Rules 변경·배포 없음.
+
+## 2026-07-17 최근 완료 — 버스·조별 명단 정합성
+
+### 배포된 커밋
+
+- `5b18069`: 행정 교사 참석과 학생 부분참 정보를 버스 인원에 반영.
+  - 교사는 `status=불참` 또는 `transport=자차/자가용/개인차량`이면 **호차별 버스 명단**에서 제외.
+  - 학생은 선복귀·후발대 일차 규칙과 `note`의 `당일참여/당일참석`을 적용.
+- `6561620`: IGuard 조별정보에 `iguard/groupStaff`의 조스탭 배정 표시.
+- `e4f07fd`: 자차 교사는 호차별에서는 제외하되, 이동수단과 무관한 **조별 현장 점호**에는 포함.
+- `7183688`: 큐싯의 `N호차 짐 하차 보조 스탭` 문구를 선탑/동승 명단으로 오인하지 않도록 파서 수정.
+- `784c85d`: `cellColors=red`인 취소 학생을 조스탭 화면, 조별 인원체크, 버스 자동배정·호차별 인원에서 제외.
+  - `cellColors` 키가 unique key(`2_S32_01`)이거나 raw ID(`S32_01`)인 경우를 모두 지원.
+- `feaebbb`: 조장을 교사 명단에 재추가하던 중복 제거.
+  - 조장은 행정 `groups[].studentIds`에 이미 포함된 학생이므로 학생으로 한 번만 집계.
+  - 호차별 화면의 교사 수·총원과 `· 교사` 꼬리표가 함께 바로잡힘.
+
+### 핵심 코드
+
+- `iguard-app/src/lib/busParticipation.ts`
+  - `isCancelledStudent`, `isStudentBusPassengerOnDay`, `isTeacherBusPassenger`가 공통 참석 판정의 단일 원천.
+- `iguard-app/src/lib/checklistMembers.ts`
+  - 조별/호차별 교사 명단을 분기하며 조장은 반환하지 않음.
+- `iguard-app/src/lib/cueSheet.ts`, `src/lib/busStaff.ts`
+  - 큐싯 선탑/동승 추출과 문장 조각 필터의 단일 원천.
+- `iguard-app/src/app/retreat/[id]/ChecklistView.tsx`
+  - 조별·호차별 명단과 요약 인원 구성.
+- `iguard-app/src/app/retreat/[id]/BusesView.tsx`
+  - 버스 자동배정 인원 계산.
+- 회귀 테스트: `busParticipation.test.ts`, `checklistMembers.test.ts`, `busStaff.test.ts`.
+
+### 현재 유지된 버스 자동배정 정책 — 다음 작업에서 혼동 금지
+
+- `BusesView.tsx`의 `RESERVED_STAFF_SEATS = 3`은 **현재 그대로 유지**되어 있다.
+- 사용자가 한때 “스탭자리 남기지 말고 배정”을 요청했지만 곧바로 “기존작업 취소”를 요청했고, 해당 변경은 완전히 되돌렸다.
+- 따라서 자동배정은 현재도 정원 비례 균등을 우선하고 가능하면 호차당 스탭석 3석을 남긴다. 이 정책을 다시 바꾸려면 새 사용자 지시를 받아 별도 설계·회귀 테스트 후 진행한다.
+- `retreats/{id}/groups`, `teachers`, `cellColors`, `partialAttendances`는 행정 앱 소유이므로 IGuard에서 읽기만 한다.
 
 ## 마지막 핵심 완료 작업 — IGuard 수련회별 PIN 잠금 (`ad6b559`)
 
@@ -89,6 +126,9 @@ IGuard에 Google 로그인·팀원 승인 위에 수련회별 PIN 잠금과 관�
 
 ### 사용자가 바로 할 수 있는 운영 작업
 
+- [ ] IGuard를 강력 새로고침한 뒤 호차별 화면에서 조장이 `교사`가 아니라 학생으로 한 번만 표시되는지 확인한다.
+- [ ] 취소 학생이 조별 명단·조별 인원체크·호차별 인원에서 빠졌는지 확인한다.
+- [ ] `7183688` 이전에 이미 가져온 큐싯 데이터에는 과거 오인된 선탑/동승 값이 남을 수 있다. 필요한 경우 큐싯을 다시 가져와 파서를 재적용한다. 에이전트가 운영 DB 재가져오기를 실행하지는 않았다.
 - [ ] IGuard 관리자 계정으로 `🔐 관리자`를 열어 잠글 수련회의 PIN을 설정한다.
   - 이 작업은 `retreats/{id}/iguard/accessLock` 한 노드에 운영 DB 쓰기를 발생시킨다.
 - [ ] 일반 팀원 계정으로 해당 수련회 진입 시 PIN 게이트가 뜨고, 오답 거부·정답 통과·새로고침 후 세션 유지가 되는지 확인한다.
@@ -96,6 +136,8 @@ IGuard에 Google 로그인·팀원 승인 위에 수련회별 PIN 잠금과 관�
 
 ### 다음 에이전트 작업 후보
 
+- [ ] 위 호차별·취소자 화면 검증에서 여전히 이상하면 추측 수정하지 말고 해당 조의 `groups[].studentIds/leader/teachers`, `cellColors`, `partialAttendances`를 읽기 전용으로 대조한다.
+- [ ] 버스 8호차 생성 문제를 다시 다룰 경우 현재 `RESERVED_STAFF_SEATS=3` 유지 상태와 정원 비례 균등 점수식을 먼저 재현한다. 사용자의 새 지시 없이 예약석 정책을 변경하지 않는다.
 - [ ] 일반 팀원 또는 staff role 테스트 계정이 제공되면 PIN 잠금과 권한별 화면을 읽기 위주로 검증한다.
 - [ ] PIN을 더 강한 데이터 보안 경계로 만들려면 현재 Rules·데이터 모델 한계를 먼저 설계 검토한다. **Rules 배포는 하지 않는다.**
 - [ ] 이미진 값이 새 저장 뒤에도 복구되면 추측 수정 금지. 저장 payload와 해당 교사 레코드 구독 결과를 읽기 전용으로 추적한다.
@@ -124,4 +166,4 @@ curl -fsS https://retreat-app-theta.vercel.app/api/version
 curl -fsS https://iguard-app.vercel.app/api/version
 ```
 
-기능 기준 배포 buildId는 `70f4a50a17ca941f5e7986b8b5392689a1d64bbf`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞서는 것이 정상이다.
+기능 기준 IGuard 배포 buildId는 `feaebbb01b76efb59f93a85a6c5e61c0141666ea`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞서는 것이 정상이다.
