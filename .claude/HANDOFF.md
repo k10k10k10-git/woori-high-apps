@@ -1,4 +1,4 @@
-# 인수인계 — 2026-07-17 (Claude 재개용)
+# 인수인계 — 2026-07-17 저녁 (에이전트 중립 — GPT/Claude 공용)
 
 > 새 세션은 다음 순서로 읽으세요:
 > ① 루트 `AGENTS.md` → ② 루트 `CLAUDE.md` → ③ 이 문서 →
@@ -7,17 +7,23 @@
 
 ## 지금 상태 (한 문장)
 
-IGuard 버스·조별 명단이 행정 참석정보를 반영하도록 보완했고, 취소 학생과 조장 중복을 제거한 최신 `main`이 운영에 배포되어 있다.
+카풀 이름 자동완성(`3d264e2`)까지 배포된 최신 `main`이 운영 중이고, 기도문자 학부모 명단(운영 산출물, `~/Downloads`)을 전달했으며, 행정 QA 발견 2건(현장등록 해제 무확인·모달 a11y)이 수정 대기다.
 
-## 저장소·배포 상태 (실측 2026-07-17 16:57 KST)
+## 저장소·배포 상태 (실측 2026-07-17 저녁)
 
-- 기능 기준 `HEAD == origin/main == feaebbb01b76efb59f93a85a6c5e61c0141666ea`.
-- 이 HANDOFF 문서를 로컬 커밋한 뒤에는 로컬 `main`이 문서 커밋 1개만큼 `origin/main`보다 앞서는 것이 정상이다. **사용자 요청 없이 push하지 말 것** — `main` push는 Vercel 자동 배포를 일으킨다.
-- 추적 파일 작업트리는 기능 커밋 기준 클린. `.agents/`만 untracked 도구 아티팩트이며 커밋 대상이 아니다.
+- `HEAD == origin/main == 3d264e2` (카풀 자동완성). **이 시점 기준 미푸시 문서 커밋 없음** — 이 HANDOFF 갱신 커밋 이후에는 로컬이 1커밋 앞서는 게 정상. **사용자 요청 없이 push하지 말 것** — `main` push는 Vercel 자동 배포를 일으킨다.
+- 추적 파일 작업트리는 클린. `.agents/`만 untracked 도구 아티팩트이며 커밋 대상이 아니다.
 - 운영 주소:
-  - retreat-app: `https://retreat-app-theta.vercel.app`
+  - retreat-app: `https://retreat-app-theta.vercel.app` — buildId `3d264e2` 대조 확인
   - iguard-app: `https://iguard-app.vercel.app`
-- IGuard Vercel Production 배포 `iguard-lgaa2xckp-smilegate1108-9038s-projects.vercel.app`이 Ready이고, 공식 `https://iguard-app.vercel.app/api/version`의 buildId가 `feaebbb01b76efb59f93a85a6c5e61c0141666ea`인 것을 확인했다.
+- retreat-app 마지막 검증(3d264e2): tsc 0 · 테스트 178 통과 · lint 오류 0/경고 10.
+
+## 2026-07-17 저녁 완료 — 카풀 자동완성 + 기도문자 명단
+
+- `3d264e2` 행정: 카풀 추가/수정 모달의 학생 이름에 자동완성(이름 검색 → 부/학년/반 후보 클릭 → 자동 입력). 의료일지의 자동완성을 `NameAutocomplete.tsx` 공용 컴포넌트로 추출해 두 탭이 공유. 손으로 적은 연락처는 안 덮음.
+- **기도문자 학부모 명단(운영 산출물, 코드 아님)**: 운영 DB 읽기 전용 + 신청 시트 CSV를 조인해 1·2일차 저녁집회 참석자 239명(본대 228·선복귀 7·후발대 4)의 학부모 연락처 정리. `~/Downloads/수련회_기도문자_명단.xlsx`(+csv, 번호 txt 3종). 취소 2명(이주윤·최신재) 제외, 연락처 누락 0(시트 236·출석부 폴백 3). 부분참 판정은 사용자가 구두 확정(곽예인 토저녁~일=후발대, 홍다인/김현채/김민하 토집회까지, 김태린G 금집회까지, 강주아/민지후 토집회까지).
+  - ⚠ 이때 발견: **1부 정예은 동명이인 2명**(3-2, 1-6) — 시트 학부모 번호를 이름만으로 매칭하면 오배정된다. 학년·반까지 대조해야 함. 시트 전수 검사 결과 이 한 쌍뿐.
+  - 참고: participants에는 학부모 번호(pPhone)가 사실상 비어 있음 — 시트 파서가 부모님 연락처 열을 추출하지 않고, 출석부 폴백도 DB 필드명이 `pphone`(소문자)라 sync의 `ms?.pPhone`이 못 읽는 잠재 이슈(카풀 자동완성의 학부모 자동입력이 비는 이유). 고치려면 별도 작업.
 - 마지막 IGuard 기능 검증:
   - `npm test`: 17개 파일, 141개 테스트 통과
   - `npx tsc --noEmit`: 성공
@@ -164,4 +170,4 @@ curl -fsS https://retreat-app-theta.vercel.app/api/version
 curl -fsS https://iguard-app.vercel.app/api/version
 ```
 
-기능 기준 IGuard 배포 buildId는 `feaebbb01b76efb59f93a85a6c5e61c0141666ea`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞서는 것이 정상이다.
+IGuard 버스·명단 기능의 마지막 변경 커밋은 `feaebbb`이고, 이후 모노레포 push로 현재 IGuard 운영 `/api/version` buildId는 `3d264e2cbba2be319ed3954f24f3ad75edc6a79d`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞서는 것이 정상이다.
