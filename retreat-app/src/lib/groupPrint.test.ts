@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolvePrintGender, studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "./groupPrint";
+import { resolveIguardGroupStaffNames, resolvePrintGender, studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "./groupPrint";
 import type { TeacherAttendance } from "./types";
 
 const teacher = (name: string, bu: string, status: TeacherAttendance["status"]): TeacherAttendance => ({
@@ -11,6 +11,23 @@ const teacher = (name: string, bu: string, status: TeacherAttendance["status"]):
 });
 
 describe("조편성 인쇄 상태·색상", () => {
+  it("이가드 조스탭 ID를 이름으로 바꾸고 고아 ID·행정 스탭 중복을 제외한다", () => {
+    const teachers = [
+      teacher("김조스탭", "스탭", "전참"),
+      teacher("중복스탭", "스탭", "부분참"),
+      { ...teacher("같은이름", "스탭", "전참"), id: "스탭_같은이름_2" },
+      teacher("같은이름", "스탭", "전참"),
+    ];
+    const staffMap = {
+      g1: [teachers[0].id, "없는_ID", teachers[1].id, teachers[2].id, teachers[3].id],
+    };
+
+    expect(resolveIguardGroupStaffNames("g1", staffMap, teachers, ["중복스탭"])).toEqual([
+      "김조스탭",
+      "같은이름",
+    ]);
+  });
+
   it("동명이인 교사는 현재 조의 부서 상태를 우선 표시한다", () => {
     const teachers = [teacher("김교사", "1부", "부분참"), teacher("김교사", "2부", "전참")];
     expect(teacherPrintStatus(teachers, "김교사", "1부")).toBe("부분참");

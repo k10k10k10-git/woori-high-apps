@@ -10,7 +10,7 @@ import AutoAssignPanel from "./AutoAssignPanel";
 import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
-import { studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "@/lib/groupPrint";
+import { resolveIguardGroupStaffNames, studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "@/lib/groupPrint";
 import { resolveGroupRoleStudent } from "@/lib/groupRoleStudent";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { buildGroupsGridColumns, type GroupsGridCell } from "@/lib/groupsGrid";
@@ -454,6 +454,8 @@ export default function GroupsTab({ retreat }: Props) {
       .r-leader .t-name  { color: #92400e; font-weight: 700; }
       .r-staff td   { background: #dcfce7; }
       .r-staff .t-name   { color: #166534; font-weight: 700; }
+      .r-iguard-staff td { background: #f3e8ff; }
+      .r-iguard-staff .t-name { color: #7e22ce; font-weight: 700; }
       .r-male td    { background: #dbeafe; }
       .r-male .t-name    { color: #1d4ed8; }
       .r-female td  { background: #fce7f3; }
@@ -492,6 +494,7 @@ export default function GroupsTab({ retreat }: Props) {
         const leaderNames = new Set(parseNames(g.leader || ""));
         const staffNames  = new Set(parseNames(g.staff  || ""));
         const teachers    = g.teachers || [];
+        const iguardStaffNames = resolveIguardGroupStaffNames(g.id, iguardGroupStaff, allTeachers, staffNames);
         const filteredIds = (g.studentIds || []).filter(sid => {
           const s = students[sid];
           return !s || (!leaderNames.has(s.name) && !staffNames.has(s.name));
@@ -505,6 +508,7 @@ export default function GroupsTab({ retreat }: Props) {
         });
 
         const teacherCount    = teachers.length;
+        const iguardStaffCount = iguardStaffNames.length;
         const cancelledCount  = sortedIds.filter(sid => cellColors[sid] === "red").length;
         const studentCount    = leaderNames.size + staffNames.size + (sortedIds.length - cancelledCount);
 
@@ -535,7 +539,21 @@ export default function GroupsTab({ retreat }: Props) {
           </tr>`;
         });
 
-        // ② 조장 행
+        // ② 이가드 조스탭 행 — 이가드 소유 배정을 읽기만 하며 출석 체크칸을 제공
+        iguardStaffNames.forEach(name => {
+          const status = teacherPrintStatus(allTeachers, name, g.bu);
+          const statusLabel = teacherPrintStatusLabel(status);
+          const statusBadge = statusLabel
+            ? `<span class="teacher-status teacher-status-${statusLabel === "불참" ? "absent" : "partial"}">${escapeHtml(statusLabel)}</span>`
+            : "";
+          html += `<tr class="r-iguard-staff">
+            <td class="t-cls">조스탭</td>
+            <td class="t-name"><div class="teacher-info"><span class="teacher-name">${escapeHtml(name)}</span>${statusBadge}</div></td>
+            <td class="t-chk"><span class="chk"></span></td>
+          </tr>`;
+        });
+
+        // ③ 조장 행
         [...leaderNames].forEach(name => {
           const s = resolveGroupRoleStudent(students, g, name);
           html += `<tr class="r-leader">
@@ -545,7 +563,7 @@ export default function GroupsTab({ retreat }: Props) {
           </tr>`;
         });
 
-        // ③ 스탭 행
+        // ④ 행정 스탭 행
         [...staffNames].forEach(name => {
           const s = resolveGroupRoleStudent(students, g, name);
           html += `<tr class="r-staff">
@@ -555,9 +573,9 @@ export default function GroupsTab({ retreat }: Props) {
           </tr>`;
         });
 
-        // ④ 학생 행 — 반 구분선 포함
+        // ⑤ 학생 행 — 반 구분선 포함
         let prevClassKey = "";
-        const hasRoleRows = teachers.length > 0 || leaderNames.size > 0 || staffNames.size > 0;
+        const hasRoleRows = teachers.length > 0 || iguardStaffCount > 0 || leaderNames.size > 0 || staffNames.size > 0;
 
         sortedIds.forEach((sid, idx) => {
           const s = students[sid];
@@ -580,7 +598,7 @@ export default function GroupsTab({ retreat }: Props) {
         });
 
         html += `</tbody></table>
-          <div class="gc-foot">${teacherCount > 0 ? `교사 ${teacherCount}명 &nbsp;·&nbsp; ` : ""}학생 ${studentCount}명</div>
+          <div class="gc-foot">${teacherCount > 0 ? `교사 ${teacherCount}명 &nbsp;·&nbsp; ` : ""}${iguardStaffCount > 0 ? `조스탭 ${iguardStaffCount}명 &nbsp;·&nbsp; ` : ""}학생 ${studentCount}명</div>
         </div>`;
       });
 
