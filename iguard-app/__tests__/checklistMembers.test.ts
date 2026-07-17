@@ -19,11 +19,11 @@ const teachers: TeacherAttendance[] = [
 describe("인원체크 교사 명단", () => {
   it("조별 인원체크에는 자차 교사를 포함한다", () => {
     expect(roleNamesForChecklist(group, teachers, "group"))
-      .toEqual(["자차교사", "버스교사", "학생조장"]);
+      .toEqual(["자차교사", "버스교사"]);
   });
 
-  it("호차별 인원체크에서는 자차 교사만 제외한다", () => {
+  it("호차별 인원체크에서는 자차 교사와 학생 조장을 교사 명단에서 제외한다", () => {
     expect(roleNamesForChecklist(group, teachers, "bus"))
-      .toEqual(["버스교사", "학생조장"]);
+      .toEqual(["버스교사"]);
   });
 });
