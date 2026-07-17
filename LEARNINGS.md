@@ -31,3 +31,8 @@
 - **접근법**: ① 가져온 텍스트 상자 전체의 줄바꿈 문자열을 `shape.text.replace(old, new)`로 한 번에 바꿨더니 제목만 바뀌고 글머리표 문단은 남는 현상을 렌더링으로 확인 → ② 기존·새 문구를 줄 단위로 나눈 뒤 각 줄에 `shape.text.replace(oldLine, newLine)`를 적용해 문단별 글머리표·서식을 보존 → ③ 제목 앞부분이 LibreOffice 렌더링에서 사라지는 상자는 공통 접두어 전체를 다시 쓰지 않고 바뀌는 뒷부분만 치환 → ④ artifact-tool PNG와 LibreOffice PNG를 각각 14장 전수 확인하고 `check_template_fidelity.mjs`로 구조를 검증.
 - **판단 질문**: 여러 문단 상자에 `shape.text = newText`를 사용하지 않았다 — 글머리표·문단 간격·강조색을 한꺼번에 잃을 수 있다. artifact-tool 미리보기만 믿지도 않았다 — 일부 제목의 접두어 손실은 실제 PowerPoint 계열 렌더러에서만 드러났다.
 - **재사용 규칙**: import한 PPT 텍스트는 한 줄씩 `shape.text.replace()`하고, 복합 서식 제목은 공통 접두어를 보존한 채 변하는 뒷부분만 교체한 다음 artifact-tool과 LibreOffice 두 렌더러로 확인한다.
+
+### 로그인 벽 뒤 웹앱 화면을 PPT용 정확한 비율로 캡처하는 법 (2026-07-17)
+- **접근법**: ① PPT의 잘림 원인을 먼저 실측 — 이미지 비율(0.462) ≠ 프레임 비율(0.492)에 srcRect(t/b 3020, 상하 3% 크롭)로 강제 맞춤돼 있었음 → ② 로그인된 실제 크롬(claude-in-chrome)에서 같은 출처 iframe(390×793)을 페이지에 주입해 프레임 비율에 딱 맞는 뷰포트 확보 → ③ CDN에서 html-to-image를 iframe 문서에 주입, toCanvas로 본문 전체(1x)·탭바를 각각 렌더해 캔버스에서 크롭+합성 → ④ 최종 6장을 세로 스프라이트 1장으로 합쳐 **단 1회 다운로드** 후 PIL로 슬라이스 → ⑤ pptx 미디어 바이트 교체 + srcRect 제거, zip -XrD로 재패킹(디렉터리 엔트리 금지), 파트 수 원본 대조.
+- **판단 질문**: localhost 수신 서버(fetch/form POST)로 전송하지 않았다 — 크롬 PNA가 https 페이지→127.0.0.1 요청을 프리플라이트에서 막는다(OPTIONS에 Access-Control-Allow-Private-Network를 줘도 최신 크롬은 차단). base64를 JS 반환값으로 조각 전송하지도 않았다 — 확장의 데이터 유출 가드가 [BLOCKED]로 막는다. 뷰포트 리사이즈(resize_window·osascript)도 신뢰하지 않았다 — inner 크기가 안 바뀌는 함정 재확인.
+- **재사용 규칙**: 브라우저에서 파일을 꺼낼 땐 ①합성까지 페이지 안 캔버스에서 끝내고 ②결과를 스프라이트 1장으로 만들어 a.click() 1회 다운로드(다중 다운로드 차단 회피, 막히면 사용자에게 주소창 차단 아이콘 허용 1클릭 요청) ③fixed 요소는 본문 렌더에 뷰포트 위치로 박히므로 visibility:hidden으로 빼고 별도 캡처(단독 캡처 시 style:{position:"static"} 오버라이드 필수 — 아니면 빈 캔버스).
