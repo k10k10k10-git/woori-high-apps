@@ -1,19 +1,17 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Group, IguardMeal, IguardMealEntry, IguardSeating } from "@/lib/types";
 import { saveIguardMeal, updateIguardMeal, deleteIguardMeal } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
-import { groupDisplayName } from "@/lib/groupNumber";
+import { buildMealOrderItems, type MealOrderItem } from "@/lib/mealOrder";
 import FairAssignButton from "./FairAssignButton";
 
-const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const SLOT_LABELS = ["아침", "점심", "저녁", "야식"] as const;
 const EMPTY = { label: "", day: 1, slot: 1 };
 type PinnedInputs = Record<string, string>;
 
 export default function MealsView({ retreatId, meals, groups, seatings }: { retreatId: string; meals: IguardMeal[]; groups: Group[]; seatings: IguardSeating[] }) {
   const { toast, uiConfirm } = useUI();
-  const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
   const [show, setShow] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<{ label: string; day: number; slot: number }>(EMPTY);
@@ -25,12 +23,9 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
   }
 
   function orderedFor(meal: IguardMeal) {
-    const map = new Map((meal.entries || []).map(e => [e.groupId, e]));
-    const present = sortedGroups.filter(g => map.has(g.id)).sort((a, b) => map.get(a.id)!.seq - map.get(b.id)!.seq);
-    const absent = sortedGroups.filter(g => !map.has(g.id));
-    return [...present, ...absent].map(g => ({ group: g }));
+    return buildMealOrderItems(meal, groups);
   }
-  async function persist(meal: IguardMeal, ordered: { group: Group }[]) {
+  async function persist(meal: IguardMeal, ordered: MealOrderItem[]) {
     const entries: IguardMealEntry[] = ordered.map((o, i) => ({ groupId: o.group.id, seq: i }));
     try { await updateIguardMeal(retreatId, meal.id, { entries }); } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
   }
@@ -109,22 +104,37 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                   />
                 </div>
                 {ordered.length === 0 ? <div className="p-6 text-center text-slate-300 text-xs">조편성 데이터가 없습니다. 행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</div> : (
-                  <table className="w-full text-sm">
-                    <thead><tr className="table-header"><th className="px-3 py-2 text-center w-12">순서</th><th className="px-3 py-2 text-left">조</th><th className="px-3 py-2 text-center w-16">인원</th><th className="px-3 py-2 text-center w-20">이동</th></tr></thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {ordered.map((o, i) => (
-                        <tr key={o.group.id} className="hover:bg-slate-50">
-                          <td className="px-3 py-2 text-center font-semibold text-slate-500">{i + 1}</td>
-                          <td className="px-3 py-2 font-medium text-slate-800"><span className="px-1.5 py-0.5 mr-1.5 rounded text-xs bg-slate-100 text-slate-500">{o.group.bu}</span>{groupDisplayName(o.group, groups)}</td>
-                          <td className="px-3 py-2 text-center text-xs text-slate-500">{o.group.studentIds?.length || 0}명</td>
-                          <td className="px-3 py-2 text-center whitespace-nowrap">
-                            <button onClick={() => move(meal, i, -1)} disabled={i === 0} className="px-1.5 text-slate-400 hover:text-fuchsia-600 disabled:opacity-20">▲</button>
-                            <button onClick={() => move(meal, i, 1)} disabled={i === ordered.length - 1} className="px-1.5 text-slate-400 hover:text-fuchsia-600 disabled:opacity-20">▼</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="p-4">
+                    <p className="mb-2 text-xs font-medium text-slate-400">왼쪽부터 식사 입장 순서 · 좌우로 밀어 전체 순서를 확인하세요</p>
+                    <div className="overflow-x-auto pb-2">
+                      <ol className="flex min-w-max items-center gap-1" aria-label={`${meal.label} 조별 식사 순서`}>
+                        {ordered.map((item, i) => (
+                          <li key={item.group.id} className="flex items-center gap-1">
+                            <div className="w-[4.75rem] shrink-0 rounded-lg border border-amber-200 bg-amber-50 px-1.5 py-2 text-center">
+                              <div className="text-[10px] font-semibold text-amber-500">{item.order}번째</div>
+                              <div className="mt-0.5 text-base font-extrabold text-slate-800">{item.label}</div>
+                              <div className="text-[10px] text-slate-400">{item.group.bu} · {item.people}명</div>
+                              <div className="mt-1 flex justify-center gap-1 border-t border-amber-100 pt-1">
+                                <button
+                                  onClick={() => move(meal, i, -1)}
+                                  disabled={i === 0}
+                                  className="rounded px-1.5 text-xs text-slate-400 hover:bg-white hover:text-fuchsia-600 disabled:opacity-20"
+                                  aria-label={`${item.label}을 한 순서 앞으로 이동`}
+                                >◀</button>
+                                <button
+                                  onClick={() => move(meal, i, 1)}
+                                  disabled={i === ordered.length - 1}
+                                  className="rounded px-1.5 text-xs text-slate-400 hover:bg-white hover:text-fuchsia-600 disabled:opacity-20"
+                                  aria-label={`${item.label}을 한 순서 뒤로 이동`}
+                                >▶</button>
+                              </div>
+                            </div>
+                            {i < ordered.length - 1 && <span className="px-0.5 text-lg font-bold text-amber-400" aria-hidden="true">→</span>}
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  </div>
                 )}
               </div>
             );
