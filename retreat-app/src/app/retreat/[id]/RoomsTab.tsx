@@ -235,6 +235,12 @@ export default function RoomsTab({ retreat }: Props) {
     return allTeachers.filter(t => !assigned.has(t.name));
   }, [rooms, allTeachers]);
 
+  // 이름 검색에서는 미배정뿐 아니라 다른 방에 배정된 사람도 찾아 "이동"할 수 있다.
+  // 신청취소자는 검색 후보에서 제외하고, 현장 등록자는 참가자 목록과 합친다.
+  const roomStudentCandidateIds = useMemo(() =>
+    [...new Set([...participantIds, ...lateRegistrantIds])].filter(id => cellColors[id] !== "red"),
+  [participantIds, lateRegistrantIds, cellColors]);
+
   function handleDragStart(type: "student" | "teacher", id: string, fromRoomId: string | null) {
     isDragging.current = true;
     setDragItemType(type);
@@ -307,6 +313,42 @@ export default function RoomsTab({ retreat }: Props) {
     });
     setDragItem(null);
     setDragFrom(null);
+  }
+
+  async function assignStudentBySearch(targetRoomId: string, studentId: string) {
+    const targetRoom = rooms.find(r => r.id === targetRoomId);
+    const student = students[studentId];
+    if (!targetRoom || !student || (targetRoom.studentIds || []).includes(studentId)) return;
+
+    if (student.gender && targetRoom.type && student.gender !== targetRoom.type) {
+      if (!await uiConfirm(`${student.name}은(는) ${student.gender}인데 ${targetRoom.type} 방에 배정합니까?`)) return;
+    }
+    const activeCount = (targetRoom.studentIds || []).filter(id => cellColors[id] !== "red").length;
+    if (activeCount >= (targetRoom.capacity ?? 99)) {
+      if (!await uiConfirm(`${roomLabel(targetRoom)}호가 정원(${targetRoom.capacity}명)을 초과합니다. 계속할까요?`)) return;
+    }
+
+    setRooms(prev => prev.map(room => {
+      const withoutStudent = (room.studentIds || []).filter(id => id !== studentId);
+      return room.id === targetRoomId
+        ? { ...room, studentIds: [...withoutStudent, studentId] }
+        : { ...room, studentIds: withoutStudent };
+    }));
+    setUnassigned(prev => prev.filter(id => id !== studentId));
+    markDirty();
+  }
+
+  function assignTeacherBySearch(targetRoomId: string, teacherName: string) {
+    const targetRoom = rooms.find(r => r.id === targetRoomId);
+    if (!targetRoom || (targetRoom.teachers || []).includes(teacherName)) return;
+
+    setRooms(prev => prev.map(room => {
+      const withoutTeacher = (room.teachers || []).filter(name => name !== teacherName);
+      return room.id === targetRoomId
+        ? { ...room, teachers: [...withoutTeacher, teacherName] }
+        : { ...room, teachers: withoutTeacher };
+    }));
+    markDirty();
   }
 
 
@@ -774,8 +816,12 @@ export default function RoomsTab({ retreat }: Props) {
               <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {rList.map(r => (
                   <RoomCard key={r.id} room={r} students={students} cellColors={cellColors}
+                    studentCandidateIds={roomStudentCandidateIds}
+                    allTeachers={allTeachers}
                     onDrop={() => handleDrop(r.id)}
                     onDragStart={(type, id) => handleDragStart(type, id, r.id)}
+                    onAssignStudent={sid => assignStudentBySearch(r.id, sid)}
+                    onAssignTeacher={name => assignTeacherBySearch(r.id, name)}
                     onRemoveStudent={sid => {
                       setRooms(prev => prev.map(rm =>
                         rm.id === r.id ? { ...rm, studentIds: rm.studentIds.filter(id => id !== sid) } : rm
@@ -926,20 +972,65 @@ function RoomTeacherChip({ teacher, onDragStart, onRemove }: {
   );
 }
 
-function RoomCard({ room, students, cellColors, onDrop, onDragStart, onRemoveStudent, onRemoveTeacher, onRemove }: {
+function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers, onDrop, onDragStart, onAssignStudent, onAssignTeacher, onRemoveStudent, onRemoveTeacher, onRemove }: {
   room: Room; students: Record<string, StudentInfo>;
   cellColors: Record<string, string>;
+  studentCandidateIds: string[];
+  allTeachers: TeacherAttendance[];
   onDrop: () => void;
   onDragStart: (type: "student" | "teacher", id: string) => void;
+  onAssignStudent: (id: string) => void;
+  onAssignTeacher: (name: string) => void;
   onRemoveStudent: (id: string) => void;
   onRemoveTeacher: (name: string) => void;
   onRemove: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const totalCount = (room.studentIds || []).length;
   const cancelledCount = (room.studentIds || []).filter(sid => cellColors[sid] === "red").length;
   const count = totalCount - cancelledCount;
   const isFull = count >= room.capacity;
   const teachers = room.teachers || [];
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ko-KR");
+  const searchResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    const studentResults = studentCandidateIds
+      .filter(id => !(room.studentIds || []).includes(id))
+      .map(id => ({ type: "student" as const, id, student: students[id] }))
+      .filter(result => (result.student?.name || result.id).toLocaleLowerCase("ko-KR").includes(normalizedQuery));
+    const seenTeacherNames = new Set<string>();
+    const teacherResults = allTeachers
+      .filter(teacher => {
+        if (seenTeacherNames.has(teacher.name)) return false;
+        seenTeacherNames.add(teacher.name);
+        return !teachers.includes(teacher.name) && teacher.name.toLocaleLowerCase("ko-KR").includes(normalizedQuery);
+      })
+      .map(teacher => ({ type: "teacher" as const, id: teacher.name, teacher }));
+
+    return [...studentResults, ...teacherResults]
+      .sort((a, b) => {
+        const aName = a.type === "student" ? (a.student?.name || a.id) : a.teacher.name;
+        const bName = b.type === "student" ? (b.student?.name || b.id) : b.teacher.name;
+        const aExact = aName.toLocaleLowerCase("ko-KR") === normalizedQuery ? 0 : 1;
+        const bExact = bName.toLocaleLowerCase("ko-KR") === normalizedQuery ? 0 : 1;
+        return aExact - bExact || aName.localeCompare(bName, "ko");
+      })
+      .slice(0, 8);
+  }, [allTeachers, normalizedQuery, room.studentIds, studentCandidateIds, students, teachers]);
+
+  function closeEditing() {
+    setEditing(false);
+    setSearchQuery("");
+  }
+
+  function selectFirstResult() {
+    const result = searchResults[0];
+    if (!result) return;
+    if (result.type === "student") onAssignStudent(result.id);
+    else onAssignTeacher(result.teacher.name);
+    setSearchQuery("");
+  }
 
   return (
     <div
@@ -956,9 +1047,71 @@ function RoomCard({ room, students, cellColors, onDrop, onDragStart, onRemoveStu
           <span className={`text-xs font-medium ${isFull ? "text-orange-500" : "text-slate-400"}`}>
             {count}/{room.capacity}
           </span>
+          <button
+            onClick={() => editing ? closeEditing() : setEditing(true)}
+            className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${editing ? "bg-blue-50 text-blue-600" : "text-slate-300 hover:bg-slate-100 hover:text-slate-600"}`}
+            title={editing ? "편집 닫기" : "이름으로 배정"}
+            aria-label={`${roomLabel(room)} ${editing ? "편집 닫기" : "이름으로 배정"}`}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+            </svg>
+          </button>
           <button onClick={onRemove} className="text-slate-300 hover:text-red-400 ml-1">×</button>
         </div>
       </div>
+
+      {editing && (
+        <div className="relative mb-2">
+          <input
+            className="input text-xs py-1.5 pr-8"
+            autoFocus
+            aria-label={`${roomLabel(room)} 배정할 이름 검색`}
+            placeholder="학생·교사 이름 입력"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") { e.preventDefault(); selectFirstResult(); }
+              if (e.key === "Escape") closeEditing();
+            }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 hover:text-slate-600"
+              aria-label="검색어 지우기"
+            >×</button>
+          )}
+          {normalizedQuery && (
+            <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+              {searchResults.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-slate-400">배정 가능한 이름을 찾지 못했습니다.</p>
+              ) : searchResults.map(result => {
+                if (result.type === "teacher") {
+                  return (
+                    <button key={`teacher-${result.teacher.name}`} type="button"
+                      onClick={() => { onAssignTeacher(result.teacher.name); setSearchQuery(""); }}
+                      className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 flex items-center justify-between gap-2">
+                      <span className="font-medium text-slate-700">👨‍🏫 {result.teacher.name}</span>
+                      <span className="text-slate-400">교사 · {result.teacher.bu}</span>
+                    </button>
+                  );
+                }
+                const student = result.student;
+                return (
+                  <button key={`student-${result.id}`} type="button"
+                    onClick={() => { onAssignStudent(result.id); setSearchQuery(""); }}
+                    className="w-full px-3 py-2 text-left text-xs hover:bg-blue-50 flex items-center justify-between gap-2">
+                    <span className="font-medium text-slate-700">{student?.name || result.id}</span>
+                    <span className="text-slate-400 whitespace-nowrap">학생 · {student?.bu || ""} {student ? `${student.grade}-${student.class}` : ""}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {teachers.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">

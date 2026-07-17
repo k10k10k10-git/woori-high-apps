@@ -816,10 +816,10 @@ export default function GroupsTab({ retreat }: Props) {
         </div>
 
         {/* Unassigned */}
-        <div className="lg:col-span-1">
-          <div className="sticky top-4">
+        <div className="lg:col-span-1 lg:sticky lg:top-[7.5rem] lg:self-start lg:max-h-[calc(100vh-8.5rem)]">
+          <div className="lg:h-full">
             <div
-              className="card p-3 min-h-32 max-h-[calc(100vh-6rem)] overflow-y-auto"
+              className="card p-3 min-h-32 max-h-[calc(100vh-8.5rem)] overflow-y-auto"
               onDragOver={e => e.preventDefault()}
               onDrop={() => handleDrop(null)}
             >
