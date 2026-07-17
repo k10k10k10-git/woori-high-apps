@@ -176,6 +176,7 @@ export interface IguardBus {
   id: string;
   busNo: number;
   day?: 1 | 3;          // 1일차 입소 / 3일차 퇴소
+  capacity?: number;    // 인승 (없으면 45로 간주 — 기존 데이터 하위호환, busCapacityOf 사용)
   groupIds: string[];   // groups 노드 id (단일 원천)
   staff?: string;       // 선탑/동승 스탭 명단 (자유 텍스트)
   note?: string;

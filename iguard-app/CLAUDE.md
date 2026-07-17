@@ -116,7 +116,7 @@ retreats/{retreatId}/iguard/
   schedule/                         # 타임테이블 시간 블록 (IguardScheduleBlock)
   posts/                            # 포스트(통제 지점) 정의 (IguardPost)
   movements/                        # 동선 매트릭스 (IguardMovement — 키: staffId__blockId)
-  buses/                            # 버스 배정 (IguardBus)
+  buses/                            # 버스 배정 (IguardBus — capacity?: 인승, 없으면 45. busCapacityOf로 읽을 것)
   seating/                          # 집회 자리배치 (IguardSeating)
   attendance/                       # 인원체크 상태 ({ checked, updatedAt?, by? } — 키는 encodeURIComponent(원본키))
                                      #   checked:false = 해제 톰스톤(삭제 대신 기록 — 오프라인 낡은 체크 부활 방지)
