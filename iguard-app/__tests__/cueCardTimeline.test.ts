@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cueTimelineWindow } from "@/lib/cueCardTimeline";
+import { cueTimelineListBlocks, cueTimelineScrollTop, cueTimelineWindow } from "@/lib/cueCardTimeline";
 import { type IguardScheduleBlock } from "@/lib/types";
 
 function block(id: string, day: number, start: string, end: string, label = id): IguardScheduleBlock {
@@ -54,5 +54,20 @@ describe("cueTimelineWindow — 개인 큐카드 고정 일정", () => {
     const result = cueTimelineWindow(overnight, "night", 3, "00:40", "active");
     expect(result.nextBlock?.id).toBe("day3");
     expect(result.remainingBlocks).toEqual([]);
+  });
+
+  it("진행 중에는 전체 일정을 남겨 위로 스크롤하면 지난 일정을 볼 수 있다", () => {
+    const remaining = schedule.slice(3);
+    expect(cueTimelineListBlocks(schedule, remaining, "active").map(item => item.id)).toEqual(
+      schedule.map(item => item.id),
+    );
+    expect(cueTimelineListBlocks(schedule, remaining, "before").map(item => item.id)).toEqual(
+      remaining.map(item => item.id),
+    );
+  });
+
+  it("최초 위치는 헤더와 고정 카드 높이를 제외해 계산한다", () => {
+    expect(cueTimelineScrollTop(1200, 100, 300)).toBe(792);
+    expect(cueTimelineScrollTop(200, 100, 300)).toBe(0);
   });
 });

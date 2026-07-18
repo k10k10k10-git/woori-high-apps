@@ -7,7 +7,9 @@ import {
   currentBlockFor, nextBlockFor, timeRangeLabel,
 } from "@/lib/scheduleTime";
 import { chooseCueCardStaffId, findPreferredStaffId } from "@/lib/staffIdentity";
-import { cueTimelineWindow, type CueTimelinePhase } from "@/lib/cueCardTimeline";
+import {
+  cueTimelineListBlocks, cueTimelineScrollTop, cueTimelineWindow, type CueTimelinePhase,
+} from "@/lib/cueCardTimeline";
 
 interface Data {
   staff: IguardStaff[];
@@ -93,6 +95,10 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
   const curDay = currentRetreatDay(periods, retreat);
   const [staffId, setStaffId] = useState("");
   const staffPicked = useRef(false);
+  const initialTimelinePositioned = useRef(false);
+  const timelineAnchorRef = useRef<HTMLDivElement | null>(null);
+  const timelineEndRef = useRef<HTMLDivElement | null>(null);
+  const pinnedCardsRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const sortedStaff = useMemo(() => [...staff].sort((a, b) => a.name.localeCompare(b.name, "ko")), [staff]);
   const preferredStaffId = useMemo(
@@ -127,11 +133,6 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
     if (staffId !== nextStaffId) setStaffId(nextStaffId);
   }, [preferredStaffId, sortedStaff, staffId]);
 
-  if (staff.length === 0 || schedule.length === 0) return (
-    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🪪</div>
-      <p>스탭·스탭 전체 큐싯·동선 매트릭스를 먼저 입력하면<br />여기에 개인 큐카드가 자동 생성됩니다.</p></div>
-  );
-
   const currentBlock = currentBlockFor(schedule, curDay, clock.time);
   const period = activePeriod(periods, retreat);
   const timelinePhase: CueTimelinePhase = curDay != null
@@ -148,13 +149,40 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
     clock.time,
     timelinePhase,
   );
-  const days = [...new Set(remainingBlocks.map(b => b.day))].sort((a, b) => a - b);
+  // 수련회 진행 중에는 지난 일정도 DOM에 남겨 위로 스크롤해 다시 볼 수 있게 한다.
+  // 시작 전·종료 후·기간 미설정 상태는 기존처럼 고정 카드 이후 일정만 간결하게 표시한다.
+  const listBlocks = cueTimelineListBlocks(sortedSchedule, remainingBlocks, timelinePhase);
+  const initialVisibleBlockId = timelinePhase === "active"
+    ? remainingBlocks[0]?.id || currentBlock?.id || "__timeline_end"
+    : null;
+  const days = [...new Set(listBlocks.map(b => b.day))].sort((a, b) => a - b);
   const currentMove = currentBlock ? myMoves.get(currentBlock.id) : null;
   const nextMove = nextBlock ? myMoves.get(nextBlock.id) : null;
   const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
   const selectedStaff = staff.find(s => s.id === staffId);
   const currentDutyLines = currentBlock ? dutyLinesForStaff(currentBlock, selectedStaff?.name) : [];
   const nextDutyLines = nextBlock ? dutyLinesForStaff(nextBlock, selectedStaff?.name) : [];
+
+  useEffect(() => {
+    if (timelinePhase !== "active" || !initialVisibleBlockId || initialTimelinePositioned.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = initialVisibleBlockId === "__timeline_end" ? timelineEndRef.current : timelineAnchorRef.current;
+      if (!target) return;
+      const headerHeight = Number.parseFloat(
+        window.getComputedStyle(document.documentElement).getPropertyValue("--ig-header-h"),
+      ) || 0;
+      const pinnedHeight = pinnedCardsRef.current?.offsetHeight || 0;
+      const targetTop = target.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: cueTimelineScrollTop(targetTop, headerHeight, pinnedHeight), behavior: "auto" });
+      initialTimelinePositioned.current = true;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initialVisibleBlockId, timelinePhase]);
+
+  if (staff.length === 0 || schedule.length === 0) return (
+    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🪪</div>
+      <p>스탭·스탭 전체 큐싯·동선 매트릭스를 먼저 입력하면<br />여기에 개인 큐카드가 자동 생성됩니다.</p></div>
+  );
 
   return (
     <div>
@@ -174,6 +202,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
         </select>
       </div>
       <div
+        ref={pinnedCardsRef}
         className="sticky z-10 -mx-3 mb-4 space-y-2 bg-slate-50/95 px-3 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-4 sm:px-4"
         style={{ top: "var(--ig-header-h, 0px)" }}
       >
@@ -278,13 +307,17 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
             })()}
           </div>
           <div className="space-y-2">
-            {remainingBlocks.filter(b => b.day === day).map(b => {
+            {listBlocks.filter(b => b.day === day).map(b => {
               const mv = myMoves.get(b.id);
               const now = isNowOn(b, curDay, clock.time);
               const isOpen = open.has(b.id);
               const dutyLines = dutyLinesForStaff(b, selectedStaff?.name);
               return (
-                <div key={b.id} className={`card p-3 ${now ? "ring-2 ring-fuchsia-400" : ""}`}>
+                <div
+                  key={b.id}
+                  ref={b.id === initialVisibleBlockId ? timelineAnchorRef : undefined}
+                  className={`card p-3 ${now ? "ring-2 ring-fuchsia-400" : ""}`}
+                >
                   <div className="flex items-start gap-3">
                     <div className="text-center shrink-0 w-14 pt-0.5">
                       <div className="font-mono text-xs text-slate-500">{b.start}</div>
@@ -322,6 +355,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
           </div>
         </div>
       ))}
+      <div ref={timelineEndRef} aria-hidden="true" />
     </div>
   );
 }

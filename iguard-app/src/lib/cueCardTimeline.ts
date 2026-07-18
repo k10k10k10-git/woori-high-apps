@@ -8,6 +8,24 @@ export interface CueTimelineWindow {
   remainingBlocks: IguardScheduleBlock[];
 }
 
+/** 진행 중에는 과거 일정도 위로 되돌아볼 수 있게 전체 목록을 유지한다. */
+export function cueTimelineListBlocks(
+  schedule: IguardScheduleBlock[],
+  remainingBlocks: IguardScheduleBlock[],
+  phase: CueTimelinePhase,
+): IguardScheduleBlock[] {
+  return phase === "active" ? [...schedule].sort(compareBlocks) : remainingBlocks;
+}
+
+/** 자동 위치 이동 시 고정 헤더와 2단 카드 높이만큼 목표 지점을 아래로 내린다. */
+export function cueTimelineScrollTop(
+  targetDocumentTop: number,
+  headerHeight: number,
+  pinnedHeight: number,
+): number {
+  return Math.max(0, targetDocumentTop - headerHeight - pinnedHeight - 8);
+}
+
 function absoluteStart(block: IguardScheduleBlock): number {
   return (block.day - 1) * 24 * 60 + (toMinutes(block.start) ?? 0);
 }
