@@ -29,10 +29,10 @@ import RetreatPinGate from "./RetreatPinGate";
 
 const GROUPS = [
   { label: "실행", hint: "현장·모바일", views: [
-    { key: "check", label: "인원체크", icon: "✅" },
-    { key: "rooms", label: "조별 정보", icon: "👥" },
     { key: "cue", label: "개인 큐카드", icon: "📋" },
     { key: "board", label: "포스트 현황", icon: "📍" },
+    { key: "rooms", label: "조별 정보", icon: "👥" },
+    { key: "check", label: "인원체크", icon: "✅" },
   ] },
   { label: "기획", hint: "PC", views: [
     { key: "schedule", label: "스탭 전체 큐싯" },
@@ -142,7 +142,7 @@ function IguardWorkspace({ id }: { id: string }) {
   const router = useRouter();
   const { user, accessLevel, memberName } = useAuth();
 
-  const [view, setView] = useState<string>("check");
+  const [view, setView] = useState<string>("cue");
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
   const [compatDismissed, setCompatDismissed] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
