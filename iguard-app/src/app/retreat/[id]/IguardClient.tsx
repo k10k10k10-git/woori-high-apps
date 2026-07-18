@@ -212,7 +212,7 @@ function IguardWorkspace({ id }: { id: string }) {
   const executionViews = GROUPS[0].views;
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-slate-50 pb-24 sm:pb-12">
+    <div className="min-h-screen overflow-x-clip bg-slate-50 pb-24 sm:pb-12">
       <header ref={headerRef} className="sticky top-0 z-20" style={{ background: "var(--color-header-bg)" }}>
         <div className="max-w-6xl mx-auto px-3 sm:px-4">
           <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
