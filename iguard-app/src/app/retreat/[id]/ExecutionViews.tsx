@@ -7,6 +7,7 @@ import {
   currentBlockFor, nextBlockFor, timeRangeLabel,
 } from "@/lib/scheduleTime";
 import { chooseCueCardStaffId, findPreferredStaffId } from "@/lib/staffIdentity";
+import { cueTimelineWindow, type CueTimelinePhase } from "@/lib/cueCardTimeline";
 
 interface Data {
   staff: IguardStaff[];
@@ -131,14 +132,29 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
       <p>스탭·스탭 전체 큐싯·동선 매트릭스를 먼저 입력하면<br />여기에 개인 큐카드가 자동 생성됩니다.</p></div>
   );
 
-  const days = [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b);
-  const todayBlocks = curDay == null ? [] : sortedSchedule.filter(b => b.day === curDay);
   const currentBlock = currentBlockFor(schedule, curDay, clock.time);
-  const nextBlock = currentBlock ? null : nextBlockFor(todayBlocks, clock.time);
+  const period = activePeriod(periods, retreat);
+  const timelinePhase: CueTimelinePhase = curDay != null
+    ? "active"
+    : !period
+      ? "unknown"
+      : clock.today < period.startDate
+        ? "before"
+        : "after";
+  const { nextBlock, remainingBlocks } = cueTimelineWindow(
+    sortedSchedule,
+    currentBlock?.id || null,
+    curDay,
+    clock.time,
+    timelinePhase,
+  );
+  const days = [...new Set(remainingBlocks.map(b => b.day))].sort((a, b) => a - b);
   const currentMove = currentBlock ? myMoves.get(currentBlock.id) : null;
+  const nextMove = nextBlock ? myMoves.get(nextBlock.id) : null;
   const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
   const selectedStaff = staff.find(s => s.id === staffId);
   const currentDutyLines = currentBlock ? dutyLinesForStaff(currentBlock, selectedStaff?.name) : [];
+  const nextDutyLines = nextBlock ? dutyLinesForStaff(nextBlock, selectedStaff?.name) : [];
 
   return (
     <div>
@@ -157,12 +173,26 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
           ))}
         </select>
       </div>
-      <div className={`card p-4 mb-4 border-2 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/50" : "border-slate-200"}`}>
+      <div
+        className="sticky z-10 -mx-3 mb-4 space-y-2 bg-slate-50/95 px-3 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-4 sm:px-4"
+        style={{ top: "var(--ig-header-h, 0px)" }}
+      >
+      <div className={`card p-4 border-2 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/80" : "border-slate-200 bg-white/95"}`}>
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
             <div className="text-xs font-semibold text-fuchsia-700 mb-1">지금 해야 할 일</div>
             <div className="text-lg font-bold text-slate-800">
-              {currentBlock ? currentBlock.label : curDay == null ? "수련회 기간 밖입니다" : nextBlock ? "다음 일정 대기" : "오늘 일정이 종료되었습니다"}
+              {currentBlock
+                ? currentBlock.label
+                : timelinePhase === "before"
+                  ? "수련회 시작 전입니다"
+                  : timelinePhase === "after"
+                    ? "수련회가 종료되었습니다"
+                    : curDay == null
+                      ? "수련회 기간을 확인해주세요"
+                      : nextBlock
+                        ? "현재 진행 중인 일정이 없습니다"
+                        : "오늘 일정이 종료되었습니다"}
             </div>
           </div>
           <div className="text-right shrink-0">
@@ -194,9 +224,50 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
           </div>
         ) : (
           <div className="text-sm text-slate-500">
-            {curDay == null ? "오늘 날짜가 이 수련회 기간에 포함되지 않습니다." : nextBlock ? `${timeRangeLabel(nextBlock)} · ${nextBlock.label}` : "현재 시간 이후로 등록된 시간 블록이 없습니다."}
+            {timelinePhase === "before"
+              ? `첫 일정은 ${nextBlock ? `${nextBlock.day}일차 ${timeRangeLabel(nextBlock)} · ${nextBlock.label}` : "아직 등록되지 않았습니다."}`
+              : timelinePhase === "after"
+                ? "모든 일정이 종료되었습니다."
+                : curDay == null
+                  ? "수련회 기간을 설정하면 현재·다음 일정이 자동으로 표시됩니다."
+                  : nextBlock
+                    ? `${timeRangeLabel(nextBlock)}까지 대기합니다.`
+                    : "현재 시간 이후로 등록된 시간 블록이 없습니다."}
           </div>
         )}
+      </div>
+      <div className={`card border p-3 ${nextBlock ? "border-violet-200 bg-violet-50/90" : "border-slate-200 bg-white/95"}`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="mb-1 text-xs font-semibold text-violet-700">다음 해야 할 일</div>
+            <div className="truncate text-base font-bold text-slate-800">
+              {nextBlock ? nextBlock.label : "예정된 다음 일정이 없습니다"}
+            </div>
+          </div>
+          {nextBlock && (
+            <div className="shrink-0 text-right text-xs text-slate-500">
+              <div className="font-mono font-semibold text-slate-700">{timeRangeLabel(nextBlock)}</div>
+              <div>{nextBlock.day}일차</div>
+            </div>
+          )}
+        </div>
+        {nextBlock && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+            {nextMove ? (
+              <>
+                <span className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700">📍 {postName(nextMove.postId)}</span>
+                {nextMove.round && <span className={`rounded-full px-2 py-0.5 ${nextMove.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{nextMove.round}</span>}
+                {nextMove.note && <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-fuchsia-700">{nextMove.note}</span>}
+              </>
+            ) : (
+              <span className="text-slate-500">배치 없음 · 조와 함께</span>
+            )}
+            {nextDutyLines.length > 0 && (
+              <span className="rounded-md bg-white px-2 py-1 text-violet-800">내 담당 · {nextDutyLines.join(" / ")}</span>
+            )}
+          </div>
+        )}
+      </div>
       </div>
       {days.map(day => (
         <div key={day} className="mb-4">
@@ -207,7 +278,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
             })()}
           </div>
           <div className="space-y-2">
-            {schedule.filter(b => b.day === day).map(b => {
+            {remainingBlocks.filter(b => b.day === day).map(b => {
               const mv = myMoves.get(b.id);
               const now = isNowOn(b, curDay, clock.time);
               const isOpen = open.has(b.id);

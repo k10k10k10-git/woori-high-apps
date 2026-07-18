@@ -71,6 +71,7 @@ src/
     ├── partialAttendance.ts        # 부분참(선복귀/후발대) 일자별 참석 공식
     ├── accessLock.ts               # PIN 검증(PBKDF2), 세션 잠금 해제 키
     ├── scheduleTime.ts             # 현장 시간·일차 판정 순수 로직 (isNowOn/currentBlockFor, 24시+ 블록 — 패턴 11) ExecutionViews에서 추출(2026-07 I2)
+    ├── cueCardTimeline.ts          # 개인 큐카드의 현재/다음 고정 일정과 이후 목록 경계 계산 (패턴 24)
     ├── cueSheet.ts                 # 큐싯 파서 (구 scheduleUtils.ts — 2026-07 I4 이동, 특성화 테스트 15개)
     └── exportUtils.ts              # printAsPDF (인쇄용 HTML → 새 창 인쇄), escapeHtml(인쇄 XSS 방지)
 
@@ -303,6 +304,12 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 - **판단 질문**: 담당반 홀짝, 교사 이름, 조 학생의 다수 성별로 교사 성별을 추론하지 않는다. 여자 교사가 남학생 반을 담당할 수 있어 같은 오배정이 재발하며, 미확인 교사를 임의 호차에 넣는 것보다 이름을 보여주고 자동배정을 중단하는 편이 안전하다.
 - **재사용 규칙**: 사람 본인의 속성과 그 사람이 담당하는 집단의 속성은 분리해 모델링하고, 버스 성별 배정에서는 행정 `teachers.gender` 명시값만 사용한다.
 
+### 24. 개인 큐카드의 현재·다음 일정 고정과 지난 일정 정리 (2026-07-18)
+
+- **접근법**: 1→ `currentBlockFor`로 현재 블록을 찾는다. 2→ `cueTimelineWindow`가 `day×1440+start` 절대 분과 현재 블록 ID를 사용해 다음 블록 하나와 그 이후 목록을 분리한다. 3→ `ExecutionViews.tsx`는 현재·다음 카드를 `top: var(--ig-header-h)`에 2단 sticky로 놓고 일반 목록에는 `remainingBlocks`만 렌더링한다. 4→ 진행 중·일정 사이·시작 전·종료 후·24시+ 일정을 `cueCardTimeline.test.ts`로 고정한다.
+- **판단 질문**: 지난 일정을 CSS로만 가리거나 `HH:mm`만 비교하지 않는다. 전자는 스크롤 시작 위치에 따라 지난 일정이 다시 보이고, 후자는 `24:30` 같은 새벽 일정과 다음 날 경계를 잘못 판단한다. 기간 설정이 없을 때는 임의로 현재를 추론하지 않고 기존 전체 목록을 보존한다.
+- **재사용 규칙**: 현장 타임라인 화면은 `현재 1개 / 다음 1개 / 이후 목록`을 하나의 순수 헬퍼에서 계산하고, UI는 그 결과만 배치한다.
+
 ---
 
 ## API 라우트
@@ -394,10 +401,10 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 
 | 그룹 | 뷰 키 | 탭 이름 | 접근 |
 |---|---|---|---|
-| **실행** (현장·모바일) | `check` | 인원체크 | 전체 |
-| | `rooms` | 조별 정보 | 전체 |
-| | `cue` | 개인 큐카드 | 전체 |
+| **실행** (현장·모바일) | `cue` | 개인 큐카드 | 전체 |
 | | `board` | 포스트 현황 | 전체 |
+| | `rooms` | 조별 정보 | 전체 |
+| | `check` | 인원체크 | 전체 |
 | **기획** (PC) | `schedule` | 스탭 전체 큐싯 | team/admin |
 | | `leadercue` | 조장 큐싯 | team/admin |
 | | `posts` | 포스트 편집 | team/admin |
