@@ -33,6 +33,11 @@ interface ClassGroup {
   }>;
 }
 
+function compactStatusLabel(label: string) {
+  const partial = label.match(/^부분참\((.+)\)$/);
+  return partial?.[1] ?? label;
+}
+
 export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat }) {
   const { toast, uiConfirm } = useUI();
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
@@ -448,7 +453,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                   {grade === -1 ? "교사" : grade > 0 ? `${grade}학년` : "미매칭"}
                   <span className="font-normal text-slate-400">{gradeReg} / {gradeTotal}명 등록</span>
                 </h3>
-                <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                   {gradeCls.map(cls => {
                     const regCount = cls.members.filter(m => m.registered).length;
                     const total = cls.members.length;
@@ -468,8 +473,8 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                           <div className={`h-full transition-all ${accentBg}`}
                             style={{ width: `${total > 0 ? Math.round(regCount / total * 100) : 0}%` }} />
                         </div>
-                        {/* 이름 카드 — 상태를 이름 옆에서 바로 확인 */}
-                        <div className="p-2 grid grid-cols-1 2xl:grid-cols-2 gap-1.5">
+                        {/* 기존의 작은 이름 칩 밀도를 유지하고 상태만 짧은 꼬리표로 붙인다. */}
+                        <div className="p-2 flex flex-wrap gap-1.5">
                           {cls.members.map(m => {
                             const groupName = m.source === "student" ? groupMap.get(m.onSiteKey) : undefined;
                             const isPending = pendingKeys.has(m.onSiteKey);
@@ -480,10 +485,10 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                                   disabled={isPending}
                                   title={
                                     m.isOnSite ? `${m.name} (현장추가)${groupName ? ` · ${groupName}` : ""}`
-                                    : m.registered ? `${m.name} — 클릭하여 등록 취소${groupName ? ` · ${groupName}` : ""}`
-                                    : `${m.name} — 클릭하여 등록${groupName ? ` · ${groupName}` : ""}`
+                                    : m.registered ? `${m.name} — 클릭하여 등록 취소${m.status ? ` · ${m.status.label}` : ""}${groupName ? ` · ${groupName}` : ""}`
+                                    : `${m.name} — 클릭하여 등록${m.status ? ` · ${m.status.label}` : ""}${groupName ? ` · ${groupName}` : ""}`
                                   }
-                                  className={`w-full min-h-10 px-2.5 py-1.5 rounded-lg text-sm font-semibold border transition-colors flex flex-wrap items-center gap-1.5 text-left ${
+                                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors inline-flex items-center gap-1 ${
                                     isPending ? "opacity-40 cursor-wait" :
                                     m.isOnSite
                                       ? "bg-amber-100 text-amber-800 border-amber-200 cursor-default"
@@ -496,12 +501,12 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                                     <span className="text-[10px] font-semibold opacity-70">{groupName}</span>
                                   )}
                                   {m.status && (
-                                    <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                    <span className={`shrink-0 rounded-full px-1.5 py-px text-[9px] leading-4 font-bold ${
                                       m.status.tone === "cancelled" || m.status.tone === "absent"
                                         ? "bg-red-100 text-red-700"
                                         : "bg-orange-100 text-orange-700"
                                     }`}>
-                                      {m.status.label}
+                                      {compactStatusLabel(m.status.label)}
                                     </span>
                                   )}
                                 </button>
