@@ -206,11 +206,11 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
         className="sticky z-10 -mx-3 mb-4 space-y-2 bg-slate-50/95 px-3 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-4 sm:px-4"
         style={{ top: "var(--ig-header-h, 0px)" }}
       >
-      <div className={`card p-4 border-2 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/80" : "border-slate-200 bg-white/95"}`}>
+      <div className={`card min-h-[116px] border-2 p-4 sm:min-h-[132px] sm:p-5 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/80" : "border-slate-200 bg-white/95"}`}>
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
             <div className="text-xs font-semibold text-fuchsia-700 mb-1">지금 해야 할 일</div>
-            <div className="text-lg font-bold text-slate-800">
+            <div className="text-lg font-bold text-slate-800 sm:text-xl">
               {currentBlock
                 ? currentBlock.label
                 : timelinePhase === "before"
@@ -265,11 +265,11 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
           </div>
         )}
       </div>
-      <div className={`card border p-3 ${nextBlock ? "border-violet-200 bg-violet-50/90" : "border-slate-200 bg-white/95"}`}>
+      <div className={`card min-h-[96px] border p-4 sm:min-h-[110px] sm:p-5 ${nextBlock ? "border-violet-200 bg-violet-50/90" : "border-slate-200 bg-white/95"}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="mb-1 text-xs font-semibold text-violet-700">다음 해야 할 일</div>
-            <div className="truncate text-base font-bold text-slate-800">
+            <div className="truncate text-lg font-bold text-slate-800">
               {nextBlock ? nextBlock.label : "예정된 다음 일정이 없습니다"}
             </div>
           </div>
