@@ -49,5 +49,33 @@ describe("normalizeAutoAssignConfig", () => {
     expect(config.rules.maxGroupSize).toBe(30);
     expect(config.rules.mixGender).toBe(false);
     expect(config.rules.assignTeachers).toBe(true);
+    expect(config.rules.keepSameClass).toBe(true);
+    expect(config.rules.inferGenderByClass).toBe(true);
+    expect(config.rules.excludeNonClassTeachers).toBe(true);
+    expect(config.rules.ensureNonEmptyGroups).toBe(true);
+    expect(config.rules.ensureEvenGroupCount).toBe(true);
+    expect(config.rules.optimizeResults).toBe(true);
+  });
+
+  it("새 배정 구조 규칙의 명시적 false를 보존한다", () => {
+    const config = normalizeAutoAssignConfig({
+      rules: {
+        keepSameClass: false,
+        inferGenderByClass: false,
+        excludeNonClassTeachers: false,
+        ensureNonEmptyGroups: false,
+        ensureEvenGroupCount: false,
+        optimizeResults: false,
+      },
+    });
+
+    expect(config.rules).toMatchObject({
+      keepSameClass: false,
+      inferGenderByClass: false,
+      excludeNonClassTeachers: false,
+      ensureNonEmptyGroups: false,
+      ensureEvenGroupCount: false,
+      optimizeResults: false,
+    });
   });
 });

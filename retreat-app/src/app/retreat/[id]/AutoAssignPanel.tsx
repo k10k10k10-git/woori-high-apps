@@ -5,7 +5,7 @@ import { DEFAULT_AUTO_ASSIGN_RULES, emptyLeaderEntry } from "@/lib/autoAssignCon
 import { getAutoAssignConfig, saveAutoAssignConfig } from "@/lib/db";
 import {
   AutoAssignScope, ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
-  buildAffinityBundles, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts,
+  buildAffinityBundles, buildAssignmentUnits, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts,
   ensureEvenScopedGroupCount, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
@@ -149,8 +149,14 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   }, [preview, closePreview]);
 
   // 반 구성 미리보기 (students DB 기준으로 반 단위 구성)
-  const classUnits1 = useMemo(() => buildClassUnits(participants, "1부", students), [participants, students]);
-  const classUnits2 = useMemo(() => buildClassUnits(participants, "2부", students), [participants, students]);
+  const classUnits1 = useMemo(
+    () => buildClassUnits(participants, "1부", students, rules.inferGenderByClass),
+    [participants, students, rules.inferGenderByClass],
+  );
+  const classUnits2 = useMemo(
+    () => buildClassUnits(participants, "2부", students, rules.inferGenderByClass),
+    [participants, students, rules.inferGenderByClass],
+  );
 
   // 반 결합·분리 모순 검증 — 에러가 있으면 실행 차단 (고려 관계 반영이 켜진 경우만)
   const relationErrors = useMemo(() => {
@@ -174,44 +180,56 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
 
   // 조 수 상한: 모든 조에 최소 한 번들을 배정할 수 있어야 하며,
   // 최소 2반 규칙이 켜지면 추가로 반 수의 절반까지만 가능하다.
-  const effectiveAffinities = rules.applyConflicts ? classAffinities : [];
+  const effectiveAffinities = useMemo(
+    () => rules.applyConflicts ? classAffinities : [],
+    [rules.applyConflicts, classAffinities],
+  );
+  const assignmentUnits1 = useMemo(() => buildAssignmentUnits(classUnits1, rules.keepSameClass), [classUnits1, rules.keepSameClass]);
+  const assignmentUnits2 = useMemo(() => buildAssignmentUnits(classUnits2, rules.keepSameClass), [classUnits2, rules.keepSameClass]);
   const bundleCount1 = useMemo(
-    () => buildAffinityBundles(classUnits1, effectiveAffinities).length,
-    [classUnits1, effectiveAffinities],
+    () => buildAffinityBundles(assignmentUnits1, effectiveAffinities).length,
+    [assignmentUnits1, effectiveAffinities],
   );
   const bundleCount2 = useMemo(
-    () => buildAffinityBundles(classUnits2, effectiveAffinities).length,
-    [classUnits2, effectiveAffinities],
+    () => buildAffinityBundles(assignmentUnits2, effectiveAffinities).length,
+    [assignmentUnits2, effectiveAffinities],
   );
-  const classRuleMax1 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits1.length / 2)) : classUnits1.length;
-  const classRuleMax2 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits2.length / 2)) : classUnits2.length;
-  const maxGroups1 = Math.min(bundleCount1, classRuleMax1);
-  const maxGroups2 = Math.min(bundleCount2, classRuleMax2);
+  const classRuleMax1 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits1.length / 2)) : assignmentUnits1.length;
+  const classRuleMax2 = rules.minTwoClasses ? Math.max(1, Math.floor(classUnits2.length / 2)) : assignmentUnits2.length;
+  const maxGroups1 = rules.ensureNonEmptyGroups ? Math.min(bundleCount1, classRuleMax1) : (bu1Count > 0 ? 20 : 0);
+  const maxGroups2 = rules.ensureNonEmptyGroups ? Math.min(bundleCount2, classRuleMax2) : (bu2Count > 0 ? 20 : 0);
   const currentGroupCount1bu = currentGroups.filter(group => group.bu === "1부").length;
   const currentGroupCount2bu = currentGroups.filter(group => group.bu === "2부").length;
 
   // maxGroupSize/인원수/최소2반 변경 시 조 수 자동 계산·클램프 (렌더 중 조정 — effect 대신)
-  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
+  const [prevAutoCalc, setPrevAutoCalc] = useState({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, ensureEvenGroupCount: rules.ensureEvenGroupCount, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
   if (
     rules.maxGroupSize !== prevAutoCalc.maxGroupSize ||
     bu1Count !== prevAutoCalc.bu1Count ||
     bu2Count !== prevAutoCalc.bu2Count ||
     rules.minTwoClasses !== prevAutoCalc.minTwoClasses ||
+    rules.ensureEvenGroupCount !== prevAutoCalc.ensureEvenGroupCount ||
     classUnits1.length !== prevAutoCalc.cls1 ||
     classUnits2.length !== prevAutoCalc.cls2 ||
     maxGroups1 !== prevAutoCalc.maxGroups1 ||
     maxGroups2 !== prevAutoCalc.maxGroups2
   ) {
-    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
+    setPrevAutoCalc({ maxGroupSize: rules.maxGroupSize, bu1Count, bu2Count, minTwoClasses: rules.minTwoClasses, ensureEvenGroupCount: rules.ensureEvenGroupCount, cls1: classUnits1.length, cls2: classUnits2.length, maxGroups1, maxGroups2 });
     if (rules.maxGroupSize > 0) {
       // 조당 최대 인원으로 조 수를 역산하고, 화면에 표시하기 전에 합계를 짝수로 보정한다.
-      const autoCounts = calculateEvenGroupCountsForMaxSize({
+      const countInput = {
         maxGroupSize: rules.maxGroupSize,
         maxGroups1,
         maxGroups2,
         studentCount1bu: bu1Count,
         studentCount2bu: bu2Count,
-      });
+      };
+      const autoCounts = rules.ensureEvenGroupCount
+        ? calculateEvenGroupCountsForMaxSize(countInput)
+        : {
+            groupCount1bu: bu1Count > 0 ? Math.min(maxGroups1, Math.max(1, Math.ceil(bu1Count / rules.maxGroupSize))) : 0,
+            groupCount2bu: bu2Count > 0 ? Math.min(maxGroups2, Math.max(1, Math.ceil(bu2Count / rules.maxGroupSize))) : 0,
+          };
       setGroupCount1bu(autoCounts.groupCount1bu);
       setGroupCount2bu(autoCounts.groupCount2bu);
     } else {
@@ -222,7 +240,9 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   }
 
   function run() {
-    const evenCounts = scope === "all"
+    const evenCounts = !rules.ensureEvenGroupCount
+      ? { groupCount1bu, groupCount2bu }
+      : scope === "all"
       ? ensureEvenCombinedGroupCounts({
           groupCount1bu,
           groupCount2bu,

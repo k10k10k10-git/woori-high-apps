@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, improveGroupsByWholeUnitMoves, mergeAutoAssignedGroups, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
+import { buildAssignmentUnits, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, improveGroupsByWholeUnitMoves, mergeAutoAssignedGroups, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -15,6 +15,8 @@ function mkT(name: string, grade: number, cls: number, status: TeacherAttendance
 
 function mkRules(over: Partial<RuleFlags>): RuleFlags {
   return {
+    keepSameClass: true, inferGenderByClass: true, excludeNonClassTeachers: true,
+    ensureNonEmptyGroups: true, ensureEvenGroupCount: true, optimizeResults: true,
     assignTeachers: false, requireFullTimer: false, pinLeaders: false, applyConflicts: false,
     mixGender: false, sameGender: false, balanceGrade: false, balanceSize: false,
     minTwoClasses: false, maxGroupSize: 0, ...over,
@@ -101,6 +103,66 @@ describe("1·2부 합산 조 수 짝수 보정", () => {
     );
     expect(groups).toHaveLength(2);
     expect(groups.length % 2).toBe(0);
+  });
+});
+
+describe("기본 배정 구조 선택", () => {
+  it("같은 반 유지 해제 시 같은 반 학생도 서로 다른 조에 배정할 수 있다", () => {
+    const participants = {
+      s1: mkP("s1", "가", 1, 1),
+      s2: mkP("s2", "나", 1, 1),
+    };
+    const groups = run(2, participants, mkRules({
+      keepSameClass: false,
+      ensureEvenGroupCount: false,
+      ensureNonEmptyGroups: true,
+    }));
+    expect(groups).toHaveLength(2);
+    expect(groupOf(groups, "s1")!.id).not.toBe(groupOf(groups, "s2")!.id);
+  });
+
+  it("반 홀짝 성별 구분 해제 시 신청서 성별을 사용한다", () => {
+    const participant = mkP("s1", "여학생", 1, 1);
+    participant.gender = "여";
+    const units = buildClassUnits({ s1: participant }, "1부", {}, false);
+    expect(units[0].gender).toBe("여");
+  });
+
+  it("반 유지와 홀짝 성별 추론을 모두 끄면 같은 반에서도 학생별 신청 성별을 보존한다", () => {
+    const male = mkP("s1", "남학생", 1, 1);
+    male.gender = "남";
+    const female = mkP("s2", "여학생", 1, 1);
+    female.gender = "여";
+    const classUnits = buildClassUnits({ s1: male, s2: female }, "1부", {}, false);
+    const studentUnits = buildAssignmentUnits(classUnits, false);
+    expect(studentUnits.map(unit => [unit.studentIds[0], unit.gender])).toEqual([
+      ["s1", "남"],
+      ["s2", "여"],
+    ]);
+  });
+
+  it("비담임 교사 제외 해제 시 부장과 스탭도 조에 배정한다", () => {
+    const participants = { s1: mkP("s1", "가", 1, 1) };
+    const teachers: TeacherAttendance[] = [
+      { id: "head", name: "부장", bu: "1부", classKey: "부장", status: "전참" },
+      { id: "staff", name: "스탭", bu: "스탭", classKey: "진행", status: "전참" },
+    ];
+    const groups = run(1, participants, mkRules({
+      assignTeachers: true,
+      excludeNonClassTeachers: false,
+      ensureEvenGroupCount: false,
+    }), { teachers });
+    expect(groups.flatMap(group => group.teachers)).toEqual(expect.arrayContaining(["부장", "스탭"]));
+  });
+
+  it("빈 조 방지와 짝수 보정을 끄면 요청한 홀수 조 수와 빈 조를 그대로 허용한다", () => {
+    const participants = { s1: mkP("s1", "가", 1, 1) };
+    const groups = run(3, participants, mkRules({
+      ensureNonEmptyGroups: false,
+      ensureEvenGroupCount: false,
+    }));
+    expect(groups).toHaveLength(3);
+    expect(groups.filter(group => group.studentIds.length === 0)).toHaveLength(2);
   });
 });
 

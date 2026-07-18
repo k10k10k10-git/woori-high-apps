@@ -218,9 +218,14 @@ export default function AutoAssignConfigPanel({
   // 반 담당 전참 교사 수 체크 (스탭/부장/회계 제외)
   const fullTimer1 = teachers.filter(t => t.bu === "1부" && t.status === "전참" && parseClassKey(t.classKey) !== null).length;
   const fullTimer2 = teachers.filter(t => t.bu === "2부" && t.status === "전참" && parseClassKey(t.classKey) !== null).length;
-  const warn1 = bu1Count > 0 && groupCount1bu > fullTimer1;
-  const warn2 = bu2Count > 0 && groupCount2bu > fullTimer2;
-  const evenGroupCounts = scope === "all"
+  const warn1 = rules.requireFullTimer && bu1Count > 0 && groupCount1bu > fullTimer1;
+  const warn2 = rules.requireFullTimer && bu2Count > 0 && groupCount2bu > fullTimer2;
+  const evenGroupCounts = !rules.ensureEvenGroupCount
+    ? {
+        groupCount1bu: scope === "2부" ? currentGroupCount1bu : groupCount1bu,
+        groupCount2bu: scope === "1부" ? currentGroupCount2bu : groupCount2bu,
+      }
+    : scope === "all"
     ? ensureEvenCombinedGroupCounts({
         groupCount1bu,
         groupCount2bu,
@@ -352,7 +357,12 @@ export default function AutoAssignConfigPanel({
           {([
             { label: "반 담당 교사를 해당 반이 속한 조에 자동 배치", key: "assignTeachers" as const },
             { label: "전참 교사가 있는 조에 우선 배정", key: "requireFullTimer" as const },
-            { label: "조장 지정 시 해당 반 전체를 그 조에 고정", key: "pinLeaders" as const },
+            {
+              label: rules.keepSameClass
+                ? "조장 지정 시 해당 반 전체를 그 조에 고정"
+                : "조장 지정 시 조장 본인을 그 조에 고정",
+              key: "pinLeaders" as const,
+            },
             { label: "고려 관계·반 붙임 관계를 조편성에 반영", key: "applyConflicts" as const },
             { label: "모든 조의 인원 수를 최대한 균등하게 배분", key: "balanceSize" as const },
             { label: "특정 학년이 한 조에 몰리지 않도록 분산 배정", key: "balanceGrade" as const },
@@ -380,22 +390,25 @@ export default function AutoAssignConfigPanel({
         </div>
 
         <div className="mt-2.5 border-t border-slate-200 pt-2">
-          <p className="mb-1.5 text-[10px] font-semibold text-slate-400">항상 적용되는 기본 구조</p>
-          <div className="space-y-1">
-            {[
-              "같은 반 학생은 반드시 같은 조로 배정",
-              "홀수반=남학생 반, 짝수반=여학생 반으로 구분",
-              "스탭·부장·회계 교사는 조 배정 제외",
-              "모든 조에 최소 1개 반 배정 (빈 조 방지)",
-              "1·2부 합산 조 수를 짝수로 자동 보정",
-              "여러 결과를 비교하고 반 이동까지 보정해 최적 결과 선택",
-            ].map(label => (
-              <div key={label} className="flex items-start gap-1.5 text-slate-400">
-                <span className="shrink-0 text-[10px] text-emerald-500">✓</span>
-                <span>{label}</span>
-                <span className="ml-auto shrink-0 rounded bg-slate-200 px-1 py-px text-[9px] text-slate-500">고정</span>
-              </div>
-            ))}
+          <p className="mb-1.5 text-[10px] font-semibold text-slate-400">배정 구조 선택</p>
+          <div className="space-y-1.5">
+            {([
+              { label: "같은 반 학생은 반드시 같은 조로 배정", key: "keepSameClass" as const },
+              { label: "홀수반=남학생 반, 짝수반=여학생 반으로 구분", key: "inferGenderByClass" as const },
+              { label: "스탭·부장·회계 교사는 조 배정 제외", key: "excludeNonClassTeachers" as const },
+              { label: "모든 조에 최소 1개 반 배정 (빈 조 방지)", key: "ensureNonEmptyGroups" as const },
+              { label: "1·2부 합산 조 수를 짝수로 자동 보정", key: "ensureEvenGroupCount" as const },
+              { label: "여러 결과를 비교하고 반 이동까지 보정해 최적 결과 선택", key: "optimizeResults" as const },
+            ]).map(({ label, key }) => {
+              const checked = rules[key];
+              return (
+                <label key={key} className="flex cursor-pointer items-start gap-2">
+                  <input type="checkbox" checked={checked} className="mt-0.5 shrink-0 rounded"
+                    onChange={e => setRules(current => ({ ...current, [key]: e.target.checked }))} />
+                  <span className={!checked ? "line-through opacity-50" : ""}>{label}</span>
+                </label>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -484,7 +497,7 @@ export default function AutoAssignConfigPanel({
               {rules.minTwoClasses && row.classes > 0 && (
                 <p className="text-xs text-blue-500">ℹ 최소 2반 규칙: 최대 {row.maxG}조까지 ({row.classes}개반 ÷ 2)</p>
               )}
-              {row.val > row.classes && (
+              {rules.keepSameClass && rules.ensureNonEmptyGroups && row.val > row.classes && (
                 <p className="text-xs text-orange-500">⚠ 조 수({row.val})가 반 수({row.classes})보다 많습니다</p>
               )}
               {row.warn && (
@@ -502,7 +515,9 @@ export default function AutoAssignConfigPanel({
         </div>
         <div className={`mt-2 rounded-lg px-2.5 py-2 text-xs ${groupCountAdjustment ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"}`}>
           합계 {combinedGroupCount}조
-          {groupCountAdjustment
+          {!rules.ensureEvenGroupCount
+            ? " · 짝수 자동 보정 꺼짐"
+            : groupCountAdjustment
             ? ` → 실행 시 ${groupCountAdjustment}로 자동 보정 (총 ${evenGroupCounts.groupCount1bu + evenGroupCounts.groupCount2bu}조)`
             : " · 짝수 조건 충족"}
           {scope !== "all" && (
@@ -516,7 +531,11 @@ export default function AutoAssignConfigPanel({
       {/* 조장 반 설정 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-2">⭐ 조장 설정</p>
-        <p className="text-[10px] text-slate-400 mb-2">기본은 본인반 동반입니다. 본인반 없이 다른 조를 섬기는 조장만 <strong className="text-fuchsia-600">파송</strong>을 체크하세요.</p>
+        <p className="text-[10px] text-slate-400 mb-2">
+          {rules.keepSameClass
+            ? <>기본은 본인반 동반입니다. 본인반 없이 다른 조를 섬기는 조장만 <strong className="text-fuchsia-600">파송</strong>을 체크하세요.</>
+            : <>같은 반 유지가 꺼져 있어 조장 본인만 해당 조에 고정됩니다. 본인반 학생을 해당 조에서 제외하려면 <strong className="text-fuchsia-600">파송</strong>을 체크하세요.</>}
+        </p>
         {([
           { bu: "1부" as const, count: groupCount1bu, entries: leaderEntries1, setEntries: setLeaderEntries1, show: bu1Count > 0, tagCls: "tag-green", units: classUnits1 },
           { bu: "2부" as const, count: groupCount2bu, entries: leaderEntries2, setEntries: setLeaderEntries2, show: bu2Count > 0, tagCls: "tag-purple", units: classUnits2 },

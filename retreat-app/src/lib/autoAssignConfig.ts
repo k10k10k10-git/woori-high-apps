@@ -4,6 +4,12 @@ export interface ConflictPair {
 }
 
 export interface RuleFlags {
+  keepSameClass: boolean;
+  inferGenderByClass: boolean;
+  excludeNonClassTeachers: boolean;
+  ensureNonEmptyGroups: boolean;
+  ensureEvenGroupCount: boolean;
+  optimizeResults: boolean;
   assignTeachers: boolean;
   requireFullTimer: boolean;
   pinLeaders: boolean;
@@ -40,6 +46,12 @@ export interface AutoAssignConfigData {
 }
 
 export const DEFAULT_AUTO_ASSIGN_RULES: RuleFlags = {
+  keepSameClass: true,
+  inferGenderByClass: true,
+  excludeNonClassTeachers: true,
+  ensureNonEmptyGroups: true,
+  ensureEvenGroupCount: true,
+  optimizeResults: true,
   assignTeachers: true,
   requireFullTimer: true,
   pinLeaders: true,
@@ -104,6 +116,12 @@ export function normalizeAutoAssignConfig(value: unknown): AutoAssignConfigData 
     groupCount1bu: finiteInt(raw.groupCount1bu, 10, 1, 20),
     groupCount2bu: finiteInt(raw.groupCount2bu, 10, 1, 20),
     rules: {
+      keepSameClass: boolRule("keepSameClass"),
+      inferGenderByClass: boolRule("inferGenderByClass"),
+      excludeNonClassTeachers: boolRule("excludeNonClassTeachers"),
+      ensureNonEmptyGroups: boolRule("ensureNonEmptyGroups"),
+      ensureEvenGroupCount: boolRule("ensureEvenGroupCount"),
+      optimizeResults: boolRule("optimizeResults"),
       assignTeachers: boolRule("assignTeachers"),
       requireFullTimer: boolRule("requireFullTimer"),
       pinLeaders: boolRule("pinLeaders"),

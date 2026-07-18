@@ -7,10 +7,12 @@ export type { ConflictPair, LeaderEntry, RuleFlags } from "@/lib/autoAssignConfi
 
 export interface ClassUnit {
   key: string;       // "1부_1_3" = 1부 1학년 3반
+  classKey?: string; // 학생 단위 배정으로 쪼개져도 유지되는 원래 반 키
   bu: string;
   grade: number;
   classNum: number;
   gender: "남" | "여";  // 홀수반=남, 짝수반=여
+  genders?: ("남" | "여")[]; // 학생 단위로 나눌 때 각 학생의 성별을 보존
   studentIds: string[];
   names: string[];
 }
@@ -65,6 +67,10 @@ export interface MaxSizeGroupCountInput {
   maxGroups2: number;
   studentCount1bu: number;
   studentCount2bu: number;
+}
+
+function unitClassKey(unit: ClassUnit) {
+  return unit.classKey ?? unit.key;
 }
 
 interface ResolvedLeader {
@@ -173,6 +179,7 @@ export function buildClassUnits(
   participants: Record<string, Participant>,
   bu: string,
   students: Record<string, { name: string; grade: number; class: number }>,
+  inferGenderByClass = true,
 ): ClassUnit[] {
   const map = new Map<string, ClassUnit>();
   const seen = new Set<string>();
@@ -189,19 +196,37 @@ export function buildClassUnits(
     const name  = sd?.name  ?? p.name;
 
     const key = `${bu}_${grade}_${cls}`;
+    const participantGender = p.gender?.trim().startsWith("여") ? "여" : p.gender?.trim().startsWith("남") ? "남" : null;
     if (!map.has(key)) {
       map.set(key, {
-        key, bu, grade, classNum: cls,
-        gender: cls % 2 === 0 ? "여" : "남",
-        studentIds: [], names: [],
+        key, classKey: key, bu, grade, classNum: cls,
+        gender: inferGenderByClass ? (cls % 2 === 0 ? "여" : "남") : (participantGender ?? (cls % 2 === 0 ? "여" : "남")),
+        genders: [], studentIds: [], names: [],
       });
     }
     const u = map.get(key)!;
     u.studentIds.push(p.studentId);
     u.names.push(name);
+    u.genders!.push(inferGenderByClass
+      ? (cls % 2 === 0 ? "여" : "남")
+      : (participantGender ?? (cls % 2 === 0 ? "여" : "남")));
   });
 
   return Array.from(map.values());
+}
+
+/** 같은 반 유지 규칙을 끄면 배정 단위를 반에서 학생으로 쪼갠다. */
+export function buildAssignmentUnits(units: ClassUnit[], keepSameClass: boolean): ClassUnit[] {
+  if (keepSameClass) return units;
+  return units.flatMap(unit => unit.studentIds.map((studentId, index) => ({
+    ...unit,
+    classKey: unitClassKey(unit),
+    key: `${unitClassKey(unit)}::${studentId}`,
+    gender: unit.genders?.[index] ?? unit.gender,
+    genders: [unit.genders?.[index] ?? unit.gender],
+    studentIds: [studentId],
+    names: [unit.names[index]],
+  })));
 }
 
 // ── 헬퍼: classKey 파싱 ("1학년 1반" → {grade:1, classNum:1}) ────────
@@ -216,6 +241,7 @@ export function findLeaderUnit(
   entry: LeaderEntry, bu: string,
   participants: Record<string, Participant>,
   students: Record<string, { name: string; grade: number; class: number }>,
+  inferGenderByClass = true,
 ): { unitKey: string; classLabel: string; studentId: string; gender: ClassUnit["gender"]; ambiguous: boolean } | null {
   if (!entry.name.trim()) return null;
   const buKey = bu === "1부" ? "1" : "2";
@@ -244,7 +270,9 @@ export function findLeaderUnit(
     unitKey: `${bu}_${grade}_${cls}`,
     classLabel: `${grade}학년 ${cls}반`,
     studentId: p.studentId!,
-    gender: cls % 2 === 0 ? "여" : "남",
+    gender: inferGenderByClass
+      ? (cls % 2 === 0 ? "여" : "남")
+      : p.gender?.trim().startsWith("여") ? "여" : p.gender?.trim().startsWith("남") ? "남" : (cls % 2 === 0 ? "여" : "남"),
     ambiguous: matches.length > 1, // 동명이인이 여전히 여러 명
   };
 }
@@ -267,7 +295,11 @@ export function buildAffinityBundles(units: ClassUnit[], affinities: ConflictPai
     return root;
   }
   affinities.forEach(({ a, b }) => {
-    if (parent.has(a) && parent.has(b)) parent.set(find(a), find(b));
+    const left = units.filter(unit => unitClassKey(unit) === a);
+    const right = units.filter(unit => unitClassKey(unit) === b);
+    if (left.length === 0 || right.length === 0) return;
+    const anchor = left[0].key;
+    [...left.slice(1), ...right].forEach(unit => parent.set(find(unit.key), find(anchor)));
   });
   const byRoot = new Map<string, ClassUnit[]>();
   units.forEach(u => {
@@ -338,12 +370,13 @@ function assignUnitToGroup(
   groups: Group[], gData: {
     maleClasses: number; femaleClasses: number;
     maleMembers: number; femaleMembers: number;
-    grades: Record<number, number>; allNames: string[]; unitKeys: string[]; total: number;
+    grades: Record<number, number>; allNames: string[]; unitKeys: string[]; classKeys: string[]; total: number;
   }[]
 ) {
   groups[groupIdx].studentIds.push(...unit.studentIds);
   gData[groupIdx].allNames.push(...unit.names);
   gData[groupIdx].unitKeys.push(unit.key);
+  if (!gData[groupIdx].classKeys.includes(unitClassKey(unit))) gData[groupIdx].classKeys.push(unitClassKey(unit));
   gData[groupIdx].total += unit.studentIds.length;
   if (unit.gender === "남") {
     gData[groupIdx].maleClasses++;
@@ -381,6 +414,7 @@ function tryAssign(
     grades: {} as Record<number, number>,
     allNames: [] as string[],
     unitKeys: [] as string[], // 이 조에 배정된 반(unitKey) 목록 — 반 고려 관계·최소 2반 판정용
+    classKeys: [] as string[],
     teacherNames: [] as string[],
     fullTimerCount: 0, // 전참 교사 수
     total: 0,
@@ -415,9 +449,10 @@ function tryAssign(
     else if (!unitKeyToHasFullTimer.has(key)) unitKeyToHasFullTimer.set(key, false);
   });
 
-  const addUnitTeachers = (unitKey: string, groupIdx: number) => {
-    (unitKeyToTeachers.get(unitKey) ?? []).forEach(tn => gData[groupIdx].teacherNames.push(tn));
-    if (unitKeyToHasFullTimer.get(unitKey)) gData[groupIdx].fullTimerCount++;
+  const addUnitTeachers = (unit: ClassUnit, groupIdx: number) => {
+    const classKey = unitClassKey(unit);
+    (unitKeyToTeachers.get(classKey) ?? []).forEach(tn => gData[groupIdx].teacherNames.push(tn));
+    if (unitKeyToHasFullTimer.get(classKey)) gData[groupIdx].fullTimerCount++;
   };
 
   // ── 번들: 붙임(결합) 관계로 연결된 반 묶음 — 묶음 단위 배정으로 결합을 구조적으로 보장 ──
@@ -436,7 +471,7 @@ function tryAssign(
       const unit = units.find(u => u.key === key);
       if (!unit || assignedKeys.has(key)) return; // 같은 반 중복 고정 방어
       assignUnitToGroup(unit, i, groups, gData);
-      addUnitTeachers(unit.key, i);
+      addUnitTeachers(unit, i);
       assignedKeys.add(key);
       const bi = bundleIdxByKey.get(key)!;
       if (!bundleAnchor.has(bi)) bundleAnchor.set(bi, i);
@@ -448,7 +483,7 @@ function tryAssign(
       bundles[bi].forEach(u => {
         if (assignedKeys.has(u.key)) return;
         assignUnitToGroup(u, groupIdx, groups, gData);
-        addUnitTeachers(u.key, groupIdx);
+        addUnitTeachers(u, groupIdx);
         assignedKeys.add(u.key);
       });
     });
@@ -473,8 +508,8 @@ function tryAssign(
   for (const bundle of remaining) {
     // 번들 집계 — 반 1개 번들이 일반 케이스라 기존 반 단위 점수와 동일하게 환원된다
     const bNames = bundle.flatMap(u => u.names);
-    const bTeachers = bundle.flatMap(u => unitKeyToTeachers.get(u.key) ?? []);
-    const bKeys = bundle.map(u => u.key);
+    const bTeachers = bundle.flatMap(u => unitKeyToTeachers.get(unitClassKey(u)) ?? []);
+    const bClassKeys = [...new Set(bundle.map(unitClassKey))];
     const bTotal = bundleTotal(bundle);
     const bMale = bundle.filter(u => u.gender === "남").length;
     const bFemale = bundle.length - bMale;
@@ -503,11 +538,11 @@ function tryAssign(
           bTeachers.some(tn => gData[i].allNames.some(n => hasConflict(tn, n, teacherStudentConflicts)));
         if (tsConflict) score -= HARD_PENALTY;
         // 반 고려(분리) — 이 조에 이미 있는 반 중 번들 내 반과 분리 대상이 있으면 하드
-        const classConflict = gData[i].unitKeys.some(k => bKeys.some(bk => hasConflict(bk, k, classConflicts)));
+        const classConflict = gData[i].classKeys.some(k => bClassKeys.some(bk => hasConflict(bk, k, classConflicts)));
         if (classConflict) score -= HARD_PENALTY;
       }
       // 파송 조장의 본인 반은 파송된 조에 들어가면 안 된다(파송 의미 자체를 보장하는 하드 제약).
-      if (leaders.some(leader => leader.mode === "sent" && leader.groupIdx === i && bKeys.includes(leader.unitKey))) {
+      if (leaders.some(leader => leader.mode === "sent" && leader.groupIdx === i && bClassKeys.includes(leader.unitKey))) {
         score -= HARD_PENALTY;
       }
       // 전참 교사 보장 (중간 유도) — 전참 반은 아직 전참이 없는 조로 유도(빈 조 포함).
@@ -517,10 +552,10 @@ function tryAssign(
       }
       // 최소 2반 유도: 반이 적게 든 조부터 채우도록 (반 개수 × 중간 가중치만큼 감점 → 0반·1반 조 우선)
       if (ruleFlags.minTwoClasses) {
-        score -= gData[i].unitKeys.length * CLASS_SPREAD_GUIDE;
+        score -= gData[i].classKeys.length * CLASS_SPREAD_GUIDE;
       }
       // 모든 조에 최소 한 반 배정 유도. 파송 조장 1명만 있는 조도 unitKeys는 0개이므로 빈 조로 본다.
-      if (gData[i].unitKeys.length === 0) score += EMPTY_GROUP_SPREAD_GUIDE;
+      if (ruleFlags.ensureNonEmptyGroups && gData[i].classKeys.length === 0) score += EMPTY_GROUP_SPREAD_GUIDE;
       // 파송 조장 외 같은 성별 학생이 아직 없으면 같은 성별 반을 우선 유도한다.
       // 조장 본인 반은 별도 하드 규칙으로 이 조에 들어올 수 없으므로 다른 반만 대상이 된다.
       const sentLeader = leaders.find(leader => leader.mode === "sent" && leader.groupIdx === i);
@@ -564,17 +599,17 @@ function tryAssign(
       const chosen = topCandidates[Math.floor(Math.random() * topCandidates.length)];
       bundle.forEach(u => {
         assignUnitToGroup(u, chosen.idx, groups, gData);
-        addUnitTeachers(u.key, chosen.idx);
+        addUnitTeachers(u, chosen.idx);
       });
     }
   }
 
   // 학생 배정 결과: unitKey → groupIdx 맵
-  const unitToGroupIdx = new Map<string, number>();
+  const classToGroupIdx = new Map<string, number>();
   for (let i = 0; i < groups.length; i++) {
     for (const unit of units) {
       if (unit.studentIds.some(sid => groups[i].studentIds.includes(sid))) {
-        unitToGroupIdx.set(unit.key, i);
+        if (!classToGroupIdx.has(unitClassKey(unit))) classToGroupIdx.set(unitClassKey(unit), i);
       }
     }
   }
@@ -583,11 +618,16 @@ function tryAssign(
   if (ruleFlags.assignTeachers) {
     for (const t of teachers) {
       const parsed = parseClassKey(t.classKey);
-      if (!parsed) continue;
-      const unitKey = `${bu}_${parsed.grade}_${parsed.classNum}`;
-      const groupIdx = unitToGroupIdx.get(unitKey);
-      if (groupIdx === undefined) continue;
-      groups[groupIdx].teachers.push(t.name);
+      if (parsed) {
+        const classKey = `${bu}_${parsed.grade}_${parsed.classNum}`;
+        const groupIdx = classToGroupIdx.get(classKey);
+        if (groupIdx !== undefined) groups[groupIdx].teachers.push(t.name);
+        continue;
+      }
+      if (!ruleFlags.excludeNonClassTeachers && groups.length > 0) {
+        const target = groups.reduce((best, group) => group.teachers.length < best.teachers.length ? group : best, groups[0]);
+        target.teachers.push(t.name);
+      }
     }
   }
 
@@ -608,11 +648,15 @@ export function scoreGroups(
   const groupIdxById = new Map(groups.map((g, i) => [g.id, i]));
   const unitByKey = new Map(units.map(u => [u.key, u]));
   const unitKeysInGroup: string[][] = groups.map(() => []);
+  const classKeysInGroup: string[][] = groups.map(() => []);
   const nameToGroup = new Map<string, string>();
   units.forEach(u => {
     const g = groups.find(gr => u.studentIds.some(sid => gr.studentIds.includes(sid)));
     if (!g) return;
-    unitKeysInGroup[groupIdxById.get(g.id)!].push(u.key);
+    const groupIdx = groupIdxById.get(g.id)!;
+    unitKeysInGroup[groupIdx].push(u.key);
+    const classKey = unitClassKey(u);
+    if (!classKeysInGroup[groupIdx].includes(classKey)) classKeysInGroup[groupIdx].push(classKey);
     u.names.forEach(n => nameToGroup.set(n, g.id));
   });
   // 파송 조장은 ClassUnit에서 빠지므로 이름 기반 고려 관계 맵에 역할 위치를 별도로 넣는다.
@@ -625,7 +669,9 @@ export function scoreGroups(
   // (assignTeachers=false여서 g.teachers가 비어도 교사 고려 관계를 판정할 수 있게 units 기준으로 도출).
   const bu = units[0]?.bu ?? "";
   const unitKeyToGroupIdx = new Map<string, number>();
-  unitKeysInGroup.forEach((keys, i) => keys.forEach(k => unitKeyToGroupIdx.set(k, i)));
+  classKeysInGroup.forEach((keys, i) => keys.forEach(k => {
+    if (!unitKeyToGroupIdx.has(k)) unitKeyToGroupIdx.set(k, i);
+  }));
   const teacherToGroup = new Map<string, string>();
   teachers.forEach(t => {
     const parsed = parseClassKey(t.classKey);
@@ -647,12 +693,14 @@ export function scoreGroups(
     score -= sizes.reduce((acc, s) => acc + (s - avg) ** 2, 0) * 10;
   }
   // 모든 활성 조에 최소 한 반 배정 (하드) — 파송 조장만 있는 조도 빈 조로 판정한다.
-  unitKeysInGroup.forEach(keys => {
-    if (keys.length === 0) score -= HARD_PENALTY;
-  });
+  if (ruleFlags.ensureNonEmptyGroups) {
+    classKeysInGroup.forEach(keys => {
+      if (keys.length === 0) score -= HARD_PENALTY;
+    });
+  }
   // 최소 2반 (하드) — 학생이 있는 조는 서로 다른 반이 2개 이상이어야 함
   if (ruleFlags.minTwoClasses) {
-    unitKeysInGroup.forEach((keys, i) => {
+    classKeysInGroup.forEach((keys, i) => {
       if (groups[i].studentIds.length > 0 && keys.length < 2) score -= HARD_PENALTY;
     });
   }
@@ -674,7 +722,7 @@ export function scoreGroups(
     });
     // 반 고려 관계 — 두 반이 같은 조에 있으면 하드
     classConflicts.forEach(({ a, b }) => {
-      const inSame = unitKeysInGroup.some(keys => keys.includes(a) && keys.includes(b));
+      const inSame = classKeysInGroup.some(keys => keys.includes(a) && keys.includes(b));
       if (inSame) score -= HARD_PENALTY;
     });
     // 반 붙임 관계 — 두 반이 서로 다른 조면 하드
@@ -686,7 +734,7 @@ export function scoreGroups(
   }
   // 파송 조장 본인 반이 같은 조에 들어간 결과는 하드 위반.
   sentLeaderExclusions.forEach(({ groupIdx, unitKey }) => {
-    if (unitKeysInGroup[groupIdx]?.includes(unitKey)) score -= HARD_PENALTY;
+    if (classKeysInGroup[groupIdx]?.includes(unitKey)) score -= HARD_PENALTY;
   });
   // 전참 교사 미배정 조 (하드)
   if (ruleFlags.requireFullTimer) {
@@ -753,6 +801,7 @@ function rebuildAssignedTeachers(
   teachers: TeacherAttendance[],
   bu: string,
   assignTeachers: boolean,
+  excludeNonClassTeachers: boolean,
 ) {
   groups.forEach(group => { group.teachers = []; });
   if (!assignTeachers) return;
@@ -760,13 +809,19 @@ function rebuildAssignedTeachers(
   const unitToGroup = new Map<string, Group>();
   units.forEach(unit => {
     const group = groups.find(candidate => unit.studentIds.some(id => candidate.studentIds.includes(id)));
-    if (group) unitToGroup.set(unit.key, group);
+    if (group && !unitToGroup.has(unitClassKey(unit))) unitToGroup.set(unitClassKey(unit), group);
   });
   teachers.filter(teacher => teacher.bu === bu).forEach(teacher => {
     const parsed = parseClassKey(teacher.classKey);
-    if (!parsed) return;
-    const group = unitToGroup.get(`${bu}_${parsed.grade}_${parsed.classNum}`);
-    if (group && !group.teachers.includes(teacher.name)) group.teachers.push(teacher.name);
+    if (parsed) {
+      const group = unitToGroup.get(`${bu}_${parsed.grade}_${parsed.classNum}`);
+      if (group && !group.teachers.includes(teacher.name)) group.teachers.push(teacher.name);
+      return;
+    }
+    if (!excludeNonClassTeachers && groups.length > 0) {
+      const target = groups.reduce((best, group) => group.teachers.length < best.teachers.length ? group : best, groups[0]);
+      if (!target.teachers.includes(teacher.name)) target.teachers.push(teacher.name);
+    }
   });
 }
 
@@ -821,7 +876,7 @@ export function improveGroupsByWholeUnitMoves(
       for (let targetIdx = 0; targetIdx < current.length; targetIdx++) {
         if (targetIdx === sourceIdx) continue;
         if (sentLeaderExclusions.some(exclusion =>
-          exclusion.groupIdx === targetIdx && bundle.some(unit => unit.key === exclusion.unitKey)
+          exclusion.groupIdx === targetIdx && bundle.some(unit => unitClassKey(unit) === exclusion.unitKey)
         )) continue;
         const candidate = current.map(group => ({
           ...group,
@@ -834,7 +889,7 @@ export function improveGroupsByWholeUnitMoves(
         const sourceStillHasClass = units.some(unit =>
           unit.studentIds.some(id => candidate[sourceIdx].studentIds.includes(id))
         );
-        if (!sourceStillHasClass) continue;
+        if (ruleFlags.ensureNonEmptyGroups && !sourceStillHasClass) continue;
         const removesExistingSentLeaderPeer = sentLeaderExclusions.some(exclusion => {
           const hasPeer = (groupsToCheck: Group[]) => units.some(unit =>
             unit.gender === exclusion.gender
@@ -846,7 +901,7 @@ export function improveGroupsByWholeUnitMoves(
         // 최대 인원은 후처리가 새로 위반하게 두지 않는다. 점수만 비교하면 다른 하드 위반을
         // 하나 줄이는 대신 최대 인원 위반을 하나 만드는 동률 교환이 가능하기 때문이다.
         if (ruleFlags.maxGroupSize > 0 && candidate[targetIdx].studentIds.length > ruleFlags.maxGroupSize) continue;
-        rebuildAssignedTeachers(candidate, units, teachers, bu, ruleFlags.assignTeachers);
+        rebuildAssignedTeachers(candidate, units, teachers, bu, ruleFlags.assignTeachers, ruleFlags.excludeNonClassTeachers);
         const candidateScore = evaluate(candidate);
         if (candidateScore > bestScore) {
           bestScore = candidateScore;
@@ -878,25 +933,29 @@ export function runAutoAssign(
   preservedOtherGroupCount = 0,
 ): Group[] {
   const rawUnitsByBu = {
-    "1부": buildClassUnits(participants, "1부", students),
-    "2부": buildClassUnits(participants, "2부", students),
+    "1부": buildClassUnits(participants, "1부", students, ruleFlags.inferGenderByClass),
+    "2부": buildClassUnits(participants, "2부", students, ruleFlags.inferGenderByClass),
   };
   const maxFor = (units: ClassUnit[]) => {
     if (units.length === 0) return 0;
+    if (!ruleFlags.ensureNonEmptyGroups) return 20;
+    const assignmentUnits = buildAssignmentUnits(units, ruleFlags.keepSameClass);
     const affinityCount = buildAffinityBundles(
-      units,
+      assignmentUnits,
       ruleFlags.applyConflicts ? classAffinities : [],
     ).length;
     const classRuleMax = ruleFlags.minTwoClasses
       ? Math.max(1, Math.floor(units.length / 2))
-      : units.length;
+      : assignmentUnits.length;
     return Math.min(affinityCount, classRuleMax);
   };
   const maxGroups1 = maxFor(rawUnitsByBu["1부"]);
   const maxGroups2 = maxFor(rawUnitsByBu["2부"]);
   const studentCount1bu = rawUnitsByBu["1부"].reduce((sum, unit) => sum + unit.studentIds.length, 0);
   const studentCount2bu = rawUnitsByBu["2부"].reduce((sum, unit) => sum + unit.studentIds.length, 0);
-  const evenCounts = scope === "all"
+  const evenCounts = !ruleFlags.ensureEvenGroupCount
+    ? { groupCount1bu, groupCount2bu }
+    : scope === "all"
     ? ensureEvenCombinedGroupCounts({
         groupCount1bu, groupCount2bu, maxGroups1, maxGroups2, studentCount1bu, studentCount2bu,
       })
@@ -929,7 +988,7 @@ export function runAutoAssign(
     const buTeachers = teachers.filter(t => t.bu === bu);
     const entries = bu === "1부" ? leaderEntries1 : leaderEntries2;
     const leaders: ResolvedLeader[] = entries.slice(0, groupCount).flatMap((entry, groupIdx) => {
-      const found = findLeaderUnit(entry, bu, participants, students);
+      const found = findLeaderUnit(entry, bu, participants, students, ruleFlags.inferGenderByClass);
       if (!entry.name.trim() || !found) return [];
       return [{
         groupIdx,
@@ -942,15 +1001,25 @@ export function runAutoAssign(
     });
     const sentLeaderIds = new Set(leaders.filter(l => l.mode === "sent").map(l => l.studentId));
     // 파송 조장 한 명만 본인 반에서 분리한다. 나머지 학생은 기존 반 단위 불변식을 그대로 유지한다.
-    const units = rawUnits.map(unit => {
+    const unitsWithoutSentLeaders = rawUnits.map(unit => {
       const kept = unit.studentIds
-        .map((studentId, i) => ({ studentId, name: unit.names[i] }))
+        .map((studentId, i) => ({ studentId, name: unit.names[i], gender: unit.genders?.[i] ?? unit.gender }))
         .filter(item => !sentLeaderIds.has(item.studentId));
-      return { ...unit, studentIds: kept.map(item => item.studentId), names: kept.map(item => item.name) };
+      return {
+        ...unit,
+        studentIds: kept.map(item => item.studentId),
+        names: kept.map(item => item.name),
+        genders: kept.map(item => item.gender),
+      };
     }).filter(unit => unit.studentIds.length > 0);
+    const units = buildAssignmentUnits(unitsWithoutSentLeaders, ruleFlags.keepSameClass);
     const pinnedKeys: (string | null)[] = Array(groupCount).fill(null);
     if (ruleFlags.pinLeaders) {
-      leaders.filter(l => l.mode === "withClass").forEach(l => { pinnedKeys[l.groupIdx] = l.unitKey; });
+      leaders.filter(l => l.mode === "withClass").forEach(leader => {
+        pinnedKeys[leader.groupIdx] = ruleFlags.keepSameClass
+          ? leader.unitKey
+          : units.find(unit => unit.studentIds.includes(leader.studentId))?.key ?? null;
+      });
     }
     const sentLeaderExclusions = leaders
       .filter(l => l.mode === "sent")
@@ -958,7 +1027,8 @@ export function runAutoAssign(
 
     const greedyCandidates: { groups: Group[]; score: number }[] = [];
     // 하드 제약이 많을수록 그리디가 첫 시도에서 막힐 수 있어 반복 횟수를 늘려 위반 0 해를 찾을 확률을 높인다.
-    for (let i = 0; i < 16; i++) {
+    const attemptCount = ruleFlags.optimizeResults ? 16 : 1;
+    for (let i = 0; i < attemptCount; i++) {
       const groups = tryAssign(groupCount, bu, units, buTeachers, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, ruleFlags, pinnedKeys, leaders);
       const score = scoreGroups(groups, units, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, ruleFlags.applyConflicts ? classAffinities : [], ruleFlags, buTeachers, sentLeaderExclusions);
       greedyCandidates.push({ groups, score });
@@ -968,18 +1038,26 @@ export function runAutoAssign(
     let bestScore = -Infinity;
     // 모든 그리디 후보에 국소 탐색을 하면 브라우저가 오래 멈춘다. 초기 점수 상위 후보만
     // 보정해 탐색 폭은 유지하면서 운영 데이터 기준 실행 시간을 짧게 제한한다.
-    for (const { groups } of greedyCandidates.sort((a, b) => b.score - a.score).slice(0, 4)) {
-      const g = improveGroupsByWholeUnitMoves(
-        groups, units,
-        studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities,
-        ruleFlags, buTeachers, pinnedKeys, sentLeaderExclusions,
-      );
+    for (const { groups } of greedyCandidates.sort((a, b) => b.score - a.score).slice(0, ruleFlags.optimizeResults ? 4 : 1)) {
+      const g = ruleFlags.optimizeResults
+        ? improveGroupsByWholeUnitMoves(
+            groups, units,
+            studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities,
+            ruleFlags, buTeachers, pinnedKeys, sentLeaderExclusions,
+          )
+        : groups;
       const s = scoreGroups(g, units, studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, ruleFlags.applyConflicts ? classAffinities : [], ruleFlags, buTeachers, sentLeaderExclusions);
       if (s > bestScore) { bestScore = s; bestGroups = g; }
     }
     if (bestGroups) {
       result.push(...bestGroups);
     }
+  }
+  if (ruleFlags.assignTeachers && !ruleFlags.excludeNonClassTeachers && result.length > 0) {
+    teachers.filter(teacher => teacher.bu === "스탭" && teacher.status !== "불참").forEach(teacher => {
+      const target = result.reduce((best, group) => group.teachers.length < best.teachers.length ? group : best, result[0]);
+      if (!target.teachers.includes(teacher.name)) target.teachers.push(teacher.name);
+    });
   }
   return result;
 }
