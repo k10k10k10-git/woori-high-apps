@@ -234,6 +234,12 @@ Firebase `update()`에서 `undefined`는 `stripUndefined()`가 제거하므로 �
 - **판단 질문**: IGuard에서 `retreatsPrivate`를 직접 읽거나 환불계좌가 든 취소 레코드를 public으로 복사하지 않는다. 전자는 앱 소유권·권한 경계를 깨고, 후자는 민감정보를 노출한다. 이름만 같거나 동명이인인 학생을 임의로 red 처리하지 않는다.
 - **재사용 규칙**: 민감 원본의 상태를 현장 앱이 알아야 하면 필요한 비민감 식별자·상태만 소유 앱의 기존 public 마커로 원자 동기화하고, 역매칭은 구획·반·이름의 유일성을 확인한다.
 
+### 3f. 현장등록 명단은 신청 원본과 상태 원본을 분리해 합성한다 (2026-07-18)
+
+- **접근법**: ① `participants` 전체를 신청 학생 원본으로 삼아 입금 색상 필터를 제거한다 → ② `teachers`에서 선택 부서(`1부`/`2부`)만 합쳐 `스탭`을 제외한다 → ③ `cellColors=red`, `partialAttendances`, `TeacherAttendance.status`를 표시 상태로 덧씌운다 → ④ 학생은 해석된 `studentKey`, 교사는 `teacher:{teacherId}`를 `onSiteReg` 키로 써 충돌을 막는다 → ⑤ `src/lib/onSiteRoster.test.ts`에서 미입금·부분참·취소·불참 포함과 스탭 제외를 고정한다.
+- **판단 질문**: `classes/{year}`의 모든 재학생을 넣지 않았다 — 현장등록 대상은 전체 재학생이 아니라 전체 **신청자**이며, 반 명단은 학년·반·학생키 보강에만 써야 한다. 취소/불참을 필터링하지도 않았다 — 이 화면은 도착 인원 산출 화면이 아니라 예외자까지 현장에서 확인하는 체크인 원장이다.
+- **재사용 규칙**: 현장등록 대상을 바꿀 때는 `src/lib/onSiteRoster.ts`에서 원본 포함 범위와 상태 오버레이를 함께 수정하고, 학생·교사 체크인 키의 네임스페이스를 절대 합치지 않는다.
+
 ### 4. Auth 접근 레벨
 ```typescript
 type AccessLevel = "none" | "member" | "admin";

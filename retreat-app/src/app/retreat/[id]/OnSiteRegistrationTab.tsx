@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useState, useMemo, useRef } from "react";
-import { Retreat, Participant, OnSiteEntry, Group } from "@/lib/types";
+import { Retreat, Participant, OnSiteEntry, Group, TeacherAttendance, PartialAttendance } from "@/lib/types";
 import {
   subscribeToParticipants, subscribeToCellColors,
   subscribeToOnSiteReg, unregisterOnSite, addWalkIn, toggleOnSiteCheckIn,
   subscribeToGroups, getClassesByYear, subscribeToConnection,
+  subscribeToTeachers, subscribeToPartialAttendances,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { parseClassKey } from "@/lib/classKey";
+import { buildOnSiteRoster, OnSiteRosterPerson } from "@/lib/onSiteRoster";
 
 type BuTab = "1부" | "2부";
 
@@ -22,24 +24,10 @@ interface ClassStudent {
   gender?: string;
 }
 
-// 검색/토글용 참가자 (실제 반 정보로 보강)
-interface RichParticipant {
-  pKey: string;       // participants 레코드 키 (p_0, p_1…)
-  onSiteKey: string;  // onSiteReg 저장 키: studentId if matched, else pKey
-  name: string;
-  gender: string;
-  grade: number;      // 실제 반 기준 학년
-  classNum: number;   // 실제 반 기준 반
-  hasMatch: boolean;
-}
-
 interface ClassGroup {
   grade: number;
   classNum: number;
-  members: Array<{
-    onSiteKey: string;
-    name: string;
-    gender: string;
+  members: Array<OnSiteRosterPerson & {
     registered: boolean;
     isOnSite: boolean;
   }>;
@@ -48,10 +36,10 @@ interface ClassGroup {
 export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat }) {
   const { toast, uiConfirm } = useUI();
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
+  const [teachers, setTeachers] = useState<TeacherAttendance[]>([]);
+  const [partialAttendances, setPartialAttendances] = useState<PartialAttendance[]>([]);
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [classStudents, setClassStudents] = useState<ClassStudent[]>([]);
-  // studentId("1_abc123") → ClassStudent
-  const [classStudentMap, setClassStudentMap] = useState<Map<string, ClassStudent>>(new Map());
   const [onSiteReg, setOnSiteReg] = useState<Record<string, OnSiteEntry>>({});
   const [groups, setGroups] = useState<Group[]>([]);
   const [bu, setBu] = useState<BuTab>("1부");
@@ -74,20 +62,16 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
 
         // 실제 반 명단 파싱
         const students: ClassStudent[] = [];
-        const map = new Map<string, ClassStudent>();
         Object.entries(classesRaw).forEach(([classKey, cd]) => {
           const parsed = parseClassKey(classKey);
           if (!parsed) return;
           const { buNum: b, grade: g, classNum: c } = parsed;
           Object.entries(cd.students || {}).forEach(([rawId, s]) => {
-            const studentId = `${b}_${rawId}`;
             const cs: ClassStudent = { rawId, buNum: b, grade: g, classNum: c, name: s.name };
             students.push(cs);
-            map.set(studentId, cs);
           });
         });
         setClassStudents(students);
-        setClassStudentMap(map);
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -103,8 +87,15 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     const unsubGroups = subscribeToGroups(retreat.id, setGroups,
       e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    const unsubTeachers = subscribeToTeachers(retreat.id, setTeachers,
+      e => setLoadError(prev => prev ?? `교사 명단 구독 실패 — ${e.message}`));
+    const unsubPartial = subscribeToPartialAttendances(retreat.id, setPartialAttendances,
+      e => setLoadError(prev => prev ?? `부분참 명단 구독 실패 — ${e.message}`));
     const unsubConn = subscribeToConnection(setConnected);
-    return () => { unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups(); unsubConn(); };
+    return () => {
+      unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups();
+      unsubTeachers(); unsubPartial(); unsubConn();
+    };
   }, [retreat.id, retreat.year]);
 
   // studentId → 조 이름 맵 (실시간 반영, 전역 번호 표시)
@@ -119,52 +110,22 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
 
   const buNum = bu === "1부" ? 1 : 2;
 
-  // classStudentMap(studentId → ClassStudent)에서 이름 기반 역방향 맵 구성
-  const nameToStudentId = useMemo(() => {
-    const map = new Map<string, string>(); // "${buNum}_${name}" → studentId
-    classStudentMap.forEach((cs, studentId) => {
-      map.set(`${cs.buNum}_${cs.name}`, studentId);
-    });
-    return map;
-  }, [classStudentMap]);
-
-  // 검색용: 입금완료(blue)인 참가자만, onSiteKey 기준 중복 제거
-  const richParticipants = useMemo<RichParticipant[]>(() => {
-    const seen = new Set<string>();
-    return Object.entries(participants)
-      .filter(([, p]) => {
-        if (!p.bu?.includes(String(buNum))) return false;
-        const colorKey = p.studentId ?? nameToStudentId.get(`${buNum}_${p.name}`);
-        return colorKey ? cellColors[colorKey] === "blue" : false;
-      })
-      .map(([pKey, p]) => {
-        const resolvedStudentId = p.studentId ?? nameToStudentId.get(`${buNum}_${p.name}`);
-        const onSiteKey = resolvedStudentId ?? pKey;
-        const cs = resolvedStudentId ? classStudentMap.get(resolvedStudentId) : undefined;
-        return {
-          pKey,
-          onSiteKey,
-          name: p.name,
-          gender: p.gender ?? "",
-          grade: cs?.grade ?? p.grade,
-          classNum: cs?.classNum ?? p.class,
-          hasMatch: !!p.studentId,
-        };
-      })
-      .filter(rp => {
-        if (seen.has(rp.onSiteKey)) return false;
-        seen.add(rp.onSiteKey);
-        return true;
-      })
-      .sort((a, b) => a.grade - b.grade || a.classNum - b.classNum || a.name.localeCompare(b.name, "ko"));
-  }, [participants, cellColors, classStudentMap, nameToStudentId, buNum]);
+  // 전체 신청 학생 + 교사(스탭 제외). 입금/후발/불참/취소 상태와 무관하게 모두 현장등록 대상에 둔다.
+  const rosterPeople = useMemo(() => buildOnSiteRoster({
+    participants,
+    teachers,
+    partialAttendances,
+    cellColors,
+    classStudents,
+    buNum: buNum as 1 | 2,
+  }), [participants, teachers, partialAttendances, cellColors, classStudents, buNum]);
 
   // 검색 결과
   const searchResults = useMemo(() => {
     const q = search.trim();
     if (!q) return [];
-    return richParticipants.filter(p => p.name.includes(q));
-  }, [richParticipants, search]);
+    return rosterPeople.filter(p => p.name.includes(q));
+  }, [rosterPeople, search]);
 
   // 현장 추가 등록된 사람 (선택 부)
   const walkIns = useMemo(() => {
@@ -174,54 +135,47 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       .sort((a, b) => a.grade - b.grade || a.class - b.class);
   }, [onSiteReg, bu]);
 
-  // 반별 그룹 — 입금완료(blue)인 학생만
+  // 교사/반별 그룹 — 전체 신청 학생과 교사를 상태와 관계없이 표시
   const byClass = useMemo<ClassGroup[]>(() => {
-    // 입금완료(blue)인 studentKey 집합 ("buNum_rawId" 형태)
-    const paidKeys = new Set(
-      Object.entries(cellColors)
-        .filter(([key, color]) => {
-          const b = parseInt(key.split("_")[0]);
-          return b === buNum && color === "blue";
-        })
-        .map(([key]) => key)
-    );
-
     const map = new Map<string, ClassGroup>();
-
-    // 실제 반 명단에서: 입금완료(blue)인 학생만
-    classStudents
-      .filter(cs => cs.buNum === buNum && paidKeys.has(`${buNum}_${cs.rawId}`))
-      .forEach(cs => {
-        const k = `${cs.grade}-${cs.classNum}`;
-        if (!map.has(k)) map.set(k, { grade: cs.grade, classNum: cs.classNum, members: [] });
-        const onSiteKey = `${buNum}_${cs.rawId}`;
-        const entry = onSiteReg[onSiteKey];
-        map.get(k)!.members.push({
-          onSiteKey,
-          name: cs.name,
-          gender: cs.gender ?? "",
-          registered: !!entry && !entry.isOnSite,
-          isOnSite: false,
-        });
+    rosterPeople.forEach(person => {
+      const isTeacher = person.source === "teacher";
+      const grade = isTeacher ? -1 : person.grade;
+      const classNum = isTeacher ? -1 : person.classNum;
+      const key = isTeacher ? "teachers" : `${grade}-${classNum}`;
+      if (!map.has(key)) map.set(key, { grade, classNum, members: [] });
+      const entry = onSiteReg[person.onSiteKey];
+      map.get(key)!.members.push({
+        ...person,
+        registered: !!entry && !entry.isOnSite,
+        isOnSite: false,
       });
+    });
 
     // 현장 추가
     walkIns.forEach(w => {
       const k = `${w.grade}-${w.class}`;
       if (!map.has(k)) map.set(k, { grade: w.grade, classNum: w.class, members: [] });
       map.get(k)!.members.push({
+        source: "student",
+        sourceKey: w.key,
         onSiteKey: w.key,
         name: w.name,
         gender: w.gender ?? "",
+        grade: w.grade,
+        classNum: w.class,
+        hasMatch: true,
         registered: true,
         isOnSite: true,
       });
     });
 
     return Array.from(map.values()).sort((a, b) => a.grade - b.grade || a.classNum - b.classNum);
-  }, [cellColors, classStudents, buNum, onSiteReg, walkIns]);
+  }, [rosterPeople, onSiteReg, walkIns]);
 
   const grades = useMemo(() => [...new Set(byClass.map(c => c.grade))].sort((a, b) => {
+    if (a === -1) return -1;
+    if (b === -1) return 1;
     if (a === 0) return 1;
     if (b === 0) return -1;
     return a - b;
@@ -229,11 +183,13 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
 
   // 통계: total = 전체 참가자, registered = 현장 등록 탭에서 수동 체크인 수
   const stats = useMemo(() => {
-    const total = richParticipants.length;
-    const registered = Object.values(onSiteReg)
-      .filter(e => !e.isOnSite && e.bu === bu).length;
+    const total = rosterPeople.length;
+    const registered = rosterPeople.filter(person => {
+      const entry = onSiteReg[person.onSiteKey];
+      return !!entry && !entry.isOnSite;
+    }).length;
     return { total, registered, walkIns: walkIns.length };
-  }, [richParticipants, onSiteReg, bu, walkIns]);
+  }, [rosterPeople, onSiteReg, walkIns]);
 
   // 트랜잭션 기반 토글 — 여러 스태프가 동시에 같은 학생을 눌러도
   // "현재 서버 상태 기준"으로 안전하게 등록/해제됨 (lost-update 방지)
@@ -249,7 +205,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
     }
   }
 
-  async function toggleRegistration(rp: RichParticipant) {
+  async function toggleRegistration(rp: OnSiteRosterPerson) {
     await runToggle(rp.onSiteKey, () => ({
       isOnSite: false,
       name: rp.name,
@@ -258,7 +214,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       bu,
       gender: rp.gender,
       registeredAt: new Date().toISOString(),
-      participantKey: rp.pKey,
+      participantKey: rp.sourceKey,
     }));
     setSearch("");
     searchRef.current?.focus();
@@ -266,16 +222,15 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
 
   async function toggleFromRightPanel(onSiteKey: string, member: ClassGroup["members"][0]) {
     if (member.isOnSite) return; // 현장추가는 토글 불가
-    const cls = byClass.find(c => c.members.some(m => m.onSiteKey === onSiteKey));
     await runToggle(onSiteKey, () => ({
       isOnSite: false,
       name: member.name,
-      grade: cls?.grade ?? 0,
-      class: cls?.classNum ?? 0,
+      grade: member.grade,
+      class: member.classNum,
       bu,
       gender: member.gender,
       registeredAt: new Date().toISOString(),
-      participantKey: onSiteKey,
+      participantKey: member.sourceKey,
     }));
   }
 
@@ -368,14 +323,14 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
           )}
         </div>
 
-        <div className="ml-auto text-xs text-slate-400 bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 text-blue-600">
-          💡 신청자 취합에서 입금완료(파란색) 표시된 학생만 표시됩니다
+        <div className="ml-auto text-xs bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 text-blue-600">
+          💡 전체 신청 학생과 교사를 표시합니다 · 스탭 제외
         </div>
       </div>
 
-      {richParticipants.length === 0 && (
+      {rosterPeople.length === 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-700 mb-4">
-          ⚠ 신청자 취합 탭에서 입금완료(파란색) 표시를 먼저 해주세요.
+          ⚠ 이 부서의 신청 학생과 교사 명단이 없습니다.
         </div>
       )}
 
@@ -411,7 +366,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                   const isReg = !!(onSiteReg[rp.onSiteKey] && !onSiteReg[rp.onSiteKey].isOnSite);
                   const isPending = pendingKeys.has(rp.onSiteKey);
                   return (
-                    <button key={rp.pKey} onClick={() => toggleRegistration(rp)} disabled={isPending}
+                    <button key={rp.onSiteKey} onClick={() => toggleRegistration(rp)} disabled={isPending}
                       className={`w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-slate-50 disabled:opacity-50 disabled:cursor-wait ${
                         isReg ? (isGreen ? "bg-green-50" : "bg-purple-50") : ""
                       }`}>
@@ -425,17 +380,28 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                       <div className="flex-1 min-w-0">
                         <div className={`font-semibold text-sm ${isReg ? (isGreen ? "text-green-800" : "text-purple-800") : "text-slate-800"}`}>
                           {rp.name}
+                          {rp.status && (
+                            <span className={`ml-1.5 inline-flex rounded-full px-1.5 py-0.5 align-middle text-[10px] font-bold ${
+                              rp.status.tone === "cancelled" || rp.status.tone === "absent"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-orange-100 text-orange-700"
+                            }`}>
+                              {rp.status.label}
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-slate-400 flex items-center flex-wrap gap-x-1">
-                          {rp.grade > 0 ? `${rp.grade}학년 ` : ""}{rp.classNum > 0 ? `${rp.classNum}반` : ""}
+                          {rp.source === "teacher" ? "교사" : (
+                            <>{rp.grade > 0 ? `${rp.grade}학년 ` : ""}{rp.classNum > 0 ? `${rp.classNum}반` : ""}</>
+                          )}
                           {rp.gender ? ` · ${rp.gender}` : ""}
-                          {groupMap.get(rp.onSiteKey) && (
+                          {rp.source === "student" && groupMap.get(rp.onSiteKey) && (
                             <span className="inline-flex items-center px-1.5 py-0 rounded-full text-[10px] font-semibold"
                               style={{ background: "var(--color-primary-glow)", color: "var(--color-primary)", border: "1px solid var(--color-primary-ring)" }}>
                               {groupMap.get(rp.onSiteKey)}
                             </span>
                           )}
-                          {!rp.hasMatch && <span className="text-yellow-500">미매칭</span>}
+                          {rp.source === "student" && !rp.hasMatch && <span className="text-yellow-500">미매칭</span>}
                         </div>
                       </div>
                       <span className={`text-xs font-medium flex-shrink-0 ${isReg ? (isGreen ? "text-green-600" : "text-purple-600") : "text-slate-300"}`}>
@@ -470,7 +436,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
           </div>
         </div>
 
-        {/* 오른쪽: 반별 현황표 (실제 반 기준) */}
+        {/* 오른쪽: 교사 + 반별 현황표 (실제 반 기준) */}
         <div className="flex-1 min-w-0 space-y-5">
           {grades.map(grade => {
             const gradeCls = byClass.filter(c => c.grade === grade);
@@ -479,10 +445,10 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
             return (
               <div key={grade}>
                 <h3 className="text-sm font-bold text-slate-500 mb-2 flex items-center gap-2">
-                  {grade > 0 ? `${grade}학년` : "미매칭"}
+                  {grade === -1 ? "교사" : grade > 0 ? `${grade}학년` : "미매칭"}
                   <span className="font-normal text-slate-400">{gradeReg} / {gradeTotal}명 등록</span>
                 </h3>
-                <div className="grid grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
                   {gradeCls.map(cls => {
                     const regCount = cls.members.filter(m => m.registered).length;
                     const total = cls.members.length;
@@ -491,7 +457,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                       <div key={`${cls.grade}-${cls.classNum}`} className="card overflow-hidden">
                         <div className={`px-3 py-1.5 border-b flex items-center justify-between ${cardHead}`}>
                           <span className="text-sm font-bold">
-                            {cls.classNum > 0 ? `${cls.classNum}반` : "기타"}
+                            {cls.grade === -1 ? "교사 명단" : cls.classNum > 0 ? `${cls.classNum}반` : "기타"}
                           </span>
                           <span className={`text-xs font-semibold ${allDone ? (isGreen ? "text-green-600" : "text-purple-600") : "text-slate-400"}`}>
                             {regCount}/{total}{allDone && " ✓"}
@@ -502,10 +468,10 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                           <div className={`h-full transition-all ${accentBg}`}
                             style={{ width: `${total > 0 ? Math.round(regCount / total * 100) : 0}%` }} />
                         </div>
-                        {/* 학생 칩 */}
-                        <div className="p-2 flex flex-wrap gap-1">
+                        {/* 이름 카드 — 상태를 이름 옆에서 바로 확인 */}
+                        <div className="p-2 grid grid-cols-1 2xl:grid-cols-2 gap-1.5">
                           {cls.members.map(m => {
-                            const groupName = groupMap.get(m.onSiteKey);
+                            const groupName = m.source === "student" ? groupMap.get(m.onSiteKey) : undefined;
                             const isPending = pendingKeys.has(m.onSiteKey);
                             return (
                               <div key={m.onSiteKey} className="relative group">
@@ -517,7 +483,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                                     : m.registered ? `${m.name} — 클릭하여 등록 취소${groupName ? ` · ${groupName}` : ""}`
                                     : `${m.name} — 클릭하여 등록${groupName ? ` · ${groupName}` : ""}`
                                   }
-                                  className={`px-2 py-0.5 rounded text-xs font-medium border transition-colors flex items-center gap-1 ${
+                                  className={`w-full min-h-10 px-2.5 py-1.5 rounded-lg text-sm font-semibold border transition-colors flex flex-wrap items-center gap-1.5 text-left ${
                                     isPending ? "opacity-40 cursor-wait" :
                                     m.isOnSite
                                       ? "bg-amber-100 text-amber-800 border-amber-200 cursor-default"
@@ -527,7 +493,16 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                                   }`}>
                                   {isPending ? "…" : m.name}
                                   {groupName && (
-                                    <span className="text-[9px] font-semibold opacity-70">{groupName}</span>
+                                    <span className="text-[10px] font-semibold opacity-70">{groupName}</span>
+                                  )}
+                                  {m.status && (
+                                    <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                      m.status.tone === "cancelled" || m.status.tone === "absent"
+                                        ? "bg-red-100 text-red-700"
+                                        : "bg-orange-100 text-orange-700"
+                                    }`}>
+                                      {m.status.label}
+                                    </span>
                                   )}
                                 </button>
                                 {m.isOnSite && (
@@ -553,7 +528,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
           {byClass.length === 0 && (
             <div className="card p-8 text-center text-slate-400">
               <div className="text-3xl mb-2">📋</div>
-              <p>신청자 취합 탭에서 입금완료(파란색) 표시된 학생이 없습니다.</p>
+              <p>이 부서의 신청 학생과 교사 명단이 없습니다.</p>
             </div>
           )}
         </div>
