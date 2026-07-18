@@ -78,6 +78,7 @@ export function BlockAssignmentSection({ retreatId, block, staff, posts, movemen
           postId: form.postId,
           round: form.round || undefined,
           note: form.notes[staffId]?.trim() || undefined,
+          source: "manual",
         });
       }
       setForm({ postId: "", staffIds: [], round: "", notes: {} });

@@ -279,7 +279,7 @@ export function subscribeToIguardMovements(retreatId: string, cb: (list: IguardM
 /** 한 스탭×블록 셀을 설정(postId 지정) 또는 해제(null) */
 export async function setIguardMovement(
   retreatId: string, staffId: string, blockId: string,
-  data: { postId: string; round?: "선밥" | "후밥"; note?: string } | null
+  data: { postId: string; round?: "선밥" | "후밥"; note?: string; source?: "sheet" | "manual" } | null
 ): Promise<void> {
   const key = `${staffId}__${blockId}`;
   const path = paths.iguardMovement(retreatId, key);

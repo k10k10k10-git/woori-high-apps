@@ -16,6 +16,7 @@ import {
   venueForBlock,
   timeRangeLabel,
 } from "@/lib/cueSheet";
+import { looksLikeLegacySheetMovement, reconcileSheetMovements } from "@/lib/movementReconcile";
 
 /** 시트가 소유하는 블록 필드만 추림 — 갱신 시 이 필드만 덮고, 앱 소유 필드(noMovement)와 동선(별도 노드)은 건드리지 않는다.
  *  빈 값은 null로 지정해 시트에서 지워진 내용이 앱에도 반영되게 한다(update가 null 키를 삭제).
@@ -202,7 +203,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
   async function importBlocks(mode: "merge" | "replace") {
     if (!parsed.blocks.length) return toast("가져올 시간 블록이 없습니다.", "warning");
     const { updates, creates, deletes } = reconcileScheduleImport(schedule, parsed.blocks);
-    const additiveLine = autoAssign ? "\n· 기존 블록의 빈 칸도 시트 배정으로 채움 (수기 배정은 유지)" : "";
+    const additiveLine = autoAssign ? "\n· 시트 자동배정 동기화 (수동 배정은 유지, 시트에서 삭제된 자동배정은 제거)" : "";
     const confirmMsg = mode === "replace"
       ? `시트 기준으로 맞춥니다:\n· 유지·갱신 ${updates.length}개 (스탭 배정·동선 보존)\n· 신규 ${creates.length}개 추가${additiveLine}\n· 시트에 없는 ${deletes.length}개 삭제 (그 동선 배정도 함께 삭제)\n진행할까요?`
       : `시트 내용을 반영합니다 (삭제 없음):\n· 유지·갱신 ${updates.length}개 (스탭 배정·동선 보존)\n· 신규 ${creates.length}개 추가${additiveLine}\n진행할까요?`;
@@ -235,24 +236,49 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
         return note;
       };
 
-      // 이미 있는 동선(staffId__blockId) — 재배정 시 이 칸은 절대 덮지 않는다(수기·기존 배정 보존, 패턴 18).
-      const existingMoveKeys = new Set(movements.map(mv => `${mv.staffId}__${mv.blockId}`));
-
       // 2) 기존 블록 내용 갱신 — ID 유지 → 동선·noMovement 보존.
-      //    자동배정은 "빈 칸만 채우는 추가 전용(additive)"으로 재실행한다: 이미 배정된 칸은 건드리지 않으므로
-      //    수기 배정을 보호하면서, 시트에 나중에 채운 배정(예: 2일차)이 재임포트로 반영된다.
+      //    자동배정은 출처를 기록해 시트와 동기화한다. 수동배정은 보존하고, 시트에서 사라진 자동배정만 제거한다.
       let addedToExistingCount = 0;
+      let removedFromExistingCount = 0;
       for (const u of updates) {
-        await updateIguardScheduleBlock(retreatId, u.id, sheetOwnedFields(u.imported, leaderNoteFor(u.imported)));
-        if (!autoAssign) continue;
-        const assignments = autoAssignmentsForBlock(u.imported, workingStaff, workingPosts, venueForBlock(u.imported, parsed.blocks));
-        for (const a of assignments) {
-          const key = `${a.staffId}__${u.id}`;
-          if (existingMoveKeys.has(key)) continue; // 이미 있으면 보존 (덮지 않음)
-          await setIguardMovement(retreatId, a.staffId, u.id, { postId: a.postId, round: a.round, note: a.note });
-          existingMoveKeys.add(key);
-          addedToExistingCount++;
+        if (autoAssign) {
+          const existingBlockMovements = movements.filter(movement => movement.blockId === u.id);
+          const previousBlock = schedule.find(block => block.id === u.id);
+          const previousAssignments = autoAssignmentsForBlock(
+            previousBlock || u.imported,
+            workingStaff,
+            workingPosts,
+            previousBlock ? venueForBlock(previousBlock, schedule) : venueForBlock(u.imported, parsed.blocks),
+          );
+          const nextAssignments = autoAssignmentsForBlock(
+            u.imported,
+            workingStaff,
+            workingPosts,
+            venueForBlock(u.imported, parsed.blocks),
+          );
+          const legacySheetMovementIds = new Set(existingBlockMovements
+            .filter(movement => looksLikeLegacySheetMovement(
+              movement,
+              workingStaff.find(member => member.id === movement.staffId)?.name,
+              workingPosts.find(post => post.id === movement.postId)?.name,
+            ))
+            .map(movement => movement.id));
+          const plan = reconcileSheetMovements(
+            existingBlockMovements,
+            previousAssignments,
+            nextAssignments,
+            legacySheetMovementIds,
+          );
+          for (const movement of plan.removes) {
+            await setIguardMovement(retreatId, movement.staffId, u.id, null);
+            removedFromExistingCount++;
+          }
+          for (const assignment of plan.upserts) {
+            await setIguardMovement(retreatId, assignment.staffId, u.id, assignment);
+            addedToExistingCount++;
+          }
         }
+        await updateIguardScheduleBlock(retreatId, u.id, sheetOwnedFields(u.imported, leaderNoteFor(u.imported)));
       }
 
       // 3) 신규 블록 생성 + (autoAssign 시) 그 블록에만 자동 배정. 새 블록엔 기존 동선이 없으므로 안전.
@@ -267,6 +293,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
             postId: assignment.postId,
             round: assignment.round,
             note: assignment.note,
+            source: "sheet",
           });
           assignmentCount++;
         }
@@ -289,7 +316,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
       // 5) 스냅샷 마커 기록 — 이후 원본 시트가 바뀌면 신선도 배너가 뜨도록.
       await markCueSheetImported(retreatId, { hash: hashCsv(text), blockCount: parsed.blocks.length });
 
-      toast(`갱신 ${updates.length}개, 신규 ${creates.length}개${mode === "replace" && deletedCount ? `, 삭제 ${deletedCount}개` : ""}${autoCreatePosts && createdPostCount ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign && assignmentCount ? `, 신규 배정 ${assignmentCount}건` : ""}${autoAssign && addedToExistingCount ? `, 기존 블록 빈칸 배정 ${addedToExistingCount}건` : ""}${autoApplyBusStaff && busStaffCount ? `, 버스 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""} 반영했습니다.`, "success");
+      toast(`갱신 ${updates.length}개, 신규 ${creates.length}개${mode === "replace" && deletedCount ? `, 삭제 ${deletedCount}개` : ""}${autoCreatePosts && createdPostCount ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign && assignmentCount ? `, 신규 배정 ${assignmentCount}건` : ""}${autoAssign && addedToExistingCount ? `, 기존 자동배정 갱신 ${addedToExistingCount}건` : ""}${autoAssign && removedFromExistingCount ? `, 삭제된 자동배정 정리 ${removedFromExistingCount}건` : ""}${autoApplyBusStaff && busStaffCount ? `, 버스 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""} 반영했습니다.`, "success");
       if (unmatchedStaffNames.length > 0) {
         toast(`행정 명단에 없는 스탭 ${unmatchedStaffNames.length}명은 배정에서 제외됐습니다: ${unmatchedStaffNames.join(", ")} — 행정 사이트에 먼저 추가해주세요.`, "warning");
       }

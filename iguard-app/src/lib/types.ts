@@ -180,6 +180,7 @@ export interface IguardMovement {
   postId: string;
   round?: "선밥" | "후밥";
   note?: string;
+  source?: "sheet" | "manual"; // 큐싯 자동배정과 현장 수동배정을 구분해 재동기화 시 수동배정을 보존
 }
 
 // ── 버스(호차) 배정 ─────────────────────────────────────────
