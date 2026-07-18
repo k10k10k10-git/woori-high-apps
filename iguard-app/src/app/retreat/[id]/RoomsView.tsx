@@ -103,7 +103,20 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
               className={`px-3 py-2 sm:flex sm:items-center sm:gap-4 ${mealIndex > 0 ? "border-t border-slate-100" : ""}`}
             >
               <span className="block shrink-0 text-xs font-medium text-amber-600 sm:w-24">{meal.label}</span>
-              <div className="mt-1 min-w-0 overflow-x-auto sm:mt-0">
+              {/* 모바일: 가로 스와이프 대신 4열 카드로 감싸 한눈에 순서를 읽는다. */}
+              <ol className="mt-2 grid grid-cols-4 gap-1.5 sm:hidden" aria-label={`${meal.label} 조별 식사 순서`}>
+                {meal.groups.map((groupLabel, groupIndex) => (
+                  <li
+                    key={`${meal.id}-mobile-${groupLabel}`}
+                    className="flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-2 text-center"
+                  >
+                    <span className="text-[10px] font-medium text-slate-400">{groupIndex + 1}</span>
+                    <span className="text-sm font-semibold text-slate-700">{groupLabel}</span>
+                  </li>
+                ))}
+              </ol>
+              {/* 태블릿·PC: 기존의 압축된 한 줄 흐름을 유지한다. */}
+              <div className="hidden min-w-0 overflow-x-auto sm:block">
                 <ol className="flex min-w-max items-center whitespace-nowrap text-xs text-slate-600" aria-label={`${meal.label} 조별 식사 순서`}>
                   {meal.groups.map((groupLabel, groupIndex) => (
                     <li key={`${meal.id}-${groupLabel}`} className="flex items-center">
