@@ -293,14 +293,21 @@ export default function PartialAttendanceTab({ retreat }: Props) {
               )}
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[920px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[120px]" />
+                <col className="w-[180px]" />
+                <col className="w-[130px]" />
+                <col />
+                <col className="w-[350px]" />
+              </colgroup>
               <thead>
                 <tr className="table-header">
-                  <th className="px-4 py-2.5 text-left">이름</th>
-                  <th className="px-4 py-2.5 text-left">부/학년반</th>
-                  <th className="px-4 py-2.5 text-left">현재 구분</th>
+                  <th className="px-4 py-2.5 text-left whitespace-nowrap">이름</th>
+                  <th className="px-4 py-2.5 text-left whitespace-nowrap">부/학년반</th>
+                  <th className="px-4 py-2.5 text-left whitespace-nowrap">현재 구분</th>
                   <th className="px-4 py-2.5 text-left">메모</th>
-                  <th className="px-4 py-2.5 text-left">지정</th>
+                  <th className="px-4 py-2.5 text-left whitespace-nowrap">지정</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -309,13 +316,13 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                   const disabled = savingKey === row.studentKey;
                   return (
                     <tr key={row.studentKey} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 font-medium text-slate-800">{row.name}</td>
-                      <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5 font-medium text-slate-800 whitespace-nowrap">{row.name}</td>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
                         <span className={`tag ${row.bu === "1부" ? "tag-green" : "tag-purple"} mr-1`}>{row.bu}</span>
                         <span className="text-slate-600">{row.grade}학년 {row.classNum}반</span>
                       </td>
-                      <td className="px-4 py-2.5">
-                        <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${TYPE_COLORS[status]}`}>
+                      <td className="px-4 py-2.5 whitespace-nowrap">
+                        <span className={`inline-flex whitespace-nowrap text-xs px-2 py-0.5 rounded-full border font-semibold ${TYPE_COLORS[status]}`}>
                           {statusLabel(row.partial)}
                         </span>
                       </td>
@@ -330,7 +337,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                         </button>
                       </td>
                       <td className="px-4 py-2.5">
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-nowrap gap-1.5 whitespace-nowrap">
                           <button
                             onClick={() => resetToMain(row)}
                             disabled={disabled || !row.partial}
@@ -355,13 +362,6 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                               {type}
                             </button>
                           ))}
-                          <button
-                            onClick={() => openEditor(row)}
-                            disabled={disabled}
-                            className="px-2.5 py-1 rounded-md border border-slate-200 text-xs text-slate-500 disabled:opacity-40 hover:bg-slate-50"
-                          >
-                            메모
-                          </button>
                         </div>
                       </td>
                     </tr>
