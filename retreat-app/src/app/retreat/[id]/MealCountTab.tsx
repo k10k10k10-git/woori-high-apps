@@ -238,13 +238,17 @@ export default function MealCountTab({ retreat }: Props) {
     });
     // 학생 — 부분 참석 탭과 동일하게 participants → classes 원장 순으로 보완
     buildMealPartialPeople(dbParticipants, dbStudents, dbPartials).forEach(p => {
+      // 당일참석: 해당 일차 식사만 포함 — 1일차 당일은 이후 식사 차감(선복귀 취급),
+      // 2일차 이후 당일은 이전 식사 차감(후발 취급)으로 기본 분류하고, detail에 일차를 명시해
+      // 담당자가 끼니별 차감을 확정할 때 참고하게 한다.
+      const dayOnly = p.type === "당일참석";
       out.push({
         key: `s_${p.id}`,
         role: "student",
         bu: p.bu, name: p.name,
         affiliation: p.matched ? `${p.grade}학년 ${p.classNum}반` : "",
-        detail: p.note,
-        defaultKind: p.type === "선복귀" ? "선복귀" : "후발",
+        detail: dayOnly ? `당일참석 ${p.day ?? "?"}일차${p.note ? ` · ${p.note}` : ""}` : p.note,
+        defaultKind: p.type === "선복귀" || (dayOnly && p.day === 1) ? "선복귀" : "후발",
       });
     });
     // 역할(교사·스탭 → 학생) → 부(1부→2부→스탭) → 이름순 정렬 — 교사/스탭과 학생이 섞여 헷갈리지 않도록 역할을 우선 그룹화

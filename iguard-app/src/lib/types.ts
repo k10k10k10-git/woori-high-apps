@@ -64,7 +64,8 @@ export interface TeacherAttendance {
 
 /** 행정 부분참석 탭의 학생별 분류 — IGuard는 버스 탑승 판정을 위해 note도 보존해 읽는다. */
 export interface PartialAttendanceInfo {
-  type: "선복귀" | "후발대";
+  type: "선복귀" | "후발대" | "당일참석";
+  day?: number;   // 당일참석 전용 — 참석 일차 (1~3)
   note?: string;
   updatedAt?: number;
 }

@@ -30,3 +30,26 @@ describe("normalizePartialAttendanceMap", () => {
     });
   });
 });
+
+describe("당일참석 (2026-07-18 신규 타입)", () => {
+  it("기록된 일차에만 현장에 있고, 다른 일차엔 없다", () => {
+    expect(isPresentOnDay({ type: "당일참석", day: 1 }, 1)).toBe(true);
+    expect(isPresentOnDay({ type: "당일참석", day: 1 }, 3)).toBe(false);
+    expect(isPresentOnDay({ type: "당일참석", day: 2 }, 1)).toBe(false);
+    expect(isPresentOnDay({ type: "당일참석", day: 2 }, 3)).toBe(false);
+    expect(isPresentOnDay({ type: "당일참석", day: 3 }, 3)).toBe(true);
+  });
+
+  it("일차 미기록 당일참석은 불참 취급(안전측)", () => {
+    expect(isPresentOnDay({ type: "당일참석" }, 1)).toBe(false);
+    expect(isPresentOnDay("당일참석", 3)).toBe(false);
+  });
+
+  it("normalize가 당일참석 type과 day를 통과시킨다", () => {
+    expect(normalizePartialAttendanceMap({
+      d2: { type: "당일참석", day: 2, note: "토 저녁부터", updatedAt: 5 },
+    })).toEqual({
+      d2: { type: "당일참석", day: 2, note: "토 저녁부터", updatedAt: 5 },
+    });
+  });
+});

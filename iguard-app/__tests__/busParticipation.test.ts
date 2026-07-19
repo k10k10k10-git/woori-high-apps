@@ -69,3 +69,10 @@ describe("교사 단체 버스 탑승 판정", () => {
     expect(isTeacherBusPassenger(teachers, "명단없는교사", "1부")).toBe(true);
   });
 });
+
+describe("당일참석 버스 제외 (2026-07-18)", () => {
+  it("당일참석 타입은 일차·day와 무관하게 단체 버스에서 제외된다", () => {
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 1 }, 1)).toBe(false);
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 3 }, 3)).toBe(false);
+  });
+});

@@ -73,6 +73,21 @@ describe("buildPartialPool", () => {
     expect(pool).toHaveLength(0);
   });
 
+  it("당일참석 기록(day 포함)도 pool에 들어가고 후발대 다음 순서로 정렬된다", () => {
+    const students = {
+      "1_a": makeStudent({ id: "1_a", name: "가", grade: 1, class: 1, buNum: 1 }),
+      "1_b": makeStudent({ id: "1_b", name: "나", grade: 1, class: 1, buNum: 1 }),
+    };
+    const records: PartialAttendance[] = [
+      { id: "1_a", type: "당일참석", day: 2, updatedAt: 1 },
+      { id: "1_b", type: "후발대", updatedAt: 1 },
+    ];
+    const pool = buildPartialPool({}, students, {}, records);
+    expect(pool.map(r => r.studentId)).toEqual(["1_b", "1_a"]); // 후발대 → 당일참석
+    expect(pool[0].partial?.type).toBe("후발대");
+    expect(pool[1].partial?.day).toBe(2);
+  });
+
   it("sorts 선복귀 → 후발대 → 미지정, then by bu/grade/class/name", () => {
     const students = {
       "1_a": makeStudent({ id: "1_a", name: "가", grade: 1, class: 1, buNum: 1 }),

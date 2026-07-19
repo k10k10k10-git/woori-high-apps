@@ -1,25 +1,21 @@
 {
   "rules": {
-
     "admins": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$uid": {
         ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
       }
     },
-
     "teacherClasses": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$uid": {
         ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || auth.uid === $uid)"
       }
     },
-
     "userRoles": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "classes": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
       "$year": {
@@ -29,7 +25,6 @@
         }
       }
     },
-
     "attendance": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
       "$year": {
@@ -39,37 +34,30 @@
         }
       }
     },
-
     "events": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "teacherData": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "teacherStaff": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "teacherAdditional": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "config": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "teacherSpecial": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "teacherExtra": {
       ".read": "auth != null",
       "$year": {
@@ -80,17 +68,14 @@
         }
       }
     },
-
     "teacherPhones": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "trash": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "suggestions": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$year": {
@@ -100,46 +85,38 @@
         }
       }
     },
-
     "staff_admins": {
       ".read": "auth != null && root.child('staff_admins').child(auth.uid).val() === true",
       "$uid": {
         ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
       }
     },
-
     "staff_roles": {
       ".read": "auth != null",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
     },
-
     "staff_attendance": {
       ".read": "auth != null",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
     },
-
     "staff_events": {
       ".read": "auth != null",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
     },
-
     "retreatAdmins": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "retreatPending": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$uid": {
         ".write": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).val() === true)"
       }
     },
-
     "iguardMembers": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
-
     "iguardRoles": {
       ".read": "auth != null",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
@@ -147,7 +124,6 @@
         ".validate": "newData.val() === 'staff' || newData.val() === 'team'"
       }
     },
-
     "iguardPending": {
       ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$uid": {
@@ -155,7 +131,6 @@
         ".write": "auth != null && (auth.uid === $uid || root.child('admins').child(auth.uid).val() === true)"
       }
     },
-
     "retreats": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
@@ -163,13 +138,27 @@
         "milestones": {
           ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || (root.child('iguardMembers').child(auth.uid).val() != null && root.child('iguardRoles').child(auth.uid).val() !== 'staff'))",
           "$milestoneId": {
-            "title":      { ".validate": "newData.isString() && newData.val().length <= 120" },
-            "targetDate": { ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)" },
-            "done":       { ".validate": "newData.isBoolean()" },
-            "note":       { ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 500)" },
-            "createdAt":  { ".validate": "newData.val() === null || newData.isNumber()" },
-            "updatedAt":  { ".validate": "newData.val() === null || newData.isNumber()" },
-            "sourceSite": { ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 40)" }
+            "title": {
+              ".validate": "newData.isString() && newData.val().length <= 120"
+            },
+            "targetDate": {
+              ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)"
+            },
+            "done": {
+              ".validate": "newData.isBoolean()"
+            },
+            "note": {
+              ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 500)"
+            },
+            "createdAt": {
+              ".validate": "newData.val() === null || newData.isNumber()"
+            },
+            "updatedAt": {
+              ".validate": "newData.val() === null || newData.isNumber()"
+            },
+            "sourceSite": {
+              ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 40)"
+            }
           }
         },
         "partialAttendances": {
@@ -177,32 +166,58 @@
           ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
           "$studentKey": {
             ".validate": "newData.hasChildren(['type'])",
-            "type":      { ".validate": "newData.val() === '선복귀' || newData.val() === '후발대'" },
-            "note":      { ".validate": "newData.isString() && newData.val().length <= 500" },
-            "updatedAt": { ".validate": "newData.isNumber()" },
-            "$other":    { ".validate": false }
+            "type": {
+              ".validate": "newData.val() === '선복귀' || newData.val() === '후발대' || newData.val() === '당일참석'"
+            },
+            "note": {
+              ".validate": "newData.isString() && newData.val().length <= 500"
+            },
+            "updatedAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "day": {
+              ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 3"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
-
         "iguard": {
           ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || (root.child('iguardMembers').child(auth.uid).val() != null && root.child('iguardRoles').child(auth.uid).val() !== 'staff'))",
           "attendance": {
             ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
             "$key": {
-              "checked":   { ".validate": "newData.isBoolean()" },
-              "updatedAt": { ".validate": "newData.val() === null || newData.isNumber()" }
+              "checked": {
+                ".validate": "newData.isBoolean()"
+              },
+              "updatedAt": {
+                ".validate": "newData.val() === null || newData.isNumber()"
+              }
             }
           },
           "meals": {
             "$mealId": {
-              "label":   { ".validate": "newData.isString()" },
-              "day":     { ".validate": "newData.isNumber()" },
-              "slot":    { ".validate": "newData.isNumber()" },
+              "label": {
+                ".validate": "newData.isString()"
+              },
+              "day": {
+                ".validate": "newData.isNumber()"
+              },
+              "slot": {
+                ".validate": "newData.isNumber()"
+              },
               "entries": {
                 "$idx": {
-                  "groupId": { ".validate": "newData.isString()" },
-                  "seq":     { ".validate": "newData.isNumber()" },
-                  "round":   { ".validate": "newData.val() === '선밥' || newData.val() === '후밥'" }
+                  "groupId": {
+                    ".validate": "newData.isString()"
+                  },
+                  "seq": {
+                    ".validate": "newData.isNumber()"
+                  },
+                  "round": {
+                    ".validate": "newData.val() === '선밥' || newData.val() === '후밥'"
+                  }
                 }
               }
             }
@@ -210,64 +225,100 @@
         }
       }
     },
-
     "retreatsPrivate": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
       "$retreatId": {
         "cancellations": {
-          ".indexOn": ["studentKey"]
+          ".indexOn": [
+            "studentKey"
+          ]
         }
       }
     },
-
     "prepMilestones": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || (root.child('iguardMembers').child(auth.uid).val() != null && root.child('iguardRoles').child(auth.uid).val() !== 'staff'))",
       "$milestoneId": {
-        "title":      { ".validate": "newData.isString() && newData.val().length <= 120" },
-        "targetDate": { ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)" },
-        "done":       { ".validate": "newData.isBoolean()" },
-        "note":       { ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 500)" },
-        "createdAt":  { ".validate": "newData.val() === null || newData.isNumber()" },
-        "updatedAt":  { ".validate": "newData.val() === null || newData.isNumber()" },
-        "sourceSite": { ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 40)" }
+        "title": {
+          ".validate": "newData.isString() && newData.val().length <= 120"
+        },
+        "targetDate": {
+          ".validate": "newData.isString() && newData.val().matches(/^\\d{4}-\\d{2}-\\d{2}$/)"
+        },
+        "done": {
+          ".validate": "newData.isBoolean()"
+        },
+        "note": {
+          ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 500)"
+        },
+        "createdAt": {
+          ".validate": "newData.val() === null || newData.isNumber()"
+        },
+        "updatedAt": {
+          ".validate": "newData.val() === null || newData.isNumber()"
+        },
+        "sourceSite": {
+          ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 40)"
+        }
       }
     },
-
     "brainstorm": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
       "$noteId": {
-        "title":     { ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 120)" },
-        "text":      { ".validate": "newData.isString() && newData.val().length <= 2000" },
-        "color":     { ".validate": "newData.isString() && newData.val().length <= 20" },
-        "author":    { ".validate": "newData.isString() && newData.val().length <= 60" },
-        "createdAt": { ".validate": "newData.isNumber()" },
-        "updatedAt": { ".validate": "newData.val() === null || newData.isNumber()" },
-        "x":         { ".validate": "newData.val() === null || newData.isNumber()" },
-        "y":         { ".validate": "newData.val() === null || newData.isNumber()" },
+        "title": {
+          ".validate": "newData.val() === null || (newData.isString() && newData.val().length <= 120)"
+        },
+        "text": {
+          ".validate": "newData.isString() && newData.val().length <= 2000"
+        },
+        "color": {
+          ".validate": "newData.isString() && newData.val().length <= 20"
+        },
+        "author": {
+          ".validate": "newData.isString() && newData.val().length <= 60"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "updatedAt": {
+          ".validate": "newData.val() === null || newData.isNumber()"
+        },
+        "x": {
+          ".validate": "newData.val() === null || newData.isNumber()"
+        },
+        "y": {
+          ".validate": "newData.val() === null || newData.isNumber()"
+        },
         "comments": {
           "$commentId": {
-            "author":    { ".validate": "newData.isString() && newData.val().length <= 60" },
-            "text":      { ".validate": "newData.isString() && newData.val().length <= 1000" },
-            "createdAt": { ".validate": "newData.isNumber()" },
-            "$other":    { ".validate": false }
+            "author": {
+              ".validate": "newData.isString() && newData.val().length <= 60"
+            },
+            "text": {
+              ".validate": "newData.isString() && newData.val().length <= 1000"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
-        "$other": { ".validate": false }
+        "$other": {
+          ".validate": false
+        }
       }
     },
-
     "semesters": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)"
     },
-
     "semestersPrivate": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)"
     }
-
   }
 }

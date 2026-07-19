@@ -66,8 +66,9 @@ export function buildPartialPool(
       }];
     })
     .sort((a, b) => {
-      // 부분참(선복귀/후발대)을 맨 위로 — 본대 사이에 묻혀 찾기 어렵다는 피드백 반영
-      const priority = (r: PartialPoolRow) => r.partial?.type === "선복귀" ? 0 : r.partial?.type === "후발대" ? 1 : 2;
+      // 부분참(선복귀/후발대/당일참석)을 맨 위로 — 본대 사이에 묻혀 찾기 어렵다는 피드백 반영
+      const priority = (r: PartialPoolRow) =>
+        r.partial?.type === "선복귀" ? 0 : r.partial?.type === "후발대" ? 1 : r.partial?.type === "당일참석" ? 2 : 3;
       return (
         priority(a) - priority(b) ||
         a.buNum - b.buNum ||

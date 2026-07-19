@@ -49,7 +49,7 @@
 | `retreats/{id}/supplies` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/snacks` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/cellColors` | 행정 | 이가드 | 행정만 | 이가드 셀 색상·취소 제외 (`red`는 private 취소명단의 공개 학생키 마커) |
-| `retreats/{id}/partialAttendances` | 행정 | 이가드 | 행정만 | 이가드 부분참 표시 |
+| `retreats/{id}/partialAttendances` | 행정 | 이가드 | 행정만 | 이가드 부분참 표시. type ∈ 선복귀/후발대/**당일참석**(+day 1~3, 2026-07-18 Rules 확장) |
 | `retreats/{id}/onSiteReg` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/participantsBackups` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/syncMeta` | 행정 | - | 행정만 | 없음 |

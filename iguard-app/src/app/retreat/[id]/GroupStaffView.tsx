@@ -23,11 +23,11 @@ function studentStatus(
   s: Student,
   partial: PartialAttendanceMap,
   cellColors: Record<string, string>,
-): { status: "전참" | "부분참" | "불참"; detail?: "선복귀" | "후발대" } {
+): { status: "전참" | "부분참" | "불참"; detail?: string } {
   // cellColors 키는 uniqueKey("${buNum}_${id}") 또는 raw studentId 둘 다 존재할 수 있어 양쪽 확인(행정과 동일).
   if (isCancelledStudent(s.id, cellColors)) return { status: "불참" };
   const pc = partial[s.id];
-  if (pc) return { status: "부분참", detail: pc.type };
+  if (pc) return { status: "부분참", detail: pc.type === "당일참석" && pc.day ? `당일참석(${pc.day}일차)` : pc.type };
   return { status: "전참" };
 }
 

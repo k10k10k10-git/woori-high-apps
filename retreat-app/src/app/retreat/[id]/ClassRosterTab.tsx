@@ -60,14 +60,18 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   const [bu, setBu] = useState<BuTab>("1부");
   const [cellColors, setCellColorsState] = useState<Record<string, string>>({});
   // 부분참(선복귀/후발대) 지정 — 부분참석 탭이 partialAttendances에 기록. 키는 cellColors와 동일한 "${buNum}_${studentId}".
-  const [partialMap, setPartialMap] = useState<Map<string, PartialAttendance["type"]>>(new Map());
+  const [partialMap, setPartialMap] = useState<Map<string, string>>(new Map()); // key → 부분참 표시라벨(당일참석은 일차 포함)
   const [pickerKey, setPickerKey] = useState<string | null>(null);
   const autoSyncedRef = useRef(false);
 
-  // partialAttendances 목록 → key→type 맵
-  const buildPartialMap = (list: PartialAttendance[]): Map<string, PartialAttendance["type"]> => {
-    const m = new Map<string, PartialAttendance["type"]>();
-    list.forEach(r => { if (r.id && (r.type === "선복귀" || r.type === "후발대")) m.set(r.id, r.type); });
+  // partialAttendances 목록 → key→표시라벨 맵 (당일참석은 일차 포함 표기)
+  const buildPartialMap = (list: PartialAttendance[]): Map<string, string> => {
+    const m = new Map<string, string>();
+    list.forEach(r => {
+      if (!r.id) return;
+      if (r.type === "선복귀" || r.type === "후발대") m.set(r.id, r.type);
+      else if (r.type === "당일참석") m.set(r.id, r.day ? `당일참석(${r.day}일차)` : "당일참석");
+    });
     return m;
   };
 

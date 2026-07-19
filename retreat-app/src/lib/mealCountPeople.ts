@@ -9,6 +9,7 @@ export interface MealPartialPerson {
   classNum: number;
   note: string;
   type: PartialAttendance["type"];
+  day?: 1 | 2 | 3;  // 당일참석 전용 — 참석 일차
   matched: boolean;
 }
 
@@ -35,6 +36,7 @@ export function buildMealPartialPeople(
       classNum: row?.classNum ?? 0,
       note: partial.note ?? "",
       type: partial.type,
+      day: partial.day,
       matched: Boolean(row),
     };
   });

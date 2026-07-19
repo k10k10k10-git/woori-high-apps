@@ -63,6 +63,7 @@ export function subscribeToPartialAttendances(retreatId: string, callback: (list
 export async function savePartialAttendance(retreatId: string, studentKey: string, data: Omit<PartialAttendance, "id">): Promise<string> {
   await set(ref(db, paths.partialAttendance(retreatId, studentKey)), stripUndefined({
     type: data.type,
+    day: data.type === "당일참석" ? data.day : undefined, // 당일참석만 일차를 기록 (Rules: 1~3)
     note: data.note,
     updatedAt: data.updatedAt ?? Date.now(),
   }));

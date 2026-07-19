@@ -138,7 +138,8 @@ export interface Milestone {
 
 export interface PartialAttendance {
   id: string;
-  type: "선복귀" | "후발대";
+  type: "선복귀" | "후발대" | "당일참석";
+  day?: 1 | 2 | 3;   // 당일참석 전용 — 참석하는 일차 (Rules validate: 1~3)
   note?: string;
   updatedAt?: number;
 }

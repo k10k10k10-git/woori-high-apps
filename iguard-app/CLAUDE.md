@@ -100,7 +100,7 @@ retreats/{retreatId}/
   rooms/                            # 방배정 (Room[])
   participants/                     # 참가자 (Record<string, Participant>)
   teachers/                         # 교사/스탭 참석 현황 (TeacherAttendance[])
-  partialAttendances/               # 부분참 분류 (선복귀/후발대 + note; 당일참여 버스 제외 판정에 note 사용)
+  partialAttendances/               # 부분참 분류 (선복귀/후발대/당일참석(day:1~3) + note; 당일참석·당일참여 note 모두 버스 제외)
   cellColors/                       # 참가자 셀 색상 (취소/불참 표시)
   periods/                          # 수련회 기간 (RetreatPeriod[]) — DB는 수련회별 소유지만
                                      #   홈 화면은 모든 수련회의 기간을 항상 합쳐서 표시(아래 패턴 8 참조)
