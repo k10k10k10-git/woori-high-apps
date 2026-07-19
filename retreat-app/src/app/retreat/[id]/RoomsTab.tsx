@@ -10,7 +10,7 @@ import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportU
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
 import { autoAssignRooms, classifyRoomAdult, makeExternalAdults, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
-import RoomAutoAssignPanel, { type RoomExternalSettings } from "./RoomAutoAssignPanel";
+import RoomAutoAssignPanel, { type RoomClassOption, type RoomExternalSettings } from "./RoomAutoAssignPanel";
 import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
 
 interface Props {
@@ -274,6 +274,19 @@ export default function RoomsTab({ retreat }: Props) {
   const roomAutoAdults = useMemo(() => allTeachers
     .filter(teacher => teacher.status !== "불참")
     .map(classifyRoomAdult), [allTeachers]);
+  const roomAutoClasses = useMemo<RoomClassOption[]>(() => {
+    const grouped = new Map<string, RoomAutoStudent[]>();
+    roomAutoStudents.forEach(student => {
+      const classKey = `${student.bu}-${student.grade}-${student.classNum}`;
+      grouped.set(classKey, [...(grouped.get(classKey) ?? []), student]);
+    });
+    return [...grouped.entries()].map(([classKey, members]) => ({
+      classKey,
+      label: `${members[0].bu} ${members[0].grade}학년 ${members[0].classNum}반`,
+      gender: members[0].gender,
+      count: members.length,
+    })).sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true }));
+  }, [roomAutoStudents]);
   const detectedAudioCount = roomAutoAdults.filter(adult => adult.category === "audio").length;
   const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
 
@@ -283,7 +296,7 @@ export default function RoomsTab({ retreat }: Props) {
       ...makeExternalAdults("audio", settings.audioCount, settings.audioGender, detectedAudioCount),
       ...makeExternalAdults("medical", settings.medicalCount, settings.medicalGender, detectedMedicalCount),
     ];
-    setRoomAutoPreview(autoAssignRooms({ rooms, students: roomAutoStudents, adults, simulations: 30 }));
+    setRoomAutoPreview(autoAssignRooms({ rooms, students: roomAutoStudents, adults, classPins: settings.classPins, simulations: 30 }));
   }
 
   function applyAutomaticRooms() {
@@ -800,6 +813,8 @@ export default function RoomsTab({ retreat }: Props) {
         adultCount={roomAutoAdults.length}
         detectedAudioCount={detectedAudioCount}
         detectedMedicalCount={detectedMedicalCount}
+        classes={roomAutoClasses}
+        rooms={rooms}
         onPreview={previewAutomaticRooms}
       />
 

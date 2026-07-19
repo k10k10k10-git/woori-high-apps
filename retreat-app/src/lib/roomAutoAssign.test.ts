@@ -77,6 +77,45 @@ describe("room auto assignment", () => {
     expect(result.unassignedAdults.map(item => item.name)).toContain("성별불일치담임");
   });
 
+  it("includes the pinned room and expands the class only to rooms with the same profile", () => {
+    const result = autoAssignRooms({
+      rooms: [
+        room("A1", 3, "남"), room("A2", 3, "남"), room("A3", 3, "남"),
+        room("B1", 2, "남", "별관"), room("B2", 2, "남", "별관"),
+      ],
+      students: students(4),
+      adults: [],
+      classPins: [{ classKey: "1부-1-1", roomId: "A2" }],
+      simulations: 30,
+    });
+
+    expect(result.hardViolations).toEqual([]);
+    const pinnedRoom = result.rooms.find(item => item.id === "A2");
+    expect(pinnedRoom?.studentIds.length).toBeGreaterThan(0);
+    const usedClassRooms = result.rooms.filter(item => item.studentIds.length > 0);
+    expect(new Set(usedClassRooms.map(item => `${item.dong}|${item.capacity}`))).toEqual(new Set(["본관|3"]));
+  });
+
+  it("blocks gender-conflicting and duplicate room pins", () => {
+    const genderConflict = autoAssignRooms({
+      rooms: [room("M1", 3, "남"), room("F1", 3, "여")],
+      students: students(2), adults: [],
+      classPins: [{ classKey: "1부-1-1", roomId: "F1" }], simulations: 30,
+    });
+    expect(genderConflict.hardViolations.some(message => message.includes("여자 방"))).toBe(true);
+
+    const duplicate = autoAssignRooms({
+      rooms: [room("M1", 3, "남"), room("M2", 3, "남")],
+      students: [...students(2, 1), ...students(2, 2)], adults: [],
+      classPins: [
+        { classKey: "1부-1-1", roomId: "M1" },
+        { classKey: "1부-1-2", roomId: "M1" },
+      ],
+      simulations: 30,
+    });
+    expect(duplicate.hardViolations.some(message => message.includes("같은 방을 지정"))).toBe(true);
+  });
+
   it("keeps ministers, audio, and medical in exclusive rooms", () => {
     const adults = [
       adult("목사1", "minister"), adult("목사2", "minister"),
