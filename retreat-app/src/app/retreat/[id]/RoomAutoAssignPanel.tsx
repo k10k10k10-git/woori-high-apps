@@ -13,6 +13,7 @@ export interface RoomClassOption {
 }
 
 export interface RoomExternalSettings {
+  includeStaff: boolean;
   audioCount: number;
   audioGender: RoomGender | null;
   medicalCount: number;
@@ -24,6 +25,7 @@ interface Props {
   roomCount: number;
   studentCount: number;
   adultCount: number;
+  staffCount: number;
   detectedAudioCount: number;
   detectedMedicalCount: number;
   classes: RoomClassOption[];
@@ -47,10 +49,11 @@ function GenderSelect({ value, onChange, disabled }: {
 }
 
 export default function RoomAutoAssignPanel({
-  roomCount, studentCount, adultCount, detectedAudioCount, detectedMedicalCount, classes, rooms, onPreview,
+  roomCount, studentCount, adultCount, staffCount, detectedAudioCount, detectedMedicalCount, classes, rooms, onPreview,
 }: Props) {
   const [open, setOpen] = useState(true);
   const [settings, setSettings] = useState<RoomExternalSettings>({
+    includeStaff: true,
     audioCount: 3,
     audioGender: null,
     medicalCount: 1,
@@ -68,6 +71,7 @@ export default function RoomAutoAssignPanel({
   const pinnedRoomIds = new Set(settings.classPins.map(pin => pin.roomId));
   const classByKey = new Map(classes.map(item => [item.classKey, item]));
   const roomById = new Map(rooms.map(room => [room.id, room]));
+  const targetAdultCount = adultCount - (settings.includeStaff ? 0 : staffCount);
 
   function addClassPin() {
     if (!selectedClassKey || !selectedRoomId || pinnedClassKeys.has(selectedClassKey) || pinnedRoomIds.has(selectedRoomId)) return;
@@ -98,15 +102,29 @@ export default function RoomAutoAssignPanel({
             <p className="font-semibold text-slate-700 mb-1">항상 적용되는 하드 규칙</p>
             <p>✓ 같은 반 학생끼리 배정, 반이 사용하는 모든 방은 같은 건물·같은 정원</p>
             <p>✓ 모든 반 담당 교사는 반드시 자기 반 학생이 있는 방에 함께 배정</p>
-            <p>✓ 방 정원 초과 금지, 학생·교사·스탭·교역자·외부인원 전원 배정</p>
+            <p>✓ 방 정원 초과 금지, 학생·교사·교역자·외부인원 전원 배정</p>
             <p>✓ 교역자 전용 방 · 음향 전용 방 · 의료 1인 전용 방</p>
             <p>✓ 선복귀·후발대 포함, 숙박하지 않는 당일참석과 신청취소 학생 제외</p>
-            <p>✓ 학생·반 담당 교사의 방을 먼저 결정하고, 일반 교사·스탭은 남는 자리에만 배정</p>
+            <p>✓ 학생·반 담당 교사의 방을 먼저 결정하고, 일반 교사와 포함된 스탭은 남는 자리에만 배정</p>
             <p>✓ 30개 방 프로필 조합을 비교해 빈 침상과 사용 방이 가장 적은 유효 결과 선택</p>
-            <p className="mt-2 text-slate-400">현재 대상: 방 {roomCount}개 · 학생 {studentCount}명 · 교사/스탭 {adultCount}명</p>
+            <p className="mt-2 text-slate-400">현재 대상: 방 {roomCount}개 · 학생 {studentCount}명 · 성인 {targetAdultCount}명</p>
             </div>
 
             <div className="space-y-3">
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-violet-600"
+                checked={settings.includeStaff}
+                onChange={event => setSettings(prev => ({ ...prev, includeStaff: event.target.checked }))}
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-700">스탭 배정 포함</span>
+                <span className="block text-[11px] text-slate-400">
+                  끄면 일반 스탭 {staffCount}명만 자동 방배정에서 제외합니다. 교역자·음향·의료는 유지됩니다.
+                </span>
+              </span>
+            </label>
             <div className="grid grid-cols-[1fr_5rem_7rem] gap-2 items-center">
               <label className="text-sm font-medium text-slate-700">외부 음향 총원</label>
               <input className="input text-sm" type="number" min={0} value={settings.audioCount}

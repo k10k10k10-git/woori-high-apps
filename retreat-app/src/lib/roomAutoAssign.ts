@@ -39,6 +39,7 @@ export interface RoomAutoAssignInput {
   classPins?: RoomClassPin[];
   simulations?: number;
   seedOffset?: number;
+  includeStaff?: boolean;
 }
 
 export interface RoomAutoAssignResult {
@@ -482,6 +483,9 @@ function isBetterResult(candidate: RoomAutoAssignResult, current: RoomAutoAssign
 
 export function autoAssignRooms(input: RoomAutoAssignInput): RoomAutoAssignResult {
   const simulationCount = input.simulations ?? 30;
+  const effectiveInput = input.includeStaff === false
+    ? { ...input, adults: input.adults.filter(adult => adult.category !== "staff") }
+    : input;
   if (simulationCount !== 30) {
     throw new Error("방 자동배정은 정확히 30회 시뮬레이션해야 합니다.");
   }
@@ -489,7 +493,7 @@ export function autoAssignRooms(input: RoomAutoAssignInput): RoomAutoAssignResul
     return {
       rooms: [], score: HARD_PENALTY, simulationCount,
       assignedStudentCount: 0, assignedAdultCount: 0,
-      unassignedStudents: input.students, unassignedAdults: input.adults,
+      unassignedStudents: effectiveInput.students, unassignedAdults: effectiveInput.adults,
       hardViolations: ["등록된 방이 없습니다."], warnings: [], usedRoomCount: 0, emptyBedCount: 0,
       classRoomFillerCount: 0, classRoomCount: 0, classRoomEmptyBedCount: 0,
     };
@@ -497,7 +501,7 @@ export function autoAssignRooms(input: RoomAutoAssignInput): RoomAutoAssignResul
   let best: RoomAutoAssignResult | null = null;
   const seedOffset = Number.isFinite(input.seedOffset) ? Math.trunc(input.seedOffset ?? 0) : 0;
   for (let trial = 0; trial < simulationCount; trial++) {
-    const result = runTrial(input, 20260719 + seedOffset * 104729 + trial * 7919, trial > 0);
+    const result = runTrial(effectiveInput, 20260719 + seedOffset * 104729 + trial * 7919, trial > 0);
     if (!best || isBetterResult(result, best)) best = result;
   }
   return { ...best!, simulationCount };

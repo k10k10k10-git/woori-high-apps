@@ -100,6 +100,27 @@ describe("room auto assignment", () => {
     expect(result.rooms.find(item => item.id === "M10")?.teachers).toHaveLength(1);
   });
 
+  it("can exclude general staff while keeping teachers and special adult roles", () => {
+    const result = autoAssignRooms({
+      rooms: [room("M1", 3, "남"), room("M2", 3, "남"), room("M3", 3, "남")],
+      students: students(1),
+      adults: [
+        adult("일반교사", "teacher"),
+        adult("일반스탭", "staff"),
+        adult("교역자", "minister"),
+        adult("음향", "audio"),
+      ],
+      includeStaff: false,
+      simulations: 30,
+    });
+
+    expect(result.hardViolations).toEqual([]);
+    expect(result.assignedAdultCount).toBe(3);
+    expect(result.unassignedAdults).toEqual([]);
+    expect(result.rooms.flatMap(item => item.teachers ?? [])).toEqual(expect.arrayContaining(["일반교사", "교역자", "음향"]));
+    expect(result.rooms.flatMap(item => item.teachers ?? [])).not.toContain("일반스탭");
+  });
+
   it("does not choose an oversized room when there are no staff fillers", () => {
     const result = autoAssignRooms({
       rooms: [

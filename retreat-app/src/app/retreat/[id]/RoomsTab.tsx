@@ -291,6 +291,7 @@ export default function RoomsTab({ retreat }: Props) {
   }, [roomAutoStudents]);
   const detectedAudioCount = roomAutoAdults.filter(adult => adult.category === "audio").length;
   const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
+  const detectedStaffCount = roomAutoAdults.filter(adult => adult.category === "staff").length;
 
   function calculateAutomaticRooms(settings: RoomExternalSettings, seedOffset: number) {
     const adults = [
@@ -305,6 +306,7 @@ export default function RoomsTab({ retreat }: Props) {
       classPins: settings.classPins,
       simulations: 30,
       seedOffset,
+      includeStaff: settings.includeStaff,
     });
   }
 
@@ -861,6 +863,7 @@ export default function RoomsTab({ retreat }: Props) {
         roomCount={rooms.length}
         studentCount={roomAutoStudents.length}
         adultCount={roomAutoAdults.length}
+        staffCount={detectedStaffCount}
         detectedAudioCount={detectedAudioCount}
         detectedMedicalCount={detectedMedicalCount}
         classes={roomAutoClasses}
