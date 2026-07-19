@@ -2,6 +2,7 @@ import { ref, get, set, update, push, remove, onValue, query, orderByChild, equa
 import { db } from "../firebase";
 import { CarPool, PartialAttendance, SupplyItem, SnackItem, AdminSupplyItem, SuppliesBudget, MealCountData, OnSiteEntry, TshirtOrder } from "../types";
 import { paths } from "../paths";
+import { isPartialAttendanceType } from "../partialAttendanceType";
 import { snapToList, stripUndefined } from "./core";
 
 // ── Carpool ───────────────────────────────────────────────
@@ -51,12 +52,12 @@ export async function setCellColor(retreatId: string, cellKey: string, color: st
 export async function getPartialAttendances(retreatId: string): Promise<PartialAttendance[]> {
   const snap = await get(ref(db, paths.partialAttendances(retreatId)));
   return snapToList<PartialAttendance>(snap)
-    .filter(r => r.type === "선복귀" || r.type === "후발대");
+    .filter(r => isPartialAttendanceType(r.type));
 }
 
 export function subscribeToPartialAttendances(retreatId: string, callback: (list: PartialAttendance[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.partialAttendances(retreatId)),
-    (snap) => callback(snapToList<PartialAttendance>(snap).filter(r => r.type === "선복귀" || r.type === "후발대")),
+    (snap) => callback(snapToList<PartialAttendance>(snap).filter(r => isPartialAttendanceType(r.type))),
     (error) => { console.warn("subscribeToPartialAttendances error:", error); onError?.(error); });
 }
 
@@ -86,7 +87,7 @@ export async function getPartialAttendanceByStudentKey(retreatId: string, studen
   const snap = await get(ref(db, paths.partialAttendance(retreatId, studentKey)));
   if (!snap.exists()) return null;
   const data = snap.val() as Omit<PartialAttendance, "id">;
-  if (data.type !== "선복귀" && data.type !== "후발대") return null;
+  if (!isPartialAttendanceType(data.type)) return null;
   return { id: studentKey, ...data };
 }
 
