@@ -52,6 +52,8 @@ export default function RoomsTab({ retreat }: Props) {
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [partialAttendances, setPartialAttendances] = useState<PartialAttendance[]>([]);
   const [roomAutoPreview, setRoomAutoPreview] = useState<RoomAutoAssignResult | null>(null);
+  const [roomAutoSettings, setRoomAutoSettings] = useState<RoomExternalSettings | null>(null);
+  const [roomAutoRunCount, setRoomAutoRunCount] = useState(0);
 
   const isDirtyRef = useRef(false);
   const isDragging = useRef(false);
@@ -290,13 +292,39 @@ export default function RoomsTab({ retreat }: Props) {
   const detectedAudioCount = roomAutoAdults.filter(adult => adult.category === "audio").length;
   const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
 
-  function previewAutomaticRooms(settings: RoomExternalSettings) {
+  function calculateAutomaticRooms(settings: RoomExternalSettings, seedOffset: number) {
     const adults = [
       ...roomAutoAdults,
       ...makeExternalAdults("audio", settings.audioCount, settings.audioGender, detectedAudioCount),
       ...makeExternalAdults("medical", settings.medicalCount, settings.medicalGender, detectedMedicalCount),
     ];
-    setRoomAutoPreview(autoAssignRooms({ rooms, students: roomAutoStudents, adults, classPins: settings.classPins, simulations: 30 }));
+    return autoAssignRooms({
+      rooms,
+      students: roomAutoStudents,
+      adults,
+      classPins: settings.classPins,
+      simulations: 30,
+      seedOffset,
+    });
+  }
+
+  function previewAutomaticRooms(settings: RoomExternalSettings) {
+    setRoomAutoSettings(settings);
+    setRoomAutoRunCount(1);
+    setRoomAutoPreview(calculateAutomaticRooms(settings, 0));
+  }
+
+  function rerunAutomaticRooms() {
+    if (!roomAutoSettings) return;
+    const nextRunCount = roomAutoRunCount + 1;
+    setRoomAutoPreview(calculateAutomaticRooms(roomAutoSettings, nextRunCount - 1));
+    setRoomAutoRunCount(nextRunCount);
+  }
+
+  function closeAutomaticPreview() {
+    setRoomAutoPreview(null);
+    setRoomAutoSettings(null);
+    setRoomAutoRunCount(0);
   }
 
   function applyAutomaticRooms() {
@@ -306,7 +334,7 @@ export default function RoomsTab({ retreat }: Props) {
     setRooms(nextRooms);
     const assigned = new Set(nextRooms.flatMap(room => room.studentIds ?? []));
     setUnassigned(roomStudentCandidateIds.filter(id => !assigned.has(id)));
-    setRoomAutoPreview(null);
+    closeAutomaticPreview();
     markDirty();
     toast(`30회 시뮬레이션 최적안으로 ${roomAutoPreview.assignedStudentCount + roomAutoPreview.assignedAdultCount}명을 배정했습니다.`, "success");
   }
@@ -844,7 +872,9 @@ export default function RoomsTab({ retreat }: Props) {
         <RoomAutoAssignPreviewModal
           result={roomAutoPreview}
           students={students}
-          onClose={() => setRoomAutoPreview(null)}
+          runCount={roomAutoRunCount}
+          onClose={closeAutomaticPreview}
+          onRerun={rerunAutomaticRooms}
           onApply={applyAutomaticRooms}
         />
       )}

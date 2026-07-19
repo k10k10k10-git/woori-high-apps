@@ -50,6 +50,21 @@ describe("room auto assignment", () => {
     expect(teacherRoom?.studentIds.some(id => id.startsWith("s1-"))).toBe(true);
   });
 
+  it("uses a different deterministic seed batch when rerunning the preview", () => {
+    const input = {
+      rooms: [room("M1", 4, "남")],
+      students: students(4),
+      adults: [],
+      simulations: 30,
+    };
+    const first = autoAssignRooms({ ...input, seedOffset: 0 });
+    const firstAgain = autoAssignRooms({ ...input, seedOffset: 0 });
+    const rerun = autoAssignRooms({ ...input, seedOffset: 1 });
+
+    expect(first.rooms[0].studentIds).toEqual(firstAgain.rooms[0].studentIds);
+    expect(rerun.rooms[0].studentIds).not.toEqual(first.rooms[0].studentIds);
+  });
+
   it("puts every class teacher in a room containing their own students", () => {
     const result = autoAssignRooms({
       rooms: [room("A1", 3, "남"), room("A2", 3, "남"), room("A3", 3, "남")],

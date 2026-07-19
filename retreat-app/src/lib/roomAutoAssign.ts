@@ -38,6 +38,7 @@ export interface RoomAutoAssignInput {
   adults: RoomAutoAdult[];
   classPins?: RoomClassPin[];
   simulations?: number;
+  seedOffset?: number;
 }
 
 export interface RoomAutoAssignResult {
@@ -494,8 +495,9 @@ export function autoAssignRooms(input: RoomAutoAssignInput): RoomAutoAssignResul
     };
   }
   let best: RoomAutoAssignResult | null = null;
+  const seedOffset = Number.isFinite(input.seedOffset) ? Math.trunc(input.seedOffset ?? 0) : 0;
   for (let trial = 0; trial < simulationCount; trial++) {
-    const result = runTrial(input, 20260719 + trial * 7919, trial > 0);
+    const result = runTrial(input, 20260719 + seedOffset * 104729 + trial * 7919, trial > 0);
     if (!best || isBetterResult(result, best)) best = result;
   }
   return { ...best!, simulationCount };
