@@ -10,7 +10,8 @@ import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportU
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
 import { autoAssignRooms, classifyRoomAdult, makeExternalAdults, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
-import RoomAutoAssignPanel, { type RoomClassOption, type RoomExternalSettings } from "./RoomAutoAssignPanel";
+import type { RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
+import RoomAutoAssignPanel, { type RoomClassOption } from "./RoomAutoAssignPanel";
 import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
 
 interface Props {
@@ -52,7 +53,7 @@ export default function RoomsTab({ retreat }: Props) {
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [partialAttendances, setPartialAttendances] = useState<PartialAttendance[]>([]);
   const [roomAutoPreview, setRoomAutoPreview] = useState<RoomAutoAssignResult | null>(null);
-  const [roomAutoSettings, setRoomAutoSettings] = useState<RoomExternalSettings | null>(null);
+  const [roomAutoSettings, setRoomAutoSettings] = useState<RoomAutoAssignSettings | null>(null);
   const [roomAutoRunCount, setRoomAutoRunCount] = useState(0);
 
   const isDirtyRef = useRef(false);
@@ -293,7 +294,7 @@ export default function RoomsTab({ retreat }: Props) {
   const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
   const detectedStaffCount = roomAutoAdults.filter(adult => adult.category === "staff").length;
 
-  function calculateAutomaticRooms(settings: RoomExternalSettings, seedOffset: number) {
+  function calculateAutomaticRooms(settings: RoomAutoAssignSettings, seedOffset: number) {
     const adults = [
       ...roomAutoAdults,
       ...makeExternalAdults("audio", settings.audioCount, settings.audioGender, detectedAudioCount),
@@ -310,7 +311,7 @@ export default function RoomsTab({ retreat }: Props) {
     });
   }
 
-  function previewAutomaticRooms(settings: RoomExternalSettings) {
+  function previewAutomaticRooms(settings: RoomAutoAssignSettings) {
     setRoomAutoSettings(settings);
     setRoomAutoRunCount(1);
     setRoomAutoPreview(calculateAutomaticRooms(settings, 0));
@@ -860,6 +861,7 @@ export default function RoomsTab({ retreat }: Props) {
       </div>
 
       <RoomAutoAssignPanel
+        retreatId={retreat.id}
         roomCount={rooms.length}
         studentCount={roomAutoStudents.length}
         adultCount={roomAutoAdults.length}

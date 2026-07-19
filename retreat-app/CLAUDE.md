@@ -94,6 +94,7 @@ retreats/
     autoAssignConfig/     # 자동 조편성 입력 설정 (조 수·규칙·조장·고려 관계, groups 결과와 분리)
     rooms/                # 방배정 (Room: dong?·roomNumber·capacity·type·studentIds·teachers) — dong은 숙소 건물 여러 개일 때만, 없으면 단일 건물. 표시는 lib/roomLabel.ts로 "동 호수" 합성(이가드도 동일 규칙)
     roomsBackups/         # rooms 전체덮어쓰기 직전 롤링 백업 (최근 5개, 10분 스로틀) — saveRooms가 자동 기록
+    roomAutoAssignConfig/ # 자동 방배정 입력 설정 (스탭 포함·외부인원·반별 기준 방, rooms 결과와 분리)
     teachers/             # 교사 참석 현황
     carpools/             # 카풀 요청
     partialAttendances/   # 부분참 목록
@@ -331,6 +332,8 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 방 프로필과 방 수는 반 학생과 담당 교사만으로 먼저 정한다. 일반 교사·스탭은 이 선택에 영향을 주지 않고, 모든 반 배정이 끝난 뒤 같은 성별 방의 남는 침상에만 들어간다. 따라서 학생 7명과 스탭 3명이 있어도 학생·담임 기준으로 `3인실 3개`가 `10인실 1개`보다 적합하면 3인실 구조를 유지하고, 스탭 2명만 빈자리를 채우며 나머지 1명은 별도 성인 방으로 간다.
 
 30회 중 첫 회는 휴리스틱 최상 후보를 반드시 남기고, 나머지 29회는 각 반의 상위 3개 방 프로필을 가중 탐색한다. 유효 결과의 비교 순서는 `학생·담임 방의 빈자리 → 학생·담임 방 수 → 스탭까지 배정한 최종 빈 침상 → 전체 사용 방 수`다. 미리보기는 `학생·담임 방/빈자리`, `스탭 채움`, `최종 빈 침상`을 분리 표시한다. 회귀 테스트는 `src/lib/roomAutoAssign.test.ts`의 스탭 유무 대조 케이스를 유지한다.
+
+입력 설정은 사용자가 `설정 저장`을 눌렀을 때 `retreats/{id}/roomAutoAssignConfig` 버전 1 문서로 원자 저장한다. 저장 범위는 스탭 포함 여부, 외부 음향·의료 총원/성별, 반별 기준 방이며 `rooms` 결과와 분리한다. 패널 진입 시 `normalizeRoomAutoAssignConfig()`로 구버전·누락값과 중복 고정을 보정해 불러오고, 수련회 ID가 바뀌면 기본값으로 먼저 초기화해 다른 수련회의 설정이 섞이지 않게 한다.
 
 ### 13. 학생 식별 키는 반드시 `resolveStudentKey`로 — 화면마다 다른 기준 금지 (`studentMatcher.ts`)
 

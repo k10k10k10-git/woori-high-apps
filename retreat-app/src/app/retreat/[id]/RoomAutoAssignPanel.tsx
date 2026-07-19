@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Room } from "@/lib/types";
-import type { RoomClassPin, RoomGender } from "@/lib/roomAutoAssign";
+import type { RoomGender } from "@/lib/roomAutoAssign";
+import { DEFAULT_ROOM_AUTO_ASSIGN_SETTINGS, type RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
+import { getRoomAutoAssignConfig, saveRoomAutoAssignConfig } from "@/lib/db";
 import { roomLabel, sortRooms } from "@/lib/roomLabel";
 
 export interface RoomClassOption {
@@ -12,16 +14,8 @@ export interface RoomClassOption {
   count: number;
 }
 
-export interface RoomExternalSettings {
-  includeStaff: boolean;
-  audioCount: number;
-  audioGender: RoomGender | null;
-  medicalCount: number;
-  medicalGender: RoomGender | null;
-  classPins: RoomClassPin[];
-}
-
 interface Props {
+  retreatId: string;
   roomCount: number;
   studentCount: number;
   adultCount: number;
@@ -30,7 +24,7 @@ interface Props {
   detectedMedicalCount: number;
   classes: RoomClassOption[];
   rooms: Room[];
-  onPreview: (settings: RoomExternalSettings) => void;
+  onPreview: (settings: RoomAutoAssignSettings) => void;
 }
 
 function GenderSelect({ value, onChange, disabled }: {
@@ -49,19 +43,16 @@ function GenderSelect({ value, onChange, disabled }: {
 }
 
 export default function RoomAutoAssignPanel({
-  roomCount, studentCount, adultCount, staffCount, detectedAudioCount, detectedMedicalCount, classes, rooms, onPreview,
+  retreatId, roomCount, studentCount, adultCount, staffCount, detectedAudioCount, detectedMedicalCount, classes, rooms, onPreview,
 }: Props) {
   const [open, setOpen] = useState(true);
-  const [settings, setSettings] = useState<RoomExternalSettings>({
-    includeStaff: true,
-    audioCount: 3,
-    audioGender: null,
-    medicalCount: 1,
-    medicalGender: null,
-    classPins: [],
-  });
+  const [settings, setSettings] = useState<RoomAutoAssignSettings>({ ...DEFAULT_ROOM_AUTO_ASSIGN_SETTINGS, classPins: [] });
   const [selectedClassKey, setSelectedClassKey] = useState("");
   const [selectedRoomId, setSelectedRoomId] = useState("");
+  const [configLoading, setConfigLoading] = useState(true);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configNotice, setConfigNotice] = useState<string | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   const missingAudio = Math.max(0, settings.audioCount - detectedAudioCount);
   const missingMedical = Math.max(0, settings.medicalCount - detectedMedicalCount);
   const canPreview = roomCount > 0
@@ -72,6 +63,47 @@ export default function RoomAutoAssignPanel({
   const classByKey = new Map(classes.map(item => [item.classKey, item]));
   const roomById = new Map(rooms.map(room => [room.id, room]));
   const targetAdultCount = adultCount - (settings.includeStaff ? 0 : staffCount);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSettings({ ...DEFAULT_ROOM_AUTO_ASSIGN_SETTINGS, classPins: [] });
+    setSelectedClassKey("");
+    setSelectedRoomId("");
+    setConfigLoading(true);
+    setConfigNotice(null);
+    setConfigError(null);
+    getRoomAutoAssignConfig(retreatId).then(config => {
+      if (cancelled || !config) return;
+      setSettings({
+        includeStaff: config.includeStaff,
+        audioCount: config.audioCount,
+        audioGender: config.audioGender,
+        medicalCount: config.medicalCount,
+        medicalGender: config.medicalGender,
+        classPins: config.classPins,
+      });
+      setConfigNotice("저장된 방배정 설정을 불러왔습니다.");
+    }).catch(error => {
+      if (!cancelled) setConfigError(error instanceof Error ? error.message : "방배정 설정을 불러오지 못했습니다.");
+    }).finally(() => {
+      if (!cancelled) setConfigLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [retreatId]);
+
+  async function saveConfig() {
+    setConfigSaving(true);
+    setConfigNotice(null);
+    setConfigError(null);
+    try {
+      await saveRoomAutoAssignConfig(retreatId, settings);
+      setConfigNotice("현재 방배정 설정을 저장했습니다.");
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : "방배정 설정을 저장하지 못했습니다.");
+    } finally {
+      setConfigSaving(false);
+    }
+  }
 
   function addClassPin() {
     if (!selectedClassKey || !selectedRoomId || pinnedClassKeys.has(selectedClassKey) || pinnedRoomIds.has(selectedRoomId)) return;
@@ -141,10 +173,18 @@ export default function RoomAutoAssignPanel({
                 onChange={medicalGender => setSettings(prev => ({ ...prev, medicalGender }))} />
             </div>
             <p className="text-[11px] text-slate-400 -mt-2">명단에서 {detectedMedicalCount}명 감지 · 추가 외부인원 {missingMedical}명</p>
-            <button type="button" className="btn-primary w-full justify-center" disabled={!canPreview}
-              onClick={() => onPreview(settings)}>
-              🎲 30회 시뮬레이션 후 미리보기
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button type="button" className="btn-secondary justify-center" disabled={configLoading || configSaving}
+                onClick={() => void saveConfig()}>
+                {configSaving ? "저장 중..." : "💾 설정 저장"}
+              </button>
+              <button type="button" className="btn-primary justify-center" disabled={!canPreview || configLoading}
+                onClick={() => onPreview(settings)}>
+                🎲 30회 시뮬레이션
+              </button>
+            </div>
+            {configNotice && <p className="text-[11px] text-green-600">✓ {configNotice}</p>}
+            {configError && <p className="text-[11px] text-red-500">{configError}</p>}
             {!canPreview && roomCount > 0 && (
               <p className="text-[11px] text-amber-600">추가할 외부인원의 성별을 먼저 선택해주세요.</p>
             )}
@@ -177,7 +217,7 @@ export default function RoomAutoAssignPanel({
                 onClick={addClassPin}>＋ 고정</button>
             </div>
             <p className="mt-2 text-[11px] text-slate-500">
-              선택한 방을 해당 반의 기준 방으로 반드시 사용합니다. 정원을 넘으면 같은 건물·같은 정원의 방을 추가합니다.
+              선택한 방을 해당 반의 기준 방으로 반드시 사용합니다. 정원을 넘으면 같은 건물·같은 정원의 방을 추가합니다. 고정 후 위의 설정 저장을 눌러주세요.
             </p>
             {settings.classPins.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">

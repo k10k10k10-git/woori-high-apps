@@ -32,6 +32,7 @@ export const paths = {
   room: (id: string, rid: string) => `retreats/${id}/rooms/${rid}`,
   roomsBackups: (id: string) => `retreats/${id}/roomsBackups`,
   roomsBackup: (id: string, backupKey: string) => `retreats/${id}/roomsBackups/${backupKey}`,
+  roomAutoAssignConfig: (id: string) => `retreats/${id}/roomAutoAssignConfig`,
 
   // ── 차량 ──
   carpools: (id: string) => `retreats/${id}/carpools`,

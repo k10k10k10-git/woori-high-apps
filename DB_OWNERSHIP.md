@@ -45,6 +45,7 @@
 | `retreats/{id}/groups` | 행정 | 이가드 | 행정만 | 이가드 조별 뷰 |
 | `retreats/{id}/autoAssignConfig` | 행정 | - | 행정만 | 없음 (자동 조편성 입력 설정, groups 결과와 분리) |
 | `retreats/{id}/rooms` | 행정 | 이가드 | 행정만 | 이가드 숙소 뷰 |
+| `retreats/{id}/roomAutoAssignConfig` | 행정 | - | 행정만 | 없음 (자동 방배정 입력 설정, rooms 결과와 분리) |
 | `retreats/{id}/carpools` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/supplies` | 행정 | - | 행정만 | 없음 |
 | `retreats/{id}/snacks` | 행정 | - | 행정만 | 없음 |

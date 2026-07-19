@@ -5,6 +5,7 @@ export * from "./db/retreats";
 export * from "./db/participants";
 export * from "./db/groupsRooms";
 export * from "./db/autoAssignConfig";
+export * from "./db/roomAutoAssignConfig";
 export * from "./db/students";
 export * from "./db/teachers";
 export * from "./db/access";
