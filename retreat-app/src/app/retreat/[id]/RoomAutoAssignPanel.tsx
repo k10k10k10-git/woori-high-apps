@@ -66,6 +66,7 @@ export default function RoomAutoAssignPanel({
           <div className="rounded-xl bg-slate-50 p-4 text-xs text-slate-600 leading-6">
             <p className="font-semibold text-slate-700 mb-1">항상 적용되는 하드 규칙</p>
             <p>✓ 같은 반 학생끼리 배정, 반이 사용하는 모든 방은 같은 건물·같은 정원</p>
+            <p>✓ 모든 반 담당 교사는 반드시 자기 반 학생이 있는 방에 함께 배정</p>
             <p>✓ 방 정원 초과 금지, 학생·교사·스탭·교역자·외부인원 전원 배정</p>
             <p>✓ 교역자 전용 방 · 음향 전용 방 · 의료 1인 전용 방</p>
             <p>✓ 선복귀·후발대 포함, 숙박하지 않는 당일참석과 신청취소 학생 제외</p>

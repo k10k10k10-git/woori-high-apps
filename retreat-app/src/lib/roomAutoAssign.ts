@@ -119,7 +119,7 @@ function roomOrder(a: Room, b: Room): number {
 
 function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResult {
   const random = mulberry32(seed);
-  const rooms = input.rooms.map(room => ({ ...room, studentIds: [], teachers: [] }));
+  const rooms: Room[] = input.rooms.map(room => ({ ...room, studentIds: [], teachers: [] }));
   const roomById = new Map(rooms.map(room => [room.id, room]));
   const unusedRoomIds = new Set(rooms.map(room => room.id));
   const assignedStudentIds = new Set<string>();
@@ -189,6 +189,11 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
     if (genders.size > 1) {
       warnings.push(`${classKey}: 한 반에 남녀가 함께 있어 성별별 방으로 나눕니다.`);
     }
+    const allOwnTeachers = (classTeachers.get(classKey) ?? [])
+      .filter(teacher => !assignedAdultIds.has(teacher.id));
+    allOwnTeachers.filter(teacher => !teacher.gender || !genders.has(teacher.gender)).forEach(teacher => {
+      hardViolations.push(`${teacher.name}: 담당 반(${classKey}) 학생과 같은 성별 방에 함께 배정할 수 없습니다.`);
+    });
     for (const gender of genders) {
       const members = shuffled(classStudents.filter(student => student.gender === gender), random);
       const profileRooms = new Map<string, Room[]>();
@@ -197,16 +202,17 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
         profileRooms.set(key, [...(profileRooms.get(key) ?? []), room]);
       });
 
-      const ownTeachers = (classTeachers.get(classKey) ?? [])
-        .filter(teacher => teacher.gender === gender && !assignedAdultIds.has(teacher.id));
+      const ownTeachers = allOwnTeachers.filter(teacher => teacher.gender === gender);
       const candidates = [...profileRooms.entries()].flatMap(([key, available]) => {
         const capacity = available[0]?.capacity ?? 0;
         if (capacity <= 0) return [];
-        const roomCount = Math.ceil(members.length / capacity);
-        if (available.length < roomCount) return [];
+        const roomCount = Math.ceil((members.length + ownTeachers.length) / capacity);
+        const teacherRoomCount = ownTeachers.length > 0 ? Math.ceil(ownTeachers.length / (capacity - 1)) : 0;
+        // 담당 교사가 든 방마다 자기 반 학생이 최소 1명 있어야 한다.
+        if (capacity <= 1 && ownTeachers.length > 0) return [];
+        if (available.length < roomCount || roomCount > members.length || teacherRoomCount > members.length) return [];
         const beds = roomCount * capacity;
-        const ownTeacherFit = Math.min(ownTeachers.length, beds - members.length);
-        return [{ key, available, capacity, roomCount, emptyAfterClass: beds - members.length - ownTeacherFit }];
+        return [{ key, available, capacity, roomCount, emptyAfterClass: beds - members.length - ownTeachers.length }];
       });
 
       const candidate = shuffled(candidates, random).sort((a, b) =>
@@ -224,36 +230,53 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
         .sort(roomOrder)
         .slice(0, candidate.roomCount);
       selectedRooms.forEach(room => unusedRoomIds.delete(room.id));
-      members.forEach((student, index) => {
-        const room = selectedRooms[Math.floor(index / candidate.capacity)];
+
+      // 교사를 먼저 배치하되 각 방에 학생 한 자리 이상을 남긴다.
+      let teacherIndex = 0;
+      for (const room of selectedRooms) {
+        while (teacherIndex < ownTeachers.length && roomOccupancy(room) < room.capacity - 1) {
+          assignAdult(room, ownTeachers[teacherIndex]);
+          teacherIndex++;
+        }
+      }
+
+      // 사용한 모든 반 방에 학생을 한 명씩 넣어 담당 교사가 학생 없는 방에 남지 않게 한다.
+      let studentIndex = 0;
+      for (const room of selectedRooms) {
+        const student = members[studentIndex++];
         room.studentIds.push(student.id);
         assignedStudentIds.add(student.id);
-      });
-
-      for (const teacher of ownTeachers) {
+      }
+      for (; studentIndex < members.length; studentIndex++) {
         const room = selectedRooms.find(item => roomOccupancy(item) < item.capacity);
         if (!room) break;
-        assignAdult(room, teacher);
+        const student = members[studentIndex];
+        room.studentIds.push(student.id);
+        assignedStudentIds.add(student.id);
+      }
+
+      // 후보 생성이 이 불변식을 보장하지만, 계산 변경 시 조용히 누락되지 않도록 즉시 방어한다.
+      for (const teacher of ownTeachers) {
+        if (!assignedAdultIds.has(teacher.id)) {
+          hardViolations.push(`${teacher.name}: 담당 반 학생과 같은 방에 배정할 자리가 없습니다.`);
+        }
       }
     }
   }
 
   const remainingAdults = shuffled(validAdults.filter(adult =>
     !assignedAdultIds.has(adult.id)
+    && adult.category !== "classTeacher"
     && adult.category !== "minister"
     && adult.category !== "audio"
     && adult.category !== "medical"
   ), random);
 
   for (const adult of remainingAdults) {
-    const matchingClassStudentIds = adult.category === "classTeacher" && adult.classKey
-      ? new Set((studentClasses.get(adult.classKey) ?? []).map(student => student.id))
-      : null;
     const classRoom = rooms
       .filter(room => room.type === adult.gender
         && room.studentIds.length > 0
-        && roomOccupancy(room) < room.capacity
-        && (!matchingClassStudentIds || room.studentIds.some(id => matchingClassStudentIds.has(id))))
+        && roomOccupancy(room) < room.capacity)
       .sort((a, b) => (a.capacity - roomOccupancy(a)) - (b.capacity - roomOccupancy(b)))[0];
     if (classRoom) {
       assignAdult(classRoom, adult);
@@ -304,6 +327,17 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
 
   const adultByName = new Map<string, RoomAutoAdult>();
   input.adults.forEach(adult => adultByName.set(adult.name, adult));
+  input.adults.filter(adult => adult.category === "classTeacher").forEach(teacher => {
+    const room = rooms.find(item => (item.teachers ?? []).includes(teacher.name));
+    if (!room || !teacher.classKey) return;
+    const sleepsWithOwnClass = room.studentIds.some(id => {
+      const student = input.students.find(item => item.id === id);
+      return student && `${student.bu}-${student.grade}-${student.classNum}` === teacher.classKey;
+    });
+    if (!sleepsWithOwnClass) {
+      hardViolations.push(`${teacher.name}: 담당 반(${teacher.classKey}) 학생과 같은 방이 아닙니다.`);
+    }
+  });
   rooms.forEach(room => {
     const adults = (room.teachers ?? []).map(name => adultByName.get(name)).filter((adult): adult is RoomAutoAdult => !!adult);
     adults.forEach(adult => {

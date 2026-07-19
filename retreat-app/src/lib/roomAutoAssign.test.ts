@@ -46,6 +46,35 @@ describe("room auto assignment", () => {
     const classRooms = result.rooms.filter(r => r.studentIds.length > 0);
     expect(new Set(classRooms.map(r => `${r.dong}|${r.capacity}`)).size).toBe(1);
     expect(classRooms.every(r => r.studentIds.every(id => id.startsWith("s1-")))).toBe(true);
+    const teacherRoom = result.rooms.find(r => r.teachers?.includes("담임"));
+    expect(teacherRoom?.studentIds.some(id => id.startsWith("s1-"))).toBe(true);
+  });
+
+  it("puts every class teacher in a room containing their own students", () => {
+    const result = autoAssignRooms({
+      rooms: [room("A1", 3, "남"), room("A2", 3, "남"), room("A3", 3, "남")],
+      students: students(6),
+      adults: [adult("1반담임", "classTeacher", "남", "1부-1-1")],
+      simulations: 30,
+    });
+
+    expect(result.hardViolations).toEqual([]);
+    const teacherRoom = result.rooms.find(r => r.teachers?.includes("1반담임"));
+    expect(teacherRoom).toBeDefined();
+    expect(teacherRoom?.studentIds.length).toBeGreaterThan(0);
+    expect(teacherRoom?.studentIds.every(id => id.startsWith("s1-"))).toBe(true);
+  });
+
+  it("blocks a class teacher who cannot share a gender-matched room with their class", () => {
+    const result = autoAssignRooms({
+      rooms: [room("M1", 3, "남"), room("F1", 3, "여")],
+      students: students(2, 1, "남"),
+      adults: [adult("성별불일치담임", "classTeacher", "여", "1부-1-1")],
+      simulations: 30,
+    });
+
+    expect(result.hardViolations.some(message => message.includes("담당 반") && message.includes("같은 성별"))).toBe(true);
+    expect(result.unassignedAdults.map(item => item.name)).toContain("성별불일치담임");
   });
 
   it("keeps ministers, audio, and medical in exclusive rooms", () => {
