@@ -1220,11 +1220,11 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
 
       {editing && (
         <div className="mb-2 space-y-2">
-          <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
-            <label className="text-xs font-medium text-slate-500 whitespace-nowrap" htmlFor={`room-capacity-${room.id}`}>방 정원</label>
+          <div className="flex min-w-0 items-center gap-1.5 rounded-md bg-slate-50 px-2 py-1">
+            <label className="shrink-0 text-[11px] font-medium text-slate-500 whitespace-nowrap" htmlFor={`room-capacity-${room.id}`}>방 정원</label>
             <input
               id={`room-capacity-${room.id}`}
-              className="input w-20 text-xs py-1 text-center"
+              className="input !h-7 !w-14 shrink-0 px-1 py-0 text-center text-xs"
               type="number"
               min={1}
               max={999}
@@ -1236,8 +1236,9 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
                 if (event.key === "Escape") closeEditing();
               }}
             />
-            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void saveCapacity()}>변경</button>
-            <span className="ml-auto text-[11px] text-slate-400">현재 {occupancy}명</span>
+            <span className="shrink-0 text-[11px] text-slate-400">명</span>
+            <button type="button" className="btn-secondary !h-7 shrink-0 whitespace-nowrap px-2 py-0 text-[11px]" onClick={() => void saveCapacity()}>변경</button>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-slate-400">현재 {occupancy}명</span>
           </div>
           <div className="relative">
             <input
