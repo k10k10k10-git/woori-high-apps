@@ -65,6 +65,44 @@ describe("room auto assignment", () => {
     expect(teacherRoom?.studentIds.every(id => id.startsWith("s1-"))).toBe(true);
   });
 
+  it("keeps staff lower-priority and only fills vacancies after the class profile is chosen", () => {
+    const result = autoAssignRooms({
+      rooms: [
+        room("M10", 10, "남"),
+        room("M3-1", 3, "남"), room("M3-2", 3, "남"), room("M3-3", 3, "남"),
+      ],
+      students: students(7),
+      adults: [adult("스탭1", "staff"), adult("스탭2", "staff"), adult("스탭3", "staff")],
+      simulations: 30,
+    });
+
+    expect(result.hardViolations).toEqual([]);
+    expect(result.classRoomCount).toBe(3);
+    expect(result.classRoomEmptyBedCount).toBe(2);
+    expect(result.classRoomFillerCount).toBe(2);
+    expect(result.usedRoomCount).toBe(4);
+    expect(result.rooms.find(item => item.id === "M10")?.studentIds).toHaveLength(0);
+    expect(result.rooms.find(item => item.id === "M10")?.teachers).toHaveLength(1);
+  });
+
+  it("does not choose an oversized room when there are no staff fillers", () => {
+    const result = autoAssignRooms({
+      rooms: [
+        room("M10", 10, "남"),
+        room("M3-1", 3, "남"), room("M3-2", 3, "남"), room("M3-3", 3, "남"),
+      ],
+      students: students(7),
+      adults: [],
+      simulations: 30,
+    });
+
+    expect(result.hardViolations).toEqual([]);
+    expect(result.usedRoomCount).toBe(3);
+    expect(result.emptyBedCount).toBe(2);
+    expect(result.classRoomFillerCount).toBe(0);
+    expect(result.classRoomEmptyBedCount).toBe(2);
+  });
+
   it("blocks a class teacher who cannot share a gender-matched room with their class", () => {
     const result = autoAssignRooms({
       rooms: [room("M1", 3, "남"), room("F1", 3, "여")],

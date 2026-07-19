@@ -34,7 +34,7 @@ export default function RoomAutoAssignPreviewModal({ result, students, onClose, 
           <div>
             <h2 className="text-lg font-bold text-slate-900">🎲 자동 방배정 결과 미리보기</h2>
             <p className="text-sm text-slate-500 mt-1">
-              30회 비교 완료 · 학생 {result.assignedStudentCount}명 · 교사/스탭/외부 {result.assignedAdultCount}명 · 사용 방 {result.usedRoomCount}개 · 빈 침상 {result.emptyBedCount}개
+              30회 비교 완료 · 학생 {result.assignedStudentCount}명 · 교사/스탭/외부 {result.assignedAdultCount}명 · 학생·담임 방 {result.classRoomCount}개/빈자리 {result.classRoomEmptyBedCount}개 · 스탭 채움 {result.classRoomFillerCount}명 · 최종 빈 침상 {result.emptyBedCount}개
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-2xl text-slate-400 hover:text-slate-700" aria-label="닫기">×</button>

@@ -52,6 +52,9 @@ export interface RoomAutoAssignResult {
   warnings: string[];
   usedRoomCount: number;
   emptyBedCount: number;
+  classRoomFillerCount: number;
+  classRoomCount: number;
+  classRoomEmptyBedCount: number;
 }
 
 const HARD_PENALTY = 1_000_000;
@@ -123,13 +126,14 @@ function roomOrder(a: Room, b: Room): number {
     || a.roomNumber.localeCompare(b.roomNumber, "ko", { numeric: true });
 }
 
-function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResult {
+function runTrial(input: RoomAutoAssignInput, seed: number, exploreProfiles: boolean): RoomAutoAssignResult {
   const random = mulberry32(seed);
   const rooms: Room[] = input.rooms.map(room => ({ ...room, studentIds: [], teachers: [] }));
   const roomById = new Map(rooms.map(room => [room.id, room]));
   const unusedRoomIds = new Set(rooms.map(room => room.id));
   const assignedStudentIds = new Set<string>();
   const assignedAdultIds = new Set<string>();
+  const adultAssignmentRoomIds = new Map<string, string>();
   const hardViolations: string[] = [];
   const warnings: string[] = [];
   const classPinByClass = new Map<string, RoomClassPin>();
@@ -157,6 +161,7 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
   const assignAdult = (room: Room, adult: RoomAutoAdult) => {
     room.teachers = [...(room.teachers ?? []), adult.name];
     assignedAdultIds.add(adult.id);
+    adultAssignmentRoomIds.set(adult.id, room.id);
   };
 
   const validAdults = input.adults.filter(adult => {
@@ -250,14 +255,29 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
         if (available.length < roomCount || roomCount > members.length || teacherRoomCount > members.length) return [];
         if (pinnedRoom && !available.some(room => room.id === pinnedRoom.id)) return [];
         const beds = roomCount * capacity;
-        return [{ key, available, capacity, roomCount, emptyAfterClass: beds - members.length - ownTeachers.length }];
+        return [{
+          key,
+          available,
+          capacity,
+          roomCount,
+          emptyAfterClass: beds - members.length - ownTeachers.length,
+        }];
       });
 
-      const candidate = shuffled(candidates, random).sort((a, b) =>
+      const rankedCandidates = shuffled(candidates, random).sort((a, b) =>
         a.emptyAfterClass - b.emptyAfterClass
         || a.roomCount - b.roomCount
         || a.capacity - b.capacity
-      )[0];
+      );
+      // 첫 시뮬레이션은 가장 좋은 휴리스틱 후보를 보장하고, 나머지 시뮬레이션은
+      // 상위 3개 프로필까지 탐색한다. 기존 구현은 동률이 아니면 매번 같은 프로필만
+      // 골라 30회를 실행해도 차선 조합을 사실상 비교하지 못했다.
+      const explorationPool = rankedCandidates.slice(0, 3);
+      const roll = random();
+      const explorationIndex = roll < 0.60 ? 0 : roll < 0.87 ? 1 : 2;
+      const candidate = exploreProfiles
+        ? explorationPool[Math.min(explorationIndex, explorationPool.length - 1)]
+        : rankedCandidates[0];
 
       if (!candidate) {
         hardViolations.push(`${classKey} ${gender} ${members.length}명을 같은 건물·정원의 방들에 배정할 수 없습니다.`);
@@ -404,6 +424,20 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
 
   const usedRooms = rooms.filter(room => roomOccupancy(room) > 0);
   const emptyBedCount = usedRooms.reduce((sum, room) => sum + room.capacity - roomOccupancy(room), 0);
+  const classRooms = usedRooms.filter(room => room.studentIds.length > 0);
+  const classTeacherCountByRoom = new Map<string, number>();
+  input.adults.forEach(adult => {
+    if (adult.category !== "classTeacher") return;
+    const roomId = adultAssignmentRoomIds.get(adult.id);
+    if (roomId) classTeacherCountByRoom.set(roomId, (classTeacherCountByRoom.get(roomId) ?? 0) + 1);
+  });
+  const classRoomEmptyBedCount = classRooms.reduce((sum, room) =>
+    sum + room.capacity - room.studentIds.length - (classTeacherCountByRoom.get(room.id) ?? 0), 0);
+  const classRoomFillerCount = input.adults.filter(adult => {
+    if (adult.category !== "teacher" && adult.category !== "staff") return false;
+    const roomId = adultAssignmentRoomIds.get(adult.id);
+    return !!roomId && (roomById.get(roomId)?.studentIds.length ?? 0) > 0;
+  }).length;
   const score = hardViolations.length * HARD_PENALTY + unassignedStudents.length * HARD_PENALTY
     + unassignedAdults.length * HARD_PENALTY + emptyBedCount * 100 + usedRooms.length * 10;
 
@@ -419,7 +453,30 @@ function runTrial(input: RoomAutoAssignInput, seed: number): RoomAutoAssignResul
     warnings: [...new Set(warnings)],
     usedRoomCount: usedRooms.length,
     emptyBedCount,
+    classRoomFillerCount,
+    classRoomCount: classRooms.length,
+    classRoomEmptyBedCount,
   };
+}
+
+function isBetterResult(candidate: RoomAutoAssignResult, current: RoomAutoAssignResult): boolean {
+  const candidateValid = candidate.hardViolations.length === 0;
+  const currentValid = current.hardViolations.length === 0;
+  if (candidateValid !== currentValid) return candidateValid;
+  if (!candidateValid) return candidate.score < current.score;
+
+  // 일반 교사·스탭은 최하위 배정이다. 최종 빈 침상 수가 줄더라도 스탭을 넣기 위해
+  // 학생·담임 반이 더 큰 방이나 더 많은 방을 쓰는 결과를 선택하지 않는다.
+  return candidate.classRoomEmptyBedCount < current.classRoomEmptyBedCount
+    || (candidate.classRoomEmptyBedCount === current.classRoomEmptyBedCount
+      && candidate.classRoomCount < current.classRoomCount)
+    || (candidate.classRoomEmptyBedCount === current.classRoomEmptyBedCount
+      && candidate.classRoomCount === current.classRoomCount
+      && candidate.emptyBedCount < current.emptyBedCount)
+    || (candidate.classRoomEmptyBedCount === current.classRoomEmptyBedCount
+      && candidate.classRoomCount === current.classRoomCount
+      && candidate.emptyBedCount === current.emptyBedCount
+      && candidate.usedRoomCount < current.usedRoomCount);
 }
 
 export function autoAssignRooms(input: RoomAutoAssignInput): RoomAutoAssignResult {
@@ -433,12 +490,13 @@ export function autoAssignRooms(input: RoomAutoAssignInput): RoomAutoAssignResul
       assignedStudentCount: 0, assignedAdultCount: 0,
       unassignedStudents: input.students, unassignedAdults: input.adults,
       hardViolations: ["등록된 방이 없습니다."], warnings: [], usedRoomCount: 0, emptyBedCount: 0,
+      classRoomFillerCount: 0, classRoomCount: 0, classRoomEmptyBedCount: 0,
     };
   }
   let best: RoomAutoAssignResult | null = null;
   for (let trial = 0; trial < simulationCount; trial++) {
-    const result = runTrial(input, 20260719 + trial * 7919);
-    if (!best || result.score < best.score) best = result;
+    const result = runTrial(input, 20260719 + trial * 7919, trial > 0);
+    if (!best || isBetterResult(result, best)) best = result;
   }
   return { ...best!, simulationCount };
 }
