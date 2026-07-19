@@ -362,6 +362,13 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                               {type}
                             </button>
                           ))}
+                          <button
+                            onClick={() => openEditor(row)}
+                            disabled={disabled}
+                            className="px-2.5 py-1 rounded-md border border-slate-200 text-xs text-slate-500 disabled:opacity-40 hover:bg-slate-50"
+                          >
+                            메모
+                          </button>
                         </div>
                       </td>
                     </tr>
