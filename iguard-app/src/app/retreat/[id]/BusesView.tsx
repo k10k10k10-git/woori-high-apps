@@ -61,7 +61,7 @@ export default function BusesView({ retreatId, buses, groups, students, particip
   }
 
   function groupPassengerCount(g: Group): number {
-    // 부분참: 선택한 일자에 실제 탑승하는 학생만 카운트 (1일차=본대+선복귀, 3일차=본대+후발대)
+    // 부분참: 선택한 일자에 실제 탑승하는 학생만 카운트. 당일참석은 지정한 1·3일차에 포함한다.
     const studentCount = (g.studentIds || [])
       .filter(sid => !isCancelledStudent(sid, cellColors))
       .filter(sid => isStudentBusPassengerOnDay(partial[sid], day)).length;

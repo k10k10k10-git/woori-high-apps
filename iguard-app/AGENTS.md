@@ -54,6 +54,7 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 - Bus 선탑/동승 parsing must go through `src/lib/busStaff.ts`. This strips trailing `sf`, removes obvious instruction fragments and count summaries such as `스탭 0명` from cue sheets, and keeps rejected fragments out of bus headcounts and checklist members while still surfacing warnings.
 - Bus auto-assignment must not be trapped by staff-only imported bus rows. If existing buses are fewer than the minimum needed for all student+teacher passengers, create the missing bus rows and preserve existing bus staff fields by `busNo`.
 - Bus gender separation uses `group + gender` cohorts, never individual scattering. Read gender from admin-owned `participants`, write only `iguard/buses.assignmentMode/segments`, fail closed on missing gender, and keep legacy buses in mixed group mode.
+- Formal `당일참석(day)` students join group checklists only on that day; day 1/3 students also join the matching bus assignment and bus checklist. Day 2 has no bus assignment. Legacy note-only day visits remain excluded from buses because their structured day is unknown.
 
 ## Roles
 
@@ -61,9 +62,9 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 
 ### 행정 참석정보를 버스 인원에 반영하기 (2026-07-17)
 
-- **접근법**: 1→ 운영 `teachers`와 `partialAttendances`를 읽기 전용으로 좁게 대조해 교사 자차는 `transport`, 학생 당일참여는 `note`에 저장됨을 확인한다. 2→ `subscribeToPartialAttendances()`가 버리던 note를 객체형 `PartialAttendanceMap`으로 보존한다. 3→ `src/lib/busParticipation.ts`에 학생 일차·당일참여와 교사 불참·자차 판정을 모으고 `BusesView`·`ChecklistView`가 같은 함수를 사용하게 한다. 4→ 객체형/레거시 문자열형 정규화와 실제 문구를 회귀 테스트로 고정한다.
-- **판단 질문**: 조 이름 목록만 보고 세거나 `partialAttendances.type`만 남기지 않는다. 전자는 행정의 불참·자차를 무시하고, 후자는 `25일 당일참여`처럼 type만으로 구분할 수 없는 학생을 버스에 다시 포함한다. 이름이 모호한 교사를 임의 제외하거나 학생 조장에게 교사 자차 필터를 적용하지 않는다.
-- **재사용 규칙**: 단체 버스 인원은 `isStudentBusPassengerOnDay()`와 `isTeacherBusPassenger()`로만 판정하고, 행정 부분참 구독에서는 `type`과 `note`를 함께 보존한다.
+- **접근법**: 1→ 운영 `teachers`와 `partialAttendances`를 읽기 전용으로 좁게 대조해 교사 자차는 `transport`, 구버전 학생 당일참여는 `note`, 정식 당일참석은 `type+day`에 저장됨을 확인한다. 2→ `subscribeToPartialAttendances()`가 객체형 `PartialAttendanceMap`으로 `type/day/note`를 보존한다. 3→ 현장 참석은 `isPresentOnDay()`, 버스 탑승은 `isStudentBusPassengerOnDay()`로 분리한다. 4→ 정식 당일참석은 지정한 1·3일차 버스에 포함하고, 일차를 확정할 수 없는 구버전 note만 제외한다. 5→ 혼합 조·성별 묶음·호차 체크가 같은 판정을 쓰는지 회귀 테스트로 고정한다.
+- **판단 질문**: 조 이름 목록만 보고 세거나 모든 당일참석을 자차로 가정해 버스에서 빼지 않는다. 전자는 행정의 불참·자차를 무시하고, 후자는 지정 일차 호차를 타야 하는 학생을 누락한다. 반대로 구조화된 `day`가 없는 구버전 메모를 임의의 호차에 넣지도 않는다. 이름이 모호한 교사를 임의 제외하거나 학생 조장에게 교사 자차 필터를 적용하지 않는다.
+- **재사용 규칙**: 조별 현장 인원은 `isPresentOnDay()`, 단체 버스 인원은 `isStudentBusPassengerOnDay()`와 `isTeacherBusPassenger()`로만 판정하고, 행정 부분참 구독에서는 `type/day/note`를 함께 보존한다.
 
 ### 버스 조별 성별 묶음 자동배정 (2026-07-17)
 

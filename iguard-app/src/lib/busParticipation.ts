@@ -15,10 +15,10 @@ export function isDayVisitOnly(note?: string): boolean {
   return /당일\s*(?:참여|참석)/.test(note ?? "");
 }
 
-/** 학생의 일차별 단체 버스 탑승 여부. 선복귀/후발대 공식 위에 당일참석(정식 타입·메모 표기 모두) 제외를 적용한다. */
+/** 학생의 일차별 단체 버스 탑승 여부. 정식 당일참석은 지정한 1·3일차 호차에 포함한다. */
 export function isStudentBusPassengerOnDay(partial: PartialAttendanceInfo | undefined, day: BusDay): boolean {
-  if (partial?.type === "당일참석") return false;      // 당일참석은 자차/개별 이동 — 단체 버스 미탑승
-  if (isDayVisitOnly(partial?.note)) return false;     // 구버전 메모 표기 하위호환
+  if (partial?.type === "당일참석") return partial.day === day;
+  if (isDayVisitOnly(partial?.note)) return false;     // 일차 구조가 없는 구버전 메모는 안전하게 제외
   return isPresentOnDay(partial, day);
 }
 

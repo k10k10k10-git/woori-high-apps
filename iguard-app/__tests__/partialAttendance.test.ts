@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { isPresentOnDay, normalizePartialAttendanceMap } from "@/lib/partialAttendance";
 
 describe("isPresentOnDay", () => {
-  it("본대(undefined) is present on both days", () => {
+  it("본대(undefined)는 모든 일차에 참석한다", () => {
     expect(isPresentOnDay(undefined, 1)).toBe(true);
+    expect(isPresentOnDay(undefined, 2)).toBe(true);
     expect(isPresentOnDay(undefined, 3)).toBe(true);
   });
 
@@ -15,6 +16,11 @@ describe("isPresentOnDay", () => {
   it("후발대 is absent on day 1, present on day 3", () => {
     expect(isPresentOnDay("후발대", 1)).toBe(false);
     expect(isPresentOnDay("후발대", 3)).toBe(true);
+  });
+
+  it("선복귀·후발대는 중간 2일차에 참석한다", () => {
+    expect(isPresentOnDay("선복귀", 2)).toBe(true);
+    expect(isPresentOnDay("후발대", 2)).toBe(true);
   });
 });
 
@@ -36,6 +42,7 @@ describe("당일참석 (2026-07-18 신규 타입)", () => {
     expect(isPresentOnDay({ type: "당일참석", day: 1 }, 1)).toBe(true);
     expect(isPresentOnDay({ type: "당일참석", day: 1 }, 3)).toBe(false);
     expect(isPresentOnDay({ type: "당일참석", day: 2 }, 1)).toBe(false);
+    expect(isPresentOnDay({ type: "당일참석", day: 2 }, 2)).toBe(true);
     expect(isPresentOnDay({ type: "당일참석", day: 2 }, 3)).toBe(false);
     expect(isPresentOnDay({ type: "당일참석", day: 3 }, 3)).toBe(true);
   });

@@ -86,8 +86,8 @@ export function subscribeToStudentsByYear(year: number, cb: (students: Record<st
     (error) => { console.warn("subscribeToStudentsByYear error:", error); onError?.(error); });
 }
 
-// 부분참(본대/선복귀/후발대) — 행정 소유, 이가드는 읽기 전용 소비
-// 노드: retreats/{id}/partialAttendances/{uniqueKey} = { type: "선복귀"|"후발대", note?, updatedAt? }
+// 부분참(선복귀/후발대/당일참석) — 행정 소유, 이가드는 읽기 전용 소비
+// 노드: retreats/{id}/partialAttendances/{uniqueKey} = { type, day?, note?, updatedAt? }
 export function subscribeToPartialAttendances(retreatId: string, cb: (map: PartialAttendanceMap) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.partialAttendances(retreatId)), (snap) => {
     cb(normalizePartialAttendanceMap(snap.exists() ? snap.val() : null));

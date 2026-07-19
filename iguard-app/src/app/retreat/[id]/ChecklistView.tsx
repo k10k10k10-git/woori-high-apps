@@ -10,6 +10,8 @@ import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/lib/busPartici
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
 import { roleNamesForChecklist } from "@/lib/checklistMembers";
 import { activeStudentIdsForGender, buildStudentGenderMap, teacherNamesForBusSegment } from "@/lib/busGender";
+import { isPresentOnDay } from "@/lib/partialAttendance";
+import type { RetreatDay } from "@/lib/partialAttendance";
 
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
@@ -58,10 +60,11 @@ export default function ChecklistView({ retreatId, groups, students, participant
   // 체크자 기록용 — 동시 사용 시 "누가 체크했는지" 대조 가능하게
   const byName = user?.displayName?.trim() || user?.email?.split("@")[0] || undefined;
   const [mode, setMode] = useState<"조별" | "호차별">("조별");
-  const [day, setDay] = useState<"1일차" | "3일차">("1일차"); // 1일차/3일차 인원이 달라 독립 체크
-  const keyOf = (sid: string) => `${selectedBusDay}:${sid}`;
+  const [day, setDay] = useState<RetreatDay>(1);
+  const keyOf = (sid: string) => `${day}:${sid}`;
   const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
-  const selectedBusDay = day === "3일차" ? 3 : 1;
+  const selectedBusDay: 1 | 3 = day === 3 ? 3 : 1;
+  const dayLabel = `${day}일차`;
   const genderMap = useMemo(() => buildStudentGenderMap(participants, students), [participants, students]);
 
   const roleNamesForGroup = useCallback(
@@ -72,13 +75,19 @@ export default function ChecklistView({ retreatId, groups, students, participant
   const membersForGroup = useCallback((g: Group, checklistMode: "group" | "bus", selectedStudentIds?: string[], selectedTeacherNames?: string[]): CheckMember[] => {
     const studentMembers = (selectedStudentIds ?? g.studentIds ?? [])
       .filter(sid => !isCancelledStudent(sid, cellColors))
-      .filter(sid => isStudentBusPassengerOnDay(partial[sid], selectedBusDay))
+      .filter(sid => checklistMode === "bus"
+        ? isStudentBusPassengerOnDay(partial[sid], selectedBusDay)
+        : isPresentOnDay(partial[sid], day))
       .map(sid => {
         const s = students[sid];
+        const partialInfo = partial[sid];
+        const dayVisitLabel = partialInfo?.type === "당일참석"
+          ? `당일참석(${partialInfo.day ?? "?"}일차)`
+          : "";
         return {
           id: `student:${sid}`,
           name: s ? s.name : "(명단 미상)",
-          meta: s ? `${s.grade}-${s.class}` : "",
+          meta: [s ? `${s.grade}-${s.class}` : "", dayVisitLabel].filter(Boolean).join(" · "),
         };
       });
     const availableTeacherNames = roleNamesForGroup(g, checklistMode);
@@ -93,7 +102,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
       })),
       ...studentMembers,
     ].sort((a, b) => memberSortRank(a.meta) - memberSortRank(b.meta));
-  }, [students, partial, cellColors, selectedBusDay, roleNamesForGroup]);
+  }, [students, partial, cellColors, selectedBusDay, day, roleNamesForGroup]);
 
   const cueStaffByBus = useMemo(() => parseBusStaffFromSchedule(schedule, selectedBusDay), [schedule, selectedBusDay]);
 
@@ -203,11 +212,11 @@ export default function ChecklistView({ retreatId, groups, students, participant
   async function resetDay() {
     const keys = units.flatMap(u => u.members.map(m => keyOf(m.id))).filter(k => checkedKeys.has(k));
     if (keys.length === 0) return toast("해제할 체크가 없습니다.", "warning");
-    const ok = await uiConfirm(`${day} 체크 ${keys.length}개를 모두 해제할까요? 도착 후 재점호 등 새로 체크할 때 사용하세요.`);
+    const ok = await uiConfirm(`${dayLabel} 체크 ${keys.length}개를 모두 해제할까요? 도착 후 재점호 등 새로 체크할 때 사용하세요.`);
     if (!ok) return;
     try {
       await clearIguardAttendance(retreatId, keys, byName);
-      toast(`${day} 체크 ${keys.length}개를 모두 해제했습니다.`, "success");
+      toast(`${dayLabel} 체크 ${keys.length}개를 모두 해제했습니다.`, "success");
     } catch (e) {
       toast(`초기화 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
@@ -215,8 +224,8 @@ export default function ChecklistView({ retreatId, groups, students, participant
 
   function print() {
     if (units.length === 0) return toast("데이터가 없습니다.", "warning");
-    let html = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${day}</h1>
-      <div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · ${mode} · ${day} · 출력 ${new Date().toLocaleString("ko-KR")}</div>`;
+    let html = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${dayLabel}</h1>
+      <div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · ${mode} · ${dayLabel} · 출력 ${new Date().toLocaleString("ko-KR")}</div>`;
     units.forEach(u => {
       const rows = u.members.map((m, i) => {
         return `<tr><td style="text-align:center">${i + 1}</td><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.meta || "")}</td><td style="text-align:center;font-size:14px">☐</td></tr>`;
@@ -233,33 +242,33 @@ export default function ChecklistView({ retreatId, groups, students, participant
       <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
         <div className="flex gap-2 flex-wrap">
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg" role="tablist" aria-label="일차 선택">
-            {(["1일차", "3일차"] as const).map(d => (
+            {(mode === "조별" ? [1, 2, 3] as const : [1, 3] as const).map(d => (
               <button key={d} onClick={() => setDay(d)} role="tab" aria-selected={day === d}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium ${day === d ? "bg-white shadow text-fuchsia-700" : "text-slate-500"}`}>{d}</button>
+                className={`px-4 py-1.5 rounded-md text-sm font-medium ${day === d ? "bg-white shadow text-fuchsia-700" : "text-slate-500"}`}>{d}일차</button>
             ))}
           </div>
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg" role="tablist" aria-label="보기 모드">
             {(["조별", "호차별"] as const).map(m => (
-              <button key={m} onClick={() => setMode(m)} role="tab" aria-selected={mode === m}
+              <button key={m} onClick={() => { setMode(m); if (m === "호차별" && day === 2) setDay(1); }} role="tab" aria-selected={mode === m}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium ${mode === m ? "bg-white shadow text-slate-800" : "text-slate-500"}`}>{m}</button>
             ))}
           </div>
         </div>
         <div className="text-sm"><span className="text-slate-500">체크 </span><strong className="text-fuchsia-700">{checkedCount}</strong><span className="text-slate-400"> / {total}명</span></div>
         <div className="flex gap-2">
-          <button onClick={resetDay} className="btn-secondary btn-sm" aria-label={`${day} 체크 전체 초기화`}>↺ 초기화</button>
+          <button onClick={resetDay} className="btn-secondary btn-sm" aria-label={`${dayLabel} 체크 전체 초기화`}>↺ 초기화</button>
           <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
         </div>
       </div>
       <p className="text-xs text-slate-400 mb-1">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 — 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
       <p className="text-xs text-fuchsia-600 mb-3">
         {mode === "호차별"
-          ? "행정의 교사 불참·자차와 학생 부분참 당일참여는 버스 인원체크에서 제외됩니다."
-          : "조별 인원체크에는 자차 교사도 포함됩니다. 이동수단 제외는 호차별에서만 적용됩니다."}
+          ? "교사 불참·자차는 제외하고, 당일참석자는 지정한 1·3일차 호차별 인원체크에 포함됩니다."
+          : "조별 인원체크는 선택한 일차의 실제 현장 참석자를 표시합니다. 당일참석자는 지정 일차에만 포함됩니다."}
       </p>
 
       {mode === "호차별" && units.length === 0 ? (
-        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🚌</div><p>{day} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>
+        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🚌</div><p>{dayLabel} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>
       ) : units.length === 0 ? (
         <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">✅</div><p>조편성 데이터가 없습니다.</p><p className="text-xs mt-1.5 text-slate-300">행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</p></div>
       ) : (

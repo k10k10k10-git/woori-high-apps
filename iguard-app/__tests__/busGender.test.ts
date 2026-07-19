@@ -46,6 +46,23 @@ describe("조별 성별 버스 묶음", () => {
     ]);
     expect(result.missingStudentIds).toEqual(["1_UNKNOWN"]);
   });
+
+  it("당일참석자는 지정한 1·3일차의 성별 묶음에만 포함한다", () => {
+    const partial = {
+      "1_S11_01": { type: "당일참석" as const, day: 1 },
+      "1_S11_02": { type: "당일참석" as const, day: 3 },
+      "1_S11_03": { type: "당일참석" as const, day: 2 },
+    };
+    const day1 = buildGenderCohorts(groups, participants, students, partial, { "1_S12_01": "red" }, 1);
+    expect(day1.cohorts).toEqual([
+      { groupId: "g1", gender: "남", studentIds: ["1_S11_01"] },
+    ]);
+
+    const day3 = buildGenderCohorts(groups, participants, students, partial, { "1_S12_01": "red" }, 3);
+    expect(day3.cohorts).toEqual([
+      { groupId: "g1", gender: "남", studentIds: ["1_S11_02"] },
+    ]);
+  });
 });
 
 describe("교사 성별 버스 묶음", () => {

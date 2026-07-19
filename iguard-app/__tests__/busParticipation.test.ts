@@ -31,7 +31,7 @@ describe("학생 단체 버스 탑승 판정", () => {
     expect(isStudentBusPassengerOnDay({ type: "선복귀" }, 3)).toBe(false);
   });
 
-  it("당일참여·당일참석 학생은 1·3일차 모두 제외한다", () => {
+  it("일차 구조가 없는 구버전 당일참여 메모는 1·3일차 모두 제외한다", () => {
     expect(isDayVisitOnly("24일(금) 당일참여")).toBe(true);
     expect(isDayVisitOnly("25일 당일 참석")).toBe(true);
     expect(isStudentBusPassengerOnDay({ type: "선복귀", note: "24일(금) 당일참여" }, 1)).toBe(false);
@@ -70,9 +70,17 @@ describe("교사 단체 버스 탑승 판정", () => {
   });
 });
 
-describe("당일참석 버스 제외 (2026-07-18)", () => {
-  it("당일참석 타입은 일차·day와 무관하게 단체 버스에서 제외된다", () => {
-    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 1 }, 1)).toBe(false);
-    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 3 }, 3)).toBe(false);
+describe("당일참석 버스 반영", () => {
+  it("지정한 1·3일차 호차에만 포함한다", () => {
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 1 }, 1)).toBe(true);
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 1 }, 3)).toBe(false);
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 3 }, 1)).toBe(false);
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 3 }, 3)).toBe(true);
+  });
+
+  it("2일차·일차 미기록 당일참석은 1·3일차 버스에서 제외한다", () => {
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 2 }, 1)).toBe(false);
+    expect(isStudentBusPassengerOnDay({ type: "당일참석", day: 2 }, 3)).toBe(false);
+    expect(isStudentBusPassengerOnDay({ type: "당일참석" }, 1)).toBe(false);
   });
 });

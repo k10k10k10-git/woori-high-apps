@@ -1,11 +1,12 @@
 "use client";
 import { useMemo } from "react";
-import { Group, Room, IguardBus, IguardMeal, IguardStaff } from "@/lib/types";
+import { Group, Room, IguardBus, IguardMeal, IguardStaff, PartialAttendanceMap, Student } from "@/lib/types";
 import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { resolveGroupStaffNames } from "@/lib/groupStaffNames";
 import { buildMealOrderSummaries } from "@/lib/mealOrder";
+import { isCancelledStudent } from "@/lib/busParticipation";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
@@ -20,15 +21,19 @@ const roomSort = (a: Room, b: Room) => {
 
 interface RoomChip { roomNumber: string; count: number; }
 interface BusInfo { day: 1 | 3; busNo: number; staff?: string; gender?: "남" | "여"; }
-interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; }
+interface DayVisitor { name: string; day?: number; }
+interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; dayVisitors: DayVisitor[]; }
 
-export default function RoomsView({ groups, rooms, buses, meals, staff, groupStaff, retreatName, year }: {
+export default function RoomsView({ groups, rooms, buses, meals, staff, groupStaff, students, partial, cellColors, retreatName, year }: {
   groups: Group[];
   rooms: Room[];
   buses: IguardBus[];
   meals: IguardMeal[];
   staff: IguardStaff[];
   groupStaff: Record<string, string[]>;
+  students: Record<string, Student>;
+  partial: PartialAttendanceMap;
+  cellColors: Record<string, string>;
   retreatName: string;
   year: number;
 }) {
@@ -36,7 +41,13 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
 
   const data = useMemo<GroupRooms[]>(() => {
     return [...groups].sort(groupSort).map(g => {
-      const memberSet = new Set(g.studentIds || []);
+      const activeStudentIds = (g.studentIds || []).filter(id => !isCancelledStudent(id, cellColors));
+      const dayVisitors = activeStudentIds
+        .filter(id => partial[id]?.type === "당일참석")
+        .map(id => ({ name: students[id]?.name ?? "(명단 미상)", day: partial[id]?.day }))
+        .sort((a, b) => (a.day ?? 99) - (b.day ?? 99) || a.name.localeCompare(b.name, "ko"));
+      // 당일참석자는 숙박 대상이 아니므로 방 배정 인원·미배정 경고에서 제외한다.
+      const memberSet = new Set(activeStudentIds.filter(id => partial[id]?.type !== "당일참석"));
       const assigned = new Set<string>();
       const nam: RoomChip[] = [], yeo: RoomChip[] = [], etc: RoomChip[] = [];
       [...rooms].sort(roomSort).forEach(r => {
@@ -59,14 +70,15 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
         .sort((a, b) => a.day - b.day);
       return {
         group: g, nam, yeo, etc, gbs: g.gbs,
-        unassigned: (g.studentIds || []).length - assigned.size,
+        unassigned: memberSet.size - assigned.size,
         teachers: g.teachers || [],
         leader: parseNames(g.leader || ""),
         staff: resolveGroupStaffNames(g.staff, groupStaff[g.id], staff),
         buses: groupBuses,
+        dayVisitors,
       };
     });
-  }, [groups, rooms, buses, staff, groupStaff]);
+  }, [groups, rooms, buses, staff, groupStaff, students, partial, cellColors]);
 
   const mealSummaries = useMemo(() => buildMealOrderSummaries(meals, groups), [meals, groups]);
 
@@ -76,9 +88,10 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
     if (data.length === 0) return toast("조편성 데이터가 없습니다.", "warning");
     const chips = (arr: RoomChip[]) => arr.length ? escapeHtml(arr.map(c => `${c.roomNumber}(${c.count})`).join(", ")) : "—";
     let html = `<h1>조장용 방배정표</h1><div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · 출력 ${new Date().toLocaleString("ko-KR")}</div>
-      <table><thead><tr><th>조</th><th>교사</th><th>조장</th><th>스탭</th><th>GBS 장소</th><th>남자 숙소</th><th>여자 숙소</th></tr></thead><tbody>`;
+      <table><thead><tr><th>조</th><th>교사</th><th>조장</th><th>스탭</th><th>당일참석</th><th>GBS 장소</th><th>남자 숙소</th><th>여자 숙소</th></tr></thead><tbody>`;
     data.forEach(d => {
-      html += `<tr><td>${escapeHtml(d.group.bu)} ${escapeHtml(groupDisplayName(d.group, groups))}</td><td>${escapeHtml(d.teachers.join(", ") || "—")}</td><td>${escapeHtml(d.leader.join(", ") || "—")}</td><td>${escapeHtml(d.staff.join(", ") || "—")}</td><td>${escapeHtml(d.gbs || "—")}</td><td>${chips(d.nam)}${d.etc.length ? " / " + chips(d.etc) : ""}</td><td>${chips(d.yeo)}</td></tr>`;
+      const dayVisitors = d.dayVisitors.map(visitor => `${visitor.name}(${visitor.day ?? "?"}일차)`).join(", ") || "—";
+      html += `<tr><td>${escapeHtml(d.group.bu)} ${escapeHtml(groupDisplayName(d.group, groups))}</td><td>${escapeHtml(d.teachers.join(", ") || "—")}</td><td>${escapeHtml(d.leader.join(", ") || "—")}</td><td>${escapeHtml(d.staff.join(", ") || "—")}</td><td>${escapeHtml(dayVisitors)}</td><td>${escapeHtml(d.gbs || "—")}</td><td>${chips(d.nam)}${d.etc.length ? " / " + chips(d.etc) : ""}</td><td>${chips(d.yeo)}</td></tr>`;
     });
     html += `</tbody></table>`;
     printAsPDF(html, "조장용-방배정표", true);
@@ -157,6 +170,17 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
               <InfoRow label="교사" cls="text-slate-600">{d.teachers.length ? d.teachers.join(", ") : <span className="text-slate-300">—</span>}</InfoRow>
               <InfoRow label="조장" cls="text-emerald-600">{d.leader.length ? d.leader.join(", ") : <span className="text-slate-300">—</span>}</InfoRow>
               <InfoRow label="스탭" cls="text-slate-600">{d.staff.length ? d.staff.join(", ") : <span className="text-slate-300">—</span>}</InfoRow>
+              {d.dayVisitors.length > 0 && (
+                <InfoRow label="당일참석" cls="text-violet-600">
+                  <span className="flex flex-wrap gap-1">
+                    {d.dayVisitors.map((visitor, index) => (
+                      <span key={`${visitor.name}-${index}`} className="rounded border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-xs text-violet-700">
+                        {visitor.name} · {visitor.day ?? "?"}일차
+                      </span>
+                    ))}
+                  </span>
+                </InfoRow>
+              )}
               <InfoRow label="GBS 장소" cls="text-indigo-600">{d.gbs ? d.gbs : <span className="text-slate-300">—</span>}</InfoRow>
               <RoomRow label="남자 숙소" cls="text-fuchsia-700" chips={[...d.nam, ...d.etc]} />
               <RoomRow label="여자 숙소" cls="text-rose-500" chips={d.yeo} />

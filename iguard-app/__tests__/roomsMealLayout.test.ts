@@ -11,4 +11,15 @@ describe("조별정보 식사순서 모바일 레이아웃", () => {
     expect(source).toContain('className="mt-2 grid grid-cols-4 gap-1.5 sm:hidden"');
     expect(source).toContain('className="hidden min-w-0 overflow-x-auto sm:block"');
   });
+
+  it("당일참석자와 참석 일차를 표시하고 숙소 미배정 인원에서는 제외한다", () => {
+    const source = readFileSync(
+      new URL("../src/app/retreat/[id]/RoomsView.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain('label="당일참석"');
+    expect(source).toContain('partial[id]?.type !== "당일참석"');
+    expect(source).toContain("unassigned: memberSet.size - assigned.size");
+  });
 });

@@ -14,15 +14,17 @@ export type PartialLike = MemberClass | { type: MemberClass; day?: number };
 // ════════════════════════════════════════════════════════════
 
 export type MemberClass = "선복귀" | "후발대" | "당일참석";
+export type RetreatDay = 1 | 2 | 3;
 
 /** 하위호환: 타입 문자열만 넘겨도 되고(기존 호출), 당일참석 일차 판정이 필요하면 record를 넘긴다. */
-export function isPresentOnDay(cls: PartialLike | undefined, day: 1 | 3): boolean {
+export function isPresentOnDay(cls: PartialLike | undefined, day: RetreatDay): boolean {
   if (!cls) return true;            // 본대(기본): 둘 다 참석
   const type = typeof cls === "string" ? cls : cls.type;
   if (type === "당일참석") {
     const d = typeof cls === "string" ? undefined : cls.day;
     return d === day;               // 기록된 일차에만 현장에 있음 (일차 미기록이면 불참 취급)
   }
+  if (day === 2) return true;       // 선복귀·후발대 모두 수련회 중간 일차에는 현장 참석
   return day === 1 ? type !== "후발대" : type !== "선복귀";
 }
 
