@@ -1,0 +1,99 @@
+import { describe, expect, it } from "vitest";
+import type { Room, TeacherAttendance } from "./types";
+import {
+  autoAssignRooms,
+  classifyRoomAdult,
+  makeExternalAdults,
+  type RoomAutoAdult,
+  type RoomAutoStudent,
+} from "./roomAutoAssign";
+
+function room(id: string, capacity: number, type: "남" | "여", dong = "본관"): Room {
+  return { id, roomNumber: id, dong, capacity, type, studentIds: [], teachers: [] };
+}
+
+function students(count: number, classNum = 1, gender: "남" | "여" = "남"): RoomAutoStudent[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `s${classNum}-${index + 1}`,
+    name: `학생${classNum}-${index + 1}`,
+    bu: "1부",
+    grade: 1,
+    classNum,
+    gender,
+  }));
+}
+
+function adult(id: string, category: RoomAutoAdult["category"], gender: "남" | "여" = "남", classKey?: string): RoomAutoAdult {
+  return { id, name: id, gender, category, classKey };
+}
+
+describe("room auto assignment", () => {
+  it("runs exactly 30 simulations and keeps one class in one building/capacity profile", () => {
+    const result = autoAssignRooms({
+      rooms: [
+        room("A1", 3, "남"), room("A2", 3, "남"), room("A3", 3, "남"),
+        room("B1", 2, "남", "별관"), room("B2", 2, "남", "별관"),
+      ],
+      students: students(7),
+      adults: [adult("담임", "classTeacher", "남", "1부-1-1"), adult("스탭1", "staff"), adult("스탭2", "staff")],
+      simulations: 30,
+    });
+
+    expect(result.simulationCount).toBe(30);
+    expect(result.hardViolations).toEqual([]);
+    expect(result.assignedStudentCount).toBe(7);
+    expect(result.assignedAdultCount).toBe(3);
+    const classRooms = result.rooms.filter(r => r.studentIds.length > 0);
+    expect(new Set(classRooms.map(r => `${r.dong}|${r.capacity}`)).size).toBe(1);
+    expect(classRooms.every(r => r.studentIds.every(id => id.startsWith("s1-")))).toBe(true);
+  });
+
+  it("keeps ministers, audio, and medical in exclusive rooms", () => {
+    const adults = [
+      adult("목사1", "minister"), adult("목사2", "minister"),
+      adult("음향1", "audio"), adult("음향2", "audio"), adult("음향3", "audio"),
+      adult("의료1", "medical", "여"), adult("일반스탭", "staff"),
+    ];
+    const result = autoAssignRooms({
+      rooms: [
+        room("M1", 3, "남"), room("M2", 3, "남"), room("M3", 3, "남"),
+        room("F1", 1, "여"), room("F2", 2, "여"),
+      ],
+      students: [], adults, simulations: 30,
+    });
+
+    expect(result.hardViolations).toEqual([]);
+    const ministerRoom = result.rooms.find(r => r.teachers?.includes("목사1"));
+    const audioRoom = result.rooms.find(r => r.teachers?.includes("음향1"));
+    const medicalRoom = result.rooms.find(r => r.teachers?.includes("의료1"));
+    expect(ministerRoom?.teachers).toEqual(expect.arrayContaining(["목사1", "목사2"]));
+    expect(audioRoom?.teachers).toEqual(expect.arrayContaining(["음향1", "음향2", "음향3"]));
+    expect(medicalRoom?.teachers).toEqual(["의료1"]);
+    expect(ministerRoom?.id).not.toBe(audioRoom?.id);
+  });
+
+  it("never exceeds capacity and reports missing gender as a blocker", () => {
+    const result = autoAssignRooms({
+      rooms: [room("M1", 2, "남")],
+      students: students(1),
+      adults: [{ id: "unknown", name: "성별미입력", gender: null, category: "staff" }],
+      simulations: 30,
+    });
+    expect(result.hardViolations.some(message => message.includes("성별"))).toBe(true);
+    expect(result.unassignedAdults.map(item => item.name)).toContain("성별미입력");
+    expect(result.rooms.every(r => r.studentIds.length + (r.teachers?.length ?? 0) <= r.capacity)).toBe(true);
+  });
+
+  it("classifies actual teacher records and only creates missing external placeholders", () => {
+    const teacher: TeacherAttendance = {
+      id: "audio", name: "음향담당", bu: "스탭", classKey: "방송 음향", status: "전참", gender: "남",
+    };
+    expect(classifyRoomAdult(teacher).category).toBe("audio");
+    expect(makeExternalAdults("audio", 3, "남", 1).map(item => item.name)).toEqual(["외부 음향 2", "외부 음향 3"]);
+  });
+
+  it("rejects simulation counts other than 30", () => {
+    expect(() => autoAssignRooms({ rooms: [room("M1", 2, "남")], students: [], adults: [], simulations: 10 }))
+      .toThrow(/30회/);
+  });
+});

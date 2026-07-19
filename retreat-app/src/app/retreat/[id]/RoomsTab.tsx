@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
-import { Retreat, Room, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { Retreat, Room, Group, Student, Participant, TeacherAttendance, PartialAttendance } from "@/lib/types";
+import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, subscribeToPartialAttendances, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
 import { groupDisplayName } from "@/lib/groupNumber";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
@@ -9,6 +9,9 @@ import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
+import { autoAssignRooms, classifyRoomAdult, makeExternalAdults, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
+import RoomAutoAssignPanel, { type RoomExternalSettings } from "./RoomAutoAssignPanel";
+import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
 
 interface Props {
   retreat: Retreat;
@@ -47,6 +50,8 @@ export default function RoomsTab({ retreat }: Props) {
   const [newRoom, setNewRoom] = useState({ dong: "", roomNumber: "", capacity: "4", type: "남" });
   const [genderFilter, setGenderFilter] = useState<string>("전체");
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
+  const [partialAttendances, setPartialAttendances] = useState<PartialAttendance[]>([]);
+  const [roomAutoPreview, setRoomAutoPreview] = useState<RoomAutoAssignResult | null>(null);
 
   const isDirtyRef = useRef(false);
   const isDragging = useRef(false);
@@ -171,6 +176,10 @@ export default function RoomsTab({ retreat }: Props) {
       setAllTeachers(teachers);
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
 
+    // Real-time: partial attendance — 당일참석자는 숙박하지 않으므로 자동배정·미배정 풀에서 제외
+    unsubs.push(subscribeToPartialAttendances(retreat.id, setPartialAttendances,
+      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+
     // Real-time: groups — 도면 인쇄에서 방별 조 표기용
     unsubs.push(subscribeToGroups(retreat.id, setGroups,
       e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
@@ -222,24 +231,72 @@ export default function RoomsTab({ retreat }: Props) {
       .map(([sid]) => sid);
   }, [cellColors, participantIds, students]);
 
+  const dayAttendanceIds = useMemo(() => new Set(
+    partialAttendances.filter(item => item.type === "당일참석").map(item => item.id)
+  ), [partialAttendances]);
+
   // 전체 미배정: 기존 미배정 + 후기 신청자 중 방에 미배정된 인원
   // 신청취소(red) 학생은 풀에서 제외 — 취소자 제거 후 리로드 시 재등장 방지
   const allUnassigned = useMemo(() => {
     const assignedSet = new Set(rooms.flatMap(r => r.studentIds || []));
     const lateUnassigned = lateRegistrantIds.filter(id => !assignedSet.has(id));
-    return [...unassigned, ...lateUnassigned].filter(id => cellColors[id] !== "red");
-  }, [unassigned, lateRegistrantIds, rooms, cellColors]);
+    return [...unassigned, ...lateUnassigned].filter(id => cellColors[id] !== "red" && !dayAttendanceIds.has(id));
+  }, [unassigned, lateRegistrantIds, rooms, cellColors, dayAttendanceIds]);
 
   const unassignedTeachers = useMemo(() => {
     const assigned = new Set(rooms.flatMap(r => r.teachers || []));
-    return allTeachers.filter(t => !assigned.has(t.name));
+    return allTeachers.filter(t => t.status !== "불참" && !assigned.has(t.name));
   }, [rooms, allTeachers]);
 
   // 이름 검색에서는 미배정뿐 아니라 다른 방에 배정된 사람도 찾아 "이동"할 수 있다.
   // 신청취소자는 검색 후보에서 제외하고, 현장 등록자는 참가자 목록과 합친다.
   const roomStudentCandidateIds = useMemo(() =>
-    [...new Set([...participantIds, ...lateRegistrantIds])].filter(id => cellColors[id] !== "red"),
-  [participantIds, lateRegistrantIds, cellColors]);
+    [...new Set([...participantIds, ...lateRegistrantIds])]
+      .filter(id => cellColors[id] !== "red" && !dayAttendanceIds.has(id)),
+  [participantIds, lateRegistrantIds, cellColors, dayAttendanceIds]);
+
+  const roomAutoStudents = useMemo<RoomAutoStudent[]>(() => roomStudentCandidateIds.flatMap(id => {
+    const student = students[id];
+    if (!student) return [];
+    const gender = student.gender === "남" || student.gender === "여"
+      ? student.gender
+      : student.class % 2 === 1 ? "남" : "여";
+    return [{
+      id,
+      name: student.name,
+      bu: student.bu ?? (student.buNum === 1 ? "1부" : student.buNum === 2 ? "2부" : "미상"),
+      grade: student.grade,
+      classNum: student.class,
+      gender,
+    }];
+  }), [roomStudentCandidateIds, students]);
+
+  const roomAutoAdults = useMemo(() => allTeachers
+    .filter(teacher => teacher.status !== "불참")
+    .map(classifyRoomAdult), [allTeachers]);
+  const detectedAudioCount = roomAutoAdults.filter(adult => adult.category === "audio").length;
+  const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
+
+  function previewAutomaticRooms(settings: RoomExternalSettings) {
+    const adults = [
+      ...roomAutoAdults,
+      ...makeExternalAdults("audio", settings.audioCount, settings.audioGender, detectedAudioCount),
+      ...makeExternalAdults("medical", settings.medicalCount, settings.medicalGender, detectedMedicalCount),
+    ];
+    setRoomAutoPreview(autoAssignRooms({ rooms, students: roomAutoStudents, adults, simulations: 30 }));
+  }
+
+  function applyAutomaticRooms() {
+    if (!roomAutoPreview || roomAutoPreview.hardViolations.length > 0) return;
+    const nextRooms = roomAutoPreview.rooms;
+    roomsRef.current = nextRooms;
+    setRooms(nextRooms);
+    const assigned = new Set(nextRooms.flatMap(room => room.studentIds ?? []));
+    setUnassigned(roomStudentCandidateIds.filter(id => !assigned.has(id)));
+    setRoomAutoPreview(null);
+    markDirty();
+    toast(`30회 시뮬레이션 최적안으로 ${roomAutoPreview.assignedStudentCount + roomAutoPreview.assignedAdultCount}명을 배정했습니다.`, "success");
+  }
 
   function handleDragStart(type: "student" | "teacher", id: string, fromRoomId: string | null) {
     isDragging.current = true;
@@ -736,6 +793,24 @@ export default function RoomsTab({ retreat }: Props) {
           </span>
         </div>
       </div>
+
+      <RoomAutoAssignPanel
+        roomCount={rooms.length}
+        studentCount={roomAutoStudents.length}
+        adultCount={roomAutoAdults.length}
+        detectedAudioCount={detectedAudioCount}
+        detectedMedicalCount={detectedMedicalCount}
+        onPreview={previewAutomaticRooms}
+      />
+
+      {roomAutoPreview && (
+        <RoomAutoAssignPreviewModal
+          result={roomAutoPreview}
+          students={students}
+          onClose={() => setRoomAutoPreview(null)}
+          onApply={applyAutomaticRooms}
+        />
+      )}
 
       {showAddRoom && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
