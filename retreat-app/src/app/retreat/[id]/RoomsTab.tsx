@@ -311,6 +311,28 @@ export default function RoomsTab({ retreat }: Props) {
     toast(`30회 시뮬레이션 최적안으로 ${roomAutoPreview.assignedStudentCount + roomAutoPreview.assignedAdultCount}명을 배정했습니다.`, "success");
   }
 
+  async function updateRoomCapacity(roomId: string, nextCapacity: number): Promise<boolean> {
+    const capacity = Math.max(1, Math.min(999, Math.trunc(nextCapacity)));
+    const room = roomsRef.current.find(item => item.id === roomId);
+    if (!room) return false;
+    if (room.capacity === capacity) return true;
+
+    const activeStudentCount = (room.studentIds || []).filter(id => cellColors[id] !== "red").length;
+    const occupancy = activeStudentCount + (room.teachers?.length ?? 0);
+    if (capacity < occupancy) {
+      const confirmed = await uiConfirm(
+        `${roomLabel(room)}에는 현재 ${occupancy}명이 배정되어 있습니다. 정원을 ${capacity}명으로 줄여 초과 상태로 둘까요?`,
+      );
+      if (!confirmed) return false;
+    }
+
+    const nextRooms = roomsRef.current.map(item => item.id === roomId ? { ...item, capacity } : item);
+    roomsRef.current = nextRooms;
+    setRooms(nextRooms);
+    markDirty();
+    return true;
+  }
+
   function handleDragStart(type: "student" | "teacher", id: string, fromRoomId: string | null) {
     isDragging.current = true;
     setDragItemType(type);
@@ -912,6 +934,7 @@ export default function RoomsTab({ retreat }: Props) {
                     onDragStart={(type, id) => handleDragStart(type, id, r.id)}
                     onAssignStudent={sid => assignStudentBySearch(r.id, sid)}
                     onAssignTeacher={name => assignTeacherBySearch(r.id, name)}
+                    onUpdateCapacity={capacity => updateRoomCapacity(r.id, capacity)}
                     onRemoveStudent={sid => {
                       setRooms(prev => prev.map(rm =>
                         rm.id === r.id ? { ...rm, studentIds: rm.studentIds.filter(id => id !== sid) } : rm
@@ -1062,7 +1085,7 @@ function RoomTeacherChip({ teacher, onDragStart, onRemove }: {
   );
 }
 
-function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers, onDrop, onDragStart, onAssignStudent, onAssignTeacher, onRemoveStudent, onRemoveTeacher, onRemove }: {
+function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers, onDrop, onDragStart, onAssignStudent, onAssignTeacher, onUpdateCapacity, onRemoveStudent, onRemoveTeacher, onRemove }: {
   room: Room; students: Record<string, StudentInfo>;
   cellColors: Record<string, string>;
   studentCandidateIds: string[];
@@ -1071,17 +1094,20 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
   onDragStart: (type: "student" | "teacher", id: string) => void;
   onAssignStudent: (id: string) => void;
   onAssignTeacher: (name: string) => void;
+  onUpdateCapacity: (capacity: number) => Promise<boolean>;
   onRemoveStudent: (id: string) => void;
   onRemoveTeacher: (name: string) => void;
   onRemove: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [capacityDraft, setCapacityDraft] = useState(String(room.capacity));
   const totalCount = (room.studentIds || []).length;
   const cancelledCount = (room.studentIds || []).filter(sid => cellColors[sid] === "red").length;
-  const count = totalCount - cancelledCount;
-  const isFull = count >= room.capacity;
   const teachers = room.teachers || [];
+  const activeStudentCount = totalCount - cancelledCount;
+  const occupancy = activeStudentCount + teachers.length;
+  const isFull = occupancy >= room.capacity;
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ko-KR");
   const searchResults = useMemo(() => {
     if (!normalizedQuery) return [];
@@ -1112,6 +1138,17 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
   function closeEditing() {
     setEditing(false);
     setSearchQuery("");
+    setCapacityDraft(String(room.capacity));
+  }
+
+  async function saveCapacity() {
+    const parsed = Number(capacityDraft);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 999) {
+      setCapacityDraft(String(room.capacity));
+      return;
+    }
+    const saved = await onUpdateCapacity(parsed);
+    if (!saved) setCapacityDraft(String(room.capacity));
   }
 
   function selectFirstResult() {
@@ -1135,13 +1172,13 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
         </div>
         <div className="flex items-center gap-1">
           <span className={`text-xs font-medium ${isFull ? "text-orange-500" : "text-slate-400"}`}>
-            {count}/{room.capacity}
+            {occupancy}/{room.capacity}
           </span>
           <button
             onClick={() => editing ? closeEditing() : setEditing(true)}
             className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${editing ? "bg-blue-50 text-blue-600" : "text-slate-300 hover:bg-slate-100 hover:text-slate-600"}`}
-            title={editing ? "편집 닫기" : "이름으로 배정"}
-            aria-label={`${roomLabel(room)} ${editing ? "편집 닫기" : "이름으로 배정"}`}
+            title={editing ? "편집 닫기" : "방 편집"}
+            aria-label={`${roomLabel(room)} ${editing ? "편집 닫기" : "방 편집"}`}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
@@ -1152,29 +1189,49 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
       </div>
 
       {editing && (
-        <div className="relative mb-2">
-          <input
-            className="input text-xs py-1.5 pr-8"
-            autoFocus
-            aria-label={`${roomLabel(room)} 배정할 이름 검색`}
-            placeholder="학생·교사 이름 입력"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter") { e.preventDefault(); selectFirstResult(); }
-              if (e.key === "Escape") closeEditing();
-            }}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 hover:text-slate-600"
-              aria-label="검색어 지우기"
-            >×</button>
-          )}
-          {normalizedQuery && (
-            <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+        <div className="mb-2 space-y-2">
+          <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-2 py-1.5">
+            <label className="text-xs font-medium text-slate-500 whitespace-nowrap" htmlFor={`room-capacity-${room.id}`}>방 정원</label>
+            <input
+              id={`room-capacity-${room.id}`}
+              className="input w-20 text-xs py-1 text-center"
+              type="number"
+              min={1}
+              max={999}
+              inputMode="numeric"
+              value={capacityDraft}
+              onChange={event => setCapacityDraft(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === "Enter") { event.preventDefault(); void saveCapacity(); }
+                if (event.key === "Escape") closeEditing();
+              }}
+            />
+            <button type="button" className="btn-secondary px-2 py-1 text-xs" onClick={() => void saveCapacity()}>변경</button>
+            <span className="ml-auto text-[11px] text-slate-400">현재 {occupancy}명</span>
+          </div>
+          <div className="relative">
+            <input
+              className="input text-xs py-1.5 pr-8"
+              autoFocus
+              aria-label={`${roomLabel(room)} 배정할 이름 검색`}
+              placeholder="학생·교사 이름 입력"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") { e.preventDefault(); selectFirstResult(); }
+                if (e.key === "Escape") closeEditing();
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 hover:text-slate-600"
+                aria-label="검색어 지우기"
+              >×</button>
+            )}
+            {normalizedQuery && (
+              <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
               {searchResults.length === 0 ? (
                 <p className="px-3 py-2 text-xs text-slate-400">배정 가능한 이름을 찾지 못했습니다.</p>
               ) : searchResults.map(result => {
@@ -1198,8 +1255,9 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
                   </button>
                 );
               })}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1233,7 +1291,7 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
             </div>
           );
         })}
-        {count === 0 && teachers.length === 0 && (
+        {occupancy === 0 && (
           <p className="text-xs text-slate-300 py-1">드래그하여 배정</p>
         )}
       </div>
