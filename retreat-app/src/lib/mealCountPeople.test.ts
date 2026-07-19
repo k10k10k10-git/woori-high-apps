@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMealPartialPeople } from "./mealCountPeople";
+import { buildMealPartialPeople, isMealIncludedForDayAttendance, retreatDateForDay } from "./mealCountPeople";
 import type { Participant, PartialAttendance, Student } from "./types";
 
 function student(over: Partial<Student> = {}): Student {
@@ -63,5 +63,25 @@ describe("식수 계산 학생 부분참 명단", () => {
     };
     const people = buildMealPartialPeople({ p1: participant }, {}, [partial("1_raw1")]);
     expect(people[0]).toMatchObject({ name: "홍길동", bu: "1부", grade: 1, classNum: 1, matched: true });
+  });
+});
+
+describe("당일참석 식사 일차 판정", () => {
+  const periods = [{ id: "p1", startDate: "2026-07-24", endDate: "2026-07-26", label: "전체" }];
+
+  it("수련회 시작일을 기준으로 1~3일차 날짜를 계산한다", () => {
+    expect(retreatDateForDay(periods, 1)).toBe("2026-07-24");
+    expect(retreatDateForDay(periods, 2)).toBe("2026-07-25");
+    expect(retreatDateForDay(periods, 3)).toBe("2026-07-26");
+  });
+
+  it("2일차 당일참석은 2일차 끼니에만 포함한다", () => {
+    expect(isMealIncludedForDayAttendance({ id: "d1", date: "2026-07-24", name: "저녁" }, periods, 2)).toBe(false);
+    expect(isMealIncludedForDayAttendance({ id: "d2", date: "2026-07-25", name: "점심" }, periods, 2)).toBe(true);
+    expect(isMealIncludedForDayAttendance({ id: "d3", date: "2026-07-26", name: "아침" }, periods, 2)).toBe(false);
+  });
+
+  it("기간이 없으면 잘못 차감하지 않는다", () => {
+    expect(isMealIncludedForDayAttendance({ id: "meal", date: "2026-07-24", name: "저녁" }, [], 1)).toBe(true);
   });
 });

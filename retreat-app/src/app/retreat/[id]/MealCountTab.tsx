@@ -10,7 +10,7 @@ import {
 } from "@/lib/db";
 import { toYMD } from "@/lib/dateFormat";
 import { useUI } from "@/context/UIContext";
-import { buildMealPartialPeople } from "@/lib/mealCountPeople";
+import { buildMealPartialPeople, isMealIncludedForDayAttendance, retreatDateForDay } from "@/lib/mealCountPeople";
 
 // DB에서 끌어온 후발/선복귀 대상자 한 명 (교사 부분참 · 스탭 후발대/부분참 · 학생 부분참)
 interface DbPerson {
@@ -21,6 +21,7 @@ interface DbPerson {
   affiliation: string;  // 반/직함 표시용
   detail: string;       // 일정 텍스트 (arrivalInfo / lateArrival / 부분참 note)
   defaultKind: "후발" | "선복귀";
+  dayAttendance?: 1 | 2 | 3; // 당일참석은 개인별 첫/마지막 식사 대신 해당 일차만 자동 포함
 }
 
 interface Props { retreat: Retreat; }
@@ -238,9 +239,6 @@ export default function MealCountTab({ retreat }: Props) {
     });
     // 학생 — 부분 참석 탭과 동일하게 participants → classes 원장 순으로 보완
     buildMealPartialPeople(dbParticipants, dbStudents, dbPartials).forEach(p => {
-      // 당일참석: 해당 일차 식사만 포함 — 1일차 당일은 이후 식사 차감(선복귀 취급),
-      // 2일차 이후 당일은 이전 식사 차감(후발 취급)으로 기본 분류하고, detail에 일차를 명시해
-      // 담당자가 끼니별 차감을 확정할 때 참고하게 한다.
       const dayOnly = p.type === "당일참석";
       out.push({
         key: `s_${p.id}`,
@@ -249,6 +247,7 @@ export default function MealCountTab({ retreat }: Props) {
         affiliation: p.matched ? `${p.grade}학년 ${p.classNum}반` : "",
         detail: dayOnly ? `당일참석 ${p.day ?? "?"}일차${p.note ? ` · ${p.note}` : ""}` : p.note,
         defaultKind: p.type === "선복귀" || (dayOnly && p.day === 1) ? "선복귀" : "후발",
+        dayAttendance: dayOnly ? p.day : undefined,
       });
     });
     // 역할(교사·스탭 → 학생) → 부(1부→2부→스탭) → 이름순 정렬 — 교사/스탭과 학생이 섞여 헷갈리지 않도록 역할을 우선 그룹화
@@ -291,14 +290,20 @@ export default function MealCountTab({ retreat }: Props) {
     // DB 명단 개인별 지정 (현재 명단에 있는 사람만 반영 — 삭제된 대상의 잔여 지정은 무시)
     dbPersons.forEach(p => {
       const a = personAssignments[p.key];
-      if (!a || a.skip || !a.mealId) return;
+      // 당일참석은 별도 저장 설정 없이 지정 일차의 모든 식사에만 자동 포함한다.
+      if (p.dayAttendance) {
+        if (!isMealIncludedForDayAttendance(meal, periods, p.dayAttendance)) counts[p.role] -= 1;
+        return;
+      }
+      if (a?.skip) return;
+      if (!a?.mealId) return;
       const refIdx = mealIndexById.get(a.mealId);
       if (refIdx === undefined) return;
       const excluded = a.kind === "후발" ? idx < refIdx : idx > refIdx;
       if (excluded) counts[p.role] -= 1;
     });
     return { meal, counts, total: sumCounts(counts) };
-  }), [meals, base, adjustments, mealIndexById, dbPersons, personAssignments]);
+  }), [meals, base, adjustments, mealIndexById, dbPersons, personAssignments, periods]);
 
   const orphanAdjustments = adjustments.filter(a => !mealIndexById.has(a.mealId));
   const baseTotal = sumCounts(base);
@@ -338,7 +343,7 @@ export default function MealCountTab({ retreat }: Props) {
       {/* 저장 바 */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          끼니별 식사 인원을 계산합니다 — 후발대는 <strong>첫 식사</strong>, 선복귀는 <strong>마지막 식사</strong>를 기준으로 앞뒤 끼니에서 자동 차감됩니다.
+          끼니별 식사 인원을 계산합니다 — 후발대는 <strong>첫 식사</strong>, 선복귀는 <strong>마지막 식사</strong>, 당일참석은 <strong>지정 일차의 식사만</strong> 포함됩니다.
         </p>
         <button onClick={handleSave} disabled={saving || !dirty} className="btn-primary text-xs px-4 py-2 shrink-0">
           {saving ? "저장 중…" : dirty ? "저장" : "저장됨"}
@@ -420,6 +425,7 @@ export default function MealCountTab({ retreat }: Props) {
           </h4>
           <p className="text-xs text-slate-400 mb-2">
             각 사람의 <strong>{`후발=첫 식사 / 선복귀=마지막 식사`}</strong> 끼니를 지정하면 표에서 1명씩 자동 차감됩니다.
+            당일참석 학생은 지정한 일차의 식사만 자동 포함됩니다.
             식사에 영향 없으면 &ldquo;제외&rdquo;를 체크하세요. 여기 반영한 사람은 아래 수동 그룹에 중복으로 넣지 마세요.
           </p>
           {dbListError && (
@@ -430,7 +436,10 @@ export default function MealCountTab({ retreat }: Props) {
           ) : (
             <>
               {(() => {
-                const unassigned = dbPersons.filter(p => { const a = personAssignments[p.key]; return !a?.skip && !a?.mealId; }).length;
+                const unassigned = dbPersons.filter(p => {
+                  const a = personAssignments[p.key];
+                  return !p.dayAttendance && !a?.skip && !a?.mealId;
+                }).length;
                 return unassigned > 0 && (
                   <div className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-700">
                     ⚠ 끼니 미지정 {unassigned}명은 아직 계산에 반영되지 않았습니다.
@@ -440,7 +449,8 @@ export default function MealCountTab({ retreat }: Props) {
               <div className="space-y-1">
                 {dbPersons.map((p, i) => {
                   const a = getAssignment(p);
-                  const applied = !a.skip && !!a.mealId && mealIndexById.has(a.mealId);
+                  const dayAttendanceDate = p.dayAttendance ? retreatDateForDay(periods, p.dayAttendance) : undefined;
+                  const applied = p.dayAttendance ? !!dayAttendanceDate : !a.skip && !!a.mealId && mealIndexById.has(a.mealId);
                   const prevRole = i > 0 ? dbPersons[i - 1].role : null;
                   const showDivider = p.role !== prevRole;
                   return (
@@ -462,22 +472,32 @@ export default function MealCountTab({ retreat }: Props) {
                       <span className="text-slate-400">{p.affiliation}</span>
                       {p.detail && <span className="text-slate-400">· {p.detail}</span>}
                       <div className="ml-auto flex items-center gap-1.5">
-                        <select className="input text-xs py-0.5 w-[76px]" value={a.kind} aria-label={`${p.name} 유형`}
-                          onChange={e => updateAssignment(p, { kind: e.target.value as "후발" | "선복귀" })}>
-                          <option value="후발">후발</option>
-                          <option value="선복귀">선복귀</option>
-                        </select>
-                        <select className="input text-xs py-0.5 w-[150px]" value={a.mealId ?? ""} aria-label={`${p.name} 기준 끼니`}
-                          disabled={a.skip}
-                          onChange={e => updateAssignment(p, { mealId: e.target.value || undefined })}>
-                          <option value="">{a.kind === "후발" ? "첫 식사 선택…" : "마지막 식사 선택…"}</option>
-                          {meals.map(m => <option key={m.id} value={m.id}>{fmtDate(m.date)} {m.name}</option>)}
-                        </select>
-                        <label className="flex items-center gap-1 text-slate-400 whitespace-nowrap">
-                          <input type="checkbox" checked={!!a.skip}
-                            onChange={e => updateAssignment(p, { skip: e.target.checked })} />
-                          제외
-                        </label>
+                        {p.dayAttendance ? (
+                          <span className="rounded-md border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 whitespace-nowrap">
+                            {p.dayAttendance}일차 식사만 자동 포함
+                          </span>
+                        ) : (
+                          <>
+                            <select className="input text-xs py-0.5 w-[76px]" value={a.kind} aria-label={`${p.name} 유형`}
+                              onChange={e => updateAssignment(p, { kind: e.target.value as "후발" | "선복귀" })}>
+                              <option value="후발">후발</option>
+                              <option value="선복귀">선복귀</option>
+                            </select>
+                            <select className="input text-xs py-0.5 w-[150px]" value={a.mealId ?? ""} aria-label={`${p.name} 기준 끼니`}
+                              disabled={a.skip}
+                              onChange={e => updateAssignment(p, { mealId: e.target.value || undefined })}>
+                              <option value="">{a.kind === "후발" ? "첫 식사 선택…" : "마지막 식사 선택…"}</option>
+                              {meals.map(m => <option key={m.id} value={m.id}>{fmtDate(m.date)} {m.name}</option>)}
+                            </select>
+                          </>
+                        )}
+                        {!p.dayAttendance && (
+                          <label className="flex items-center gap-1 text-slate-400 whitespace-nowrap">
+                            <input type="checkbox" checked={!!a.skip}
+                              onChange={e => updateAssignment(p, { skip: e.target.checked })} />
+                            제외
+                          </label>
+                        )}
                       </div>
                     </div>
                     </div>

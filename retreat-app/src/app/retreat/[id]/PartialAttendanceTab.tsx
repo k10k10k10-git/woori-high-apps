@@ -4,6 +4,7 @@ import { Retreat, PartialAttendance, Participant, Student } from "@/lib/types";
 import { getPartialAttendances, savePartialAttendance, deletePartialAttendance, getParticipants, getCellColors, getStudentsByYear } from "@/lib/db";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { buildPartialPool, PartialPoolRow } from "@/lib/partialPool";
+import { isDayAttendanceOn } from "@/lib/partialAttendanceType";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -140,15 +141,18 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     const 선복귀Rows = poolRows.filter(r => r.partial?.type === "선복귀");
     const 후발대Rows = poolRows.filter(r => r.partial?.type === "후발대");
     const 당일참석Rows = poolRows.filter(r => r.partial?.type === "당일참석");
+    const day1AttendanceRows = 당일참석Rows.filter(r => r.partial && isDayAttendanceOn(r.partial, 1));
+    const day3AttendanceRows = 당일참석Rows.filter(r => r.partial && isDayAttendanceOn(r.partial, 3));
     return {
       total: rows.length,
       본대: mainRows.length,
       선복귀: 선복귀Rows.length,
       후발대: 후발대Rows.length,
       당일참석: 당일참석Rows.length,
-      // 당일참석은 단체 버스를 타지 않으므로 출발/복귀 명단에서 제외
-      day1Rows: [...mainRows, ...선복귀Rows], // 후발대·당일참석은 1일차 출발에서 제외
-      day3Rows: [...mainRows, ...후발대Rows], // 선복귀·당일참석은 3일차 복귀에서 제외
+      day1Attendance: day1AttendanceRows.length,
+      day3Attendance: day3AttendanceRows.length,
+      day1Rows: [...mainRows, ...선복귀Rows, ...day1AttendanceRows],
+      day3Rows: [...mainRows, ...후발대Rows, ...day3AttendanceRows],
     };
   }, [rows, poolRows]);
 
@@ -221,16 +225,16 @@ export default function PartialAttendanceTab({ retreat }: Props) {
             <span className="text-sm font-semibold text-slate-700">1일차 출발</span>
             <span className="text-xl font-bold text-sky-700">{stats.day1Rows.length}명</span>
           </div>
-          <p className="text-xs text-slate-400">본대 {stats.본대} + 선복귀 {stats.선복귀}</p>
-          <p className="text-[11px] text-slate-400 mt-1">후발대·당일참석은 1일차 출발에서 제외</p>
+          <p className="text-xs text-slate-400">본대 {stats.본대} + 선복귀 {stats.선복귀} + 1일차 당일참석 {stats.day1Attendance}</p>
+          <p className="text-[11px] text-slate-400 mt-1">후발대·2~3일차 당일참석은 1일차 출발에서 제외</p>
         </div>
         <div className="card p-4">
           <div className="flex items-baseline justify-between mb-1">
             <span className="text-sm font-semibold text-slate-700">3일차 복귀</span>
             <span className="text-xl font-bold text-indigo-700">{stats.day3Rows.length}명</span>
           </div>
-          <p className="text-xs text-slate-400">본대 {stats.본대} + 후발대 {stats.후발대}</p>
-          <p className="text-[11px] text-slate-400 mt-1">선복귀·당일참석은 3일차 복귀에서 제외</p>
+          <p className="text-xs text-slate-400">본대 {stats.본대} + 후발대 {stats.후발대} + 3일차 당일참석 {stats.day3Attendance}</p>
+          <p className="text-[11px] text-slate-400 mt-1">선복귀·1~2일차 당일참석은 3일차 복귀에서 제외</p>
         </div>
       </div>
 
