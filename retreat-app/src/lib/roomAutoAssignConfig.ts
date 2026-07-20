@@ -40,14 +40,12 @@ function normalizeGender(value: unknown): RoomGender | null {
 function normalizeClassPins(value: unknown): RoomClassPin[] {
   if (!Array.isArray(value)) return [];
   const classKeys = new Set<string>();
-  const roomIds = new Set<string>();
   return value.slice(0, 100).flatMap(item => {
     if (!isRecord(item) || typeof item.classKey !== "string" || typeof item.roomId !== "string") return [];
     const classKey = item.classKey.trim();
     const roomId = item.roomId.trim();
-    if (!classKey || !roomId || classKeys.has(classKey) || roomIds.has(roomId)) return [];
+    if (!classKey || !roomId || classKeys.has(classKey)) return [];
     classKeys.add(classKey);
-    roomIds.add(roomId);
     return [{ classKey, roomId }];
   });
 }

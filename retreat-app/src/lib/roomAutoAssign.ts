@@ -174,7 +174,7 @@ function runTrial(input: RoomAutoAssignInput, seed: number, exploreProfiles: boo
   const hardViolations: string[] = [];
   const warnings: string[] = [];
   const classPinByClass = new Map<string, RoomClassPin>();
-  const pinClassByRoom = new Map<string, string>();
+  const pinClassesByRoom = new Map<string, string[]>();
   (input.classPins ?? []).forEach(pin => {
     if (!roomById.has(pin.roomId)) {
       hardViolations.push(`${pin.classKey}: 지정한 방을 찾을 수 없습니다.`);
@@ -184,15 +184,10 @@ function runTrial(input: RoomAutoAssignInput, seed: number, exploreProfiles: boo
       hardViolations.push(`${pin.classKey}: 기준 방이 두 개 이상 지정되었습니다.`);
       return;
     }
-    const existingClass = pinClassByRoom.get(pin.roomId);
-    if (existingClass && existingClass !== pin.classKey) {
-      hardViolations.push(`${roomById.get(pin.roomId)?.roomNumber ?? pin.roomId}: ${existingClass}와 ${pin.classKey}가 같은 방을 지정했습니다.`);
-      return;
-    }
     classPinByClass.set(pin.classKey, pin);
-    pinClassByRoom.set(pin.roomId, pin.classKey);
+    pinClassesByRoom.set(pin.roomId, [...(pinClassesByRoom.get(pin.roomId) ?? []), pin.classKey]);
   });
-  const pinnedRoomIds = new Set(pinClassByRoom.keys());
+  const pinnedRoomIds = new Set(pinClassesByRoom.keys());
 
   const roomOccupancy = (room: Room) => (room.studentIds?.length ?? 0) + (room.teachers?.length ?? 0);
   const assignAdult = (room: Room, adult: RoomAutoAdult) => {
@@ -249,7 +244,50 @@ function runTrial(input: RoomAutoAssignInput, seed: number, exploreProfiles: boo
     studentClasses.set(key, [...(studentClasses.get(key) ?? []), student]);
   });
 
-  const classEntries = shuffled([...studentClasses.entries()], random)
+  // 같은 방을 여러 반에 고정한 경우는 작은 반 합방 의도로 보고, 해당 방을 먼저 공동 배정한다.
+  // 합방은 한 방 안에 학생과 각 반 담당 교사가 모두 들어가야 하므로 정원 초과 시 임의로
+  // 다른 방으로 흩뜨리지 않고 명시적 오류로 돌려 사용자가 방/반 조합을 다시 고르게 한다.
+  const sharedPinnedClassKeys = new Set<string>();
+  pinClassesByRoom.forEach((classKeys, roomId) => {
+    if (classKeys.length < 2) return;
+    classKeys.forEach(classKey => sharedPinnedClassKeys.add(classKey));
+    const pinnedRoom = roomById.get(roomId);
+    if (!pinnedRoom) return;
+
+    const missingClasses = classKeys.filter(classKey => !(studentClasses.get(classKey)?.length));
+    if (missingClasses.length > 0) {
+      hardViolations.push(`${pinnedRoom.roomNumber}: ${missingClasses.join(", ")}에 숙박 대상 학생이 없어 합방할 수 없습니다.`);
+      return;
+    }
+    const sharedStudents = classKeys.flatMap(classKey => studentClasses.get(classKey) ?? []);
+    const genders = new Set(sharedStudents.map(student => student.gender));
+    if (genders.size !== 1 || !genders.has(pinnedRoom.type as RoomGender)) {
+      hardViolations.push(`${pinnedRoom.roomNumber}: 같은 성별 반만 ${pinnedRoom.type}자 방에 합방할 수 있습니다.`);
+      return;
+    }
+    const sharedTeachers = classKeys.flatMap(classKey => classTeachers.get(classKey) ?? [])
+      .filter(teacher => !assignedAdultIds.has(teacher.id));
+    const mismatchedTeachers = sharedTeachers.filter(teacher => teacher.gender !== pinnedRoom.type);
+    if (mismatchedTeachers.length > 0) {
+      hardViolations.push(`${pinnedRoom.roomNumber}: ${mismatchedTeachers.map(teacher => teacher.name).join(", ")} 교사의 성별이 합방과 맞지 않습니다.`);
+      return;
+    }
+    const total = sharedStudents.length + sharedTeachers.length;
+    if (total > pinnedRoom.capacity) {
+      hardViolations.push(`${pinnedRoom.roomNumber}: 합방 인원 ${total}명(학생 ${sharedStudents.length} + 반교사 ${sharedTeachers.length})이 정원 ${pinnedRoom.capacity}명을 초과합니다.`);
+      return;
+    }
+
+    unusedRoomIds.delete(pinnedRoom.id);
+    sharedTeachers.forEach(teacher => assignAdult(pinnedRoom, teacher));
+    shuffled(sharedStudents, random).forEach(student => {
+      pinnedRoom.studentIds.push(student.id);
+      assignedStudentIds.add(student.id);
+    });
+    warnings.push(`${pinnedRoom.roomNumber}: ${classKeys.join(" + ")} 합방 고정을 적용했습니다.`);
+  });
+
+  const classEntries = shuffled([...studentClasses.entries()].filter(([classKey]) => !sharedPinnedClassKeys.has(classKey)), random)
     .sort((a, b) => Number(classPinByClass.has(b[0])) - Number(classPinByClass.has(a[0]))
       || b[1].length - a[1].length || random() - 0.5);
 
@@ -408,7 +446,12 @@ function runTrial(input: RoomAutoAssignInput, seed: number, exploreProfiles: boo
       const student = input.students.find(item => item.id === id);
       return student ? `${student.bu}-${student.grade}-${student.classNum}` : "unknown";
     }));
-    if (classKeys.size > 1) hardViolations.push(`${room.roomNumber}: 서로 다른 반 학생이 섞였습니다.`);
+    if (classKeys.size > 1) {
+      const explicitlySharedClasses = new Set(pinClassesByRoom.get(room.id) ?? []);
+      const isPinnedSharedRoom = explicitlySharedClasses.size > 1
+        && [...classKeys].every(classKey => explicitlySharedClasses.has(classKey));
+      if (!isPinnedSharedRoom) hardViolations.push(`${room.roomNumber}: 합방 고정 없이 서로 다른 반 학생이 섞였습니다.`);
+    }
     room.studentIds.forEach(id => {
       const student = input.students.find(item => item.id === id);
       if (student && student.gender !== room.type) hardViolations.push(`${room.roomNumber}: ${student.name}의 성별과 방 성별이 다릅니다.`);

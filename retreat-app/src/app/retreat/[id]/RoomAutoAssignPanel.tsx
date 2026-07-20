@@ -61,7 +61,10 @@ export default function RoomAutoAssignPanel({
     && (missingAudio === 0 || settings.audioGender !== null)
     && (missingMedical === 0 || settings.medicalGender !== null);
   const pinnedClassKeys = new Set(settings.classPins.map(pin => pin.classKey));
-  const pinnedRoomIds = new Set(settings.classPins.map(pin => pin.roomId));
+  const pinCountByRoom = settings.classPins.reduce((counts, pin) => {
+    counts.set(pin.roomId, (counts.get(pin.roomId) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
   const classByKey = new Map(classes.map(item => [item.classKey, item]));
   const roomById = new Map(rooms.map(room => [room.id, room]));
   const targetAdultCount = adultCount - (settings.includeStaff ? 0 : staffCount);
@@ -108,7 +111,7 @@ export default function RoomAutoAssignPanel({
   }
 
   function addClassPin() {
-    if (!selectedClassKey || !selectedRoomId || pinnedClassKeys.has(selectedClassKey) || pinnedRoomIds.has(selectedRoomId)) return;
+    if (!selectedClassKey || !selectedRoomId || pinnedClassKeys.has(selectedClassKey)) return;
     setSettings(prev => ({ ...prev, classPins: [...prev.classPins, { classKey: selectedClassKey, roomId: selectedRoomId }] }));
     setSelectedClassKey("");
     setSelectedRoomId("");
@@ -212,8 +215,10 @@ export default function RoomAutoAssignPanel({
                 <select className="input text-sm mt-1" value={selectedRoomId}
                   onChange={event => setSelectedRoomId(event.target.value)}>
                   <option value="">방 선택</option>
-                  {sortRooms(rooms).filter(room => !pinnedRoomIds.has(room.id)).map(room => (
-                    <option key={room.id} value={room.id}>{roomLabel(room)} · {room.type} · {room.capacity}인실</option>
+                  {sortRooms(rooms).map(room => (
+                    <option key={room.id} value={room.id}>
+                      {roomLabel(room)} · {room.type} · {room.capacity}인실{pinCountByRoom.has(room.id) ? ` · 현재 ${pinCountByRoom.get(room.id)}개 반 고정` : ""}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -221,7 +226,7 @@ export default function RoomAutoAssignPanel({
                 onClick={addClassPin}>＋ 고정</button>
             </div>
             <p className="mt-2 text-[11px] text-slate-500">
-              선택한 방을 해당 반의 기준 방으로 반드시 사용합니다. 정원을 넘으면 같은 건물·같은 정원의 방을 추가합니다. 고정 후 위의 설정 저장을 눌러주세요.
+              선택한 방을 해당 반의 기준 방으로 반드시 사용합니다. 같은 방을 여러 반에 지정하면 동일 성별이며 학생+반교사 합계가 정원 안에 드는 반끼리 합방합니다. 한 반만 지정한 방은 정원을 넘으면 같은 건물·같은 정원의 방을 추가합니다. 고정 후 위의 설정 저장을 눌러주세요.
             </p>
             {settings.classPins.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">

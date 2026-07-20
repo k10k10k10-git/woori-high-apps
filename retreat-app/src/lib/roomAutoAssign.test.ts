@@ -191,16 +191,18 @@ describe("room auto assignment", () => {
     expect(new Set(usedClassRooms.map(item => `${item.dong}|${item.capacity}`))).toEqual(new Set(["본관|3"]));
   });
 
-  it("blocks gender-conflicting and duplicate room pins", () => {
+  it("blocks a gender-conflicting room pin", () => {
     const genderConflict = autoAssignRooms({
       rooms: [room("M1", 3, "남"), room("F1", 3, "여")],
       students: students(2), adults: [],
       classPins: [{ classKey: "1부-1-1", roomId: "F1" }], simulations: 30,
     });
     expect(genderConflict.hardViolations.some(message => message.includes("여자 방"))).toBe(true);
+  });
 
-    const duplicate = autoAssignRooms({
-      rooms: [room("M1", 3, "남"), room("M2", 3, "남")],
+  it("combines two small same-gender classes in one explicitly shared room", () => {
+    const shared = autoAssignRooms({
+      rooms: [room("M1", 6, "남"), room("M2", 3, "남")],
       students: [...students(2, 1), ...students(2, 2)], adults: [],
       classPins: [
         { classKey: "1부-1-1", roomId: "M1" },
@@ -208,7 +210,42 @@ describe("room auto assignment", () => {
       ],
       simulations: 30,
     });
-    expect(duplicate.hardViolations.some(message => message.includes("같은 방을 지정"))).toBe(true);
+    expect(shared.hardViolations).toEqual([]);
+    expect(shared.usedRoomCount).toBe(1);
+    expect(shared.rooms.find(item => item.id === "M1")?.studentIds).toHaveLength(4);
+    expect(shared.warnings.some(message => message.includes("합방 고정"))).toBe(true);
+  });
+
+  it("keeps both class teachers with their students in a shared room", () => {
+    const shared = autoAssignRooms({
+      rooms: [room("M1", 6, "남")],
+      students: [...students(2, 1), ...students(2, 2)],
+      adults: [
+        adult("1반담임", "classTeacher", "남", "1부-1-1"),
+        adult("2반담임", "classTeacher", "남", "1부-1-2"),
+      ],
+      classPins: [
+        { classKey: "1부-1-1", roomId: "M1" },
+        { classKey: "1부-1-2", roomId: "M1" },
+      ],
+      simulations: 30,
+    });
+    expect(shared.hardViolations).toEqual([]);
+    expect(shared.rooms[0].teachers).toEqual(expect.arrayContaining(["1반담임", "2반담임"]));
+  });
+
+  it("rejects a shared room when the combined students and class teachers exceed capacity", () => {
+    const overflow = autoAssignRooms({
+      rooms: [room("M1", 4, "남")],
+      students: [...students(2, 1), ...students(2, 2)],
+      adults: [adult("1반담임", "classTeacher", "남", "1부-1-1")],
+      classPins: [
+        { classKey: "1부-1-1", roomId: "M1" },
+        { classKey: "1부-1-2", roomId: "M1" },
+      ],
+      simulations: 30,
+    });
+    expect(overflow.hardViolations.some(message => message.includes("합방 인원") && message.includes("정원 4명"))).toBe(true);
   });
 
   it("keeps ministers, audio, and medical in exclusive rooms", () => {

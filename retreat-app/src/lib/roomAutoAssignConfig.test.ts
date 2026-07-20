@@ -6,7 +6,7 @@ describe("room auto assignment config", () => {
     expect(normalizeRoomAutoAssignConfig(null)).toMatchObject(DEFAULT_ROOM_AUTO_ASSIGN_SETTINGS);
   });
 
-  it("preserves valid settings and removes duplicate or malformed pins", () => {
+  it("preserves shared-room pins and removes duplicate classes or malformed pins", () => {
     const result = normalizeRoomAutoAssignConfig({
       includeStaff: false,
       audioCount: 4.9,
@@ -30,6 +30,7 @@ describe("room auto assignment config", () => {
       medicalGender: "여",
       classPins: [
         { classKey: "1부-1-1", roomId: "room-1" },
+        { classKey: "1부-1-2", roomId: "room-1" },
         { classKey: "1부-1-3", roomId: "room-3" },
       ],
     });
