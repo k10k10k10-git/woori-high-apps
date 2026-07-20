@@ -810,6 +810,7 @@ export default function GroupsTab({ retreat }: Props) {
             participants={participants}
             teachers={allTeachers}
             students={students}
+            cellColors={cellColors}
             currentGroups={groups}
             onApply={handleAutoApply}
           />

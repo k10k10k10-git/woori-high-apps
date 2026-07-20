@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAssignmentUnits, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, improveGroupsByWholeUnitMoves, mergeAutoAssignedGroups, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
+import { buildAssignmentUnits, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, excludeCancelledParticipants, improveGroupsByWholeUnitMoves, mergeAutoAssignedGroups, runAutoAssign, scoreGroups, validateClassRelations, RuleFlags, ConflictPair, ClassUnit, LeaderEntry } from "./autoAssignUtils";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 
 // ── 헬퍼 ──────────────────────────────────────────────────────────────
@@ -12,6 +12,30 @@ function mkP(studentId: string, name: string, grade: number, cls: number, bu = "
 function mkT(name: string, grade: number, cls: number, status: TeacherAttendance["status"] = "전참"): TeacherAttendance {
   return { id: name, name, bu: "1부", classKey: `${grade}학년 ${cls}반`, status };
 }
+
+describe("자동 조편성 신청취소 필터", () => {
+  it("접두형 studentId와 raw cellColors 키를 같은 학생으로 판정해 제외한다", () => {
+    const participants = {
+      active: mkP("1_active", "참석", 1, 1),
+      cancelled: mkP("1_cancelled", "취소", 1, 1),
+    };
+
+    const filtered = excludeCancelledParticipants(participants, { cancelled: "red" });
+
+    expect(Object.keys(filtered)).toEqual(["active"]);
+  });
+
+  it("raw studentId는 부서를 사용해 접두형 cellColors 키와 대조한다", () => {
+    const participants = {
+      active: mkP("active", "참석", 1, 1, "2부"),
+      cancelled: mkP("cancelled", "취소", 1, 1, "2부"),
+    };
+
+    const filtered = excludeCancelledParticipants(participants, { "2_cancelled": "red" });
+
+    expect(Object.keys(filtered)).toEqual(["active"]);
+  });
+});
 
 function mkRules(over: Partial<RuleFlags>): RuleFlags {
   return {

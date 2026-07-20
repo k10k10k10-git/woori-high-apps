@@ -215,6 +215,27 @@ export function buildClassUnits(
   return Array.from(map.values());
 }
 
+/**
+ * 자동 조편성 입력에서 신청취소(cellColors=red) 학생을 제외한다.
+ * studentId·cellColors가 접두형("1_x") 또는 과거 raw id("x") 중 어느 형태여도 같은 학생으로 판정한다.
+ */
+export function excludeCancelledParticipants(
+  participants: Record<string, Participant>,
+  cellColors: Record<string, string>,
+): Record<string, Participant> {
+  return Object.fromEntries(Object.entries(participants).filter(([, participant]) => {
+    const studentId = participant.studentId?.trim();
+    if (!studentId) return true;
+
+    const prefixedMatch = studentId.match(/^([12])_(.+)$/);
+    const rawId = prefixedMatch?.[2] ?? studentId;
+    const buNum = prefixedMatch?.[1]
+      ?? (participant.bu?.trim().startsWith("2") ? "2" : participant.bu?.trim().startsWith("1") ? "1" : "");
+    const candidateKeys = [studentId, rawId, buNum ? `${buNum}_${rawId}` : ""].filter(Boolean);
+    return !candidateKeys.some(key => cellColors[key] === "red");
+  }));
+}
+
 /** 같은 반 유지 규칙을 끄면 배정 단위를 반에서 학생으로 쪼갠다. */
 export function buildAssignmentUnits(units: ClassUnit[], keepSameClass: boolean): ClassUnit[] {
   if (keepSameClass) return units;

@@ -6,7 +6,7 @@ import { getAutoAssignConfig, saveAutoAssignConfig } from "@/lib/db";
 import {
   AutoAssignScope, ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
   buildAffinityBundles, buildAssignmentUnits, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts,
-  ensureEvenScopedGroupCount, runAutoAssign, validateClassRelations,
+  ensureEvenScopedGroupCount, excludeCancelledParticipants, runAutoAssign, validateClassRelations,
 } from "./autoAssignUtils";
 import AutoAssignConfigPanel from "./AutoAssignConfigPanel";
 import AutoAssignPreviewModal from "./AutoAssignPreviewModal";
@@ -21,13 +21,14 @@ interface Props {
   participants: Record<string, Participant>;
   teachers: TeacherAttendance[];
   students: Record<string, { name: string; grade: number; class: number }>;
+  cellColors: Record<string, string>;
   currentGroups: Group[];
   onApply: (groups: Group[], scope: AutoAssignScope) => void;
 }
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────
 
-export default function AutoAssignPanel({ retreatId, participants, teachers, students, currentGroups, onApply }: Props) {
+export default function AutoAssignPanel({ retreatId, participants, teachers, students, cellColors, currentGroups, onApply }: Props) {
   const [scope, setScope] = useState<AutoAssignScope>("all");
   const [groupCount1bu, setGroupCount1bu] = useState(10);
   const [groupCount2bu, setGroupCount2bu] = useState(10);
@@ -148,14 +149,20 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
     };
   }, [preview, closePreview]);
 
+  // 신청취소(red)는 미리보기·조 수 계산·실제 자동편성 전체에서 제외한다.
+  const activeParticipants = useMemo(
+    () => excludeCancelledParticipants(participants, cellColors),
+    [participants, cellColors],
+  );
+
   // 반 구성 미리보기 (students DB 기준으로 반 단위 구성)
   const classUnits1 = useMemo(
-    () => buildClassUnits(participants, "1부", students, rules.inferGenderByClass),
-    [participants, students, rules.inferGenderByClass],
+    () => buildClassUnits(activeParticipants, "1부", students, rules.inferGenderByClass),
+    [activeParticipants, students, rules.inferGenderByClass],
   );
   const classUnits2 = useMemo(
-    () => buildClassUnits(participants, "2부", students, rules.inferGenderByClass),
-    [participants, students, rules.inferGenderByClass],
+    () => buildClassUnits(activeParticipants, "2부", students, rules.inferGenderByClass),
+    [activeParticipants, students, rules.inferGenderByClass],
   );
 
   // 반 결합·분리 모순 검증 — 에러가 있으면 실행 차단 (고려 관계 반영이 켜진 경우만)
@@ -281,7 +288,7 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
     setTimeout(() => {
       const groups = runAutoAssign(
         evenCounts.groupCount1bu, evenCounts.groupCount2bu, rules,
-        studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, participants, teachers, students,
+        studentConflicts, teacherConflicts, teacherStudentConflicts, classConflicts, classAffinities, activeParticipants, teachers, students,
         leaderEntries1, leaderEntries2,
         scope, preservedOtherGroupCount,
       );
