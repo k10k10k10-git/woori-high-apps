@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/lib/busStaff";
-import { roleNamesForChecklist } from "@/lib/checklistMembers";
+import { roleNamesForChecklist, studentPartialLabel, teacherChecklistMeta } from "@/lib/checklistMembers";
 import { activeStudentIdsForGender, buildStudentGenderMap, teacherNamesForBusSegment } from "@/lib/busGender";
 import { isPresentOnDay } from "@/lib/partialAttendance";
 import type { RetreatDay } from "@/lib/partialAttendance";
@@ -81,13 +81,10 @@ export default function ChecklistView({ retreatId, groups, students, participant
       .map(sid => {
         const s = students[sid];
         const partialInfo = partial[sid];
-        const dayVisitLabel = partialInfo?.type === "당일참석"
-          ? `당일참석(${partialInfo.day ?? "?"}일차)`
-          : "";
         return {
           id: `student:${sid}`,
           name: s ? s.name : "(명단 미상)",
-          meta: [s ? `${s.grade}-${s.class}` : "", dayVisitLabel].filter(Boolean).join(" · "),
+          meta: [s ? `${s.grade}-${s.class}` : "", studentPartialLabel(partialInfo)].filter(Boolean).join(" · "),
         };
       });
     const availableTeacherNames = roleNamesForGroup(g, checklistMode);
@@ -98,11 +95,11 @@ export default function ChecklistView({ retreatId, groups, students, participant
       ...teacherNames.map((name, idx) => ({
         id: `teacher:${g.id}:${idx}:${name}`,
         name,
-        meta: "교사",
+        meta: teacherChecklistMeta(teachers, name, g.bu),
       })),
       ...studentMembers,
     ].sort((a, b) => memberSortRank(a.meta) - memberSortRank(b.meta));
-  }, [students, partial, cellColors, selectedBusDay, day, roleNamesForGroup]);
+  }, [students, partial, cellColors, selectedBusDay, day, roleNamesForGroup, teachers]);
 
   const cueStaffByBus = useMemo(() => parseBusStaffFromSchedule(schedule, selectedBusDay), [schedule, selectedBusDay]);
 
