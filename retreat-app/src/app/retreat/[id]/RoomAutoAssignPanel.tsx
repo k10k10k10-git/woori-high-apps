@@ -11,7 +11,9 @@ export interface RoomClassOption {
   classKey: string;
   label: string;
   gender: RoomGender;
-  count: number;
+  studentCount: number;
+  teacherCount: number;
+  totalCount: number;
 }
 
 interface Props {
@@ -199,7 +201,9 @@ export default function RoomAutoAssignPanel({
                   onChange={event => setSelectedClassKey(event.target.value)}>
                   <option value="">반 선택</option>
                   {classes.filter(item => !pinnedClassKeys.has(item.classKey)).map(item => (
-                    <option key={item.classKey} value={item.classKey}>{item.label} · {item.gender} · {item.count}명</option>
+                    <option key={item.classKey} value={item.classKey}>
+                      {item.label} · {item.gender} · 총 {item.totalCount}명 (학생 {item.studentCount} + 반교사 {item.teacherCount})
+                    </option>
                   ))}
                 </select>
               </label>

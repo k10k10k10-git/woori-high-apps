@@ -9,7 +9,7 @@ import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
-import { autoAssignRooms, classifyRoomAdult, makeExternalAdults, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
+import { autoAssignRooms, classifyRoomAdult, makeExternalAdults, summarizeRoomAutoClasses, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
 import type { RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
 import RoomAutoAssignPanel, { type RoomClassOption } from "./RoomAutoAssignPanel";
 import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
@@ -277,19 +277,15 @@ export default function RoomsTab({ retreat }: Props) {
   const roomAutoAdults = useMemo(() => allTeachers
     .filter(teacher => teacher.status !== "불참")
     .map(classifyRoomAdult), [allTeachers]);
-  const roomAutoClasses = useMemo<RoomClassOption[]>(() => {
-    const grouped = new Map<string, RoomAutoStudent[]>();
-    roomAutoStudents.forEach(student => {
-      const classKey = `${student.bu}-${student.grade}-${student.classNum}`;
-      grouped.set(classKey, [...(grouped.get(classKey) ?? []), student]);
-    });
-    return [...grouped.entries()].map(([classKey, members]) => ({
-      classKey,
-      label: `${members[0].bu} ${members[0].grade}학년 ${members[0].classNum}반`,
-      gender: members[0].gender,
-      count: members.length,
-    })).sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true }));
-  }, [roomAutoStudents]);
+  const roomAutoClasses = useMemo<RoomClassOption[]>(() =>
+    summarizeRoomAutoClasses(roomAutoStudents, roomAutoAdults).map(summary => {
+      const [bu, grade, classNum] = summary.classKey.split("-");
+      return {
+        ...summary,
+        label: `${bu} ${Number(grade)}학년 ${Number(classNum)}반`,
+      };
+    }).sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true })),
+  [roomAutoStudents, roomAutoAdults]);
   const detectedAudioCount = roomAutoAdults.filter(adult => adult.category === "audio").length;
   const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
   const detectedStaffCount = roomAutoAdults.filter(adult => adult.category === "staff").length;

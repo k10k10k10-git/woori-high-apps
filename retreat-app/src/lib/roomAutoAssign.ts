@@ -27,6 +27,14 @@ export interface RoomAutoAdult {
   classKey?: string;
 }
 
+export interface RoomAutoClassSummary {
+  classKey: string;
+  gender: RoomGender;
+  studentCount: number;
+  teacherCount: number;
+  totalCount: number;
+}
+
 export interface RoomClassPin {
   classKey: string;
   roomId: string;
@@ -99,6 +107,33 @@ export function makeExternalAdults(
     gender,
     category,
   }));
+}
+
+/** 실제 방배정 대상 학생과 반 담당 교사를 합친 반별 숙박 인원 요약. */
+export function summarizeRoomAutoClasses(
+  students: RoomAutoStudent[],
+  adults: RoomAutoAdult[],
+): RoomAutoClassSummary[] {
+  const studentsByClass = new Map<string, RoomAutoStudent[]>();
+  students.forEach(student => {
+    const classKey = `${student.bu}-${student.grade}-${student.classNum}`;
+    studentsByClass.set(classKey, [...(studentsByClass.get(classKey) ?? []), student]);
+  });
+  const teacherCountByClass = new Map<string, number>();
+  adults.forEach(adult => {
+    if (adult.category !== "classTeacher" || !adult.classKey) return;
+    teacherCountByClass.set(adult.classKey, (teacherCountByClass.get(adult.classKey) ?? 0) + 1);
+  });
+  return [...studentsByClass.entries()].map(([classKey, members]) => {
+    const teacherCount = teacherCountByClass.get(classKey) ?? 0;
+    return {
+      classKey,
+      gender: members[0].gender,
+      studentCount: members.length,
+      teacherCount,
+      totalCount: members.length + teacherCount,
+    };
+  });
 }
 
 function mulberry32(seed: number) {

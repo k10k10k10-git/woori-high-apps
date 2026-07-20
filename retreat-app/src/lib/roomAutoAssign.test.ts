@@ -4,6 +4,7 @@ import {
   autoAssignRooms,
   classifyRoomAdult,
   makeExternalAdults,
+  summarizeRoomAutoClasses,
   type RoomAutoAdult,
   type RoomAutoStudent,
 } from "./roomAutoAssign";
@@ -28,6 +29,26 @@ function adult(id: string, category: RoomAutoAdult["category"], gender: "남" | 
 }
 
 describe("room auto assignment", () => {
+  it("summarizes each class using eligible students plus its attending class teachers", () => {
+    const summaries = summarizeRoomAutoClasses(
+      students(3),
+      [
+        adult("담임1", "classTeacher", "남", "1부-1-1"),
+        adult("담임2", "classTeacher", "남", "1부-1-1"),
+        adult("일반교사", "teacher"),
+        adult("스탭", "staff"),
+      ],
+    );
+
+    expect(summaries).toEqual([{
+      classKey: "1부-1-1",
+      gender: "남",
+      studentCount: 3,
+      teacherCount: 2,
+      totalCount: 5,
+    }]);
+  });
+
   it("runs exactly 30 simulations and keeps one class in one building/capacity profile", () => {
     const result = autoAssignRooms({
       rooms: [
