@@ -440,7 +440,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
             </div>
           )}
           <p className="mt-3 text-[11px] text-slate-400 leading-relaxed">
-            두 방식 모두 같은 시각의 블록은 <strong>기존 스탭 배정·동선을 그대로 두고 내용만 갱신</strong>합니다. 기존 배정은 덮지 않되, <strong>비어있는 칸은 시트 배정으로 채웁니다</strong>(시트에 나중에 채운 배정도 반영). 새벽 일정(예: 2일차 00:30)은 전날 24시+ 표기(1일차 24:30)로 자동 정리됩니다.
+            두 방식 모두 같은 시각의 블록 내용은 갱신합니다. <strong>사이트 내 수동 배정은 유지하고 시트 자동배정은 최신 시트 기준으로 동기화합니다.</strong> 비어있는 칸은 시트 배정으로 채웁니다(시트에 나중에 채운 배정도 반영). 새벽 일정(예: 2일차 00:30)은 전날 24시+ 표기(1일차 24:30)로 자동 정리됩니다.
           </p>
           <div className="flex justify-end gap-2 mt-2">
             <button type="button" onClick={() => importBlocks("merge")} className="btn-secondary">시트 반영 (삭제 없음)</button>
