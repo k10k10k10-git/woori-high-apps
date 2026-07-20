@@ -113,28 +113,16 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
           {mealSummaries.map((meal, mealIndex) => (
             <div
               key={meal.id}
-              className={`px-3 py-2 sm:flex sm:items-center sm:gap-4 ${mealIndex > 0 ? "border-t border-slate-100" : ""}`}
+              className={`px-3 py-2.5 sm:flex sm:items-center sm:gap-4 sm:py-2 ${mealIndex > 0 ? "border-t border-slate-100" : ""}`}
             >
-              <span className="block shrink-0 text-xs font-medium text-amber-600 sm:w-24">{meal.label}</span>
-              {/* 모바일: 가로 스와이프 대신 4열 카드로 감싸 한눈에 순서를 읽는다. */}
-              <ol className="mt-2 grid grid-cols-4 gap-1.5 sm:hidden" aria-label={`${meal.label} 조별 식사 순서`}>
-                {meal.groups.map((groupLabel, groupIndex) => (
-                  <li
-                    key={`${meal.id}-mobile-${groupLabel}`}
-                    className="flex min-h-10 items-center justify-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-2 text-center"
-                  >
-                    <span className="text-[10px] font-medium text-slate-400">{groupIndex + 1}</span>
-                    <span className="text-sm font-semibold text-slate-700">{groupLabel}</span>
-                  </li>
-                ))}
-              </ol>
-              {/* 태블릿·PC: 기존의 압축된 한 줄 흐름을 유지한다. */}
-              <div className="hidden min-w-0 overflow-x-auto sm:block">
-                <ol className="flex min-w-max items-center whitespace-nowrap text-xs text-slate-600" aria-label={`${meal.label} 조별 식사 순서`}>
+              <span className="block shrink-0 text-sm font-medium text-amber-600 sm:w-24 sm:text-xs">{meal.label}</span>
+              {/* PC와 같은 한 줄 흐름. 모바일에서만 글자·간격·행 높이를 소폭 키우고 가로로 스와이프한다. */}
+              <div className="mt-1.5 min-w-0 overflow-x-auto overscroll-x-contain pb-1 [-webkit-overflow-scrolling:touch] sm:mt-0 sm:pb-0">
+                <ol className="flex min-w-max items-center whitespace-nowrap text-sm text-slate-600 sm:text-xs" aria-label={`${meal.label} 조별 식사 순서`}>
                   {meal.groups.map((groupLabel, groupIndex) => (
-                    <li key={`${meal.id}-${groupLabel}`} className="flex items-center">
-                      <span className="font-medium text-slate-700">{groupLabel}</span>
-                      {groupIndex < meal.groups.length - 1 && <span className="mx-1.5 text-slate-300" aria-hidden="true">→</span>}
+                    <li key={`${meal.id}-${groupLabel}`} className="flex min-h-8 items-center sm:min-h-0">
+                      <span className="font-semibold text-slate-700 sm:font-medium">{groupLabel}</span>
+                      {groupIndex < meal.groups.length - 1 && <span className="mx-2 text-slate-300 sm:mx-1.5" aria-hidden="true">→</span>}
                     </li>
                   ))}
                 </ol>
