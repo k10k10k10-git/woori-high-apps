@@ -1,19 +1,18 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
-import { getTeachers, getTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
+import { getCancellations, getTeachers, getTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
+import {
+  excludeAbsentInsuranceTeachers,
+  excludeCancelledInsuranceStudents,
+  InsuranceStudentEntry,
+} from "@/lib/insuranceRoster";
 
-interface StudentEntry {
-  name: string;
-  bu: string;
-  grade: number;
-  cls: number;
-  idNumber: string;
-}
+type StudentEntry = InsuranceStudentEntry;
 
 interface TeacherRow extends TeacherAttendance {
   idDraft: string; // 입력 중인 값
@@ -38,13 +37,14 @@ export default function InsuranceTab({ retreat }: Props) {
     setLoading(true);
     setError("");
     try {
-      // 교사: Firebase에서 전체 불러오기 + 주민번호는 분리된 private 노드에서
-      const [teachers, idMap] = await Promise.all([
+      // 교사 참석·취소 상태와 분리된 private 주민번호를 함께 대조한다.
+      const [teachers, idMap, cancellations] = await Promise.all([
         getTeachers(retreat.id),
         getTeacherIdNumbers(retreat.id),
+        getCancellations(retreat.id),
       ]);
       setTeacherRows(
-        teachers
+        excludeAbsentInsuranceTeachers(teachers)
           .sort((a, b) => a.bu.localeCompare(b.bu) || a.classKey.localeCompare(b.classKey, "ko"))
           .map(t => ({ ...t, idNumber: idMap[t.id] || "", idDraft: idMap[t.id] || "", saving: false }))
       );
@@ -52,7 +52,7 @@ export default function InsuranceTab({ retreat }: Props) {
       // 학생: 시트에서 주민등록번호 있는 행
       if (retreat.sheetId) {
         const result = await fetchInsuranceFromSheet(retreat.sheetId, retreat.sheetGid);
-        setStudentEntries(result.entries);
+        setStudentEntries(excludeCancelledInsuranceStudents(result.entries, cancellations));
         setIdColName(result.idCol);
       }
     } catch (e) {
@@ -160,6 +160,7 @@ export default function InsuranceTab({ retreat }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-slate-800">여행자 보험</h2>
+          <p className="text-xs text-slate-500 mt-0.5">신청취소 학생과 불참 교사·스탭은 자동으로 제외됩니다.</p>
           {idColName && <p className="text-xs text-slate-400 mt-0.5">학생 주민번호 컬럼: <span className="font-mono bg-slate-100 px-1 rounded">{idColName}</span></p>}
         </div>
         <div className="flex gap-2">
