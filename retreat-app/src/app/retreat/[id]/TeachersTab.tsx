@@ -4,6 +4,13 @@ import { Retreat, TeacherAttendance } from "@/lib/types";
 import { getTeachers, saveTeacher, updateTeacher, deleteTeacher, loadTeachersFromDB, getRetreats } from "@/lib/db";
 import { prepareTeacherUpdate } from "@/lib/teacherWrite";
 import { resolveTeacherGender } from "@/lib/teacherGender";
+import {
+  getTeacherSourceLabel,
+  getVisibleTeacherAttendanceLabel,
+  sortTeachersForTable,
+  TeacherSortDirection,
+  TeacherSortKey,
+} from "@/lib/teacherTableSort";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -24,14 +31,6 @@ const TEACHER_ATTENDANCE_OPTIONS = ["전참", "부분참", "불참"] as const;
 
 function isStaffBu(bu: string) {
   return bu === "스탭";
-}
-
-function getVisibleAttendanceLabel(teacher: Pick<TeacherAttendance, "bu" | "status" | "corps">) {
-  if (isStaffBu(teacher.bu)) {
-    if (teacher.status === "불참") return "불참";
-    return teacher.corps || "본대";
-  }
-  return teacher.status;
 }
 
 function deriveTeacherState(form: TeacherFormState): Pick<TeacherAttendance, "status" | "corps"> {
@@ -88,6 +87,7 @@ export default function TeachersTab({ retreat }: Props) {
   const [search, setSearch] = useState("");
   const [buFilter, setBuFilter] = useState("전체");
   const [statusFilter, setStatusFilter] = useState("전체");
+  const [sortState, setSortState] = useState<{ key: TeacherSortKey; direction: TeacherSortDirection } | null>(null);
   const [showImport, setShowImport] = useState(false);
   const [importList, setImportList] = useState<{ name: string; bu: string; classKey: string; originKey: string; gender?: "남" | "여"; selected: boolean }[]>([]);
   const [importing, setImporting] = useState(false);
@@ -303,12 +303,32 @@ async function handleSave() {
     }
   }
 
-  const filtered = teachers.filter(t => {
+  const matchingTeachers = teachers.filter(t => {
     if (buFilter !== "전체" && t.bu !== buFilter) return false;
     if (statusFilter !== "전체" && t.status !== statusFilter) return false;
     if (search && !t.name.includes(search) && !t.classKey.includes(search)) return false;
     return true;
   });
+  const filtered = sortState
+    ? sortTeachersForTable(matchingTeachers, sortState.key, sortState.direction)
+    : matchingTeachers;
+
+  function toggleSort(key: TeacherSortKey) {
+    setSortState(current => current?.key === key
+      ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+      : { key, direction: "asc" });
+  }
+
+  const sortableHeaders: { key: TeacherSortKey; label: string }[] = [
+    { key: "name", label: "이름" },
+    { key: "source", label: "출처" },
+    { key: "bu", label: "부" },
+    { key: "gender", label: "성별" },
+    { key: "classKey", label: "담당반" },
+    { key: "attendance", label: "참석" },
+    { key: "schedule", label: "이동/일정" },
+    { key: "note", label: "비고" },
+  ];
 
   const stats = teachers.reduce(
     (acc, t) => { acc[t.status as keyof typeof acc]++; acc.total++; return acc; },
@@ -584,14 +604,28 @@ async function handleSave() {
           <table className="w-full text-xs sm:text-sm min-w-[600px] sm:min-w-0">
             <thead>
               <tr className="table-header">
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">이름</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">출처</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">부</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">성별</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">담당반</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">참석</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">이동/일정</th>
-                <th className="px-2 sm:px-4 py-2 sm:py-2.5 text-left">비고</th>
+                {sortableHeaders.map(({ key, label }) => {
+                  const active = sortState?.key === key;
+                  return (
+                    <th
+                      key={key}
+                      className="px-2 sm:px-4 py-2 sm:py-2.5 text-left whitespace-nowrap"
+                      aria-sort={active ? (sortState.direction === "asc" ? "ascending" : "descending") : "none"}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(key)}
+                        className="inline-flex items-center gap-1 select-none hover:text-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
+                        title={`${label} ${active && sortState.direction === "asc" ? "내림차순" : "오름차순"} 정렬`}
+                      >
+                        <span>{label}</span>
+                        <span className={active ? "text-blue-600" : "text-slate-300"} aria-hidden="true">
+                          {active ? (sortState.direction === "asc" ? "▲" : "▼") : "↕"}
+                        </span>
+                      </button>
+                    </th>
+                  );
+                })}
                 <th className="px-2 sm:px-4 py-2 sm:py-2.5"></th>
               </tr>
             </thead>
@@ -605,9 +639,7 @@ async function handleSave() {
                       t.source === "manual-assistant" ? "tag-purple" :
                       "tag-yellow"
                     }`}>
-                      {t.source === "attendance-db" ? "출석부" :
-                        t.source === "manual-assistant" ? "보조스탭" :
-                        "수동"}
+                      {getTeacherSourceLabel(t)}
                     </span>
                   </td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
@@ -616,8 +648,8 @@ async function handleSave() {
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600">{resolveTeacherGender(t) || "—"}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600 whitespace-nowrap">{t.classKey || "—"}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
-                    <span className={`tag ${STATUS_COLORS[getVisibleAttendanceLabel(t)]}`}>
-                      {getVisibleAttendanceLabel(t)}
+                    <span className={`tag ${STATUS_COLORS[getVisibleTeacherAttendanceLabel(t)]}`}>
+                      {getVisibleTeacherAttendanceLabel(t)}
                     </span>
                   </td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-500 text-xs whitespace-nowrap">
@@ -649,7 +681,7 @@ async function handleSave() {
                 <span className={`tag ${t.bu === "1부" ? "tag-green" : t.bu === "2부" ? "tag-purple" : "tag-blue"} text-[10px]`}>{t.bu}</span>
                 <span className="font-medium text-slate-700">{t.name}</span>
                 <span className="text-slate-500">{t.classKey}</span>
-                <span className={`tag ${STATUS_COLORS[getVisibleAttendanceLabel(t)]}`}>{getVisibleAttendanceLabel(t)}</span>
+                <span className={`tag ${STATUS_COLORS[getVisibleTeacherAttendanceLabel(t)]}`}>{getVisibleTeacherAttendanceLabel(t)}</span>
                 {t.arrivalInfo && <span className="text-slate-400 text-xs">· {t.arrivalInfo}</span>}
                 {t.lateArrival && <span className="text-slate-400 text-xs">· 입소 {t.lateArrival}</span>}
               </div>
