@@ -13,6 +13,7 @@ import {
 import CenterSpinner from "@/components/CenterSpinner";
 import ChecklistView from "./ChecklistView";
 import RoomsView from "./RoomsView";
+import LodgingMapView from "./LodgingMapView";
 import MealsView from "./MealsView";
 import StaffView from "./StaffView";
 import ScheduleView from "./ScheduleView";
@@ -32,6 +33,7 @@ const GROUPS = [
     { key: "cue", label: "개인 큐카드", icon: "📋" },
     { key: "board", label: "포스트 현황", icon: "📍" },
     { key: "rooms", label: "조별 정보", icon: "👥" },
+    { key: "lodgingmap", label: "숙소 배정도", icon: "🗺️" },
     { key: "check", label: "인원체크", icon: "✅" },
   ] },
   { label: "기획", hint: "PC", views: [
@@ -300,6 +302,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
         {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} participants={participants} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} cellColors={cellColors} schedule={schedule} />}
         {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} staff={staffForViews} groupStaff={groupStaff} students={students} partial={partial} cellColors={cellColors} retreatName={retreat.name} year={retreat.year} />}
+        {!dataLoading && view === "lodgingmap" && <LodgingMapView rooms={rooms} students={students} partial={partial} cellColors={cellColors} />}
         {!dataLoading && view === "cue" && <CueCardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
         {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
@@ -319,7 +322,7 @@ function IguardWorkspace({ id }: { id: string }) {
       {/* 하단 탭바는 실행 뷰에서만 — 기획·정보 화면에서는 숨겨 세로 공간 확보 + 오탐 이동 방지 (2026-07-12) */}
       {executionViews.some(v => v.key === view) && (
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden" aria-label="실행 뷰 탐색">
-          <div className="mx-auto grid max-w-md grid-cols-4 gap-1" role="tablist">
+          <div className="mx-auto grid max-w-md grid-cols-5 gap-1" role="tablist">
             {executionViews.map(v => {
               const active = view === v.key;
               return (

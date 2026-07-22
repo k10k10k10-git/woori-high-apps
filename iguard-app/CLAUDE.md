@@ -35,9 +35,10 @@ src/
 │   ├── providers.tsx               # InAppBrowserGuard → AuthProvider → UIProvider 래핑
 │   └── retreat/[id]/
 │       ├── page.tsx                # 서버 컴포넌트 entry → IguardClient
-│       ├── IguardClient.tsx        # 탭 라우터 (실행/기획/정보 3그룹, 16개 뷰)
+│       ├── IguardClient.tsx        # 탭 라우터 (실행/기획/정보 3그룹, 17개 뷰)
 │       ├── ChecklistView.tsx       # 인원체크 (조별 학생+교사 체크, 버스별 체크)
 │       ├── RoomsView.tsx           # 조별 정보 (방배정·학생·교사·이가드 조스탭 조회)
+│       ├── LodgingMapView.tsx      # 숙소 배정도 (PDF 도면 위 방별 반·학생·교사 실시간 표시)
 │       ├── ExecutionViews.tsx      # 개인 큐카드 + 포스트 보드 (현장 모바일용)
 │       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트, src/lib/cueSheet.ts의 parseCueSheetText 사용)
 │       ├── LeaderCueManageView.tsx # 조장 큐싯 관리
@@ -65,6 +66,7 @@ src/
     ├── firebase.ts                 # Firebase 초기화 (db, auth, googleProvider)
     ├── snapToList.ts               # DataSnapshot → T[] 변환 헬퍼 (null/배열/원시값 안전 처리)
     ├── compat.ts                   # 행정 데이터 형태 계약 런타임 점검 (classKey, studentId, bu 검증)
+    ├── lodgingMap.ts               # 숙소 도면 좌표·건물/호실 매칭·방별 반 요약
     ├── fairAssign.ts               # 공정 배분 알고리즘 (식사 순서 + 집회 자리 통합 누적 점수)
     ├── groupNumber.ts              # 조 전역 번호 표시 (2부는 1부 조 수만큼 오프셋)
     ├── groupStaffNames.ts          # 행정 group.staff + 이가드 groupStaff ID를 이름으로 중복 없이 병합
@@ -390,6 +392,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `busGender.test.ts` | 버스 성별 배정 | raw/unique 학생키, 조+성별 묶음, 교사 명시 성별·미확인 차단, 구버전 세그먼트, 단일 성별 호차·정원 불변식 |
 | `checklistMembers.test.ts` | 인원체크 교사 명단 | 조별은 자차 포함, 호차별은 자차 제외 |
 | `checklistLayout.test.ts` | 인원체크 레이아웃 | 호차별 모바일 2열·조별 인쇄 페이지당 4개 조 및 체크 저장 회귀 방지 |
+| `lodgingMap.test.ts` | 숙소 배정도 | 건물·호실 매칭, HRD 정원 보조 매칭, 취소·당일참석 제외, 미매칭 안전 처리 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 
 ---
@@ -403,6 +406,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 - **뷰포트 고정**: 모바일 현장 사용 기준, `maximumScale: 1`
 - **호차별 인원체크**: 모바일에서도 호차 카드는 2열로 배치하고 이름·소속은 카드 폭 안에서 줄바꿈한다. 조별 인원체크는 기존 모바일 1열을 유지한다.
 - **조별 인원체크 인쇄**: A4 세로 인쇄 가능 높이(276mm)를 2열×2행으로 꽉 채워 4개 조씩 출력한다. 각 조 표는 셀 높이를 가용 영역에 맞춰 늘리며, 호차별 인쇄는 기존 단일 열 형식을 유지한다.
+- **숙소 배정도**: 첨부 PDF를 최적화한 정적 WebP 도면 위에 행정 소유 `rooms`를 읽기 전용으로 연결한다. `dong + roomNumber`를 우선하고, 포괄적인 HRD 건물명일 때만 2·3인실 정원을 보조키로 사용한다. 도면에 없는 호실은 추정 배치하지 않고 미매칭 경고로 표시한다.
 
 ---
 
@@ -413,6 +417,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | **실행** (현장·모바일) | `cue` | 개인 큐카드 | 전체 |
 | | `board` | 포스트 현황 | 전체 |
 | | `rooms` | 조별 정보 | 전체 |
+| | `lodgingmap` | 숙소 배정도 | 전체 |
 | | `check` | 인원체크 | 전체 |
 | **기획** (PC) | `schedule` | 스탭 전체 큐싯 | team/admin |
 | | `leadercue` | 조장 큐싯 | team/admin |

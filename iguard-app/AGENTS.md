@@ -60,6 +60,12 @@ Do not write to admin-owned retreat data. Keep the read/write separation in `src
 
 `staff` users see execution views only. `team` and `admin` can access planning and info views.
 
+### 정적 숙소 도면에 실시간 방배정 겹쳐 보기 (2026-07-22)
+
+- **접근법**: 1→ 제공된 PDF를 페이지별 고해상도 WebP로 변환해 `public/room-maps/`에 둔다. 2→ `src/lib/lodgingMap.ts`에 건물·층·호실별 정규화 키와 상대 좌표 핫스팟을 선언한다. 3→ 행정 소유 `rooms`를 읽기 전용으로 받아 취소 학생과 숙박하지 않는 당일참석을 제외하고 반·학생·교사 요약을 만든다. 4→ `LodgingMapView.tsx`에서 원본 비율을 유지한 이미지 위에 퍼센트 좌표 버튼을 겹치고, 모바일은 가로 스크롤과 상세 패널을 제공한다. 5→ 정확한 건물명+호실을 우선하고 HRD의 일반 건물명만 정원(3인실=핵심관, 2인실=인재관)으로 보강하며, 추론할 수 없는 방은 경고 목록에 남긴다.
+- **판단 질문**: PDF를 브라우저에서 직접 렌더링하거나 DB에 도면 좌표를 저장하지 않는다. 전자는 모바일 PDF 호환성과 오버레이 정렬이 불안정하고, 후자는 정적 UI 메타데이터 때문에 공유 DB 스키마를 늘린다. 이름이 비슷한 별관이나 VIP 방을 임의의 건물로 매핑하지도 않는다. 잘못된 위치를 보여주는 것보다 미매칭 경고가 안전하다.
+- **재사용 규칙**: 정적 평면도 오버레이는 최적화 이미지+상대 좌표로 구현하고, 운영 데이터 매칭은 정확한 키 우선·제한된 폴백·미매칭 공개의 세 단계로 구성한다.
+
 ### 행정 참석정보를 버스 인원에 반영하기 (2026-07-17)
 
 - **접근법**: 1→ 운영 `teachers`와 `partialAttendances`를 읽기 전용으로 좁게 대조해 교사 자차는 `transport`, 구버전 학생 당일참여는 `note`, 정식 당일참석은 `type+day`에 저장됨을 확인한다. 2→ `subscribeToPartialAttendances()`가 객체형 `PartialAttendanceMap`으로 `type/day/note`를 보존한다. 3→ 현장 참석은 `isPresentOnDay()`, 버스 탑승은 `isStudentBusPassengerOnDay()`로 분리한다. 4→ 정식 당일참석은 지정한 1·3일차 버스에 포함하고, 일차를 확정할 수 없는 구버전 note만 제외한다. 5→ 화면과 인쇄가 공유하는 `ChecklistView.membersForGroup()` 앞단에서 취소 학생·불참 교사를 제거하고 `studentPartialLabel()`·`teacherChecklistMeta()`로 부분참 표기를 만든다. 6→ 혼합 조·성별 묶음·조별·호차별 체크가 같은 판정을 쓰는지 회귀 테스트로 고정한다.
