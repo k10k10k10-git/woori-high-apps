@@ -38,6 +38,22 @@ describe("숙소 배정도 매칭", () => {
     expect(location?.hotspot.roomNumber).toBe("215");
   });
 
+  it("별관 숙소의 6개 호실을 4구역 간이 배치도에 모두 연결한다", () => {
+    const roomNumbers = ["101", "102", "103", "201", "202", "203"];
+    const locations = roomNumbers.map(roomNumber => findRoomMapLocation(room({ dong: "별관 숙소(VIP)", roomNumber })));
+
+    expect(locations.every(location => location?.building.id === "annex")).toBe(true);
+    expect(locations.every(location => location?.page.id === "annex-all")).toBe(true);
+    expect(locations[0]?.page.image).toBeUndefined();
+    expect(locations[0]?.page.schematicZones).toHaveLength(4);
+    expect(new Set(locations.map(location => location?.hotspot.roomNumber))).toEqual(new Set(roomNumbers));
+  });
+
+  it("별관·VIP 축약 건물명도 별관 간이 배치도로 인식한다", () => {
+    expect(findRoomMapLocation(room({ dong: "별관", roomNumber: "101" }))?.building.id).toBe("annex");
+    expect(findRoomMapLocation(room({ dong: "VIP", roomNumber: "203호" }))?.building.id).toBe("annex");
+  });
+
   it("본관 2층의 홀수 호실과 우측 호실을 실제 도면 방 중앙에 배치한다", () => {
     expect(findRoomMapLocation(room({ roomNumber: "211" }))?.hotspot.top).toBeCloseTo(61.2, 1);
     expect(findRoomMapLocation(room({ roomNumber: "217" }))?.hotspot.top).toBeCloseTo(61.2, 1);

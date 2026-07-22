@@ -11,8 +11,16 @@ export interface RoomHotspot {
 export interface LodgingMapPage {
   id: string;
   floorLabel: string;
-  image: string;
+  image?: string;
   minWidth: number;
+  schematicHeight?: number;
+  schematicZones?: Array<{
+    label: string;
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  }>;
   hotspots: RoomHotspot[];
 }
 
@@ -74,6 +82,31 @@ function talentFloor(floor: number, top: number, bottom: number): RoomHotspot[] 
 }
 
 export const LODGING_MAP_BUILDINGS: LodgingMapBuilding[] = [
+  {
+    id: "annex",
+    label: "별관 숙소(VIP)",
+    aliases: ["별관 숙소(VIP)", "별관숙소VIP", "별관 숙소", "별관숙소", "별관", "VIP"],
+    pages: [{
+      id: "annex-all",
+      floorLabel: "1·2층",
+      minWidth: 640,
+      schematicHeight: 360,
+      schematicZones: [
+        { label: "1층 A", left: 3, top: 7, width: 46, height: 39 },
+        { label: "1층 B", left: 51, top: 7, width: 46, height: 39 },
+        { label: "2층 A", left: 3, top: 54, width: 46, height: 39 },
+        { label: "2층 B", left: 51, top: 54, width: 46, height: 39 },
+      ],
+      hotspots: [
+        { roomNumber: "101", left: 16, top: 27 },
+        { roomNumber: "102", left: 36, top: 27 },
+        { roomNumber: "103", left: 74, top: 27 },
+        { roomNumber: "201", left: 16, top: 74 },
+        { roomNumber: "202", left: 36, top: 74 },
+        { roomNumber: "203", left: 74, top: 74 },
+      ],
+    }],
+  },
   {
     id: "main",
     label: "본관 숙소동",

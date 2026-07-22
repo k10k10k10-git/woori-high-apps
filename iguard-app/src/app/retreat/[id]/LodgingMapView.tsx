@@ -190,7 +190,27 @@ export default function LodgingMapView({ rooms, groups, students, partial, cellC
           </div>
           <div ref={mapScrollRef} className="overflow-x-auto overscroll-x-contain rounded-lg border border-slate-200 bg-slate-100 [-webkit-overflow-scrolling:touch]">
             <div className="relative" style={{ minWidth: `${page.minWidth}px` }}>
-              <img src={page.image} alt={`${building.label} ${page.floorLabel} 숙소 도면`} className="block h-auto w-full select-none" draggable={false} />
+              {page.image ? (
+                <img src={page.image} alt={`${building.label} ${page.floorLabel} 숙소 도면`} className="block h-auto w-full select-none" draggable={false} />
+              ) : (
+                <div
+                  role="img"
+                  aria-label={`${building.label} ${page.floorLabel} 간이 배치도`}
+                  className="relative w-full overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100"
+                  style={{ height: `${page.schematicHeight ?? 360}px` }}
+                >
+                  <div className="absolute left-1/2 top-1/2 h-[72%] w-px -translate-x-1/2 -translate-y-1/2 bg-slate-200" aria-hidden="true" />
+                  {page.schematicZones?.map(zone => (
+                    <div
+                      key={zone.label}
+                      className="absolute rounded-2xl border-2 border-slate-300 bg-white/80 shadow-sm"
+                      style={{ left: `${zone.left}%`, top: `${zone.top}%`, width: `${zone.width}%`, height: `${zone.height}%` }}
+                    >
+                      <span className="absolute left-3 top-2 text-xs font-bold tracking-wide text-slate-400">{zone.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {page.hotspots.map(hotspot => {
                 const summary = summaryByRoom.get(hotspot.roomNumber);
                 if (!summary) return null;
