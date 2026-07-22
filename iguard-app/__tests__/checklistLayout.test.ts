@@ -34,6 +34,9 @@ describe("호차별 인원체크 모바일 레이아웃", () => {
     expect(source).toContain("pageStart += 4");
     expect(source).toContain("units.slice(pageStart, pageStart + 4)");
     expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(source).toContain("height: 276mm");
+    expect(source).toContain("grid-template-rows: repeat(2, minmax(0, 1fr))");
+    expect(source).toContain(".group-print-card table { height: 100%");
     expect(source).toContain('mode === "조별"');
     expect(source).toContain("units.map(u => renderUnit(u, false))");
   });

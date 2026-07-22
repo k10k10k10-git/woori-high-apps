@@ -236,15 +236,15 @@ export default function ChecklistView({ retreatId, groups, students, participant
     if (mode === "조별") {
       html += `<style>
         @media print { body { padding: 0; } }
-        .group-print-page { break-after: page; page-break-after: always; }
+        .group-print-page { display: flex; flex-direction: column; height: 276mm; overflow: hidden; break-after: page; page-break-after: always; }
         .group-print-page:last-child { break-after: auto; page-break-after: auto; }
-        .group-print-page .subtitle { margin-bottom: 8px; }
-        .group-print-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; align-items: start; }
-        .group-print-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
-        .group-print-card h2 { margin: 0 0 3px; padding-bottom: 2px; font-size: 11px; line-height: 1.25; }
-        .group-print-card table { width: 100%; margin: 0; table-layout: fixed; font-size: 9px; line-height: 1.2; }
-        .group-print-card th { padding: 2px 4px; }
-        .group-print-card td { overflow-wrap: anywhere; padding: 2px 4px; }
+        .group-print-page .subtitle { margin-bottom: 7px; }
+        .group-print-grid { display: grid; flex: 1; min-height: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: 10px 12px; align-items: stretch; }
+        .group-print-card { display: flex; min-width: 0; min-height: 0; flex-direction: column; break-inside: avoid; page-break-inside: avoid; }
+        .group-print-card h2 { margin: 0 0 4px; padding-bottom: 3px; font-size: 12px; line-height: 1.25; }
+        .group-print-card table { height: 100%; width: 100%; flex: 1; margin: 0; table-layout: fixed; font-size: 10px; line-height: 1.2; }
+        .group-print-card th { padding: 3px 4px; }
+        .group-print-card td { overflow-wrap: anywhere; padding: 3px 4px; }
         .group-print-card th:first-child { width: 24px !important; }
         .group-print-card th:nth-child(3) { width: 74px !important; }
         .group-print-card th:last-child { width: 34px !important; }
