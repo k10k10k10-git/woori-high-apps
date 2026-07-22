@@ -37,8 +37,8 @@
 - **판단 질문**: localhost 수신 서버(fetch/form POST)로 전송하지 않았다 — 크롬 PNA가 https 페이지→127.0.0.1 요청을 프리플라이트에서 막는다(OPTIONS에 Access-Control-Allow-Private-Network를 줘도 최신 크롬은 차단). base64를 JS 반환값으로 조각 전송하지도 않았다 — 확장의 데이터 유출 가드가 [BLOCKED]로 막는다. 뷰포트 리사이즈(resize_window·osascript)도 신뢰하지 않았다 — inner 크기가 안 바뀌는 함정 재확인.
 - **재사용 규칙**: 브라우저에서 파일을 꺼낼 땐 ①합성까지 페이지 안 캔버스에서 끝내고 ②결과를 스프라이트 1장으로 만들어 a.click() 1회 다운로드(다중 다운로드 차단 회피, 막히면 사용자에게 주소창 차단 아이콘 허용 1클릭 요청) ③fixed 요소는 본문 렌더에 뷰포트 위치로 박히므로 visibility:hidden으로 빼고 별도 캡처(단독 캡처 시 style:{position:"static"} 오버라이드 필수 — 아니면 빈 캔버스).
 
-### Vercel Root Directory가 설정된 모노리포 앱을 CLI로 수동 배포하는 법 (2026-07-20)
-- **접근법**: 1→ 앱 폴더에서 `npx vercel --prod --yes`가 `iguard-app/iguard-app`을 찾으며 실패하면 Vercel 프로젝트의 원격 Root Directory와 로컬 작업 경로가 중복된 것으로 판정한다. 2→ 저장소 루트에서 `npx vercel deploy . --prod --yes --project <projectId> --scope <teamId> --dry --format=json`을 실행해 `basePath`와 감지된 Next.js 루트를 확인한다. 3→ 같은 명령에서 `--dry --format=json`만 제거해 배포한다. 4→ `npx vercel inspect <deployment-url>`의 `target=production`, `status=Ready`, 운영 별칭을 확인하고 `curl`로 홈과 `/api/version`의 HTTP 200을 검증한다.
+### Vercel Root Directory가 설정된 모노리포 앱을 CLI로 수동 배포하는 법 (2026-07-20, 보강 2026-07-22)
+- **접근법**: 1→ 앱 폴더에서 `npx vercel --prod --yes`가 `iguard-app/iguard-app`을 찾으며 실패하면 Vercel 프로젝트의 원격 Root Directory와 로컬 작업 경로가 중복된 것으로 판정한다. 2→ 저장소 루트에서 `npx vercel deploy . --prod --yes --project <projectId> --scope <teamId> --dry --format=json`을 실행해 `basePath`와 감지된 Next.js 루트를 확인한다. 3→ 같은 명령에서 `--dry --format=json`만 제거해 배포한다. 프로젝트 플래그 대신 기존 링크를 재사용해야 하면 앱의 `.vercel/project.json`에서 `projectId`·`orgId`만 복사한 임시 루트 `.vercel/project.json`을 만들고 저장소 루트에서 배포한 뒤 즉시 삭제한다. 4→ `npx vercel ls <project>`의 Production `Ready`와 운영 별칭을 확인하고, 로그인된 운영 탭을 새로고침해 핵심 화면 로드를 검증한다.
 - **판단 질문**: Vercel 대시보드의 Root Directory를 임시로 지우거나 앱 소스를 이중 디렉터리로 복사하지 않는다. 전자는 Git 자동배포 설정을 깨뜨리고, 후자는 잘못된 소스·환경변수로 배포할 위험이 있다. 저장소 루트 드라이런 없이 바로 업로드하지도 않는다. 다른 앱과 대용량 산출물이 입력에 섞이는지 먼저 확인해야 하기 때문이다.
 - **재사용 규칙**: 원격 Root Directory가 앱 폴더로 지정된 모노리포의 수동 Vercel 배포는 저장소 루트에서 프로젝트 ID와 팀 ID를 명시하고, 반드시 드라이런 → 운영 배포 → inspect/HTTP 확인 순서로 실행한다.
 
