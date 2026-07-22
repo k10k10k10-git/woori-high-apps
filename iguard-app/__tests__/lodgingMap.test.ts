@@ -38,6 +38,21 @@ describe("숙소 배정도 매칭", () => {
     expect(location?.hotspot.roomNumber).toBe("215");
   });
 
+  it("본관 2층의 홀수 호실과 우측 호실을 실제 도면 방 중앙에 배치한다", () => {
+    expect(findRoomMapLocation(room({ roomNumber: "211" }))?.hotspot.top).toBeCloseTo(61.2, 1);
+    expect(findRoomMapLocation(room({ roomNumber: "217" }))?.hotspot.top).toBeCloseTo(61.2, 1);
+    expect(findRoomMapLocation(room({ roomNumber: "216" }))?.hotspot.top).toBeCloseTo(77.7, 1);
+    expect(findRoomMapLocation(room({ roomNumber: "214" }))?.hotspot.top).toBeCloseTo(88.5, 1);
+  });
+
+  it("호실 상세를 하단 카드가 아니라 선택 배지 옆 팝오버로 표시한다", () => {
+    const source = readFileSync(new URL("../src/app/retreat/[id]/LodgingMapView.tsx", import.meta.url), "utf8");
+    expect(source).toContain("createPortal");
+    expect(source).toContain('role="dialog"');
+    expect(source).toContain('className="fixed z-[100]');
+    expect(source).toContain('aria-controls={active ? "lodging-room-popover" : undefined}');
+  });
+
   it("HRD처럼 건물명이 포괄적이면 방 정원으로 핵심관·인재관을 구분한다", () => {
     expect(findRoomMapLocation(room({ dong: "HRD", roomNumber: "304", capacity: 3 }))?.building.id).toBe("hrd-core");
     expect(findRoomMapLocation(room({ dong: "HRD센터", roomNumber: "304", capacity: 2 }))?.building.id).toBe("hrd-talent");

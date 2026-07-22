@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PartialAttendanceMap, Room, Student } from "@/lib/types";
 import {
   buildLodgingMapResult,
@@ -17,6 +18,14 @@ function markerLabel(summary: LodgingRoomSummary): string {
   if (summary.shortClassLabels.length === 0) return "교사";
   if (summary.shortClassLabels.length === 1) return summary.shortClassLabels[0];
   return `${summary.shortClassLabels[0]} +${summary.shortClassLabels.length - 1}`;
+}
+
+interface PopoverPosition {
+  left: number;
+  top: number;
+  width: number;
+  arrowTop: number;
+  side: "left" | "right";
 }
 
 export default function LodgingMapView({ rooms, students, partial, cellColors }: {
@@ -39,17 +48,69 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
   const building = LODGING_MAP_BUILDINGS.find(item => item.id === buildingId) ?? LODGING_MAP_BUILDINGS[0];
   const [pageId, setPageId] = useState(building.pages[0].id);
   const page = building.pages.find(item => item.id === pageId) ?? building.pages[0];
-  const [selectedRoom, setSelectedRoom] = useState<LodgingRoomSummary | null>(null);
+  const [selection, setSelection] = useState<{ room: LodgingRoomSummary; anchor: HTMLButtonElement } | null>(null);
+  const [popoverPosition, setPopoverPosition] = useState<PopoverPosition | null>(null);
   const mapScrollRef = useRef<HTMLDivElement | null>(null);
+  const popoverRef = useRef<HTMLElement | null>(null);
+
+  const closePopover = useCallback(() => {
+    setSelection(null);
+    setPopoverPosition(null);
+  }, []);
+
+  const updatePopoverPosition = useCallback(() => {
+    if (!selection || typeof window === "undefined") return;
+    const anchorRect = selection.anchor.getBoundingClientRect();
+    const margin = 12;
+    const gap = 12;
+    const width = Math.min(288, window.innerWidth - margin * 2);
+    const height = popoverRef.current?.offsetHeight ?? 190;
+    const canOpenRight = anchorRect.right + gap + width <= window.innerWidth - margin;
+    const canOpenLeft = anchorRect.left - gap - width >= margin;
+    const side: PopoverPosition["side"] = canOpenRight || !canOpenLeft ? "right" : "left";
+    const preferredLeft = side === "right" ? anchorRect.right + gap : anchorRect.left - gap - width;
+    const left = Math.min(window.innerWidth - margin - width, Math.max(margin, preferredLeft));
+    const anchorCenter = anchorRect.top + anchorRect.height / 2;
+    const maxTop = Math.max(margin, window.innerHeight - margin - height);
+    const top = Math.min(maxTop, Math.max(margin, anchorCenter - height / 2));
+    const arrowTop = Math.min(height - 18, Math.max(18, anchorCenter - top));
+    setPopoverPosition({ left, top, width, arrowTop, side });
+  }, [selection]);
 
   useEffect(() => {
     if (!building.pages.some(item => item.id === pageId)) setPageId(building.pages[0].id);
-    setSelectedRoom(null);
-  }, [building, pageId]);
+    closePopover();
+  }, [building, closePopover, pageId]);
 
   useEffect(() => {
     mapScrollRef.current?.scrollTo({ left: 0, behavior: "auto" });
   }, [page.id]);
+
+  useEffect(() => {
+    if (!selection) return;
+    updatePopoverPosition();
+    const frame = window.requestAnimationFrame(updatePopoverPosition);
+    window.addEventListener("resize", updatePopoverPosition);
+    window.addEventListener("scroll", updatePopoverPosition, true);
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (selection.anchor.contains(target) || popoverRef.current?.contains(target)) return;
+      closePopover();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePopover();
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", updatePopoverPosition);
+      window.removeEventListener("scroll", updatePopoverPosition, true);
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closePopover, selection, updatePopoverPosition]);
 
   const pageRooms = result.mapped.filter(summary => summary.pageId === page.id);
   const summaryByRoom = new Map(pageRooms.map(summary => [summary.hotspot.roomNumber, summary]));
@@ -128,12 +189,17 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
                 const summary = summaryByRoom.get(hotspot.roomNumber);
                 if (!summary) return null;
                 const female = (summary.room.type ?? "").includes("여");
-                const active = selectedRoom?.room.id === summary.room.id;
+                const active = selection?.room.room.id === summary.room.id;
                 return (
                   <button
                     key={`${page.id}-${hotspot.roomNumber}`}
                     type="button"
-                    onClick={() => setSelectedRoom(summary)}
+                    onClick={event => {
+                      if (active) closePopover();
+                      else setSelection({ room: summary, anchor: event.currentTarget });
+                    }}
+                    aria-expanded={active}
+                    aria-controls={active ? "lodging-room-popover" : undefined}
                     aria-label={`${roomLabel(summary.room)} ${summary.classLabels.join(", ") || "교사 배정"} 상세 보기`}
                     className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-md border px-1.5 py-1 text-center text-[10px] font-bold leading-tight shadow-md transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 ${
                       female
@@ -153,34 +219,49 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
         </div>
       </section>
 
-      {selectedRoom && (
-        <section className="card border-fuchsia-200 p-4" aria-live="polite">
+      {selection && popoverPosition && createPortal(
+        <aside
+          ref={popoverRef}
+          id="lodging-room-popover"
+          role="dialog"
+          aria-label={`${roomLabel(selection.room.room)} 배정 상세`}
+          className="fixed z-[100] max-h-[calc(100vh-24px)] overflow-y-auto rounded-xl border border-fuchsia-200 bg-white p-4 shadow-2xl"
+          style={{ left: popoverPosition.left, top: popoverPosition.top, width: popoverPosition.width }}
+        >
+          <i
+            aria-hidden="true"
+            className={`absolute h-3 w-3 rotate-45 border border-fuchsia-200 bg-white ${
+              popoverPosition.side === "right" ? "-left-1.5 border-r-0 border-t-0" : "-right-1.5 border-b-0 border-l-0"
+            }`}
+            style={{ top: popoverPosition.arrowTop - 6 }}
+          />
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="font-bold text-slate-900">{roomLabel(selectedRoom.room)}</h2>
-              <p className="mt-0.5 text-xs text-slate-500">{selectedRoom.peopleCount}/{selectedRoom.room.capacity}명 · {selectedRoom.room.type || "성별 미지정"}</p>
+              <h2 className="font-bold text-slate-900">{roomLabel(selection.room.room)}</h2>
+              <p className="mt-0.5 text-xs text-slate-500">{selection.room.peopleCount}/{selection.room.room.capacity}명 · {selection.room.room.type || "성별 미지정"}</p>
             </div>
-            <button type="button" onClick={() => setSelectedRoom(null)} className="text-sm text-slate-400 hover:text-slate-600" aria-label="호실 상세 닫기">✕</button>
+            <button type="button" onClick={closePopover} className="-mr-1 -mt-1 rounded p-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="호실 상세 닫기">✕</button>
           </div>
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex items-start gap-2">
               <span className="w-12 shrink-0 text-xs font-semibold text-fuchsia-600">반</span>
               <div className="flex flex-wrap gap-1">
-                {selectedRoom.classLabels.length > 0
-                  ? selectedRoom.classLabels.map(label => <span key={label} className="rounded bg-fuchsia-50 px-2 py-0.5 text-xs text-fuchsia-700">{label}</span>)
+                {selection.room.classLabels.length > 0
+                  ? selection.room.classLabels.map(label => <span key={label} className="rounded bg-fuchsia-50 px-2 py-0.5 text-xs text-fuchsia-700">{label}</span>)
                   : <span className="text-xs text-slate-400">학생 배정 없음</span>}
               </div>
             </div>
             <div className="flex items-start gap-2">
               <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">학생</span>
-              <span className="text-xs leading-relaxed text-slate-700">{selectedRoom.studentNames.join(", ") || "—"}</span>
+              <span className="text-xs leading-relaxed text-slate-700">{selection.room.studentNames.join(", ") || "—"}</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="w-12 shrink-0 text-xs font-semibold text-emerald-600">교사</span>
-              <span className="text-xs leading-relaxed text-slate-700">{selectedRoom.teacherNames.join(", ") || "—"}</span>
+              <span className="text-xs leading-relaxed text-slate-700">{selection.room.teacherNames.join(", ") || "—"}</span>
             </div>
           </div>
-        </section>
+        </aside>,
+        document.body,
       )}
 
       {result.unmatched.length > 0 && (

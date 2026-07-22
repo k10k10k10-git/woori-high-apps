@@ -44,7 +44,8 @@ export interface LodgingMapResult {
 const pct = (value: number, total: number) => Number(((value / total) * 100).toFixed(2));
 
 function mainRow(roomNumbers: string[], top: number): RoomHotspot[] {
-  const centers = [148, 344, 540, 736, 932, 1128];
+  // WebP 도면(2248px)의 실제 호실 사각형 중앙 좌표.
+  const centers = [149, 344, 541, 739, 936, 1134];
   return roomNumbers.map((roomNumber, index) => ({ roomNumber, left: pct(centers[index], 2248), top }));
 }
 
@@ -83,8 +84,8 @@ export const LODGING_MAP_BUILDINGS: LodgingMapBuilding[] = [
         image: "/room-maps/main-1f.webp",
         minWidth: 720,
         hotspots: [
-          ...mainRow(["112", "110", "108", "106", "104", "102"], 15.1),
-          ...mainRow(["111", "109", "107", "105", "103", "101"], 61.0),
+          ...mainRow(["112", "110", "108", "106", "104", "102"], 16.4),
+          ...mainRow(["111", "109", "107", "105", "103", "101"], 61.2),
         ],
       },
       {
@@ -93,13 +94,13 @@ export const LODGING_MAP_BUILDINGS: LodgingMapBuilding[] = [
         image: "/room-maps/main-2f.webp",
         minWidth: 720,
         hotspots: [
-          ...mainRow(["212", "210", "208", "206", "204", "202"], 15.0),
-          ...mainRow(["211", "209", "207", "205", "203", "201"], 33.5),
-          { roomNumber: "217", left: 94.4, top: 33.5 },
-          { roomNumber: "216", left: 76.5, top: 64.5 },
-          { roomNumber: "215", left: 94.4, top: 64.5 },
-          { roomNumber: "214", left: 76.5, top: 81.0 },
-          { roomNumber: "213", left: 94.4, top: 81.0 },
+          ...mainRow(["212", "210", "208", "206", "204", "202"], 16.4),
+          ...mainRow(["211", "209", "207", "205", "203", "201"], 61.2),
+          { roomNumber: "217", left: 94.0, top: 61.2 },
+          { roomNumber: "216", left: 76.8, top: 77.7 },
+          { roomNumber: "215", left: 94.0, top: 77.7 },
+          { roomNumber: "214", left: 76.8, top: 88.5 },
+          { roomNumber: "213", left: 94.0, top: 88.5 },
         ],
       },
       {
@@ -108,13 +109,13 @@ export const LODGING_MAP_BUILDINGS: LodgingMapBuilding[] = [
         image: "/room-maps/main-3f.webp",
         minWidth: 720,
         hotspots: [
-          ...mainRow(["312", "310", "308", "306", "304", "302"], 15.1),
-          ...mainRow(["311", "309", "307", "305", "303", "301"], 61.0),
-          { roomNumber: "317", left: 94.4, top: 61.0 },
-          { roomNumber: "316", left: 76.5, top: 79.5 },
-          { roomNumber: "315", left: 94.4, top: 79.5 },
-          { roomNumber: "314", left: 76.5, top: 92.0 },
-          { roomNumber: "313", left: 94.4, top: 92.0 },
+          ...mainRow(["312", "310", "308", "306", "304", "302"], 16.4),
+          ...mainRow(["311", "309", "307", "305", "303", "301"], 61.2),
+          { roomNumber: "317", left: 94.0, top: 61.2 },
+          { roomNumber: "316", left: 76.8, top: 77.7 },
+          { roomNumber: "315", left: 94.0, top: 77.7 },
+          { roomNumber: "314", left: 76.8, top: 88.5 },
+          { roomNumber: "313", left: 94.0, top: 88.5 },
         ],
       },
     ],
