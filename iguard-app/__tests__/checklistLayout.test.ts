@@ -24,4 +24,17 @@ describe("호차별 인원체크 모바일 레이아웃", () => {
     expect(source).toContain("await updateIguardAttendance(retreatId, k, true, byName)");
     expect(source).toContain("await uiConfirm(`${m.name} 체크를 해제할까요?`)");
   });
+
+  it("조별 인쇄는 한 페이지에 4개 조를 2열로 배치하고 호차별 인쇄는 기존 형식을 유지한다", () => {
+    const source = readFileSync(
+      new URL("../src/app/retreat/[id]/ChecklistView.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("pageStart += 4");
+    expect(source).toContain("units.slice(pageStart, pageStart + 4)");
+    expect(source).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(source).toContain('mode === "조별"');
+    expect(source).toContain("units.map(u => renderUnit(u, false))");
+  });
 });

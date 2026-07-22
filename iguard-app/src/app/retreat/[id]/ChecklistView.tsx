@@ -221,16 +221,40 @@ export default function ChecklistView({ retreatId, groups, students, participant
 
   function print() {
     if (units.length === 0) return toast("데이터가 없습니다.", "warning");
-    let html = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${dayLabel}</h1>
-      <div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · ${mode} · ${dayLabel} · 출력 ${new Date().toLocaleString("ko-KR")}</div>`;
-    units.forEach(u => {
+    const printedAt = new Date().toLocaleString("ko-KR");
+    const printHeader = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${dayLabel}</h1>
+      <div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · ${mode} · ${dayLabel} · 출력 ${printedAt}</div>`;
+    const renderUnit = (u: Unit, compact: boolean) => {
       const rows = u.members.map((m, i) => {
         return `<tr><td style="text-align:center">${i + 1}</td><td>${escapeHtml(m.name)}</td><td>${escapeHtml(m.meta || "")}</td><td style="text-align:center;font-size:14px">☐</td></tr>`;
       }).join("");
-      html += `<div class="section"><h2>${escapeHtml(u.title)} <span style="font-weight:400;color:#888">· ${u.members.length}명${u.sub ? ` · ${escapeHtml(u.sub)}` : ""}</span></h2>
+      return `<div class="${compact ? "group-print-card" : "section"}"><h2>${escapeHtml(u.title)} <span style="font-weight:400;color:#888">· ${u.members.length}명${u.sub ? ` · ${escapeHtml(u.sub)}` : ""}</span></h2>
         <table><thead><tr><th style="width:36px">#</th><th>이름</th><th style="width:90px">구분/반</th><th style="width:50px">체크</th></tr></thead>
         <tbody>${rows || `<tr><td colspan="4" style="text-align:center;color:#aaa">없음</td></tr>`}</tbody></table></div>`;
-    });
+    };
+    let html = "";
+    if (mode === "조별") {
+      html += `<style>
+        @media print { body { padding: 0; } }
+        .group-print-page { break-after: page; page-break-after: always; }
+        .group-print-page:last-child { break-after: auto; page-break-after: auto; }
+        .group-print-page .subtitle { margin-bottom: 8px; }
+        .group-print-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; align-items: start; }
+        .group-print-card { min-width: 0; break-inside: avoid; page-break-inside: avoid; }
+        .group-print-card h2 { margin: 0 0 3px; padding-bottom: 2px; font-size: 11px; line-height: 1.25; }
+        .group-print-card table { width: 100%; margin: 0; table-layout: fixed; font-size: 9px; line-height: 1.2; }
+        .group-print-card th { padding: 2px 4px; }
+        .group-print-card td { overflow-wrap: anywhere; padding: 2px 4px; }
+        .group-print-card th:first-child { width: 24px !important; }
+        .group-print-card th:nth-child(3) { width: 74px !important; }
+        .group-print-card th:last-child { width: 34px !important; }
+      </style>`;
+      for (let pageStart = 0; pageStart < units.length; pageStart += 4) {
+        html += `<section class="group-print-page">${printHeader}<div class="group-print-grid">${units.slice(pageStart, pageStart + 4).map(u => renderUnit(u, true)).join("")}</div></section>`;
+      }
+    } else {
+      html = `${printHeader}${units.map(u => renderUnit(u, false)).join("")}`;
+    }
     printAsPDF(html, `체크리스트-${mode}`);
   }
 
