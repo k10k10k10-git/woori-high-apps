@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PartialAttendanceMap, Room, Student } from "@/lib/types";
+import { Group, PartialAttendanceMap, Room, Student } from "@/lib/types";
 import {
   buildLodgingMapResult,
   LODGING_MAP_BUILDINGS,
@@ -20,6 +20,11 @@ function markerLabel(summary: LodgingRoomSummary): string {
   return `${summary.shortClassLabels[0]} +${summary.shortClassLabels.length - 1}`;
 }
 
+function markerGroupLabel(summary: LodgingRoomSummary): string {
+  if (summary.groupLabels.length <= 2) return summary.groupLabels.join("·");
+  return `${summary.groupLabels.slice(0, 2).join("·")} +${summary.groupLabels.length - 2}`;
+}
+
 interface PopoverPosition {
   left: number;
   top: number;
@@ -28,15 +33,16 @@ interface PopoverPosition {
   side: "left" | "right";
 }
 
-export default function LodgingMapView({ rooms, students, partial, cellColors }: {
+export default function LodgingMapView({ rooms, groups, students, partial, cellColors }: {
   rooms: Room[];
+  groups: Group[];
   students: Record<string, Student>;
   partial: PartialAttendanceMap;
   cellColors: Record<string, string>;
 }) {
   const result = useMemo(
-    () => buildLodgingMapResult(rooms, students, partial, cellColors),
-    [rooms, students, partial, cellColors],
+    () => buildLodgingMapResult(rooms, students, partial, cellColors, groups),
+    [rooms, groups, students, partial, cellColors],
   );
   const countsByBuilding = useMemo(() => {
     const counts = new Map<string, number>();
@@ -126,7 +132,7 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
-        ℹ️ 행정사이트 방배정을 실시간으로 읽어 도면 위에 표시합니다. 호실의 반 배지를 누르면 학생·교사 명단을 확인할 수 있습니다.
+        ℹ️ 행정사이트 방배정과 조편성을 실시간으로 읽어 도면 위에 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다.
       </div>
 
       <section className="card overflow-hidden">
@@ -200,7 +206,7 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
                     }}
                     aria-expanded={active}
                     aria-controls={active ? "lodging-room-popover" : undefined}
-                    aria-label={`${roomLabel(summary.room)} ${summary.classLabels.join(", ") || "교사 배정"} 상세 보기`}
+                    aria-label={`${roomLabel(summary.room)} ${summary.classLabels.join(", ") || "교사 배정"}${summary.groupLabels.length > 0 ? ` ${summary.groupLabels.join(", ")}` : ""} 상세 보기`}
                     className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-md border px-1.5 py-1 text-center text-[10px] font-bold leading-tight shadow-md transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 ${
                       female
                         ? "border-rose-400 bg-rose-50/95 text-rose-700"
@@ -210,6 +216,11 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
                   >
                     <span className="block text-[9px] font-medium opacity-70">{hotspot.roomNumber}</span>
                     <span className="whitespace-nowrap">{markerLabel(summary)}</span>
+                    {summary.groupLabels.length > 0 && (
+                      <span className="mt-0.5 block whitespace-nowrap border-t border-current/20 pt-0.5 text-[9px] font-semibold opacity-80">
+                        {markerGroupLabel(summary)}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -252,6 +263,14 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
               </div>
             </div>
             <div className="flex items-start gap-2">
+              <span className="w-12 shrink-0 text-xs font-semibold text-sky-600">조</span>
+              <div className="flex flex-wrap gap-1">
+                {selection.room.groupLabels.length > 0
+                  ? selection.room.groupLabels.map(label => <span key={label} className="rounded bg-sky-50 px-2 py-0.5 text-xs text-sky-700">{label}</span>)
+                  : <span className="text-xs text-slate-400">조 미지정</span>}
+              </div>
+            </div>
+            <div className="flex items-start gap-2">
               <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">학생</span>
               <span className="text-xs leading-relaxed text-slate-700">{selection.room.studentNames.join(", ") || "—"}</span>
             </div>
@@ -274,7 +293,7 @@ export default function LodgingMapView({ rooms, students, partial, cellColors }:
       <div className="flex flex-wrap gap-3 px-1 text-[11px] text-slate-500">
         <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm border border-sky-400 bg-sky-50" />남자 방</span>
         <span><i className="mr-1 inline-block h-2.5 w-2.5 rounded-sm border border-rose-400 bg-rose-50" />여자 방</span>
-        <span>배지 표기: 부-학년-반</span>
+        <span>배지 표기: 부-학년-반 · 조</span>
       </div>
     </div>
   );

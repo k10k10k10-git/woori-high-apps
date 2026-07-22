@@ -1,5 +1,6 @@
-import { PartialAttendanceMap, Room, Student } from "./types";
+import { Group, PartialAttendanceMap, Room, Student } from "./types";
 import { isCancelledStudent } from "./busParticipation";
+import { groupDisplayName } from "./groupNumber";
 
 export interface RoomHotspot {
   roomNumber: string;
@@ -31,6 +32,7 @@ export interface LodgingRoomSummary {
   hotspot: RoomHotspot;
   classLabels: string[];
   shortClassLabels: string[];
+  groupLabels: string[];
   studentNames: string[];
   teacherNames: string[];
   peopleCount: number;
@@ -209,6 +211,7 @@ export function buildLodgingMapResult(
   students: Record<string, Student>,
   partial: PartialAttendanceMap,
   cellColors: Record<string, string>,
+  groups: Group[] = [],
 ): LodgingMapResult {
   const mapped: LodgingRoomSummary[] = [];
   const unmatched: Room[] = [];
@@ -230,6 +233,12 @@ export function buildLodgingMapResult(
     const classes = studentRecords.map(studentClass);
     const classLabels = [...new Set(classes.map(item => item.full))].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
     const shortClassLabels = [...new Set(classes.map(item => item.short))].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+    const activeStudentIdSet = new Set(activeStudentIds);
+    const groupLabels = groups
+      .filter(group => group.studentIds.some(studentId => activeStudentIdSet.has(studentId)))
+      .map(group => groupDisplayName(group, groups))
+      .filter((label, index, labels) => labels.indexOf(label) === index)
+      .sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
     const studentNames = activeStudentIds.map(id => students[id]?.name ?? "명단 미상");
 
     mapped.push({
@@ -239,6 +248,7 @@ export function buildLodgingMapResult(
       hotspot: location.hotspot,
       classLabels,
       shortClassLabels,
+      groupLabels,
       studentNames,
       teacherNames,
       peopleCount: activeStudentIds.length + teacherNames.length,

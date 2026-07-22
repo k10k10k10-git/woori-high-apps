@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildLodgingMapResult, findRoomMapLocation } from "@/lib/lodgingMap";
-import { Room, Student } from "@/lib/types";
+import { Group, Room, Student } from "@/lib/types";
 
 const room = (overrides: Partial<Room> = {}): Room => ({
   id: "room-101",
@@ -77,6 +77,29 @@ describe("숙소 배정도 매칭", () => {
     expect(result.mapped[0].studentNames).toEqual(["학생A"]);
     expect(result.mapped[0].teacherNames).toEqual(["담임"]);
     expect(result.mapped[0].peopleCount).toBe(2);
+  });
+
+  it("숙박 학생의 조를 전역 조 번호로 중복 없이 요약하고 제외 학생의 조는 빼준다", () => {
+    const students = {
+      "2_a": { ...student("2_a", "학생A", 3), buNum: 2 },
+      "2_b": { ...student("2_b", "학생B", 3), buNum: 2 },
+    };
+    const groups: Group[] = [
+      { id: "one", name: "1조", bu: "1부", teachers: [], leader: "", studentIds: [] },
+      { id: "two", name: "2조", bu: "1부", teachers: [], leader: "", studentIds: [] },
+      { id: "three", name: "1조", bu: "2부", teachers: [], leader: "", studentIds: ["2_a"] },
+      { id: "four", name: "2조", bu: "2부", teachers: [], leader: "", studentIds: ["2_b"] },
+    ];
+    const result = buildLodgingMapResult(
+      [room({ studentIds: ["2_a", "2_b"] })],
+      students,
+      { "2_b": { type: "당일참석", day: 2 } },
+      {},
+      groups,
+    );
+
+    expect(result.mapped[0].groupLabels).toEqual(["3조"]);
+    expect(result.mapped[0].studentNames).toEqual(["학생A"]);
   });
 
   it("도면에 없는 건물·호실은 임의 배치하지 않고 미매칭으로 남긴다", () => {
