@@ -389,6 +389,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `busParticipation.test.ts` | 버스 탑승 판정 | 당일참여 학생, 자차·불참 교사, 부서 동명이인 매칭 |
 | `busGender.test.ts` | 버스 성별 배정 | raw/unique 학생키, 조+성별 묶음, 교사 명시 성별·미확인 차단, 구버전 세그먼트, 단일 성별 호차·정원 불변식 |
 | `checklistMembers.test.ts` | 인원체크 교사 명단 | 조별은 자차 포함, 호차별은 자차 제외 |
+| `checklistLayout.test.ts` | 인원체크 모바일 레이아웃 | 호차별 2열·조별 기존 레이아웃 및 체크 저장 회귀 방지 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 
 ---
@@ -400,6 +401,7 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 - **Toast `aria-live="polite"`**: 토스트 컨테이너에 `role="status"` + `aria-live` 적용
 - **아이콘 `aria-hidden="true"`**: 장식 아이콘에 적용, 텍스트로 의미 전달
 - **뷰포트 고정**: 모바일 현장 사용 기준, `maximumScale: 1`
+- **호차별 인원체크**: 모바일에서도 호차 카드는 2열로 배치하고 이름·소속은 카드 폭 안에서 줄바꿈한다. 조별 인원체크는 기존 모바일 1열을 유지한다.
 
 ---
 

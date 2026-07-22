@@ -269,42 +269,61 @@ export default function ChecklistView({ retreatId, groups, students, participant
       ) : units.length === 0 ? (
         <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">✅</div><p>조편성 데이터가 없습니다.</p><p className="text-xs mt-1.5 text-slate-300">행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</p></div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className={mode === "호차별" ? "grid grid-cols-2 gap-2 sm:gap-4" : "grid gap-4 sm:grid-cols-2"}>
           {units.map(u => {
             const c = u.members.filter(m => checkedKeys.has(keyOf(m.id))).length;
             return (
-              <div key={u.key} className="card overflow-hidden">
-                <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-2">
-                  <h3 className="font-semibold text-slate-700">{u.title}</h3>
-                  <div className="flex items-center gap-2">
+              <div key={u.key} className="card min-w-0 overflow-hidden">
+                <div className={`flex items-center justify-between border-b border-slate-100 bg-slate-50 ${mode === "호차별" ? "gap-1.5 px-2.5 py-2.5 sm:gap-2 sm:px-4 sm:py-3" : "gap-2 px-4 py-3"}`}>
+                  <h3 className={`min-w-0 font-semibold text-slate-700 ${mode === "호차별" ? "text-sm sm:text-base" : ""}`}>{u.title}</h3>
+                  <div className={`flex shrink-0 items-center ${mode === "호차별" ? "gap-1 sm:gap-2" : "gap-2"}`}>
                     {c > 0 && (
-                      <button onClick={() => resetUnit(u)} className="text-xs text-slate-400 hover:text-slate-600 underline" aria-label={`${u.title} 체크 초기화`}>초기화</button>
+                      <button onClick={() => resetUnit(u)} className={`${mode === "호차별" ? "text-[10px] sm:text-xs" : "text-xs"} text-slate-400 underline hover:text-slate-600`} aria-label={`${u.title} 체크 초기화`}>
+                        {mode === "호차별" ? <><span aria-hidden="true">↺</span><span className="hidden sm:inline">초기화</span></> : "초기화"}
+                      </button>
                     )}
-                    <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
+                    <span className={`font-medium ${mode === "호차별" ? "text-xs sm:text-sm" : "text-sm"} ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
                   </div>
                 </div>
                 {(u.summary || u.sub) && (
-                  <div className="space-y-1 border-b border-slate-50 px-4 py-2">
-                    {u.summary && <div className="text-xs font-semibold text-slate-600">{u.summary}</div>}
-                    {u.sub && <div className="text-xs text-slate-500">{u.sub}</div>}
+                  <div className={`space-y-1 border-b border-slate-50 py-2 ${mode === "호차별" ? "px-2.5 sm:px-4" : "px-4"}`}>
+                    {u.summary && <div className={`${mode === "호차별" ? "text-[10px] leading-tight sm:text-xs" : "text-xs"} font-semibold text-slate-600`}>{u.summary}</div>}
+                    {u.sub && <div className={`${mode === "호차별" ? "break-words text-[10px] leading-tight sm:text-xs" : "text-xs"} text-slate-500`}>{u.sub}</div>}
                   </div>
                 )}
                 {u.warning && (
-                  <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-[11px] leading-relaxed text-amber-700">⚠ {u.warning}</div>
+                  <div className={`border-b border-amber-100 bg-amber-50 py-2 text-[11px] leading-relaxed text-amber-700 ${mode === "호차별" ? "break-words px-2.5 sm:px-4" : "px-4"}`}>⚠ {u.warning}</div>
                 )}
                 <ul className="divide-y divide-slate-100">
                   {u.members.length === 0 ? <li className="px-4 py-3 text-center text-slate-300 text-xs">없음</li> :
                     u.members.map((m, i) => {
                       const on = checkedKeys.has(keyOf(m.id));
                       const by = on ? attendanceInfo[keyOf(m.id)]?.by : undefined;
+                      const nameNode = m.name === "(명단 미상)" ? <span className="text-amber-500">{m.name}</span> : m.name;
                       return (
                         <li key={m.id}>
-                          <button onClick={() => on ? uncheck(m) : check(m.id)} className={`w-full flex items-center gap-3 px-4 py-3 text-left ${on ? "bg-fuchsia-50" : "hover:bg-slate-50"}`}>
+                          <button onClick={() => on ? uncheck(m) : check(m.id)} className={`w-full text-left ${mode === "호차별" ? "grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-2 px-2 py-2.5 sm:flex sm:gap-3 sm:px-4 sm:py-3" : "flex items-center gap-3 px-4 py-3"} ${on ? "bg-fuchsia-50" : "hover:bg-slate-50"}`}>
                             <span className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm shrink-0 ${on ? "bg-green-500 border-green-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
-                            <span className="text-slate-400 text-xs w-5">{i + 1}</span>
-                            <span className={`font-medium ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{m.name === "(명단 미상)" ? <span className="text-amber-500">{m.name}</span> : m.name}</span>
-                            {by && <span className="text-[10px] text-fuchsia-400 shrink-0" title={`${by} 체크`}>✓{by}</span>}
-                            <span className="ml-auto text-xs text-slate-400">{m.meta}</span>
+                            {mode === "호차별" ? (
+                              <>
+                                <span className="min-w-0 sm:hidden">
+                                  <span className={`block break-words text-sm font-medium leading-tight ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
+                                  <span className="mt-1 block break-words text-[10px] leading-tight text-slate-400">{i + 1}. {m.meta}</span>
+                                  {by && <span className="mt-1 block break-words text-[9px] leading-tight text-fuchsia-400" title={`${by} 체크`}>✓{by}</span>}
+                                </span>
+                                <span className="hidden w-5 text-xs text-slate-400 sm:inline-block">{i + 1}</span>
+                                <span className={`hidden font-medium sm:inline ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
+                                {by && <span className="hidden shrink-0 text-[10px] text-fuchsia-400 sm:inline" title={`${by} 체크`}>✓{by}</span>}
+                                <span className="ml-auto hidden text-xs text-slate-400 sm:inline">{m.meta}</span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="w-5 text-xs text-slate-400">{i + 1}</span>
+                                <span className={`font-medium ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
+                                {by && <span className="shrink-0 text-[10px] text-fuchsia-400" title={`${by} 체크`}>✓{by}</span>}
+                                <span className="ml-auto text-xs text-slate-400">{m.meta}</span>
+                              </>
+                            )}
                           </button>
                         </li>
                       );
