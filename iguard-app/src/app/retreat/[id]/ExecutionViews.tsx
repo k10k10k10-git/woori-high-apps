@@ -100,6 +100,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
   const timelineEndRef = useRef<HTMLDivElement | null>(null);
   const pinnedCardsRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [pinnedCardsCollapsed, setPinnedCardsCollapsed] = useState(false);
   const sortedStaff = useMemo(() => [...staff].sort((a, b) => a.name.localeCompare(b.name, "ko")), [staff]);
   const preferredStaffId = useMemo(
     () => findPreferredStaffId(sortedStaff, preferredStaffNames),
@@ -203,14 +204,14 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
       </div>
       <div
         ref={pinnedCardsRef}
-        className="sticky z-10 -mx-3 mb-4 space-y-2 bg-slate-50/95 px-3 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-4 sm:px-4"
+        className={`sticky z-10 -mx-3 mb-4 bg-slate-50/95 px-3 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-4 sm:px-4 ${pinnedCardsCollapsed ? "space-y-1" : "space-y-2"}`}
         style={{ top: "var(--ig-header-h, 0px)" }}
       >
-      <div className={`card min-h-[116px] border-2 p-4 sm:min-h-[132px] sm:p-5 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/80" : "border-slate-200 bg-white/95"}`}>
-        <div className="flex items-start justify-between gap-3 mb-2">
+      <div className={`card border-2 ${pinnedCardsCollapsed ? "p-3" : "min-h-[116px] p-4 sm:min-h-[132px] sm:p-5"} ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/80" : "border-slate-200 bg-white/95"}`}>
+        <div className={`flex items-start justify-between gap-3 ${pinnedCardsCollapsed ? "mb-0" : "mb-2"}`}>
           <div>
             <div className="text-xs font-semibold text-fuchsia-700 mb-1">지금 해야 할 일</div>
-            <div className="text-lg font-bold text-slate-800 sm:text-xl">
+            <div className={`${pinnedCardsCollapsed ? "text-base" : "text-lg sm:text-xl"} font-bold text-slate-800`}>
               {currentBlock
                 ? currentBlock.label
                 : timelinePhase === "before"
@@ -224,12 +225,26 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
                         : "오늘 일정이 종료되었습니다"}
             </div>
           </div>
-          <div className="text-right shrink-0">
-            <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
-            <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+          <div className="flex shrink-0 items-start gap-2">
+            <div className="text-right">
+              <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
+              {!pinnedCardsCollapsed && (
+                <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+              )}
+            </div>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-fuchsia-300 hover:text-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400"
+              aria-expanded={!pinnedCardsCollapsed}
+              aria-controls="cue-card-current-details cue-card-next-details"
+              onClick={() => setPinnedCardsCollapsed(value => !value)}
+            >
+              {pinnedCardsCollapsed ? "펼치기 ▼" : "접기 ▲"}
+            </button>
           </div>
         </div>
-        {currentBlock ? (
+        <div id="cue-card-current-details">
+        {!pinnedCardsCollapsed && (currentBlock ? (
           <div className="space-y-2">
             <div className="text-xs text-slate-500">{timeRangeLabel(currentBlock)}</div>
             <div className="rounded-lg bg-white border border-fuchsia-100 p-3">
@@ -263,13 +278,14 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
                     ? `${timeRangeLabel(nextBlock)}까지 대기합니다.`
                     : "현재 시간 이후로 등록된 시간 블록이 없습니다."}
           </div>
-        )}
+        ))}
+        </div>
       </div>
-      <div className={`card min-h-[96px] border p-4 sm:min-h-[110px] sm:p-5 ${nextBlock ? "border-violet-200 bg-violet-50/90" : "border-slate-200 bg-white/95"}`}>
+      <div className={`card border ${pinnedCardsCollapsed ? "p-3" : "min-h-[96px] p-4 sm:min-h-[110px] sm:p-5"} ${nextBlock ? "border-violet-200 bg-violet-50/90" : "border-slate-200 bg-white/95"}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="mb-1 text-xs font-semibold text-violet-700">다음 해야 할 일</div>
-            <div className="truncate text-lg font-bold text-slate-800">
+            <div className={`${pinnedCardsCollapsed ? "mb-0.5" : "mb-1"} text-xs font-semibold text-violet-700`}>다음 해야 할 일</div>
+            <div className={`truncate font-bold text-slate-800 ${pinnedCardsCollapsed ? "text-base" : "text-lg"}`}>
               {nextBlock ? nextBlock.label : "예정된 다음 일정이 없습니다"}
             </div>
           </div>
@@ -280,7 +296,8 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
             </div>
           )}
         </div>
-        {nextBlock && (
+        <div id="cue-card-next-details">
+        {!pinnedCardsCollapsed && nextBlock && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
             {nextMove ? (
               <>
@@ -296,6 +313,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
             )}
           </div>
         )}
+        </div>
       </div>
       </div>
       {days.map(day => (

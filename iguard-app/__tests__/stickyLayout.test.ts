@@ -11,4 +11,17 @@ describe("현장 화면 sticky 레이아웃 계약", () => {
     expect(source).toContain("min-h-screen overflow-x-clip");
     expect(source).not.toContain("min-h-screen overflow-x-hidden");
   });
+
+  it("개인 큐카드의 고정 일정 영역은 상세를 접고 다시 펼칠 수 있다", () => {
+    const source = readFileSync(
+      new URL("../src/app/retreat/[id]/ExecutionViews.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("const [pinnedCardsCollapsed, setPinnedCardsCollapsed] = useState(false)");
+    expect(source).toContain('aria-expanded={!pinnedCardsCollapsed}');
+    expect(source).toContain('aria-controls="cue-card-current-details cue-card-next-details"');
+    expect(source).toContain('{pinnedCardsCollapsed ? "펼치기 ▼" : "접기 ▲"}');
+    expect(source).toContain("!pinnedCardsCollapsed && nextBlock");
+  });
 });
