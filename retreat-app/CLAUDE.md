@@ -241,6 +241,8 @@ Firebase `update()`에서 `undefined`는 `stripUndefined()`가 제거하므로 �
 - **판단 질문**: `classes/{year}`의 모든 재학생을 넣지 않았다 — 현장등록 대상은 전체 재학생이 아니라 전체 **신청자**이며, 반 명단은 학년·반·학생키 보강에만 써야 한다. 취소/불참을 필터링하지도 않았다 — 이 화면은 도착 인원 산출 화면이 아니라 예외자까지 현장에서 확인하는 체크인 원장이다.
 - **재사용 규칙**: 현장등록 대상을 바꿀 때는 `src/lib/onSiteRoster.ts`에서 원본 포함 범위와 상태 오버레이를 함께 수정하고, 학생·교사 체크인 키의 네임스페이스를 절대 합치지 않는다.
 
+⚠ **등록은 즉시, 해제는 확인창** (2026-07-27). 체크인 칩은 토글이라 이미 등록된 학생을 "확인하려고" 눌렀다가 해제되는 오조작이 가능했다(루트 CLAUDE.md 실수 목록 11번의 행정 앱 버전). `toggleRegistration`·`toggleFromRightPanel` 두 경로 모두 `willUnregisterOnSite(onSiteReg[key])`가 참일 때만 `uiConfirm`을 거친다. 판정은 `onSiteRoster.ts`의 이 순수 함수가 단일 원천이며 `toggleOnSiteCheckIn` 트랜잭션의 분기(미등록→등록 / 등록→해제 / `isOnSite`는 토글 안 함)와 같은 기준이다. **등록(미등록→등록) 경로에는 확인창을 넣지 말 것** — 현장에서 빠르게 연속 체크인해야 한다. 회귀 테스트: `onSiteRoster.test.ts`의 `describe("willUnregisterOnSite")`.
+
 ### 4. Auth 접근 레벨
 ```typescript
 type AccessLevel = "none" | "member" | "admin";
@@ -276,6 +278,11 @@ GroupsTab에서 추출한 순수 UI 컴포넌트:
 - **탭 패널**: `role="tabpanel"` + `id="tab-content-panel"` (탭 `aria-controls`와 연결)
 - **모달**: `role="dialog"` + `aria-modal="true"` + `aria-label` + ESC 키 닫기 (`onKeyDown`)
 - **아이콘 버튼**: `aria-label` 필수 (예: `aria-label="조 편집"`, `aria-label="조 삭제"`, `aria-label="교사명 제거"`)
+
+**확인창(`uiConfirm`)이 기준 구현이다** (2026-07-27). `UIContext.tsx`의 confirm 모달은 `role="dialog"`·`aria-modal`·메시지를 가리키는 `aria-labelledby` 외에 **ESC=취소, Tab 포커스 트랩(취소↔확인 순환), 열기 전 포커스 복원**까지 갖췄고, 열릴 때 포커스는 파괴적 동작의 안전 기본값인 **취소 버튼**에 둔다. 새 모달을 만들 때 이 파일을 참고할 것.
+- ESC·Tab은 `document`의 **capture 단계** 리스너로 처리한다 — 오버레이 `div`의 `onKeyDown`은 포커스가 모달 안에 있을 때만 동작해서, 포커스가 밖에 있으면 ESC가 먹지 않는다.
+- `handleConfirm`은 `confirmResolveRef`로 resolve하고 **setState 업데이터 안에서 resolve를 호출하지 않는다**. StrictMode(Next 기본 on)가 업데이터를 두 번 실행하므로 그 안에 부수효과를 넣으면 이중 호출된다.
+- ⚠ 아직 `role="dialog"`가 없는 오버레이가 10개 파일에 남아 있다(GroupsTab·RoomsTab·TeachersTab·CarpoolTab·MedicalLogTab·NotesTab·SuppliesTab·CancellationTab·OnSiteRegistrationTab·AutoAssignPreviewModal). 해당 파일을 만질 때 위 기준으로 함께 보강할 것.
 
 ### 8. MAIN_ADMIN 환경변수 (page.tsx)
 ```typescript

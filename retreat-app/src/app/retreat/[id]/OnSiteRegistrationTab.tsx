@@ -10,7 +10,7 @@ import {
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { parseClassKey } from "@/lib/classKey";
-import { buildOnSiteRoster, OnSiteRosterPerson } from "@/lib/onSiteRoster";
+import { buildOnSiteRoster, willUnregisterOnSite, OnSiteRosterPerson } from "@/lib/onSiteRoster";
 
 type BuTab = "1부" | "2부";
 
@@ -211,6 +211,9 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
   }
 
   async function toggleRegistration(rp: OnSiteRosterPerson) {
+    // 등록은 즉시, 해제는 확인 후 — "확인하려다 해제" 오조작 방지
+    if (willUnregisterOnSite(onSiteReg[rp.onSiteKey])
+      && !await uiConfirm(`"${rp.name}" 등록을 해제하시겠습니까?`)) return;
     await runToggle(rp.onSiteKey, () => ({
       isOnSite: false,
       name: rp.name,
@@ -227,6 +230,8 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
 
   async function toggleFromRightPanel(onSiteKey: string, member: ClassGroup["members"][0]) {
     if (member.isOnSite) return; // 현장추가는 토글 불가
+    if (willUnregisterOnSite(onSiteReg[onSiteKey])
+      && !await uiConfirm(`"${member.name}" 등록을 해제하시겠습니까?`)) return;
     await runToggle(onSiteKey, () => ({
       isOnSite: false,
       name: member.name,

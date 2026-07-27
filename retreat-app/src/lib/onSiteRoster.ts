@@ -170,3 +170,15 @@ export function buildOnSiteRoster({
     return a.grade - b.grade || a.classNum - b.classNum || a.name.localeCompare(b.name, "ko");
   });
 }
+
+/**
+ * 체크인 칩을 누르면 "등록 해제"가 되는 상황인지 판정한다.
+ * toggleOnSiteCheckIn의 트랜잭션 분기와 같은 기준을 화면 쪽에서 미리 계산해,
+ * 해제일 때만 확인창을 띄우기 위한 순수 함수.
+ * 등록(미등록 → 등록)은 현장에서 빠르게 눌러야 하므로 확인창을 띄우지 않는다.
+ */
+export function willUnregisterOnSite(entry: { isOnSite?: boolean } | null | undefined): boolean {
+  if (!entry) return false;      // 미등록 → 등록
+  if (entry.isOnSite) return false; // 현장추가 → 토글 대상 아님
+  return true;                    // 등록됨 → 해제
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Participant, PartialAttendance, TeacherAttendance } from "./types";
-import { buildOnSiteRoster } from "./onSiteRoster";
+import { buildOnSiteRoster, willUnregisterOnSite } from "./onSiteRoster";
 
 const participants: Record<string, Participant> = {
   paid: { name: "입금학생", gender: "남", grade: 1, class: 1, bu: "1부", studentId: "s1", registeredAt: "" },
@@ -53,5 +53,20 @@ describe("buildOnSiteRoster", () => {
     expect(roster[0].status?.label).toBe("부분참(후발대)");
     expect(roster[1].status?.label).toBe("불참");
     expect(roster.every(person => person.onSiteKey.startsWith("teacher:"))).toBe(true);
+  });
+});
+
+describe("willUnregisterOnSite", () => {
+  it("이미 등록된 인원만 해제로 판정한다 (확인창 대상)", () => {
+    expect(willUnregisterOnSite({ isOnSite: false })).toBe(true);
+  });
+
+  it("미등록 인원은 등록이므로 해제가 아니다 (확인창 없이 즉시 등록)", () => {
+    expect(willUnregisterOnSite(null)).toBe(false);
+    expect(willUnregisterOnSite(undefined)).toBe(false);
+  });
+
+  it("현장추가(isOnSite) 인원은 토글 대상이 아니라 해제가 아니다", () => {
+    expect(willUnregisterOnSite({ isOnSite: true })).toBe(false);
   });
 });
