@@ -1,22 +1,126 @@
-# 인수인계 — 2026-07-17 저녁 (에이전트 중립 — GPT/Claude 공용)
+# 인수인계 — 2026-07-27 20:20 (에이전트 중립 — GPT/Claude 공용)
+
+## 지금 하던 일 (한 문장)
+
+행정(retreat-app)의 품질 부채 2건(현장등록 해제 오조작 방지 + 공용 확인창 접근성)을 수정·배포 완료했고, 다음 후보는 남은 모달 10개의 a11y 보강 또는 IGuard 피드백 설문이다.
+
+## 완료된 것 (커밋 해시와 함께)
+
+- `2cf9360 행정: 현장등록 해제 확인창과 공용 확인창 접근성 보강` — **푸시·배포·buildId 대조까지 완료**.
+  - **ⓐ 현장등록 해제 확인창**: 체크인 칩이 토글이라 등록된 학생을 확인하려고 눌렀다가 해제되는 오조작이 가능했다. 등록(미등록→등록)은 현장 속도를 위해 그대로 두고 **해제일 때만** `uiConfirm`을 거치게 했다. 경로 2개 모두 적용: `OnSiteRegistrationTab.tsx`의 `toggleRegistration`(검색 패널), `toggleFromRightPanel`(반별 칩 — 기존 감사에서 누락됐던 경로).
+  - 판정 단일 원천은 `retreat-app/src/lib/onSiteRoster.ts`의 순수 함수 `willUnregisterOnSite(entry)`이며 `toggleOnSiteCheckIn` 트랜잭션 분기(미등록→등록 / 등록→해제 / `isOnSite`는 토글 안 함)와 기준이 같다. 회귀 테스트 3개: `onSiteRoster.test.ts`의 `describe("willUnregisterOnSite")`.
+  - **ⓑ 공용 확인창 a11y**: `src/context/UIContext.tsx`의 confirm에 `role="dialog"`·`aria-modal`·`aria-labelledby`(메시지 연결)·**ESC=취소**·**Tab 포커스 트랩**·**열기 전 포커스 복원**을 넣고 초기 포커스를 안전 기본값인 **취소** 버튼에 둔다. 모든 `uiConfirm()` 호출이 함께 개선된다.
+  - 문서 동반 갱신: `retreat-app/CLAUDE.md` 패턴 7(확인창을 기준 구현으로 명시 + 미보강 파일 목록)·패턴 3f(등록 즉시/해제 확인 규칙), `LEARNINGS.md`(인증 벽 뒤 공용 UI 검증법).
+
+### 저장소·운영 배포 상태 (실측 2026-07-27 20:1x)
+
+- `HEAD == origin/main == 2cf9360e15b50b4c00ab3c843662c3d536504828`.
+- retreat-app: Vercel Production `● Ready`(44초), `https://retreat-app-theta.vercel.app/api/version` buildId = `2cf9360…` **대조 일치**.
+- iguard-app: 모노레포 push로 함께 재배포됨, `https://iguard-app.vercel.app/api/version` buildId = `2cf9360…` **대조 일치**. IGuard 소스 변경은 없다(이번 변경은 `retreat-app/` 안에서만).
+- 검증: retreat-app `tsc` 0 errors · 테스트 **27파일 235개 통과**(232→+3) · `lint` 0 errors/기존 경고 9 · `build` 성공. iguard-app `tsc` 0 errors(이번 세션 재실측), 테스트 25파일 193개 통과(직전 세션 기록).
+- DB 직접 쓰기와 Firebase Rules 변경·배포는 **없었다**.
+- 작업 트리 미추적 항목 `.agents/`, `outputs/`, `rayquaza-v2-upgrade/`, `tmp/`는 과거 운영 산출물·도구 아티팩트다. 임의 커밋·삭제하지 않는다.
+
+## 미완인 것 — 정확한 다음 단계
+
+- [ ] **남은 모달 a11y 보강 (권장 다음 작업)**: `role="dialog"`가 없는 오버레이가 아직 10개 파일에 있다 — `GroupsTab` · `RoomsTab` · `TeachersTab` · `CarpoolTab` · `MedicalLogTab` · `NotesTab` · `SuppliesTab` · `CancellationTab` · `OnSiteRegistrationTab`(현장추가 모달) · `AutoAssignPreviewModal`. 기준 구현은 `src/context/UIContext.tsx`. 현황 재확인 명령:
+  ```bash
+  cd retreat-app && for f in $(grep -rl 'fixed inset-0' src/); do grep -q 'role="dialog"' "$f" || echo "$f"; done
+  ```
+- [ ] **IGuard 피드백 설문** (수련회 2026-07-24~26 종료 후 대기 중): 실사용 스탭 대상 **익명 Google Form**. 이름·이메일 미수집, 약 5분 내 응답 분량. 기능별 평가는 `선형 배율` 대신 아래 6지 **객관식**을 권장(선형 배율에는 `사용하지 않음`을 넣을 수 없다): `매우 어려웠다 / 어려웠다 / 보통이었다 / 쉬웠다 / 매우 쉬웠다 / 사용하지 않았다`. 사용자가 선형 배율을 고수하면 `1 라벨=매우 어려웠다`, `5 라벨=매우 쉬웠다`로 두고 필수 질문을 해제하도록 안내. 다음 요청은 문항 다듬기·폼 작성 지원·응답 분석일 가능성이 높다.
+- [ ] **사용자 운영 확인(코드 아님)**: 배포된 현장 등록 탭에서 이미 등록된 칩을 눌러 `"…등록을 해제하시겠습니까?"`가 뜨는지 확인. **확인창에서 취소를 누르면 DB에 아무것도 쓰이지 않으므로** 이 방법으로 안전하게 검증할 수 있다.
+
+## 미커밋 변경 (있다면 파일별 요약)
+
+- 없음. 이 인수인계 파일 자체를 제외하면 작업 트리는 깨끗하고 `origin/main`과 동일하다.
+
+## 막힌 것 / 사용자 답변 대기 중인 질문
+
+- 없음. 직전 질문("HANDOFF 갱신할까요?")에 사용자가 갱신을 지시해 이 문서를 쓰는 중이다.
+
+## 이 작업의 함정 (이번 세션에서 배운 것)
+
+- **인증 벽 뒤 UI 검증**: `uiConfirm` 같은 전역 공용 UI는 호출 지점이 전부 Google OAuth 뒤라 헤드리스로 못 지나간다. `retreat-app/src/app/<임시라우트>/page.tsx`에 `useUI()`만 쓰는 최소 페이지를 만들어 dev 서버에서 구동 검증하고 **끝나면 삭제**한다(삭제 확인은 `npm run build` 라우트 목록 + `git status` 두 곳). 상세는 `LEARNINGS.md` 2026-07-27 항목.
+- **Next.js App Router는 `_`로 시작하는 폴더를 private folder로 보고 라우팅에서 제외한다** → `__a11y-check`로 만들면 404. `tmp-a11y-check`처럼 밑줄로 시작하지 않는 이름을 쓸 것(실제로 밟았다).
+- **모달 키 처리는 `document`의 capture 리스너로**. 오버레이 `div`의 `onKeyDown`은 포커스가 모달 안에 있을 때만 동작해서, 포커스가 밖이면 ESC가 먹지 않는다. 기존 `FormGuideModal.tsx`가 이 방식이라 같은 약점이 있다.
+- **`setState` 업데이터 안에서 promise resolve 같은 부수효과 금지**. Next 기본값으로 StrictMode가 켜져 있어 업데이터가 두 번 실행된다. `handleConfirm`은 `confirmResolveRef`로 업데이터 밖에서 resolve한다.
+- **파괴적 확인창에 backdrop 클릭 닫기를 넣지 말 것**. 실수 클릭으로 닫히면 확인창의 의미가 없다.
+- 기존 감사 보고서의 범위를 그대로 믿지 말 것 — 이번에 ⓐ는 보고된 1개 경로 외에 `toggleFromRightPanel`이, ⓑ는 1개 파일 외에 10개 파일이 추가로 발견됐다.
+
+## 검증 상태
+
+- **tsc**: retreat-app 0 errors / iguard-app 0 errors (둘 다 이번 세션 재실측)
+- **테스트**: retreat-app 27파일 235개 통과 / iguard-app 25파일 193개 통과
+- **lint**: retreat-app 0 errors, 경고 9개(기존 baseline과 동일 — 신규 경고 없음)
+- **배포**: retreat-app `● Ready` + buildId `2cf9360…` 대조 일치 / iguard-app buildId 동일 대조 일치
+
+### 최신 IGuard UI 변경
+
+- `iguard-app/src/app/retreat/[id]/ExecutionViews.tsx`
+  - 개인 큐카드의 고정 `지금 해야 할 일 / 다음 해야 할 일` 영역에 `접기 ▲ / 펼치기 ▼` 버튼을 추가했다.
+  - 기본은 펼친 상태다.
+  - 접으면 상세 동선·담당 내용만 숨기고 현재/다음 일정 제목과 시간은 남긴다.
+  - `aria-expanded`와 두 상세 영역을 가리키는 `aria-controls`를 연결했다.
+- `iguard-app/__tests__/stickyLayout.test.ts`
+  - 고정 일정 영역의 접기 상태·접근성 속성·다음 일정 상세 조건부 렌더링 계약을 회귀 테스트로 고정했다.
+
+### 2026-07-22~24 최근 숙소 배정도 기능
+
+- `e9ab707`: IGuard 실행 탭에 숙소 배정도 추가.
+- `8d0b39d`: 실제 도면 좌표에 방 정보를 맞추고 상세를 앵커 옆 말풍선으로 변경.
+- `cd366f3`: 방 배지에 반뿐 아니라 조 번호도 표시.
+- `252ecfe`: 도면이 없는 별관 숙소를 실제 운영 DB 호실 기준 간이 배치도로 추가.
+- 핵심 구현과 재사용 규칙은 `iguard-app/AGENTS.md`의 `정적 숙소 도면에 실시간 방배정 겹쳐 보기` 항목에 기록돼 있다.
+
+### 아래 오래된 섹션을 읽을 때 주의
+
+- 아래 2026-07-19의 `당일참석 Rules 블로커`는 **역사 기록이며 현재 미완료 작업이 아니다**. 이후 정식 `당일참석(day)`이 행정·IGuard의 해당 일차 조별/버스/인원체크에 반영되도록 구현됐다.
+- 최신 동작은 코드와 `iguard-app/AGENTS.md`의 `Formal 당일참석(day)` 규칙을 우선한다.
+- 아래의 과거 `HEAD=f557997`·`a03fba2` 및 그때의 배포 상태도 역사 기록이다. 현재 기준은 위 `2cf9360`이다.
+- 아래 `2026-07-17 저녁` 섹션 이하에 나오는 buildId·`HEAD` 값은 전부 그 시점의 값이다. 배포 판단은 항상 `git rev-parse HEAD`와 운영 `/api/version`을 직접 대조해서 하고, 이 문서에 적힌 해시를 믿지 말 것.
 
 > 새 세션은 다음 순서로 읽으세요:
 > ① 루트 `AGENTS.md` → ② 루트 `CLAUDE.md` → ③ 이 문서 →
 > ④ 대상 앱 `CLAUDE.md`·`AGENTS.md` → ⑤ 경로 변경은 `DB_OWNERSHIP.md` → ⑥ 배포·복구는 `OPERATIONS.md` → ⑦ 도구 함정은 `LEARNINGS.md`.
 > **모든 작업 시작 전 DB 안전 4문답을 먼저 답하세요.** 여름수련회는 2026-07-24~26입니다.
 
-## 지금 상태 (한 문장)
+## 과거 기록 — 2026-07-19 당시 상태
 
-카풀 이름 자동완성(`3d264e2`)까지 배포된 최신 `main`이 운영 중이고, 기도문자 학부모 명단(운영 산출물, `~/Downloads`)을 전달했으며, 행정 QA 발견 2건(현장등록 해제 무확인·모달 a11y)이 수정 대기다.
+조편성의 기본 구조 6개를 실제 선택 규칙으로 전환한 `f557997`이 행정 운영에 배포됐고, 다음 요청인 부분참석 `당일참석` 추가는 Firebase Rules가 현재 유형과 필드를 차단해 안전 규칙에 따라 코드 수정 전 중단한 상태다.
 
-## 저장소·배포 상태 (실측 2026-07-17 저녁)
+## 과거 기록 — 저장소·배포 상태 (실측 2026-07-19)
 
-- `HEAD == origin/main == 3d264e2` (카풀 자동완성). **이 시점 기준 미푸시 문서 커밋 없음** — 이 HANDOFF 갱신 커밋 이후에는 로컬이 1커밋 앞서는 게 정상. **사용자 요청 없이 push하지 말 것** — `main` push는 Vercel 자동 배포를 일으킨다.
-- 추적 파일 작업트리는 클린. `.agents/`만 untracked 도구 아티팩트이며 커밋 대상이 아니다.
+- `HEAD == origin/main == f55799759133222f9172b08af59ce7a645ca2d2d`.
+- 이 인수인계를 위한 `.claude/HANDOFF.md`만 미커밋 수정 상태. `.agents/`와 `rayquaza-v2-upgrade/`는 untracked이며 커밋 대상이 아니다.
 - 운영 주소:
-  - retreat-app: `https://retreat-app-theta.vercel.app` — buildId `3d264e2` 대조 확인
+  - retreat-app: `https://retreat-app-theta.vercel.app` — buildId `f55799759133222f9172b08af59ce7a645ca2d2d` 대조 확인
   - iguard-app: `https://iguard-app.vercel.app`
-- retreat-app 마지막 검증(3d264e2): tsc 0 · 테스트 178 통과 · lint 오류 0/경고 10.
+- retreat-app 마지막 검증(`f557997`): tsc 0 · 테스트 193 통과 · build 성공 · lint 오류 0/기존 경고 9.
+
+## 2026-07-19 최신 완료 — 조편성 기본 구조도 선택형으로 전환
+
+- 커밋/배포: `f557997` (`행정: 조편성 기본 구조 규칙 선택 지원`), Vercel Production Ready 및 운영 `/api/version` 일치 확인.
+- 기존 `항상 적용되는 기본 구조` 6개를 체크박스로 전환: `keepSameClass`, `inferGenderByClass`, `excludeNonClassTeachers`, `ensureNonEmptyGroups`, `ensureEvenGroupCount`, `optimizeResults`.
+- UI만 바꾸지 않고 `AutoAssignPanel.tsx`의 조 수 사전계산과 `autoAssignUtils.ts`의 배정·점수·교사 분산·후처리를 모두 규칙별로 실제 분기.
+- 구버전 `autoAssignConfig` 문서에 새 플래그가 없으면 모두 `true`로 보정해 기존 동작을 유지. 사용자가 `설정 저장`을 누를 때만 `retreats/{id}/autoAssignConfig` 문서에 선택값 기록.
+- `keepSameClass=false`+성별 추론 해제 조합에서 학생별 신청 성별이 유지되도록 `ClassUnit.genders` 보존. 회귀 테스트가 구버전 기본값·명시적 false·규칙 조합을 보호.
+- 학습 메모: `retreat-app/AGENTS.md` 하단 `고정처럼 보이던 배정 구조를 실제 선택 규칙으로 전환`.
+
+## 2026-07-19 조사 — `현장 추가 등록`의 현재 반영 범위
+
+- `OnSiteRegistrationTab.handleAddWalkIn()`→`addWalkIn()`이 `retreats/{id}/onSiteReg/{pushKey}`에 `isOnSite=true`, 이름·부·학년·반·성별·시간만 저장.
+- 현장등록 반별 명단에는 즉시 `registered=true`로 보이고 `현장추가 N명`으로 별도 표시되지만, 기존 `등록/전체` 진행률에는 포함되지 않음.
+- `onSiteReg` 구독은 현재 현장등록 탭만 사용. `participants`에 추가하지 않아 시트 연동·신청자 취합·조편성·방배정·식수·부분참·이가드에는 반영 안 됨.
+- 여행자 보험 학생은 `InsuranceTab.tsx`가 Google Sheet의 주민번호 열을 직접 읽으므로 현장추가에는 반영 안 됨.
+- 이 조사에서 코드·DB 수정 없음.
+
+## 과거 기록 — 당시 부분참석 `당일참석` 블로커 (이후 해결됨)
+
+- 사용자 요청: 행정 부분참석 탭에 `당일참석`을 추가하고 식수 계산·이가드 인원체크/버스 등 다른 소비처에도 반영.
+- **코드 수정 전 중단함**. 배포 Rules의 `retreats/$retreatId/partialAttendances/$studentKey` 검증은 `type` 값을 `선복귀|후발대`로만 제한하고 `$other.validate=false`로 새 필드도 차단한다. 따라서 `당일참석` 유형과 날짜/식사 범위 필드를 정식 저장하려면 Rules 변경이 필수.
+- 루트 안전 규칙상 에이전트는 Rules를 수정·배포하지 않는다. Rules 원천은 `고등부 학생 출석부/database.rules.json` 하나뿐이며 retreat/iguard의 `DO_NOT_DEPLOY` 파일은 사용 금지.
+- 구조 결정이 추가로 필요: `당일참석`은 적어도 참석 날짜, 첫 참석 식사, 마지막 참석 식사, 버스 탑승 여부를 구조화해야 식수·버스·인원체크가 정확해짐. 메모 문자열 파싱 회피.
+- 다음 에이전트는 반드시 DB 안전 4문답 후 진행. Rules 변경/배포 없이 코드만 준비할지, 운영 담당자가 Rules를 먼저 허용할지 사용자 결정 대기.
 
 ## 2026-07-17 저녁 완료 — 카풀 자동완성 + 기도문자 명단
 
@@ -170,4 +274,4 @@ curl -fsS https://retreat-app-theta.vercel.app/api/version
 curl -fsS https://iguard-app.vercel.app/api/version
 ```
 
-IGuard 버스·명단 기능의 마지막 변경 커밋은 `feaebbb`이고, 이후 모노레포 push로 현재 IGuard 운영 `/api/version` buildId는 `3d264e2cbba2be319ed3954f24f3ad75edc6a79d`다. 로컬 HEAD는 이 HANDOFF 문서 커밋 때문에 한 커밋 더 앞서는 것이 정상이다.
+⚠ (역사 기록) IGuard 버스·명단 기능의 마지막 변경 커밋은 `feaebbb`이고, 2026-07-17 당시 IGuard 운영 `/api/version` buildId는 `3d264e2cbba2be319ed3954f24f3ad75edc6a79d`였다. **현재 값이 아니다** — 최신 기준은 이 문서 맨 위의 `2cf9360`이다.
