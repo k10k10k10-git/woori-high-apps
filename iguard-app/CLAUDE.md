@@ -232,6 +232,26 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 - **판단 질문**: sticky 카드에 `fixed`를 덧씌우거나 임의 픽셀 `top`을 추가하지 않는다. 원인인 조상 overflow를 남겨두면 헤더 높이·모바일 뷰포트가 바뀔 때 다시 어긋나고, `fixed`는 문서 흐름에서 빠져 일정 카드를 가린다.
 - **재사용 규칙**: `position: sticky`가 안 붙으면 대상 요소보다 먼저 조상의 `overflow: hidden/auto/scroll`을 검사하고, 단순 클리핑 목적이면 `overflow: clip`을 사용한다.
 
+### 26. 인앱 브라우저 탈출은 절대 현재 주소로 이동하지 않는다 (`inAppBrowser.ts` / `InAppBrowserGuard.tsx`, 2026-07-29)
+
+예전 `InAppBrowserGuard`는 iOS 분기에서 `window.location.href = url`을 실행했는데, 이 `url`이 같은 effect에서 읽은 **현재 주소 자기 자신**이었다. iOS 카카오톡 웹뷰는 이 대입으로 사파리를 열지 않고 **같은 페이지를 리로드**하므로 리로드 → effect 재실행 → 재대입의 무한 루프가 됐고, 폴백 안내 UI를 띄우려던 `setTimeout(1500)`은 한 번도 도달하지 못했다. 실사용 피드백의 "카톡에서 열면 무한 로딩"이 이것이다.
+
+- 감지·이동 전략은 `src/lib/inAppBrowser.ts`의 순수 함수 `escapeStrategyFor(ua, currentUrl)`에만 둔다. 화면에서 UA를 직접 분기하지 말 것.
+- **불변식: 이동 주소가 현재 주소와 같으면 무조건 `guide`(안내 UI)로 강등한다.** `inAppBrowser.test.ts`가 모든 인앱 UA에 대해 이를 고정한다.
+- 플랫폼별로 실제 동작하는 수단만 쓴다 — 안드로이드 `intent://…package=com.android.chrome`, iOS 카카오톡 `kakaotalk://web/openExternal?url=`, 그 외 iOS 인앱(인스타·네이버·라인)은 **자동 이동 없이 안내만**.
+- `shouldAttemptEscape(sessionStorage)`로 세션당 자동 이동 1회 제한 — 외부 브라우저가 같은 주소로 되돌아와도 루프가 생기지 않는다.
+- 인앱 웹뷰에서 `<a target="_blank">`는 같은 인앱에서 열려 효과가 없다. 폴백은 스킴 버튼 + 링크 복사로 한다.
+
+### 27. 전역 검색은 판정 로직을 재구현하지 않고 민감정보를 담지 않는다 (`personIndex.ts` / `SearchOverlay.tsx`, 2026-07-29)
+
+수련회 피드백에서 3명이 "이름으로 학생 찾기", "이름만 아는 학생의 숙소", "조가 너무 많아 스크롤"을 각각 보고했다. 공통 원인은 이름 검색 부재가 아니라 **모든 탐색이 긴 목록 훑기**라, 사람(학생·교사·스탭)과 조·방·호차를 한 인덱스에 넣었다.
+
+- `buildSearchIndex(input)`는 **새 구독을 만들지 않는다** — `useRetreatData`가 이미 구독 중인 데이터의 파생이다(새 DB 경로·쓰기 0). 검색 때문에 훅에 구독을 추가하지 말 것.
+- **취소·부분참·자차·조 번호·부-학년-반 판정을 새로 쓰지 않는다.** `busParticipation`·`checklistMembers`·`groupNumber`·`lodgingMap.studentClass`·`staffIdentity`를 그대로 쓴다. 검색 결과의 값이 각 화면과 달라지면 검색을 신뢰할 수 없게 된다.
+- ⚠ **취소 학생과 불참·자차 교사에게 호차를 표시하지 않는다.** 다른 화면은 이미 제외하는데 검색만 표시하면 실제 사고("2호차 명단에 있는데 실제로는 자차 이동")를 그대로 재생산한다. `isTeacherBusPassenger`가 단일 원천이며 `personIndex.test.ts`가 고정한다.
+- 🔒 **`Student.phone`·`Student.pPhone`·`TeacherAttendance.idNumber`를 인덱스에 담지 않는다.** 검색은 `staff` 접근 레벨도 쓰는 화면이다. 테스트가 직렬화 결과에 이 값들이 없음을 확인한다.
+- 초성 검색은 `toChosung`(완성형 → 초성)만 사용한다. 시간 판정이 필요하면 `scheduleTime`의 헬퍼 결과(`currentBlockId`)를 인자로 받고, 인덱스 안에서 시:분을 비교하지 않는다(패턴 11).
+
 ---
 
 ## API 라우트
@@ -292,6 +312,8 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `checklistLayout.test.ts` | 인원체크 레이아웃 | 호차별 모바일 2열·조별 인쇄 페이지당 4개 조 및 체크 저장 회귀 방지 |
 | `lodgingMap.test.ts` | 숙소 배정도 | 건물·호실 매칭, 별관 4구역 간이 배치도, HRD 정원 보조 매칭, 취소·당일참석 제외, 미매칭 안전 처리 |
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
+| `inAppBrowser.test.ts` | 인앱 브라우저 탈출 | 인앱 판정, 플랫폼별 전략, **현재 주소 재이동 금지 불변식**, 세션 1회 제한 |
+| `personIndex.test.ts` | 전역 검색 | 초성 변환·검색, 취소/부분참 배지, **취소자·자차 교사 호차 미표시**, 민감정보 미포함, 정렬·limit |
 
 ---
 
@@ -331,6 +353,8 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | | `todos` | 준비 할일 | team/admin |
 
 `staff` 역할은 **실행 그룹만** 볼 수 있음 (기획·정보 숨김).
+
+탭과 별개로 헤더에 **🔍 전역 검색**(`SearchOverlay`)이 상시 있다. 접근 레벨과 무관하게 모두 사용하며, 결과 카드에서 해당 탭으로 이동한다(패턴 27).
 
 ---
 
