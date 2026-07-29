@@ -231,7 +231,8 @@ export function findRoomMapLocation(room: Room): { building: LodgingMapBuilding;
   return null;
 }
 
-function studentClass(student: Student): { full: string; short: string } {
+/** 학생의 부-학년-반 표기. 검색 결과·배정도가 같은 문구를 쓰도록 단일 원천으로 export한다. */
+export function studentClass(student: Student): { full: string; short: string } {
   const bu = student.buNum ?? "?";
   return {
     full: `${bu}부 ${student.grade}학년 ${student.class}반`,

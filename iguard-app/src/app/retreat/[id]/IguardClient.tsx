@@ -27,6 +27,9 @@ import LeaderCueManageView from "./LeaderCueManageView";
 import { GuideView, TodosView } from "./InfoViews";
 import GroupStaffView from "./GroupStaffView";
 import RetreatPinGate from "./RetreatPinGate";
+import SearchOverlay from "./SearchOverlay";
+import type { SearchIndexInput } from "@/lib/personIndex";
+import { currentBlockFor, currentRetreatDay } from "@/lib/scheduleTime";
 
 const GROUPS = [
   { label: "실행", hint: "현장·모바일", views: [
@@ -145,6 +148,7 @@ function IguardWorkspace({ id }: { id: string }) {
   const { user, accessLevel, memberName } = useAuth();
 
   const [view, setView] = useState<string>("cue");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
   const [compatDismissed, setCompatDismissed] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
@@ -166,6 +170,18 @@ function IguardWorkspace({ id }: { id: string }) {
     () => [memberName, user?.displayName].filter((name): name is string => !!name?.trim()),
     [memberName, user?.displayName],
   );
+  // 전역 검색 입력 — 새 구독 없이 이미 구독 중인 데이터의 파생이다(새 DB 경로·쓰기 없음).
+  // 현재 블록은 여는 시점 기준으로 한 번 계산한다. 시계 tick에 의존하면 패턴 17(선택 리셋) 위험이 있어
+  // 여기서는 tick을 걸지 않고, 시간 판정은 scheduleTime의 헬퍼에만 맡긴다.
+  const searchData = useMemo<SearchIndexInput>(() => ({
+    groups, rooms, students, participants, adminTeachers,
+    staff: staffForViews, groupStaff, buses, movements, posts,
+    partial, cellColors,
+    currentBlockId: currentBlockFor(schedule, currentRetreatDay(periods, retreat ?? undefined))?.id ?? null,
+  }), [
+    groups, rooms, students, participants, adminTeachers, staffForViews, groupStaff,
+    buses, movements, posts, partial, cellColors, schedule, periods, retreat,
+  ]);
   const absentStaffNames = useMemo(
     () => adminTeachers.filter(t => t.bu === "스탭" && t.status === "불참" && t.name?.trim()).map(t => t.name.trim()),
     [adminTeachers]
@@ -222,6 +238,14 @@ function IguardWorkspace({ id }: { id: string }) {
             <span className="hidden text-slate-600 sm:inline">|</span>
             <span className="px-2 py-0.5 rounded-full text-xs font-semibold shrink-0" style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
             <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
+            <button
+              onClick={() => setSearchOpen(true)}
+              disabled={dataLoading}
+              className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40 sm:text-xs"
+              aria-label="이름·조·호실·호차 검색"
+            >
+              <span aria-hidden="true">🔍</span><span className="hidden sm:inline">검색</span>
+            </button>
             {accessLevel !== "staff" && (
               <button
                 onClick={() => {
@@ -318,6 +342,14 @@ function IguardWorkspace({ id }: { id: string }) {
         {!dataLoading && view === "guide" && <GuideView retreatId={id} guide={guide} />}
         {!dataLoading && view === "todos" && <TodosView todos={todos} />}
       </main>
+
+      {searchOpen && (
+        <SearchOverlay
+          data={searchData}
+          onClose={() => setSearchOpen(false)}
+          onJump={nextView => { setView(nextView); setSearchOpen(false); }}
+        />
+      )}
 
       {/* 하단 탭바는 실행 뷰에서만 — 기획·정보 화면에서는 숨겨 세로 공간 확보 + 오탐 이동 방지 (2026-07-12) */}
       {executionViews.some(v => v.key === view) && (
