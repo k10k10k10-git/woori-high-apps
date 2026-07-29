@@ -4,84 +4,6 @@
 
 ---
 
-## 기술 스택
-
-| 항목 | 내용 |
-|---|---|
-| 프레임워크 | Next.js 16.1.7 (App Router) |
-| UI | React 19, Tailwind CSS 4 |
-| 언어 | TypeScript 5 (strict mode) |
-| 데이터베이스 | Firebase Realtime Database |
-| 인증 | Firebase Auth (Google OAuth) |
-| 시트 연동 | Google Sheets CSV (공개 게시) |
-| 엑셀 내보내기 | xlsx-js-style (npm 별칭 `"xlsx"` — import 경로는 그대로. 셀 fill/font/border 스타일 지원 포크, 0.18.5 기반. 조편성 그리드 XLSX의 성별·역할 색이 이걸 쓴다) |
-| 테스트 | Vitest 4 (`npm test` = `vitest run`) |
-| 배포 | Vercel (`npx vercel --prod --yes`) |
-| 의존성 | firebase, next, react, react-dom, xlsx, vitest(dev) — 최소화 유지 |
-
----
-
-## 디렉터리 구조
-
-```
-src/
-├── app/
-│   ├── page.tsx                    # 홈 (수련회 목록 + 준비 일정 캘린더 패널, md 기준 모바일/데스크탑 분기)
-│   ├── RetreatCalendarPanel.tsx    # 메인 준비 일정 패널 (수련회 기간 + 마일스톤 달력) — 기간은 전체 수련회 합쳐서 표시
-│   ├── FormGuideModal.tsx          # 구글폼 작성 가이드 모달
-│   ├── UpdateBanner.tsx            # 새 배포 감지 배너 (NEXT_PUBLIC_BUILD_ID 폴링)
-│   ├── api/version/route.ts        # 현재 배포 빌드 ID 반환 (UpdateBanner가 폴링)
-│   ├── layout.tsx / providers.tsx
-│   └── retreat/[id]/
-│       ├── page.tsx                # 서버 컴포넌트 entry
-│       ├── RetreatPageClient.tsx   # 탭 라우터 (TAB_IDX 상수 + 15개 탭 관리, keep-alive 패턴)
-│       ├── GroupComponents.tsx     # 조편성 UI 컴포넌트 (GroupCard, UnassignedBySection, StudentChip, TeacherChip)
-│       ├── ParticipantsTab.tsx     # 신청자 취합 (시트 연동)
-│       ├── GroupsTab.tsx           # 조편성 (GroupComponents 사용)
-│       ├── RoomsTab.tsx            # 방배정 (실시간 구독)
-│       ├── ClassRosterTab.tsx      # 반 명단(신청자 취합) — 장결자(jang)는 메인 그리드/집계에서 빼고 하단 별도 구역에 표시
-│       ├── TeachersTab.tsx         # 교사 참석
-│       ├── NotesTab.tsx            # 특이사항
-│       ├── CarpoolTab.tsx          # 카풀
-│       ├── PartialAttendanceTab.tsx # 부분참
-│       ├── InsuranceTab.tsx        # 여행자 보험
-│       ├── CancellationTab.tsx     # 취소명단
-│       ├── SuppliesTab.tsx         # 물품/간식
-│       ├── OnSiteRegistrationTab.tsx # 현장 등록
-│       ├── UnmatchedPaymentsTab.tsx  # 입금 미매칭
-│       ├── TshirtTab.tsx           # 단체티 신청
-│       ├── MedicalLogTab.tsx       # 의료 일지 (약 처방 기록, 프리셋 편집, 부서→학년→반 + 참가자 이름 자동완성)
-│       ├── AutoAssignPanel.tsx     # 자동 조편성 패널
-│       └── BackupRestoreButton.tsx # 조편성/방배정 롤링 백업 복구 버튼 (공용 — GroupsTab·RoomsTab 툴바에서 사용)
-├── context/
-│   ├── AuthContext.tsx             # Google OAuth, accessLevel 관리
-│   └── UIContext.tsx               # toast(), uiConfirm() 전역 UI 유틸
-└── lib/
-    ├── types.ts                    # 전체 타입 정의 (RetreatPeriod, RetreatAdminMember 포함)
-    ├── db.ts                       # Firebase 접근 배럴 — 본문은 db/ 도메인 모듈 10개 (2026-07 R5 분할, import 경로는 @/lib/db 유지)
-    ├── db/                         # core(공용 헬퍼)·retreats·participants·groupsRooms·students·teachers·access·retreatOps·private·shared
-    ├── classKey.ts                 # parseClassKey — "{부}-{학년}-{반}" 파싱 단일 원천 (+테스트)
-    ├── syncParticipants.ts         # 시트 동기화 보존·중복제거 순수 로직 (충돌 가드 포함, +특성화 테스트)
-    ├── dateFormat.ts               # toYMD — YYYY-MM-DD 포맷 단일 원천
-    ├── firebase.ts                 # Firebase 초기화 (db, auth, googleProvider)
-    ├── sheetsParser.ts             # Google Sheets CSV 파싱 (parseCSV: 따옴표 내 줄바꿈 처리)
-    ├── sheetsParser.test.ts        # sheetsParser 단위 테스트
-    ├── studentMatcher.ts           # 신청자↔출석부 학생 9단계 매칭 (findStudent, normalizeName, stripSuffix)
-    ├── studentMatcher.test.ts      # studentMatcher 단위 테스트
-    ├── groupNumber.ts              # 조 전역 번호 표시 (groupDisplayName: 2부는 1부 조 개수만큼 이어서)
-    ├── groupNumber.test.ts         # groupNumber 단위 테스트
-    ├── exportUtils.ts              # xlsx 내보내기, printAsPDF, escapeHtml(인쇄 XSS 방지)
-    ├── exportUtils.test.ts         # exportUtils 단위 테스트
-    ├── constants.ts                # 공통 상수 (TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS)
-    └── constants.test.ts           # constants 단위 테스트
-
-루트 파일:
-- DO_NOT_DEPLOY.database.rules.json # 보관용 규칙 사본 (배포 금지 — 배포용 원천은 학생 앱)
-- vitest.config.ts                  # Vitest 설정 (globals: true, @ alias → src/)
-```
-
----
-
 ## Firebase DB 구조
 
 ```
@@ -356,30 +278,6 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 
 ---
 
-## 테스트
-
-```bash
-# 전체 테스트 실행
-npm test          # = vitest run
-
-# watch 모드
-npx vitest
-```
-
-테스트 파일 위치: `src/lib/*.test.ts` (순수 로직 유닛 테스트)
-- `studentMatcher.test.ts` — 이름 정규화, 9단계 매칭 로직
-- `sheetsParser.test.ts` — CSV 파싱 (따옴표 내 줄바꿈 등)
-- `exportUtils.test.ts` — xlsx 내보내기 유틸
-- `groupNumber.test.ts` — 조 번호 연속 표시 로직
-
-설정: `vitest.config.ts` — `globals: true`, `@` alias → `src/`
-
----
-
-> RetreatDataContext는 미사용으로 2026-07 삭제됨(git 히스토리에 있음). 탭 간 구독 공유가 필요해지면 새로 설계할 것.
-
----
-
 ## 절대 하지 말 것
 
 1. **컴포넌트에서 Firebase 직접 import 금지**
@@ -423,61 +321,22 @@ npx vitest
 
 ---
 
-## 개발 & 배포
+## 설계 결정 메모 (코드만 봐서는 알 수 없는 것)
 
-```bash
-# 개발 서버
-npm run dev
-
-# TypeScript 타입 체크 (배포 전 필수)
-npx tsc --noEmit
-
-# 테스트
-npm test
-
-# 프로덕션 배포
-npx vercel --prod --yes
-```
-
-배포 URL: **https://retreat-app-theta.vercel.app**
-
-✅ **Git 자동배포 정상(2026-07-08 확인)**: 07-06에 "push해도 배포가 안 잡힌다"는 이슈가 있었으나, Vercel API 배포 이력 검증 결과 07-06 `git connect`+Root Directory 세팅 완료 이후의 모든 push가 정상적으로 자동 배포됨(git 소스, READY). push 후 `npx vercel ls`로 Ready 확인은 계속 할 것(/ship 스킬 절차). 만약 다시 트리거가 안 되면 비상 폴백: 레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사한 뒤(Root Directory가 retreat-app이라 레포 루트에서 실행) `npx vercel --prod --yes`로 수동 배포, 작업 후 임시 `.vercel/` 삭제.
+- **RetreatDataContext는 미사용으로 2026-07 삭제됨**(git 히스토리에 있음). 탭 간 구독 공유가 필요해지면 새로 설계할 것.
+- **탭 이름 "시트 연동"의 유래**: 이전엔 "참가자 명단"이 별도 "사이트 셋팅" 그룹이었으나, 실제로는 사전 준비의 첫 단계(시트 연동·DB 매칭)라 "신청자 취합"과 헷갈리지 않도록 이름을 바꾸고 "사전 준비" 그룹 맨 앞으로 옮겼다. 탭 구성·인덱스는 `RetreatPageClient.tsx`의 `TAB_IDX`/`TAB_GROUPS`가 원천.
 
 ---
 
-## 탭 구조 (RetreatPageClient.tsx)
+## 배포 — 이 앱에만 해당하는 사실
 
-탭 인덱스는 `TAB_IDX` 상수로 관리 (`RetreatPageClient.tsx` 상단):
+배포 URL: **https://retreat-app-theta.vercel.app** (프로덕션 배포는 `npx vercel --prod --yes`)
 
-```typescript
-const TAB_IDX = {
-  PARTICIPANTS: 0, GROUPS: 1, ROOMS: 2, NOTES: 3, TEACHERS: 4,
-  CARPOOL: 5, PARTIAL: 6, ROSTER: 7, INSURANCE: 8, CANCELLATION: 9,
-  SUPPLIES: 10, ONSITE: 11, PAYMENTS: 12, TSHIRT: 13, MEDICAL: 14,
-} as const;
-```
+✅ **Git 자동배포 정상(2026-07-08 확인)**: 07-06에 "push해도 배포가 안 잡힌다"는 이슈가 있었으나, Vercel API 배포 이력 검증 결과 07-06 `git connect`+Root Directory 세팅 완료 이후의 모든 push가 정상적으로 자동 배포됨(git 소스, READY). push 후 `npx vercel ls`로 Ready 확인은 계속 할 것(/ship 스킬 절차). 만약 다시 트리거가 안 되면 비상 폴백: 레포 루트에 `retreat-app/.vercel/project.json`을 임시 복사한 뒤(Root Directory가 retreat-app이라 레포 루트에서 실행) `npx vercel --prod --yes`로 수동 배포, 작업 후 임시 `.vercel/` 삭제.
 
-탭 그룹 구조 (`TAB_GROUPS`): 대그룹 → 소그룹 2계층. 대그룹 탭은 `role="tablist" aria-label="탭 그룹"`, 소그룹 탭은 `role="tablist" aria-label="세부 탭"`.
+> 표준 명령(`npm run dev` · `npx tsc --noEmit` · `npm test`)은 `package.json`에서 확인할 것.
 
-| 그룹 | 탭 | TAB_IDX 키 | keep-alive |
-|---|---|---|---|
-| 사전 준비 | 시트 연동 | PARTICIPANTS (0) | ✅ |
-| | 신청자 취합 | ROSTER (7) | ✅ |
-| | 미납자 현황 | PAYMENTS (12) | |
-| | 단체티 신청 | TSHIRT (13) | |
-| | 취소명단 | CANCELLATION (9) | |
-| | 여행자 보험 | INSURANCE (8) | |
-| | 조편성 | GROUPS (1) | ✅ |
-| | 방배정 | ROOMS (2) | ✅ |
-| | 교사 참석 | TEACHERS (4) | |
-| | 물품/간식 | SUPPLIES (10) | |
-| 현장 준비 | 카풀 | CARPOOL (5) | |
-| | 부분 참석 | PARTIAL (6) | |
-| | 현장 등록 | ONSITE (11) | |
-| | 의료 일지 | MEDICAL (14) | |
-| | 특이사항 | NOTES (3) | |
-
-(이전엔 "참가자 명단"이 별도 "사이트 셋팅" 그룹이었으나, 실제 사전 준비의 첫 단계(시트 연동·DB 매칭)라 "신청자 취합"과 헷갈리지 않도록 이름을 "시트 연동"으로 바꾸고 "사전 준비" 그룹 맨 앞으로 옮김.)
+---
 
 ### layout.tsx — dangerouslySetInnerHTML
 `<head>`에 인라인 스크립트(`dangerouslySetInnerHTML`)가 있음. 카카오톡/네이버 등 인앱 브라우저에서 Firebase Auth가 작동하지 않으므로, 페이지 로드 즉시 외부 브라우저로 리다이렉트합니다. 정적 문자열이며 사용자 입력을 포함하지 않습니다.

@@ -5,92 +5,6 @@
 
 ---
 
-## 기술 스택
-
-| 항목 | 내용 |
-|---|---|
-| 프레임워크 | Next.js 16.1.7 (App Router) |
-| UI | React 19, Tailwind CSS 4 |
-| 언어 | TypeScript 5 (strict mode) |
-| 데이터베이스 | Firebase Realtime Database (프로젝트: `woori-high`) |
-| 인증 | Firebase Auth (Google OAuth) |
-| 테스트 | Vitest 3 |
-| 배포 | Vercel |
-| 의존성 | firebase, next, react, react-dom (4개, 최소화 유지) |
-
----
-
-## 디렉터리 구조
-
-```
-src/
-├── app/
-│   ├── page.tsx                    # 홈 (수련회 목록 + 준비 일정 캘린더, 행사 날짜 최신순 정렬, md 기준 모바일/데스크탑 분기)
-│   ├── PrepCalendar.tsx            # 준비 일정 캘린더 (마일스톤·수련회 기간 표시) — 기간은 전체 수련회 합쳐서 표시
-│   ├── TeamModal.tsx               # 팀원 관리 모달 (admin 전용 — 승인/거절/역할 변경)
-│   ├── AdminModal.tsx              # 수련회별 PIN 잠금 관리 (admin 전용)
-│   ├── UpdateBanner.tsx            # 새 배포 감지 배너 (NEXT_PUBLIC_BUILD_ID 폴링)
-│   ├── api/version/route.ts        # 현재 배포 빌드 ID 반환 (UpdateBanner가 폴링)
-│   ├── layout.tsx                  # RootLayout (lang="ko", viewport 설정)
-│   ├── providers.tsx               # InAppBrowserGuard → AuthProvider → UIProvider 래핑
-│   └── retreat/[id]/
-│       ├── page.tsx                # 서버 컴포넌트 entry → IguardClient
-│       ├── IguardClient.tsx        # 탭 라우터 (실행/기획/정보 3그룹, 17개 뷰)
-│       ├── ChecklistView.tsx       # 인원체크 (조별 학생+교사 체크, 버스별 체크)
-│       ├── RoomsView.tsx           # 조별 정보 (방배정·학생·교사·이가드 조스탭 조회)
-│       ├── LodgingMapView.tsx      # 숙소 배정도 (PDF 도면 위 방별 반·학생·교사 실시간 표시)
-│       ├── ExecutionViews.tsx      # 개인 큐카드 + 포스트 보드 (현장 모바일용)
-│       ├── ScheduleView.tsx        # 스탭 전체 큐싯 (시간블록 CRUD + 시트 임포트, src/lib/cueSheet.ts의 parseCueSheetText 사용)
-│       ├── LeaderCueManageView.tsx # 조장 큐싯 관리
-│       ├── PostsView.tsx           # 포스트(통제 지점) CRUD
-│       ├── StaffView.tsx           # 스탭 명단 (읽기 전용, 행정 teachers 기반)
-│       ├── MovementsView.tsx       # 동선 매트릭스 (스탭 × 시간블록 → 포스트 배정)
-│       ├── ValidationView.tsx      # 검증 (시간 겹침, 미배정 공백, 고아 동선 경고)
-│       ├── GroupStaffView.tsx      # 조스탭 배정
-│       ├── MealsView.tsx           # 식사 순서 (조별 배식 순서)
-│       ├── BusesView.tsx           # 버스(호차) 배정
-│       ├── SeatingView.tsx         # 집회 자리배치 (구역별 조 배정)
-│       ├── FairAssignButton.tsx    # 공정 배분 버튼 (식사+자리 통합 배정)
-│       └── InfoViews.tsx           # 조스탭 가이드 + 준비 할일
-├── hooks/
-│   └── useRetreatData.ts           # 데이터 허브 — 17개 Firebase 실시간 구독 + 연결 상태(.info/connected) 중앙 관리
-├── components/
-│   ├── InAppBrowserGuard.tsx       # 인앱 브라우저 감지 → 외부 브라우저 유도
-│   └── CenterSpinner.tsx           # 공용 로딩 스피너
-├── context/
-│   ├── AuthContext.tsx             # Google OAuth, AccessLevel(none/staff/team/admin) 관리
-│   └── UIContext.tsx               # toast(), uiConfirm() 전역 UI (aria-live, 포커스 트랩)
-└── lib/
-    ├── types.ts                    # 전체 타입 (행정 읽기 전용 + 이가드 소유 구분 주석)
-    ├── db.ts                       # Firebase CRUD 유일 접근 레이어 (읽기/쓰기 영역 명시 구분)
-    ├── firebase.ts                 # Firebase 초기화 (db, auth, googleProvider)
-    ├── snapToList.ts               # DataSnapshot → T[] 변환 헬퍼 (null/배열/원시값 안전 처리)
-    ├── compat.ts                   # 행정 데이터 형태 계약 런타임 점검 (classKey, studentId, bu 검증)
-    ├── lodgingMap.ts               # 숙소 도면 좌표·건물/호실 매칭·방별 반 요약
-    ├── fairAssign.ts               # 공정 배분 알고리즘 (식사 순서 + 집회 자리 통합 누적 점수)
-    ├── groupNumber.ts              # 조 전역 번호 표시 (2부는 1부 조 수만큼 오프셋)
-    ├── groupStaffNames.ts          # 행정 group.staff + 이가드 groupStaff ID를 이름으로 중복 없이 병합
-    ├── partialAttendance.ts        # 부분참(선복귀/후발대) 일자별 참석 공식
-    ├── accessLock.ts               # PIN 검증(PBKDF2), 세션 잠금 해제 키
-    ├── scheduleTime.ts             # 현장 시간·일차 판정 순수 로직 (isNowOn/currentBlockFor, 24시+ 블록 — 패턴 11) ExecutionViews에서 추출(2026-07 I2)
-    ├── cueCardTimeline.ts          # 개인 큐카드의 현재/다음 고정 일정과 이후 목록 경계 계산 (패턴 24)
-    ├── cueSheet.ts                 # 큐싯 파서 (구 scheduleUtils.ts — 2026-07 I4 이동, 특성화 테스트 15개)
-    └── exportUtils.ts              # printAsPDF (인쇄용 HTML → 새 창 인쇄), escapeHtml(인쇄 XSS 방지)
-
-루트 파일:
-├── DO_NOT_DEPLOY.database.rules.json  # 보관용 규칙 사본 (배포 금지 — 배포용 원천은 학생 앱)
-├── vitest.config.ts                # 테스트 설정 (@ 경로 별칭)
-├── vercel.json                     # Vercel 배포 설정
-├── next.config.ts                  # Next.js 설정 (빈 설정)
-├── eslint.config.mjs               # ESLint 설정
-└── __tests__/                      # 단위 테스트 (snapToList, compat, groupNumber, partialAttendance)
-
-scripts/                            # 일회성 마이그레이션 스크립트 (운영 DB 패치용)
-backups/                            # 마이그레이션 전 백업 스냅샷
-```
-
----
-
 ## Firebase DB 구조 — 이 앱이 사용하는 경로
 
 ### 읽기 전용 (행정 앱 소유 — 절대 쓰기 금지)
@@ -343,25 +257,9 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 
 ## 개발 & 배포
 
-```bash
-# 개발 서버
-npm run dev
+프로덕션 배포는 `npx vercel --prod --yes`. 표준 명령(`npm run dev` · `npx tsc --noEmit` · `npm run lint` · `npm test`)은 `package.json`에서 확인할 것.
 
-# TypeScript 타입 체크
-npx tsc --noEmit
-
-# Lint
-npm run lint
-
-# 테스트 실행
-npm test              # vitest run (단일 실행)
-npm run test:watch    # vitest (watch 모드)
-
-# 프로덕션 배포 (Vercel)
-npx vercel --prod --yes
-```
-
-이 프로젝트는 GitHub main 브랜치 push 시 Vercel 자동배포가 정상 트리거된다(2026-07-06 확인). 같은 모노레포의 `retreat-app`은 자동배포가 안 되는 경우가 있었으니, 두 앱을 동시에 고칠 땐 각각 `npx vercel ls`로 배포 여부를 따로 확인할 것.
+GitHub main 브랜치 push 시 Vercel 자동배포가 정상 트리거된다(2026-07-06 확인). 같은 모노레포의 `retreat-app`도 **2026-07-08 자동배포 정상이 확인됐다** — 과거 "retreat-app은 자동배포가 안 된다"는 서술은 07-06 세팅 전 증상이니 따르지 말 것. 다만 모노레포 push는 두 앱을 동시에 재배포하므로, push 후 각각 `npx vercel ls`로 Ready를 따로 확인한다.
 
 ### 환경변수 (`.env.local`)
 
