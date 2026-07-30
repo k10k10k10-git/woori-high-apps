@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { looksLikeLegacySheetMovement, reconcileSheetMovements } from "@/lib/movementReconcile";
 import { type AutoAssignment } from "@/lib/cueSheet";
-import { type IguardMovement } from "@/lib/types";
+import { type AssignedIguardMovement } from "@/lib/types";
 
 const previousLunch: AutoAssignment = {
   staffId: "choi",
@@ -10,7 +10,7 @@ const previousLunch: AutoAssignment = {
   note: "1층 퇴식구: 최성우sf",
 };
 
-function movement(overrides: Partial<IguardMovement> = {}): IguardMovement {
+function movement(overrides: Partial<AssignedIguardMovement> = {}): AssignedIguardMovement {
   return {
     id: "choi__lunch",
     staffId: "choi",

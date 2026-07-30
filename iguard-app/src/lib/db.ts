@@ -2,7 +2,7 @@ import { ref, get, set, update, push, remove, onValue, runTransaction, DataSnaps
 import { db } from "./firebase";
 import { paths } from "./paths";
 import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
-  IguardScheduleBlock, IguardPost, IguardMovement, IguardBus, IguardSeating,
+  IguardScheduleBlock, IguardSegment, IguardPost, IguardMovement, IguardBus, IguardSeating,
   RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
   IguardAccessLock } from "./types";
 export { snapToList } from "./snapToList";
@@ -234,11 +234,54 @@ export async function updateIguardScheduleBlock(retreatId: string, id: string, d
   await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), stripUndefined(data));
 }
 export async function deleteIguardScheduleBlock(retreatId: string, id: string): Promise<void> {
-  const movementsSnap = await get(ref(db, paths.iguardMovements(retreatId)));
+  const [segmentsSnap, movementsSnap] = await Promise.all([
+    get(ref(db, paths.iguardSegments(retreatId))),
+    get(ref(db, paths.iguardMovements(retreatId))),
+  ]);
   const updates: Record<string, null> = { [paths.iguardScheduleBlock(retreatId, id)]: null };
+  if (segmentsSnap.exists()) {
+    Object.entries(segmentsSnap.val() as Record<string, IguardSegment>).forEach(([key, segment]) => {
+      if (segment?.blockId === id) updates[paths.iguardSegment(retreatId, key)] = null;
+    });
+  }
   if (movementsSnap.exists()) {
     Object.entries(movementsSnap.val() as Record<string, IguardMovement>).forEach(([key, movement]) => {
       if (movement?.blockId === id) updates[paths.iguardMovement(retreatId, key)] = null;
+    });
+  }
+  await update(ref(db), updates);
+}
+
+// ── 시간 블록 구간 (iguard/segments) ───────────────────────
+export function subscribeToIguardSegments(
+  retreatId: string,
+  cb: (list: IguardSegment[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.iguardSegments(retreatId)), (snap) =>
+    cb(snapToList<IguardSegment>(snap).sort((a, b) =>
+      a.blockId.localeCompare(b.blockId) || a.order - b.order || a.label.localeCompare(b.label, "ko")
+    )),
+    (error) => { console.warn("subscribeToIguardSegments error:", error); onError?.(error); });
+}
+export async function saveIguardSegment(retreatId: string, data: Omit<IguardSegment, "id">): Promise<string> {
+  const r = push(ref(db, paths.iguardSegments(retreatId)));
+  await set(r, stripUndefined(data));
+  return r.key!;
+}
+export async function updateIguardSegment(
+  retreatId: string,
+  id: string,
+  data: Partial<Omit<IguardSegment, "id">>,
+): Promise<void> {
+  await update(ref(db, paths.iguardSegment(retreatId, id)), stripUndefined(data));
+}
+export async function deleteIguardSegment(retreatId: string, id: string): Promise<void> {
+  const movementsSnap = await get(ref(db, paths.iguardMovements(retreatId)));
+  const updates: Record<string, null> = { [paths.iguardSegment(retreatId, id)]: null };
+  if (movementsSnap.exists()) {
+    Object.entries(movementsSnap.val() as Record<string, IguardMovement>).forEach(([key, movement]) => {
+      if (movement?.segmentId === id) updates[paths.iguardMovement(retreatId, key)] = null;
     });
   }
   await update(ref(db), updates);

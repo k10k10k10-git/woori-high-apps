@@ -71,8 +71,9 @@
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
 | `retreats/{id}/iguard/schedule` | 이가드 | - | 이가드만 | 없음 |
+| `retreats/{id}/iguard/segments` | 이가드 | - | 이가드만 | 시간 블록 안의 동선 구간 — `movements.segmentId`가 참조 |
 | `retreats/{id}/iguard/posts` | 이가드 | - | 이가드만 | 없음 |
-| `retreats/{id}/iguard/movements` | 이가드 | - | 이가드만 | 없음 |
+| `retreats/{id}/iguard/movements` | 이가드 | - | 이가드만 | 구간·포스트·스탭(또는 미정 슬롯) 배정. 구버전 `staffId__blockId` 키는 2027 겨울까지 읽기 호환 |
 | `retreats/{id}/iguard/buses` | 이가드 | - | 이가드만 | 버스 배정 — 기존 혼합은 `groupIds`, 남녀 분리는 `assignmentMode=gender`+`segments[{groupId,gender,teacherNames}]`; `includeTeachers`는 구버전 읽기 전용 |
 | `retreats/{id}/iguard/attendance` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/seating` | 이가드 | - | 이가드만 | 없음 |

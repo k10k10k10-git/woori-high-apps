@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import { IguardStaff, IguardScheduleBlock, IguardPost, IguardMovement } from "@/lib/types";
+import { IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement } from "@/lib/types";
 import { updateIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 
@@ -9,7 +9,7 @@ interface Props {
   staff: IguardStaff[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
 }
 
 import { isTeleport } from "@/lib/validationRules";
@@ -23,8 +23,8 @@ export default function ValidationView({ retreatId, staff, schedule, posts, move
     const staffName = new Map(staff.map(s => [s.id, s.name]));
     const postName = new Map(posts.map(p => [p.id, p.name]));
     const blockById = new Map(schedule.map(b => [b.id, b]));
-    const byStaff = new Map<string, IguardMovement[]>();
-    const byBlock = new Map<string, IguardMovement[]>();
+    const byStaff = new Map<string, AssignedIguardMovement[]>();
+    const byBlock = new Map<string, AssignedIguardMovement[]>();
     movements.forEach(mv => {
       (byStaff.get(mv.staffId) ?? byStaff.set(mv.staffId, []).get(mv.staffId)!).push(mv);
       (byBlock.get(mv.blockId) ?? byBlock.set(mv.blockId, []).get(mv.blockId)!).push(mv);
@@ -40,7 +40,7 @@ export default function ValidationView({ retreatId, staff, schedule, posts, move
 
     // 1) 순간이동: 한 스탭이 시간 겹치는 두 블록에 "서로 다른 포스트"로 배치 (같은 포스트면 이동 없음 → 정상)
     staff.forEach(s => {
-      const mvs = (byStaff.get(s.id) || []).map(mv => ({ mv, b: blockById.get(mv.blockId) })).filter(x => x.b) as { mv: IguardMovement; b: IguardScheduleBlock }[];
+      const mvs = (byStaff.get(s.id) || []).map(mv => ({ mv, b: blockById.get(mv.blockId) })).filter(x => x.b) as { mv: AssignedIguardMovement; b: IguardScheduleBlock }[];
       for (let i = 0; i < mvs.length; i++) for (let j = i + 1; j < mvs.length; j++) {
         if (isTeleport({ postId: mvs[i].mv.postId, block: mvs[i].b }, { postId: mvs[j].mv.postId, block: mvs[j].b })) {
           out.push({ level: "error", text: `순간이동: ${s.name} 이(가) 겹치는 시간 「${mvs[i].b.label}」(${postName.get(mvs[i].mv.postId)})와 「${mvs[j].b.label}」(${postName.get(mvs[j].mv.postId)})에 동시에 배치됨` });

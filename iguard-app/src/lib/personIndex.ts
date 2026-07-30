@@ -18,7 +18,7 @@
 
 import {
   Group, Room, Student, Participant, TeacherAttendance,
-  IguardStaff, IguardBus, IguardMovement, IguardPost,
+  IguardStaff, IguardBus, AssignedIguardMovement, IguardPost,
   PartialAttendanceMap, BusStudentGender,
 } from "./types";
 import { groupDisplayName } from "./groupNumber";
@@ -99,7 +99,7 @@ export interface SearchIndexInput {
   staff: IguardStaff[];
   groupStaff: Record<string, string[]>;
   buses: IguardBus[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
   posts: IguardPost[];
   partial: PartialAttendanceMap;
   cellColors: Record<string, string>;

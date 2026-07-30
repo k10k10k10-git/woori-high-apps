@@ -1,10 +1,10 @@
 import { type AutoAssignment } from "@/lib/cueSheet";
-import { type IguardMovement } from "@/lib/types";
+import { type AssignedIguardMovement } from "@/lib/types";
 
 export type SheetMovementUpsert = AutoAssignment & { source: "sheet" };
 
 export interface SheetMovementReconcileResult {
-  removes: IguardMovement[];
+  removes: AssignedIguardMovement[];
   upserts: SheetMovementUpsert[];
 }
 
@@ -18,7 +18,7 @@ function compactIdentity(value?: string | null): string {
 
 /** 옛 자동배정이 남긴 `포스트명: 스탭명sf` 메모인지 보수적으로 판별한다. */
 export function looksLikeLegacySheetMovement(
-  movement: IguardMovement,
+  movement: AssignedIguardMovement,
   staffName?: string,
   postName?: string,
 ): boolean {
@@ -38,7 +38,7 @@ function sameOptionalValue(a?: string | null, b?: string | null): boolean {
   return (a || "") === (b || "");
 }
 
-function movementMatchesAssignment(movement: IguardMovement, assignment: AutoAssignment): boolean {
+function movementMatchesAssignment(movement: AssignedIguardMovement, assignment: AutoAssignment): boolean {
   return movement.staffId === assignment.staffId
     && movement.postId === assignment.postId
     && sameOptionalValue(movement.round, assignment.round)
@@ -54,14 +54,14 @@ function movementMatchesAssignment(movement: IguardMovement, assignment: AutoAss
  *   자동배정 고유 메모 형식이 확인될 때만 시트 소유로 간주한다.
  */
 export function reconcileSheetMovements(
-  existing: IguardMovement[],
+  existing: AssignedIguardMovement[],
   previousSheetAssignments: AutoAssignment[],
   nextSheetAssignments: AutoAssignment[],
   legacySheetMovementIds: ReadonlySet<string> = new Set(),
 ): SheetMovementReconcileResult {
   const nextByStaff = new Map(nextSheetAssignments.map(assignment => [assignment.staffId, assignment]));
   const existingByStaff = new Map(existing.map(movement => [movement.staffId, movement]));
-  const removes: IguardMovement[] = [];
+  const removes: AssignedIguardMovement[] = [];
   const upserts: SheetMovementUpsert[] = [];
 
   existing.forEach(movement => {

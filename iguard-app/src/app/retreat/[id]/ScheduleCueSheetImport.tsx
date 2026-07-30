@@ -1,6 +1,6 @@
 "use client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus, IguardMovement } from "@/lib/types";
+import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus, AssignedIguardMovement } from "@/lib/types";
 import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock, saveIguardPost, setIguardMovement, saveIguardBus, updateIguardBus, subscribeToIguardCueSheet, saveIguardCueSheet, markCueSheetImported, IguardCueSheet } from "@/lib/db";
 import { fetchSheetCsv } from "@/lib/sheetClient";
 import { reconcileScheduleImport, hashCsv, blockKey } from "@/lib/scheduleReconcile";
@@ -114,7 +114,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
   schedule: IguardScheduleBlock[];
   staff: IguardStaff[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
   buses: IguardBus[];
   open: boolean;
   onClose: () => void;

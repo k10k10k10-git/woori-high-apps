@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IguardStaff, IguardScheduleBlock, IguardPost, IguardMovement, Retreat, RetreatPeriod } from "@/lib/types";
+import { IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement, Retreat, RetreatPeriod } from "@/lib/types";
 import {
   nowHHMM, todayStr, addDays, formatShortDate, normalizeText, activePeriod, retreatDateForDay,
   periodRangeLabel, currentRetreatDay, isOpenEndedBlock, toMinutes, compareBlocks, isNowOn,
@@ -15,7 +15,7 @@ interface Data {
   staff: IguardStaff[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
   retreat?: Retreat;
   periods?: RetreatPeriod[];   // 준비일정의 "수련회 기간" — 오늘이 며칠차인지 계산용
   preferredStaffNames?: string[];
@@ -123,7 +123,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
     return (id: string) => m.get(id) || "(삭제된 포스트)";
   }, [posts]);
   const myMoves = useMemo(() => {
-    const m = new Map<string, IguardMovement>();
+    const m = new Map<string, AssignedIguardMovement>();
     movements.filter(mv => mv.staffId === staffId).forEach(mv => m.set(mv.blockId, mv));
     return m;
   }, [movements, staffId]);

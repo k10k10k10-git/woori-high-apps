@@ -1,12 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
-import { IguardStaff, IguardScheduleBlock, IguardPost, IguardMovement } from "@/lib/types";
+import { IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement } from "@/lib/types";
 
 interface Props {
   staff: IguardStaff[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
 }
 
 export default function MovementsView({ staff, schedule, posts, movements }: Props) {
@@ -14,7 +14,7 @@ export default function MovementsView({ staff, schedule, posts, movements }: Pro
   const [day, setDay] = useState<number>(days[0] ?? 1);
 
   const moveMap = useMemo(() => {
-    const m = new Map<string, IguardMovement>();
+    const m = new Map<string, AssignedIguardMovement>();
     movements.forEach(mv => m.set(`${mv.staffId}__${mv.blockId}`, mv));
     return m;
   }, [movements]);

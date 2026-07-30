@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   subscribeToRetreat, subscribeToStudentsByYear, subscribeToGroups, subscribeToRooms,
   subscribeToIguardMeals, subscribeToIguardSchedule,
-  subscribeToIguardPosts, subscribeToIguardMovements, subscribeToIguardBuses,
+  subscribeToIguardSegments, subscribeToIguardPosts, subscribeToIguardMovements, subscribeToIguardBuses,
   subscribeToIguardSeating, subscribeToMilestones, subscribeToIguardGuide,
   subscribeToRetreatPeriods, subscribeToIguardAttendance, subscribeToPartialAttendances,
   subscribeToTeacherAttendances, subscribeToIguardGroupStaff, subscribeToCellColors,
@@ -11,9 +11,10 @@ import {
 } from "@/lib/db";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
-  IguardPost, IguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
+  IguardSegment, IguardPost, IguardMovement, AssignedIguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
   TeacherAttendance, IguardAttendanceInfo, PartialAttendanceMap, Participant,
 } from "@/lib/types";
+import { movementsForDefaultSegments } from "@/lib/defaultSegment";
 
 export interface RetreatData {
   retreat: Retreat | null;
@@ -27,8 +28,12 @@ export interface RetreatData {
   adminTeachers: TeacherAttendance[];
   meals: IguardMeal[];
   schedule: IguardScheduleBlock[];
+  segments: IguardSegment[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  /** 구간 UI 전환 전 기존 화면용: 레거시 + 기본 구간의 지정 완료 동선만. */
+  movements: AssignedIguardMovement[];
+  /** 새 모델 전체 레코드: 비기본 구간·담당 미정 슬롯 포함. */
+  movementRecords: IguardMovement[];
   buses: IguardBus[];
   seating: IguardSeating[];
   todos: Milestone[];
@@ -59,8 +64,9 @@ export function useRetreatData(id: string): RetreatData {
   const [adminTeachers, setAdminTeachers] = useState<TeacherAttendance[]>([]);
   const [meals, setMeals] = useState<IguardMeal[]>([]);
   const [schedule, setSchedule] = useState<IguardScheduleBlock[]>([]);
+  const [segments, setSegments] = useState<IguardSegment[]>([]);
   const [posts, setPosts] = useState<IguardPost[]>([]);
-  const [movements, setMovements] = useState<IguardMovement[]>([]);
+  const [movementRecords, setMovementRecords] = useState<IguardMovement[]>([]);
   const [buses, setBuses] = useState<IguardBus[]>([]);
   const [seating, setSeating] = useState<IguardSeating[]>([]);
   const [todos, setTodos] = useState<Milestone[]>([]);
@@ -72,6 +78,10 @@ export function useRetreatData(id: string): RetreatData {
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
   const [connected, setConnected] = useState(true);
+  const movements = useMemo(
+    () => movementsForDefaultSegments(segments, movementRecords),
+    [segments, movementRecords],
+  );
 
   // 수련회 메타 구독
   useEffect(() => {
@@ -93,7 +103,7 @@ export function useRetreatData(id: string): RetreatData {
     setDataLoading(true);
     let alive = true;
     const pending = new Set([
-      "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "posts",
+      "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "segments", "posts",
       "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff",
     ]);
     const ready = (key: string) => {
@@ -115,8 +125,9 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToRooms(id, value => { setRooms(value); ready("rooms"); }, fail("rooms")),
       subscribeToIguardMeals(id, value => { setMeals(value); ready("meals"); }, fail("meals")),
       subscribeToIguardSchedule(id, value => { setSchedule(value); ready("schedule"); }, fail("schedule")),
+      subscribeToIguardSegments(id, value => { setSegments(value); ready("segments"); }, fail("segments")),
       subscribeToIguardPosts(id, value => { setPosts(value); ready("posts"); }, fail("posts")),
-      subscribeToIguardMovements(id, value => { setMovements(value); ready("movements"); }, fail("movements")),
+      subscribeToIguardMovements(id, value => { setMovementRecords(value); ready("movements"); }, fail("movements")),
       subscribeToIguardBuses(id, value => { setBuses(value); ready("buses"); }, fail("buses")),
       subscribeToIguardSeating(id, value => { setSeating(value); ready("seating"); }, fail("seating")),
       subscribeToMilestones(value => { setTodos(value); ready("todos"); }, fail("todos")),
@@ -136,7 +147,7 @@ export function useRetreatData(id: string): RetreatData {
   return {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, participants, adminTeachers,
-    meals, schedule, posts, movements, buses, seating,
+    meals, schedule, segments, posts, movements, movementRecords, buses, seating,
     todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff,
     connected,
   };

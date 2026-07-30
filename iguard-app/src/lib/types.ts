@@ -165,6 +165,17 @@ export interface IguardScheduleBlock {
   noMovement?: boolean | null; // 동선 배정이 필요 없는 블록(검증 공백 경고 제외)
 }
 
+/** 시간 블록 안의 이동 구간. 구간이 없는 레거시 블록은 화면에서 기본 구간으로 해석한다. */
+export interface IguardSegment {
+  id: string;
+  blockId: string;
+  order: number;
+  label: string;
+  zone?: "위" | "아래" | null;
+  note?: string | null;
+  source?: "sheet" | "manual";
+}
+
 // ── 포스트(통제 지점) 정의 ──────────────────────────────────
 export interface IguardPost {
   id: string;
@@ -172,17 +183,25 @@ export interface IguardPost {
   area?: string;    // 예: "4층", "식당", "강당"
 }
 
-// ── 동선 매트릭스: 스탭 × 시간블록 → 포스트 ─────────────────
-// 키 = `${staffId}__${blockId}` (한 스탭이 한 블록에 한 포스트)
+// ── 동선 매트릭스: 구간 × 포스트 × 스탭(또는 미정 슬롯) ──────
+// 새 키 = `${segmentId}__${postId}__${staffId ?? `tbd${slot}`}`
+// 레거시 키 `${staffId}__${blockId}`와 segmentId 없는 레코드는 2027 겨울수련회까지 읽는다.
 export interface IguardMovement {
-  id: string;       // 복합키 staffId__blockId
-  staffId: string;
-  blockId: string;
+  id: string;
+  segmentId?: string | null;
+  blockId: string;         // 블록 단위 조회·레거시 호환용 비정규화
   postId: string;
+  staffId?: string | null; // null = 담당 미정
+  slot?: number;           // 담당 미정 슬롯 구분
   round?: "선밥" | "후밥";
+  detail?: string | null;  // 괄호 상세: "1층", "A동 1,2층"
+  actor?: string | null;   // 비스탭 주체: "행정팀", "이가드sf"
   note?: string;
   source?: "sheet" | "manual"; // 큐싯 자동배정과 현장 수동배정을 구분해 재동기화 시 수동배정을 보존
 }
+
+/** 기존 화면이 다루는, 실제 스탭이 지정된 동선. */
+export type AssignedIguardMovement = IguardMovement & { staffId: string };
 
 // ── 버스(호차) 배정 ─────────────────────────────────────────
 export type BusStudentGender = "남" | "여";

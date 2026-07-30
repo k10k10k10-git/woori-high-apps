@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
+import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement } from "@/lib/types";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "@/lib/cueSheet";
 
@@ -9,7 +9,7 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
   groups: Group[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
   absentStaffNames?: string[];
 }) {
   const [openStaffId, setOpenStaffId] = useState<string | null>(null);

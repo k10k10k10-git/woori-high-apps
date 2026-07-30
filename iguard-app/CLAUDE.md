@@ -32,8 +32,10 @@ retreatAdmins/{uid}                 # 행정 사이트 멤버
 retreats/{retreatId}/iguard/
   meals/                            # 식사 세션 (IguardMeal — 조별 배식 순서)
   schedule/                         # 타임테이블 시간 블록 (IguardScheduleBlock)
+  segments/                         # 블록 안 이동 구간 (IguardSegment — blockId/order/label)
   posts/                            # 포스트(통제 지점) 정의 (IguardPost)
-  movements/                        # 동선 매트릭스 (IguardMovement — 키: staffId__blockId)
+  movements/                        # 구간 동선 (IguardMovement — segmentId/postId/staffId 또는 미정 slot)
+                                     #   하위호환: segmentId 없는 staffId__blockId 키는 2027 겨울까지 읽음
   buses/                            # 버스 배정 (IguardBus — capacity?: 인승, 없으면 45. busCapacityOf로 읽을 것)
   seating/                          # 집회 자리배치 (IguardSeating)
   attendance/                       # 인원체크 상태 ({ checked, updatedAt?, by? } — 키는 encodeURIComponent(원본키))

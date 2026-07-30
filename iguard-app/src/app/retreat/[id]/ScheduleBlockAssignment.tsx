@@ -1,6 +1,6 @@
 "use client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
+import { IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement } from "@/lib/types";
 import { setIguardMovement, updateIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { postLabel, isValidTime, normalizeTime } from "@/lib/cueSheet";
@@ -34,7 +34,7 @@ export function BlockAssignmentSection({ retreatId, block, staff, posts, movemen
   block: IguardScheduleBlock;
   staff: IguardStaff[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
 }) {
   const { toast } = useUI();
   const [adding, setAdding] = useState(false);
@@ -50,7 +50,7 @@ export function BlockAssignmentSection({ retreatId, block, staff, posts, movemen
   const postMap = useMemo(() => new Map(posts.map(p => [p.id, p])), [posts]);
   const assignedIds = useMemo(() => new Set(blockMvs.map(mv => mv.staffId)), [blockMvs]);
   const movementsByPost = useMemo(() => {
-    const map = new Map<string, IguardMovement[]>();
+    const map = new Map<string, AssignedIguardMovement[]>();
     blockMvs.forEach(mv => {
       const list = map.get(mv.postId) || [];
       list.push(mv);
@@ -86,7 +86,7 @@ export function BlockAssignmentSection({ retreatId, block, staff, posts, movemen
     } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
   }
 
-  async function del(mv: IguardMovement) {
+  async function del(mv: AssignedIguardMovement) {
     try { await setIguardMovement(retreatId, mv.staffId, block.id, null); }
     catch (e) { toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
   }

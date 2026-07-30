@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement, IguardBus } from "@/lib/types";
+import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement, IguardBus } from "@/lib/types";
 import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import {
@@ -24,7 +24,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
   schedule: IguardScheduleBlock[];
   staff: IguardStaff[];
   posts: IguardPost[];
-  movements: IguardMovement[];
+  movements: AssignedIguardMovement[];
   buses: IguardBus[];
   groups: Group[];
   absentStaffNames?: string[];
