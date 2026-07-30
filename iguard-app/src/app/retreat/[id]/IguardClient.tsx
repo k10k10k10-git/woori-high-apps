@@ -164,7 +164,7 @@ function IguardWorkspace({ id }: { id: string }) {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, participants, adminTeachers,
     meals, schedule, segments, posts, movements, movementRecords, buses, seating,
-    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs,
+    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps,
     connected,
   } = useRetreatData(id);
 
@@ -332,7 +332,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
         {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} participants={participants} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} cellColors={cellColors} schedule={schedule} />}
         {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} staff={staffForViews} groupStaff={groupStaff} gbs={gbs} students={students} partial={partial} cellColors={cellColors} retreatName={retreat.name} year={retreat.year} />}
-        {!dataLoading && view === "lodgingmap" && <LodgingMapView rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} />}
+        {!dataLoading && view === "lodgingmap" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} canManage={accessLevel !== "staff"} />}
         {!dataLoading && view === "cue" && <CueCardView retreatId={id} staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} groups={groups} groupStaff={groupStaff} gbs={gbs} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
         {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}

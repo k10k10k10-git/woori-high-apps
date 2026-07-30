@@ -43,6 +43,10 @@ export const paths = {
   iguardCueSheet: (id: string) => `retreats/${id}/iguard/cueSheet`,
   iguardGuide: (id: string) => `retreats/${id}/iguard/guide`,
   iguardAccessLock: (id: string) => `retreats/${id}/iguard/accessLock`,
+  iguardLodgingMaps: (id: string) => `retreats/${id}/iguard/lodgingMaps`,
+  iguardLodgingMap: (id: string, mapId: string) => `retreats/${id}/iguard/lodgingMaps/${mapId}`,
+  iguardLodgingHotspot: (id: string, mapId: string, roomId: string) =>
+    `retreats/${id}/iguard/lodgingMaps/${mapId}/hotspots/${roomId}`,
 
   // ── 마일스톤 (전역 공유) ──
   prepMilestones: () => "prepMilestones",

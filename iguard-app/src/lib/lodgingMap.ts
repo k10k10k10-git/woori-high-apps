@@ -240,6 +240,43 @@ export function studentClass(student: Student): { full: string; short: string } 
   };
 }
 
+export function summarizeLodgingRoom(
+  room: Room,
+  students: Record<string, Student>,
+  partial: PartialAttendanceMap,
+  cellColors: Record<string, string>,
+  groups: Group[] = [],
+  location?: { buildingId: string; pageId: string; hotspot: RoomHotspot },
+): LodgingRoomSummary | null {
+  const activeStudentIds = (room.studentIds ?? []).filter(studentId =>
+    !isCancelledStudent(studentId, cellColors) && partial[studentId]?.type !== "당일참석",
+  );
+  const teacherNames = (room.teachers ?? []).map(name => name.trim()).filter(Boolean);
+  if (activeStudentIds.length === 0 && teacherNames.length === 0) return null;
+  const studentRecords = activeStudentIds.map(id => students[id]).filter((student): student is Student => !!student);
+  const classes = studentRecords.map(studentClass);
+  const classLabels = [...new Set(classes.map(item => item.full))].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+  const shortClassLabels = [...new Set(classes.map(item => item.short))].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+  const activeStudentIdSet = new Set(activeStudentIds);
+  const groupLabels = groups
+    .filter(group => group.studentIds.some(studentId => activeStudentIdSet.has(studentId)))
+    .map(group => groupDisplayName(group, groups))
+    .filter((label, index, labels) => labels.indexOf(label) === index)
+    .sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
+  return {
+    room,
+    buildingId: location?.buildingId ?? "custom",
+    pageId: location?.pageId ?? "custom",
+    hotspot: location?.hotspot ?? { roomNumber: room.roomNumber, left: 50, top: 50 },
+    classLabels,
+    shortClassLabels,
+    groupLabels,
+    studentNames: activeStudentIds.map(id => students[id]?.name ?? "명단 미상"),
+    teacherNames,
+    peopleCount: activeStudentIds.length + teacherNames.length,
+  };
+}
+
 export function buildLodgingMapResult(
   rooms: Room[],
   students: Record<string, Student>,
@@ -251,42 +288,19 @@ export function buildLodgingMapResult(
   const unmatched: Room[] = [];
 
   rooms.forEach(room => {
-    const activeStudentIds = (room.studentIds ?? []).filter(studentId =>
-      !isCancelledStudent(studentId, cellColors) && partial[studentId]?.type !== "당일참석",
-    );
-    const teacherNames = (room.teachers ?? []).map(name => name.trim()).filter(Boolean);
-    if (activeStudentIds.length === 0 && teacherNames.length === 0) return;
-
+    const preview = summarizeLodgingRoom(room, students, partial, cellColors, groups);
+    if (!preview) return;
     const location = findRoomMapLocation(room);
     if (!location) {
       unmatched.push(room);
       return;
     }
-
-    const studentRecords = activeStudentIds.map(id => students[id]).filter((student): student is Student => !!student);
-    const classes = studentRecords.map(studentClass);
-    const classLabels = [...new Set(classes.map(item => item.full))].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
-    const shortClassLabels = [...new Set(classes.map(item => item.short))].sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
-    const activeStudentIdSet = new Set(activeStudentIds);
-    const groupLabels = groups
-      .filter(group => group.studentIds.some(studentId => activeStudentIdSet.has(studentId)))
-      .map(group => groupDisplayName(group, groups))
-      .filter((label, index, labels) => labels.indexOf(label) === index)
-      .sort((a, b) => a.localeCompare(b, "ko", { numeric: true }));
-    const studentNames = activeStudentIds.map(id => students[id]?.name ?? "명단 미상");
-
-    mapped.push({
-      room,
+    const summary = summarizeLodgingRoom(room, students, partial, cellColors, groups, {
       buildingId: location.building.id,
       pageId: location.page.id,
       hotspot: location.hotspot,
-      classLabels,
-      shortClassLabels,
-      groupLabels,
-      studentNames,
-      teacherNames,
-      peopleCount: activeStudentIds.length + teacherNames.length,
     });
+    if (summary) mapped.push(summary);
   });
 
   return { mapped, unmatched };

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement, IguardBus, IguardMovement, IguardSegment } from "@/lib/types";
-import { saveIguardScheduleBlock, markIguardScheduleProgress, deleteIguardScheduleBlock } from "@/lib/db";
+import { saveIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import {
   EMPTY,
@@ -16,8 +16,6 @@ import {
 import StaffRosterBar from "./ScheduleStaffRoster";
 import CueSheetImportPanel from "./ScheduleCueSheetImport";
 import StructureClonePanel from "./StructureClonePanel";
-import { actualStartForBlock, progressCurrentBlock } from "@/lib/scheduleProgress";
-import { nowHHMM } from "@/lib/scheduleTime";
 import ScheduleSheetEditor from "./ScheduleSheetEditor";
 
 export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, segments, movements, movementRecords, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
@@ -69,13 +67,6 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
   async function del(b: IguardScheduleBlock) {
     if (!await uiConfirm(`"${b.label}" 블록을 삭제할까요?`)) return;
     try { await deleteIguardScheduleBlock(retreatId, b.id); } catch (e) { toast(`삭제 오류: ${e}`, "error"); }
-  }
-  const progressBlock = progressCurrentBlock(schedule);
-  async function markProgress(b: IguardScheduleBlock) {
-    try {
-      await markIguardScheduleProgress(retreatId, b.id, actualStartForBlock(b, nowHHMM()));
-      toast(`현재 진행을 "${b.label}"로 변경했습니다.`, "success");
-    } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
   }
   return (
     <div>
@@ -158,8 +149,6 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
           movements={movementRecords}
           staff={staff}
           posts={posts}
-          progressBlockId={progressBlock?.id}
-          onMarkProgress={markProgress}
           onDelete={del}
         />
       )}

@@ -8,7 +8,6 @@ export default function PostsView({ retreatId, posts }: { retreatId: string; pos
   const { toast, uiConfirm } = useUI();
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
-  const [editing, setEditing] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, { name: string; area: string }>>({});
 
   useEffect(() => {
@@ -42,59 +41,59 @@ export default function PostsView({ retreatId, posts }: { retreatId: string; pos
     }
     try {
       await updateIguardPostFields(retreatId, changes);
-      setEditing(false);
       toast(`${Object.keys(changes).length}개 포스트를 저장했습니다.`, "success");
     } catch (error) { toast(`저장 오류: ${error instanceof Error ? error.message : String(error)}`, "error"); }
   }
 
-  const areas = [...new Set(posts.map(p => p.area || "(구역 미지정)"))];
-
   return (
     <div>
-      <div className="mb-4 bg-violet-50 border border-violet-100 rounded-lg p-3 text-xs text-violet-700">
-        ℹ️ 건물별 통제 지점(층장·계단앞·엘베앞·배식구·퇴식구·화장실·문단속 등). 사람이 건물을 보고 직접 정의합니다. 동선 매트릭스에서 스탭에게 배정됩니다.
+      <div className="mb-4 rounded-lg border border-violet-100 bg-violet-50 p-3 text-xs leading-relaxed text-violet-700">
+        ℹ️ 스프레드시트처럼 아래 표에 바로 적어 저장하세요. 큐싯의 <strong>담당·동선</strong> 칸에
+        <code className="mx-1 rounded bg-white px-1 py-0.5">강당 입구: 김민수, 이영희</code>
+        형식으로 적으면 포스트와 담당 동선도 자동 생성됩니다.
       </div>
-      <div className="flex flex-wrap gap-2 mb-4">
-        <input className="input max-w-[140px]" placeholder="장소 (예: 4층, 식당)" value={area}
-          onChange={e => setArea(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
-        <input className="input max-w-[200px]" placeholder="상세구역 (예: 강당 엘베 앞)" value={name}
-          onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
-        <button onClick={add} className="btn-primary">＋ 추가</button>
-        {posts.length > 0 && (
-          editing ? (
-            <>
-              <button onClick={saveAll} disabled={changedCount === 0} className="btn-primary disabled:opacity-50">변경 {changedCount}개 저장</button>
-              <button onClick={() => { setEditing(false); setDrafts(Object.fromEntries(posts.map(post => [post.id, { name: post.name, area: post.area || "" }]))); }} className="btn-secondary">취소</button>
-            </>
-          ) : <button onClick={() => setEditing(true)} className="btn-secondary">여러 포스트 수정</button>
-        )}
-      </div>
-      {posts.length === 0 ? (
-        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">📍</div><p>등록된 포스트가 없습니다.</p></div>
-      ) : (
-        <div className="space-y-3">
-          {areas.map(area => (
-            <div key={area} className="card overflow-hidden">
-              <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 text-sm font-semibold text-slate-600">{area}</div>
-              <ul className="divide-y divide-slate-100">
-                {posts.filter(p => (p.area || "(구역 미지정)") === area).map(p => (
-                  <li key={p.id} className="flex items-center gap-2 px-4 py-2.5 hover:bg-slate-50">
-                    {editing ? (
-                      <>
-                        <input className="input max-w-[160px] text-sm" value={drafts[p.id]?.area || ""}
-                          onChange={event => setDrafts(current => ({ ...current, [p.id]: { ...(current[p.id] || { name: p.name, area: "" }), area: event.target.value } }))} placeholder="구역" />
-                        <input className="input min-w-0 flex-1 text-sm" value={drafts[p.id]?.name || ""}
-                          onChange={event => setDrafts(current => ({ ...current, [p.id]: { ...(current[p.id] || { name: "", area: p.area || "" }), name: event.target.value } }))} placeholder="포스트 이름" />
-                      </>
-                    ) : <span className="text-sm text-slate-800">{p.name}</span>}
-                    <button onClick={() => del(p)} className="ml-auto text-xs text-slate-300 hover:text-red-400">삭제</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+      <section className="card overflow-hidden">
+        <div className="grid grid-cols-[minmax(120px,0.35fr)_minmax(220px,1fr)_auto] gap-2 border-b border-slate-200 bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
+          <span>구역</span><span>포스트</span><span className="w-14 text-center">관리</span>
         </div>
-      )}
+        {posts.map(post => (
+          <div key={post.id} className="grid grid-cols-[minmax(120px,0.35fr)_minmax(220px,1fr)_auto] items-center gap-2 border-b border-slate-100 px-3 py-2 last:border-b-0">
+            <input
+              aria-label={`${post.name} 구역`}
+              className="input min-h-10 text-sm"
+              value={drafts[post.id]?.area || ""}
+              onChange={event => setDrafts(current => ({
+                ...current,
+                [post.id]: { ...(current[post.id] || { name: post.name, area: "" }), area: event.target.value },
+              }))}
+              placeholder="예: 4층, 식당"
+            />
+            <input
+              aria-label={`${post.name} 이름`}
+              className="input min-h-10 min-w-0 text-sm"
+              value={drafts[post.id]?.name || ""}
+              onChange={event => setDrafts(current => ({
+                ...current,
+                [post.id]: { ...(current[post.id] || { name: "", area: post.area || "" }), name: event.target.value },
+              }))}
+              placeholder="예: 강당 엘리베이터 앞"
+            />
+            <button onClick={() => del(post)} className="min-h-10 w-14 text-xs text-slate-400 hover:text-red-500">삭제</button>
+          </div>
+        ))}
+        <div className="grid grid-cols-[minmax(120px,0.35fr)_minmax(220px,1fr)_auto] items-center gap-2 bg-slate-50 px-3 py-3">
+          <input className="input min-h-10 text-sm" placeholder="새 구역" value={area}
+          onChange={e => setArea(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
+          <input className="input min-h-10 min-w-0 text-sm" placeholder="새 포스트 이름" value={name}
+          onChange={e => setName(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
+          <button onClick={add} className="btn-secondary min-h-10 w-14 px-1 text-xs">추가</button>
+        </div>
+      </section>
+      <div className="sticky bottom-3 mt-3 flex justify-end">
+        <button onClick={saveAll} disabled={changedCount === 0} className="btn-primary min-h-11 shadow-lg disabled:opacity-50">
+          {changedCount > 0 ? `변경 ${changedCount}개 저장` : "모두 저장됨"}
+        </button>
+      </div>
     </div>
   );
 }

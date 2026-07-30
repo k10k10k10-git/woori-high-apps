@@ -196,6 +196,26 @@ export interface IguardPost {
   source?: "manual" | "sheet" | "cloned";
 }
 
+export interface IguardLodgingHotspot {
+  roomId: string;
+  page: number;
+  left: number;
+  top: number;
+}
+
+/** 수련회마다 달라지는 숙소 PDF와 호실 핀. 파일 본문은 Storage, 메타데이터만 IGuard DB에 둔다. */
+export interface IguardLodgingMap {
+  id: string;
+  label: string;
+  building: string;
+  fileName: string;
+  fileUrl: string;
+  filePath: string;
+  pageCount?: number;
+  hotspots?: Record<string, IguardLodgingHotspot>;
+  createdAt?: number;
+}
+
 // ── 동선 매트릭스: 구간 × 포스트 × 스탭(또는 미정 슬롯) ──────
 // 새 키 = `${segmentId}__${postId}__${staffId ?? `tbd${slot}`}`
 // 레거시 키 `${staffId}__${blockId}`와 segmentId 없는 레코드는 2027 겨울수련회까지 읽는다.

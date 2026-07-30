@@ -16,7 +16,7 @@ import type {
   IguardSegment,
   IguardStaff,
 } from "@/lib/types";
-import { updateIguardScheduleBlock } from "@/lib/db";
+import { syncIguardScheduleOwner, updateIguardScheduleBlock } from "@/lib/db";
 import {
   normalizeEnd,
   normalizeTime,
@@ -88,24 +88,22 @@ function SaveBadge({ state }: { state: SaveState }) {
 function ScheduleSheetRow({
   retreatId,
   block,
+  schedule,
   segments,
   movements,
   staff,
   posts,
-  activeProgress,
   onOpenAdvanced,
-  onMarkProgress,
   onDelete,
 }: {
   retreatId: string;
   block: IguardScheduleBlock;
+  schedule: IguardScheduleBlock[];
   segments: IguardSegment[];
   movements: IguardMovement[];
   staff: IguardStaff[];
   posts: IguardPost[];
-  activeProgress: boolean;
   onOpenAdvanced: () => void;
-  onMarkProgress: () => void;
   onDelete: () => void;
 }) {
   const { toast } = useUI();
@@ -179,6 +177,20 @@ function ScheduleSheetRow({
         meal: normalized.meal || null,
         noMovement: normalized.noMovement || null,
       });
+      if (normalized.owner !== (committedRef.current.owner || "").trim()) {
+        const sync = await syncIguardScheduleOwner(
+          retreatId,
+          { ...block, ...normalized, end: normalized.end || undefined },
+          schedule,
+          staff,
+          posts,
+          segments,
+          movements,
+        );
+        if (sync.unmatched.length > 0) {
+          toast(`명단에서 찾지 못한 담당자: ${sync.unmatched.join(", ")}`, "warning");
+        }
+      }
       if (run !== saveRunRef.current) return false;
       committedRef.current = normalized;
       setDraft(normalized);
@@ -216,21 +228,21 @@ function ScheduleSheetRow({
       onFocusCapture={() => { editingRef.current = true; }}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDown}
-      className="grid gap-3 border-b border-slate-200 bg-white px-3 py-3 last:border-b-0 lg:grid-cols-[150px_180px_minmax(260px,1.35fr)_minmax(250px,1.2fr)_minmax(220px,0.9fr)_120px] lg:gap-3 lg:px-3 lg:py-3"
+      className="grid gap-3 border-b border-slate-200 bg-white px-3 py-4 last:border-b-0 lg:grid-cols-[160px_190px_minmax(280px,1.35fr)_minmax(270px,1.2fr)_minmax(240px,0.9fr)_112px] lg:gap-3 lg:px-4 lg:py-5"
     >
       <div>
         <SheetFieldLabel>시간</SheetFieldLabel>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
           <input
             aria-label={`${block.label} 시작 시간`}
-            className="input min-h-11 min-w-0 px-3 py-2 font-mono text-sm"
+            className="input min-h-12 min-w-0 px-3 py-2 font-mono text-sm"
             value={draft.start}
             onChange={event => change("start", event.target.value)}
           />
           <span className="text-xs text-slate-300">~</span>
           <input
             aria-label={`${block.label} 종료 시간`}
-            className="input min-h-11 min-w-0 px-3 py-2 font-mono text-sm"
+            className="input min-h-12 min-w-0 px-3 py-2 font-mono text-sm"
             value={draft.end}
             onChange={event => change("end", event.target.value)}
             placeholder="종료"
@@ -242,7 +254,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>구분</SheetFieldLabel>
         <input
           aria-label={`${block.label} 구분`}
-          className="input min-h-11 w-full px-3 py-2 text-base font-semibold"
+          className="input min-h-12 w-full px-3 py-2 text-sm font-semibold"
           value={draft.label}
           onChange={event => change("label", event.target.value)}
         />
@@ -262,7 +274,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>내용</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 내용`}
-          className="input min-h-[92px] w-full resize-y px-3 py-3 text-sm leading-relaxed lg:min-h-[112px]"
+          className="input min-h-[112px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[148px]"
           value={draft.detail}
           onChange={event => change("detail", event.target.value)}
           placeholder="분 단위 진행 내용과 준비 사항"
@@ -273,10 +285,10 @@ function ScheduleSheetRow({
         <SheetFieldLabel>담당·동선</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 담당`}
-          className="input min-h-[92px] w-full resize-y px-3 py-3 text-sm leading-relaxed lg:min-h-[112px]"
+          className="input min-h-[112px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[148px]"
           value={draft.owner}
           onChange={event => change("owner", event.target.value)}
-          placeholder="진행 총괄, 미디어 등 자유 담당"
+          placeholder={"장소: 담당자 형식으로 적으면 포스트·동선에 자동 반영됩니다.\n예) 강당 입구: 김민수, 이영희"}
         />
         <div className="mt-1.5 space-y-1">
           {assignmentLines.slice(0, 3).map(line => (
@@ -298,7 +310,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>특이사항</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 특이사항`}
-          className="input min-h-[92px] w-full resize-y px-3 py-3 text-sm leading-relaxed lg:min-h-[112px]"
+          className="input min-h-[112px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[148px]"
           value={draft.notice}
           onChange={event => change("notice", event.target.value)}
           placeholder="주의사항·준비물·예외"
@@ -311,17 +323,6 @@ function ScheduleSheetRow({
         </div>
         <button type="button" onClick={() => { void openAdvanced(); }} className="btn-secondary min-h-10 text-xs">
           상세 설정 · {movementCount}
-        </button>
-        <button
-          type="button"
-          onClick={onMarkProgress}
-          className={`min-h-10 rounded-lg border px-2 text-xs ${
-            activeProgress
-              ? "border-fuchsia-400 bg-fuchsia-50 font-semibold text-fuchsia-700"
-              : "border-slate-200 text-slate-500 hover:border-fuchsia-300"
-          }`}
-        >
-          {activeProgress ? "진행 중" : "지금 여기"}
         </button>
         <button type="button" onClick={onDelete} className="min-h-8 text-xs text-slate-300 hover:text-red-500">
           삭제
@@ -430,8 +431,6 @@ export default function ScheduleSheetEditor({
   movements,
   staff,
   posts,
-  progressBlockId,
-  onMarkProgress,
   onDelete,
 }: {
   retreatId: string;
@@ -440,8 +439,6 @@ export default function ScheduleSheetEditor({
   movements: IguardMovement[];
   staff: IguardStaff[];
   posts: IguardPost[];
-  progressBlockId?: string;
-  onMarkProgress: (block: IguardScheduleBlock) => void;
   onDelete: (block: IguardScheduleBlock) => void;
 }) {
   const days = useMemo(() => [...new Set(schedule.map(block => block.day))].sort((a, b) => a - b), [schedule]);
@@ -499,10 +496,9 @@ export default function ScheduleSheetEditor({
       </div>
 
       <div className="card overflow-x-auto border-slate-200">
-        <div className="lg:min-w-[1380px]">
+        <div className="lg:min-w-[1450px]">
           <div
-            className="sticky z-[9] hidden grid-cols-[150px_180px_minmax(260px,1.35fr)_minmax(250px,1.2fr)_minmax(220px,0.9fr)_120px] gap-3 border-b border-slate-300 bg-slate-900 px-3 py-3 text-sm font-semibold text-white shadow-sm lg:grid"
-            style={{ top: "calc(var(--ig-header-h, 92px) + var(--schedule-roster-h, 0px) + 8px)" }}
+            className="hidden grid-cols-[160px_190px_minmax(280px,1.35fr)_minmax(270px,1.2fr)_minmax(240px,0.9fr)_112px] gap-3 border-b border-slate-300 bg-slate-900 px-4 py-3 text-xs font-semibold text-white lg:grid"
           >
             <div>시간</div>
             <div>구분</div>
@@ -514,8 +510,7 @@ export default function ScheduleSheetEditor({
           {visibleDays.map(day => (
             <section key={day}>
               <div
-                className="sticky z-[8] border-b border-slate-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800 [--sheet-column-h:0px] lg:[--sheet-column-h:45px]"
-                style={{ top: "calc(var(--ig-header-h, 92px) + var(--schedule-roster-h, 0px) + var(--sheet-column-h, 0px) + 8px)" }}
+                className="border-b border-slate-200 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-800"
               >
                 {day}일차
               </div>
@@ -524,13 +519,12 @@ export default function ScheduleSheetEditor({
                   key={block.id}
                   retreatId={retreatId}
                   block={block}
+                  schedule={schedule}
                   segments={segments}
                   movements={movements}
                   staff={staff}
                   posts={posts}
-                  activeProgress={progressBlockId === block.id}
                   onOpenAdvanced={() => openAdvanced(block.id)}
-                  onMarkProgress={() => onMarkProgress(block)}
                   onDelete={() => onDelete(block)}
                 />
               ))}

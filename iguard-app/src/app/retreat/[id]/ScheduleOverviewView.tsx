@@ -1,6 +1,7 @@
 "use client";
 import type { IguardScheduleBlock } from "@/lib/types";
 import { buildScheduleOverview, overviewBlockLabel } from "@/lib/scheduleOverview";
+import { toMinutes } from "@/lib/scheduleTime";
 
 export default function ScheduleOverviewView({ schedule }: { schedule: IguardScheduleBlock[] }) {
   const grid = buildScheduleOverview(schedule);
@@ -23,8 +24,17 @@ export default function ScheduleOverviewView({ schedule }: { schedule: IguardSch
             </tr>
           </thead>
           <tbody>
-            {grid.rows.map(row => (
-              <tr key={row.start} className="border-b border-slate-200 align-top last:border-b-0">
+            {grid.rows.map(row => {
+              const duration = row.end
+                ? Math.max(0, (toMinutes(row.end) ?? 0) - (toMinutes(row.start) ?? 0))
+                : 30;
+              const rowHeight = Math.max(64, Math.min(180, Math.round(duration * 1.25)));
+              return (
+              <tr
+                key={row.start}
+                className="border-b border-slate-200 align-top last:border-b-0"
+                style={{ height: `${rowHeight}px` }}
+              >
                 <th className="bg-slate-50 px-3 py-3 text-left font-mono text-xs text-slate-500">
                   <div>{row.start}</div>
                   {row.end && <div className="mt-1 text-[10px] font-normal text-slate-300">~ {row.end}</div>}
@@ -36,7 +46,7 @@ export default function ScheduleOverviewView({ schedule }: { schedule: IguardSch
                     <td
                       key={day}
                       rowSpan={row.rowSpans[day]}
-                      className="border-l border-slate-200 p-2"
+                      className="h-px border-l border-slate-200 p-2 align-stretch"
                     >
                       {blocks.length ? (
                         <div className="flex h-full min-h-16 flex-col gap-1.5">
@@ -52,7 +62,8 @@ export default function ScheduleOverviewView({ schedule }: { schedule: IguardSch
                   );
                 })}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

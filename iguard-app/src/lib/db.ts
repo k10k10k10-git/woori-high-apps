@@ -5,11 +5,14 @@ import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardSegment, IguardPost, IguardMovement, IguardBus, IguardSeating,
   RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
   IguardAccessLock, IguardGbsPlace } from "./types";
+import type { IguardLodgingHotspot, IguardLodgingMap } from "./types";
 export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
 import { normalizePartialAttendanceMap } from "./partialAttendance";
 import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "./defaultSegment";
 import { buildStructureClonePayload, occupiedCloneNodes, type CloneIdFactory, type IguardStructureSource } from "./structureClone";
+import { parseOwnerSegments, venueForBlock } from "./cueSheet";
+import { reconcileSegmentSheetMovements, type SegmentSheetMovement } from "./movementReconcile";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -253,6 +256,194 @@ export async function updateIguardScheduleBlock(
   },
 ): Promise<void> {
   await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), stripUndefined(data));
+}
+
+function ownerSyncKey(value?: string | null): string {
+  return (value || "")
+    .trim()
+    .toLocaleLowerCase("ko-KR")
+    .replace(/sf$/i, "")
+    .replace(/[\s\[\](){}._-]/g, "");
+}
+
+/**
+ * 시트형 `장소: 담당자` 입력을 포스트·구간·동선으로 동기화한다.
+ *
+ * source=sheet 레코드만 교체하며 사이트에서 만든 수동 포스트·구간·동선은 보존한다.
+ * 행정 소유 경로는 읽거나 쓰지 않고 retreats/{id}/iguard 하위만 multi-path update한다.
+ */
+export async function syncIguardScheduleOwner(
+  retreatId: string,
+  block: IguardScheduleBlock,
+  schedule: IguardScheduleBlock[],
+  staff: Array<{ id: string; name: string }>,
+  posts: IguardPost[],
+  segments: IguardSegment[],
+  movements: IguardMovement[],
+): Promise<{ posts: number; movements: number; unmatched: string[] }> {
+  const parsed = parseOwnerSegments(block);
+  const drafts = parsed.movements;
+  const updates: Record<string, unknown | null> = {};
+  const area = venueForBlock(block, schedule);
+  const workingPosts = [...posts];
+  let createdPosts = 0;
+
+  const postFor = (name: string): IguardPost => {
+    const key = ownerSyncKey(name);
+    const existing = workingPosts.find(post =>
+      ownerSyncKey(post.name) === key && (!post.area || post.area === area),
+    ) || workingPosts.find(post => ownerSyncKey(post.name) === key);
+    if (existing) return existing;
+    const postRef = push(ref(db, paths.iguardPosts(retreatId)));
+    const post: IguardPost = { id: postRef.key!, name: name.trim(), area, source: "sheet" };
+    workingPosts.push(post);
+    updates[paths.iguardPost(retreatId, post.id)] = stripUndefined({
+      name: post.name,
+      area: post.area,
+      source: post.source,
+    });
+    createdPosts++;
+    return post;
+  };
+
+  drafts.forEach(draft => postFor(draft.postName));
+
+  const blockSegments = segments.filter(segment => segment.blockId === block.id);
+  let defaultSegment = blockSegments.find(segment => isDefaultSegment(segment));
+  if (!defaultSegment) {
+    const segmentRef = push(ref(db, paths.iguardSegments(retreatId)));
+    defaultSegment = {
+      id: segmentRef.key!,
+      blockId: block.id,
+      order: 0,
+      label: DEFAULT_SEGMENT_LABEL,
+      source: "manual",
+    };
+    updates[paths.iguardSegment(retreatId, defaultSegment.id)] = stripUndefined({
+      blockId: block.id,
+      order: 0,
+      label: DEFAULT_SEGMENT_LABEL,
+      source: "manual",
+    });
+  }
+
+  const segmentIdByOrder = new Map<number, string>([[0, defaultSegment.id]]);
+  parsed.segments.forEach(draft => {
+    const existing = blockSegments.find(segment =>
+      segment.order === draft.order && (segment.source === "sheet"
+        || (segment.label === draft.label && (segment.zone || undefined) === draft.zone)),
+    );
+    if (existing) {
+      segmentIdByOrder.set(draft.order, existing.id);
+      if (existing.source === "sheet"
+        && (existing.label !== draft.label || (existing.zone || undefined) !== draft.zone)) {
+        updates[paths.iguardSegment(retreatId, existing.id)] = stripUndefined({
+          label: draft.label,
+          zone: draft.zone ?? null,
+        });
+      }
+      return;
+    }
+    const segmentRef = push(ref(db, paths.iguardSegments(retreatId)));
+    segmentIdByOrder.set(draft.order, segmentRef.key!);
+    updates[paths.iguardSegment(retreatId, segmentRef.key!)] = stripUndefined({
+      blockId: block.id,
+      order: draft.order,
+      label: draft.label,
+      zone: draft.zone,
+      source: "sheet",
+    });
+  });
+
+  const staffByName = new Map(staff.map(member => [ownerSyncKey(member.name), member.id]));
+  const unmatched = new Set<string>();
+  const actorSlots = new Map<string, number>();
+  const nextMovements: SegmentSheetMovement[] = [];
+  drafts.forEach(draft => {
+    const segmentId = segmentIdByOrder.get(draft.segmentOrder);
+    if (!segmentId) return;
+    const post = postFor(draft.postName);
+    const staffId = draft.staffName ? staffByName.get(ownerSyncKey(draft.staffName)) : undefined;
+    if (draft.staffName && !staffId) {
+      unmatched.add(draft.staffName);
+      return;
+    }
+    let slot = draft.slot;
+    if (draft.actor) {
+      const key = `${segmentId}__${post.id}__${ownerSyncKey(draft.actor)}`;
+      slot = (actorSlots.get(key) || 0) + 1;
+      actorSlots.set(key, slot);
+    }
+    nextMovements.push({
+      segmentId,
+      blockId: block.id,
+      postId: post.id,
+      staffId,
+      actor: draft.actor,
+      slot,
+      round: draft.round,
+      detail: draft.detail,
+      note: draft.note,
+    });
+  });
+
+  const plan = reconcileSegmentSheetMovements(
+    movements.filter(movement => movement.blockId === block.id),
+    nextMovements,
+  );
+  plan.removes.forEach(movement => {
+    updates[paths.iguardMovement(retreatId, movement.id)] = null;
+  });
+  plan.upserts.forEach(movement => {
+    updates[paths.iguardMovement(retreatId, iguardMovementKey(movement))] = stripUndefined(movement);
+  });
+  if (Object.keys(updates).length > 0) await update(ref(db), updates);
+  return { posts: createdPosts, movements: plan.upserts.length, unmatched: [...unmatched] };
+}
+
+export function subscribeToIguardLodgingMaps(
+  retreatId: string,
+  cb: (maps: IguardLodgingMap[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.iguardLodgingMaps(retreatId)), snap =>
+    cb(snapToList<IguardLodgingMap>(snap).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0))),
+  error => {
+    console.warn("subscribeToIguardLodgingMaps error:", error);
+    onError?.(error);
+  });
+}
+
+export function createIguardLodgingMapId(retreatId: string): string {
+  return push(ref(db, paths.iguardLodgingMaps(retreatId))).key!;
+}
+
+export async function saveIguardLodgingMap(
+  retreatId: string,
+  mapId: string,
+  data: Omit<IguardLodgingMap, "id">,
+): Promise<void> {
+  await update(ref(db, paths.iguardLodgingMap(retreatId, mapId)), stripUndefined(data));
+}
+
+export async function saveIguardLodgingHotspot(
+  retreatId: string,
+  mapId: string,
+  hotspot: IguardLodgingHotspot,
+): Promise<void> {
+  await set(ref(db, paths.iguardLodgingHotspot(retreatId, mapId, hotspot.roomId)), hotspot);
+}
+
+export async function deleteIguardLodgingHotspot(
+  retreatId: string,
+  mapId: string,
+  roomId: string,
+): Promise<void> {
+  await remove(ref(db, paths.iguardLodgingHotspot(retreatId, mapId, roomId)));
+}
+
+export async function deleteIguardLodgingMap(retreatId: string, mapId: string): Promise<void> {
+  await remove(ref(db, paths.iguardLodgingMap(retreatId, mapId)));
 }
 export async function markIguardScheduleProgress(retreatId: string, id: string, actualStart: string): Promise<void> {
   await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), {

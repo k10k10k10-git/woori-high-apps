@@ -31,6 +31,9 @@ describe("in-app schedule editor infrastructure", () => {
     expect(schedule).toContain("<StructureClonePanel");
     expect(schedule).not.toContain("<CueSheetFreshnessBanner");
     expect(read("src/app/retreat/[id]/PostsView.tsx")).toContain("updateIguardPostFields");
+    expect(sheetEditor).toContain("syncIguardScheduleOwner");
+    expect(db).toContain("source=sheet 레코드만 교체");
+    expect(read("src/app/retreat/[id]/PostsView.tsx")).toContain("스프레드시트처럼 아래 표에 바로 적어 저장하세요");
   });
 
   it("orders blocks by editable day and start time", () => {
@@ -42,11 +45,11 @@ describe("in-app schedule editor infrastructure", () => {
     expect(editor).toContain("start: block.start");
   });
 
-  it("marks field progress and lets cue cards prefer the progress marker", () => {
-    expect(read("src/app/retreat/[id]/ScheduleSheetEditor.tsx")).toContain('activeProgress ? "진행 중" : "지금 여기"');
+  it("uses retreat date and clock instead of a manual progress marker", () => {
+    expect(read("src/app/retreat/[id]/ScheduleSheetEditor.tsx")).not.toContain('"지금 여기"');
     const execution = read("src/app/retreat/[id]/ExecutionViews.tsx");
-    expect(execution).toContain("progressCurrentBlock(schedule)");
-    expect(execution).toContain("progressBlock || currentBlockFor");
-    expect(execution).toContain("effectiveTimeRangeLabel");
+    expect(execution).not.toContain("progressCurrentBlock(schedule)");
+    expect(execution).toContain("currentBlockFor(schedule, curDay, clock.time)");
+    expect(execution).toContain("const effectiveDay = curDay");
   });
 });

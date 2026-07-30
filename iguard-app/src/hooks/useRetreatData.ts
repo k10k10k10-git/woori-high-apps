@@ -8,12 +8,14 @@ import {
   subscribeToRetreatPeriods, subscribeToIguardAttendance, subscribeToPartialAttendances,
   subscribeToTeacherAttendances, subscribeToIguardGroupStaff, subscribeToCellColors,
   subscribeToConnection, subscribeToParticipants, subscribeToIguardGbs,
+  subscribeToIguardLodgingMaps,
 } from "@/lib/db";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
   IguardSegment, IguardPost, IguardMovement, AssignedIguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
   TeacherAttendance, IguardAttendanceInfo, PartialAttendanceMap, Participant,
   IguardGbsPlace,
+  IguardLodgingMap,
 } from "@/lib/types";
 import { movementsForDefaultSegments } from "@/lib/defaultSegment";
 
@@ -46,6 +48,7 @@ export interface RetreatData {
   cellColors: Record<string, string>;
   groupStaff: Record<string, string[]>;
   gbs: Record<string, IguardGbsPlace>;
+  lodgingMaps: IguardLodgingMap[];
   connected: boolean;
 }
 
@@ -80,6 +83,7 @@ export function useRetreatData(id: string): RetreatData {
   const [cellColors, setCellColors] = useState<Record<string, string>>({});
   const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
   const [gbs, setGbs] = useState<Record<string, IguardGbsPlace>>({});
+  const [lodgingMaps, setLodgingMaps] = useState<IguardLodgingMap[]>([]);
   const [connected, setConnected] = useState(true);
   const movements = useMemo(
     () => movementsForDefaultSegments(segments, movementRecords),
@@ -107,7 +111,7 @@ export function useRetreatData(id: string): RetreatData {
     let alive = true;
     const pending = new Set([
       "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "segments", "posts",
-      "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff", "gbs",
+      "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff", "gbs", "lodgingMaps",
     ]);
     const ready = (key: string) => {
       pending.delete(key);
@@ -141,6 +145,7 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToCellColors(id, value => { setCellColors(value); ready("cellColors"); }, fail("cellColors")),
       subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }, fail("groupStaff")),
       subscribeToIguardGbs(id, value => { setGbs(value); ready("gbs"); }, fail("gbs")),
+      subscribeToIguardLodgingMaps(id, value => { setLodgingMaps(value); ready("lodgingMaps"); }, fail("lodgingMaps")),
     ];
     return () => {
       alive = false;
@@ -152,7 +157,7 @@ export function useRetreatData(id: string): RetreatData {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, participants, adminTeachers,
     meals, schedule, segments, posts, movements, movementRecords, buses, seating,
-    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs,
+    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps,
     connected,
   };
 }

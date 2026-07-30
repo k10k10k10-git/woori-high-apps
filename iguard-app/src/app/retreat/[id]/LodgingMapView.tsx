@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Group, PartialAttendanceMap, Room, Student } from "@/lib/types";
+import { Group, IguardLodgingMap, PartialAttendanceMap, Room, Student } from "@/lib/types";
 import {
   buildLodgingMapResult,
   LODGING_MAP_BUILDINGS,
   LodgingRoomSummary,
 } from "@/lib/lodgingMap";
+import CustomLodgingMap from "./CustomLodgingMap";
 
 function roomLabel(room: Room): string {
   const dong = (room.dong ?? "").trim();
@@ -33,12 +34,15 @@ interface PopoverPosition {
   side: "left" | "right";
 }
 
-export default function LodgingMapView({ rooms, groups, students, partial, cellColors }: {
+export default function LodgingMapView({ retreatId, rooms, groups, students, partial, cellColors, maps, canManage }: {
+  retreatId: string;
   rooms: Room[];
   groups: Group[];
   students: Record<string, Student>;
   partial: PartialAttendanceMap;
   cellColors: Record<string, string>;
+  maps: IguardLodgingMap[];
+  canManage: boolean;
 }) {
   const result = useMemo(
     () => buildLodgingMapResult(rooms, students, partial, cellColors, groups),
@@ -132,10 +136,25 @@ export default function LodgingMapView({ rooms, groups, students, partial, cellC
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
-        ℹ️ 행정사이트 방배정과 조편성을 실시간으로 읽어 도면 위에 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다.
+        ℹ️ 수련회별 숙소 PDF 위에 행정사이트 방배정과 조편성을 실시간으로 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다.
       </div>
 
-      <section className="card overflow-hidden">
+      <CustomLodgingMap
+        retreatId={retreatId}
+        maps={maps}
+        rooms={rooms}
+        groups={groups}
+        students={students}
+        partial={partial}
+        cellColors={cellColors}
+        canManage={canManage}
+        onSelect={(room, anchor) => setSelection({ room, anchor })}
+      />
+
+      <details className="group card overflow-hidden" open={maps.length === 0}>
+        <summary className="cursor-pointer list-none border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">
+          기본 제공 도면 <span className="ml-1 text-xs font-normal text-slate-400">{maps.length > 0 ? "펼치기" : "새 PDF를 올리기 전 예비 도면"}</span>
+        </summary>
         <div className="border-b border-slate-100 p-3 sm:p-4">
           <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="숙소 건물 선택">
             {LODGING_MAP_BUILDINGS.map(item => {
@@ -248,7 +267,7 @@ export default function LodgingMapView({ rooms, groups, students, partial, cellC
           </div>
           <p className="mt-2 px-1 text-[11px] text-slate-400 sm:hidden">↔ 도면을 좌우로 밀어 전체 호실을 확인하세요.</p>
         </div>
-      </section>
+      </details>
 
       {selection && popoverPosition && createPortal(
         <aside

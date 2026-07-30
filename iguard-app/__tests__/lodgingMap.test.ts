@@ -69,6 +69,19 @@ describe("숙소 배정도 매칭", () => {
     expect(source).toContain('aria-controls={active ? "lodging-room-popover" : undefined}');
   });
 
+  it("수련회별 PDF를 올리고 호실 핀을 저장하는 사용자 배치도를 지원한다", () => {
+    const view = readFileSync(new URL("../src/app/retreat/[id]/CustomLodgingMap.tsx", import.meta.url), "utf8");
+    const paths = readFileSync(new URL("../src/lib/paths.ts", import.meta.url), "utf8");
+    const storage = readFileSync(new URL("../src/lib/lodgingMapStorage.ts", import.meta.url), "utf8");
+
+    expect(view).toContain('accept="application/pdf,.pdf"');
+    expect(view).toContain("saveIguardLodgingHotspot");
+    expect(view).toContain("summarizeLodgingRoom");
+    expect(view).toContain("onSelect(summary, event.currentTarget)");
+    expect(paths).toContain("iguardLodgingMaps");
+    expect(storage).toContain("uploadBytes");
+  });
+
   it("HRD처럼 건물명이 포괄적이면 방 정원으로 핵심관·인재관을 구분한다", () => {
     expect(findRoomMapLocation(room({ dong: "HRD", roomNumber: "304", capacity: 3 }))?.building.id).toBe("hrd-core");
     expect(findRoomMapLocation(room({ dong: "HRD센터", roomNumber: "304", capacity: 2 }))?.building.id).toBe("hrd-talent");
