@@ -101,6 +101,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
   const pinnedCardsRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [pinnedCardsCollapsed, setPinnedCardsCollapsed] = useState(false);
+  const [timelineCompact, setTimelineCompact] = useState(false);
   const sortedStaff = useMemo(() => [...staff].sort((a, b) => a.name.localeCompare(b.name, "ko")), [staff]);
   const preferredStaffId = useMemo(
     () => findPreferredStaffId(sortedStaff, preferredStaffNames),
@@ -316,6 +317,32 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
         </div>
       </div>
       </div>
+      <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-slate-700">전체 일정 {listBlocks.length}개</div>
+          <div className="truncate text-xs text-slate-400">
+            {timelineCompact ? "시간·일정·내 위치를 한 줄로 확인합니다." : "한눈에 보기로 급할 때 전체 흐름을 빠르게 확인하세요."}
+          </div>
+        </div>
+        <button
+          type="button"
+          className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 ${
+            timelineCompact
+              ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700"
+              : "border-slate-200 bg-white text-slate-600 hover:border-fuchsia-300 hover:text-fuchsia-700"
+          }`}
+          aria-pressed={timelineCompact}
+          onClick={() => {
+            setTimelineCompact(value => {
+              const next = !value;
+              if (next) setPinnedCardsCollapsed(true);
+              return next;
+            });
+          }}
+        >
+          {timelineCompact ? "상세 카드로 보기" : "한눈에 보기"}
+        </button>
+      </div>
       {days.map(day => (
         <div key={day} className="mb-4">
           <div className="text-xs font-semibold text-slate-400 mb-2">
@@ -334,35 +361,56 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
                 <div
                   key={b.id}
                   ref={b.id === initialVisibleBlockId ? timelineAnchorRef : undefined}
-                  className={`card p-3 ${now ? "ring-2 ring-fuchsia-400" : ""}`}
+                  className={`card ${timelineCompact ? "p-2.5" : "p-3"} ${now ? "ring-2 ring-fuchsia-400" : ""}`}
                 >
-                  <div className="flex items-start gap-3">
-                    <div className="text-center shrink-0 w-14 pt-0.5">
+                  <div className={`flex items-start ${timelineCompact ? "gap-2" : "gap-3"}`}>
+                    <div className={`shrink-0 pt-0.5 text-center ${timelineCompact ? "w-12" : "w-14"}`}>
                       <div className="font-mono text-xs text-slate-500">{b.start}</div>
                       {now && <div className="text-[10px] text-fuchsia-700 font-bold">지금</div>}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs text-slate-500 truncate">{b.label}</div>
-                      {mv ? (
-                        <div className="font-semibold text-slate-800">
-                          📍 {postName(mv.postId)}
-                          {mv.round && <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${mv.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{mv.round}</span>}
-                        </div>
-                      ) : <div className="text-sm text-slate-300">배치 없음 (조와 함께)</div>}
-                      {mv?.note && <div className="text-xs text-fuchsia-700 mt-0.5">• {mv.note}</div>}
-                      {dutyLines.length > 0 && (
-                        <div className="mt-1 rounded-lg bg-fuchsia-50 border border-fuchsia-100 px-2 py-1.5 text-xs text-fuchsia-800 whitespace-pre-line leading-relaxed">
-                          {dutyLines.join("\n")}
-                        </div>
+                      {timelineCompact ? (
+                        <>
+                          <div className="truncate text-sm font-semibold text-slate-800">{b.label}</div>
+                          <div className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+                            <span className="truncate">{mv ? `📍 ${postName(mv.postId)}` : "조와 함께"}</span>
+                            {mv?.round && (
+                              <span className={`shrink-0 rounded px-1.5 py-0.5 ${mv.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                {mv.round}
+                              </span>
+                            )}
+                          </div>
+                          {dutyLines.length > 0 && (
+                            <div className="mt-0.5 truncate text-xs font-medium text-fuchsia-700">
+                              내 담당 · {dutyLines.join(" / ")}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xs text-slate-500 truncate">{b.label}</div>
+                          {mv ? (
+                            <div className="font-semibold text-slate-800">
+                              📍 {postName(mv.postId)}
+                              {mv.round && <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${mv.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{mv.round}</span>}
+                            </div>
+                          ) : <div className="text-sm text-slate-300">배치 없음 (조와 함께)</div>}
+                          {mv?.note && <div className="text-xs text-fuchsia-700 mt-0.5">• {mv.note}</div>}
+                          {dutyLines.length > 0 && (
+                            <div className="mt-1 rounded-lg bg-fuchsia-50 border border-fuchsia-100 px-2 py-1.5 text-xs text-fuchsia-800 whitespace-pre-line leading-relaxed">
+                              {dutyLines.join("\n")}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                    {(b.detail || b.owner || b.notice) && (
+                    {!timelineCompact && (b.detail || b.owner || b.notice) && (
                       <button onClick={() => toggleOpen(b.id)} className="text-xs text-slate-400 hover:text-fuchsia-600 shrink-0 whitespace-nowrap">
                         {isOpen ? "접기" : "상세 ▾"}
                       </button>
                     )}
                   </div>
-                  {(b.detail || b.owner || b.notice) && isOpen && (
+                  {!timelineCompact && (b.detail || b.owner || b.notice) && isOpen && (
                     <div className="mt-2 ml-14">
                       <BlockTextSummary block={b} />
                     </div>
