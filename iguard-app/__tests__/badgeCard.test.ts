@@ -113,6 +113,10 @@ describe("명찰카드 파생과 인쇄 안전", () => {
     expect(html).not.toContain("특정 학생");
     expect(html).toContain("height:277mm");
     expect(html).toContain("page-break-after:always");
+    expect(html).toContain("badge-gbs-grid");
+    expect(html).toContain("grid-template-columns:repeat(2");
+    expect(html).toContain("badge-timeline-grid");
+    expect(html).toContain("grid-template-columns:repeat(3");
   });
 
   it("개인 일정에서는 다른 스탭 이름 목록을 숨기고 담당 역할만 남긴다", () => {

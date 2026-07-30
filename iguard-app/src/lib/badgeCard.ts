@@ -184,6 +184,43 @@ function row(label: string, value: string): string {
   return `<div class="badge-row"><b>${escapeHtml(label)}</b><span>${escapeHtml(value || "—")}</span></div>`;
 }
 
+function gbsGrid(items: BadgeCardData["gbs"]): string {
+  const midpoint = Math.ceil(items.length / 2);
+  const columns = [items.slice(0, midpoint), items.slice(midpoint)]
+    .filter(column => column.length > 0)
+    .map(column => `<div class="badge-gbs-column">${column.map(item => {
+      const groups = item.groups.join(", ") || "조 미지정";
+      return `<div class="badge-gbs-item"><strong>${escapeHtml(groups)}</strong><span>${escapeHtml(item.place)}</span></div>`;
+    }).join("")}</div>`)
+    .join("");
+  return `<div class="badge-row badge-gbs-row">
+    <b>GBS 장소</b>
+    <div class="badge-gbs-grid">${columns || '<span class="badge-empty">—</span>'}</div>
+  </div>`;
+}
+
+function timelineGrid(items: BadgeCardData["timeline"]): string {
+  const days = [...new Set(items.map(item => item.day))].sort((a, b) => a - b);
+  const columns = days.map(day => {
+    const rows = items
+      .filter(item => item.day === day)
+      .map(item => `<div class="badge-timeline-item">
+        <time>${escapeHtml(item.time)}</time>
+        <span><strong>${escapeHtml(item.label)}</strong>${item.assignments.length
+          ? `<small>${escapeHtml(item.assignments.join(" / "))}</small>`
+          : ""}</span>
+      </div>`).join("");
+    return `<section class="badge-day">
+      <h3>${escapeHtml(`${day}일차`)}</h3>
+      <div>${rows}</div>
+    </section>`;
+  }).join("");
+  return `<div class="badge-timeline-row">
+    <b>전체 일정</b>
+    <div class="badge-timeline-grid">${columns || '<span class="badge-empty">—</span>'}</div>
+  </div>`;
+}
+
 /** 사용자·운영 데이터는 이 함수에서 모두 escapeHtml을 거쳐 인쇄 HTML로 변환한다. */
 export function badgeCardsHtml(cards: BadgeCardData[], retreatName: string, year: number): string {
   const cardHtml = cards.map(card => {
@@ -191,26 +228,22 @@ export function badgeCardsHtml(cards: BadgeCardData[], retreatName: string, year
       `${bus.day}일차 ${bus.busNo}호차 (${bus.groups.join(", ") || "조 미지정"})${bus.companions.length ? ` · 동승 ${bus.companions.join(", ")}` : ""}`,
     ).join("\n");
     const meals = card.meals.map(meal => `${meal.label}: ${meal.groups.join(" → ")}`).join("\n");
-    const gbs = card.gbs.map(item => `${item.groups.join(", ")}: ${item.place}`).join("\n");
     const seating = card.seating.map(session =>
       `${session.label}: ${session.zoneGroups.map(groups => groups.join(" · ") || "미배정").join(" / ")}`,
-    ).join("\n");
-    const timeline = card.timeline.map(item =>
-      `${item.day}일차 ${item.time} ${item.label}${item.assignments.length ? ` — ${item.assignments.join(" / ")}` : ""}`,
     ).join("\n");
     return `<section class="badge-card">
       <header><strong>${escapeHtml(card.staffName)}</strong><small>${escapeHtml(`${retreatName} · ${year}년`)}</small></header>
       ${row("호차·동승", buses)}
       ${row("식사 이동", meals)}
-      ${row("GBS 장소", gbs)}
+      ${gbsGrid(card.gbs)}
       ${row("집회 이동", seating)}
-      ${row("전체 일정", timeline)}
+      ${timelineGrid(card.timeline)}
     </section>`;
   }).join("");
 
   return `<style>
     .badge-grid { display:block; }
-    .badge-card { min-height:250mm; border:1.5px solid #1e293b; border-radius:4mm; padding:8mm; break-inside:avoid; page-break-inside:avoid; overflow:hidden; }
+    .badge-card { min-height:250mm; border:1.5px solid #1e293b; border-radius:4mm; padding:8mm; break-inside:avoid; page-break-inside:avoid; }
     .badge-card + .badge-card { margin-top:10mm; }
     .badge-card header { display:flex; align-items:baseline; justify-content:space-between; gap:4mm; padding-bottom:4mm; margin-bottom:3mm; border-bottom:2px solid #1e293b; }
     .badge-card header strong { font-size:24px; }
@@ -218,9 +251,27 @@ export function badgeCardsHtml(cards: BadgeCardData[], retreatName: string, year
     .badge-row { display:grid; grid-template-columns:27mm 1fr; gap:3mm; padding:3mm 0; border-bottom:1px solid #e2e8f0; font-size:11px; line-height:1.5; white-space:pre-line; }
     .badge-row b { color:#475569; }
     .badge-row span { overflow-wrap:anywhere; }
+    .badge-gbs-row { align-items:start; white-space:normal; }
+    .badge-gbs-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); column-gap:6mm; row-gap:1mm; }
+    .badge-gbs-column { display:grid; align-content:start; gap:1mm; min-width:0; }
+    .badge-gbs-item { display:grid; grid-template-columns:10mm minmax(0, 1fr); gap:1.5mm; min-width:0; font-size:10px; line-height:1.35; }
+    .badge-gbs-item strong { color:#334155; white-space:nowrap; }
+    .badge-gbs-item span { color:#475569; }
+    .badge-empty { color:#94a3b8; }
+    .badge-timeline-row { padding-top:3mm; }
+    .badge-timeline-row > b { display:block; margin-bottom:2mm; color:#475569; font-size:11px; }
+    .badge-timeline-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:3mm; align-items:start; }
+    .badge-day { min-width:0; overflow:hidden; border:1px solid #cbd5e1; border-radius:2mm; }
+    .badge-day h3 { margin:0; padding:1.5mm 2mm; background:#1e293b; color:#fff; font-size:10px; }
+    .badge-timeline-item { display:grid; grid-template-columns:20mm minmax(0, 1fr); gap:1.5mm; padding:1.2mm 2mm; border-top:1px solid #e2e8f0; font-size:8.5px; line-height:1.25; }
+    .badge-timeline-item:first-child { border-top:0; }
+    .badge-timeline-item time { color:#64748b; font-family:monospace; white-space:nowrap; }
+    .badge-timeline-item span { min-width:0; overflow-wrap:anywhere; }
+    .badge-timeline-item strong { display:block; color:#334155; }
+    .badge-timeline-item small { display:block; margin-top:.5mm; color:#a21caf; font-size:7.5px; line-height:1.2; }
     @media print {
       body { padding:0 !important; }
-      .badge-card { width:100%; height:277mm; min-height:277mm; border-radius:3mm; padding:8mm; page-break-after:always; break-after:page; }
+      .badge-card { width:100%; height:277mm; min-height:277mm; border-radius:3mm; padding:7mm; page-break-after:always; break-after:page; }
       .badge-card:last-child { page-break-after:auto; break-after:auto; }
       .badge-card + .badge-card { margin-top:0; }
     }
