@@ -91,7 +91,7 @@ export default function FormGuideModal({ onClose }: Props) {
                 },
                 {
                   keyword: "\"기타\" 또는 \"특이\" 포함",
-                  desc: "특이사항 (특이사항 탭용)",
+                  desc: "특이사항 (건강 특이사항 탭용)",
                   example: "기타 사항 / 특이사항이 있으면 적어주세요",
                   valueRule: "장문 입력",
                   color: "amber",
@@ -189,14 +189,14 @@ export default function FormGuideModal({ onClose }: Props) {
                 { num: 4, title: "몇 부인가요?", type: "객관식", options: "1부 / 2부", note: "반드시 이 두 선택지만 사용", role: "전체 필터링", tag: "필수 ⚠", tagColor: "red" },
                 { num: 5, title: "학년을 선택해주세요", type: "객관식", options: "1학년 / 2학년 / 3학년", note: "제목에 '학년' 포함 필수 · 분기 폼 사용 시 2개 열 생성됨(정상)", role: "조편성·반 명단", tag: "필수 ⚠", tagColor: "red" },
                 { num: 6, title: "반을 선택해주세요", type: "객관식", options: "1반 / 2반 / … / 12반", note: "제목에 '반' 포함 필수 · 선생님 이름 포함 가능: 3반 (홍길동T)", role: "조편성·반 명단", tag: "필수 ⚠", tagColor: "red" },
-                { num: 7, title: "학생 연락처", type: "단답형", options: null, note: "숫자만 또는 하이픈 포함 무관", role: "카풀·부분참 탭", tag: "선택", tagColor: "slate" },
-                { num: 8, title: "부모님 연락처", type: "단답형", options: null, note: "숫자만 또는 하이픈 포함 무관", role: "카풀·부분참 탭", tag: "선택", tagColor: "slate" },
+                { num: 7, title: "학생 연락처", type: "단답형", options: null, note: "숫자만 또는 하이픈 포함 무관", role: "카풀·자차·부분 참석 탭", tag: "선택", tagColor: "slate" },
+                { num: 8, title: "부모님 연락처", type: "단답형", options: null, note: "숫자만 또는 하이픈 포함 무관", role: "카풀·자차·부분 참석 탭", tag: "선택", tagColor: "slate" },
                 { num: 9, title: "단체티(굿즈) 구매를 원하시나요?", type: "객관식", options: "예 / 아니오", note: "예 → 디자인 질문으로 이동 · 아니오 → 다음 질문으로 이동", role: "단체티 탭", tag: "선택", tagColor: "rose" },
                 { num: 10, title: "수련회 티셔츠 디자인을 선택해주세요", type: "객관식", options: "1번 / 2번 / 3번 / 4번", note: "제목에 '디자인' 포함 필수 · Q9에서 '예' 선택자만 응답", role: "단체티 탭", tag: "선택", tagColor: "rose" },
                 { num: 11, title: "티셔츠 사이즈를 선택해주세요", type: "객관식", options: "XS(85) / S(90) / M(95) / L(100) / XL(105) / 2XL(110) / 3XL(115)", note: "제목에 '사이즈' 포함 필수 · Q9에서 '예' 선택자만 응답", role: "단체티 탭", tag: "선택", tagColor: "rose" },
                 { num: 12, title: "여행자 보험 가입을 원하시나요?", type: "객관식", options: "예 / 아니오", note: "예 → 주민등록번호 질문으로 이동 · 아니오 → 다음 질문으로 이동", role: "여행자 보험 탭", tag: "선택", tagColor: "teal" },
                 { num: 13, title: "주민등록번호를 입력해주세요", type: "단답형", options: null, note: "제목에 '주민' 포함 필수 · Q12에서 '예' 선택자만 응답", role: "여행자 보험 탭", tag: "선택", tagColor: "teal" },
-                { num: 14, title: "기타 사항이 있으면 적어주세요", type: "장문형", options: null, note: "제목에 '기타' 또는 '특이' 포함 필수", role: "특이사항 탭", tag: "선택", tagColor: "slate" },
+                { num: 14, title: "기타 사항이 있으면 적어주세요", type: "장문형", options: null, note: "제목에 '기타' 또는 '특이' 포함 필수", role: "건강 특이사항 탭", tag: "선택", tagColor: "slate" },
               ].map(q => {
                 const tagStyle: Record<string, string> = {
                   red:   "bg-red-100 text-red-700",

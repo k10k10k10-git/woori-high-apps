@@ -102,7 +102,7 @@ export default function ParticipantsTab({ retreat }: Props) {
       await backupParticipants(retreat.id);
       const list = await fetchSheetParticipants(retreat.sheetId, retreat.sheetGid);
 
-      // 특이사항 보존: 시트에도 특이사항 열이 있어서 전체 재생성 시 관리자가 특이사항 탭에서
+      // 특이사항 보존: 시트에도 특이사항 열이 있어서 전체 재생성 시 관리자가 건강 특이사항 탭에서
       // 수정한 내용([분류] 태그, 문구 수정, 추가 메모)이 시트 원문으로 되돌아가는 버그가 있었다.
       // 키(p_N)는 매 동기화마다 재배열되므로 studentId(없으면 이름+부+학년+반)로 사람을 맞춰
       // 기존 extra를 우선 유지한다. 기존 값이 없을 때만 시트의 특이사항을 새로 채운다.
@@ -161,7 +161,7 @@ export default function ParticipantsTab({ retreat }: Props) {
     const chosen = dup.entries[entryIndex];
     if (!chosen) return;
     const ms = findStudent(chosen, students);
-    // 다른 신청 항목을 선택해도 관리자가 특이사항 탭에서 수정한 extra는 유지
+    // 다른 신청 항목을 선택해도 관리자가 건강 특이사항 탭에서 수정한 extra는 유지
     const prevExtra = participants[dup.participantKey]?.extra;
     const updated: Participant = {
       ...stripRaw(chosen),
@@ -649,7 +649,7 @@ export default function ParticipantsTab({ retreat }: Props) {
             <span className="text-sm font-semibold text-teal-700">
               📋 후기 신청자 {lateRegistrants.length}명
             </span>
-            <span className="text-xs text-teal-500">— 신청자 취합탭 색칠로 처리된 인원</span>
+            <span className="text-xs text-teal-500">— 반별 명단 탭 색칠로 처리된 인원</span>
           </div>
           <table className="w-full text-sm">
             <thead>

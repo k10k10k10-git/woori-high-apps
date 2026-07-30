@@ -10,8 +10,8 @@ import { useUI } from "@/context/UIContext";
 interface Props { retreat: Retreat; }
 
 type PartialType = PartialAttendance["type"];
-// 작업 목록은 "신청자 취합에서 주황(부분참)으로 칠한 학생 ∪ 이미 선복귀/후발대로 지정된 학생"만 담는다.
-// 전체/본대 전수 목록은 여기서 다루지 않는다(부분참 대상은 신청자 취합에서 주황으로 칠해 넘긴다).
+// 작업 목록은 "반별 명단에서 주황(부분참)으로 칠한 학생 ∪ 이미 선복귀/후발대로 지정된 학생"만 담는다.
+// 전체/본대 전수 목록은 여기서 다루지 않는다(부분참 대상은 반별 명단에서 주황으로 칠해 넘긴다).
 type Filter = "전체" | "미지정" | PartialType;
 
 // 행 타입은 pool 로직과 공유 (lib/partialPool.ts). rows(시트 신청자)·poolRows 모두 이 형태.
@@ -84,7 +84,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const rows = useMemo<ParticipantRow[]>(() => {
     return Object.values(participants)
       .flatMap(p => {
-        // 신청자 취합(셀색상)과 동일 규칙으로 키 해석 — studentId가 없어도 반 명단에서 찾아 보강.
+        // 반별 명단(셀색상)과 동일 규칙으로 키 해석 — studentId가 없어도 반 명단에서 찾아 보강.
         const studentKey = resolveStudentKey(p, students);
         if (!studentKey) return [];
         if (cellColors[studentKey] === "red") return [];
@@ -260,7 +260,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
       </div>
 
       <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-3 text-xs text-orange-700">
-        📋 <strong>신청자 취합에서 부분참(주황)으로 칠한 학생</strong>만 아래에 나옵니다. 여기서 <strong>선복귀 / 후발대 / 당일참석</strong>을 지정하고 메모를 남기세요. 당일참석은 참석 일차를 함께 고릅니다. 대상을 추가·제외하려면 신청자 취합에서 주황색을 켜고 끄면 됩니다.
+        📋 <strong>반별 명단에서 부분참(주황)으로 칠한 학생</strong>만 아래에 나옵니다. 여기서 <strong>선복귀 / 후발대 / 당일참석</strong>을 지정하고 메모를 남기세요. 당일참석은 참석 일차를 함께 고릅니다. 대상을 추가·제외하려면 반별 명단에서 주황색을 켜고 끄면 됩니다.
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -290,7 +290,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
               <div className="text-3xl mb-2">⏰</div>
               {filter === "전체" ? (
                 <p>부분참 대상 학생이 아직 없습니다.<br />
-                  <span className="text-xs"><strong className="text-slate-500">신청자 취합</strong> 탭에서 부분참 학생을 <strong className="text-orange-500">주황색</strong>으로 칠하면 여기에 나타납니다.</span>
+                  <span className="text-xs"><strong className="text-slate-500">반별 명단</strong> 탭에서 부분참 학생을 <strong className="text-orange-500">주황색</strong>으로 칠하면 여기에 나타납니다.</span>
                 </p>
               ) : (
                 <p>이 구분에 해당하는 학생이 없습니다.</p>

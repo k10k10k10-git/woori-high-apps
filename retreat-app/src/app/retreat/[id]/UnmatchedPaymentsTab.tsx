@@ -26,7 +26,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   const [note, setNote]           = useState("");
   const [adding, setAdding]       = useState(false);
 
-  // 미납자 현황 탭
+  // 입금 대조 탭
   const [unpaidBu, setUnpaidBu] = useState<BuTab>("1부");
 
   // 학생 연결 UI
@@ -137,7 +137,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   async function handleUnresolve(payment: UnmatchedPayment) {
     try {
       // 연결 시 markPaid로 세팅했던 cellColors(입금완료 파란색)도 함께 지워서
-      // 신청자 취합 화면에 해제된 상태가 정확히 반영되게 한다.
+      // 반별 명단 화면에 해제된 상태가 정확히 반영되게 한다.
       await unresolveUnmatchedPayment(retreat.id, payment.id, payment.resolvedStudentId);
       if (payment.resolvedStudentId) {
         setCellColors_(prev => {
@@ -233,10 +233,10 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
         </div>
       )}
 
-      {/* ══ 왼쪽: 미납자 현황 ══ */}
+      {/* ══ 왼쪽: 입금 대조 ══ */}
       <div className="flex-1 min-w-0">
       <div className="mb-8">
-        <h2 className="text-base font-bold text-slate-700 mb-3">미납자 현황</h2>
+        <h2 className="text-base font-bold text-slate-700 mb-3">입금 대조</h2>
 
         {/* 요약 카드 */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">

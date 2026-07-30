@@ -147,7 +147,7 @@ export default function MealCountTab({ retreat }: Props) {
     try {
       await saveMealCount(retreat.id, { base, extraLabel, meals, adjustments, personAssignments });
       setDirty(false);
-      toast("식수 계산을 저장했습니다.", "success");
+      toast("식사 인원을 저장했습니다.", "success");
     } catch (e) {
       toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
@@ -316,7 +316,7 @@ export default function MealCountTab({ retreat }: Props) {
       list.push({ name: meal.name, total });
       byDate.set(meal.date, list);
     });
-    const lines: string[] = [`${retreat.name} 식수 인원 (총 ${baseTotal}명 기준)`, ""];
+    const lines: string[] = [`${retreat.name} 식사 인원 (총 ${baseTotal}명 기준)`, ""];
     byDate.forEach((items, date) => {
       lines.push(fmtDate(date));
       items.forEach(it => lines.push(`${it.name} - ${it.total}`));

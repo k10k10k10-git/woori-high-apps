@@ -311,7 +311,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   ), [uniqueParts]);
 
   // 표시용 실효 색상: 빨강(취소)이 최우선, 그다음 부분참(선복귀/후발대) 지정이 있으면 주황,
-  // 아니면 수동 지정 색(cellColors). 부분참석 탭의 지정을 신청자 취합 화면·집계·인쇄에 함께 반영한다.
+  // 아니면 수동 지정 색(cellColors). 부분 참석 탭의 지정을 반별 명단 화면·집계·인쇄에 함께 반영한다.
   const effectiveColorOf = useCallback((colorKey: string): CellColor | undefined => {
     return resolveEffectiveColor(cellColors[colorKey] as CellColor | undefined, partialMap.has(colorKey));
   }, [cellColors, partialMap]);
@@ -501,7 +501,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     </span>`).join("");
 
     return `
-      <h1 style="margin:0 0 2px;font-size:14px">${escapeHtml(retreat.name)} 신청자 취합 (${escapeHtml(bu)})</h1>
+      <h1 style="margin:0 0 2px;font-size:14px">${escapeHtml(retreat.name)} 반별 명단 (${escapeHtml(bu)})</h1>
       <p style="font-size:10px;color:#888;margin:0 0 6px">총 ${stats.total}명 (남 ${stats.male} / 여 ${stats.female}) · 출력일: ${new Date().toLocaleDateString("ko-KR")}</p>
       <div style="margin-bottom:8px">${legendItems}</div>
       <table style="border-collapse:collapse;width:100%;table-layout:auto">

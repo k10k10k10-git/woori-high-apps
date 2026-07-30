@@ -56,30 +56,45 @@ const TAB_IDX = {
 // ── 탭 그룹 구조 (대그룹 → 소그룹) ─────────────────────────────
 const TAB_GROUPS = [
   {
-    label: "사전 준비",
+    label: "명단",
     tabs: [
-      { label: "시트 연동",   idx: 0 },
-      { label: "신청자 취합",  idx: 7 },
-      { label: "미납자 현황",  idx: 12 },
-      { label: "취소명단",     idx: 9 },
-      { label: "여행자 보험",  idx: 8 },
-      { label: "단체티 신청",  idx: 13 },
-      { label: "조편성",      idx: 1 },
-      { label: "방배정",      idx: 2 },
-      { label: "교사 참석",   idx: 4 },
-      { label: "물품/간식",   idx: 10 },
-      { label: "행정물품",   idx: 16 },
-      { label: "식수 계산",   idx: 15 },
+      { label: "신청 접수", idx: 0 },
+      { label: "반별 명단", idx: 7 },
+      { label: "입금 대조", idx: 12 },
+      { label: "취소·환불", idx: 9 },
     ],
   },
   {
-    label: "현장 준비",
+    label: "편성",
     tabs: [
-      { label: "카풀",       idx: 5 },
-      { label: "부분 참석",   idx: 6 },
-      { label: "현장 등록",   idx: 11 },
-      { label: "의료 일지",   idx: 14 },
-      { label: "특이사항",    idx: 3 },
+      { label: "조편성", idx: 1 },
+      { label: "방배정", idx: 2 },
+      { label: "교사 참석", idx: 4 },
+    ],
+  },
+  {
+    label: "이동·참석",
+    tabs: [
+      { label: "부분 참석", idx: 6 },
+      { label: "카풀·자차", idx: 5 },
+    ],
+  },
+  {
+    label: "물품·비용",
+    tabs: [
+      { label: "여행자 보험", idx: 8 },
+      { label: "단체티", idx: 13 },
+      { label: "구매 물품", idx: 10 },
+      { label: "물품 재고", idx: 16 },
+      { label: "식사 인원", idx: 15 },
+    ],
+  },
+  {
+    label: "현장",
+    tabs: [
+      { label: "현장 등록", idx: 11 },
+      { label: "건강 특이사항", idx: 3 },
+      { label: "의료 일지", idx: 14 },
     ],
   },
 ] as const;
