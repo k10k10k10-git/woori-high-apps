@@ -111,5 +111,20 @@ describe("명찰카드 파생과 인쇄 안전", () => {
     expect(html).toContain("[본관] 강당 입구");
     expect(html).not.toContain("담당 호실");
     expect(html).not.toContain("특정 학생");
+    expect(html).toContain("height:277mm");
+    expect(html).toContain("page-break-after:always");
+  });
+
+  it("개인 일정에서는 다른 스탭 이름 목록을 숨기고 담당 역할만 남긴다", () => {
+    const card = buildBadgeCard("staff-1", {
+      ...input,
+      staff: [
+        { id: "staff-1", name: "박혜원sf" },
+        { id: "staff-2", name: "김동연sf" },
+      ],
+      posts: [{ id: "post-1", name: "숙소 총장: 박혜원sf, 김동연sf", area: "수련회장" }],
+    });
+    expect(card?.timeline[0].assignments).toEqual(["[수련회장] 숙소 총장"]);
+    expect(card?.timeline[0].assignments.join(" ")).not.toContain("김동연");
   });
 });

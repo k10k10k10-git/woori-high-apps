@@ -11,6 +11,7 @@ import {
   cueTimelineListBlocks, cueTimelineScrollTop, cueTimelineWindow, type CueTimelinePhase,
 } from "@/lib/cueCardTimeline";
 import { gbsPlacesForStaff } from "@/lib/gbsPlaces";
+import { dutyLabelsForStaff } from "@/lib/personalDuty";
 
 interface Data {
   retreatId?: string;
@@ -191,6 +192,8 @@ export function CueCardView({
   );
   const currentDutyLines = currentBlock ? dutyLinesForStaff(currentBlock, selectedStaff?.name) : [];
   const nextDutyLines = nextBlock ? dutyLinesForStaff(nextBlock, selectedStaff?.name) : [];
+  const currentDutyLabels = dutyLabelsForStaff(currentDutyLines, selectedStaff?.name);
+  const nextDutyLabels = dutyLabelsForStaff(nextDutyLines, selectedStaff?.name);
 
   useEffect(() => {
     if (timelinePhase !== "active" || !initialVisibleBlockId || initialTimelinePositioned.current) return;
@@ -312,8 +315,8 @@ export function CueCardView({
               )}
             </div>
 
-            {currentDutyLines.length > 0 && (
-              <TextBlock title="내 담당" tone="fuchsia">{currentDutyLines.join("\n")}</TextBlock>
+            {currentDutyLabels.length > 0 && (
+              <TextBlock title="담당 역할" tone="fuchsia">{currentDutyLabels.join("\n")}</TextBlock>
             )}
             {currentBlock.detail && <div className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{currentBlock.detail}</div>}
           </div>
@@ -361,8 +364,8 @@ export function CueCardView({
             ) : (
               <span className="text-slate-500">배치 없음 · 조와 함께</span>
             )}
-            {nextDutyLines.length > 0 && (
-              <span className="rounded-md bg-white px-2 py-1 text-violet-800">내 담당 · {nextDutyLines.join(" / ")}</span>
+            {nextDutyLabels.length > 0 && (
+              <span className="rounded-md bg-white px-2 py-1 text-violet-800">담당 · {nextDutyLabels.join(" · ")}</span>
             )}
           </div>
         )}
@@ -409,6 +412,7 @@ export function CueCardView({
               const now = isNowOn(b, curDay, clock.time);
               const isOpen = open.has(b.id);
               const dutyLines = dutyLinesForStaff(b, selectedStaff?.name);
+              const dutyLabels = dutyLabelsForStaff(dutyLines, selectedStaff?.name);
               return (
                 <div
                   key={b.id}
@@ -434,9 +438,9 @@ export function CueCardView({
                               </span>
                             )}
                           </div>
-                          {dutyLines.length > 0 && (
+                          {dutyLabels.length > 0 && (
                             <div className="mt-0.5 truncate text-xs font-medium text-fuchsia-700">
-                              내 담당 · {selectedStaff?.name}
+                              담당 · {dutyLabels.join(" · ")}
                             </div>
                           )}
                         </>
@@ -454,9 +458,9 @@ export function CueCardView({
                               ))}
                             </div>
                           ) : <div className="text-sm text-slate-300">배치 없음 (조와 함께)</div>}
-                          {dutyLines.length > 0 && (
+                          {dutyLabels.length > 0 && (
                             <div className="mt-1 rounded-lg bg-fuchsia-50 border border-fuchsia-100 px-2 py-1.5 text-xs text-fuchsia-800 whitespace-pre-line leading-relaxed">
-                              {dutyLines.join("\n")}
+                              담당 역할 · {dutyLabels.join(" · ")}
                             </div>
                           )}
                         </>

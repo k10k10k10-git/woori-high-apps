@@ -11,6 +11,7 @@ import { parseAssignedAreas, roomMatchesAssignedAreas } from "./assignedArea";
 import { isCancelledStudent } from "./busParticipation";
 import { escapeHtml } from "./exportUtils";
 import { compareBlocks, timeRangeLabel } from "./scheduleTime";
+import { personalAssignmentLabel } from "./personalDuty";
 
 export interface BadgeCardBus {
   day: number;
@@ -79,6 +80,7 @@ export function buildBadgeCard(staffId: string, input: BadgeCardInput): BadgeCar
   const member = input.staff.find(candidate => candidate.id === staffId);
   if (!member) return null;
   const memberKey = normalizeStaffIdentityName(member.name);
+  const staffNames = input.staff.map(candidate => candidate.name);
 
   const buses = input.buses
     .filter(bus => parseBusStaffNames(bus.staff).some(name => normalizeStaffIdentityName(name) === memberKey))
@@ -112,12 +114,13 @@ export function buildBadgeCard(staffId: string, input: BadgeCardInput): BadgeCar
         .filter(movement => movement.staffId === staffId && movement.blockId === block.id)
         .map(movement => {
           const post = postNames.get(movement.postId) || "삭제된 포스트";
-          return [
+          return personalAssignmentLabel([
             post,
             movement.round,
             movement.note,
-          ].filter(Boolean).join(" · ");
-        });
+          ].filter(Boolean).join(" · "), staffNames);
+        })
+        .filter(Boolean);
       return {
         day: block.day,
         time: timeRangeLabel(block),
@@ -206,17 +209,20 @@ export function badgeCardsHtml(cards: BadgeCardData[], retreatName: string, year
   }).join("");
 
   return `<style>
-    .badge-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8mm; }
-    .badge-card { min-height:86mm; border:1.5px solid #1e293b; border-radius:3mm; padding:4mm; break-inside:avoid; page-break-inside:avoid; overflow:hidden; }
-    .badge-card header { display:flex; align-items:baseline; justify-content:space-between; gap:3mm; padding-bottom:2mm; margin-bottom:2mm; border-bottom:2px solid #1e293b; }
-    .badge-card header strong { font-size:16px; }
-    .badge-card header small { color:#64748b; font-size:8px; text-align:right; }
-    .badge-row { display:grid; grid-template-columns:18mm 1fr; gap:2mm; padding:1.1mm 0; border-bottom:1px solid #e2e8f0; font-size:7.5px; line-height:1.28; white-space:pre-line; }
+    .badge-grid { display:block; }
+    .badge-card { min-height:250mm; border:1.5px solid #1e293b; border-radius:4mm; padding:8mm; break-inside:avoid; page-break-inside:avoid; overflow:hidden; }
+    .badge-card + .badge-card { margin-top:10mm; }
+    .badge-card header { display:flex; align-items:baseline; justify-content:space-between; gap:4mm; padding-bottom:4mm; margin-bottom:3mm; border-bottom:2px solid #1e293b; }
+    .badge-card header strong { font-size:24px; }
+    .badge-card header small { color:#64748b; font-size:11px; text-align:right; }
+    .badge-row { display:grid; grid-template-columns:27mm 1fr; gap:3mm; padding:3mm 0; border-bottom:1px solid #e2e8f0; font-size:11px; line-height:1.5; white-space:pre-line; }
     .badge-row b { color:#475569; }
     .badge-row span { overflow-wrap:anywhere; }
     @media print {
-      body { padding:8mm !important; }
-      .badge-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:6mm; }
+      body { padding:0 !important; }
+      .badge-card { width:100%; height:277mm; min-height:277mm; border-radius:3mm; padding:8mm; page-break-after:always; break-after:page; }
+      .badge-card:last-child { page-break-after:auto; break-after:auto; }
+      .badge-card + .badge-card { margin-top:0; }
     }
   </style><div class="badge-grid">${cardHtml}</div>`;
 }

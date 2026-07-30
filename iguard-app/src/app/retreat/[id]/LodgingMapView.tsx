@@ -34,7 +34,7 @@ interface PopoverPosition {
   side: "left" | "right";
 }
 
-export default function LodgingMapView({ retreatId, rooms, groups, students, partial, cellColors, maps, canManage }: {
+export default function LodgingMapView({ retreatId, rooms, groups, students, partial, cellColors, maps, mode }: {
   retreatId: string;
   rooms: Room[];
   groups: Group[];
@@ -42,7 +42,7 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
   partial: PartialAttendanceMap;
   cellColors: Record<string, string>;
   maps: IguardLodgingMap[];
-  canManage: boolean;
+  mode: "manage" | "view";
 }) {
   const result = useMemo(
     () => buildLodgingMapResult(rooms, students, partial, cellColors, groups),
@@ -136,7 +136,9 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
-        ℹ️ 수련회별 숙소 PDF 위에 행정사이트 방배정과 조편성을 실시간으로 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다.
+        {mode === "manage"
+          ? "ℹ️ 숙소 PDF를 올리면 건물명과 호실 번호를 자동 분석합니다. 인식하지 못한 호실은 PDF 위에 직접 배치할 수 있습니다."
+          : "ℹ️ 행정사이트 방배정과 조편성을 실시간으로 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다."}
       </div>
 
       <CustomLodgingMap
@@ -147,7 +149,7 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
         students={students}
         partial={partial}
         cellColors={cellColors}
-        canManage={canManage}
+        mode={mode}
         onSelect={(room, anchor) => setSelection({ room, anchor })}
       />
 

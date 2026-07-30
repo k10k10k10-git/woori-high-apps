@@ -35,6 +35,7 @@ describe("현장 화면 sticky 레이아웃 계약", () => {
     expect(source).toContain("if (next) setPinnedCardsCollapsed(true)");
     expect(source).toContain("aria-pressed={timelineCompact}");
     expect(source).toContain('{timelineCompact ? "상세 카드로 보기" : "한눈에 보기"}');
-    expect(source).toContain("내 담당 · {selectedStaff?.name}");
+    expect(source).toContain('담당 · {dutyLabels.join(" · ")}');
+    expect(source).not.toContain("내 담당 · {selectedStaff?.name}");
   });
 });

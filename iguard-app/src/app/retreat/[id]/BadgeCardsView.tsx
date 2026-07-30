@@ -72,7 +72,7 @@ export default function BadgeCardsView(props: Props) {
         <section className="card p-4" aria-labelledby="badge-preview-title">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 id="badge-preview-title" className="font-semibold text-slate-800">{card.staffName} 카드 미리보기</h2>
-            <span className="text-xs text-slate-400">인쇄본은 A4 2열 배치</span>
+            <span className="text-xs text-slate-400">스탭 1명당 A4 1장</span>
           </div>
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <Preview label="호차·동승" values={card.buses.map(bus => `${bus.day}일차 ${bus.busNo}호차 · ${bus.groups.join(", ") || "조 미지정"}${bus.companions.length ? ` · ${bus.companions.join(", ")}` : ""}`)} />

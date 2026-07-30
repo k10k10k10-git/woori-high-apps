@@ -18,6 +18,7 @@ import {
   saveIguardLodgingMap,
 } from "@/lib/db";
 import { deleteLodgingMapPdf, uploadLodgingMapPdf } from "@/lib/lodgingMapStorage";
+import { analyzeLodgingPdf } from "@/lib/lodgingPdf";
 import { useUI } from "@/context/UIContext";
 
 function roomLabel(room: Room): string {
@@ -77,7 +78,7 @@ export default function CustomLodgingMap({
   students,
   partial,
   cellColors,
-  canManage,
+  mode,
   onSelect,
 }: {
   retreatId: string;
@@ -87,22 +88,18 @@ export default function CustomLodgingMap({
   students: Record<string, Student>;
   partial: PartialAttendanceMap;
   cellColors: Record<string, string>;
-  canManage: boolean;
+  mode: "manage" | "view";
   onSelect: (summary: LodgingRoomSummary, anchor: HTMLButtonElement) => void;
 }) {
   const { toast, uiConfirm } = useUI();
-  const buildings = useMemo(
-    () => [...new Set(rooms.map(room => (room.dong || "건물 미지정").trim()))].sort((a, b) => a.localeCompare(b, "ko")),
-    [rooms],
-  );
+  const canManage = mode === "manage";
   const [mapId, setMapId] = useState(maps[0]?.id || "");
   const map = maps.find(item => item.id === mapId) || maps[0];
   const [page, setPage] = useState(1);
   const [pageCount, setPageCount] = useState(1);
-  const [building, setBuilding] = useState(buildings[0] || "건물 미지정");
-  const [label, setLabel] = useState("");
   const [roomId, setRoomId] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState("");
   const handlePageCount = useCallback((count: number) => {
     setPageCount(count);
   }, []);
@@ -114,6 +111,12 @@ export default function CustomLodgingMap({
 
   const mapRooms = useMemo(() => {
     if (!map) return [];
+    const hotspotRoomIds = new Set(Object.keys(map.hotspots || {}));
+    if (hotspotRoomIds.size > 0) {
+      const detected = rooms.filter(room => hotspotRoomIds.has(room.id));
+      const sameBuildings = new Set(detected.map(room => (room.dong || "건물 미지정").trim()));
+      return rooms.filter(room => sameBuildings.has((room.dong || "건물 미지정").trim()));
+    }
     const exact = rooms.filter(room => (room.dong || "건물 미지정").trim() === map.building);
     return exact.length ? exact : rooms;
   }, [map, rooms]);
@@ -121,24 +124,35 @@ export default function CustomLodgingMap({
   async function upload(file: File | null) {
     if (!file) return;
     setUploading(true);
+    setUploadStatus("PDF 내용 분석 중…");
     const nextId = createIguardLodgingMapId(retreatId);
     try {
-      const uploaded = await uploadLodgingMapPdf(retreatId, nextId, file);
+      const analysis = await analyzeLodgingPdf(file, rooms);
+      setUploadStatus("업로드 준비 중…");
+      const uploaded = await uploadLodgingMapPdf(retreatId, nextId, file, percent => {
+        setUploadStatus(`PDF 업로드 ${percent}%`);
+      });
+      setUploadStatus("배치도 적용 중…");
       await saveIguardLodgingMap(retreatId, nextId, {
-        label: label.trim() || file.name.replace(/\.pdf$/i, ""),
-        building,
+        label: analysis.label,
+        building: analysis.building,
         fileName: file.name,
         ...uploaded,
+        pageCount: analysis.pageCount,
+        hotspots: analysis.hotspots,
         createdAt: Date.now(),
       });
       setMapId(nextId);
       setPage(1);
-      setLabel("");
-      toast("숙소 배치도 PDF를 추가했습니다. 호실을 고른 뒤 도면을 눌러 배치하세요.", "success");
+      toast(
+        `숙소 배치도를 적용했습니다. ${analysis.building} · 호실 ${analysis.detectedRoomCount}개 자동 인식`,
+        "success",
+      );
     } catch (reason) {
       toast(`PDF 업로드 오류: ${reason instanceof Error ? reason.message : String(reason)}`, "error");
     } finally {
       setUploading(false);
+      setUploadStatus("");
     }
   }
 
@@ -167,29 +181,38 @@ export default function CustomLodgingMap({
     toast("호실 위치를 저장했습니다.", "success");
   }
 
-  if (maps.length === 0) {
-    return canManage ? (
-      <section className="card border-dashed border-fuchsia-200 p-4">
-        <h2 className="font-bold text-slate-800">새 장소의 숙소 배치도 추가</h2>
-        <p className="mt-1 text-xs text-slate-500">PDF를 올리면 수련회별로 저장됩니다. 업로드 후 방을 선택하고 도면에서 해당 호실을 눌러주세요.</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(150px,0.5fr)_minmax(180px,1fr)_auto]">
-          <select className="input" value={building} onChange={event => setBuilding(event.target.value)}>
-            {buildings.map(item => <option key={item}>{item}</option>)}
-          </select>
-          <input className="input" value={label} onChange={event => setLabel(event.target.value)} placeholder="배치도 이름 (예: 본관 1-3층)" />
-          <label className="btn-primary flex min-h-11 cursor-pointer items-center justify-center">
-            {uploading ? "업로드 중…" : "PDF 선택"}
-            <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={uploading} onChange={event => void upload(event.target.files?.[0] || null)} />
-          </label>
+  const uploader = canManage ? (
+    <section className="card border-dashed border-fuchsia-200 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="font-bold text-slate-800">숙소 배치도 PDF 적용</h2>
+          <p className="mt-1 text-xs text-slate-500">파일 안의 건물명과 호실 번호를 자동으로 읽습니다. 인식하지 못한 호실만 도면에서 수동 배치할 수 있습니다.</p>
         </div>
-      </section>
-    ) : null;
+        <label className={`btn-primary flex min-h-11 shrink-0 cursor-pointer items-center justify-center ${uploading ? "pointer-events-none opacity-60" : ""}`}>
+          {uploading ? uploadStatus || "처리 중…" : "PDF 선택"}
+          <input type="file" accept="application/pdf,.pdf" className="sr-only" disabled={uploading} onChange={event => void upload(event.target.files?.[0] || null)} />
+        </label>
+      </div>
+      {uploading && (
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-fuchsia-100" aria-live="polite">
+          <div className="h-full w-2/3 animate-pulse rounded-full bg-fuchsia-500" />
+        </div>
+      )}
+    </section>
+  ) : null;
+
+  if (maps.length === 0) {
+    return canManage ? uploader : (
+      <div className="card p-8 text-center text-sm text-slate-400">기획 탭에서 숙소 배치도 PDF를 먼저 적용해주세요.</div>
+    );
   }
 
   if (!map) return null;
   const hotspots = Object.values(map.hotspots || {}).filter(hotspot => hotspot.page === page);
 
   return (
+    <div className="space-y-4">
+      {uploader}
     <section className="card overflow-hidden">
       <div className="border-b border-slate-100 p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -255,5 +278,6 @@ export default function CustomLodgingMap({
         </div>
       </div>
     </section>
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildLodgingMapResult, findRoomMapLocation } from "@/lib/lodgingMap";
+import { detectLodgingBuilding, fileLabel } from "@/lib/lodgingPdf";
 import { Group, Room, Student } from "@/lib/types";
 
 const room = (overrides: Partial<Room> = {}): Room => ({
@@ -24,10 +25,23 @@ const student = (id: string, name: string, cls: number): Student => ({
 });
 
 describe("숙소 배정도 매칭", () => {
-  it("실행 영역과 모바일 5열 탭에 숙소 배정도를 노출한다", () => {
+  it("PDF 본문 또는 파일명에서 장소별 건물명을 자동 선택한다", () => {
+    const rooms = [
+      room({ dong: "새빛 생활관" }),
+      room({ id: "room-201", dong: "은혜관", roomNumber: "201" }),
+    ];
+    expect(detectLodgingBuilding("새빛 생활관 1층 101 102", "도면.pdf", rooms)).toBe("새빛 생활관");
+    expect(detectLodgingBuilding("", "은혜관_배치도.pdf", rooms)).toBe("은혜관");
+    expect(fileLabel("은혜관_배치도.pdf")).toBe("은혜관 배치도");
+  });
+
+  it("실행에는 숙소 안내, 기획에는 배치도 관리를 분리해 노출한다", () => {
     const source = readFileSync(new URL("../src/app/retreat/[id]/IguardClient.tsx", import.meta.url), "utf8");
-    expect(source).toContain('{ key: "lodgingmap", label: "숙소 배정도", icon: "🗺️" }');
-    expect(source).toContain('view === "lodgingmap"');
+    expect(source).toContain('{ key: "lodging", label: "숙소 안내", icon: "🗺️" }');
+    expect(source).toContain('{ key: "lodgingmap", label: "배치도 관리" }');
+    expect(source).toContain('view === "lodging"');
+    expect(source).toContain('mode="view"');
+    expect(source).toContain('mode="manage"');
     expect(source).toContain("grid-cols-5");
   });
 
@@ -79,7 +93,10 @@ describe("숙소 배정도 매칭", () => {
     expect(view).toContain("summarizeLodgingRoom");
     expect(view).toContain("onSelect(summary, event.currentTarget)");
     expect(paths).toContain("iguardLodgingMaps");
-    expect(storage).toContain("uploadBytes");
+    expect(view).toContain("analyzeLodgingPdf");
+    expect(view).not.toContain("배치도 이름 (예:");
+    expect(storage).toContain("uploadBytesResumable");
+    expect(storage).toContain("업로드 시간이 초과");
   });
 
   it("HRD처럼 건물명이 포괄적이면 방 정원으로 핵심관·인재관을 구분한다", () => {

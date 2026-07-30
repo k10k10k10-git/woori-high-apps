@@ -39,7 +39,7 @@ const GROUPS = [
     { key: "cue", label: "개인 큐카드", icon: "📋" },
     { key: "board", label: "포스트 현황", icon: "📍" },
     { key: "rooms", label: "조별 정보", icon: "👥" },
-    { key: "lodgingmap", label: "숙소 배정도", icon: "🗺️" },
+    { key: "lodging", label: "숙소 안내", icon: "🗺️" },
     { key: "check", label: "인원체크", icon: "✅" },
   ] },
   { label: "기획", hint: "PC", views: [
@@ -56,6 +56,7 @@ const GROUPS = [
     { key: "meals", label: "식사순서" },
     { key: "buses", label: "버스배정" },
     { key: "seating", label: "집회자리" },
+    { key: "lodgingmap", label: "배치도 관리" },
   ] },
   { label: "정보", hint: "", views: [
     { key: "guide", label: "조스탭 가이드" },
@@ -332,7 +333,8 @@ function IguardWorkspace({ id }: { id: string }) {
 
         {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} participants={participants} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} cellColors={cellColors} schedule={schedule} />}
         {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} staff={staffForViews} groupStaff={groupStaff} gbs={gbs} students={students} partial={partial} cellColors={cellColors} retreatName={retreat.name} year={retreat.year} />}
-        {!dataLoading && view === "lodgingmap" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} canManage={accessLevel !== "staff"} />}
+        {!dataLoading && view === "lodging" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} mode="view" />}
+        {!dataLoading && view === "lodgingmap" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} mode="manage" />}
         {!dataLoading && view === "cue" && <CueCardView retreatId={id} staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} groups={groups} groupStaff={groupStaff} gbs={gbs} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
         {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
