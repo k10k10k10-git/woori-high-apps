@@ -28,6 +28,7 @@ import LeaderCueManageView from "./LeaderCueManageView";
 import { GuideView, TodosView } from "./InfoViews";
 import GroupStaffView from "./GroupStaffView";
 import GbsPlacesView from "./GbsPlacesView";
+import BadgeCardsView from "./BadgeCardsView";
 import RetreatPinGate from "./RetreatPinGate";
 import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/lib/personIndex";
@@ -51,6 +52,7 @@ const GROUPS = [
     { key: "validate", label: "데이터 검증" },
     { key: "groupstaff", label: "조스탭 배정" },
     { key: "gbs", label: "GBS 장소" },
+    { key: "badge", label: "명찰카드" },
     { key: "meals", label: "식사순서" },
     { key: "buses", label: "버스배정" },
     { key: "seating", label: "집회자리" },
@@ -342,6 +344,24 @@ function IguardWorkspace({ id }: { id: string }) {
         {!dataLoading && view === "validate" && <ValidationView retreatId={id} staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
         {!dataLoading && view === "groupstaff" && <GroupStaffView retreatId={id} groups={groups} staff={staffForViews} students={students} adminTeachers={adminTeachers} partial={partial} cellColors={cellColors} groupStaff={groupStaff} />}
         {!dataLoading && view === "gbs" && <GbsPlacesView retreatId={id} groups={groups} gbs={gbs} />}
+        {!dataLoading && view === "badge" && (
+          <BadgeCardsView
+            retreatName={retreat.name}
+            year={retreat.year}
+            staff={staffForViews}
+            groups={groups}
+            groupStaff={groupStaff}
+            gbs={gbs}
+            buses={buses}
+            meals={meals}
+            seating={seating}
+            movements={movementRecords}
+            rooms={rooms}
+            students={students}
+            partial={partial}
+            cellColors={cellColors}
+          />
+        )}
         {!dataLoading && view === "meals" && <MealsView retreatId={id} meals={meals} groups={groups} seatings={seating} />}
         {!dataLoading && view === "buses" && <BusesView retreatId={id} buses={buses} groups={groups} students={students} participants={participants} teachers={adminTeachers} partial={partial} cellColors={cellColors} schedule={schedule} />}
         {!dataLoading && view === "seating" && <SeatingView retreatId={id} seating={seating} groups={groups} meals={meals} />}
