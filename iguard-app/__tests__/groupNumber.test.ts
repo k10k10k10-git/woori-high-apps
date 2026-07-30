@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { groupDisplayName } from "@/lib/groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import type { Group } from "@/lib/types";
 
 function makeGroup(overrides: Partial<Group> & { id: string; bu: string; name: string }): Group {
@@ -40,5 +40,10 @@ describe("groupDisplayName", () => {
   it("handles bare number without 조 suffix", () => {
     const bare = makeGroup({ id: "g", bu: "1부", name: "5" });
     expect(groupDisplayName(bare, groups)).toBe("5조");
+  });
+
+  it("부 구분을 섞지 않고 전역 표시 번호 1조부터 순서대로 정렬한다", () => {
+    expect(sortGroupsByDisplayNumber([groups[3], groups[1], groups[4], groups[0], groups[2]])
+      .map(group => groupDisplayName(group, groups))).toEqual(["1조", "2조", "3조", "4조", "5조"]);
   });
 });

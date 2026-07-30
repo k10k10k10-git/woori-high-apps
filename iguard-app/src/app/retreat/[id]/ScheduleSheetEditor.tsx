@@ -216,21 +216,21 @@ function ScheduleSheetRow({
       onFocusCapture={() => { editingRef.current = true; }}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDown}
-      className="grid gap-3 border-b border-slate-200 bg-white px-3 py-3 last:border-b-0 lg:grid-cols-[108px_150px_minmax(180px,1.35fr)_minmax(180px,1.2fr)_minmax(150px,0.9fr)_105px] lg:gap-2 lg:px-2 lg:py-2"
+      className="grid gap-3 border-b border-slate-200 bg-white px-3 py-3 last:border-b-0 lg:grid-cols-[150px_180px_minmax(260px,1.35fr)_minmax(250px,1.2fr)_minmax(220px,0.9fr)_120px] lg:gap-3 lg:px-3 lg:py-3"
     >
       <div>
         <SheetFieldLabel>시간</SheetFieldLabel>
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
           <input
             aria-label={`${block.label} 시작 시간`}
-            className="input min-w-0 px-2 py-2 font-mono text-xs"
+            className="input min-h-11 min-w-0 px-3 py-2 font-mono text-sm"
             value={draft.start}
             onChange={event => change("start", event.target.value)}
           />
           <span className="text-xs text-slate-300">~</span>
           <input
             aria-label={`${block.label} 종료 시간`}
-            className="input min-w-0 px-2 py-2 font-mono text-xs"
+            className="input min-h-11 min-w-0 px-3 py-2 font-mono text-sm"
             value={draft.end}
             onChange={event => change("end", event.target.value)}
             placeholder="종료"
@@ -242,7 +242,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>구분</SheetFieldLabel>
         <input
           aria-label={`${block.label} 구분`}
-          className="input w-full px-2 py-2 text-sm font-semibold"
+          className="input min-h-11 w-full px-3 py-2 text-base font-semibold"
           value={draft.label}
           onChange={event => change("label", event.target.value)}
         />
@@ -262,7 +262,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>내용</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 내용`}
-          className="input min-h-[72px] w-full resize-y px-2 py-2 text-sm leading-relaxed lg:min-h-[86px]"
+          className="input min-h-[92px] w-full resize-y px-3 py-3 text-sm leading-relaxed lg:min-h-[112px]"
           value={draft.detail}
           onChange={event => change("detail", event.target.value)}
           placeholder="분 단위 진행 내용과 준비 사항"
@@ -273,7 +273,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>담당·동선</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 담당`}
-          className="input min-h-[54px] w-full resize-y px-2 py-2 text-sm leading-relaxed"
+          className="input min-h-[92px] w-full resize-y px-3 py-3 text-sm leading-relaxed lg:min-h-[112px]"
           value={draft.owner}
           onChange={event => change("owner", event.target.value)}
           placeholder="진행 총괄, 미디어 등 자유 담당"
@@ -298,7 +298,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>특이사항</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 특이사항`}
-          className="input min-h-[72px] w-full resize-y px-2 py-2 text-sm leading-relaxed lg:min-h-[86px]"
+          className="input min-h-[92px] w-full resize-y px-3 py-3 text-sm leading-relaxed lg:min-h-[112px]"
           value={draft.notice}
           onChange={event => change("notice", event.target.value)}
           placeholder="주의사항·준비물·예외"
@@ -498,43 +498,45 @@ export default function ScheduleSheetEditor({
         <p className="text-xs text-slate-400">행을 벗어나면 자동 저장 · ⌘/Ctrl + Enter 즉시 저장</p>
       </div>
 
-      <div className="card overflow-visible border-slate-200">
-        <div
-          className="sticky z-[9] hidden grid-cols-[108px_150px_minmax(180px,1.35fr)_minmax(180px,1.2fr)_minmax(150px,0.9fr)_105px] gap-2 border-b border-slate-300 bg-slate-900 px-2 py-2.5 text-xs font-semibold text-white shadow-sm lg:grid"
-          style={{ top: "calc(var(--ig-header-h, 92px) + var(--schedule-roster-h, 0px) + 8px)" }}
-        >
-          <div>시간</div>
-          <div>구분</div>
-          <div>내용</div>
-          <div>담당·동선</div>
-          <div>특이사항</div>
-          <div>상태</div>
+      <div className="card overflow-x-auto border-slate-200">
+        <div className="lg:min-w-[1380px]">
+          <div
+            className="sticky z-[9] hidden grid-cols-[150px_180px_minmax(260px,1.35fr)_minmax(250px,1.2fr)_minmax(220px,0.9fr)_120px] gap-3 border-b border-slate-300 bg-slate-900 px-3 py-3 text-sm font-semibold text-white shadow-sm lg:grid"
+            style={{ top: "calc(var(--ig-header-h, 92px) + var(--schedule-roster-h, 0px) + 8px)" }}
+          >
+            <div>시간</div>
+            <div>구분</div>
+            <div>내용</div>
+            <div>담당·동선</div>
+            <div>특이사항</div>
+            <div>상태</div>
+          </div>
+          {visibleDays.map(day => (
+            <section key={day}>
+              <div
+                className="sticky z-[8] border-b border-slate-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800 [--sheet-column-h:0px] lg:[--sheet-column-h:45px]"
+                style={{ top: "calc(var(--ig-header-h, 92px) + var(--schedule-roster-h, 0px) + var(--sheet-column-h, 0px) + 8px)" }}
+              >
+                {day}일차
+              </div>
+              {schedule.filter(block => block.day === day).map(block => (
+                <ScheduleSheetRow
+                  key={block.id}
+                  retreatId={retreatId}
+                  block={block}
+                  segments={segments}
+                  movements={movements}
+                  staff={staff}
+                  posts={posts}
+                  activeProgress={progressBlockId === block.id}
+                  onOpenAdvanced={() => openAdvanced(block.id)}
+                  onMarkProgress={() => onMarkProgress(block)}
+                  onDelete={() => onDelete(block)}
+                />
+              ))}
+            </section>
+          ))}
         </div>
-        {visibleDays.map(day => (
-          <section key={day}>
-            <div
-              className="sticky z-[8] border-b border-slate-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 [--sheet-column-h:0px] lg:[--sheet-column-h:37px]"
-              style={{ top: "calc(var(--ig-header-h, 92px) + var(--schedule-roster-h, 0px) + var(--sheet-column-h, 0px) + 8px)" }}
-            >
-              {day}일차
-            </div>
-            {schedule.filter(block => block.day === day).map(block => (
-              <ScheduleSheetRow
-                key={block.id}
-                retreatId={retreatId}
-                block={block}
-                segments={segments}
-                movements={movements}
-                staff={staff}
-                posts={posts}
-                activeProgress={progressBlockId === block.id}
-                onOpenAdvanced={() => openAdvanced(block.id)}
-                onMarkProgress={() => onMarkProgress(block)}
-                onDelete={() => onDelete(block)}
-              />
-            ))}
-          </section>
-        ))}
       </div>
 
       {advancedBlock && (

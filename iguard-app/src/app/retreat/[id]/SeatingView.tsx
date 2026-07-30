@@ -3,10 +3,8 @@ import { useMemo, useState } from "react";
 import { Group, IguardSeating, IguardSeatingZone, IguardMeal } from "@/lib/types";
 import { saveIguardSeating, updateIguardSeating, deleteIguardSeating } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
-import { groupDisplayName } from "@/lib/groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import FairAssignButton from "./FairAssignButton";
-
-const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 
 function parseLayoutPattern(value: string): number[] {
   const normalized = value.replace(/[×xX]/g, "*").replace(/[，,/\s]+/g, " ").trim();
@@ -23,13 +21,14 @@ function parseLayoutPattern(value: string): number[] {
 
 export default function SeatingView({ retreatId, seating, groups, meals }: { retreatId: string; seating: IguardSeating[]; groups: Group[]; meals: IguardMeal[] }) {
   const { toast, uiConfirm } = useUI();
-  const sortedGroups = useMemo(() => [...groups].sort(groupSort), [groups]);
+  const sortedGroups = useMemo(() => sortGroupsByDisplayNumber(groups), [groups]);
   const [label, setLabel] = useState("");
   const [day, setDay] = useState(1);
   const [zoneInputs, setZoneInputs] = useState<Record<string, string>>({});
   const [patternInputs, setPatternInputs] = useState<Record<string, string>>({});
   const [avoidInputs, setAvoidInputs] = useState<Record<string, string>>({});
   const [pinnedInputs, setPinnedInputs] = useState<Record<string, string>>({});
+  const [editingZones, setEditingZones] = useState<Set<string>>(new Set());
 
   async function addSession() {
     if (!label.trim()) return toast("집회/세션 이름을 입력해주세요.", "warning");
@@ -75,6 +74,15 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
     setZones(s, zones);
   }
   function delZone(s: IguardSeating, zi: number) { setZones(s, (s.zones || []).filter((_, i) => i !== zi)); }
+  function toggleZoneEditor(sessionId: string, zoneIndex: number) {
+    const key = `${sessionId}:${zoneIndex}`;
+    setEditingZones(previous => {
+      const next = new Set(previous);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
   function applyRowPattern(s: IguardSeating) {
     const pattern = (patternInputs[s.id] ?? s.layoutPattern ?? "").trim();
     const counts = parseLayoutPattern(pattern);
@@ -129,43 +137,55 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
                 <button onClick={() => delSession(s)} className="text-xs text-slate-300 hover:text-red-400">삭제</button>
               </div>
               <div className="space-y-3">
-                <div className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">열별 조 수</label>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      className="input flex-1 min-w-[180px] bg-white"
-                      placeholder="예: 4*4 / 333322 / 3 3 4 4"
-                      value={patternInputs[s.id] ?? s.layoutPattern ?? ""}
-                      onChange={e => setPatternInputs(p => ({ ...p, [s.id]: e.target.value }))}
-                      onBlur={e => saveLayoutPattern(s, e.target.value)}
-                      onKeyDown={e => e.key === "Enter" && applyRowPattern(s)}
-                    />
-                    <button onClick={() => applyRowPattern(s)} className="btn-secondary btn-sm">열 패턴 적용</button>
+                <details className="group rounded-lg border border-slate-100 bg-slate-50">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-semibold text-slate-600 marker:hidden">
+                    <span>자동배정 조건</span>
+                    <span className="flex items-center gap-2 text-[11px] font-normal text-slate-400">
+                      {s.avoidPairs?.trim() && <span>분리 조건 있음</span>}
+                      {s.pinnedFront?.trim() && <span>맨앞 고정 있음</span>}
+                      <span className="group-open:hidden">펼치기 ▾</span>
+                      <span className="hidden group-open:inline">접기 ▴</span>
+                    </span>
+                  </summary>
+                  <div className="space-y-3 border-t border-slate-100 p-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">열별 조 수</label>
+                      <div className="flex flex-wrap gap-2">
+                        <input
+                          className="input flex-1 min-w-[180px] bg-white"
+                          placeholder="예: 4*4 / 333322 / 3 3 4 4"
+                          value={patternInputs[s.id] ?? s.layoutPattern ?? ""}
+                          onChange={e => setPatternInputs(p => ({ ...p, [s.id]: e.target.value }))}
+                          onBlur={e => saveLayoutPattern(s, e.target.value)}
+                          onKeyDown={e => e.key === "Enter" && applyRowPattern(s)}
+                        />
+                        <button onClick={() => applyRowPattern(s)} className="btn-secondary btn-sm">열 패턴 적용</button>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">입력한 숫자대로 앞열부터 조를 나눕니다. 예: 4*4는 4개 조씩 4열입니다.</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">붙이면 안 되는 조</label>
+                      <textarea
+                        className="input min-h-[74px] resize-y bg-white leading-relaxed"
+                        placeholder={"예: 1조-2조\n3조-14조"}
+                        value={avoidInputs[s.id] ?? s.avoidPairs ?? ""}
+                        onChange={e => setAvoidInputs(p => ({ ...p, [s.id]: e.target.value }))}
+                        onBlur={() => saveAvoidPairs(s)}
+                      />
+                      <p className="mt-1 text-[11px] text-slate-400">공정배정 시 같은 열에 들어가지 않도록 최대한 분리합니다.</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">맨앞 고정 조</label>
+                      <input
+                        className="input bg-white"
+                        placeholder="예: 1조 또는 1조, 3조"
+                        value={pinnedInputs[s.id] ?? s.pinnedFront ?? ""}
+                        onChange={e => setPinnedInputs(p => ({ ...p, [s.id]: e.target.value }))}
+                        onBlur={e => savePinnedFront(s, e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <p className="mt-1 text-[11px] text-slate-400">입력한 숫자대로 앞열부터 조를 나눕니다. 예: 4*4는 4개 조씩 4열, 333322는 3·3·3·3·2·2열입니다.</p>
-                </div>
-                <div className="rounded-lg border border-slate-100 bg-white p-3">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">붙이면 안 되는 조</label>
-                  <textarea
-                    className="input min-h-[74px] resize-y leading-relaxed"
-                    placeholder={"예: 1조-2조\n1부 3조, 2부 4조"}
-                    value={avoidInputs[s.id] ?? s.avoidPairs ?? ""}
-                    onChange={e => setAvoidInputs(p => ({ ...p, [s.id]: e.target.value }))}
-                    onBlur={() => saveAvoidPairs(s)}
-                  />
-                  <p className="mt-1 text-[11px] text-slate-400">공정배정 시 같은 열에 들어가지 않도록 최대한 분리합니다.</p>
-                </div>
-                <div className="rounded-lg border border-slate-100 bg-white p-3">
-                  <label className="text-xs font-semibold text-slate-500 block mb-1">맨앞 고정 조</label>
-                  <input
-                    className="input"
-                    placeholder="예: 1조 또는 1조, 3조 (이 집회만 자동배정 시 맨 앞자리로)"
-                    value={pinnedInputs[s.id] ?? s.pinnedFront ?? ""}
-                    onChange={e => setPinnedInputs(p => ({ ...p, [s.id]: e.target.value }))}
-                    onBlur={e => savePinnedFront(s, e.target.value)}
-                  />
-                  <p className="mt-1 text-[11px] text-slate-400">쉼표로 여러 조 입력 시 적힌 순서대로 앞자리부터 배정됩니다. &ldquo;붙이면 안 되는 조&rdquo; 조건이 우선될 수 있어 드물게 밀릴 수 있습니다.</p>
-                </div>
+                </details>
                 {(s.zones || []).map((z, zi) => (
                   <div key={zi} className="border border-slate-100 rounded-lg p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -182,14 +202,40 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
                             onBlur={e => saveZoneWeight(s, zi, e.target.value)}
                           />
                         </label>
+                        <button
+                          type="button"
+                          onClick={() => toggleZoneEditor(s.id, zi)}
+                          className="min-h-8 rounded-md border border-violet-200 bg-violet-50 px-2 text-xs font-semibold text-violet-700"
+                        >
+                          {editingZones.has(`${s.id}:${zi}`) ? "수정 완료" : "조 수정"}
+                        </button>
                         <button onClick={() => delZone(s, zi)} className="text-xs text-slate-300 hover:text-red-400">구역 삭제</button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {sortedGroups.map(g => (
-                        <button key={g.id} onClick={() => toggleGroup(s, zi, g.id)}
-                          className={`px-2 py-1 rounded text-xs border ${(z.groupIds || []).includes(g.id) ? "bg-violet-100 text-violet-700 border-violet-300" : "bg-white text-slate-400 border-slate-200"}`}>{groupDisplayName(g, groups)}</button>
+                      {(editingZones.has(`${s.id}:${zi}`)
+                        ? sortedGroups
+                        : (z.groupIds || [])
+                            .map(groupId => groups.find(group => group.id === groupId))
+                            .filter((group): group is Group => !!group)
+                      ).map(g => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          disabled={!editingZones.has(`${s.id}:${zi}`)}
+                          onClick={() => toggleGroup(s, zi, g.id)}
+                          className={`rounded border px-2.5 py-1.5 text-sm font-semibold ${
+                            (z.groupIds || []).includes(g.id)
+                              ? "border-violet-300 bg-violet-100 text-violet-700"
+                              : "border-slate-200 bg-white text-slate-400"
+                          } disabled:cursor-default`}
+                        >
+                          {groupDisplayName(g, groups)}
+                        </button>
                       ))}
+                      {!editingZones.has(`${s.id}:${zi}`) && (z.groupIds || []).length === 0 && (
+                        <span className="text-sm text-slate-300">배정된 조 없음</span>
+                      )}
                     </div>
                   </div>
                 ))}

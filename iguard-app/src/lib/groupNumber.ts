@@ -36,3 +36,22 @@ export function sortGroupsByNumber<T extends { name: string }>(groups: T[]): T[]
     return a.name.localeCompare(b.name, "ko");
   });
 }
+
+/**
+ * 화면에 표시되는 전역 조 번호 기준 정렬.
+ * 1부/2부 로컬 번호가 같은 조를 번갈아 놓지 않고 1조, 2조 … 전체 순서로 나열한다.
+ */
+export function sortGroupsByDisplayNumber<T extends Group>(groups: T[]): T[] {
+  const displayNumber = (group: T): number | null => {
+    const match = groupDisplayName(group, groups).match(/^\s*(\d+)\s*조?\s*$/);
+    return match ? Number(match[1]) : null;
+  };
+  return [...groups].sort((a, b) => {
+    const aNumber = displayNumber(a);
+    const bNumber = displayNumber(b);
+    if (aNumber !== null && bNumber !== null) return aNumber - bNumber;
+    if (aNumber !== null) return -1;
+    if (bNumber !== null) return 1;
+    return groupDisplayName(a, groups).localeCompare(groupDisplayName(b, groups), "ko", { numeric: true });
+  });
+}

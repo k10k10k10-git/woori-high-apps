@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Group, IguardGbsPlace, IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement, Retreat, RetreatPeriod } from "@/lib/types";
 import {
-  nowHHMM, todayStr, addDays, formatShortDate, normalizeText, activePeriod, retreatDateForDay,
-  periodRangeLabel, currentRetreatDay, isOpenEndedBlock, toMinutes, compareBlocks, isNowOn,
+  nowHHMM, todayStr, formatShortDate, activePeriod, retreatDateForDay,
+  periodRangeLabel, currentRetreatDay, compareBlocks, isNowOn,
   currentBlockFor, nextBlockFor, timeRangeLabel,
 } from "@/lib/scheduleTime";
 import { chooseCueCardStaffId, findPreferredStaffId } from "@/lib/staffIdentity";
@@ -14,6 +14,7 @@ import { gbsPlacesForStaff } from "@/lib/gbsPlaces";
 import { effectiveTimeRangeLabel, progressCurrentBlock } from "@/lib/scheduleProgress";
 
 interface Data {
+  retreatId?: string;
   staff: IguardStaff[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
@@ -96,7 +97,7 @@ function BlockTextSummary({ block }: { block: IguardScheduleBlock }) {
 // 개인 큐카드 (스탭 1인의 시간순 동선) — 모바일
 // ════════════════════════════════════════════════════════════
 export function CueCardView({
-  staff, schedule, posts, movements, retreat, periods, preferredStaffNames = [],
+  retreatId, staff, schedule, posts, movements, retreat, periods, preferredStaffNames = [],
   groups = [], groupStaff = {}, gbs = {},
 }: Data) {
   const clock = useClock();
@@ -111,6 +112,7 @@ export function CueCardView({
   const [pinnedCardsCollapsed, setPinnedCardsCollapsed] = useState(false);
   const [timelineCompact, setTimelineCompact] = useState(false);
   const sortedStaff = useMemo(() => [...staff].sort((a, b) => a.name.localeCompare(b.name, "ko")), [staff]);
+  const staffSelectionKey = retreatId ? `iguard:${retreatId}:cue-card-staff` : null;
   const preferredStaffId = useMemo(
     () => findPreferredStaffId(sortedStaff, preferredStaffNames),
     [sortedStaff, preferredStaffNames],
@@ -131,11 +133,24 @@ export function CueCardView({
     return (id: string) => m.get(id) || "(삭제된 포스트)";
   }, [posts]);
   const myMoves = useMemo(() => {
-    const m = new Map<string, AssignedIguardMovement>();
-    movements.filter(mv => mv.staffId === staffId).forEach(mv => m.set(mv.blockId, mv));
+    const m = new Map<string, AssignedIguardMovement[]>();
+    movements.filter(mv => mv.staffId === staffId).forEach(mv => {
+      const current = m.get(mv.blockId) || [];
+      current.push(mv);
+      m.set(mv.blockId, current);
+    });
     return m;
   }, [movements, staffId]);
   const sortedSchedule = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
+
+  useEffect(() => {
+    if (!staffSelectionKey || staffPicked.current) return;
+    const saved = window.localStorage.getItem(staffSelectionKey);
+    if (saved && sortedStaff.some(member => member.id === saved)) {
+      staffPicked.current = true;
+      setStaffId(saved);
+    }
+  }, [sortedStaff, staffSelectionKey]);
 
   useEffect(() => {
     if (!sortedStaff.length) return;
@@ -170,8 +185,8 @@ export function CueCardView({
     ? remainingBlocks[0]?.id || currentBlock?.id || "__timeline_end"
     : null;
   const days = [...new Set(listBlocks.map(b => b.day))].sort((a, b) => a - b);
-  const currentMove = currentBlock ? myMoves.get(currentBlock.id) : null;
-  const nextMove = nextBlock ? myMoves.get(nextBlock.id) : null;
+  const currentMoves = currentBlock ? myMoves.get(currentBlock.id) || [] : [];
+  const nextMoves = nextBlock ? myMoves.get(nextBlock.id) || [] : [];
   const currentDate = effectiveDay == null ? null : retreatDateForDay(periods, retreat, effectiveDay);
   const selectedStaff = staff.find(s => s.id === staffId);
   const selectedStaffGbs = useMemo(
@@ -212,6 +227,7 @@ export function CueCardView({
           onChange={e => {
             staffPicked.current = true;
             setStaffId(e.target.value);
+            if (staffSelectionKey) window.localStorage.setItem(staffSelectionKey, e.target.value);
           }}
         >
           {displayedStaff.map(s => (
@@ -284,14 +300,18 @@ export function CueCardView({
               {progressBlock && <span className="ml-1 text-fuchsia-600">(계획 {timeRangeLabel(currentBlock)})</span>}
             </div>
             <div className="rounded-lg bg-white border border-fuchsia-100 p-3">
-              {currentMove ? (
-                <>
-                  <div className="text-sm font-semibold text-slate-800">📍 {postName(currentMove.postId)}</div>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {currentMove.round && <span className={`px-2 py-0.5 rounded-full text-xs ${currentMove.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{currentMove.round}</span>}
-                    {currentMove.note && <span className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">{currentMove.note}</span>}
-                  </div>
-                </>
+              {currentMoves.length > 0 ? (
+                <div className="space-y-2">
+                  {currentMoves.map(move => (
+                    <div key={move.id}>
+                      <div className="text-sm font-semibold text-slate-800">📍 {postName(move.postId)}</div>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {move.round && <span className={`px-2 py-0.5 rounded-full text-xs ${move.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{move.round}</span>}
+                        {move.note && <span className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">{move.note}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
                 <div className="text-sm font-semibold text-slate-500">배치 없음 · 조와 함께 움직이면 됩니다.</div>
               )}
@@ -335,12 +355,14 @@ export function CueCardView({
         <div id="cue-card-next-details">
         {!pinnedCardsCollapsed && nextBlock && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-            {nextMove ? (
-              <>
-                <span className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700">📍 {postName(nextMove.postId)}</span>
-                {nextMove.round && <span className={`rounded-full px-2 py-0.5 ${nextMove.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{nextMove.round}</span>}
-                {nextMove.note && <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-fuchsia-700">{nextMove.note}</span>}
-              </>
+            {nextMoves.length > 0 ? (
+              nextMoves.map(move => (
+                <span key={move.id} className="inline-flex flex-wrap items-center gap-1">
+                  <span className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700">📍 {postName(move.postId)}</span>
+                  {move.round && <span className={`rounded-full px-2 py-0.5 ${move.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{move.round}</span>}
+                  {move.note && <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-fuchsia-700">{move.note}</span>}
+                </span>
+              ))
             ) : (
               <span className="text-slate-500">배치 없음 · 조와 함께</span>
             )}
@@ -388,7 +410,7 @@ export function CueCardView({
           </div>
           <div className="space-y-2">
             {listBlocks.filter(b => b.day === day).map(b => {
-              const mv = myMoves.get(b.id);
+              const blockMoves = myMoves.get(b.id) || [];
               const now = progressBlock ? b.id === progressBlock.id : isNowOn(b, curDay, clock.time);
               const isOpen = open.has(b.id);
               const dutyLines = dutyLinesForStaff(b, selectedStaff?.name);
@@ -408,10 +430,12 @@ export function CueCardView({
                         <>
                           <div className="truncate text-sm font-semibold text-slate-800">{b.label}</div>
                           <div className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
-                            <span className="truncate">{mv ? `📍 ${postName(mv.postId)}` : "조와 함께"}</span>
-                            {mv?.round && (
-                              <span className={`shrink-0 rounded px-1.5 py-0.5 ${mv.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                                {mv.round}
+                            <span className="truncate">
+                              {blockMoves.length ? `📍 ${blockMoves.map(move => postName(move.postId)).join(" · ")}` : "조와 함께"}
+                            </span>
+                            {blockMoves[0]?.round && (
+                              <span className={`shrink-0 rounded px-1.5 py-0.5 ${blockMoves[0].round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                                {blockMoves[0].round}
                               </span>
                             )}
                           </div>
@@ -424,13 +448,17 @@ export function CueCardView({
                       ) : (
                         <>
                           <div className="text-xs text-slate-500 truncate">{b.label}</div>
-                          {mv ? (
-                            <div className="font-semibold text-slate-800">
-                              📍 {postName(mv.postId)}
-                              {mv.round && <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${mv.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{mv.round}</span>}
+                          {blockMoves.length ? (
+                            <div className="space-y-1">
+                              {blockMoves.map(move => (
+                                <div key={move.id} className="font-semibold text-slate-800">
+                                  📍 {postName(move.postId)}
+                                  {move.round && <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${move.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{move.round}</span>}
+                                  {move.note && <span className="ml-2 text-xs font-normal text-fuchsia-700">• {move.note}</span>}
+                                </div>
+                              ))}
                             </div>
                           ) : <div className="text-sm text-slate-300">배치 없음 (조와 함께)</div>}
-                          {mv?.note && <div className="text-xs text-fuchsia-700 mt-0.5">• {mv.note}</div>}
                           {dutyLines.length > 0 && (
                             <div className="mt-1 rounded-lg bg-fuchsia-50 border border-fuchsia-100 px-2 py-1.5 text-xs text-fuchsia-800 whitespace-pre-line leading-relaxed">
                               {dutyLines.join("\n")}

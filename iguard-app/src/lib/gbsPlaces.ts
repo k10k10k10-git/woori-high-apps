@@ -1,5 +1,5 @@
 import { Group, IguardGbsPlace } from "./types";
-import { groupDisplayName, sortGroupsByNumber } from "./groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "./groupNumber";
 import { normalizeStaffIdentityName } from "./staffIdentity";
 
 export interface GbsPlaceGroup {
@@ -27,7 +27,7 @@ export function buildGbsPlaceSummaries(
   gbs: Record<string, IguardGbsPlace>,
 ): GbsPlaceSummary[] {
   const byPlace = new Map<string, GbsPlaceGroup[]>();
-  sortGroupsByNumber(groups).forEach(group => {
+  sortGroupsByDisplayNumber(groups).forEach(group => {
     const place = effectiveGbsPlace(group, gbs);
     if (!place) return;
     const current = byPlace.get(place) || [];
@@ -59,5 +59,11 @@ export function gbsPlacesForStaff(
       .split(/[,\n/]+/)
       .some(name => normalizeStaffIdentityName(name) === staffNameKey);
   });
-  return buildGbsPlaceSummaries(assignedGroups, gbs);
+  const assignedIds = new Set(assignedGroups.map(group => group.id));
+  return buildGbsPlaceSummaries(groups, gbs)
+    .map(summary => ({
+      ...summary,
+      groups: summary.groups.filter(group => assignedIds.has(group.id)),
+    }))
+    .filter(summary => summary.groups.length > 0);
 }

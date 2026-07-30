@@ -52,6 +52,10 @@ describe("명찰카드 파생과 인쇄 안전", () => {
       id: "seat-1", label: "저녁집회", day: 1, order: 0,
       zones: [{ name: "앞열", groupIds: ["group-1"] }],
     }],
+    schedule: [{
+      id: "block-1", day: 1, start: "19:30", end: "22:30", label: "저녁집회",
+    }],
+    posts: [{ id: "post-1", name: "강당 입구", area: "본관" }],
     movements: [{
       id: "movement-1", blockId: "block-1", segmentId: "segment-1",
       postId: "post-1", staffId: "staff-1", detail: "C동 3층",
@@ -77,8 +81,15 @@ describe("명찰카드 파생과 인쇄 안전", () => {
       companions: ["김동연"],
     });
     expect(card?.meals[0].groups).toEqual(["1조"]);
-    expect(card?.gbs[0]).toEqual({ place: "분임실 131호", groups: ["1부 1조"] });
+    expect(card?.gbs[0]).toEqual({ place: "분임실 131호", groups: ["1조"] });
     expect(card?.seating[0].zones).toEqual(["앞열: 1조"]);
+    expect(card?.seating[0].zoneGroups).toEqual([["1조"]]);
+    expect(card?.timeline).toEqual([{
+      day: 1,
+      time: "19:30~22:30",
+      label: "저녁집회",
+      assignments: ["[본관] 강당 입구"],
+    }]);
     expect(card?.assignedRooms).toEqual([{
       label: "C동 301호",
       studentNames: ["홍<script>alert(1)</script>"],
@@ -96,6 +107,9 @@ describe("명찰카드 파생과 인쇄 안전", () => {
     expect(html).not.toContain("<script>");
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;script&gt;retreat&lt;/script&gt;");
-    expect(html).toContain("홍&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(html).toContain("전체 일정");
+    expect(html).toContain("[본관] 강당 입구");
+    expect(html).not.toContain("담당 호실");
+    expect(html).not.toContain("특정 학생");
   });
 });

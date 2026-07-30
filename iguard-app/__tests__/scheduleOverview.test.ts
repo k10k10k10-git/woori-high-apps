@@ -32,4 +32,17 @@ describe("buildScheduleOverview", () => {
     const grid = buildScheduleOverview([block("a", 1, "10:00"), block("b", 1, "10:00")]);
     expect(grid.rows[0].cells[1]).toHaveLength(2);
   });
+
+  it("긴 일정은 중간 시각 행을 rowspan으로 덮어 빈칸을 만들지 않는다", () => {
+    const grid = buildScheduleOverview([
+      { ...block("breakfast", 2, "07:30", "아침 식사"), end: "09:00" },
+      { ...block("day3", 3, "08:30", "기상"), end: "10:00" },
+      { ...block("program", 2, "09:00", "둘째날 오전"), end: "12:00" },
+    ]);
+    const breakfastRow = grid.rows.find(row => row.start === "07:30");
+    const middleRow = grid.rows.find(row => row.start === "08:30");
+    expect(breakfastRow?.rowSpans[2]).toBe(2);
+    expect(middleRow?.coveredDays).toContain(2);
+    expect(grid.rows.find(row => row.start === "09:00")?.cells[2][0].id).toBe("program");
+  });
 });

@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Group, IguardGbsPlace } from "@/lib/types";
 import { saveIguardGbsPlace } from "@/lib/db";
 import { buildGbsPlaceSummaries, effectiveGbsPlace } from "@/lib/gbsPlaces";
-import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import { useUI } from "@/context/UIContext";
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
 
 export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
   const { toast } = useUI();
-  const sortedGroups = useMemo(() => sortGroupsByNumber(groups), [groups]);
+  const sortedGroups = useMemo(() => sortGroupsByDisplayNumber(groups), [groups]);
   const [groupId, setGroupId] = useState("");
   const [place, setPlace] = useState("");
   const [saving, setSaving] = useState(false);
@@ -62,7 +62,7 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
             <option value="">조를 선택하세요</option>
             {sortedGroups.map(group => (
               <option key={group.id} value={group.id}>
-                {group.bu} {groupDisplayName(group, groups)}
+                {groupDisplayName(group, groups)}
               </option>
             ))}
           </select>
@@ -103,7 +103,7 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
                 className="min-h-16 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-fuchsia-300 hover:bg-fuchsia-50"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-800">{group.bu} {groupDisplayName(group, groups)}</span>
+                  <span className="font-semibold text-slate-800">{groupDisplayName(group, groups)}</span>
                   <span className={`text-[11px] ${gbs[group.id]?.place ? "text-fuchsia-600" : "text-slate-400"}`}>
                     {gbs[group.id]?.place ? "이가드" : group.gbs ? "행정 폴백" : "미지정"}
                   </span>
@@ -128,7 +128,7 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
                 <div className="mt-2 flex flex-wrap gap-1">
                   {summary.groups.map(group => (
                     <span key={group.id} className="rounded-full border border-fuchsia-200 bg-white px-2 py-1 text-xs text-fuchsia-700">
-                      {group.bu} {group.label}
+                      {group.label}
                     </span>
                   ))}
                 </div>

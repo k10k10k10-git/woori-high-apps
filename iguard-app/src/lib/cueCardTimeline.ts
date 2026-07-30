@@ -14,7 +14,7 @@ export function cueTimelineListBlocks(
   remainingBlocks: IguardScheduleBlock[],
   phase: CueTimelinePhase,
 ): IguardScheduleBlock[] {
-  return phase === "active" ? [...schedule].sort(compareBlocks) : remainingBlocks;
+  return phase === "before" ? remainingBlocks : [...schedule].sort(compareBlocks);
 }
 
 /** 자동 위치 이동 시 고정 헤더와 2단 카드 높이만큼 목표 지점을 아래로 내린다. */

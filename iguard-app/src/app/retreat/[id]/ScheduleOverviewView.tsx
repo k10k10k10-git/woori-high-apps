@@ -25,21 +25,32 @@ export default function ScheduleOverviewView({ schedule }: { schedule: IguardSch
           <tbody>
             {grid.rows.map(row => (
               <tr key={row.start} className="border-b border-slate-200 align-top last:border-b-0">
-                <th className="bg-slate-50 px-3 py-3 text-left font-mono text-xs text-slate-500">{row.start}</th>
-                {grid.days.map(day => (
-                  <td key={day} className="border-l border-slate-200 px-2 py-2">
-                    {row.cells[day].length ? (
-                      <div className="space-y-1.5">
-                        {row.cells[day].map(block => (
-                          <div key={block.id} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
-                            <div className="font-semibold text-slate-800">{block.label}</div>
-                            <div className="mt-0.5 font-mono text-[11px] text-slate-400">{overviewBlockLabel(block).split(" · ")[0]}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : <span className="text-slate-200">—</span>}
-                  </td>
-                ))}
+                <th className="bg-slate-50 px-3 py-3 text-left font-mono text-xs text-slate-500">
+                  <div>{row.start}</div>
+                  {row.end && <div className="mt-1 text-[10px] font-normal text-slate-300">~ {row.end}</div>}
+                </th>
+                {grid.days.map(day => {
+                  if (row.coveredDays.includes(day)) return null;
+                  const blocks = row.cells[day];
+                  return (
+                    <td
+                      key={day}
+                      rowSpan={row.rowSpans[day]}
+                      className="border-l border-slate-200 p-2"
+                    >
+                      {blocks.length ? (
+                        <div className="flex h-full min-h-16 flex-col gap-1.5">
+                          {blocks.map(block => (
+                            <div key={block.id} className="flex min-h-full flex-1 flex-col justify-center rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                              <div className="font-semibold text-slate-800">{block.label}</div>
+                              <div className="mt-1 font-mono text-xs text-slate-400">{overviewBlockLabel(block).split(" · ")[0]}</div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <span className="text-slate-200">—</span>}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
           </tbody>

@@ -33,11 +33,14 @@ describe("cueTimelineWindow — 개인 큐카드 고정 일정", () => {
     expect(result.remainingBlocks[0]?.id).toBe("register");
   });
 
-  it("수련회 종료 후에는 지난 일정을 일반 목록에 다시 노출하지 않는다", () => {
+  it("수련회 종료 후 고정 다음 일정은 없지만 전체 목록은 다시 확인할 수 있다", () => {
     expect(cueTimelineWindow(schedule, null, null, "12:00", "after")).toEqual({
       nextBlock: null,
       remainingBlocks: [],
     });
+    expect(cueTimelineListBlocks(schedule, [], "after").map(item => item.id)).toEqual(
+      schedule.map(item => item.id),
+    );
   });
 
   it("기간 설정이 없으면 기존처럼 전체 목록을 보존한다", () => {
