@@ -69,7 +69,7 @@ function TextBlock({ title, children, tone = "slate" }: { title: string; childre
       : "bg-white border-slate-100 text-slate-700";
   return (
     <div className={`rounded-lg border p-3 ${cls}`}>
-      <div className="text-[11px] font-semibold mb-1 opacity-70">{title}</div>
+      <div className="mb-1 text-xs font-semibold opacity-70">{title}</div>
       <div className="text-xs whitespace-pre-line leading-relaxed">{children}</div>
     </div>
   );
@@ -230,12 +230,12 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
             <div className="text-right">
               <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
               {!pinnedCardsCollapsed && (
-                <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+                <div className="text-xs text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
               )}
             </div>
             <button
               type="button"
-              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-fuchsia-300 hover:text-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400"
+              className="min-h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-fuchsia-300 hover:text-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400"
               aria-expanded={!pinnedCardsCollapsed}
               aria-controls="cue-card-current-details cue-card-next-details"
               onClick={() => setPinnedCardsCollapsed(value => !value)}
@@ -366,7 +366,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
                   <div className={`flex items-start ${timelineCompact ? "gap-2" : "gap-3"}`}>
                     <div className={`shrink-0 pt-0.5 text-center ${timelineCompact ? "w-12" : "w-14"}`}>
                       <div className="font-mono text-xs text-slate-500">{b.start}</div>
-                      {now && <div className="text-[10px] text-fuchsia-700 font-bold">지금</div>}
+                      {now && <div className="text-[11px] font-bold text-fuchsia-700">지금</div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       {timelineCompact ? (
@@ -405,7 +405,7 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
                       )}
                     </div>
                     {!timelineCompact && (b.detail || b.owner || b.notice) && (
-                      <button onClick={() => toggleOpen(b.id)} className="text-xs text-slate-400 hover:text-fuchsia-600 shrink-0 whitespace-nowrap">
+                      <button onClick={() => toggleOpen(b.id)} className="min-h-9 shrink-0 whitespace-nowrap rounded px-2 text-xs text-slate-500 hover:bg-fuchsia-50 hover:text-fuchsia-700">
                         {isOpen ? "접기" : "상세 ▾"}
                       </button>
                     )}
@@ -498,7 +498,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
           </div>
           <div className="text-right shrink-0">
             <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
-            <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+            <div className="text-xs text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
           </div>
         </div>
         {currentBlock ? (
@@ -539,7 +539,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
       <div className="flex gap-1 mb-3 flex-wrap">
         {days.map(d => (
           <button key={d} onClick={() => { userPicked.current = true; setDay(d); }}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium ${day === d ? "bg-fuchsia-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+            className={`min-h-10 rounded-lg px-4 text-sm font-medium ${day === d ? "bg-fuchsia-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
             {(() => {
               const date = retreatDateForDay(periods, retreat, d);
               return `${d}일차${date ? ` · ${formatShortDate(date)}${curDay === d ? " · 오늘" : ""}` : ""}`;
@@ -634,7 +634,7 @@ export function LeaderCueView({ schedule, retreat, periods }: {
           </div>
           <div className="text-right shrink-0">
             <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
-            <div className="text-[11px] text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+            <div className="text-xs text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
           </div>
         </div>
         {currentBlock ? (
@@ -666,7 +666,7 @@ export function LeaderCueView({ schedule, retreat, periods }: {
                   <div className="flex items-start gap-3">
                     <div className="text-center shrink-0 w-14 pt-0.5">
                       <div className="font-mono text-xs text-slate-500">{b.start}</div>
-                      {now && <div className="text-[10px] text-emerald-700 font-bold">지금</div>}
+                      {now && <div className="text-[11px] font-bold text-emerald-700">지금</div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs text-slate-500">{b.label}</div>

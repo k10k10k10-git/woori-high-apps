@@ -234,14 +234,14 @@ function IguardWorkspace({ id }: { id: string }) {
       <header ref={headerRef} className="sticky top-0 z-20" style={{ background: "var(--color-header-bg)" }}>
         <div className="max-w-6xl mx-auto px-3 sm:px-4">
           <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
-            <button onClick={() => router.push("/")} className="shrink-0 text-[11px] text-slate-400 hover:text-fuchsia-200 sm:text-xs" aria-label="수련회 목록으로 돌아가기">← 목록</button>
+            <button onClick={() => router.push("/")} className="min-h-10 shrink-0 px-1 text-xs text-slate-300 hover:text-fuchsia-200" aria-label="수련회 목록으로 돌아가기">← 목록</button>
             <span className="hidden text-slate-600 sm:inline">|</span>
             <span className="px-2 py-0.5 rounded-full text-xs font-semibold shrink-0" style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
             <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
             <button
               onClick={() => setSearchOpen(true)}
               disabled={dataLoading}
-              className="shrink-0 flex items-center gap-1 whitespace-nowrap rounded-lg px-2 py-1 text-[11px] text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40 sm:text-xs"
+              className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
               aria-label="이름·조·호실·호차 검색"
             >
               <span aria-hidden="true">🔍</span><span className="hidden sm:inline">검색</span>
@@ -252,7 +252,7 @@ function IguardWorkspace({ id }: { id: string }) {
                   setView("schedule");
                   setSheetSettingsOpen(true);
                 }}
-                className="shrink-0 text-[11px] flex items-center gap-1 transition-colors text-slate-400 hover:text-fuchsia-200 whitespace-nowrap sm:text-xs"
+                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-fuchsia-200"
                 aria-label="시트 설정 열기"
               >
                 <span className="sm:hidden" aria-hidden="true">⚙</span><span className="hidden sm:inline">⚙ 시트 설정</span>
@@ -267,7 +267,7 @@ function IguardWorkspace({ id }: { id: string }) {
                 <button key={g.label} onClick={() => setView(g.views[0].key)}
                   role="tab"
                   aria-selected={active}
-                  className="rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors sm:px-5"
+                  className="min-h-11 rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors sm:px-5"
                   style={active ? { background: "#fff", color: "#1e293b" } : { background: "transparent", color: "#94a3b8" }}>
                   {g.label}
                 </button>
@@ -282,7 +282,7 @@ function IguardWorkspace({ id }: { id: string }) {
               <button key={v.key} onClick={() => setView(v.key)}
                 role="tab"
                 aria-selected={view === v.key}
-                className="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap"
+                className="min-h-11 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
                 style={view === v.key ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" } : { borderColor: "transparent", color: "var(--color-text-muted)" }}>
                 {v.label}
               </button>
@@ -304,7 +304,7 @@ function IguardWorkspace({ id }: { id: string }) {
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <div className="flex items-start justify-between gap-3">
               <div className="font-semibold">⚠ 행정 데이터 호환성 경고</div>
-              <button onClick={() => setCompatDismissed(true)} className="shrink-0 text-xs text-amber-500 hover:text-amber-700">닫기</button>
+              <button onClick={() => setCompatDismissed(true)} className="min-h-9 shrink-0 rounded px-2 text-xs text-amber-600 hover:bg-amber-100 hover:text-amber-800">닫기</button>
             </div>
             <ul className="mt-1.5 space-y-1">
               {compatWarnings.map((w, i) => (
@@ -313,7 +313,7 @@ function IguardWorkspace({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
-            <div className="mt-1.5 text-[11px] text-amber-500">행정 사이트의 명단·조편성 형식이 바뀌었을 수 있습니다. 행정팀과 확인해주세요.</div>
+            <div className="mt-1.5 text-xs text-amber-600">행정 사이트의 명단·조편성 형식이 바뀌었을 수 있습니다. 행정팀과 확인해주세요.</div>
           </div>
         )}
 
@@ -364,11 +364,11 @@ function IguardWorkspace({ id }: { id: string }) {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setView(v.key)}
-                  className={`min-h-12 rounded-lg px-1.5 text-[11px] font-semibold transition-colors ${
+                  className={`min-h-14 rounded-lg px-1.5 text-xs font-semibold transition-colors ${
                     active ? "bg-fuchsia-700 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
                   }`}
                 >
-                  <span aria-hidden="true" className="block text-sm leading-none mb-0.5">{v.icon}</span>
+                  <span aria-hidden="true" className="mb-1 block text-base leading-none">{v.icon}</span>
                   {v.label}
                 </button>
               );

@@ -265,13 +265,13 @@ export default function ChecklistView({ retreatId, groups, students, participant
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg" role="tablist" aria-label="일차 선택">
             {(mode === "조별" ? [1, 2, 3] as const : [1, 3] as const).map(d => (
               <button key={d} onClick={() => setDay(d)} role="tab" aria-selected={day === d}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium ${day === d ? "bg-white shadow text-fuchsia-700" : "text-slate-500"}`}>{d}일차</button>
+                className={`min-h-10 rounded-md px-4 text-sm font-medium ${day === d ? "bg-white shadow text-fuchsia-700" : "text-slate-500"}`}>{d}일차</button>
             ))}
           </div>
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg" role="tablist" aria-label="보기 모드">
             {(["조별", "호차별"] as const).map(m => (
               <button key={m} onClick={() => { setMode(m); if (m === "호차별" && day === 2) setDay(1); }} role="tab" aria-selected={mode === m}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium ${mode === m ? "bg-white shadow text-slate-800" : "text-slate-500"}`}>{m}</button>
+                className={`min-h-10 rounded-md px-4 text-sm font-medium ${mode === m ? "bg-white shadow text-slate-800" : "text-slate-500"}`}>{m}</button>
             ))}
           </div>
         </div>
@@ -302,21 +302,21 @@ export default function ChecklistView({ retreatId, groups, students, participant
                   <h3 className={`min-w-0 font-semibold text-slate-700 ${mode === "호차별" ? "text-sm sm:text-base" : ""}`}>{u.title}</h3>
                   <div className={`flex shrink-0 items-center ${mode === "호차별" ? "gap-1 sm:gap-2" : "gap-2"}`}>
                     {c > 0 && (
-                      <button onClick={() => resetUnit(u)} className={`${mode === "호차별" ? "text-[10px] sm:text-xs" : "text-xs"} text-slate-400 underline hover:text-slate-600`} aria-label={`${u.title} 체크 초기화`}>
+                      <button onClick={() => resetUnit(u)} className={`${mode === "호차별" ? "text-[11px] sm:text-xs" : "text-xs"} min-h-8 rounded px-1 text-slate-500 underline hover:bg-slate-100 hover:text-slate-700`} aria-label={`${u.title} 체크 초기화`}>
                         {mode === "호차별" ? <><span aria-hidden="true">↺</span><span className="hidden sm:inline">초기화</span></> : "초기화"}
                       </button>
                     )}
-                    <span className={`font-medium ${mode === "호차별" ? "text-xs sm:text-sm" : "text-sm"} ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
+                    <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
                   </div>
                 </div>
                 {(u.summary || u.sub) && (
                   <div className={`space-y-1 border-b border-slate-50 py-2 ${mode === "호차별" ? "px-2.5 sm:px-4" : "px-4"}`}>
-                    {u.summary && <div className={`${mode === "호차별" ? "text-[10px] leading-tight sm:text-xs" : "text-xs"} font-semibold text-slate-600`}>{u.summary}</div>}
-                    {u.sub && <div className={`${mode === "호차별" ? "break-words text-[10px] leading-tight sm:text-xs" : "text-xs"} text-slate-500`}>{u.sub}</div>}
+                    {u.summary && <div className={`${mode === "호차별" ? "text-[11px] leading-snug sm:text-xs" : "text-xs"} font-semibold text-slate-600`}>{u.summary}</div>}
+                    {u.sub && <div className={`${mode === "호차별" ? "break-words text-[11px] leading-snug sm:text-xs" : "text-xs"} text-slate-500`}>{u.sub}</div>}
                   </div>
                 )}
                 {u.warning && (
-                  <div className={`border-b border-amber-100 bg-amber-50 py-2 text-[11px] leading-relaxed text-amber-700 ${mode === "호차별" ? "break-words px-2.5 sm:px-4" : "px-4"}`}>⚠ {u.warning}</div>
+                  <div className={`border-b border-amber-100 bg-amber-50 py-2 text-xs leading-relaxed text-amber-700 ${mode === "호차별" ? "break-words px-2.5 sm:px-4" : "px-4"}`}>⚠ {u.warning}</div>
                 )}
                 <ul className="divide-y divide-slate-100">
                   {u.members.length === 0 ? <li className="px-4 py-3 text-center text-slate-300 text-xs">없음</li> :
@@ -332,8 +332,8 @@ export default function ChecklistView({ retreatId, groups, students, participant
                               <>
                                 <span className="min-w-0 sm:hidden">
                                   <span className={`block break-words text-sm font-medium leading-tight ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
-                                  <span className="mt-1 block break-words text-[10px] leading-tight text-slate-400">{i + 1}. {m.meta}</span>
-                                  {by && <span className="mt-1 block break-words text-[9px] leading-tight text-fuchsia-400" title={`${by} 체크`}>✓{by}</span>}
+                                  <span className="mt-1 block break-words text-[11px] leading-snug text-slate-500">{i + 1}. {m.meta}</span>
+                                  {by && <span className="mt-1 block break-words text-[10px] leading-snug text-fuchsia-500" title={`${by} 체크`}>✓{by}</span>}
                                 </span>
                                 <span className="hidden w-5 text-xs text-slate-400 sm:inline-block">{i + 1}</span>
                                 <span className={`hidden font-medium sm:inline ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
