@@ -1,147 +1,139 @@
-# 인수인계 — 2026-07-30 17:10 (에이전트 중립 — GPT/Codex/Claude 공용)
+# 인수인계 — 2026-07-30 (에이전트 중립 — GPT/Codex/Claude 공용)
 
-> **다음 실행자가 Codex/GPT일 수 있다.** Claude 전용 스킬(`/ship`·`/bugfix`·`/handoff` 등)은 Codex에 없으므로, 필요한 절차는 아래 "표준 검증 절차"에 명령어로 풀어 적었다.
+## 지금 하던 일
 
-## 지금 하던 일 (한 문장)
+`iguard-app/REMODEL_PLAN.md`의 PA-1부터 P6까지 코드 구현과 승인된 운영
+동선 마이그레이션을 완료했다. 현재는 최종 배포 직전이며, **main push는
+아직 하지 않았다.**
 
-2026 여름수련회 피드백(설문 7건 + 행정팀 논의 + 실물 명찰카드 PDF)을 근거로 **이가드 사이트를 "스프레드시트 없이 큐싯 제작"까지 끌고 갈 리모델링 설계서를 완성**했고, 첫 실행 단계(PA)의 착수 승인을 기다리는 중이다.
+## 반드시 먼저 읽을 것
 
-## 완료된 것 (커밋 해시와 함께)
+1. 루트 `AGENTS.md`
+2. 루트 `CLAUDE.md`
+3. 이 파일
+4. `iguard-app/CLAUDE.md`
+5. `iguard-app/REMODEL_PLAN.md`
+6. `iguard-app/REMODEL_RELEASE_CHECKLIST.md`
 
-전부 `origin/main` 푸시·배포 확인 완료. **미푸시 커밋 없음.**
+모든 작업 첫 응답에서 DB 안전 4문답을 먼저 답한다. Firebase Rules는
+`고등부 학생 출석부/database.rules.json` 외의 파일에서 배포하지 않는다.
 
-| 해시 | 내용 |
-|---|---|
-| `f743d05` | **이가드: 카톡 인앱 브라우저 무한 로딩 수정** — iOS 카톡에서 `location.href`에 **현재 주소를 재대입**해 리로드 루프가 나던 버그. `iguard-app/src/lib/inAppBrowser.ts` 신설(순수 로직), 회귀 테스트 10개 |
-| `a76d7cf` | **이가드: 이름·초성·번호 전역 검색** — `src/lib/personIndex.ts`(순수) + `SearchOverlay.tsx`, 헤더 🔍 버튼. 테스트 23개 |
-| `d8e94d6` | 학습 메모 → `LEARNINGS.md` "인앱 브라우저 무한 로딩의 정체" |
-| `a5bee43` | 두 앱 CLAUDE.md 중복 서술 정리(기술스택표·디렉터리트리 제거) |
-| `a05c15a` | iguard CLAUDE.md **패턴 26·27** 추가(인앱 탈출 불변식 · 전역 검색 규칙) |
-| `c719274`→`a051d5a`→`4793a3a` | **`iguard-app/REMODEL_PLAN.md` 설계서** 작성 및 2회 개정 |
+## 완료된 로컬 커밋
 
-### 저장소·운영 배포 상태 (실측 2026-07-30 17:0x)
+아래 10개 커밋은 `main`에 있으나 `origin/main`보다 앞서 있으며 아직
+push하지 않았다.
 
-- `HEAD == origin/main == 4793a3af138d9c3190a615758455b32062206f14`
-- iguard-app `/api/version` buildId = `4793a3a…` **대조 일치**
-- retreat-app `/api/version` buildId = `4793a3a…` **대조 일치** (모노레포 push로 함께 재배포)
-- **DB 직접 쓰기 0건 / Firebase Rules 변경·배포 0건**
-- 미추적 항목 `.agents/`, `outputs/`, `rayquaza-v2-upgrade/`, `tmp/`는 과거 운영 산출물·도구 아티팩트다. **임의 커밋·삭제하지 않는다.**
+| 해시 | 단계 | 내용 |
+|---|---|---|
+| `f8bb0e1` | PA-1 | 조별 정보 방 카드에 학생 이름 |
+| `1a03b55` | PA-2 | 개인 큐카드 한눈에 보기 |
+| `d0ab7c8` | PA-3 | 375px 현장 화면 가독성 |
+| `3d91df0` | P1 | 구간 기반 동선 모델과 기본 구간 어댑터 |
+| `9fdf031` | P2 | 안전한 동선 마이그레이션 도구 |
+| `35cbd2f` | P3 | 실제 큐싯 구간 동기화와 전체 개요 |
+| `866d272` | P4 | GBS 장소 단일 원천과 역방향 조회 |
+| `96c295f` | P0b | 명찰카드 자동 생성·인쇄 |
+| `1a801f9` | P5 | 큐싯 직접 편집과 구조만 복제 |
+| `f463200` | P6 | 현장 진행 마커와 지연 시각 파생 |
 
-## 미완인 것 — 정확한 다음 단계
+구현 핵심:
 
-전체 로드맵의 원천은 **`iguard-app/REMODEL_PLAN.md`** 다(495행). 아래는 그 중 바로 실행 가능한 것만 뽑은 것.
+- 시간 블록 → 구간 → 포스트·담당자 구조를 사이트에서 직접 편집한다.
+- 단일 레코드는 `update()`, 동선 자연키 변경은 루트 multi-path update로
+  이전 키 삭제와 새 키 생성을 한 번에 처리한다.
+- 구조 복제는 사람·메모·조·버스·GBS·인원체크·PIN을 복제하지 않는다.
+- 구글 시트는 지속 동기화가 아니라 초기 1회 이관 도구다.
+- 진행 버튼은 계획 시간을 고치지 않고 `actualStart/actualStartAt` 한
+  블록만 기록해 이후 표시 시각을 파생한다.
 
-- [ ] **PA-1. 조별 정보에 학생 이름 표시 ← 여기부터 시작 (권장)**
-  - 파일: `iguard-app/src/app/retreat/[id]/RoomsView.tsx`
-  - 현재 결손: 방을 `const chip = { roomNumber: roomLabel(r), count: mine.length }`(56행 부근)로만 만들어 **학생 이름이 화면에 없다.** 이름이 나오는 건 `dayVisitors`(당일참석자)뿐.
-  - 할 일: 방 칩에 해당 방 학생 이름을 펼친다. 이미 계산된 `mine`(그 방의 활성 학생 id 배열)과 `students[id]?.name`을 쓴다.
-  - ⚠ 취소·당일참석 제외 판정을 **새로 만들지 말 것**. `isCancelledStudent`(`src/lib/busParticipation.ts`)와 이 파일의 `memberSet` 규칙 그대로.
-  - 근거: 행정팀 논의 *"조별 정보에 애들 이름이 없다는 피드백이 있었던"*, 설문 ⑦ *"학생이 물어봐서 숙소를 찾아야 했는데 쉽게 찾기 힘들었음"*
-  - 검증: 아래 표준 절차 전부 + **375px 뷰포트** 확인
+## 운영 DB 이관 — 승인·실행 완료
 
-- [ ] **PA-2. 개인 큐카드 "한눈에 보기"**
-  - 파일: `iguard-app/src/app/retreat/[id]/ExecutionViews.tsx`, 참고 `src/lib/cueCardTimeline.ts`
-  - 근거: 설문 ⑦ *"정리는 너무 잘 되어있지만 **급할 때는 결국 구글시트** 들어가서 보는 경우가 더 많았음"* / 설문 ④ *"전·후 일정을 보려 스크롤했으나 메인이 현재 일정으로 고정되어 어려웠다"*
-  - **원인 가설(중요)**: 딜레이가 아니라 **전체가 한 화면에 스캔되지 않는 것**이 원인이다. 시트는 펼쳐져 있고 앱은 2단 sticky + 스크롤이다.
-  - ⚠ 패턴 24(현재·다음 2단 sticky)와 패턴 17(시계 tick이 사용자 선택을 덮지 않음)을 깨지 말 것. `stickyLayout.test.ts`·`cueCardTimeline.test.ts`가 경계를 고정한다.
+사용자가 “운영 DB 이관 승인”을 명시했고, 수련회별 스냅샷 뒤 한 번씩
+실행했다. Firebase Rules 배포는 없었다.
 
-- [ ] **PA-3. 글자·버튼 크기 점검(375px)** — 설문 ⑦이 이 항목에 **최저점 2**를 줬다.
+| 수련회 | 기존/변환/최종 동선 | 기본 구간 | 이슈 | 백업 |
+|---|---:|---:|---:|---|
+| `-OnzAiqQpn7McL0MWe7M` | 149 / 149 / 149 | 26 | 0 | `iguard-app/backups/movement-segments-execute-2026-07-30T09-16-51-053Z/` |
+| `-Ov_SQVKmfIcnPSlPGDC` | 200 / 200 / 200 | 22 | 0 | `iguard-app/backups/movement-segments-execute-2026-07-30T09-17-19-542Z/` |
 
-- [ ] **P0b. 명찰카드 인쇄 (부분)** — `REMODEL_PLAN.md` 3.5절. 실물은 `~/Downloads/26 여름 이가드 동선 최종.pdf`(10면).
-  - 오늘 데이터로 가능: 본인 호차+동승(`buses`) / 식사 이동 순서(`meals`+`mealOrder.ts`) / 집회 이동 순서(`seating`)
-  - 아직 불가: 담당 구역별 호실 명단(P1 필요) · GBS 장소(P4 필요) · 수찬·선교 학생(행정 협의 필요)
-  - ⚠ `printAsPDF` HTML의 사용자 데이터는 **전부 `escapeHtml()`** (패턴 13)
+합계: 동선 349건, 기본 구간 48건, 적용 경로 746개, 이슈 0건.
+최종 dry-run은 레거시 0건·구조화 349건·이슈 0건이었다.
 
-- [ ] **P1 이후** — 동선 모델 확장 → 마이그레이션 → 파서 확장 → GBS → 큐싯 에디터 → 딜레이 대응. `REMODEL_PLAN.md` 6장.
-  - ⚠ **P2(마이그레이션)는 운영 DB에 처음 쓰는 단계다.** 드라이런 건수 보고 → 사용자 승인 → 스냅샷 백업 → 수련회 1개씩 → 건수 대조 → 불일치 1건이라도 나오면 롤백.
+불일치가 발견되면 새 패치를 쓰지 말고 각 실행 폴더의 `RESTORE.txt`를
+사용한다. `backups/`는 Git 제외이며 임의 삭제하지 않는다.
 
-- [ ] **행정 모달 a11y 보강 10개 파일** (직전 인수인계에서 이월, 미착수) — `GroupsTab`·`RoomsTab`·`TeachersTab`·`CarpoolTab`·`MedicalLogTab`·`NotesTab`·`SuppliesTab`·`CancellationTab`·`OnSiteRegistrationTab`(현장추가 모달)·`AutoAssignPreviewModal`. 기준 구현 `retreat-app/src/context/UIContext.tsx`. 현황 확인:
-  ```bash
-  cd retreat-app && for f in $(grep -rl 'fixed inset-0' src/); do grep -q 'role="dialog"' "$f" || echo "$f"; done
-  ```
+## 검증 상태
 
-### 사용자가 직접 해야 하는 것 (코드 아님)
+P6까지 마지막 자동 검증:
 
-- [ ] **관찰 테스트** — 다음 큐싯 제작자가 정해지면 **설명 없이 30분** 현재 앱으로 큐싯 초안을 만들게 하고, 막힌 지점·질문 횟수·**"시트 열고 싶다"고 한 순간**을 기록. `REMODEL_PLAN.md` 9장. **P5를 기다리지 말고 최대한 빨리 하는 것이 이득.**
-- [ ] **행정팀 협의 3건** — ①현장 정보 변동 반영(후발·선복귀·자차) ②학생 속성(수찬·선교팀 태그) ③"조스탭 불가" 필드. `REMODEL_PLAN.md` 8장. **합의 전 코드 작성 금지.**
-- [ ] **아이폰 카톡 실기기 확인** — `f743d05`가 실제 카톡에서 외부 브라우저를 여는지. 무한 로딩 자체는 스킴 성공 여부와 무관하게 해소됐다.
+- `npm test`: 38개 파일, 274개 통과
+- `npm run typecheck`: 오류 0
+- `npm run lint`: 오류 0, 기존 기준선 경고 10
+- `npm run build`: 성공
 
-## 미커밋 변경 (있다면 파일별 요약)
+최종 문서 작성 뒤에도 네 명령을 다시 실행했고 같은 결과로 통과했다.
+2026-07-30 19:41 KST 읽기 전용 DB dry-run도 구조화 동선 349건,
+레거시 0건, 추가 payload 0건, 이슈 0건으로 통과했다.
 
-**없음.** 작업 트리는 `origin/main`과 동일하다(미추적 4개 디렉터리 제외).
+375×812 브라우저 QA:
 
-## 막힌 것 / 사용자 답변 대기 중인 질문
+- 로컬 production 서버와 로그인 화면은 정상 렌더링됐다.
+- 인앱 브라우저와 Chrome 모두 Firebase 로그인 세션이 없어 보호된
+  화면의 실제 375px 읽기 검증은 수행하지 못했다.
+- 로그인·저장은 시도하지 않았다. 운영 DB 추가 쓰기 0건.
+- 보호 화면 검증은 `iguard-app/REMODEL_RELEASE_CHECKLIST.md` 4장에
+  수동 게이트로 남겼다.
 
-1. **PA 착수 승인** — PA-1/2/3을 한 번에 낼지, 하나씩 낼지. 직전 제안은 **하나씩**(스탭이 개선을 자주 체감하는 것이 지금 중요).
-2. **다음 큐싯 제작자가 정해졌는지** — 정해졌으면 관찰 테스트가 최우선.
+## 아직 완료로 표시하면 안 되는 것
 
-## 이 작업의 함정 (이번 세션에서 배운 것)
+1. **초보 큐싯 제작자 관찰 테스트**
+   - 설명 없이 30분
+   - 블록 3개 이상을 구간·포스트까지 채우면 통과
+   - 통과 전 P5는 코드 구현 완료이지 운영 전환 완료가 아니다.
+2. **로그인 후 모바일·동시편집·현장진행·인쇄·오프라인 리허설**
+   - 전체 절차는 `iguard-app/REMODEL_RELEASE_CHECKLIST.md` 4장.
+3. **스프레드시트 폐기**
+   - 위 두 게이트 통과 전에는 폐기하지 않는다.
+4. **S4 설문 결과**
+   - 다음 수련회 사후 설문에서만 측정할 수 있다.
 
-### 도구·환경
+## 다음 실행자가 할 일
 
-- **이 맥에는 PDF CLI 도구가 없다** (`pdftotext`·`pdftoppm`·`mutool`·`qpdf` 미설치, PyObjC `Quartz`도 없음). PDF를 읽으려면: ①scratchpad에 venv 만들어 `pypdf`+`pillow` 설치 ②`PdfWriter`로 **낱장 PDF 분할** ③낱장마다 `sips -s format png -Z 1400 --out out.png split_NN.pdf`.
-  - `sips`를 원본 PDF에 바로 쓰면 **1페이지만** 나온다.
-  - `page.images` 추출은 이 파일에선 무의미(글리프 조각 수천 개로 쪼개져 있음).
-- **구글시트는 gviz CSV로 읽는다**: `https://docs.google.com/spreadsheets/d/<ID>/gviz/tq?tqx=out:csv&gid=<GID>` 를 `curl -sL`. 탭 목록은 `/htmlview`를 받아 `grep -oE 'gid=[0-9]+' | sort -u`.
-- **`WebFetch`에 "전문을 verbatim으로" 요청하면 인용 제한으로 거부된다.** 원문이 필요하면 `curl`로 파일에 받아 직접 읽을 것.
-- **브라우저 자동화로 한글이 입력되지 않는다**(합성 키입력이 IME를 안 거침). React 입력을 채우려면:
-  ```js
-  const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-  set.call(input, '값'); input.dispatchEvent(new Event('input',{bubbles:true}));
-  ```
-- **dev 서버 설정은 리포 루트 `.claude/launch.json`에 이미 있다**(`retreat-admin`·`iguard-app`·`semester-app`·`agent-os`). `iguard-app/.claude/launch.json`을 새로 만들지 말 것 — 이름을 못 찾는다.
-- **로그인 벽 뒤 UI 검증**: `src/app/tmp-<이름>/page.tsx`에 목 데이터로 컴포넌트만 마운트하는 임시 라우트를 만들어 dev 서버에서 확인하고 **끝나면 삭제**한다(확인은 `npm run build` 라우트 목록 + `git status`). ⚠ 폴더명이 `_`로 시작하면 Next.js가 private folder로 보고 404를 낸다.
+1. 변경 파일을 경로 지정해 커밋한다:
+   - `iguard-app/REMODEL_RELEASE_CHECKLIST.md`
+   - `.claude/HANDOFF.md`
+   - `iguard-app/AGENTS.md`
+2. `git status --short`와 `git log origin/main..HEAD`를 확인한다.
+3. 사용자에게 자동 검증 결과, 운영 DB 이관 결과, 남은 수동 게이트를
+   보고하고 **main push/운영 배포의 별도 최종 승인**을 요청한다.
+4. 승인 전에는 push하거나 `vercel --prod`를 실행하지 않는다.
+5. 승인 후 push하고 두 앱 `/api/version`과 Vercel Ready를 확인한다.
 
-### 리포 관행
+## 배포·롤백
 
-- **CLAUDE.md 파일에 내가 만들지 않은 미커밋 변경이 섞여 있을 수 있다.** 이번 세션 시작 시 두 앱 CLAUDE.md에 -253줄 삭제가 있었는데 직전 인수인계에는 "작업 트리 깨끗"으로 적혀 있었다. **커밋 시 `git add`에 경로를 명시**해 남의 변경을 쓸어담지 말 것.
-- 코드 변경이 앱 CLAUDE.md "핵심 코드 패턴"과 관련되면 **같은 커밋에** 문서도 갱신한다(이번엔 위 사정으로 `a05c15a`로 분리됐다).
-
-### 설계상 배운 것 (다시 발견하지 않도록)
-
-- **앱의 경쟁자는 스프레드시트가 아니라 종이 명찰카드였다.** 스탭은 카드를 명찰에 달고 다녔고 앱은 2차 도구였다. "식사순서·자리배치를 현장에서 안 썼다"는 응답은 *필요 없어서*가 아니라 *이미 종이로 뽑아왔기 때문*이다.
-- **`IguardMovement`의 괄호 상세(`박혜원sf(C동 3,4층)`)가 명찰카드 자동 생성의 핵심 키다.** 부수 필드처럼 보이지만 이것이 "담당 구역"이고, 방배정과 결합하면 카드의 개인 섹션이 자동 생성된다.
-- **현재 `IguardMovement` 키는 `staffId__blockId`라 "한 스탭 한 블록 한 포스트"인데, 실측 22블록 중 7개(32%)에서 같은 스탭이 2개 이상 포스트를 맡는다.** 피드백의 "층장 교대가 안 보인다"가 이 모델 한계였다.
-- **시트가 쉬운 이유는 자유 입력이 아니라 "0에서 시작하지 않는 것"이다.** 새 제작자는 지난 시트를 복사해 고친다. 앱에는 복제 기능이 **전혀 없어**(코드 확인) 매번 백지에서 시작한다. 복제 없이 개념만 늘리면 앱은 더 어려워진다.
-- **행정 앱이 성공한 원인은 UI가 아니라 퇴로를 없앤 것이다** — "시트도 안 만들고 아예 사이트로만" 했다. 이행 시점을 미리 정하지 않으면 같은 실패가 반복된다.
-
-## 표준 검증 절차 (Codex용 — 스킬 없이 그대로 실행)
-
-```bash
-cd /Users/sunghoon/Desktop/ai개발/iguard-app
-npx tsc --noEmit          # 0 errors 필수
-npm test                  # 전체 통과 필수 (현재 27파일 226개)
-npm run lint              # 0 errors, 신규 경고 0 (기존 경고 10개가 baseline)
-npm run build             # 필요 시
-```
-
-커밋·푸시 (커밋 메시지는 한국어 `영역: 요약` 형식, 기능 단위 1커밋):
+`main` push는 `iguard-app`과 `retreat-app`의 Vercel 자동 배포를
+트리거한다. 배포 전 승인 필요.
 
 ```bash
 cd /Users/sunghoon/Desktop/ai개발
-git add <바꾼 파일 경로를 명시>   # 전체 add 금지 — 남의 미커밋 변경이 섞일 수 있음
-git commit -F - <<'EOF'
-이가드: <요약>
-
-<본문>
-EOF
 git push origin main
-```
-
-배포 확인 (모노레포 push는 두 앱을 동시에 재배포한다):
-
-```bash
 git rev-parse HEAD
 curl -s https://iguard-app.vercel.app/api/version
 curl -s https://retreat-app-theta.vercel.app/api/version
-# 두 buildId가 HEAD와 일치해야 배포 완료. 안 맞으면 아직 빌드 중.
-cd iguard-app && npx vercel ls    # ● Ready 확인
+cd iguard-app && npx vercel ls
 ```
 
-## 검증 상태 (2026-07-30 17:10 실측)
+치명 결함이면 Vercel 직전 Ready 배포 또는 문제 커밋 revert로 앱을
+되돌린다. DB 이관 롤백은 위 실행 폴더의 경로별 restore patch만 사용하며
+전체 `retreats` 노드를 덮어쓰지 않는다.
 
-- **tsc**: iguard-app 0 errors / retreat-app 0 errors
-- **테스트**: iguard-app **27파일 226개 통과** (세션 시작 25파일 193개 → +33)
-- **lint**: iguard-app 0 errors, 경고 10개(baseline 동일 — 신규 경고 없음)
-- **배포**: 두 앱 모두 buildId `4793a3a…` = HEAD **일치**
-- **DB**: 직접 쓰기 0건 / Rules 배포 0건
+## 작업 트리 주의
+
+과거부터 존재하는 미추적 디렉터리는 이 작업 대상이 아니다.
+
+- `.agents/`
+- `outputs/`
+- `rayquaza-v2-upgrade/`
+- `tmp/`
+
+임의 커밋·삭제하지 않는다. `git add .`도 사용하지 않는다.
