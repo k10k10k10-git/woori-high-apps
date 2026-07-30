@@ -1,176 +1,148 @@
-# 인수인계 — 2026-07-30 (에이전트 중립 — GPT/Codex/Claude 공용)
+# 인수인계 — 2026-07-31 (Claude/Codex 공용)
 
-## 지금 하던 일
+## 현재 상태
 
-`iguard-app/REMODEL_PLAN.md`의 PA-1부터 P6까지 코드 구현과 승인된 운영
-동선 마이그레이션과 사용자 승인에 따른 운영 배포를 완료했다.
+`main`은 `origin/main`보다 **2커밋 앞서며 아직 push·배포하지 않았다.**
 
-그 뒤 사용자가 실제 구글 시트의 `스탭 큐싯 최종`과 비교해 기존 사이트
-편집기가 너무 복잡하다고 피드백했고, **시트형 큐싯 작성 화면을 로컬에
-구현했다. 이 최신 변경은 아직 push·배포하지 않았다.**
+```text
+52e011f 이가드: 큐싯 본문을 잘림 없이 전체 표시
+00682d7 행정: 탭을 5그룹으로 재분류하고 이름 정합
+2ee761a origin/main
+```
 
-최신 로컬 변경:
+사용자는 현재 작업을 Claude에서 이어서 진행한다고 말했다. 다음 실행자는
+아래 두 로컬 커밋을 보존하고, 추가 수정 요청이 없다면 배포 승인 여부부터
+확인한다.
 
-- `ScheduleSheetEditor.tsx`: 한 행에서 시간·구분·내용·담당·특이사항 수정
-- 행 이탈 자동 저장 및 `⌘/Ctrl + Enter` 즉시 저장
-- 상세 설정을 열기 전 현재 행 저장
-- 기존 구간·포스트·담당자 배정을 행 안에 읽기 요약으로 표시
-- 기존 `ScheduleBlockEditor`·`ScheduleSegmentEditor`는 우측 상세 패널로 이동
-- 상세 패널 ESC·포커스 트랩·닫은 뒤 원래 버튼 포커스 복원
-- 일차 필터, 앱 헤더·스탭 명단 아래 고정 열 제목/일차 제목
-- 모바일은 가로 표가 아니라 같은 필드를 세로 카드로 표시
-- 일정 추가 폼은 기본 접힘, 상세 입력은 한 번 더 펼치는 구조
-
-DB 경로·형태·운영 데이터 변경은 없다. 기존
-`retreats/{id}/iguard/schedule/{blockId}` 레코드 단위 `update()`와
-기존 `segments`, `movements`만 재사용한다. Firebase Rules 변경도 없다.
-
-최신 로컬 검증:
-
-- `npm test`: 39개 파일, 278개 통과
-- `npm run typecheck`: 오류 0
-- `npm run lint`: 오류 0, 기존 기준선 경고 10
-- `npm run build`: 성공
-
-다음 단계는 로그인된 연습용 수련회에서 PC·375px 작성 동선을 직접
-확인하고, 사용자 검토 뒤 명시적 배포 승인을 받아 push하는 것이다.
+DB 직접 쓰기 0건, DB 경로·형태 변경 없음, Firebase Rules 변경·배포 없음.
 
 ## 반드시 먼저 읽을 것
 
 1. 루트 `AGENTS.md`
 2. 루트 `CLAUDE.md`
 3. 이 파일
-4. `iguard-app/CLAUDE.md`
-5. `iguard-app/REMODEL_PLAN.md`
-6. `iguard-app/REMODEL_RELEASE_CHECKLIST.md`
+4. `retreat-app/CLAUDE.md`, `retreat-app/AGENTS.md`
+5. `iguard-app/CLAUDE.md`, `iguard-app/AGENTS.md`
+6. 배포할 때 `OPERATIONS.md`
 
-모든 작업 첫 응답에서 DB 안전 4문답을 먼저 답한다. Firebase Rules는
-`고등부 학생 출석부/database.rules.json` 외의 파일에서 배포하지 않는다.
+모든 새 작업의 첫 응답에서 DB 안전 4문답을 먼저 답한다.
 
-## 완료된 로컬 커밋
+## 로컬 커밋 1 — 행정 탭 재분류
 
-아래 구현·출시 준비 커밋은 `main`에 push되어 이가드와 행정사이트에
-운영 배포됐다.
+커밋: `00682d7 행정: 탭을 5그룹으로 재분류하고 이름 정합`
 
-| 해시 | 단계 | 내용 |
-|---|---|---|
-| `f8bb0e1` | PA-1 | 조별 정보 방 카드에 학생 이름 |
-| `1a03b55` | PA-2 | 개인 큐카드 한눈에 보기 |
-| `d0ab7c8` | PA-3 | 375px 현장 화면 가독성 |
-| `3d91df0` | P1 | 구간 기반 동선 모델과 기본 구간 어댑터 |
-| `9fdf031` | P2 | 안전한 동선 마이그레이션 도구 |
-| `35cbd2f` | P3 | 실제 큐싯 구간 동기화와 전체 개요 |
-| `866d272` | P4 | GBS 장소 단일 원천과 역방향 조회 |
-| `96c295f` | P0b | 명찰카드 자동 생성·인쇄 |
-| `1a801f9` | P5 | 큐싯 직접 편집과 구조만 복제 |
-| `f463200` | P6 | 현장 진행 마커와 지연 시각 파생 |
-| `a6be8c0` | 출시 준비 | 배포 전 검증·리허설·롤백 체크리스트 |
+`retreat-app`의 숫자 `TAB_IDX`와 기존 탭 상태 로직은 그대로 두고, 17개 탭을
+다음 5그룹으로 재분류했다.
 
-구현 핵심:
+- 명단: 신청 접수, 반별 명단, 입금 대조, 취소·환불
+- 편성: 조편성, 방배정, 교사 참석
+- 이동·참석: 부분 참석, 카풀·자차
+- 물품·비용: 여행자 보험, 단체티, 구매 물품, 물품 재고, 식사 인원
+- 현장: 현장 등록, 건강 특이사항, 의료 일지
 
-- 시간 블록 → 구간 → 포스트·담당자 구조를 사이트에서 직접 편집한다.
-- 단일 레코드는 `update()`, 동선 자연키 변경은 루트 multi-path update로
-  이전 키 삭제와 새 키 생성을 한 번에 처리한다.
-- 구조 복제는 사람·메모·조·버스·GBS·인원체크·PIN을 복제하지 않는다.
-- 구글 시트는 지속 동기화가 아니라 초기 1회 이관 도구다.
-- 진행 버튼은 계획 시간을 고치지 않고 `actualStart/actualStartAt` 한
-  블록만 기록해 이후 표시 시각을 파생한다.
+화면 안의 이전 탭 명칭도 새 이름과 맞췄다. DB 값인
+`AdminSupplyKind = "행정물품"`과 `ADMIN_SUPPLY_KINDS`는 건드리지 않았다.
 
-## 운영 DB 이관 — 승인·실행 완료
+변경 파일:
 
-사용자가 “운영 DB 이관 승인”을 명시했고, 수련회별 스냅샷 뒤 한 번씩
-실행했다. Firebase Rules 배포는 없었다.
+- `retreat-app/src/app/retreat/[id]/RetreatPageClient.tsx`
+- `retreat-app/src/app/retreat/[id]/UnmatchedPaymentsTab.tsx`
+- `retreat-app/src/app/retreat/[id]/MealCountTab.tsx`
+- `retreat-app/src/app/retreat/[id]/ClassRosterTab.tsx`
+- `retreat-app/src/app/retreat/[id]/PartialAttendanceTab.tsx`
+- `retreat-app/src/app/retreat/[id]/ParticipantsTab.tsx`
+- `retreat-app/src/app/FormGuideModal.tsx`
+- `retreat-app/src/lib/retreatTabs.test.ts`
+- `retreat-app/AGENTS.md`
 
-| 수련회 | 기존/변환/최종 동선 | 기본 구간 | 이슈 | 백업 |
-|---|---:|---:|---:|---|
-| `-OnzAiqQpn7McL0MWe7M` | 149 / 149 / 149 | 26 | 0 | `iguard-app/backups/movement-segments-execute-2026-07-30T09-16-51-053Z/` |
-| `-Ov_SQVKmfIcnPSlPGDC` | 200 / 200 / 200 | 22 | 0 | `iguard-app/backups/movement-segments-execute-2026-07-30T09-17-19-542Z/` |
+검증 완료:
 
-합계: 동선 349건, 기본 구간 48건, 적용 경로 746개, 이슈 0건.
-최종 dry-run은 레거시 0건·구조화 349건·이슈 0건이었다.
+- `cd retreat-app && npx tsc --noEmit`: 오류 0
+- `cd retreat-app && npm test`: 전체 통과
+- `cd retreat-app && npm run build`: 성공
+- 로그인된 연습 화면에서 5개 그룹과 17개 탭 전환 확인
+- 물품 재고 탭의 기존 `행정물품` 데이터가 유지되는 것을 확인
 
-실행 전 스냅샷과 현재 운영 동선을
-`staffId + blockId + postId + round + note + source` 의미 필드
-다중집합으로 전수 대조한 결과도 두 수련회 모두 양방향 차이 0건이었다.
-수련회별 배정 수 상위 스탭 3명의 전후 건수도 모두 동일했다.
+## 로컬 커밋 2 — 큐싯 본문 전체 노출
 
-불일치가 발견되면 새 패치를 쓰지 말고 각 실행 폴더의 `RESTORE.txt`를
-사용한다. `backups/`는 Git 제외이며 임의 삭제하지 않는다.
+커밋: `52e011f 이가드: 큐싯 본문을 잘림 없이 전체 표시`
 
-## 검증 상태
+사용자 요구는 `스탭 전체 큐싯`에서 페이지가 길어져도 좋으니 내용·담당·
+특이사항 텍스트가 셀 내부 스크롤이나 말줄임 없이 한눈에 전부 보이게 하는
+것이었다.
 
-최종 요구사항 감사까지 포함한 자동 검증:
+구현:
 
-- `npm test`: 38개 파일, 276개 통과
-- `npm run typecheck`: 오류 0
-- `npm run lint`: 오류 0, 기존 기준선 경고 10
-- `npm run build`: 성공
+- `ScheduleSheetEditor.tsx`에 공통 `AutoGrowTextarea` 추가
+- 값이나 브라우저 너비가 바뀔 때 `scrollHeight`만큼 자동 높이 확장
+- `box-sizing: border-box`의 테두리 2px 부족 문제를
+  `offsetHeight - clientHeight` 보정으로 해결
+- 실제 본문 글꼴을 공통 `.input`보다 우선하는 11px로 축소
+- 기본 입력 높이를 모바일 240px, PC 300px로 확대
+- 입력칸 내부 스크롤과 수동 리사이즈 제거
+- 담당·동선 요약의 `slice(0, 3)`, `truncate`, `외 N개 장소`를 제거하고
+  모든 줄을 줄바꿈으로 표시
 
-최종 문서 작성 뒤에도 네 명령을 다시 실행했고 같은 결과로 통과했다.
-2026-07-30 19:41 KST 읽기 전용 DB dry-run도 구조화 동선 349건,
-레거시 0건, 추가 payload 0건, 이슈 0건으로 통과했다.
+변경 파일:
 
-375×812 브라우저 QA:
+- `iguard-app/src/app/retreat/[id]/ScheduleSheetEditor.tsx`
+- `iguard-app/__tests__/planningUi.test.ts`
+- `iguard-app/AGENTS.md`
 
-- 로컬 production 서버와 로그인 화면은 정상 렌더링됐다.
-- 이후 인증된 Chrome 세션을 확인해, 이관된 DB를 읽는 현재 운영 버전의
-  여름 수련회 보호 화면과 개인 큐카드가 정상 로드됨을 확인했다.
-- 콘솔 오류 0건, 375×812에서 문서 가로 넘침 0px, 모바일 하단 핵심 탭
-  높이 48px였다.
-- 로그인·저장은 시도하지 않았다. 운영 DB 추가 쓰기 0건.
-- 이 검증은 **이관 후 기존 운영 버전 하위호환** 증거다. 리모델링
-  배포 뒤에도 같은 방식으로 재검증했다.
-- 배포 커밋 `fa043cbe2251a186610e1047e36063c1ce1d06ec`이 양 앱
-  `/api/version`과 일치했고 두 Vercel 배포가 Ready였다.
-- 전체 개요, GBS 정·역방향 표시, 큐싯 직접 편집기, 조별 방 학생 이름,
-  모바일 한눈에 보기가 실제 운영 데이터로 정상 표시됐다.
-- 375×812 가로 넘침 0px, 상단 핵심 버튼 40px, 하단 실행 탭 56px,
-  양 앱 콘솔 오류 0건이었다.
+검증 완료:
 
-## 아직 완료로 표시하면 안 되는 것
+- `cd iguard-app && npx tsc --noEmit`: 오류 0
+- `cd iguard-app && npm test`: 42개 파일, 291개 테스트 통과
+- `cd iguard-app && npm run build`: 성공
+- 로그인된 연습용 수련회
+  `http://localhost:3000/retreat/-Ov_SQVKmfIcnPSlPGDC`에서 확인
+- 내용·담당·특이사항 textarea 66개 전수 측정:
+  - `scrollHeight > clientHeight`인 항목 0개
+  - 실제 `font-size: 11px`
+  - `overflow-y: hidden`
+- 긴 항목은 행 자체가 700px 이상 늘어나고 페이지 스크롤로 전체 표시됨
 
-1. **초보 큐싯 제작자 관찰 테스트**
-   - 설명 없이 30분
-   - 블록 3개 이상을 구간·포스트까지 채우면 통과
-   - 통과 전 P5는 코드 구현 완료이지 운영 전환 완료가 아니다.
-2. **로그인 후 모바일·동시편집·현장진행·인쇄·오프라인 리허설**
-   - 전체 절차는 `iguard-app/REMODEL_RELEASE_CHECKLIST.md` 4장.
-3. **스프레드시트 폐기**
-   - 위 두 게이트 통과 전에는 폐기하지 않는다.
-4. **S4 설문 결과**
-   - 다음 수련회 사후 설문에서만 측정할 수 있다.
+## 배포 전 반드시 확인할 질문
 
-## 다음 실행자가 할 일
+두 로컬 커밋을 push하면 모노레포의 `retreat-app`과 `iguard-app` 배포가
+같이 시작된다. 사용자는 직전 질문에 아직 배포 승인으로 답하지 않고
+Claude로 이어서 작업한다고만 했다.
 
-1. 초보 큐싯 제작자 1명을 섭외해 30분 무설명 관찰 테스트를 진행한다.
-2. 연습용 수련회에서 저장·동시편집·인쇄·오프라인 리허설을 진행한다.
-3. 위 게이트 통과 전에는 기존 큐싯 시트를 폐기하지 않는다.
+따라서 push 전 다음을 확인한다.
 
-## 배포·롤백
+> 행정 탭 재분류(`00682d7`)와 이가드 큐싯 전체 노출(`52e011f`)을 함께
+> push해 두 앱을 배포할까요?
 
-`main` push는 `iguard-app`과 `retreat-app`의 Vercel 자동 배포를
-트리거한다. 배포 전 승인 필요.
+승인 없이 push하지 않는다. 행정 변경만 따로 내야 한다면 현재 `main`에서
+무작정 push하지 말고 커밋 분리 방식을 먼저 사용자와 합의한다.
+
+## 승인 후 배포·확인
+
+루트에서 명시 경로만 다루고 `git add .`는 사용하지 않는다.
 
 ```bash
 cd /Users/sunghoon/Desktop/ai개발
+git status --short
 git push origin main
 git rev-parse HEAD
-curl -s https://iguard-app.vercel.app/api/version
+
 curl -s https://retreat-app-theta.vercel.app/api/version
-cd iguard-app && npx vercel ls
+curl -s https://iguard-app.vercel.app/api/version
+
+cd retreat-app && npx vercel ls
+cd ../iguard-app && npx vercel ls
 ```
 
-치명 결함이면 Vercel 직전 Ready 배포 또는 문제 커밋 revert로 앱을
-되돌린다. DB 이관 롤백은 위 실행 폴더의 경로별 restore patch만 사용하며
-전체 `retreats` 노드를 덮어쓰지 않는다.
+두 `/api/version`의 buildId가 `git rev-parse HEAD`와 같고, 양쪽 Vercel
+배포가 `Ready`인지 확인한 뒤에만 배포 완료라고 보고한다.
 
 ## 작업 트리 주의
 
-과거부터 존재하는 미추적 디렉터리는 이 작업 대상이 아니다.
+아래 미추적 디렉터리는 이전부터 존재하며 이번 작업 대상이 아니다.
 
 - `.agents/`
 - `outputs/`
 - `rayquaza-v2-upgrade/`
 - `tmp/`
 
-임의 커밋·삭제하지 않는다. `git add .`도 사용하지 않는다.
+임의 커밋·삭제하지 않는다. `git add .` 금지.
