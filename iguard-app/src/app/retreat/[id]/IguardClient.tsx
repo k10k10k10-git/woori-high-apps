@@ -17,6 +17,7 @@ import LodgingMapView from "./LodgingMapView";
 import MealsView from "./MealsView";
 import StaffView from "./StaffView";
 import ScheduleView from "./ScheduleView";
+import ScheduleOverviewView from "./ScheduleOverviewView";
 import PostsView from "./PostsView";
 import MovementsView from "./MovementsView";
 import ValidationView from "./ValidationView";
@@ -40,6 +41,7 @@ const GROUPS = [
     { key: "check", label: "인원체크", icon: "✅" },
   ] },
   { label: "기획", hint: "PC", views: [
+    { key: "overview", label: "전체 개요" },
     { key: "schedule", label: "스탭 전체 큐싯" },
     { key: "leadercue", label: "조장 큐싯" },
     { key: "posts", label: "포스트 편집" },
@@ -157,7 +159,7 @@ function IguardWorkspace({ id }: { id: string }) {
   const {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, participants, adminTeachers,
-    meals, schedule, posts, movements, buses, seating,
+    meals, schedule, segments, posts, movements, movementRecords, buses, seating,
     todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff,
     connected,
   } = useRetreatData(id);
@@ -330,7 +332,8 @@ function IguardWorkspace({ id }: { id: string }) {
         {!dataLoading && view === "cue" && <CueCardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} />}
         {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
         {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
-        {!dataLoading && view === "schedule" && <ScheduleView retreatId={id} retreatName={retreat.name} schedule={schedule} staff={staffForViews} posts={posts} movements={movements} buses={buses} groups={groups} absentStaffNames={absentStaffNames} sheetSettingsOpen={sheetSettingsOpen} onSheetSettingsClose={() => setSheetSettingsOpen(false)} />}
+        {!dataLoading && view === "overview" && <ScheduleOverviewView schedule={schedule} />}
+        {!dataLoading && view === "schedule" && <ScheduleView retreatId={id} retreatName={retreat.name} schedule={schedule} staff={staffForViews} posts={posts} segments={segments} movements={movements} movementRecords={movementRecords} buses={buses} groups={groups} absentStaffNames={absentStaffNames} sheetSettingsOpen={sheetSettingsOpen} onSheetSettingsClose={() => setSheetSettingsOpen(false)} />}
         {!dataLoading && view === "posts" && <PostsView retreatId={id} posts={posts} />}
         {!dataLoading && view === "staff" && <StaffView retreatId={id} staff={staffForViews} />}
         {!dataLoading && view === "movements" && <MovementsView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}

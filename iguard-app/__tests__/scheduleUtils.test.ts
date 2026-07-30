@@ -90,7 +90,14 @@ describe("parseCueSheetText — 사양 D", () => {
       "이동\t10:00~11:00\t\t\t",
     ].join("\n");
     const r = parseCueSheetText(raw);
-    expect(r.importStats).toEqual({ detailCount: 1, ownerCount: 1, noticeCount: 1 });
+    expect(r.importStats).toEqual({
+      detailCount: 1,
+      ownerCount: 1,
+      noticeCount: 1,
+      segmentCount: 0,
+      movementCount: 0,
+      tbdCount: 0,
+    });
   });
 });
 

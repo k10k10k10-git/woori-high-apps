@@ -14,12 +14,17 @@ export type ScheduleDraft = {
 export type ImportedBlock = Omit<IguardScheduleBlock, "id">;
 export type ParsedCueSheet = {
   blocks: ImportedBlock[];
+  segments: ParsedSegmentDraft[];
+  movementDrafts: ParsedMovementDraft[];
   staffDrafts: AutoStaffDraft[];
   busDrafts: AutoBusDraft[];
   importStats: {
     detailCount: number;
     ownerCount: number;
     noticeCount: number;
+    segmentCount: number;
+    movementCount: number;
+    tbdCount: number;
   };
   warnings: string[];
   dayCounts: Record<number, number>;
@@ -28,6 +33,25 @@ export type AutoAssignment = {
   staffId: string;
   postId: string;
   round?: "선밥" | "후밥";
+  note?: string;
+};
+export type ParsedSegmentDraft = {
+  blockKey: string;
+  blockDay: number;
+  blockStart: string;
+  order: number;
+  label: string;
+  zone?: "위" | "아래";
+};
+export type ParsedMovementDraft = {
+  blockKey: string;
+  segmentOrder: number;
+  postName: string;
+  staffName?: string | null;
+  actor?: string | null;
+  slot?: number;
+  round?: "선밥" | "후밥";
+  detail?: string | null;
   note?: string;
 };
 export type AutoPostDraft = {
@@ -220,6 +244,153 @@ function parseTimeRange(value: string): { start: string; end?: string } | null {
   return { start, end };
 }
 
+export function cueBlockKey(day: number, start: string): string {
+  return `${day}__${normalizeTime(start)}`;
+}
+
+function splitTopLevel(value: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let roundDepth = 0;
+  let squareDepth = 0;
+  for (const char of value) {
+    if (char === "(") roundDepth++;
+    if (char === ")") roundDepth = Math.max(0, roundDepth - 1);
+    if (char === "[") squareDepth++;
+    if (char === "]") squareDepth = Math.max(0, squareDepth - 1);
+    if (/[,，、]/.test(char) && roundDepth === 0 && squareDepth === 0) {
+      if (current.trim()) parts.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+function parseSegmentHeading(line: string): { label: string; zone?: "위" | "아래" } | null {
+  const trimmed = line.trim();
+  if (!/^[*＊]/.test(trimmed) || !/(?:->|→)/.test(trimmed) || /[:：]/.test(trimmed)) return null;
+  const zoneMatch = trimmed.match(/\(\s*(위|아래)\s*\)/);
+  const label = trimmed
+    .replace(/^[*＊]\s*/, "")
+    .replace(/\(\s*(?:위|아래)\s*\)\s*/, "")
+    .replace(/\s*(?:->|→)\s*/g, " → ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!label) return null;
+  return { label, zone: zoneMatch?.[1] as "위" | "아래" | undefined };
+}
+
+function detailFromToken(token: string): string | null {
+  const details = [...token.matchAll(/\(([^()]*)\)/g)]
+    .map(match => match[1]?.trim())
+    .filter((value): value is string => !!value);
+  return details.length ? details.join(" · ") : null;
+}
+
+function actorFromToken(token: string): string | null {
+  const cleaned = token
+    .replace(/\[[^[\]]*\]/g, "")
+    .replace(/\([^()]*\)/g, "")
+    .trim();
+  if (/^행정팀$/i.test(cleaned)) return "행정팀";
+  if (/^이가드\s*sf$/i.test(cleaned)) return "이가드sf";
+  if (/^행정(?:팀)?\s*(?:(?:및|\/|·|&|\+)\s*)?이가드(?:\s*sf)?$/i.test(cleaned)) return cleaned.replace(/\s+/g, " ");
+  return null;
+}
+
+function isBareTbdToken(token: string): boolean {
+  const cleaned = token
+    .replace(/\[[^[\]]*\]/g, "")
+    .replace(/\([^()]*\)/g, "")
+    .replace(/[\s:：.\-•*]+/g, "")
+    .toLowerCase();
+  return cleaned === "sf";
+}
+
+/**
+ * 한 시간 블록의 담당 셀을 구간·포스트·담당자 초안으로 분해한다.
+ * 블록 날짜/시각 정규화가 끝난 뒤 호출해야 자정 넘김 블록과 안정적으로 연결된다.
+ */
+export function parseOwnerSegments(
+  block: ImportedBlock,
+): { segments: ParsedSegmentDraft[]; movements: ParsedMovementDraft[] } {
+  const key = cueBlockKey(block.day, block.start);
+  const segments: ParsedSegmentDraft[] = [];
+  const movements: ParsedMovementDraft[] = [];
+  const slotByPost = new Map<string, number>();
+  let segmentOrder = 0;
+
+  `${block.owner || ""}`.split(/\n+/).map(line => line.trim()).filter(Boolean).forEach(line => {
+    const segment = parseSegmentHeading(line);
+    if (segment) {
+      segmentOrder++;
+      segments.push({
+        blockKey: key,
+        blockDay: block.day,
+        blockStart: block.start,
+        order: segmentOrder,
+        ...segment,
+      });
+      return;
+    }
+    // 화살표 없는 "* 소제목"은 특정 이동 구간이 아니라 블록 공통 업무다.
+    if (/^[*＊]/.test(line) && !/[:：]/.test(line)) {
+      segmentOrder = 0;
+      return;
+    }
+    if (!/[:：]/.test(line)) return;
+    const postName = roleFromLine(line);
+    if (!usableAutoPostName(postName)) return;
+    const source = line.split(/[:：]/).slice(1).join(":").trim();
+    const round = roundFromLine(line);
+    splitTopLevel(source).forEach(token => {
+      const detail = detailFromToken(token);
+      const actor = actorFromToken(token);
+      if (actor) {
+        movements.push({
+          blockKey: key, segmentOrder, postName, actor, round, detail,
+          note: cleanRole(line).slice(0, 160),
+        });
+        return;
+      }
+      if (isBareTbdToken(token)) {
+        const slotKey = `${segmentOrder}__${postName}`;
+        const slot = (slotByPost.get(slotKey) || 0) + 1;
+        slotByPost.set(slotKey, slot);
+        movements.push({
+          blockKey: key, segmentOrder, postName, staffName: null, slot, round, detail,
+          note: cleanRole(line).slice(0, 160),
+        });
+        return;
+      }
+      // parseBusStaff 자체도 쉼표로 나누므로 "A동 1,2층" 상세를 먼저 제거해
+      // 상세 조각이 사람 이름에 붙거나 별도 이름으로 오인되지 않게 한다.
+      const nameToken = token.replace(/\([^()]*\)/g, " ");
+      parseBusStaff(nameToken).names.forEach(staffName => {
+        movements.push({
+          blockKey: key, segmentOrder, postName, staffName, round, detail,
+          note: cleanRole(line).slice(0, 160),
+        });
+      });
+    });
+  });
+
+  const unique = new Map<string, ParsedMovementDraft>();
+  movements.forEach(movement => {
+    const identity = [
+      movement.blockKey,
+      movement.segmentOrder,
+      searchText(movement.postName),
+      movement.staffName ? searchText(movement.staffName) : movement.actor ? `actor:${searchText(movement.actor)}` : `tbd:${movement.slot || 1}`,
+    ].join("__");
+    if (!unique.has(identity)) unique.set(identity, movement);
+  });
+  return { segments, movements: [...unique.values()] };
+}
+
 function headerIndex(headers: string[], names: string[]): number {
   return headers.findIndex(h => names.some(name => h.replace(/\s+/g, "").includes(name)));
 }
@@ -375,8 +546,8 @@ function extractStaffDraftsFromRows(rows: string[][]): AutoStaffDraft[] {
 export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): ParsedCueSheet {
   const rows = parseDelimitedRows(raw);
   const warnings: string[] = [];
-  const emptyStats = { detailCount: 0, ownerCount: 0, noticeCount: 0 };
-  if (rows.length === 0) return { blocks: [], staffDrafts: [], busDrafts: [], importStats: emptyStats, warnings: ["붙여넣은 내용이 비어있습니다."], dayCounts: {} };
+  const emptyStats = { detailCount: 0, ownerCount: 0, noticeCount: 0, segmentCount: 0, movementCount: 0, tbdCount: 0 };
+  if (rows.length === 0) return { blocks: [], segments: [], movementDrafts: [], staffDrafts: [], busDrafts: [], importStats: emptyStats, warnings: ["붙여넣은 내용이 비어있습니다."], dayCounts: {} };
   const staffDrafts = extractStaffDraftsFromRows(rows);
   const busDraftResult = extractBusStaffDraftsFromRows(rows);
   const busDrafts = busDraftResult.drafts;
@@ -384,7 +555,7 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
 
   const headerRowIndex = rows.findIndex(isRepeatedHeader);
   if (headerRowIndex < 0) {
-    return { blocks: [], staffDrafts, busDrafts, importStats: emptyStats, warnings: ["구분/시간/내용 헤더를 찾지 못했습니다. 시트의 큐싯 표 범위를 복사해 붙여넣어주세요."], dayCounts: {} };
+    return { blocks: [], segments: [], movementDrafts: [], staffDrafts, busDrafts, importStats: emptyStats, warnings: ["구분/시간/내용 헤더를 찾지 못했습니다. 시트의 큐싯 표 범위를 복사해 붙여넣어주세요."], dayCounts: {} };
   }
 
   const headers = rows[headerRowIndex];
@@ -474,8 +645,21 @@ export function parseCueSheetText(raw: string, staff: IguardStaff[] = []): Parse
     detailCount: blocks.filter(block => !!block.detail).length,
     ownerCount: blocks.filter(block => !!block.owner).length,
     noticeCount: blocks.filter(block => !!block.notice).length,
+    segmentCount: 0,
+    movementCount: 0,
+    tbdCount: 0,
   };
-  return { blocks, staffDrafts, busDrafts, importStats, warnings, dayCounts };
+  // 동선 노드는 현장 이동을 표현한다. 출발 전 교회 블록(기도회·등록)의 담당은
+  // 블록 owner 원문으로 보존하고 구간 동선으로 중복 생성하지 않는다.
+  const parsedOwners = blocks
+    .filter(block => venueForBlock(block, blocks) === "수련회장")
+    .map(parseOwnerSegments);
+  const segments = parsedOwners.flatMap(result => result.segments);
+  const movementDrafts = parsedOwners.flatMap(result => result.movements);
+  importStats.segmentCount = segments.length;
+  importStats.movementCount = movementDrafts.length;
+  importStats.tbdCount = movementDrafts.filter(movement => movement.staffName == null && !movement.actor).length;
+  return { blocks, segments, movementDrafts, staffDrafts, busDrafts, importStats, warnings, dayCounts };
 }
 
 function cleanRole(value: string): string {
@@ -545,10 +729,6 @@ function staffMentions(line: string, staff: IguardStaff[]): IguardStaff[] {
   });
 }
 
-function isSectionLine(line: string, staff: IguardStaff[]): boolean {
-  return /^[*•]/.test(line.trim()) && !/[:：]/.test(line) && staffMentions(line, staff).length === 0;
-}
-
 function usableAutoPostName(name: string): boolean {
   const key = searchText(name);
   if (key.length < 2 || key.length > 40) return false;
@@ -565,15 +745,8 @@ export function collectAutoPostDrafts(blocks: ImportedBlock[], staff: IguardStaf
 
   blocks.forEach(block => {
     const area = venueForBlock(block, blocks);
-    const lines = `${block.owner || ""}`
-      .split(/\n+/)
-      .map(line => line.trim())
-      .filter(Boolean);
-
-    lines.forEach(line => {
-      if (isSectionLine(line, staff)) return;
-      if (!/[:：]/.test(line) || staffMentions(line, staff).length === 0) return;
-      const name = roleFromLine(line);
+    parseOwnerSegments(block).movements.forEach(movement => {
+      const name = movement.postName;
       const key = postIdentity(area, name);
       if (!usableAutoPostName(name) || known.has(key) || drafted.has(key)) return;
       drafted.add(key);

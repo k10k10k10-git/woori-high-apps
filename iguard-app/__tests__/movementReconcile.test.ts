@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { looksLikeLegacySheetMovement, reconcileSheetMovements } from "@/lib/movementReconcile";
+import { looksLikeLegacySheetMovement, reconcileSegmentSheetMovements, reconcileSheetMovements } from "@/lib/movementReconcile";
 import { type AutoAssignment } from "@/lib/cueSheet";
-import { type AssignedIguardMovement } from "@/lib/types";
+import { type AssignedIguardMovement, type IguardMovement } from "@/lib/types";
 
 const previousLunch: AutoAssignment = {
   staffId: "choi",
@@ -74,6 +74,48 @@ describe("reconcileSheetMovements — 시트 자동배정 정합성", () => {
   it("유지되는 레거시 자동배정에는 source=sheet를 기록한다", () => {
     expect(reconcileSheetMovements([movement()], [previousLunch], [previousLunch]).upserts).toEqual([
       { ...previousLunch, source: "sheet" },
+    ]);
+  });
+});
+
+describe("reconcileSegmentSheetMovements — 구간 단위 수동 보존", () => {
+  const sheetMovement: IguardMovement = {
+    id: "seg__post__staff",
+    segmentId: "seg",
+    blockId: "block",
+    postId: "post",
+    staffId: "staff",
+    detail: "1층",
+    source: "sheet",
+  };
+
+  it("시트에서 사라진 자동 동선만 제거하고 수동 동선은 보존한다", () => {
+    const manual = { ...sheetMovement, id: "manual", staffId: "manual-staff", source: "manual" as const };
+    expect(reconcileSegmentSheetMovements([sheetMovement, manual], [])).toEqual({
+      removes: [sheetMovement],
+      upserts: [],
+    });
+  });
+
+  it("같은 자연키의 상세가 바뀌면 갱신한다", () => {
+    const next = {
+      segmentId: "seg",
+      blockId: "block",
+      postId: "post",
+      staffId: "staff",
+      detail: "2층",
+    };
+    expect(reconcileSegmentSheetMovements([sheetMovement], [next]).upserts).toEqual([
+      { ...next, source: "sheet" },
+    ]);
+  });
+
+  it("담당 미정과 actor 슬롯도 각각 안정적인 자연키로 대조한다", () => {
+    const tbd = { segmentId: "seg", blockId: "block", postId: "lobby", staffId: null, slot: 1 };
+    const actor = { segmentId: "seg", blockId: "block", postId: "water", actor: "행정팀", slot: 1 };
+    expect(reconcileSegmentSheetMovements([], [tbd, actor]).upserts).toEqual([
+      { ...tbd, source: "sheet" },
+      { ...actor, source: "sheet" },
     ]);
   });
 });

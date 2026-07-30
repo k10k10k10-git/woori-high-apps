@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement, IguardBus } from "@/lib/types";
+import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement, IguardBus, IguardMovement, IguardSegment } from "@/lib/types";
 import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import {
@@ -18,13 +18,15 @@ import StaffRosterBar from "./ScheduleStaffRoster";
 import CueSheetImportPanel from "./ScheduleCueSheetImport";
 import CueSheetFreshnessBanner from "./CueSheetFreshnessBanner";
 
-export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, movements, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
+export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, segments, movements, movementRecords, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
   retreatId: string;
   retreatName: string;
   schedule: IguardScheduleBlock[];
   staff: IguardStaff[];
   posts: IguardPost[];
+  segments: IguardSegment[];
   movements: AssignedIguardMovement[];
+  movementRecords: IguardMovement[];
   buses: IguardBus[];
   groups: Group[];
   absentStaffNames?: string[];
@@ -78,7 +80,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
         ℹ️ 일자별 시간 블록(전환 시점)입니다. 이 블록들이 <strong>동선 매트릭스의 열</strong>이자 <strong>개인 큐카드의 타임라인</strong>이 됩니다.
       </div>
       <StaffRosterBar staff={staff} groups={groups} schedule={schedule} posts={posts} movements={movements} absentStaffNames={absentStaffNames} />
-      <CueSheetImportPanel retreatId={retreatId} retreatName={retreatName} schedule={schedule} staff={staff} posts={posts} movements={movements} buses={buses} open={sheetSettingsOpen} onClose={onSheetSettingsClose || (() => undefined)} />
+      <CueSheetImportPanel retreatId={retreatId} retreatName={retreatName} schedule={schedule} staff={staff} posts={posts} segments={segments} movementRecords={movementRecords} buses={buses} open={sheetSettingsOpen} onClose={onSheetSettingsClose || (() => undefined)} />
 
       <div className="card p-3 mb-4">
         <div className="grid gap-2.5 md:grid-cols-[110px_130px_130px_1fr_auto]">

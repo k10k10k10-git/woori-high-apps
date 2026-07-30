@@ -8,6 +8,7 @@ import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
 export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
 import { normalizePartialAttendanceMap } from "./partialAttendance";
+import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "./defaultSegment";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -227,8 +228,20 @@ export function subscribeToIguardSchedule(retreatId: string, cb: (list: IguardSc
     (error) => { console.warn("subscribeToIguardSchedule error:", error); onError?.(error); });
 }
 export async function saveIguardScheduleBlock(retreatId: string, data: Omit<IguardScheduleBlock, "id">): Promise<string> {
-  const r = push(ref(db, paths.iguardSchedule(retreatId)));
-  await set(r, stripUndefined(data)); return r.key!;
+  const blockRef = push(ref(db, paths.iguardSchedule(retreatId)));
+  const segmentRef = push(ref(db, paths.iguardSegments(retreatId)));
+  const blockId = blockRef.key!;
+  const segmentId = segmentRef.key!;
+  await update(ref(db), {
+    [paths.iguardScheduleBlock(retreatId, blockId)]: stripUndefined(data),
+    [paths.iguardSegment(retreatId, segmentId)]: {
+      blockId,
+      order: 0,
+      label: DEFAULT_SEGMENT_LABEL,
+      source: "manual",
+    },
+  });
+  return blockId;
 }
 export async function updateIguardScheduleBlock(retreatId: string, id: string, data: Partial<Omit<IguardScheduleBlock, "id">>): Promise<void> {
   await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), stripUndefined(data));
@@ -313,21 +326,107 @@ export async function deleteIguardPost(retreatId: string, id: string): Promise<v
   await update(ref(db), updates);
 }
 
-// ── 동선 매트릭스 (iguard/movements) — 복합키 staffId__blockId ──
+// ── 동선 매트릭스 (iguard/movements) — 복합키 segmentId__postId__담당 ──
 export function subscribeToIguardMovements(retreatId: string, cb: (list: IguardMovement[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardMovements(retreatId)), (snap) =>
     cb(snapToList<IguardMovement>(snap)),
     (error) => { console.warn("subscribeToIguardMovements error:", error); onError?.(error); });
 }
-/** 한 스탭×블록 셀을 설정(postId 지정) 또는 해제(null) */
+export function iguardMovementKey(data: Pick<IguardMovement, "segmentId" | "postId" | "staffId" | "slot" | "actor">): string {
+  if (!data.segmentId) throw new Error("동선 저장에는 segmentId가 필요합니다.");
+  const assignee = data.staffId?.trim()
+    ? data.staffId.trim()
+    : data.actor
+      ? `actor${data.slot || 1}`
+      : `tbd${data.slot || 1}`;
+  return `${data.segmentId}__${data.postId}__${assignee}`;
+}
+
+/** 구간 단위 동선을 자연키로 저장한다. 동일 자연키만 갱신하며 다른 수동 배정은 건드리지 않는다. */
+export async function setIguardSegmentMovement(
+  retreatId: string,
+  data: Omit<IguardMovement, "id">,
+): Promise<string> {
+  const key = iguardMovementKey(data);
+  await set(ref(db, paths.iguardMovement(retreatId, key)), stripUndefined(data));
+  return key;
+}
+
+export async function deleteIguardMovementById(retreatId: string, id: string): Promise<void> {
+  await remove(ref(db, paths.iguardMovement(retreatId, id)));
+}
+
+async function defaultSegmentForBlock(
+  retreatId: string,
+  blockId: string,
+): Promise<{ id: string; created: boolean }> {
+  const segmentsSnap = await get(ref(db, paths.iguardSegments(retreatId)));
+  if (segmentsSnap.exists()) {
+    const entry = Object.entries(segmentsSnap.val() as Record<string, Omit<IguardSegment, "id">>)
+      .find(([, segment]) => segment.blockId === blockId && isDefaultSegment({ id: "", ...segment }));
+    if (entry) return { id: entry[0], created: false };
+  }
+  const segmentRef = push(ref(db, paths.iguardSegments(retreatId)));
+  return { id: segmentRef.key!, created: true };
+}
+
+export async function ensureIguardDefaultSegment(retreatId: string, blockId: string): Promise<string> {
+  const result = await defaultSegmentForBlock(retreatId, blockId);
+  if (result.created) {
+    await set(ref(db, paths.iguardSegment(retreatId, result.id)), {
+      blockId,
+      order: 0,
+      label: DEFAULT_SEGMENT_LABEL,
+      source: "manual",
+    });
+  }
+  return result.id;
+}
+
+/**
+ * 구버전 블록 편집 UI용 어댑터.
+ * 기본 구간의 한 스탭 배정만 교체하고, 다른 명시 구간의 배정은 보존한다.
+ */
 export async function setIguardMovement(
   retreatId: string, staffId: string, blockId: string,
   data: { postId: string; round?: "선밥" | "후밥"; note?: string; source?: "sheet" | "manual" } | null
 ): Promise<void> {
-  const key = `${staffId}__${blockId}`;
-  const path = paths.iguardMovement(retreatId, key);
-  if (data === null) { await remove(ref(db, path)); return; }
-  await set(ref(db, path), stripUndefined({ staffId, blockId, ...data }));
+  const [defaultSegment, movementsSnap] = await Promise.all([
+    defaultSegmentForBlock(retreatId, blockId),
+    get(ref(db, paths.iguardMovements(retreatId))),
+  ]);
+  const updates: Record<string, unknown | null> = {};
+  if (defaultSegment.created) {
+    updates[paths.iguardSegment(retreatId, defaultSegment.id)] = {
+      blockId,
+      order: 0,
+      label: DEFAULT_SEGMENT_LABEL,
+      source: "manual",
+    };
+  }
+  if (movementsSnap.exists()) {
+    Object.entries(movementsSnap.val() as Record<string, IguardMovement>).forEach(([id, movement]) => {
+      if (movement.blockId === blockId
+        && movement.segmentId === defaultSegment.id
+        && movement.staffId === staffId) {
+        updates[paths.iguardMovement(retreatId, id)] = null;
+      }
+      // P2 이전 키가 편집 시 남아 있다면 같은 셀의 레거시 레코드도 함께 정리한다.
+      if (!movement.segmentId && movement.blockId === blockId && movement.staffId === staffId) {
+        updates[paths.iguardMovement(retreatId, id)] = null;
+      }
+    });
+  }
+  if (data !== null) {
+    const movement: Omit<IguardMovement, "id"> = {
+      segmentId: defaultSegment.id,
+      staffId,
+      blockId,
+      ...data,
+    };
+    updates[paths.iguardMovement(retreatId, iguardMovementKey(movement))] = stripUndefined(movement);
+  }
+  if (Object.keys(updates).length) await update(ref(db), updates);
 }
 
 // ── 버스(호차) 배정 (iguard/buses) ─────────────────────────

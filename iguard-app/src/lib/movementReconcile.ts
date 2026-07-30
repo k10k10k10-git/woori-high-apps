@@ -1,11 +1,18 @@
 import { type AutoAssignment } from "@/lib/cueSheet";
-import { type AssignedIguardMovement } from "@/lib/types";
+import { type AssignedIguardMovement, type IguardMovement } from "@/lib/types";
 
 export type SheetMovementUpsert = AutoAssignment & { source: "sheet" };
 
 export interface SheetMovementReconcileResult {
   removes: AssignedIguardMovement[];
   upserts: SheetMovementUpsert[];
+}
+
+export type SegmentSheetMovement = Omit<IguardMovement, "id" | "source"> & { source?: "sheet" };
+
+export interface SegmentMovementReconcileResult {
+  removes: IguardMovement[];
+  upserts: Array<SegmentSheetMovement & { source: "sheet" }>;
 }
 
 function compactIdentity(value?: string | null): string {
@@ -85,6 +92,63 @@ export function reconcileSheetMovements(
   nextSheetAssignments.forEach(assignment => {
     if (existingByStaff.has(assignment.staffId)) return;
     upserts.push({ ...assignment, source: "sheet" });
+  });
+
+  return { removes, upserts };
+}
+
+function segmentMovementIdentity(
+  movement: Pick<IguardMovement, "segmentId" | "postId" | "staffId" | "actor" | "slot">,
+): string {
+  const assignee = movement.staffId
+    ? `staff:${movement.staffId}`
+    : movement.actor
+      ? `actor:${compactIdentity(movement.actor)}:${movement.slot || 1}`
+      : `tbd:${movement.slot || 1}`;
+  return `${movement.segmentId || ""}__${movement.postId}__${assignee}`;
+}
+
+function sameSegmentMovement(
+  existing: IguardMovement,
+  next: SegmentSheetMovement,
+): boolean {
+  return segmentMovementIdentity(existing) === segmentMovementIdentity(next)
+    && existing.blockId === next.blockId
+    && sameOptionalValue(existing.round, next.round)
+    && sameOptionalValue(existing.detail, next.detail)
+    && sameOptionalValue(existing.note, next.note)
+    && sameOptionalValue(existing.actor, next.actor);
+}
+
+/**
+ * 새 구간 모델의 시트 동선을 동기화한다.
+ *
+ * 자연키는 segment×post×담당자(또는 actor/TBD 슬롯)다.
+ * 수동 배정과 출처 미상의 기존 배정은 항상 보존하고 source=sheet만 교체한다.
+ */
+export function reconcileSegmentSheetMovements(
+  existing: IguardMovement[],
+  nextAssignments: SegmentSheetMovement[],
+): SegmentMovementReconcileResult {
+  const nextByIdentity = new Map(nextAssignments.map(item => [segmentMovementIdentity(item), item]));
+  const existingByIdentity = new Map(existing.map(item => [segmentMovementIdentity(item), item]));
+  const removes: IguardMovement[] = [];
+  const upserts: Array<SegmentSheetMovement & { source: "sheet" }> = [];
+
+  existing.forEach(movement => {
+    if (movement.source !== "sheet") return;
+    const next = nextByIdentity.get(segmentMovementIdentity(movement));
+    if (!next) {
+      removes.push(movement);
+      return;
+    }
+    if (!sameSegmentMovement(movement, next)) upserts.push({ ...next, source: "sheet" });
+  });
+
+  nextAssignments.forEach(next => {
+    const existingMovement = existingByIdentity.get(segmentMovementIdentity(next));
+    if (existingMovement) return;
+    upserts.push({ ...next, source: "sheet" });
   });
 
   return { removes, upserts };

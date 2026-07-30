@@ -1,7 +1,24 @@
 "use client";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus, AssignedIguardMovement } from "@/lib/types";
-import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock, saveIguardPost, setIguardMovement, saveIguardBus, updateIguardBus, subscribeToIguardCueSheet, saveIguardCueSheet, markCueSheetImported, IguardCueSheet } from "@/lib/db";
+import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus, IguardMovement, IguardSegment } from "@/lib/types";
+import {
+  saveIguardScheduleBlock,
+  updateIguardScheduleBlock,
+  deleteIguardScheduleBlock,
+  saveIguardPost,
+  saveIguardSegment,
+  ensureIguardDefaultSegment,
+  updateIguardSegment,
+  deleteIguardSegment,
+  setIguardSegmentMovement,
+  deleteIguardMovementById,
+  saveIguardBus,
+  updateIguardBus,
+  subscribeToIguardCueSheet,
+  saveIguardCueSheet,
+  markCueSheetImported,
+  IguardCueSheet,
+} from "@/lib/db";
 import { fetchSheetCsv } from "@/lib/sheetClient";
 import { reconcileScheduleImport, hashCsv, blockKey } from "@/lib/scheduleReconcile";
 import { useUI } from "@/context/UIContext";
@@ -12,11 +29,12 @@ import {
   staffWithAutoDrafts,
   postsWithAutoDrafts,
   collectAutoPostDrafts,
-  autoAssignmentsForBlock,
+  cueBlockKey,
   venueForBlock,
   timeRangeLabel,
 } from "@/lib/cueSheet";
-import { looksLikeLegacySheetMovement, reconcileSheetMovements } from "@/lib/movementReconcile";
+import { looksLikeLegacySheetMovement, reconcileSegmentSheetMovements, type SegmentSheetMovement } from "@/lib/movementReconcile";
+import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "@/lib/defaultSegment";
 
 /** 시트가 소유하는 블록 필드만 추림 — 갱신 시 이 필드만 덮고, 앱 소유 필드(noMovement)와 동선(별도 노드)은 건드리지 않는다.
  *  빈 값은 null로 지정해 시트에서 지워진 내용이 앱에도 반영되게 한다(update가 null 키를 삭제).
@@ -108,13 +126,14 @@ function CueSheetLinkModal({ retreatId, retreatName, current, onClose, onSaved, 
   );
 }
 
-export default function CueSheetImportPanel({ retreatId, retreatName, schedule, staff, posts, movements, buses, open, onClose }: {
+export default function CueSheetImportPanel({ retreatId, retreatName, schedule, staff, posts, segments, movementRecords, buses, open, onClose }: {
   retreatId: string;
   retreatName: string;
   schedule: IguardScheduleBlock[];
   staff: IguardStaff[];
   posts: IguardPost[];
-  movements: AssignedIguardMovement[];
+  segments: IguardSegment[];
+  movementRecords: IguardMovement[];
   buses: IguardBus[];
   open: boolean;
   onClose: () => void;
@@ -189,14 +208,25 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
     [parsed.blocks, staff, posts]
   );
   const previewAutoAssignmentCount = useMemo(
-    () => parsed.blocks.reduce((sum, block) => sum + autoAssignmentsForBlock(
-      block,
-      staff,
-      autoCreatePosts ? autoPostPreview.posts : posts,
-      venueForBlock(block, parsed.blocks)
-    ).length, 0),
-    [autoCreatePosts, autoPostPreview.posts, parsed.blocks, staff, posts]
+    () => parsed.movementDrafts.length,
+    [parsed.movementDrafts.length]
   );
+
+  const compactIdentity = (value?: string | null) => (value || "")
+    .trim()
+    .toLocaleLowerCase("ko-KR")
+    .replace(/sf$/i, "")
+    .replace(/[\s\[\](){}._-]/g, "");
+
+  function resolveStaffId(name?: string | null): string | null {
+    if (!name) return null;
+    const key = compactIdentity(name);
+    return staff.find(member => compactIdentity(member.name) === key)?.id ?? null;
+  }
+
+  function postKey(area: string | undefined, name: string): string {
+    return `${compactIdentity(area)}__${compactIdentity(name)}`;
+  }
 
   // mode "merge": 시트 내용 반영(삭제 없음) / "replace": 시트에 없는 블록까지 삭제.
   // 두 모드 모두 day__start가 같은 기존 블록은 ID를 유지한 채 내용만 갱신 → 스탭 배정(동선)이 보존된다.
@@ -236,70 +266,144 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
         return note;
       };
 
-      // 2) 기존 블록 내용 갱신 — ID 유지 → 동선·noMovement 보존.
-      //    자동배정은 출처를 기록해 시트와 동기화한다. 수동배정은 보존하고, 시트에서 사라진 자동배정만 제거한다.
-      let addedToExistingCount = 0;
-      let removedFromExistingCount = 0;
+      // 2) 기존 블록 내용 갱신 — ID 유지 → 수동 동선·noMovement 보존.
+      const blockIdByCueKey = new Map<string, string>();
       for (const u of updates) {
-        if (autoAssign) {
-          const existingBlockMovements = movements.filter(movement => movement.blockId === u.id);
-          const previousBlock = schedule.find(block => block.id === u.id);
-          const previousAssignments = autoAssignmentsForBlock(
-            previousBlock || u.imported,
-            workingStaff,
-            workingPosts,
-            previousBlock ? venueForBlock(previousBlock, schedule) : venueForBlock(u.imported, parsed.blocks),
-          );
-          const nextAssignments = autoAssignmentsForBlock(
-            u.imported,
-            workingStaff,
-            workingPosts,
-            venueForBlock(u.imported, parsed.blocks),
-          );
-          const legacySheetMovementIds = new Set(existingBlockMovements
-            .filter(movement => looksLikeLegacySheetMovement(
-              movement,
-              workingStaff.find(member => member.id === movement.staffId)?.name,
-              workingPosts.find(post => post.id === movement.postId)?.name,
-            ))
-            .map(movement => movement.id));
-          const plan = reconcileSheetMovements(
-            existingBlockMovements,
-            previousAssignments,
-            nextAssignments,
-            legacySheetMovementIds,
-          );
-          for (const movement of plan.removes) {
-            await setIguardMovement(retreatId, movement.staffId, u.id, null);
-            removedFromExistingCount++;
-          }
-          for (const assignment of plan.upserts) {
-            await setIguardMovement(retreatId, assignment.staffId, u.id, assignment);
-            addedToExistingCount++;
-          }
-        }
         await updateIguardScheduleBlock(retreatId, u.id, sheetOwnedFields(u.imported, leaderNoteFor(u.imported)));
+        blockIdByCueKey.set(cueBlockKey(u.imported.day, u.imported.start), u.id);
       }
 
-      // 3) 신규 블록 생성 + (autoAssign 시) 그 블록에만 자동 배정. 새 블록엔 기존 동선이 없으므로 안전.
-      let assignmentCount = 0;
+      // 3) 신규 블록 생성. saveIguardScheduleBlock가 기본 구간도 같은 update에 함께 만든다.
       for (const block of creates) {
         const leaderNote = leaderNoteFor(block);
         const blockId = await saveIguardScheduleBlock(retreatId, leaderNote ? { ...block, leaderNote } : block);
-        if (!autoAssign) continue;
-        const assignments = autoAssignmentsForBlock(block, workingStaff, workingPosts, venueForBlock(block, parsed.blocks));
-        for (const assignment of assignments) {
-          await setIguardMovement(retreatId, assignment.staffId, blockId, {
-            postId: assignment.postId,
-            round: assignment.round,
-            note: assignment.note,
-            source: "sheet",
+        blockIdByCueKey.set(cueBlockKey(block.day, block.start), blockId);
+      }
+
+      // 4) 구간·동선 동기화. source=manual 및 출처 미상의 수동 데이터는 보존한다.
+      let segmentCreateCount = 0;
+      let segmentUpdateCount = 0;
+      let segmentRemoveCount = 0;
+      let assignmentCount = 0;
+      let removedAssignmentCount = 0;
+      let preservedManualSegmentCount = 0;
+      const unmatchedMovementStaff = new Set<string>();
+      if (autoAssign) {
+        for (const block of parsed.blocks) {
+          const cueKey = cueBlockKey(block.day, block.start);
+          const blockId = blockIdByCueKey.get(cueKey);
+          if (!blockId) continue;
+
+          let existingBlockSegments = segments.filter(segment => segment.blockId === blockId);
+          let defaultSegment = existingBlockSegments.find(isDefaultSegment);
+          if (!defaultSegment) {
+            const id = await ensureIguardDefaultSegment(retreatId, blockId);
+            defaultSegment = { id, blockId, order: 0, label: DEFAULT_SEGMENT_LABEL, source: "manual" };
+            existingBlockSegments = [...existingBlockSegments, defaultSegment];
+          }
+
+          const nextSegments = parsed.segments.filter(segment => segment.blockKey === cueKey);
+          const segmentIdByOrder = new Map<number, string>([[0, defaultSegment.id]]);
+          for (const draft of nextSegments) {
+            const sameSheetOrder = existingBlockSegments.find(segment =>
+              segment.order === draft.order && segment.source === "sheet");
+            const sameManualShape = existingBlockSegments.find(segment =>
+              segment.order === draft.order
+              && segment.label === draft.label
+              && (segment.zone || undefined) === draft.zone);
+            const existingSegment = sameSheetOrder || sameManualShape;
+            if (existingSegment) {
+              segmentIdByOrder.set(draft.order, existingSegment.id);
+              if (existingSegment.source === "sheet"
+                && (existingSegment.label !== draft.label || (existingSegment.zone || undefined) !== draft.zone)) {
+                await updateIguardSegment(retreatId, existingSegment.id, {
+                  label: draft.label,
+                  zone: draft.zone ?? null,
+                });
+                segmentUpdateCount++;
+              }
+            } else {
+              const id = await saveIguardSegment(retreatId, {
+                blockId,
+                order: draft.order,
+                label: draft.label,
+                zone: draft.zone,
+                source: "sheet",
+              });
+              segmentIdByOrder.set(draft.order, id);
+              segmentCreateCount++;
+            }
+          }
+
+          const nextOrders = new Set(nextSegments.map(segment => segment.order));
+          for (const oldSegment of existingBlockSegments.filter(segment =>
+            segment.order > 0 && segment.source === "sheet" && !nextOrders.has(segment.order))) {
+            const attached = movementRecords.filter(movement => movement.segmentId === oldSegment.id);
+            if (attached.some(movement => movement.source !== "sheet")) {
+              preservedManualSegmentCount++;
+              continue;
+            }
+            await deleteIguardSegment(retreatId, oldSegment.id);
+            segmentRemoveCount++;
+          }
+
+          const postByKey = new Map(workingPosts.map(post => [postKey(post.area, post.name), post]));
+          const area = venueForBlock(block, parsed.blocks);
+          const actorSlots = new Map<string, number>();
+          const nextMovements: SegmentSheetMovement[] = [];
+          parsed.movementDrafts.filter(draft => draft.blockKey === cueKey).forEach(draft => {
+            const segmentId = segmentIdByOrder.get(draft.segmentOrder);
+            const post = postByKey.get(postKey(area, draft.postName));
+            if (!segmentId || !post) return;
+            const staffId = resolveStaffId(draft.staffName);
+            if (draft.staffName && !staffId) {
+              unmatchedMovementStaff.add(draft.staffName);
+              return;
+            }
+            let slot = draft.slot;
+            if (draft.actor) {
+              const actorKey = `${segmentId}__${post.id}__${compactIdentity(draft.actor)}`;
+              slot = (actorSlots.get(actorKey) || 0) + 1;
+              actorSlots.set(actorKey, slot);
+            }
+            nextMovements.push({
+              segmentId,
+              blockId,
+              postId: post.id,
+              staffId,
+              actor: draft.actor,
+              slot,
+              round: draft.round,
+              detail: draft.detail,
+              note: draft.note,
+            });
           });
-          assignmentCount++;
+
+          const segmentIds = new Set(segmentIdByOrder.values());
+          const existingBlockMovements = movementRecords
+            .filter(movement => movement.blockId === blockId && (!movement.segmentId || segmentIds.has(movement.segmentId)))
+            .map(movement => {
+              if (movement.source != null || !movement.staffId) return movement;
+              const legacySheetOwned = looksLikeLegacySheetMovement(
+                movement as IguardMovement & { staffId: string },
+                workingStaff.find(member => member.id === movement.staffId)?.name,
+                workingPosts.find(post => post.id === movement.postId)?.name,
+              );
+              return legacySheetOwned ? { ...movement, source: "sheet" as const } : movement;
+            });
+          const movementPlan = reconcileSegmentSheetMovements(existingBlockMovements, nextMovements);
+          for (const movement of movementPlan.removes) {
+            await deleteIguardMovementById(retreatId, movement.id);
+            removedAssignmentCount++;
+          }
+          for (const movement of movementPlan.upserts) {
+            await setIguardSegmentMovement(retreatId, movement);
+            assignmentCount++;
+          }
         }
       }
 
-      // 4) 버스 선탑/동승 반영 (busNo 기준 보존/갱신)
+      // 5) 버스 선탑/동승 반영 (busNo 기준 보존/갱신)
       let busStaffCount = 0;
       if (autoApplyBusStaff) {
         for (const draft of parsed.busDrafts) {
@@ -313,12 +417,16 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
         }
       }
 
-      // 5) 스냅샷 마커 기록 — 이후 원본 시트가 바뀌면 신선도 배너가 뜨도록.
+      // 6) 스냅샷 마커 기록 — 이후 원본 시트가 바뀌면 신선도 배너가 뜨도록.
       await markCueSheetImported(retreatId, { hash: hashCsv(text), blockCount: parsed.blocks.length });
 
-      toast(`갱신 ${updates.length}개, 신규 ${creates.length}개${mode === "replace" && deletedCount ? `, 삭제 ${deletedCount}개` : ""}${autoCreatePosts && createdPostCount ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign && assignmentCount ? `, 신규 배정 ${assignmentCount}건` : ""}${autoAssign && addedToExistingCount ? `, 기존 자동배정 갱신 ${addedToExistingCount}건` : ""}${autoAssign && removedFromExistingCount ? `, 삭제된 자동배정 정리 ${removedFromExistingCount}건` : ""}${autoApplyBusStaff && busStaffCount ? `, 버스 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""} 반영했습니다.`, "success");
-      if (unmatchedStaffNames.length > 0) {
-        toast(`행정 명단에 없는 스탭 ${unmatchedStaffNames.length}명은 배정에서 제외됐습니다: ${unmatchedStaffNames.join(", ")} — 행정 사이트에 먼저 추가해주세요.`, "warning");
+      toast(`갱신 ${updates.length}개, 신규 ${creates.length}개${mode === "replace" && deletedCount ? `, 삭제 ${deletedCount}개` : ""}${autoCreatePosts && createdPostCount ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign ? `, 구간 +${segmentCreateCount}/수정 ${segmentUpdateCount}/삭제 ${segmentRemoveCount}, 동선 반영 ${assignmentCount}건/정리 ${removedAssignmentCount}건` : ""}${autoApplyBusStaff && busStaffCount ? `, 버스 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""} 반영했습니다.`, "success");
+      const allUnmatched = [...new Set([...unmatchedStaffNames, ...unmatchedMovementStaff])];
+      if (allUnmatched.length > 0) {
+        toast(`행정 명단에 없는 스탭 ${allUnmatched.length}명은 배정에서 제외됐습니다: ${allUnmatched.join(", ")} — 행정 사이트에 먼저 추가해주세요.`, "warning");
+      }
+      if (preservedManualSegmentCount > 0) {
+        toast(`시트에서 사라진 구간 ${preservedManualSegmentCount}개에는 사이트 수동 배정이 있어 보존했습니다.`, "warning");
       }
       setText("");
     } catch (e) {
@@ -411,7 +519,13 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
               <span className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-full px-2 py-0.5">특이사항 {parsed.importStats.noticeCount}개</span>
             )}
             {autoAssign && (
-              <span className="text-[11px] text-sky-700 bg-sky-50 border border-sky-100 rounded-full px-2 py-0.5">예상 스탭배정 {previewAutoAssignmentCount}건</span>
+              <>
+                <span className="text-[11px] text-sky-700 bg-sky-50 border border-sky-100 rounded-full px-2 py-0.5">구간 {parsed.importStats.segmentCount}개</span>
+                <span className="text-[11px] text-sky-700 bg-sky-50 border border-sky-100 rounded-full px-2 py-0.5">예상 동선 {previewAutoAssignmentCount}건</span>
+                {parsed.importStats.tbdCount > 0 && (
+                  <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">담당 미정 {parsed.importStats.tbdCount}건</span>
+                )}
+              </>
             )}
             {leaderMap.size > 0 && (
               <span className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">조장 큐싯 {leaderMap.size}개</span>
