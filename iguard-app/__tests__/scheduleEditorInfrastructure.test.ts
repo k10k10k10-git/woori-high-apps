@@ -22,4 +22,12 @@ describe("in-app schedule editor infrastructure", () => {
     expect(schedule).not.toContain("<CueSheetFreshnessBanner");
     expect(read("src/app/retreat/[id]/PostsView.tsx")).toContain("updateIguardPostFields");
   });
+
+  it("marks field progress and lets cue cards prefer the progress marker", () => {
+    expect(read("src/app/retreat/[id]/ScheduleView.tsx")).toContain("지금 여기까지");
+    const execution = read("src/app/retreat/[id]/ExecutionViews.tsx");
+    expect(execution).toContain("progressCurrentBlock(schedule)");
+    expect(execution).toContain("progressBlock || currentBlockFor");
+    expect(execution).toContain("effectiveTimeRangeLabel");
+  });
 });

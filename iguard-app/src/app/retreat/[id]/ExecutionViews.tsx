@@ -11,6 +11,7 @@ import {
   cueTimelineListBlocks, cueTimelineScrollTop, cueTimelineWindow, type CueTimelinePhase,
 } from "@/lib/cueCardTimeline";
 import { gbsPlacesForStaff } from "@/lib/gbsPlaces";
+import { effectiveTimeRangeLabel, progressCurrentBlock } from "@/lib/scheduleProgress";
 
 interface Data {
   staff: IguardStaff[];
@@ -142,9 +143,13 @@ export function CueCardView({
     if (staffId !== nextStaffId) setStaffId(nextStaffId);
   }, [preferredStaffId, sortedStaff, staffId]);
 
-  const currentBlock = currentBlockFor(schedule, curDay, clock.time);
+  const progressBlock = progressCurrentBlock(schedule);
+  const currentBlock = progressBlock || currentBlockFor(schedule, curDay, clock.time);
+  const effectiveDay = progressBlock?.day ?? curDay;
   const period = activePeriod(periods, retreat);
-  const timelinePhase: CueTimelinePhase = curDay != null
+  const timelinePhase: CueTimelinePhase = progressBlock
+    ? "active"
+    : curDay != null
     ? "active"
     : !period
       ? "unknown"
@@ -154,7 +159,7 @@ export function CueCardView({
   const { nextBlock, remainingBlocks } = cueTimelineWindow(
     sortedSchedule,
     currentBlock?.id || null,
-    curDay,
+    effectiveDay,
     clock.time,
     timelinePhase,
   );
@@ -167,7 +172,7 @@ export function CueCardView({
   const days = [...new Set(listBlocks.map(b => b.day))].sort((a, b) => a - b);
   const currentMove = currentBlock ? myMoves.get(currentBlock.id) : null;
   const nextMove = nextBlock ? myMoves.get(nextBlock.id) : null;
-  const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
+  const currentDate = effectiveDay == null ? null : retreatDateForDay(periods, retreat, effectiveDay);
   const selectedStaff = staff.find(s => s.id === staffId);
   const selectedStaffGbs = useMemo(
     () => gbsPlacesForStaff(staffId, selectedStaff?.name, groups, groupStaff, gbs),
@@ -257,7 +262,7 @@ export function CueCardView({
             <div className="text-right">
               <div className="font-mono text-sm font-semibold text-slate-700">{clock.time}</div>
               {!pinnedCardsCollapsed && (
-                <div className="text-xs text-slate-400">{currentDate ? `${curDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
+                <div className="text-xs text-slate-400">{currentDate ? `${effectiveDay}일차 · ${formatShortDate(currentDate)}` : periodRangeLabel(periods, retreat)}</div>
               )}
             </div>
             <button
@@ -274,7 +279,10 @@ export function CueCardView({
         <div id="cue-card-current-details">
         {!pinnedCardsCollapsed && (currentBlock ? (
           <div className="space-y-2">
-            <div className="text-xs text-slate-500">{timeRangeLabel(currentBlock)}</div>
+            <div className="text-xs text-slate-500">
+              {effectiveTimeRangeLabel(currentBlock, progressBlock)}
+              {progressBlock && <span className="ml-1 text-fuchsia-600">(계획 {timeRangeLabel(currentBlock)})</span>}
+            </div>
             <div className="rounded-lg bg-white border border-fuchsia-100 p-3">
               {currentMove ? (
                 <>
@@ -319,7 +327,7 @@ export function CueCardView({
           </div>
           {nextBlock && (
             <div className="shrink-0 text-right text-xs text-slate-500">
-              <div className="font-mono font-semibold text-slate-700">{timeRangeLabel(nextBlock)}</div>
+              <div className="font-mono font-semibold text-slate-700">{effectiveTimeRangeLabel(nextBlock, progressBlock)}</div>
               <div>{nextBlock.day}일차</div>
             </div>
           )}
@@ -381,7 +389,7 @@ export function CueCardView({
           <div className="space-y-2">
             {listBlocks.filter(b => b.day === day).map(b => {
               const mv = myMoves.get(b.id);
-              const now = isNowOn(b, curDay, clock.time);
+              const now = progressBlock ? b.id === progressBlock.id : isNowOn(b, curDay, clock.time);
               const isOpen = open.has(b.id);
               const dutyLines = dutyLinesForStaff(b, selectedStaff?.name);
               return (
@@ -392,7 +400,7 @@ export function CueCardView({
                 >
                   <div className={`flex items-start ${timelineCompact ? "gap-2" : "gap-3"}`}>
                     <div className={`shrink-0 pt-0.5 text-center ${timelineCompact ? "w-12" : "w-14"}`}>
-                      <div className="font-mono text-xs text-slate-500">{b.start}</div>
+                      <div className="font-mono text-xs text-slate-500">{effectiveTimeRangeLabel(b, progressBlock).split("~")[0]}</div>
                       {now && <div className="text-[11px] font-bold text-fuchsia-700">지금</div>}
                     </div>
                     <div className="flex-1 min-w-0">

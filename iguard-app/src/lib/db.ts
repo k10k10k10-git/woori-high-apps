@@ -254,6 +254,12 @@ export async function updateIguardScheduleBlock(
 ): Promise<void> {
   await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), stripUndefined(data));
 }
+export async function markIguardScheduleProgress(retreatId: string, id: string, actualStart: string): Promise<void> {
+  await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), {
+    actualStart,
+    actualStartAt: Date.now(),
+  });
+}
 export async function deleteIguardScheduleBlock(retreatId: string, id: string): Promise<void> {
   const [segmentsSnap, movementsSnap] = await Promise.all([
     get(ref(db, paths.iguardSegments(retreatId))),

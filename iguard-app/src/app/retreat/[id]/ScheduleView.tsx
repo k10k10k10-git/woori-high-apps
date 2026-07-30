@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement, IguardBus, IguardMovement, IguardSegment } from "@/lib/types";
-import { saveIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
+import { saveIguardScheduleBlock, markIguardScheduleProgress, deleteIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import {
   EMPTY,
@@ -19,6 +19,8 @@ import CueSheetImportPanel from "./ScheduleCueSheetImport";
 import ScheduleSegmentEditor from "./ScheduleSegmentEditor";
 import ScheduleBlockEditor from "./ScheduleBlockEditor";
 import StructureClonePanel from "./StructureClonePanel";
+import { actualStartForBlock, progressCurrentBlock } from "@/lib/scheduleProgress";
+import { nowHHMM } from "@/lib/scheduleTime";
 
 export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, segments, movements, movementRecords, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
   retreatId: string;
@@ -66,6 +68,13 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
   async function del(b: IguardScheduleBlock) {
     if (!await uiConfirm(`"${b.label}" 블록을 삭제할까요?`)) return;
     try { await deleteIguardScheduleBlock(retreatId, b.id); } catch (e) { toast(`삭제 오류: ${e}`, "error"); }
+  }
+  const progressBlock = progressCurrentBlock(schedule);
+  async function markProgress(b: IguardScheduleBlock) {
+    try {
+      await markIguardScheduleProgress(retreatId, b.id, actualStartForBlock(b, nowHHMM()));
+      toast(`현재 진행을 "${b.label}"로 변경했습니다.`, "success");
+    } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
   }
   const days = [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b);
 
@@ -145,6 +154,10 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
                     <span className="text-sm font-medium text-slate-800">{b.label}{b.meal && !looksLikeMeal(b.label, "") && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[11px] bg-orange-100 text-orange-600">식사</span>}</span>
                     {timeError && <span className="text-[11px] text-red-500">{timeError}</span>}
                     <span className="ml-auto text-[11px] text-slate-400">{segments.filter(segment => segment.blockId === b.id).length}구간 · {blockMovements.length}배정</span>
+                    <button onClick={() => markProgress(b)}
+                      className={`rounded-lg border px-2 py-1 text-xs ${progressBlock?.id === b.id ? "border-fuchsia-400 bg-fuchsia-50 font-semibold text-fuchsia-700" : "border-slate-200 text-slate-500 hover:border-fuchsia-300"}`}>
+                      {progressBlock?.id === b.id ? `진행 중 · ${b.actualStart}` : "지금 여기까지"}
+                    </button>
                     <button onClick={() => del(b)} className="text-xs text-slate-300 hover:text-red-400">삭제</button>
                   </div>
                   <div className="mt-2 grid gap-1.5">

@@ -172,6 +172,8 @@ export interface IguardScheduleBlock {
   leaderNote?: string | null; // 조장용 내용 — 조장 큐싯("구분·시간·내용")의 내용 열
   noMovement?: boolean | null; // 동선 배정이 필요 없는 블록(검증 공백 경고 제외)
   note?: string | null; // 자유 메모 — 정리되지 않은 제작 메모를 시트 밖에서도 보존
+  actualStart?: string | null; // 현장 실제 시작(HH:MM, 새벽은 24시+). 최신 진행 마커가 큐카드 현재 일정을 결정
+  actualStartAt?: number | null; // 여러 블록 중 가장 최근에 누른 진행 마커 판정용 epoch ms
   source?: "sheet" | "manual" | "cloned";
 }
 
