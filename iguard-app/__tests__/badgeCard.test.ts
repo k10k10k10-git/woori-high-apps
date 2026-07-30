@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseAssignedAreas, roomMatchesAssignedAreas } from "@/lib/assignedArea";
-import { badgeCardsHtml, buildBadgeCard, type BadgeCardInput } from "@/lib/badgeCard";
+import { badgeCardsHtml, buildBadgeCard, splitGbsPrintColumns, type BadgeCardInput } from "@/lib/badgeCard";
 import type { Room } from "@/lib/types";
 
 const room = (overrides: Partial<Room> = {}): Room => ({
@@ -130,5 +130,20 @@ describe("명찰카드 파생과 인쇄 안전", () => {
     });
     expect(card?.timeline[0].assignments).toEqual(["[수련회장] 숙소 총장"]);
     expect(card?.timeline[0].assignments.join(" ")).not.toContain("김동연");
+  });
+
+  it("GBS 인쇄 2열은 1~10조와 11~21조로 연속 분할한다", () => {
+    const items = Array.from({ length: 21 }, (_, index) => ({
+      place: `${index + 1}호`,
+      groups: [`${index + 1}조`],
+    }));
+    const [left, right] = splitGbsPrintColumns(items);
+
+    expect(left.map(item => item.groups[0])).toEqual(
+      Array.from({ length: 10 }, (_, index) => `${index + 1}조`),
+    );
+    expect(right.map(item => item.groups[0])).toEqual(
+      Array.from({ length: 11 }, (_, index) => `${index + 11}조`),
+    );
   });
 });

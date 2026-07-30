@@ -56,7 +56,7 @@ const GROUPS = [
     { key: "meals", label: "식사순서" },
     { key: "buses", label: "버스배정" },
     { key: "seating", label: "집회자리" },
-    { key: "lodgingmap", label: "배치도 관리" },
+    { key: "lodgingmap", label: "숙소 배치도" },
   ] },
   { label: "정보", hint: "", views: [
     { key: "guide", label: "조스탭 가이드" },
@@ -343,7 +343,7 @@ function IguardWorkspace({ id }: { id: string }) {
         {!dataLoading && view === "posts" && <PostsView retreatId={id} posts={posts} />}
         {!dataLoading && view === "staff" && <StaffView retreatId={id} staff={staffForViews} />}
         {!dataLoading && view === "movements" && <MovementsView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
-        {!dataLoading && view === "validate" && <ValidationView retreatId={id} staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
+        {!dataLoading && view === "validate" && <ValidationView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
         {!dataLoading && view === "groupstaff" && <GroupStaffView retreatId={id} groups={groups} staff={staffForViews} students={students} adminTeachers={adminTeachers} partial={partial} cellColors={cellColors} groupStaff={groupStaff} />}
         {!dataLoading && view === "gbs" && <GbsPlacesView retreatId={id} groups={groups} gbs={gbs} />}
         {!dataLoading && view === "badge" && (

@@ -274,7 +274,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>내용</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 내용`}
-          className="input min-h-[112px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[148px]"
+          className="input min-h-[160px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[220px]"
           value={draft.detail}
           onChange={event => change("detail", event.target.value)}
           placeholder="분 단위 진행 내용과 준비 사항"
@@ -285,7 +285,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>담당·동선</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 담당`}
-          className="input min-h-[112px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[148px]"
+          className="input min-h-[160px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[220px]"
           value={draft.owner}
           onChange={event => change("owner", event.target.value)}
           placeholder={"장소: 담당자 형식으로 적으면 포스트·동선에 자동 반영됩니다.\n예) 강당 입구: 김민수, 이영희"}
@@ -310,7 +310,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>특이사항</SheetFieldLabel>
         <textarea
           aria-label={`${block.label} 특이사항`}
-          className="input min-h-[112px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[148px]"
+          className="input min-h-[160px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[220px]"
           value={draft.notice}
           onChange={event => change("notice", event.target.value)}
           placeholder="주의사항·준비물·예외"

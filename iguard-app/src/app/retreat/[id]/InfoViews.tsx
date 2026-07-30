@@ -34,9 +34,9 @@ export function GuideView({ retreatId, guide }: { retreatId: string; guide: stri
           </div>
         ))}
       </div>
-      <div className="flex gap-2 mt-3">
-        <input className="input" placeholder="수칙 추가" value={adding} onChange={e => setAdding(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
-        <button onClick={add} className="btn-secondary">＋ 추가</button>
+      <div className="mt-3 flex gap-2">
+        <input className="input min-w-0 flex-1" placeholder="수칙 추가" value={adding} onChange={e => setAdding(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} />
+        <button onClick={add} className="btn-secondary min-h-11 min-w-[96px] whitespace-nowrap px-4 text-sm">＋ 추가</button>
       </div>
     </div>
   );

@@ -184,9 +184,26 @@ function row(label: string, value: string): string {
   return `<div class="badge-row"><b>${escapeHtml(label)}</b><span>${escapeHtml(value || "—")}</span></div>`;
 }
 
+export function splitGbsPrintColumns(
+  items: BadgeCardData["gbs"],
+): [BadgeCardData["gbs"], BadgeCardData["gbs"]] {
+  const displayNumber = (item: BadgeCardData["gbs"][number]): number | null => {
+    const match = item.groups[0]?.match(/^\s*(\d+)\s*조?\s*$/);
+    return match ? Number(match[1]) : null;
+  };
+  const firstColumn = items.filter(item => {
+    const number = displayNumber(item);
+    return number !== null && number <= 10;
+  });
+  const secondColumn = items.filter(item => {
+    const number = displayNumber(item);
+    return number === null || number > 10;
+  });
+  return [firstColumn, secondColumn];
+}
+
 function gbsGrid(items: BadgeCardData["gbs"]): string {
-  const midpoint = Math.ceil(items.length / 2);
-  const columns = [items.slice(0, midpoint), items.slice(midpoint)]
+  const columns = splitGbsPrintColumns(items)
     .filter(column => column.length > 0)
     .map(column => `<div class="badge-gbs-column">${column.map(item => {
       const groups = item.groups.join(", ") || "조 미지정";

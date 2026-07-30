@@ -35,10 +35,10 @@ describe("숙소 배정도 매칭", () => {
     expect(fileLabel("은혜관_배치도.pdf")).toBe("은혜관 배치도");
   });
 
-  it("실행에는 숙소 안내, 기획에는 배치도 관리를 분리해 노출한다", () => {
+  it("실행에는 숙소 안내, 기획에는 숙소 배치도를 분리해 노출한다", () => {
     const source = readFileSync(new URL("../src/app/retreat/[id]/IguardClient.tsx", import.meta.url), "utf8");
     expect(source).toContain('{ key: "lodging", label: "숙소 안내", icon: "🗺️" }');
-    expect(source).toContain('{ key: "lodgingmap", label: "배치도 관리" }');
+    expect(source).toContain('{ key: "lodgingmap", label: "숙소 배치도" }');
     expect(source).toContain('view === "lodging"');
     expect(source).toContain('mode="view"');
     expect(source).toContain('mode="manage"');

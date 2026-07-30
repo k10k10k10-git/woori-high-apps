@@ -1,39 +1,32 @@
 "use client";
 import { useMemo } from "react";
 import { IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement } from "@/lib/types";
-import { updateIguardScheduleBlock } from "@/lib/db";
-import { useUI } from "@/context/UIContext";
+import { buildStaffAssignmentStats } from "@/lib/staffAssignmentStats";
+import { isTeleport } from "@/lib/validationRules";
 
 interface Props {
-  retreatId: string;
   staff: IguardStaff[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
   movements: AssignedIguardMovement[];
 }
 
-import { isTeleport } from "@/lib/validationRules";
+type Issue = { text: string };
 
-type Issue = { level: "error" | "warn" | "info"; text: string };
-
-export default function ValidationView({ retreatId, staff, schedule, posts, movements }: Props) {
-  const { toast } = useUI();
+export default function ValidationView({ staff, schedule, posts, movements }: Props) {
   const issues = useMemo<Issue[]>(() => {
     const out: Issue[] = [];
     const staffName = new Map(staff.map(s => [s.id, s.name]));
     const postName = new Map(posts.map(p => [p.id, p.name]));
     const blockById = new Map(schedule.map(b => [b.id, b]));
     const byStaff = new Map<string, AssignedIguardMovement[]>();
-    const byBlock = new Map<string, AssignedIguardMovement[]>();
     movements.forEach(mv => {
       (byStaff.get(mv.staffId) ?? byStaff.set(mv.staffId, []).get(mv.staffId)!).push(mv);
-      (byBlock.get(mv.blockId) ?? byBlock.set(mv.blockId, []).get(mv.blockId)!).push(mv);
     });
 
     const unknownStaffIds = [...new Set(movements.map(mv => mv.staffId).filter(id => !staffName.has(id)))];
     if (unknownStaffIds.length > 0) {
       out.push({
-        level: "error",
         text: `동선 스탭 ID 불일치: 현재 명단에서 찾을 수 없는 배정이 ${unknownStaffIds.length}건 있습니다. 해당 스탭이 행정 명단에서 빠졌는지 확인하거나, 스탭 전체 큐싯을 다시 가져와 주세요.`,
       });
     }
@@ -43,91 +36,84 @@ export default function ValidationView({ retreatId, staff, schedule, posts, move
       const mvs = (byStaff.get(s.id) || []).map(mv => ({ mv, b: blockById.get(mv.blockId) })).filter(x => x.b) as { mv: AssignedIguardMovement; b: IguardScheduleBlock }[];
       for (let i = 0; i < mvs.length; i++) for (let j = i + 1; j < mvs.length; j++) {
         if (isTeleport({ postId: mvs[i].mv.postId, block: mvs[i].b }, { postId: mvs[j].mv.postId, block: mvs[j].b })) {
-          out.push({ level: "error", text: `순간이동: ${s.name} 이(가) 겹치는 시간 「${mvs[i].b.label}」(${postName.get(mvs[i].mv.postId)})와 「${mvs[j].b.label}」(${postName.get(mvs[j].mv.postId)})에 동시에 배치됨` });
+          out.push({ text: `순간이동: ${s.name} 이(가) 겹치는 시간 「${mvs[i].b.label}」(${postName.get(mvs[i].mv.postId)})와 「${mvs[j].b.label}」(${postName.get(mvs[j].mv.postId)})에 동시에 배치됨` });
         }
       }
-    });
-
-    // 2) 공백 시간블록: 아무 스탭도 배치되지 않은 블록. 단, 동선 없음 표시 블록은 제외.
-    schedule.forEach(b => {
-      if (!b.noMovement && !(byBlock.get(b.id)?.length)) out.push({ level: "warn", text: `공백 블록: 「${b.day}일차 ${b.start} ${b.label}」 에 배치된 스탭이 없습니다.` });
-    });
-
-    // 3) 미배치 스탭
-    staff.forEach(s => { if (!(byStaff.get(s.id)?.length)) out.push({ level: "info", text: `미배치 스탭: ${s.name} 은(는) 한 번도 포스트에 배치되지 않았습니다.` }); });
-
-    // 4) 과부하: 전체 블록의 80% 이상 배치된 스탭
-    const total = schedule.length;
-    if (total > 0) staff.forEach(s => {
-      if (s.role === "이가드") return;
-      const c = byStaff.get(s.id)?.length || 0;
-      if (c >= Math.ceil(total * 0.8)) out.push({ level: "info", text: `과부하 주의: ${s.name} 은(는) ${total}개 블록 중 ${c}개에 배치됨 (휴식 확인)` });
     });
 
     return out;
   }, [staff, schedule, posts, movements]);
 
-  const groups = {
-    error: issues.filter(i => i.level === "error"),
-    warn: issues.filter(i => i.level === "warn"),
-    info: issues.filter(i => i.level === "info"),
-  };
-  const meta = {
-    error: { cls: "bg-red-50 border-red-200 text-red-700", icon: "🔴", label: "오류 (순간이동)" },
-    warn: { cls: "bg-amber-50 border-amber-200 text-amber-700", icon: "🟠", label: "경고 (공백)" },
-    info: { cls: "bg-slate-50 border-slate-200 text-slate-600", icon: "🟡", label: "참고 (미배치·과부하)" },
-  } as const;
-  async function setNoMovement(block: IguardScheduleBlock, checked: boolean) {
-    try {
-      await updateIguardScheduleBlock(retreatId, block.id, { noMovement: checked || null });
-      toast(checked ? "동선 없는 블록으로 표시했습니다." : "동선 검증 대상에 다시 포함했습니다.", "success");
-    } catch (e) {
-      toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
-    }
-  }
-  const sortedSchedule = [...schedule].sort((a, b) => a.day - b.day || a.start.localeCompare(b.start) || a.label.localeCompare(b.label, "ko"));
+  const assignmentStats = useMemo(
+    () => buildStaffAssignmentStats(staff, movements),
+    [staff, movements],
+  );
+  const unassigned = assignmentStats.filter(stat => stat.movementCount === 0);
+  const assigned = assignmentStats.filter(stat => stat.movementCount > 0);
 
   return (
-    <div>
-      <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
-        ℹ️ 동선 매트릭스를 자동 점검합니다. <strong>그 시간에 누가 어디 있는지</strong>의 모순·공백을 사전에 잡습니다.
-        <div className="mt-1 text-fuchsia-600">이가드 역할 스탭은 과부하 경고에서 제외하고, 동선 없는 블록은 공백 경고에서 제외합니다.</div>
+    <div className="space-y-5">
+      <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
+        ℹ️ 겹치는 시간에 서로 다른 장소로 배정된 경우와 명단 불일치를 점검합니다.
+        스탭별 배정 횟수는 상대적인 과부하 판정 없이 실제 동선 수 그대로 표시합니다.
       </div>
-      {sortedSchedule.length > 0 && (
-        <div className="card p-3 mb-4">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-sm font-semibold text-slate-700">검증 예외 관리</div>
-              <div className="text-[11px] text-slate-400">실제로 동선 배정이 필요 없는 일정은 체크하면 공백 블록 피드백에서 제외됩니다.</div>
-            </div>
-            <span className="text-xs text-slate-400">동선 없음 {sortedSchedule.filter(b => b.noMovement).length}개</span>
+
+      <section aria-labelledby="validation-errors-title">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 id="validation-errors-title" className="text-sm font-semibold text-slate-700">🔴 실제 오류 · {issues.length}건</h2>
+          <span className="text-xs text-slate-400">순간이동·명단 불일치</span>
+        </div>
+        {issues.length === 0 ? (
+          <div className="card border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-700">
+            ✅ 겹치는 동선과 명단 불일치가 없습니다.
           </div>
-          <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-3">
-            {sortedSchedule.map(b => (
-              <label key={b.id} className="flex min-w-0 items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2 text-xs text-slate-600">
-                <input type="checkbox" checked={!!b.noMovement} onChange={e => setNoMovement(b, e.target.checked)} />
-                <span className="min-w-0 truncate">
-                  <span className="font-semibold text-slate-700">{b.day}일차 {b.start}</span> {b.label}
-                </span>
-              </label>
+        ) : (
+          <div className="space-y-2">
+            {issues.map((issue, index) => (
+              <div key={index} className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{issue.text}</div>
             ))}
           </div>
+        )}
+      </section>
+
+      <section aria-labelledby="unassigned-staff-title">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 id="unassigned-staff-title" className="text-sm font-semibold text-slate-700">🟠 미배치 스탭 · {unassigned.length}명</h2>
+          <span className="text-xs text-slate-400">동선 배정 0회</span>
         </div>
-      )}
-      {issues.length === 0 ? (
-        <div className="card p-8 text-center text-emerald-600"><div className="text-3xl mb-2">✅</div><p>발견된 문제가 없습니다.</p></div>
-      ) : (
-        (["error", "warn", "info"] as const).map(lv => groups[lv].length > 0 && (
-          <div key={lv} className="mb-4">
-            <div className="text-sm font-semibold text-slate-600 mb-2">{meta[lv].icon} {meta[lv].label} · {groups[lv].length}건</div>
-            <div className="space-y-2">
-              {groups[lv].map((i, idx) => (
-                <div key={idx} className={`border rounded-lg p-3 text-sm ${meta[lv].cls}`}>{i.text}</div>
-              ))}
-            </div>
+        {unassigned.length === 0 ? (
+          <div className="card p-4 text-sm text-emerald-700">모든 스탭에게 한 번 이상 동선이 배정되어 있습니다.</div>
+        ) : (
+          <div className="card flex flex-wrap gap-2 p-4">
+            {unassigned.map(stat => (
+              <span key={stat.staffId} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-800">
+                {stat.name}
+              </span>
+            ))}
           </div>
-        ))
-      )}
+        )}
+      </section>
+
+      <section aria-labelledby="assignment-count-title">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 id="assignment-count-title" className="text-sm font-semibold text-slate-700">🔵 스탭별 동선 배정 횟수</h2>
+          <span className="text-xs text-slate-400">많은 순서 · 총 {movements.length}건</span>
+        </div>
+        {assigned.length === 0 ? (
+          <div className="card p-4 text-sm text-slate-500">아직 등록된 동선 배정이 없습니다.</div>
+        ) : (
+          <div className="card grid gap-px overflow-hidden bg-slate-200 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {assigned.map(stat => (
+              <div key={stat.staffId} className="flex items-center justify-between gap-3 bg-white px-3 py-3">
+                <span className="min-w-0 truncate text-sm font-medium text-slate-700">{stat.name}</span>
+                <span className="shrink-0 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                  동선 {stat.movementCount}회 · 일정 {stat.blockCount}개
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
