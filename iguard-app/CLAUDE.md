@@ -38,6 +38,7 @@ retreats/{retreatId}/iguard/
                                      #   하위호환: segmentId 없는 staffId__blockId 키는 2027 겨울까지 읽음
   buses/                            # 버스 배정 (IguardBus — capacity?: 인승, 없으면 45. busCapacityOf로 읽을 것)
   seating/                          # 집회 자리배치 (IguardSeating)
+  gbs/                              # 조별 GBS 장소 (groupId → IguardGbsPlace, 장소별 목록은 파생)
   attendance/                       # 인원체크 상태 ({ checked, updatedAt?, by? } — 키는 encodeURIComponent(원본키))
                                      #   checked:false = 해제 톰스톤(삭제 대신 기록 — 오프라인 낡은 체크 부활 방지)
                                      #   by = 체크/해제한 스탭 이름. 하위호환: 구버전 true/{checked:true}도 구독에서 지원

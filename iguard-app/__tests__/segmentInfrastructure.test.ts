@@ -7,6 +7,9 @@ describe("동선 구간 인프라 계약", () => {
     expect(paths.iguardSegments("retreat-1")).toBe("retreats/retreat-1/iguard/segments");
     expect(paths.iguardSegment("retreat-1", "segment-1"))
       .toBe("retreats/retreat-1/iguard/segments/segment-1");
+    expect(paths.iguardGbs("retreat-1")).toBe("retreats/retreat-1/iguard/gbs");
+    expect(paths.iguardGbsGroup("retreat-1", "group-1"))
+      .toBe("retreats/retreat-1/iguard/gbs/group-1");
   });
 
   it("segments 구독은 오류 콜백을 전달하고 CRUD는 단일 경로를 사용한다", () => {
@@ -26,5 +29,15 @@ describe("동선 구간 인프라 계약", () => {
     expect(source).toContain('ready("segments")');
     expect(source).toContain('fail("segments")');
     expect(source).toContain("movementsForDefaultSegments(segments, movementRecords)");
+  });
+
+  it("신규 segments와 gbs 경로가 루트·앱 소유권 문서에 함께 기록된다", () => {
+    const ownership = readFileSync(new URL("../../DB_OWNERSHIP.md", import.meta.url), "utf8");
+    const appGuide = readFileSync(new URL("../CLAUDE.md", import.meta.url), "utf8");
+
+    expect(ownership).toContain("`retreats/{id}/iguard/segments`");
+    expect(ownership).toContain("`retreats/{id}/iguard/gbs`");
+    expect(appGuide).toContain("segments/");
+    expect(appGuide).toContain("gbs/");
   });
 });

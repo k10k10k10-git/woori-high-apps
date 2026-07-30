@@ -78,6 +78,7 @@
 | `retreats/{id}/iguard/attendance` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/seating` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/meals` | 이가드 | - | 이가드만 | 없음 |
+| `retreats/{id}/iguard/gbs` | 이가드 | - | 이가드만 | 조별 GBS 장소의 단일 쓰기 원천. 장소→조 목록은 화면에서 파생하고 행정 `groups.gbs`는 읽기 폴백만 사용 |
 | `retreats/{id}/iguard/groupStaff` | 이가드 | **행정** | 이가드만 | **행정 GroupsTab 조스탭 표시** |
 | `retreats/{id}/iguard/cueSheet` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/guide` | 이가드 | - | 이가드만 | 없음 |

@@ -20,8 +20,8 @@
 
 ## 완료된 로컬 커밋
 
-아래 10개 커밋은 `main`에 있으나 `origin/main`보다 앞서 있으며 아직
-push하지 않았다.
+아래 11개 구현·출시 준비 커밋과 최종 요구사항 감사 커밋 1개는
+`main`에 있으나 `origin/main`보다 앞서 있으며 아직 push하지 않았다.
 
 | 해시 | 단계 | 내용 |
 |---|---|---|
@@ -35,6 +35,7 @@ push하지 않았다.
 | `96c295f` | P0b | 명찰카드 자동 생성·인쇄 |
 | `1a801f9` | P5 | 큐싯 직접 편집과 구조만 복제 |
 | `f463200` | P6 | 현장 진행 마커와 지연 시각 파생 |
+| `a6be8c0` | 출시 준비 | 배포 전 검증·리허설·롤백 체크리스트 |
 
 구현 핵심:
 
@@ -59,14 +60,19 @@ push하지 않았다.
 합계: 동선 349건, 기본 구간 48건, 적용 경로 746개, 이슈 0건.
 최종 dry-run은 레거시 0건·구조화 349건·이슈 0건이었다.
 
+실행 전 스냅샷과 현재 운영 동선을
+`staffId + blockId + postId + round + note + source` 의미 필드
+다중집합으로 전수 대조한 결과도 두 수련회 모두 양방향 차이 0건이었다.
+수련회별 배정 수 상위 스탭 3명의 전후 건수도 모두 동일했다.
+
 불일치가 발견되면 새 패치를 쓰지 말고 각 실행 폴더의 `RESTORE.txt`를
 사용한다. `backups/`는 Git 제외이며 임의 삭제하지 않는다.
 
 ## 검증 상태
 
-P6까지 마지막 자동 검증:
+최종 요구사항 감사까지 포함한 자동 검증:
 
-- `npm test`: 38개 파일, 274개 통과
+- `npm test`: 38개 파일, 276개 통과
 - `npm run typecheck`: 오류 0
 - `npm run lint`: 오류 0, 기존 기준선 경고 10
 - `npm run build`: 성공
@@ -99,15 +105,11 @@ P6까지 마지막 자동 검증:
 
 ## 다음 실행자가 할 일
 
-1. 변경 파일을 경로 지정해 커밋한다:
-   - `iguard-app/REMODEL_RELEASE_CHECKLIST.md`
-   - `.claude/HANDOFF.md`
-   - `iguard-app/AGENTS.md`
-2. `git status --short`와 `git log origin/main..HEAD`를 확인한다.
-3. 사용자에게 자동 검증 결과, 운영 DB 이관 결과, 남은 수동 게이트를
+1. `git status --short`와 `git log origin/main..HEAD`를 확인한다.
+2. 사용자에게 자동 검증 결과, 운영 DB 이관 결과, 남은 수동 게이트를
    보고하고 **main push/운영 배포의 별도 최종 승인**을 요청한다.
-4. 승인 전에는 push하거나 `vercel --prod`를 실행하지 않는다.
-5. 승인 후 push하고 두 앱 `/api/version`과 Vercel Ready를 확인한다.
+3. 승인 전에는 push하거나 `vercel --prod`를 실행하지 않는다.
+4. 승인 후 push하고 두 앱 `/api/version`과 Vercel Ready를 확인한다.
 
 ## 배포·롤백
 

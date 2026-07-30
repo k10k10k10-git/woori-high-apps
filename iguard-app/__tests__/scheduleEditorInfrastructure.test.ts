@@ -23,6 +23,15 @@ describe("in-app schedule editor infrastructure", () => {
     expect(read("src/app/retreat/[id]/PostsView.tsx")).toContain("updateIguardPostFields");
   });
 
+  it("orders blocks by editable day and start time", () => {
+    const db = read("src/lib/db.ts");
+    const editor = read("src/app/retreat/[id]/ScheduleBlockEditor.tsx");
+
+    expect(db).toContain("a.day - b.day || a.start.localeCompare(b.start)");
+    expect(editor).toContain("day: block.day");
+    expect(editor).toContain("start: block.start");
+  });
+
   it("marks field progress and lets cue cards prefer the progress marker", () => {
     expect(read("src/app/retreat/[id]/ScheduleView.tsx")).toContain("지금 여기까지");
     const execution = read("src/app/retreat/[id]/ExecutionViews.tsx");

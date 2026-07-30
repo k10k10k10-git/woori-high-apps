@@ -37,6 +37,17 @@
 구조화 동선 349건, 기존 기본 구간 48건, 추가 payload 0건, 이슈 0건을
 확인했다.
 
+추가로 실행 전 스냅샷과 현재 운영 동선을
+`staffId + blockId + postId + round + note + source` 다중집합으로
+읽기 전용 대조했다.
+
+- 겨울: 149건 ↔ 149건, 양방향 의미 차이 0건
+- 여름: 200건 ↔ 200건, 양방향 의미 차이 0건
+- 수련회별 배정 수가 가장 많은 스탭 3명씩도 전후 건수가 모두 동일
+
+따라서 키와 `segmentId`가 바뀐 것 외에 기존 개인 큐카드가 사용하는
+담당자·블록·포스트·회차·메모 의미는 보존됐다.
+
 복구가 필요하면 새 수정으로 덮지 말고 해당 실행 폴더의 `RESTORE.txt`를
 그대로 사용한다. 각 폴더에는 `schedule.before.json`,
 `segments.before.json`, `movements.before.json`,
@@ -64,10 +75,36 @@ npm run build
 
 2026-07-30 최종 실행 결과:
 
-- `npm test`: 38개 파일, 274개 테스트 통과
+- `npm test`: 38개 파일, 276개 테스트 통과
 - `npm run typecheck`: 오류 0
 - `npm run lint`: 오류 0, 기존 기준선 경고 10개
 - `npm run build`: 성공
+
+## 3.1 설계서 요구사항 추적
+
+| 요구사항 | 현재 근거 | 판정 |
+|---|---|---|
+| PA-1 방별 학생 이름 | `RoomsView.tsx`, 기존 취소·당일참석 판정 재사용 | 코드 완료 |
+| PA-2 전체 큐카드 스캔 + 현재·다음 보존 | `ExecutionViews.tsx`, `cueCardTimeline.test.ts`, `stickyLayout.test.ts` | 코드 완료 |
+| PA-3 375px 가독성 | `mobileReadability.test.ts`; 핵심 조작 40px·명단 48px | 자동 검증 완료, 로그인 후 실기기 확인 대기 |
+| P0 구조만 복제 | `structureClone.ts`, `structureClone.test.ts`; 사람·메모·운영 배정 제외 | 코드 완료 |
+| P0 포스트 여러 건 수정 | `PostsView.tsx`, `updateIguardPostFields()` | 코드 완료 |
+| P0b 명찰카드 | `badgeCard.ts`, `badgeCard.test.ts`; 모든 인쇄 문자열 escape | 코드 완료 |
+| P1 segments 모델·경로·구독·어댑터 | `types.ts`, `paths.ts`, `db.ts`, `useRetreatData.ts`, `defaultSegment.ts` | 코드 완료 |
+| P1 소유권 문서 | 루트 `DB_OWNERSHIP.md`, 앱 `CLAUDE.md`, `segmentInfrastructure.test.ts` | 완료 |
+| P2 무손실 이관·복구 | 2장의 백업·dry-run·의미 다중집합 대조 | 완료 |
+| P3 실제 큐싯 표현 | `cueSheetSegments.test.ts`: 22블록·24구간·214동선·미정 5건 | 완료 |
+| P3 수동 배정 보존 | `movementReconcile.test.ts`와 `source` 구분 | 완료 |
+| P3 전체 개요 | `scheduleOverview.ts`, `scheduleOverview.test.ts` | 완료 |
+| P4 GBS 단일 원천·역방향 파생 | `gbsPlaces.ts`, `GbsPlacesView.tsx`, `gbsPlaces.test.ts` | 완료 |
+| P5 블록·구간·포스트·담당자 직접 편집 | `ScheduleBlockEditor.tsx`, `ScheduleSegmentEditor.tsx`; 블록 순서는 편집 가능한 일차·시작 시각으로 정렬; 레코드 단위 update | 코드 완료 |
+| P5 초기 이관으로 시트 격하 | `ScheduleCueSheetImport.tsx`; 신선도 배너 제거 회귀 테스트 | 코드 완료 |
+| P5 초보 제작자 관찰 | 5장 절차 | 사람 검증 대기 |
+| P6 진행 마커·지연 표시 | `scheduleProgress.ts`, `scheduleProgress.test.ts` | 코드 완료 |
+
+학생의 수찬·선교팀 같은 특정 조건 분류와 “조스탭 불가”는 설계서 8장의
+행정 데이터 계약 협의 항목이다. 현재 명찰카드에는 값을 추측하지 않고
+“학생 속성 미연동”으로 명시하며, 합의 전 임의 필드를 추가하지 않는다.
 
 ## 4. 로그인 후 리허설 QA
 
