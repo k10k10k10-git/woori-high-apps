@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement, IguardBus, IguardMovement, IguardSegment } from "@/lib/types";
-import { saveIguardScheduleBlock, updateIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
+import { saveIguardScheduleBlock, deleteIguardScheduleBlock } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import {
   EMPTY,
@@ -13,10 +13,12 @@ import {
   looksLikeMeal,
   type ScheduleDraft,
 } from "@/lib/cueSheet";
-import { CollapsiblePanel, BlockAssignmentSection, DetailEditor, FreeTextEditor } from "./ScheduleBlockAssignment";
+import { CollapsiblePanel, DetailEditor, FreeTextEditor } from "./ScheduleBlockAssignment";
 import StaffRosterBar from "./ScheduleStaffRoster";
 import CueSheetImportPanel from "./ScheduleCueSheetImport";
-import CueSheetFreshnessBanner from "./CueSheetFreshnessBanner";
+import ScheduleSegmentEditor from "./ScheduleSegmentEditor";
+import ScheduleBlockEditor from "./ScheduleBlockEditor";
+import StructureClonePanel from "./StructureClonePanel";
 
 export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, segments, movements, movementRecords, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
   retreatId: string;
@@ -56,6 +58,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
         detail: form.detail.trim() || undefined,
         owner: form.owner.trim() || undefined,
         notice: form.notice.trim() || undefined,
+        source: "manual",
       });
       setForm({ ...EMPTY, day: form.day });
     } catch (e) { toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error"); }
@@ -64,25 +67,19 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
     if (!await uiConfirm(`"${b.label}" 블록을 삭제할까요?`)) return;
     try { await deleteIguardScheduleBlock(retreatId, b.id); } catch (e) { toast(`삭제 오류: ${e}`, "error"); }
   }
-  async function setNoMovement(b: IguardScheduleBlock, checked: boolean) {
-    try {
-      await updateIguardScheduleBlock(retreatId, b.id, { noMovement: checked ? true : null });
-    } catch (e) {
-      toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
-    }
-  }
   const days = [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b);
 
   return (
     <div>
-      <CueSheetFreshnessBanner retreatId={retreatId} />
       <div className="mb-3 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-2.5 text-xs text-fuchsia-700">
-        ℹ️ 일자별 시간 블록(전환 시점)입니다. 이 블록들이 <strong>동선 매트릭스의 열</strong>이자 <strong>개인 큐카드의 타임라인</strong>이 됩니다.
+        ℹ️ 시간 블록·구간·포스트·담당자를 이 화면에서 직접 관리합니다. 구글 시트 가져오기는 새 수련회 초기 설정용 보조 도구입니다.
       </div>
       <StaffRosterBar staff={staff} groups={groups} schedule={schedule} posts={posts} movements={movements} absentStaffNames={absentStaffNames} />
       <CueSheetImportPanel retreatId={retreatId} retreatName={retreatName} schedule={schedule} staff={staff} posts={posts} segments={segments} movementRecords={movementRecords} buses={buses} open={sheetSettingsOpen} onClose={onSheetSettingsClose || (() => undefined)} />
+      <StructureClonePanel retreatId={retreatId} />
 
       <div className="card p-3 mb-4">
+        <div className="mb-2 text-sm font-semibold text-slate-700">새 시간 블록</div>
         <div className="grid gap-2.5 md:grid-cols-[110px_130px_130px_1fr_auto]">
           <div><label className="text-xs text-slate-500 block mb-1">일자</label>
             <select className="input w-full" value={form.day} onChange={e => setForm(p => ({ ...p, day: parseInt(e.target.value) }))}>
@@ -140,26 +137,22 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
           <div className="divide-y divide-slate-100">
             {schedule.filter(b => b.day === day).map(b => {
               const timeError = scheduleTimeError(b.start, b.end);
-              const blockMovements = movements.filter(mv => mv.blockId === b.id);
+              const blockMovements = movementRecords.filter(mv => mv.blockId === b.id);
               return (
                 <div key={b.id} className="px-3 py-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className={`font-mono text-[11px] whitespace-nowrap w-24 ${timeError ? "text-red-500" : "text-slate-500"}`}>{timeRangeLabel(b.start, b.end)}</span>
                     <span className="text-sm font-medium text-slate-800">{b.label}{b.meal && !looksLikeMeal(b.label, "") && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[11px] bg-orange-100 text-orange-600">식사</span>}</span>
                     {timeError && <span className="text-[11px] text-red-500">{timeError}</span>}
-                    <label className="ml-auto flex items-center gap-1 text-xs text-slate-400">
-                      <input
-                        type="checkbox"
-                        checked={!!b.noMovement}
-                        onChange={e => setNoMovement(b, e.target.checked)}
-                      />
-                      동선 없음
-                    </label>
+                    <span className="ml-auto text-[11px] text-slate-400">{segments.filter(segment => segment.blockId === b.id).length}구간 · {blockMovements.length}배정</span>
                     <button onClick={() => del(b)} className="text-xs text-slate-300 hover:text-red-400">삭제</button>
                   </div>
                   <div className="mt-2 grid gap-1.5">
-                    <CollapsiblePanel title="스탭 배정" count={b.noMovement ? "동선 없음" : `${blockMovements.length}명`} defaultOpen={!b.noMovement && blockMovements.length === 0}>
-                      <BlockAssignmentSection retreatId={retreatId} block={b} staff={staff} posts={posts} movements={movements} />
+                    <CollapsiblePanel title="블록 정보·시간 순서" count={`${b.day}일차 ${timeRangeLabel(b.start, b.end)}`}>
+                      <ScheduleBlockEditor retreatId={retreatId} block={b} />
+                    </CollapsiblePanel>
+                    <CollapsiblePanel title="구간·포스트·담당자" count={b.noMovement ? "동선 없음" : `${blockMovements.length}건`} defaultOpen={!b.noMovement && blockMovements.length === 0}>
+                      <ScheduleSegmentEditor retreatId={retreatId} block={b} allSegments={segments} movements={movementRecords} staff={staff} posts={posts} />
                     </CollapsiblePanel>
                     <CollapsiblePanel title="세부 시간/내용" count={b.detail ? "입력됨" : "비어있음"}>
                       <DetailEditor retreatId={retreatId} block={b} />

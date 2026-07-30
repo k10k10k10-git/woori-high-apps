@@ -447,8 +447,8 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
       <div className="mt-5 border-t border-slate-100 pt-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold text-slate-800">시트 큐싯 가져오기</div>
-          <div className="text-xs text-slate-500">구글 시트 연동 또는 표 범위 붙여넣기로 스탭 전체 큐싯을 채웁니다.</div>
+          <div className="text-sm font-semibold text-slate-800">초기 큐싯 가져오기</div>
+          <div className="text-xs text-slate-500">새 수련회 시작 시 구글 시트나 표를 한 번 가져온 뒤, 이후 변경은 이 화면에서 직접 편집합니다.</div>
         </div>
       </div>
 
@@ -554,7 +554,7 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
             </div>
           )}
           <p className="mt-3 text-[11px] text-slate-400 leading-relaxed">
-            두 방식 모두 같은 시각의 블록 내용은 갱신합니다. <strong>사이트 내 수동 배정은 유지하고 시트 자동배정은 최신 시트 기준으로 동기화합니다.</strong> 비어있는 칸은 시트 배정으로 채웁니다(시트에 나중에 채운 배정도 반영). 새벽 일정(예: 2일차 00:30)은 전날 24시+ 표기(1일차 24:30)로 자동 정리됩니다.
+            초기 자료를 옮길 때만 사용하세요. 두 방식 모두 같은 시각의 블록 내용은 갱신하며, <strong>사이트에서 직접 만든 수동 배정은 유지합니다.</strong> 가져온 뒤에는 시간 블록·구간·담당자를 사이트에서 관리합니다. 새벽 일정(예: 2일차 00:30)은 전날 24시+ 표기(1일차 24:30)로 자동 정리됩니다.
           </p>
           <div className="flex justify-end gap-2 mt-2">
             <button type="button" onClick={() => importBlocks("merge")} className="btn-secondary">시트 반영 (삭제 없음)</button>

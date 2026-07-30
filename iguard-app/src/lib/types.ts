@@ -127,6 +127,7 @@ export interface IguardMeal {
   weight?: number | null; // (미사용·하위호환) 예전 '앞순서 효용 가중치'. 평균순위 편차를 키워 공정배정에서 제거됨(fairAssign.ts ⚖ 참조)
   pinnedFront?: string | null; // 이 끼니만 맨 앞 순서로 고정할 조. 예: "1조" 또는 "1조, 3조"(쉼표 순서대로 앞순서)
   entries: IguardMealEntry[];
+  source?: "manual" | "cloned";
 }
 
 export interface IguardMealEntry {
@@ -170,6 +171,8 @@ export interface IguardScheduleBlock {
   notice?: string | null;  // 기타/특이사항 — 큐싯 "기타", "유의사항" 열
   leaderNote?: string | null; // 조장용 내용 — 조장 큐싯("구분·시간·내용")의 내용 열
   noMovement?: boolean | null; // 동선 배정이 필요 없는 블록(검증 공백 경고 제외)
+  note?: string | null; // 자유 메모 — 정리되지 않은 제작 메모를 시트 밖에서도 보존
+  source?: "sheet" | "manual" | "cloned";
 }
 
 /** 시간 블록 안의 이동 구간. 구간이 없는 레거시 블록은 화면에서 기본 구간으로 해석한다. */
@@ -180,7 +183,7 @@ export interface IguardSegment {
   label: string;
   zone?: "위" | "아래" | null;
   note?: string | null;
-  source?: "sheet" | "manual";
+  source?: "sheet" | "manual" | "cloned";
 }
 
 // ── 포스트(통제 지점) 정의 ──────────────────────────────────
@@ -188,6 +191,7 @@ export interface IguardPost {
   id: string;
   name: string;     // 예: "강당 엘베 앞", "배식구", "4층 층장"
   area?: string;    // 예: "4층", "식당", "강당"
+  source?: "manual" | "sheet" | "cloned";
 }
 
 // ── 동선 매트릭스: 구간 × 포스트 × 스탭(또는 미정 슬롯) ──────
@@ -204,7 +208,7 @@ export interface IguardMovement {
   detail?: string | null;  // 괄호 상세: "1층", "A동 1,2층"
   actor?: string | null;   // 비스탭 주체: "행정팀", "이가드sf"
   note?: string;
-  source?: "sheet" | "manual"; // 큐싯 자동배정과 현장 수동배정을 구분해 재동기화 시 수동배정을 보존
+  source?: "sheet" | "manual" | "cloned"; // 큐싯 자동배정과 현장 수동배정을 구분해 재동기화 시 수동배정을 보존
 }
 
 /** 기존 화면이 다루는, 실제 스탭이 지정된 동선. */
@@ -276,6 +280,7 @@ export interface IguardSeating {
   pinnedFront?: string | null; // 이 집회만 맨 앞자리(첫 구역)로 고정할 조. 예: "1조" 또는 "1조, 3조"(쉼표 순서대로 앞자리)
   zoneWeights?: number[] | null; // 앞열부터 자리 효용 점수. 값이 클수록 좋은 자리로 계산.
   zones: IguardSeatingZone[];
+  source?: "manual" | "cloned";
 }
 
 // ── 준비 할 일 (D-day 체크리스트) ───────────────────────────

@@ -9,6 +9,7 @@ export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
 import { normalizePartialAttendanceMap } from "./partialAttendance";
 import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "./defaultSegment";
+import { buildStructureClonePayload, occupiedCloneNodes, type CloneIdFactory, type IguardStructureSource } from "./structureClone";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -243,7 +244,14 @@ export async function saveIguardScheduleBlock(retreatId: string, data: Omit<Igua
   });
   return blockId;
 }
-export async function updateIguardScheduleBlock(retreatId: string, id: string, data: Partial<Omit<IguardScheduleBlock, "id">>): Promise<void> {
+export async function updateIguardScheduleBlock(
+  retreatId: string,
+  id: string,
+  data: Omit<Partial<Omit<IguardScheduleBlock, "id">>, "end" | "meal"> & {
+    end?: string | null;
+    meal?: boolean | null;
+  },
+): Promise<void> {
   await update(ref(db, paths.iguardScheduleBlock(retreatId, id)), stripUndefined(data));
 }
 export async function deleteIguardScheduleBlock(retreatId: string, id: string): Promise<void> {
@@ -279,7 +287,7 @@ export function subscribeToIguardSegments(
 }
 export async function saveIguardSegment(retreatId: string, data: Omit<IguardSegment, "id">): Promise<string> {
   const r = push(ref(db, paths.iguardSegments(retreatId)));
-  await set(r, stripUndefined(data));
+  await update(r, stripUndefined(data));
   return r.key!;
 }
 export async function updateIguardSegment(
@@ -310,7 +318,7 @@ export function subscribeToIguardPosts(retreatId: string, cb: (list: IguardPost[
 }
 export async function saveIguardPost(retreatId: string, data: Omit<IguardPost, "id">): Promise<string> {
   const r = push(ref(db, paths.iguardPosts(retreatId)));
-  await set(r, stripUndefined(data)); return r.key!;
+  await update(r, stripUndefined(data)); return r.key!;
 }
 export async function updateIguardPost(retreatId: string, id: string, data: Partial<Omit<IguardPost, "id">>): Promise<void> {
   await update(ref(db, paths.iguardPost(retreatId, id)), stripUndefined(data));
@@ -348,12 +356,84 @@ export async function setIguardSegmentMovement(
   data: Omit<IguardMovement, "id">,
 ): Promise<string> {
   const key = iguardMovementKey(data);
-  await set(ref(db, paths.iguardMovement(retreatId, key)), stripUndefined(data));
+  await update(ref(db, paths.iguardMovement(retreatId, key)), stripUndefined(data));
   return key;
 }
 
 export async function deleteIguardMovementById(retreatId: string, id: string): Promise<void> {
   await remove(ref(db, paths.iguardMovement(retreatId, id)));
+}
+
+export async function updateIguardMovementById(
+  retreatId: string,
+  id: string,
+  data: Partial<Omit<IguardMovement, "id">>,
+): Promise<void> {
+  await update(ref(db, paths.iguardMovement(retreatId, id)), stripUndefined(data));
+}
+
+/** 담당자·포스트 변경으로 자연키가 바뀔 때 이전 키 삭제와 새 키 생성을 원자적으로 처리한다. */
+export async function replaceIguardSegmentMovement(
+  retreatId: string,
+  oldId: string,
+  data: Omit<IguardMovement, "id">,
+): Promise<string> {
+  const nextId = iguardMovementKey(data);
+  if (nextId === oldId) {
+    await updateIguardMovementById(retreatId, oldId, data);
+    return nextId;
+  }
+  await update(ref(db), {
+    [paths.iguardMovement(retreatId, oldId)]: null,
+    [paths.iguardMovement(retreatId, nextId)]: stripUndefined(data),
+  });
+  return nextId;
+}
+
+/** 포스트 이름·장소 일괄 변경. 변경된 필드 경로만 한 번의 update로 보낸다. */
+export async function updateIguardPostFields(
+  retreatId: string,
+  changes: Record<string, Partial<Pick<IguardPost, "name" | "area">>>,
+): Promise<void> {
+  const updates: Record<string, string | null> = {};
+  Object.entries(changes).forEach(([postId, fields]) => {
+    if (fields.name !== undefined) updates[`${postId}/name`] = fields.name.trim();
+    if (fields.area !== undefined) updates[`${postId}/area`] = fields.area.trim() || null;
+  });
+  if (Object.keys(updates).length > 0) await update(ref(db, paths.iguardPosts(retreatId)), updates);
+}
+
+/** 다른 수련회의 큐싯 구조만 빈 대상에 복제한다. 사람·메모·배정·체크 상태는 복제하지 않는다. */
+export async function cloneIguardStructure(sourceRetreatId: string, targetRetreatId: string): Promise<number> {
+  if (!sourceRetreatId || sourceRetreatId === targetRetreatId) throw new Error("다른 원본 수련회를 선택해주세요.");
+  const [sourceSnap, targetSnap] = await Promise.all([
+    get(ref(db, paths.iguard(sourceRetreatId))),
+    get(ref(db, paths.iguard(targetRetreatId))),
+  ]);
+  if (!sourceSnap.exists()) throw new Error("원본 수련회에 복제할 이가드 구조가 없습니다.");
+  const occupied = occupiedCloneNodes(targetSnap.exists() ? targetSnap.val() : null);
+  if (occupied.length > 0) {
+    throw new Error(`대상에 이미 데이터가 있어 중단했습니다: ${occupied.join(", ")}`);
+  }
+  const targetRefFor = (node: Parameters<CloneIdFactory>[0]) => {
+    switch (node) {
+      case "schedule": return paths.iguardSchedule(targetRetreatId);
+      case "segments": return paths.iguardSegments(targetRetreatId);
+      case "posts": return paths.iguardPosts(targetRetreatId);
+      case "movements": return paths.iguardMovements(targetRetreatId);
+      case "seating": return paths.iguardSeating(targetRetreatId);
+      case "meals": return paths.iguardMeals(targetRetreatId);
+    }
+  };
+  const makeId: CloneIdFactory = node => push(ref(db, targetRefFor(node))).key!;
+  const relativePayload = buildStructureClonePayload(sourceSnap.val() as IguardStructureSource, makeId);
+  const updates: Record<string, unknown> = {};
+  Object.entries(relativePayload).forEach(([relativePath, value]) => {
+    updates[`${paths.iguard(targetRetreatId)}/${relativePath}`] = value;
+  });
+  if (Object.keys(updates).length === 0) throw new Error("원본에 복제 가능한 구조가 없습니다.");
+  await update(ref(db), updates);
+  return Object.keys(updates).length;
 }
 
 async function defaultSegmentForBlock(
