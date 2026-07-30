@@ -198,3 +198,9 @@ Production deploy is `npx vercel --prod --yes`, but only do this when explicitly
 - **접근법**: 1→ `src/app/retreat/[id]/ValidationView.tsx`의 항목을 운영 불변식 위반, 배정 완결성, 설명 통계로 분류한다. 2→ 겹치는 다른 장소 배정과 명단 불일치만 실제 오류로 남긴다. 3→ 동선 0회 스탭은 미배치 섹션에 따로 모은다. 4→ `src/lib/staffAssignmentStats.ts`에서 스탭별 실제 동선 수와 서로 다른 일정 수를 집계해 배정된 스탭만 많은 순서로 보여준다. 5→ 일부 일정은 의도적으로 조와 함께 움직일 수 있으므로 담당자가 없는 일정 자체는 경고에서 제외한다.
 - **판단 질문**: 전체 평균의 80% 같은 임의 기준으로 “과부하”를 판정하지 않는다. 행사마다 일정 수와 역할 밀도가 달라 같은 숫자의 의미가 달라지고, 사용자가 확인하려는 사실은 상대적 낙인이 아니라 실제 배정 횟수이기 때문이다. 미배치 스탭을 횟수 표에 다시 0회로 중복 노출하지도 않는다.
 - **재사용 규칙**: 운영 검증 화면은 `실제 불변식 오류 → 미배치 상태 → 사실 기반 업무량 통계` 순으로 분리하고, 의도 가능한 공백이나 상대적 임계값을 오류 문구로 만들지 않는다.
+
+### 긴 큐싯 편집값을 내부 스크롤 없이 전부 노출하기 (2026-07-31)
+
+- **접근법**: 1→ `src/app/retreat/[id]/ScheduleSheetEditor.tsx`의 내용·담당·특이사항 입력을 공통 `AutoGrowTextarea`로 바꾼다. 2→ 값이나 창 너비가 바뀔 때 높이를 `auto`로 초기화한 뒤 `scrollHeight + (offsetHeight - clientHeight)`로 다시 계산해 테두리까지 포함한 실제 높이를 맞춘다. 3→ `overflow-hidden resize-none`으로 내부 스크롤과 수동 높이 차이를 없애고, 공통 `.input`의 글자 크기 덮어쓰기는 `!text-[11px]`로 명시한다. 4→ 담당·동선 요약의 `slice()`와 `truncate`를 제거해 모든 줄을 줄바꿈으로 펼친다. 5→ 로그인된 연습 화면에서 모든 textarea의 `scrollHeight <= clientHeight`, `overflowY=hidden`, 실제 글자 크기 11px을 전수 측정한다.
+- **판단 질문**: 고정 `min-height`만 계속 늘리지 않는다. 데이터가 더 길어지면 다시 내부 스크롤이 생기고, 짧은 칸은 필요 이상으로 커진다. `height = scrollHeight`만 적용하지도 않는다. 전역 `box-sizing: border-box`에서 테두리만큼 실제 내용 높이가 2px 부족해질 수 있다. 담당 요약을 “외 N개”로 접어 화면 높이를 줄이지 않는다. 이 화면의 우선순위는 페이지 길이보다 전체 내용의 즉시 확인이다.
+- **재사용 규칙**: 긴 운영 텍스트를 한눈에 보여야 하는 편집 화면은 고정 높이와 셀 내부 스크롤 대신 콘텐츠 자동 높이, 테두리 보정, 실제 computed style 및 `scrollHeight/clientHeight` 전수 검증을 사용한다.

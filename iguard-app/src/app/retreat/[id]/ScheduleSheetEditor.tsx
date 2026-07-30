@@ -3,8 +3,10 @@
 import {
   type FocusEvent,
   type KeyboardEvent,
+  type TextareaHTMLAttributes,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -62,6 +64,43 @@ function sameDraft(a: SheetDraft, b: SheetDraft): boolean {
 
 function SheetFieldLabel({ children }: { children: string }) {
   return <div className="mb-1 text-[11px] font-semibold text-slate-400 lg:hidden">{children}</div>;
+}
+
+type AutoGrowTextareaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value"> & {
+  value: string;
+};
+
+function AutoGrowTextarea({
+  value,
+  className = "",
+  ...props
+}: AutoGrowTextareaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const resizeToContent = () => {
+      textarea.style.height = "auto";
+      const borderHeight = textarea.offsetHeight - textarea.clientHeight;
+      textarea.style.height = `${textarea.scrollHeight + borderHeight}px`;
+    };
+
+    resizeToContent();
+    window.addEventListener("resize", resizeToContent);
+    return () => window.removeEventListener("resize", resizeToContent);
+  }, [value]);
+
+  return (
+    <textarea
+      {...props}
+      ref={textareaRef}
+      rows={1}
+      value={value}
+      className={`input min-h-[240px] w-full resize-none overflow-hidden px-3 py-3 !text-[11px] !leading-[1.55] lg:min-h-[300px] ${className}`}
+    />
+  );
 }
 
 function SaveBadge({ state }: { state: SaveState }) {
@@ -272,9 +311,8 @@ function ScheduleSheetRow({
 
       <div>
         <SheetFieldLabel>내용</SheetFieldLabel>
-        <textarea
+        <AutoGrowTextarea
           aria-label={`${block.label} 내용`}
-          className="input min-h-[160px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[220px]"
           value={draft.detail}
           onChange={event => change("detail", event.target.value)}
           placeholder="분 단위 진행 내용과 준비 사항"
@@ -283,23 +321,19 @@ function ScheduleSheetRow({
 
       <div>
         <SheetFieldLabel>담당·동선</SheetFieldLabel>
-        <textarea
+        <AutoGrowTextarea
           aria-label={`${block.label} 담당`}
-          className="input min-h-[160px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[220px]"
           value={draft.owner}
           onChange={event => change("owner", event.target.value)}
           placeholder={"장소: 담당자 형식으로 적으면 포스트·동선에 자동 반영됩니다.\n예) 강당 입구: 김민수, 이영희"}
         />
         <div className="mt-1.5 space-y-1">
-          {assignmentLines.slice(0, 3).map(line => (
-            <div key={`${line.segmentId}-${line.postId}`} className="truncate text-[11px] text-slate-500" title={`${line.segmentLabel} · ${line.postLabel}: ${line.assignees.join(", ")}`}>
+          {assignmentLines.map(line => (
+            <div key={`${line.segmentId}-${line.postId}`} className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-500">
               <span className="font-semibold text-fuchsia-600">{line.segmentLabel}</span>
               {" · "}{line.postLabel}: {line.assignees.join(", ")}
             </div>
           ))}
-          {assignmentLines.length > 3 && (
-            <div className="text-[11px] text-slate-400">외 {assignmentLines.length - 3}개 장소</div>
-          )}
           {assignmentLines.length === 0 && !draft.noMovement && (
             <div className="text-[11px] text-amber-600">구조화된 동선 배정 없음</div>
           )}
@@ -308,9 +342,8 @@ function ScheduleSheetRow({
 
       <div>
         <SheetFieldLabel>특이사항</SheetFieldLabel>
-        <textarea
+        <AutoGrowTextarea
           aria-label={`${block.label} 특이사항`}
-          className="input min-h-[160px] w-full resize-y px-3 py-3 text-[13px] leading-relaxed lg:min-h-[220px]"
           value={draft.notice}
           onChange={event => change("notice", event.target.value)}
           placeholder="주의사항·준비물·예외"

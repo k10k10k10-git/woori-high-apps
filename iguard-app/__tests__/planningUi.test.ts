@@ -13,9 +13,18 @@ describe("기획 화면 가독성 계약", () => {
     expect(guide).toContain("min-w-[96px] whitespace-nowrap px-4 text-sm");
   });
 
-  it("큐싯 본문 셀은 내부 스크롤을 줄이도록 충분한 기본 높이를 둔다", () => {
+  it("큐싯 본문 셀은 내부 스크롤·잘림 없이 내용 높이만큼 모두 펼친다", () => {
     const schedule = read("src/app/retreat/[id]/ScheduleSheetEditor.tsx");
-    expect(schedule.match(/lg:min-h-\[220px\]/g)).toHaveLength(3);
+    expect(schedule).toContain('textarea.style.height = "auto"');
+    expect(schedule).toContain("textarea.scrollHeight");
+    expect(schedule).toContain("textarea.offsetHeight - textarea.clientHeight");
+    expect(schedule).toContain("overflow-hidden");
+    expect(schedule).toContain("resize-none");
+    expect(schedule).toContain("!text-[11px]");
+    expect(schedule).toContain("lg:min-h-[300px]");
+    expect(schedule).toContain("assignmentLines.map");
+    expect(schedule).not.toContain("assignmentLines.slice(0, 3)");
+    expect(schedule).not.toContain('className="truncate text-[11px] text-slate-500"');
   });
 
   it("공백·과부하 경고 대신 미배치와 실제 배정 횟수를 분리한다", () => {
