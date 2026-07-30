@@ -16,8 +16,18 @@ describe("in-app schedule editor infrastructure", () => {
 
   it("exposes block, segment, assignee, clone, and bulk post editing", () => {
     const schedule = read("src/app/retreat/[id]/ScheduleView.tsx");
-    expect(schedule).toContain("<ScheduleBlockEditor");
-    expect(schedule).toContain("<ScheduleSegmentEditor");
+    const sheetEditor = read("src/app/retreat/[id]/ScheduleSheetEditor.tsx");
+    const roster = read("src/app/retreat/[id]/ScheduleStaffRoster.tsx");
+    const db = read("src/lib/db.ts");
+    expect(schedule).toContain("<ScheduleSheetEditor");
+    expect(sheetEditor).toContain("<ScheduleSegmentEditor");
+    expect(sheetEditor).toContain('role="dialog"');
+    expect(sheetEditor).toContain("행을 벗어나면 자동 저장");
+    expect(sheetEditor).toContain("advancedTriggerRef.current?.focus()");
+    expect(sheetEditor).toContain("if (await save()) onOpenAdvanced()");
+    expect(roster).toContain("--schedule-roster-h");
+    expect(db).toContain("updateIguardScheduleBlock");
+    expect(db).toContain("update(ref(db, paths.iguardScheduleBlock");
     expect(schedule).toContain("<StructureClonePanel");
     expect(schedule).not.toContain("<CueSheetFreshnessBanner");
     expect(read("src/app/retreat/[id]/PostsView.tsx")).toContain("updateIguardPostFields");
@@ -33,7 +43,7 @@ describe("in-app schedule editor infrastructure", () => {
   });
 
   it("marks field progress and lets cue cards prefer the progress marker", () => {
-    expect(read("src/app/retreat/[id]/ScheduleView.tsx")).toContain("지금 여기까지");
+    expect(read("src/app/retreat/[id]/ScheduleSheetEditor.tsx")).toContain('activeProgress ? "진행 중" : "지금 여기"');
     const execution = read("src/app/retreat/[id]/ExecutionViews.tsx");
     expect(execution).toContain("progressCurrentBlock(schedule)");
     expect(execution).toContain("progressBlock || currentBlockFor");

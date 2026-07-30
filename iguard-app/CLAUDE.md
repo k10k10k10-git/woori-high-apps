@@ -255,6 +255,14 @@ AccessLevel = "none" | "staff" | "team" | "admin"
 - 🔒 **`Student.phone`·`Student.pPhone`·`TeacherAttendance.idNumber`를 인덱스에 담지 않는다.** 검색은 `staff` 접근 레벨도 쓰는 화면이다. 테스트가 직렬화 결과에 이 값들이 없음을 확인한다.
 - 초성 검색은 `toChosung`(완성형 → 초성)만 사용한다. 시간 판정이 필요하면 `scheduleTime`의 헬퍼 결과(`currentBlockId`)를 인자로 받고, 인덱스 안에서 시:분을 비교하지 않는다(패턴 11).
 
+### 28. 큐싯 작성 화면은 시트처럼 평탄화하되 저장 구조는 유지한다 (`ScheduleSheetEditor.tsx`, 2026-07-30)
+
+기본 작성 화면은 한 행에서 시간·구분·내용·담당·특이사항을 이어서 수정한다. 행을 벗어나면 `updateIguardScheduleBlock()`로 해당 블록만 저장하고, `⌘/Ctrl + Enter`도 같은 저장 경로를 사용한다. 상세 설정을 열기 전에는 현재 행을 먼저 저장한다.
+
+구간·포스트·담당자는 기존 `segments`와 `movements`를 그대로 사용한다. `scheduleSheet.ts`가 한 행에 읽기 전용 배정 요약을 만들고, 실제 구조 편집은 우측 상세 패널의 `ScheduleSegmentEditor`에서 한다. 화면을 단순하게 만들기 위해 블록·구간·동선을 하나의 새 레코드로 합치거나 전체 목록을 덮어쓰면 안 된다.
+
+상단 열 제목과 일차 제목은 앱 헤더 및 스탭 명단 아래에 고정한다. 스탭 명단의 실제 높이는 `ResizeObserver`로 `--schedule-roster-h`에 기록해 접기·펼치기 뒤에도 겹치지 않게 한다. 모바일은 같은 필드를 세로 카드로 바꾸고 가로 스크롤을 강제하지 않는다.
+
 ---
 
 ## API 라우트
@@ -317,6 +325,8 @@ Vitest 기반, `@` 경로 별칭 설정 완료 (`vitest.config.ts`).
 | `accessLock.test.ts` | 수련회 PIN 잠금 | 형식, PBKDF2 검증, salt, 세션 무효화 |
 | `inAppBrowser.test.ts` | 인앱 브라우저 탈출 | 인앱 판정, 플랫폼별 전략, **현재 주소 재이동 금지 불변식**, 세션 1회 제한 |
 | `personIndex.test.ts` | 전역 검색 | 초성 변환·검색, 취소/부분참 배지, **취소자·자차 교사 호차 미표시**, 민감정보 미포함, 정렬·limit |
+| `scheduleSheet.test.ts` | 시트형 큐싯 요약 | 구간 순서·포스트별 담당 묶음, 명단 불일치·미정 담당 표시 |
+| `scheduleEditorInfrastructure.test.ts` | 큐싯 편집 인프라 | 레코드 단위 저장, 시트형 편집·상세 패널·포커스 복원·고정 헤더 높이 계약 |
 
 ---
 

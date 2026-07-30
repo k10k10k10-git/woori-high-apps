@@ -18,6 +18,7 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
   const [showLate, setShowLate] = useState(true);
   const [showGroupException, setShowGroupException] = useState(true);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const rosterRef = useRef<HTMLDivElement | null>(null);
   const assignedStaff = useMemo(() => new Set(movements.map(mv => mv.staffId)), [movements]);
   const sortedStaff = useMemo(
     () => [...staff].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "ko")),
@@ -77,6 +78,21 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
     };
   }, [openStaffId]);
 
+  useEffect(() => {
+    const element = rosterRef.current;
+    if (!element) return;
+    const apply = () => document.documentElement.style.setProperty("--schedule-roster-h", `${element.offsetHeight}px`);
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(element);
+    window.addEventListener("resize", apply);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", apply);
+      document.documentElement.style.removeProperty("--schedule-roster-h");
+    };
+  }, []);
+
   function chipClasses(assigned: boolean, active: boolean): string {
     // 배정 여부는 "연한 파랑 배경 + 파란 점"으로 표시 → 이름의 corps 색(빨강/볼드/밑줄)과 겹치지 않게
     return `inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
@@ -97,7 +113,7 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
   }
 
   return (
-    <div className="sticky z-10 mb-3 rounded-lg border border-slate-200 bg-white/95 p-2.5 shadow-sm backdrop-blur" style={{ top: "var(--ig-header-h, 92px)" }}>
+    <div ref={rosterRef} className="sticky z-10 mb-3 rounded-lg border border-slate-200 bg-white/95 p-2.5 shadow-sm backdrop-blur" style={{ top: "var(--ig-header-h, 92px)" }}>
       <div className="relative mb-1 flex flex-wrap items-start justify-between gap-2">
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-xs font-semibold text-slate-600">스탭 명단</span>
