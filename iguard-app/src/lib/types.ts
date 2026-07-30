@@ -135,6 +135,13 @@ export interface IguardMealEntry {
   round?: "선밥" | "후밥";    // 레거시 — 미사용
 }
 
+/** 조별 GBS 장소. 조 목록은 행정 groups를 참조하고 장소만 이가드가 소유한다. */
+export interface IguardGbsPlace {
+  groupId: string;
+  place: string;
+  updatedAt?: number;
+}
+
 // ── 이가드 스탭 명단 (교사와 별개) ──────────────────────────
 export interface IguardStaff {
   id: string;

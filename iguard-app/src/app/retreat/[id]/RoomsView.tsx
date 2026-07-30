@@ -1,12 +1,13 @@
 "use client";
 import { useMemo } from "react";
-import { Group, Room, IguardBus, IguardMeal, IguardStaff, PartialAttendanceMap, Student } from "@/lib/types";
+import { Group, Room, IguardBus, IguardGbsPlace, IguardMeal, IguardStaff, PartialAttendanceMap, Student } from "@/lib/types";
 import { printAsPDF, escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { resolveGroupStaffNames } from "@/lib/groupStaffNames";
 import { buildMealOrderSummaries } from "@/lib/mealOrder";
 import { isCancelledStudent } from "@/lib/busParticipation";
+import { effectiveGbsPlace } from "@/lib/gbsPlaces";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
@@ -24,13 +25,14 @@ interface BusInfo { day: 1 | 3; busNo: number; staff?: string; gender?: "남" | 
 interface DayVisitor { name: string; day?: number; }
 interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; dayVisitors: DayVisitor[]; }
 
-export default function RoomsView({ groups, rooms, buses, meals, staff, groupStaff, students, partial, cellColors, retreatName, year }: {
+export default function RoomsView({ groups, rooms, buses, meals, staff, groupStaff, gbs, students, partial, cellColors, retreatName, year }: {
   groups: Group[];
   rooms: Room[];
   buses: IguardBus[];
   meals: IguardMeal[];
   staff: IguardStaff[];
   groupStaff: Record<string, string[]>;
+  gbs: Record<string, IguardGbsPlace>;
   students: Record<string, Student>;
   partial: PartialAttendanceMap;
   cellColors: Record<string, string>;
@@ -73,7 +75,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
         }))
         .sort((a, b) => a.day - b.day);
       return {
-        group: g, nam, yeo, etc, gbs: g.gbs,
+        group: g, nam, yeo, etc, gbs: effectiveGbsPlace(g, gbs),
         unassigned: memberSet.size - assigned.size,
         teachers: g.teachers || [],
         leader: parseNames(g.leader || ""),
@@ -82,7 +84,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
         dayVisitors,
       };
     });
-  }, [groups, rooms, buses, staff, groupStaff, students, partial, cellColors]);
+  }, [groups, rooms, buses, staff, groupStaff, gbs, students, partial, cellColors]);
 
   const mealSummaries = useMemo(() => buildMealOrderSummaries(meals, groups), [meals, groups]);
 
@@ -110,7 +112,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
   return (
     <div>
       <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
-        ℹ️ 조별 교사·스탭·GBS·숙소입니다. <strong>행정 사이트의 방배정·조편성</strong>에서 자동으로 계산됩니다(조원이 들어있는 호실 기준). 바뀌면 실시간 반영.
+        ℹ️ 조별 교사·스탭·GBS·숙소입니다. 방·조 정보는 <strong>행정 사이트</strong>, GBS 장소는 <strong>이가드 기획 탭</strong> 값을 우선해 실시간 반영합니다.
       </div>
 
       {mealSummaries.length > 0 && (

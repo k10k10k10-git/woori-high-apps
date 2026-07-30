@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement, Retreat, RetreatPeriod } from "@/lib/types";
+import { Group, IguardGbsPlace, IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement, Retreat, RetreatPeriod } from "@/lib/types";
 import {
   nowHHMM, todayStr, addDays, formatShortDate, normalizeText, activePeriod, retreatDateForDay,
   periodRangeLabel, currentRetreatDay, isOpenEndedBlock, toMinutes, compareBlocks, isNowOn,
@@ -10,6 +10,7 @@ import { chooseCueCardStaffId, findPreferredStaffId } from "@/lib/staffIdentity"
 import {
   cueTimelineListBlocks, cueTimelineScrollTop, cueTimelineWindow, type CueTimelinePhase,
 } from "@/lib/cueCardTimeline";
+import { gbsPlacesForStaff } from "@/lib/gbsPlaces";
 
 interface Data {
   staff: IguardStaff[];
@@ -19,6 +20,9 @@ interface Data {
   retreat?: Retreat;
   periods?: RetreatPeriod[];   // 준비일정의 "수련회 기간" — 오늘이 며칠차인지 계산용
   preferredStaffNames?: string[];
+  groups?: Group[];
+  groupStaff?: Record<string, string[]>;
+  gbs?: Record<string, IguardGbsPlace>;
 }
 
 function useClock() {
@@ -90,7 +94,10 @@ function BlockTextSummary({ block }: { block: IguardScheduleBlock }) {
 // ════════════════════════════════════════════════════════════
 // 개인 큐카드 (스탭 1인의 시간순 동선) — 모바일
 // ════════════════════════════════════════════════════════════
-export function CueCardView({ staff, schedule, posts, movements, retreat, periods, preferredStaffNames = [] }: Data) {
+export function CueCardView({
+  staff, schedule, posts, movements, retreat, periods, preferredStaffNames = [],
+  groups = [], groupStaff = {}, gbs = {},
+}: Data) {
   const clock = useClock();
   const curDay = currentRetreatDay(periods, retreat);
   const [staffId, setStaffId] = useState("");
@@ -162,6 +169,10 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
   const nextMove = nextBlock ? myMoves.get(nextBlock.id) : null;
   const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
   const selectedStaff = staff.find(s => s.id === staffId);
+  const selectedStaffGbs = useMemo(
+    () => gbsPlacesForStaff(staffId, selectedStaff?.name, groups, groupStaff, gbs),
+    [staffId, selectedStaff?.name, groups, groupStaff, gbs],
+  );
   const currentDutyLines = currentBlock ? dutyLinesForStaff(currentBlock, selectedStaff?.name) : [];
   const nextDutyLines = nextBlock ? dutyLinesForStaff(nextBlock, selectedStaff?.name) : [];
 
@@ -202,6 +213,22 @@ export function CueCardView({ staff, schedule, posts, movements, retreat, period
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
+        <div className="mt-2 flex min-h-10 items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs">
+          <span className="shrink-0 font-semibold text-indigo-700">우리 조 GBS 장소</span>
+          {selectedStaffGbs.length > 0 ? (
+            <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-indigo-900">
+              {selectedStaffGbs.flatMap(summary =>
+                summary.groups.map(group => (
+                  <span key={`${summary.place}-${group.id}`}>
+                    {group.bu} {group.label} · <strong>{summary.place}</strong>
+                  </span>
+                )),
+              )}
+            </span>
+          ) : (
+            <span className="text-indigo-400">담당 조 또는 장소가 지정되지 않았습니다.</span>
+          )}
+        </div>
       </div>
       <div
         ref={pinnedCardsRef}

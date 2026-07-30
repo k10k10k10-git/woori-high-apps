@@ -4,7 +4,7 @@ import { paths } from "./paths";
 import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardSegment, IguardPost, IguardMovement, IguardBus, IguardSeating,
   RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
-  IguardAccessLock } from "./types";
+  IguardAccessLock, IguardGbsPlace } from "./types";
 export { snapToList } from "./snapToList";
 import { snapToList } from "./snapToList";
 import { normalizePartialAttendanceMap } from "./partialAttendance";
@@ -544,6 +544,23 @@ export async function updateIguardGroupStaffEntries(retreatId: string, entries: 
   const updates: Record<string, string[] | null> = {};
   Object.entries(entries).forEach(([gid, ids]) => { updates[gid] = ids && ids.length > 0 ? ids : null; });
   await update(ref(db, paths.iguardGroupStaff(retreatId)), updates);
+}
+
+// ── 조별 GBS 장소 (iguard/gbs) ──────────────────────────────
+// 행정 groups의 gbs 필드는 읽기 폴백으로만 두고, 새 편집값은 이가드 소유 경로의 조 한 건만 갱신한다.
+export function subscribeToIguardGbs(retreatId: string, cb: (map: Record<string, IguardGbsPlace>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.iguardGbs(retreatId)), (snap) =>
+    cb(snap.exists() ? (snap.val() as Record<string, IguardGbsPlace>) : {}),
+    (error) => { console.warn("subscribeToIguardGbs error:", error); onError?.(error); });
+}
+export async function saveIguardGbsPlace(retreatId: string, groupId: string, place: string): Promise<void> {
+  const value = place.trim();
+  const target = ref(db, paths.iguardGbsGroup(retreatId, groupId));
+  if (!value) {
+    await remove(target);
+    return;
+  }
+  await update(target, { groupId, place: value, updatedAt: Date.now() });
 }
 
 // 준비 할 일은 전역 prepMilestones(행정과 공유)를 사용한다. iguard/todos는 폐기됨.
