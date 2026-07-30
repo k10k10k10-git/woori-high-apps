@@ -24,4 +24,15 @@ describe("조별정보 식사순서 모바일 레이아웃", () => {
     expect(source).toContain('partial[id]?.type !== "당일참석"');
     expect(source).toContain("unassigned: memberSet.size - assigned.size");
   });
+
+  it("숙소 칩에 방별 활성 학생 이름을 표시하고 인쇄에도 포함한다", () => {
+    const source = readFileSync(
+      new URL("../src/app/retreat/[id]/RoomsView.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).toContain("studentNames: mine.map(id => students[id]?.name");
+    expect(source).toContain('{c.studentNames.join(", ")}');
+    expect(source).toContain('${c.studentNames.join(", ")}');
+  });
 });

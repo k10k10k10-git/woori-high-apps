@@ -19,7 +19,7 @@ const roomSort = (a: Room, b: Room) => {
   return a.roomNumber.localeCompare(b.roomNumber, "ko", { numeric: true });
 };
 
-interface RoomChip { roomNumber: string; count: number; }
+interface RoomChip { roomNumber: string; count: number; studentNames: string[]; }
 interface BusInfo { day: 1 | 3; busNo: number; staff?: string; gender?: "남" | "여"; }
 interface DayVisitor { name: string; day?: number; }
 interface GroupRooms { group: Group; nam: RoomChip[]; yeo: RoomChip[]; etc: RoomChip[]; gbs?: string; unassigned: number; teachers: string[]; leader: string[]; staff: string[]; buses: BusInfo[]; dayVisitors: DayVisitor[]; }
@@ -54,7 +54,11 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
         const mine = (r.studentIds || []).filter(id => memberSet.has(id));
         if (mine.length === 0) return;
         mine.forEach(id => assigned.add(id));
-        const chip = { roomNumber: roomLabel(r), count: mine.length };
+        const chip = {
+          roomNumber: roomLabel(r),
+          count: mine.length,
+          studentNames: mine.map(id => students[id]?.name ?? "(명단 미상)"),
+        };
         if ((r.type || "").includes("남")) nam.push(chip);
         else if ((r.type || "").includes("여")) yeo.push(chip);
         else etc.push(chip);
@@ -86,7 +90,9 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
 
   function print() {
     if (data.length === 0) return toast("조편성 데이터가 없습니다.", "warning");
-    const chips = (arr: RoomChip[]) => arr.length ? escapeHtml(arr.map(c => `${c.roomNumber}(${c.count})`).join(", ")) : "—";
+    const chips = (arr: RoomChip[]) => arr.length
+      ? escapeHtml(arr.map(c => `${c.roomNumber}(${c.count}) · ${c.studentNames.join(", ")}`).join(" / "))
+      : "—";
     let html = `<h1>조장용 방배정표</h1><div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · 출력 ${new Date().toLocaleString("ko-KR")}</div>
       <table><thead><tr><th>조</th><th>교사</th><th>조장</th><th>스탭</th><th>당일참석</th><th>GBS 장소</th><th>남자 숙소</th><th>여자 숙소</th></tr></thead><tbody>`;
     data.forEach(d => {
@@ -212,7 +218,15 @@ function RoomRow({ label, cls, chips }: { label: string; cls: string; chips: Roo
       <div className="flex flex-wrap gap-1">
         {chips.length === 0 ? <span className="text-slate-300 text-xs">—</span> :
           chips.map((c, i) => (
-            <span key={i} className="px-1.5 py-0.5 rounded text-xs bg-slate-100 text-slate-700">{c.roomNumber} <span className="text-slate-400">{c.count}</span></span>
+            <span key={i} className="max-w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700">
+              <span className="flex items-center gap-1 font-medium">
+                {c.roomNumber}
+                <span className="text-slate-400">{c.count}명</span>
+              </span>
+              <span className="mt-0.5 block break-keep leading-relaxed text-slate-600">
+                {c.studentNames.join(", ")}
+              </span>
+            </span>
           ))}
       </div>
     </div>
