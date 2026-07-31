@@ -7,9 +7,14 @@ import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
-import { TEACHER_STATUS_CLS, LATE_REGISTRANT_COLORS } from "@/lib/constants";
+import { TEACHER_STATUS_CLS } from "@/lib/constants";
 import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
-import { autoAssignRooms, classifyRoomAdult, makeExternalAdults, summarizeRoomAutoClasses, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
+import { autoAssignRooms, makeExternalAdults, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
+import {
+  findLateRegistrantIds, findDayAttendanceIds, findUnassignedStudentIds,
+  findUnassignedTeachers, findRoomStudentCandidateIds,
+  toRoomAutoStudents, toRoomAutoAdults, toRoomClassOptions,
+} from "@/lib/roomsBoard";
 import type { RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
 import RoomAutoAssignPanel, { type RoomClassOption } from "./RoomAutoAssignPanel";
 import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
@@ -226,66 +231,32 @@ export default function RoomsTab({ retreat }: Props) {
     markClean();
   }
 
-  // 후기 신청자: 색칠(blue/orange)되었지만 폼 미신청인 학생
-  const lateRegistrantIds = useMemo(() => {
-    const pSet = new Set(participantIds);
-    return Object.entries(cellColors)
-      .filter(([sid, color]) => LATE_REGISTRANT_COLORS.has(color) && !pSet.has(sid) && !!students[sid])
-      .map(([sid]) => sid);
-  }, [cellColors, participantIds, students]);
+  // 아래 파생 계산의 본문은 lib/roomsBoard.ts에 있다 (특성화 테스트: roomsBoard.test.ts).
+  const lateRegistrantIds = useMemo(
+    () => findLateRegistrantIds(cellColors, participantIds, students),
+    [cellColors, participantIds, students]);
 
-  const dayAttendanceIds = useMemo(() => new Set(
-    partialAttendances.filter(item => item.type === "당일참석").map(item => item.id)
-  ), [partialAttendances]);
+  const dayAttendanceIds = useMemo(
+    () => findDayAttendanceIds(partialAttendances), [partialAttendances]);
 
-  // 전체 미배정: 기존 미배정 + 후기 신청자 중 방에 미배정된 인원
-  // 신청취소(red) 학생은 풀에서 제외 — 취소자 제거 후 리로드 시 재등장 방지
-  const allUnassigned = useMemo(() => {
-    const assignedSet = new Set(rooms.flatMap(r => r.studentIds || []));
-    const lateUnassigned = lateRegistrantIds.filter(id => !assignedSet.has(id));
-    return [...unassigned, ...lateUnassigned].filter(id => cellColors[id] !== "red" && !dayAttendanceIds.has(id));
-  }, [unassigned, lateRegistrantIds, rooms, cellColors, dayAttendanceIds]);
+  const allUnassigned = useMemo(
+    () => findUnassignedStudentIds({ unassigned, lateRegistrantIds, rooms, cellColors, dayAttendanceIds }),
+    [unassigned, lateRegistrantIds, rooms, cellColors, dayAttendanceIds]);
 
-  const unassignedTeachers = useMemo(() => {
-    const assigned = new Set(rooms.flatMap(r => r.teachers || []));
-    return allTeachers.filter(t => t.status !== "불참" && !assigned.has(t.name));
-  }, [rooms, allTeachers]);
+  const unassignedTeachers = useMemo(
+    () => findUnassignedTeachers(rooms, allTeachers), [rooms, allTeachers]);
 
-  // 이름 검색에서는 미배정뿐 아니라 다른 방에 배정된 사람도 찾아 "이동"할 수 있다.
-  // 신청취소자는 검색 후보에서 제외하고, 현장 등록자는 참가자 목록과 합친다.
-  const roomStudentCandidateIds = useMemo(() =>
-    [...new Set([...participantIds, ...lateRegistrantIds])]
-      .filter(id => cellColors[id] !== "red" && !dayAttendanceIds.has(id)),
-  [participantIds, lateRegistrantIds, cellColors, dayAttendanceIds]);
+  const roomStudentCandidateIds = useMemo(
+    () => findRoomStudentCandidateIds({ participantIds, lateRegistrantIds, cellColors, dayAttendanceIds }),
+    [participantIds, lateRegistrantIds, cellColors, dayAttendanceIds]);
 
-  const roomAutoStudents = useMemo<RoomAutoStudent[]>(() => roomStudentCandidateIds.flatMap(id => {
-    const student = students[id];
-    if (!student) return [];
-    const gender = student.gender === "남" || student.gender === "여"
-      ? student.gender
-      : student.class % 2 === 1 ? "남" : "여";
-    return [{
-      id,
-      name: student.name,
-      bu: student.bu ?? (student.buNum === 1 ? "1부" : student.buNum === 2 ? "2부" : "미상"),
-      grade: student.grade,
-      classNum: student.class,
-      gender,
-    }];
-  }), [roomStudentCandidateIds, students]);
+  const roomAutoStudents = useMemo<RoomAutoStudent[]>(
+    () => toRoomAutoStudents(roomStudentCandidateIds, students), [roomStudentCandidateIds, students]);
 
-  const roomAutoAdults = useMemo(() => allTeachers
-    .filter(teacher => teacher.status !== "불참")
-    .map(classifyRoomAdult), [allTeachers]);
-  const roomAutoClasses = useMemo<RoomClassOption[]>(() =>
-    summarizeRoomAutoClasses(roomAutoStudents, roomAutoAdults).map(summary => {
-      const [bu, grade, classNum] = summary.classKey.split("-");
-      return {
-        ...summary,
-        label: `${bu} ${Number(grade)}학년 ${Number(classNum)}반`,
-      };
-    }).sort((a, b) => a.label.localeCompare(b.label, "ko", { numeric: true })),
-  [roomAutoStudents, roomAutoAdults]);
+  const roomAutoAdults = useMemo(() => toRoomAutoAdults(allTeachers), [allTeachers]);
+
+  const roomAutoClasses = useMemo<RoomClassOption[]>(
+    () => toRoomClassOptions(roomAutoStudents, roomAutoAdults), [roomAutoStudents, roomAutoAdults]);
   const detectedAudioCount = roomAutoAdults.filter(adult => adult.category === "audio").length;
   const detectedMedicalCount = roomAutoAdults.filter(adult => adult.category === "medical").length;
   const detectedStaffCount = roomAutoAdults.filter(adult => adult.category === "staff").length;
