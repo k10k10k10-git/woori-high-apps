@@ -11,7 +11,7 @@ import {
   cueTimelineListBlocks, cueTimelineScrollTop, cueTimelineWindow, type CueTimelinePhase,
 } from "@/lib/cueCardTimeline";
 import { gbsPlacesForStaff } from "@/lib/gbsPlaces";
-import { dutyLabelsForStaff } from "@/lib/personalDuty";
+import { dutyLabelsForStaff, dutyLinesForStaff, visibleNoticeLines } from "@/lib/personalDuty";
 
 interface Data {
   retreatId?: string;
@@ -34,38 +34,6 @@ function useClock() {
     return () => window.clearInterval(id);
   }, []);
   return clock;
-}
-function textLines(value?: string | null): string[] {
-  return (value || "").split(/\n+/).map(line => line.trim()).filter(Boolean);
-}
-function visibleNoticeLines(value?: string | null): string[] {
-  const lines = textLines(value);
-  const visible: string[] = [];
-  let inRosterMemo = false;
-
-  for (const line of lines) {
-    const compact = line.replace(/\s+/g, "");
-    if (/^스탭명단/.test(compact)) {
-      inRosterMemo = true;
-      continue;
-    }
-    if (/^\*\s*(볼드체|밑줄|파란색|빨간색)/.test(line)) continue;
-    if (inRosterMemo) continue;
-    visible.push(line);
-  }
-  return visible;
-}
-function dutyLinesForStaff(block: IguardScheduleBlock, staffName?: string): string[] {
-  if (!staffName) return [];
-  const all = [...textLines(block.owner), ...visibleNoticeLines(block.notice)];
-  const picked: string[] = [];
-  all.forEach((line, index) => {
-    if (!line.includes(staffName)) return;
-    const prev = all[index - 1];
-    if (prev && !prev.includes(staffName) && /[:：]$/.test(prev.trim()) && !picked.includes(prev)) picked.push(prev);
-    if (!picked.includes(line)) picked.push(line);
-  });
-  return picked;
 }
 function TextBlock({ title, children, tone = "slate" }: { title: string; children: string; tone?: "slate" | "fuchsia" | "amber" }) {
   const cls = tone === "fuchsia"

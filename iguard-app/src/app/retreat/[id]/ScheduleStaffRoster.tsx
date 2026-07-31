@@ -1,15 +1,16 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, IguardScheduleBlock, IguardStaff, IguardPost, AssignedIguardMovement } from "@/lib/types";
+import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "@/lib/cueSheet";
+import { dutyLabelsForStaff, dutyLinesForStaff } from "@/lib/personalDuty";
 
 export default function StaffRosterBar({ staff, groups, schedule, posts, movements, absentStaffNames = [] }: {
   staff: IguardStaff[];
   groups: Group[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
-  movements: AssignedIguardMovement[];
+  movements: IguardMovement[];
   absentStaffNames?: string[];
 }) {
   const [openStaffId, setOpenStaffId] = useState<string | null>(null);
@@ -19,7 +20,15 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
   const [showGroupException, setShowGroupException] = useState(true);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const rosterRef = useRef<HTMLDivElement | null>(null);
-  const assignedStaff = useMemo(() => new Set(movements.map(mv => mv.staffId)), [movements]);
+  const assignedStaff = useMemo(() => {
+    const ids = new Set(movements.flatMap(movement => movement.staffId ? [movement.staffId] : []));
+    staff.forEach(member => {
+      if (schedule.some(block => dutyLabelsForStaff(dutyLinesForStaff(block, member.name), member.name).length > 0)) {
+        ids.add(member.id);
+      }
+    });
+    return ids;
+  }, [movements, schedule, staff]);
   const sortedStaff = useMemo(
     () => [...staff].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "ko")),
     [staff]
@@ -55,6 +64,17 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
       .map(mv => ({ movement: mv, block: scheduleMap.get(mv.blockId), post: postMap.get(mv.postId) }))
       .sort((a, b) => scheduleSortValue(a.block).localeCompare(scheduleSortValue(b.block)));
   }, [movements, openStaff, postMap, scheduleMap]);
+
+  const staffDuties = useMemo(() => {
+    if (!openStaff) return [];
+    return schedule
+      .map(block => ({
+        block,
+        labels: dutyLabelsForStaff(dutyLinesForStaff(block, openStaff.name), openStaff.name),
+      }))
+      .filter(item => item.labels.length > 0)
+      .sort((a, b) => scheduleSortValue(a.block).localeCompare(scheduleSortValue(b.block)));
+  }, [openStaff, schedule]);
 
   useEffect(() => {
     if (!openStaffId) return;
@@ -234,8 +254,8 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
                 )}
 
                 <div>
-                  <div className="text-[11px] font-semibold text-slate-400">동선</div>
-                  {staffMovements.length > 0 ? (
+                  <div className="text-[11px] font-semibold text-slate-400">동선·담당</div>
+                  {staffMovements.length > 0 || staffDuties.length > 0 ? (
                     <div className="mt-1 max-h-56 space-y-1 overflow-y-auto pr-1">
                       {staffMovements.map(({ movement, block, post }) => (
                         <div key={movement.id} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
@@ -247,9 +267,18 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
                           {movement.note && <div className="mt-0.5 text-[11px] text-slate-400">{movement.note}</div>}
                         </div>
                       ))}
+                      {staffDuties.map(({ block, labels }) => (
+                        <div key={`duty-${block.id}`} className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-2.5 py-2">
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="font-mono text-slate-500">{block.day}일차 {timeRangeLabel(block.start, block.end)}</span>
+                            <span className="font-medium text-slate-700">{block.label}</span>
+                          </div>
+                          <div className="mt-1 text-xs font-medium text-fuchsia-700">담당 · {labels.join(" · ")}</div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    <div className="mt-1 text-xs text-slate-400">배정된 동선 없음</div>
+                    <div className="mt-1 text-xs text-slate-400">배정된 동선·담당 없음</div>
                   )}
                 </div>
               </div>

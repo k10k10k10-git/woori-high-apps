@@ -20,6 +20,7 @@ describe("in-app schedule editor infrastructure", () => {
     const roster = read("src/app/retreat/[id]/ScheduleStaffRoster.tsx");
     const db = read("src/lib/db.ts");
     expect(schedule).toContain("<ScheduleSheetEditor");
+    expect(schedule).toContain("movements={movementRecords}");
     expect(sheetEditor).toContain("<ScheduleSegmentEditor");
     expect(sheetEditor).toContain('role="dialog"');
     expect(sheetEditor).toContain("행을 벗어나면 자동 저장");

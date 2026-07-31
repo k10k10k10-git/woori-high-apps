@@ -73,7 +73,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
       <div className="mb-3 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-2.5 text-xs text-fuchsia-700">
         ℹ️ 시간·구분·내용·담당·특이사항을 한 행에서 바로 수정합니다. 구간·포스트·담당자 구조는 각 행의 상세 설정에서 관리하며, 구글 시트 가져오기는 새 수련회 초기 설정용 보조 도구입니다.
       </div>
-      <StaffRosterBar staff={staff} groups={groups} schedule={schedule} posts={posts} movements={movements} absentStaffNames={absentStaffNames} />
+      <StaffRosterBar staff={staff} groups={groups} schedule={schedule} posts={posts} movements={movementRecords} absentStaffNames={absentStaffNames} />
       <CueSheetImportPanel retreatId={retreatId} retreatName={retreatName} schedule={schedule} staff={staff} posts={posts} segments={segments} movementRecords={movementRecords} buses={buses} open={sheetSettingsOpen} onClose={onSheetSettingsClose || (() => undefined)} />
       <StructureClonePanel retreatId={retreatId} />
 

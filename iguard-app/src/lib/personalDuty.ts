@@ -1,3 +1,5 @@
+import type { IguardScheduleBlock } from "@/lib/types";
+
 function compactName(value: string): string {
   return value.normalize("NFKC").replace(/sf/gi, "").replace(/\s+/g, "");
 }
@@ -8,6 +10,47 @@ function cleanRole(value: string): string {
     .replace(/\s+/g, " ")
     .replace(/[,:：/|\-–—\s]+$/u, "")
     .trim();
+}
+
+function textLines(value?: string | null): string[] {
+  return (value || "").split(/\n+/).map(line => line.trim()).filter(Boolean);
+}
+
+/** 스탭 명단 안내처럼 개인 담당으로 해석하면 안 되는 특이사항 줄을 제외한다. */
+export function visibleNoticeLines(value?: string | null): string[] {
+  const lines = textLines(value);
+  const visible: string[] = [];
+  let inRosterMemo = false;
+
+  for (const line of lines) {
+    const compact = line.replace(/\s+/g, "");
+    if (/^스탭명단/.test(compact)) {
+      inRosterMemo = true;
+      continue;
+    }
+    if (/^\*\s*(볼드체|밑줄|파란색|빨간색)/.test(line)) continue;
+    if (inRosterMemo) continue;
+    visible.push(line);
+  }
+  return visible;
+}
+
+/** 큐싯 담당·특이사항에서 선택한 스탭이 언급된 역할 줄을 찾는다. */
+export function dutyLinesForStaff(block: IguardScheduleBlock, staffName?: string): string[] {
+  if (!staffName) return [];
+  const target = compactName(staffName);
+  const all = [...textLines(block.owner), ...visibleNoticeLines(block.notice)];
+  const picked: string[] = [];
+
+  all.forEach((line, index) => {
+    if (!compactName(line).includes(target)) return;
+    const prev = all[index - 1];
+    if (prev && !compactName(prev).includes(target) && /[:：]$/.test(prev.trim()) && !picked.includes(prev)) {
+      picked.push(prev);
+    }
+    if (!picked.includes(line)) picked.push(line);
+  });
+  return picked;
 }
 
 /**
