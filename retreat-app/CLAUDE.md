@@ -134,8 +134,10 @@ await saveParticipants(retreatId, updatedParticipants);
 
 **특이사항 오염 진단·복구 방법** (재발 시 재사용) — extra는 `[분류]` 태그가 붙으므로 단순 문자열 비교로는 태그 유무 차이 때문에 오염을 놓친다(2026-07-08 실측). 반드시 **DB의 모든 extra에서 `^\[.+?\]\s*` 태그를 떼고 → 시트 원문(기타사항 열, 이름 접두숫자 제거 후)과 전수 대조**해, 시트에 그 사람 본인 값이 없는 항목을 오염으로 판정한다. 복구는 `participants/{key}/extra`만 경로 지정으로 수정(시트에 원문 있으면 복원, 없으면 삭제) — 전체 덮어쓰기 금지, 진행 전 스냅샷 확보.
 
-### 3b. 전체 덮어쓰기 노드의 자동 백업 — groups/rooms
-`saveGroups`/`saveRooms`는 구조상 전체 `set()` 덮어쓰기가 불가피한데(배열 순서·삭제 반영), participants와 달리 백업이 없어 저장 버그·실수 시 복구 수단이 없었다(2026-07-06 수정). `db.ts`의 `backupNodeBeforeOverwrite()`가 저장 직전 현재 상태를 롤링 백업(최근 5개)한다. 편집 중 저장이 잦으므로 **마지막 백업 후 10분 이내면 스킵**해 쓰기 폭주를 막는다(복구 시엔 `minIntervalMs=0`으로 강제 백업). 각 탭 툴바의 `BackupRestoreButton`이 시점 선택 복구 UI를 제공한다. 새로 전체 덮어쓰기 노드를 추가할 땐 이 패턴(백업 헬퍼 + 복구 버튼)을 재사용할 것.
+### 3b. 전체 덮어쓰기 노드의 자동 백업 — participants/groups/rooms
+`saveGroups`/`saveRooms`는 구조상 전체 `set()` 덮어쓰기가 불가피한데(배열 순서·삭제 반영) 백업이 없어 저장 버그·실수 시 복구 수단이 없었다(2026-07-06 수정). `db.ts`의 `backupNodeBeforeOverwrite()`가 저장 직전 현재 상태를 롤링 백업(최근 5개)한다.
+
+⚠ **`saveParticipants`도 2026-07-31부터 같은 규칙을 함수 안에서 강제한다.** 이전에는 호출부가 `backupParticipants()`를 따로 불러야 했는데(`ParticipantsTab`은 실제로 부르고 있었다), 이가드까지 읽는 2순위 꼬임 경로(`DB_OWNERSHIP.md`)의 안전장치를 호출부 규약에만 맡기면 새 호출부 하나가 백업 없이 전체를 날릴 수 있다. `restoreParticipantsBackup`도 groups/rooms와 동일하게 **복구 전 현재 상태를 `minIntervalMs=0`으로 강제 백업**하고, 백업 실패 시 복구를 중단한다(잘못된 시점을 골랐을 때 되돌아올 수 있어야 하므로). 회귀 테스트: `src/lib/db/participants.test.ts`. 편집 중 저장이 잦으므로 **마지막 백업 후 10분 이내면 스킵**해 쓰기 폭주를 막는다(복구 시엔 `minIntervalMs=0`으로 강제 백업). 각 탭 툴바의 `BackupRestoreButton`이 시점 선택 복구 UI를 제공한다. 새로 전체 덮어쓰기 노드를 추가할 땐 이 패턴(백업 헬퍼 + 복구 버튼)을 재사용할 것.
 
 조편성의 `clearGroups()`와 방배정의 `clearRooms()`는 전면 삭제 전용 예외다(2026-07-13 추가). 방배정 `clearRoomAssignments()`(2026-07-15)는 방 구조(동·호수·정원·성별)는 유지하고 `studentIds`/`teachers`만 비우는 부분 초기화로, 같은 강제 백업 규칙을 따른다. 최근 자동 백업이 있어도 `minIntervalMs=0`으로 현재 상태를 다시 강제 백업하며, 백업 결과가 `false`면 삭제 자체를 중단한다. UI는 미저장 편집을 먼저 `saveGroups()`/`saveRooms()`로 반영한 다음 전용 삭제 함수를 호출해야 복구 시점에 사용자가 보고 있던 상태가 담긴다. 조 삭제 시 방배정과 이가드 소유 `iguard/groupStaff`는 소유권 경계상 함께 삭제하지 않으며, 방 삭제 시에도 `rooms` 외 다른 노드는 건드리지 않는다.
 

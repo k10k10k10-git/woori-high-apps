@@ -2,14 +2,27 @@ import { ref, get, set, update, push, remove, onValue } from "firebase/database"
 import { db } from "../firebase";
 import { Participant, SyncDuplicateGroup } from "../types";
 import { paths } from "../paths";
-import { snapToList, stripUndefined } from "./core";
+import { snapToList, stripUndefined, backupNodeBeforeOverwrite } from "./core";
 
 // ── Participants ───────────────────────────────────────────
 
+/**
+ * ⚠ participants 노드 **전체 덮어쓰기**. 시트 동기화·중복 신청 선택처럼 전체 재생성이
+ * 불가피한 경로에서만 쓴다(단일 필드는 `updateParticipant`/`updateParticipantExtra`).
+ *
+ * 저장 직전 롤링 백업을 **함수 안에서** 강제한다 — groups/rooms와 같은 규칙(CLAUDE.md 패턴 3b).
+ * 예전에는 호출부가 `backupParticipants()`를 따로 불러야 했는데, 이가드까지 읽는
+ * 2순위 꼬임 경로(DB_OWNERSHIP.md)를 호출부 규약에만 맡기면 새 호출부 하나가
+ * 백업 없이 전체를 날릴 수 있다. 최근 백업이 있으면 스로틀이 중복 쓰기를 막는다.
+ */
 export async function saveParticipants(
   retreatId: string,
   participants: Record<string, Participant>
 ): Promise<void> {
+  await backupNodeBeforeOverwrite(
+    paths.participants(retreatId),
+    paths.participantsBackups(retreatId),
+  );
   await set(ref(db, paths.participants(retreatId)), stripUndefined(participants));
 }
 
@@ -37,9 +50,20 @@ export async function getParticipantsBackups(retreatId: string): Promise<Record<
   return snap.exists() ? snap.val() : {};
 }
 
+/**
+ * 백업 시점으로 되돌린다. 복구 자체가 현재 상태를 덮으므로, 잘못된 시점을 골랐을 때
+ * 다시 돌아올 수 있도록 **스로틀을 무시한 강제 백업** 후에만 실행한다(groups/rooms와 동일).
+ * 백업에 실패하면 복구하지 않는다 — 되돌릴 수 없는 덮어쓰기를 막는 것이 우선이다.
+ */
 export async function restoreParticipantsBackup(retreatId: string, backupKey: string): Promise<void> {
   const snap = await get(ref(db, paths.participantsBackup(retreatId, backupKey)));
   if (!snap.exists()) throw new Error("백업을 찾을 수 없습니다.");
+  const backedUp = await backupNodeBeforeOverwrite(
+    paths.participants(retreatId),
+    paths.participantsBackups(retreatId),
+    0,
+  );
+  if (!backedUp) throw new Error("현재 상태 백업에 실패해 복구를 중단했습니다.");
   await set(ref(db, paths.participants(retreatId)), snap.val());
 }
 
