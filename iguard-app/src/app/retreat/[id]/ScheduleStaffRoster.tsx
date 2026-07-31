@@ -95,6 +95,24 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, segment
       .sort((a, b) => scheduleSortValue(a.block).localeCompare(scheduleSortValue(b.block)));
   }, [openStaff, schedule, staffMovements]);
 
+  const staffTimeline = useMemo(() => {
+    const blockOrder = new Map(
+      [...schedule]
+        .sort((a, b) => scheduleSortValue(a).localeCompare(scheduleSortValue(b)))
+        .map((block, index) => [block.id, index]),
+    );
+    return [
+      ...staffMovements.map((item, order) => ({ ...item, kind: "movement" as const, order })),
+      ...staffDuties.map((item, order) => ({ ...item, kind: "duty" as const, order })),
+    ].sort((a, b) => {
+      const scheduleOrder = (blockOrder.get(a.block?.id || "") ?? Number.MAX_SAFE_INTEGER)
+        - (blockOrder.get(b.block?.id || "") ?? Number.MAX_SAFE_INTEGER);
+      if (scheduleOrder !== 0) return scheduleOrder;
+      if (a.kind !== b.kind) return a.kind === "movement" ? -1 : 1;
+      return a.order - b.order;
+    });
+  }, [schedule, staffDuties, staffMovements]);
+
   useEffect(() => {
     if (!openStaffId) return;
     function handlePointerDown(event: MouseEvent) {
@@ -274,32 +292,38 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, segment
 
                 <div>
                   <div className="text-[11px] font-semibold text-slate-400">동선·담당</div>
-                  {staffMovements.length > 0 || staffDuties.length > 0 ? (
+                  {staffTimeline.length > 0 ? (
                     <div className="mt-1 max-h-56 space-y-1 overflow-y-auto pr-1">
-                      {staffMovements.map(({ movement, block, post, segment }) => (
-                        <div key={movement.id} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-mono text-slate-500">{block ? `${block.day}일차 ${timeRangeLabel(block.start, block.end)}` : "시간 미정"}</span>
-                            {movement.round && <span className={`rounded px-1.5 py-0.5 text-[10px] ${movement.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{movement.round}</span>}
-                          </div>
-                          {segment && !isDefaultSegment(segment) && (
-                            <div className="mt-1 text-xs font-semibold text-slate-700">
-                              {segment.zone ? `(${segment.zone}) ` : ""}{segment.label}
+                      {staffTimeline.map(item => {
+                        if (item.kind === "movement") {
+                          const { movement, block, post, segment } = item;
+                          return (
+                            <div key={`movement-${movement.id}`} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="font-mono text-slate-500">{block ? `${block.day}일차 ${timeRangeLabel(block.start, block.end)}` : "시간 미정"}</span>
+                                {movement.round && <span className={`rounded px-1.5 py-0.5 text-[10px] ${movement.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{movement.round}</span>}
+                              </div>
+                              {segment && !isDefaultSegment(segment) && (
+                                <div className="mt-1 text-xs font-semibold text-slate-700">
+                                  {segment.zone ? `(${segment.zone}) ` : ""}{segment.label}
+                                </div>
+                              )}
+                              <div className="mt-1 text-xs font-medium text-slate-700">{postLabel(post)}</div>
+                              {movement.note && <div className="mt-0.5 text-[11px] text-slate-400">{movement.note}</div>}
                             </div>
-                          )}
-                          <div className="mt-1 text-xs font-medium text-slate-700">{postLabel(post)}</div>
-                          {movement.note && <div className="mt-0.5 text-[11px] text-slate-400">{movement.note}</div>}
-                        </div>
-                      ))}
-                      {staffDuties.map(({ block, labels }) => (
-                        <div key={`duty-${block.id}`} className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-2.5 py-2">
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="font-mono text-slate-500">{block.day}일차 {timeRangeLabel(block.start, block.end)}</span>
-                            <span className="font-medium text-slate-700">{block.label}</span>
+                          );
+                        }
+                        const { block, labels } = item;
+                        return (
+                          <div key={`duty-${block.id}`} className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-2.5 py-2">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-mono text-slate-500">{block.day}일차 {timeRangeLabel(block.start, block.end)}</span>
+                              <span className="font-medium text-slate-700">{block.label}</span>
+                            </div>
+                            <div className="mt-1 text-xs font-medium text-fuchsia-700">담당 · {labels.join(" · ")}</div>
                           </div>
-                          <div className="mt-1 text-xs font-medium text-fuchsia-700">담당 · {labels.join(" · ")}</div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="mt-1 text-xs text-slate-400">배정된 동선·담당 없음</div>

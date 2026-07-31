@@ -30,6 +30,9 @@ describe("in-app schedule editor infrastructure", () => {
     expect(roster).toContain("--schedule-roster-h");
     expect(roster).toContain("!isDefaultSegment(segment)");
     expect(roster).toContain("{segment.label}");
+    expect(roster).toContain("const staffTimeline = useMemo");
+    expect(roster).toContain("blockOrder.get(a.block?.id");
+    expect(roster).toContain("staffTimeline.map(item =>");
     expect(db).toContain("updateIguardScheduleBlock");
     expect(db).toContain("update(ref(db, paths.iguardScheduleBlock");
     expect(schedule).toContain("<StructureClonePanel");
