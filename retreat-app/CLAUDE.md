@@ -266,6 +266,22 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 
 입력 설정은 사용자가 `설정 저장`을 눌렀을 때 `retreats/{id}/roomAutoAssignConfig` 버전 1 문서로 원자 저장한다. 저장 범위는 스탭 포함 여부, 외부 음향·의료 총원/성별, 반별 기준 방이며 `rooms` 결과와 분리한다. 패널 진입 시 `normalizeRoomAutoAssignConfig()`로 구버전·누락값과 중복 고정을 보정해 불러오고, 수련회 ID가 바뀌면 기본값으로 먼저 초기화해 다른 수련회의 설정이 섞이지 않게 한다.
 
+### 14. 배정 화면 공통 계산은 `assignmentBoard.ts` — 단, 같은 이름이 같은 개념은 아니다 (2026-07-31)
+
+조편성(`GroupsTab`)과 방배정(`RoomsTab`)은 "후보 명단 − 이미 배정된 사람 = 미배정"이라는 같은 골격을 쓴다. 이 계산이 두 화면에 각각 인라인으로 12벌 흩어져 있어 한쪽만 고치면 판정이 갈라졌다. 공통 순수 함수는 `src/lib/assignmentBoard.ts`에 있고 `assignmentBoard.test.ts`가 고정한다. 새 배정 화면을 만들면 여기를 재사용할 것.
+
+- **접근법**: 1→ 두 화면에서 `new Set(...flatMap(x => x.studentIds || []))` 패턴을 grep해 인라인 중복을 전수 센다. 2→ 컨테이너 타입을 `StudentContainer { studentIds?: string[] }`로 일반화해 `Room`·`Group`이 함께 만족하게 한다. 3→ **특성화 테스트를 먼저 만들고** 새 lib에만 커밋한 뒤(화면 무변경), 다음 커밋에서 화면을 배선한다. 4→ 각 단계마다 `npx tsc --noEmit` + `npm test` + `npm run build`로 확인한다.
+- **판단 질문**: ⚠ **이름이 같다고 합치지 않는다.** 이 리포에는 `parseClassKey`가 **세 개** 있고 전부 다른 개념이다 — `src/lib/classKey.ts`는 `"1-2-3"`(부-학년-반 숫자), `RoomsTab.tsx` 로컬 함수는 `"3학년 6반"`(한글 텍스트), `roomAutoAssign.ts:119`가 만드는 `classKey`는 `"1부-3-6"`(부 문자열 포함)이다. 통합하면 `parseInt("1부")`가 되어 조용히 깨진다. 통합 전에 **입력 형식의 실제 예시를 코드에서 확인**할 것. 같은 이유로 조편성이 당일참석 학생을 빼지 않는 것도 버그가 아니라 도메인 차이다(조 활동은 참여, 숙박만 안 함) — `GroupsTab`은 `EMPTY_DAY_ATTENDANCE`를 명시적으로 넘겨 이 결정을 코드에 남긴다.
+- **재사용 규칙**: 중복 통합 전에 (1) 입력 형식의 실제 예시, (2) 제외 조건의 도메인 근거 두 가지를 코드에서 확인하고, 하나라도 다르면 합치지 말고 주석으로 차이를 남긴다.
+
+### 14b. `useMemo`가 많다고 과다가 아니다 — 파생 체인은 세지 말고 따라가라 (2026-07-31)
+
+`ClassRosterTab.tsx`는 `useMemo`가 19개라 감사에서 "과도한 메모이제이션"으로 추정했으나 **실측 결과 가설이 틀렸다.** 대부분은 `visibleClasses → regularClasses/jangClasses/allStudents → grades/maxRows`로 이어지는 파생 체인이고, 상위 메모를 지우면 참조가 매번 새로 만들어져 **하위 메모가 전부 재계산된다.** 즉 메모를 줄이면 성능이 나빠진다.
+
+- **접근법**: 1→ 각 `useMemo`의 반환 타입이 원시값인지 객체/배열인지 본다. 2→ 그 값이 **다른 훅의 의존성 배열에 들어가는지** grep한다. 3→ 객체·배열이면서 하위 의존성이면 **유지**한다. 4→ 진짜 기회는 메모 개수가 아니라 "순수 계산이 컴포넌트에 갇혀 테스트 불가"인 쪽이므로 그것을 lib로 뽑는다(`rosterStats.ts`).
+- **판단 질문**: 훅 개수를 지표로 삼아 일괄 제거하지 않는다. 원시값 반환 메모(`hasJang`, `maxRows`)만 떼어내면 몇 줄은 줄지만 성능 이득이 0이고 diff만 커진다. 반대로 배열 반환 메모를 지우면 하위 체인이 조용히 느려진다.
+- **재사용 규칙**: 훅 밀도가 높은 컴포넌트를 만나면 개수를 세지 말고 **의존성 그래프를 따라가고**, 리팩터링 대상은 "메모"가 아니라 "테스트 불가능한 순수 계산"으로 잡는다.
+
 ### 13. 학생 식별 키는 반드시 `resolveStudentKey`로 — 화면마다 다른 기준 금지 (`studentMatcher.ts`)
 
 > ⚠ `getStudentsByYear`는 반환 `Record`의 키와 각 `Student.id` 둘 다 이미 `"${buNum}_${rawId}"` 형태로 만든다. `cellColors`의 `studentKey`로 학생을 찾을 때는 `students[studentKey]`로 직접 조회하고, 접두를 떼서 `students[rawId]`로 찾지 말 것. `findStudent`가 반환한 `s.id`에도 접두를 다시 붙이면 이중접두가 된다. 테스트 fixture도 `{ "2_rid9": { id: "2_rid9", ... } }` 형태로 실제 반환값을 재현한다.
