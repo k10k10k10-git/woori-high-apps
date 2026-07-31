@@ -12,6 +12,15 @@ function cleanRole(value: string): string {
     .trim();
 }
 
+function compactDutyLabel(value: string): string {
+  return value
+    .normalize("NFKC")
+    .replace(/\[[^\]]+\]/gu, "")
+    .replace(/^담당\s*[·:：-]?\s*/u, "")
+    .replace(/[\s·:：,，/|\-–—()[\]{}]+/gu, "")
+    .toLowerCase();
+}
+
 function textLines(value?: string | null): string[] {
   return (value || "").split(/\n+/).map(line => line.trim()).filter(Boolean);
 }
@@ -81,6 +90,18 @@ export function dutyLabelsForStaff(lines: string[], staffName?: string): string[
   }
 
   return labels;
+}
+
+/**
+ * 같은 블록의 구조화 동선(회색 카드)에 이미 표시되는 역할은
+ * 자유문구 담당(보라색 카드)에서 한 번 더 보여주지 않는다.
+ */
+export function withoutStructuredDutyLabels(
+  dutyLabels: string[],
+  structuredLabels: string[],
+): string[] {
+  const structured = new Set(structuredLabels.map(compactDutyLabel).filter(Boolean));
+  return dutyLabels.filter(label => !structured.has(compactDutyLabel(label)));
 }
 
 /** 개인 카드에서는 다른 스탭의 이름 목록을 숨기고 담당 지점·역할만 남긴다. */

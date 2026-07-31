@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "@/lib/cueSheet";
-import { dutyLabelsForStaff, dutyLinesForStaff } from "@/lib/personalDuty";
+import { dutyLabelsForStaff, dutyLinesForStaff, withoutStructuredDutyLabels } from "@/lib/personalDuty";
 
 export default function StaffRosterBar({ staff, groups, schedule, posts, movements, absentStaffNames = [] }: {
   staff: IguardStaff[];
@@ -68,13 +68,21 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
   const staffDuties = useMemo(() => {
     if (!openStaff) return [];
     return schedule
-      .map(block => ({
-        block,
-        labels: dutyLabelsForStaff(dutyLinesForStaff(block, openStaff.name), openStaff.name),
-      }))
+      .map(block => {
+        const structuredLabels = staffMovements
+          .filter(item => item.movement.blockId === block.id)
+          .map(item => postLabel(item.post));
+        return {
+          block,
+          labels: withoutStructuredDutyLabels(
+            dutyLabelsForStaff(dutyLinesForStaff(block, openStaff.name), openStaff.name),
+            structuredLabels,
+          ),
+        };
+      })
       .filter(item => item.labels.length > 0)
       .sort((a, b) => scheduleSortValue(a.block).localeCompare(scheduleSortValue(b.block)));
-  }, [openStaff, schedule]);
+  }, [openStaff, schedule, staffMovements]);
 
   useEffect(() => {
     if (!openStaffId) return;

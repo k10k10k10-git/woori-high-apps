@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { dutyLabelsForStaff, dutyLinesForStaff, personalAssignmentLabel } from "@/lib/personalDuty";
+import {
+  dutyLabelsForStaff,
+  dutyLinesForStaff,
+  personalAssignmentLabel,
+  withoutStructuredDutyLabels,
+} from "@/lib/personalDuty";
 
 describe("개인 담당 표시", () => {
   it("여러 담당자 명단에서 선택한 스탭의 실제 역할만 보여준다", () => {
@@ -40,5 +45,12 @@ describe("개인 담당 표시", () => {
     };
 
     expect(dutyLabelsForStaff(dutyLinesForStaff(block, "김현민"), "김현민")).toEqual(["4호차"]);
+  });
+
+  it("구조화 동선과 같은 자유문구 담당만 중복 표시에서 제외한다", () => {
+    expect(withoutStructuredDutyLabels(
+      ["아래 숙소 층장", "선교팀 학생 인솔"],
+      ["[수련회장] 아래 숙소 층장"],
+    )).toEqual(["선교팀 학생 인솔"]);
   });
 });
