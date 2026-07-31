@@ -9,6 +9,7 @@ import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMa
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import { parseClassKey } from "@/lib/classKey";
 import { resolveEffectiveColor } from "@/lib/rosterColor";
+import { uniqueMatchedParticipants, summarizeRoster } from "@/lib/rosterStats";
 import { resolvePrintGender } from "@/lib/groupPrint";
 
 interface StudentInfo {
@@ -289,26 +290,9 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   );
 
   // 중복 제거한 고유 참가자 — DB 매칭된 인원만 카운트
-  const uniqueParts = useMemo(() => {
-    const seen = new Set<string>();
-    return buParts.filter(p => {
-      if (!p.studentId) return false; // 미매칭 제외
-      if (seen.has(p.studentId)) return false;
-      seen.add(p.studentId);
-      return true;
-    });
-  }, [buParts]);
+  const uniqueParts = useMemo(() => uniqueMatchedParticipants(buParts), [buParts]);
 
-  const stats = useMemo(() => uniqueParts.reduce(
-    (acc, p) => {
-      acc.total++;
-      if (p.studentId != null) acc.matched++;
-      if (p.gender === "남") acc.male++;
-      else if (p.gender === "여") acc.female++;
-      return acc;
-    },
-    { total: 0, matched: 0, male: 0, female: 0 }
-  ), [uniqueParts]);
+  const stats = useMemo(() => summarizeRoster(uniqueParts), [uniqueParts]);
 
   // 표시용 실효 색상: 빨강(취소)이 최우선, 그다음 부분참(선복귀/후발대) 지정이 있으면 주황,
   // 아니면 수동 지정 색(cellColors). 부분 참석 탭의 지정을 반별 명단 화면·집계·인쇄에 함께 반영한다.
