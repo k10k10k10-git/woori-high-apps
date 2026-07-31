@@ -1,4 +1,4 @@
-import { ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo, runTransaction, DataSnapshot } from "firebase/database";
+import { ref, get, set, update, push, remove, onValue, query, orderByChild, equalTo } from "firebase/database";
 import { db } from "../firebase";
 import { Cancellation, UnmatchedPayment, MedicalLog } from "../types";
 import { paths } from "../paths";

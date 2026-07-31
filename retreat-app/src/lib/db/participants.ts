@@ -1,8 +1,8 @@
-import { ref, get, set, update, push, remove, onValue } from "firebase/database";
+import { ref, get, set, update, remove, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { Participant, SyncDuplicateGroup } from "../types";
 import { paths } from "../paths";
-import { snapToList, stripUndefined, backupNodeBeforeOverwrite } from "./core";
+import { stripUndefined, backupNodeBeforeOverwrite } from "./core";
 
 // ── Participants ───────────────────────────────────────────
 
