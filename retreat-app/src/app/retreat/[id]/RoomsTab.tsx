@@ -12,7 +12,7 @@ import { roomLabel, roomFloor, sortRooms } from "@/lib/roomLabel";
 import { autoAssignRooms, makeExternalAdults, type RoomAutoAssignResult, type RoomAutoStudent } from "@/lib/roomAutoAssign";
 import {
   findLateRegistrantIds, findDayAttendanceIds, findUnassignedStudentIds,
-  findUnassignedTeachers, findRoomStudentCandidateIds,
+  findUnassignedTeachers, findRoomStudentCandidateIds, excludeAssignedStudents,
   toRoomAutoStudents, toRoomAutoAdults, toRoomClassOptions,
 } from "@/lib/roomsBoard";
 import type { RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
@@ -170,8 +170,7 @@ export default function RoomsTab({ retreat }: Props) {
 
       // Recalculate unassigned
       setRooms(prev => {
-        const assigned = new Set(prev.flatMap(r => r.studentIds || []));
-        setUnassigned(ids.filter(id => !assigned.has(id)));
+        setUnassigned(excludeAssignedStudents(ids, prev));
         return prev;
       });
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
@@ -197,8 +196,7 @@ export default function RoomsTab({ retreat }: Props) {
       if (!initialLoaded.current) {
         setRooms(newRooms);
         setParticipantIds(prev => {
-          const assigned = new Set(newRooms.flatMap(r => r.studentIds || []));
-          setUnassigned(prev.filter(id => !assigned.has(id)));
+          setUnassigned(excludeAssignedStudents(prev, newRooms));
           return prev;
         });
         setLoading(false);
@@ -206,8 +204,7 @@ export default function RoomsTab({ retreat }: Props) {
       } else if (!isDirtyRef.current && !isDragging.current) {
         setRooms(newRooms);
         setParticipantIds(prev => {
-          const assigned = new Set(newRooms.flatMap(r => r.studentIds || []));
-          setUnassigned(prev.filter(id => !assigned.has(id)));
+          setUnassigned(excludeAssignedStudents(prev, newRooms));
           return prev;
         });
       } else if (!isSavingRef.current) {
@@ -224,8 +221,7 @@ export default function RoomsTab({ retreat }: Props) {
     const newRooms = latestRemoteRoomsRef.current;
     setRooms(newRooms);
     setParticipantIds(prev => {
-      const assigned = new Set(newRooms.flatMap(r => r.studentIds || []));
-      setUnassigned(prev.filter(id => !assigned.has(id)));
+      setUnassigned(excludeAssignedStudents(prev, newRooms));
       return prev;
     });
     markClean();
@@ -302,8 +298,7 @@ export default function RoomsTab({ retreat }: Props) {
     const nextRooms = roomAutoPreview.rooms;
     roomsRef.current = nextRooms;
     setRooms(nextRooms);
-    const assigned = new Set(nextRooms.flatMap(room => room.studentIds ?? []));
-    setUnassigned(roomStudentCandidateIds.filter(id => !assigned.has(id)));
+    setUnassigned(excludeAssignedStudents(roomStudentCandidateIds, nextRooms));
     closeAutomaticPreview();
     markDirty();
     toast(`30회 시뮬레이션 최적안으로 ${roomAutoPreview.assignedStudentCount + roomAutoPreview.assignedAdultCount}명을 배정했습니다.`, "success");
@@ -795,8 +790,7 @@ export default function RoomsTab({ retreat }: Props) {
               if (!await uiConfirm(`신청취소 학생 ${n}명을 모든 방에서 제거하시겠습니까?`)) return;
               setRooms(prev => {
                 const updated = prev.map(r => ({ ...r, studentIds: (r.studentIds||[]).filter(id => !cancelled.has(id)) }));
-                const assigned = new Set(updated.flatMap(r => r.studentIds||[]));
-                setUnassigned(participantIds.filter(id => !assigned.has(id) && !cancelled.has(id)));
+                setUnassigned(excludeAssignedStudents(participantIds, updated, cancelled));
                 return updated;
               });
               markDirty();

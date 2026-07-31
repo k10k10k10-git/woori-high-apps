@@ -69,6 +69,21 @@ export function findUnassignedStudentIds(input: {
     .filter(id => input.cellColors[id] !== "red" && !input.dayAttendanceIds.has(id));
 }
 
+/**
+ * 후보 중 **어느 방에도 배정되지 않은** 인원만 남긴다.
+ * 구독 초기화·원격 반영·자동배정 적용·취소자 일괄 제거 등 화면 6곳에서
+ * 같은 식(`후보 − 방에 배정된 사람`)을 각자 인라인으로 쓰고 있던 것을 하나로 모았다.
+ * `alsoExclude`는 취소자처럼 추가로 빼야 하는 집합(선택).
+ */
+export function excludeAssignedStudents(
+  candidateIds: readonly string[],
+  rooms: readonly Room[],
+  alsoExclude?: ReadonlySet<string>,
+): string[] {
+  const assigned = new Set(rooms.flatMap(r => r.studentIds || []));
+  return candidateIds.filter(id => !assigned.has(id) && !alsoExclude?.has(id));
+}
+
 /** 방이 없는 교사. 불참 교사는 배정 대상이 아니다. */
 export function findUnassignedTeachers(
   rooms: readonly Room[],

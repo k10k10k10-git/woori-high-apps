@@ -4,6 +4,7 @@ import {
   findDayAttendanceIds,
   findUnassignedStudentIds,
   findUnassignedTeachers,
+  excludeAssignedStudents,
   findRoomStudentCandidateIds,
   toRoomAutoStudents,
   toRoomAutoAdults,
@@ -86,6 +87,26 @@ describe("findUnassignedStudentIds", () => {
   it("당일참석은 숙박 대상이 아니라 제외한다", () => {
     expect(findUnassignedStudentIds({ ...base, dayAttendanceIds: new Set(["1_d"]) }))
       .toEqual(["1_a", "1_b"]);
+  });
+});
+
+describe("excludeAssignedStudents", () => {
+  it("어느 방에도 없는 후보만 남긴다", () => {
+    const rooms = [room("r1", ["1_a"]), room("r2", ["1_b"])];
+    expect(excludeAssignedStudents(["1_a", "1_b", "1_c"], rooms)).toEqual(["1_c"]);
+  });
+
+  it("studentIds가 없는 방도 안전하게 처리한다", () => {
+    const rooms = [{ id: "r1", roomNumber: "1", capacity: 4, type: "남" } as Room];
+    expect(excludeAssignedStudents(["1_a"], rooms)).toEqual(["1_a"]);
+  });
+
+  it("추가 제외 집합(취소자 등)을 함께 뺀다", () => {
+    expect(excludeAssignedStudents(["1_a", "1_b"], [], new Set(["1_b"]))).toEqual(["1_a"]);
+  });
+
+  it("후보 순서를 보존한다", () => {
+    expect(excludeAssignedStudents(["1_c", "1_a", "1_b"], [])).toEqual(["1_c", "1_a", "1_b"]);
   });
 });
 
