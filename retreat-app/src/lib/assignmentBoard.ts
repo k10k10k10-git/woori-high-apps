@@ -1,15 +1,18 @@
 /**
- * 방배정 화면(`RoomsTab`)의 순수 파생 계산.
+ * 배정 화면(`RoomsTab` 방배정 · `GroupsTab` 조편성)의 공통 순수 파생 계산.
  *
- * `RoomsTab.tsx`의 메인 컴포넌트가 964줄이라 이 계산들이 화면·구독·드래그 상태와
- * 뒤섞여 있었고, 테스트할 방법이 없었다. 방배정 결과(`retreats/{id}/rooms`)는
- * 이가드가 읽는 데이터라 여기서 회귀가 나면 숙소 안내·명찰카드·인원체크까지 번진다.
- * 그래서 화면에서 분리해 테스트로 고정한다.
+ * 두 화면은 "후보 명단 − 이미 배정된 사람 = 미배정"이라는 같은 골격을 쓰는데,
+ * 메인 컴포넌트가 각각 964줄·900줄이라 이 계산들이 구독·드래그 상태와 뒤섞여
+ * 테스트할 수 없었고 같은 식이 화면마다 복제돼 있었다.
+ * 조편성·방배정 결과(`groups`/`rooms`)는 이가드가 읽는 데이터라 회귀가
+ * 숙소 안내·명찰카드·인원체크까지 번진다. 그래서 분리해 테스트로 고정한다.
  *
  * ⚠ 이 모듈은 순수 함수만 둔다. Firebase·React·DOM에 의존하지 않는다.
+ * ⚠ 조편성과 방배정의 **의도된 차이**는 합치지 않는다 — 예: 당일참석 학생은
+ *    조에는 들어가지만 숙박은 하지 않으므로 방배정에서만 제외한다.
  */
 
-import type { Room, Student, TeacherAttendance, PartialAttendance } from "./types";
+import type { Student, TeacherAttendance, PartialAttendance } from "./types";
 import { LATE_REGISTRANT_COLORS } from "./constants";
 import {
   classifyRoomAdult,
@@ -26,6 +29,16 @@ export interface RoomBoardStudent extends Student {
 }
 
 export type RoomBoardStudents = Record<string, RoomBoardStudent>;
+
+/** 학생을 담는 배정 단위 — 방(`Room`)과 조(`Group`)가 모두 만족한다. */
+export interface StudentContainer {
+  studentIds?: string[];
+}
+
+/** 교사 이름을 담는 배정 단위 — 방만 해당(조는 teachers 외에 staff·leader도 본다). */
+export interface TeacherContainer {
+  teachers?: string[];
+}
 
 /** 자동배정 반 옵션 — 요약에 화면 표시용 라벨을 더한 것. */
 export interface RoomBoardClassOption extends RoomAutoClassSummary {
@@ -59,7 +72,7 @@ export function findDayAttendanceIds(partialAttendances: readonly PartialAttenda
 export function findUnassignedStudentIds(input: {
   unassigned: readonly string[];
   lateRegistrantIds: readonly string[];
-  rooms: readonly Room[];
+  rooms: readonly StudentContainer[];
   cellColors: Record<string, string>;
   dayAttendanceIds: ReadonlySet<string>;
 }): string[] {
@@ -77,16 +90,16 @@ export function findUnassignedStudentIds(input: {
  */
 export function excludeAssignedStudents(
   candidateIds: readonly string[],
-  rooms: readonly Room[],
+  containers: readonly StudentContainer[],
   alsoExclude?: ReadonlySet<string>,
 ): string[] {
-  const assigned = new Set(rooms.flatMap(r => r.studentIds || []));
+  const assigned = new Set(containers.flatMap(c => c.studentIds || []));
   return candidateIds.filter(id => !assigned.has(id) && !alsoExclude?.has(id));
 }
 
 /** 방이 없는 교사. 불참 교사는 배정 대상이 아니다. */
 export function findUnassignedTeachers(
-  rooms: readonly Room[],
+  rooms: readonly TeacherContainer[],
   allTeachers: readonly TeacherAttendance[],
 ): TeacherAttendance[] {
   const assigned = new Set(rooms.flatMap(r => r.teachers || []));

@@ -8,7 +8,10 @@ import { useUI } from "@/context/UIContext";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import AutoAssignPanel from "./AutoAssignPanel";
 import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
-import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
+import { findLateRegistrantIds, findUnassignedStudentIds, excludeAssignedStudents } from "@/lib/assignmentBoard";
+
+/** 조편성은 당일참석 학생도 포함하므로 제외 집합이 비어 있다(방배정과의 의도된 차이). */
+const EMPTY_DAY_ATTENDANCE: ReadonlySet<string> = new Set();
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { resolveIguardGroupStaffNames, studentPrintRowClass, teacherPrintStatus, teacherPrintStatusLabel } from "@/lib/groupPrint";
 import { resolveGroupRoleStudent } from "@/lib/groupRoleStudent";
@@ -156,8 +159,7 @@ export default function GroupsTab({ retreat }: Props) {
 
       // Recalculate unassigned based on current groups
       setGroups(prev => {
-        const assigned = new Set(prev.flatMap(g => g.studentIds || []));
-        setUnassigned(ids.filter(id => !assigned.has(id)));
+        setUnassigned(excludeAssignedStudents(ids, prev));
         return prev;
       });
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
@@ -178,8 +180,7 @@ export default function GroupsTab({ retreat }: Props) {
       if (!initialLoaded.current) {
         setGroups(newGroups);
         setParticipantIds(prev => {
-          const assigned = new Set(newGroups.flatMap(g => g.studentIds || []));
-          setUnassigned(prev.filter(id => !assigned.has(id)));
+          setUnassigned(excludeAssignedStudents(prev, newGroups));
           return prev;
         });
         setLoading(false);
@@ -187,8 +188,7 @@ export default function GroupsTab({ retreat }: Props) {
       } else if (!isDirtyRef.current && !isDragging.current) {
         setGroups(newGroups);
         setParticipantIds(prev => {
-          const assigned = new Set(newGroups.flatMap(g => g.studentIds || []));
-          setUnassigned(prev.filter(id => !assigned.has(id)));
+          setUnassigned(excludeAssignedStudents(prev, newGroups));
           return prev;
         });
       } else if (!isSavingRef.current) {
@@ -207,28 +207,25 @@ export default function GroupsTab({ retreat }: Props) {
     const newGroups = latestRemoteGroupsRef.current;
     setGroups(newGroups);
     setParticipantIds(prev => {
-      const assigned = new Set(newGroups.flatMap(g => g.studentIds || []));
-      setUnassigned(prev.filter(id => !assigned.has(id)));
+      setUnassigned(excludeAssignedStudents(prev, newGroups));
       return prev;
     });
     markClean();
   }
 
   // 후기 신청자: 색칠(blue/orange)되었지만 폼 미신청인 학생
-  const lateRegistrantIds = useMemo(() => {
-    const pSet = new Set(participantIds);
-    return Object.entries(cellColors)
-      .filter(([sid, color]) => LATE_REGISTRANT_COLORS.has(color) && !pSet.has(sid) && !!students[sid])
-      .map(([sid]) => sid);
-  }, [cellColors, participantIds, students]);
+  const lateRegistrantIds = useMemo(
+    () => findLateRegistrantIds(cellColors, participantIds, students),
+    [cellColors, participantIds, students]);
 
   // 전체 미배정: 기존 미배정 + 후기 신청자 중 조에 미배정된 인원
   // 신청취소(red) 학생은 풀에서 제외 — 취소자 제거 후 리로드 시 재등장 방지
-  const allUnassigned = useMemo(() => {
-    const assignedSet = new Set(groups.flatMap(g => g.studentIds || []));
-    const lateUnassigned = lateRegistrantIds.filter(id => !assignedSet.has(id));
-    return [...unassigned, ...lateUnassigned].filter(id => cellColors[id] !== "red");
-  }, [unassigned, lateRegistrantIds, groups, cellColors]);
+  // ⚠ 방배정과 달리 당일참석 학생을 빼지 않는다 — 그날 조 활동에는 참여한다.
+  const allUnassigned = useMemo(
+    () => findUnassignedStudentIds({
+      unassigned, lateRegistrantIds, rooms: groups, cellColors, dayAttendanceIds: EMPTY_DAY_ATTENDANCE,
+    }),
+    [unassigned, lateRegistrantIds, groups, cellColors]);
 
   const unassignedTeachers = useMemo(() => {
     const assigned = new Set(groups.flatMap(g => [
@@ -313,9 +310,8 @@ export default function GroupsTab({ retreat }: Props) {
   function handleAutoApply(newGroups: Group[], scope: AutoAssignScope) {
     const mergedGroups = mergeAutoAssignedGroups(groups, newGroups, scope);
     setGroups(mergedGroups);
-    const assigned = new Set(mergedGroups.flatMap(g => g.studentIds || []));
     // 폼 참가자만 unassigned state에 반영 (후기 신청자는 allUnassigned memo가 처리)
-    setUnassigned(participantIds.filter(id => !assigned.has(id)));
+    setUnassigned(excludeAssignedStudents(participantIds, mergedGroups));
     markDirty();
   }
 
@@ -752,8 +748,7 @@ export default function GroupsTab({ retreat }: Props) {
               if (!await uiConfirm(`신청취소 학생 ${n}명을 모든 조에서 제거하시겠습니까?`)) return;
               setGroups(prev => {
                 const updated = prev.map(g => ({ ...g, studentIds: (g.studentIds||[]).filter(id => !cancelled.has(id)) }));
-                const assigned = new Set(updated.flatMap(g => g.studentIds||[]));
-                setUnassigned(participantIds.filter(id => !assigned.has(id) && !cancelled.has(id)));
+                setUnassigned(excludeAssignedStudents(participantIds, updated, cancelled));
                 return updated;
               });
               markDirty();

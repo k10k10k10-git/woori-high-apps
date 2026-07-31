@@ -10,7 +10,7 @@ import {
   toRoomAutoAdults,
   toRoomClassOptions,
   type RoomBoardStudents,
-} from "./roomsBoard";
+} from "./assignmentBoard";
 import type { Room, TeacherAttendance, PartialAttendance } from "./types";
 
 /**

@@ -14,7 +14,7 @@ import {
   findLateRegistrantIds, findDayAttendanceIds, findUnassignedStudentIds,
   findUnassignedTeachers, findRoomStudentCandidateIds, excludeAssignedStudents,
   toRoomAutoStudents, toRoomAutoAdults, toRoomClassOptions,
-} from "@/lib/roomsBoard";
+} from "@/lib/assignmentBoard";
 import type { RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
 import RoomAutoAssignPanel, { type RoomClassOption } from "./RoomAutoAssignPanel";
 import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
@@ -227,7 +227,7 @@ export default function RoomsTab({ retreat }: Props) {
     markClean();
   }
 
-  // 아래 파생 계산의 본문은 lib/roomsBoard.ts에 있다 (특성화 테스트: roomsBoard.test.ts).
+  // 아래 파생 계산의 본문은 lib/assignmentBoard.ts에 있다 (특성화 테스트: assignmentBoard.test.ts).
   const lateRegistrantIds = useMemo(
     () => findLateRegistrantIds(cellColors, participantIds, students),
     [cellColors, participantIds, students]);
