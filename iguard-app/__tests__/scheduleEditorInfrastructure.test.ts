@@ -21,12 +21,15 @@ describe("in-app schedule editor infrastructure", () => {
     const db = read("src/lib/db.ts");
     expect(schedule).toContain("<ScheduleSheetEditor");
     expect(schedule).toContain("movements={movementRecords}");
+    expect(schedule).toContain("segments={segments}");
     expect(sheetEditor).toContain("<ScheduleSegmentEditor");
     expect(sheetEditor).toContain('role="dialog"');
     expect(sheetEditor).toContain("행을 벗어나면 자동 저장");
     expect(sheetEditor).toContain("advancedTriggerRef.current?.focus()");
     expect(sheetEditor).toContain("if (await save()) onOpenAdvanced()");
     expect(roster).toContain("--schedule-roster-h");
+    expect(roster).toContain("!isDefaultSegment(segment)");
+    expect(roster).toContain("{segment.label}");
     expect(db).toContain("updateIguardScheduleBlock");
     expect(db).toContain("update(ref(db, paths.iguardScheduleBlock");
     expect(schedule).toContain("<StructureClonePanel");

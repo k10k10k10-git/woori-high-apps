@@ -7,8 +7,9 @@ function compactName(value: string): string {
 function cleanRole(value: string): string {
   return value
     .replace(/^[\s*•·\-–—]+/u, "")
+    .replace(/\s*(?:-{1,2}>|=>|→)\s*/gu, " → ")
     .replace(/\s+/g, " ")
-    .replace(/[,:：/|\-–—\s]+$/u, "")
+    .replace(/[,:：/|\-–—@\s]+$/u, "")
     .trim();
 }
 
@@ -17,7 +18,8 @@ function compactDutyLabel(value: string): string {
     .normalize("NFKC")
     .replace(/\[[^\]]+\]/gu, "")
     .replace(/^담당\s*[·:：-]?\s*/u, "")
-    .replace(/[\s·:：,，/|\-–—()[\]{}]+/gu, "")
+    .replace(/\s*(?:-{1,2}>|=>|→)\s*/gu, "→")
+    .replace(/[\s·:：,，/|\-–—@()[\]{}]+/gu, "")
     .toLowerCase();
 }
 

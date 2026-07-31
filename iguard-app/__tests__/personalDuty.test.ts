@@ -53,4 +53,25 @@ describe("개인 담당 표시", () => {
       ["[수련회장] 아래 숙소 층장"],
     )).toEqual(["선교팀 학생 인솔"]);
   });
+
+  it("화살표 표기가 달라도 구조화 구간과 같은 자유문구 경로는 제외한다", () => {
+    expect(withoutStructuredDutyLabels(
+      ["숙소-->강당 @", "5호차"],
+      ["숙소 → 강당", "[수련회장] 숙소 층장"],
+    )).toEqual(["5호차"]);
+  });
+
+  it("자유문구 경로는 읽기 쉬운 화살표로 정리한다", () => {
+    const block = {
+      id: "dinner",
+      day: 1,
+      start: "17:40",
+      end: "19:30",
+      label: "저녁 식사",
+      owner: "숙소-->강당 @ 이채희sf",
+    };
+
+    expect(dutyLabelsForStaff(dutyLinesForStaff(block, "이채희"), "이채희"))
+      .toEqual(["숙소 → 강당"]);
+  });
 });

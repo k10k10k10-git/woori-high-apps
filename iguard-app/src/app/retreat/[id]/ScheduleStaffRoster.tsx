@@ -1,15 +1,17 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement } from "@/lib/types";
+import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement, IguardSegment } from "@/lib/types";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "@/lib/cueSheet";
 import { dutyLabelsForStaff, dutyLinesForStaff, withoutStructuredDutyLabels } from "@/lib/personalDuty";
+import { isDefaultSegment } from "@/lib/defaultSegment";
 
-export default function StaffRosterBar({ staff, groups, schedule, posts, movements, absentStaffNames = [] }: {
+export default function StaffRosterBar({ staff, groups, schedule, posts, segments, movements, absentStaffNames = [] }: {
   staff: IguardStaff[];
   groups: Group[];
   schedule: IguardScheduleBlock[];
   posts: IguardPost[];
+  segments: IguardSegment[];
   movements: IguardMovement[];
   absentStaffNames?: string[];
 }) {
@@ -59,11 +61,17 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
 
   const staffMovements = useMemo(() => {
     if (!openStaff) return [];
+    const segmentMap = new Map(segments.map(segment => [segment.id, segment]));
     return movements
       .filter(mv => mv.staffId === openStaff.id)
-      .map(mv => ({ movement: mv, block: scheduleMap.get(mv.blockId), post: postMap.get(mv.postId) }))
+      .map(mv => ({
+        movement: mv,
+        block: scheduleMap.get(mv.blockId),
+        post: postMap.get(mv.postId),
+        segment: mv.segmentId ? segmentMap.get(mv.segmentId) : undefined,
+      }))
       .sort((a, b) => scheduleSortValue(a.block).localeCompare(scheduleSortValue(b.block)));
-  }, [movements, openStaff, postMap, scheduleMap]);
+  }, [movements, openStaff, postMap, scheduleMap, segments]);
 
   const staffDuties = useMemo(() => {
     if (!openStaff) return [];
@@ -71,7 +79,10 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
       .map(block => {
         const structuredLabels = staffMovements
           .filter(item => item.movement.blockId === block.id)
-          .map(item => postLabel(item.post));
+          .flatMap(item => [
+            postLabel(item.post),
+            item.segment && !isDefaultSegment(item.segment) ? item.segment.label : "",
+          ]);
         return {
           block,
           labels: withoutStructuredDutyLabels(
@@ -265,12 +276,17 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, movemen
                   <div className="text-[11px] font-semibold text-slate-400">동선·담당</div>
                   {staffMovements.length > 0 || staffDuties.length > 0 ? (
                     <div className="mt-1 max-h-56 space-y-1 overflow-y-auto pr-1">
-                      {staffMovements.map(({ movement, block, post }) => (
+                      {staffMovements.map(({ movement, block, post, segment }) => (
                         <div key={movement.id} className="rounded-lg border border-slate-100 bg-slate-50 px-2.5 py-2">
                           <div className="flex items-center gap-2 text-xs">
                             <span className="font-mono text-slate-500">{block ? `${block.day}일차 ${timeRangeLabel(block.start, block.end)}` : "시간 미정"}</span>
                             {movement.round && <span className={`rounded px-1.5 py-0.5 text-[10px] ${movement.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{movement.round}</span>}
                           </div>
+                          {segment && !isDefaultSegment(segment) && (
+                            <div className="mt-1 text-xs font-semibold text-slate-700">
+                              {segment.zone ? `(${segment.zone}) ` : ""}{segment.label}
+                            </div>
+                          )}
                           <div className="mt-1 text-xs font-medium text-slate-700">{postLabel(post)}</div>
                           {movement.note && <div className="mt-0.5 text-[11px] text-slate-400">{movement.note}</div>}
                         </div>
