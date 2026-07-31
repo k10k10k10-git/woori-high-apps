@@ -12,7 +12,11 @@ import { normalizePartialAttendanceMap } from "./partialAttendance";
 import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "./defaultSegment";
 import { buildStructureClonePayload, occupiedCloneNodes, type CloneIdFactory, type IguardStructureSource } from "./structureClone";
 import { parseOwnerSegments, venueForBlock } from "./cueSheet";
-import { reconcileSegmentSheetMovements, type SegmentSheetMovement } from "./movementReconcile";
+import {
+  looksLikeLegacySheetMovement,
+  reconcileSegmentSheetMovements,
+  type SegmentSheetMovement,
+} from "./movementReconcile";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -387,10 +391,19 @@ export async function syncIguardScheduleOwner(
     });
   });
 
-  const plan = reconcileSegmentSheetMovements(
-    movements.filter(movement => movement.blockId === block.id),
-    nextMovements,
-  );
+  const existingBlockMovements = movements
+    .filter(movement => movement.blockId === block.id)
+    .map(movement => {
+      if (movement.source != null) return movement;
+      const assigneeName = movement.staffId
+        ? staff.find(member => member.id === movement.staffId)?.name
+        : movement.actor || undefined;
+      const postName = workingPosts.find(post => post.id === movement.postId)?.name;
+      return looksLikeLegacySheetMovement(movement, assigneeName, postName)
+        ? { ...movement, source: "sheet" as const }
+        : movement;
+    });
+  const plan = reconcileSegmentSheetMovements(existingBlockMovements, nextMovements);
   plan.removes.forEach(movement => {
     updates[paths.iguardMovement(retreatId, movement.id)] = null;
   });

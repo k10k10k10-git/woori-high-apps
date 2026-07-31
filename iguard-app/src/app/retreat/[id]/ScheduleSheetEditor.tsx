@@ -149,6 +149,7 @@ function ScheduleSheetRow({
   const rowRef = useRef<HTMLElement | null>(null);
   const editingRef = useRef(false);
   const committedRef = useRef<SheetDraft>(draftOf(block));
+  const draftRef = useRef<SheetDraft>(draftOf(block));
   const saveRunRef = useRef(0);
   const [draft, setDraft] = useState<SheetDraft>(() => draftOf(block));
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -157,6 +158,7 @@ function ScheduleSheetRow({
     if (editingRef.current) return;
     const next = draftOf(block);
     committedRef.current = next;
+    draftRef.current = next;
     setDraft(next);
   }, [block]);
 
@@ -169,54 +171,62 @@ function ScheduleSheetRow({
   function change<K extends keyof SheetDraft>(key: K, value: SheetDraft[K]) {
     setDraft(previous => {
       const next = { ...previous, [key]: value };
+      draftRef.current = next;
       setSaveState(sameDraft(next, committedRef.current) ? "idle" : "dirty");
       return next;
     });
   }
 
-  async function save(): Promise<boolean> {
-    if (sameDraft(draft, committedRef.current)) {
+  async function save({ forceOwnerSync = false }: { forceOwnerSync?: boolean } = {}): Promise<boolean> {
+    const snapshot = draftRef.current;
+    const draftChanged = !sameDraft(snapshot, committedRef.current);
+    if (!draftChanged && !forceOwnerSync) {
       setSaveState("idle");
       return true;
     }
-    const start = normalizeTime(draft.start);
-    const end = normalizeEnd(draft.end);
+    const start = normalizeTime(snapshot.start);
+    const end = normalizeEnd(snapshot.end);
     const timeError = scheduleTimeError(start, end || undefined);
     if (timeError) {
       setSaveState("error");
       toast(timeError, "warning");
       return false;
     }
-    if (!draft.label.trim()) {
+    if (!snapshot.label.trim()) {
       setSaveState("error");
       toast("구분을 입력해주세요.", "warning");
       return false;
     }
 
     const normalized: SheetDraft = {
-      ...draft,
+      ...snapshot,
       start,
       end,
-      label: draft.label.trim(),
-      detail: draft.detail.trim(),
-      owner: draft.owner.trim(),
-      notice: draft.notice.trim(),
+      label: snapshot.label.trim(),
+      detail: snapshot.detail.trim(),
+      owner: snapshot.owner.trim(),
+      notice: snapshot.notice.trim(),
     };
+    // 블록 저장 직후 실시간 구독이 committedRef를 먼저 갱신할 수 있으므로,
+    // 담당 변경 여부는 await 전에 고정해야 구조화 동선 동기화를 놓치지 않는다.
+    const ownerChanged = normalized.owner !== (committedRef.current.owner || "").trim();
     const run = ++saveRunRef.current;
     setSaveState("saving");
     try {
-      await updateIguardScheduleBlock(retreatId, block.id, {
-        day: normalized.day,
-        start: normalized.start,
-        end: normalized.end || null,
-        label: normalized.label,
-        detail: normalized.detail || null,
-        owner: normalized.owner || null,
-        notice: normalized.notice || null,
-        meal: normalized.meal || null,
-        noMovement: normalized.noMovement || null,
-      });
-      if (normalized.owner !== (committedRef.current.owner || "").trim()) {
+      if (draftChanged) {
+        await updateIguardScheduleBlock(retreatId, block.id, {
+          day: normalized.day,
+          start: normalized.start,
+          end: normalized.end || null,
+          label: normalized.label,
+          detail: normalized.detail || null,
+          owner: normalized.owner || null,
+          notice: normalized.notice || null,
+          meal: normalized.meal || null,
+          noMovement: normalized.noMovement || null,
+        });
+      }
+      if (ownerChanged || forceOwnerSync) {
         const sync = await syncIguardScheduleOwner(
           retreatId,
           { ...block, ...normalized, end: normalized.end || undefined },
@@ -232,8 +242,13 @@ function ScheduleSheetRow({
       }
       if (run !== saveRunRef.current) return false;
       committedRef.current = normalized;
-      setDraft(normalized);
-      setSaveState("saved");
+      if (sameDraft(draftRef.current, snapshot)) {
+        draftRef.current = normalized;
+        setDraft(normalized);
+        setSaveState("saved");
+      } else {
+        setSaveState("dirty");
+      }
       return true;
     } catch (error) {
       if (run !== saveRunRef.current) return false;
@@ -249,9 +264,11 @@ function ScheduleSheetRow({
 
   function handleBlur(event: FocusEvent<HTMLElement>) {
     const next = event.relatedTarget;
-    if (next instanceof Node && rowRef.current?.contains(next)) return;
-    editingRef.current = false;
-    void save();
+    const leavingRow = !(next instanceof Node && rowRef.current?.contains(next));
+    const forceOwnerSync = (event.target as HTMLElement).dataset.scheduleOwner === "true";
+    if (!leavingRow && !forceOwnerSync) return;
+    if (leavingRow) editingRef.current = false;
+    void save({ forceOwnerSync });
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
@@ -323,6 +340,7 @@ function ScheduleSheetRow({
         <SheetFieldLabel>담당·동선</SheetFieldLabel>
         <AutoGrowTextarea
           aria-label={`${block.label} 담당`}
+          data-schedule-owner="true"
           value={draft.owner}
           onChange={event => change("owner", event.target.value)}
           placeholder={"장소: 담당자 형식으로 적으면 포스트·동선에 자동 반영됩니다.\n예) 강당 입구: 김민수, 이영희"}

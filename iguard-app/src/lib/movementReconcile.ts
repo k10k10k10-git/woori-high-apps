@@ -25,17 +25,17 @@ function compactIdentity(value?: string | null): string {
 
 /** 옛 자동배정이 남긴 `포스트명: 스탭명sf` 메모인지 보수적으로 판별한다. */
 export function looksLikeLegacySheetMovement(
-  movement: AssignedIguardMovement,
-  staffName?: string,
+  movement: Pick<IguardMovement, "source" | "note">,
+  assigneeName?: string,
   postName?: string,
 ): boolean {
-  if (movement.source != null || !movement.note || !staffName || !postName) return false;
+  if (movement.source != null || !movement.note || !assigneeName || !postName) return false;
   const [role = "", ...staffParts] = movement.note.split(/[:：]/);
   if (staffParts.length === 0) return false;
   const roleKey = compactIdentity(role);
   const postKey = compactIdentity(postName);
   const noteStaffKey = compactIdentity(staffParts.join(":"));
-  const staffKey = compactIdentity(staffName);
+  const staffKey = compactIdentity(assigneeName);
   return !!roleKey && !!postKey && !!staffKey
     && (roleKey.includes(postKey) || postKey.includes(roleKey))
     && noteStaffKey.includes(staffKey);

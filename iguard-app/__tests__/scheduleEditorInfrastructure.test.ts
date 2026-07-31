@@ -45,6 +45,25 @@ describe("in-app schedule editor infrastructure", () => {
     expect(editor).toContain("start: block.start");
   });
 
+  it("captures owner changes before the realtime block update can refresh committed state", () => {
+    const sheetEditor = read("src/app/retreat/[id]/ScheduleSheetEditor.tsx");
+    const ownerChanged = sheetEditor.indexOf("const ownerChanged =");
+    const blockUpdate = sheetEditor.indexOf("await updateIguardScheduleBlock");
+    const ownerSync = sheetEditor.indexOf("if (ownerChanged || forceOwnerSync)");
+
+    expect(ownerChanged).toBeGreaterThan(-1);
+    expect(blockUpdate).toBeGreaterThan(ownerChanged);
+    expect(ownerSync).toBeGreaterThan(blockUpdate);
+  });
+
+  it("reconciles an already-saved owner again when the owner field loses focus", () => {
+    const sheetEditor = read("src/app/retreat/[id]/ScheduleSheetEditor.tsx");
+
+    expect(sheetEditor).toContain('data-schedule-owner="true"');
+    expect(sheetEditor).toContain("ownerChanged || forceOwnerSync");
+    expect(sheetEditor).toContain("void save({ forceOwnerSync })");
+  });
+
   it("uses retreat date and clock instead of a manual progress marker", () => {
     expect(read("src/app/retreat/[id]/ScheduleSheetEditor.tsx")).not.toContain('"지금 여기"');
     const execution = read("src/app/retreat/[id]/ExecutionViews.tsx");

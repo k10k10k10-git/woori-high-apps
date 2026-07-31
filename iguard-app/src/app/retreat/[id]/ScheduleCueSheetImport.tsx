@@ -383,10 +383,13 @@ export default function CueSheetImportPanel({ retreatId, retreatName, schedule, 
           const existingBlockMovements = movementRecords
             .filter(movement => movement.blockId === blockId && (!movement.segmentId || segmentIds.has(movement.segmentId)))
             .map(movement => {
-              if (movement.source != null || !movement.staffId) return movement;
+              if (movement.source != null) return movement;
+              const assigneeName = movement.staffId
+                ? workingStaff.find(member => member.id === movement.staffId)?.name
+                : movement.actor || undefined;
               const legacySheetOwned = looksLikeLegacySheetMovement(
-                movement as IguardMovement & { staffId: string },
-                workingStaff.find(member => member.id === movement.staffId)?.name,
+                movement,
+                assigneeName,
                 workingPosts.find(post => post.id === movement.postId)?.name,
               );
               return legacySheetOwned ? { ...movement, source: "sheet" as const } : movement;

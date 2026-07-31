@@ -57,6 +57,19 @@ describe("reconcileSheetMovements — 시트 자동배정 정합성", () => {
     expect(looksLikeLegacySheetMovement(existing, "최성우", "배식구")).toBe(false);
   });
 
+  it("출처가 없는 비스탭 actor도 기존 담당 메모와 정확히 일치하면 자동동선으로 식별한다", () => {
+    const existing: IguardMovement = {
+      id: "legacy-admin",
+      blockId: "service",
+      segmentId: "default",
+      postId: "pledge",
+      actor: "행정팀",
+      note: "서약서 및 불펜 준비: 행정팀",
+    };
+    expect(looksLikeLegacySheetMovement(existing, existing.actor || undefined, "서약서 및 불펜 준비")).toBe(true);
+    expect(looksLikeLegacySheetMovement(existing, existing.actor || undefined, "다른 역할")).toBe(false);
+  });
+
   it("시트 자동배정의 포스트가 바뀌면 새 값으로 갱신한다", () => {
     const existing = movement({ source: "sheet" });
     const next = { ...previousLunch, postId: "exit-2f", note: "2층 퇴식구: 최성우sf" };
