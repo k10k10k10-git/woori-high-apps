@@ -282,6 +282,30 @@ await updateRetreatPeriod(selectedRetreat.id, period.id, data); // ❌ — perio
 - **판단 질문**: 훅 개수를 지표로 삼아 일괄 제거하지 않는다. 원시값 반환 메모(`hasJang`, `maxRows`)만 떼어내면 몇 줄은 줄지만 성능 이득이 0이고 diff만 커진다. 반대로 배열 반환 메모를 지우면 하위 체인이 조용히 느려진다.
 - **재사용 규칙**: 훅 밀도가 높은 컴포넌트를 만나면 개수를 세지 말고 **의존성 그래프를 따라가고**, 리팩터링 대상은 "메모"가 아니라 "테스트 불가능한 순수 계산"으로 잡는다.
 
+### 15. 디자인 토큰 레이어 — 컴포넌트를 안 건드리고 전 화면 밀도를 바꾼다 (2026-08-01)
+
+시각 개편 요청을 컴포넌트 196개를 고쳐서 처리하면 회귀 위험이 크다. 대신 `globals.css`의
+토큰과 공용 유틸리티만 고치고, 기존 마크업(`.card`, `.table-header`, `.card table tbody tr`)을
+후손 선택자로 잡아 전 화면에 전파한다. 두 앱의 Primary(행정 `#0284c7`·이가드 `#a83fa3`)는
+각자 유지하며, 링·표 밀도·고정폭 숫자·정렬 아이콘만 공통 규칙으로 맞춘다.
+
+⚠ **Tailwind v4에서 레이어 밖 규칙이 `@layer utilities`를 이긴다.** 이 때문에 두 번 밟았다:
+- `.card { border: none }`을 쓰면 `card border-l-4 border-yellow-400`(경고 콜아웃),
+  `card border-emerald-200`(성공 패널) 같은 **의미를 담은 강조 보더 9곳이 조용히 사라진다.**
+  → `border` 속성을 **아예 선언하지 않는다**. div는 기본이 보더 없음이라 결과는 같고 유틸은 산다.
+- 같은 이유로 `.card`에 `padding`을 주면 의도적으로 패딩 0인 카드(테이블 감싸개)가 깨진다.
+  → 카드 내부 여백은 `--card-pad` 토큰과 옵트인 `.card-body`로만 넓힌다.
+
+⚠ **밀도 증가는 `@media (min-width: 641px)`에만 적용한다.** 이가드 현장 화면은 375px에서
+이미 튜닝돼 있고(AGENTS.md "375px 현장 화면의 가독성과 밀도"), 일괄 확대하면 스크롤이 늘어
+오히려 사용성이 떨어진다. 실측으로 모바일 `--table-cell-y` 10px·`--card-pad` 16px·입력 폰트
+16px(iOS 줌 방지)이 그대로 유지되는지 확인할 것.
+
+⚠ **CSS 변경은 눈으로 봐야 한다.** 이번에 문자열 치환으로 이가드에 블록을 복사했는데, 이가드
+`globals.css`에는 앵커로 쓴 "Mobile responsive" 섹션이 없어 **치환이 조용히 무시**됐다. 빌드도
+테스트도 통과했지만 화면에서 지표 카드가 깨진 걸 보고서야 발견했다. 토큰·유틸 변경 뒤에는
+임시 라우트로 카드·표·폼을 한 화면에 띄워 데스크톱과 375px을 모두 확인한다.
+
 ### 13. 학생 식별 키는 반드시 `resolveStudentKey`로 — 화면마다 다른 기준 금지 (`studentMatcher.ts`)
 
 > ⚠ `getStudentsByYear`는 반환 `Record`의 키와 각 `Student.id` 둘 다 이미 `"${buNum}_${rawId}"` 형태로 만든다. `cellColors`의 `studentKey`로 학생을 찾을 때는 `students[studentKey]`로 직접 조회하고, 접두를 떼서 `students[rawId]`로 찾지 말 것. `findStudent`가 반환한 `s.id`에도 접두를 다시 붙이면 이중접두가 된다. 테스트 fixture도 `{ "2_rid9": { id: "2_rid9", ... } }` 형태로 실제 반환값을 재현한다.

@@ -49,6 +49,26 @@
   --text-md:   15px;
   --text-lg:   17px;
   --text-xl:   20px;
+  --text-2xl:  26px;   /* 지표 숫자 전용 — 본문과 확실히 다른 층 */
+
+  /* Font weight — 굵기로도 위계를 만든다 (크기만으로는 부족) */
+  --weight-normal:  400;
+  --weight-medium:  500;
+  --weight-semi:    600;
+
+  /* Spacing scale — 여백의 미. 컴포넌트가 인라인으로 흩뿌리던 값을 토큰화 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* 카드 내부 패딩 — 모바일은 기존 밀도 유지, 데스크톱에서만 넓힌다 */
+  --card-pad:     var(--space-4);
+  --card-gap:     var(--space-3);
+  --table-cell-y: 10px;
 
   /* Shadow scale — 프리미엄 느낌 10/10 */
   --shadow-xs:  0 1px 2px rgba(0,0,0,0.05);
@@ -86,20 +106,50 @@ body {
 /* ════════════════════════════════════════════════════
    Card — 프리미엄 느낌
 ════════════════════════════════════════════════════ */
+/* 보더 대신 헤어라인 링 + 부드러운 그림자로 구획을 나눈다.
+   1px solid 보더는 카드가 많아질수록 화면을 격자로 잘라 시각 피로를 만든다.
+   ring(0 0 0 1px)은 레이아웃 폭을 차지하지 않아 정렬도 흔들리지 않는다.
+   ⚠ `border` 속성은 **아예 선언하지 않는다**. `border: none`을 쓰면 레이어 밖 규칙이
+   Tailwind `@layer utilities`를 이겨서, `card border-l-4 border-yellow-400`(경고 콜아웃)
+   `card border-emerald-200`(성공 패널)처럼 의미를 담은 강조 보더 9곳이 조용히 사라진다. */
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--color-border);
-  transition: box-shadow var(--duration-normal) var(--ease-out),
-              border-color var(--duration-normal) var(--ease-out);
+  box-shadow: 0 0 0 1px rgba(43, 34, 48, 0.05), var(--shadow-sm);
+  transition: box-shadow var(--duration-normal) var(--ease-out);
 }
 .card:where([data-hover]) {
   cursor: pointer;
 }
 .card:where([data-hover]):hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-border-hover);
+  box-shadow: 0 0 0 1px rgba(43, 34, 48, 0.10), var(--shadow-md);
+}
+
+/* ════════════════════════════════════════════════════
+   숫자 — 고정폭(tabular)으로 자릿수가 흔들리지 않게
+   인원·금액처럼 세로로 비교하는 값이 많아 정렬이 곧 가독성이다.
+════════════════════════════════════════════════════ */
+.num,
+table td,
+table th {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* 대시보드 지표 숫자 */
+.stat-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semi);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+.stat-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
 }
 
 /* ════════════════════════════════════════════════════
@@ -165,6 +215,15 @@ body {
 .btn-danger:hover  { background: #fecaca; }
 .btn-danger:active { background: #fca5a5; transform: scale(0.97); }
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* flex 컨테이너 안에서 버튼이 눌려 글자가 세로로 쪼개지는 것을 막는다.
+   너비가 유동인 입력 옆에 버튼을 두는 배치가 흔해 전역으로 고정한다. */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 .btn-primary:focus-visible,
 .btn-secondary:focus-visible,
@@ -255,13 +314,45 @@ body {
   border-bottom: 1px solid var(--color-border);
 }
 .table-header th {
-  padding: 10px 16px;
+  padding: var(--table-cell-y) var(--space-4);
   font-size: var(--text-xs);
-  font-weight: 600;
+  font-weight: var(--weight-semi);
   color: var(--color-text-muted);
   text-align: left;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* 정렬 가능한 헤더 — 아이콘 자리를 미리 확보해 정렬 상태가 바뀌어도 열이 안 흔들린다 */
+.table-header th[aria-sort] {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+.table-header th[aria-sort]:hover { color: var(--color-text-secondary); }
+.table-header th[aria-sort]::after {
+  content: "↕";
+  display: inline-block;
+  width: 1em;
+  margin-left: var(--space-1);
+  opacity: 0.35;
+  font-size: 0.9em;
+}
+.table-header th[aria-sort="ascending"]::after  { content: "↑"; opacity: 1; color: var(--color-primary); }
+.table-header th[aria-sort="descending"]::after { content: "↓"; opacity: 1; color: var(--color-primary); }
+
+/* 데이터 행 — 높이를 확보하고 호버로 현재 행을 잃지 않게 한다.
+   행 사이 보더 대신 아주 옅은 구분선만 남겨 격자 느낌을 줄인다. */
+.card table tbody tr {
+  transition: background var(--duration-fast) var(--ease-out);
+}
+.card table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
+.card table tbody td {
+  padding-top: var(--table-cell-y);
+  padding-bottom: var(--table-cell-y);
 }
 
 /* ════════════════════════════════════════════════════
@@ -293,3 +384,38 @@ body {
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-text-faint); }
+
+/* ════════════════════════════════════════════════════
+   Desktop density — 여백의 미는 데스크톱에서만 넓힌다
+
+   ⚠ 이 앱의 실행(현장) 화면은 375px에서 밀도를 이미 튜닝했다(AGENTS.md
+   "375px 현장 화면의 가독성과 밀도 함께 지키기"). 모바일에서 일괄 확대하면
+   스크롤이 늘어 오히려 사용성이 떨어지므로, 밀도 증가는 641px 이상
+   기획·데스크톱 화면에만 적용한다.
+
+   ⚠ `.card`에 padding을 직접 주지 않는다. Tailwind v4에서 레이어 밖 규칙이
+   `@layer utilities`를 이기므로, 의도적으로 패딩 0인 카드(테이블 감싸개 등)까지
+   깨진다. 카드 내부 여백은 `--card-pad` 토큰을 컴포넌트가 채택하는 방식으로 넓힌다.
+════════════════════════════════════════════════════ */
+@media (min-width: 641px) {
+  :root {
+    --card-pad:     var(--space-5);   /* 16 → 20px */
+    --card-gap:     var(--space-4);   /* 12 → 16px */
+    --table-cell-y: 14px;             /* 10 → 14px (행 높이 ≈ 1.4배) */
+  }
+
+  body { line-height: 1.55; }
+
+  .input       { padding: 10px 14px; }
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger  { padding: 9px 18px; }
+}
+
+/* 카드 내부 여백을 토큰으로 쓰는 옵트인 클래스 — 새 화면은 이걸 사용 */
+.card-body {
+  padding: var(--card-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--card-gap);
+}
