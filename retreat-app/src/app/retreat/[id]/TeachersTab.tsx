@@ -12,6 +12,7 @@ import {
   TeacherSortKey,
 } from "@/lib/teacherTableSort";
 import { useUI } from "@/context/UIContext";
+import { useSubmitLock } from "@/lib/useSubmitLock";
 
 interface Props { retreat: Retreat; }
 type TeacherFormState = Omit<TeacherAttendance, "id">;
@@ -78,6 +79,8 @@ function teacherNameKey(t: Pick<TeacherAttendance, "bu" | "name"> | { bu: string
 
 export default function TeachersTab({ retreat }: Props) {
   const { toast, uiConfirm } = useUI();
+  // 느린 네트워크에서 저장 연타 시 레코드가 중복 생성되는 것을 막는다.
+  const { busy: saving, run: runSave } = useSubmitLock();
   const [teachers, setTeachers] = useState<TeacherAttendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -584,7 +587,7 @@ async function handleSave() {
             </div>
             </div>
             <div className="flex gap-2 px-6 py-4 border-t border-slate-100 shrink-0">
-              <button onClick={handleSave} className="btn-primary flex-1 justify-center">저장</button>
+              <button onClick={() => runSave(handleSave)} disabled={saving} className="btn-primary flex-1 justify-center">{saving ? "저장 중…" : "저장"}</button>
               <button onClick={() => { setShowAdd(false); setEditId(null); }}
                 className="btn-secondary flex-1 justify-center">취소</button>
             </div>

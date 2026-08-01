@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, CarPool, Participant } from "@/lib/types";
 import { getCarpools, saveCarpool, updateCarpool, deleteCarpool, getParticipants } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
+import { useSubmitLock } from "@/lib/useSubmitLock";
 import NameAutocomplete from "./NameAutocomplete";
 
 interface Props { retreat: Retreat; }
@@ -15,6 +16,8 @@ const EMPTY_FORM: Omit<CarPool, "id"> = {
 
 export default function CarpoolTab({ retreat }: Props) {
   const { toast, uiConfirm } = useUI();
+  // 느린 네트워크에서 저장 연타 시 레코드가 중복 생성되는 것을 막는다.
+  const { busy: saving, run: runSave } = useSubmitLock();
   const [carpools, setCarpools] = useState<CarPool[]>([]);
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [loading, setLoading] = useState(true);
@@ -208,7 +211,7 @@ export default function CarpoolTab({ retreat }: Props) {
                 onChange={e => setForm(p => ({ ...p, note: e.target.value }))} />
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={handleSave} className="btn-primary flex-1 justify-center">저장</button>
+              <button onClick={() => runSave(handleSave)} disabled={saving} className="btn-primary flex-1 justify-center">{saving ? "저장 중…" : "저장"}</button>
               <button onClick={() => { setShowAdd(false); setEditId(null); }}
                 className="btn-secondary flex-1 justify-center">취소</button>
             </div>

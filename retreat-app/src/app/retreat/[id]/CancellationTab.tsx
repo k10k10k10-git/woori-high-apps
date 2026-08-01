@@ -9,6 +9,7 @@ import {
 import { parseClassKey } from "@/lib/classKey";
 import { buildCancellationRosterStudents, CancellationRosterStudent, resolveCancellationStudentKey } from "@/lib/cancellationRoster";
 import { useUI } from "@/context/UIContext";
+import { useSubmitLock } from "@/lib/useSubmitLock";
 
 interface Props { retreat: Retreat; }
 
@@ -23,6 +24,8 @@ function parseOptionalAmount(value: string, valueAsNumber: number): number | nul
 
 export default function CancellationTab({ retreat }: Props) {
   const { toast, uiConfirm } = useUI();
+  // 느린 네트워크에서 저장 연타 시 레코드가 중복 생성되는 것을 막는다.
+  const { busy: saving, run: runSave } = useSubmitLock();
   const [records, setRecords] = useState<Cancellation[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -210,7 +213,7 @@ export default function CancellationTab({ retreat }: Props) {
                 onChange={e => setForm(p => ({ ...p, note: e.target.value }))} />
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={handleSave} className="btn-primary flex-1 justify-center">저장</button>
+              <button onClick={() => runSave(handleSave)} disabled={saving} className="btn-primary flex-1 justify-center">{saving ? "저장 중…" : "저장"}</button>
               <button onClick={() => { setShowAdd(false); setEditId(null); }}
                 className="btn-secondary flex-1 justify-center">취소</button>
             </div>
