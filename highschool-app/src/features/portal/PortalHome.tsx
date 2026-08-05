@@ -8,6 +8,7 @@ import { getRetreats, subscribeToAllRetreatPeriods, type RetreatPeriodWithOwner 
 import type { Retreat } from "@/lib/types";
 import { getSemesters, subscribeSessions } from "@/features/semester/db";
 import type { Semester, Session } from "@/features/semester/types";
+import { useMyRetreatMinistry } from "./useMyRetreatMinistry";
 
 type TimelineItem = {
   id: string;
@@ -36,7 +37,10 @@ export default function PortalHome() {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessionState, setSessionState] = useState<{ semesterId: string; items: Session[] }>({
+    semesterId: "",
+    items: [],
+  });
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,12 +66,18 @@ export default function PortalHome() {
   }, [semesters]);
 
   useEffect(() => {
-    if (!currentSemester) {
-      setSessions([]);
-      return;
-    }
-    return subscribeSessions(currentSemester.id, setSessions, (error) => setLoadError(error.message));
+    if (!currentSemester) return;
+    return subscribeSessions(
+      currentSemester.id,
+      items => setSessionState({ semesterId: currentSemester.id, items }),
+      (error) => setLoadError(error.message),
+    );
   }, [currentSemester]);
+
+  const sessions = useMemo(
+    () => sessionState.semesterId === currentSemester?.id ? sessionState.items : [],
+    [currentSemester?.id, sessionState],
+  );
 
   useEffect(() => {
     return subscribeToAllRetreatPeriods(
@@ -84,6 +94,14 @@ export default function PortalHome() {
     const next = periods.find((period) => period.startDate >= today);
     return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
   }, [periods, retreats]);
+  const preferredStaffNames = useMemo(
+    () => [memberName, user?.displayName],
+    [memberName, user?.displayName],
+  );
+  const myRetreatMinistry = useMyRetreatMinistry(
+    iguardAccessLevel !== "none" ? currentRetreat?.id ?? "" : "",
+    preferredStaffNames,
+  );
 
   const timeline = useMemo<TimelineItem[]>(() => {
     const semesterItems = currentSemester
@@ -204,7 +222,7 @@ export default function PortalHome() {
           <div className="space-y-4">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold">내 담당 사역</h2>
-              <p className="mt-1 text-xs text-slate-400">통합 계정의 역할과 사용 가능한 영역입니다.</p>
+              <p className="mt-1 text-xs text-slate-400">통합 계정과 현재 수련회 배정을 함께 모았습니다.</p>
               <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
                 <strong>{memberName || user.displayName || "승인된 사용자"}</strong>
                 <p className="mt-1 text-xs text-slate-400">
@@ -212,6 +230,43 @@ export default function PortalHome() {
                   {iguardAccessLevel !== "none" ? ` · 이가드 ${iguardAccessLevel === "staff" ? "스탭" : "팀"}` : ""}
                 </p>
               </div>
+              {currentRetreat && iguardAccessLevel !== "none" && (
+                <div className="mt-3 space-y-3">
+                  {myRetreatMinistry.loading ? (
+                    <p className="rounded-xl border border-slate-100 px-4 py-3 text-xs text-slate-400">현재 수련회 담당을 확인하는 중…</p>
+                  ) : myRetreatMinistry.error ? (
+                    <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-600">담당 배정을 불러오지 못했습니다.</p>
+                  ) : !myRetreatMinistry.matchedStaffId ? (
+                    <p className="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs text-amber-700">승인 계정 이름과 현재 수련회 스탭 명단이 연결되지 않았습니다.</p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {myRetreatMinistry.groups.map(group => (
+                          <span key={group.id} className="rounded-full bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-700">
+                            조스탭 · {group.bu} {group.name}
+                          </span>
+                        ))}
+                        <span className="rounded-full bg-violet-50 px-2.5 py-1 font-semibold text-violet-700">
+                          큐싯 담당 · {myRetreatMinistry.duties.length}개 일정
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {myRetreatMinistry.duties.slice(0, 4).map(duty => (
+                          <div key={duty.blockId} className="rounded-xl border border-slate-100 px-3 py-2.5">
+                            <p className="text-xs font-semibold text-slate-700">{duty.day}일차 {duty.start} · {duty.scheduleLabel}</p>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                              {[...duty.roles, ...duty.posts].join(" · ")}
+                            </p>
+                          </div>
+                        ))}
+                        {myRetreatMinistry.duties.length === 0 && myRetreatMinistry.groups.length === 0 && (
+                          <p className="rounded-xl border border-slate-100 px-4 py-3 text-xs text-slate-400">현재 수련회에 연결된 조·동선·담당이 없습니다.</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </section>
             <nav className="grid grid-cols-2 gap-3">
               {accessLevel !== "none" && <Link href="/semesters" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-sky-300">학기 목록</Link>}
