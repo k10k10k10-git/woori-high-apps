@@ -156,8 +156,11 @@ export default function PortalHome() {
       <main className="min-h-screen grid place-items-center px-6 text-center">
         <div>
           <h1 className="text-xl font-bold">접근 승인이 필요합니다</h1>
-          <p className="mt-2 text-sm text-slate-500">행정팀 승인 후 학기와 수련회 메뉴를 사용할 수 있습니다.</p>
-          <button onClick={() => void signOut()} className="mt-5 text-sm text-slate-500 underline">로그아웃</button>
+          <p className="mt-2 text-sm text-slate-500">행정팀 또는 이가드팀 승인 후 사역 메뉴를 사용할 수 있습니다.</p>
+          <div className="mt-5 flex items-center justify-center gap-3">
+            <Link href="/field" className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white">이가드 접근 요청</Link>
+            <button onClick={() => void signOut()} className="text-sm text-slate-500 underline">로그아웃</button>
+          </div>
         </div>
       </main>
     );
@@ -276,6 +279,7 @@ export default function PortalHome() {
             <nav className="grid grid-cols-2 gap-3">
               {canAccessPortalArea("semester", portalAccess) && <Link href="/semesters" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-sky-300">학기 목록</Link>}
               {canAccessPortalArea("retreat-admin", portalAccess) && <Link href="/retreats" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-violet-300">수련회 목록</Link>}
+              {iguardAccessLevel !== "none" && <Link href="/field" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-violet-300">이가드 센터</Link>}
               {currentRetreat && iguardAccessLevel !== "none" && <Link href={`/retreat/${currentRetreat.id}/field`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-violet-300">이가드 현장</Link>}
             </nav>
           </div>

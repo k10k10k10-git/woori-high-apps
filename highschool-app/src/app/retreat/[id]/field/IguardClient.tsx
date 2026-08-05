@@ -33,36 +33,7 @@ import RetreatPinGate from "./RetreatPinGate";
 import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
-
-const GROUPS = [
-  { label: "실행", hint: "현장·모바일", views: [
-    { key: "cue", label: "개인 큐카드", icon: "📋" },
-    { key: "board", label: "포스트 현황", icon: "📍" },
-    { key: "rooms", label: "조별 정보", icon: "👥" },
-    { key: "lodging", label: "숙소 안내", icon: "🗺️" },
-    { key: "check", label: "인원체크", icon: "✅" },
-  ] },
-  { label: "기획", hint: "PC", views: [
-    { key: "overview", label: "전체 개요" },
-    { key: "schedule", label: "스탭 전체 큐싯" },
-    { key: "leadercue", label: "조장 큐싯" },
-    { key: "posts", label: "포스트 편집" },
-    { key: "staff", label: "스탭" },
-    { key: "movements", label: "동선 매트릭스" },
-    { key: "validate", label: "데이터 검증" },
-    { key: "groupstaff", label: "조스탭 배정" },
-    { key: "gbs", label: "GBS 장소" },
-    { key: "badge", label: "명찰카드" },
-    { key: "meals", label: "식사순서" },
-    { key: "buses", label: "버스배정" },
-    { key: "seating", label: "집회자리" },
-    { key: "lodgingmap", label: "숙소 배치도" },
-  ] },
-  { label: "정보", hint: "", views: [
-    { key: "guide", label: "조스탭 가이드" },
-    { key: "todos", label: "준비 할일" },
-  ] },
-] as const;
+import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
 
 function parseNames(value?: string): string[] {
   return (value || "")
@@ -196,7 +167,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
   // 스탭은 실행 탭만, 이가드팀/관리자는 전체 그룹
   const visibleGroups = useMemo(
-    () => (accessLevel === "staff" ? GROUPS.filter(g => g.label === "실행") : [...GROUPS]),
+    () => (accessLevel === "staff" ? IGUARD_VIEW_GROUPS.filter(g => g.label === "실행") : [...IGUARD_VIEW_GROUPS]),
     [accessLevel]
   );
   const activeGroup = useMemo(
@@ -234,7 +205,7 @@ function IguardWorkspace({ id }: { id: string }) {
     </div>
   );
 
-  const executionViews = GROUPS[0].views;
+  const executionViews = IGUARD_VIEW_GROUPS[0].views;
   // 기획 탭은 큐싯 5열 편집처럼 가로가 필요한 PC 화면이라 컨테이너를 넓힌다.
   // 실행 탭은 현장·모바일 기준이므로 기존 폭을 유지한다(밀도 튜닝이 이 폭 기준).
   const shellWidth = activeGroup.label === "기획" ? "max-w-[1760px]" : "max-w-6xl";

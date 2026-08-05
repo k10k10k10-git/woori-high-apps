@@ -24,6 +24,7 @@ import MedicalLogTab from "./MedicalLogTab";
 import MealCountTab from "./MealCountTab";
 import AdminSuppliesTab from "./AdminSuppliesTab";
 import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
 
 // 자주 사용하는 탭은 한번 마운트되면 CSS display로 보여주기/숨기기 (keep-alive).
 // 이를 통해 탭 전환 시 Firebase 재구독과 상태 초기화를 방지합니다.
@@ -55,51 +56,6 @@ const TAB_IDX = {
 } as const;
 
 // ── 탭 그룹 구조 (대그룹 → 소그룹) ─────────────────────────────
-const TAB_GROUPS = [
-  {
-    label: "명단",
-    tabs: [
-      { label: "신청 접수", idx: 0 },
-      { label: "반별 명단", idx: 7 },
-      { label: "입금 대조", idx: 12 },
-      { label: "취소·환불", idx: 9 },
-    ],
-  },
-  {
-    label: "편성",
-    tabs: [
-      { label: "조편성", idx: 1 },
-      { label: "방배정", idx: 2 },
-      { label: "교사 참석", idx: 4 },
-    ],
-  },
-  {
-    label: "이동·참석",
-    tabs: [
-      { label: "부분 참석", idx: 6 },
-      { label: "카풀·자차", idx: 5 },
-    ],
-  },
-  {
-    label: "물품·비용",
-    tabs: [
-      { label: "여행자 보험", idx: 8 },
-      { label: "단체티", idx: 13 },
-      { label: "구매 물품", idx: 10 },
-      { label: "물품 재고", idx: 16 },
-      { label: "식사 인원", idx: 15 },
-    ],
-  },
-  {
-    label: "현장",
-    tabs: [
-      { label: "현장 등록", idx: 11 },
-      { label: "건강 특이사항", idx: 3 },
-      { label: "의료 일지", idx: 14 },
-    ],
-  },
-] as const;
-
 type TabEntry = { label: string; idx: number };
 
 export default function RetreatPageClient() {
@@ -187,11 +143,11 @@ export default function RetreatPageClient() {
   }
 
   // 현재 탭이 속한 그룹
-  const activeGroupIdx = TAB_GROUPS.findIndex(g =>
+  const activeGroupIdx = RETREAT_TAB_GROUPS.findIndex(g =>
     (g.tabs as ReadonlyArray<TabEntry>).some(t => t.idx === tab)
   );
   const safeGroupIdx = activeGroupIdx >= 0 ? activeGroupIdx : 0;
-  const activeGroup  = TAB_GROUPS[safeGroupIdx];
+  const activeGroup  = RETREAT_TAB_GROUPS[safeGroupIdx];
 
   // ── 로딩 화면 ────────────────────────────────────────────────
   if (authLoading || !user || (accessLevel !== "none" && loading)) return (
@@ -289,7 +245,7 @@ export default function RetreatPageClient() {
 
             {/* 대그룹 탭 */}
             <div className="flex gap-0.5 sm:gap-1" role="tablist" aria-label="탭 그룹">
-              {TAB_GROUPS.map((g, gi) => {
+              {RETREAT_TAB_GROUPS.map((g, gi) => {
                 const isActive = gi === safeGroupIdx;
                 return (
                   <button

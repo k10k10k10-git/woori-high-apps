@@ -1,20 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
 
 const read = (relativePath: string) =>
   readFileSync(new URL(relativePath, import.meta.url), "utf8");
 
 describe("행정사이트 탭 분류 계약", () => {
   it("기존 인덱스를 유지한 채 17개 탭을 5개 그룹으로 분류한다", () => {
-    const source = read("../app/retreat/[id]/RetreatPageClient.tsx");
-    const groupSource = source.slice(
-      source.indexOf("const TAB_GROUPS = ["),
-      source.indexOf("] as const;", source.indexOf("const TAB_GROUPS = [")),
-    );
-    const groups = [...groupSource.matchAll(/label: "([^"]+)",\n\s+tabs:/g)]
-      .map(match => match[1]);
-    const tabs = [...groupSource.matchAll(/\{ label: "([^"]+)", idx: (\d+) \}/g)]
-      .map(match => ({ label: match[1], idx: Number(match[2]) }));
+    const groups = RETREAT_TAB_GROUPS.map(group => group.label);
+    const tabs = RETREAT_TAB_GROUPS.flatMap(group => group.tabs);
 
     expect(groups).toEqual(["명단", "편성", "이동·참석", "물품·비용", "현장"]);
     expect(tabs).toEqual([

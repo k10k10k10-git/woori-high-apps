@@ -21,9 +21,9 @@ import CompletionTab from "./CompletionTab";
 import CurriculumTab from "./CurriculumTab";
 import ArchiveTab from "./ArchiveTab";
 import SettingsTab from "./SettingsTab";
+import { SEMESTER_TABS } from "@/features/portal/featureCatalog";
 
-const TABS = ["접수", "배치", "출석", "수료", "커리큘럼", "아카이브", "설정"] as const;
-type TabName = (typeof TABS)[number];
+type TabName = (typeof SEMESTER_TABS)[number];
 
 export default function SemesterClient({ semesterId }: { semesterId: string }) {
   const { user, loading: authLoading, accessLevel, signIn } = useAuth();
@@ -83,7 +83,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
       )}
 
       <nav role="tablist" aria-label="학기 탭" className="flex gap-1 overflow-x-auto mb-5 pb-1">
-        {TABS.map((t) => (
+        {SEMESTER_TABS.map((t) => (
           <button
             key={t}
             role="tab"
