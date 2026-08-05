@@ -2,6 +2,8 @@
 
 Internal semester ministry and training hub for intake, team assignment, attendance, completion, curriculum, and archive workflows.
 
+**Compatibility app.** The live semester ministry screens are in `highschool-app` (`/semesters`, `/semester/[id]`). This app now redirects `/` and `/semester/:path*` to `https://woorihigh-app.vercel.app` (see `next.config.ts`). Build new semester features in `highschool-app`, not here; retiring this app needs separate user approval. Note that `highschool-app` has moved ahead of this app: six ministry roles with read-only access for the staff role, staff members (`teacherStaff/{year}`) as intake targets with an `s_` appKey prefix, and student/guardian phone numbers in `applicationsPrivate`. Port those here only if the user asks.
+
 Read `CLAUDE.md`, `../DB_OWNERSHIP.md`, and `../OPERATIONS.md` before significant changes.
 
 ## Stack

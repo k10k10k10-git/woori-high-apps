@@ -2,9 +2,15 @@
 
 최종 갱신: 2026-08-06 (Asia/Seoul)
 
+## 0. 에이전트별 시작 지점
+
+- **Codex(또는 CLAUDE.md를 안 읽는 에이전트)**: 루트 `AGENTS.md` → 이 문서 → 대상 앱 `AGENTS.md` 순서로 읽는다. 세 문서 모두 6단계 역할 표·운영 주소·검증 명령을 담고 있어 이것만으로 착수할 수 있다.
+- **Claude Code**: 루트 `CLAUDE.md`가 최우선(안전 4문답·스킬 지도 포함) → 이 문서 → 대상 앱 `CLAUDE.md`.
+- 두 계열 문서가 어긋나면 **코드가 진실**이고, 안전 규칙은 루트 `CLAUDE.md`가 우선이다. 발견 즉시 같은 커밋에서 문서를 맞춘다.
+
 ## 1. 먼저 읽을 문서
 
-1. 루트 `CLAUDE.md`
+1. 루트 `CLAUDE.md` (Codex는 루트 `AGENTS.md`)
 2. 이 문서
 3. `DB_OWNERSHIP.md`
 4. `OPERATIONS.md`

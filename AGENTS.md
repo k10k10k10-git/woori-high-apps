@@ -22,7 +22,7 @@ Before changing code, always check whether the change can affect Firebase paths 
 
 | Path | Purpose | Main DB ownership |
 |---|---|---|
-| `highschool-app/` | Unified semester, retreat admin, and on-site app | `semesters/*`, `retreats/{id}/*`, `retreatsPrivate/{id}`, `retreatAdmins`, `retreats/{id}/iguard/*`, `iguard*` |
+| `highschool-app/` | Unified semester, retreat admin, and on-site app — production URL `https://woorihigh-app.vercel.app` (the old `highschool-app-flame.vercel.app` still points at the same deployment) | `semesters/*`, `retreats/{id}/*`, `retreatsPrivate/{id}`, `retreatAdmins`, `retreats/{id}/iguard/*`, `iguard*` |
 | `고등부 학생 출석부/` | Student attendance PWA | `classes/`, `attendance/`, `events/`, `admins`, `teacherClasses` |
 | `semester-app/` | Semester ministry and training hub | `semesters/`, `semestersPrivate/` |
 | `고등부 교사·스탭 출석부/` | Teacher/staff attendance app | `staff_*` paths only |
@@ -32,6 +32,25 @@ Read these first for cross-app work:
 - `DB_OWNERSHIP.md`
 - `OPERATIONS.md`
 - The relevant app's `CLAUDE.md` and `AGENTS.md`
+
+## Roles and permissions (unified app, since 2026-08-06)
+
+`highschool-app` has six ministry roles. The single source of truth is `highschool-app/src/features/portal/accessPolicy.ts`; the required table is frozen by `accessPolicy.test.ts`. Never compare role strings in components — call `canAccessPortalArea` / `canEditPortalArea` / `iguardScope` / `canManageRoles`.
+
+| Role (ko) | Semester | Retreat admin | iGuard field | Assign roles | Stored as |
+|---|---|---|---|---|---|
+| 통합관리자 (super admin) | edit | edit | all tabs | yes | `admins/{uid} = true` |
+| 교역자 (pastor) | edit | edit | all tabs | no | `retreatAdmins/{uid}.role = "pastor"` |
+| 팀장 (team lead) | edit | edit | all tabs | no | `.role = "leader"` |
+| 행정팀 (admin team) | edit | edit | execution tabs only | no | `.role = "adminTeam"` (legacy entries with no `role` count as this) |
+| 이가드팀 (iGuard team) | none | none | all tabs | no | `iguardMembers/{uid}` + `iguardRoles/{uid} = "team"` |
+| 스탭 (staff) | read only | none | execution tabs only | no | `iguardMembers/{uid}` + `iguardRoles/{uid} = "staff"` |
+
+- Roles are expressed with **existing** DB nodes and one optional field, so no Firebase Rules change was needed. Do not invent a new roles node: new nodes have no `.read`/`.write` in the rules and are rejected immediately, and rules can only be deployed from the student app.
+- `iguardRoles` has a `.validate` that accepts only `"staff"` / `"team"`. Never write other values there.
+- Role judgement lives in one pure function, `resolveMinistryRole`, shared by both AuthContexts (`src/context/AuthContext.tsx` and `src/features/iguard/context/AuthContext.tsx`).
+- Role writes go through `roleAssign.planRoleAssignment` (pure, grants before revokes) then `applyRole.applyRoleSteps` (execution). Do not call the underlying DB functions from UI code.
+- ⚠ Open blocker: staff read of `semesters` is still denied by the rules, so the staff role sees an error banner on semester screens. The exact rules snippet is in `.claude/HANDOFF.md` section 2-1; it must be deployed from the student app by the user. `semestersPrivate` (contacts) stays admin-side only on purpose.
 
 ## Firebase Safety Rules
 
@@ -53,6 +72,10 @@ npm run build
 ```
 
 Deployment is not part of routine edits unless explicitly requested. If production deployment is requested, follow `OPERATIONS.md`.
+
+Because every screen sits behind Google OAuth, headless browsers cannot verify logged-in pages. Confirm a deployment by comparing `curl -s https://woorihigh-app.vercel.app/api/version` (`buildId`) with `git rev-parse HEAD`, and check `npx vercel ls` shows Production `Ready`. For destructive flows, test with one dummy row that matches nothing, read the confirmation count, then **cancel** — never press the real confirm button. Details in `LEARNINGS.md`.
+
+If a `*.vercel.app` alias you just created answers `302` with `location: .../sso-api?...`, that is Deployment Protection, not an app bug: register it with `npx vercel domains add <subdomain>.vercel.app <projectId>` and re-check with curl.
 
 ## App Priority
 
