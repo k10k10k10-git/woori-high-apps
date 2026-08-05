@@ -9,6 +9,7 @@ import type { Retreat } from "@/lib/types";
 import { getSemesters, subscribeSessions } from "@/features/semester/db";
 import type { Semester, Session } from "@/features/semester/types";
 import { useMyRetreatMinistry } from "./useMyRetreatMinistry";
+import { canAccessPortalArea, retreatEntryHref } from "./accessPolicy";
 
 type TimelineItem = {
   id: string;
@@ -34,6 +35,10 @@ function formatDateRange(start: string, end?: string) {
 
 export default function PortalHome() {
   const { user, loading, accessLevel, iguardAccessLevel, memberName, signIn, signOut } = useAuth();
+  const portalAccess = useMemo(
+    () => ({ accessLevel, iguardAccessLevel }),
+    [accessLevel, iguardAccessLevel],
+  );
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
@@ -121,13 +126,13 @@ export default function PortalHome() {
         endDate: period.endDate,
         title: `${retreat?.name ?? "수련회"}${period.label ? ` · ${period.label}` : ""}`,
         kind: "retreat" as const,
-        href: accessLevel !== "none" ? `/retreat/${period.retreatId}` : `/retreat/${period.retreatId}/field`,
+        href: retreatEntryHref(period.retreatId, portalAccess),
       };
     });
     return [...semesterItems, ...retreatItems]
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(0, 10);
-  }, [accessLevel, currentSemester, periods, retreats, sessions]);
+  }, [currentSemester, periods, portalAccess, retreats, sessions]);
 
   if (loading) {
     return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중…</main>;
@@ -146,7 +151,7 @@ export default function PortalHome() {
     );
   }
 
-  if (accessLevel === "none" && iguardAccessLevel === "none") {
+  if (!canAccessPortalArea("home", portalAccess)) {
     return (
       <main className="min-h-screen grid place-items-center px-6 text-center">
         <div>
@@ -177,7 +182,7 @@ export default function PortalHome() {
         {loadError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
 
         <section className="grid gap-4 lg:grid-cols-2">
-          {accessLevel !== "none" ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          {canAccessPortalArea("semester", portalAccess) ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-bold text-sky-700">학기 중 사역</span>
               <span className="text-slate-300 transition group-hover:translate-x-1">→</span>
@@ -190,7 +195,7 @@ export default function PortalHome() {
             <p className="mt-2 text-sm">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
           </section>}
 
-          <Link href={currentRetreat ? (accessLevel !== "none" ? `/retreat/${currentRetreat.id}` : `/retreat/${currentRetreat.id}/field`) : "/retreats"} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, portalAccess) : "/retreats"} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <div className="flex items-center justify-between">
               <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">방학 중 사역</span>
               <span className="text-slate-300 transition group-hover:translate-x-1">→</span>
@@ -269,8 +274,8 @@ export default function PortalHome() {
               )}
             </section>
             <nav className="grid grid-cols-2 gap-3">
-              {accessLevel !== "none" && <Link href="/semesters" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-sky-300">학기 목록</Link>}
-              {accessLevel !== "none" && <Link href="/retreats" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-violet-300">수련회 목록</Link>}
+              {canAccessPortalArea("semester", portalAccess) && <Link href="/semesters" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-sky-300">학기 목록</Link>}
+              {canAccessPortalArea("retreat-admin", portalAccess) && <Link href="/retreats" className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-violet-300">수련회 목록</Link>}
               {currentRetreat && iguardAccessLevel !== "none" && <Link href={`/retreat/${currentRetreat.id}/field`} className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-bold shadow-sm hover:border-violet-300">이가드 현장</Link>}
             </nav>
           </div>

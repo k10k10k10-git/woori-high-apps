@@ -23,6 +23,7 @@ import TshirtTab from "./TshirtTab";
 import MedicalLogTab from "./MedicalLogTab";
 import MealCountTab from "./MealCountTab";
 import AdminSuppliesTab from "./AdminSuppliesTab";
+import { canAccessPortalArea } from "@/features/portal/accessPolicy";
 
 // 자주 사용하는 탭은 한번 마운트되면 CSS display로 보여주기/숨기기 (keep-alive).
 // 이를 통해 탭 전환 시 Firebase 재구독과 상태 초기화를 방지합니다.
@@ -105,7 +106,7 @@ export default function RetreatPageClient() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, accessLevel, iguardAccessLevel } = useAuth();
   const { toast } = useUI();
 
   const [retreat, setRetreat] = useState<Retreat | null>(null);
@@ -135,7 +136,7 @@ export default function RetreatPageClient() {
       router.push("/");
       return;
     }
-    if (!id) return;
+    if (accessLevel === "none" || !id) return;
 
     let cancelled = false;
     getRetreat(id)
@@ -157,7 +158,7 @@ export default function RetreatPageClient() {
       });
 
     return () => { cancelled = true; };
-  }, [authLoading, id, router, toast, user]);
+  }, [accessLevel, authLoading, id, router, toast, user]);
 
   const parsedSheetUrl = useMemo(() => parseSheetUrl(sheetForm.sheetUrl), [sheetForm.sheetUrl]);
 
@@ -193,12 +194,31 @@ export default function RetreatPageClient() {
   const activeGroup  = TAB_GROUPS[safeGroupIdx];
 
   // ── 로딩 화면 ────────────────────────────────────────────────
-  if (authLoading || loading || !user) return (
+  if (authLoading || !user || (accessLevel !== "none" && loading)) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-screen-bg)" }}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
           style={{ borderColor: "var(--color-primary)", borderTopColor: "transparent" }} />
         <div className="text-slate-400 text-sm">로딩 중...</div>
+      </div>
+    </div>
+  );
+
+  if (!canAccessPortalArea("retreat-admin", { accessLevel, iguardAccessLevel })) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
+      <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm">
+        <h1 className="text-xl font-bold text-slate-800">행정 화면 접근 권한이 없습니다</h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-500">
+          이가드 전용 계정은 현장 운영 화면만 사용할 수 있습니다.
+        </p>
+        <div className="mt-5 flex justify-center gap-2">
+          {canAccessPortalArea("retreat-field", { accessLevel, iguardAccessLevel }) && (
+            <button onClick={() => router.push(`/retreat/${encodeURIComponent(id)}/field`)} className="btn-primary">
+              현장 화면으로
+            </button>
+          )}
+          <button onClick={() => router.push("/")} className="btn-secondary">통합 홈으로</button>
+        </div>
       </div>
     </div>
   );
