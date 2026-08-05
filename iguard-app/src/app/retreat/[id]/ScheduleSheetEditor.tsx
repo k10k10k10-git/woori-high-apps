@@ -284,7 +284,7 @@ function ScheduleSheetRow({
       onFocusCapture={() => { editingRef.current = true; }}
       onBlurCapture={handleBlur}
       onKeyDownCapture={handleKeyDown}
-      className="grid gap-3 border-b border-slate-200 bg-white px-3 py-4 last:border-b-0 lg:grid-cols-[160px_190px_minmax(280px,1.35fr)_minmax(270px,1.2fr)_minmax(240px,0.9fr)_112px] lg:gap-3 lg:px-4 lg:py-5"
+      className="grid gap-3 border-b border-slate-200 bg-white px-3 py-4 last:border-b-0 lg:grid-cols-[150px_170px_minmax(260px,1.35fr)_minmax(250px,1.2fr)_minmax(220px,0.95fr)_104px] lg:gap-3 lg:px-4 lg:py-5"
     >
       <div>
         <SheetFieldLabel>시간</SheetFieldLabel>
@@ -547,9 +547,11 @@ export default function ScheduleSheetEditor({
       </div>
 
       <div className="card overflow-x-auto border-slate-200">
-        <div className="lg:min-w-[1450px]">
+        {/* 강제 min-width를 두면 컨테이너보다 넓어져 특이사항 열이 잘린다.
+            컬럼 minmax 최소값(합계 약 1284px)이 자연 최소폭을 정하게 둔다. */}
+        <div>
           <div
-            className="hidden grid-cols-[160px_190px_minmax(280px,1.35fr)_minmax(270px,1.2fr)_minmax(240px,0.9fr)_112px] gap-3 border-b border-slate-300 bg-slate-900 px-4 py-3 text-xs font-semibold text-white lg:grid"
+            className="hidden grid-cols-[150px_170px_minmax(260px,1.35fr)_minmax(250px,1.2fr)_minmax(220px,0.95fr)_104px] gap-3 border-b border-slate-300 bg-slate-900 px-4 py-3 text-xs font-semibold text-white lg:grid"
           >
             <div>시간</div>
             <div>구분</div>

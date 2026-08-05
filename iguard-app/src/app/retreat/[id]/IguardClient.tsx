@@ -235,11 +235,14 @@ function IguardWorkspace({ id }: { id: string }) {
   );
 
   const executionViews = GROUPS[0].views;
+  // 기획 탭은 큐싯 5열 편집처럼 가로가 필요한 PC 화면이라 컨테이너를 넓힌다.
+  // 실행 탭은 현장·모바일 기준이므로 기존 폭을 유지한다(밀도 튜닝이 이 폭 기준).
+  const shellWidth = activeGroup.label === "기획" ? "max-w-[1760px]" : "max-w-6xl";
 
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-50 pb-24 sm:pb-12">
       <header ref={headerRef} className="sticky top-0 z-20" style={{ background: "var(--color-header-bg)" }}>
-        <div className="max-w-6xl mx-auto px-3 sm:px-4">
+        <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
           <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
             <button onClick={() => router.push("/")} className="min-h-10 shrink-0 px-1 text-xs text-slate-300 hover:text-fuchsia-200" aria-label="수련회 목록으로 돌아가기">← 목록</button>
             <span className="hidden text-slate-600 sm:inline">|</span>
@@ -284,7 +287,7 @@ function IguardWorkspace({ id }: { id: string }) {
         </div>
         {/* 소그룹 */}
         <div className={`bg-white border-b border-slate-200 ${activeGroup.label === "실행" ? "hidden sm:block" : "block"}`}>
-          <div className="max-w-6xl mx-auto px-4 flex gap-0 overflow-x-auto" role="tablist" aria-label={`${activeGroup.label} 하위 탭`}>
+          <div className={`${shellWidth} mx-auto px-4 flex gap-0 overflow-x-auto`} role="tablist" aria-label={`${activeGroup.label} 하위 탭`}>
             {activeGroup.views.map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
                 role="tab"
@@ -298,7 +301,7 @@ function IguardWorkspace({ id }: { id: string }) {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-3 py-4 sm:px-4 sm:py-6">
+      <main className={`${shellWidth} mx-auto px-3 py-4 sm:px-4 sm:py-6`}>
         {!connected && (
           <div className="mb-4 bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700 flex items-center gap-2 animate-pulse" role="alert">
             <span className="text-lg" aria-hidden="true">📡</span>
