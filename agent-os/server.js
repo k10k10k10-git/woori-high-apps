@@ -67,12 +67,12 @@ function vercelLatest(project, token) {
 // ── 일일 보고서 ────────────────────────────────────────
 async function buildReport() {
   const token = vercelToken();
-  const [cy, ct, cw, retreat, iguard] = await Promise.all([
+  const [cy, ct, cw, highschool, semester] = await Promise.all([
     sh("git", ["log", "--since=yesterday 00:00", "--until=today 00:00", "--format=%h│%s"]),
     sh("git", ["log", "--since=today 00:00", "--format=%h│%s"]),
     sh("git", ["rev-list", "--count", "--since=7 days ago", "HEAD"]),
-    vercelLatest("retreat-app", token),
-    vercelLatest("iguard-app", token),
+    vercelLatest("highschool-app", token),
+    vercelLatest("semester-app", token),
   ]);
   const parse = (s) => s ? s.split("\n").map((l) => { const [h, ...m] = l.split("│"); return { hash: h, msg: m.join("│") }; }) : [];
 
@@ -111,7 +111,7 @@ async function buildReport() {
   return {
     now: Date.now(), dday,
     commitsYesterday: parse(cy), commitsToday: parse(ct), commitsWeek: Number(cw) || 0,
-    deployments: { "retreat-app": retreat, "iguard-app": iguard },
+    deployments: { "highschool-app": highschool, "semester-app": semester },
     sessionsWeek, backlog, overnight: overnight.slice(0, 5), recentRuns: runs.slice(0, 5),
   };
 }

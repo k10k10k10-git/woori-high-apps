@@ -5,7 +5,7 @@
 
 ## 기술 스택
 
-retreat-app과 동일 (Next.js 16 App Router, React 19, Tailwind 4, TS strict, Firebase RTDB, Vitest). xlsx 없음 — 시트 연동 자체가 없다. dev 포트 **3002**.
+highschool-app과 동일한 기반 (Next.js 16 App Router, React 19, Tailwind 4, TS strict, Firebase RTDB, Vitest). xlsx 없음 — 시트 연동 자체가 없다. dev 포트 **3002**.
 
 ## 디렉터리
 
@@ -35,7 +35,7 @@ semesters/{sid}/                 # sid = "2026-1"
   teams/{teamId} { name, color(파스텔), room?, order }
   sessions/{sessId} { date, type: 정규|휴강|행사, label? }
   applications/{appKey} { studentId, bu, grade, class, name, choice1/2, trainingOnly?, status, teamId }
-                                 # appKey = "{buNum}_{studentId}" (retreat-app 컨벤션)
+                                 # appKey = "{buNum}_{studentId}" (통합 행정 컨벤션)
   attendance/team/{sessId}/{appKey} { s: 출석|지각|결석, by, at }   # 노드 없음 = 미기록
   completion/{appKey} { certPrinted?, photoChecked? }              # 체크리스트만 — 수료 여부는 저장 안 함
   curriculum/{teamId}/{sessId} { plan }
@@ -45,7 +45,7 @@ semestersPrivate/{sid}/applicationsPrivate/{appKey} { motive, wish, phone?, pare
 
 읽기 전용: `classes/{year}`(접수 반 명단), `admins`/`retreatAdmins`(인증). **여기에 쓰기 함수를 만들지 말 것.**
 
-## 핵심 패턴 (retreat-app 컨벤션 계승 + 이 앱 고유)
+## 핵심 패턴 (통합 행정 컨벤션 계승 + 이 앱 고유)
 
 1. **수료 판정은 계산值** — `lib/completion.ts`의 `calcCompletion`만 사용 (출석2/지각1/결석·미기록0, 휴강 회차는 만점 제외). DB에 수료 여부를 저장하지 않는다(이중 원장 방지). 규칙 변경 시 테스트(`completion.test.ts`) 갱신 필수.
 2. **출석은 멱등 명시 상태** — 토글 금지(모노레포 실수 규칙 11). 같은 상태 재탭 = 동일 결과. 취소는 별도 지우기 버튼.
@@ -73,6 +73,6 @@ npx vercel --prod --yes   # 프로덕션 배포 (CLI — Git 자동배포 미연
 ```
 
 - 배포 URL: **https://semester-app.vercel.app** (Vercel 프로젝트 `semester-app`, 2026-07-10 생성)
-- 환경변수: `NEXT_PUBLIC_FIREBASE_*` + `NEXT_PUBLIC_MAIN_ADMIN_*` production 등록 완료 (retreat-app과 동일 값)
+- 환경변수: `NEXT_PUBLIC_FIREBASE_*` + `NEXT_PUBLIC_MAIN_ADMIN_*` production 등록 완료 (highschool-app과 동일 Firebase 프로젝트)
 - ⚠ **Git 자동배포 미연결** — push해도 이 앱은 배포되지 않는다. 배포는 `npx vercel --prod --yes`를 semester-app 폴더에서 실행. (연결하려면 Vercel 대시보드에서 repo 연결 + Root Directory `semester-app` 설정)
 - ⚠ **Firebase Auth 승인 도메인**: `semester-app.vercel.app`이 Firebase Console → Authentication → Settings → Authorized domains에 있어야 Google 로그인이 된다.

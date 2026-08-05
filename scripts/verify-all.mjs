@@ -1,8 +1,7 @@
 import { spawnSync } from "node:child_process";
 
 const apps = [
-  "retreat-app",
-  "iguard-app",
+  "highschool-app",
   "semester-app",
   "고등부 학생 출석부",
   "고등부 교사·스탭 출석부",

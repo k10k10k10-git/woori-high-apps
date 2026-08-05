@@ -1,6 +1,6 @@
-# 워크스페이스 운영 매뉴얼 (5개 앱 모노레포)
+# 워크스페이스 운영 매뉴얼 (통합 플랫폼 모노레포)
 
-이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 5개 앱(학생 출석부·retreat·iguard·교사스탭·semester)을 담는다.
+이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 통합 플랫폼과 관련 앱을 담는다. 독립 `retreat-app`·`iguard-app`은 2026-08-05에 `highschool-app`으로 통합 후 제거했다.
 **이 문서는 "이 저장소에서 일하는 방법" 전체를 규정한다.** 개별 앱의 코드 패턴은 각 앱의 CLAUDE.md가 원천이며, 충돌 시 이 문서의 안전 규칙이 우선한다.
 
 작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md`.
@@ -13,7 +13,7 @@
 
 1. **Firebase DB 데이터를 변경하는가?** (운영 DB 직접 쓰기는 사용자 명시 승인 + 사전 스냅샷 백업 없이는 금지)
 2. **실제 배포를 실행하는가?** (`npx vercel --prod` 등 — 사용자가 요청했거나 /ship 절차일 때만)
-3. **Firebase Rules 배포가 포함되는가?** (답은 항상 "아니오"여야 함 — Rules 배포 원천은 `고등부 학생 출석부/database.rules.json` 하나뿐. retreat-app/iguard-app의 `DO_NOT_DEPLOY.database.rules.json`은 보관용)
+3. **Firebase Rules 배포가 포함되는가?** (답은 항상 "아니오"여야 함 — Rules 배포 원천은 `고등부 학생 출석부/database.rules.json` 하나뿐)
 4. **조심해야 할 DB 경로는 무엇인가?** (예: 다른 앱 소유 노드, `retreatsPrivate/*` 민감 데이터, 전체 덮어쓰기 노드)
 
 이 4문답 없이 작업을 시작하지 말 것. 사용자가 별도 안전 헤더를 붙이지 않아도 항상 적용된다.
@@ -27,19 +27,19 @@
 | 앱 | 소유 (쓰기 가능) | 다른 앱 노드 |
 |---|---|---|
 | 학생 출석부 | `classes/`, `attendance/`, `admins`, `teacher*`, Rules 배포 | — |
-| retreat-app | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용 |
-| iguard-app | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
+| highschool-app 행정 모듈 | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용 |
+| highschool-app 현장 모듈 | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
 | 교사·스탭 출석부 | `staff_*` | — (여름수련회 이후까지 작업 보류) |
 | semester-app | `semesters/`, `semestersPrivate/` | `classes/`·`retreatAdmins` 읽기 전용 |
 
-- 공유 쓰기 노드는 단 하나: `prepMilestones/` (행정↔이가드 양방향). 하위 문서(DB_OWNERSHIP.md·retreat-app CLAUDE.md)에 `retreats/{id}/milestones`가 공유로 적혀 있는 것은 이관 전 낡은 서술이다 — 코드(`paths.ts`) 기준으로 이 문장이 진실.
+- 공유 쓰기 노드는 단 하나: `prepMilestones/` (통합 앱의 행정↔현장 모듈 양방향). `retreats/{id}/milestones`는 레거시이며 코드(`paths.ts`) 기준으로 이 문장이 진실이다.
 - 민감 데이터(환불계좌·의료일지·주민번호·시트 raw)는 `retreatsPrivate/{id}/` 아래에만. 이가드 멤버는 `retreats/{id}` 전체를 읽으므로 그 아래 두면 노출이다.
 
 ## 컨벤션
 
 **기존 (이 저장소가 이미 따르는 것):**
 - 소통·커밋 메시지·코드 주석은 한국어. 커밋은 `영역: 요약` 형식(예: `이가드: 버스 파싱 오염 필터`), 기능 단위 1커밋.
-- Firebase 접근은 각 앱 `src/lib/db.ts`(retreat-app은 `db/` 모듈+배럴)만. 경로 문자열은 `paths.ts`만. 컴포넌트에서 firebase 직접 import 금지.
+- Firebase 접근은 각 앱의 DB 모듈만. 경로 문자열은 `paths.ts` 등 앱별 경로 헬퍼만 사용하고 컴포넌트에서 firebase 직접 import를 금지한다.
 - `snapToList<T>` 사용 — `Object.entries(snap.val()).map` 직접 금지.
 - 의존성 최소(firebase/next/react/react-dom + retreat만 xlsx). 새 패키지 추가는 사용자 승인 필요.
 - UI 색상은 파스텔(Tailwind `*-100` 계열, 예: `bg-blue-100`) 선호, 같은 의미의 자동/수동 표시는 같은 색.
@@ -62,7 +62,7 @@
 4. **회귀 테스트 생략** ★ — 특이사항 초기화 버그가 테스트 없이 3세션/5회 재발했다. → 규칙: 순수 로직 버그는 회귀 테스트 1개를 **같은 커밋**에 포함.
 5. **Rules 오배포** — retreat/iguard 폴더에서 `firebase deploy --only database`. → 규칙: Rules는 학생 앱에서만. 다른 앱의 rules 파일명이 `DO_NOT_DEPLOY.*`인 이유다.
 6. **구독 onError 누락** ★ — 새 onValue 구독에 에러 콜백이 없으면 권한 오류 시 무한 스피너. → 규칙: 모든 구독 함수는 `onError?: (e: Error) => void`를 받고, 훅/컴포넌트는 loadError에 배선한다(iguard 패턴 16).
-7. **시간 비교 재발명** ★ — 큐싯의 `24:30~25:30`(자정 넘김) 표기를 단순 시:분 비교로 처리 → 새벽에 전부 "일정 없음". → 규칙: `iguard-app/src/lib/scheduleTime.ts`의 `isNowOn`/`currentBlockFor`만 사용.
+7. **시간 비교 재발명** ★ — 큐싯의 `24:30~25:30`(자정 넘김) 표기를 단순 시:분 비교로 처리 → 새벽에 전부 "일정 없음". → 규칙: `highschool-app/src/features/iguard/lib/scheduleTime.ts`의 `isNowOn`/`currentBlockFor`만 사용.
 8. **큐싯 파싱 순서 변경** ★ — 날짜 마커 검사를 시간 검사보다 먼저 하면 "둘째날 오전 프로그램" 행이 통째로 사라진다. → 규칙: `cueSheet.ts` 수정 시 "시간 유무 → 날짜 판정" 순서 유지, `scheduleUtils.test.ts` D2가 지킨다.
 9. **이름 매칭 재구현** ★ — sf 꼬리표·학번 접두어 처리를 화면마다 새로 짜면 같은 사람이 두 명으로 보인다. → 규칙: `normalizeName`/`stripSuffix`/`parseBusStaff`만 사용. UnmatchedPaymentsTab의 로컬 `strip`은 의미가 달라 통합 금지(주석 참조).
 10. **동기화 보존 가드 제거** ★ — `syncFromSheet`의 ambiguous 충돌 가드를 지우면 특이사항이 엉뚱한 사람에게 영구 복사된다(실제 12명 오염). → 규칙: `syncParticipants.ts`를 통해서만 수정, `syncParticipants.test.ts` A2가 지킨다.
@@ -123,7 +123,7 @@
 ## 배포
 
 - 배포·커밋·푸시·Ready 확인은 `/ship` 스킬 절차를 따른다.
-- retreat-app 자동배포는 2026-07-08 정상 확인됨(과거 미작동은 07-06 세팅 전 증상). `OPERATIONS.md`의 07-06 "자동배포 안 잡힘" 경고는 낡은 서술이니 따르지 말 것 — 이 문장이 최신. 그래도 push 후 `npx vercel ls`로 Ready 확인 (상세: retreat-app/CLAUDE.md).
+- `highschool-app`은 Vercel의 `highschool-app` 프로젝트로 배포한다. push 후 `/api/version`과 `npx vercel ls`로 Ready를 확인한다.
 - 학생 앱은 Firebase Hosting(`firebase deploy --only hosting`, predeploy가 SW 캐시명 갱신). 교사·스탭 앱은 미배포·작업 보류.
 - 배포 전 `npx tsc --noEmit` 0 errors + `npm test` 통과 필수.
 
@@ -131,7 +131,7 @@
 
 | 상황 | 스킬 |
 |---|---|
-| 검증→커밋→푸시→배포 Ready 확인 | `/ship [retreat\|iguard\|all]` |
+| 검증→커밋→푸시→배포 Ready 확인 | `/ship highschool` |
 | 버그 신고 접수 | `/bugfix <증상>` — 재현→원인→수정+회귀테스트→verify까지 한 흐름 |
 | 운영 DB 정합성 의심(특이사항 오염 등) | `/db-audit` — 읽기 전용 진단, 복구는 승인 후 |
 | 세션 마무리/재개 | `/handoff` (저장) · `/handoff resume` (이어서) |

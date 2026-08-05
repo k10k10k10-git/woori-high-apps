@@ -2,29 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "retreat-admin",
+      "name": "highschool-app",
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "run",
         "dev",
         "--prefix",
-        "retreat-app"
+        "highschool-app"
       ],
       "port": 3000
-    },
-    {
-      "name": "iguard-app",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--prefix",
-        "iguard-app",
-        "--",
-        "-p",
-        "3001"
-      ],
-      "port": 3001
     },
     {
       "name": "semester-app",

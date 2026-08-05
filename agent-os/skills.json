@@ -1,95 +1,79 @@
 {
   "dday": {
-    "label": "여름수련회",
-    "date": "2026-07-24"
+    "label": "다음 수련회",
+    "date": "2027-01-01"
   },
   "skills": [
     {
       "id": "deploy-status",
       "domain": "배포·운영",
-      "label": "배포 상태 브리핑",
-      "desc": "두 앱의 Vercel 최신 배포를 확인해 짧게 보고",
-      "prompt": "retreat-app과 iguard-app 폴더에서 각각 npx vercel ls를 실행해 최신 배포의 상태(Ready/Error)와 커밋을 확인하고, 한국어 3~4줄로 요약 보고해줘. 코드·설정은 절대 변경하지 마.",
+      "label": "통합 플랫폼 배포 상태",
+      "desc": "통합 플랫폼과 학기 앱의 최신 Vercel 배포를 확인",
+      "prompt": "highschool-app과 semester-app의 Vercel 최신 배포 상태(Ready/Error)와 커밋을 확인하고 한국어 3~4줄로 요약해줘. 코드와 설정은 변경하지 마.",
       "danger": false
     },
     {
-      "id": "ship-retreat",
+      "id": "ship-highschool",
       "domain": "배포·운영",
-      "label": "행정 앱 배포 (/ship retreat)",
-      "desc": "타입체크·테스트 통과 시 커밋·푸시·Ready 확인",
-      "prompt": "/ship retreat",
-      "danger": true
-    },
-    {
-      "id": "ship-iguard",
-      "domain": "배포·운영",
-      "label": "이가드 앱 배포 (/ship iguard)",
-      "desc": "타입체크·테스트 통과 시 커밋·푸시·Ready 확인",
-      "prompt": "/ship iguard",
-      "danger": true
-    },
-    {
-      "id": "ship-all",
-      "domain": "배포·운영",
-      "label": "전체 배포 (/ship all)",
-      "desc": "두 앱 모두 검증 후 배포",
-      "prompt": "/ship all",
+      "label": "통합 플랫폼 배포",
+      "desc": "타입체크·테스트·빌드 통과 후 통합 플랫폼 배포",
+      "prompt": "highschool-app을 검증하고 커밋·푸시한 뒤 Vercel Ready와 /api/version을 확인해줘.",
       "danger": true
     },
     {
       "id": "tests",
       "domain": "QA·감사",
-      "label": "테스트 일괄 실행",
-      "desc": "양쪽 앱 tsc + vitest, 결과 요약만",
-      "prompt": "retreat-app과 iguard-app에서 각각 npx tsc --noEmit과 npm test를 실행하고, 앱별로 '타입 에러 N개 / 테스트 N개 통과' 형식으로 요약 보고해줘. 코드는 절대 변경하지 마.",
+      "label": "통합 플랫폼 테스트",
+      "desc": "highschool-app 타입·테스트·빌드 결과 요약",
+      "prompt": "highschool-app에서 npx tsc --noEmit, npm test, npm run build를 실행하고 결과를 요약해줘. 코드는 변경하지 마.",
       "danger": false
     },
     {
-      "id": "qa-iguard",
+      "id": "qa-field",
       "domain": "QA·감사",
-      "label": "이가드 리허설 QA (/retreat-qa)",
-      "desc": "스탭 시점 화면 전수 점검, 심각도별 리포트",
-      "prompt": "/retreat-qa iguard",
+      "label": "현장 운영 리허설 QA",
+      "desc": "통합 플랫폼의 이가드 현장 화면 전수 점검",
+      "prompt": "highschool-app의 /field와 /retreat/{id}/field 기능을 읽기 전용으로 점검하고 심각도별로 보고해줘.",
       "danger": false
     },
     {
       "id": "audit-all",
       "domain": "QA·감사",
-      "label": "출시전 감사 (/launch-audit)",
-      "desc": "보안·데이터 안전·오류 처리 진단 (읽기 전용)",
-      "prompt": "/launch-audit all",
+      "label": "통합 플랫폼 출시 감사",
+      "desc": "보안·데이터 안전·오류 처리 진단",
+      "prompt": "highschool-app의 보안·DB 소유권·오류 처리·권한 경계를 읽기 전용으로 감사해줘.",
       "danger": false
     },
     {
       "id": "db-audit",
       "domain": "QA·감사",
-      "label": "DB 정합성 진단 (/db-audit)",
-      "desc": "특이사항·버스·조편성 전수 대조 — 읽기 전용, 복구는 별도 승인",
-      "prompt": "/db-audit all",
+      "label": "DB 정합성 진단",
+      "desc": "공유 Firebase 경로를 읽기 전용으로 대조",
+      "prompt": "DB_OWNERSHIP.md를 기준으로 통합 플랫폼의 수련회·이가드·학기 데이터 정합성을 읽기 전용으로 진단해줘. 복구나 쓰기는 하지 마.",
       "danger": false
     },
     {
       "id": "backlog",
       "domain": "계획·리포트",
       "label": "백로그 브리핑",
-      "desc": "미해결 백로그를 코드와 대조, 다음 할 일 3개 추천",
-      "prompt": "메모리의 '미해결·보류 백로그'(project_pending_backlog)를 읽고, 현재 코드 상태와 대조해서 다음에 하면 좋을 일 3개를 근거와 함께 짧게 추천해줘. 코드는 절대 변경하지 마.",
+      "desc": "현재 코드와 인수인계를 대조해 다음 작업 추천",
+      "prompt": ".claude/HANDOFF.md와 현재 코드를 대조해서 다음 작업 3개를 근거와 함께 추천해줘. 코드는 변경하지 마.",
       "danger": false
     },
     {
       "id": "daily-deep",
       "domain": "계획·리포트",
       "label": "일일 보고서 심층판",
-      "desc": "커밋·배포·백로그 종합 리포트 생성",
-      "prompt": "어제와 오늘의 git 커밋, 두 앱의 Vercel 배포 상태, 메모리의 미해결 백로그를 종합해 한국어 일일 보고서를 작성해줘. 읽기 전용 — 아무것도 변경하지 마.",
+      "desc": "커밋·배포·인수인계 종합 리포트",
+      "prompt": "어제와 오늘의 git 커밋, highschool-app 배포 상태, .claude/HANDOFF.md를 종합해 한국어 일일 보고서를 작성해줘. 읽기 전용으로 진행해.",
       "danger": false
     },
     {
       "id": "refactor-plan",
       "domain": "계획·리포트",
-      "label": "리팩토링 계획 수립 (/refactor-plan)",
-      "desc": "코드 무변경, 실행자용 계획서 작성",
-      "prompt": "/refactor-plan retreat-app iguard-app",
+      "label": "통합 플랫폼 리팩터링 계획",
+      "desc": "코드 무변경 실행 계획 작성",
+      "prompt": "highschool-app의 중복과 대형 파일을 조사해 기능 보존형 리팩터링 계획을 작성해줘. 코드는 변경하지 마.",
       "danger": false
     }
   ]

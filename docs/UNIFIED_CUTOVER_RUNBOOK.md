@@ -20,13 +20,22 @@
 7. 기존 사이트와 기능·데이터 결과 대조: 정적 계약 테스트와 전체 회귀 테스트 완료
 8. 운영 리허설: 읽기 전용 경로·빌드·배포 점검 완료. 운영 DB 쓰기 리허설은 별도 승인과 스냅샷 후 실시
 9. 새 통합 주소 전환: 완료
-10. 기존 주소 리다이렉트: 임시 리다이렉트로 전환 후 모니터링
-11. 기존 Vercel 프로젝트 종료: 아래 안정화 조건 충족 후 실행
-12. 기존 코드 정리: `pre-unified-apps-2026-08-05` 태그 보존 후 11단계와 함께 실행
+10. 기존 주소 리다이렉트: 통합 전환 기간 동안 완료
+11. 기존 Vercel 프로젝트 종료: **완료 (2026-08-05)** — `retreat-app`, `iguard-app` 삭제
+12. 기존 코드 정리: **완료 (2026-08-05)** — `pre-unified-apps-2026-08-05`, `pre-legacy-app-removal-2026-08-05` 태그 보존
+
+## 2026-08-05 종료 결과
+
+- Vercel 프로젝트 `retreat-app`, `iguard-app` 삭제
+- Firebase Hosting 사이트 `woori-high-retreat`, `woori-high-iguard` 삭제
+- Firebase 웹 앱 등록은 통합 앱이 같은 App ID를 사용하므로 삭제하지 않고 `고등부 사역 플랫폼`으로 이름 변경
+- Firebase Realtime Database 데이터와 Rules는 변경·삭제·배포하지 않음
+- 레거시 소스 디렉터리 `retreat-app/`, `iguard-app/` 제거
+- 운영 단일 주소: `https://highschool-app-flame.vercel.app`
 
 ## 안정화 조건
 
-전환 후 최소 7일 동안 다음 조건을 모두 만족해야 한다.
+종료 승인 전 아래 항목을 확인했다. 향후 통합 플랫폼 변경에서도 동일 기준을 유지한다.
 
 - 로그인·승인·관리자 우회 관련 P0/P1 장애 0건
 - 학기, 행정, 이가드 주요 화면의 데이터 불일치 0건
@@ -34,17 +43,18 @@
 - 운영 담당자의 학기 생성, 수련회 생성, 현장 조회 리허설 완료
 - 운영 DB 쓰기 리허설 직전 대상 노드 스냅샷 확보
 
-## 종료 절차
+## 완료된 종료 절차
 
 1. 통합 앱의 `/api/version`과 배포 커밋을 대조한다.
 2. 기존 세 주소의 리다이렉트와 `/api/version`을 확인한다.
 3. Firebase Authentication 허용 도메인에 통합 운영 주소가 있는지 확인한다.
-4. 기존 Vercel 프로젝트를 한 번에 하나씩 종료한다.
-5. 24시간 동안 오류가 없으면 다음 프로젝트를 종료한다.
-6. 세 프로젝트 종료 후 기존 앱 디렉터리를 제거하고 태그에서 복구 가능한지 확인한다.
+4. 기존 Vercel 프로젝트와 Firebase Hosting 사이트를 한 번에 하나씩 종료했다.
+5. Firebase RTDB와 Rules는 건드리지 않았다.
+6. 기존 앱 디렉터리를 제거하고 삭제 직전 태그를 남겼다.
 
 ## 복구
 
 - 통합 전 코드: `git checkout pre-unified-apps-2026-08-05`
-- 리다이렉트 철회: 각 기존 앱의 `next.config.ts`에서 `redirects()`를 제거하고 재배포
+- 삭제 직전 독립 앱 코드: `git checkout pre-legacy-app-removal-2026-08-05 -- retreat-app iguard-app`
+- 독립 앱 복구가 꼭 필요하면 태그에서 코드를 복원하고 새 Vercel/Firebase Hosting 프로젝트를 별도로 다시 만든다.
 - DB 스키마와 경로는 통합 과정에서 변경하지 않는다.

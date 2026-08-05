@@ -35,7 +35,7 @@
 
 > 교사·스탭 앱은 `classes/{year}`를 **읽기만** 해서 교사 명단을 구성합니다.
 
-## 수련회 행정 도메인 (소유: 행정 앱)
+## 수련회 행정 도메인 (소유: highschool-app 행정 모듈)
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
@@ -66,7 +66,7 @@
 | `retreatAdmins` | 행정 | 이가드 | 행정만 | 이가드 관리자 인증 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
-## 이가드 도메인 (소유: 이가드 앱)
+## 이가드 도메인 (소유: highschool-app 현장 모듈)
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
@@ -90,14 +90,14 @@
 | `iguardRoles` | 이가드 | - | 이가드만 | 이가드 권한 분류 |
 | `iguardPending` | 이가드 | - | 이가드만 | 없음 |
 
-## 학기 사역 도메인 (소유: semester-app)
+## 학기 사역 도메인 (소유: highschool-app 학기 모듈, semester-app 호환 유지)
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
-| `semesters/{sid}` (meta·teams·sessions·applications·attendance·completion·curriculum·archiveLinks) | semester-app | - | semester-app만 | 없음 (독립) |
-| `semestersPrivate/{sid}/applicationsPrivate` | semester-app | - | semester-app만 | 없음 (민감정보 — 지원 동기·연락처) |
+| `semesters/{sid}` (meta·teams·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 두 화면의 호환 계약 |
+| `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·연락처 |
 
-> semester-app은 `classes/{year}`(현장 접수 반 명단)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
+> `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
 > Rules는 2026-07-10 학생 앱에서 추가·배포 완료 (admins·retreatAdmins만 접근).
 
 ---
@@ -129,13 +129,10 @@
 | 파일 위치 | 상태 | 비고 |
 |----------|------|------|
 | 학생 앱/database.rules.json | **유일한 배포 원천** | 모든 경로 포함, 역할 기반 제한 |
-| 행정 앱/firebase.json | **학생 앱 규칙을 참조** | `../고등부 학생 출석부/database.rules.json`을 가리킴 |
-| 행정 앱/DO_NOT_DEPLOY.database.rules.json | **보관 전용** | 절대 배포하지 않음 |
 | 교사·스탭 앱 | **없음** | firebase.json 자체가 없음 |
-| 이가드 앱/DO_NOT_DEPLOY.database.rules.json | **보관 전용** | 절대 배포하지 않음 |
+| highschool-app | **배포 금지** | 학생 앱 규칙을 소비하며 자체 Rules 원천이 없음 |
 
-> **경고:** `DO_NOT_DEPLOY` 파일을 배포하면 경로 보호가 약해질 수 있습니다.
-> 배포용 Rules의 단일 원천은 학생 앱 `database.rules.json`이며, 행정 앱도 이 파일을 참조합니다.
+> 배포용 Rules의 단일 원천은 학생 앱 `database.rules.json`입니다. 통합 플랫폼에서는 Rules를 배포하지 않습니다.
 
 ---
 

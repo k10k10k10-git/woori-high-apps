@@ -118,7 +118,7 @@ async function loadReport() {
     <div class="card"><h3>이번 주 커밋</h3><div class="big">${r.commitsWeek}</div><div class="sub">오늘 ${r.commitsToday.length} · 어제 ${r.commitsYesterday.length}</div></div>
     <div class="card"><h3>이번 주 Claude 세션</h3><div class="big">${r.sessionsWeek}</div><div class="sub">최근 7일</div></div>
     <div class="card"><h3>미해결 백로그</h3><div class="big">${r.backlog.length}</div><div class="sub">메모리 기준</div></div>
-    <div class="card"><h3>배포 상태</h3>${dep("retreat-app")}${dep("iguard-app")}</div>
+    <div class="card"><h3>배포 상태</h3>${dep("highschool-app")}${dep("semester-app")}</div>
     <div class="card wide"><h3>오늘의 커밋</h3>${commits(r.commitsToday)}</div>
     <div class="card wide"><h3>어제의 커밋</h3>${commits(r.commitsYesterday)}</div>
     <div class="card"><h3>밤새 실행된 항목</h3>${runsRows(r.overnight)}</div>
