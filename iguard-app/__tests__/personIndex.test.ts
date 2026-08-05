@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildSearchIndex, searchIndex, toChosung, isChosungQuery,
+  buildSearchIndex, searchIndex, toChosung, isChosungQuery, hasJamo, koreanPatternIndexOf,
   type SearchIndexInput, type SearchEntry,
 } from "@/lib/personIndex";
 import type { Group, Room, Student, Participant, TeacherAttendance, IguardStaff, IguardBus } from "@/lib/types";
@@ -208,5 +208,63 @@ describe("searchIndex", () => {
 
   it("limit을 넘지 않는다", () => {
     expect(searchIndex(index, "김", 1).length).toBe(1);
+  });
+});
+
+// 실사용 신고(2026-08-02): "김성훈"을 끝까지 입력했는데 김서하·김서현C처럼
+// 초성만 같은 사람이 전부 떴다. 질의 전체를 초성으로 바꿔 한 번 더 매칭했기 때문이다.
+describe("완성형 이름 검색 — 초성이 같다고 섞이지 않는다", () => {
+  const index = buildSearchIndex(makeInput());
+
+  it("이름을 끝까지 입력하면 그 이름만 나온다", () => {
+    const titles = searchIndex(index, "김현민").map(e => e.title);
+    expect(titles).toContain("김현민");
+    expect(titles).not.toContain("김현수"); // 초성 ㄱㅎㅅ ≠ 글자
+  });
+
+  it("초성이 같아도 글자가 다르면 제외한다", () => {
+    // 김현민·김현수는 초성이 모두 ㄱㅎㅁ/ㄱㅎㅅ로 앞 두 글자가 같다
+    const ids = searchIndex(index, "김현수").map(e => e.id);
+    expect(ids).toContain("student:1_102");
+    expect(ids).not.toContain("student:1_101");
+  });
+
+  it("순수 초성 질의는 여전히 폭넓게 찾는다", () => {
+    const ids = searchIndex(index, "ㄱㅎ").map(e => e.id);
+    expect(ids).toContain("student:1_101");
+    expect(ids).toContain("student:1_102");
+  });
+
+  it("조합 중 상태(완성형 + 끝 자음)도 이어서 찾는다", () => {
+    // IME로 "김현민"을 치는 도중 "김현ㅁ" 상태에서도 결과가 끊기지 않아야 한다
+    const titles = searchIndex(index, "김현ㅁ").map(e => e.title);
+    expect(titles).toContain("김현민");
+    expect(titles).not.toContain("김현수");
+  });
+});
+
+describe("koreanPatternIndexOf / hasJamo", () => {
+  it("완성형은 글자 그대로 비교한다", () => {
+    expect(koreanPatternIndexOf("김성훈", "김성훈")).toBe(0);
+    expect(koreanPatternIndexOf("김서하", "김성훈")).toBe(-1);
+  });
+
+  it("자음 자리는 초성으로 비교한다", () => {
+    expect(koreanPatternIndexOf("김성훈", "김성ㅎ")).toBe(0);
+    expect(koreanPatternIndexOf("김성훈", "김성ㄱ")).toBe(-1);
+  });
+
+  it("중간 위치에서도 찾는다", () => {
+    expect(koreanPatternIndexOf("본관김성훈", "김성훈")).toBe(2);
+  });
+
+  it("질의가 대상보다 길면 -1", () => {
+    expect(koreanPatternIndexOf("김", "김성훈")).toBe(-1);
+  });
+
+  it("hasJamo는 조합 중 상태만 참", () => {
+    expect(hasJamo("김성훈")).toBe(false);
+    expect(hasJamo("김성ㅎ")).toBe(true);
+    expect(hasJamo("ㄱㅅㅎ")).toBe(true);
   });
 });

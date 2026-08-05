@@ -63,6 +63,57 @@ export function isChosungQuery(query: string): boolean {
   return true;
 }
 
+// 조합용 초성(U+1100~U+1112)은 CHOSUNG 배열과 순서가 같다.
+const CONJOINING_START = 0x1100;
+const CONJOINING_END = 0x1112;
+
+/**
+ * 낱자 자음을 호환 자모(ㄱ, ㅎ …)로 통일한다. 자음이 아니면 null.
+ *
+ * ⚠ 이 변환이 필요한 이유: `normalizeStaffIdentityName`이 `NFKC`를 적용하는데,
+ * NFKC는 호환 자모 `ㅁ`(U+3141)을 **조합용 자모**(U+1106)로 바꾼다. 범위 검사를
+ * 호환 자모로만 하면 정규화를 거친 질의에서 자음을 놓쳐 "김현ㅁ"이 아무것도 못 찾는다.
+ */
+function toCompatJamo(char: string): string | null {
+  const code = char.charCodeAt(0);
+  if (code >= JAMO_START && code <= JAMO_END) return char;
+  if (code >= CONJOINING_START && code <= CONJOINING_END) return CHOSUNG[code - CONJOINING_START];
+  return null;
+}
+
+/** 질의에 조합되지 않은 자음이 섞여 있는가 (IME 조합 중 상태 판정) */
+export function hasJamo(text: string): boolean {
+  for (const char of text) {
+    if (toCompatJamo(char)) return true;
+  }
+  return false;
+}
+
+/**
+ * 완성형 글자는 **글자 그대로**, 자음만 입력된 자리는 **초성으로** 비교해 부분 일치 위치를 찾는다.
+ * 못 찾으면 -1.
+ *
+ *   koreanPatternIndexOf("김성훈", "김성훈")  →  0   (완전히 같은 이름만)
+ *   koreanPatternIndexOf("김성훈", "김성ㅎ")  →  0   (조합 중 상태도 이어서 찾힘)
+ *   koreanPatternIndexOf("김서하", "김성훈")  → -1   (초성이 같아도 글자가 다르면 제외)
+ *
+ * 순수 초성 질의("ㄱㅅㅎ")는 이 경로가 아니라 chosungKeys가 처리한다.
+ */
+export function koreanPatternIndexOf(target: string, query: string): number {
+  if (!query || query.length > target.length) return -1;
+  for (let start = 0; start + query.length <= target.length; start++) {
+    let matched = true;
+    for (let i = 0; i < query.length; i++) {
+      const q = query[i];
+      const t = target[start + i];
+      const jamo = toCompatJamo(q);
+      if (jamo ? toChosung(t) !== jamo : q !== t) { matched = false; break; }
+    }
+    if (matched) return start;
+  }
+  return -1;
+}
+
 // ── 인덱스 타입 ──────────────────────────────────────────────
 export type SearchEntryKind = "student" | "teacher" | "staff" | "group" | "room" | "bus";
 
@@ -401,11 +452,16 @@ function scoreEntry(entry: SearchEntry, query: string, chosungMode: boolean): nu
     else if (key.startsWith(query)) best = Math.max(best, 70);
     else if (key.includes(query)) best = Math.max(best, 40);
   }
-  // 초성 질의가 아니어도 초성 인덱스로 한 번 더 기회를 준다("ㄱㅎ" 아닌 "김ㅎ" 같은 혼합 입력 대비)
-  if (!chosungMode && best === 0) {
-    const chosungQuery = toChosung(query);
-    for (const key of entry.chosungKeys) {
-      if (key.startsWith(chosungQuery)) { best = Math.max(best, 25); break; }
+  // 완성형과 자음이 섞인 **조합 중** 상태만 보조 매칭한다("김성ㅎ" → 김성훈).
+  //
+  // ⚠ 예전에는 질의 전체를 초성으로 바꿔 비교했다. 그래서 "김성훈"을 다 쳐도
+  // "ㄱㅅㅎ"로 변환돼 김서하·김서현까지 걸렸다. 이름을 끝까지 입력한 사용자는
+  // 그 이름만 보길 기대하므로, 완성형만으로 된 질의에는 초성 폴백을 쓰지 않는다.
+  if (!chosungMode && best === 0 && hasJamo(query)) {
+    for (const key of entry.keys) {
+      const at = koreanPatternIndexOf(key, query);
+      if (at === 0) { best = Math.max(best, 60); break; }
+      if (at > 0) { best = Math.max(best, 30); break; }
     }
   }
   return best;
