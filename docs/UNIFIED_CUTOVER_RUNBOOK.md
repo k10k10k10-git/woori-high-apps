@@ -4,7 +4,7 @@
 
 ## 운영 주소
 
-- 통합 플랫폼: `https://highschool-app-flame.vercel.app`
+- 통합 플랫폼: `https://woorihigh-app.vercel.app`
 - 학기 중 사역: `/semesters`, `/semester/{id}`
 - 방학 중 행정: `/retreats`, `/retreat/{id}`
 - 방학 중 이가드: `/field`, `/retreat/{id}/field`
@@ -31,7 +31,7 @@
 - Firebase 웹 앱 등록은 통합 앱이 같은 App ID를 사용하므로 삭제하지 않고 `고등부 사역 플랫폼`으로 이름 변경
 - Firebase Realtime Database 데이터와 Rules는 변경·삭제·배포하지 않음
 - 레거시 소스 디렉터리 `retreat-app/`, `iguard-app/` 제거
-- 운영 단일 주소: `https://highschool-app-flame.vercel.app`
+- 운영 단일 주소: `https://woorihigh-app.vercel.app`
 
 ## 안정화 조건
 

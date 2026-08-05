@@ -10,12 +10,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/",
-        destination: "https://highschool-app-flame.vercel.app/semesters",
+        destination: "https://woorihigh-app.vercel.app/semesters",
         permanent: false,
       },
       {
         source: "/semester/:path*",
-        destination: "https://highschool-app-flame.vercel.app/semester/:path*",
+        destination: "https://woorihigh-app.vercel.app/semester/:path*",
         permanent: false,
       },
     ];

@@ -15,7 +15,7 @@
 ## 2. 현재 운영 구조
 
 - 통합 고등부 플랫폼: `highschool-app/`
-- 운영 URL: `https://highschool-app-flame.vercel.app`
+- 운영 URL: `https://woorihigh-app.vercel.app`
 - 주요 라우트
   - 통합 홈: `/`
   - 학기 사역: `/semesters`, `/semester/{id}`
@@ -99,7 +99,7 @@ npx tsc --noEmit
 npm test
 npm run build
 npx vercel ls
-curl -s https://highschool-app-flame.vercel.app/api/version
+curl -s https://woorihigh-app.vercel.app/api/version
 ```
 
 2026-08-05 레거시 삭제 전 기준선은 타입 오류 0개, 테스트 38파일/295개 통과, 프로덕션 빌드 성공이었다. 삭제 정리 커밋 후에도 같은 세 검증을 다시 통과시켜야 한다.

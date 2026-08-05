@@ -13,13 +13,31 @@
 - `/retreats`, `/retreat/[id]`: 수련회 행정
 - `/retreat/[id]/field`: 이가드 현장 운영
 
-## 권한
+운영 주소는 `https://woorihigh-app.vercel.app` 입니다(구 `highschool-app-flame.vercel.app`도 같은 배포를 가리킵니다).
 
-- `admins/{uid}`: 전체 관리자
-- `retreatAdmins/{uid}`: 학기·행정 접근
-- `iguardMembers/{uid}`, `iguardRoles/{uid}`: 이가드 접근
+## 화면 셸 규칙
 
-행정 권한과 이가드 권한을 합쳐서 판정하지 않습니다. 이가드 전용 사용자는 통합 홈과 현장 화면에만 접근하고 학기·행정 화면은 사용할 수 없어야 합니다.
+- 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당합니다. 하위 화면에 "수련회 행정시스템" 같은 제목 줄을 다시 만들지 않습니다(제목 2줄 중복 금지).
+- 상단 메뉴는 **학기 중 사역 / 방학 중 사역** 두 항목이며, 방학 중 사역은 hover·클릭 시 `수련회 행정팀`·`수련회 이가드팀` 드롭다운으로 갈라집니다.
+- 도메인별 색: 학기=초록(`.semester-scope`), 행정=스카이(기본 토큰), 이가드=보라(`.iguard-scope`). 레이아웃·컴포넌트 클래스(`card`/`input`/`btn-primary`/`table-header`)는 세 도메인이 공유합니다.
+
+## 권한 — 6단계 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
+
+| 역할 | 학기 중 사역 | 수련회 행정 | 이가드 현장 | 역할 배정 | DB 저장 위치 |
+|---|---|---|---|---|---|
+| 통합관리자 | 수정 | 수정 | 전체 | ✅ | `admins/{uid} = true` |
+| 교역자 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role = "pastor"` |
+| 팀장 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role = "leader"` |
+| 행정팀 | 수정 | 수정 | 실행탭만 | — | `retreatAdmins/{uid}.role = "adminTeam"` (role 없는 레거시도 동일) |
+| 이가드팀 | ✕ | ✕ | 전체 | — | `iguardMembers/{uid}` + `iguardRoles/{uid} = "team"` |
+| 스탭 | 조회만 | ✕ | 실행탭만 | — | `iguardMembers/{uid}` + `iguardRoles/{uid} = "staff"` |
+
+- 화면 게이트는 `canAccessPortalArea` / `canEditPortalArea` / `iguardScope` / `canManageRoles`만 사용합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
+- 역할 판정은 `resolveMinistryRole`(순수) 하나로, 통합 `AuthContext`와 이가드 `AuthContext`가 같은 결론을 냅니다.
+- 역할 배정 쓰기는 `roleAssign.planRoleAssignment`(순수·테스트) → `applyRole.applyRoleSteps`(실행) 경로만 사용합니다. 부여를 먼저, 해제를 나중에 실행합니다.
+- 학기 화면의 편집 잠금은 `features/semester/EditContext`의 `useSemesterCanEdit()`으로만 판단합니다.
+- ⚠ 스탭의 학기 조회는 Firebase Rules에서 `semesters` 읽기가 `admins`/`retreatAdmins`로 제한되어 있어 **Rules 보강 전에는 실제 데이터가 로드되지 않습니다**(에러 배너로 표시). Rules는 학생 앱에서만 배포합니다.
+- 행정 권한과 이가드 권한의 **쓰기 경계**는 계속 분리합니다. 이가드팀 계정은 통합 홈과 현장 화면만 사용합니다.
 
 ## Firebase 안전
 

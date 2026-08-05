@@ -15,7 +15,7 @@
 | `userRoles` | 학생 앱 | - | 학생 앱만 | 학생 앱 로그인/권한 |
 | `teacherClasses` | 학생 앱 | - | 학생 앱만 | 교사별 반 매핑 |
 | `admins` | 학생 앱 | 행정, 이가드 | 학생 앱만 | 전체 관리자 인증에 영향 |
-| `teacherStaff/{year}` | 학생 앱 | 행정 | 학생 앱만 | 행정 교사 목록 동기화 |
+| `teacherStaff/{year}` | 학생 앱 | 행정, 학기 모듈 | 학생 앱만 | 행정 교사 목록 동기화 + 학기 접수의 스탭 명단 |
 | `teacherSpecial/{year}` | 학생 앱 | 행정 | 학생 앱만 | 행정 교사 목록 동기화 |
 | `teacherExtra/{year}` | 학생 앱 | 행정 | 학생 앱만 | 행정 교사 목록 동기화 |
 | `teacherAdditional/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
@@ -63,7 +63,7 @@
 | `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/medicalLogs` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
-| `retreatAdmins` | 행정 | 이가드 | 행정만 | 이가드 관리자 인증 |
+| `retreatAdmins` | 행정 | 이가드, semester-app | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role}` — `role`은 `pastor`/`leader`/`adminTeam`(없으면 행정팀). 다른 앱은 존재 여부(`!= null`)만 보므로 필드 추가는 호환 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
 ## 이가드 도메인 (소유: highschool-app 현장 모듈)
@@ -87,7 +87,7 @@
 | `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 (유일한 공유 쓰기 노드) |
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |
 | `iguardMembers` | 이가드 | - | 이가드만 | 이가드 멤버 인증 |
-| `iguardRoles` | 이가드 | - | 이가드만 | 이가드 권한 분류 |
+| `iguardRoles` | 이가드 | 행정(역할 판정) | 이가드만 | `staff`(스탭) / `team`(이가드팀) — Rules validate가 이 두 값만 허용 |
 | `iguardPending` | 이가드 | - | 이가드만 | 없음 |
 
 ## 학기 사역 도메인 (소유: highschool-app 학기 모듈, semester-app 호환 유지)
@@ -95,9 +95,9 @@
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
 | `semesters/{sid}` (meta·teams·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 두 화면의 호환 계약 |
-| `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·연락처 |
+| `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 
-> `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
+> `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
 > Rules는 2026-07-10 학생 앱에서 추가·배포 완료 (admins·retreatAdmins만 접근).
 
 ---

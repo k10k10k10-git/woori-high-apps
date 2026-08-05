@@ -21,9 +21,10 @@ firebase deploy --only hosting
 cd "highschool-app"
 npx vercel --prod
 ```
-- 배포 URL: https://highschool-app-flame.vercel.app
+- 배포 URL: https://woorihigh-app.vercel.app (구 주소 `highschool-app-flame.vercel.app`도 같은 배포를 가리키게 남겨 둠 — 기존 링크·북마크 보호)
+- 주소 변경/이관: `npx vercel alias set <배포 URL> woorihigh-app.vercel.app`
 - GitHub 연동: main 브랜치 머지 시 자동 배포 (Root Directory: `highschool-app`)
-- 배포 후 `curl -s https://highschool-app-flame.vercel.app/api/version`의 `buildId`와 `git rev-parse HEAD`를 대조하고 `npx vercel ls`에서 Ready를 확인한다.
+- 배포 후 `curl -s https://woorihigh-app.vercel.app/api/version`의 `buildId`와 `git rev-parse HEAD`를 대조하고 `npx vercel ls`에서 Ready를 확인한다.
 - 독립 `retreat-app`·`iguard-app` Vercel 프로젝트와 Firebase Hosting 사이트는 2026-08-05 제거했다.
 
 ### 교사·스탭 앱
