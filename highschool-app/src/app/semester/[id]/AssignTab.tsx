@@ -5,7 +5,9 @@
 
 import { useMemo } from "react";
 import { useUI } from "@/context/UIContext";
-import { updateApplication } from "@/features/semester/db";
+import { describeApplicant, updateApplication } from "@/features/semester/db";
+import { applicantSortKey } from "@/features/semester/applicant";
+import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { Application, Team } from "@/features/semester/types";
 
 interface Props {
@@ -15,8 +17,13 @@ interface Props {
   teamById: Map<string, Team>;
 }
 
+function byApplicant(a: Application, b: Application) {
+  return applicantSortKey(a).localeCompare(applicantSortKey(b), "ko");
+}
+
 export default function AssignTab({ sid, teams, applications, teamById }: Props) {
   const { toast } = useUI();
+  const canEdit = useSemesterCanEdit();
 
   const targets = useMemo(
     () => applications.filter((a) => a.status !== "취소" && !a.trainingOnly),
@@ -40,58 +47,55 @@ export default function AssignTab({ sid, teams, applications, teamById }: Props)
   }
 
   if (teams.length === 0) {
-    return <p className="text-sm text-gray-400">먼저 설정 탭에서 팀을 만들어주세요.</p>;
+    return <p className="text-sm text-slate-400">먼저 설정 탭에서 팀을 만들어주세요.</p>;
   }
 
   return (
-    <div className="grid lg:grid-cols-[1fr_2fr] gap-4">
+    <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
       {/* 미배정 풀 */}
-      <section className="bg-white border border-gray-200 rounded-xl p-4">
-        <h3 className="font-semibold mb-3">
-          미배정 <span className="text-sm text-gray-400">{unassigned.length}명</span>
+      <section className="card card-body">
+        <h3 className="font-semibold text-slate-800">
+          미배정 <span className="text-sm text-slate-400">{unassigned.length}명</span>
         </h3>
-        {unassigned.length === 0 && <p className="text-sm text-gray-400">모두 배치되었습니다 🎉</p>}
+        {unassigned.length === 0 && <p className="text-sm text-slate-400">모두 배치되었습니다 🎉</p>}
         <ul className="grid gap-1.5">
-          {unassigned
-            .sort((a, b) => a.bu.localeCompare(b.bu) || a.grade - b.grade || a.class - b.class)
-            .map((a) => {
-              const c1 = a.choice1 ? teamById.get(a.choice1) : undefined;
-              const c2 = a.choice2 ? teamById.get(a.choice2) : undefined;
-              return (
-                <li key={a.id} className="border border-gray-200 rounded-lg px-3 py-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>
-                      {a.name}
-                      <span className="text-xs text-gray-400 ml-1.5">
-                        {a.bu} {a.grade}-{a.class}
-                      </span>
-                    </span>
-                    <select
-                      aria-label={`${a.name} 팀 배치`}
-                      value=""
-                      onChange={(e) => e.target.value && void assign(a, e.target.value)}
-                      className="text-xs border border-gray-300 rounded-md px-1.5 py-1"
-                    >
-                      <option value="">배치…</option>
-                      {teams.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                          {t.id === a.choice1 ? " ★1지망" : t.id === a.choice2 ? " ☆2지망" : ""}
-                        </option>
-                      ))}
-                    </select>
+          {[...unassigned].sort(byApplicant).map((a) => {
+            const c1 = a.choice1 ? teamById.get(a.choice1) : undefined;
+            const c2 = a.choice2 ? teamById.get(a.choice2) : undefined;
+            return (
+              <li key={a.id} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--color-border)" }}>
+                <div className="flex items-center justify-between text-sm">
+                  <span>
+                    {a.name}
+                    <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
+                  </span>
+                  <select
+                    aria-label={`${a.name} 팀 배치`}
+                    value=""
+                    disabled={!canEdit}
+                    onChange={(e) => e.target.value && void assign(a, e.target.value)}
+                    className="input h-8 w-28 px-1.5 py-1 text-xs"
+                  >
+                    <option value="">배치…</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                        {t.id === a.choice1 ? " ★1지망" : t.id === a.choice2 ? " ☆2지망" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {(c1 || c2) && (
+                  <div className="mt-1 flex gap-1">
+                    {c1 && <span className={`rounded px-1.5 py-0.5 text-xs ${c1.color}`}>1지망 {c1.name}</span>}
+                    {c2 && <span className={`rounded px-1.5 py-0.5 text-xs ${c2.color}`}>2지망 {c2.name}</span>}
                   </div>
-                  {(c1 || c2) && (
-                    <div className="flex gap-1 mt-1">
-                      {c1 && <span className={`text-xs px-1.5 py-0.5 rounded ${c1.color}`}>1지망 {c1.name}</span>}
-                      {c2 && <span className={`text-xs px-1.5 py-0.5 rounded ${c2.color}`}>2지망 {c2.name}</span>}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
+                )}
+              </li>
+            );
+          })}
         </ul>
-        {unassigned.length > 0 && (
+        {unassigned.length > 0 && canEdit && (
           <button
             onClick={async () => {
               // 1지망 일괄 배치 — 지망이 있는 미배정 전원을 1지망 팀으로
@@ -99,7 +103,7 @@ export default function AssignTab({ sid, teams, applications, teamById }: Props)
               for (const a of withChoice) await assign(a, a.choice1!);
               toast(`1지망 일괄 배치 완료 (${withChoice.length}명)`, "success");
             }}
-            className="mt-3 w-full py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-sm font-medium"
+            className="btn-primary w-full justify-center"
           >
             1지망대로 일괄 배치
           </button>
@@ -107,36 +111,34 @@ export default function AssignTab({ sid, teams, applications, teamById }: Props)
       </section>
 
       {/* 팀 칼럼 */}
-      <section className="grid sm:grid-cols-2 gap-3">
+      <section className="grid gap-3 sm:grid-cols-2">
         {teams.map((t) => {
-          const members = (byTeam.get(t.id) ?? []).sort(
-            (a, b) => a.bu.localeCompare(b.bu) || a.grade - b.grade || a.class - b.class,
-          );
+          const members = [...(byTeam.get(t.id) ?? [])].sort(byApplicant);
           return (
-            <div key={t.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className={`px-4 py-2.5 font-semibold text-sm ${t.color}`}>
-                {t.name} <span className="font-normal text-gray-600">{members.length}명</span>
+            <div key={t.id} className="card overflow-hidden">
+              <div className={`px-4 py-2.5 text-sm font-semibold ${t.color}`}>
+                {t.name} <span className="font-normal text-slate-600">{members.length}명</span>
               </div>
-              <ul className="p-3 grid gap-1">
+              <ul className="grid gap-1 p-3">
                 {members.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between text-sm px-2 py-1 rounded hover:bg-gray-50">
+                  <li key={a.id} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-slate-50">
                     <span>
                       {a.name}
-                      <span className="text-xs text-gray-400 ml-1.5">
-                        {a.bu} {a.grade}-{a.class}
-                      </span>
-                      {a.choice1 === t.id && <span className="text-xs text-blue-500 ml-1">★</span>}
+                      <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
+                      {a.choice1 === t.id && <span className="ml-1 text-xs" style={{ color: "var(--color-primary)" }}>★</span>}
                     </span>
-                    <button
-                      aria-label={`${a.name} 배치 해제`}
-                      onClick={() => void assign(a, "")}
-                      className="text-xs text-gray-400 hover:text-red-500"
-                    >
-                      ✕
-                    </button>
+                    {canEdit && (
+                      <button
+                        aria-label={`${a.name} 배치 해제`}
+                        onClick={() => void assign(a, "")}
+                        className="text-xs text-slate-400 hover:text-red-500"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </li>
                 ))}
-                {members.length === 0 && <li className="text-xs text-gray-300 px-2 py-1">아직 없음</li>}
+                {members.length === 0 && <li className="px-2 py-1 text-xs text-slate-300">아직 없음</li>}
               </ul>
             </div>
           );

@@ -5,6 +5,7 @@
 import { useEffect, useState } from "react";
 import { useUI } from "@/context/UIContext";
 import { subscribeCurriculum, updateCurriculumEntry } from "@/features/semester/db";
+import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { CurriculumEntry, Session, Team } from "@/features/semester/types";
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export default function CurriculumTab({ sid, teams, sessions }: Props) {
   const { toast } = useUI();
+  const canEdit = useSemesterCanEdit();
   const [teamId, setTeamId] = useState<string>("");
   const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -41,8 +43,8 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
     }
   }
 
-  if (teams.length === 0) return <p className="text-sm text-gray-400">먼저 설정 탭에서 팀을 만들어주세요.</p>;
-  if (sessions.length === 0) return <p className="text-sm text-gray-400">먼저 설정 탭에서 회차를 등록해주세요.</p>;
+  if (teams.length === 0) return <p className="text-sm text-slate-400">먼저 설정 탭에서 팀을 만들어주세요.</p>;
+  if (sessions.length === 0) return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차를 등록해주세요.</p>;
 
   return (
     <div>
@@ -60,7 +62,7 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
             aria-selected={teamId === t.id}
             onClick={() => setTeamId(t.id)}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
-              teamId === t.id ? t.color + " font-medium" : "text-gray-500 hover:bg-gray-100"
+              teamId === t.id ? t.color + " font-medium" : "text-slate-500 hover:bg-slate-100"
             }`}
           >
             {t.name}
@@ -70,23 +72,24 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
 
       <ul className="grid gap-2">
         {sessions.map((s, i) => (
-          <li key={s.id} className="bg-white border border-gray-200 rounded-xl p-3">
+          <li key={s.id} className="card p-3">
             <div className="flex items-center gap-2 mb-1.5 text-sm">
               <span className="font-semibold">{i + 1}회차</span>
-              <span className="text-gray-400">{s.date}</span>
-              {s.label && <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5">{s.label}</span>}
+              <span className="text-slate-400">{s.date}</span>
+              {s.label && <span className="text-xs rounded bg-slate-100 px-1.5 py-0.5">{s.label}</span>}
               {s.type !== "정규" && (
                 <span className="text-xs bg-yellow-100 text-yellow-800 rounded px-1.5 py-0.5">{s.type}</span>
               )}
             </div>
             <textarea
               aria-label={`${s.date} 계획`}
+              disabled={!canEdit}
               value={drafts[s.id] ?? entries[s.id]?.plan ?? ""}
               onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))}
               onBlur={() => void save(s.id)}
               rows={2}
               placeholder="모임 계획 (예: 아이스 브레이킹, 예배당 셋팅)"
-              className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm"
+              className="input text-sm"
             />
           </li>
         ))}

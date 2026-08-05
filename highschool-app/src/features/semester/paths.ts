@@ -30,6 +30,8 @@ export const paths = {
 
   // ── 읽기 전용 (다른 앱 소유 — 여기에 쓰기 함수를 만들지 말 것) ──
   classesByYear: (year: string) => `classes/${year}`,
+  // 공식스탭 명단 (교사·스탭 출석부 앱 소유) — 접수 대상에 스탭을 포함하기 위해 읽는다
+  teacherStaffByYear: (year: string) => `teacherStaff/${year}`,
   admins: (uid: string) => `admins/${uid}`,
   retreatAdmin: (uid: string) => `retreatAdmins/${uid}`,
 };

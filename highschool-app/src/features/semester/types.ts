@@ -87,6 +87,14 @@ export interface CurriculumEntry {
   note?: string;
 }
 
+// teacherStaff/{year} 읽기용 (교사·스탭 출석부 앱 소유 스키마) — 접수 대상에 스탭 포함
+export interface StaffPerson {
+  staffId: string; // teacherStaff 노드키 (인물 단위 안정 키)
+  name: string;
+  title?: string;
+  phone?: string;
+}
+
 // classes/{year} 읽기용 (학생 출석부 앱 소유 스키마)
 export interface ClassStudent {
   name: string;

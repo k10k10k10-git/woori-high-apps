@@ -5,7 +5,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useUI } from "@/context/UIContext";
-import { subscribeAllAttendance, subscribeCompletion, updateCompletionEntry } from "@/features/semester/db";
+import { describeApplicant, subscribeAllAttendance, subscribeCompletion, updateCompletionEntry } from "@/features/semester/db";
+import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { calcCompletion } from "@/features/semester/completion";
 import { Application, CompletionEntry, SemesterMeta, Session, SessionAttendance, Team } from "@/features/semester/types";
 
@@ -19,6 +20,7 @@ interface Props {
 
 export default function CompletionTab({ sid, meta, sessions, applications, teamById }: Props) {
   const { toast } = useUI();
+  const canEdit = useSemesterCanEdit();
   const [attBySession, setAttBySession] = useState<Record<string, SessionAttendance>>({});
   const [checklist, setChecklist] = useState<Record<string, CompletionEntry>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -71,37 +73,35 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
       )}
 
       <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
-        <span className="bg-green-100 text-green-900 rounded-lg px-3 py-1.5">
+        <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-emerald-900">
           수료 {completedCount} / {rows.length}명
         </span>
-        <span className="text-gray-500">
+        <span className="text-slate-500">
           기준: 출석점수 {Math.round(minRate * 100)}% 이상 (출석2·지각1, 휴강 제외 — 설정에서 변경)
         </span>
       </div>
 
-      <div className="overflow-x-auto bg-white border border-gray-200 rounded-xl">
+      <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-gray-500 border-b border-gray-100">
-              <th className="px-3 py-2.5">이름</th>
-              <th className="px-3 py-2.5">팀</th>
-              <th className="px-3 py-2.5 text-right">점수</th>
-              <th className="px-3 py-2.5 text-right">출석률</th>
-              <th className="px-3 py-2.5 text-center">판정</th>
-              <th className="px-3 py-2.5 text-center">수료증</th>
-              <th className="px-3 py-2.5 text-center">사진</th>
+          <thead className="table-header">
+            <tr>
+              <th>이름</th>
+              <th>팀</th>
+              <th className="text-right">점수</th>
+              <th className="text-right">출석률</th>
+              <th className="text-center">판정</th>
+              <th className="text-center">수료증</th>
+              <th className="text-center">사진</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(({ app, result, check }) => {
               const team = teamById.get(app.teamId!);
               return (
-                <tr key={app.id} className="border-b border-gray-50 last:border-0">
+                <tr key={app.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
                   <td className="px-3 py-2">
                     {app.name}
-                    <span className="text-xs text-gray-400 ml-1.5">
-                      {app.bu} {app.grade}-{app.class}
-                    </span>
+                    <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(app)}</span>
                   </td>
                   <td className="px-3 py-2">
                     {team && <span className={`text-xs px-1.5 py-0.5 rounded ${team.color}`}>{team.name}</span>}
@@ -113,7 +113,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
                   <td className="px-3 py-2 text-center">
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        result.completed ? "bg-green-100 text-green-900" : "bg-gray-100 text-gray-500"
+                        result.completed ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-500"
                       }`}
                     >
                       {result.completed ? "수료" : "미수료"}
@@ -123,6 +123,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
                     <input
                       type="checkbox"
                       aria-label={`${app.name} 수료증 제작`}
+                      disabled={!canEdit}
                       checked={check.certPrinted ?? false}
                       onChange={(e) => void toggleCheck(app.id, "certPrinted", e.target.checked)}
                     />
@@ -131,6 +132,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
                     <input
                       type="checkbox"
                       aria-label={`${app.name} 사진 확인`}
+                      disabled={!canEdit}
                       checked={check.photoChecked ?? false}
                       onChange={(e) => void toggleCheck(app.id, "photoChecked", e.target.checked)}
                     />
@@ -140,7 +142,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-gray-400">
+                <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
                   배치된 인원이 없습니다
                 </td>
               </tr>

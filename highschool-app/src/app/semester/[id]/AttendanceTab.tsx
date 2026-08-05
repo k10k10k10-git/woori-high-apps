@@ -7,7 +7,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
-import { clearAttendance, setAttendance, subscribeSessionAttendance } from "@/features/semester/db";
+import { clearAttendance, describeApplicant, setAttendance, subscribeSessionAttendance } from "@/features/semester/db";
+import { applicantSortKey } from "@/features/semester/applicant";
+import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { Application, AttendanceStatus, Session, SessionAttendance, Team } from "@/features/semester/types";
 
 interface Props {
@@ -32,6 +34,7 @@ function todayYMD(): string {
 export default function AttendanceTab({ sid, teams, sessions, applications, teamById }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
+  const canEdit = useSemesterCanEdit();
   const [sessId, setSessId] = useState<string>("");
   const [teamFilter, setTeamFilter] = useState<string>("");
   const [att, setAtt] = useState<SessionAttendance>({});
@@ -64,7 +67,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
         .sort((a, b) => {
           const ta = teamById.get(a.teamId!)?.order ?? 99;
           const tb = teamById.get(b.teamId!)?.order ?? 99;
-          return ta - tb || a.bu.localeCompare(b.bu) || a.grade - b.grade || a.class - b.class;
+          return ta - tb || applicantSortKey(a).localeCompare(applicantSortKey(b), "ko");
         }),
     [applications, teamFilter, teamById],
   );
@@ -78,7 +81,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
   }
 
   if (sessions.length === 0) {
-    return <p className="text-sm text-gray-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
+    return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
   }
 
   const counts = { 출석: 0, 지각: 0, 결석: 0, 미기록: 0 };
@@ -104,7 +107,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
             userPicked.current = true;
             setSessId(e.target.value);
           }}
-          className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className="input h-9 w-auto px-2.5 py-1.5 text-sm"
         >
           {sessions.map((s) => (
             <option key={s.id} value={s.id}>
@@ -116,7 +119,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
           aria-label="팀 필터"
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
-          className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm"
+          className="input h-9 w-auto px-2.5 py-1.5 text-sm"
         >
           <option value="">전체 팀</option>
           {teams.map((t) => (
@@ -131,7 +134,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
         </div>
       )}
 
-      <div className="flex gap-3 text-xs text-gray-500 mb-3">
+      <div className="flex gap-3 text-xs text-slate-500 mb-3">
         <span>출석 {counts.출석}</span>
         <span>지각 {counts.지각}</span>
         <span>결석 {counts.결석}</span>
@@ -144,12 +147,10 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
           const entry = att[m.id];
           const team = teamById.get(m.teamId!);
           return (
-            <li key={m.id} className="bg-white border border-gray-200 rounded-lg px-3 py-2 flex items-center gap-2">
+            <li key={m.id} className="card flex items-center gap-2 px-3 py-2">
               <div className="flex-1 min-w-0 text-sm">
                 <span className="font-medium">{m.name}</span>
-                <span className="text-xs text-gray-400 ml-1.5">
-                  {m.bu} {m.grade}-{m.class}
-                </span>
+                <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(m)}</span>
                 {team && !teamFilter && (
                   <span className={`text-xs px-1.5 py-0.5 rounded ml-1.5 ${team.color}`}>{team.name}</span>
                 )}
@@ -159,20 +160,21 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
                   <button
                     key={s}
                     onClick={() => void mark(m.id, s)}
+                    disabled={!canEdit}
                     aria-label={`${m.name} ${s}`}
                     aria-pressed={entry?.s === s}
                     className={`px-2.5 py-1.5 rounded-md text-xs border font-medium ${
-                      entry?.s === s ? on : "border-gray-200 text-gray-400 hover:border-gray-300"
+                      entry?.s === s ? on : "border-slate-200 text-slate-400 hover:border-slate-300"
                     }`}
                   >
                     {s}
                   </button>
                 ))}
-                {entry && (
+                {entry && canEdit && (
                   <button
                     onClick={() => void clearAttendance(sid, sessId, m.id)}
                     aria-label={`${m.name} 기록 지우기`}
-                    className="px-1.5 text-xs text-gray-300 hover:text-gray-500"
+                    className="px-1.5 text-xs text-slate-300 hover:text-slate-600"
                   >
                     ⌫
                   </button>
@@ -181,7 +183,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
             </li>
           );
         })}
-        {members.length === 0 && <p className="text-sm text-gray-400">배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요.</p>}
+        {members.length === 0 && <p className="text-sm text-slate-400">배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요.</p>}
       </ul>
     </div>
   );

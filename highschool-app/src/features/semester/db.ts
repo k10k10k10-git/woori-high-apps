@@ -23,9 +23,11 @@ import {
   SemesterMeta,
   Session,
   SessionAttendance,
+  StaffPerson,
   Team,
 } from "./types";
 import { buildTeamRemovalUpdates } from "./teamRemoval";
+import { makeAppKey } from "./applicant";
 
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
   if (!snap.exists()) return [];
@@ -127,10 +129,9 @@ export async function removeSession(sid: string, sessId: string): Promise<void> 
 
 // ── 신청 ──────────────────────────────────────────────────────────────
 
-export function makeAppKey(bu: string, studentId: string): string {
-  const buNum = bu === "1부" ? "1" : "2";
-  return `${buNum}_${studentId}`;
-}
+// appKey 규칙은 순수 모듈(applicant.ts)이 원천이다. 여기서는 재수출만 한다.
+export { isStaffAppKey, describeApplicant, STAFF_BU } from "./applicant";
+export { makeAppKey };
 
 export function subscribeApplications(
   sid: string,
@@ -171,6 +172,17 @@ export async function removeApplication(sid: string, appKey: string): Promise<vo
 export async function getApplicationPrivate(sid: string, appKey: string): Promise<ApplicationPrivate | null> {
   const snap = await get(ref(db, paths.applicationPrivate(sid, appKey)));
   return snap.val();
+}
+
+/** 🔒 연락처·지원동기 전체 맵 — 접수 화면의 연락처 표시용.
+ *  semestersPrivate는 행정 계열(admins/retreatAdmins)만 읽을 수 있다(Rules).
+ *  조회 전용 역할에서는 호출하지 않는다. */
+export function subscribeApplicationsPrivate(
+  sid: string,
+  cb: (map: Record<string, ApplicationPrivate>) => void,
+  onError?: (e: Error) => void,
+) {
+  return onValue(ref(db, paths.applicationsPrivate(sid)), (s) => cb(s.val() ?? {}), onError);
 }
 
 // ── 출석 ──────────────────────────────────────────────────────────────
@@ -275,4 +287,20 @@ export async function getClassesByYear(year: string): Promise<ClassInfo[]> {
   return Object.entries(snap.val() as Record<string, Omit<ClassInfo, "classKey">>).map(
     ([classKey, data]) => ({ classKey, teacher: data.teacher, students: data.students ?? {} }),
   );
+}
+
+// ── 읽기 전용: 공식스탭 명단 (teacherStaff — 교사·스탭 출석부 앱 소유. 쓰기 함수 추가 금지) ──
+
+export async function getStaffByYear(year: string): Promise<StaffPerson[]> {
+  const snap = await get(ref(db, paths.teacherStaffByYear(year)));
+  if (!snap.exists()) return [];
+  return Object.entries(snap.val() as Record<string, { name?: string; title?: string; phone?: string }>)
+    .filter(([, value]) => value?.name?.trim())
+    .map(([staffId, value]) => ({
+      staffId,
+      name: value.name!.trim(),
+      ...(value.title?.trim() ? { title: value.title.trim() } : {}),
+      ...(value.phone?.trim() ? { phone: value.phone.trim() } : {}),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }

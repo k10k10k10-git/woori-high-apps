@@ -89,43 +89,43 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
   return (
     <div className="grid gap-4">
       {/* 학기 메타 */}
-      <section className="bg-white border border-gray-200 rounded-xl p-4">
+      <section className="card card-body">
         <h3 className="font-semibold mb-3">학기 설정</h3>
         <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-end">
           <label className="text-sm flex-1 w-full">
-            <span className="text-xs text-gray-500">제목</span>
+            <span className="text-xs text-slate-500">제목</span>
             <input
               value={draft.title}
               onChange={(e) => setDraft((current) => editSettingsDraft(current, { title: e.target.value }))}
               placeholder={meta?.title ?? ""}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 mt-0.5"
+              className="input mt-0.5"
             />
           </label>
           <label className="text-sm">
-            <span className="text-xs text-gray-500">수료 기준 (출석점수 %)</span>
+            <span className="text-xs text-slate-500">수료 기준 (출석점수 %)</span>
             <input
               type="number"
               min={0}
               max={100}
               value={draft.minRatePct}
               onChange={(e) => setDraft((current) => editSettingsDraft(current, { minRatePct: Number(e.target.value) }))}
-              className="w-full sm:w-28 border border-gray-300 rounded-lg px-3 py-2 mt-0.5"
+              className="input mt-0.5 sm:w-28"
             />
           </label>
-          <button onClick={() => void saveMeta()} className="px-4 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-sm font-medium">
+          <button onClick={() => void saveMeta()} className="btn-primary justify-center">
             저장
           </button>
         </div>
       </section>
 
       {/* 팀 관리 */}
-      <section className="bg-white border border-gray-200 rounded-xl p-4">
+      <section className="card card-body">
         <h3 className="font-semibold mb-3">팀 관리</h3>
         <ul className="grid gap-1.5 mb-3">
           {teams.map((t) => (
             <li key={t.id} className="flex items-center gap-2">
               <span className={`text-sm px-2.5 py-1 rounded-lg ${t.color}`}>{t.name}</span>
-              {t.room && <span className="text-xs text-gray-400">{t.room}</span>}
+              {t.room && <span className="text-xs text-slate-400">{t.room}</span>}
               <input
                 aria-label={`${t.name} 모임 장소`}
                 defaultValue={t.room ?? ""}
@@ -134,7 +134,7 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
                   const room = e.target.value.trim();
                   if (room !== (t.room ?? "")) void updateTeam(sid, t.id, { room });
                 }}
-                className="border border-gray-200 rounded-md px-2 py-1 text-xs w-24"
+                className="input w-24 px-2 py-1 text-xs"
               />
               <button
                 aria-label={`${t.name} 삭제`}
@@ -153,13 +153,13 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
                     }
                   }
                 }}
-                className="text-xs text-gray-300 hover:text-red-500 ml-auto"
+                className="text-xs text-slate-300 hover:text-red-500 ml-auto"
               >
                 삭제
               </button>
             </li>
           ))}
-          {teams.length === 0 && <li className="text-sm text-gray-400">아직 팀이 없습니다</li>}
+          {teams.length === 0 && <li className="text-sm text-slate-400">아직 팀이 없습니다</li>}
         </ul>
         <div className="flex gap-2">
           <input
@@ -167,12 +167,12 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
             onChange={(e) => setTeamName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && void handleAddTeam()}
             placeholder="팀 이름 (예: 예배팀)"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1"
+            className="input flex-1 text-sm"
           />
           <button
             onClick={() => void handleAddTeam()}
             disabled={!teamName.trim()}
-            className="px-4 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 disabled:opacity-50 text-sm font-medium"
+            className="btn-primary justify-center"
           >
             팀 추가
           </button>
@@ -180,26 +180,26 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
       </section>
 
       {/* 회차 관리 */}
-      <section className="bg-white border border-gray-200 rounded-xl p-4">
+      <section className="card card-body">
         <h3 className="font-semibold mb-3">회차(모임 날짜) 관리</h3>
         <ul className="grid gap-1.5 mb-3">
           {sessions.map((s, i) => (
             <li key={s.id} className="flex items-center gap-2 text-sm">
-              <span className="text-xs text-gray-400 w-12">{i + 1}회차</span>
+              <span className="text-xs text-slate-400 w-12">{i + 1}회차</span>
               <span className="tabular-nums">{s.date}</span>
               <select
                 aria-label={`${s.date} 유형`}
                 value={s.type}
                 onChange={(e) => void updateSession(sid, s.id, { type: e.target.value as SessionType })}
                 className={`text-xs border rounded-md px-1.5 py-1 ${
-                  s.type === "휴강" ? "bg-yellow-50 border-yellow-200" : "border-gray-200"
+                  s.type === "휴강" ? "bg-yellow-50 border-yellow-200" : "border-slate-200"
                 }`}
               >
                 <option value="정규">정규</option>
                 <option value="휴강">휴강</option>
                 <option value="행사">행사</option>
               </select>
-              {s.label && <span className="text-xs bg-gray-100 rounded px-1.5 py-0.5">{s.label}</span>}
+              {s.label && <span className="text-xs rounded bg-slate-100 px-1.5 py-0.5">{s.label}</span>}
               <button
                 aria-label={`${s.date} 회차 삭제`}
                 onClick={async () => {
@@ -207,32 +207,32 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
                     await removeSession(sid, s.id);
                   }
                 }}
-                className="text-xs text-gray-300 hover:text-red-500 ml-auto"
+                className="text-xs text-slate-300 hover:text-red-500 ml-auto"
               >
                 삭제
               </button>
             </li>
           ))}
-          {sessions.length === 0 && <li className="text-sm text-gray-400">아직 회차가 없습니다</li>}
+          {sessions.length === 0 && <li className="text-sm text-slate-400">아직 회차가 없습니다</li>}
         </ul>
         <div className="flex flex-col sm:flex-row gap-2">
           <input
             type="date"
             value={sessDate}
             onChange={(e) => setSessDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="input w-auto text-sm"
           />
           <input
             value={sessLabel}
             onChange={(e) => setSessLabel(e.target.value)}
             placeholder="라벨 (예: 개강예배, 선택)"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1"
+            className="input flex-1 text-sm"
           />
           <select
             aria-label="회차 유형"
             value={sessType}
             onChange={(e) => setSessType(e.target.value as SessionType)}
-            className="border border-gray-300 rounded-lg px-2 py-2 text-sm"
+            className="input w-auto text-sm"
           >
             <option value="정규">정규</option>
             <option value="휴강">휴강</option>
@@ -241,7 +241,7 @@ export default function SettingsTab({ sid, meta, teams, sessions, applications }
           <button
             onClick={() => void handleAddSession()}
             disabled={!sessDate}
-            className="px-4 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 disabled:opacity-50 text-sm font-medium"
+            className="btn-primary justify-center"
           >
             회차 추가
           </button>
