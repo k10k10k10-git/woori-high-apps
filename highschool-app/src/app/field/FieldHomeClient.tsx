@@ -5,7 +5,6 @@ import { useAuth } from "@/features/iguard/context/AuthContext";
 import { getRetreats, requestIguardAccess, getMyIguardPending, subscribeToAllRetreatPeriods, subscribeToMilestones, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks, type RetreatPeriodWithOwner } from "@/features/iguard/lib/db";
 import { Retreat, Milestone, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
-import TeamModal from "./TeamModal";
 import AdminModal from "./AdminModal";
 import PrepCalendar from "./PrepCalendar";
 import CenterSpinner from "@/components/CenterSpinner";
@@ -41,7 +40,6 @@ export default function FieldHomeClient() {
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showTeam, setShowTeam] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
   const [requested, setRequested] = useState(false);
@@ -175,7 +173,7 @@ export default function FieldHomeClient() {
   // ── 수련회 목록 + 준비 일정 ──
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50">
-      <header className="sticky top-0 z-20" style={{ background: "var(--color-header-bg)" }}>
+      <header className="sticky top-14 z-20" style={{ background: "var(--color-header-bg)" }}>
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="text-[26px] leading-none">🧭</span>
@@ -189,11 +187,6 @@ export default function FieldHomeClient() {
                   className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
                   style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
                   🔐 <span className="hidden sm:inline">관리자</span>
-                </button>
-                <button onClick={() => setShowTeam(true)} aria-label="팀원 관리"
-                  className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
-                  style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  👥 <span className="hidden sm:inline">팀원 관리</span>
                 </button>
               </>
             )}
@@ -316,7 +309,6 @@ export default function FieldHomeClient() {
         )}
       </main>
 
-      {showTeam && <TeamModal onClose={() => setShowTeam(false)} myEmail={user.email} />}
       {showAdmin && <AdminModal onClose={() => setShowAdmin(false)} retreats={retreats} locks={accessLocks} adminId={user.uid} />}
     </div>
   );

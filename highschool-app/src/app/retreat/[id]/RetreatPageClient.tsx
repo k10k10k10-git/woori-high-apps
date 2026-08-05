@@ -194,7 +194,7 @@ export default function RetreatPageClient() {
       {/* ══════════════════════════════════════════════════════
           Header
       ══════════════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-20">
+      <header className="sticky top-14 z-20">
 
         {/* 1단: 다크 배경 — 타이틀 + 대그룹 탭 */}
         <div style={{ background: "var(--color-header-bg)" }}>

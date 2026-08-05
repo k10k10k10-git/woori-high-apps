@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "./providers";
 import UpdateBanner from "./UpdateBanner";
+import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
 
 export const metadata: Metadata = {
   title: "고등부 사역 플랫폼",
@@ -37,7 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <UpdateBanner />
-        <Providers>{children}</Providers>
+        <Providers>
+          <GlobalPortalHeader />
+          {children}
+        </Providers>
       </body>
     </html>
   );

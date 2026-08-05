@@ -8,7 +8,10 @@ const read = (relativePath: string) =>
 describe("행정사이트 탭 분류 계약", () => {
   it("기존 인덱스를 유지한 채 17개 탭을 5개 그룹으로 분류한다", () => {
     const groups = RETREAT_TAB_GROUPS.map(group => group.label);
-    const tabs = RETREAT_TAB_GROUPS.flatMap(group => group.tabs);
+    const tabs = RETREAT_TAB_GROUPS.reduce<Array<{ label: string; idx: number }>>(
+      (all, group) => [...all, ...group.tabs],
+      [],
+    );
 
     expect(groups).toEqual(["명단", "편성", "이동·참석", "물품·비용", "현장"]);
     expect(tabs).toEqual([

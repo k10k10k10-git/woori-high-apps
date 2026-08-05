@@ -212,7 +212,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen overflow-x-clip bg-slate-50 pb-24 sm:pb-12">
-      <header ref={headerRef} className="sticky top-0 z-20" style={{ background: "var(--color-header-bg)" }}>
+      <header ref={headerRef} className="sticky top-14 z-20" style={{ background: "var(--color-header-bg)" }}>
         <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
           <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
             <button onClick={() => router.push("/")} className="min-h-10 shrink-0 px-1 text-xs text-slate-300 hover:text-fuchsia-200" aria-label="수련회 목록으로 돌아가기">← 목록</button>

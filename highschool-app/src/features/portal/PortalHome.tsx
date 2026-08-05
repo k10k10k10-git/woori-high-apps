@@ -10,6 +10,7 @@ import { getSemesters, subscribeSessions } from "@/features/semester/db";
 import type { Semester, Session } from "@/features/semester/types";
 import { useMyRetreatMinistry } from "./useMyRetreatMinistry";
 import { canAccessPortalArea, retreatEntryHref } from "./accessPolicy";
+import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS } from "./featureCatalog";
 
 type TimelineItem = {
   id: string;
@@ -168,21 +169,23 @@ export default function PortalHome() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="border-b border-slate-800 bg-slate-950 text-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
-          <div>
-            <p className="text-xs font-semibold tracking-[0.18em] text-sky-300">BUNDANG WOORI HIGH</p>
-            <h1 className="mt-1 text-xl font-bold sm:text-2xl">고등부 사역 플랫폼</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-slate-300 sm:inline">{user.displayName || user.email}</span>
-            <button onClick={() => void signOut()} className="rounded-lg border border-white/15 px-3 py-2 text-xs text-slate-300">로그아웃</button>
-          </div>
-        </div>
-      </header>
-
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-9">
         {loadError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
+
+        <section className="mb-6 overflow-hidden rounded-3xl bg-slate-900 px-5 py-6 text-white shadow-lg sm:px-8 sm:py-8">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-bold tracking-[0.16em] text-sky-300">TODAY&apos;S MINISTRY</p>
+              <h1 className="mt-2 text-2xl font-bold sm:text-3xl">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">학기 운영, 수련회 행정, 현장 실행을 같은 계정과 같은 데이터 흐름에서 이어갑니다.</p>
+            </div>
+            {accessLevel === "admin" && (
+              <button onClick={() => window.dispatchEvent(new Event("portal:open-team"))} className="shrink-0 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold transition hover:bg-white/15">
+                👥 통합 팀원 관리
+              </button>
+            )}
+          </div>
+        </section>
 
         <section className="grid gap-4 lg:grid-cols-2">
           {canAccessPortalArea("semester", portalAccess) ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
@@ -206,6 +209,34 @@ export default function PortalHome() {
             <h2 className="mt-5 text-2xl font-bold">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
             <p className="mt-2 text-sm text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
           </Link>
+        </section>
+
+        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <div className="mb-5">
+            <p className="text-xs font-bold tracking-[0.14em] text-slate-400">WORKSPACES</p>
+            <h2 className="mt-1 text-xl font-bold">업무 바로가기</h2>
+            <p className="mt-1 text-sm text-slate-500">기존 사이트별 메뉴를 하나의 사역 흐름으로 정리했습니다.</p>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-3">
+            {canAccessPortalArea("semester", portalAccess) && (
+              <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl border border-sky-100 bg-sky-50/60 p-4 transition hover:border-sky-300 hover:bg-sky-50">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-sky-950">학기 운영</h3><span className="text-sky-400 group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-3 flex flex-wrap gap-1.5">{SEMESTER_TABS.map((label) => <span key={label} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-sky-700 shadow-sm">{label}</span>)}</div>
+              </Link>
+            )}
+            {canAccessPortalArea("retreat-admin", portalAccess) && (
+              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} className="group rounded-2xl border border-violet-100 bg-violet-50/60 p-4 transition hover:border-violet-300 hover:bg-violet-50">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-violet-950">수련회 행정</h3><span className="text-violet-400 group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-3 space-y-2">{RETREAT_TAB_GROUPS.map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-14 font-bold text-violet-700">{group.label}</span><span className="leading-relaxed text-slate-500">{group.tabs.map((tab) => tab.label).join(" · ")}</span></div>)}</div>
+              </Link>
+            )}
+            {canAccessPortalArea("retreat-field", portalAccess) && (
+              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} className="group rounded-2xl border border-fuchsia-100 bg-fuchsia-50/60 p-4 transition hover:border-fuchsia-300 hover:bg-fuchsia-50">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-fuchsia-950">이가드 현장</h3><span className="text-fuchsia-400 group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-3 space-y-2">{IGUARD_VIEW_GROUPS.map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-9 font-bold text-fuchsia-700">{group.label}</span><span className="line-clamp-2 leading-relaxed text-slate-500">{group.views.map((view) => view.label).join(" · ")}</span></div>)}</div>
+              </Link>
+            )}
+          </div>
         </section>
 
         <section className="mt-7 grid gap-6 lg:grid-cols-[1.5fr_1fr]">

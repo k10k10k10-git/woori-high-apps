@@ -4,10 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
   getRetreats, createRetreat, deleteRetreat,
-  getRetreatAdmins, removeRetreatAdmin, updateRetreatAdminMemberName,
-  getPendingRequests, approveRetreatRequest, denyRetreatRequest,
   requestRetreatAccess, getEarliestPeriodDateByRetreat,
-  type RetreatAdminMember,
 } from "@/lib/db";
 import { Retreat } from "@/lib/types";
 import { parseSheetUrl } from "@/lib/sheetsParser";
@@ -15,11 +12,6 @@ import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import RetreatCalendarPanel from "./RetreatCalendarPanel";
 import BrainstormPanel from "./BrainstormPanel";
-
-const MAIN_ADMIN = {
-  name: process.env.NEXT_PUBLIC_MAIN_ADMIN_NAME ?? "관리자",
-  email: process.env.NEXT_PUBLIC_MAIN_ADMIN_EMAIL ?? "",
-};
 
 // ── 로고 SVG ────────────────────────────────────────────────
 function RetreatLogo({ size = 32 }: { size?: number }) {
@@ -51,20 +43,14 @@ function DarkScreen({ children }: { children: React.ReactNode }) {
 export default function HomePage() {
   const router = useRouter();
   const { user, loading, accessLevel, signIn, signOut } = useAuth();
-  const { toast, uiConfirm } = useUI();
+  const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [showMembers, setShowMembers] = useState(false);
-  const [members, setMembers] = useState<Record<string, RetreatAdminMember>>({});
-  const [memberNameDrafts, setMemberNameDrafts] = useState<Record<string, string>>({});
-  const [editingMemberNameUid, setEditingMemberNameUid] = useState<string | null>(null);
-  const [pending, setPending] = useState<Record<string, { email: string; name: string; requestedAt: number }>>({});
   const [form, setForm] = useState({ name: "", year: new Date().getFullYear().toString(), sheetUrl: "" });
   const [saving, setSaving] = useState(false);
   const [createError, setCreateError] = useState("");
   const [retreatLoadError, setRetreatLoadError] = useState("");
-  const [membersError, setMembersError] = useState("");
   const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [selectedRetreatId, setSelectedRetreatId] = useState<string | null>(null);
@@ -96,31 +82,6 @@ export default function HomePage() {
     if (!loading && accessLevel !== "none" && user) void loadRetreats();
   }, [loading, accessLevel, user, loadRetreats]);
 
-  async function loadMembersAndPending() {
-    setMembersError("");
-    try {
-      const [m, p] = await Promise.all([getRetreatAdmins(), getPendingRequests()]);
-      setMembers(m);
-      setMemberNameDrafts(Object.fromEntries(Object.entries(m).map(([uid, member]) => [uid, member.name ?? ""])));
-      setPending(p);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "팀원 정보를 불러오지 못했습니다.";
-      setMembersError(message);
-      toast(message, "error");
-    }
-  }
-
-  async function handleSaveMemberName(uid: string, member: RetreatAdminMember) {
-    try {
-      await updateRetreatAdminMemberName(uid, member, memberNameDrafts[uid] ?? "");
-      await loadMembersAndPending();
-      setEditingMemberNameUid(null);
-      toast("팀원 이름을 저장했습니다.", "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "팀원 이름을 저장하지 못했습니다.", "error");
-    }
-  }
-
   async function handleRequestAccess() {
     if (!user) return;
     try {
@@ -132,11 +93,6 @@ export default function HomePage() {
   }
 
   const parsedSheetUrl = useMemo(() => parseSheetUrl(form.sheetUrl), [form.sheetUrl]);
-  const approvedMembers = useMemo(
-    () => Object.entries(members).filter(([, member]) => member.email !== MAIN_ADMIN.email),
-    [members]
-  );
-
   async function handleCreate() {
     const name = form.name.trim();
     const year = Number(form.year);
@@ -190,39 +146,6 @@ export default function HomePage() {
       toast("수련회를 삭제했습니다.", "success");
     } catch (e) {
       toast(e instanceof Error ? e.message : "수련회를 삭제하지 못했습니다.", "error");
-    }
-  }
-
-  async function handleApproveMember(uid: string, info: { email: string; name?: string }) {
-    try {
-      await approveRetreatRequest(uid, info);
-      await loadMembersAndPending();
-      toast("팀원을 승인했습니다.", "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "팀원을 승인하지 못했습니다.", "error");
-    }
-  }
-
-  async function handleDenyMember(uid: string) {
-    try {
-      await denyRetreatRequest(uid);
-      await loadMembersAndPending();
-      toast("요청을 거절했습니다.", "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "요청을 거절하지 못했습니다.", "error");
-    }
-  }
-
-  async function handleRemoveMember(uid: string) {
-    const member = members[uid];
-    const label = member?.name ? `${member.name} (${member.email})` : member?.email ?? "이 팀원";
-    if (!await uiConfirm(`${label}을 팀원에서 삭제하시겠습니까?`)) return;
-    try {
-      await removeRetreatAdmin(uid);
-      await loadMembersAndPending();
-      toast("팀원을 삭제했습니다.", "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "팀원을 삭제하지 못했습니다.", "error");
     }
   }
 
@@ -312,7 +235,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-50">
 
       {/* ═══ Header ═══════════════════════════════════════════ */}
-      <header className="sticky top-0 z-10" style={{ background: "var(--color-header-bg)" }}>
+      <header className="sticky top-14 z-10" style={{ background: "var(--color-header-bg)" }}>
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <RetreatLogo size={26} />
@@ -324,17 +247,6 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm hidden sm:inline" style={{ color: "#6b7280" }}>{user.displayName}</span>
-            {accessLevel === "admin" && (
-              <button
-                onClick={() => { setShowMembers(true); loadMembersAndPending(); }}
-                className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-                style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#e2e8f0")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-              >
-                👥 팀원 관리
-              </button>
-            )}
             <button
               onClick={signOut}
               className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
@@ -347,121 +259,6 @@ export default function HomePage() {
           </div>
         </div>
       </header>
-
-      {/* ═══ 팀원 관리 모달 ════════════════════════════════════ */}
-      {showMembers && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onKeyDown={e => { if (e.key === 'Escape') setShowMembers(false); }}>
-          <div className="card p-6 w-full max-w-md max-h-[80vh] overflow-y-auto" role="dialog" aria-modal="true" aria-label="팀원 관리">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg">팀원 관리</h3>
-              <button onClick={() => setShowMembers(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="닫기">×</button>
-            </div>
-            <div className="mb-5">
-              <h4 className="text-sm font-semibold text-blue-700 mb-2">👑 관리자</h4>
-              <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="text-sm font-semibold text-slate-800 truncate">{MAIN_ADMIN.name}</div>
-                  <span className="text-[11px] px-1.5 py-0.5 rounded border border-blue-200 bg-white text-blue-700 shrink-0">관리자</span>
-                </div>
-                <div className="text-xs text-slate-500 truncate mt-0.5">{MAIN_ADMIN.email}</div>
-              </div>
-            </div>
-            <div className="mb-5">
-              <h4 className="text-sm font-semibold text-orange-600 mb-2">⏳ 승인 대기 ({Object.keys(pending).length}명)</h4>
-              {membersError && (
-                <div className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                  ⚠ {membersError}
-                </div>
-              )}
-              {Object.keys(pending).length === 0 ? (
-                <p className="text-xs text-slate-400 py-2">대기 중인 요청이 없습니다.</p>
-              ) : (
-                <div className="space-y-2">
-                  {Object.entries(pending).map(([uid, info]) => (
-                    <div key={uid} className="flex items-center justify-between bg-orange-50 rounded-lg px-3 py-2">
-                      <div>
-                        <div className="text-sm font-medium text-slate-800">{info.name}</div>
-                        <div className="text-xs text-slate-500">{info.email}</div>
-                      </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => handleApproveMember(uid, info)}
-                          className="btn-primary btn-sm text-xs">승인</button>
-                        <button onClick={() => handleDenyMember(uid)}
-                          className="btn-secondary btn-sm text-xs">거절</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <h4 className="text-sm font-semibold text-slate-600 mb-2">✅ 승인된 팀원 ({approvedMembers.length}명)</h4>
-              {approvedMembers.length === 0 ? (
-                <p className="text-xs text-slate-400 py-2">승인된 팀원이 없습니다.</p>
-              ) : (
-                <div className="space-y-2">
-                  {approvedMembers.map(([uid, member]) => (
-                    <div key={uid} className="bg-slate-50 rounded-lg px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 min-w-0">
-                            {member.name ? (
-                              <div className="text-sm font-medium text-slate-800 truncate">{member.name}</div>
-                            ) : (
-                              <div className="text-sm font-medium text-slate-400 truncate">이름 미설정</div>
-                            )}
-                            <button
-                              onClick={() => setEditingMemberNameUid(editingMemberNameUid === uid ? null : uid)}
-                              className="text-[11px] px-1.5 py-0.5 rounded border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 bg-white shrink-0"
-                            >
-                              이름 수정
-                            </button>
-                          </div>
-                          <div className="text-xs text-slate-500 truncate mt-0.5">
-                            {member.email}
-                          </div>
-                        </div>
-                        <button onClick={() => handleRemoveMember(uid)}
-                          className="text-slate-300 hover:text-red-400 text-lg leading-none transition-colors shrink-0" aria-label="삭제">×</button>
-                      </div>
-                      {editingMemberNameUid === uid && (
-                        <div className="flex gap-2 mt-2">
-                          <input
-                            className="input text-xs flex-1 py-1.5"
-                            placeholder="이름 입력"
-                            aria-label="팀원 이름"
-                            value={memberNameDrafts[uid] ?? ""}
-                            onChange={e => setMemberNameDrafts(prev => ({ ...prev, [uid]: e.target.value }))}
-                            onKeyDown={e => e.key === "Enter" && handleSaveMemberName(uid, member)}
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => handleSaveMemberName(uid, member)}
-                            className="btn-secondary btn-sm text-xs whitespace-nowrap"
-                          >
-                            저장
-                          </button>
-                          <button
-                            onClick={() => {
-                              setMemberNameDrafts(prev => ({ ...prev, [uid]: member.name ?? "" }));
-                              setEditingMemberNameUid(null);
-                            }}
-                            className="btn-secondary btn-sm text-xs whitespace-nowrap"
-                          >
-                            취소
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-slate-400 mt-4">팀원들이 앱에서 &apos;접근 요청 보내기&apos;를 누르면 여기서 승인할 수 있습니다.</p>
-          </div>
-        </div>
-      )}
 
       {/* ═══ 삭제 확인 모달 ═══════════════════════════════════════ */}
       {deleteTarget && (
