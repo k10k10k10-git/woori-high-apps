@@ -6,6 +6,20 @@ const BUILD_ID = process.env.VERCEL_GIT_COMMIT_SHA || String(Date.now());
 
 const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_BUILD_ID: BUILD_ID },
+  async redirects() {
+    return [
+      {
+        source: "/",
+        destination: "https://highschool-app-flame.vercel.app/retreats",
+        permanent: false,
+      },
+      {
+        source: "/retreat/:path*",
+        destination: "https://highschool-app-flame.vercel.app/retreat/:path*",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
