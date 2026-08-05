@@ -10,6 +10,7 @@ import { useUI } from "@/context/UIContext";
 import { clearAttendance, describeApplicant, setAttendance, subscribeSessionAttendance } from "@/features/semester/db";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
+import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
 import { Application, AttendanceStatus, Session, SessionAttendance, Team } from "@/features/semester/types";
 
 interface Props {
@@ -37,44 +38,41 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
   const canEdit = useSemesterCanEdit();
   const [sessId, setSessId] = useState<string>("");
   const [teamFilter, setTeamFilter] = useState<string>("");
+  const [scope, setScope] = useState<SemesterRosterScope>("team");
   const [att, setAtt] = useState<SessionAttendance>({});
   const [loadError, setLoadError] = useState<string | null>(null);
-  const userPicked = useMemo(() => ({ current: false }), []); // 자동 선택이 사용자 선택을 덮지 않게 (패턴 17)
-
-  // 오늘(또는 가장 가까운 미래) 회차 자동 선택 — 사용자가 고른 뒤엔 덮지 않음
-  useEffect(() => {
-    if (userPicked.current || sessions.length === 0) return;
+  const defaultSessId = useMemo(() => {
+    if (sessions.length === 0) return "";
     const today = todayYMD();
     const candidate =
       sessions.find((s) => s.date === today) ??
       sessions.find((s) => s.date >= today) ??
       sessions[sessions.length - 1];
-    setSessId(candidate.id);
-  }, [sessions, userPicked]);
+    return candidate.id;
+  }, [sessions]);
+  const activeSessId = sessions.some((session) => session.id === sessId) ? sessId : defaultSessId;
 
   useEffect(() => {
-    if (!sessId) return;
-    setLoadError(null);
-    return subscribeSessionAttendance(sid, sessId, setAtt, (e) => setLoadError(e.message));
-  }, [sid, sessId]);
+    if (!activeSessId) return;
+    return subscribeSessionAttendance(sid, activeSessId, setAtt, (e) => setLoadError(e.message));
+  }, [sid, activeSessId]);
 
-  const session = sessions.find((s) => s.id === sessId);
+  const session = sessions.find((s) => s.id === activeSessId);
   const members = useMemo(
     () =>
-      applications
-        .filter((a) => a.status !== "취소" && !a.trainingOnly && a.teamId)
-        .filter((a) => !teamFilter || a.teamId === teamFilter)
+      semesterRoster(applications, scope)
+        .filter((a) => scope === "trainingOnly" || !teamFilter || a.teamId === teamFilter)
         .sort((a, b) => {
-          const ta = teamById.get(a.teamId!)?.order ?? 99;
-          const tb = teamById.get(b.teamId!)?.order ?? 99;
+          const ta = a.teamId ? teamById.get(a.teamId)?.order ?? 99 : 99;
+          const tb = b.teamId ? teamById.get(b.teamId)?.order ?? 99 : 99;
           return ta - tb || applicantSortKey(a).localeCompare(applicantSortKey(b), "ko");
         }),
-    [applications, teamFilter, teamById],
+    [applications, scope, teamFilter, teamById],
   );
 
   async function mark(appKey: string, status: AttendanceStatus) {
     try {
-      await setAttendance(sid, sessId, appKey, status, user?.uid);
+      await setAttendance(sid, activeSessId, appKey, status, user?.uid);
     } catch (e) {
       toast(`기록 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
@@ -99,12 +97,36 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
         </div>
       )}
 
+      <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="출석 명단 구분">
+          <button
+            role="tab"
+            aria-selected={scope === "team"}
+            onClick={() => setScope("team")}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "team" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
+          >
+            사역팀 출석
+          </button>
+          <button
+            role="tab"
+            aria-selected={scope === "trainingOnly"}
+            onClick={() => {
+              setScope("trainingOnly");
+              setTeamFilter("");
+            }}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "trainingOnly" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
+          >
+            훈련만 신청 <span className="ml-1 text-xs">{semesterRoster(applications, "trainingOnly").length}명</span>
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap gap-2 mb-3">
         <select
           aria-label="회차 선택"
-          value={sessId}
+          value={activeSessId}
           onChange={(e) => {
-            userPicked.current = true;
+            setLoadError(null);
             setSessId(e.target.value);
           }}
           className="input h-9 w-auto px-2.5 py-1.5 text-sm"
@@ -115,7 +137,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
             </option>
           ))}
         </select>
-        <select
+        {scope === "team" && <select
           aria-label="팀 필터"
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
@@ -125,7 +147,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
           {teams.map((t) => (
             <option key={t.id} value={t.id}>{t.name}</option>
           ))}
-        </select>
+        </select>}
       </div>
 
       {session?.type === "휴강" && (
@@ -145,7 +167,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
       <ul className="grid gap-1.5">
         {members.map((m) => {
           const entry = att[m.id];
-          const team = teamById.get(m.teamId!);
+          const team = m.teamId ? teamById.get(m.teamId) : undefined;
           return (
             <li key={m.id} className="card flex items-center gap-2 px-3 py-2">
               <div className="flex-1 min-w-0 text-sm">
@@ -172,7 +194,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
                 ))}
                 {entry && canEdit && (
                   <button
-                    onClick={() => void clearAttendance(sid, sessId, m.id)}
+                    onClick={() => void clearAttendance(sid, activeSessId, m.id)}
                     aria-label={`${m.name} 기록 지우기`}
                     className="px-1.5 text-xs text-slate-300 hover:text-slate-600"
                   >
@@ -183,7 +205,11 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
             </li>
           );
         })}
-        {members.length === 0 && <p className="text-sm text-slate-400">배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요.</p>}
+        {members.length === 0 && (
+          <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+            {scope === "trainingOnly" ? "훈련만 신청한 인원이 없습니다." : "배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요."}
+          </p>
+        )}
       </ul>
     </div>
   );

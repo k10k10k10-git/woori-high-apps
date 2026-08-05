@@ -1,0 +1,103 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo, useState } from "react";
+
+export type SharedCalendarItem = {
+  id: string;
+  date: string;
+  endDate?: string;
+  title: string;
+  kind: "semester" | "retreat";
+  href: string;
+};
+
+const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function ymd(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function calendarItemsForDate(items: SharedCalendarItem[], date: string) {
+  return items.filter((item) => item.date <= date && date <= (item.endDate ?? item.date));
+}
+
+export default function SharedMinistryCalendar({ items }: { items: SharedCalendarItem[] }) {
+  const today = new Date();
+  const initial = items.find((item) => item.date >= ymd(today.getFullYear(), today.getMonth(), today.getDate()))?.date;
+  const initialDate = initial ? new Date(`${initial}T00:00:00`) : today;
+  const [cursor, setCursor] = useState(() => new Date(initialDate.getFullYear(), initialDate.getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(() => initial ?? ymd(today.getFullYear(), today.getMonth(), today.getDate()));
+
+  const cells = useMemo(() => {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+    const first = new Date(year, month, 1).getDay();
+    const count = new Date(year, month + 1, 0).getDate();
+    return [
+      ...Array.from({ length: first }, () => null),
+      ...Array.from({ length: count }, (_, index) => index + 1),
+    ];
+  }, [cursor]);
+
+  const selectedItems = calendarItemsForDate(items, selectedDate);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold">공유 사역 캘린더</h2>
+          <p className="mt-0.5 text-xs text-slate-400">학기 모임과 수련회 일정을 한 달력에서 함께 확인합니다.</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <button aria-label="이전 달" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))} className="rounded-lg px-2.5 py-2 text-slate-500 hover:bg-slate-100">‹</button>
+          <strong className="min-w-24 text-center text-sm">{cursor.getFullYear()}년 {cursor.getMonth() + 1}월</strong>
+          <button aria-label="다음 달" onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))} className="rounded-lg px-2.5 py-2 text-slate-500 hover:bg-slate-100">›</button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.75fr)]">
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          <div className="grid grid-cols-7 bg-slate-50 text-center text-[11px] font-semibold text-slate-400">
+            {WEEKDAYS.map((day) => <div key={day} className="py-2">{day}</div>)}
+          </div>
+          <div className="grid grid-cols-7">
+            {cells.map((day, index) => {
+              if (!day) return <div key={`empty-${index}`} className="min-h-20 border-t border-slate-100 bg-slate-50/40 sm:min-h-24" />;
+              const date = ymd(cursor.getFullYear(), cursor.getMonth(), day);
+              const dayItems = calendarItemsForDate(items, date);
+              const selected = selectedDate === date;
+              return (
+                <button
+                  key={date}
+                  onClick={() => setSelectedDate(date)}
+                  className={`min-h-20 border-t border-slate-100 p-1.5 text-left align-top transition sm:min-h-24 sm:p-2 ${selected ? "bg-sky-50 ring-2 ring-inset ring-sky-300" : "hover:bg-slate-50"}`}
+                >
+                  <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${date === ymd(today.getFullYear(), today.getMonth(), today.getDate()) ? "bg-slate-900 text-white" : "text-slate-600"}`}>{day}</span>
+                  <span className="mt-1 grid gap-1">
+                    {dayItems.slice(0, 2).map((item) => <span key={item.id} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium ${item.kind === "semester" ? "bg-emerald-100 text-emerald-800" : "bg-violet-100 text-violet-800"}`}>{item.title}</span>)}
+                    {dayItems.length > 2 && <span className="px-1 text-[10px] text-slate-400">+{dayItems.length - 2}개</span>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <aside className="rounded-2xl bg-slate-900 p-4 text-white lg:min-h-full">
+          <p className="text-xs font-semibold tracking-wide text-sky-300">{selectedDate.replaceAll("-", ".")}</p>
+          <h3 className="mt-1 text-base font-bold">전체 일정</h3>
+          <div className="mt-4 grid gap-2">
+            {selectedItems.map((item) => (
+              <Link key={item.id} href={item.href} className="rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
+                <span className={`text-[10px] font-bold ${item.kind === "semester" ? "text-emerald-300" : "text-violet-300"}`}>{item.kind === "semester" ? "학기 중 사역" : "방학 중 사역"}</span>
+                <p className="mt-1 text-sm font-semibold leading-snug">{item.title}</p>
+              </Link>
+            ))}
+            {selectedItems.length === 0 && <p className="rounded-xl border border-dashed border-white/15 px-3 py-8 text-center text-xs text-slate-400">등록된 일정이 없습니다.</p>}
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}

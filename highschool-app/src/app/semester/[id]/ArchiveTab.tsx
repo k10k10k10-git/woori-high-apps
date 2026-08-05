@@ -7,6 +7,7 @@ import { useUI } from "@/context/UIContext";
 import { addArchiveLink, removeArchiveLink, subscribeArchiveLinks } from "@/features/semester/db";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { ArchiveLink } from "@/features/semester/types";
+import { deleteSemesterArchiveFile, uploadSemesterArchiveFile } from "@/features/semester/archiveStorage";
 
 const KIND_LABEL: Record<ArchiveLink["kind"], string> = {
   doc: "📄 문서",
@@ -24,22 +25,44 @@ export default function ArchiveTab({ sid }: { sid: string }) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [kind, setKind] = useState<ArchiveLink["kind"]>("doc");
+  const [mode, setMode] = useState<"file" | "link">("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => subscribeArchiveLinks(sid, setLinks, (e) => setLoadError(e.message)), [sid]);
 
   async function add() {
-    if (!title.trim() || !url.trim()) return;
-    if (!/^https?:\/\//.test(url.trim())) {
+    if (!title.trim()) return;
+    if (mode === "link" && !/^https?:\/\//.test(url.trim())) {
       toast("URL은 http(s)://로 시작해야 합니다", "warning");
       return;
     }
+    if (mode === "file" && !file) return;
+    setUploading(true);
     try {
-      await addArchiveLink(sid, { title: title.trim(), url: url.trim(), kind });
+      if (mode === "file" && file) {
+        const uploaded = await uploadSemesterArchiveFile(sid, file, setProgress);
+        await addArchiveLink(sid, {
+          title: title.trim(),
+          url: uploaded.fileUrl,
+          kind,
+          filePath: uploaded.filePath,
+          fileName: file.name,
+          fileSize: file.size,
+        });
+      } else {
+        await addArchiveLink(sid, { title: title.trim(), url: url.trim(), kind });
+      }
       setTitle("");
       setUrl("");
-      toast("링크가 추가되었습니다", "success");
+      setFile(null);
+      setProgress(0);
+      toast(mode === "file" ? "파일이 업로드되었습니다" : "링크가 추가되었습니다", "success");
     } catch (e) {
       toast(`추가 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -51,9 +74,18 @@ export default function ArchiveTab({ sid }: { sid: string }) {
         </div>
       )}
 
-      {canEdit && <div className="card card-body mb-4">
-        <h3 className="font-semibold mb-2 text-sm">자료 링크 추가</h3>
-        <div className="flex flex-col sm:flex-row gap-2">
+      {canEdit && <div className="card card-body mb-5">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-slate-800">자료 보관</h3>
+            <p className="mt-0.5 text-xs text-slate-400">파일을 직접 올리거나 기존 드라이브·문서 링크를 연결합니다.</p>
+          </div>
+          <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+            <button onClick={() => setMode("file")} className={`rounded-lg px-3 py-1.5 ${mode === "file" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>파일 업로드</button>
+            <button onClick={() => setMode("link")} className={`rounded-lg px-3 py-1.5 ${mode === "link" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>링크 연결</button>
+          </div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-[auto_1fr_1.2fr_auto]">
           <select
             aria-label="자료 종류"
             value={kind}
@@ -67,21 +99,32 @@ export default function ArchiveTab({ sid }: { sid: string }) {
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="제목 (예: 2026 신청명단 시트)"
+            placeholder="자료 제목"
             className="input flex-1 text-sm"
           />
-          <input
+          {mode === "link" ? <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://…"
             className="input flex-1 text-sm"
-          />
+          /> : <label className="input flex cursor-pointer items-center text-sm text-slate-500">
+            <input
+              type="file"
+              className="sr-only"
+              onChange={(event) => {
+                const nextFile = event.target.files?.[0] ?? null;
+                setFile(nextFile);
+                if (nextFile && !title.trim()) setTitle(nextFile.name.replace(/\.[^.]+$/, ""));
+              }}
+            />
+            <span className="truncate">{file?.name ?? "파일 선택 (최대 30MB)"}</span>
+          </label>}
           <button
             onClick={() => void add()}
-            disabled={!title.trim() || !url.trim()}
+            disabled={uploading || !title.trim() || (mode === "file" ? !file : !url.trim())}
             className="btn-primary justify-center"
           >
-            추가
+            {uploading ? `${progress}%` : mode === "file" ? "업로드" : "추가"}
           </button>
         </div>
       </div>}
@@ -91,12 +134,19 @@ export default function ArchiveTab({ sid }: { sid: string }) {
           <li key={l.id} className="card flex items-center gap-2 p-3">
             <a href={l.url} target="_blank" rel="noreferrer" className="flex-1 min-w-0 hover:underline">
               <div className="text-sm font-medium truncate">{l.title}</div>
-              <div className="text-xs text-slate-400">{KIND_LABEL[l.kind]}</div>
+              <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
+                <span>{KIND_LABEL[l.kind]}</span>
+                {l.fileName && <span className="truncate">{l.fileName}</span>}
+                {l.fileSize && <span>{Math.max(1, Math.round(l.fileSize / 1024))}KB</span>}
+              </div>
             </a>
             {canEdit && <button
               aria-label={`${l.title} 삭제`}
               onClick={async () => {
-                if (await uiConfirm(`'${l.title}' 링크를 삭제할까요?`)) await removeArchiveLink(sid, l.id);
+                if (await uiConfirm(`'${l.title}' 자료를 삭제할까요?`)) {
+                  if (l.filePath) await deleteSemesterArchiveFile(l.filePath);
+                  await removeArchiveLink(sid, l.id);
+                }
               }}
               className="text-xs text-slate-300 hover:text-red-500"
             >
@@ -104,7 +154,7 @@ export default function ArchiveTab({ sid }: { sid: string }) {
             </button>}
           </li>
         ))}
-        {links.length === 0 && <p className="text-sm text-slate-400">아직 링크가 없습니다. 기존 시트·문서·폴더 링크를 등록해 유실을 막으세요.</p>}
+        {links.length === 0 && <p className="col-span-full rounded-2xl border border-dashed border-slate-200 px-4 py-12 text-center text-sm text-slate-400">아직 보관된 자료가 없습니다. 파일을 올리거나 기존 시트·문서·폴더 링크를 연결해주세요.</p>}
       </ul>
     </div>
   );

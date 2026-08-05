@@ -53,6 +53,7 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
   const [staffError, setStaffError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editing, setEditing] = useState<PersonRow | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -135,6 +136,13 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
   }, [classes, staff]);
 
   const selected = buckets.find((bucket) => bucket.key === selectedKey);
+  const queryResults = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("ko");
+    if (!normalized) return [];
+    return buckets.flatMap((bucket) => bucket.rows.map((row) => ({ bucket, row })))
+      .filter(({ row }) => row.name.toLocaleLowerCase("ko").includes(normalized))
+      .slice(0, 30);
+  }, [buckets, query]);
 
   function bucketAppCount(bucket: Bucket): number {
     return bucket.rows.filter((row) => appByKey.has(makeAppKey(row.bu, row.personId))).length;
@@ -162,30 +170,42 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
         <p className="text-sm text-slate-400">classes/{year} 에 명단이 없습니다. 학생 출석부 앱에서 먼저 명단을 동기화해주세요.</p>
       )}
 
-      {/* 반·스탭 그리드 */}
-      <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {buckets.map((bucket) => {
-          const total = bucket.rows.length;
-          const count = bucketAppCount(bucket);
-          const active = bucket.key === selectedKey;
-          return (
-            <button
-              key={bucket.key}
-              onClick={() => setSelectedKey(active ? null : bucket.key)}
-              className="card p-2.5 text-left text-sm transition"
-              data-hover=""
-              style={active
-                ? { boxShadow: `0 0 0 2px var(--color-primary)` }
-                : undefined}
-            >
-              <div className="font-medium text-slate-800">{bucket.label}</div>
-              <div className={`mt-0.5 text-xs ${count > 0 ? "font-semibold" : "text-slate-400"}`}
-                style={count > 0 ? { color: "var(--color-primary)" } : undefined}>
-                신청 {count} / {total}명
-              </div>
-            </button>
-          );
-        })}
+      <div className="card mb-4 p-3 sm:p-4">
+        <label className="block text-xs font-semibold text-slate-500" htmlFor="semester-applicant-search">이름으로 찾기</label>
+        <input id="semester-applicant-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="학생·스탭 이름 검색" className="input mt-1.5 text-sm" />
+        {query.trim() && (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {queryResults.map(({ bucket, row }) => {
+              const appKey = makeAppKey(row.bu, row.personId);
+              const app = appByKey.get(appKey);
+              return <button key={appKey} onClick={() => setEditing(row)} disabled={!canEdit && !app} className="rounded-xl border border-slate-200 px-3 py-2 text-left hover:border-emerald-300 hover:bg-emerald-50/50"><strong className="text-sm">{row.name}</strong><span className="ml-2 text-xs text-slate-400">{bucket.label}</span>{app && <span className="ml-2 text-xs font-semibold text-emerald-600">신청됨</span>}</button>;
+            })}
+            {queryResults.length === 0 && <p className="col-span-full py-3 text-center text-sm text-slate-400">검색 결과가 없습니다.</p>}
+          </div>
+        )}
+      </div>
+
+      {/* 반이 많아도 화면을 밀어내지 않도록 한 번에 하나만 선택한다. */}
+      <div className="card mb-5 p-3 sm:p-4">
+        <label className="block text-xs font-semibold text-slate-500" htmlFor="semester-roster-bucket">
+          반·스탭 명단
+        </label>
+        <select
+          id="semester-roster-bucket"
+          className="input mt-1.5 text-sm"
+          value={selectedKey ?? ""}
+          onChange={(event) => setSelectedKey(event.target.value || null)}
+        >
+          <option value="">명단을 선택하세요</option>
+          {buckets.map((bucket) => (
+            <option key={bucket.key} value={bucket.key}>
+              {bucket.label} · 신청 {bucketAppCount(bucket)}/{bucket.rows.length}명
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-xs text-slate-400">
+          이름 검색 또는 반 선택으로 신청 상태와 연락처를 빠르게 확인할 수 있습니다.
+        </p>
       </div>
 
       {/* 선택된 반·스탭 명단 */}

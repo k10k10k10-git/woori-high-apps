@@ -8,6 +8,7 @@ import { useUI } from "@/context/UIContext";
 import { describeApplicant, subscribeAllAttendance, subscribeCompletion, updateCompletionEntry } from "@/features/semester/db";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { calcCompletion } from "@/features/semester/completion";
+import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
 import { Application, CompletionEntry, SemesterMeta, Session, SessionAttendance, Team } from "@/features/semester/types";
 
 interface Props {
@@ -24,6 +25,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
   const [attBySession, setAttBySession] = useState<Record<string, SessionAttendance>>({});
   const [checklist, setChecklist] = useState<Record<string, CompletionEntry>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [scope, setScope] = useState<SemesterRosterScope>("team");
 
   useEffect(() => {
     const fail = (e: Error) => setLoadError(e.message);
@@ -39,19 +41,18 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
 
   const rows = useMemo(
     () =>
-      applications
-        .filter((a) => a.status !== "취소" && !a.trainingOnly && a.teamId)
+      semesterRoster(applications, scope)
         .map((a) => ({
           app: a,
           result: calcCompletion(a.id, sessions, attBySession, minRate),
           check: checklist[a.id] ?? {},
         }))
         .sort((x, y) => {
-          const tx = teamById.get(x.app.teamId!)?.order ?? 99;
-          const ty = teamById.get(y.app.teamId!)?.order ?? 99;
+          const tx = x.app.teamId ? teamById.get(x.app.teamId)?.order ?? 99 : 99;
+          const ty = y.app.teamId ? teamById.get(y.app.teamId)?.order ?? 99 : 99;
           return tx - ty || y.result.rate - x.result.rate;
         }),
-    [applications, sessions, attBySession, checklist, minRate, teamById],
+    [applications, scope, sessions, attBySession, checklist, minRate, teamById],
   );
 
   async function toggleCheck(appKey: string, field: "certPrinted" | "photoChecked", value: boolean) {
@@ -71,6 +72,11 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
           ⚠ 로드 오류: {loadError}
         </div>
       )}
+
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2" role="tablist" aria-label="수료 명단 구분">
+        <button role="tab" aria-selected={scope === "team"} onClick={() => setScope("team")} className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${scope === "team" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>사역팀 수료</button>
+        <button role="tab" aria-selected={scope === "trainingOnly"} onClick={() => setScope("trainingOnly")} className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${scope === "trainingOnly" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>훈련만 신청 수료</button>
+      </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
         <span className="rounded-lg bg-emerald-100 px-3 py-1.5 text-emerald-900">
@@ -96,7 +102,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
           </thead>
           <tbody>
             {rows.map(({ app, result, check }) => {
-              const team = teamById.get(app.teamId!);
+              const team = app.teamId ? teamById.get(app.teamId) : undefined;
               return (
                 <tr key={app.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
                   <td className="px-3 py-2">
@@ -143,7 +149,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
             {rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
-                  배치된 인원이 없습니다
+                  {scope === "trainingOnly" ? "훈련만 신청한 인원이 없습니다" : "배치된 인원이 없습니다"}
                 </td>
               </tr>
             )}

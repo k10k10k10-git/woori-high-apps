@@ -28,6 +28,16 @@ import { SEMESTER_TABS } from "@/features/portal/featureCatalog";
 
 type TabName = (typeof SEMESTER_TABS)[number];
 
+const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
+  접수: { title: "훈련·사역팀 신청", description: "학생과 스탭의 신청 내용, 연락처와 지원 정보를 한곳에서 관리합니다." },
+  배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
+  출석: { title: "훈련 출석부", description: "사역팀과 훈련만 신청한 인원을 구분해 회차별 출석을 기록합니다." },
+  수료: { title: "훈련 수료 현황", description: "출석 점수에 따른 수료 여부와 후속 제작 업무를 확인합니다." },
+  커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 회차별 모임 계획을 작성하고 공유합니다." },
+  아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
+  설정: { title: "학기 운영 설정", description: "학기 제목, 팀, 훈련 회차와 수료 기준을 관리합니다." },
+};
+
 export default function SemesterClient({ semesterId }: { semesterId: string }) {
   const router = useRouter();
   const { user, loading: authLoading, role, signIn } = useAuth();
@@ -138,14 +148,23 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-5 sm:py-6">
+      <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7">
         {loadError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             ⚠ 로드 오류: {loadError}
           </div>
         )}
 
-        <div role="tabpanel" id="tab-content-panel">
+        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-600">{activeTab}</p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2>
+            <p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p>
+          </div>
+          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 팀 {teams.length}개 · 훈련 {sessions.length}회</p>
+        </div>
+
+        <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "접수" && <IntakeTab sid={semesterId} teams={teams} applications={applications} />}
             {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} applications={applications} teamById={teamById} />}

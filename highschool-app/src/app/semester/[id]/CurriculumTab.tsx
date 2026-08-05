@@ -21,22 +21,18 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
   const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
+  const activeTeamId = teams.some((team) => team.id === teamId) ? teamId : teams[0]?.id ?? "";
 
   useEffect(() => {
-    if (!teamId && teams.length > 0) setTeamId(teams[0].id);
-  }, [teams, teamId]);
-
-  useEffect(() => {
-    if (!teamId) return;
-    setDrafts({});
-    return subscribeCurriculum(sid, teamId, setEntries, (e) => setLoadError(e.message));
-  }, [sid, teamId]);
+    if (!activeTeamId) return;
+    return subscribeCurriculum(sid, activeTeamId, setEntries, (e) => setLoadError(e.message));
+  }, [sid, activeTeamId]);
 
   async function save(sessId: string) {
     const draft = drafts[sessId];
     if (draft === undefined || draft === (entries[sessId]?.plan ?? "")) return;
     try {
-      await updateCurriculumEntry(sid, teamId, sessId, { plan: draft });
+      await updateCurriculumEntry(sid, activeTeamId, sessId, { plan: draft });
       toast("저장됨", "success");
     } catch (e) {
       toast(`저장 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -59,10 +55,13 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
           <button
             key={t.id}
             role="tab"
-            aria-selected={teamId === t.id}
-            onClick={() => setTeamId(t.id)}
+            aria-selected={activeTeamId === t.id}
+            onClick={() => {
+              setDrafts({});
+              setTeamId(t.id);
+            }}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
-              teamId === t.id ? t.color + " font-medium" : "text-slate-500 hover:bg-slate-100"
+              activeTeamId === t.id ? t.color + " font-medium" : "text-slate-500 hover:bg-slate-100"
             }`}
           >
             {t.name}
@@ -70,9 +69,9 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
         ))}
       </div>
 
-      <ul className="grid gap-2">
+      <ul className="grid gap-3 lg:grid-cols-2">
         {sessions.map((s, i) => (
-          <li key={s.id} className="card p-3">
+          <li key={s.id} className="card p-4">
             <div className="flex items-center gap-2 mb-1.5 text-sm">
               <span className="font-semibold">{i + 1}회차</span>
               <span className="text-slate-400">{s.date}</span>
@@ -87,7 +86,7 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
               value={drafts[s.id] ?? entries[s.id]?.plan ?? ""}
               onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))}
               onBlur={() => void save(s.id)}
-              rows={2}
+              rows={4}
               placeholder="모임 계획 (예: 아이스 브레이킹, 예배당 셋팅)"
               className="input text-sm"
             />

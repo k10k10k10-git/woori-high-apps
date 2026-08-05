@@ -80,6 +80,9 @@ export interface ArchiveLink {
   title: string;
   url: string;
   kind: "doc" | "sheet" | "drive" | "video" | "etc";
+  filePath?: string;
+  fileName?: string;
+  fileSize?: number;
 }
 
 export interface CurriculumEntry {
