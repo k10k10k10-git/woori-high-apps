@@ -1,6 +1,6 @@
 # Claude Code 인수인계 — 통합 플랫폼 전환 및 레거시 종료
 
-최종 갱신: 2026-08-05 (Asia/Seoul)
+최종 갱신: 2026-08-06 (Asia/Seoul)
 
 ## 1. 먼저 읽을 문서
 
@@ -23,6 +23,48 @@
   - 수련회 현장: `/field`, `/retreat/{id}/field`
 - 호환용 독립 학기 앱: `semester-app/` / `https://semester-app.vercel.app`
 - 학생 출석부와 교사·스탭 출석부는 기존 Firebase Hosting을 유지한다.
+
+## 2-1. 2026-08-06 완료 — 6단계 역할 모델 · 주소 변경 · 화면 개편
+
+배포 커밋 `8b6683d` (Ready, buildId 확인). 새 주소 `https://woorihigh-app.vercel.app`,
+구 주소 `highschool-app-flame.vercel.app`도 같은 배포를 가리켜 기존 링크가 살아 있다.
+`semester-app`도 재배포해 `/` 리다이렉트 목적지를 새 주소로 바꿨다.
+
+역할(단일 원천 `highschool-app/src/features/portal/accessPolicy.ts`):
+
+| 역할 | 학기 | 행정 | 이가드 | 역할배정 | 저장 |
+|---|---|---|---|---|---|
+| 통합관리자 | 수정 | 수정 | 전체 | ✅ | `admins/{uid}=true` |
+| 교역자 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role="pastor"` |
+| 팀장 | 수정 | 수정 | 전체 | — | `.role="leader"` |
+| 행정팀 | 수정 | 수정 | 실행탭 | — | `.role="adminTeam"` (레거시 무필드 동일) |
+| 이가드팀 | ✕ | ✕ | 전체 | — | `iguardMembers` + `iguardRoles="team"` |
+| 스탭 | 조회만 | ✕ | 실행탭 | — | `iguardMembers` + `iguardRoles="staff"` |
+
+화면: 상단 메뉴 = 학기 중 사역 / 방학 중 사역(hover → 수련회 행정팀·이가드팀).
+팀원 관리 진입점은 전역 헤더 하나. `/retreats`·`/field`의 중복 제목 줄 제거.
+홈 = 사역 바로가기 + 전체 일정(정규 회차는 "한 학기 사역팀 모임 전체 기간" 한 줄).
+학기 화면은 행정·이가드와 같은 셸에 초록 토큰(`.semester-scope`), 접수에 스탭·연락처 추가.
+
+### ⚠ 남은 블로커 — 스탭의 학기 조회는 Rules 보강이 필요하다
+
+`semesters` 읽기가 `admins`/`retreatAdmins`로 제한돼 스탭 계정은 학기 화면에서 데이터가 비고
+에러 배너가 뜬다. 아래를 **학생 앱에서** 배포해야 완성된다(이 저장소에서 배포 금지).
+
+```json
+"semesters": {
+  ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
+  ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)"
+}
+```
+
+`semestersPrivate`(연락처)는 그대로 행정 계열 전용으로 둔다 — 스탭에게 연락처를 노출하지 않는다.
+
+### 로그인 뒤 화면 육안 확인은 미완
+
+Google OAuth 때문에 헤드리스로 로그인할 수 없어(LEARNINGS.md) 배포 확인은
+`/api/version` buildId 대조 + 라우트 200으로만 했다. 역할별 화면(특히 스탭·이가드팀 계정),
+방학 중 사역 드롭다운, 375px 모바일은 사용자 로그인 상태에서 한 번 훑어야 한다.
 
 ## 3. 2026-08-05 완료한 레거시 정리
 
@@ -117,6 +159,7 @@ curl -s https://woorihigh-app.vercel.app/api/version
 
 ## 9. 다음 작업 권장 순서
 
+0. **(우선)** 위 2-1의 Rules 스니펫을 학생 앱에서 배포해 스탭의 학기 조회를 열고, 역할별 계정으로 화면을 한 번 훑는다.
 1. `highschool-app`에서 새 기능을 계속 개발한다.
 2. 통합 홈·행정·현장 권한 조합 회귀 테스트를 유지한다.
 3. 학기 기능이 통합 앱에서 완전히 안정화되면 `semester-app` 종료 여부를 별도 승인받는다.
