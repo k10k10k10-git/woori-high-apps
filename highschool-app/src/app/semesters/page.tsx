@@ -1,16 +1,22 @@
 "use client";
 
+// 학기 목록 — 셸·컴포넌트 클래스는 수련회 행정 화면과 동일하고 색만 초록(.semester-scope).
+// 사이트 제목·계정·로그아웃은 전역 헤더가 담당한다(중복 제목 줄을 두지 않는다).
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
+import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
 import { getSemesters, createSemester } from "@/features/semester/db";
 import { Semester } from "@/features/semester/types";
 import LoginButton from "@/components/LoginButton";
 
-export default function HomePage() {
-  const { user, loading, accessLevel, signIn, signOut } = useAuth();
+export default function SemestersPage() {
+  const { user, loading, role, signIn, signOut } = useAuth();
   const { toast } = useUI();
+  const allowed = canAccessPortalArea("semester", role);
+  const canEdit = canEditPortalArea("semester", role);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -31,9 +37,9 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    if (user && accessLevel !== "none") void load();
+    if (user && allowed) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, accessLevel]);
+  }, [user, allowed]);
 
   async function handleCreate() {
     const id = newId.trim();
@@ -60,29 +66,29 @@ export default function HomePage() {
   }
 
   if (loading) {
-    return <main className="min-h-screen flex items-center justify-center text-gray-500">불러오는 중…</main>;
+    return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
   }
 
   if (!user) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
-        <h1 className="text-2xl font-bold">학기 사역 허브</h1>
-        <p className="text-sm text-gray-500">분당우리교회 고등부 · 훈련·사역팀 관리</p>
+        <h1 className="text-2xl font-bold">학기 중 사역</h1>
+        <p className="text-sm text-slate-500">분당우리교회 고등부 · 훈련·사역팀 관리</p>
         <LoginButton signIn={signIn} />
       </main>
     );
   }
 
-  if (accessLevel === "none") {
+  if (!allowed) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center">
         <h1 className="text-xl font-bold">접근 권한이 없습니다</h1>
-        <p className="text-sm text-gray-500">
-          행정팀 멤버(retreatAdmins) 계정만 사용할 수 있습니다.
+        <p className="text-sm text-slate-500">
+          이가드팀 계정은 현장 운영 화면만 사용할 수 있습니다.
           <br />
-          수련회 행정 사이트에서 멤버 승인을 받아주세요.
+          통합관리자에게 역할 배정을 요청해주세요.
         </p>
-        <button onClick={() => void signOut()} className="text-sm text-gray-400 underline">
+        <button onClick={() => void signOut()} className="text-sm text-slate-400 underline">
           로그아웃
         </button>
       </main>
@@ -90,64 +96,75 @@ export default function HomePage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <header className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">학기 사역 허브</h1>
-          <p className="text-sm text-gray-500">접수 → 배치 → 출석 → 수료 → 아카이브</p>
+    <div className="semester-scope">
+      <main className="max-w-5xl mx-auto px-4 py-5 sm:py-6">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-bold text-slate-800">학기 중 사역</h1>
+            <p className="mt-0.5 text-sm text-slate-500">접수 → 배치 → 출석 → 수료 → 아카이브</p>
+          </div>
+          {!canEdit && (
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">조회 전용</span>
+          )}
         </div>
-        <button onClick={() => void signOut()} className="text-sm text-gray-400 hover:text-gray-600">
-          로그아웃
-        </button>
-      </header>
 
-      {loadError && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-          ⚠ 로드 오류: {loadError}
-        </div>
-      )}
-
-      <section className="grid gap-3 mb-8">
-        {listLoading && <p className="text-sm text-gray-400">목록 불러오는 중…</p>}
-        {!listLoading && semesters.length === 0 && !loadError && (
-          <p className="text-sm text-gray-400">아직 학기가 없습니다. 아래에서 첫 학기를 만들어보세요.</p>
+        {loadError && (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            ⚠ 로드 오류: {loadError}
+          </div>
         )}
-        {semesters.map((s) => (
-          <Link
-            key={s.id}
-            href={`/semester/${s.id}`}
-            className="block bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition"
-          >
-            <div className="font-semibold">{s.meta.title}</div>
-            <div className="text-xs text-gray-400 mt-1">{s.id}</div>
-          </Link>
-        ))}
-      </section>
 
-      <section className="bg-white border border-gray-200 rounded-xl p-4">
-        <h2 className="font-semibold mb-3">새 학기 만들기</h2>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            value={newId}
-            onChange={(e) => setNewId(e.target.value)}
-            placeholder="학기 ID (예: 2026-1)"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1"
-          />
-          <input
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="제목 (비우면 자동)"
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm flex-1"
-          />
-          <button
-            onClick={() => void handleCreate()}
-            disabled={creating || !newId.trim()}
-            className="px-4 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 disabled:opacity-50 text-sm font-medium"
-          >
-            {creating ? "생성 중…" : "생성"}
-          </button>
-        </div>
-      </section>
-    </main>
+        <section className="mb-6 grid gap-3 sm:grid-cols-2">
+          {listLoading && <p className="text-sm text-slate-400">목록 불러오는 중…</p>}
+          {!listLoading && semesters.length === 0 && !loadError && (
+            <p className="text-sm text-slate-400">
+              {canEdit ? "아직 학기가 없습니다. 아래에서 첫 학기를 만들어보세요." : "등록된 학기가 없습니다."}
+            </p>
+          )}
+          {semesters.map((s) => (
+            <Link key={s.id} href={`/semester/${s.id}`} className="card card-body" data-hover="">
+              <div className="flex items-center justify-between">
+                <span
+                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                  style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}
+                >
+                  {s.id}
+                </span>
+                <span className="text-slate-300">→</span>
+              </div>
+              <div className="font-semibold text-slate-800">{s.meta.title}</div>
+              {s.meta.startDate && s.meta.endDate && (
+                <div className="text-xs text-slate-400">{s.meta.startDate} ~ {s.meta.endDate}</div>
+              )}
+            </Link>
+          ))}
+        </section>
+
+        {canEdit && (
+          <section className="card card-body">
+            <h2 className="font-semibold text-slate-800">새 학기 만들기</h2>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                value={newId}
+                onChange={(e) => setNewId(e.target.value)}
+                placeholder="학기 ID (예: 2026-1)"
+                aria-label="학기 ID"
+                className="input flex-1"
+              />
+              <input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="제목 (비우면 자동)"
+                aria-label="학기 제목"
+                className="input flex-1"
+              />
+              <button onClick={() => void handleCreate()} disabled={creating || !newId.trim()} className="btn-primary justify-center">
+                {creating ? "생성 중…" : "생성"}
+              </button>
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
   );
 }

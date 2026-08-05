@@ -12,6 +12,7 @@ import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import RetreatCalendarPanel from "./RetreatCalendarPanel";
 import BrainstormPanel from "./BrainstormPanel";
+import { canAccessPortalArea } from "@/features/portal/accessPolicy";
 
 // ── 로고 SVG ────────────────────────────────────────────────
 function RetreatLogo({ size = 32 }: { size?: number }) {
@@ -42,7 +43,8 @@ function DarkScreen({ children }: { children: React.ReactNode }) {
 
 export default function HomePage() {
   const router = useRouter();
-  const { user, loading, accessLevel, signIn, signOut } = useAuth();
+  const { user, loading, role, signIn, signOut } = useAuth();
+  const canUseAdmin = canAccessPortalArea("retreat-admin", role);
   const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
@@ -79,8 +81,8 @@ export default function HomePage() {
   }, [toast]);
 
   useEffect(() => {
-    if (!loading && accessLevel !== "none" && user) void loadRetreats();
-  }, [loading, accessLevel, user, loadRetreats]);
+    if (!loading && canUseAdmin && user) void loadRetreats();
+  }, [loading, canUseAdmin, user, loadRetreats]);
 
   async function handleRequestAccess() {
     if (!user) return;
@@ -194,7 +196,7 @@ export default function HomePage() {
   );
 
   // ── 접근 권한 없음 ──────────────────────────────────────────
-  if (accessLevel === "none") return (
+  if (!canUseAdmin) return (
     <DarkScreen>
       <div className="w-full max-w-sm mx-4">
         <div className="text-center mb-6">
@@ -234,31 +236,8 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* ═══ Header ═══════════════════════════════════════════ */}
-      <header className="sticky top-14 z-10" style={{ background: "var(--color-header-bg)" }}>
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <RetreatLogo size={26} />
-            <span className="font-bold text-white text-base">수련회 행정시스템</span>
-            <span className="hidden sm:inline text-xs px-2 py-0.5 rounded-full ml-1"
-              style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>
-              고등부
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm hidden sm:inline" style={{ color: "#6b7280" }}>{user.displayName}</span>
-            <button
-              onClick={signOut}
-              className="text-xs px-3 py-1.5 rounded-lg font-medium transition-colors"
-              style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "#e2e8f0")}
-              onMouseLeave={e => (e.currentTarget.style.color = "#9ca3af")}
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* 전역 헤더(고등부 사역 플랫폼)가 이미 사이트 제목·계정·로그아웃을 담당한다.
+          여기서 "수련회 행정시스템" 줄을 다시 그리면 제목이 두 줄로 겹쳐 보인다. */}
 
       {/* ═══ 삭제 확인 모달 ═══════════════════════════════════════ */}
       {deleteTarget && (

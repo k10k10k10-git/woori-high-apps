@@ -34,6 +34,7 @@ import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
 import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
+import { canAccessPortalArea, canManageRoles, iguardScope } from "@/features/portal/accessPolicy";
 
 function parseNames(value?: string): string[] {
   return (value || "")
@@ -74,19 +75,21 @@ function teachersToStaff(adminTeachers: TeacherAttendance[], groups: Group[], gr
 export default function IguardClient() {
   const router = useRouter();
   const id = (useParams().id as string);
-  const { user, loading: authLoading, accessLevel } = useAuth();
+  const { user, loading: authLoading, role } = useAuth();
+  const fieldAllowed = canAccessPortalArea("retreat-field", role);
   const [lock, setLock] = useState<IguardAccessLock | null | undefined>(undefined);
   const [unlocked, setUnlocked] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && (!user || accessLevel === "none")) router.push("/");
-  }, [authLoading, user, accessLevel, router]);
+    if (!authLoading && (!user || !fieldAllowed)) router.push("/");
+  }, [authLoading, user, fieldAllowed, router]);
 
   useEffect(() => {
-    if (authLoading || !user || accessLevel === "none") return;
+    if (authLoading || !user || !fieldAllowed) return;
     setLockError(null);
-    if (accessLevel === "admin") {
+    // PIN 우회는 통합관리자만 (기존 admins 계정과 동일 범위 — 넓히지 않는다)
+    if (canManageRoles(role)) {
       setLock(null);
       setUnlocked(true);
       return;
@@ -103,10 +106,10 @@ export default function IguardClient() {
       setLock(undefined);
       setUnlocked(false);
     });
-  }, [authLoading, user, accessLevel, id]);
+  }, [authLoading, user, fieldAllowed, role, id]);
 
   if (authLoading) return <CenterSpinner />;
-  if (!user || accessLevel === "none") return null;
+  if (!user || !fieldAllowed) return null;
   if (lockError) return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <div className="mb-3 text-3xl" aria-hidden="true">⚠️</div>
@@ -123,7 +126,9 @@ export default function IguardClient() {
 
 function IguardWorkspace({ id }: { id: string }) {
   const router = useRouter();
-  const { user, accessLevel, memberName } = useAuth();
+  const { user, role, memberName } = useAuth();
+  const executionOnly = iguardScope(role) === "execution";
+  const fieldAllowed = canAccessPortalArea("retreat-field", role);
 
   const [view, setView] = useState<string>("cue");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -167,8 +172,8 @@ function IguardWorkspace({ id }: { id: string }) {
 
   // 스탭은 실행 탭만, 이가드팀/관리자는 전체 그룹
   const visibleGroups = useMemo(
-    () => (accessLevel === "staff" ? IGUARD_VIEW_GROUPS.filter(g => g.label === "실행") : [...IGUARD_VIEW_GROUPS]),
-    [accessLevel]
+    () => (executionOnly ? IGUARD_VIEW_GROUPS.filter(g => g.label === "실행") : [...IGUARD_VIEW_GROUPS]),
+    [executionOnly]
   );
   const activeGroup = useMemo(
     () => visibleGroups.find(g => g.views.some(v => v.key === view)) ?? visibleGroups[0],
@@ -176,8 +181,8 @@ function IguardWorkspace({ id }: { id: string }) {
   );
   // 행정 데이터 형태 계약 점검 (스탭에겐 숨김 — 기획/운영자용 경고)
   const compatWarnings = useMemo(
-    () => (accessLevel === "staff" ? [] : checkAdminCompat(students, groups)),
-    [accessLevel, students, groups]
+    () => (executionOnly ? [] : checkAdminCompat(students, groups)),
+    [executionOnly, students, groups]
   );
   // 허용되지 않은 탭(스탭이 기획/정보 뷰에 있던 경우)이면 실행 기본 탭으로
   useEffect(() => {
@@ -197,7 +202,7 @@ function IguardWorkspace({ id }: { id: string }) {
   }, [retreat, view]);
 
   if (retreatLoading) return <CenterSpinner />;
-  if (!user || accessLevel === "none") return null;
+  if (!user || !fieldAllowed) return null;
   if (!retreat) return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">
       <p className="text-slate-500 mb-4">수련회를 찾을 수 없습니다.</p>
@@ -227,7 +232,7 @@ function IguardWorkspace({ id }: { id: string }) {
             >
               <span aria-hidden="true">🔍</span><span className="hidden sm:inline">검색</span>
             </button>
-            {accessLevel !== "staff" && (
+            {!executionOnly && (
               <button
                 onClick={() => {
                   setView("schedule");

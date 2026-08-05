@@ -492,6 +492,28 @@ table th {
   }
 }
 
+/* 학기 중 사역 영역은 초록 토큰을 쓴다(행정=스카이, 이가드=보라와 구분).
+   레이아웃·컴포넌트 클래스(.card/.input/.btn-primary/.table-header)는 행정·이가드와 같은 것을 쓰고
+   색만 이 스코프에서 바뀐다 — UI/UX는 동일, 컬러감만 초록. */
+.semester-scope {
+  --color-primary: #16a34a;
+  --color-primary-hover: #15803d;
+  --color-primary-active: #166534;
+  --color-primary-light: #86efac;
+  --color-primary-disabled: #86efac;
+  --color-primary-glow: rgba(22, 163, 74, 0.15);
+  --color-primary-ring: rgba(22, 163, 74, 0.25);
+  --color-badge-bg: rgba(22, 163, 74, 0.18);
+  --color-badge-border: rgba(22, 163, 74, 0.36);
+  --color-header-bg: #16301f;
+  --color-screen-bg: #0b1a12;
+  --color-bg: #f5faf6;
+  --color-border: #dcebe1;
+  --color-border-hover: #bcd8c5;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
 /* 이가드 현장 영역은 기존 보라색 브랜드 토큰을 유지하되 전역 행정 화면에는 번지지 않는다. */
 .iguard-scope {
   --color-primary: #a83fa3;

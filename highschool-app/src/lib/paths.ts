@@ -98,6 +98,7 @@ export const paths = {
 
   // ── 접근 관리 ──
   admins: (uid: string) => `admins/${uid}`,
+  mainAdmins: () => "admins",
   retreatAdmins: () => "retreatAdmins",
   retreatAdmin: (uid: string) => `retreatAdmins/${uid}`,
   retreatPending: () => "retreatPending",

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/features/iguard/context/AuthContext";
+import { canAccessPortalArea, canManageRoles } from "@/features/portal/accessPolicy";
 import { getRetreats, requestIguardAccess, getMyIguardPending, subscribeToAllRetreatPeriods, subscribeToMilestones, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks, type RetreatPeriodWithOwner } from "@/features/iguard/lib/db";
 import { Retreat, Milestone, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
@@ -34,7 +35,8 @@ function openExternal(kind: "kakao" | "line" | "other") {
 }
 
 export default function FieldHomeClient() {
-  const { user, loading: authLoading, accessLevel, signIn, signOut } = useAuth();
+  const { user, loading: authLoading, role, signIn, signOut } = useAuth();
+  const fieldAllowed = canAccessPortalArea("retreat-field", role);
   const { toast } = useUI();
 
   const [retreats, setRetreats] = useState<Retreat[]>([]);
@@ -56,7 +58,7 @@ export default function FieldHomeClient() {
   }, []);
 
   useEffect(() => {
-    if (!user || accessLevel === "none") return;
+    if (!user || !fieldAllowed) return;
     setLoading(true);
     setLoadError(null);
     getRetreats()
@@ -76,17 +78,17 @@ export default function FieldHomeClient() {
       })
       .catch(e => setLoadError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [user, accessLevel]);
+  }, [user, fieldAllowed]);
 
   // 준비 일정(milestones)은 전역 공유 — 선택 수련회와 무관하게 항상 구독(행정·이가드 공유)
   useEffect(() => {
-    if (!user || accessLevel === "none") {
+    if (!user || !fieldAllowed) {
       setMilestones([]);
       return;
     }
     const u = subscribeToMilestones(setMilestones, e => setLoadError(prev => prev ?? `준비 일정 구독 실패 — ${e.message}`));
     return () => u();
-  }, [user, accessLevel]);
+  }, [user, fieldAllowed]);
 
   // 수련회 기간(periods)은 선택과 무관하게 모든 수련회를 합쳐서 항상 표시
   useEffect(() => {
@@ -99,16 +101,16 @@ export default function FieldHomeClient() {
 
   // 승인 사용자에게 수련회별 PIN 잠금 상태를 표시한다. 실제 PIN 검증은 내부 화면 진입 전에 다시 수행한다.
   useEffect(() => {
-    if (!user || accessLevel === "none") { setAccessLocks({}); return; }
+    if (!user || !fieldAllowed) { setAccessLocks({}); return; }
     const ids = retreats.map(r => r.id);
     return subscribeToIguardAccessLocks(ids, setAccessLocks,
       e => setLoadError(prev => prev ?? `PIN 잠금 상태 구독 실패 — ${e.message}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, accessLevel, retreats.map(r => r.id).join(",")]);
+  }, [user, fieldAllowed, retreats.map(r => r.id).join(",")]);
 
   useEffect(() => {
-    if (user && accessLevel === "none") getMyIguardPending(user.uid).then(setRequested).catch(() => {});
-  }, [user, accessLevel]);
+    if (user && !fieldAllowed) getMyIguardPending(user.uid).then(setRequested).catch(() => {});
+  }, [user, fieldAllowed]);
 
   async function sendRequest() {
     if (!user) return;
@@ -151,7 +153,7 @@ export default function FieldHomeClient() {
   );
 
   // ── 권한 없음 ──
-  if (accessLevel === "none") return (
+  if (!fieldAllowed) return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
       <div className="text-3xl mb-3">🔒</div>
       {requested ? (
@@ -173,31 +175,16 @@ export default function FieldHomeClient() {
   // ── 수련회 목록 + 준비 일정 ──
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50">
-      <header className="sticky top-14 z-20" style={{ background: "var(--color-header-bg)" }}>
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="text-[26px] leading-none">🧭</span>
-            <span className="font-bold text-white text-base">수련회 이동가이드</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {user.displayName && <span className="text-sm hidden sm:inline" style={{ color: "#6b7280" }}>{user.displayName}</span>}
-            {accessLevel === "admin" && (
-              <>
-                <button onClick={() => setShowAdmin(true)} aria-label="관리자"
-                  className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
-                  style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
-                  🔐 <span className="hidden sm:inline">관리자</span>
-                </button>
-              </>
-            )}
-            <button onClick={() => signOut()} aria-label="로그아웃"
-              className="text-xs px-2 sm:px-3 py-1.5 rounded-lg font-medium transition-colors"
-              style={{ background: "rgba(255,255,255,0.08)", color: "#9ca3af", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <span className="sm:hidden" aria-hidden="true">↪</span><span className="hidden sm:inline">로그아웃</span>
-            </button>
-          </div>
+      {/* 사이트 제목·계정·로그아웃은 전역 헤더가 담당한다(중복 제목 줄 제거).
+          현장 전용 관리자 도구만 본문 상단에 남긴다. */}
+      {canManageRoles(role) && (
+        <div className="mx-auto flex max-w-7xl justify-end px-4 pt-3">
+          <button onClick={() => setShowAdmin(true)} aria-label="현장 관리자 도구"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800">
+            🔐 <span className="hidden sm:inline">현장 관리자</span>
+          </button>
         </div>
-      </header>
+      )}
 
       <main className="max-w-7xl mx-auto px-4 py-5 sm:py-6">
         {loadError && <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
@@ -234,7 +221,7 @@ export default function FieldHomeClient() {
                     <span>이동가이드 입장 →</span>
                     {accessLocks[selectedRetreat.id] && (
                       <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] text-fuchsia-700">
-                        {accessLevel === "admin" ? "🔓 관리자 우회" : "🔒 PIN"}
+                        {canManageRoles(role) ? "🔓 관리자 우회" : "🔒 PIN"}
                       </span>
                     )}
                   </div>
@@ -277,7 +264,7 @@ export default function FieldHomeClient() {
                             style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>{r.year}년</span>
                         {accessLocks[r.id] && (
                           <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
-                            {accessLevel === "admin" ? "🔓 관리자" : "🔒 PIN"}
+                            {canManageRoles(role) ? "🔓 관리자" : "🔒 PIN"}
                           </span>
                         )}
                       </div>

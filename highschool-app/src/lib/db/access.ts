@@ -2,11 +2,14 @@ import { ref, get, set, remove } from "firebase/database";
 import { db } from "../firebase";
 import { paths } from "../paths";
 import { stripUndefined } from "./core";
+import { isAdminSideRole, type AdminSideRole } from "@/features/portal/accessPolicy";
 
 export interface RetreatAdminMember {
   email: string;
   name?: string;
   approvedAt?: number;
+  /** 교역자·팀장·행정팀 구분. 없으면 행정팀(레거시)으로 간주한다. */
+  role?: AdminSideRole;
 }
 
 function normalizeRetreatAdminMember(value: unknown): RetreatAdminMember {
@@ -17,6 +20,7 @@ function normalizeRetreatAdminMember(value: unknown): RetreatAdminMember {
       email: data.email ?? "",
       ...(data.name ? { name: data.name } : {}),
       ...(data.approvedAt ? { approvedAt: data.approvedAt } : {}),
+      ...(isAdminSideRole(data.role) ? { role: data.role } : {}),
     };
   }
   return { email: "" };
@@ -37,11 +41,17 @@ export async function getRetreatAdmins(): Promise<Record<string, RetreatAdminMem
   );
 }
 
-export async function addRetreatAdmin(uid: string, email: string, name?: string): Promise<void> {
+export async function addRetreatAdmin(
+  uid: string,
+  email: string,
+  name?: string,
+  role: AdminSideRole = "adminTeam",
+): Promise<void> {
   await set(ref(db, paths.retreatAdmin(uid)), stripUndefined({
     email,
     name: name?.trim() || undefined,
     approvedAt: Date.now(),
+    role,
   }));
 }
 
@@ -50,11 +60,26 @@ export async function updateRetreatAdminMemberName(uid: string, member: RetreatA
     email: member.email,
     name: name.trim() || undefined,
     approvedAt: member.approvedAt ?? Date.now(),
+    role: member.role ?? "adminTeam",
   }));
 }
 
 export async function removeRetreatAdmin(uid: string): Promise<void> {
   await remove(ref(db, paths.retreatAdmin(uid)));
+}
+
+// ── 통합관리자 (admins/{uid}) ──────────────────────────────
+// admins는 시스템 최상위 권한이다. 통합관리자만 쓸 수 있고(Rules), 화면에서도
+// canManageRoles(role)이 참일 때만 이 함수를 호출한다.
+
+export async function setMainAdmin(uid: string, enabled: boolean): Promise<void> {
+  if (enabled) await set(ref(db, paths.admins(uid)), true);
+  else await remove(ref(db, paths.admins(uid)));
+}
+
+export async function getMainAdmins(): Promise<Record<string, boolean>> {
+  const snap = await get(ref(db, paths.mainAdmins()));
+  return snap.exists() ? snap.val() : {};
 }
 
 export async function requestRetreatAccess(uid: string, email: string, name: string): Promise<void> {

@@ -5,15 +5,13 @@ import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup }
 import { get, ref } from "firebase/database";
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
-
-export type AccessLevel = "none" | "member" | "admin";
-export type IguardAccessLevel = "none" | "staff" | "team" | "admin";
+import { resolveMinistryRole, type MinistryRole } from "@/features/portal/accessPolicy";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  accessLevel: AccessLevel;
-  iguardAccessLevel: IguardAccessLevel;
+  /** 6단계 역할 — 화면 게이트는 accessPolicy의 판정 함수를 통해서만 쓴다 */
+  role: MinistryRole;
   memberName: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -33,8 +31,7 @@ async function canReadAsMainAdmin(uid: string): Promise<boolean> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [accessLevel, setAccessLevel] = useState<AccessLevel>("none");
-  const [iguardAccessLevel, setIguardAccessLevel] = useState<IguardAccessLevel>("none");
+  const [role, setRole] = useState<MinistryRole>("none");
   const [memberName, setMemberName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,31 +45,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             get(ref(db, paths.iguardMember(u.uid))),
             get(ref(db, paths.iguardRole(u.uid))),
           ]);
-          const isMember = retreatAdminSnap.val() != null;
-          const isMainAdmin = await canReadAsMainAdmin(u.uid);
+          const retreatAdmin = retreatAdminSnap.val();
           const iguardMember = iguardMemberSnap.val();
+          const isMainAdmin = await canReadAsMainAdmin(u.uid);
 
-          if (iguardMember && typeof iguardMember === "object" && typeof iguardMember.name === "string") {
-            setMemberName(iguardMember.name.trim() || null);
-          }
+          const nameSource = [retreatAdmin, iguardMember].find(
+            (value) => value && typeof value === "object" && typeof value.name === "string",
+          );
+          if (nameSource) setMemberName(nameSource.name.trim() || null);
 
-          if (isMainAdmin) setAccessLevel("admin");
-          else if (isMember) setAccessLevel("member");
-          else setAccessLevel("none");
-
-          if (isMainAdmin) setIguardAccessLevel("admin");
-          else if (isMember) setIguardAccessLevel("team");
-          else if (iguardMember != null) {
-            setIguardAccessLevel(iguardRoleSnap.val() === "staff" ? "staff" : "team");
-          } else setIguardAccessLevel("none");
+          setRole(resolveMinistryRole({
+            isMainAdmin,
+            hasRetreatAdmin: retreatAdmin != null,
+            retreatAdminRole: retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin.role : undefined,
+            hasIguardMember: iguardMember != null,
+            iguardRole: iguardRoleSnap.val(),
+          }));
         } catch {
-          setAccessLevel("none");
-          setIguardAccessLevel("none");
+          setRole("none");
           setMemberName(null);
         }
       } else {
-        setAccessLevel("none");
-        setIguardAccessLevel("none");
+        setRole("none");
         setMemberName(null);
       }
       setLoading(false);
@@ -86,13 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await firebaseSignOut(auth);
-    setAccessLevel("none");
-    setIguardAccessLevel("none");
+    setRole("none");
     setMemberName(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, accessLevel, iguardAccessLevel, memberName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, role, memberName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );
