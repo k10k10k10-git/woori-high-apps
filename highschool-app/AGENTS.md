@@ -41,6 +41,14 @@
 - 도메인 색: 학기 `.semester-scope`(초록), 행정 기본 토큰(스카이), 이가드 `.iguard-scope`(보라). 레이아웃·컴포넌트 클래스(`card`/`input`/`btn-primary`/`table-header`/2단 sticky 헤더)는 세 도메인이 공유한다 — 새 화면도 색만 스코프에서 바꾼다.
 - effect 안에서 `setState`를 직접 호출하지 않는다(eslint `react-hooks/set-state-in-effect`). 탭 유효성처럼 파생 가능한 값은 렌더 중 계산한다(`SemesterClient`의 `activeTab` 참고).
 
+## 학기 사역 계약 (2026-08-06)
+
+- 접수 원칙: 훈련 신청이 사역팀 지원의 전제. 예외는 고3 2학기·스탭. 판정은 `src/features/semester/intakeRule.ts`(순수)만 사용한다.
+- `trainingOnly`는 `deriveTrainingOnly`가 파생한다. 출석·수료 명단은 `roster.ts`(훈련 명단 = 훈련 반 배정자 전원 + 레거시 `trainingOnly`).
+- 회차 유형 변환은 `sessionKind.ts`. 출석 만점에서 빠지는 유형은 휴강뿐이다.
+- 훈련 반: `semesters/{sid}/trainingClasses/{id}`. 삭제는 `trainingClass.ts`의 루트 다중 경로 update(신청자 `trainingClassId`까지 정리).
+- `.input`은 레이어 밖 규칙이라 `width:100%`가 유틸리티를 이긴다 — 폭은 감싼 div로, 높이는 `h-*` 금지.
+
 ## 검증
 
 ```bash
@@ -84,6 +92,6 @@ npm run build
 - **재사용 규칙**: 기존 명단 기반 기능에 다른 출처의 인원을 넣을 때는 키 생성 규칙을 순수 모듈로 먼저 떼어내고 접두어로 namespace를 나눈 뒤, 새 출처는 실패해도 기존 흐름이 살아 있는 보조 원천으로 붙인다.
 
 ### 훈련 전용 신청과 민감 상세정보를 기존 저장 경로에서 안전하게 분리하기 (2026-08-06)
-- **접근법**: 1→ `src/features/semester/roster.ts`에서 취소자를 먼저 제외하고 `team`과 `trainingOnly` 명단을 명시적으로 나눈다. 2→ 출석·수료 화면은 두 명단을 탭으로 전환하되 기존 `attendance`, `completion` 경로와 신청자 키를 그대로 쓴다. 3→ 팀 상세 화면은 공개 신청 정보(`semesters/*/applications`)와 연락처·지원 동기(`semestersPrivate/*/applications`)를 신청자 ID로 결합한다. 4→ 비공개 경로는 `useSemesterCanEdit()` 권한에서만 구독하고 조회 전용 사용자는 값이 렌더되지 않게 한다. 5→ 순수 명단 필터를 표 기반 테스트로 고정하고 로그인된 실제 화면에서 두 명단 탭과 상세 펼침을 확인한다.
+- **접근법**: 1→ `src/features/semester/roster.ts`에서 취소자를 먼저 제외하고 `team`과 `training` 명단을 명시적으로 나눈다(2026-08-06 훈련 반 도입으로 scope 이름이 `training`으로 바뀌었다). 2→ 출석·수료 화면은 두 명단을 탭으로 전환하되 기존 `attendance`, `completion` 경로와 신청자 키를 그대로 쓴다. 3→ 팀 상세 화면은 공개 신청 정보(`semesters/*/applications`)와 연락처·지원 동기(`semestersPrivate/*/applicationsPrivate`)를 신청자 ID로 결합한다. 4→ 비공개 경로는 `useSemesterCanEdit()` 권한에서만 구독하고 조회 전용 사용자는 값이 렌더되지 않게 한다. 5→ 순수 명단 필터를 표 기반 테스트로 고정하고 로그인된 실제 화면에서 두 명단 탭과 상세 펼침을 확인한다.
 - **판단 질문**: 훈련 전용 인원을 별도 DB 노드로 복제하지 않는다 — 출석과 수료의 진실이 두 군데로 갈라지고 기존 키 기반 집계가 깨지기 때문이다. 공개 신청 노드로 연락처·지원 동기를 옮기지도 않는다 — 민감정보 경계가 무너진다.
 - **재사용 규칙**: 같은 신청자 집합에서 운영 목적별 명단이 필요하면 새 저장소를 만들지 말고 순수 필터로 뷰를 나누며, 민감정보는 기존 private 경로를 권한 있는 화면에서만 ID로 결합한다.

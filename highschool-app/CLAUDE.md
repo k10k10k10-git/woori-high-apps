@@ -39,6 +39,15 @@
 - ⚠ 스탭의 학기 조회는 Firebase Rules에서 `semesters` 읽기가 `admins`/`retreatAdmins`로 제한되어 있어 **Rules 보강 전에는 실제 데이터가 로드되지 않습니다**(에러 배너로 표시). Rules는 학생 앱에서만 배포합니다.
 - 행정 권한과 이가드 권한의 **쓰기 경계**는 계속 분리합니다. 이가드팀 계정은 통합 홈과 현장 화면만 사용합니다.
 
+## 학기 사역 계약 (2026-08-06)
+
+- **접수 원칙**: 훈련(`trainingClassId`)을 신청해야 사역팀(`choice1`)에 지원할 수 있다. 예외는 **고3 2학기와 스탭**. 판정은 `features/semester/intakeRule.ts`(순수)만 사용하고 화면에서 조건을 재구현하지 않는다.
+- `trainingOnly`는 계속 저장하되 `deriveTrainingOnly`로 파생한다 — 출석·수료 명단(`roster.ts`)이 쓰는 기존 계약이라 직접 세팅하지 않는다.
+- **훈련 명단**은 훈련 반 배정자 전원이다(사역팀을 겸하는 사람 포함). 레거시 `trainingOnly=true`도 훈련 신청으로 흡수한다.
+- **회차 유형**은 `sessionKind.ts`로만 변환한다. 저장 스키마(`type`/`label`)는 그대로이고, **출석 집계(만점)에서 빠지는 것은 `휴강`뿐**이다(`completion.regularSessions`).
+- 훈련 반 삭제는 `trainingClass.ts`의 루트 다중 경로 update로 신청자 참조까지 함께 정리한다(팀 삭제와 같은 패턴).
+- `.input`은 `@layer` 밖 규칙이라 `width:100%`가 유틸리티 `w-*`를 이긴다. 폭은 감싼 div로 주고, 높이는 `h-*`로 고정하지 않는다(모바일 16px 글꼴에서 글자가 잘린다).
+
 ## Firebase 안전
 
 - 기존 앱의 경로·스키마·민감정보 분리를 그대로 유지합니다.

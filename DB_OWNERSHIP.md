@@ -94,7 +94,10 @@
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
-| `semesters/{sid}` (meta·teams·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 두 화면의 호환 계약 |
+| `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 두 화면의 호환 계약 |
+| `semesters/{sid}/trainingClasses/{id}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반. 삭제 시 `applications/*/trainingClassId`를 같은 루트 update로 함께 비운다(`trainingClass.ts`) |
+| `semesters/{sid}/teams/{id}/goal` | highschool-app 학기 모듈 | - | highschool-app | 팀별 이번 학기 목표 (커리큘럼 탭 상단) |
+| `semesters/{sid}/applications/{key}/trainingClassId` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반 배정. 값이 없으면 훈련 미신청 — 사역팀 지원은 고3 2학기·스탭만 가능(`intakeRule.ts`). `trainingOnly`는 파생 유지 |
 | `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 
 > `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
