@@ -1,4 +1,4 @@
-const CACHE_NAME = 'woori-att-20260714';
+const CACHE_NAME = 'woori-att-20260806';
 const ASSETS = [
   '/',
   '/attendance',
