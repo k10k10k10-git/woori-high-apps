@@ -62,6 +62,15 @@ export async function createSemester(id: string, title: string): Promise<void> {
   await update(ref(db, paths.semesterMeta(id)), meta);
 }
 
+/** 학기 전체 삭제 — 공개·비공개 노드를 한 번의 루트 update로 함께 지운다.
+ *  되돌릴 수 없다. 화면에서 학기 ID를 직접 입력받아 확인한 뒤에만 호출한다. */
+export async function removeSemester(sid: string): Promise<void> {
+  await update(ref(db), {
+    [paths.semester(sid)]: null,
+    [paths.semesterPrivate(sid)]: null,
+  });
+}
+
 export async function updateSemesterMeta(id: string, partial: Partial<SemesterMeta>): Promise<void> {
   await update(ref(db, paths.semesterMeta(id)), partial);
 }

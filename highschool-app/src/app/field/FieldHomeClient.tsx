@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/features/iguard/context/AuthContext";
-import { canAccessPortalArea, canManageRoles } from "@/features/portal/accessPolicy";
+import { canAccessPortalArea, canEditPortalArea, canManageRoles } from "@/features/portal/accessPolicy";
+import NewRetreatButton from "@/features/portal/NewRetreatButton";
 import { getRetreats, requestIguardAccess, getMyIguardPending, subscribeToAllRetreatPeriods, subscribeToMilestones, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks, type RetreatPeriodWithOwner } from "@/features/iguard/lib/db";
 import { Retreat, Milestone, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
@@ -242,12 +243,20 @@ export default function FieldHomeClient() {
 
           <div className="hidden gap-6 items-start md:flex">
             <aside className="w-72 shrink-0">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-base font-bold text-slate-700">수련회 목록</h2>
-                <span className="rounded-full px-2 py-1 text-xs font-semibold"
-                  style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>
-                  공유 일정
-                </span>
+                {/* 수련회는 행정·이가드가 같은 `retreats/{id}`를 보므로 어느 쪽에서 만들어도 양쪽에 나타난다 */}
+                {canEditPortalArea("retreat-admin", role) ? (
+                  <NewRetreatButton
+                    hrefAfterCreate={(id) => `/retreat/${id}/field`}
+                    className="btn-primary text-xs px-2 py-1"
+                  />
+                ) : (
+                  <span className="rounded-full px-2 py-1 text-xs font-semibold"
+                    style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>
+                    공유 일정
+                  </span>
+                )}
               </div>
 
               <div className="space-y-2">

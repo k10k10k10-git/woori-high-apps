@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
-import { getSemesters, createSemester } from "@/features/semester/db";
+import { getSemesters, createSemester, removeSemester } from "@/features/semester/db";
 import { Semester } from "@/features/semester/types";
 import LoginButton from "@/components/LoginButton";
 
@@ -23,6 +23,10 @@ export default function SemestersPage() {
   const [newId, setNewId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [creating, setCreating] = useState(false);
+  // 삭제는 되돌릴 수 없다 — 학기 ID를 직접 입력해야 실행된다
+  const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setListLoading(true);
@@ -65,6 +69,22 @@ export default function SemestersPage() {
     }
   }
 
+  async function handleDelete() {
+    if (!deleteTarget || deleteInput.trim() !== deleteTarget.id) return;
+    setDeleting(true);
+    try {
+      await removeSemester(deleteTarget.id);
+      toast(`${deleteTarget.id} 학기를 삭제했습니다`, "success");
+      setDeleteTarget(null);
+      setDeleteInput("");
+      await load();
+    } catch (e) {
+      toast(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (loading) {
     return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
   }
@@ -101,7 +121,6 @@ export default function SemestersPage() {
         <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
           <div>
             <h1 className="text-xl font-bold text-slate-800">학기 중 사역</h1>
-            <p className="mt-0.5 text-sm text-slate-500">접수 → 배치 → 출석 → 수료 → 아카이브</p>
           </div>
           {!canEdit && (
             <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">조회 전용</span>
@@ -122,21 +141,31 @@ export default function SemestersPage() {
             </p>
           )}
           {semesters.map((s) => (
-            <Link key={s.id} href={`/semester/${s.id}`} className="card card-body" data-hover="">
-              <div className="flex items-center justify-between">
-                <span
-                  className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                  style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}
+            <div key={s.id} className="card card-body relative">
+              <Link href={`/semester/${s.id}`} className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                    style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}
+                  >
+                    {s.id}
+                  </span>
+                  <span className="text-slate-300">→</span>
+                </div>
+                <div className="font-semibold text-slate-800">{s.meta.title}</div>
+                {s.meta.startDate && s.meta.endDate && (
+                  <div className="text-xs text-slate-400">{s.meta.startDate} ~ {s.meta.endDate}</div>
+                )}
+              </Link>
+              {canEdit && (
+                <button
+                  onClick={() => { setDeleteTarget(s); setDeleteInput(""); }}
+                  className="self-end text-xs text-slate-300 transition-colors hover:text-red-500"
                 >
-                  {s.id}
-                </span>
-                <span className="text-slate-300">→</span>
-              </div>
-              <div className="font-semibold text-slate-800">{s.meta.title}</div>
-              {s.meta.startDate && s.meta.endDate && (
-                <div className="text-xs text-slate-400">{s.meta.startDate} ~ {s.meta.endDate}</div>
+                  학기 삭제
+                </button>
               )}
-            </Link>
+            </div>
           ))}
         </section>
 
@@ -163,6 +192,48 @@ export default function SemestersPage() {
               </button>
             </div>
           </section>
+        )}
+        {deleteTarget && (
+          <div
+            className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
+            onClick={() => setDeleteTarget(null)}
+            onKeyDown={(e) => e.key === "Escape" && setDeleteTarget(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="학기 삭제 확인"
+              className="modal-card card w-full max-w-md p-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-bold text-slate-900">학기를 삭제할까요?</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                <strong>{deleteTarget.meta.title}</strong>({deleteTarget.id})의 신청·배치·출석·수료·커리큘럼·아카이브와
+                연락처 등 비공개 정보가 <strong className="text-red-600">모두 삭제</strong>됩니다. 되돌릴 수 없습니다.
+              </p>
+              <label className="mt-4 block text-sm">
+                <span className="text-xs text-slate-500">확인을 위해 학기 ID <strong>{deleteTarget.id}</strong>를 입력하세요</span>
+                <input
+                  autoFocus
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder={deleteTarget.id}
+                  aria-label="삭제 확인용 학기 ID"
+                  className="input mt-1"
+                />
+              </label>
+              <div className="mt-5 flex justify-end gap-2">
+                <button onClick={() => setDeleteTarget(null)} className="btn-secondary">취소</button>
+                <button
+                  onClick={() => void handleDelete()}
+                  disabled={deleting || deleteInput.trim() !== deleteTarget.id}
+                  className="btn-danger"
+                >
+                  {deleting ? "삭제 중…" : "영구 삭제"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

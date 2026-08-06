@@ -12,7 +12,8 @@ import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import RetreatCalendarPanel from "./RetreatCalendarPanel";
 import BrainstormPanel from "./BrainstormPanel";
-import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
+import NewRetreatButton from "@/features/portal/NewRetreatButton";
 
 // ── 로고 SVG ────────────────────────────────────────────────
 function RetreatLogo({ size = 32 }: { size?: number }) {
@@ -48,10 +49,6 @@ export default function HomePage() {
   const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
-  const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: "", year: new Date().getFullYear().toString(), sheetUrl: "" });
-  const [saving, setSaving] = useState(false);
-  const [createError, setCreateError] = useState("");
   const [retreatLoadError, setRetreatLoadError] = useState("");
   const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -91,45 +88,6 @@ export default function HomePage() {
       setRequestSent(true);
     } catch (e) {
       toast(e instanceof Error ? e.message : "접근 요청을 보내지 못했습니다.", "error");
-    }
-  }
-
-  const parsedSheetUrl = useMemo(() => parseSheetUrl(form.sheetUrl), [form.sheetUrl]);
-  async function handleCreate() {
-    const name = form.name.trim();
-    const year = Number(form.year);
-    if (!name) return toast("수련회 이름을 입력해주세요.", "warning");
-    if (!Number.isInteger(year) || year < 2000 || year > 2100) {
-      toast("연도를 2000~2100 사이의 숫자로 입력해주세요.", "warning");
-      return;
-    }
-    const parsed = form.sheetUrl.trim() ? parseSheetUrl(form.sheetUrl) : null;
-    if (form.sheetUrl.trim() && !parsed) {
-      setCreateError("올바른 구글 시트 URL이 아닙니다.");
-      return;
-    }
-    setSaving(true);
-    setCreateError("");
-    try {
-      const id = await createRetreat({
-        name,
-        year,
-        sheetId: parsed?.sheetId ?? "",
-        sheetGid: parsed?.sheetGid ?? "",
-        createdAt: Date.now(),
-        groupCount: 0,
-      });
-      setShowCreate(false);
-      setForm({ name: "", year: new Date().getFullYear().toString(), sheetUrl: "" });
-      await loadRetreats();
-      router.push(`/retreat/${id}`);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setCreateError(msg.includes("PERMISSION_DENIED")
-        ? "권한 없음: Firebase 보안 규칙을 확인해주세요."
-        : `오류: ${msg}`);
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -270,59 +228,7 @@ export default function HomePage() {
       {/* ═══ 구글폼 가이드 모달 ══════════════════════════════════ */}
       {showGuide && <FormGuideModal onClose={() => setShowGuide(false)} />}
 
-      {/* ═══ 새 수련회 모달 ════════════════════════════════════ */}
-      {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onKeyDown={e => { if (e.key === 'Escape') setShowCreate(false); }}>
-          <div className="card p-6 w-full max-w-md" role="dialog" aria-modal="true" aria-label="새 수련회 만들기">
-            <h3 className="font-bold text-lg mb-4 text-slate-800">새 수련회 만들기</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">수련회 이름 *</label>
-                <input className="input" placeholder="2026 겨울 수련회"
-                  value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">연도 *</label>
-                <input className="input" type="number" value={form.year}
-                  onChange={e => setForm(p => ({ ...p, year: e.target.value }))} />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-600 block mb-1">
-                  신청 응답 시트 URL
-                  <span className="text-xs text-slate-400 ml-1">(선택, 나중에도 설정 가능)</span>
-                </label>
-                <input
-                  className={`input ${
-                    form.sheetUrl && !parsedSheetUrl ? "border-red-400" :
-                    form.sheetUrl && parsedSheetUrl  ? "border-green-400" : ""
-                  }`}
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                  value={form.sheetUrl}
-                  onChange={e => setForm(p => ({ ...p, sheetUrl: e.target.value }))}
-                />
-                {form.sheetUrl && parsedSheetUrl && (
-                  <div className="mt-1.5 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
-                    ✅ 파싱 성공 — Sheet ID: <span className="font-mono">{parsedSheetUrl.sheetId.slice(0, 20)}…</span>
-                  </div>
-                )}
-                {form.sheetUrl && !parsedSheetUrl && (
-                  <p className="mt-1 text-xs text-red-500">올바른 구글 시트 URL을 입력해주세요.</p>
-                )}
-              </div>
-            </div>
-            {createError && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-700">{createError}</div>
-            )}
-            <div className="flex gap-2 mt-5">
-              <button onClick={handleCreate} disabled={saving} className="btn-primary flex-1 justify-center">
-                {saving ? "생성 중..." : "만들기"}
-              </button>
-              <button onClick={() => setShowCreate(false)} className="btn-secondary flex-1 justify-center">취소</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 새 수련회 생성은 NewRetreatButton(행정·이가드 공용)이 담당한다 */}
 
       {/* ═══ 메인 컨텐츠 ═══════════════════════════════════════ */}
       <main className="max-w-7xl mx-auto px-4 py-6">
@@ -339,9 +245,9 @@ export default function HomePage() {
             <div className="flex justify-center mb-4"><RetreatLogo size={64} /></div>
             <p className="text-slate-500 font-medium">아직 수련회가 없습니다</p>
             <p className="text-sm text-slate-400 mt-1 mb-5">&apos;새 수련회&apos; 버튼으로 시작하세요!</p>
-            <button onClick={() => setShowCreate(true)} className="btn-primary">
-              ＋ 새 수련회 만들기
-            </button>
+            {canEditPortalArea("retreat-admin", role) && (
+              <NewRetreatButton hrefAfterCreate={(id) => `/retreat/${id}`} onCreated={loadRetreats} />
+            )}
           </div>
         ) : (
           <div className="flex flex-col md:flex-row gap-6 items-stretch md:items-start">
@@ -358,7 +264,13 @@ export default function HomePage() {
                     onMouseEnter={e => (e.currentTarget.style.background = "rgba(2,132,199,0.1)")}
                     onMouseLeave={e => (e.currentTarget.style.background = "rgba(2,132,199,0.05)")}
                   >폼 가이드</button>
-                  <button onClick={() => setShowCreate(true)} className="btn-primary text-xs px-2 py-1">＋ 새 수련회</button>
+                  {canEditPortalArea("retreat-admin", role) && (
+                    <NewRetreatButton
+                      hrefAfterCreate={(id) => `/retreat/${id}`}
+                      onCreated={loadRetreats}
+                      className="btn-primary text-xs px-2 py-1"
+                    />
+                  )}
                 </div>
               </div>
 

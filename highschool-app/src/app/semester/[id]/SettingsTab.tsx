@@ -154,25 +154,27 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
 
       {/* 사역팀 · 훈련 반 — 같은 형태의 두 축을 좌우로 */}
       <div className="grid gap-4 lg:grid-cols-2">
-        <section className="card card-body">
+        <section className="card card-body min-w-0 overflow-hidden">
           <div>
             <h3 className="font-semibold">사역팀 관리</h3>
             <p className="mt-0.5 text-xs text-slate-400">배치·커리큘럼·출석이 이 목록을 따릅니다.</p>
           </div>
           <ul className="grid gap-1.5">
             {teams.map((t) => (
-              <li key={t.id} className="flex items-center gap-2">
+              <li key={t.id} className="flex flex-wrap items-center gap-2">
                 <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-sm ${t.color}`}>{t.name}</span>
-                <input
-                  aria-label={`${t.name} 모임 장소`}
-                  defaultValue={t.room ?? ""}
-                  placeholder="장소"
-                  onBlur={(e) => {
-                    const room = e.target.value.trim();
-                    if (room !== (t.room ?? "")) void updateTeam(sid, t.id, { room });
-                  }}
-                  className="input min-w-0 flex-1 px-2 py-1 text-xs"
-                />
+                <div className="min-w-0 flex-1 basis-32">
+                  <input
+                    aria-label={`${t.name} 모임 장소`}
+                    defaultValue={t.room ?? ""}
+                    placeholder="장소"
+                    onBlur={(e) => {
+                      const room = e.target.value.trim();
+                      if (room !== (t.room ?? "")) void updateTeam(sid, t.id, { room });
+                    }}
+                    className="input px-2 py-1 text-xs"
+                  />
+                </div>
                 <button
                   aria-label={`${t.name} 삭제`}
                   onClick={async () => {
@@ -213,35 +215,27 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
           </div>
         </section>
 
-        <section className="card card-body">
+        <section className="card card-body min-w-0 overflow-hidden">
           <div>
             <h3 className="font-semibold">훈련 관리</h3>
             <p className="mt-0.5 text-xs text-slate-400">사역팀 신청의 전제입니다. 접수 화면에서 훈련 반을 고릅니다.</p>
           </div>
           <ul className="grid gap-1.5">
             {trainingClasses.map((c) => (
-              <li key={c.id} className="flex items-center gap-2">
+              <li key={c.id} className="flex flex-wrap items-center gap-2">
                 <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-sm ${c.color}`}>{c.name}</span>
-                <input
-                  aria-label={`${c.name} 모임 장소`}
-                  defaultValue={c.room ?? ""}
-                  placeholder="장소"
-                  onBlur={(e) => {
-                    const room = e.target.value.trim();
-                    if (room !== (c.room ?? "")) void updateTrainingClass(sid, c.id, { room });
-                  }}
-                  className="input min-w-0 flex-1 px-2 py-1 text-xs"
-                />
-                <input
-                  aria-label={`${c.name} 담당`}
-                  defaultValue={c.teacher ?? ""}
-                  placeholder="담당"
-                  onBlur={(e) => {
-                    const teacher = e.target.value.trim();
-                    if (teacher !== (c.teacher ?? "")) void updateTrainingClass(sid, c.id, { teacher });
-                  }}
-                  className="input w-20 shrink-0 px-2 py-1 text-xs"
-                />
+                <div className="min-w-0 flex-1 basis-32">
+                  <input
+                    aria-label={`${c.name} 담당`}
+                    defaultValue={c.teacher ?? ""}
+                    placeholder="담당"
+                    onBlur={(e) => {
+                      const teacher = e.target.value.trim();
+                      if (teacher !== (c.teacher ?? "")) void updateTrainingClass(sid, c.id, { teacher });
+                    }}
+                    className="input px-2 py-1 text-xs"
+                  />
+                </div>
                 <button
                   aria-label={`${c.name} 삭제`}
                   onClick={async () => {

@@ -272,7 +272,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
             <div className="grid gap-1.5 sm:grid-cols-2">
               {ASSIGNABLE_ROLES.filter((role) => role !== "none").map((role) => (
                 <div key={role} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2">
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${ROLE_CHIP[role]}`}>{MINISTRY_ROLE_LABELS[role]}</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[role]}`}>{MINISTRY_ROLE_LABELS[role]}</span>
                   <span className="text-[11px] leading-snug text-slate-500">{MINISTRY_ROLE_HINTS[role]}</span>
                   <span className="ml-auto shrink-0 text-xs font-bold text-slate-400">{roleCounts.get(role) ?? 0}명</span>
                 </div>
@@ -300,7 +300,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
                       </div>
                       <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0 sm:justify-end">
                         <select
-                          className="input h-9 w-36 text-xs"
+                          className="input text-xs sm:w-36"
                           aria-label={`${info?.name || info?.email} 승인 역할`}
                           value={choice}
                           disabled={!canManage || busyUid === request.uid}
@@ -357,10 +357,10 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
                         </div>
                       ) : (
                         <>
-                          <div className="flex items-center gap-2">
-                            <p className="truncate font-semibold text-slate-800">{memberLabel(member)}</p>
-                            {isMe && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">나</span>}
-                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${ROLE_CHIP[member.role]}`}>{MINISTRY_ROLE_LABELS[member.role]}</span>
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <p className="truncate font-semibold leading-6 text-slate-800">{memberLabel(member)}</p>
+                            {isMe && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] leading-none text-slate-500">나</span>}
+                            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[member.role]}`}>{MINISTRY_ROLE_LABELS[member.role]}</span>
                             {(member.admin || member.iguard) && (
                               <button onClick={() => { setEditingUid(member.uid); setDraftName(member.name); }} className="text-[11px] text-slate-400 underline">이름 수정</button>
                             )}
@@ -370,9 +370,9 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
                         </>
                       )}
                     </div>
-                    <div className="mt-3 sm:mt-0">
+                    <div className="mt-3 shrink-0 sm:mt-0 sm:w-40">
                       <select
-                        className="input h-9 w-40 text-xs"
+                        className="input text-xs"
                         aria-label={`${memberLabel(member)} 역할`}
                         value={member.role}
                         disabled={!canManage || isMe || busyUid === member.uid}

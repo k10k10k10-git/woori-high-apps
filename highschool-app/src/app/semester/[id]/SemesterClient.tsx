@@ -30,7 +30,7 @@ import { SEMESTER_TABS } from "@/features/portal/featureCatalog";
 type TabName = (typeof SEMESTER_TABS)[number];
 
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
-  접수: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
+  신청: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
   배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
   출석: { title: "출석부", description: "사역팀 출석부와 훈련 출석부를 나눠 회차별로 기록합니다." },
   수료: { title: "훈련 수료 현황", description: "출석 점수에 따른 수료 여부와 후속 제작 업무를 확인합니다." },
@@ -44,7 +44,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
   const { user, loading: authLoading, role, signIn } = useAuth();
   const allowed = canAccessPortalArea("semester", role);
   const canEdit = canEditPortalArea("semester", role);
-  const [tab, setTab] = useState<TabName>("접수");
+  const [tab, setTab] = useState<TabName>("신청");
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
@@ -169,7 +169,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
 
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
-            {activeTab === "접수" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
+            {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
             {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} applications={applications} teamById={teamById} />}
             {activeTab === "출석" && (
               <AttendanceTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />

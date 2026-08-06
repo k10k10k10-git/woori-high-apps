@@ -46,6 +46,9 @@
 - **훈련 명단**은 훈련 반 배정자 전원이다(사역팀을 겸하는 사람 포함). 레거시 `trainingOnly=true`도 훈련 신청으로 흡수한다.
 - **회차 유형**은 `sessionKind.ts`로만 변환한다. 저장 스키마(`type`/`label`)는 그대로이고, **출석 집계(만점)에서 빠지는 것은 `휴강`뿐**이다(`completion.regularSessions`).
 - 훈련 반 삭제는 `trainingClass.ts`의 루트 다중 경로 update로 신청자 참조까지 함께 정리한다(팀 삭제와 같은 패턴).
+- **학기 삭제**(`removeSemester`)는 `semesters/{sid}`와 `semestersPrivate/{sid}`를 한 번의 루트 update로 지운다. 되돌릴 수 없으므로 화면에서 **학기 ID를 직접 입력받아** 확인한 뒤에만 호출한다.
+- **수련회 생성**은 행정·이가드 공용 컴포넌트 `features/portal/NewRetreatButton.tsx` 하나만 쓴다. `retreats/{id}`가 공유 노드라 어느 화면에서 만들어도 양쪽 목록에 나타난다. 쓰기는 행정 db(`@/lib/db`)가 담당하고 버튼은 `canEditPortalArea("retreat-admin")`로 게이트한다.
+- **출석 표**(`AttendanceGrid`)의 셀은 토글이 아니다. 셀을 누르면 출석·지각·결석·지우기를 명시적으로 고른다(멱등 기록 — 실수 규칙 11).
 - `.input`은 `@layer` 밖 규칙이라 `width:100%`가 유틸리티 `w-*`를 이긴다. 폭은 감싼 div로 주고, 높이는 `h-*`로 고정하지 않는다(모바일 16px 글꼴에서 글자가 잘린다).
 
 ## Firebase 안전

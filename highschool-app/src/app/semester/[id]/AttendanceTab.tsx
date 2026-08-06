@@ -7,7 +7,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
-import { clearAttendance, describeApplicant, setAttendance, subscribeSessionAttendance } from "@/features/semester/db";
+import { clearAttendance, describeApplicant, setAttendance, subscribeAllAttendance, subscribeSessionAttendance } from "@/features/semester/db";
+import AttendanceGrid from "./AttendanceGrid";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
@@ -42,6 +43,8 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [teamFilter, setTeamFilter] = useState<string>("");
   const [scope, setScope] = useState<SemesterRosterScope>("team");
   const [att, setAtt] = useState<SessionAttendance>({});
+  const [attAll, setAttAll] = useState<Record<string, SessionAttendance>>({});
+  const [view, setView] = useState<"grid" | "session">("grid");
   const [loadError, setLoadError] = useState<string | null>(null);
   const defaultSessId = useMemo(() => {
     if (sessions.length === 0) return "";
@@ -59,6 +62,12 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     return subscribeSessionAttendance(sid, activeSessId, setAtt, (e) => setLoadError(e.message));
   }, [sid, activeSessId]);
 
+  // 표 보기는 전 회차를 한 번에 본다 (수료 탭과 같은 경로를 재사용)
+  useEffect(() => {
+    if (view !== "grid") return;
+    return subscribeAllAttendance(sid, setAttAll, (e) => setLoadError(e.message));
+  }, [sid, view]);
+
   const session = sessions.find((s) => s.id === activeSessId);
   const members = useMemo(
     () =>
@@ -72,13 +81,15 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     [applications, scope, teamFilter, teamById],
   );
 
-  async function mark(appKey: string, status: AttendanceStatus) {
+  async function markAt(appKey: string, sessionId: string, status: AttendanceStatus) {
     try {
-      await setAttendance(sid, activeSessId, appKey, status, user?.uid);
+      await setAttendance(sid, sessionId, appKey, status, user?.uid);
     } catch (e) {
       toast(`기록 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
+
+  const mark = (appKey: string, status: AttendanceStatus) => markAt(appKey, activeSessId, status);
 
   if (sessions.length === 0) {
     return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
@@ -126,7 +137,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
       {/* .input은 레이어 밖 규칙(width:100%)이라 유틸리티 w-*를 이긴다 → 폭은 감싼 div로 준다.
           높이도 h-*로 고정하지 않는다(모바일 16px 글꼴에서 글자 아랫부분이 잘렸다). */}
       <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
-        <div>
+        {view === "session" && <div>
           <select
             aria-label="회차 선택"
             value={activeSessId}
@@ -142,7 +153,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
               </option>
             ))}
           </select>
-        </div>
+        </div>}
         {scope === "team" && (
           <div>
             <select
@@ -166,6 +177,29 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         </div>
       )}
 
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="출석 보기 방식">
+          {([["grid", "표로 보기"], ["session", "회차별 체크"]] as const).map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {view === "grid" && <span className="text-xs text-slate-400">칸을 눌러 출석·지각·결석을 고릅니다.</span>}
+      </div>
+
+      {view === "grid" ? (
+        <AttendanceGrid
+          members={members}
+          sessions={sessions}
+          attBySession={attAll}
+          canEdit={canEdit}
+          onMark={(appKey, sessionId, status) => void markAt(appKey, sessionId, status)}
+          onClear={(appKey, sessionId) => void clearAttendance(sid, sessionId, appKey)}
+        />
+      ) : (
+      <>
       <div className="flex gap-3 text-xs text-slate-500 mb-3">
         <span>출석 {counts.출석}</span>
         <span>지각 {counts.지각}</span>
@@ -227,6 +261,8 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           </p>
         )}
       </ul>
+      </>
+      )}
     </div>
   );
 }
