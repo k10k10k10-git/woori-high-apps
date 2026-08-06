@@ -13,8 +13,9 @@ import {
   subscribeTeams,
   subscribeSessions,
   subscribeApplications,
+  subscribeTrainingClasses,
 } from "@/features/semester/db";
-import { Application, SemesterMeta, Session, Team } from "@/features/semester/types";
+import { Application, SemesterMeta, Session, Team, TrainingClass } from "@/features/semester/types";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import IntakeTab from "./IntakeTab";
 import LoginButton from "@/components/LoginButton";
@@ -29,13 +30,13 @@ import { SEMESTER_TABS } from "@/features/portal/featureCatalog";
 type TabName = (typeof SEMESTER_TABS)[number];
 
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
-  접수: { title: "훈련·사역팀 신청", description: "학생과 스탭의 신청 내용, 연락처와 지원 정보를 한곳에서 관리합니다." },
+  접수: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
   배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
-  출석: { title: "훈련 출석부", description: "사역팀과 훈련만 신청한 인원을 구분해 회차별 출석을 기록합니다." },
+  출석: { title: "출석부", description: "사역팀 출석부와 훈련 출석부를 나눠 회차별로 기록합니다." },
   수료: { title: "훈련 수료 현황", description: "출석 점수에 따른 수료 여부와 후속 제작 업무를 확인합니다." },
   커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 회차별 모임 계획을 작성하고 공유합니다." },
   아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
-  설정: { title: "학기 운영 설정", description: "학기 제목, 팀, 훈련 회차와 수료 기준을 관리합니다." },
+  설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 회차와 수료 기준을 관리합니다." },
 };
 
 export default function SemesterClient({ semesterId }: { semesterId: string }) {
@@ -46,6 +47,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
   const [tab, setTab] = useState<TabName>("접수");
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
     const unsubs = [
       subscribeSemesterMeta(semesterId, setMeta, fail),
       subscribeTeams(semesterId, setTeams, fail),
+      subscribeTrainingClasses(semesterId, setTrainingClasses, fail),
       subscribeSessions(semesterId, setSessions, fail),
       subscribeApplications(semesterId, setApplications, fail),
     ];
@@ -161,15 +164,15 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
             <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2>
             <p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p>
           </div>
-          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 팀 {teams.length}개 · 훈련 {sessions.length}회</p>
+          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 회차 {sessions.length}회</p>
         </div>
 
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
-            {activeTab === "접수" && <IntakeTab sid={semesterId} teams={teams} applications={applications} />}
+            {activeTab === "접수" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
             {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} applications={applications} teamById={teamById} />}
             {activeTab === "출석" && (
-              <AttendanceTab sid={semesterId} teams={teams} sessions={sessions} applications={applications} teamById={teamById} />
+              <AttendanceTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />
             )}
             {activeTab === "수료" && (
               <CompletionTab sid={semesterId} meta={meta} sessions={sessions} applications={applications} teamById={teamById} />
@@ -177,7 +180,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
             {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} sessions={sessions} />}
             {activeTab === "아카이브" && <ArchiveTab sid={semesterId} />}
             {activeTab === "설정" && canEdit && (
-              <SettingsTab sid={semesterId} meta={meta} teams={teams} sessions={sessions} applications={applications} />
+              <SettingsTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} />
             )}
           </SemesterEditProvider>
         </div>

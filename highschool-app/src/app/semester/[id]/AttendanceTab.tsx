@@ -11,11 +11,13 @@ import { clearAttendance, describeApplicant, setAttendance, subscribeSessionAtte
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
-import { Application, AttendanceStatus, Session, SessionAttendance, Team } from "@/features/semester/types";
+import { sessionDisplayLabel } from "@/features/semester/sessionKind";
+import { Application, AttendanceStatus, Session, SessionAttendance, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
   sid: string;
   teams: Team[];
+  trainingClasses: TrainingClass[];
   sessions: Session[];
   applications: Application[];
   teamById: Map<string, Team>;
@@ -32,7 +34,7 @@ function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AttendanceTab({ sid, teams, sessions, applications, teamById }: Props) {
+export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
@@ -61,7 +63,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
   const members = useMemo(
     () =>
       semesterRoster(applications, scope)
-        .filter((a) => scope === "trainingOnly" || !teamFilter || a.teamId === teamFilter)
+        .filter((a) => scope === "training" || !teamFilter || a.teamId === teamFilter)
         .sort((a, b) => {
           const ta = a.teamId ? teamById.get(a.teamId)?.order ?? 99 : 99;
           const tb = b.teamId ? teamById.get(b.teamId)?.order ?? 99 : 99;
@@ -105,49 +107,57 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
             onClick={() => setScope("team")}
             className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "team" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
           >
-            사역팀 출석
+            사역팀 출석부
           </button>
           <button
             role="tab"
-            aria-selected={scope === "trainingOnly"}
+            aria-selected={scope === "training"}
             onClick={() => {
-              setScope("trainingOnly");
+              setScope("training");
               setTeamFilter("");
             }}
-            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "trainingOnly" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "training" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
           >
-            훈련만 신청 <span className="ml-1 text-xs">{semesterRoster(applications, "trainingOnly").length}명</span>
+            훈련 출석부 <span className="ml-1 text-xs">{semesterRoster(applications, "training").length}명</span>
           </button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-3">
-        <select
-          aria-label="회차 선택"
-          value={activeSessId}
-          onChange={(e) => {
-            setLoadError(null);
-            setSessId(e.target.value);
-          }}
-          className="input h-9 w-auto px-2.5 py-1.5 text-sm"
-        >
-          {sessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.date} {s.label ?? ""} {s.type !== "정규" ? `(${s.type})` : ""}
-            </option>
-          ))}
-        </select>
-        {scope === "team" && <select
-          aria-label="팀 필터"
-          value={teamFilter}
-          onChange={(e) => setTeamFilter(e.target.value)}
-          className="input h-9 w-auto px-2.5 py-1.5 text-sm"
-        >
-          <option value="">전체 팀</option>
-          {teams.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>}
+      {/* .input은 레이어 밖 규칙(width:100%)이라 유틸리티 w-*를 이긴다 → 폭은 감싼 div로 준다.
+          높이도 h-*로 고정하지 않는다(모바일 16px 글꼴에서 글자 아랫부분이 잘렸다). */}
+      <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
+        <div>
+          <select
+            aria-label="회차 선택"
+            value={activeSessId}
+            onChange={(e) => {
+              setLoadError(null);
+              setSessId(e.target.value);
+            }}
+            className="input text-sm"
+          >
+            {sessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.date} · {sessionDisplayLabel(s)}
+              </option>
+            ))}
+          </select>
+        </div>
+        {scope === "team" && (
+          <div>
+            <select
+              aria-label="팀 필터"
+              value={teamFilter}
+              onChange={(e) => setTeamFilter(e.target.value)}
+              className="input text-sm"
+            >
+              <option value="">전체 팀</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {session?.type === "휴강" && (
@@ -173,9 +183,15 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
               <div className="flex-1 min-w-0 text-sm">
                 <span className="font-medium">{m.name}</span>
                 <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(m)}</span>
-                {team && !teamFilter && (
-                  <span className={`text-xs px-1.5 py-0.5 rounded ml-1.5 ${team.color}`}>{team.name}</span>
+                {scope === "team" && team && !teamFilter && (
+                  <span className={`ml-1.5 rounded px-1.5 py-0.5 text-xs ${team.color}`}>{team.name}</span>
                 )}
+                {scope === "training" && (() => {
+                  const trainingClass = m.trainingClassId ? trainingClasses.find((c) => c.id === m.trainingClassId) : undefined;
+                  return trainingClass
+                    ? <span className={`ml-1.5 rounded px-1.5 py-0.5 text-xs ${trainingClass.color}`}>{trainingClass.name}</span>
+                    : <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">반 미정</span>;
+                })()}
               </div>
               <div className="flex gap-1">
                 {STATUS_BTN.map(({ s, on }) => (
@@ -207,7 +223,7 @@ export default function AttendanceTab({ sid, teams, sessions, applications, team
         })}
         {members.length === 0 && (
           <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-            {scope === "trainingOnly" ? "훈련만 신청한 인원이 없습니다." : "배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요."}
+            {scope === "training" ? "훈련을 신청한 인원이 없습니다." : "배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요."}
           </p>
         )}
       </ul>

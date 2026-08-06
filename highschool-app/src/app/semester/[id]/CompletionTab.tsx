@@ -75,7 +75,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
 
       <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2" role="tablist" aria-label="수료 명단 구분">
         <button role="tab" aria-selected={scope === "team"} onClick={() => setScope("team")} className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${scope === "team" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>사역팀 수료</button>
-        <button role="tab" aria-selected={scope === "trainingOnly"} onClick={() => setScope("trainingOnly")} className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${scope === "trainingOnly" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>훈련만 신청 수료</button>
+        <button role="tab" aria-selected={scope === "training"} onClick={() => setScope("training")} className={`rounded-xl px-3 py-2.5 text-sm font-semibold ${scope === "training" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>훈련 수료</button>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
@@ -149,7 +149,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
             {rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-3 py-6 text-center text-slate-400">
-                  {scope === "trainingOnly" ? "훈련만 신청한 인원이 없습니다" : "배치된 인원이 없습니다"}
+                  {scope === "training" ? "훈련을 신청한 인원이 없습니다" : "배치된 인원이 없습니다"}
                 </td>
               </tr>
             )}

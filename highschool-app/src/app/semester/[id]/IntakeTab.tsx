@@ -16,13 +16,15 @@ import {
   upsertApplication,
 } from "@/features/semester/db";
 import { STAFF_BU } from "@/features/semester/applicant";
+import { deriveTrainingOnly, validateIntake } from "@/features/semester/intakeRule";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { parseClassKey } from "@/features/semester/classKey";
-import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team } from "@/features/semester/types";
+import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
   sid: string;
   teams: Team[];
+  trainingClasses: TrainingClass[];
   applications: Application[];
 }
 
@@ -40,7 +42,7 @@ interface PersonRow {
 
 type Bucket = { key: string; label: string; sub?: string; rows: PersonRow[] };
 
-export default function IntakeTab({ sid, teams, applications }: Props) {
+export default function IntakeTab({ sid, teams, trainingClasses, applications }: Props) {
   const { user } = useAuth();
   const { toast, uiConfirm } = useUI();
   const canEdit = useSemesterCanEdit();
@@ -51,7 +53,6 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [staffError, setStaffError] = useState<string | null>(null);
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [editing, setEditing] = useState<PersonRow | null>(null);
   const [query, setQuery] = useState("");
 
@@ -135,18 +136,23 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
     return [...classBuckets, ...staffBucket];
   }, [classes, staff]);
 
-  const selected = buckets.find((bucket) => bucket.key === selectedKey);
-  const queryResults = useMemo(() => {
+  const SEARCH_LIMIT = 40;
+  const matched = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ko");
     if (!normalized) return [];
     return buckets.flatMap((bucket) => bucket.rows.map((row) => ({ bucket, row })))
-      .filter(({ row }) => row.name.toLocaleLowerCase("ko").includes(normalized))
-      .slice(0, 30);
+      .filter(({ row }) => row.name.toLocaleLowerCase("ko").includes(normalized));
   }, [buckets, query]);
+  const queryResults = matched.slice(0, SEARCH_LIMIT);
 
-  function bucketAppCount(bucket: Bucket): number {
-    return bucket.rows.filter((row) => appByKey.has(makeAppKey(row.bu, row.personId))).length;
-  }
+  // 검색어가 없을 때는 이미 접수된 사람만 보여준다 (반 목록 없이 이름 중심 운영)
+  const applied = useMemo(
+    () => buckets
+      .flatMap((bucket) => bucket.rows.map((row) => ({ bucket, row })))
+      .filter(({ bucket, row }) => appByKey.has(makeAppKey(row.bu, row.personId)) && bucket.key !== "")
+      .sort((a, b) => a.row.name.localeCompare(b.row.name, "ko")),
+    [buckets, appByKey],
+  );
 
   return (
     <div>
@@ -172,97 +178,92 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
 
       <div className="card mb-4 p-3 sm:p-4">
         <label className="block text-xs font-semibold text-slate-500" htmlFor="semester-applicant-search">이름으로 찾기</label>
-        <input id="semester-applicant-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="학생·스탭 이름 검색" className="input mt-1.5 text-sm" />
+        <input
+          id="semester-applicant-search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="학생·스탭 이름 검색"
+          className="input mt-1.5 text-sm"
+        />
+        <p className="mt-2 text-xs text-slate-400">이름을 입력해 신청을 접수하거나 수정합니다.</p>
         {query.trim() && (
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {queryResults.map(({ bucket, row }) => {
               const appKey = makeAppKey(row.bu, row.personId);
               const app = appByKey.get(appKey);
-              return <button key={appKey} onClick={() => setEditing(row)} disabled={!canEdit && !app} className="rounded-xl border border-slate-200 px-3 py-2 text-left hover:border-emerald-300 hover:bg-emerald-50/50"><strong className="text-sm">{row.name}</strong><span className="ml-2 text-xs text-slate-400">{bucket.label}</span>{app && <span className="ml-2 text-xs font-semibold text-emerald-600">신청됨</span>}</button>;
+              return (
+                <button
+                  key={appKey}
+                  onClick={() => setEditing(row)}
+                  disabled={!canEdit && !app}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-left transition hover:border-emerald-300 hover:bg-emerald-50/50 disabled:cursor-default"
+                >
+                  <strong className="text-sm">{row.name}</strong>
+                  <span className="ml-2 text-xs text-slate-400">{bucket.label}</span>
+                  {app && <span className="ml-2 text-xs font-semibold text-emerald-600">신청됨</span>}
+                </button>
+              );
             })}
             {queryResults.length === 0 && <p className="col-span-full py-3 text-center text-sm text-slate-400">검색 결과가 없습니다.</p>}
+            {matched.length > queryResults.length && (
+              <p className="col-span-full text-center text-xs text-slate-400">
+                {matched.length}명 중 {queryResults.length}명만 표시했습니다 — 이름을 더 입력해주세요.
+              </p>
+            )}
           </div>
         )}
       </div>
 
-      {/* 반이 많아도 화면을 밀어내지 않도록 한 번에 하나만 선택한다. */}
-      <div className="card mb-5 p-3 sm:p-4">
-        <label className="block text-xs font-semibold text-slate-500" htmlFor="semester-roster-bucket">
-          반·스탭 명단
-        </label>
-        <select
-          id="semester-roster-bucket"
-          className="input mt-1.5 text-sm"
-          value={selectedKey ?? ""}
-          onChange={(event) => setSelectedKey(event.target.value || null)}
-        >
-          <option value="">명단을 선택하세요</option>
-          {buckets.map((bucket) => (
-            <option key={bucket.key} value={bucket.key}>
-              {bucket.label} · 신청 {bucketAppCount(bucket)}/{bucket.rows.length}명
-            </option>
-          ))}
-        </select>
-        <p className="mt-2 text-xs text-slate-400">
-          이름 검색 또는 반 선택으로 신청 상태와 연락처를 빠르게 확인할 수 있습니다.
-        </p>
+      {/* 접수된 신청자 — 검색 없이도 현황을 바로 본다 */}
+      <div className="card card-body">
+        <h3 className="font-semibold text-slate-800">
+          접수 명단 <span className="ml-1 text-sm font-normal text-slate-400">{applied.length}명</span>
+        </h3>
+        <ul className="grid gap-1.5 sm:grid-cols-2">
+          {applied.map(({ bucket, row }) => {
+            const appKey = makeAppKey(row.bu, row.personId);
+            const app = appByKey.get(appKey);
+            const priv = privateMap[appKey];
+            const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
+            const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
+            const trainingClass = app?.trainingClassId ? trainingClasses.find((c) => c.id === app.trainingClassId) : undefined;
+            const phone = priv?.phone || row.rosterPhone;
+            return (
+              <li key={appKey}>
+                <button
+                  onClick={() => setEditing(row)}
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-sm transition disabled:cursor-default"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="min-w-0">
+                      <span className="font-medium text-slate-800">{row.name}</span>
+                      <span className="ml-1.5 text-xs text-slate-400">{bucket.label}</span>
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {team?.name ?? (choice1 ? `지망: ${choice1.name}` : app?.trainingOnly ? "훈련만" : "접수됨")}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+                    <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>
+                    <span>본인 {phone || "—"}</span>
+                    <span>보호자 {priv?.parentPhone || "—"}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {applied.length === 0 && (
+            <li className="text-sm text-slate-400">아직 접수된 신청이 없습니다. 위에서 이름을 검색해 접수하세요.</li>
+          )}
+        </ul>
       </div>
-
-      {/* 선택된 반·스탭 명단 */}
-      {selected && (
-        <div className="card card-body">
-          <h3 className="font-semibold text-slate-800">
-            {selected.label}
-            {selected.sub && <span className="ml-2 text-xs text-slate-400">{selected.sub}</span>}
-          </h3>
-          <ul className="grid gap-1.5 sm:grid-cols-2">
-            {selected.rows.map((row) => {
-              const appKey = makeAppKey(row.bu, row.personId);
-              const app = appByKey.get(appKey);
-              const priv = privateMap[appKey];
-              const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
-              const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
-              const phone = priv?.phone || row.rosterPhone;
-              return (
-                <li key={appKey}>
-                  <button
-                    onClick={() => setEditing(row)}
-                    disabled={!canEdit && !app}
-                    className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition disabled:cursor-default ${
-                      app ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50 hover:border-emerald-200"
-                    }`}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="min-w-0">
-                        <span className="font-medium text-slate-800">{row.name}</span>
-                        {row.title && <span className="ml-1 text-xs text-slate-400">{row.title}</span>}
-                        {row.jang && <span className="ml-1 text-xs text-slate-400">(장결)</span>}
-                      </span>
-                      <span className="shrink-0 text-xs text-slate-500">
-                        {app
-                          ? app.trainingOnly
-                            ? "훈련만"
-                            : team?.name ?? (choice1 ? `지망: ${choice1.name}` : "접수됨")
-                          : ""}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-                      <span>본인 {phone || "—"}</span>
-                      <span>보호자 {priv?.parentPhone || "—"}</span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-            {selected.rows.length === 0 && <li className="text-sm text-slate-400">명단이 비어 있습니다.</li>}
-          </ul>
-        </div>
-      )}
 
       {editing && (
         <IntakeModal
           sid={sid}
           teams={teams}
+          trainingClasses={trainingClasses}
           person={editing}
           existing={appByKey.get(makeAppKey(editing.bu, editing.personId))}
           existingPrivate={privateMap[makeAppKey(editing.bu, editing.personId)]}
@@ -284,6 +285,7 @@ export default function IntakeTab({ sid, teams, applications }: Props) {
 function IntakeModal({
   sid,
   teams,
+  trainingClasses,
   person,
   existing,
   existingPrivate,
@@ -294,6 +296,7 @@ function IntakeModal({
 }: {
   sid: string;
   teams: Team[];
+  trainingClasses: TrainingClass[];
   person: PersonRow;
   existing?: Application;
   existingPrivate?: ApplicationPrivate;
@@ -305,16 +308,20 @@ function IntakeModal({
   const { toast } = useUI();
   const [choice1, setChoice1] = useState(existing?.choice1 ?? "");
   const [choice2, setChoice2] = useState(existing?.choice2 ?? "");
-  const [trainingOnly, setTrainingOnly] = useState(existing?.trainingOnly ?? false);
+  const [trainingClassId, setTrainingClassId] = useState(existing?.trainingClassId ?? "");
   const [phone, setPhone] = useState(existingPrivate?.phone ?? person.rosterPhone ?? "");
   const [parentPhone, setParentPhone] = useState(existingPrivate?.parentPhone ?? "");
   const [motive, setMotive] = useState(existingPrivate?.motive ?? "");
   const [wish, setWish] = useState(existingPrivate?.wish ?? "");
   const [saving, setSaving] = useState(false);
 
+  const selection = { trainingClassId, ministryChoice1: choice1 };
+  const check = validateIntake(selection, { grade: person.grade, bu: person.bu }, sid);
+  const trainingOnly = deriveTrainingOnly(selection);
+
   async function save() {
-    if (!trainingOnly && !choice1) {
-      toast("희망팀(1지망)을 선택하거나 '훈련만 신청'을 체크해주세요", "warning");
+    if (!check.ok) {
+      toast(check.message, "warning");
       return;
     }
     setSaving(true);
@@ -327,8 +334,9 @@ function IntakeModal({
           grade: person.grade,
           class: person.classNum,
           name: person.name,
-          choice1: trainingOnly ? "" : choice1,
-          choice2: trainingOnly ? "" : choice2,
+          choice1: choice1 ? choice1 : "",
+          choice2: choice1 && choice2 ? choice2 : "",
+          trainingClassId,
           trainingOnly,
           status: existing?.status ?? "접수",
           teamId: existing?.teamId ?? "",
@@ -372,32 +380,64 @@ function IntakeModal({
         </h3>
         <p className="mb-4 text-xs text-slate-400">{existing ? "신청 내용 수정" : "새 신청 접수"}</p>
 
-        <label className="mb-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={trainingOnly} disabled={!canEdit} onChange={(e) => setTrainingOnly(e.target.checked)} />
-          훈련만 신청 (사역팀 배치 제외)
-        </label>
+        <div className="mb-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
+          <label className="block text-sm">
+            <span className="text-xs font-semibold text-emerald-800">훈련 반</span>
+            <select
+              value={trainingClassId}
+              disabled={!canEdit}
+              onChange={(e) => setTrainingClassId(e.target.value)}
+              className="input mt-0.5"
+            >
+              <option value="">훈련 신청 안 함</option>
+              {trainingClasses.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <p className="mt-2 text-[11px] leading-relaxed text-emerald-800/80">
+            사역팀은 훈련을 신청해야 지원할 수 있습니다. 고3 2학기와 스탭만 훈련 없이 사역팀을 신청할 수 있습니다.
+          </p>
+          {trainingClasses.length === 0 && (
+            <p className="mt-1 text-[11px] text-amber-700">설정 탭의 훈련 관리에서 훈련 반을 먼저 만들어주세요.</p>
+          )}
+        </div>
 
-        {!trainingOnly && (
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <label className="text-sm">
-              <span className="text-xs text-slate-500">1지망</span>
-              <select value={choice1} disabled={!canEdit} onChange={(e) => setChoice1(e.target.value)} className="input mt-0.5">
-                <option value="">선택</option>
-                {teams.map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="text-xs text-slate-500">2지망 (선택)</span>
-              <select value={choice2} disabled={!canEdit} onChange={(e) => setChoice2(e.target.value)} className="input mt-0.5">
-                <option value="">없음</option>
-                {teams.filter((t) => t.id !== choice1).map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <label className="text-sm">
+            <span className="text-xs text-slate-500">사역팀 1지망</span>
+            <select value={choice1} disabled={!canEdit} onChange={(e) => setChoice1(e.target.value)} className="input mt-0.5">
+              <option value="">신청 안 함</option>
+              {teams.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm">
+            <span className="text-xs text-slate-500">2지망 (선택)</span>
+            <select value={choice2} disabled={!canEdit || !choice1} onChange={(e) => setChoice2(e.target.value)} className="input mt-0.5">
+              <option value="">없음</option>
+              {teams.filter((t) => t.id !== choice1).map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {!check.ok && (
+          <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">
+            {check.message}
+          </p>
+        )}
+        {check.ok && check.hint && (
+          <p className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            {check.hint}
+          </p>
+        )}
+        {check.ok && trainingOnly && (
+          <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            훈련만 신청 — 사역팀 배치 대상에서 제외됩니다.
+          </p>
         )}
 
         <div className="mb-3 grid grid-cols-2 gap-2">
@@ -445,7 +485,7 @@ function IntakeModal({
           <div className="flex gap-2">
             <button onClick={onClose} className="btn-secondary">닫기</button>
             {canEdit && (
-              <button onClick={() => void save()} disabled={saving} className="btn-primary">
+              <button onClick={() => void save()} disabled={saving || !check.ok} className="btn-primary">
                 {saving ? "저장 중…" : "저장"}
               </button>
             )}

@@ -19,6 +19,17 @@ export interface Team {
   color: string; // Tailwind 파스텔 클래스 (예: "bg-blue-100")
   room?: string;
   order: number;
+  goal?: string; // 이번 학기 팀 목표 (커리큘럼 탭 상단)
+}
+
+/** 훈련 반 — 사역팀과 별개 축. 모든 학생은 훈련을 거쳐 사역팀에 지원한다(고3 2학기 예외). */
+export interface TrainingClass {
+  id: string;
+  name: string;
+  color: string;
+  room?: string;
+  teacher?: string;
+  order: number;
 }
 
 export type SessionType = "정규" | "휴강" | "행사";
@@ -41,7 +52,8 @@ export interface Application {
   name: string;
   choice1?: string; // teamId
   choice2?: string;
-  trainingOnly?: boolean; // 훈련만 신청 (사역팀 배치 제외)
+  trainingClassId?: string; // 훈련 반 (없으면 훈련 미신청 — 고3 2학기·스탭만 가능)
+  trainingOnly?: boolean; // 훈련만 신청 (사역팀 배치 제외) — intakeRule.deriveTrainingOnly가 파생
   status: ApplicationStatus;
   teamId?: string; // 배치 결과
   createdAt: string;

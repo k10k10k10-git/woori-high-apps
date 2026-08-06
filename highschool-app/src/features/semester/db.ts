@@ -25,9 +25,12 @@ import {
   SessionAttendance,
   StaffPerson,
   Team,
+  TrainingClass,
 } from "./types";
 import { buildTeamRemovalUpdates } from "./teamRemoval";
+import { buildTrainingClassRemovalUpdates } from "./trainingClass";
 import { makeAppKey } from "./applicant";
+import type { SessionValue } from "./sessionKind";
 
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
   if (!snap.exists()) return [];
@@ -101,6 +104,41 @@ export async function removeTeam(sid: string, teamId: string): Promise<void> {
   await update(ref(db), buildTeamRemovalUpdates(sid, teamId, applications));
 }
 
+// ── 훈련 반 ────────────────────────────────────────────────────────────
+// 사역팀(teams)과 같은 형태지만 다른 축이다. 신청자는 훈련 반 + 사역팀 지망을 함께 가진다.
+
+export function subscribeTrainingClasses(
+  sid: string,
+  cb: (classes: TrainingClass[]) => void,
+  onError?: (e: Error) => void,
+) {
+  return onValue(
+    ref(db, paths.trainingClasses(sid)),
+    (s) => cb(snapToList<TrainingClass>(s).sort((a, b) => a.order - b.order)),
+    onError,
+  );
+}
+
+export async function addTrainingClass(sid: string, name: string, color: string, order: number): Promise<void> {
+  await update(ref(db, paths.trainingClass(sid, newId())), { name, color, order });
+}
+
+export async function updateTrainingClass(
+  sid: string,
+  classId: string,
+  partial: Partial<Omit<TrainingClass, "id">>,
+): Promise<void> {
+  await update(ref(db, paths.trainingClass(sid, classId)), partial);
+}
+
+export async function removeTrainingClass(sid: string, classId: string): Promise<void> {
+  const applicationsSnap = await get(ref(db, paths.applications(sid)));
+  const applications = applicationsSnap.exists()
+    ? applicationsSnap.val() as Record<string, Omit<Application, "id">>
+    : {};
+  await update(ref(db), buildTrainingClassRemovalUpdates(sid, classId, applications));
+}
+
 // ── 회차 ──────────────────────────────────────────────────────────────
 
 export function subscribeSessions(
@@ -121,6 +159,11 @@ export async function addSession(sid: string, sess: Omit<Session, "id">): Promis
 
 export async function updateSession(sid: string, sessId: string, partial: Partial<Omit<Session, "id">>): Promise<void> {
   await update(ref(db, paths.session(sid, sessId)), partial);
+}
+
+/** 유형 변경 — 라벨을 비우려면 null을 써야 하므로 별도 함수로 둔다(sessionKind가 값을 만든다). */
+export async function updateSessionKind(sid: string, sessId: string, value: SessionValue): Promise<void> {
+  await update(ref(db, paths.session(sid, sessId)), { type: value.type, label: value.label });
 }
 
 export async function removeSession(sid: string, sessId: string): Promise<void> {

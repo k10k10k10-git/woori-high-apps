@@ -4,7 +4,8 @@
 
 import { useEffect, useState } from "react";
 import { useUI } from "@/context/UIContext";
-import { subscribeCurriculum, updateCurriculumEntry } from "@/features/semester/db";
+import { subscribeCurriculum, updateCurriculumEntry, updateTeam } from "@/features/semester/db";
+import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { CurriculumEntry, Session, Team } from "@/features/semester/types";
 
@@ -20,6 +21,7 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
   const [teamId, setTeamId] = useState<string>("");
   const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [goalDraft, setGoalDraft] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const activeTeamId = teams.some((team) => team.id === teamId) ? teamId : teams[0]?.id ?? "";
 
@@ -27,6 +29,21 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
     if (!activeTeamId) return;
     return subscribeCurriculum(sid, activeTeamId, setEntries, (e) => setLoadError(e.message));
   }, [sid, activeTeamId]);
+
+  const activeTeam = teams.find((team) => team.id === activeTeamId);
+
+  async function saveGoal() {
+    if (goalDraft === null || !activeTeam) return;
+    const goal = goalDraft.trim();
+    setGoalDraft(null);
+    if (goal === (activeTeam.goal ?? "")) return;
+    try {
+      await updateTeam(sid, activeTeam.id, { goal });
+      toast("팀 목표를 저장했습니다", "success");
+    } catch (e) {
+      toast(`목표 저장 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
 
   async function save(sessId: string) {
     const draft = drafts[sessId];
@@ -58,6 +75,7 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
             aria-selected={activeTeamId === t.id}
             onClick={() => {
               setDrafts({});
+              setGoalDraft(null);
               setTeamId(t.id);
             }}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
@@ -69,16 +87,34 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
         ))}
       </div>
 
+      {activeTeam && (
+        <section className="card card-body mb-4">
+          <div>
+            <h3 className="font-semibold text-slate-800">{activeTeam.name} · 이번 학기 목표</h3>
+            <p className="mt-0.5 text-xs text-slate-400">한 학기 동안 이 팀이 무엇을 이루려는지 적어두면 회차 계획의 기준이 됩니다.</p>
+          </div>
+          <textarea
+            aria-label={`${activeTeam.name} 이번 학기 목표`}
+            disabled={!canEdit}
+            value={goalDraft ?? activeTeam.goal ?? ""}
+            onChange={(e) => setGoalDraft(e.target.value)}
+            onBlur={() => void saveGoal()}
+            rows={3}
+            placeholder="예: 매주 예배 셋팅을 학생 스스로 준비할 수 있게 한다"
+            className="input text-sm"
+          />
+        </section>
+      )}
+
       <ul className="grid gap-3 lg:grid-cols-2">
         {sessions.map((s, i) => (
           <li key={s.id} className="card p-4">
             <div className="flex items-center gap-2 mb-1.5 text-sm">
               <span className="font-semibold">{i + 1}회차</span>
               <span className="text-slate-400">{s.date}</span>
-              {s.label && <span className="text-xs rounded bg-slate-100 px-1.5 py-0.5">{s.label}</span>}
-              {s.type !== "정규" && (
-                <span className="text-xs bg-yellow-100 text-yellow-800 rounded px-1.5 py-0.5">{s.type}</span>
-              )}
+              <span className={`rounded px-1.5 py-0.5 text-xs ${s.type === "휴강" ? "bg-yellow-100 text-yellow-800" : "bg-slate-100 text-slate-600"}`}>
+                {sessionDisplayLabel(s)}
+              </span>
             </div>
             <textarea
               aria-label={`${s.date} 계획`}
