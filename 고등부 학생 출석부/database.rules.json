@@ -6,82 +6,90 @@
         ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
       }
     },
-    "teacherClasses": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+    "attendanceAdmins": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$uid": {
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || auth.uid === $uid)"
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+        ".validate": "newData.isBoolean()"
+      }
+    },
+    "teacherClasses": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+      "$uid": {
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || auth.uid === $uid || root.child('attendanceAdmins').child(auth.uid).val() === true)"
       }
     },
     "userRoles": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "classes": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {
         "$classKey": {
           ".read": "auth != null && root.child('teacherClasses').child(auth.uid).val() === $classKey",
-          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey)"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)"
         }
       }
     },
     "attendance": {
-      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {
         "$classKey": {
           ".read": "auth != null && root.child('teacherClasses').child(auth.uid).val() === $classKey",
-          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey)"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)"
         }
       }
     },
     "events": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "teacherData": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "teacherStaff": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "teacherAdditional": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "config": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "teacherSpecial": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "teacherExtra": {
       ".read": "auth != null",
       "$year": {
         "$part": {
           "$classKey": {
-            ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val().replace('-','_').replace('-','_').replace('-','_') === $classKey)"
+            ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val().replace('-','_').replace('-','_').replace('-','_') === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)"
           }
         }
       }
     },
     "teacherPhones": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "trash": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
-      ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
     },
     "suggestions": {
-      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {
         "$classKey": {
           ".read": "auth != null && root.child('teacherClasses').child(auth.uid).val() === $classKey",
-          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey)"
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)"
         }
       }
     },

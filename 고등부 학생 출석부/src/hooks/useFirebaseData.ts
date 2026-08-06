@@ -4,6 +4,7 @@ import { db, ref, onValue, set, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { sortAndRenumber, emailToKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
+import { dataLoadMessage } from '@/utils/dbError';
 import type { ClassDataMap, AttData, CustomEventData, UserRole, Student } from '@/types';
 
 type FbClass = {
@@ -52,7 +53,7 @@ export function useFirebaseData() {
         });
       }, err => {
         console.error('학생/반 데이터 구독 오류:', err);
-        showToast('학생/반 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('학생/반', err));
       });
       unsubRef.current.push(unsub1);
 
@@ -64,7 +65,7 @@ export function useFirebaseData() {
         });
       }, err => {
         console.error('출석 데이터 구독 오류:', err);
-        showToast('출석 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('출석', err));
       });
       unsubRef.current.push(unsub2);
     } else {
@@ -80,7 +81,7 @@ export function useFirebaseData() {
         dispatch({ type: 'SET_CLASS_DATA', payload: newData });
       }, err => {
         console.error('학생/반 데이터 구독 오류:', err);
-        showToast('학생/반 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('학생/반', err));
       });
       unsubRef.current.push(unsub1);
 
@@ -92,7 +93,7 @@ export function useFirebaseData() {
         });
       }, err => {
         console.error('출석 데이터 구독 오류:', err);
-        showToast('출석 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('출석', err));
       });
       unsubRef.current.push(unsub2);
     }
@@ -106,7 +107,7 @@ export function useFirebaseData() {
       });
     }, err => {
       console.error('이벤트 데이터 구독 오류:', err);
-      showToast('이벤트 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+      showToast(dataLoadMessage('이벤트', err));
     });
     unsubRef.current.push(unsub3);
 
@@ -115,6 +116,16 @@ export function useFirebaseData() {
       unsubRef.current = [];
     };
   }, [fbReady, curYear, role, teacherCk, dispatch]);
+}
+
+// 관리자 권한 보유 확인 — admins(플랫폼 통합관리자) 또는 attendanceAdmins(출석부 전용).
+// admins/{uid} 읽기는 관리자만 허용되므로 거부되면 '없음'으로 본다.
+async function hasAdminGrant(uid: string): Promise<boolean> {
+  const [platform, attendance] = await Promise.all([
+    get(ref(db, `admins/${uid}`)).then(s => s.val() === true).catch(() => false),
+    get(ref(db, `attendanceAdmins/${uid}`)).then(s => s.val() === true).catch(() => false),
+  ]);
+  return platform || attendance;
 }
 
 // 사용자 역할 로드
@@ -147,9 +158,16 @@ export async function loadUserRole(
         showToast('교사 반 정보 동기화에 실패했습니다.', 'error');
       }
     } else {
-      set(ref(db, `admins/${user.uid}`), true).catch(() => {
-        showToast('관리자 정보 동기화에 실패했습니다.', 'error');
-      });
+      // 관리자 권한은 두 노드 중 하나로 부여된다 (2026-08-06 분리):
+      //   admins/{uid}            = 플랫폼 통합관리자 (고등부 사역 플랫폼 전권 포함)
+      //   attendanceAdmins/{uid}  = 출석부 전용 관리자 (이 앱 경로에만 효력)
+      // 앱이 스스로 부여할 수는 없다 — Rules상 기존 관리자만 쓸 수 있어서, 예전의
+      // set(admins/…) 시도는 항상 실패하고 "동기화 실패" 토스트만 남겼다.
+      // 대신 보유 여부를 확인해 원인을 정확히 안내한다.
+      const granted = await hasAdminGrant(user.uid);
+      if (!granted) {
+        showToast('이 계정에는 아직 출석부 관리자 권한이 없습니다. 관리자에게 승인을 요청해 주세요.', 'error');
+      }
     }
     return 'ok';
   } catch {

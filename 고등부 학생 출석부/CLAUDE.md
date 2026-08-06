@@ -218,6 +218,15 @@ CSS 모듈 없음. `src/app/globals.css` 하나에 모든 스타일이 있다. `
 - `admin`: 모든 반 읽기/쓰기, 학생/반 추가·삭제, 계정 관리, 이벤트 등록, 진급 처리
 - `teacher`: 본인 반(`part-grade-class`)만 출석 수정 및 학생 관리, 건의사항 작성
 
+**관리자 권한 노드는 두 개다 (2026-08-06 분리).** `userRoles.role`은 화면 UI용이고, 실제 DB 권한은 아래 노드가 결정한다.
+
+| 노드 | 부여 대상 | 이 앱 | 고등부 사역 플랫폼 |
+|---|---|---|---|
+| `admins/{uid}` | 플랫폼 통합관리자 | 전권 | 전권 + 역할 배정 + 민감정보 |
+| `attendanceAdmins/{uid}` | 출석부 전용 관리자 | 전권 | **접근 불가** |
+
+출석부만 맡는 계정에는 반드시 `attendanceAdmins`를 준다. `admins`를 주면 학기·수련회·이가드 전권과 역할 배정 권한까지 함께 간다. 두 노드 모두 **앱에서 스스로 부여할 수 없다**(기존 관리자만 쓰기 가능) — 최초 1건은 Firebase Console에서 넣고, 이후에는 기존 관리자가 추가한다. `loadUserRole`은 부여 시도를 하지 않고 보유 여부만 확인해 안내한다.
+
 Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 확인한다.
 
 **읽기 권한도 본인 반으로 제한됨**: `classes`/`attendance`의 `.read`는 admin·retreatAdmins·iguardMembers(전체) + 교사는 `teacherClasses/{uid}===classKey`(본인 반만). `useFirebaseData.ts`가 교사 로그인 시 `classes/{year}/{ck}`(본인 반)만 구독하고, 관리자는 `classes/{year}` 전체를 구독한다. `loadUserRole`은 `teacherClasses/{uid}` 쓰기를 **await**해야 함 — read 규칙이 이 값을 즉시 참조하므로 구독 전에 반드시 기록돼 있어야 한다.
@@ -231,7 +240,8 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 주요 규칙 특이사항:
 - `admins` 노드: bootstrap 조건 제거됨 — 최초 admin은 Firebase Console에서 직접 추가해야 함
 - `teacherExtra` 쓰기 규칙: classKey에 하이픈(`-`)이 포함되므로 `.replace('-','_')`을 3회 체이닝하여 Firebase 경로의 `_`와 매칭 (`replace`는 첫 매치만 치환하므로 3번 호출)
-- `classes`/`attendance`: read 규칙이 관리자(admin·retreatAdmins·iguardMembers) 전체 + 교사는 본인 반(`teacherClasses` 매칭)만 — 행정·이가드 앱이 비관리자 계정으로 전체 `classes`를 읽으므로 단순 admin-only로 잠그면 그 앱들이 깨진다(반드시 `retreatAdmins`/`iguardMembers`도 허용목록에 포함).
+- `attendanceAdmins`: 출석부 전용 관리자. 이 앱이 쓰는 21개 규칙(`classes`·`attendance`·`events`·`teacher*`·`config`·`trash`·`suggestions`·`userRoles`·`teacherClasses`)에만 OR로 포함되고, 플랫폼 노드(`retreats*`·`iguard*`·`semesters*`)와 `admins`에는 **절대 넣지 않는다** — 이게 권한 분리의 전부다.
+- `classes`/`attendance`: read 규칙이 관리자(admin·attendanceAdmins·retreatAdmins·iguardMembers) 전체 + 교사는 본인 반(`teacherClasses` 매칭)만 — 행정·이가드 앱이 비관리자 계정으로 전체 `classes`를 읽으므로 단순 admin-only로 잠그면 그 앱들이 깨진다(반드시 `retreatAdmins`/`iguardMembers`도 허용목록에 포함).
 
 ### 학생 데이터 쓰기 패턴 — 단일 경로만 수정 (전체 덮어쓰기 금지)
 
