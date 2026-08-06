@@ -4,6 +4,7 @@ import { db, ref, onValue, set, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { sortAndRenumber, emailToKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
+import { dataLoadMessage } from '@/utils/dbError';
 import type { ClassDataMap, AttData, CustomEventData, UserRole, Student } from '@/types';
 
 type FbClass = {
@@ -52,7 +53,7 @@ export function useFirebaseData() {
         });
       }, err => {
         console.error('학생/반 데이터 구독 오류:', err);
-        showToast('학생/반 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('학생/반', err));
       });
       unsubRef.current.push(unsub1);
 
@@ -64,7 +65,7 @@ export function useFirebaseData() {
         });
       }, err => {
         console.error('출석 데이터 구독 오류:', err);
-        showToast('출석 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('출석', err));
       });
       unsubRef.current.push(unsub2);
     } else {
@@ -80,7 +81,7 @@ export function useFirebaseData() {
         dispatch({ type: 'SET_CLASS_DATA', payload: newData });
       }, err => {
         console.error('학생/반 데이터 구독 오류:', err);
-        showToast('학생/반 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('학생/반', err));
       });
       unsubRef.current.push(unsub1);
 
@@ -92,7 +93,7 @@ export function useFirebaseData() {
         });
       }, err => {
         console.error('출석 데이터 구독 오류:', err);
-        showToast('출석 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+        showToast(dataLoadMessage('출석', err));
       });
       unsubRef.current.push(unsub2);
     }
@@ -106,7 +107,7 @@ export function useFirebaseData() {
       });
     }, err => {
       console.error('이벤트 데이터 구독 오류:', err);
-      showToast('이벤트 데이터를 불러오지 못했습니다. 네트워크를 확인해 주세요.');
+      showToast(dataLoadMessage('이벤트', err));
     });
     unsubRef.current.push(unsub3);
 
@@ -146,11 +147,15 @@ export async function loadUserRole(
       } catch {
         showToast('교사 반 정보 동기화에 실패했습니다.', 'error');
       }
-    } else {
-      set(ref(db, `admins/${user.uid}`), true).catch(() => {
-        showToast('관리자 정보 동기화에 실패했습니다.', 'error');
-      });
     }
+    // 관리자 계정은 여기서 아무것도 쓰거나 읽지 않는다.
+    //   admins/{uid}           = 플랫폼 통합관리자 (고등부 사역 플랫폼 전권 포함)
+    //   attendanceAdmins/{uid} = 출석부 전용 관리자 (이 앱 경로에만 효력)
+    // 둘 다 기존 관리자만 쓸 수 있어 앱이 스스로 부여할 수 없다(예전 set(admins/…)는
+    // 항상 실패하고 "관리자 정보 동기화에 실패했습니다" 토스트만 남겼다).
+    // ⚠ 보유 여부를 확인하려고 admins/{uid}를 읽지도 말 것 — 권한 없는 계정에서
+    //   인증 게이트를 막을 수 있다. 권한이 없으면 데이터 구독 오류에서
+    //   dataLoadMessage가 "볼 권한이 없습니다"로 정확히 안내한다.
     return 'ok';
   } catch {
     return 'unauthorized';
