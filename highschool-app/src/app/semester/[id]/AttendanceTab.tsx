@@ -41,6 +41,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const canEdit = useSemesterCanEdit();
   const [sessId, setSessId] = useState<string>("");
   const [teamFilter, setTeamFilter] = useState<string>("");
+  const [classFilter, setClassFilter] = useState<string>("");
   const [scope, setScope] = useState<SemesterRosterScope>("team");
   const [att, setAtt] = useState<SessionAttendance>({});
   const [attAll, setAttAll] = useState<Record<string, SessionAttendance>>({});
@@ -72,13 +73,16 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const members = useMemo(
     () =>
       semesterRoster(applications, scope)
-        .filter((a) => scope === "training" || !teamFilter || a.teamId === teamFilter)
+        .filter((a) => scope === "training"
+          ? (!classFilter
+              || (classFilter === "__none__" ? !a.trainingClassId : a.trainingClassId === classFilter))
+          : (!teamFilter || a.teamId === teamFilter))
         .sort((a, b) => {
           const ta = a.teamId ? teamById.get(a.teamId)?.order ?? 99 : 99;
           const tb = b.teamId ? teamById.get(b.teamId)?.order ?? 99 : 99;
           return ta - tb || applicantSortKey(a).localeCompare(applicantSortKey(b), "ko");
         }),
-    [applications, scope, teamFilter, teamById],
+    [applications, scope, teamFilter, classFilter, teamById],
   );
 
   async function markAt(appKey: string, sessionId: string, status: AttendanceStatus) {
@@ -154,6 +158,22 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             ))}
           </select>
         </div>}
+        {scope === "training" && (
+          <div>
+            <select
+              aria-label="훈련 반 필터"
+              value={classFilter}
+              onChange={(e) => setClassFilter(e.target.value)}
+              className="input text-sm"
+            >
+              <option value="">전체 훈련 반</option>
+              {trainingClasses.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+              <option value="__none__">반 미정</option>
+            </select>
+          </div>
+        )}
         {scope === "team" && (
           <div>
             <select

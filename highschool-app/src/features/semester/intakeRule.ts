@@ -14,8 +14,10 @@ import { STAFF_BU } from "./applicant";
 export type IntakeSelection = {
   /** 훈련 반 id — 빈 문자열이면 훈련 미신청 */
   trainingClassId: string;
-  /** 사역팀 1지망 id — 빈 문자열이면 사역팀 미지원 */
+  /** 사역팀 1지망 id — 빈 문자열이면 사역팀 미지원 (학생용) */
   ministryChoice1: string;
+  /** 확정 팀 id — 스탭(교사)은 지망 없이 팀에 바로 배정한다 */
+  assignedTeamId?: string;
 };
 
 export type IntakePerson = {
@@ -38,11 +40,22 @@ export function canApplyMinistryWithoutTraining(person: IntakePerson, semesterId
   return person.grade === 3 && isSecondSemester(semesterId);
 }
 
+/** 스탭(교사)은 훈련 대상이 아니고 지망도 받지 않는다 — 팀에 바로 배정한다. */
+export function isStaffApplicant(person: IntakePerson): boolean {
+  return person.bu === STAFF_BU;
+}
+
 export function validateIntake(
   selection: IntakeSelection,
   person: IntakePerson,
   semesterId: string,
 ): IntakeCheck {
+  if (isStaffApplicant(person)) {
+    return (selection.assignedTeamId ?? "").trim() !== ""
+      ? { ok: true }
+      : { ok: false, message: "교사·스탭은 사역팀을 선택해야 합니다." };
+  }
+
   const wantsTraining = selection.trainingClassId.trim() !== "";
   const wantsMinistry = selection.ministryChoice1.trim() !== "";
 
@@ -73,5 +86,6 @@ export function validateIntake(
  * (훈련은 신청했지만 사역팀에는 지원하지 않은 사람)
  */
 export function deriveTrainingOnly(selection: IntakeSelection): boolean {
+  if ((selection.assignedTeamId ?? "").trim() !== "") return false;
   return selection.trainingClassId.trim() !== "" && selection.ministryChoice1.trim() === "";
 }

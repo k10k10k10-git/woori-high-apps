@@ -194,7 +194,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-50">
 
-      {/* 전역 헤더(고등부 사역 플랫폼)가 이미 사이트 제목·계정·로그아웃을 담당한다.
+      {/* 전역 헤더(분당우리교회 서현고등부)가 이미 사이트 제목·계정·로그아웃을 담당한다.
           여기서 "수련회 행정시스템" 줄을 다시 그리면 제목이 두 줄로 겹쳐 보인다. */}
 
       {/* ═══ 삭제 확인 모달 ═══════════════════════════════════════ */}
@@ -300,10 +300,18 @@ export default function HomePage() {
                           className="text-slate-300 hover:text-red-400 text-lg leading-none transition-colors" aria-label="삭제">×</button>
                       </div>
                       <div className="font-bold leading-snug text-slate-800">{s.name}</div>
-                      <button onClick={() => router.push(`/retreat/${s.id}`)}
-                        className="mt-2 text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
-                        상세 보기 →
-                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <button onClick={() => router.push(`/retreat/${s.id}`)}
+                          className="text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
+                          행정 →
+                        </button>
+                        {canAccessPortalArea("retreat-field", role) && (
+                          <button onClick={() => router.push(`/retreat/${s.id}/field`)}
+                            className="text-xs font-semibold text-fuchsia-600">
+                            현장(이가드) →
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })()}
@@ -347,19 +355,27 @@ export default function HomePage() {
                         >×</button>
                       </div>
                       <h3 className="font-bold text-slate-800 text-sm leading-tight mb-2">{r.name}</h3>
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs text-slate-400">
                           {new Date(r.createdAt).toLocaleDateString("ko-KR")} 생성
                         </p>
-                        <button
-                          onClick={e => { e.stopPropagation(); router.push(`/retreat/${r.id}`); }}
-                          className="text-xs font-medium transition-colors"
-                          style={{ color: "var(--color-primary)" }}
-                          onMouseEnter={e => (e.currentTarget.style.color = "var(--color-primary-hover)")}
-                          onMouseLeave={e => (e.currentTarget.style.color = "var(--color-primary)")}
-                        >
-                          상세 보기 →
-                        </button>
+                        <span className="flex items-center gap-2.5">
+                          <button
+                            onClick={e => { e.stopPropagation(); router.push(`/retreat/${r.id}`); }}
+                            className="text-xs font-medium transition-colors"
+                            style={{ color: "var(--color-primary)" }}
+                          >
+                            행정 →
+                          </button>
+                          {canAccessPortalArea("retreat-field", role) && (
+                            <button
+                              onClick={e => { e.stopPropagation(); router.push(`/retreat/${r.id}/field`); }}
+                              className="text-xs font-medium text-fuchsia-600 transition-colors hover:text-fuchsia-700"
+                            >
+                              현장 →
+                            </button>
+                          )}
+                        </span>
                       </div>
                     </div>
                   );

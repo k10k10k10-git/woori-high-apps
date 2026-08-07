@@ -13,12 +13,12 @@
 - `/retreats`, `/retreat/[id]`: 수련회 행정
 - `/retreat/[id]/field`: 이가드 현장 운영
 
-운영 주소는 `https://woorihigh-app.vercel.app` 입니다(구 `highschool-app-flame.vercel.app`도 같은 배포를 가리킵니다).
+서비스 이름은 **분당우리교회 서현고등부**이고, 운영 주소는 `https://woorihigh-app.vercel.app` 입니다(구 `highschool-app-flame.vercel.app`도 같은 배포를 가리킵니다).
 
 ## 화면 셸 규칙
 
 - 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당합니다. 하위 화면에 "수련회 행정시스템" 같은 제목 줄을 다시 만들지 않습니다(제목 2줄 중복 금지).
-- 상단 메뉴는 **학기 중 사역 / 방학 중 사역** 두 항목이며, 방학 중 사역은 hover·클릭 시 `수련회 행정팀`·`수련회 이가드팀` 드롭다운으로 갈라집니다.
+- 상단 메뉴는 **학기 중 사역 / 방학 중 사역** 두 항목이며, 방학 중 사역은 진입점 하나입니다(행정 권한이 있으면 `/retreats`, 없으면 `/field`). 두 화면은 같은 수련회 목록·준비 일정을 보여주고, 각 카드의 `행정 →`·`현장 →`으로 갈라집니다.
 - 도메인별 색: 학기=초록(`.semester-scope`), 행정=스카이(기본 토큰), 이가드=보라(`.iguard-scope`). 레이아웃·컴포넌트 클래스(`card`/`input`/`btn-primary`/`table-header`)는 세 도메인이 공유합니다.
 
 ## 권한 — 6단계 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
@@ -48,6 +48,7 @@
 - 훈련 반 삭제는 `trainingClass.ts`의 루트 다중 경로 update로 신청자 참조까지 함께 정리한다(팀 삭제와 같은 패턴).
 - **학기 삭제**(`removeSemester`)는 `semesters/{sid}`와 `semestersPrivate/{sid}`를 한 번의 루트 update로 지운다. 되돌릴 수 없으므로 화면에서 **학기 ID를 직접 입력받아** 확인한 뒤에만 호출한다.
 - **수련회 생성**은 행정·이가드 공용 컴포넌트 `features/portal/NewRetreatButton.tsx` 하나만 쓴다. `retreats/{id}`가 공유 노드라 어느 화면에서 만들어도 양쪽 목록에 나타난다. 쓰기는 행정 db(`@/lib/db`)가 담당하고 버튼은 `canEditPortalArea("retreat-admin")`로 게이트한다.
+- **교사·스탭 접수**는 학생과 다른 경로다: 훈련·지망 없이 사역팀에 바로 배정한다(`intakeRule.isStaffApplicant`). 저장 시 `teamId`를 직접 채우고 `choice1/2`·`trainingClassId`는 비운다.
 - **출석 표**(`AttendanceGrid`)의 셀은 토글이 아니다. 셀을 누르면 출석·지각·결석·지우기를 명시적으로 고른다(멱등 기록 — 실수 규칙 11).
 - `.input`은 `@layer` 밖 규칙이라 `width:100%`가 유틸리티 `w-*`를 이긴다. 폭은 감싼 div로 주고, 높이는 `h-*`로 고정하지 않는다(모바일 16px 글꼴에서 글자가 잘린다).
 

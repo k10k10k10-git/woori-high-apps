@@ -126,7 +126,7 @@ export default function PortalHome() {
       <main className="min-h-screen grid place-items-center bg-slate-950 px-6 text-center">
         <div className="max-w-md">
           <div className="mb-5 text-5xl">🧭</div>
-          <h1 className="text-3xl font-bold text-white">고등부 사역 플랫폼</h1>
+          <h1 className="text-3xl font-bold text-white">분당우리교회 서현고등부</h1>
           <p className="mt-2 mb-7 text-sm text-slate-400">학기 사역과 수련회 준비·현장 운영을 한곳에서 관리합니다.</p>
           <LoginButton signIn={signIn} />
         </div>

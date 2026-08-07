@@ -61,9 +61,26 @@ describe("고3 2학기 예외", () => {
       .toEqual({ ok: true });
   });
 
-  it("스탭은 학기와 무관하게 훈련 없이 사역팀만 신청할 수 있다", () => {
+  it("스탭은 학기와 무관하게 훈련 없이 사역팀에 들어간다", () => {
     expect(canApplyMinistryWithoutTraining(staff, "2026-1")).toBe(true);
-    expect(validateIntake({ trainingClassId: "", ministryChoice1: "m1" }, staff, "2026-1").ok).toBe(true);
+  });
+});
+
+describe("스탭(교사)은 지망 없이 팀 배정만 받는다", () => {
+  it("팀을 고르면 통과한다", () => {
+    expect(validateIntake({ trainingClassId: "", ministryChoice1: "", assignedTeamId: "team-a" }, staff, "2026-1"))
+      .toEqual({ ok: true });
+  });
+
+  it("팀을 고르지 않으면 막는다", () => {
+    const result = validateIntake({ trainingClassId: "", ministryChoice1: "", assignedTeamId: "" }, staff, "2026-1");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("사역팀을 선택");
+  });
+
+  it("팀 배정은 훈련만 신청으로 저장되지 않는다", () => {
+    expect(deriveTrainingOnly({ trainingClassId: "", ministryChoice1: "", assignedTeamId: "team-a" })).toBe(false);
+    expect(deriveTrainingOnly({ trainingClassId: "t1", ministryChoice1: "", assignedTeamId: "team-a" })).toBe(false);
   });
 });
 

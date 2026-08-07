@@ -5,8 +5,8 @@ import UpdateBanner from "./UpdateBanner";
 import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
 
 export const metadata: Metadata = {
-  title: "고등부 사역 플랫폼",
-  description: "분당우리교회 고등부 학기·수련회 통합 사역 플랫폼",
+  title: "분당우리교회 서현고등부",
+  description: "분당우리교회 서현고등부 학기·수련회 통합 사역 플랫폼",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

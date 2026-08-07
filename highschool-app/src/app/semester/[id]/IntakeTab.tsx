@@ -16,7 +16,7 @@ import {
   upsertApplication,
 } from "@/features/semester/db";
 import { STAFF_BU } from "@/features/semester/applicant";
-import { deriveTrainingOnly, validateIntake } from "@/features/semester/intakeRule";
+import { deriveTrainingOnly, isStaffApplicant, validateIntake } from "@/features/semester/intakeRule";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { parseClassKey } from "@/features/semester/classKey";
 import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
@@ -309,13 +309,15 @@ function IntakeModal({
   const [choice1, setChoice1] = useState(existing?.choice1 ?? "");
   const [choice2, setChoice2] = useState(existing?.choice2 ?? "");
   const [trainingClassId, setTrainingClassId] = useState(existing?.trainingClassId ?? "");
+  const [assignedTeamId, setAssignedTeamId] = useState(existing?.teamId ?? "");
+  const isStaff = isStaffApplicant({ grade: person.grade, bu: person.bu });
   const [phone, setPhone] = useState(existingPrivate?.phone ?? person.rosterPhone ?? "");
   const [parentPhone, setParentPhone] = useState(existingPrivate?.parentPhone ?? "");
   const [motive, setMotive] = useState(existingPrivate?.motive ?? "");
   const [wish, setWish] = useState(existingPrivate?.wish ?? "");
   const [saving, setSaving] = useState(false);
 
-  const selection = { trainingClassId, ministryChoice1: choice1 };
+  const selection = { trainingClassId, ministryChoice1: choice1, assignedTeamId };
   const check = validateIntake(selection, { grade: person.grade, bu: person.bu }, sid);
   const trainingOnly = deriveTrainingOnly(selection);
 
@@ -334,12 +336,12 @@ function IntakeModal({
           grade: person.grade,
           class: person.classNum,
           name: person.name,
-          choice1: choice1 ? choice1 : "",
-          choice2: choice1 && choice2 ? choice2 : "",
-          trainingClassId,
+          choice1: isStaff ? "" : choice1 || "",
+          choice2: isStaff ? "" : (choice1 && choice2 ? choice2 : ""),
+          trainingClassId: isStaff ? "" : trainingClassId,
           trainingOnly,
-          status: existing?.status ?? "접수",
-          teamId: existing?.teamId ?? "",
+          status: isStaff ? (assignedTeamId ? "배치" : "접수") : (existing?.status ?? "접수"),
+          teamId: isStaff ? assignedTeamId : (existing?.teamId ?? ""),
           createdAt: existing?.createdAt,
           createdBy: existing?.createdBy ?? byUid,
         },
@@ -369,7 +371,7 @@ function IntakeModal({
         role="dialog"
         aria-modal="true"
         aria-label={`${person.name} 신청 접수`}
-        className="modal-card card max-h-[90vh] w-full max-w-md overflow-y-auto p-5"
+        className="modal-card card max-h-[90vh] w-full max-w-md overflow-y-auto px-5 pb-5 pt-7"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="mb-1 font-bold text-slate-800">
@@ -380,6 +382,28 @@ function IntakeModal({
         </h3>
         <p className="mb-4 text-xs text-slate-400">{existing ? "신청 내용 수정" : "새 신청 접수"}</p>
 
+        {isStaff ? (
+          <div className="mb-3">
+            <label className="block text-sm">
+              <span className="text-xs font-semibold text-slate-600">사역팀 배정</span>
+              <select
+                value={assignedTeamId}
+                disabled={!canEdit}
+                onChange={(e) => setAssignedTeamId(e.target.value)}
+                className="input mt-1"
+              >
+                <option value="">팀 선택</option>
+                {teams.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              교사·스탭은 훈련 대상이 아니라 지망 없이 사역팀에 바로 배정됩니다.
+            </p>
+          </div>
+        ) : (
+        <>
         <div className="mb-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3">
           <label className="block text-sm">
             <span className="text-xs font-semibold text-emerald-800">훈련 반</span>
@@ -396,7 +420,7 @@ function IntakeModal({
             </select>
           </label>
           <p className="mt-2 text-[11px] leading-relaxed text-emerald-800/80">
-            사역팀은 훈련을 신청해야 지원할 수 있습니다. 고3 2학기와 스탭만 훈련 없이 사역팀을 신청할 수 있습니다.
+            사역팀은 훈련을 신청해야 지원할 수 있습니다. 고3 2학기만 훈련 없이 사역팀을 신청할 수 있습니다.
           </p>
           {trainingClasses.length === 0 && (
             <p className="mt-1 text-[11px] text-amber-700">설정 탭의 훈련 관리에서 훈련 반을 먼저 만들어주세요.</p>
@@ -423,6 +447,8 @@ function IntakeModal({
             </select>
           </label>
         </div>
+        </>
+        )}
 
         {!check.ok && (
           <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800" role="alert">
@@ -434,7 +460,7 @@ function IntakeModal({
             {check.hint}
           </p>
         )}
-        {check.ok && trainingOnly && (
+        {check.ok && trainingOnly && !isStaff && (
           <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
             훈련만 신청 — 사역팀 배치 대상에서 제외됩니다.
           </p>

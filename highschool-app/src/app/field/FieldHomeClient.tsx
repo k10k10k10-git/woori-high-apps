@@ -219,7 +219,7 @@ export default function FieldHomeClient() {
                   </div>
                   <div className="font-bold leading-snug text-slate-800">{selectedRetreat.name}</div>
                   <div className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
-                    <span>이동가이드 입장 →</span>
+                    <span>현장 입장 →</span>
                     {accessLocks[selectedRetreat.id] && (
                       <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] text-fuchsia-700">
                         {canManageRoles(role) ? "🔓 관리자 우회" : "🔒 PIN"}
@@ -263,7 +263,8 @@ export default function FieldHomeClient() {
                 {retreats.map(r => {
                   const active = selectedId === r.id;
                   return (
-                    <Link key={r.id} href={`/retreat/${r.id}/field`}
+                    <div key={r.id}>
+                    <Link href={`/retreat/${r.id}/field`}
                       onMouseEnter={() => setSelectedId(r.id)}
                       onFocus={() => setSelectedId(r.id)}
                       className={`card block w-full p-4 text-left cursor-pointer transition-colors ${active ? "ring-1" : "hover:border-slate-300"}`}
@@ -282,10 +283,17 @@ export default function FieldHomeClient() {
                         <span className="text-xs text-slate-400">이동가이드</span>
                         <span className="text-xs font-medium transition-colors"
                           style={{ color: "var(--color-primary)" }}>
-                          입장 →
+                          현장 →
                         </span>
                         </div>
                     </Link>
+                    {canAccessPortalArea("retreat-admin", role) && (
+                      <Link href={`/retreat/${r.id}`}
+                        className="mt-1 block px-2 text-right text-xs font-medium text-sky-600 hover:text-sky-700">
+                        행정 화면으로 →
+                      </Link>
+                    )}
+                    </div>
                   );
                 })}
               </div>
