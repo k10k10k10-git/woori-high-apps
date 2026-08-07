@@ -1,215 +1,87 @@
-# Claude Code 인수인계 — 통합 플랫폼 전환 및 레거시 종료
-
-최종 갱신: 2026-08-06 (Asia/Seoul) — 최신 항목은 11절
+# 인수인계 — 2026-08-07
 
 ## 0. 에이전트별 시작 지점
 
-- **Codex(또는 CLAUDE.md를 안 읽는 에이전트)**: 루트 `AGENTS.md` → 이 문서 → 대상 앱 `AGENTS.md` 순서로 읽는다. 세 문서 모두 6단계 역할 표·운영 주소·검증 명령을 담고 있어 이것만으로 착수할 수 있다.
-- **Claude Code**: 루트 `CLAUDE.md`가 최우선(안전 4문답·스킬 지도 포함) → 이 문서 → 대상 앱 `CLAUDE.md`.
-- 두 계열 문서가 어긋나면 **코드가 진실**이고, 안전 규칙은 루트 `CLAUDE.md`가 우선이다. 발견 즉시 같은 커밋에서 문서를 맞춘다.
+- **Codex(또는 CLAUDE.md를 안 읽는 에이전트)**: 루트 `AGENTS.md` → 이 문서 → 대상 앱 `AGENTS.md`.
+- **Claude Code**: 루트 `CLAUDE.md`(안전 4문답·스킬 지도) → 이 문서 → 대상 앱 `CLAUDE.md`.
+- 문서와 코드가 다르면 **코드가 진실**. 안전 규칙은 루트 `CLAUDE.md`가 우선.
 
-## 1. 먼저 읽을 문서
+## 지금 하던 일 (한 문장)
 
-1. 루트 `CLAUDE.md` (Codex는 루트 `AGENTS.md`)
-2. 이 문서
-3. `DB_OWNERSHIP.md`
-4. `OPERATIONS.md`
-5. 대상 앱의 `CLAUDE.md`, `AGENTS.md`
+고등부 사역 플랫폼(`highschool-app`)의 학기·수련회 화면을 사용자 피드백대로 다듬는 연속 작업 — 마지막 요청분(큐싯 시트 연동 제거·공유 일정 편집·훈련 배치/커리큘럼 축·수료 문구)까지 배포 완료했고, 다음 지시를 기다리는 상태다.
 
-모든 작업 첫 응답에서 루트 문서의 **DB 안전 4문답**을 답한다. Firebase Rules는 항상 학생 앱 `고등부 학생 출석부/database.rules.json`만 원천이며, 통합 플랫폼에서는 배포하지 않는다.
+## 현재 운영 구조
 
-## 2. 현재 운영 구조
+- 서비스명 **분당우리교회 서현고등부**, 운영 URL `https://woorihigh-app.vercel.app` (구 `highschool-app-flame.vercel.app`도 같은 배포)
+- 라우트: `/` 홈 · `/semesters` `/semester/[id]` 학기 · `/retreats` `/retreat/[id]` 행정 · `/field` `/retreat/[id]/field` 현장
+- 학생 출석부: Firebase Hosting `https://woori-high.web.app` (별도 앱, 같은 RTDB)
+- 배포: highschool-app은 `npx vercel --prod --yes` 후 **별칭 2개를 수동으로 옮겨야** 한다
+  ```bash
+  npx vercel alias set <새 배포 URL> woorihigh-app.vercel.app
+  npx vercel alias set <새 배포 URL> highschool-app-flame.vercel.app
+  curl -s https://woorihigh-app.vercel.app/api/version   # buildId == git rev-parse HEAD 확인
+  ```
 
-- 통합 고등부 플랫폼: `highschool-app/`
-- 운영 URL: `https://woorihigh-app.vercel.app`
-- 주요 라우트
-  - 통합 홈: `/`
-  - 학기 사역: `/semesters`, `/semester/{id}`
-  - 수련회 행정: `/retreats`, `/retreat/{id}`
-  - 수련회 현장: `/field`, `/retreat/{id}/field`
-- 호환용 독립 학기 앱: `semester-app/` / `https://semester-app.vercel.app`
-- 학생 출석부와 교사·스탭 출석부는 기존 Firebase Hosting을 유지한다.
+## 완료된 것 (2026-08-06~07, 전부 푸시·배포됨)
 
-## 2-1. 2026-08-06 완료 — 6단계 역할 모델 · 주소 변경 · 화면 개편
+| 커밋 | 내용 |
+|---|---|
+| `730f081` | **6단계 역할 모델**(통합관리자·교역자·팀장·행정팀·이가드팀·스탭) + 전역 셸 개편 |
+| `2f52672` | 학기 접수에 연락처·스탭 추가, 학기 UI 초록 통일 |
+| `8b6683d` | 운영 주소 `woorihigh-app.vercel.app` 전환 |
+| `f8b7a4e` `9edd3f6` | 학습 메모 2건, Codex용 AGENTS 문서 갱신 |
+| `ae99b10` | (다른 세션) 학기 운영 UX·공유 캘린더 |
+| `59684bd` `0479477` | **훈련 반** 도입 + 접수 원칙(훈련 필수, 고3 2학기·스탭 예외) |
+| `c9fa802` | **출석부 권한 분리** — Rules에 `attendanceAdmins` 신설·배포 |
+| `112dc50` `f6b9dcb` | 학생앱 훅 롤백 → 안전 버전 재적용(실패하는 `admins` 쓰기 제거) |
+| `168b608` | 팀원 관리 잘림 수정, 학기 삭제, 수련회 생성 공용화, 접수→신청, 출석 표 보기 |
+| `0ef574b` | 교사·스탭 접수 분리(팀 직접 배정), 훈련 반 필터, 서비스명 변경 |
+| `8654d18` | **방학 중 사역 홈을 화면 하나로 통합**(`VacationHome`), 드롭다운 유지 |
+| `e272f71` | 큐싯 시트 연동 제거, 홈 공유 일정 편집, 훈련 배치/커리큘럼 축, 수료 문구 |
 
-배포 커밋 `8b6683d` (Ready, buildId 확인). 새 주소 `https://woorihigh-app.vercel.app`,
-구 주소 `highschool-app-flame.vercel.app`도 같은 배포를 가리켜 기존 링크가 살아 있다.
-`semester-app`도 재배포해 `/` 리다이렉트 목적지를 새 주소로 바꿨다.
+## 미완인 것 — 정확한 다음 단계
 
-역할(단일 원천 `highschool-app/src/features/portal/accessPolicy.ts`):
+- [ ] **(사용자 몫) 학생 출석부 세션 문제 확인**: `admin@woorihigh.com`으로 로그인한 크롬에서 `https://woori-high.web.app`가 스피너에서 멈춘다. **롤백한 코드에서도 재현**됐으므로 코드 원인이 아니고, 로그인 안 된 깨끗한 브라우저에서는 정상 동작한다. 사용자가 **로그아웃 → 재로그인**(또는 시크릿 창)으로 확인해야 한다. 그래도 같으면: 로그인 직후 `read_console_messages`로 RTDB 경고를 잡고, `loadUserRole`의 `get(userRoles/…)` 응답이 오는지부터 확인할 것.
+- [ ] **(사용자 몫, 선택) 스탭의 학기 조회 Rules 보강**: `semesters` `.read`에 `iguardMembers`를 추가해야 스탭 역할이 학기 화면 데이터를 본다. 지금은 에러 배너가 뜬다. 스니펫:
+  ```json
+  "semesters": { ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)" }
+  ```
+  배포는 **학생 앱에서만** (`cd "고등부 학생 출석부" && firebase deploy --only database`). `semestersPrivate`(연락처)는 계속 행정 전용으로 둘 것.
+- [ ] **(사용자 몫) Storage 업로드 운영 확인**: 학기 아카이브 파일 업로드는 자동 점검에서 실행하지 않았다. 작은 파일 1개로 업로드→열기→삭제 확인 권장.
+- [ ] **(대기) 조장 큐싯 붙여넣기 경로**: 시트 연동 제거로 조장 큐싯 자동 가져오기가 사라졌다. 붙여넣기로도 받게 할지 사용자 답변 대기.
+- [ ] **(대기) 훈련 반 목표 필드**: 커리큘럼의 "이번 학기 목표"는 `teams.goal`만 있어 사역팀에서만 보인다. 훈련 반에도 필요하면 `TrainingClass.goal` 추가.
 
-| 역할 | 학기 | 행정 | 이가드 | 역할배정 | 저장 |
-|---|---|---|---|---|---|
-| 통합관리자 | 수정 | 수정 | 전체 | ✅ | `admins/{uid}=true` |
-| 교역자 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role="pastor"` |
-| 팀장 | 수정 | 수정 | 전체 | — | `.role="leader"` |
-| 행정팀 | 수정 | 수정 | 실행탭 | — | `.role="adminTeam"` (레거시 무필드 동일) |
-| 이가드팀 | ✕ | ✕ | 전체 | — | `iguardMembers` + `iguardRoles="team"` |
-| 스탭 | 조회만 | ✕ | 실행탭 | — | `iguardMembers` + `iguardRoles="staff"` |
+## 미커밋 변경
 
-화면: 상단 메뉴 = 학기 중 사역 / 방학 중 사역(hover → 수련회 행정팀·이가드팀).
-팀원 관리 진입점은 전역 헤더 하나. `/retreats`·`/field`의 중복 제목 줄 제거.
-홈 = 사역 바로가기 + 전체 일정(정규 회차는 "한 학기 사역팀 모임 전체 기간" 한 줄).
-학기 화면은 행정·이가드와 같은 셸에 초록 토큰(`.semester-scope`), 접수에 스탭·연락처 추가.
+없음. `git status` 깨끗(무관한 미추적 디렉터리 `.agents/` `outputs/` `rayquaza-v2-upgrade/` `tmp/` 제외 — 커밋 시 `git add .` 금지).
 
-### ⚠ 남은 블로커 — 스탭의 학기 조회는 Rules 보강이 필요하다
+## 막힌 것 / 사용자 답변 대기 중인 질문
 
-`semesters` 읽기가 `admins`/`retreatAdmins`로 제한돼 스탭 계정은 학기 화면에서 데이터가 비고
-에러 배너가 뜬다. 아래를 **학생 앱에서** 배포해야 완성된다(이 저장소에서 배포 금지).
+- 위 "미완인 것"의 마지막 두 항목(조장 큐싯 붙여넣기, 훈련 반 목표)이 사용자 답변 대기.
+- 학생 출석부 스피너는 **사용자 재로그인 확인 후에야** 다음 진단이 가능하다(비밀번호 필요 — 에이전트가 로그인하지 않는다).
 
-```json
-"semesters": {
-  ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
-  ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)"
-}
-```
+## 이 작업의 함정 (다시 밟지 말 것)
 
-`semestersPrivate`(연락처)는 그대로 행정 계열 전용으로 둔다 — 스탭에게 연락처를 노출하지 않는다.
+1. **`.input`은 `@layer` 밖 CSS라 `width:100%`가 유틸리티 `w-*`를 이긴다.** 폭은 감싼 div로 주고 높이는 `h-*`로 고정하지 말 것(모바일 16px 글꼴에서 글자가 잘린다).
+2. **인증 게이트에서 권한 없는 경로를 읽지 말 것.** `loadUserRole`에서 `get(admins/{uid})`를 await했다가 프로덕션 로그인이 스피너로 멈췄다. 권한 안내는 데이터 구독 오류(`dbError.dataLoadMessage`)가 담당한다.
+3. **원인 확정 전에 재배포를 반복하지 말 것.** 위 사고에서 "내 변경이 범인"이라 단정해 두 번 재배포했지만, 롤백해도 증상이 남아 원인이 아니었다. 배포 전 깨끗한 브라우저 기준선을 먼저 잡고, 증상이 나오면 롤백 → 원인 규명 순서로.
+4. **새 vercel.app 별칭은 302 `sso-api`로 막힌다.** `vercel domains add <sub>.vercel.app <projectId>`로 프로젝트 도메인 등록해야 열린다(자세한 건 `LEARNINGS.md`).
+5. **Rules에 새 노드를 만들지 말 것.** 규칙이 없는 노드는 즉시 권한 거부다. 권한 확장은 기존 노드 + 옵션 필드 조합으로(6단계 역할이 그 예).
+6. **출석·인원체크는 토글 금지** — 명시 선택(멱등). 출석 표 셀도 클릭 시 메뉴에서 고른다.
+7. **effect 안에서 setState 금지**(eslint `react-hooks/set-state-in-effect`). 파생 가능한 값은 렌더 중 계산(`SemesterClient`의 `activeTab`).
+8. 학생 출석부 HTML은 `cache-control: max-age=3600`이라 배포 직후 브라우저가 옛 화면을 보여준다. 검증할 때 캐시·SW를 반드시 비울 것.
 
-### 로그인 뒤 화면 육안 확인은 미완
+## 검증 상태 (2026-08-07 실측)
 
-Google OAuth 때문에 헤드리스로 로그인할 수 없어(LEARNINGS.md) 배포 확인은
-`/api/version` buildId 대조 + 라우트 200으로만 했다. 역할별 화면(특히 스탭·이가드팀 계정),
-방학 중 사역 드롭다운, 375px 모바일은 사용자 로그인 상태에서 한 번 훑어야 한다.
+- `highschool-app`: `npx tsc --noEmit` 통과 / `npm test` **47파일 359개 통과** / 프로덕션 빌드 성공
+- `고등부 학생 출석부`: `npx tsc --noEmit` 통과 / `npm test` **4파일 52개 통과**
+- 배포: `/api/version` buildId `e272f71…` == `git rev-parse HEAD` ✓, `/` `/semesters` `/retreats` `/field` 모두 200
+- lint: 두 앱 모두 **신규 오류 0**. `highschool-app`에 기존 오류 24건이 남아 있다(대부분 이가드 현장 모듈의 `react-hooks/set-state-in-effect`) — 이번 작업과 무관한 부채.
+- ⚠ 로그인 뒤 화면은 **로컬 로그인 브라우저로 육안 확인**했다(신청·배치·출석 표·커리큘럼·설정·팀원 관리·수련회 홈). 운영 DB 쓰기는 하지 않았다(모달은 저장 없이 닫음).
 
-## 3. 2026-08-05 완료한 레거시 정리
+## 참고 문서
 
-사용자 명시 승인 후 다음을 제거했다.
-
-- Vercel 프로젝트 `retreat-app`
-- Vercel 프로젝트 `iguard-app`
-- Firebase Hosting 사이트 `woori-high-retreat`
-- Firebase Hosting 사이트 `woori-high-iguard`
-- 로컬 소스 디렉터리 `retreat-app/`
-- 로컬 소스 디렉터리 `iguard-app/`
-
-삭제하지 않은 것:
-
-- Firebase Realtime Database의 모든 운영 데이터
-- Firebase Rules와 Authentication 데이터
-- 통합 플랫폼이 쓰는 Firebase Web App ID `1:964793733884:web:a937dadf77e302dfa7bd79`
-
-해당 Web App의 표시명만 `분당우리고등부 수련회`에서 `고등부 사역 플랫폼`으로 변경했다.
-
-## 4. 복구 지점
-
-- 독립 앱 삭제 직전: `pre-legacy-app-removal-2026-08-05`
-- 통합 앱 이관 전: `pre-unified-apps-2026-08-05`
-
-독립 앱 소스만 복원할 때:
-
-```bash
-git checkout pre-legacy-app-removal-2026-08-05 -- retreat-app iguard-app
-```
-
-Vercel/Firebase Hosting 프로젝트는 삭제되었으므로 소스 복원만으로 기존 주소가 살아나지는 않는다. 꼭 필요할 때 새 프로젝트를 별도로 생성해야 한다.
-
-## 5. 외부 리소스 확인 결과
-
-Firebase Web Apps:
-
-- `분당우리고등부 출석부`
-- `분당우리고등부 교사/스탭 출석부`
-- `고등부 사역 플랫폼`
-
-Firebase Hosting:
-
-- `woori-high`
-- `woori-high-teach`
-
-Vercel:
-
-- `highschool-app`
-- `semester-app`
-- `lol-jungle-analyzer` (이 작업과 무관)
-
-종료된 네 주소(`retreat-app-theta.vercel.app`, `iguard-app.vercel.app`, `woori-high-retreat.web.app`, `woori-high-iguard.web.app`)는 모두 HTTP 404, 통합 운영 주소는 HTTP 200으로 확인했다.
-
-## 6. 데이터 계약
-
-통합은 코드와 배포 단위를 합친 것이며 DB 이관이 아니다.
-
-- 학기: `semesters/*`, `semestersPrivate/*`
-- 수련회 행정: `retreats/{id}/*`, `retreatsPrivate/{id}/*`
-- 현장 운영: `retreats/{id}/iguard/*`
-- 공통 명단: `classes/{year}` 읽기 전용
-- 승인: `admins`, `retreatAdmins`, `iguardMembers`, `iguardRoles`, `iguardPending`
-
-행정과 현장 권한은 화면에서 통합해 보여도 저장 경로와 쓰기 함수는 계속 분리한다. 민감정보는 반드시 `retreatsPrivate/*`, `semestersPrivate/*` 아래에 둔다.
-
-## 7. 검증과 배포
-
-통합 앱 기준 명령:
-
-```bash
-cd /Users/sunghoon/Desktop/ai개발/highschool-app
-npx tsc --noEmit
-npm test
-npm run build
-npx vercel ls
-curl -s https://woorihigh-app.vercel.app/api/version
-```
-
-2026-08-05 레거시 삭제 전 기준선은 타입 오류 0개, 테스트 38파일/295개 통과, 프로덕션 빌드 성공이었다. 삭제 정리 커밋 후에도 같은 세 검증을 다시 통과시켜야 한다.
-
-## 8. 작업 트리 주의
-
-루트에 다음 미추적 디렉터리가 있으며 이번 정리와 무관하므로 건드리지 않았다.
-
-- `.agents/`
-- `outputs/`
-- `rayquaza-v2-upgrade/`
-- `tmp/`
-
-커밋 시 `git add .`를 쓰지 말고 경로를 명시한다.
-
-## 9. 다음 작업 권장 순서
-
-0. **(우선)** 위 2-1의 Rules 스니펫을 학생 앱에서 배포해 스탭의 학기 조회를 열고, 역할별 계정으로 화면을 한 번 훑는다.
-1. `highschool-app`에서 새 기능을 계속 개발한다.
-2. 통합 홈·행정·현장 권한 조합 회귀 테스트를 유지한다.
-3. 학기 기능이 통합 앱에서 완전히 안정화되면 `semester-app` 종료 여부를 별도 승인받는다.
-4. 운영 DB 쓰기가 필요한 변경은 대상 경로·건수·스냅샷 계획을 제시하고 명시 승인을 받은 뒤 진행한다.
-
-현재 레거시 행정·이가드 정리는 완료 상태다. 다시 독립 앱을 만들지 말고 통합 플랫폼의 도메인 모듈에서 이어서 작업한다.
-
-## 10. 2026-08-06 완료 — 학기 중 사역 UX·훈련 전용 명단·공유 캘린더
-
-통합 홈과 `highschool-app/src/app/semester/[id]`의 7개 탭을 로그인된 로컬 화면에서 직접 확인하고 다음을 반영했다.
-
-- 접수: 이름 검색 + 한 개 반/스탭 선택 방식으로 정리해 50여 개 반 카드가 화면을 밀어내지 않게 했다.
-- 배치: 팀 이름 오른쪽 `명단 상세` 버튼을 추가했다. 학생을 펼치면 본인 연락처, 보호자 연락처, 지원 동기, 하고 싶은 활동을 확인한다. 민감정보는 편집 권한에서만 `semestersPrivate/{sid}/applicationsPrivate`를 구독한다.
-- 출석·수료: 기존에 빠지던 `trainingOnly` 신청자를 `훈련만 신청` 명단으로 분리했다. 새 DB 경로 없이 기존 출석·수료 경로와 신청자 키를 그대로 사용한다.
-- 커리큘럼: PC에서 2열 카드로 배치하고 입력 영역을 넓혔다.
-- 아카이브: 외부 링크뿐 아니라 Firebase Storage에 파일을 직접 업로드할 수 있다. 파일 메타데이터는 기존 `archiveLinks` 레코드의 선택 필드(`filePath`, `fileName`, `fileSize`)로 저장하며 파일 크기는 30MB로 제한한다.
-- 학기 화면: 모든 탭에 현재 기능 설명과 신청·팀·훈련 수 요약을 표시한다.
-- 홈: 메뉴 이름을 `훈련·사역팀`, `수련회 이가드`로 정리했다. `내 담당 사역`은 수련회 동선 대신 계정이 접근 가능한 운영 영역을 보여준다. 학기 회차와 수련회 기간을 합친 `공유 사역 캘린더`는 날짜 클릭 시 오른쪽 상세 패널에 전체 일정을 보여준다.
-
-검증 결과:
-
-- `npx tsc --noEmit`: 통과
-- `npm test`: 44파일, 331개 통과
-- 이번 변경 파일 대상 ESLint: 통과
-- 전체 `npm run lint`: 이번 작업과 무관한 수련회 현장 모듈의 기존 `react-hooks/set-state-in-effect` 오류 때문에 실패한다. 새 학기/홈 파일에는 오류가 없다.
-- `npm run build`: 최종 수정 후 통과
-- 로그인된 로컬 Chrome: 7개 탭 모두 열림, 출석·수료의 훈련 전용 전환, 아카이브 파일 업로드 UI, 팀 명단 상세의 4개 비공개 필드 노출 확인. 운영 DB 쓰기는 하지 않았다.
-
-주의:
-
-- Firebase Rules 배포는 하지 않았다. 현재 Rules에서 `semesters/*` 읽기는 `admins`/`retreatAdmins`만 허용하므로 이가드 전용 스탭에게 학기 일정까지 포함한 공유 캘린더를 완전히 열려면 이 문서 2-1의 학생 앱 Rules 변경이 여전히 필요하다. `semestersPrivate`는 계속 행정 계열 전용이어야 한다.
-- 실제 파일 업로드는 운영 Storage 쓰기이므로 자동 점검 중 실행하지 않았다. 권한 있는 사용자로 작은 테스트 파일 1개를 업로드·열기·삭제하는 운영 확인을 권장한다.
-
-## 11. 2026-08-06 완료 — 훈련 반 도입과 접수 원칙, 학기 화면 정리
-
-사용자 지시(스크린샷 7건)를 반영했다. 로그인된 로컬 Chrome에서 실제 화면으로 확인했다.
-
-- **훈련 반**: 설정 탭을 `사역팀 관리 | 훈련 관리` 2열로 나눴다. 새 경로 `semesters/{sid}/trainingClasses/{id}`(이름·장소·담당). 반 삭제는 `trainingClass.ts`의 루트 다중 경로 update로 신청자의 `trainingClassId`까지 정리한다. 팀 배지는 `whitespace-nowrap`으로 한 줄 고정.
-- **접수 원칙**: 훈련을 신청해야 사역팀에 지원할 수 있다. 예외는 **고3 2학기와 스탭**. 판정은 `intakeRule.ts`(순수·테스트)이고, 위반이면 모달에 경고를 띄우고 저장 버튼을 잠근다. `trainingOnly`는 `deriveTrainingOnly`로 계속 파생 저장해 기존 출석·수료 명단 계약을 유지한다.
-- **접수 화면**: 반·스탭 명단 선택 상자를 없애고 이름 검색 + 접수 명단만 남겼다(검색 40명 초과 시 안내).
-- **출석 탭**: 제목 `출석부`, 좌우 탭 `사역팀 출석부`/`훈련 출석부`. 훈련 명단은 이제 훈련 반 배정자 전원(사역팀 겸임 포함)이며 레거시 `trainingOnly`도 흡수한다(`roster.ts`).
-- **회차 유형**: 정규·개강·종강·휴강·직접 입력. 저장 스키마는 그대로이고 `sessionKind.ts`가 변환한다. **출석 집계에서 빠지는 것은 휴강뿐**이라는 규칙은 유지했다(개강·종강·직접 입력은 정규로 저장).
-- **커리큘럼**: 팀별 `이번 학기 목표`를 상단에 추가(`teams/{id}/goal`).
-- 셀렉트 글자 잘림: `.input`은 레이어 밖 규칙(width:100%·고정 높이 금지)이라 폭은 감싼 div로 주고 `h-*`를 쓰지 않는다.
-
-검증: `npx tsc --noEmit` 통과, `npm test` 47파일/356개 통과, `npm run build` 통과, 이번 변경 파일 ESLint 신규 오류 0.
-로그인 화면 확인: 설정 2열·훈련 관리, 접수 검색·모달, 고1 차단 문구와 저장 잠금, 고3 2학기 허용 안내와 저장 활성, 출석부 탭 이름·셀렉트 잘림 해소, 커리큘럼 목표 박스, 375px 레이아웃. **운영 DB에는 쓰지 않았다**(모달은 저장하지 않고 닫음).
+- 역할·권한 계약: `highschool-app/CLAUDE.md`(6단계 역할 표), `highschool-app/AGENTS.md`
+- DB 소유권: `DB_OWNERSHIP.md` (`attendanceAdmins`·`trainingClasses`·`applications.trainingClassId` 포함)
+- 함정 모음: `LEARNINGS.md`
+- 복구 태그: `pre-legacy-app-removal-2026-08-05`, `pre-unified-apps-2026-08-05`
