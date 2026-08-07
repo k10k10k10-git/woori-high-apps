@@ -63,7 +63,17 @@ const PRESET_MILESTONES = [
   "교사 참석 확인 마감", "최종 인원 확인", "수련회 용품 구매 완료",
 ];
 
-export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: Retreat; retreats: Retreat[] }) {
+export default function RetreatCalendarPanel({
+  retreat,
+  retreats,
+  canEditPeriods = true,
+}: {
+  retreat?: Retreat;
+  retreats: Retreat[];
+  /** 수련회 기간(retreats/{id}/periods) 쓰기 권한 — 이가드 전용 계정은 Rules상 쓸 수 없다.
+   *  준비 일정(prepMilestones)은 이가드팀도 공유 편집 대상이라 그대로 둔다. */
+  canEditPeriods?: boolean;
+}) {
   const { toast, uiConfirm } = useUI();
   const today = toYMD(new Date());
 
@@ -270,7 +280,7 @@ export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: 
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-slate-500">수련회 기간</span>
-          {retreat && (
+          {retreat && canEditPeriods && (
             <button onClick={openAddPeriod}
               className="text-xs px-2.5 py-1 rounded-lg font-medium transition-colors"
               style={{ color: "var(--color-primary)", background: "var(--color-primary-glow)", border: "1px solid var(--color-primary-ring)" }}>
@@ -313,8 +323,10 @@ export default function RetreatCalendarPanel({ retreat, retreats }: { retreat?: 
                       )}
                     </div>
                     <div className="flex gap-2 shrink-0">
-                      <button onClick={() => openEditPeriod(p)} className={`text-xs ${c.text} opacity-60 hover:opacity-100`}>수정</button>
-                      <button onClick={() => handleDeletePeriod(p.retreatId, p.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                      {canEditPeriods && <>
+                        <button onClick={() => openEditPeriod(p)} className={`text-xs ${c.text} opacity-60 hover:opacity-100`}>수정</button>
+                        <button onClick={() => handleDeletePeriod(p.retreatId, p.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                      </>}
                     </div>
                   </div>
                 </div>

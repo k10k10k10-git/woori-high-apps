@@ -1,14 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/features/iguard/context/AuthContext";
-import { canAccessPortalArea, canEditPortalArea, canManageRoles } from "@/features/portal/accessPolicy";
-import NewRetreatButton from "@/features/portal/NewRetreatButton";
-import { getRetreats, requestIguardAccess, getMyIguardPending, subscribeToAllRetreatPeriods, subscribeToMilestones, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks, type RetreatPeriodWithOwner } from "@/features/iguard/lib/db";
-import { Retreat, Milestone, type IguardAccessLock } from "@/features/iguard/lib/types";
+import { canAccessPortalArea, canManageRoles } from "@/features/portal/accessPolicy";
+import VacationHome from "@/features/portal/VacationHome";
+import type { Retreat as PortalRetreat } from "@/lib/types";
+import { getRetreats, requestIguardAccess, getMyIguardPending, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
+import { Retreat, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
 import AdminModal from "./AdminModal";
-import PrepCalendar from "./PrepCalendar";
 import CenterSpinner from "@/components/CenterSpinner";
 
 function inAppKind(): "kakao" | "line" | "other" | null {
@@ -49,8 +48,6 @@ export default function FieldHomeClient() {
   const [kind, setKind] = useState<"kakao" | "line" | "other" | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
 
   useEffect(() => {
     const k = inAppKind();
@@ -81,25 +78,6 @@ export default function FieldHomeClient() {
       .finally(() => setLoading(false));
   }, [user, fieldAllowed]);
 
-  // 준비 일정(milestones)은 전역 공유 — 선택 수련회와 무관하게 항상 구독(행정·이가드 공유)
-  useEffect(() => {
-    if (!user || !fieldAllowed) {
-      setMilestones([]);
-      return;
-    }
-    const u = subscribeToMilestones(setMilestones, e => setLoadError(prev => prev ?? `준비 일정 구독 실패 — ${e.message}`));
-    return () => u();
-  }, [user, fieldAllowed]);
-
-  // 수련회 기간(periods)은 선택과 무관하게 모든 수련회를 합쳐서 항상 표시
-  useEffect(() => {
-    const ids = retreats.map(r => r.id);
-    const u = subscribeToAllRetreatPeriods(ids, setPeriods,
-      e => setLoadError(prev => prev ?? `수련회 기간 구독 실패 — ${e.message}`));
-    return () => u();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retreats.map(r => r.id).join(",")]);
-
   // 승인 사용자에게 수련회별 PIN 잠금 상태를 표시한다. 실제 PIN 검증은 내부 화면 진입 전에 다시 수행한다.
   useEffect(() => {
     if (!user || !fieldAllowed) { setAccessLocks({}); return; }
@@ -124,7 +102,6 @@ export default function FieldHomeClient() {
     }
   }
 
-  const selectedRetreat = retreats.find(r => r.id === selectedId) ?? null;
 
   if (authLoading) return <CenterSpinner />;
 
@@ -187,131 +164,20 @@ export default function FieldHomeClient() {
         </div>
       )}
 
-      <main className="max-w-7xl mx-auto px-4 py-5 sm:py-6">
-        {loadError && <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
-
-        {loading ? (
-          <div className="card p-8 text-center text-slate-400">로딩 중...</div>
-        ) : retreats.length === 0 ? (
-          <div className="card p-8 text-center text-slate-400">
-            <div className="text-3xl mb-2">🗂️</div>
-            <p>등록된 수련회가 없습니다. (행정 사이트에서 생성)</p>
-          </div>
-        ) : (
-          <>
-          <div className="space-y-4 md:hidden">
-            <section className="card p-4">
-              <label className="mb-1 block text-xs font-semibold text-slate-500">수련회 선택</label>
-              <select
-                className="input h-11 w-full bg-white text-sm font-semibold text-slate-800"
-                value={selectedId ?? ""}
-                onChange={e => setSelectedId(e.target.value)}
-              >
-                {retreats.map(r => (
-                  <option key={r.id} value={r.id}>{r.year}년 {r.name}</option>
-                ))}
-              </select>
-              {selectedRetreat && (
-                <Link href={`/retreat/${selectedRetreat.id}/field`} className="mt-3 block rounded-lg border border-fuchsia-200 bg-fuchsia-50/60 p-3">
-                  <div className="mb-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>
-                    {selectedRetreat.year}년
-                  </div>
-                  <div className="font-bold leading-snug text-slate-800">{selectedRetreat.name}</div>
-                  <div className="mt-2 flex items-center justify-between gap-2 text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
-                    <span>현장 입장 →</span>
-                    {accessLocks[selectedRetreat.id] && (
-                      <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] text-fuchsia-700">
-                        {canManageRoles(role) ? "🔓 관리자 우회" : "🔒 PIN"}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-              )}
-            </section>
-
-            <section>
-              <div className="mb-3">
-                <h2 className="text-base font-bold text-slate-700">준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span></h2>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  날짜를 클릭해 일정 추가 — 모든 수련회·행정과 공유{selectedRetreat ? ` · ${selectedRetreat.name} 기간 표시` : ""}
-                </p>
-              </div>
-              <PrepCalendar periods={periods} milestones={milestones} retreats={retreats} />
-            </section>
-          </div>
-
-          <div className="hidden gap-6 items-start md:flex">
-            <aside className="w-72 shrink-0">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-base font-bold text-slate-700">수련회 목록</h2>
-                {/* 수련회는 행정·이가드가 같은 `retreats/{id}`를 보므로 어느 쪽에서 만들어도 양쪽에 나타난다 */}
-                {canEditPortalArea("retreat-admin", role) ? (
-                  <NewRetreatButton
-                    hrefAfterCreate={(id) => `/retreat/${id}/field`}
-                    className="btn-primary text-xs px-2 py-1"
-                  />
-                ) : (
-                  <span className="rounded-full px-2 py-1 text-xs font-semibold"
-                    style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>
-                    공유 일정
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                {retreats.map(r => {
-                  const active = selectedId === r.id;
-                  return (
-                    <div key={r.id}>
-                    <Link href={`/retreat/${r.id}/field`}
-                      onMouseEnter={() => setSelectedId(r.id)}
-                      onFocus={() => setSelectedId(r.id)}
-                      className={`card block w-full p-4 text-left cursor-pointer transition-colors ${active ? "ring-1" : "hover:border-slate-300"}`}
-                      style={active ? { borderColor: "var(--color-primary)", boxShadow: "0 4px 16px var(--color-primary-glow)" } : undefined}>
-                      <div className="mb-1.5 flex items-start justify-between gap-2">
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                            style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>{r.year}년</span>
-                        {accessLocks[r.id] && (
-                          <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">
-                            {canManageRoles(role) ? "🔓 관리자" : "🔒 PIN"}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="mb-2 truncate text-sm font-bold leading-tight text-slate-800">{r.name}</h3>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-slate-400">이동가이드</span>
-                        <span className="text-xs font-medium transition-colors"
-                          style={{ color: "var(--color-primary)" }}>
-                          현장 →
-                        </span>
-                        </div>
-                    </Link>
-                    {canAccessPortalArea("retreat-admin", role) && (
-                      <Link href={`/retreat/${r.id}`}
-                        className="mt-1 block px-2 text-right text-xs font-medium text-sky-600 hover:text-sky-700">
-                        행정 화면으로 →
-                      </Link>
-                    )}
-                    </div>
-                  );
-                })}
-              </div>
-            </aside>
-
-            <section className="flex-1 min-w-0">
-              <div className="mb-3">
-                <h2 className="text-base font-bold text-slate-700">준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span></h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  날짜를 클릭해 일정을 추가하세요 — 모든 수련회·행정과 공유됩니다.{selectedRetreat ? ` 선택: ${selectedRetreat.name}(기간 표시)` : ""}
-                </p>
-              </div>
-              <PrepCalendar periods={periods} milestones={milestones} retreats={retreats} />
-            </section>
-          </div>
-          </>
-        )}
-      </main>
+      {/* 행정(/retreats)과 같은 화면을 쓴다 — 들어가는 곳만 현장으로 다르다 */}
+      {loading ? (
+        <div className="mx-auto max-w-7xl px-4 py-6"><div className="card p-8 text-center text-slate-400">로딩 중...</div></div>
+      ) : (
+        <VacationHome
+          mode="field"
+          role={role}
+          retreats={retreats as unknown as PortalRetreat[]}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          loadError={loadError}
+          lockedIds={new Set(Object.keys(accessLocks))}
+        />
+      )}
 
       {showAdmin && <AdminModal onClose={() => setShowAdmin(false)} retreats={retreats} locks={accessLocks} adminId={user.uid} />}
     </div>

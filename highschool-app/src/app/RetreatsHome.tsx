@@ -1,19 +1,16 @@
 "use client";
-import { useCallback, useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getRetreats, createRetreat, deleteRetreat,
+  getRetreats, deleteRetreat,
   requestRetreatAccess, getEarliestPeriodDateByRetreat,
 } from "@/lib/db";
 import { Retreat } from "@/lib/types";
-import { parseSheetUrl } from "@/lib/sheetsParser";
 import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
-import RetreatCalendarPanel from "./RetreatCalendarPanel";
 import BrainstormPanel from "./BrainstormPanel";
-import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
-import NewRetreatButton from "@/features/portal/NewRetreatButton";
+import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import VacationHome from "@/features/portal/VacationHome";
 
 // ── 로고 SVG ────────────────────────────────────────────────
 function RetreatLogo({ size = 32 }: { size?: number }) {
@@ -43,7 +40,6 @@ function DarkScreen({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
-  const router = useRouter();
   const { user, loading, role, signIn, signOut } = useAuth();
   const canUseAdmin = canAccessPortalArea("retreat-admin", role);
   const { toast } = useUI();
@@ -230,175 +226,27 @@ export default function HomePage() {
 
       {/* 새 수련회 생성은 NewRetreatButton(행정·이가드 공용)이 담당한다 */}
 
-      {/* ═══ 메인 컨텐츠 ═══════════════════════════════════════ */}
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        {retreatLoadError && (
-          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <span>⚠ {retreatLoadError}</span>
-            <button onClick={loadRetreats} className="btn-secondary btn-sm justify-center">다시 불러오기</button>
-          </div>
-        )}
-
-        {retreats.length === 0 ? (
-          /* 빈 상태 */
-          <div className="card p-16 text-center max-w-md mx-auto">
-            <div className="flex justify-center mb-4"><RetreatLogo size={64} /></div>
-            <p className="text-slate-500 font-medium">아직 수련회가 없습니다</p>
-            <p className="text-sm text-slate-400 mt-1 mb-5">&apos;새 수련회&apos; 버튼으로 시작하세요!</p>
-            {canEditPortalArea("retreat-admin", role) && (
-              <NewRetreatButton hrefAfterCreate={(id) => `/retreat/${id}`} onCreated={loadRetreats} />
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col md:flex-row gap-6 items-stretch md:items-start">
-
-            {/* 왼쪽: 수련회 목록 */}
-            <div className="w-full md:w-72 md:shrink-0">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-base font-bold text-slate-700">수련회 목록</h2>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setShowGuide(true)}
-                    className="text-xs px-2 py-1 rounded-lg font-medium transition-colors border"
-                    style={{ color: "#0284c7", borderColor: "rgba(2,132,199,0.3)", background: "rgba(2,132,199,0.05)" }}
-                    onMouseEnter={e => (e.currentTarget.style.background = "rgba(2,132,199,0.1)")}
-                    onMouseLeave={e => (e.currentTarget.style.background = "rgba(2,132,199,0.05)")}
-                  >폼 가이드</button>
-                  {canEditPortalArea("retreat-admin", role) && (
-                    <NewRetreatButton
-                      hrefAfterCreate={(id) => `/retreat/${id}`}
-                      onCreated={loadRetreats}
-                      className="btn-primary text-xs px-2 py-1"
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* 모바일: select 드롭다운 + 선택된 수련회 카드 (이가드 사이트와 동일 패턴) */}
-              <div className="md:hidden">
-                <select
-                  className="input h-11 w-full bg-white text-sm font-semibold text-slate-800"
-                  value={selectedRetreatId ?? ""}
-                  onChange={e => setSelectedRetreatId(e.target.value)}
-                >
-                  {retreats.map(r => (
-                    <option key={r.id} value={r.id}>{r.year}년 {r.name}</option>
-                  ))}
-                </select>
-                {(() => {
-                  const s = retreats.find(r => r.id === selectedRetreatId);
-                  if (!s) return null;
-                  return (
-                    <div className="mt-3 rounded-lg p-3"
-                      style={{ background: "var(--color-primary-glow)", border: "1px solid var(--color-primary-ring)" }}>
-                      <div className="flex items-start justify-between gap-2 mb-1">
-                        <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                          style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>
-                          {s.year}년
-                        </span>
-                        <button onClick={() => handleDelete(s.id, s.name)}
-                          className="text-slate-300 hover:text-red-400 text-lg leading-none transition-colors" aria-label="삭제">×</button>
-                      </div>
-                      <div className="font-bold leading-snug text-slate-800">{s.name}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <button onClick={() => router.push(`/retreat/${s.id}`)}
-                          className="text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
-                          행정 →
-                        </button>
-                        {canAccessPortalArea("retreat-field", role) && (
-                          <button onClick={() => router.push(`/retreat/${s.id}/field`)}
-                            className="text-xs font-semibold text-fuchsia-600">
-                            현장(이가드) →
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* 데스크탑: 전체 카드 리스트 */}
-              <div className="hidden md:block space-y-2">
-                {retreats.map(r => {
-                  const isSelected = selectedRetreatId === r.id;
-                  return (
-                    <div
-                      key={r.id}
-                      onClick={() => router.push(`/retreat/${r.id}`)}
-                      className="card p-4 cursor-pointer group transition-all duration-150"
-                      style={{
-                        borderColor: isSelected ? "var(--color-primary)" : "var(--color-border)",
-                        boxShadow: isSelected ? "0 4px 16px var(--color-primary-glow)" : "",
-                      }}
-                      onMouseEnter={e => {
-                        if (!isSelected) {
-                          (e.currentTarget as HTMLDivElement).style.borderColor = "var(--color-primary)";
-                          (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px var(--color-primary-glow)";
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!isSelected) {
-                          (e.currentTarget as HTMLDivElement).style.borderColor = "var(--color-border)";
-                          (e.currentTarget as HTMLDivElement).style.boxShadow = "";
-                        }
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-1.5">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-semibold"
-                          style={{ background: "var(--color-primary-glow)", color: "var(--color-primary)", border: "1px solid var(--color-primary-ring)" }}>
-                          {r.year}년
-                        </span>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDelete(r.id, r.name); }}
-                          className="text-slate-200 hover:text-red-400 text-lg leading-none transition-colors opacity-0 group-hover:opacity-100"
-                          aria-label="삭제"
-                        >×</button>
-                      </div>
-                      <h3 className="font-bold text-slate-800 text-sm leading-tight mb-2">{r.name}</h3>
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs text-slate-400">
-                          {new Date(r.createdAt).toLocaleDateString("ko-KR")} 생성
-                        </p>
-                        <span className="flex items-center gap-2.5">
-                          <button
-                            onClick={e => { e.stopPropagation(); router.push(`/retreat/${r.id}`); }}
-                            className="text-xs font-medium transition-colors"
-                            style={{ color: "var(--color-primary)" }}
-                          >
-                            행정 →
-                          </button>
-                          {canAccessPortalArea("retreat-field", role) && (
-                            <button
-                              onClick={e => { e.stopPropagation(); router.push(`/retreat/${r.id}/field`); }}
-                              className="text-xs font-medium text-fuchsia-600 transition-colors hover:text-fuchsia-700"
-                            >
-                              현장 →
-                            </button>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 오른쪽: 준비 일정 — 모든 수련회가 공유하는 전역 캘린더 (수련회 선택과 무관하게 항상 표시) */}
-            <div className="w-full flex-1 min-w-0">
-              <div className="mb-3">
-                <h2 className="text-base font-bold text-slate-700">준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span></h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  날짜를 클릭해 일정을 추가하세요 — 모든 수련회·이가드와 공유됩니다. 수련회 기간도 항상 전체가 함께 표시됩니다.
-                  {(() => { const s = retreats.find(r => r.id === selectedRetreatId); return s ? ` 새 기간 추가 대상: ${s.name}` : ""; })()}
-                </p>
-              </div>
-              <RetreatCalendarPanel retreat={retreats.find(r => r.id === selectedRetreatId)} retreats={retreats} />
-              <BrainstormPanel authorName={user.displayName || user.email || "이름 없음"} />
-            </div>
-
-          </div>
-        )}
-      </main>
+      {/* 방학 중 사역 홈은 행정·이가드가 같은 화면(VacationHome)을 쓴다 — 다른 것은 입장 목적지뿐 */}
+      <VacationHome
+        mode="admin"
+        role={role}
+        retreats={retreats}
+        selectedId={selectedRetreatId}
+        onSelect={setSelectedRetreatId}
+        onCreated={loadRetreats}
+        onDelete={handleDelete}
+        loadError={retreatLoadError || null}
+        onRetry={loadRetreats}
+        emptyLogo={<RetreatLogo size={64} />}
+        headerActions={
+          <button
+            onClick={() => setShowGuide(true)}
+            className="rounded-lg border px-2 py-1 text-xs font-medium transition-colors"
+            style={{ color: "#0284c7", borderColor: "rgba(2,132,199,0.3)", background: "rgba(2,132,199,0.05)" }}
+          >폼 가이드</button>
+        }
+        footer={<BrainstormPanel authorName={user.displayName || user.email || "이름 없음"} />}
+      />
     </div>
   );
 }

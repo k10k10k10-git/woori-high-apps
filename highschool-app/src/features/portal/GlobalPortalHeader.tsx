@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import TeamModal from "./TeamModal";
 import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
@@ -19,6 +19,8 @@ export default function GlobalPortalHeader() {
   const pathname = usePathname();
   const { user, loading, role, signOut } = useAuth();
   const [teamOpen, setTeamOpen] = useState(false);
+  const [vacationOpen, setVacationOpen] = useState(false);
+  const vacationRef = useRef<HTMLDivElement>(null);
   const currentArea = activeArea(pathname);
   const openTeam = useCallback(() => setTeamOpen(true), []);
 
@@ -27,14 +29,34 @@ export default function GlobalPortalHeader() {
     return () => window.removeEventListener("portal:open-team", openTeam);
   }, [openTeam]);
 
+  // 드롭다운 닫기는 이벤트에서만 한다(effect에서 setState하면 cascading render).
+  useEffect(() => {
+    if (!vacationOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setVacationOpen(false);
+    }
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      if (!vacationRef.current?.contains(event.target as Node)) setVacationOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [vacationOpen]);
+
   if (loading || !user) return null;
 
   const semesterAllowed = canAccessPortalArea("semester", role);
-  // 방학 중 사역은 진입점 하나. 행정 권한이 있으면 행정 홈, 아니면 현장 홈으로 보낸다.
-  // 두 화면 모두 같은 수련회 목록을 보여주고 카드에서 행정·현장으로 갈라진다.
-  const vacationHref = canAccessPortalArea("retreat-admin", role)
-    ? "/retreats"
-    : canAccessPortalArea("retreat-field", role) ? "/field" : null;
+  // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
+  // 수련회에 들어갔을 때 행정 화면이냐 현장 화면이냐만 달라진다.
+  const vacationItems = [
+    ...(canAccessPortalArea("retreat-admin", role) ? [{ href: "/retreats", label: "수련회 행정팀", hint: "신청·편성·물품" }] : []),
+    ...(canAccessPortalArea("retreat-field", role) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
+  ];
 
   return (
     <>
@@ -56,13 +78,42 @@ export default function GlobalPortalHeader() {
               </Link>
             )}
 
-            {vacationHref && (
-              <Link
-                href={vacationHref}
-                className={`rounded-lg px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${currentArea === "vacation" ? "bg-white/12 text-white" : "text-slate-400 hover:bg-white/8 hover:text-white"}`}
+            {vacationItems.length > 0 && (
+              <div
+                ref={vacationRef}
+                className="relative"
+                onMouseEnter={() => setVacationOpen(true)}
+                onMouseLeave={() => setVacationOpen(false)}
               >
-                방학 중 사역
-              </Link>
+                <button
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded={vacationOpen}
+                  onClick={() => setVacationOpen((open) => !open)}
+                  onFocus={() => setVacationOpen(true)}
+                  className={`flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${currentArea === "vacation" ? "bg-white/12 text-white" : "text-slate-400 hover:bg-white/8 hover:text-white"}`}
+                >
+                  방학 중 사역
+                  <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
+                </button>
+                {vacationOpen && (
+                  <div className="absolute left-0 top-full z-[70] w-56 pt-1.5">
+                    <div className="overflow-hidden rounded-xl border border-white/10 bg-slate-900 shadow-xl">
+                      {vacationItems.map((item) => (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setVacationOpen(false)}
+                          className="block px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
+                        >
+                          {item.label}
+                          <span className="mt-0.5 block text-[10px] font-normal text-slate-500">{item.hint}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </nav>
 
