@@ -8,8 +8,16 @@ export type SharedCalendarItem = {
   date: string;
   endDate?: string;
   title: string;
-  kind: "semester" | "retreat";
-  href: string;
+  /** shared = 직접 등록한 공유 일정(prepMilestones) — 이 화면에서 추가·수정·삭제한다 */
+  kind: "semester" | "retreat" | "shared";
+  href?: string;
+  done?: boolean;
+};
+
+const KIND_LABEL: Record<SharedCalendarItem["kind"], string> = {
+  semester: "학기 중 사역",
+  retreat: "방학 중 사역",
+  shared: "공유 일정",
 };
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -22,7 +30,19 @@ export function calendarItemsForDate(items: SharedCalendarItem[], date: string) 
   return items.filter((item) => item.date <= date && date <= (item.endDate ?? item.date));
 }
 
-export default function SharedMinistryCalendar({ items }: { items: SharedCalendarItem[] }) {
+export default function SharedMinistryCalendar({
+  items,
+  canEdit = false,
+  onAdd,
+  onEdit,
+  onDelete,
+}: {
+  items: SharedCalendarItem[];
+  canEdit?: boolean;
+  onAdd?: (date: string) => void;
+  onEdit?: (item: SharedCalendarItem) => void;
+  onDelete?: (item: SharedCalendarItem) => void;
+}) {
   const today = new Date();
   const initial = items.find((item) => item.date >= ymd(today.getFullYear(), today.getMonth(), today.getDate()))?.date;
   const initialDate = initial ? new Date(`${initial}T00:00:00`) : today;
@@ -75,7 +95,7 @@ export default function SharedMinistryCalendar({ items }: { items: SharedCalenda
                 >
                   <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${date === ymd(today.getFullYear(), today.getMonth(), today.getDate()) ? "bg-slate-900 text-white" : "text-slate-600"}`}>{day}</span>
                   <span className="mt-1 grid gap-1">
-                    {dayItems.slice(0, 2).map((item) => <span key={item.id} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium ${item.kind === "semester" ? "bg-emerald-100 text-emerald-800" : "bg-violet-100 text-violet-800"}`}>{item.title}</span>)}
+                    {dayItems.slice(0, 2).map((item) => <span key={item.id} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium ${item.kind === "semester" ? "bg-emerald-100 text-emerald-800" : item.kind === "retreat" ? "bg-violet-100 text-violet-800" : "bg-sky-100 text-sky-800"}`}>{item.title}</span>)}
                     {dayItems.length > 2 && <span className="px-1 text-[10px] text-slate-400">+{dayItems.length - 2}개</span>}
                   </span>
                 </button>
@@ -85,16 +105,54 @@ export default function SharedMinistryCalendar({ items }: { items: SharedCalenda
         </div>
 
         <aside className="rounded-2xl bg-slate-900 p-4 text-white lg:min-h-full">
-          <p className="text-xs font-semibold tracking-wide text-sky-300">{selectedDate.replaceAll("-", ".")}</p>
-          <h3 className="mt-1 text-base font-bold">전체 일정</h3>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold tracking-wide text-sky-300">{selectedDate.replaceAll("-", ".")}</p>
+              <h3 className="mt-1 text-base font-bold">전체 일정</h3>
+            </div>
+            {canEdit && onAdd && (
+              <button
+                onClick={() => onAdd(selectedDate)}
+                className="rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-xs font-semibold transition hover:bg-white/20"
+              >
+                + 일정 추가
+              </button>
+            )}
+          </div>
           <div className="mt-4 grid gap-2">
-            {selectedItems.map((item) => (
-              <Link key={item.id} href={item.href} className="rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-                <span className={`text-[10px] font-bold ${item.kind === "semester" ? "text-emerald-300" : "text-violet-300"}`}>{item.kind === "semester" ? "학기 중 사역" : "방학 중 사역"}</span>
-                <p className="mt-1 text-sm font-semibold leading-snug">{item.title}</p>
-              </Link>
-            ))}
-            {selectedItems.length === 0 && <p className="rounded-xl border border-dashed border-white/15 px-3 py-8 text-center text-xs text-slate-400">등록된 일정이 없습니다.</p>}
+            {selectedItems.map((item) => {
+              const body = (
+                <>
+                  <span className={`text-[10px] font-bold ${item.kind === "semester" ? "text-emerald-300" : item.kind === "retreat" ? "text-violet-300" : "text-sky-300"}`}>
+                    {KIND_LABEL[item.kind]}
+                  </span>
+                  <p className={`mt-1 text-sm font-semibold leading-snug ${item.done ? "text-slate-400 line-through" : ""}`}>{item.title}</p>
+                </>
+              );
+              if (item.kind === "shared") {
+                return (
+                  <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    {body}
+                    {canEdit && (
+                      <div className="mt-2 flex gap-2">
+                        <button onClick={() => onEdit?.(item)} className="text-[11px] text-sky-200 underline-offset-2 hover:underline">수정</button>
+                        <button onClick={() => onDelete?.(item)} className="text-[11px] text-red-300 underline-offset-2 hover:underline">삭제</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return (
+                <Link key={item.id} href={item.href ?? "#"} className="rounded-xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
+                  {body}
+                </Link>
+              );
+            })}
+            {selectedItems.length === 0 && (
+              <p className="rounded-xl border border-dashed border-white/15 px-3 py-8 text-center text-xs text-slate-400">
+                등록된 일정이 없습니다.{canEdit && onAdd ? " 위 ‘일정 추가’로 만들 수 있어요." : ""}
+              </p>
+            )}
           </div>
         </aside>
       </div>

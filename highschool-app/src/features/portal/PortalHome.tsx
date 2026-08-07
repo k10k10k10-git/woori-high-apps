@@ -4,12 +4,22 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
-import { getRetreats, subscribeToAllRetreatPeriods, type RetreatPeriodWithOwner } from "@/lib/db";
+import {
+  deleteMilestone,
+  getRetreats,
+  saveMilestone,
+  subscribeToAllRetreatPeriods,
+  subscribeToMilestones,
+  updateMilestone,
+  type RetreatPeriodWithOwner,
+} from "@/lib/db";
+import type { Milestone } from "@/lib/types";
 import type { Retreat } from "@/lib/types";
 import { getSemesters, subscribeSessions } from "@/features/semester/db";
 import type { Semester, Session } from "@/features/semester/types";
 import {
   canAccessPortalArea,
+  canEditPortalArea,
   iguardScope,
   MINISTRY_ROLE_HINTS,
   MINISTRY_ROLE_LABELS,
@@ -36,6 +46,10 @@ export default function PortalHome() {
     items: [],
   });
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 공유 일정(prepMilestones) — 행정·이가드가 함께 쓰는 전역 노드. 스탭은 Rules상 쓰기 불가.
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string } | null>(null);
+  const canEditSchedule = canEditPortalArea("retreat-admin", role) || iguardScope(role) === "all";
 
   const semesterAllowed = canAccessPortalArea("semester", role);
   const fieldAllowed = canAccessPortalArea("retreat-field", role);
@@ -78,6 +92,11 @@ export default function PortalHome() {
   );
 
   useEffect(() => {
+    if (!user || !canAccessPortalArea("home", role)) return;
+    return subscribeToMilestones(setMilestones, (error) => setLoadError(error.message));
+  }, [user, role]);
+
+  useEffect(() => {
     return subscribeToAllRetreatPeriods(
       retreats.map((retreat) => retreat.id),
       setPeriods,
@@ -114,8 +133,31 @@ export default function PortalHome() {
         href: retreatEntryHref(period.retreatId, role),
       };
     });
-    return [...semesterItems, ...retreatItems].sort((a, b) => a.date.localeCompare(b.date));
-  }, [currentSemester, periods, retreats, role, sessions]);
+    const sharedItems: SharedCalendarItem[] = milestones.map((milestone) => ({
+      id: `shared-${milestone.id}`,
+      date: milestone.targetDate,
+      title: milestone.title,
+      kind: "shared" as const,
+      done: milestone.done,
+    }));
+    return [...semesterItems, ...retreatItems, ...sharedItems].sort((a, b) => a.date.localeCompare(b.date));
+  }, [currentSemester, milestones, periods, retreats, role, sessions]);
+
+  async function submitSchedule() {
+    if (!scheduleDraft) return;
+    const title = scheduleDraft.title.trim();
+    if (!title) return;
+    try {
+      if (scheduleDraft.id) {
+        await updateMilestone(scheduleDraft.id, { title, targetDate: scheduleDraft.date });
+      } else {
+        await saveMilestone({ title, targetDate: scheduleDraft.date, done: false });
+      }
+      setScheduleDraft(null);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error));
+    }
+  }
 
   if (loading) {
     return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중…</main>;
@@ -217,7 +259,19 @@ export default function PortalHome() {
         </section>
 
         <section className="mt-7 grid gap-6">
-          <SharedMinistryCalendar items={calendarItems} />
+          <SharedMinistryCalendar
+            items={calendarItems}
+            canEdit={canEditSchedule}
+            onAdd={(date) => setScheduleDraft({ date, title: "" })}
+            onEdit={(item) => setScheduleDraft({ id: item.id.replace(/^shared-/, ""), date: item.date, title: item.title })}
+            onDelete={async (item) => {
+              try {
+                await deleteMilestone(item.id.replace(/^shared-/, ""));
+              } catch (error) {
+                setLoadError(error instanceof Error ? error.message : String(error));
+              }
+            }}
+          />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -238,6 +292,54 @@ export default function PortalHome() {
             </section>
           </div>
         </section>
+        {scheduleDraft && (
+          <div
+            className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            onClick={() => setScheduleDraft(null)}
+            onKeyDown={(event) => event.key === "Escape" && setScheduleDraft(null)}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}
+              className="modal-card w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <h3 className="font-bold text-slate-900">{scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}</h3>
+              <p className="mt-1 text-xs text-slate-500">행정·이가드가 함께 보는 준비 일정입니다.</p>
+              <label className="mt-4 block text-sm">
+                <span className="text-xs text-slate-500">날짜</span>
+                <input
+                  type="date"
+                  value={scheduleDraft.date}
+                  onChange={(event) => setScheduleDraft({ ...scheduleDraft, date: event.target.value })}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="mt-3 block text-sm">
+                <span className="text-xs text-slate-500">일정 내용</span>
+                <input
+                  autoFocus
+                  value={scheduleDraft.title}
+                  onChange={(event) => setScheduleDraft({ ...scheduleDraft, title: event.target.value })}
+                  onKeyDown={(event) => event.key === "Enter" && void submitSchedule()}
+                  placeholder="예: 사역팀 모임 준비"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <div className="mt-5 flex justify-end gap-2">
+                <button onClick={() => setScheduleDraft(null)} className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100">취소</button>
+                <button
+                  onClick={() => void submitSchedule()}
+                  disabled={!scheduleDraft.title.trim() || !scheduleDraft.date}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

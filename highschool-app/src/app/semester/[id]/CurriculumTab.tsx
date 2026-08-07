@@ -7,36 +7,40 @@ import { useUI } from "@/context/UIContext";
 import { subscribeCurriculum, updateCurriculumEntry, updateTeam } from "@/features/semester/db";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
-import { CurriculumEntry, Session, Team } from "@/features/semester/types";
+import { CurriculumEntry, Session, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
   sid: string;
   teams: Team[];
+  trainingClasses: TrainingClass[];
   sessions: Session[];
 }
 
-export default function CurriculumTab({ sid, teams, sessions }: Props) {
+export default function CurriculumTab({ sid, teams, trainingClasses, sessions }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
+  // 사역팀과 훈련 반은 같은 curriculum/{id} 맵을 쓴다 (id가 서로 겹치지 않는다)
+  const [scope, setScope] = useState<"team" | "training">("team");
   const [teamId, setTeamId] = useState<string>("");
   const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [goalDraft, setGoalDraft] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const activeTeamId = teams.some((team) => team.id === teamId) ? teamId : teams[0]?.id ?? "";
+  const groups = scope === "team" ? teams : trainingClasses;
+  const activeTeamId = groups.some((group) => group.id === teamId) ? teamId : groups[0]?.id ?? "";
 
   useEffect(() => {
     if (!activeTeamId) return;
     return subscribeCurriculum(sid, activeTeamId, setEntries, (e) => setLoadError(e.message));
   }, [sid, activeTeamId]);
 
-  const activeTeam = teams.find((team) => team.id === activeTeamId);
+  const activeTeam = groups.find((group) => group.id === activeTeamId);
 
   async function saveGoal() {
-    if (goalDraft === null || !activeTeam) return;
+    if (goalDraft === null || !activeTeam || scope !== "team") return;
     const goal = goalDraft.trim();
     setGoalDraft(null);
-    if (goal === (activeTeam.goal ?? "")) return;
+    if (goal === (("goal" in activeTeam ? activeTeam.goal : "") ?? "")) return;
     try {
       await updateTeam(sid, activeTeam.id, { goal });
       toast("팀 목표를 저장했습니다", "success");
@@ -56,7 +60,6 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
     }
   }
 
-  if (teams.length === 0) return <p className="text-sm text-slate-400">먼저 설정 탭에서 팀을 만들어주세요.</p>;
   if (sessions.length === 0) return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차를 등록해주세요.</p>;
 
   return (
@@ -67,8 +70,26 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
         </div>
       )}
 
-      <div role="tablist" aria-label="팀 선택" className="flex gap-1 overflow-x-auto mb-4">
-        {teams.map((t) => (
+      <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+        <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="커리큘럼 구분">
+          {([["team", `사역팀 ${teams.length}개`], ["training", `훈련 ${trainingClasses.length}개`]] as const).map(([key, label]) => (
+            <button key={key} role="tab" aria-selected={scope === key}
+              onClick={() => { setScope(key); setTeamId(""); setDrafts({}); setGoalDraft(null); }}
+              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === key ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {groups.length === 0 ? (
+        <p className="text-sm text-slate-400">
+          {scope === "team" ? "먼저 설정 탭에서 사역팀을 만들어주세요." : "먼저 설정 탭의 훈련 관리에서 반을 만들어주세요."}
+        </p>
+      ) : (
+      <>
+      <div role="tablist" aria-label={scope === "team" ? "사역팀 선택" : "훈련 반 선택"} className="flex gap-1 overflow-x-auto mb-4">
+        {groups.map((t) => (
           <button
             key={t.id}
             role="tab"
@@ -87,7 +108,7 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
         ))}
       </div>
 
-      {activeTeam && (
+      {activeTeam && scope === "team" && (
         <section className="card card-body mb-4">
           <div>
             <h3 className="font-semibold text-slate-800">{activeTeam.name} · 이번 학기 목표</h3>
@@ -96,7 +117,7 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
           <textarea
             aria-label={`${activeTeam.name} 이번 학기 목표`}
             disabled={!canEdit}
-            value={goalDraft ?? activeTeam.goal ?? ""}
+            value={goalDraft ?? ("goal" in activeTeam ? activeTeam.goal : "") ?? ""}
             onChange={(e) => setGoalDraft(e.target.value)}
             onBlur={() => void saveGoal()}
             rows={3}
@@ -129,6 +150,8 @@ export default function CurriculumTab({ sid, teams, sessions }: Props) {
           </li>
         ))}
       </ul>
+      </>
+      )}
     </div>
   );
 }

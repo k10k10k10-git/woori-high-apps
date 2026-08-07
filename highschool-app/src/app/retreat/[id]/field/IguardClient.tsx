@@ -239,9 +239,9 @@ function IguardWorkspace({ id }: { id: string }) {
                   setSheetSettingsOpen(true);
                 }}
                 className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-fuchsia-200"
-                aria-label="시트 설정 열기"
+                aria-label="큐싯 가져오기 열기"
               >
-                <span className="sm:hidden" aria-hidden="true">⚙</span><span className="hidden sm:inline">⚙ 시트 설정</span>
+                <span className="sm:hidden" aria-hidden="true">⬇</span><span className="hidden sm:inline">⬇ 큐싯 가져오기</span>
               </button>
             )}
           </div>

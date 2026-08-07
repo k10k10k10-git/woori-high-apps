@@ -33,7 +33,7 @@ const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   신청: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
   배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
   출석: { title: "출석부", description: "사역팀 출석부와 훈련 출석부를 나눠 회차별로 기록합니다." },
-  수료: { title: "훈련 수료 현황", description: "출석 점수에 따른 수료 여부와 후속 제작 업무를 확인합니다." },
+  수료: { title: "훈련 및 사역팀 수료 현황", description: "출석 점수에 따른 수료 여부와 후속 제작 사역을 확인합니다." },
   커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 회차별 모임 계획을 작성하고 공유합니다." },
   아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
   설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 회차와 수료 기준을 관리합니다." },
@@ -170,14 +170,14 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
-            {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} applications={applications} teamById={teamById} />}
+            {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
             {activeTab === "출석" && (
               <AttendanceTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />
             )}
             {activeTab === "수료" && (
               <CompletionTab sid={semesterId} meta={meta} sessions={sessions} applications={applications} teamById={teamById} />
             )}
-            {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} sessions={sessions} />}
+            {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} />}
             {activeTab === "아카이브" && <ArchiveTab sid={semesterId} />}
             {activeTab === "설정" && canEdit && (
               <SettingsTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} />

@@ -6,13 +6,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useUI } from "@/context/UIContext";
 import { describeApplicant, subscribeApplicationsPrivate, updateApplication } from "@/features/semester/db";
+import { STAFF_BU } from "@/features/semester/applicant";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
-import { Application, ApplicationPrivate, Team } from "@/features/semester/types";
+import { Application, ApplicationPrivate, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
   sid: string;
   teams: Team[];
+  trainingClasses: TrainingClass[];
   applications: Application[];
   teamById: Map<string, Team>;
 }
@@ -21,7 +23,7 @@ function byApplicant(a: Application, b: Application) {
   return applicantSortKey(a).localeCompare(applicantSortKey(b), "ko");
 }
 
-export default function AssignTab({ sid, teams, applications, teamById }: Props) {
+export default function AssignTab({ sid, teams, trainingClasses, applications, teamById }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
   const [privateMap, setPrivateMap] = useState<Record<string, ApplicationPrivate>>({});
@@ -45,6 +47,32 @@ export default function AssignTab({ sid, teams, applications, teamById }: Props)
     return m;
   }, [targets, teams]);
 
+  // 훈련 배치 — 학생만 대상(교사·스탭은 훈련 과정이 없다)
+  const trainingTargets = useMemo(
+    () => applications.filter((a) => a.status !== "취소" && a.bu !== STAFF_BU),
+    [applications],
+  );
+  const trainingUnassigned = trainingTargets.filter((a) => !a.trainingClassId);
+  const byTrainingClass = useMemo(() => {
+    const map = new Map<string, Application[]>();
+    for (const trainingClass of trainingClasses) map.set(trainingClass.id, []);
+    for (const app of trainingTargets) {
+      if (app.trainingClassId && map.has(app.trainingClassId)) map.get(app.trainingClassId)!.push(app);
+    }
+    return map;
+  }, [trainingTargets, trainingClasses]);
+
+  async function assignTraining(app: Application, trainingClassId: string) {
+    try {
+      await updateApplication(sid, app.id, { trainingClassId });
+      if (trainingClassId) {
+        toast(`${app.name} → ${trainingClasses.find((c) => c.id === trainingClassId)?.name ?? ""} 훈련 반 배정`, "success");
+      }
+    } catch (e) {
+      toast(`훈련 반 배정 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
   async function assign(app: Application, teamId: string) {
     try {
       await updateApplication(sid, app.id, { teamId, status: teamId ? "배치" : "접수" });
@@ -59,7 +87,10 @@ export default function AssignTab({ sid, teams, applications, teamById }: Props)
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+    <div className="grid gap-6">
+    <section>
+      <h3 className="mb-2 text-sm font-bold text-slate-700">사역팀 배치</h3>
+      <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
       {/* 미배정 풀 */}
       <section className="card card-body">
         <h3 className="font-semibold text-slate-800">
@@ -161,6 +192,85 @@ export default function AssignTab({ sid, teams, applications, teamById }: Props)
           );
         })}
       </section>
+
+      </div>
+    </section>
+
+    <section>
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-bold text-slate-700">훈련 배치</h3>
+        <span className="text-xs text-slate-400">교사·스탭은 훈련 대상이 아니라 목록에 없습니다.</span>
+      </div>
+      {trainingClasses.length === 0 ? (
+        <p className="text-sm text-slate-400">먼저 설정 탭의 훈련 관리에서 반을 만들어주세요.</p>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+          <div className="card card-body">
+            <h4 className="font-semibold text-slate-800">
+              반 미정 <span className="text-sm text-slate-400">{trainingUnassigned.length}명</span>
+            </h4>
+            {trainingUnassigned.length === 0 && <p className="text-sm text-slate-400">모두 배정되었습니다 🎉</p>}
+            <ul className="grid gap-1.5">
+              {[...trainingUnassigned].sort(byApplicant).map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: "var(--color-border)" }}>
+                  <span>
+                    {a.name}
+                    <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
+                  </span>
+                  <select
+                    aria-label={`${a.name} 훈련 반 배정`}
+                    value=""
+                    disabled={!canEdit}
+                    onChange={(e) => e.target.value && void assignTraining(a, e.target.value)}
+                    className="input h-8 w-28 px-1.5 py-1 text-xs"
+                  >
+                    <option value="">배정…</option>
+                    {trainingClasses.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {trainingClasses.map((c) => {
+              const members = [...(byTrainingClass.get(c.id) ?? [])].sort(byApplicant);
+              return (
+                <div key={c.id} className="card overflow-hidden">
+                  <div className={`px-4 py-2.5 text-sm font-semibold ${c.color}`}>
+                    {c.name} <span className="font-normal text-slate-600">{members.length}명</span>
+                    {c.teacher && <span className="ml-1 text-xs font-normal text-slate-500">담당 {c.teacher}</span>}
+                  </div>
+                  <ul className="grid gap-1 p-3">
+                    {members.map((a) => (
+                      <li key={a.id} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-slate-50">
+                        <span>
+                          {a.name}
+                          <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
+                        </span>
+                        {canEdit && (
+                          <button
+                            aria-label={`${a.name} 훈련 반 해제`}
+                            onClick={() => void assignTraining(a, "")}
+                            className="text-xs text-slate-400 hover:text-red-500"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                    {members.length === 0 && <li className="px-2 py-1 text-xs text-slate-300">아직 없음</li>}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
 
       {detailTeamId && (() => {
         const detailTeam = teamById.get(detailTeamId);
