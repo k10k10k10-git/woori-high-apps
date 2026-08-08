@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { IguardPost } from "@/features/iguard/lib/types";
 import { saveIguardPost, deleteIguardPost, updateIguardPostFields } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
@@ -10,9 +10,9 @@ export default function PostsView({ retreatId, posts }: { retreatId: string; pos
   const [area, setArea] = useState("");
   const [drafts, setDrafts] = useState<Record<string, { name: string; area: string }>>({});
 
-  useEffect(() => {
-    setDrafts(Object.fromEntries(posts.map(post => [post.id, { name: post.name, area: post.area || "" }])));
-  }, [posts]);
+  // drafts에는 사용자가 실제로 고친 항목만 담고, 나머지는 렌더 중 서버 값에서 파생한다.
+  // 예전처럼 effect로 posts 전체를 draft에 복사하면 실시간 갱신이 입력 중인 값을 덮었다.
+  const draftFor = (post: IguardPost) => drafts[post.id] ?? { name: post.name, area: post.area || "" };
 
   const changedCount = useMemo(() => posts.filter(post => {
     const draft = drafts[post.id];
@@ -31,8 +31,7 @@ export default function PostsView({ retreatId, posts }: { retreatId: string; pos
   async function saveAll() {
     const changes: Record<string, Partial<Pick<IguardPost, "name" | "area">>> = {};
     for (const post of posts) {
-      const draft = drafts[post.id];
-      if (!draft) continue;
+      const draft = draftFor(post);
       if (!draft.name.trim()) return toast("포스트 이름은 비워둘 수 없습니다.", "warning");
       const fields: Partial<Pick<IguardPost, "name" | "area">> = {};
       if (draft.name.trim() !== post.name) fields.name = draft.name.trim();
@@ -61,20 +60,20 @@ export default function PostsView({ retreatId, posts }: { retreatId: string; pos
             <input
               aria-label={`${post.name} 구역`}
               className="input min-h-10 text-sm"
-              value={drafts[post.id]?.area || ""}
+              value={draftFor(post).area}
               onChange={event => setDrafts(current => ({
                 ...current,
-                [post.id]: { ...(current[post.id] || { name: post.name, area: "" }), area: event.target.value },
+                [post.id]: { ...draftFor(post), area: event.target.value },
               }))}
               placeholder="예: 4층, 식당"
             />
             <input
               aria-label={`${post.name} 이름`}
               className="input min-h-10 min-w-0 text-sm"
-              value={drafts[post.id]?.name || ""}
+              value={draftFor(post).name}
               onChange={event => setDrafts(current => ({
                 ...current,
-                [post.id]: { ...(current[post.id] || { name: "", area: post.area || "" }), name: event.target.value },
+                [post.id]: { ...draftFor(post), name: event.target.value },
               }))}
               placeholder="예: 강당 엘리베이터 앞"
             />

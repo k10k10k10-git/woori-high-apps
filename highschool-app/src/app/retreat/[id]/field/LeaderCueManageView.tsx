@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { IguardScheduleBlock } from "@/features/iguard/lib/types";
 import { updateIguardScheduleBlock } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
@@ -11,11 +11,10 @@ function timeRangeLabel(block: IguardScheduleBlock): string {
 
 function LeaderNoteEditor({ retreatId, block }: { retreatId: string; block: IguardScheduleBlock }) {
   const { toast } = useUI();
+  // 부모가 key={block.id}로 렌더하므로 블록이 바뀌면 이 컴포넌트가 리마운트되고
+  // 초기값이 다시 잡힌다. 서버 값으로 되돌리는 effect를 두면 오히려 입력 중인
+  // 내용을 실시간 갱신이 덮어쓴다.
   const [text, setText] = useState(block.leaderNote || "");
-
-  useEffect(() => {
-    setText(block.leaderNote || "");
-  }, [block.id, block.leaderNote]);
 
   async function save() {
     const trimmed = text.trim();

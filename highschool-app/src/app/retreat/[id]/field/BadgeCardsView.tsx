@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { badgeCardsHtml, buildBadgeCard, type BadgeCardInput } from "@/features/iguard/lib/badgeCard";
 import { printAsPDF } from "@/features/iguard/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
@@ -13,24 +13,22 @@ interface Props extends BadgeCardInput {
 
 export default function BadgeCardsView(props: Props) {
   const { toast } = useUI();
-  const [staffId, setStaffId] = useState("");
+  // 저장된 선택은 최초 1회 lazy 초기화로 읽는다. 유효성(명단에 아직 있는가) 판정은
+  // 렌더 중 파생 — effect에서 setState하면 cascading render가 되고 실수 13의 씨앗이 된다.
+  const [staffId, setStaffId] = useState<string>(() => {
+    try { return window.localStorage.getItem(`iguard:${props.retreatId}:badge-card-staff`) ?? ""; }
+    catch { return ""; }
+  });
   const sortedStaff = useMemo(
     () => [...props.staff].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name, "ko")),
     [props.staff],
   );
   const selectionKey = `iguard:${props.retreatId}:badge-card-staff`;
-  const card = useMemo(() => buildBadgeCard(staffId, props), [staffId, props]);
+  const activeStaffId = sortedStaff.some(member => member.id === staffId)
+    ? staffId
+    : (sortedStaff[0]?.id ?? "");
+  const card = useMemo(() => buildBadgeCard(activeStaffId, props), [activeStaffId, props]);
 
-  useEffect(() => {
-    if (!sortedStaff.length) return;
-    const saved = window.localStorage.getItem(selectionKey);
-    const next = sortedStaff.some(member => member.id === staffId)
-      ? staffId
-      : sortedStaff.some(member => member.id === saved)
-        ? saved!
-        : sortedStaff[0].id;
-    if (next !== staffId) setStaffId(next);
-  }, [selectionKey, sortedStaff, staffId]);
 
   function printCards(ids: string[]) {
     const cards = ids.map(id => buildBadgeCard(id, props)).filter((item): item is NonNullable<typeof item> => !!item);
@@ -55,7 +53,7 @@ export default function BadgeCardsView(props: Props) {
           <span className="mb-1 block text-xs font-semibold text-slate-500">스탭 선택</span>
           <select
             className="input h-11 w-full"
-            value={staffId}
+            value={activeStaffId}
             onChange={event => {
               setStaffId(event.target.value);
               window.localStorage.setItem(selectionKey, event.target.value);
@@ -64,7 +62,7 @@ export default function BadgeCardsView(props: Props) {
             {sortedStaff.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
           </select>
         </label>
-        <button type="button" className="btn-secondary min-h-11 justify-center" onClick={() => printCards([staffId])}>선택 카드 인쇄</button>
+        <button type="button" className="btn-secondary min-h-11 justify-center" onClick={() => printCards([activeStaffId])}>선택 카드 인쇄</button>
         <button type="button" className="btn-primary min-h-11 justify-center" onClick={() => printCards(sortedStaff.map(member => member.id))}>전체 카드 인쇄</button>
       </div>
 

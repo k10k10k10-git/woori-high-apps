@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { IguardScheduleBlock } from "@/features/iguard/lib/types";
 import { updateIguardScheduleBlock } from "@/features/iguard/lib/db";
 import { normalizeEnd, normalizeTime, scheduleTimeError } from "@/features/iguard/lib/cueSheet";
@@ -17,10 +17,8 @@ export default function ScheduleBlockEditor({ retreatId, block }: { retreatId: s
     noMovement: !!block.noMovement,
     note: block.note || "",
   });
-  useEffect(() => setDraft({
-    day: block.day, start: block.start, end: block.end || "", label: block.label,
-    meal: !!block.meal, noMovement: !!block.noMovement, note: block.note || "",
-  }), [block]);
+  // 부모가 key로 렌더하므로 대상이 바뀌면 리마운트되어 초기값이 다시 잡힌다.
+  // 서버 값으로 되돌리는 effect를 두면 입력 중인 내용을 실시간 갱신이 덮어쓴다.
 
   async function save() {
     const start = normalizeTime(draft.start);

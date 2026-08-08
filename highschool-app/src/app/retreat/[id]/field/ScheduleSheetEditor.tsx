@@ -458,7 +458,7 @@ function AdvancedDrawer({
         <div className="flex-1 overflow-y-auto p-4">
           <section className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <h3 className="mb-2 text-sm font-bold text-slate-700">시간 블록 고급 설정</h3>
-            <ScheduleBlockEditor retreatId={retreatId} block={block} />
+            <ScheduleBlockEditor key={block.id} retreatId={retreatId} block={block} />
           </section>
           <h3 className="mb-2 text-sm font-bold text-slate-700">구간·포스트·담당자</h3>
           <ScheduleSegmentEditor

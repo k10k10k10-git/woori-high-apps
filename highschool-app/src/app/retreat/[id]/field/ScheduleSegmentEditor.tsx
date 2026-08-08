@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { IguardMovement, IguardPost, IguardScheduleBlock, IguardSegment, IguardStaff } from "@/features/iguard/lib/types";
 import {
   deleteIguardMovementById,
@@ -44,16 +44,8 @@ function MovementRow({ retreatId, movement, allMovements, staff, posts }: {
     note: movement.note || "",
   });
 
-  useEffect(() => {
-    setDraft({
-      postId: movement.postId,
-      assignee: assigneeOf(movement),
-      actor: movement.actor || "",
-      round: movement.round || "",
-      detail: movement.detail || "",
-      note: movement.note || "",
-    });
-  }, [movement]);
+  // 부모가 key로 렌더하므로 대상이 바뀌면 리마운트되어 초기값이 다시 잡힌다.
+  // 서버 값으로 되돌리는 effect를 두면 입력 중인 내용을 실시간 갱신이 덮어쓴다.
 
   async function save() {
     if (!movement.segmentId || !draft.postId) return;
@@ -142,12 +134,10 @@ function SegmentSection({ retreatId, block, segment, segments, movements, staff,
   const [newActor, setNewActor] = useState("");
   const rows = movements.filter(movement => movement.segmentId === segment.id);
 
-  useEffect(() => {
-    setLabel(segment.label); setZone(segment.zone || ""); setNote(segment.note || "");
-  }, [segment]);
-  useEffect(() => {
-    if (!posts.some(post => post.id === newPostId)) setNewPostId(posts[0]?.id || "");
-  }, [newPostId, posts]);
+  // 부모가 key로 렌더하므로 대상이 바뀌면 리마운트되어 초기값이 다시 잡힌다.
+  // 서버 값으로 되돌리는 effect를 두면 입력 중인 내용을 실시간 갱신이 덮어쓴다.
+  // 고른 포스트가 사라지면 렌더 중 파생으로 첫 포스트로 되돌린다(effect setState 금지).
+  const activePostId = posts.some(post => post.id === newPostId) ? newPostId : (posts[0]?.id || "");
 
   async function saveSegment() {
     if (!label.trim()) return toast("구간 이름을 입력해주세요.", "warning");
@@ -169,10 +159,10 @@ function SegmentSection({ retreatId, block, segment, segments, movements, staff,
       await setIguardSegmentMovement(retreatId, {
         blockId: block.id,
         segmentId: segment.id,
-        postId: newPostId,
+        postId: activePostId,
         staffId,
         actor: newAssignee === "actor" ? newActor.trim() : null,
-        slot: staffId ? undefined : nextSlot(movements, segment.id, newPostId),
+        slot: staffId ? undefined : nextSlot(movements, segment.id, activePostId),
         source: "manual",
       });
       setNewAssignee("tbd"); setNewActor("");
@@ -205,7 +195,7 @@ function SegmentSection({ retreatId, block, segment, segments, movements, staff,
       </div>
       {posts.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-dashed border-slate-200 bg-white p-2">
-          <select className="input min-w-[180px] flex-1 text-sm" value={newPostId} onChange={e => setNewPostId(e.target.value)}>
+          <select className="input min-w-[180px] flex-1 text-sm" value={activePostId} onChange={e => setNewPostId(e.target.value)}>
             {posts.map(post => <option key={post.id} value={post.id}>{post.area ? `[${post.area}] ` : ""}{post.name}</option>)}
           </select>
           <select className="input min-w-[160px] text-sm" value={newAssignee} onChange={e => setNewAssignee(e.target.value as Assignee)}>
