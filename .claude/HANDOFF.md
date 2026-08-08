@@ -42,11 +42,8 @@
 ## 미완인 것 — 정확한 다음 단계
 
 - [ ] **(사용자 몫) 학생 출석부 세션 문제 확인**: `admin@woorihigh.com`으로 로그인한 크롬에서 `https://woori-high.web.app`가 스피너에서 멈춘다. **롤백한 코드에서도 재현**됐으므로 코드 원인이 아니고, 로그인 안 된 깨끗한 브라우저에서는 정상 동작한다. 사용자가 **로그아웃 → 재로그인**(또는 시크릿 창)으로 확인해야 한다. 그래도 같으면: 로그인 직후 `read_console_messages`로 RTDB 경고를 잡고, `loadUserRole`의 `get(userRoles/…)` 응답이 오는지부터 확인할 것.
-- [ ] **(사용자 몫, 선택) 스탭의 학기 조회 Rules 보강**: `semesters` `.read`에 `iguardMembers`를 추가해야 스탭 역할이 학기 화면 데이터를 본다. 지금은 에러 배너가 뜬다. 스니펫:
-  ```json
-  "semesters": { ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)" }
-  ```
-  배포는 **학생 앱에서만** (`cd "고등부 학생 출석부" && firebase deploy --only database`). `semestersPrivate`(연락처)는 계속 행정 전용으로 둘 것.
+- [x] **스탭의 학기 조회 Rules 보강 — 2026-08-08 완료.** `semesters` `.read`에 `iguardMembers`를 추가하고 학생 앱에서 배포했다(`firebase deploy --only database`). 라이브 Rules 재조회로 반영 확인, 배포 전후 달라진 최상위 노드는 `semesters` 하나뿐. `.write`와 `semestersPrivate`는 무변경. 배포 전 스냅샷: `tmp/rules-backup/live-rules-20260808-120543.json`(미추적).
+  - 남은 확인: **스탭 계정으로 실제 로그인**해 `/semester/2026-2`에서 배너가 사라지는지 육안 확인(에이전트는 스탭 비밀번호가 없어 미실행).
 - [ ] **(사용자 몫) Storage 업로드 운영 확인**: 학기 아카이브 파일 업로드는 자동 점검에서 실행하지 않았다. 작은 파일 1개로 업로드→열기→삭제 확인 권장.
 - [ ] **(대기) 조장 큐싯 붙여넣기 경로**: 시트 연동 제거로 조장 큐싯 자동 가져오기가 사라졌다. 붙여넣기로도 받게 할지 사용자 답변 대기.
 - [ ] **(대기) 훈련 반 목표 필드**: 커리큘럼의 "이번 학기 목표"는 `teams.goal`만 있어 사역팀에서만 보인다. 훈련 반에도 필요하면 `TrainingClass.goal` 추가.

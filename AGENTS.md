@@ -50,7 +50,7 @@ Read these first for cross-app work:
 - `iguardRoles` has a `.validate` that accepts only `"staff"` / `"team"`. Never write other values there.
 - Role judgement lives in one pure function, `resolveMinistryRole`, shared by both AuthContexts (`src/context/AuthContext.tsx` and `src/features/iguard/context/AuthContext.tsx`).
 - Role writes go through `roleAssign.planRoleAssignment` (pure, grants before revokes) then `applyRole.applyRoleSteps` (execution). Do not call the underlying DB functions from UI code.
-- ⚠ Open blocker: staff read of `semesters` is still denied by the rules, so the staff role sees an error banner on semester screens. The exact rules snippet is in `.claude/HANDOFF.md` section 2-1; it must be deployed from the student app by the user. `semestersPrivate` (contacts) stays admin-side only on purpose.
+- Resolved 2026-08-08: staff read of `semesters` now works — `iguardMembers` was added to the `semesters` `.read` rule and deployed from the student app. `.write` is still `admins`/`retreatAdmins` only, and `semestersPrivate` (contacts) stays admin-side only on purpose.
 
 ## Firebase Safety Rules
 

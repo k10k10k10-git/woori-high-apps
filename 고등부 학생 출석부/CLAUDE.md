@@ -242,6 +242,7 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 - `teacherExtra` 쓰기 규칙: classKey에 하이픈(`-`)이 포함되므로 `.replace('-','_')`을 3회 체이닝하여 Firebase 경로의 `_`와 매칭 (`replace`는 첫 매치만 치환하므로 3번 호출)
 - `attendanceAdmins`: 출석부 전용 관리자. 이 앱이 쓰는 21개 규칙(`classes`·`attendance`·`events`·`teacher*`·`config`·`trash`·`suggestions`·`userRoles`·`teacherClasses`)에만 OR로 포함되고, 플랫폼 노드(`retreats*`·`iguard*`·`semesters*`)와 `admins`에는 **절대 넣지 않는다** — 이게 권한 분리의 전부다.
 - `classes`/`attendance`: read 규칙이 관리자(admin·attendanceAdmins·retreatAdmins·iguardMembers) 전체 + 교사는 본인 반(`teacherClasses` 매칭)만 — 행정·이가드 앱이 비관리자 계정으로 전체 `classes`를 읽으므로 단순 admin-only로 잠그면 그 앱들이 깨진다(반드시 `retreatAdmins`/`iguardMembers`도 허용목록에 포함).
+- `semesters`: read는 `admins`·`retreatAdmins`·`iguardMembers`(2026-08-08 추가 — 고등부 사역 플랫폼의 "스탭=학기 조회만" 역할), **write는 `admins`·`retreatAdmins`만**. 연락처·지원 동기가 있는 `semestersPrivate`는 read/write 모두 행정 전용으로 유지한다 — 학기 쪽 새 민감 필드는 반드시 `semestersPrivate` 아래에 둔다.
 
 ### 학생 데이터 쓰기 패턴 — 단일 경로만 수정 (전체 덮어쓰기 금지)
 

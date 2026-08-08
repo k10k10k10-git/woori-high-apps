@@ -102,7 +102,8 @@
 | `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 
 > `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 **읽기만** 한다.
-> Rules는 2026-07-10 학생 앱에서 추가·배포 완료 (admins·retreatAdmins만 접근).
+> Rules는 2026-07-10 학생 앱에서 추가·배포 완료.
+> **2026-08-08 보강**: `semesters` `.read`에 `iguardMembers`를 추가해 스탭의 학기 조회를 열었다(6단계 역할표의 "스탭=조회만"). `.write`는 `admins`·`retreatAdmins`만 그대로이고, `semestersPrivate`(연락처·지원 동기)는 **읽기까지 행정 전용**이다 — 새 민감 필드는 계속 `semestersPrivate` 아래에만 둘 것.
 
 ---
 

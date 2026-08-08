@@ -38,7 +38,7 @@
 - 역할 판정은 `resolveMinistryRole`(순수) 하나로, 통합 `AuthContext`와 이가드 `AuthContext`가 같은 결론을 냅니다.
 - 역할 배정 쓰기는 `roleAssign.planRoleAssignment`(순수·테스트) → `applyRole.applyRoleSteps`(실행) 경로만 사용합니다. 부여를 먼저, 해제를 나중에 실행합니다.
 - 학기 화면의 편집 잠금은 `features/semester/EditContext`의 `useSemesterCanEdit()`으로만 판단합니다.
-- ⚠ 스탭의 학기 조회는 Firebase Rules에서 `semesters` 읽기가 `admins`/`retreatAdmins`로 제한되어 있어 **Rules 보강 전에는 실제 데이터가 로드되지 않습니다**(에러 배너로 표시). Rules는 학생 앱에서만 배포합니다.
+- 스탭의 학기 **조회**는 2026-08-08 Rules 보강으로 열렸습니다 — `semesters` `.read`에 `iguardMembers`가 추가됐습니다. `.write`는 계속 `admins`/`retreatAdmins`만이고, 연락처가 있는 `semestersPrivate`는 **행정 전용 그대로**입니다. 즉 스탭은 `semesters/*`(명단·팀·훈련 반·회차·출석·커리큘럼)를 읽지만 저장은 못 합니다. Rules는 학생 앱에서만 배포합니다.
 - 행정 권한과 이가드 권한의 **쓰기 경계**는 계속 분리합니다. 이가드팀 계정은 통합 홈과 현장 화면만 사용합니다.
 
 ## 학기 사역 계약 (2026-08-06)
