@@ -62,9 +62,9 @@
 4. **회귀 테스트 생략** ★ — 특이사항 초기화 버그가 테스트 없이 3세션/5회 재발했다. → 규칙: 순수 로직 버그는 회귀 테스트 1개를 **같은 커밋**에 포함.
 5. **Rules 오배포** — retreat/iguard 폴더에서 `firebase deploy --only database`. → 규칙: Rules는 학생 앱에서만. 다른 앱의 rules 파일명이 `DO_NOT_DEPLOY.*`인 이유다.
 6. **구독 onError 누락** ★ — 새 onValue 구독에 에러 콜백이 없으면 권한 오류 시 무한 스피너. → 규칙: 모든 구독 함수는 `onError?: (e: Error) => void`를 받고, 훅/컴포넌트는 loadError에 배선한다(iguard 패턴 16).
-7. **시간 비교 재발명** ★ — 큐싯의 `24:30~25:30`(자정 넘김) 표기를 단순 시:분 비교로 처리 → 새벽에 전부 "일정 없음". → 규칙: `highschool-app/src/features/iguard/lib/scheduleTime.ts`의 `isNowOn`/`currentBlockFor`만 사용.
-8. **큐싯 파싱 순서 변경** ★ — 날짜 마커 검사를 시간 검사보다 먼저 하면 "둘째날 오전 프로그램" 행이 통째로 사라진다. → 규칙: `cueSheet.ts` 수정 시 "시간 유무 → 날짜 판정" 순서 유지, `scheduleUtils.test.ts` D2가 지킨다.
-9. **이름 매칭 재구현** ★ — sf 꼬리표·학번 접두어 처리를 화면마다 새로 짜면 같은 사람이 두 명으로 보인다. → 규칙: `normalizeName`/`stripSuffix`/`parseBusStaff`만 사용. UnmatchedPaymentsTab의 로컬 `strip`은 의미가 달라 통합 금지(주석 참조).
+7. **시간 비교 재발명** ★ — 큐싯의 `24:30~25:30`(자정 넘김) 표기를 단순 시:분 비교로 처리 → 새벽에 전부 "일정 없음". → 규칙: `highschool-app/src/features/iguard/lib/scheduleTime.ts`의 `isNowOn`/`currentBlockFor`만 사용. `scheduleTime.test.ts`가 지킨다(2026-08-09 신설).
+8. **큐싯 파싱 순서 변경** ★ — 날짜 마커 검사를 시간 검사보다 먼저 하면 "둘째날 오전 프로그램" 행이 통째로 사라진다. → 규칙: `cueSheet.ts` 수정 시 "시간 유무 → 날짜 판정" 순서 유지, `cueSheet.test.ts`가 지킨다(2026-08-09 신설 — 그전까지 이 자리에 적혀 있던 `scheduleUtils.test.ts`는 **존재한 적이 없다**).
+9. **이름 매칭 재구현** ★ — sf 꼬리표·학번 접두어 처리를 화면마다 새로 짜면 같은 사람이 두 명으로 보인다. → 규칙: `normalizeName`/`stripSuffix`/`parseBusStaff`만 사용. `studentMatcher.test.ts`·`busStaff.test.ts`가 지킨다(후자는 2026-08-09 신설). UnmatchedPaymentsTab의 로컬 `strip`은 의미가 달라 통합 금지(주석 참조).
 10. **동기화 보존 가드 제거** ★ — `syncFromSheet`의 ambiguous 충돌 가드를 지우면 특이사항이 엉뚱한 사람에게 영구 복사된다(실제 12명 오염). → 규칙: `syncParticipants.ts`를 통해서만 수정, `syncParticipants.test.ts` A2가 지킨다.
 11. **인원체크를 토글로 회귀** ★ — 탭=토글로 바꾸면 "확인하려다 해제" 사고 재발. → 규칙: 멱등 체크 + 트랜잭션 + 톰스톤(iguard 패턴 15) 유지. `set`/`remove` 직접 쓰기 금지.
 12. **민감정보 위치 실수** — 취소계좌·의료·주민번호를 `retreats/{id}` 아래 저장. → 규칙: 신규 민감 필드는 무조건 `paths.ts`의 retreatsPrivate 계열로.
