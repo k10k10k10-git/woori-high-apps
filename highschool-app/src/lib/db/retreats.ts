@@ -1,7 +1,8 @@
-import { ref, get, set, update, push, remove, onValue } from "firebase/database";
+import { ref, get, set, update, push, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { Retreat } from "../types";
 import { paths } from "../paths";
+import { buildRetreatRemovalUpdates } from "../retreatRemoval";
 import { stripUndefined, snapToList } from "./core";
 
 // ── Retreats ──────────────────────────────────────────────
@@ -21,8 +22,9 @@ export async function updateRetreat(id: string, data: Partial<Retreat>): Promise
   await update(ref(db, paths.retreat(id)), stripUndefined(data));
 }
 
+/** 공개 노드와 민감정보 노드를 한 번의 루트 update로 함께 지운다(중간 실패로 고아가 남지 않게). */
 export async function deleteRetreat(id: string): Promise<void> {
-  await remove(ref(db, paths.retreat(id)));
+  await update(ref(db), buildRetreatRemovalUpdates(id));
 }
 
 export async function getRetreat(id: string): Promise<Retreat | null> {
