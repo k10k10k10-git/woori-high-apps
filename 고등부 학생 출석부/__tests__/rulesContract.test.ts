@@ -44,4 +44,34 @@ describe('database.rules.json 권한 계약', () => {
       },
     );
   });
+
+  // 2026-08-09: 교사 전화·생년월일(teacherStaff 40건)과 계정 목록(userRoles 51건)이
+  // "로그인만 하면" 읽혔다. 역할 없는 구글 계정도 전부 읽을 수 있었다.
+  describe('교사 개인정보 노드는 로그인만으로 읽히지 않는다', () => {
+    it.each([
+      'teacherStaff',
+      'teacherSpecial',
+      'teacherExtra',
+      'teacherAdditional',
+      'teacherPhones',
+      'userRoles',
+    ])('%s의 최상위 read가 auth != null 단독이 아니다', (node) => {
+      expect(rules[node]['.read']).not.toBe('auth != null');
+      expect(refers(rules[node]['.read'], 'admins')).toBe(true);
+    });
+
+    it('teacherStaff는 학기 접수·수련회 명단이 읽으므로 retreatAdmins·iguardMembers도 허용한다', () => {
+      for (const role of ['retreatAdmins', 'iguardMembers']) {
+        expect(refers(rules.teacherStaff['.read'], role)).toBe(true);
+      }
+    });
+
+    it('userRoles 전체 목록은 관리자만, 본인 레코드는 이메일이 일치할 때만 읽는다', () => {
+      expect(refers(rules.userRoles['.read'], 'attendanceAdmins')).toBe(true);
+      // loadUserRole이 userRoles/{emailKey} 단건을 읽어 로그인을 판정한다 —
+      // 이 자기조회 규칙이 없으면 담임 교사 전원이 로그인하지 못한다.
+      const selfRead = (rules.userRoles as Record<string, { '.read'?: string }>).$emailKey?.['.read'];
+      expect(selfRead).toContain('auth.token.email');
+    });
+  });
 });
