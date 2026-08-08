@@ -497,11 +497,11 @@ export default function ScheduleSheetEditor({
   const [advancedBlockId, setAdvancedBlockId] = useState<string | null>(null);
   const advancedTriggerRef = useRef<HTMLElement | null>(null);
   const advancedBlock = schedule.find(block => block.id === advancedBlockId) || null;
-  const visibleDays = selectedDay === "all" ? days : days.filter(day => day === selectedDay);
-
-  useEffect(() => {
-    if (selectedDay !== "all" && !days.includes(selectedDay)) setSelectedDay("all");
-  }, [days, selectedDay]);
+  // 고른 일차가 사라지면(큐싯 재가져오기 등) 렌더 중 파생으로 "전체"로 되돌린다 —
+  // effect에서 setState하면 cascading render가 되고, 시계 tick류 effect와 겹치면
+  // 사용자 선택을 덮는 사고로 이어진다(루트 CLAUDE.md 실수 13).
+  const activeDay = selectedDay !== "all" && !days.includes(selectedDay) ? "all" : selectedDay;
+  const visibleDays = activeDay === "all" ? days : days.filter(day => day === activeDay);
 
   const openAdvanced = useCallback((blockId: string) => {
     advancedTriggerRef.current = document.activeElement instanceof HTMLElement
@@ -522,9 +522,9 @@ export default function ScheduleSheetEditor({
           <button
             type="button"
             onClick={() => setSelectedDay("all")}
-            aria-pressed={selectedDay === "all"}
+            aria-pressed={activeDay === "all"}
             className={`min-h-10 rounded-lg border px-3 text-sm font-semibold ${
-              selectedDay === "all" ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-500"
+              activeDay === "all" ? "border-slate-800 bg-slate-800 text-white" : "border-slate-200 bg-white text-slate-500"
             }`}
           >
             전체 {schedule.length}
@@ -534,9 +534,9 @@ export default function ScheduleSheetEditor({
               key={day}
               type="button"
               onClick={() => setSelectedDay(day)}
-              aria-pressed={selectedDay === day}
+              aria-pressed={activeDay === day}
               className={`min-h-10 rounded-lg border px-3 text-sm font-semibold ${
-                selectedDay === day ? "border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700" : "border-slate-200 bg-white text-slate-500"
+                activeDay === day ? "border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700" : "border-slate-200 bg-white text-slate-500"
               }`}
             >
               {day}일차 {schedule.filter(block => block.day === day).length}

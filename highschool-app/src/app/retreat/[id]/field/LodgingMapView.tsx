@@ -87,10 +87,11 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
     setPopoverPosition({ left, top, width, arrowTop, side });
   }, [selection]);
 
+  // pageId 정규화는 필요 없다 — 위의 `page`가 이미 없는 id면 첫 장으로 폴백하고,
+  // 화면은 pageId가 아니라 page를 쓴다. effect에서 setState하면 cascading render만 는다.
   useEffect(() => {
-    if (!building.pages.some(item => item.id === pageId)) setPageId(building.pages[0].id);
     closePopover();
-  }, [building, closePopover, pageId]);
+  }, [building, closePopover]);
 
   useEffect(() => {
     mapScrollRef.current?.scrollTo({ left: 0, behavior: "auto" });

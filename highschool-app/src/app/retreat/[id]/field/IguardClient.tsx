@@ -153,20 +153,22 @@ function IguardWorkspace({ id }: { id: string }) {
     () => (executionOnly ? IGUARD_VIEW_GROUPS.filter(g => g.label === "실행") : [...IGUARD_VIEW_GROUPS]),
     [executionOnly]
   );
+  // 허용되지 않은 탭(스탭이 기획/정보 뷰에 있던 경우)이면 실행 기본 탭으로 —
+  // 렌더 중 파생으로 되돌린다. effect에서 setState하면 cascading render가 되고,
+  // 30초 시계 tick류 effect와 겹치면 사용자 선택을 덮는다(루트 CLAUDE.md 실수 13).
+  const activeView = visibleGroups.some(g => g.views.some(v => v.key === view))
+    ? view
+    : visibleGroups[0].views[0].key;
+
   const activeGroup = useMemo(
-    () => visibleGroups.find(g => g.views.some(v => v.key === view)) ?? visibleGroups[0],
-    [view, visibleGroups]
+    () => visibleGroups.find(g => g.views.some(v => v.key === activeView)) ?? visibleGroups[0],
+    [activeView, visibleGroups]
   );
   // 행정 데이터 형태 계약 점검 (스탭에겐 숨김 — 기획/운영자용 경고)
   const compatWarnings = useMemo(
     () => (executionOnly ? [] : checkAdminCompat(students, groups)),
     [executionOnly, students, groups]
   );
-  // 허용되지 않은 탭(스탭이 기획/정보 뷰에 있던 경우)이면 실행 기본 탭으로
-  useEffect(() => {
-    if (!visibleGroups.some(g => g.views.some(v => v.key === view))) setView(visibleGroups[0].views[0].key);
-  }, [visibleGroups, view]);
-
   // 헤더 실제 높이를 CSS 변수로 노출 — sticky 요소(스탭 명단 바)가 모바일/데스크톱·줄바꿈에서 헤더에 안 가리도록
   useEffect(() => {
     const el = headerRef.current;
@@ -177,7 +179,7 @@ function IguardWorkspace({ id }: { id: string }) {
     ro.observe(el);
     window.addEventListener("resize", apply);
     return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
-  }, [retreat, view]);
+  }, [retreat, activeView]);
 
   if (retreatLoading) return <CenterSpinner />;
   if (!user || !fieldAllowed) return null;
@@ -245,9 +247,9 @@ function IguardWorkspace({ id }: { id: string }) {
             {activeGroup.views.map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
                 role="tab"
-                aria-selected={view === v.key}
+                aria-selected={activeView === v.key}
                 className="min-h-11 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-                style={view === v.key ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" } : { borderColor: "transparent", color: "var(--color-text-muted)" }}>
+                style={activeView === v.key ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" } : { borderColor: "transparent", color: "var(--color-text-muted)" }}>
                 {v.label}
               </button>
             ))}
@@ -288,22 +290,22 @@ function IguardWorkspace({ id }: { id: string }) {
           </div>
         )}
 
-        {!dataLoading && view === "check" && <ChecklistView retreatId={id} groups={groups} students={students} participants={participants} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} cellColors={cellColors} schedule={schedule} />}
-        {!dataLoading && view === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} staff={staffForViews} groupStaff={groupStaff} gbs={gbs} students={students} partial={partial} cellColors={cellColors} retreatName={retreat.name} year={retreat.year} />}
-        {!dataLoading && view === "lodging" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} mode="view" />}
-        {!dataLoading && view === "lodgingmap" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} mode="manage" />}
-        {!dataLoading && view === "cue" && <CueCardView retreatId={id} staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} groups={groups} groupStaff={groupStaff} gbs={gbs} />}
-        {!dataLoading && view === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
-        {!dataLoading && view === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
-        {!dataLoading && view === "overview" && <ScheduleOverviewView schedule={schedule} />}
-        {!dataLoading && view === "schedule" && <ScheduleView retreatId={id} retreatName={retreat.name} schedule={schedule} staff={staffForViews} posts={posts} segments={segments} movements={movements} movementRecords={movementRecords} buses={buses} groups={groups} absentStaffNames={absentStaffNames} sheetSettingsOpen={sheetSettingsOpen} onSheetSettingsClose={() => setSheetSettingsOpen(false)} />}
-        {!dataLoading && view === "posts" && <PostsView retreatId={id} posts={posts} />}
-        {!dataLoading && view === "staff" && <StaffView retreatId={id} staff={staffForViews} />}
-        {!dataLoading && view === "movements" && <MovementsView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
-        {!dataLoading && view === "validate" && <ValidationView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
-        {!dataLoading && view === "groupstaff" && <GroupStaffView retreatId={id} groups={groups} staff={staffForViews} students={students} adminTeachers={adminTeachers} partial={partial} cellColors={cellColors} groupStaff={groupStaff} />}
-        {!dataLoading && view === "gbs" && <GbsPlacesView retreatId={id} groups={groups} gbs={gbs} />}
-        {!dataLoading && view === "badge" && (
+        {!dataLoading && activeView === "check" && <ChecklistView retreatId={id} groups={groups} students={students} participants={participants} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} cellColors={cellColors} schedule={schedule} />}
+        {!dataLoading && activeView === "rooms" && <RoomsView groups={groups} rooms={rooms} buses={buses} meals={meals} staff={staffForViews} groupStaff={groupStaff} gbs={gbs} students={students} partial={partial} cellColors={cellColors} retreatName={retreat.name} year={retreat.year} />}
+        {!dataLoading && activeView === "lodging" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} mode="view" />}
+        {!dataLoading && activeView === "lodgingmap" && <LodgingMapView retreatId={id} rooms={rooms} groups={groups} students={students} partial={partial} cellColors={cellColors} maps={lodgingMaps} mode="manage" />}
+        {!dataLoading && activeView === "cue" && <CueCardView retreatId={id} staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} preferredStaffNames={preferredStaffNames} groups={groups} groupStaff={groupStaff} gbs={gbs} />}
+        {!dataLoading && activeView === "leadercue" && <LeaderCueManageView retreatId={id} schedule={schedule} />}
+        {!dataLoading && activeView === "board" && <PostBoardView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} retreat={retreat} periods={periods} />}
+        {!dataLoading && activeView === "overview" && <ScheduleOverviewView schedule={schedule} />}
+        {!dataLoading && activeView === "schedule" && <ScheduleView retreatId={id} retreatName={retreat.name} schedule={schedule} staff={staffForViews} posts={posts} segments={segments} movements={movements} movementRecords={movementRecords} buses={buses} groups={groups} absentStaffNames={absentStaffNames} sheetSettingsOpen={sheetSettingsOpen} onSheetSettingsClose={() => setSheetSettingsOpen(false)} />}
+        {!dataLoading && activeView === "posts" && <PostsView retreatId={id} posts={posts} />}
+        {!dataLoading && activeView === "staff" && <StaffView retreatId={id} staff={staffForViews} />}
+        {!dataLoading && activeView === "movements" && <MovementsView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
+        {!dataLoading && activeView === "validate" && <ValidationView staff={staffForViews} schedule={schedule} posts={posts} movements={movements} />}
+        {!dataLoading && activeView === "groupstaff" && <GroupStaffView retreatId={id} groups={groups} staff={staffForViews} students={students} adminTeachers={adminTeachers} partial={partial} cellColors={cellColors} groupStaff={groupStaff} />}
+        {!dataLoading && activeView === "gbs" && <GbsPlacesView retreatId={id} groups={groups} gbs={gbs} />}
+        {!dataLoading && activeView === "badge" && (
           <BadgeCardsView
             retreatId={id}
             retreatName={retreat.name}
@@ -324,11 +326,11 @@ function IguardWorkspace({ id }: { id: string }) {
             cellColors={cellColors}
           />
         )}
-        {!dataLoading && view === "meals" && <MealsView retreatId={id} meals={meals} groups={groups} seatings={seating} />}
-        {!dataLoading && view === "buses" && <BusesView retreatId={id} buses={buses} groups={groups} students={students} participants={participants} teachers={adminTeachers} partial={partial} cellColors={cellColors} schedule={schedule} />}
-        {!dataLoading && view === "seating" && <SeatingView retreatId={id} seating={seating} groups={groups} meals={meals} />}
-        {!dataLoading && view === "guide" && <GuideView retreatId={id} guide={guide} />}
-        {!dataLoading && view === "todos" && <TodosView todos={todos} />}
+        {!dataLoading && activeView === "meals" && <MealsView retreatId={id} meals={meals} groups={groups} seatings={seating} />}
+        {!dataLoading && activeView === "buses" && <BusesView retreatId={id} buses={buses} groups={groups} students={students} participants={participants} teachers={adminTeachers} partial={partial} cellColors={cellColors} schedule={schedule} />}
+        {!dataLoading && activeView === "seating" && <SeatingView retreatId={id} seating={seating} groups={groups} meals={meals} />}
+        {!dataLoading && activeView === "guide" && <GuideView retreatId={id} guide={guide} />}
+        {!dataLoading && activeView === "todos" && <TodosView todos={todos} />}
       </main>
 
       {searchOpen && (
@@ -340,11 +342,11 @@ function IguardWorkspace({ id }: { id: string }) {
       )}
 
       {/* 하단 탭바는 실행 뷰에서만 — 기획·정보 화면에서는 숨겨 세로 공간 확보 + 오탐 이동 방지 (2026-07-12) */}
-      {executionViews.some(v => v.key === view) && (
+      {executionViews.some(v => v.key === activeView) && (
         <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden" aria-label="실행 뷰 탐색">
           <div className="mx-auto grid max-w-md grid-cols-5 gap-1" role="tablist">
             {executionViews.map(v => {
-              const active = view === v.key;
+              const active = activeView === v.key;
               return (
                 <button
                   key={v.key}
