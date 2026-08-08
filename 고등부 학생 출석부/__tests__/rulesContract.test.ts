@@ -66,6 +66,32 @@ describe('database.rules.json 권한 계약', () => {
       }
     });
 
+    // 2026-08-09 2차: 역할 멤버십 목록(이메일·이름)도 로그인만으로 읽혔다.
+    // 단, 두 AuthContext가 자기 uid를 읽어 역할을 판정하고 실패하면 role="none"으로
+    // 떨어지므로, 자기조회를 남기지 않으면 비관리자 전원이 앱에서 잠긴다.
+    describe.each(['retreatAdmins', 'iguardMembers', 'iguardRoles'])('%s', (node) => {
+      it('목록은 역할 보유자만 읽는다', () => {
+        const read = rules[node]['.read'];
+        expect(read).not.toBe('auth != null');
+        for (const role of ['admins', 'retreatAdmins', 'iguardMembers']) {
+          expect(refers(read, role)).toBe(true);
+        }
+      });
+
+      it('본인 uid는 언제나 읽을 수 있다 — 없으면 역할 판정이 실패해 전원 잠긴다', () => {
+        const selfRead = (rules[node] as Record<string, { '.read'?: string }>).$uid?.['.read'];
+        expect(selfRead).toBe('auth != null && auth.uid === $uid');
+      });
+    });
+
+    it.each(['staff_roles', 'staff_attendance', 'staff_events'])(
+      '%s는 쓰기와 같은 범위(admins·staff_admins)로만 읽는다',
+      (node) => {
+        expect(rules[node]['.read']).not.toBe('auth != null');
+        expect(refers(rules[node]['.read'], 'staff_admins')).toBe(true);
+      },
+    );
+
     it('userRoles 전체 목록은 관리자만, 본인 레코드는 이메일이 일치할 때만 읽는다', () => {
       expect(refers(rules.userRoles['.read'], 'attendanceAdmins')).toBe(true);
       // loadUserRole이 userRoles/{emailKey} 단건을 읽어 로그인을 판정한다 —

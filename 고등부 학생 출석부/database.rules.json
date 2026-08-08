@@ -103,19 +103,22 @@
       }
     },
     "staff_roles": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
     },
     "staff_attendance": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
     },
     "staff_events": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)",
       ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('staff_admins').child(auth.uid).val() === true)"
     },
     "retreatAdmins": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      },
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
     "retreatPending": {
@@ -125,13 +128,17 @@
       }
     },
     "iguardMembers": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      },
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true"
     },
     "iguardRoles": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
       ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
       "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
         ".validate": "newData.val() === 'staff' || newData.val() === 'team'"
       }
     },
