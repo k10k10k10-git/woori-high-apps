@@ -30,6 +30,7 @@ import {
 import { buildTeamRemovalUpdates } from "./teamRemoval";
 import { buildTrainingClassRemovalUpdates } from "./trainingClass";
 import { makeAppKey } from "./applicant";
+import { buildApplicationPrivateUpdates } from "./applicationPrivate";
 import type { SessionValue } from "./sessionKind";
 
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
@@ -203,8 +204,9 @@ export async function upsertApplication(
     ...app,
     createdAt: app.createdAt ?? nowISO(),
   });
-  if (priv && Object.values(priv).some((v) => v != null && v !== "")) {
-    await update(ref(db, paths.applicationPrivate(sid, appKey)), priv);
+  // 빈 값도 반드시 써야 한다 — 건너뛰면 "연락처 지우기"가 저장되지 않고 옛 값이 남는다.
+  if (priv) {
+    await update(ref(db, paths.applicationPrivate(sid, appKey)), buildApplicationPrivateUpdates(priv));
   }
 }
 
