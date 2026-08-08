@@ -17,6 +17,7 @@ import {
   IguardGbsPlace,
   IguardLodgingMap,
 } from "@/features/iguard/lib/types";
+import { useLoadErrors } from "@/lib/useLoadErrors";
 import { movementsForDefaultSegments } from "@/features/iguard/lib/defaultSegment";
 
 export interface RetreatData {
@@ -60,7 +61,9 @@ export function useRetreatData(id: string): RetreatData {
   const [retreat, setRetreat] = useState<Retreat | null>(null);
   const [retreatLoading, setRetreatLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // 21개 구독의 실패를 경로별로 모은다 — 하나로 합치면 첫 실패만 보여 원인을 잘못 짚는다
+  // (2026-08-08 학기·홈에서 실제로 두 번 오진했다). scope가 id라 수련회를 옮기면 초기화된다.
+  const { fail: failPath, ok: okPath, message: loadError } = useLoadErrors(id);
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -94,10 +97,10 @@ export function useRetreatData(id: string): RetreatData {
   useEffect(() => {
     if (!id) return;
     const unsub = subscribeToRetreat(id,
-      r => { setRetreat(r); setRetreatLoading(false); },
-      e => { setLoadError(prev => prev ?? `retreat 구독 실패 — ${e.message}`); setRetreatLoading(false); });
+      r => { setRetreat(r); okPath("수련회 정보"); setRetreatLoading(false); },
+      e => { failPath("수련회 정보")(e); setRetreatLoading(false); });
     return unsub;
-  }, [id]);
+  }, [id, failPath, okPath]);
 
   // 연결 상태 구독 — 수련회와 무관한 앱 전역 상태라 별도 useEffect
   useEffect(() => subscribeToConnection(setConnected), []);
@@ -106,23 +109,26 @@ export function useRetreatData(id: string): RetreatData {
   const retreatYear = retreat?.year;
   useEffect(() => {
     if (!id || retreatYear == null) return;
-    setLoadError(null);
     setDataLoading(true);
     let alive = true;
     const pending = new Set([
       "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "segments", "posts",
       "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff", "gbs", "lodgingMaps",
     ]);
-    const ready = (key: string) => {
+    const markReady = (key: string) => {
       pending.delete(key);
       if (alive && pending.size === 0) setDataLoading(false);
     };
-    // 구독 에러(권한 거부·규칙 변경 등) 시: 에러 배너를 띄우고 해당 키를 ready 처리해
+    // 성공하면 그 경로의 이전 실패를 지운다 — 권한이 열린 뒤 재구독하면 배너가 사라진다.
+    const ready = (key: string) => {
+      if (alive) okPath(key);
+      markReady(key);
+    };
+    // 구독 에러(권한 거부·규칙 변경 등) 시: 실패한 경로를 배너에 모으고 해당 키를 ready 처리해
     // dataLoading이 영원히 true로 남는 "무한 스피너"를 방지한다.
-    // (이 전파가 없던 시절엔 loadError가 선언만 되고 설정되는 곳이 없었다.)
     const fail = (key: string) => (error: Error) => {
-      if (alive) setLoadError(prev => prev ?? `${key} 구독 실패 — ${error.message}`);
-      ready(key);
+      if (alive) failPath(key)(error);
+      markReady(key);
     };
     const unsubs = [
       subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }, fail("students")),
@@ -151,7 +157,7 @@ export function useRetreatData(id: string): RetreatData {
       alive = false;
       unsubs.forEach(u => u());
     };
-  }, [id, retreatYear]);
+  }, [id, retreatYear, failPath, okPath]);
 
   return {
     retreat, retreatLoading, dataLoading, loadError,
