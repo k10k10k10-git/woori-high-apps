@@ -41,7 +41,9 @@ export async function restoreGroupsBackup(retreatId: string, backupKey: string):
   const snap = await get(ref(db, paths.groupsBackup(retreatId, backupKey)));
   if (!snap.exists()) throw new Error("조편성 백업을 찾을 수 없습니다.");
   // 복구도 되돌릴 수 있도록 현재 상태를 강제 백업(스로틀 무시)한 뒤 덮어쓴다.
-  await backupNodeBeforeOverwrite(paths.groups(retreatId), paths.groupsBackups(retreatId), 0);
+  // 백업이 실패하면 덮어쓰지 않는다 — 실패를 무시하면 되돌릴 수 없는 유실이 된다.
+  const backedUp = await backupNodeBeforeOverwrite(paths.groups(retreatId), paths.groupsBackups(retreatId), 0);
+  if (!backedUp) throw new Error("현재 상태 백업에 실패해 복구를 중단했습니다.");
   await set(ref(db, paths.groups(retreatId)), snap.val());
 }
 
@@ -113,7 +115,9 @@ export async function restoreRoomsBackup(retreatId: string, backupKey: string): 
   const snap = await get(ref(db, paths.roomsBackup(retreatId, backupKey)));
   if (!snap.exists()) throw new Error("방배정 백업을 찾을 수 없습니다.");
   // 복구도 되돌릴 수 있도록 현재 상태를 강제 백업(스로틀 무시)한 뒤 덮어쓴다.
-  await backupNodeBeforeOverwrite(paths.rooms(retreatId), paths.roomsBackups(retreatId), 0);
+  // 백업이 실패하면 덮어쓰지 않는다 — 실패를 무시하면 되돌릴 수 없는 유실이 된다.
+  const backedUp = await backupNodeBeforeOverwrite(paths.rooms(retreatId), paths.roomsBackups(retreatId), 0);
+  if (!backedUp) throw new Error("현재 상태 백업에 실패해 복구를 중단했습니다.");
   await set(ref(db, paths.rooms(retreatId)), snap.val());
 }
 

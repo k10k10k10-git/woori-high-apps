@@ -25,7 +25,39 @@ vi.mock("./core", () => ({
   backupNodeBeforeOverwrite: mocks.backupNodeBeforeOverwrite,
 }));
 
-import { clearGroups, clearRooms, clearRoomAssignments } from "./groupsRooms";
+import {
+  clearGroups,
+  clearRooms,
+  clearRoomAssignments,
+  restoreGroupsBackup,
+  restoreRoomsBackup,
+} from "./groupsRooms";
+
+// 복구는 현재 상태를 통째로 덮어쓴다 — 사전 백업이 실패했는데도 덮어쓰면 되돌릴 수 없다.
+describe.each([
+  ["restoreGroupsBackup", restoreGroupsBackup, "retreats/retreat-1/groups"],
+  ["restoreRoomsBackup", restoreRoomsBackup, "retreats/retreat-1/rooms"],
+] as const)("%s", (_name, restore, nodePath) => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.get.mockResolvedValue({ exists: () => true, val: () => ({ a: 1 }) });
+  });
+
+  it("백업이 성공하면 백업 내용으로 덮어쓴다", async () => {
+    mocks.backupNodeBeforeOverwrite.mockResolvedValue(true);
+
+    await restore("retreat-1", "backup-key");
+
+    expect(mocks.set).toHaveBeenCalledWith(nodePath, { a: 1 });
+  });
+
+  it("백업이 실패하면 덮어쓰지 않는다", async () => {
+    mocks.backupNodeBeforeOverwrite.mockResolvedValue(false);
+
+    await expect(restore("retreat-1", "backup-key")).rejects.toThrow("백업에 실패");
+    expect(mocks.set).not.toHaveBeenCalled();
+  });
+});
 
 describe("clearGroups", () => {
   beforeEach(() => {
