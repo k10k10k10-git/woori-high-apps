@@ -4,8 +4,10 @@
 // ⚠ 셀은 토글이 아니다. 셀을 누르면 출석/지각/결석/지우기를 명시적으로 고른다
 //   (같은 값을 다시 골라도 결과가 같은 멱등 기록 — 모노레포 실수 규칙 11).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { describeApplicant } from "@/features/semester/db";
+import { splitStudentsAndStaff } from "@/features/semester/roster";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Application, AttendanceStatus, Session, SessionAttendance } from "@/features/semester/types";
 
@@ -36,10 +38,50 @@ function monthGroups(sessions: Session[]) {
   return groups;
 }
 
+/** 학생·스탭 구간. 둘 다 있을 때만 구분 머리글을 넣는다(한쪽뿐이면 군더더기). */
+function memberSections(members: Application[]): { label: string | null; rows: Application[] }[] {
+  const { students, staff } = splitStudentsAndStaff(members);
+  if (students.length === 0 || staff.length === 0) return [{ label: null, rows: members }];
+  return [
+    { label: "학생", rows: students },
+    { label: "교사·스탭", rows: staff },
+  ];
+}
+
 export default function AttendanceGrid({ members, sessions, attBySession, canEdit, onMark, onClear }: Props) {
   const [openCell, setOpenCell] = useState<{ appKey: string; sessId: string } | null>(null);
+  // 메뉴는 body로 포털한다 — 표 컨테이너가 overflow-x:auto라 절대배치 메뉴가 아래에서 잘렸다.
+  const [menuAt, setMenuAt] = useState<{ left: number; top: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const anchorRef = useRef<HTMLButtonElement | null>(null);
   const groups = useMemo(() => monthGroups(sessions), [sessions]);
+  const sections = useMemo(() => memberSections(members), [members]);
+  const columnCount = sessions.length + 2;
+
+  // 위치는 레이아웃 확정 직후 계산한다(스크롤·리사이즈에도 따라붙는다).
+  useLayoutEffect(() => {
+    // 닫을 때 위치를 비우지 않는다 — 렌더는 openCell로 막고, 다시 열릴 때 페인트 전에
+    // place()가 새 위치를 잡는다(effect 안 setState 금지 — 실수 규칙 13).
+    if (!openCell) return;
+    const place = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const width = 148;
+      const left = Math.min(Math.max(rect.left + rect.width / 2 - width / 2, 8), window.innerWidth - width - 8);
+      // 아래 공간이 부족하면 위로 띄운다 — 화면 밖으로 나가지 않게.
+      const below = window.innerHeight - rect.bottom;
+      const top = below < 150 ? rect.top - 150 : rect.bottom + 4;
+      setMenuAt({ left, top: Math.max(top, 8) });
+    };
+    place();
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [openCell]);
 
   useEffect(() => {
     if (!openCell) return;
@@ -65,7 +107,8 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
   }
 
   return (
-    <div className="card relative overflow-x-auto">
+    // 카드가 내용만큼만 차지하게 한다 — 회차가 적을 때 오른쪽에 빈 카드가 넓게 남지 않도록.
+    <div className="card relative inline-block max-w-full overflow-x-auto align-top">
       {/* 회차가 적을 때 열이 늘어나지 않도록 내용 폭(w-max)으로 둔다 */}
       <table className="w-max border-collapse text-center text-sm">
         <thead>
@@ -96,55 +139,78 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
           </tr>
         </thead>
         <tbody>
-          {members.map((member, index) => (
-            <tr key={member.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
-              <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-xs text-slate-400">{index + 1}</td>
-              <td className="sticky left-8 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left">
-                <span className="font-medium text-slate-800">{member.name}</span>
-                <span className="ml-1.5 text-[11px] text-slate-400">{describeApplicant(member)}</span>
-              </td>
-              {sessions.map((session) => {
-                const entry = attBySession[session.id]?.[member.id];
-                const holiday = session.type === "휴강";
-                const open = openCell?.appKey === member.id && openCell?.sessId === session.id;
-                return (
-                  <td key={session.id} className={`relative p-0 ${holiday ? "bg-amber-50/60" : ""}`}>
-                    <button
-                      disabled={!canEdit || holiday}
-                      onClick={() => setOpenCell(open ? null : { appKey: member.id, sessId: session.id })}
-                      aria-label={`${member.name} ${session.date} 출석 상태${entry ? ` (현재 ${entry.s})` : ""}`}
-                      className={`h-9 w-full text-sm font-semibold transition-colors disabled:cursor-default ${
-                        entry ? MARK[entry.s].cell : "text-slate-200 hover:bg-slate-50"
-                      } ${open ? "ring-2 ring-inset" : ""}`}
-                      style={open ? { boxShadow: "inset 0 0 0 2px var(--color-primary)" } : undefined}
-                    >
-                      {holiday ? <span className="text-[10px] text-amber-600">휴강</span> : entry ? MARK[entry.s].text : "·"}
-                    </button>
-                    {open && (
-                      <div ref={menuRef}
-                        className="absolute left-1/2 top-full z-30 mt-1 w-32 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-                        {(Object.keys(MARK) as AttendanceStatus[]).map((status) => (
-                          <button key={status}
-                            onClick={() => { onMark(member.id, session.id, status); setOpenCell(null); }}
-                            className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:bg-slate-50 ${entry?.s === status ? "text-slate-900" : "text-slate-500"}`}>
-                            {MARK[status].text} {status}{entry?.s === status ? " (현재)" : ""}
-                          </button>
-                        ))}
-                        {entry && (
-                          <button onClick={() => { onClear(member.id, session.id); setOpenCell(null); }}
-                            className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-slate-50">
-                            ⌫ 기록 지우기
-                          </button>
-                        )}
-                      </div>
-                    )}
+          {sections.map((section) => (
+            <Fragment key={section.label ?? "all"}>
+              {section.label && (
+                <tr>
+                  <th colSpan={columnCount}
+                    className="sticky left-0 bg-slate-50 px-2 py-1 text-left text-[11px] font-semibold text-slate-500">
+                    {section.label} <span className="font-normal text-slate-400">{section.rows.length}명</span>
+                  </th>
+                </tr>
+              )}
+              {section.rows.map((member, index) => (
+                <tr key={member.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
+                  <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-xs text-slate-400">{index + 1}</td>
+                  <td className="sticky left-8 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left">
+                    <span className="font-medium text-slate-800">{member.name}</span>
+                    <span className="ml-1.5 text-[11px] text-slate-400">{describeApplicant(member)}</span>
                   </td>
-                );
-              })}
-            </tr>
+                  {sessions.map((session) => {
+                    const entry = attBySession[session.id]?.[member.id];
+                    const holiday = session.type === "휴강";
+                    const open = openCell?.appKey === member.id && openCell?.sessId === session.id;
+                    return (
+                      <td key={session.id} className={`p-0 ${holiday ? "bg-amber-50/60" : ""}`}>
+                        <button
+                          ref={open ? anchorRef : undefined}
+                          disabled={!canEdit || holiday}
+                          onClick={() => setOpenCell(open ? null : { appKey: member.id, sessId: session.id })}
+                          aria-label={`${member.name} ${session.date} 출석 상태${entry ? ` (현재 ${entry.s})` : ""}`}
+                          aria-expanded={open}
+                          className={`h-9 w-full text-sm font-semibold transition-colors disabled:cursor-default ${
+                            entry ? MARK[entry.s].cell : "text-slate-200 hover:bg-slate-50"
+                          }`}
+                          style={open ? { boxShadow: "inset 0 0 0 2px var(--color-primary)" } : undefined}
+                        >
+                          {holiday ? <span className="text-[10px] text-amber-600">휴강</span> : entry ? MARK[entry.s].text : "·"}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </Fragment>
           ))}
         </tbody>
       </table>
+
+      {/* 메뉴는 body로 포털 — 표의 overflow에 잘리지 않는다 */}
+      {openCell && menuAt && typeof document !== "undefined" && createPortal(
+        (() => {
+          const entry = attBySession[openCell.sessId]?.[openCell.appKey];
+          return (
+            <div ref={menuRef} role="menu"
+              style={{ left: menuAt.left, top: menuAt.top, width: 148 }}
+              className="fixed z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
+              {(Object.keys(MARK) as AttendanceStatus[]).map((status) => (
+                <button key={status} role="menuitem"
+                  onClick={() => { onMark(openCell.appKey, openCell.sessId, status); setOpenCell(null); }}
+                  className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:bg-slate-50 ${entry?.s === status ? "text-slate-900" : "text-slate-500"}`}>
+                  {MARK[status].text} {status}{entry?.s === status ? " (현재)" : ""}
+                </button>
+              ))}
+              {entry && (
+                <button role="menuitem" onClick={() => { onClear(openCell.appKey, openCell.sessId); setOpenCell(null); }}
+                  className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-slate-50">
+                  ⌫ 기록 지우기
+                </button>
+              )}
+            </div>
+          );
+        })(),
+        document.body,
+      )}
     </div>
   );
 }

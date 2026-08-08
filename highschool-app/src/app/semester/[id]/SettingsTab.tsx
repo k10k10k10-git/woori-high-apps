@@ -163,7 +163,9 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
             {teams.map((t) => (
               <li key={t.id} className="flex flex-wrap items-center gap-2">
                 <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-sm ${t.color}`}>{t.name}</span>
-                <div className="min-w-0 flex-1 basis-32">
+                {/* 장소·담당 입력은 훈련 관리와 같은 고정 폭으로 맞춘다 — 팀 이름 길이에 따라
+                    입력칸 폭이 제각각으로 늘어나던 문제. 폭은 감싼 div가 정한다(.input은 width:100%). */}
+                <div className="ml-auto w-28 shrink-0 sm:w-32">
                   <input
                     aria-label={`${t.name} 모임 장소`}
                     defaultValue={t.room ?? ""}
@@ -224,7 +226,8 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
             {trainingClasses.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-2">
                 <span className={`shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-sm ${c.color}`}>{c.name}</span>
-                <div className="min-w-0 flex-1 basis-32">
+                {/* 사역팀 관리와 같은 고정 폭 */}
+                <div className="ml-auto w-28 shrink-0 sm:w-32">
                   <input
                     aria-label={`${c.name} 담당`}
                     defaultValue={c.teacher ?? ""}

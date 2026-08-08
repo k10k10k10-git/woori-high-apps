@@ -17,6 +17,7 @@ import {
 } from "@/features/semester/db";
 import { STAFF_BU } from "@/features/semester/applicant";
 import { deriveTrainingOnly, isStaffApplicant, validateIntake } from "@/features/semester/intakeRule";
+import { isStaffApplication } from "@/features/semester/roster";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { parseClassKey } from "@/features/semester/classKey";
 import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
@@ -244,10 +245,13 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
                       {team?.name ?? (choice1 ? `지망: ${choice1.name}` : app?.trainingOnly ? "훈련만" : "접수됨")}
                     </span>
                   </span>
+                  {/* 교사·스탭은 훈련 대상도, 보호자 연락처 대상도 아니다 — 빈 칸으로 두지 말고 아예 감춘다. */}
                   <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-                    <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>
+                    {!isStaffApplication(row) && (
+                      <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>
+                    )}
                     <span>본인 {phone || "—"}</span>
-                    <span>보호자 {priv?.parentPhone || "—"}</span>
+                    {!isStaffApplication(row) && <span>보호자 {priv?.parentPhone || "—"}</span>}
                   </span>
                 </button>
               </li>

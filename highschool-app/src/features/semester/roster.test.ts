@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isTrainingApplicant, semesterRoster } from "./roster";
+import { completionRoster, isStaffApplication, isTrainingApplicant, semesterRoster, splitStudentsAndStaff } from "./roster";
 import type { Application } from "./types";
 
 function app(id: string, partial: Partial<Application> = {}): Application {
@@ -47,5 +47,34 @@ describe("isTrainingApplicant", () => {
     expect(isTrainingApplicant(app("a", { trainingClassId: "tc1" }))).toBe(true);
     expect(isTrainingApplicant(app("b", { trainingOnly: true }))).toBe(true);
     expect(isTrainingApplicant(app("c", { teamId: "team-a" }))).toBe(false);
+  });
+});
+
+describe("스탭 분리", () => {
+  const staff = app("staff", { bu: "스탭", teamId: "team-a", status: "배치" });
+  const student = app("student", { teamId: "team-a", status: "배치" });
+
+  it("스탭 여부는 bu로 판정한다", () => {
+    expect(isStaffApplication(staff)).toBe(true);
+    expect(isStaffApplication(student)).toBe(false);
+  });
+
+  it("학생과 스탭을 두 묶음으로 나누고 원래 순서를 유지한다", () => {
+    const { students, staff: staffList } = splitStudentsAndStaff([student, staff, app("student2", { teamId: "t" })]);
+    expect(students.map((item) => item.id)).toEqual(["student", "student2"]);
+    expect(staffList.map((item) => item.id)).toEqual(["staff"]);
+  });
+
+  it("출석 명단에는 스탭이 남지만 수료 대상에서는 빠진다", () => {
+    const applications = [student, staff];
+    expect(semesterRoster(applications, "team").map((item) => item.id)).toEqual(["student", "staff"]);
+    expect(completionRoster(applications, "team").map((item) => item.id)).toEqual(["student"]);
+  });
+
+  it("훈련 수료에서도 스탭은 제외된다", () => {
+    const trainingStaff = app("trainingStaff", { bu: "스탭", trainingClassId: "tc1" });
+    const trainingStudent = app("trainingStudent", { trainingClassId: "tc1" });
+    expect(completionRoster([trainingStaff, trainingStudent], "training").map((item) => item.id))
+      .toEqual(["trainingStudent"]);
   });
 });

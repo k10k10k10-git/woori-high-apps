@@ -8,7 +8,7 @@ import { useUI } from "@/context/UIContext";
 import { describeApplicant, subscribeAllAttendance, subscribeCompletion, updateCompletionEntry } from "@/features/semester/db";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { calcCompletion } from "@/features/semester/completion";
-import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
+import { completionRoster, type SemesterRosterScope } from "@/features/semester/roster";
 import { Application, CompletionEntry, SemesterMeta, Session, SessionAttendance, Team } from "@/features/semester/types";
 
 interface Props {
@@ -41,7 +41,8 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
 
   const rows = useMemo(
     () =>
-      semesterRoster(applications, scope)
+      // 교사·스탭은 수료 대상이 아니다 — 수료율 분모에 섞이면 통계가 틀어진다.
+      completionRoster(applications, scope)
         .map((a) => ({
           app: a,
           result: calcCompletion(a.id, sessions, attBySession, minRate),
