@@ -45,6 +45,9 @@
 - [x] **스탭의 학기 조회 Rules 보강 — 2026-08-08 완료.** `semesters` `.read`에 `iguardMembers`를 추가하고 학생 앱에서 배포했다(`firebase deploy --only database`). 라이브 Rules 재조회로 반영 확인, 배포 전후 달라진 최상위 노드는 `semesters` 하나뿐. `.write`와 `semestersPrivate`는 무변경. 배포 전 스냅샷: `tmp/rules-backup/live-rules-20260808-120543.json`(미추적).
   - 관리자 계정(`smilegate1108@gmail.com`) 기준으로는 **로그인된 실제 브라우저에서 검증 완료** — 홈·`/semester/2026-2` 모두 배너 없이 `sessions`까지 로드(회차 1회).
   - 남은 확인: **스탭 계정으로 실제 로그인**해 학기 화면이 보이는지 육안 확인(에이전트는 스탭 비밀번호가 없어 미실행).
+- [x] **전반 점검 후속 4건 — 2026-08-09 완료 (`cb5f6c5`…`4928418`, 배포됨).** ①교사 개인정보 노드 Rules 축소(콘솔 플레이그라운드 4케이스 검증) ②사고 이력 모듈 3종 회귀 가드 신설 + CLAUDE.md 거짓 보증 정정 ③모달 ESC 3건·aria-label 2건 ④set-state-in-effect 20→18.
+  - **남은 것**: `set-state-in-effect` 18건. 성격이 다르다 — 편집 draft를 props에서 동기화(7), 자동 선택(2), 레이아웃 측정·fetch·팝오버 닫기(나머지). 권장 수정은 `key` 기반 리마운트이고, 실수 13(자동 선택이 사용자 선택을 덮음) 영역이라 수련회 직전 일괄 수정을 피했다.
+  - **남은 것**: `iguardMembers`·`iguardRoles`·`retreatAdmins`·`events`·`staff_*`의 `.read`가 아직 `auth != null`이다. 역할 판정이 자기 멤버십을 읽어야 해서 좁히려면 `resolveMinistryRole` 경로 확인이 선행돼야 한다.
 - [x] **학기 화면 UI 5건 + PIN 잠금 공유 — 2026-08-09 완료 (`4c6adf6`, `a4ff0a0`, 배포됨).** ①출석 표 상태 메뉴 포털(잘림 해결)·카드 폭 축소·학생/스탭 구분 ②설정 장소·담당 입력칸 폭 통일 ③수료 대상에서 스탭 제외(`completionRoster`) ④접수 명단에서 스탭의 훈련·보호자 숨김 ⑤팀 상세 학생/스탭 분리. 스탭 판정은 `roster.ts`의 `isStaffApplication`/`splitStudentsAndStaff` 한 곳.
   - PIN 잠금: `useRetreatPinGate` 공용 훅 신설, 행정 상세에도 게이트 적용, 행정 홈에 🔐 관리자 버튼·자물쇠 배지. **운영 DB에 PIN을 쓰지 않고** 로컬에서 잠금 상태를 흉내 내 양쪽 화면 검증 후 원복.
 - [x] **코드 리뷰 지적 8건 전부 수정 — 2026-08-09 완료 (`1b78adc`…`b382fa4`, 배포됨).** 1건=1커밋. ①수련회 삭제 시 `retreatsPrivate` 함께 제거(조사 결과 기존 고아 0건) ②복구 전 백업 실패 시 중단 ③인원체크 키에서 배열 인덱스 제거(구형 키 하위호환) ④연락처 전체 삭제 저장 ⑤훈련 반 삭제 시 커리큘럼 정리 ⑥이가드 허브 `useLoadErrors` 이관 ⑦자물쇠 구독 부분 실패 허용 ⑧홈 기간 구독 `user` 가드.
