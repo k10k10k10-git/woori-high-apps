@@ -105,13 +105,16 @@ export default function PortalHome() {
     return subscribeToMilestones((v) => { setMilestones(v); ok("공유 일정"); }, fail("공유 일정"));
   }, [user, role, fail, ok]);
 
+  // 회차 구독과 같은 이유로 user 가드가 필요하다 — 로그아웃해도 retreats 상태가 남아
+  // 인증이 끊긴 채 재구독하면서 엉뚱한 permission_denied 배너가 뜬다.
   useEffect(() => {
+    if (!user) return;
     return subscribeToAllRetreatPeriods(
       retreats.map((retreat) => retreat.id),
       (v) => { setPeriods(v); ok("수련회 기간"); },
       fail("수련회 기간"),
     );
-  }, [retreats, fail, ok]);
+  }, [user, retreats, fail, ok]);
 
   const currentRetreat = useMemo(() => {
     const today = todayYmd();
