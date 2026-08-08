@@ -10,6 +10,7 @@ import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/features/iguar
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/features/iguard/lib/busStaff";
 import { roleNamesForChecklist, studentPartialLabel, teacherChecklistMeta } from "@/features/iguard/lib/checklistMembers";
 import { activeStudentIdsForGender, buildStudentGenderMap, teacherNamesForBusSegment } from "@/features/iguard/lib/busGender";
+import { isMemberChecked, memberCheckKeys, stableMemberId } from "@/features/iguard/lib/checklistKeys";
 import { isPresentOnDay } from "@/features/iguard/lib/partialAttendance";
 import type { RetreatDay } from "@/features/iguard/lib/partialAttendance";
 
@@ -92,8 +93,8 @@ export default function ChecklistView({ retreatId, groups, students, participant
       ? availableTeacherNames
       : selectedTeacherNames.filter(name => availableTeacherNames.includes(name));
     return [
-      ...teacherNames.map((name, idx) => ({
-        id: `teacher:${g.id}:${idx}:${name}`,
+      ...teacherNames.map((name) => ({
+        id: stableMemberId("teacher", g.id, name),
         name,
         meta: teacherChecklistMeta(teachers, name, g.bu),
       })),
@@ -138,8 +139,8 @@ export default function ChecklistView({ retreatId, groups, students, participant
       const mergedStaff = mergeBusStaffNames(busFieldStaff, cueStaff);
 
       const summary = `학생 ${studentCount} · 교사 ${teacherCount} · 스탭 ${mergedStaff.length} · 총 ${studentCount + teacherCount + mergedStaff.length}`;
-      const staffMembers: CheckMember[] = mergedStaff.map((name, idx) => ({
-        id: `bus-staff:${b.id}:${idx}:${name}`,
+      const staffMembers: CheckMember[] = mergedStaff.map((name) => ({
+        id: stableMemberId("bus-staff", b.id, name),
         name,
         meta: staffMetaLabel(name),
       }));
@@ -166,13 +167,16 @@ export default function ChecklistView({ retreatId, groups, students, participant
   }, [mode, sortedGroups, buses, selectedBusDay, groups, membersForGroup, partial, cellColors, cueStaffByBus, roleNamesForGroup, genderMap]);
 
   const total = units.reduce((a, u) => a + u.members.length, 0);
-  const checkedCount = units.reduce((a, u) => a + u.members.filter(m => checkedKeys.has(keyOf(m.id))).length, 0);
+  // 체크 판정·해제는 항상 memberCheckKeys를 거친다 — 구형 인덱스 키로 저장된 체크를 놓치지 않기 위해.
+  const isChecked = (id: string) => isMemberChecked(checkedKeys, day, id);
+  const keysFor = (id: string) => memberCheckKeys(checkedKeys, day, id);
+  const checkedCount = units.reduce((a, u) => a + u.members.filter(m => isChecked(m.id)).length, 0);
 
   // 멱등 체크: 탭 = "출석 확인"(항상 present=true). 여러 스탭이 같은 학생을 동시에/중복
   // 눌러도 결과가 "출석"으로 수렴한다. 해제는 아래 uncheck로만 — 실수로 present를 푸는 사고 방지.
   async function check(sid: string) {
     const k = keyOf(sid);
-    if (checkedKeys.has(k)) return; // 이미 체크됨 — 멱등, 아무 것도 안 함
+    if (isChecked(sid)) return; // 이미 체크됨 — 멱등, 아무 것도 안 함 (구형 키 포함)
     try {
       await updateIguardAttendance(retreatId, k, true, byName);
     } catch (e) {
@@ -182,19 +186,20 @@ export default function ChecklistView({ retreatId, groups, students, participant
 
   // 해제는 확인을 거친다 — "확인하려다 오히려 해제"되는 동시 사용 사고를 막는 핵심.
   async function uncheck(m: CheckMember) {
-    const k = keyOf(m.id);
-    if (!checkedKeys.has(k)) return;
+    // 신형·구형 키를 함께 해제한다 — 하나라도 남으면 화면에서 체크가 되살아난다.
+    const keys = keysFor(m.id);
+    if (keys.length === 0) return;
     const ok = await uiConfirm(`${m.name} 체크를 해제할까요?`);
     if (!ok) return;
     try {
-      await updateIguardAttendance(retreatId, k, false, byName);
+      await clearIguardAttendance(retreatId, keys, byName);
     } catch (e) {
       toast(`해제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 
   async function resetUnit(u: Unit) {
-    const keys = u.members.map(m => keyOf(m.id)).filter(k => checkedKeys.has(k));
+    const keys = u.members.flatMap(m => keysFor(m.id));
     if (keys.length === 0) return toast("해제할 체크가 없습니다.", "warning");
     const ok = await uiConfirm(`${u.title} 체크 ${keys.length}개를 해제할까요? (재점호용)`);
     if (!ok) return;
@@ -207,7 +212,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
   }
 
   async function resetDay() {
-    const keys = units.flatMap(u => u.members.map(m => keyOf(m.id))).filter(k => checkedKeys.has(k));
+    const keys = units.flatMap(u => u.members.flatMap(m => keysFor(m.id)));
     if (keys.length === 0) return toast("해제할 체크가 없습니다.", "warning");
     const ok = await uiConfirm(`${dayLabel} 체크 ${keys.length}개를 모두 해제할까요? 도착 후 재점호 등 새로 체크할 때 사용하세요.`);
     if (!ok) return;
@@ -295,7 +300,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
       ) : (
         <div className={mode === "호차별" ? "grid grid-cols-2 gap-2 sm:gap-4" : "grid gap-4 sm:grid-cols-2"}>
           {units.map(u => {
-            const c = u.members.filter(m => checkedKeys.has(keyOf(m.id))).length;
+            const c = u.members.filter(m => isChecked(m.id)).length;
             return (
               <div key={u.key} className="card min-w-0 overflow-hidden">
                 <div className={`flex items-center justify-between border-b border-slate-100 bg-slate-50 ${mode === "호차별" ? "gap-1.5 px-2.5 py-2.5 sm:gap-2 sm:px-4 sm:py-3" : "gap-2 px-4 py-3"}`}>
@@ -321,8 +326,9 @@ export default function ChecklistView({ retreatId, groups, students, participant
                 <ul className="divide-y divide-slate-100">
                   {u.members.length === 0 ? <li className="px-4 py-3 text-center text-slate-300 text-xs">없음</li> :
                     u.members.map((m, i) => {
-                      const on = checkedKeys.has(keyOf(m.id));
-                      const by = on ? attendanceInfo[keyOf(m.id)]?.by : undefined;
+                      const memberKeys = keysFor(m.id);
+                      const on = memberKeys.length > 0;
+                      const by = on ? attendanceInfo[memberKeys[0]]?.by : undefined;
                       const nameNode = m.name === "(명단 미상)" ? <span className="text-amber-500">{m.name}</span> : m.name;
                       return (
                         <li key={m.id}>
