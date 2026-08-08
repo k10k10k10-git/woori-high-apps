@@ -954,6 +954,8 @@ export function subscribeToIguardAccessLocks(
   if (retreatIds.length === 0) { cb({}); return () => {}; }
   const values: Record<string, IguardAccessLock> = {};
   const ready = new Set<string>();
+  // 실패한 수련회도 ready로 친다 — 한 곳의 읽기가 거부되면 나머지 자물쇠 배지까지
+  // 영원히 안 뜨던 문제(에러 경로가 ready에 들어가지 않아 emit 조건이 성립하지 않았다).
   const emit = () => {
     if (ready.size === retreatIds.length) cb({ ...values });
   };
@@ -962,7 +964,12 @@ export function subscribeToIguardAccessLocks(
     else delete values[retreatId];
     ready.add(retreatId);
     emit();
-  }, onError));
+  }, error => {
+    delete values[retreatId];
+    ready.add(retreatId);
+    emit();
+    onError?.(error);
+  }));
   return () => unsubs.forEach(unsub => unsub());
 }
 
