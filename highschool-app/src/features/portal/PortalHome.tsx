@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
+import { useLoadErrors } from "@/lib/useLoadErrors";
 import {
   deleteMilestone,
   getRetreats,
@@ -45,7 +46,10 @@ export default function PortalHome() {
     semesterId: "",
     items: [],
   });
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // 로드 실패는 경로별로 모으고(마지막 하나만 보이던 문제), 저장·삭제 실패는 따로 둔다.
+  const { fail, ok, message: dataError } = useLoadErrors(user?.uid ?? "");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const loadError = dataError ?? actionError;
   // 공유 일정(prepMilestones) — 행정·이가드가 함께 쓰는 전역 노드. 스탭은 Rules상 쓰기 불가.
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string } | null>(null);
@@ -59,15 +63,18 @@ export default function PortalHome() {
     if (!user || !canAccessPortalArea("home", role)) return;
 
     getRetreats()
-      .then((retreatList) => setRetreats([...retreatList].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt)))
-      .catch((error: unknown) => setLoadError(error instanceof Error ? error.message : String(error)));
+      .then((retreatList) => {
+        setRetreats([...retreatList].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
+        ok("수련회 목록");
+      })
+      .catch((error: unknown) => fail("수련회 목록")(error instanceof Error ? error : new Error(String(error))));
 
     if (canAccessPortalArea("semester", role)) {
       getSemesters()
-        .then(setSemesters)
-        .catch((error: unknown) => setLoadError(error instanceof Error ? error.message : String(error)));
+        .then((list) => { setSemesters(list); ok("학기 목록"); })
+        .catch((error: unknown) => fail("학기 목록")(error instanceof Error ? error : new Error(String(error))));
     }
-  }, [user, role]);
+  }, [user, role, fail, ok]);
 
   const currentSemester = useMemo(() => {
     const today = todayYmd();
@@ -77,14 +84,16 @@ export default function PortalHome() {
     }) ?? semesters[0] ?? null;
   }, [semesters]);
 
+  // user 가드가 필요하다 — 로그아웃해도 semesters 상태는 남아 currentSemester가 유지되므로,
+  // 가드가 없으면 인증이 끊긴 채 재구독해 엉뚱한 permission_denied 배너가 뜬다.
   useEffect(() => {
-    if (!currentSemester) return;
+    if (!user || !currentSemester) return;
     return subscribeSessions(
       currentSemester.id,
-      items => setSessionState({ semesterId: currentSemester.id, items }),
-      (error) => setLoadError(error.message),
+      items => { setSessionState({ semesterId: currentSemester.id, items }); ok("회차"); },
+      fail("회차"),
     );
-  }, [currentSemester]);
+  }, [user, currentSemester, fail, ok]);
 
   const sessions = useMemo(
     () => sessionState.semesterId === currentSemester?.id ? sessionState.items : [],
@@ -93,16 +102,16 @@ export default function PortalHome() {
 
   useEffect(() => {
     if (!user || !canAccessPortalArea("home", role)) return;
-    return subscribeToMilestones(setMilestones, (error) => setLoadError(error.message));
-  }, [user, role]);
+    return subscribeToMilestones((v) => { setMilestones(v); ok("공유 일정"); }, fail("공유 일정"));
+  }, [user, role, fail, ok]);
 
   useEffect(() => {
     return subscribeToAllRetreatPeriods(
       retreats.map((retreat) => retreat.id),
-      setPeriods,
-      (error) => setLoadError(error.message),
+      (v) => { setPeriods(v); ok("수련회 기간"); },
+      fail("수련회 기간"),
     );
-  }, [retreats]);
+  }, [retreats, fail, ok]);
 
   const currentRetreat = useMemo(() => {
     const today = todayYmd();
@@ -147,6 +156,7 @@ export default function PortalHome() {
     if (!scheduleDraft) return;
     const title = scheduleDraft.title.trim();
     if (!title) return;
+    setActionError(null);
     try {
       if (scheduleDraft.id) {
         await updateMilestone(scheduleDraft.id, { title, targetDate: scheduleDraft.date });
@@ -155,7 +165,7 @@ export default function PortalHome() {
       }
       setScheduleDraft(null);
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : String(error));
+      setActionError(error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -265,10 +275,11 @@ export default function PortalHome() {
             onAdd={(date) => setScheduleDraft({ date, title: "" })}
             onEdit={(item) => setScheduleDraft({ id: item.id.replace(/^shared-/, ""), date: item.date, title: item.title })}
             onDelete={async (item) => {
+              setActionError(null);
               try {
                 await deleteMilestone(item.id.replace(/^shared-/, ""));
               } catch (error) {
-                setLoadError(error instanceof Error ? error.message : String(error));
+                setActionError(error instanceof Error ? error.message : String(error));
               }
             }}
           />

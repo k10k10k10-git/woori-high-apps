@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useLoadErrors } from "@/lib/useLoadErrors";
 import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
 import {
   subscribeSemesterMeta,
@@ -50,20 +51,20 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  // 실패는 경로별로 모은다 — 5개가 동시에 거부돼도 마지막 하나만 보이면 원인을 잘못 짚는다.
+  const { fail, ok, message: loadError } = useLoadErrors(`${semesterId}|${user?.uid ?? ""}`);
 
   useEffect(() => {
     if (!user || !allowed) return;
-    const fail = (e: Error) => setLoadError(e.message);
     const unsubs = [
-      subscribeSemesterMeta(semesterId, setMeta, fail),
-      subscribeTeams(semesterId, setTeams, fail),
-      subscribeTrainingClasses(semesterId, setTrainingClasses, fail),
-      subscribeSessions(semesterId, setSessions, fail),
-      subscribeApplications(semesterId, setApplications, fail),
+      subscribeSemesterMeta(semesterId, (v) => { setMeta(v); ok("학기 정보"); }, fail("학기 정보")),
+      subscribeTeams(semesterId, (v) => { setTeams(v); ok("사역팀"); }, fail("사역팀")),
+      subscribeTrainingClasses(semesterId, (v) => { setTrainingClasses(v); ok("훈련 반"); }, fail("훈련 반")),
+      subscribeSessions(semesterId, (v) => { setSessions(v); ok("회차"); }, fail("회차")),
+      subscribeApplications(semesterId, (v) => { setApplications(v); ok("신청 명단"); }, fail("신청 명단")),
     ];
     return () => unsubs.forEach((u) => u());
-  }, [semesterId, user, allowed]);
+  }, [semesterId, user, allowed, fail, ok]);
 
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
 
