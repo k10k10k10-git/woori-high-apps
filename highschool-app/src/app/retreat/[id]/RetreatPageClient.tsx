@@ -24,6 +24,8 @@ import MedicalLogTab from "./MedicalLogTab";
 import MealCountTab from "./MealCountTab";
 import AdminSuppliesTab from "./AdminSuppliesTab";
 import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
+import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
 
 // 자주 사용하는 탭은 한번 마운트되면 CSS display로 보여주기/숨기기 (keep-alive).
@@ -65,6 +67,11 @@ export default function RetreatPageClient() {
   const { user, loading: authLoading, role } = useAuth();
   const adminAllowed = canAccessPortalArea("retreat-admin", role);
   const { toast } = useUI();
+  // 현장 화면과 같은 잠금 — 어느 쪽에서 PIN을 걸어도 행정·이가드 모두 잠긴다.
+  const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(id, {
+    enabled: !authLoading && !!user && adminAllowed,
+    role,
+  });
 
   const [retreat, setRetreat] = useState<Retreat | null>(null);
   const [tab, setTab] = useState(0);
@@ -178,6 +185,23 @@ export default function RetreatPageClient() {
         </div>
       </div>
     </div>
+  );
+
+  // ── PIN 잠금 게이트 (현장 화면과 동일) ───────────────────────
+  if (lockError) return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      <div className="mb-3 text-3xl" aria-hidden="true">⚠️</div>
+      <p className="mb-4 max-w-md text-sm text-red-700" role="alert">{lockError}</p>
+      <button onClick={() => router.push("/retreats")} className="btn-secondary">수련회 목록으로</button>
+    </div>
+  );
+  if (lock === undefined) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-screen-bg)" }}>
+      <div className="text-slate-400 text-sm">잠금 확인 중...</div>
+    </div>
+  );
+  if (lock && !unlocked) return (
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/retreats")} />
   );
 
   if (!retreat) return (

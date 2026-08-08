@@ -9,8 +9,11 @@ import { Retreat } from "@/lib/types";
 import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import BrainstormPanel from "./BrainstormPanel";
-import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
+import AdminModal from "./field/AdminModal";
+import { subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
+import type { IguardAccessLock, Retreat as IguardRetreat } from "@/features/iguard/lib/types";
 
 // ── 로고 SVG ────────────────────────────────────────────────
 function RetreatLogo({ size = 32 }: { size?: number }) {
@@ -49,6 +52,11 @@ export default function HomePage() {
   const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [selectedRetreatId, setSelectedRetreatId] = useState<string | null>(null);
+  // PIN 잠금은 현장(/field)과 같은 노드(retreats/{id}/iguard/accessLock)를 쓴다 —
+  // 어느 화면에서 잠가도 행정·이가드 양쪽에 똑같이 반영된다.
+  const [showLockAdmin, setShowLockAdmin] = useState(false);
+  const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
+  const canManageLocks = canEditPortalArea("retreat-admin", role);
 
   const loadRetreats = useCallback(async () => {
     setRetreatLoadError("");
@@ -76,6 +84,15 @@ export default function HomePage() {
   useEffect(() => {
     if (!loading && canUseAdmin && user) void loadRetreats();
   }, [loading, canUseAdmin, user, loadRetreats]);
+
+  // 잠금 상태 — 목록의 자물쇠 배지와 관리자 모달이 함께 쓴다(현장 화면과 같은 노드).
+  const retreatIdsKey = retreats.map((r) => r.id).join(",");
+  useEffect(() => {
+    if (!user || !canUseAdmin) return;
+    const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
+    return subscribeToIguardAccessLocks(ids, setAccessLocks,
+      (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 — ${e.message}`));
+  }, [user, canUseAdmin, retreatIdsKey]);
 
   async function handleRequestAccess() {
     if (!user) return;
@@ -238,15 +255,30 @@ export default function HomePage() {
         loadError={retreatLoadError || null}
         onRetry={loadRetreats}
         emptyLogo={<RetreatLogo size={64} />}
+        lockedIds={new Set(Object.keys(accessLocks))}
         headerActions={
-          <button
-            onClick={() => setShowGuide(true)}
-            className="rounded-lg border px-2 py-1 text-xs font-medium transition-colors"
-            style={{ color: "#0284c7", borderColor: "rgba(2,132,199,0.3)", background: "rgba(2,132,199,0.05)" }}
-          >폼 가이드</button>
+          <>
+            <button
+              onClick={() => setShowGuide(true)}
+              className="rounded-lg border px-2 py-1 text-xs font-medium transition-colors"
+              style={{ color: "#0284c7", borderColor: "rgba(2,132,199,0.3)", background: "rgba(2,132,199,0.05)" }}
+            >폼 가이드</button>
+            {/* 현장 화면과 같은 잠금 도구 — 여기서 잠가도 이가드까지 함께 잠긴다 */}
+            {canManageLocks && (
+              <button onClick={() => setShowLockAdmin(true)} aria-label="수련회 PIN 잠금 관리"
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800">
+                🔐 <span className="hidden sm:inline">관리자</span>
+              </button>
+            )}
+          </>
         }
         footer={<BrainstormPanel authorName={user.displayName || user.email || "이름 없음"} />}
       />
+
+      {showLockAdmin && (
+        <AdminModal onClose={() => setShowLockAdmin(false)} retreats={retreats as unknown as IguardRetreat[]}
+          locks={accessLocks} adminId={user.uid} />
+      )}
     </div>
   );
 }

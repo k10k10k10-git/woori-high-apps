@@ -2,12 +2,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/features/iguard/context/AuthContext";
-import { subscribeToIguardAccessLock } from "@/features/iguard/lib/db";
-import { hasRetreatSessionUnlock } from "@/features/iguard/lib/accessLock";
+import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import { checkAdminCompat } from "@/features/iguard/lib/compat";
 import { useRetreatData } from "@/features/iguard/hooks/useRetreatData";
 import {
-  Group, IguardAccessLock, IguardStaff,
+  Group, IguardStaff,
   TeacherAttendance,
 } from "@/features/iguard/lib/types";
 import CenterSpinner from "@/components/CenterSpinner";
@@ -34,7 +33,7 @@ import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
 import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
-import { canAccessPortalArea, canManageRoles, iguardScope } from "@/features/portal/accessPolicy";
+import { canAccessPortalArea, iguardScope } from "@/features/portal/accessPolicy";
 
 function parseNames(value?: string): string[] {
   return (value || "")
@@ -77,36 +76,15 @@ export default function IguardClient() {
   const id = (useParams().id as string);
   const { user, loading: authLoading, role } = useAuth();
   const fieldAllowed = canAccessPortalArea("retreat-field", role);
-  const [lock, setLock] = useState<IguardAccessLock | null | undefined>(undefined);
-  const [unlocked, setUnlocked] = useState(false);
-  const [lockError, setLockError] = useState<string | null>(null);
+  // 잠금 판정은 행정 화면과 같은 훅을 쓴다 — 어느 쪽에서 잠가도 양쪽이 같은 결론을 낸다.
+  const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(id, {
+    enabled: !authLoading && !!user && fieldAllowed,
+    role,
+  });
 
   useEffect(() => {
     if (!authLoading && (!user || !fieldAllowed)) router.push("/");
   }, [authLoading, user, fieldAllowed, router]);
-
-  useEffect(() => {
-    if (authLoading || !user || !fieldAllowed) return;
-    setLockError(null);
-    // PIN 우회는 통합관리자만 (기존 admins 계정과 동일 범위 — 넓히지 않는다)
-    if (canManageRoles(role)) {
-      setLock(null);
-      setUnlocked(true);
-      return;
-    }
-    setLock(undefined);
-    setUnlocked(false);
-    return subscribeToIguardAccessLock(id, nextLock => {
-      setLock(nextLock);
-      if (!nextLock) { setUnlocked(true); return; }
-      try { setUnlocked(hasRetreatSessionUnlock(id, nextLock, window.sessionStorage)); }
-      catch { setUnlocked(false); }
-    }, error => {
-      setLockError(`PIN 잠금 상태를 확인하지 못했습니다 — ${error.message}`);
-      setLock(undefined);
-      setUnlocked(false);
-    });
-  }, [authLoading, user, fieldAllowed, role, id]);
 
   if (authLoading) return <CenterSpinner />;
   if (!user || !fieldAllowed) return null;
@@ -119,7 +97,7 @@ export default function IguardClient() {
   );
   if (lock === undefined) return <CenterSpinner />;
   if (lock && !unlocked) return (
-    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={() => setUnlocked(true)} onBack={() => router.push(`/retreat/${id}`)} />
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/retreat/${id}`)} />
   );
   return <IguardWorkspace id={id} />;
 }
