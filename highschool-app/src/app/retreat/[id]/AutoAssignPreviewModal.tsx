@@ -28,7 +28,7 @@ export default function AutoAssignPreviewModal({
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-lg">🎲 자동 배정 결과 미리보기</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="미리보기 닫기" className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
         <p className="text-xs text-orange-500 mb-4">
           ⚠ {scope === "all"

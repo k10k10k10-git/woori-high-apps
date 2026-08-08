@@ -1,5 +1,6 @@
 "use client";
 import { type ReactNode, useMemo, useState } from "react";
+import { useDialogEscape } from "@/components/useDialogEscape";
 import { IguardScheduleBlock, IguardStaff, IguardPost, IguardBus, IguardMovement, IguardSegment } from "@/features/iguard/lib/types";
 import {
   saveIguardScheduleBlock,
@@ -51,6 +52,7 @@ function sheetOwnedFields(b: ImportedBlock, leaderNote?: string): Record<string,
 
 /** 큐싯 가져오기 모달 셸 — 구글 시트 연동은 2026-08-07 제거했다(표 붙여넣기만 사용). */
 function CueSheetImportModal({ onClose, children }: { onClose: () => void; children?: ReactNode }) {
+  useDialogEscape(true, onClose);
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 modal-backdrop" onClick={onClose}>
       <div

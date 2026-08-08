@@ -10,6 +10,7 @@ import { STAFF_BU } from "@/features/semester/applicant";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { isStaffApplication, splitStudentsAndStaff } from "@/features/semester/roster";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
+import { useDialogEscape } from "@/components/useDialogEscape";
 import { Application, ApplicationPrivate, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
@@ -29,6 +30,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
   const canEdit = useSemesterCanEdit();
   const [privateMap, setPrivateMap] = useState<Record<string, ApplicationPrivate>>({});
   const [detailTeamId, setDetailTeamId] = useState<string | null>(null);
+  useDialogEscape(!!detailTeamId, () => setDetailTeamId(null));
   const [expandedApplicantId, setExpandedApplicantId] = useState<string | null>(null);
 
   useEffect(() => {

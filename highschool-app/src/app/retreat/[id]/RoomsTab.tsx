@@ -1180,7 +1180,7 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
               <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
             </svg>
           </button>
-          <button onClick={onRemove} className="text-slate-300 hover:text-red-400 ml-1">×</button>
+          <button onClick={onRemove} aria-label={`${roomLabel(room)} 삭제`} className="text-slate-300 hover:text-red-400 ml-1">×</button>
         </div>
       </div>
 

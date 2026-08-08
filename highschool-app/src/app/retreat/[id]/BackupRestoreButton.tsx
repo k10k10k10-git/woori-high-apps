@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useDialogEscape } from "@/components/useDialogEscape";
 import { useUI } from "@/context/UIContext";
 
 /**
@@ -16,6 +17,7 @@ export default function BackupRestoreButton({ label, loadBackups, restore, disab
   const [open, setOpen] = useState(false);
   const [keys, setKeys] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
+  useDialogEscape(open, () => { if (!busy) setOpen(false); });
 
   async function openPicker() {
     setOpen(true);
