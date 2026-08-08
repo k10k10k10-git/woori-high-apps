@@ -25,6 +25,9 @@ export function buildTrainingClassRemovalUpdates(
 ): Record<string, unknown> {
   const updates: Record<string, unknown> = {
     [paths.trainingClass(sid, trainingClassId)]: null,
+    // 커리큘럼은 사역팀·훈련 반이 id 하나로 공유하는 맵이다(두 축의 id는 겹치지 않는다).
+    // 팀 삭제(buildTeamRemovalUpdates)와 같이 함께 지운다 — 안 지우면 고아로 남는다.
+    [paths.curriculum(sid, trainingClassId)]: null,
   };
 
   for (const [appKey, app] of Object.entries(applications)) {

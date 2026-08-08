@@ -36,6 +36,8 @@ describe("buildTrainingClassRemovalUpdates", () => {
 
     expect(updates).toEqual({
       "semesters/2026-2/trainingClasses/tc1": null,
+      // 커리큘럼은 사역팀 삭제와 같이 함께 지운다 — 안 지우면 고아로 남는다
+      "semesters/2026-2/curriculum/tc1": null,
       "semesters/2026-2/applications/1_100/trainingClassId": null,
     });
   });
