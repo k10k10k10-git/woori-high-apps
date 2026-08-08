@@ -22,6 +22,7 @@
 - **방학 중 사역 홈은 화면 하나**입니다. 두 경로 모두 `features/portal/VacationHome.tsx`를 렌더하고, `mode`("admin"/"field")로 **수련회에 들어갔을 때의 목적지만** 달라집니다(행정 화면 / 현장 화면). 목록·수련회 기간·준비 일정 캘린더는 완전히 같은 컴포넌트를 씁니다. 각 라우트는 로그인·권한 게이트와 도메인 전용 요소(행정: 폼 가이드·삭제·브레인스토밍 / 현장: PIN 배지·현장 관리자)만 슬롯으로 넘깁니다.
 - 준비 일정 캘린더는 `RetreatCalendarPanel` 하나로 통일했습니다(구 `PrepCalendar` 삭제). 수련회 기간 편집은 Rules상 행정 권한이 필요하므로 `canEditPeriods`로 잠급니다 — `prepMilestones`는 이가드팀도 공유 편집합니다.
 - 도메인별 색: 학기=초록(`.semester-scope`), 행정=스카이(기본 토큰), 이가드=보라(`.iguard-scope`). 레이아웃·컴포넌트 클래스(`card`/`input`/`btn-primary`/`table-header`)는 세 도메인이 공유합니다.
+- **수련회 PIN 잠금은 `useRetreatPinGate` 하나로만 판정합니다**(`src/features/portal/useRetreatPinGate.ts`). 잠금은 `retreats/{id}/iguard/accessLock` 한 노드에만 있으므로 **행정·이가드 어느 쪽에서 잠가도 양쪽이 잠깁니다**. 화면마다 구독을 새로 짜면 한쪽만 잠기는 사고가 납니다. 설정 UI는 공용 `AdminModal`(현장·행정 홈이 함께 씀), PIN 우회는 통합관리자만.
 - **로드 실패 배너는 `useLoadErrors(scope)` 하나만 씁니다**(`src/lib/useLoadErrors.ts`). 실패를 경로별로 모아 **전부** 나열하고, `scope`(학기 id·계정 uid)가 바뀌면 렌더 중 파생으로 초기화합니다. 단일 `loadError` 문자열로 되돌리지 마세요 — 5개 구독이 동시에 거부돼도 마지막 하나만 보여 2026-08-08에 권한 공백의 원인을 두 번 잘못 짚었습니다. 저장·삭제 실패는 `actionError`로 분리합니다. ⚠ Firebase RTDB는 **한 번 거부된 리스너를 규칙이 바뀌어도 재시도하지 않습니다** — 권한을 열어도 그 탭은 새로고침(재구독) 전까지 실패 상태로 남습니다.
 
 ## 권한 — 6단계 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
