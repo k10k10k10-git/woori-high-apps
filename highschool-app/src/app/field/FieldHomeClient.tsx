@@ -152,17 +152,6 @@ export default function FieldHomeClient() {
   // ── 수련회 목록 + 준비 일정 ──
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50">
-      {/* 사이트 제목·계정·로그아웃은 전역 헤더가 담당한다(중복 제목 줄 제거).
-          현장 전용 관리자 도구만 본문 상단에 남긴다. */}
-      {canManageRoles(role) && (
-        <div className="mx-auto flex max-w-7xl justify-end px-4 pt-3">
-          <button onClick={() => setShowAdmin(true)} aria-label="현장 관리자 도구"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800">
-            🔐 <span className="hidden sm:inline">현장 관리자</span>
-          </button>
-        </div>
-      )}
-
       {/* 행정(/retreats)과 같은 화면을 쓴다 — 들어가는 곳만 현장으로 다르다 */}
       {loading ? (
         <div className="mx-auto max-w-7xl px-4 py-6"><div className="card p-8 text-center text-slate-400">로딩 중...</div></div>
@@ -175,6 +164,12 @@ export default function FieldHomeClient() {
           onSelect={setSelectedId}
           loadError={loadError}
           lockedIds={new Set(Object.keys(accessLocks))}
+          headerActions={canManageRoles(role) ? (
+            <button onClick={() => setShowAdmin(true)} aria-label="현장 관리자 도구"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800">
+              🔐 <span className="hidden sm:inline">현장 관리자</span>
+            </button>
+          ) : null}
         />
       )}
 

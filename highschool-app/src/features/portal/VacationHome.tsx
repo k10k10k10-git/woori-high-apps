@@ -24,7 +24,7 @@ type Props = {
   onDelete?: (id: string, name: string) => void;
   /** 현장 모드에서만 — 수련회별 PIN 잠금 여부 */
   lockedIds?: Set<string>;
-  /** 우측 상단 슬롯 (폼 가이드 / 현장 관리자) */
+  /** 화면 우측 상단의 전역 도구 슬롯 (폼 가이드 / 잠금 관리자 / 현장 관리자) */
   headerActions?: ReactNode;
   /** 캘린더 아래 슬롯 (행정 브레인스토밍) */
   footer?: ReactNode;
@@ -45,6 +45,12 @@ export default function VacationHome({
 
   return (
     <main className="page-container max-w-7xl">
+      {headerActions && (
+        <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+          {headerActions}
+        </div>
+      )}
+
       {loadError && (
         <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
           <span>⚠ {loadError}</span>
@@ -65,16 +71,13 @@ export default function VacationHome({
           <div className="w-full md:w-72 md:shrink-0">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <div><p className="section-kicker">RETREATS</p><h2 className="mt-1 text-lg font-bold text-slate-800">수련회 목록</h2></div>
-              <div className="flex items-center gap-1.5">
-                {headerActions}
-                {canCreate && (
-                  <NewRetreatButton
-                    hrefAfterCreate={entryHref}
-                    onCreated={onCreated}
-                    className="btn-primary px-2 py-1 text-xs"
-                  />
-                )}
-              </div>
+              {canCreate && (
+                <NewRetreatButton
+                  hrefAfterCreate={entryHref}
+                  onCreated={onCreated}
+                  className="btn-primary px-2 py-1 text-xs"
+                />
+              )}
             </div>
 
             {/* 모바일: 선택 상자 + 선택된 수련회 카드 */}
