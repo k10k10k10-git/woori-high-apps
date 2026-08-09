@@ -52,6 +52,19 @@ Read these first for cross-app work:
 - Role writes go through `roleAssign.planRoleAssignment` (pure, grants before revokes) then `applyRole.applyRoleSteps` (execution). Do not call the underlying DB functions from UI code.
 - Resolved 2026-08-08: staff read of `semesters` now works — `iguardMembers` was added to the `semesters` `.read` rule and deployed from the student app. `.write` is still `admins`/`retreatAdmins` only, and `semestersPrivate` (contacts) stays admin-side only on purpose.
 
+## Read access was tightened on 2026-08-09 — do not widen it back
+
+Several nodes used to be readable by **any signed-in Google account** (no role at all), exposing 40 teachers' phone numbers and birthdates plus 51 account records. Two deploys fixed this:
+
+- `teacherStaff`, `teacherSpecial`, `teacherExtra` → `admins` / `attendanceAdmins` / `retreatAdmins` / `iguardMembers` (the semester intake screen and retreat rosters read these).
+- `teacherAdditional`, `teacherPhones` → `admins` / `attendanceAdmins` only.
+- `userRoles` → list read is admin-only; **each record keeps a self-read rule** (`data.child('email').val() === auth.token.email`) because `loadUserRole` reads `userRoles/{emailKey}` to decide login. Remove it and every homeroom teacher is locked out.
+- `retreatAdmins`, `iguardMembers`, `iguardRoles` → list read is role holders only, and **each keeps `$uid` self-read** (`auth.uid === $uid`). Both AuthContexts read their own uid from these three; on failure the `catch` sets role `"none"`, so removing self-read locks out every non-admin.
+- `staff_*` → `admins` / `staff_admins` (0 records today, app not deployed).
+- `events` stays `auth != null` on purpose — month/day/label only, no personal data.
+
+`고등부 학생 출석부/__tests__/rulesContract.test.ts` pins all of this. Run it before touching rules.
+
 ## Firebase Safety Rules
 
 - Rules deployment source is only `고등부 학생 출석부/database.rules.json`.

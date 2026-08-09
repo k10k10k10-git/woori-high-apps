@@ -59,6 +59,18 @@ npm run build
 
 독립 `retreat-app`·`iguard-app`은 기능 동등성 확인과 사용자 승인 후 2026-08-05 제거했습니다. 복구 태그는 `pre-legacy-app-removal-2026-08-05`입니다.
 
+## 2026-08-09에 굳힌 계약 (되돌리지 말 것)
+
+- **로드 오류 배너는 `lib/useLoadErrors.ts` 하나로만.** 실패를 경로별로 모아 전부 나열하고, `scope`(대상 id·계정 uid) 변경 시 렌더 중 파생으로 초기화한다. 단일 `loadError` 문자열로 되돌리면 동시 실패 중 마지막 하나만 보여 원인을 잘못 짚는다(실제로 두 번 오진했다). ⚠ Firebase RTDB는 **한 번 거부된 리스너를 규칙이 바뀌어도 재시도하지 않는다** — 권한을 열어도 그 탭은 새로고침 전까지 실패 상태다.
+- **수련회 PIN 잠금은 `features/portal/useRetreatPinGate.ts` 하나로만.** 잠금은 `retreats/{id}/iguard/accessLock` 한 노드라 **행정·이가드 어느 쪽에서 잠가도 양쪽이 잠긴다.** 화면마다 구독을 새로 짜면 한쪽만 잠기는 사고가 난다. PIN 우회는 통합관리자만.
+- **인원체크 키에 배열 인덱스를 넣지 않는다.** `features/iguard/lib/checklistKeys.ts`의 `stableMemberId`(`{kind}:{ownerId}:{name}`)만 쓴다. 운영 DB에 구형 인덱스 키가 남아 있으므로 판정·해제는 반드시 `memberCheckKeys`/`isMemberChecked`를 거친다(신형·구형 동시 인식, 쓰기는 신형만).
+- **스탭/학생 구분은 `features/semester/roster.ts` 한 곳.** `isStaffApplication`·`splitStudentsAndStaff`·`completionRoster`. 수료 명단에서 교사·스탭을 빼는 것은 `completionRoster`가 담당한다(출석 명단은 스탭도 포함).
+- **삭제는 짝이 되는 노드를 함께.** 수련회는 `lib/retreatRemoval.ts`(`retreats` + `retreatsPrivate`), 팀·훈련 반은 `curriculum`까지. 한쪽만 지우면 화면에서 접근 불가능한 고아가 남는다.
+- **전체 덮어쓰기 복구는 사전 백업 성공을 확인한 뒤에만** — `backupNodeBeforeOverwrite`의 반환값을 검사한다(`if (!backedUp) throw`). 스로틀된 상시 저장 백업만 예외.
+- **인앱 브라우저 탈출은 `features/iguard/lib/inAppBrowser.ts`만.** 화면에 복제하지 말 것 — 복제본에는 "이동 주소 ≠ 현재 주소" 불변식과 세션 1회 가드가 빠져 무한 리로드가 났다.
+- **`.input`은 `globals.css`의 `@layer` 밖 규칙이라 Tailwind 유틸리티를 이긴다.** `h-*`로 높이를 고정하면 글자가 잘리고, `w-*`·`text-*`·`px-*`는 무시된다. 폭은 **감싼 div**로, 글꼴은 **인라인 style**로 준다.
+- 남은 `set-state-in-effect` 9건은 의도적으로 남긴 것이 대부분이다: `ExecutionViews` 3건은 `staffPicked`/`userPicked` ref 가드 자동 선택(루트 CLAUDE.md 실수 13이 **처방한** 패턴), `LodgingMapView` 2건은 레이아웃·팝오버, `useRetreatData`·`RetreatsHome`은 로딩/fetch. 나머지 2건(`ScheduleSheetEditor`·`SettingsTab`)만 draft 동기화라 `key` 부여로 정리 가능하다.
+
 ## 핵심 코드 패턴
 
 ### 통합 포털에서도 도메인 권한과 DB 소유권을 합치지 않기 (2026-08-05)
