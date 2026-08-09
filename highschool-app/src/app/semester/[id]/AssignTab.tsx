@@ -106,26 +106,31 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
             const c2 = a.choice2 ? teamById.get(a.choice2) : undefined;
             return (
               <li key={a.id} className="rounded-lg border px-3 py-2" style={{ borderColor: "var(--color-border)" }}>
-                <div className="flex items-center justify-between text-sm">
-                  <span>
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span className="min-w-0">
                     {a.name}
                     <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
                   </span>
-                  <select
-                    aria-label={`${a.name} 팀 배치`}
-                    value=""
-                    disabled={!canEdit}
-                    onChange={(e) => e.target.value && void assign(a, e.target.value)}
-                    className="input h-8 w-28 px-1.5 py-1 text-xs"
-                  >
-                    <option value="">배치…</option>
-                    {teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                        {t.id === a.choice1 ? " ★1지망" : t.id === a.choice2 ? " ☆2지망" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  {/* .input은 @layer 밖 규칙이라 h-*·px-*·text-*가 먹지 않는다.
+                      h-8로 높이를 고정했더니 padding 8px + text-base가 32px를 넘겨 "배치…"가 잘렸다.
+                      높이는 고정하지 않고, 폭만 감싼 div로 준다(루트 CLAUDE.md 함정 1). */}
+                  <div className="w-28 shrink-0">
+                    <select
+                      aria-label={`${a.name} 팀 배치`}
+                      value=""
+                      disabled={!canEdit}
+                      onChange={(e) => e.target.value && void assign(a, e.target.value)}
+                      className="input"
+                    >
+                      <option value="">배치…</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                          {t.id === a.choice1 ? " ★1지망" : t.id === a.choice2 ? " ☆2지망" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 {(c1 || c2) && (
                   <div className="mt-1 flex gap-1">
@@ -217,22 +222,25 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
               {[...trainingUnassigned].sort(byApplicant).map((a) => (
                 <li key={a.id} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
                   style={{ borderColor: "var(--color-border)" }}>
-                  <span>
+                  <span className="min-w-0">
                     {a.name}
                     <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
                   </span>
-                  <select
-                    aria-label={`${a.name} 훈련 반 배정`}
-                    value=""
-                    disabled={!canEdit}
-                    onChange={(e) => e.target.value && void assignTraining(a, e.target.value)}
-                    className="input h-8 w-28 px-1.5 py-1 text-xs"
-                  >
-                    <option value="">배정…</option>
-                    {trainingClasses.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  {/* 사역팀 배치와 같은 이유로 높이를 고정하지 않는다(글자 잘림) — 폭만 감싼 div로. */}
+                  <div className="w-28 shrink-0">
+                    <select
+                      aria-label={`${a.name} 훈련 반 배정`}
+                      value=""
+                      disabled={!canEdit}
+                      onChange={(e) => e.target.value && void assignTraining(a, e.target.value)}
+                      className="input"
+                    >
+                      <option value="">배정…</option>
+                      {trainingClasses.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </li>
               ))}
             </ul>
