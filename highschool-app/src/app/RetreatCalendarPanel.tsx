@@ -93,7 +93,7 @@ export default function RetreatCalendarPanel({
   const [savingPeriod, setSavingPeriod] = useState(false);
 
   // 마일스톤 날짜 클릭 패널
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(today);
   const [formTitle, setFormTitle] = useState("");
   const [formNote,  setFormNote]  = useState("");
   const [saving,    setSaving]    = useState(false);
@@ -129,6 +129,7 @@ export default function RetreatCalendarPanel({
         const d = parseYMD(earliest.startDate);
         setCalYear(d.getFullYear());
         setCalMonth(d.getMonth());
+        setSelectedDate(earliest.startDate);
       }
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     return () => unsubP();
@@ -267,6 +268,8 @@ export default function RetreatCalendarPanel({
   // 가장 이른 수련회 기간 기준 D-Day
   const nextPeriod = periods.find(p => p.endDate >= today);
   const dDay = nextPeriod ? diffDays(nextPeriod.startDate) : null;
+  const selectedMilestones = milestonesByDate.get(selectedDate) ?? [];
+  const selectedPeriods = periodsByDate.get(selectedDate) ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -395,205 +398,121 @@ export default function RetreatCalendarPanel({
         </div>
       )}
 
-      {/* 달력 */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100">
-          <button onClick={prevMonth} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 text-base leading-none">‹</button>
-          <div className="flex items-center gap-1.5">
-            <select
-              className="input text-sm font-semibold py-1 px-2 cursor-pointer"
-              style={{ width: 90 }}
-              value={calYear}
-              onChange={e => setCalYear(Number(e.target.value))}
-            >
-              {Array.from({ length: 101 }, (_, i) => 2000 + i).map(y => (
-                <option key={y} value={y}>{y}년</option>
-              ))}
-            </select>
-            <select
-              className="input text-sm font-semibold py-1 px-2 cursor-pointer"
-              style={{ width: 70 }}
-              value={calMonth}
-              onChange={e => setCalMonth(Number(e.target.value))}
-            >
-              {Array.from({ length: 12 }, (_, i) => i).map(m => (
-                <option key={m} value={m}>{m + 1}월</option>
-              ))}
-            </select>
+      {/* 공유 캘린더 — 홈과 같은 월간표 + 선택 날짜 상세 패널 구조 */}
+      <section className="card p-4 sm:p-5">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-800">공유 준비 캘린더</h3>
+            <p className="mt-0.5 text-[11px] text-slate-400">날짜를 선택해 수련회 기간과 준비 일정을 함께 확인합니다.</p>
           </div>
-          <button onClick={nextMonth} className="p-1.5 rounded hover:bg-slate-100 text-slate-500 text-base leading-none">›</button>
-        </div>
-
-
-
-        <div className="grid grid-cols-7 border-b border-slate-100">
-          {WEEK_DAYS.map((d, i) => (
-            <div key={d} className={`py-1.5 text-center text-[10px] font-semibold ${
-              i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-slate-400"
-            }`}>{d}</div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7">
-          {cells.map((day, i) => {
-            if (!day) return (
-              <div key={`empty-${i}`} className="border-b border-r border-slate-100 h-[72px] bg-slate-50/20" />
-            );
-
-            const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-            const dayMilestones = milestonesByDate.get(dateStr) ?? [];
-            const dayPeriods = periodsByDate.get(dateStr) ?? [];
-            const isToday    = dateStr === today;
-            const isPast     = dateStr < today;
-            const dow        = i % 7;
-            const isSelected = selectedDate === dateStr;
-
-            // 첫 번째 기간 기준으로 배경색
-            const primaryPeriod = dayPeriods[0];
-            const primaryColor = primaryPeriod ? periodColor(primaryPeriod.idx) : null;
-
-            return (
-              <div
-                key={dateStr}
-                onClick={() => {
-                  if (isSelected) { setSelectedDate(null); }
-                  else { setSelectedDate(dateStr); setEditingId(null); }
-                }}
-                className={`border-b border-r border-slate-100 h-[72px] p-1 cursor-pointer transition-colors ${
-                  isSelected      ? "bg-blue-50 ring-1 ring-inset ring-blue-300" :
-                  primaryColor    ? primaryColor.rangeBg :
-                  isToday         ? "bg-slate-50" :
-                  isPast          ? "bg-slate-50/20" :
-                  "hover:bg-slate-50"
-                }`}
-              >
-                {/* 날짜 숫자 */}
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className={`text-[11px] font-bold w-5 h-5 flex items-center justify-center rounded-full ${
-                    isToday ? "bg-blue-500 text-white" :
-                    primaryColor && (primaryPeriod.isStart || primaryPeriod.isEnd) ? `${primaryColor.dot} text-white` :
-                    isPast  ? "text-slate-400" :
-                    dow === 0 ? "text-red-600" :
-                    dow === 6 ? "text-blue-600" :
-                    "text-slate-800"
-                  }`}>{day}</span>
-                </div>
-
-                {/* 주제 (시작일에만 한 줄) */}
-                {dayPeriods.filter(dp => dp.isStart && dp.period.theme).map(dp => {
-                  const c = periodColor(dp.idx);
-                  return (
-                    <div key={dp.period.id} className={`text-[9px] px-1 py-0.5 rounded mb-0.5 truncate ${c.bg} ${c.text} ${c.border} border`}>
-                      📌 {dp.period.theme}
-                    </div>
-                  );
-                })}
-
-                {/* 마일스톤 칩 */}
-                <div className="space-y-0.5">
-                  {dayMilestones.slice(0, 2).map(m => {
-                    const c = getMilestoneColor(m);
-                    return (
-                      <div key={m.id} onClick={e => e.stopPropagation()}
-                        className={`text-[9px] px-1 py-0.5 rounded border leading-tight flex items-center gap-0.5 ${c.bg} ${c.text} ${c.border}`}>
-                        <span className={`w-1 h-1 rounded-full shrink-0 ${c.dot}`} />
-                        <span className="truncate">{m.title}</span>
-                      </div>
-                    );
-                  })}
-                  {dayMilestones.length > 2 && (
-                    <div className="text-[9px] text-slate-400">+{dayMilestones.length - 2}</div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 날짜 클릭 패널 */}
-      {selectedDate && (
-        <div className="card p-4 border-2 border-blue-200">
-          <div className="flex items-center justify-between mb-3">
-            <span className="font-bold text-slate-700 text-sm">
-              {parseYMD(selectedDate).getMonth()+1}월 {parseYMD(selectedDate).getDate()}일 준비 일정
-            </span>
-            <button onClick={() => { setSelectedDate(null); setEditingId(null); setFormTitle(""); setFormNote(""); }}
-              className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
+          <div className="flex items-center gap-1">
+            <button onClick={prevMonth} aria-label="이전 달" className="rounded-lg px-2 py-1.5 text-sm text-slate-500 hover:bg-slate-100">‹</button>
+            <strong className="min-w-24 text-center text-xs text-slate-700">{calYear}년 {calMonth + 1}월</strong>
+            <button onClick={nextMonth} aria-label="다음 달" className="rounded-lg px-2 py-1.5 text-sm text-slate-500 hover:bg-slate-100">›</button>
           </div>
+        </div>
 
-          {(milestonesByDate.get(selectedDate) ?? []).length > 0 && (
-            <div className="space-y-1.5 mb-3">
-              {(milestonesByDate.get(selectedDate) ?? []).map(m => {
-                const c = getMilestoneColor(m);
-                const isEditing = editingId === m.id;
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.75fr)]">
+          <div className="overflow-hidden rounded-2xl border border-slate-200">
+            <div className="grid grid-cols-7 bg-slate-50 text-center text-[10px] font-semibold text-slate-400">
+              {WEEK_DAYS.map((d, i) => <div key={d} className={`py-2 ${i === 0 ? "text-red-400" : i === 6 ? "text-blue-500" : ""}`}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7">
+              {cells.map((day, i) => {
+                if (!day) return <div key={`empty-${i}`} className="min-h-20 border-t border-slate-100 bg-slate-50/40 sm:min-h-24" />;
+                const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const dayMilestones = milestonesByDate.get(dateStr) ?? [];
+                const dayPeriods = periodsByDate.get(dateStr) ?? [];
+                const isToday = dateStr === today;
+                const isSelected = selectedDate === dateStr;
                 return (
-                  <div key={m.id} className={`rounded-lg border p-2 ${c.bg} ${c.border}`}>
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <input className="input text-sm" value={editTitle}
-                          onChange={e => setEditTitle(e.target.value)} />
-                        <div className="flex gap-2">
-                          <input type="date" className="input text-sm flex-1" value={editDate}
-                            onChange={e => setEditDate(e.target.value)} />
-                          <input className="input text-sm flex-1" placeholder="메모"
-                            value={editNote} onChange={e => setEditNote(e.target.value)} />
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={saveEdit} disabled={editSaving} className="btn-primary btn-sm flex-1 justify-center text-xs">{editSaving ? "..." : "저장"}</button>
-                          <button onClick={() => setEditingId(null)} className="btn-secondary btn-sm flex-1 justify-center text-xs">취소</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => toggleDone(m)}
-                          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                            m.done ? `${c.dot} border-transparent text-white` : "border-current"
-                          }`}>
-                          {m.done && <span className="text-[8px] font-bold">✓</span>}
-                        </button>
-                        <span className={`flex-1 text-xs font-medium ${c.text} ${m.done ? "line-through opacity-60" : ""}`}>
-                          {m.title}
-                          {m.note && <span className="ml-1 opacity-70">{m.note}</span>}
-                        </span>
-                        <button onClick={() => { setEditingId(m.id); setEditTitle(m.title); setEditDate(m.targetDate); setEditNote(m.note ?? ""); }}
-                          className={`text-xs ${c.text} opacity-60 hover:opacity-100`}>수정</button>
-                        <button onClick={() => handleDeleteMilestone(m.id)}
-                          className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                  <button
+                    key={dateStr}
+                    onClick={() => { setSelectedDate(dateStr); setEditingId(null); setFormTitle(""); setFormNote(""); }}
+                    className={`min-h-20 border-t border-slate-100 p-1.5 text-left align-top transition sm:min-h-24 sm:p-2 ${isSelected ? "bg-sky-50 ring-2 ring-inset ring-sky-300" : "hover:bg-slate-50"}`}
+                  >
+                    <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${isToday ? "bg-slate-900 text-white" : "text-slate-600"}`}>{day}</span>
+                    <span className="mt-1 grid gap-1">
+                      {dayPeriods.filter(dp => dp.isStart).slice(0, 1).map(dp => {
+                        const c = periodColor(dp.idx);
+                        const title = dp.period.theme || retreats.find(r => r.id === dp.period.retreatId)?.name || "수련회 기간";
+                        return <span key={`period-${dp.period.id}`} className={`truncate rounded px-1.5 py-1 text-[9px] font-medium ${c.bg} ${c.text}`}>📌 {title}</span>;
+                      })}
+                      {dayMilestones.slice(0, dayPeriods.some(dp => dp.isStart) ? 1 : 2).map(m => {
+                        const c = getMilestoneColor(m);
+                        return <span key={m.id} className={`truncate rounded px-1.5 py-1 text-[9px] font-medium ${c.bg} ${c.text}`}>● {m.title}</span>;
+                      })}
+                      {dayMilestones.length + dayPeriods.filter(dp => dp.isStart).length > 2 && <span className="px-1 text-[9px] text-slate-400">+{dayMilestones.length + dayPeriods.filter(dp => dp.isStart).length - 2}개</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <aside className="rounded-2xl bg-slate-900 p-4 text-white lg:min-h-full">
+            <div>
+              <p className="text-[11px] font-semibold tracking-wide text-sky-300">{selectedDate.replaceAll("-", ".")}</p>
+              <h3 className="mt-1 text-sm font-bold">전체 일정</h3>
+            </div>
+
+            <div className="mt-4 grid gap-2">
+              {selectedPeriods.map(({ period }) => {
+                const ownerName = retreats.find(r => r.id === period.retreatId)?.name ?? "수련회";
+                return (
+                  <div key={`selected-period-${period.id}`} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <span className="text-[9px] font-bold text-violet-300">수련회 기간</span>
+                    <p className="mt-1 text-xs font-semibold leading-snug">{ownerName}{period.label ? ` · ${period.label}` : ""}</p>
+                    {period.theme && <p className="mt-1 text-[10px] text-slate-400">📌 {period.theme}</p>}
+                    {canEditPeriods && (
+                      <div className="mt-2 flex gap-2">
+                        <button onClick={() => openEditPeriod(period)} className="text-[10px] text-sky-200 hover:underline">수정</button>
+                        <button onClick={() => handleDeletePeriod(period.retreatId, period.id)} className="text-[10px] text-red-300 hover:underline">삭제</button>
                       </div>
                     )}
                   </div>
                 );
               })}
-            </div>
-          )}
 
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-1">
-              {PRESET_MILESTONES
-                .filter(t => !(milestonesByDate.get(selectedDate) ?? []).some(m => m.title === t))
-                .map(t => (
-                  <button key={t} onClick={() => setFormTitle(t)}
-                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                      formTitle === t ? "bg-slate-700 text-white border-slate-700"
-                        : "bg-white text-slate-600 border-slate-300 hover:border-slate-500"
-                    }`}>{t}</button>
-                ))}
+              {selectedMilestones.map(m => {
+                const c = getMilestoneColor(m);
+                const isEditing = editingId === m.id;
+                return (
+                  <div key={m.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    {isEditing ? (
+                      <div className="grid gap-2">
+                        <input className="rounded-lg border border-white/10 bg-white/10 px-2.5 py-2 text-xs text-white" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+                        <input type="date" className="rounded-lg border border-white/10 bg-white/10 px-2.5 py-2 text-xs text-white" value={editDate} onChange={e => setEditDate(e.target.value)} />
+                        <input className="rounded-lg border border-white/10 bg-white/10 px-2.5 py-2 text-xs text-white" placeholder="메모" value={editNote} onChange={e => setEditNote(e.target.value)} />
+                        <div className="flex gap-2"><button onClick={saveEdit} disabled={editSaving} className="rounded-lg bg-sky-500 px-2.5 py-1.5 text-[10px] font-semibold">{editSaving ? "..." : "저장"}</button><button onClick={() => setEditingId(null)} className="text-[10px] text-slate-300">취소</button></div>
+                      </div>
+                    ) : (
+                      <>
+                        <button onClick={() => toggleDone(m)} aria-label={`${m.title} 완료 상태 변경`} className="flex w-full items-start gap-2 text-left">
+                          <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border ${m.done ? `${c.dot} border-transparent` : "border-white/40"}`}>{m.done && <span className="text-[8px]">✓</span>}</span>
+                          <span><span className="text-[9px] font-bold text-sky-300">준비 일정</span><span className={`mt-1 block text-xs font-semibold ${m.done ? "text-slate-400 line-through" : ""}`}>{m.title}</span>{m.note && <span className="mt-1 block text-[10px] text-slate-400">{m.note}</span>}</span>
+                        </button>
+                        <div className="mt-2 flex gap-2"><button onClick={() => { setEditingId(m.id); setEditTitle(m.title); setEditDate(m.targetDate); setEditNote(m.note ?? ""); }} className="text-[10px] text-sky-200 hover:underline">수정</button><button onClick={() => handleDeleteMilestone(m.id)} className="text-[10px] text-red-300 hover:underline">삭제</button></div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+
+              {selectedPeriods.length === 0 && selectedMilestones.length === 0 && <p className="rounded-xl border border-dashed border-white/15 px-3 py-7 text-center text-[10px] text-slate-400">등록된 일정이 없습니다.</p>}
             </div>
-            <input className="input text-sm" placeholder="직접 입력 (또는 위에서 선택)"
-              value={formTitle} onChange={e => setFormTitle(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleAdd()} />
-            <div className="flex gap-2">
-              <input className="input text-sm flex-1" placeholder="메모 (선택)"
-                value={formNote} onChange={e => setFormNote(e.target.value)} />
-              <button onClick={handleAdd} disabled={!formTitle.trim() || saving}
-                className="btn-primary btn-sm whitespace-nowrap">
-                {saving ? "..." : "＋ 추가"}
-              </button>
+
+            <div className="mt-4 border-t border-white/10 pt-4">
+              <p className="mb-2 text-[10px] font-semibold text-slate-300">준비 일정 추가</p>
+              <div className="mb-2 flex flex-wrap gap-1">
+                {PRESET_MILESTONES.filter(t => !selectedMilestones.some(m => m.title === t)).slice(0, 5).map(t => <button key={t} onClick={() => setFormTitle(t)} className={`rounded-full border px-2 py-1 text-[9px] ${formTitle === t ? "border-sky-300 bg-sky-400/20 text-sky-200" : "border-white/10 text-slate-400"}`}>{t}</button>)}
+              </div>
+              <input className="w-full rounded-lg border border-white/10 bg-white/10 px-2.5 py-2 text-xs text-white placeholder:text-slate-500" placeholder="일정 이름" value={formTitle} onChange={e => setFormTitle(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAdd()} />
+              <div className="mt-2 flex gap-2"><input className="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/10 px-2.5 py-2 text-xs text-white placeholder:text-slate-500" placeholder="메모 (선택)" value={formNote} onChange={e => setFormNote(e.target.value)} /><button onClick={handleAdd} disabled={!formTitle.trim() || saving} className="rounded-lg bg-sky-500 px-3 py-2 text-[10px] font-semibold text-white disabled:opacity-40">{saving ? "..." : "추가"}</button></div>
             </div>
-          </div>
+          </aside>
         </div>
-      )}
+      </section>
 
     </div>
   );
