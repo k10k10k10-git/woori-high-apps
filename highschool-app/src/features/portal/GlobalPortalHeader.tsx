@@ -72,7 +72,7 @@ export default function GlobalPortalHeader() {
             {semesterAllowed && (
               <Link
                 href="/semesters"
-                className={`rounded-xl px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 ${currentArea === "semester" ? "bg-white/[0.12] text-white shadow-inner" : "text-slate-400 hover:bg-white/[0.07] hover:text-white"}`}
+                className={`rounded-xl px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${currentArea === "semester" ? "bg-white/[0.12] text-white shadow-inner" : "text-[var(--color-on-dark-secondary)] hover:bg-white/[0.07] hover:text-white"}`}
               >
                 학기 중 사역
               </Link>
@@ -91,7 +91,7 @@ export default function GlobalPortalHeader() {
                   aria-expanded={vacationOpen}
                   onClick={() => setVacationOpen((open) => !open)}
                   onFocus={() => setVacationOpen(true)}
-                  className={`flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-[11px] font-semibold transition sm:px-3 ${currentArea === "vacation" ? "bg-white/[0.12] text-white shadow-inner" : "text-slate-400 hover:bg-white/[0.07] hover:text-white"}`}
+                  className={`flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${currentArea === "vacation" ? "bg-white/[0.12] text-white shadow-inner" : "text-[var(--color-on-dark-secondary)] hover:bg-white/[0.07] hover:text-white"}`}
                 >
                   방학 중 사역
                   <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
@@ -107,7 +107,7 @@ export default function GlobalPortalHeader() {
                           className="block rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
                         >
                           {item.label}
-                          <span className="mt-0.5 block text-[10px] font-normal text-slate-500">{item.hint}</span>
+                          <span className="mt-0.5 block text-[10px] font-normal text-[var(--color-on-dark-muted)]">{item.hint}</span>
                         </Link>
                       ))}
                     </div>
@@ -119,12 +119,12 @@ export default function GlobalPortalHeader() {
 
           <div className="ml-auto flex items-center gap-2">
             {canManageRoles(role) && (
-              <button onClick={() => setTeamOpen(true)} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white">
+              <button onClick={() => setTeamOpen(true)} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-[var(--color-on-dark-primary)] transition hover:bg-white/10 hover:text-white">
                 <span aria-hidden="true" className="text-[#8ee1d5]">●</span><span className="hidden sm:inline"> 팀원 관리</span>
               </button>
             )}
-            <span className="hidden max-w-32 truncate text-[11px] text-slate-500 lg:inline">{user.displayName || user.email}</span>
-            <button onClick={() => void signOut()} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-slate-400 hover:text-white" aria-label="로그아웃">
+            <span className="hidden max-w-32 truncate text-xs text-[var(--color-on-dark-primary)] lg:inline">{user.displayName || user.email}</span>
+            <button onClick={() => void signOut()} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-[var(--color-on-dark-secondary)] hover:text-white" aria-label="로그아웃">
               <span className="hidden sm:inline">로그아웃</span><span className="sm:hidden">↪</span>
             </button>
           </div>

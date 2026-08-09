@@ -702,19 +702,25 @@ export default function ParticipantsTab({ retreat }: Props) {
             <p className="text-sm mt-1">구글시트 동기화를 눌러 데이터를 불러오세요.</p>
           </div>
         ) : (
-          <table className="w-full text-xs sm:text-sm" style={{ minWidth: 580 }}>
+          <table className="w-full text-xs sm:text-sm" style={{ minWidth: 900 }}>
             <thead>
+              <tr className="border-b border-slate-200 bg-slate-100/80 text-[11px] font-semibold tracking-wide text-slate-500">
+                <th colSpan={5} className="px-4 py-2 text-left">신청자 정보</th>
+                <th colSpan={2} className="border-l-2 border-slate-200 bg-blue-50/70 px-4 py-2 text-left text-blue-700">연락처</th>
+                <th className="border-l-2 border-slate-200 px-4 py-2 text-left">접수 정보</th>
+              </tr>
               <tr className="table-header">
-                <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">#</th>
-                <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-blue-600"
+                <th className="sticky left-0 z-20 w-[42px] bg-slate-50 px-2 sm:px-4 py-2 text-left whitespace-nowrap">#</th>
+                <th className="sticky left-[42px] z-20 min-w-[112px] bg-slate-50 px-2 sm:px-4 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-blue-600"
                   onClick={() => { if (sortBy === "name") setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortBy("name"); setSortDir("asc"); } }}>
                   이름 {sortBy === "name" ? (sortDir === "asc" ? "▲" : "▼") : ""}
                 </th>
                 <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">성별</th>
                 <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">부</th>
                 <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">학년/반</th>
-                <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap">연락처</th>
-                <th className="px-2 sm:px-4 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-blue-600"
+                <th className="border-l-2 border-slate-200 bg-blue-50/40 px-2 sm:px-4 py-2 text-left whitespace-nowrap">학생 연락처</th>
+                <th className="bg-blue-50/40 px-2 sm:px-4 py-2 text-left whitespace-nowrap">보호자 연락처</th>
+                <th className="border-l-2 border-slate-200 px-2 sm:px-4 py-2 text-left whitespace-nowrap cursor-pointer select-none hover:text-blue-600"
                   onClick={() => { if (sortBy === "registeredAt") setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortBy("registeredAt"); setSortDir("desc"); } }}>
                   신청일시 {sortBy === "registeredAt" ? (sortDir === "asc" ? "▲" : "▼") : ""}
                 </th>
@@ -727,8 +733,8 @@ export default function ParticipantsTab({ retreat }: Props) {
                   ambiguousKeys.has(p.key) ? "bg-yellow-50 hover:bg-yellow-100/60" :
                   "hover:bg-slate-50"
                 }>
-                  <td className="px-2 sm:px-4 py-2 text-slate-400 whitespace-nowrap">{i + 1}</td>
-                  <td className="px-2 sm:px-4 py-2 font-medium text-slate-800 whitespace-nowrap">
+                  <td className="sticky left-0 z-10 bg-inherit px-2 sm:px-4 py-2 text-slate-500 whitespace-nowrap">{i + 1}</td>
+                  <td className="sticky left-[42px] z-10 bg-inherit px-2 sm:px-4 py-2 font-medium text-slate-800 whitespace-nowrap">
                     {mismatchKeys.has(p.key) && <span className="mr-1 text-orange-400">⚠</span>}
                     {ambiguousKeys.has(p.key) && <span className="mr-1 text-yellow-500">🔀</span>}
                     {p.name}
@@ -742,10 +748,13 @@ export default function ParticipantsTab({ retreat }: Props) {
                   <td className="px-2 sm:px-4 py-2 text-slate-600 whitespace-nowrap">
                     {p.grade > 0 ? `${p.grade}학년 ${p.class > 0 ? p.class + "반" : ""}` : "—"}
                   </td>
-                  <td className="px-2 sm:px-4 py-2 text-slate-500 whitespace-nowrap">
+                  <td className="border-l-2 border-slate-100 bg-blue-50/20 px-2 sm:px-4 py-2 text-slate-600 whitespace-nowrap">
                     {p.phone || "—"}
                   </td>
-                  <td className="px-2 sm:px-4 py-2 text-slate-400 whitespace-nowrap">{p.registeredAt}</td>
+                  <td className="bg-blue-50/20 px-2 sm:px-4 py-2 text-slate-600 whitespace-nowrap">
+                    {p.pPhone || "—"}
+                  </td>
+                  <td className="border-l-2 border-slate-100 px-2 sm:px-4 py-2 text-slate-500 whitespace-nowrap">{p.registeredAt}</td>
                 </tr>
               ))}
             </tbody>

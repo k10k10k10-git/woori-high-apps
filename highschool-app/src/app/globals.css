@@ -32,8 +32,12 @@
   /* Text */
   --color-text-primary:    #17213a;
   --color-text-secondary:  #41506b;
-  --color-text-muted:      #64748b;
-  --color-text-faint:      #94a3b8;
+  --color-text-muted:      #56657a;
+  --color-text-faint:      #64748b;
+  /* 어두운 헤더에 밝은 배경용 텍스트 토큰을 재사용하지 않는다. */
+  --color-on-dark-primary:   #f8fafc;
+  --color-on-dark-secondary: #cbd5e1;
+  --color-on-dark-muted:     #aebbd0;
 
   /* Semantic */
   --color-danger:          #d84a59;
@@ -45,7 +49,7 @@
   --color-warning-bg:      #fff6df;
 
   /* Typography scale — 정보 계층 10/10 */
-  --text-xs:   11px;
+  --text-xs:   12px;
   --text-sm:   13px;
   --text-base: 14px;
   --text-md:   15px;

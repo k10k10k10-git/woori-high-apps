@@ -37,6 +37,14 @@ function todayYmd() {
   return `${y}-${m}-${d}`;
 }
 
+function daysBetweenYmd(from: string, to: string) {
+  const toUtc = (value: string) => {
+    const [year, month, day] = value.split("-").map(Number);
+    return Date.UTC(year, month - 1, day);
+  };
+  return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
+}
+
 export default function PortalHome() {
   const { user, loading, role, memberName, signIn, signOut } = useAuth();
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -155,6 +163,25 @@ export default function PortalHome() {
     return [...semesterItems, ...retreatItems, ...sharedItems].sort((a, b) => a.date.localeCompare(b.date));
   }, [currentSemester, milestones, periods, retreats, role, sessions]);
 
+  const homeSummary = useMemo(() => {
+    const today = todayYmd();
+    const todayCount = calendarItems.filter((item) => item.date <= today && (item.endDate ?? item.date) >= today).length;
+    const pendingCount = milestones.filter((item) => !item.done).length;
+    const nextPeriod = [...periods]
+      .filter((period) => period.endDate >= today)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+    const nextRetreat = nextPeriod
+      ? retreats.find((retreat) => retreat.id === nextPeriod.retreatId)
+      : null;
+    const daysUntil = nextPeriod ? daysBetweenYmd(today, nextPeriod.startDate) : null;
+    return {
+      todayCount,
+      pendingCount,
+      retreatName: nextRetreat?.name ?? "예정 없음",
+      retreatTiming: daysUntil === null ? "-" : daysUntil <= 0 ? "진행 중" : `D-${daysUntil}`,
+    };
+  }, [calendarItems, milestones, periods, retreats]);
+
   async function submitSchedule() {
     if (!scheduleDraft) return;
     const title = scheduleDraft.title.trim();
@@ -209,11 +236,16 @@ export default function PortalHome() {
       <main className="page-container">
         {loadError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
 
-        <section className="page-hero mb-7">
-          <div>
+        <section className="page-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
+          <div className="min-w-0">
             <p className="page-eyebrow">TODAY&apos;S MINISTRY</p>
             <h1 className="page-title">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
             <p className="page-description">학기 운영, 수련회 행정, 현장 실행을 하나의 계정과 일관된 업무 흐름에서 이어갑니다.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3" aria-label="오늘의 사역 요약">
+            <HeroMetric label="오늘 일정" value={`${homeSummary.todayCount}건`} />
+            <HeroMetric label="다음 수련회" value={homeSummary.retreatTiming} detail={homeSummary.retreatName} />
+            <HeroMetric label="미완료 준비" value={`${homeSummary.pendingCount}건`} />
           </div>
         </section>
 
@@ -356,6 +388,16 @@ export default function PortalHome() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function HeroMetric({ label, value, detail }: { label: string; value: string; detail?: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-white/[0.09] px-3 py-3.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] backdrop-blur-sm sm:px-4">
+      <p className="text-xs font-medium text-slate-300">{label}</p>
+      <p className="mt-1 text-lg font-bold tabular-nums text-white sm:text-xl">{value}</p>
+      {detail && <p className="mt-1 truncate text-[11px] text-slate-300" title={detail}>{detail}</p>}
     </div>
   );
 }
