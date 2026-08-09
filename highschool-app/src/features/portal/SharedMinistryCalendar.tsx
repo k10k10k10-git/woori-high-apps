@@ -63,7 +63,7 @@ export default function SharedMinistryCalendar({
   const selectedItems = calendarItemsForDate(items, selectedDate);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <section className="calendar-shell surface-panel p-4 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold">공유 사역 캘린더</h2>
@@ -77,7 +77,7 @@ export default function SharedMinistryCalendar({
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(250px,0.75fr)]">
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
+        <div className="calendar-grid overflow-hidden rounded-2xl">
           <div className="grid grid-cols-7 bg-slate-50 text-center text-[11px] font-semibold text-slate-400">
             {WEEKDAYS.map((day) => <div key={day} className="py-2">{day}</div>)}
           </div>
@@ -91,9 +91,9 @@ export default function SharedMinistryCalendar({
                 <button
                   key={date}
                   onClick={() => setSelectedDate(date)}
-                  className={`min-h-20 border-t border-slate-100 p-1.5 text-left align-top transition sm:min-h-24 sm:p-2 ${selected ? "bg-sky-50 ring-2 ring-inset ring-sky-300" : "hover:bg-slate-50"}`}
+                  className={`min-h-20 border-t border-slate-100 p-1.5 text-left align-top transition sm:min-h-24 sm:p-2 ${selected ? "calendar-selected" : "hover:bg-slate-50"}`}
                 >
-                  <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${date === ymd(today.getFullYear(), today.getMonth(), today.getDate()) ? "bg-slate-900 text-white" : "text-slate-600"}`}>{day}</span>
+                  <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${date === ymd(today.getFullYear(), today.getMonth(), today.getDate()) ? "calendar-today text-white" : "text-slate-600"}`}>{day}</span>
                   <span className="mt-1 grid gap-1">
                     {dayItems.slice(0, 2).map((item) => <span key={item.id} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium ${item.kind === "semester" ? "bg-emerald-100 text-emerald-800" : item.kind === "retreat" ? "bg-violet-100 text-violet-800" : "bg-sky-100 text-sky-800"}`}>{item.title}</span>)}
                     {dayItems.length > 2 && <span className="px-1 text-[10px] text-slate-400">+{dayItems.length - 2}개</span>}
@@ -104,10 +104,10 @@ export default function SharedMinistryCalendar({
           </div>
         </div>
 
-        <aside className="rounded-2xl bg-slate-900 p-4 text-white lg:min-h-full">
+        <aside className="calendar-detail-panel rounded-2xl p-4 text-white lg:min-h-full sm:p-5">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-xs font-semibold tracking-wide text-sky-300">{selectedDate.replaceAll("-", ".")}</p>
+              <p className="text-xs font-semibold tracking-wide text-[var(--color-on-dark-accent)]">{selectedDate.replaceAll("-", ".")}</p>
               <h3 className="mt-1 text-base font-bold">전체 일정</h3>
             </div>
             {canEdit && onAdd && (

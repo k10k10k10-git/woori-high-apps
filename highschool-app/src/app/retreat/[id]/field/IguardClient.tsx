@@ -197,7 +197,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
   return (
     <div className="iguard-scope min-h-screen overflow-x-clip pb-24 sm:pb-12">
-      <header ref={headerRef} className="workspace-header sticky top-14 z-20">
+      <header ref={headerRef} className="workspace-sticky-header workspace-header">
         <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
           <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
             <button onClick={() => router.push("/")} className="min-h-10 shrink-0 rounded-lg px-2 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white" aria-label="수련회 목록으로 돌아가기">← 목록</button>
@@ -218,7 +218,7 @@ function IguardWorkspace({ id }: { id: string }) {
                   setView("schedule");
                   setSheetSettingsOpen(true);
                 }}
-                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-[#8ee1d5]"
+                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-[var(--color-on-dark-accent)]"
                 aria-label="큐싯 가져오기 열기"
               >
                 <span className="sm:hidden" aria-hidden="true">⬇</span><span className="hidden sm:inline">⬇ 큐싯 가져오기</span>
@@ -233,8 +233,7 @@ function IguardWorkspace({ id }: { id: string }) {
                 <button key={g.label} onClick={() => setView(g.views[0].key)}
                   role="tab"
                   aria-selected={active}
-                  className="min-h-11 rounded-t-lg px-4 py-2 text-sm font-semibold transition-colors sm:px-5"
-                  style={active ? { background: "#fff", color: "#1e293b" } : { background: "transparent", color: "#94a3b8" }}>
+                  className="workspace-group-tab">
                   {g.label}
                 </button>
               );
@@ -285,7 +284,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
         {dataLoading && (
           <div className="card p-8 text-center text-slate-400">
-            <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[#3e63dd] border-t-transparent" />
+            <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
             <p className="text-sm">수련회 데이터를 불러오는 중입니다.</p>
           </div>
         )}
@@ -355,7 +354,7 @@ function IguardWorkspace({ id }: { id: string }) {
                   aria-selected={active}
                   onClick={() => setView(v.key)}
                   className={`min-h-14 rounded-lg px-1.5 text-xs font-semibold transition-colors ${
-                    active ? "bg-[#3e63dd] text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
+                    active ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
                   }`}
                 >
                   <span aria-hidden="true" className="mb-1 block text-base leading-none">{v.icon}</span>

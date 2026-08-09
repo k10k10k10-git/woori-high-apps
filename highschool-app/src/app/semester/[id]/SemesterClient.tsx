@@ -100,7 +100,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
 
   return (
     <div className="semester-scope">
-      <header className="sticky top-14 z-20">
+      <header className="workspace-sticky-header">
         {/* 1단: 다크 배경 — 타이틀 */}
         <div className="workspace-header">
           <div className="max-w-6xl mx-auto px-4">

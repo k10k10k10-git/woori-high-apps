@@ -60,19 +60,20 @@ export default function GlobalPortalHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-[60] h-14 border-b border-white/[0.08] bg-[#18233f]/95 text-white shadow-[0_6px_24px_rgba(16,24,46,0.16)] backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[1760px] items-center gap-3 px-3 sm:px-5">
-          <Link href="/" className="group flex min-w-0 shrink-0 items-center gap-2.5 rounded-xl pr-1 transition hover:text-white" aria-label="분당우리교회 서현고등부 홈으로">
-            <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-gradient-to-br from-[#5c7cfa] to-[#0f9d8c] text-sm font-black shadow-[0_6px_16px_rgba(62,99,221,0.3)] transition group-hover:-translate-y-0.5">W</span>
-            <span className="hidden text-[13px] font-bold tracking-[-0.01em] text-slate-100 sm:inline">분당우리교회 서현고등부</span>
+      <header className="global-portal-header">
+        <div className="global-portal-inner">
+          <Link href="/" className="portal-brand group" aria-label="분당우리교회 서현고등부 홈으로">
+            <span className="portal-brand-mark transition group-hover:-translate-y-0.5">W</span>
+            <span className="portal-brand-name hidden sm:inline">분당우리교회 서현고등부</span>
             <span className="text-[13px] font-bold sm:hidden">홈</span>
           </Link>
 
-          <nav className="ml-1 flex min-w-0 flex-1 items-center gap-1" aria-label="통합 사역 메뉴">
+          <nav className="portal-nav" aria-label="통합 사역 메뉴">
             {semesterAllowed && (
               <Link
                 href="/semesters"
-                className={`rounded-xl px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${currentArea === "semester" ? "bg-white/[0.12] text-white shadow-inner" : "text-[var(--color-on-dark-secondary)] hover:bg-white/[0.07] hover:text-white"}`}
+                className="portal-nav-link"
+                aria-current={currentArea === "semester" ? "page" : undefined}
               >
                 학기 중 사역
               </Link>
@@ -91,14 +92,15 @@ export default function GlobalPortalHeader() {
                   aria-expanded={vacationOpen}
                   onClick={() => setVacationOpen((open) => !open)}
                   onFocus={() => setVacationOpen(true)}
-                  className={`flex items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-semibold transition sm:px-3 ${currentArea === "vacation" ? "bg-white/[0.12] text-white shadow-inner" : "text-[var(--color-on-dark-secondary)] hover:bg-white/[0.07] hover:text-white"}`}
+                  className="portal-nav-link"
+                  data-active={currentArea === "vacation" ? "true" : undefined}
                 >
                   방학 중 사역
                   <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
                 </button>
                 {vacationOpen && (
                   <div className="absolute left-0 top-full z-[70] w-56 pt-1.5">
-                    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#202d4b] p-1.5 shadow-2xl shadow-slate-950/30">
+                    <div className="portal-menu">
                       {vacationItems.map((item) => (
                         <Link
                           key={item.href}
@@ -119,12 +121,12 @@ export default function GlobalPortalHeader() {
 
           <div className="ml-auto flex items-center gap-2">
             {canManageRoles(role) && (
-              <button onClick={() => setTeamOpen(true)} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-[var(--color-on-dark-primary)] transition hover:bg-white/10 hover:text-white">
-                <span aria-hidden="true" className="text-[#8ee1d5]">●</span><span className="hidden sm:inline"> 팀원 관리</span>
+              <button onClick={() => setTeamOpen(true)} className="portal-action">
+                <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">팀원 관리</span>
               </button>
             )}
-            <span className="hidden max-w-32 truncate text-xs text-[var(--color-on-dark-primary)] lg:inline">{user.displayName || user.email}</span>
-            <button onClick={() => void signOut()} className="rounded-lg border border-white/10 px-2.5 py-1.5 text-xs text-[var(--color-on-dark-secondary)] hover:text-white" aria-label="로그아웃">
+            <span className="portal-account-name hidden lg:inline">{user.displayName || user.email}</span>
+            <button onClick={() => void signOut()} className="portal-action" aria-label="로그아웃">
               <span className="hidden sm:inline">로그아웃</span><span className="sm:hidden">↪</span>
             </button>
           </div>
