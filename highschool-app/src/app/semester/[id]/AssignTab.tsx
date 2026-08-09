@@ -113,14 +113,16 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                   </span>
                   {/* .input은 @layer 밖 규칙이라 h-*·px-*·text-*가 먹지 않는다.
                       h-8로 높이를 고정했더니 padding 8px + text-base가 32px를 넘겨 "배치…"가 잘렸다.
-                      높이는 고정하지 않고, 폭만 감싼 div로 준다(루트 CLAUDE.md 함정 1). */}
-                  <div className="w-28 shrink-0">
+                      높이는 고정하지 않고, 폭은 감싼 div로 준다(루트 CLAUDE.md 함정 1).
+                      글꼴을 줄이려면 유틸리티(text-xs)로는 안 되고 인라인 style이어야 한다. */}
+                  <div className="w-32 shrink-0">
                     <select
                       aria-label={`${a.name} 팀 배치`}
                       value=""
                       disabled={!canEdit}
                       onChange={(e) => e.target.value && void assign(a, e.target.value)}
                       className="input"
+                      style={{ fontSize: "var(--text-sm)" }}
                     >
                       <option value="">배치…</option>
                       {teams.map((t) => (
@@ -227,13 +229,14 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                     <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
                   </span>
                   {/* 사역팀 배치와 같은 이유로 높이를 고정하지 않는다(글자 잘림) — 폭만 감싼 div로. */}
-                  <div className="w-28 shrink-0">
+                  <div className="w-32 shrink-0">
                     <select
                       aria-label={`${a.name} 훈련 반 배정`}
                       value=""
                       disabled={!canEdit}
                       onChange={(e) => e.target.value && void assignTraining(a, e.target.value)}
                       className="input"
+                      style={{ fontSize: "var(--text-sm)" }}
                     >
                       <option value="">배정…</option>
                       {trainingClasses.map((c) => (
