@@ -47,7 +47,7 @@
 - 모달은 포커스 트랩+ESC+`role="dialog"`, 토스트는 `aria-live`, 아이콘 버튼은 `aria-label`.
 
 **추가 (이 매뉴얼로 명문화하는 것):**
-- 재사용 우선: 이름 정규화는 `studentMatcher`, 버스 명단은 `busStaff`, 시간 판정은 `scheduleTime`, 큐싯은 `cueSheet`, classKey는 `classKey.ts`, 동기화 보존은 `syncParticipants` — **같은 목적의 함수를 새로 쓰기 전에 lib를 grep**한다.
+- 재사용 우선: 이름 정규화는 `studentMatcher`, 버스 명단은 `busStaff`, 시간 판정은 `scheduleTime`, 큐싯은 `cueSheet`, classKey는 `classKey.ts`, 동기화 보존은 `syncParticipants`, 인앱 브라우저 탈출은 `inAppBrowser` — **같은 목적의 함수를 새로 쓰기 전에 lib를 grep**한다. (2026-08-09: `inAppBrowser`가 있는데 `FieldHomeClient`가 같은 로직을 복제해 두어 공용 모듈이 고아가 됐고, 그 사이 무한 리로드 가드가 복제본에는 빠져 있었다.)
 - 새 폴더/앱 이름은 영문·공백 없음 (한글 폴더명은 Vercel Git 배포에서 Turbopack 크래시+함수명 검증 실패를 실제로 냈다).
 - 조사·감사 보고서의 모든 수치는 실측(실행한 명령의 출력)이거나 "추정"으로 표기한다.
 - 코드 변경이 각 앱 CLAUDE.md의 "패턴" 섹션과 관련되면 같은 커밋에서 그 문서도 갱신한다.

@@ -9,25 +9,21 @@ import { Retreat, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
 import AdminModal from "./AdminModal";
 import CenterSpinner from "@/components/CenterSpinner";
+import { detectInAppBrowser, escapeStrategyFor, shouldAttemptEscape, type InAppBrowserKind } from "@/features/iguard/lib/inAppBrowser";
 
-function inAppKind(): "kakao" | "line" | "other" | null {
-  if (typeof navigator === "undefined") return null;
-  const ua = navigator.userAgent || "";
-  if (/KAKAOTALK/i.test(ua)) return "kakao";
-  if (/Line\//i.test(ua)) return "line";
-  if (/FBAN|FBAV|Instagram|NAVER|DaumApps|; wv\)|Snapchat|kakaostory|Whale/i.test(ua)) return "other";
-  return null;
+// 인앱 감지·탈출 전략은 공용 모듈(features/iguard/lib/inAppBrowser)만 쓴다.
+// 예전엔 이 파일에 같은 로직을 복제해 두어 공용 모듈이 고아가 됐고, 그 사이
+// "이동 주소 != 현재 주소" 불변식과 세션 1회 가드가 이쪽에는 빠져 있었다.
+function escapeNow(): "moved" | "guide" {
+  const strategy = escapeStrategyFor(navigator.userAgent || "", window.location.href);
+  if (strategy.kind === "guide") return "guide";
+  window.location.href = strategy.targetUrl;
+  return "moved";
 }
-function openExternal(kind: "kakao" | "line" | "other") {
+
+/** 자동 탈출 수단이 없을 때의 수동 폴백 — 주소를 복사해 직접 붙여넣게 안내한다. */
+function copyAddressFallback() {
   const url = window.location.href;
-  if (kind === "kakao") { window.location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(url); return; }
-  if (kind === "line") { window.location.href = url + (url.includes("?") ? "&" : "?") + "openExternalBrowser=1"; return; }
-  const isAndroid = /Android/i.test(navigator.userAgent);
-  if (isAndroid) {
-    const noScheme = url.replace(/^https?:\/\//, "");
-    window.location.href = `intent://${noScheme}#Intent;scheme=https;package=com.android.chrome;end`;
-    return;
-  }
   navigator.clipboard?.writeText(url).then(
     () => alert("주소를 복사했어요. Safari나 Chrome에 붙여넣어 열어주세요."),
     () => alert("우측 상단 메뉴(···)에서 'Safari/Chrome으로 열기'를 눌러주세요."),
@@ -45,14 +41,17 @@ export default function FieldHomeClient() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
   const [requested, setRequested] = useState(false);
-  const [kind, setKind] = useState<"kakao" | "line" | "other" | null>(null);
+  const [kind, setKind] = useState<InAppBrowserKind | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const k = inAppKind();
-    setKind(k);
-    if (k === "kakao" || k === "line") { try { openExternal(k); } catch { /* 배너로 안내 */ } }
+    const detected = detectInAppBrowser(navigator.userAgent || "");
+    setKind(detected);
+    // 자동 탈출은 세션당 1회만 — 스킴이 실패하거나 외부 브라우저가 되돌아와도 반복되지 않는다.
+    if (!detected) return;
+    if (!shouldAttemptEscape(typeof window === "undefined" ? null : window.sessionStorage)) return;
+    try { escapeNow(); } catch { /* 실패해도 아래 배너로 안내한다 */ }
   }, []);
 
   useEffect(() => {
@@ -116,7 +115,7 @@ export default function FieldHomeClient() {
       {kind && (
         <div className="mb-5 max-w-xs bg-amber-50 border border-amber-300 rounded-lg p-4 text-xs text-amber-800 text-center">
           ⚠️ <strong>앱 안의 브라우저</strong>에서는 구글 로그인이 막힙니다.
-          <button onClick={() => openExternal(kind)} className="btn-primary w-full justify-center mt-3 mb-1">크롬/사파리로 열기</button>
+          <button onClick={() => { if (escapeNow() === "guide") copyAddressFallback(); }} className="btn-primary w-full justify-center mt-3 mb-1">크롬/사파리로 열기</button>
           <span className="text-[11px] text-amber-700">{kind === "other" ? "버튼이 안 되면 우측 상단 ··· → '다른 브라우저로 열기'를 눌러주세요." : "자동 전환이 안 되면 위 버튼을 눌러주세요."}</span>
         </div>
       )}

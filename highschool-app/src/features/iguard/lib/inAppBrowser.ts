@@ -12,7 +12,7 @@
  * 같아질 수밖에 없는 상황이면 이동하지 말고 안내 UI(`guide`)로 떨어진다.
  */
 
-export type InAppBrowserKind = "kakaotalk" | "naver" | "instagram" | "facebook" | "line";
+export type InAppBrowserKind = "kakaotalk" | "naver" | "instagram" | "facebook" | "line" | "other";
 
 export type EscapeStrategy =
   /** 안드로이드: intent:// 로 크롬 실행 */
@@ -28,8 +28,10 @@ export function detectInAppBrowser(ua: string): InAppBrowserKind | null {
   if (/KAKAOTALK/i.test(ua)) return "kakaotalk";
   if (/NAVER\(inapp/i.test(ua) || /NAVER/.test(ua)) return "naver";
   if (/Instagram/i.test(ua)) return "instagram";
-  if (/FBAN|FBAV/i.test(ua)) return "facebook";
+  if (/FBAN|FBAV|FB_IAB/i.test(ua)) return "facebook";
   if (/Line\//i.test(ua)) return "line";
+  // 그 외 인앱 웹뷰 — 자동 탈출 수단은 플랫폼별로만 있고, 최소한 안내 배너는 띄워야 한다.
+  if (/DaumApps|; wv\)|Snapchat|kakaostory|Whale/i.test(ua)) return "other";
   return null;
 }
 
@@ -61,7 +63,17 @@ export function escapeStrategyFor(ua: string, currentUrl: string): EscapeStrateg
   return strategy;
 }
 
+/** LINE이 공식 지원하는 외부 브라우저 파라미터. 이미 붙어 있으면 다시 붙이지 않는다. */
+const LINE_EXTERNAL_PARAM = "openExternalBrowser=1";
+
 function pickStrategy(kind: InAppBrowserKind, ua: string, currentUrl: string): EscapeStrategy {
+  // LINE은 플랫폼과 무관하게 쿼리 파라미터로 외부 브라우저를 연다(iOS에도 스킴이 없다).
+  // 이미 파라미터가 붙은 주소에 또 붙이면 매번 다른 주소가 되어 이동이 반복된다 → guide로 강등.
+  if (kind === "line") {
+    if (currentUrl.includes(LINE_EXTERNAL_PARAM)) return { kind: "guide" };
+    const separator = currentUrl.includes("?") ? "&" : "?";
+    return { kind: "scheme", targetUrl: `${currentUrl}${separator}${LINE_EXTERNAL_PARAM}` };
+  }
   if (isAndroidUA(ua)) {
     const bare = currentUrl.replace(/^https?:\/\//i, "");
     return { kind: "intent", targetUrl: `intent://${bare}#Intent;scheme=https;package=com.android.chrome;end` };
