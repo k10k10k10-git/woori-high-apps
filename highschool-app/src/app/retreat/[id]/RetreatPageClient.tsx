@@ -214,7 +214,7 @@ export default function RetreatPageClient() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="app-page">
 
       {/* ══════════════════════════════════════════════════════
           Header
@@ -222,18 +222,15 @@ export default function RetreatPageClient() {
       <header className="sticky top-14 z-20">
 
         {/* 1단: 다크 배경 — 타이틀 + 대그룹 탭 */}
-        <div style={{ background: "var(--color-header-bg)" }}>
+        <div className="workspace-header">
           <div className="max-w-6xl mx-auto px-4">
 
             {/* 타이틀 */}
             <div className="pt-2 sm:pt-3 pb-1.5 sm:pb-2 flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
                 onClick={() => router.push("/retreats")}
-                className="text-[11px] sm:text-xs transition-colors shrink-0 py-1 px-1"
+                className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white sm:text-xs"
                 aria-label="수련회 목록으로 돌아가기"
-                style={{ color: "#6b7280" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#38bdf8")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#6b7280")}
               >
                 ← 목록
               </button>
@@ -244,17 +241,14 @@ export default function RetreatPageClient() {
               <h1 className="font-bold text-white text-xs sm:text-base truncate min-w-0">{retreat.name}</h1>
               <button
                 onClick={() => router.push(`/retreat/${id}/field`)}
-                className="ml-auto rounded-lg border border-sky-400/30 bg-sky-400/10 px-2.5 py-1 text-[11px] font-semibold text-sky-200 transition hover:bg-sky-400/20 sm:text-xs"
+                className="ml-auto rounded-lg border border-white/10 bg-white/[0.07] px-2.5 py-1.5 text-[11px] font-semibold text-[#8ee1d5] transition hover:bg-white/[0.12] sm:text-xs"
               >
                 이가드 현장 →
               </button>
               <button
                 onClick={() => setEditingSheet(true)}
-                className="text-xs flex items-center gap-1 transition-colors shrink-0 hidden sm:flex"
+                className="hidden shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white sm:flex"
                 aria-label="시트 설정 열기"
-                style={{ color: "#6b7280" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "#38bdf8")}
-                onMouseLeave={e => (e.currentTarget.style.color = "#6b7280")}
               >
                 ⚙ 시트 설정
               </button>
@@ -296,7 +290,7 @@ export default function RetreatPageClient() {
         </div>
 
         {/* 2단: 흰 배경 — 소그룹 탭 (가로 스크롤, 모바일 터치 최적화) */}
-        <div className="bg-white border-b border-slate-200 relative">
+        <div className="workspace-tabs relative">
           <div className="max-w-6xl mx-auto px-0 sm:px-4">
             <div className="flex gap-0 overflow-x-auto scrollbar-hide tab-scroll-container" role="tablist" aria-label="세부 탭">
               {(activeGroup.tabs as ReadonlyArray<TabEntry>).map((t) => (
@@ -305,13 +299,7 @@ export default function RetreatPageClient() {
                   onClick={() => setTab(t.idx)}
                   role="tab"
                   aria-selected={tab === t.idx}
-                  className="px-3 sm:px-4 py-3 sm:py-2.5 text-[12px] sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap shrink-0"
-                  style={tab === t.idx
-                    ? { borderColor: "var(--color-primary)", color: "var(--color-primary)", fontWeight: 600 }
-                    : { borderColor: "transparent", color: "var(--color-text-muted)" }
-                  }
-                  onMouseEnter={e => { if (tab !== t.idx) e.currentTarget.style.color = "#1e293b"; }}
-                  onMouseLeave={e => { if (tab !== t.idx) e.currentTarget.style.color = "#64748b"; }}
+                  className="workspace-tab shrink-0"
                 >
                   {t.label}
                 </button>

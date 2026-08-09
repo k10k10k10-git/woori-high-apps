@@ -2,7 +2,7 @@
 
 // 탭 라우터 + 공용 구독 단일 지점 — 하위 탭 컴포넌트는 직접 구독하지 않고 props로 받는다
 // (이가드 useRetreatData 패턴 축소판). 모든 구독은 onError를 loadError에 배선한다.
-// 셸 구조(sticky 2단 헤더 + 탭바)는 수련회 행정·이가드 화면과 동일하고 색만 초록이다(.semester-scope).
+// 셸 구조와 브랜드 토큰은 수련회 행정·이가드 화면과 동일하다.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -102,12 +102,12 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
     <div className="semester-scope">
       <header className="sticky top-14 z-20">
         {/* 1단: 다크 배경 — 타이틀 */}
-        <div style={{ background: "var(--color-header-bg)" }}>
+        <div className="workspace-header">
           <div className="max-w-6xl mx-auto px-4">
             <div className="pt-2 sm:pt-3 pb-1.5 sm:pb-2 flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
                 onClick={() => router.push("/semesters")}
-                className="shrink-0 px-1 py-1 text-[11px] text-slate-400 transition-colors hover:text-emerald-200 sm:text-xs"
+                className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs"
                 aria-label="학기 목록으로 돌아가기"
               >
                 ← 목록
@@ -129,7 +129,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
         </div>
 
         {/* 2단: 흰 배경 — 탭 (행정 화면 소그룹 탭과 동일 패턴) */}
-        <div className="border-b bg-white" style={{ borderColor: "var(--color-border)" }}>
+        <div className="workspace-tabs">
           <div className="max-w-6xl mx-auto px-0 sm:px-4">
             <div className="flex gap-0 overflow-x-auto scrollbar-hide tab-scroll-container" role="tablist" aria-label="학기 탭">
               {visibleTabs.map((name) => (
@@ -139,10 +139,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
                   aria-selected={activeTab === name}
                   aria-controls="tab-content-panel"
                   onClick={() => setTab(name)}
-                  className="min-h-11 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-                  style={activeTab === name
-                    ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" }
-                    : { borderColor: "transparent", color: "var(--color-text-muted)" }}
+                  className="workspace-tab"
                 >
                   {name}
                 </button>
@@ -152,7 +149,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-7">
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {loadError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             ⚠ 로드 오류: {loadError}
@@ -161,7 +158,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
 
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-600">{activeTab}</p>
+            <p className="section-kicker">{activeTab}</p>
             <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2>
             <p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p>
           </div>

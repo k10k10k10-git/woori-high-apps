@@ -44,7 +44,7 @@ export default function VacationHome({
   const selected = retreats.find((retreat) => retreat.id === selectedId);
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6">
+    <main className="page-container max-w-7xl">
       {loadError && (
         <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
           <span>⚠ {loadError}</span>
@@ -60,11 +60,11 @@ export default function VacationHome({
           {canCreate && <NewRetreatButton hrefAfterCreate={entryHref} onCreated={onCreated} />}
         </div>
       ) : (
-        <div className="flex flex-col items-stretch gap-6 md:flex-row md:items-start">
+        <div className="flex flex-col items-stretch gap-7 md:flex-row md:items-start">
           {/* 왼쪽: 수련회 목록 */}
           <div className="w-full md:w-72 md:shrink-0">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-base font-bold text-slate-700">수련회 목록</h2>
+              <div><p className="section-kicker">RETREATS</p><h2 className="mt-1 text-lg font-bold text-slate-800">수련회 목록</h2></div>
               <div className="flex items-center gap-1.5">
                 {headerActions}
                 {canCreate && (
@@ -125,7 +125,8 @@ export default function VacationHome({
                     key={retreat.id}
                     onClick={() => router.push(entryHref(retreat.id))}
                     onMouseEnter={() => onSelect(retreat.id)}
-                    className="card group cursor-pointer p-4 transition-all duration-150"
+                    className="card group cursor-pointer p-[18px] transition-all duration-150"
+                    data-hover
                     style={{
                       borderColor: isSelected ? "var(--color-primary)" : "var(--color-border)",
                       boxShadow: isSelected ? "0 4px 16px var(--color-primary-glow)" : "",
@@ -165,7 +166,7 @@ export default function VacationHome({
           {/* 오른쪽: 준비 일정 — 행정·이가드가 공유하는 전역 캘린더 */}
           <div className="w-full min-w-0 flex-1">
             <div className="mb-3">
-              <h2 className="text-base font-bold text-slate-700">
+              <h2 className="text-lg font-bold text-slate-800">
                 준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span>
               </h2>
               <p className="mt-0.5 text-xs text-slate-400">

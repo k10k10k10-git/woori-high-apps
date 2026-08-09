@@ -1,6 +1,6 @@
 "use client";
 
-// 학기 목록 — 셸·컴포넌트 클래스는 수련회 행정 화면과 동일하고 색만 초록(.semester-scope).
+// 학기 목록 — 통합 셸·브랜드 토큰을 수련회 행정·이가드 화면과 공유한다.
 // 사이트 제목·계정·로그아웃은 전역 헤더가 담당한다(중복 제목 줄을 두지 않는다).
 
 import { useEffect, useState } from "react";
@@ -116,11 +116,13 @@ export default function SemestersPage() {
   }
 
   return (
-    <div className="semester-scope">
-      <main className="max-w-5xl mx-auto px-4 py-5 sm:py-6">
-        <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
+    <div className="semester-scope app-page">
+      <main className="page-container max-w-5xl">
+        <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-slate-800">학기 중 사역</h1>
+            <p className="section-kicker">SEMESTER MINISTRY</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-slate-900">학기 중 사역</h1>
+            <p className="mt-1 text-sm text-slate-500">훈련과 사역팀의 신청부터 수료까지 한 흐름으로 관리합니다.</p>
           </div>
           {!canEdit && (
             <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">조회 전용</span>
@@ -133,7 +135,7 @@ export default function SemestersPage() {
           </div>
         )}
 
-        <section className="mb-6 grid gap-3 sm:grid-cols-2">
+        <section className="mb-7 grid gap-4 sm:grid-cols-2">
           {listLoading && <p className="text-sm text-slate-400">목록 불러오는 중…</p>}
           {!listLoading && semesters.length === 0 && !loadError && (
             <p className="text-sm text-slate-400">
@@ -141,7 +143,7 @@ export default function SemestersPage() {
             </p>
           )}
           {semesters.map((s) => (
-            <div key={s.id} className="card card-body relative">
+            <div key={s.id} className="card card-body relative" data-hover>
               <Link href={`/semester/${s.id}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span

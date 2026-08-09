@@ -205,67 +205,68 @@ export default function PortalHome() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-9">
+    <div className="app-page">
+      <main className="page-container">
         {loadError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
 
-        <section className="mb-6 overflow-hidden rounded-3xl bg-slate-900 px-5 py-6 text-white shadow-lg sm:px-8 sm:py-8">
+        <section className="page-hero mb-7">
           <div>
-            <p className="text-xs font-bold tracking-[0.16em] text-emerald-300">TODAY&apos;S MINISTRY</p>
-            <h1 className="mt-2 text-2xl font-bold sm:text-3xl">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">학기 운영, 수련회 행정, 현장 실행을 같은 계정과 같은 데이터 흐름에서 이어갑니다.</p>
+            <p className="page-eyebrow">TODAY&apos;S MINISTRY</p>
+            <h1 className="page-title">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
+            <p className="page-description">학기 운영, 수련회 행정, 현장 실행을 하나의 계정과 일관된 업무 흐름에서 이어갑니다.</p>
           </div>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
-          {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <section className="grid gap-5 lg:grid-cols-2">
+          {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card group p-6 sm:p-7" data-hover>
             <div className="flex items-center justify-between">
-              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">학기 중 사역</span>
-              <span className="text-slate-300 transition group-hover:translate-x-1">→</span>
+              <span className="tag bg-[#eef1ff] px-3 py-1.5 text-[#3e63dd]">학기 중 사역</span>
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#eef1ff] group-hover:text-[#3e63dd]">→</span>
             </div>
-            <h2 className="mt-5 text-2xl font-bold">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
-            <p className="mt-2 text-sm text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
-          </Link> : <section className="rounded-2xl border border-slate-200 bg-slate-100 p-6 text-slate-400">
+            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
+          </Link> : <section className="card p-6 text-slate-400 opacity-75">
             <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold">학기 중 사역</span>
             <h2 className="mt-5 text-2xl font-bold">통합관리자 승인 후 이용</h2>
             <p className="mt-2 text-sm">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
           </section>}
 
-          <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, role) : (retreatAdminAllowed ? "/retreats" : "/field")} className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+          <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, role) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card group p-6 sm:p-7" data-hover>
             <div className="flex items-center justify-between">
-              <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-bold text-violet-700">방학 중 사역</span>
-              <span className="text-slate-300 transition group-hover:translate-x-1">→</span>
+              <span className="tag bg-[#e7f7f4] px-3 py-1.5 text-[#0f8879]">방학 중 사역</span>
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#e7f7f4] group-hover:text-[#0f8879]">→</span>
             </div>
-            <h2 className="mt-5 text-2xl font-bold">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
-            <p className="mt-2 text-sm text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
+            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
           </Link>
         </section>
 
-        <section className="mt-7 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <div className="mb-5">
-            <p className="text-xs font-bold tracking-[0.14em] text-slate-400">WORKSPACES</p>
-            <h2 className="mt-1 text-xl font-bold">사역 바로가기</h2>
+        <section className="surface-panel mt-7 p-5 sm:p-7">
+          <div className="section-heading">
+            <div><p className="section-kicker">WORKSPACES</p>
+            <h2 className="section-title">사역 바로가기</h2>
             <p className="mt-1 text-sm text-slate-500">기존 사이트별 메뉴를 하나의 사역 흐름으로 정리했습니다.</p>
+            </div>
           </div>
           <div className="grid gap-4 xl:grid-cols-3">
             {semesterAllowed && (
-              <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4 transition hover:border-emerald-300 hover:bg-emerald-50">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-emerald-950">훈련·사역팀</h3><span className="text-emerald-400 group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-3 flex flex-wrap gap-1.5">{SEMESTER_TABS.map((label) => <span key={label} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-emerald-700 shadow-sm">{label}</span>)}</div>
+              <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="group rounded-2xl bg-[#f5f7ff] p-5 transition hover:-translate-y-0.5 hover:bg-[#eef1ff]">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-[#25345d]">훈련·사역팀</h3><span className="text-[#7289df] group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-4 flex flex-wrap gap-2">{SEMESTER_TABS.map((label) => <span key={label} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-[#5369bb] shadow-sm">{label}</span>)}</div>
               </Link>
             )}
             {retreatAdminAllowed && (
-              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} className="group rounded-2xl border border-violet-100 bg-violet-50/60 p-4 transition hover:border-violet-300 hover:bg-violet-50">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-violet-950">수련회 행정</h3><span className="text-violet-400 group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-3 space-y-2">{RETREAT_TAB_GROUPS.map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-14 font-bold text-violet-700">{group.label}</span><span className="leading-relaxed text-slate-500">{group.tabs.map((tab) => tab.label).join(" · ")}</span></div>)}</div>
+              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} className="group rounded-2xl bg-[#f2f8fb] p-5 transition hover:-translate-y-0.5 hover:bg-[#eaf4f8]">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-[#23425e]">수련회 행정</h3><span className="text-[#5d8faf] group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-4 space-y-2.5">{RETREAT_TAB_GROUPS.map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-14 font-bold text-[#397397]">{group.label}</span><span className="leading-relaxed text-slate-500">{group.tabs.map((tab) => tab.label).join(" · ")}</span></div>)}</div>
               </Link>
             )}
             {fieldAllowed && (
-              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} className="group rounded-2xl border border-fuchsia-100 bg-fuchsia-50/60 p-4 transition hover:border-fuchsia-300 hover:bg-fuchsia-50">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-fuchsia-950">수련회 이가드</h3><span className="text-fuchsia-400 group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-3 space-y-2">{IGUARD_VIEW_GROUPS
+              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} className="group rounded-2xl bg-[#eff9f7] p-5 transition hover:-translate-y-0.5 hover:bg-[#e7f7f4]">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-[#174e48]">수련회 이가드</h3><span className="text-[#46a697] group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-4 space-y-2.5">{IGUARD_VIEW_GROUPS
                   .filter((group) => iguardScope(role) === "all" || group.label === "실행")
-                  .map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-9 font-bold text-fuchsia-700">{group.label}</span><span className="line-clamp-2 leading-relaxed text-slate-500">{group.views.map((view) => view.label).join(" · ")}</span></div>)}</div>
+                  .map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-9 font-bold text-[#198879]">{group.label}</span><span className="line-clamp-2 leading-relaxed text-slate-500">{group.views.map((view) => view.label).join(" · ")}</span></div>)}</div>
               </Link>
             )}
           </div>
@@ -288,7 +289,7 @@ export default function PortalHome() {
           />
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="surface-panel p-5 sm:p-6">
               <h2 className="text-lg font-bold">내 담당 사역</h2>
               <p className="mt-1 text-xs text-slate-400">현재 계정이 맡은 운영 영역과 권한을 표시합니다.</p>
               <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
@@ -361,9 +362,9 @@ export default function PortalHome() {
 
 function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "emerald" | "violet" | "fuchsia" }) {
   const toneClass = {
-    emerald: "border-emerald-100 bg-emerald-50 text-emerald-900",
-    violet: "border-violet-100 bg-violet-50 text-violet-900",
-    fuchsia: "border-fuchsia-100 bg-fuchsia-50 text-fuchsia-900",
+    emerald: "bg-[#f5f7ff] text-[#25345d] hover:bg-[#eef1ff]",
+    violet: "bg-[#f2f8fb] text-[#23425e] hover:bg-[#eaf4f8]",
+    fuchsia: "bg-[#eff9f7] text-[#174e48] hover:bg-[#e7f7f4]",
   }[tone];
-  return <Link href={href} className={`rounded-xl border p-3 transition hover:-translate-y-0.5 ${toneClass}`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
+  return <Link href={href} className={`rounded-xl p-3.5 transition hover:-translate-y-0.5 ${toneClass}`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
 }

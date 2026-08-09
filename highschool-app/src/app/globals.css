@@ -5,42 +5,44 @@
    모든 컴포넌트는 이 변수를 참조
 ════════════════════════════════════════════════════ */
 :root {
-  /* Primary (스카이 블루) */
-  --color-primary:         #0284c7;
-  --color-primary-hover:   #0369a1;
-  --color-primary-active:  #075985;
-  --color-primary-light:   #7dd3fc;
-  --color-primary-disabled:#7dd3fc;
-  --color-primary-glow:    rgba(2, 132, 199, 0.15);
-  --color-primary-ring:    rgba(2, 132, 199, 0.22);
-  --color-badge-bg:        rgba(2, 132, 199, 0.18);
-  --color-badge-border:    rgba(2, 132, 199, 0.35);
+  /* Brand — Midnight Indigo + Cobalt + Teal */
+  --color-primary:         #3e63dd;
+  --color-primary-hover:   #3154c8;
+  --color-primary-active:  #2847af;
+  --color-primary-light:   #afc6ff;
+  --color-primary-disabled:#a8b7e8;
+  --color-primary-glow:    rgba(62, 99, 221, 0.18);
+  --color-primary-ring:    rgba(62, 99, 221, 0.22);
+  --color-badge-bg:        rgba(62, 99, 221, 0.10);
+  --color-badge-border:    rgba(62, 99, 221, 0.24);
+  --color-accent:          #0f9d8c;
+  --color-accent-soft:     #e7f7f4;
 
   /* Layout */
-  --color-header-bg:       #1e293b;
-  --color-screen-bg:       #0a1628;
+  --color-header-bg:       #18233f;
+  --color-screen-bg:       #10182e;
 
   /* Surface */
-  --color-bg:              #f8fafc;
+  --color-bg:              #f4f7fb;
   --color-surface:         #ffffff;
-  --color-surface-hover:   #f8fafc;
-  --color-border:          #e2e8f0;
-  --color-border-hover:    #cbd5e1;
+  --color-surface-hover:   #f7f9fd;
+  --color-border:          #e3e9f2;
+  --color-border-hover:    #cbd5e4;
 
   /* Text */
-  --color-text-primary:    #1e293b;
-  --color-text-secondary:  #475569;
+  --color-text-primary:    #17213a;
+  --color-text-secondary:  #41506b;
   --color-text-muted:      #64748b;
   --color-text-faint:      #94a3b8;
 
   /* Semantic */
-  --color-danger:          #dc2626;
-  --color-danger-bg:       #fee2e2;
-  --color-danger-border:   #fca5a5;
-  --color-success:         #15803d;
-  --color-success-bg:      #dcfce7;
-  --color-warning:         #a16207;
-  --color-warning-bg:      #fef9c3;
+  --color-danger:          #d84a59;
+  --color-danger-bg:       #fff0f2;
+  --color-danger-border:   #f4b9c0;
+  --color-success:         #0d8f72;
+  --color-success-bg:      #e8f8f2;
+  --color-warning:         #b97912;
+  --color-warning-bg:      #fff6df;
 
   /* Typography scale — 정보 계층 10/10 */
   --text-xs:   11px;
@@ -71,17 +73,17 @@
   --table-cell-y: 10px;
 
   /* Shadow scale — 프리미엄 느낌 10/10 */
-  --shadow-xs:  0 1px 2px rgba(0,0,0,0.05);
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:  0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg:  0 8px 24px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+  --shadow-xs:  0 1px 2px rgba(24,35,63,0.04);
+  --shadow-sm:  0 1px 3px rgba(24,35,63,0.06), 0 1px 2px rgba(24,35,63,0.03);
+  --shadow-md:  0 8px 20px rgba(24,35,63,0.08), 0 2px 5px rgba(24,35,63,0.04);
+  --shadow-lg:  0 18px 44px rgba(24,35,63,0.12), 0 4px 12px rgba(24,35,63,0.05);
   --shadow-primary: 0 4px 14px var(--color-primary-glow);
 
   /* Radius */
   --radius-sm:  6px;
   --radius-md:  8px;
-  --radius-lg:  12px;
-  --radius-xl:  16px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
 
   /* Transition — 인터랙션 품질 10/10 */
   --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
@@ -94,14 +96,25 @@
    Base
 ════════════════════════════════════════════════════ */
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
-  background-color: var(--color-bg);
+  margin: 0;
+  font-family: "Pretendard Variable", Pretendard, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(62, 99, 221, 0.055), transparent 28rem),
+    var(--color-bg);
   color: var(--color-text-primary);
   font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+button, input, select, textarea { font: inherit; }
+textarea { resize: vertical; }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: rgba(62, 99, 221, 0.18); color: var(--color-text-primary); }
+:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 /* ════════════════════════════════════════════════════
    Card — 프리미엄 느낌
@@ -115,14 +128,15 @@ body {
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.04), var(--shadow-sm);
-  transition: box-shadow var(--duration-normal) var(--ease-out);
+  box-shadow: 0 0 0 1px rgba(24, 35, 63, 0.035), var(--shadow-sm);
+  transition: box-shadow var(--duration-normal) var(--ease-out), transform var(--duration-normal) var(--ease-out);
 }
 .card:where([data-hover]) {
   cursor: pointer;
 }
 .card:where([data-hover]):hover {
-  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.08), var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 1px rgba(62, 99, 221, 0.10), var(--shadow-md);
 }
 
 /* ════════════════════════════════════════════════════
@@ -159,7 +173,8 @@ table th {
 .btn-primary {
   background: var(--color-primary);
   color: white;
-  padding: 8px 16px;
+  min-height: 40px;
+  padding: 9px 16px;
   border-radius: var(--radius-md);
   font-weight: 500;
   font-size: var(--text-base);
@@ -178,7 +193,8 @@ table th {
 .btn-primary:disabled { background: var(--color-primary-disabled); cursor: not-allowed; box-shadow: none; transform: none; }
 
 .btn-secondary {
-  background: #f1f5f9;
+  min-height: 40px;
+  background: #f6f8fc;
   color: var(--color-text-secondary);
   padding: 8px 16px;
   border-radius: var(--radius-md);
@@ -198,6 +214,7 @@ table th {
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .btn-danger {
+  min-height: 40px;
   background: var(--color-danger-bg);
   color: var(--color-danger);
   padding: 8px 16px;
@@ -254,7 +271,7 @@ table th {
 .tag-green  { background: var(--color-success-bg); color: var(--color-success); }
 .tag-red    { background: var(--color-danger-bg); color: var(--color-danger); }
 .tag-yellow { background: var(--color-warning-bg); color: #854d0e; }
-.tag-purple { background: #f3e8ff; color: var(--color-primary); }
+.tag-purple { background: #eef1ff; color: var(--color-primary); }
 .tag-gray   { background: #f1f5f9; color: var(--color-text-secondary); }
 .tag-orange { background: #ffedd5; color: #c2410c; }
 
@@ -263,7 +280,8 @@ table th {
 ════════════════════════════════════════════════════ */
 .input {
   width: 100%;
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 9px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--text-base);
@@ -310,7 +328,7 @@ table th {
    Table header — 정보 계층
 ════════════════════════════════════════════════════ */
 .table-header {
-  background: var(--color-bg);
+  background: #f7f9fd;
   border-bottom: 1px solid var(--color-border);
 }
 .table-header th {
@@ -348,12 +366,13 @@ table th {
   transition: background var(--duration-fast) var(--ease-out);
 }
 .card table tbody tr:hover {
-  background: var(--color-surface-hover);
+  background: #f4f7ff;
 }
 .card table tbody td {
   padding-top: var(--table-cell-y);
   padding-bottom: var(--table-cell-y);
 }
+.card table tbody tr + tr { box-shadow: inset 0 1px rgba(227,233,242,.78); }
 
 /* ════════════════════════════════════════════════════
    Modal backdrop — 프리미엄 느낌
@@ -363,6 +382,8 @@ table th {
 }
 .modal-card {
   animation: modalIn 0.2s var(--ease-out) both;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
 }
 
 @keyframes backdropIn {
@@ -492,44 +513,139 @@ table th {
   }
 }
 
-/* 학기 중 사역 영역은 초록 토큰을 쓴다(행정=스카이, 이가드=보라와 구분).
-   레이아웃·컴포넌트 클래스(.card/.input/.btn-primary/.table-header)는 행정·이가드와 같은 것을 쓰고
-   색만 이 스코프에서 바뀐다 — UI/UX는 동일, 컬러감만 초록. */
-.semester-scope {
-  --color-primary: #16a34a;
-  --color-primary-hover: #15803d;
-  --color-primary-active: #166534;
-  --color-primary-light: #86efac;
-  --color-primary-disabled: #86efac;
-  --color-primary-glow: rgba(22, 163, 74, 0.15);
-  --color-primary-ring: rgba(22, 163, 74, 0.25);
-  --color-badge-bg: rgba(22, 163, 74, 0.18);
-  --color-badge-border: rgba(22, 163, 74, 0.36);
-  --color-header-bg: #16301f;
-  --color-screen-bg: #0b1a12;
-  --color-bg: #f5faf6;
-  --color-border: #dcebe1;
-  --color-border-hover: #bcd8c5;
+/* 통합 앱의 모든 업무 영역은 같은 브랜드 토큰을 사용한다.
+   색이 아니라 제목·아이콘·정보 구조로 영역을 구분해 한 제품처럼 보이게 한다. */
+.semester-scope,
+.iguard-scope {
   min-height: 100vh;
   background: var(--color-bg);
 }
 
-/* 이가드 현장 영역은 기존 보라색 브랜드 토큰을 유지하되 전역 행정 화면에는 번지지 않는다. */
-.iguard-scope {
-  --color-primary: #a83fa3;
-  --color-primary-hover: #8f2f8a;
-  --color-primary-active: #74236f;
-  --color-primary-light: #f0abed;
-  --color-primary-disabled: #d891d4;
-  --color-primary-glow: rgba(218, 112, 214, 0.18);
-  --color-primary-ring: rgba(168, 63, 163, 0.28);
-  --color-badge-bg: rgba(218, 112, 214, 0.16);
-  --color-badge-border: rgba(218, 112, 214, 0.34);
-  --color-header-bg: #241827;
-  --color-screen-bg: #160d1b;
-  --color-bg: #fbf7fb;
-  --color-border: #eaddea;
-  --color-border-hover: #d8c4d8;
-  min-height: 100vh;
-  background: var(--color-bg);
+/* ── Unified application shell ───────────────────────────── */
+.app-page {
+  min-height: calc(100vh - 56px);
+  color: var(--color-text-primary);
+}
+
+.page-container {
+  width: min(calc(100% - 32px), 1440px);
+  margin-inline: auto;
+  padding-block: 28px 48px;
+}
+
+.surface-panel {
+  border-radius: var(--radius-xl);
+  background: rgba(255,255,255,0.94);
+  box-shadow: 0 0 0 1px rgba(24,35,63,0.035), var(--shadow-sm);
+  backdrop-filter: blur(10px);
+}
+
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 40px);
+  color: white;
+  background:
+    radial-gradient(circle at 88% 14%, rgba(15,157,140,0.28), transparent 22rem),
+    radial-gradient(circle at 65% 120%, rgba(92,125,235,0.42), transparent 28rem),
+    linear-gradient(135deg, #18233f 0%, #1f315a 62%, #243d72 100%);
+  box-shadow: 0 18px 44px rgba(24,35,63,0.18);
+}
+
+.page-eyebrow {
+  color: #8ee1d5;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin-top: 8px;
+  font-size: clamp(24px, 3vw, 34px);
+  font-weight: 750;
+  line-height: 1.2;
+  letter-spacing: -.03em;
+}
+
+.page-description {
+  margin-top: 10px;
+  max-width: 720px;
+  color: #b9c4da;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.section-kicker {
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.section-title {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 720;
+  letter-spacing: -.02em;
+}
+
+.workspace-header {
+  background: linear-gradient(125deg, #18233f, #20345f);
+  color: white;
+  box-shadow: 0 8px 26px rgba(24,35,63,.15);
+}
+
+.workspace-tabs {
+  border-bottom: 1px solid rgba(203,213,228,.78);
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(14px);
+}
+
+.workspace-tab {
+  position: relative;
+  min-height: 46px;
+  padding: 0 15px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+.workspace-tab:hover { color: var(--color-text-primary); background: rgba(62,99,221,.04); }
+.workspace-tab[aria-selected="true"] { color: var(--color-primary); }
+.workspace-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 14px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 99px 99px 0 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
+}
+
+@media (max-width: 640px) {
+  .page-container { width: min(calc(100% - 24px), 1440px); padding-block: 18px 32px; }
+  .page-hero { border-radius: 18px; padding: 24px 20px; }
+  .surface-panel { border-radius: 16px; }
+  .workspace-tab { min-height: 44px; padding-inline: 12px; }
 }

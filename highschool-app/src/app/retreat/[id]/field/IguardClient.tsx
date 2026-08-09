@@ -196,11 +196,11 @@ function IguardWorkspace({ id }: { id: string }) {
   const shellWidth = activeGroup.label === "기획" ? "max-w-[1760px]" : "max-w-6xl";
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-slate-50 pb-24 sm:pb-12">
-      <header ref={headerRef} className="sticky top-14 z-20" style={{ background: "var(--color-header-bg)" }}>
+    <div className="iguard-scope min-h-screen overflow-x-clip pb-24 sm:pb-12">
+      <header ref={headerRef} className="workspace-header sticky top-14 z-20">
         <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
           <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
-            <button onClick={() => router.push("/")} className="min-h-10 shrink-0 px-1 text-xs text-slate-300 hover:text-fuchsia-200" aria-label="수련회 목록으로 돌아가기">← 목록</button>
+            <button onClick={() => router.push("/")} className="min-h-10 shrink-0 rounded-lg px-2 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white" aria-label="수련회 목록으로 돌아가기">← 목록</button>
             <span className="hidden text-slate-600 sm:inline">|</span>
             <span className="px-2 py-0.5 rounded-full text-xs font-semibold shrink-0" style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
             <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
@@ -218,7 +218,7 @@ function IguardWorkspace({ id }: { id: string }) {
                   setView("schedule");
                   setSheetSettingsOpen(true);
                 }}
-                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-fuchsia-200"
+                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-[#8ee1d5]"
                 aria-label="큐싯 가져오기 열기"
               >
                 <span className="sm:hidden" aria-hidden="true">⬇</span><span className="hidden sm:inline">⬇ 큐싯 가져오기</span>
@@ -242,14 +242,14 @@ function IguardWorkspace({ id }: { id: string }) {
           </div>
         </div>
         {/* 소그룹 */}
-        <div className={`bg-white border-b border-slate-200 ${activeGroup.label === "실행" ? "hidden sm:block" : "block"}`}>
+        <div className={`workspace-tabs ${activeGroup.label === "실행" ? "hidden sm:block" : "block"}`}>
           <div className={`${shellWidth} mx-auto px-4 flex gap-0 overflow-x-auto`} role="tablist" aria-label={`${activeGroup.label} 하위 탭`}>
             {activeGroup.views.map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
                 role="tab"
                 aria-selected={activeView === v.key}
-                className="min-h-11 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors"
-                style={activeView === v.key ? { borderColor: "var(--color-primary)", color: "var(--color-primary)" } : { borderColor: "transparent", color: "var(--color-text-muted)" }}>
+                className="workspace-tab"
+              >
                 {v.label}
               </button>
             ))}
@@ -285,7 +285,7 @@ function IguardWorkspace({ id }: { id: string }) {
 
         {dataLoading && (
           <div className="card p-8 text-center text-slate-400">
-            <div className="mx-auto mb-3 h-7 w-7 rounded-full border-2 border-fuchsia-500 border-t-transparent animate-spin" />
+            <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[#3e63dd] border-t-transparent" />
             <p className="text-sm">수련회 데이터를 불러오는 중입니다.</p>
           </div>
         )}
@@ -355,7 +355,7 @@ function IguardWorkspace({ id }: { id: string }) {
                   aria-selected={active}
                   onClick={() => setView(v.key)}
                   className={`min-h-14 rounded-lg px-1.5 text-xs font-semibold transition-colors ${
-                    active ? "bg-fuchsia-700 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
+                    active ? "bg-[#3e63dd] text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
                   }`}
                 >
                   <span aria-hidden="true" className="mb-1 block text-base leading-none">{v.icon}</span>

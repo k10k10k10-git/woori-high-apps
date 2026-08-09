@@ -38,7 +38,7 @@
 
 - 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당한다. 하위 화면에 제목 줄을 다시 만들지 않는다(중복 제목 금지 — `/retreats`·`/field`에서 실제로 겹쳤다).
 - 상단 메뉴는 학기 중 사역 / 방학 중 사역 두 개이고, 방학 중 사역이 수련회 행정팀·이가드팀 드롭다운으로 갈라진다.
-- 도메인 색: 학기 `.semester-scope`(초록), 행정 기본 토큰(스카이), 이가드 `.iguard-scope`(보라). 레이아웃·컴포넌트 클래스(`card`/`input`/`btn-primary`/`table-header`/2단 sticky 헤더)는 세 도메인이 공유한다 — 새 화면도 색만 스코프에서 바꾼다.
+- 통합 브랜드 색: 학기·수련회 행정·이가드 모두 `globals.css`의 미드나이트 인디고·코발트·틸 토큰을 공유한다. `.semester-scope`와 `.iguard-scope`는 배경·최소 높이만 제공하며 도메인별 원색으로 토큰을 재정의하지 않는다. 상태 의미(정상·검토·위험)에만 에메랄드·앰버·로즈를 사용한다.
 - effect 안에서 `setState`를 직접 호출하지 않는다(eslint `react-hooks/set-state-in-effect`). 탭 유효성처럼 파생 가능한 값은 렌더 중 계산한다(`SemesterClient`의 `activeTab` 참고).
 
 ## 학기 사역 계약 (2026-08-06)
