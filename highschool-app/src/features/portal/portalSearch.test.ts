@@ -23,5 +23,6 @@ describe("portal search", () => {
     const items = buildPortalSearchItems({ role: "superAdmin", semesters, retreats });
     expect(filterPortalSearchItems(items, "조편성").map((item) => item.id)).toContain("retreat-home");
     expect(filterPortalSearchItems(items, "커리큘럼").map((item) => item.id)).toContain("semester-home");
+    expect(filterPortalSearchItems(items, "목양").map((item) => item.id)).toContain("ministry-guide");
   });
 });

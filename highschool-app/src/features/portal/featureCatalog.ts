@@ -97,6 +97,7 @@ export const IGUARD_VIEW_GROUPS = [
 
 export const UNIFIED_ROUTES = [
   "/",
+  "/ministry-guide",
   "/suggestions",
   "/semesters",
   "/semester/[id]",

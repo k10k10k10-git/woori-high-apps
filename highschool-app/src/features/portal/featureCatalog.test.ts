@@ -25,6 +25,7 @@ describe("통합 앱 기능 카탈로그", () => {
   });
 
   it("통합 홈과 세 도메인의 진입 경로를 제공한다", () => {
+    expect(UNIFIED_ROUTES).toContain("/ministry-guide");
     expect(UNIFIED_ROUTES).toContain("/suggestions");
     expect(UNIFIED_ROUTES).toContain("/semesters");
     expect(UNIFIED_ROUTES).toContain("/retreats");

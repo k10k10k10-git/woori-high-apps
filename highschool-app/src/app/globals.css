@@ -1114,6 +1114,153 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .workspace-group-tab { min-height: 40px; padding-inline: 12px; font-size: 12px; }
 }
 
+/* ════════════════════════════════════════════════════
+   사역 가이드 — 운영 문서를 읽는 화면은 장식보다 탐색성과 긴 글 가독성을 우선한다.
+════════════════════════════════════════════════════ */
+.ministry-guide-page { background: linear-gradient(180deg, #f1f7f4 0, var(--color-bg) 330px); }
+.ministry-guide-hero {
+  display: grid;
+  min-height: 230px;
+  align-items: end;
+  gap: 28px;
+  border-radius: 24px;
+  background: #102b23;
+  padding: 38px 42px;
+  color: white;
+  box-shadow: var(--shadow-md);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, .72fr);
+}
+.ministry-guide-hero .page-eyebrow { color: #8ae5c1; }
+.ministry-guide-hero .page-title { color: white; }
+.ministry-guide-hero .page-description { color: #bdcec7; }
+.ministry-guide-theme {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  border-radius: 18px;
+  background: rgba(255,255,255,.08);
+  padding: 22px 24px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
+}
+.ministry-guide-theme strong { font-size: 17px; line-height: 1.5; }
+.ministry-guide-theme p { color: #b9cbc3; font-size: 12px; line-height: 1.7; }
+.guide-status { width: fit-content; border-radius: 999px; background: #e5f7f0; padding: 5px 9px; color: #087a57; font-size: 11px; font-weight: 750; }
+.ministry-guide-theme .guide-status { background: rgba(138,229,193,.12); color: #8ae5c1; }
+.guide-privacy-note { display: flex; margin-top: 16px; align-items: flex-start; gap: 10px; border-radius: 14px; background: #fff9e9; padding: 14px 17px; color: #745a1a; font-size: 12px; line-height: 1.65; box-shadow: inset 0 0 0 1px rgba(185,121,18,.14); }
+.guide-month-panel { margin-top: 28px; padding: 26px; }
+.guide-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.guide-section-heading > div > p:last-child { margin-top: 6px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.guide-month-tabs { display: grid; margin-top: 22px; grid-template-columns: repeat(12, minmax(48px, 1fr)); gap: 6px; }
+.guide-month-tabs button { min-height: 40px; border: 0; border-radius: 10px; background: #f3f6f4; color: var(--color-text-muted); cursor: pointer; font-size: 12px; font-weight: 700; transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast); }
+.guide-month-tabs button:hover { background: #e4efe9; color: var(--color-primary); }
+.guide-month-tabs button[aria-selected="true"] { background: var(--color-primary); color: white; box-shadow: var(--shadow-primary); }
+.guide-month-brief { display: grid; margin-top: 14px; align-items: center; gap: 24px; border-radius: 17px; background: #edf7f3; padding: 22px 24px; grid-template-columns: 82px minmax(220px, .8fr) minmax(0, 1fr); }
+.guide-month-number { color: var(--color-primary); font-size: 13px; font-weight: 700; }
+.guide-month-number span { margin-right: 2px; font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.guide-field-label { display: block; margin-bottom: 5px; color: var(--color-text-muted); font-size: 10px; font-weight: 750; letter-spacing: .06em; }
+.guide-month-brief h3 { font-size: 16px; line-height: 1.5; }
+.guide-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-chip-list span { border-radius: 999px; background: white; padding: 7px 10px; color: var(--color-text-secondary); font-size: 11px; font-weight: 650; box-shadow: var(--shadow-xs); }
+.guide-search { display: flex; width: min(310px, 100%); min-height: 42px; align-items: center; gap: 8px; border-radius: 12px; background: white; padding: 0 13px; box-shadow: inset 0 0 0 1px var(--color-border), var(--shadow-xs); }
+.guide-search span { color: var(--color-text-faint); font-size: 18px; }
+.guide-search input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--color-text-primary); font-size: 12px; }
+.guide-category-tabs { display: flex; margin-top: 18px; flex-wrap: wrap; gap: 7px; }
+.guide-category-tabs button { min-height: 38px; border: 0; border-radius: 999px; background: #e9efec; padding: 8px 14px; color: var(--color-text-secondary); cursor: pointer; font-size: 11px; font-weight: 700; }
+.guide-category-tabs button[data-active="true"] { background: #17201d; color: white; }
+.guide-card-grid { display: grid; margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.guide-card { position: relative; overflow: hidden; border-radius: 19px; background: white; padding: 25px; box-shadow: 0 0 0 1px rgba(18,28,24,.04), var(--shadow-sm); }
+.guide-card::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--guide-tone); content: ""; }
+.guide-tone-blue { --guide-tone: #3b82f6; --guide-soft: #eff6ff; --guide-ink: #2457b8; }
+.guide-tone-green { --guide-tone: #10a779; --guide-soft: #eaf8f3; --guide-ink: #087a57; }
+.guide-tone-violet { --guide-tone: #7c6ee6; --guide-soft: #f1efff; --guide-ink: #5a4fbd; }
+.guide-tone-amber { --guide-tone: #d79a2b; --guide-soft: #fff7e5; --guide-ink: #966510; }
+.guide-tone-rose { --guide-tone: #d96b79; --guide-soft: #fff0f2; --guide-ink: #af4554; }
+.guide-card-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.guide-card-topline span:first-child { border-radius: 999px; background: var(--guide-soft); padding: 5px 8px; color: var(--guide-ink); font-size: 10px; font-weight: 800; }
+.guide-card-topline span:last-child { overflow: hidden; color: var(--color-text-faint); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.guide-card > h3 { margin-top: 18px; font-size: 19px; letter-spacing: -.02em; }
+.guide-card-summary { margin-top: 7px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
+.guide-card-block { margin-top: 20px; }
+.guide-card-block h4 { margin-bottom: 9px; color: var(--color-text-secondary); font-size: 11px; font-weight: 800; }
+.guide-card-block ul { display: grid; margin: 0; padding: 0; gap: 7px; list-style: none; }
+.guide-card-block li { position: relative; padding-left: 13px; color: var(--color-text-secondary); font-size: 12px; line-height: 1.65; }
+.guide-card-block li::before { position: absolute; top: .68em; left: 1px; width: 4px; height: 4px; border-radius: 50%; background: var(--guide-tone); content: ""; }
+.guide-card-checklist { border-radius: 13px; background: var(--guide-soft); padding: 14px 15px; }
+.guide-card-checklist ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.guide-card-checklist li { display: flex; padding: 0; align-items: flex-start; gap: 6px; color: var(--guide-ink); font-size: 11px; font-weight: 650; }
+.guide-card-checklist li::before { display: none; }
+.guide-card-checklist li span { flex: 0 0 auto; }
+.guide-card-caution { margin-top: 14px; border-radius: 11px; background: #fff8e7; padding: 10px 12px; color: #7f611a; font-size: 10px; line-height: 1.6; }
+.guide-tools-grid { display: grid; align-items: start; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 16px; }
+.guide-tool-card { padding: 26px; }
+.guide-form-grid { display: grid; margin-top: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
+.guide-form-grid label > span { display: block; margin: 0 0 5px 2px; color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
+.guide-form-grid input { width: 100%; min-height: 42px; border: 0; border-radius: 10px; background: #f4f7f5; padding: 10px 12px; outline: 0; color: var(--color-text-primary); font-size: 12px; box-shadow: inset 0 0 0 1px transparent; }
+.guide-form-grid input:focus { background: white; box-shadow: inset 0 0 0 1.5px var(--color-primary); }
+.guide-notice-preview { position: relative; margin-top: 14px; border-radius: 14px; background: #102b23; padding: 20px; color: white; }
+.guide-notice-preview pre { min-height: 180px; margin: 0; padding-right: 100px; color: #e3eee9; font: 400 12px/1.75 "Pretendard Variable", Pretendard, sans-serif; white-space: pre-wrap; word-break: keep-all; }
+.guide-notice-preview .btn-primary { position: absolute; right: 14px; bottom: 14px; background: white; color: #102b23; box-shadow: none; }
+.guide-question-list { display: grid; margin: 22px 0 0; padding: 0; gap: 9px; list-style: none; }
+.guide-question-list li { display: grid; align-items: start; gap: 10px; border-radius: 13px; background: #f4f7f5; padding: 14px; grid-template-columns: 25px 1fr; }
+.guide-question-list span { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 8px; background: #dff4ec; color: var(--color-primary); font-size: 10px; font-weight: 800; }
+.guide-question-list p { color: var(--color-text-secondary); font-size: 12px; line-height: 1.65; }
+.guide-review-principles { margin-top: 16px; border-radius: 14px; background: #fff8e7; padding: 17px; }
+.guide-review-principles h3 { color: #715516; font-size: 12px; }
+.guide-review-principles ul { display: grid; margin: 10px 0 0; padding-left: 16px; gap: 7px; color: #80672e; font-size: 11px; line-height: 1.55; }
+
+.home-ministry-brief {
+  display: grid;
+  align-items: center;
+  gap: 20px;
+  border-radius: 19px;
+  background: #102b23;
+  padding: 22px 25px;
+  color: white;
+  box-shadow: var(--shadow-md);
+  grid-template-columns: 74px minmax(0, 1fr) auto;
+  transition: transform var(--duration-fast), box-shadow var(--duration-fast);
+}
+.home-ministry-brief:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.home-ministry-brief__month { color: #8ae5c1; font-size: 12px; font-weight: 750; }
+.home-ministry-brief__month span { margin-right: 2px; font-size: 31px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.home-ministry-brief .section-kicker { color: #8ae5c1; }
+.home-ministry-brief .guide-status { background: rgba(138,229,193,.12); color: #8ae5c1; }
+.home-ministry-brief h2 { margin-top: 7px; color: white; font-size: 17px; letter-spacing: -.02em; }
+.home-ministry-brief__focus { display: flex; margin-top: 9px; flex-wrap: wrap; gap: 6px; }
+.home-ministry-brief__focus span { border-radius: 999px; background: rgba(255,255,255,.08); padding: 5px 8px; color: #c8d8d1; font-size: 10px; font-weight: 650; }
+.home-ministry-brief__action { display: flex; min-height: 40px; align-items: center; gap: 8px; border-radius: 12px; background: rgba(255,255,255,.08); padding: 0 14px; color: #e4f0eb; font-size: 11px; font-weight: 750; }
+.home-ministry-brief__action b { transition: transform var(--duration-fast); }
+.home-ministry-brief:hover .home-ministry-brief__action b { transform: translateX(3px); }
+
+@media (max-width: 900px) {
+  .ministry-guide-hero, .guide-tools-grid { grid-template-columns: 1fr; }
+  .guide-month-tabs { grid-template-columns: repeat(6, minmax(48px, 1fr)); }
+  .guide-month-brief { grid-template-columns: 70px 1fr; }
+  .guide-month-brief > div:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 640px) {
+  .ministry-guide-hero { min-height: 0; border-radius: 18px; padding: 26px 20px; }
+  .ministry-guide-theme { padding: 18px; }
+  .guide-month-panel, .guide-tool-card { padding: 20px 16px; }
+  .guide-section-heading { align-items: stretch; flex-direction: column; }
+  .guide-search { width: 100%; }
+  .guide-month-tabs { overflow-x: auto; grid-template-columns: repeat(12, 52px); padding-bottom: 4px; }
+  .guide-month-brief { padding: 18px; grid-template-columns: 1fr; }
+  .guide-month-brief > div:last-child { grid-column: auto; }
+  .guide-card-grid { grid-template-columns: 1fr; }
+  .guide-card { padding: 22px 19px; }
+  .guide-card-topline { align-items: flex-start; flex-direction: column; }
+  .guide-card-topline span:last-child { width: 100%; text-align: left; white-space: normal; }
+  .guide-form-grid { grid-template-columns: 1fr; }
+  .guide-form-grid .sm\:col-span-2 { grid-column: auto; }
+  .guide-notice-preview pre { min-height: 230px; padding: 0 0 54px; }
+  .guide-card-checklist ul { grid-template-columns: 1fr; }
+  .home-ministry-brief { align-items: start; padding: 20px; grid-template-columns: 56px minmax(0, 1fr); }
+  .home-ministry-brief__month span { font-size: 27px; }
+  .home-ministry-brief__action { grid-column: 1 / -1; justify-content: space-between; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     scroll-behavior: auto !important;

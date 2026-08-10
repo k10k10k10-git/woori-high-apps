@@ -8,11 +8,12 @@ import TeamModal from "./TeamModal";
 import PortalSearch from "./PortalSearch";
 import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
 
-type GlobalArea = "home" | "semester" | "vacation";
+type GlobalArea = "home" | "semester" | "guide" | "vacation";
 
 function activeArea(pathname: string): GlobalArea {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/semester")) return "semester";
+  if (pathname.startsWith("/ministry-guide")) return "guide";
   return "vacation";
 }
 
@@ -79,6 +80,14 @@ export default function GlobalPortalHeader() {
                 학기 중 사역
               </Link>
             )}
+
+            <Link
+              href="/ministry-guide"
+              className="portal-nav-link"
+              aria-current={currentArea === "guide" ? "page" : undefined}
+            >
+              사역 가이드
+            </Link>
 
             {vacationItems.length > 0 && (
               <div

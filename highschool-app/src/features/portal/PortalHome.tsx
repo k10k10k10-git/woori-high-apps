@@ -29,6 +29,7 @@ import {
 import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS } from "./featureCatalog";
 import SharedMinistryCalendar, { type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
+import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
 
 function todayYmd() {
   const now = new Date();
@@ -63,6 +64,7 @@ export default function PortalHome() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string } | null>(null);
   const canEditSchedule = canEditPortalArea("retreat-admin", role) || iguardScope(role) === "all";
+  const monthlyMinistry = getMonthlyMinistry(new Date().getMonth() + 1);
 
   const semesterAllowed = canAccessPortalArea("semester", role);
   const fieldAllowed = canAccessPortalArea("retreat-field", role);
@@ -277,6 +279,23 @@ export default function PortalHome() {
             <p className="mt-2 text-sm leading-6 text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
           </Link>
         </section>
+
+        <Link href="/ministry-guide" className="home-ministry-brief group mt-7" data-hover>
+          <div className="home-ministry-brief__month">
+            <span>{monthlyMinistry.month}</span>월
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="section-kicker">THIS MONTH</p>
+              <span className="guide-status">사역계획 가안</span>
+            </div>
+            <h2>{monthlyMinistry.curriculum}</h2>
+            <div className="home-ministry-brief__focus">
+              {monthlyMinistry.focus.map((item) => <span key={item}>{item}</span>)}
+            </div>
+          </div>
+          <span className="home-ministry-brief__action">사역 가이드 <b aria-hidden="true">→</b></span>
+        </Link>
 
         <section className="surface-panel mt-7 p-5 sm:p-7">
           <div className="section-heading">
