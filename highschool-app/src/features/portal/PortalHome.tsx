@@ -28,6 +28,7 @@ import {
 } from "./accessPolicy";
 import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS } from "./featureCatalog";
 import SharedMinistryCalendar, { type SharedCalendarItem } from "./SharedMinistryCalendar";
+import { buildHomeActions } from "./homeActions";
 
 function todayYmd() {
   const now = new Date();
@@ -182,6 +183,19 @@ export default function PortalHome() {
     };
   }, [calendarItems, milestones, periods, retreats]);
 
+  const homeActions = useMemo(() => {
+    const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : undefined;
+    return buildHomeActions({
+      today: todayYmd(),
+      role,
+      milestones,
+      sessions: semesterAllowed ? sessions : [],
+      semesterHref,
+      periods,
+      retreats,
+    });
+  }, [currentSemester, milestones, periods, retreats, role, semesterAllowed, sessions]);
+
   async function submitSchedule() {
     if (!scheduleDraft) return;
     const title = scheduleDraft.title.trim();
@@ -327,6 +341,39 @@ export default function PortalHome() {
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScope(role) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
               </div>
+            </section>
+            <section className="surface-panel p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="section-kicker">ACTION INBOX</p>
+                  <h2 className="mt-1 text-lg font-bold">지금 확인할 일</h2>
+                  <p className="mt-1 text-xs text-slate-500">공유 준비 일정과 다음 사역을 날짜순으로 모았습니다.</p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-600">{homeActions.length}건</span>
+              </div>
+              <div className="mt-4 space-y-2">
+                {homeActions.length > 0 ? homeActions.map((item) => {
+                  const content = (
+                    <>
+                      <span className={`home-action-date home-action-date--${item.urgency}`}>{item.date.slice(5).replace("-", ".")}</span>
+                      <span className="min-w-0 flex-1">
+                        <strong className="block truncate text-sm text-slate-800">{item.title}</strong>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">{item.meta}</span>
+                      </span>
+                      {item.href && <span aria-hidden="true" className="text-slate-300">→</span>}
+                    </>
+                  );
+                  return item.href
+                    ? <Link key={item.id} href={item.href} className="home-action-row">{content}</Link>
+                    : <div key={item.id} className="home-action-row">{content}</div>;
+                }) : (
+                  <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
+                    <p className="text-sm font-semibold text-slate-700">급히 확인할 일이 없습니다.</p>
+                    <p className="mt-1 text-xs text-slate-400">공유 일정을 추가하면 여기에 나타납니다.</p>
+                  </div>
+                )}
+              </div>
+              <Link href="/suggestions" className="mt-4 inline-flex min-h-10 items-center text-xs font-semibold text-[var(--color-primary)] hover:underline">사이트 개선 제안 작성 →</Link>
             </section>
           </div>
         </section>

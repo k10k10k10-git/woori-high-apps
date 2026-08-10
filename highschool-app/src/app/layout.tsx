@@ -3,10 +3,18 @@ import "./globals.css";
 import Providers from "./providers";
 import UpdateBanner from "./UpdateBanner";
 import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
+import ConnectivityBanner from "./ConnectivityBanner";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://woorihigh-app.vercel.app"),
   title: "분당우리교회 서현고등부",
   description: "분당우리교회 서현고등부 학기·수련회 통합 사역 플랫폼",
+  openGraph: {
+    title: "분당우리교회 서현고등부",
+    description: "학기 운영과 수련회 행정·현장을 하나로 연결하는 사역 플랫폼",
+    type: "website",
+    locale: "ko_KR",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -39,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <UpdateBanner />
         <Providers>
+          <ConnectivityBanner />
           <GlobalPortalHeader />
           {children}
         </Providers>

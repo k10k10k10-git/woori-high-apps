@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import TeamModal from "./TeamModal";
+import PortalSearch from "./PortalSearch";
 import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
 
 type GlobalArea = "home" | "semester" | "vacation";
@@ -120,6 +121,8 @@ export default function GlobalPortalHeader() {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            <PortalSearch />
+            <Link href="/suggestions" className="portal-action hidden sm:inline-flex">개선 제안</Link>
             {canManageRoles(role) && (
               <button onClick={() => setTeamOpen(true)} className="portal-action">
                 <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">팀원 관리</span>

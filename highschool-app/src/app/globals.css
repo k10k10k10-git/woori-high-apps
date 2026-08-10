@@ -758,6 +758,64 @@ main .text-slate-400 { color: var(--color-text-faint); }
   transition: transform var(--duration-normal) var(--ease-out), background var(--duration-normal);
 }
 .home-workspace-card:hover { transform: translateY(-2px); background: #eef5f2; }
+
+/* 홈 업무함 — 날짜와 행동을 한 눈에 스캔할 수 있게 고정폭으로 맞춘다. */
+.home-action-row {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 13px;
+  background: #f7f9f8;
+  padding: 10px 12px;
+  transition: background var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+}
+a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
+.home-action-date {
+  display: grid;
+  min-width: 48px;
+  min-height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e9efec;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+.home-action-date--overdue { background: var(--color-danger-bg); color: var(--color-danger); }
+.home-action-date--today { background: var(--color-success-bg); color: var(--color-success); }
+
+/* 새 화면의 입력 요소도 기존 토큰과 같은 키·포커스 규칙을 사용한다. */
+.form-control {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  background: white;
+  padding: 10px 12px;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  line-height: 1.55;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+.form-control:hover { border-color: var(--color-border-hover); }
+.form-control:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-ring); outline: none; }
+
+.connectivity-banner {
+  position: fixed;
+  z-index: 120;
+  right: 16px;
+  bottom: 16px;
+  max-width: min(440px, calc(100% - 32px));
+  border-radius: 12px;
+  padding: 11px 14px;
+  box-shadow: var(--shadow-lg);
+  font-size: 12px;
+  font-weight: 650;
+}
+.connectivity-banner--offline { background: #713f12; color: #fff7d6; }
+.connectivity-banner--online { background: #075f46; color: #ecfdf5; }
 .hero-metric {
   min-width: 0;
   border-radius: 16px;
