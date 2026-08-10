@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
+import LandingPage from "@/features/landing/LandingPage";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import {
   deleteMilestone,
@@ -204,17 +204,7 @@ export default function PortalHome() {
   }
 
   if (!user) {
-    return (
-      <main className="portal-login-screen min-h-screen grid place-items-center px-6 text-center">
-        <div className="portal-login-card max-w-md">
-          <div className="portal-login-mark mb-6">W</div>
-          <p className="page-eyebrow">WOORI HIGH MINISTRY</p>
-          <h1 className="mt-3 text-3xl font-bold text-white">분당우리교회 서현고등부</h1>
-          <p className="mb-8 mt-3 text-sm text-[var(--color-on-dark-secondary)]">학기 사역과 수련회 준비·현장 운영을 한곳에서 관리합니다.</p>
-          <LoginButton signIn={signIn} />
-        </div>
-      </main>
-    );
+    return <LandingPage signIn={signIn} />;
   }
 
   if (!canAccessPortalArea("home", role)) {
