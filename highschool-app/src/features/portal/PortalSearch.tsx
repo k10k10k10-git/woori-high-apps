@@ -1,40 +1,59 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getSemesters } from "@/features/semester/db";
-import type { Semester } from "@/features/semester/types";
-import { getRetreats } from "@/lib/db";
-import type { Retreat } from "@/lib/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessPortalArea } from "./accessPolicy";
-import { buildPortalSearchItems, filterPortalSearchItems } from "./portalSearchCatalog";
+import { buildPeopleProfiles, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
+import { loadPeopleSearchData } from "./peopleSearchDb";
 
-const AREA_LABEL = {
-  home: "홈",
-  semester: "학기",
-  retreat: "행정",
-  field: "현장",
-  support: "도움",
-} as const;
+const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
+  "학적·출석": "bg-blue-50 text-blue-700",
+  "학기 중 사역": "bg-emerald-50 text-emerald-700",
+  "새친구": "bg-amber-50 text-amber-700",
+  "수련회": "bg-violet-50 text-violet-700",
+};
 
 export default function PortalSearch() {
   const { role } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [retreats, setRetreats] = useState<Retreat[]>([]);
+  const [profiles, setProfiles] = useState<PersonProfile[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const loadedFor = useRef("");
+  const loadedAt = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const includeSemester = canAccessPortalArea("semester", role);
+  const includePrivate = canAccessPortalArea("retreat-admin", role);
+  const loadKey = `${role}:${includeSemester}:${includePrivate}`;
+
+  const beginOpen = useCallback(() => {
+    setOpen(true);
+    const cacheFresh = loadedFor.current === loadKey && Date.now() - loadedAt.current < 60_000;
+    if (!cacheFresh) {
+      setLoading(true);
+      setError("");
+      void loadPeopleSearchData({ includeSemester, includePrivate })
+        .then((data) => {
+          setProfiles(buildPeopleProfiles(data));
+          loadedFor.current = loadKey;
+          loadedAt.current = Date.now();
+        })
+        .catch((cause: unknown) => {
+          console.error("people search load failed", cause);
+          setError("인물 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [includePrivate, includeSemester, loadKey]);
 
   useEffect(() => {
     if (!open) return;
-    if (canAccessPortalArea("semester", role)) {
-      void getSemesters().then(setSemesters).catch(() => setSemesters([]));
-    }
-    void getRetreats().then(setRetreats).catch(() => setRetreats([]));
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
-  }, [open, role]);
+  }, [open]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -42,78 +61,173 @@ export default function PortalSearch() {
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setOpen(true);
+        beginOpen();
       } else if (event.key === "/" && !typing) {
         event.preventDefault();
-        setOpen(true);
+        beginOpen();
       } else if (event.key === "Escape") {
-        setOpen(false);
+        if (selectedId) setSelectedId(null);
+        else setOpen(false);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [beginOpen, selectedId]);
 
-  const items = useMemo(
-    () => buildPortalSearchItems({ role, semesters, retreats }),
-    [role, semesters, retreats],
-  );
-  const results = useMemo(() => filterPortalSearchItems(items, query), [items, query]);
+  const results = useMemo(() => searchPeople(profiles, query), [profiles, query]);
+  const selected = useMemo(() => profiles.find((profile) => profile.id === selectedId) ?? null, [profiles, selectedId]);
 
   function close() {
     setOpen(false);
     setQuery("");
+    setSelectedId(null);
   }
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="portal-action" aria-label="통합 검색 열기">
+      <button type="button" onClick={beginOpen} className="portal-search-trigger" aria-label="학생 통합검색 열기">
         <span aria-hidden="true">⌕</span>
-        <span className="hidden md:inline">검색</span>
+        <span>학생 통합검색</span>
         <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-on-dark-muted)] xl:inline">⌘K</kbd>
       </button>
       {open && (
-        <div className="modal-backdrop fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/55 px-4 pt-[12vh] backdrop-blur-[2px]" onMouseDown={close}>
+        <div className="modal-backdrop fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/60 px-3 pt-[5vh] backdrop-blur-[2px] sm:px-5 sm:pt-[8vh]" onMouseDown={close}>
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="통합 검색"
-            className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            aria-label="학생 통합검색"
+            className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ${selected ? "max-w-5xl" : "max-w-2xl"}`}
             onMouseDown={(event) => event.stopPropagation()}
           >
-            <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
-              <span aria-hidden="true" className="text-lg text-slate-400">⌕</span>
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="사역, 수련회, 조편성, 인원체크 검색"
-                aria-label="검색어"
-                className="min-h-11 flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
-              />
-              <button type="button" onClick={close} className="rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100">ESC</button>
-            </div>
-            <div className="max-h-[58vh] overflow-y-auto p-2.5">
-              {results.length > 0 ? results.map((item) => (
-                <Link key={item.id} href={item.href} onClick={close} className="group flex items-start gap-3 rounded-xl px-3.5 py-3 transition hover:bg-slate-50 focus-visible:bg-slate-50">
-                  <span className="mt-0.5 min-w-11 rounded-md bg-slate-100 px-2 py-1 text-center text-[10px] font-bold text-slate-500">{AREA_LABEL[item.area]}</span>
-                  <span className="min-w-0 flex-1">
-                    <strong className="block truncate text-sm text-slate-900">{item.label}</strong>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">{item.description}</span>
-                  </span>
-                  <span aria-hidden="true" className="mt-2 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--color-primary)]">→</span>
-                </Link>
-              )) : (
-                <div className="px-5 py-12 text-center">
-                  <p className="text-sm font-semibold text-slate-700">검색 결과가 없습니다.</p>
-                  <p className="mt-1 text-xs text-slate-400">다른 탭 이름이나 수련회 이름으로 검색해 보세요.</p>
+            {selected ? (
+              <PersonDetail profile={selected} onBack={() => setSelectedId(null)} onClose={close} />
+            ) : (
+              <>
+                <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
+                  <span aria-hidden="true" className="text-lg text-slate-400">⌕</span>
+                  <input
+                    ref={inputRef}
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="학생 이름을 입력하세요 (예: 강민채)"
+                    aria-label="학생 이름"
+                    className="min-h-11 flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
+                  />
+                  <button type="button" onClick={close} className="rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100">ESC</button>
                 </div>
-              )}
-            </div>
-            <footer className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">접근 권한이 있는 사역과 화면만 표시됩니다.</footer>
+                <div className="min-h-52 flex-1 overflow-y-auto p-2.5">
+                  {loading ? <SearchState title="고등부 인물 기록을 모으고 있습니다…" description="학적·출석, 학기 사역, 새친구, 수련회 데이터를 연결합니다." />
+                    : error ? <SearchState title={error} description="창을 닫았다가 다시 열어 재시도할 수 있습니다." />
+                    : query.trim().length < 2 ? <SearchState title="학생 이름으로 검색하세요." description="두 글자 이상 입력하면 현재 DB의 모든 연도 기록을 한 번에 찾습니다." />
+                    : results.length > 0 ? results.map((profile) => (
+                      <button key={profile.id} type="button" onClick={() => setSelectedId(profile.id)} className="group flex w-full items-start gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-slate-50 focus-visible:bg-slate-50">
+                        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-sm font-extrabold text-emerald-700">{profile.name.slice(0, 1)}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <strong className="text-[15px] text-slate-900">{profile.name}</strong>
+                            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">동명이인 구분</span>}
+                          </span>
+                          <span className="mt-1 block text-xs text-slate-500">
+                            {profile.latestClass ?? "학적 기록 없음"} · 관련 기록 {profile.records.length}건
+                            {profile.years.length > 0 ? ` · ${profile.years.join(", ")}` : ""}
+                          </span>
+                        </span>
+                        <span aria-hidden="true" className="mt-2 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-600">→</span>
+                      </button>
+                    )) : <SearchState title="일치하는 학생이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
+                </div>
+                <footer className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">
+                  현재 권한으로 열람할 수 있는 DB만 표시합니다. 동명이인은 생년·연락처·학생 ID로 분리합니다.
+                </footer>
+              </>
+            )}
           </section>
         </div>
       )}
     </>
+  );
+}
+
+function SearchState({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="px-5 py-14 text-center">
+      <p className="text-sm font-semibold text-slate-700">{title}</p>
+      <p className="mt-1.5 text-xs text-slate-400">{description}</p>
+    </div>
+  );
+}
+
+function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; onBack: () => void; onClose: () => void }) {
+  const grouped = profile.records.reduce((map, record) => {
+    map.set(record.category, [...(map.get(record.category) ?? []), record]);
+    return map;
+  }, new Map<PersonRecord["category"], PersonRecord[]>());
+
+  return (
+    <>
+      <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+        <button type="button" onClick={onBack} className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" aria-label="검색 결과로 돌아가기">←</button>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{profile.name}</h2>
+            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">동명이인 후보</span>}
+          </div>
+          <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"} · 연결된 기록 {profile.records.length}건</p>
+        </div>
+        <button type="button" onClick={onClose} className="rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100">ESC</button>
+      </header>
+      <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
+        {profile.ambiguous && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
+            같은 이름의 서로 다른 식별자가 있어 별도 인물로 나눴습니다. 학년·반과 연락처를 확인해 주세요.
+          </div>
+        )}
+        <div className="space-y-6">
+          {["학적·출석", "학기 중 사역", "새친구", "수련회"].map((category) => {
+            const records = grouped.get(category as PersonRecord["category"]);
+            if (!records?.length) return null;
+            return (
+              <section key={category}>
+                <div className="mb-2.5 flex items-center gap-2">
+                  <h3 className="text-sm font-extrabold text-slate-900">{category}</h3>
+                  <span className="text-[11px] text-slate-400">{records.length}건</span>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-2">
+                  {records.map((record) => <RecordCard key={record.id} record={record} />)}
+                </div>
+              </section>
+            );
+          })}
+        </div>
+      </div>
+      <footer className="border-t border-slate-100 bg-white px-5 py-3 text-[11px] text-slate-500">
+        표시 내용은 검색 창을 열 때 현재 DB를 조회해 묶은 결과이며, 이 화면에서 데이터는 수정되지 않습니다.
+      </footer>
+    </>
+  );
+}
+
+function RecordCard({ record }: { record: PersonRecord }) {
+  return (
+    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
+        <span className={`mt-0.5 rounded-md px-2 py-1 text-[10px] font-extrabold ${CATEGORY_STYLE[record.category]}`}>{record.category}</span>
+        <span className="min-w-0 flex-1">
+          <strong className="block text-sm text-slate-900">{record.title}</strong>
+          <span className="mt-0.5 block text-[11px] text-slate-500">{record.period}</span>
+        </span>
+        {record.private && <span className="text-[10px] font-semibold text-rose-500">민감정보 포함</span>}
+      </header>
+      {record.fields.length > 0 ? (
+        <dl className="grid grid-cols-1 gap-x-5 gap-y-2.5 px-4 py-3.5 sm:grid-cols-2">
+          {record.fields.map((item, index) => (
+            <div key={`${item.label}-${index}`} className={item.value.length > 34 ? "sm:col-span-2" : ""}>
+              <dt className="text-[10px] font-bold text-slate-400">{item.label}</dt>
+              <dd className={`mt-0.5 whitespace-pre-wrap break-words text-xs leading-5 ${item.sensitive ? "text-slate-700" : "text-slate-800"}`}>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : <p className="px-4 py-4 text-xs text-slate-400">상세 값이 없습니다.</p>}
+    </article>
   );
 }

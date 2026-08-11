@@ -87,6 +87,7 @@ export const paths = {
   period: (id: string, pid: string) => `retreats/${id}/periods/${pid}`,
 
   // ── 민감정보 (retreatsPrivate) ──
+  retreatsPrivate: () => "retreatsPrivate",
   /** 수련회의 민감정보 루트. 수련회 삭제 시 이 노드까지 함께 지워야 한다(고아로 남으면 UI로 접근 불가). */
   retreatPrivate: (id: string) => `retreatsPrivate/${id}`,
   cancellations: (id: string) => `retreatsPrivate/${id}/cancellations`,
@@ -113,7 +114,9 @@ export const paths = {
   prepMilestone: (id: string) => `prepMilestones/${id}`,
 
   // ── 학생 앱 소유 (읽기 전용) ──
+  classesRoot: () => "classes",
   classes: (year: number) => `classes/${year}`,
+  attendanceRoot: () => "attendance",
   attendance: (year: number) => `attendance/${year}`,
   teacherStaff: (year: number) => `teacherStaff/${year}`,
   teacherSpecial: (year: number) => `teacherSpecial/${year}`,

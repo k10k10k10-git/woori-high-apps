@@ -6,6 +6,7 @@
 export const paths = {
   // ── 소유 노드 ──
   semesters: () => `semesters`,
+  semestersPrivate: () => `semestersPrivate`,
   semester: (sid: string) => `semesters/${sid}`,
   semesterPrivate: (sid: string) => `semestersPrivate/${sid}`,
   semesterMeta: (sid: string) => `semesters/${sid}/meta`,

@@ -392,7 +392,7 @@ export default function PortalHome() {
                   </div>
                 )}
               </div>
-              <Link href="/suggestions" className="mt-4 inline-flex min-h-10 items-center text-xs font-semibold text-[var(--color-primary)] hover:underline">사이트 개선 제안 작성 →</Link>
+              <Link href="/suggestions" className="mt-4 inline-flex min-h-10 items-center text-xs font-semibold text-[var(--color-primary)] hover:underline">사이트 건의사항 작성 →</Link>
             </section>
           </div>
         </section>

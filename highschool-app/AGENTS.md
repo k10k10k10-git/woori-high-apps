@@ -37,7 +37,7 @@
 ## 화면 셸 규칙
 
 - 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당한다. 하위 화면에 제목 줄을 다시 만들지 않는다(중복 제목 금지 — `/retreats`·`/field`에서 실제로 겹쳤다).
-- 상단 메뉴는 학기 중 사역 / 사역 가이드 / 방학 중 사역이며, 방학 중 사역이 수련회 행정팀·이가드팀 드롭다운으로 갈라진다.
+- 상단 메뉴는 학기 중 사역 / 방학 중 사역 / 사역 가이드 / 사이트 건의사항 순서이며, 방학 중 사역이 수련회 행정팀·이가드팀 드롭다운으로 갈라진다. 우측 계정 영역의 학생 통합검색은 기능 메뉴가 아니라 기존 DB에서 인물 기록을 읽기 전용으로 파생한다.
 - 통합 브랜드 색: 학기·수련회 행정·이가드 모두 `globals.css`의 미드나이트 인디고·코발트·틸 토큰을 공유한다. `.semester-scope`와 `.iguard-scope`는 배경·최소 높이만 제공하며 도메인별 원색으로 토큰을 재정의하지 않는다. 상태 의미(정상·검토·위험)에만 에메랄드·앰버·로즈를 사용한다.
 - effect 안에서 `setState`를 직접 호출하지 않는다(eslint `react-hooks/set-state-in-effect`). 탭 유효성처럼 파생 가능한 값은 렌더 중 계산한다(`SemesterClient`의 `activeTab` 참고).
 
@@ -142,3 +142,8 @@ npm run build
 - **접근법**: 1→ `../고등부 학생 출석부/database.rules.json`을 확인해 `classes/{year}` 쓰기가 이미 `admins`에만 허용됨을 고정하고 `accessPolicy.canWriteStudentRoster`를 같은 계약으로 테스트한다. 2→ `features/semester/newFriend.ts`에서 새친구 ID 기반 결정적 `nf_` 학생 ID, 2주 과정·등록 결정·반배정 검증, 이름·생년월일·연락처 중복 차단을 순수 함수로 만든다. 3→ `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}` 사전 스냅샷, `classes/{year}/{classKey}/students/{studentId}` 단일 신규 경로, `semesters/{sid}/newFriends/{friendId}/rosterSync` 이력을 하나의 루트 update 계획으로 만든다. 4→ 실행 뒤 생성한 학생 경로를 다시 읽어 검증하고, 재클릭은 같은 결정적 ID를 확인해 중복 생성 없이 연결만 복구한다. 5→ 출석부 반영 뒤에는 이름·부서·학년·연락처·반배정을 잠가 기존 학생 수정·이동·삭제가 학생 앱 소유로 돌아가게 한다.
 - **판단 질문**: Firebase Cloud Functions를 억지로 추가하지 않았다 — `npx firebase functions:list --project woori-high --debug`에서 Functions API 비활성, Cloud Billing API에서 `billingEnabled:false`를 실측했고 Functions 배포는 Blaze 요금제 연결이 필요했기 때문이다. `retreatAdmins`에 `classes` 쓰기를 여는 Rules 변경도 하지 않았다 — 권한 범위가 행정팀 전체의 기존 학생 수정까지 넓어진다. 통합 앱에 범용 학생 수정 함수도 만들지 않고 신규·미존재 경로 추가 하나로 예외를 닫았다.
 - **재사용 규칙**: 다른 앱 소유 원장에 자동 연결이 필요하지만 서버 함수·Rules 변경을 할 수 없으면, 기존 Rules가 이미 허용한 최상위 관리자에게만 `결정적 신규 ID + 중복 차단 + 비공개 사전 스냅샷 + 단일 경로 원자 추가 + 재조회 검증`을 제공하고 반영 직후 편집을 다시 소유 앱으로 잠근다.
+
+### 여러 도메인의 개인 기록을 새 검색 노드 없이 한 프로필로 연결하기 (2026-08-11)
+- **접근법**: 1→ `src/features/portal/peopleSearchDb.ts`에서 `classes`, `attendance`, `semesters`, `retreats` 기존 루트를 읽기 전용으로 병렬 조회하되 `canAccessPortalArea` 결과에 따라 `semestersPrivate`·`retreatsPrivate`를 아예 요청하지 않는다. 2→ `peopleSearch.ts`에서 이름을 `normalizeName`·`stripSuffix`로 정규화하고 학생 ID·생년·학생/보호자 전화번호 토큰이 겹치는 기록만 같은 인물로 연결한다. 3→ 같은 연도·같은 도메인에 식별자 없는 동명 기록이 둘이면 별도 후보로 만들고, 각 후보에 학년·반·출석 집계·훈련·사역팀·새친구·수련회 신청/조/숙소/부분참/현장/민감 기록을 읽기 모델로 붙인다. 4→ 두 글자 미만 검색은 전체 명단을 반환하지 않고, 순수 함수 테스트로 교차연도 결합과 동명이인 분리를 고정한다. 5→ 로그인한 실제 운영 DB에서 특정 학생의 연도별 결과를 대조하고 PC·375px·브라우저 오류를 확인한다.
+- **판단 질문**: Firebase에 사람별 검색 인덱스나 통합 프로필 노드를 새로 저장하지 않는다. 원본 데이터가 여러 앱 소유 경로에서 계속 바뀌므로 별도 인덱스는 동기화 누락과 새 Rules 계약을 만들고, 이름만으로 단순 병합하면 동명이인의 출석·연락처·의료 기록까지 섞일 수 있기 때문이다. 민감 루트를 모든 역할에 읽히게 하지 않고 화면 접근 정책과 Rules의 좁은 쪽을 따른다.
+- **재사용 규칙**: 여러 운영 DB의 인물 이력을 합칠 때는 `권한별 원본 읽기 → 정규화 이름 후보 → 안정 ID/생년/전화 교집합 결합 → 동일 시점 충돌 분리 → 화면용 파생 모델` 순서로 구현하고, 쓰기형 검색 인덱스는 데이터 규모가 실제 병목이 된 뒤 별도 동기화 설계와 함께 검토한다.

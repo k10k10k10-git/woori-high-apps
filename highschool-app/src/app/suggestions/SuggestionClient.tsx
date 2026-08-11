@@ -19,7 +19,7 @@ type Draft = {
 
 const INITIAL: Draft = {
   category: "통합 홈",
-  kind: "개선 제안",
+  kind: "사이트 건의사항",
   title: "",
   description: "",
   page: "",
@@ -121,14 +121,14 @@ export default function SuggestionClient() {
       <main className="page-container max-w-6xl">
         <section className="page-hero mb-7">
           <p className="page-eyebrow">PRODUCT FEEDBACK</p>
-          <h1 className="page-title">개선 제안 작성</h1>
+          <h1 className="page-title">사이트 건의사항</h1>
           <p className="page-description">오류 상황과 원하는 결과를 한 번에 정리해 개발 담당자에게 전달합니다.</p>
         </section>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
           <section className="surface-panel p-5 sm:p-7">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="제안 유형"><select value={draft.kind} onChange={(event) => update("kind", event.target.value)} className="form-control"><option>개선 제안</option><option>오류 제보</option><option>사용법 문의</option><option>디자인 제안</option></select></Field>
+              <Field label="제안 유형"><select value={draft.kind} onChange={(event) => update("kind", event.target.value)} className="form-control"><option>사이트 건의사항</option><option>오류 제보</option><option>사용법 문의</option><option>디자인 제안</option></select></Field>
               <Field label="화면 분류"><select value={draft.category} onChange={(event) => update("category", event.target.value)} className="form-control"><option>통합 홈</option><option>학기 중 사역</option><option>수련회 행정</option><option>수련회 이가드</option><option>팀원·권한</option><option>기타</option></select></Field>
               <Field label="제목" wide><input value={draft.title} onChange={(event) => update("title", event.target.value)} className="form-control" placeholder="예: 인원체크에서 취소 학생이 보여요" /></Field>
               <Field label="현상·제안 내용" wide><textarea value={draft.description} onChange={(event) => update("description", event.target.value)} className="form-control min-h-32" placeholder="무엇이 불편했고 어떤 상황에서 발생했는지 적어 주세요." /></Field>

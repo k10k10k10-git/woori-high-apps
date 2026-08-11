@@ -8,12 +8,13 @@ import TeamModal from "./TeamModal";
 import PortalSearch from "./PortalSearch";
 import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
 
-type GlobalArea = "home" | "semester" | "guide" | "vacation";
+type GlobalArea = "home" | "semester" | "guide" | "vacation" | "suggestions";
 
 function activeArea(pathname: string): GlobalArea {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/semester")) return "semester";
   if (pathname.startsWith("/ministry-guide")) return "guide";
+  if (pathname.startsWith("/suggestions")) return "suggestions";
   return "vacation";
 }
 
@@ -81,14 +82,6 @@ export default function GlobalPortalHeader() {
               </Link>
             )}
 
-            <Link
-              href="/ministry-guide"
-              className="portal-nav-link"
-              aria-current={currentArea === "guide" ? "page" : undefined}
-            >
-              사역 가이드
-            </Link>
-
             {vacationItems.length > 0 && (
               <div
                 ref={vacationRef}
@@ -127,20 +120,37 @@ export default function GlobalPortalHeader() {
                 )}
               </div>
             )}
+
+            <Link
+              href="/ministry-guide"
+              className="portal-nav-link"
+              aria-current={currentArea === "guide" ? "page" : undefined}
+            >
+              사역 가이드
+            </Link>
+
+            <Link
+              href="/suggestions"
+              className="portal-nav-link"
+              aria-current={currentArea === "suggestions" ? "page" : undefined}
+            >
+              사이트 건의사항
+            </Link>
           </nav>
 
-          <div className="ml-auto flex items-center gap-2">
-            <PortalSearch />
-            <Link href="/suggestions" className="portal-action hidden sm:inline-flex">개선 제안</Link>
-            {canManageRoles(role) && (
-              <button onClick={() => setTeamOpen(true)} className="portal-action">
-                <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">팀원 관리</span>
+          <div className="portal-header-tools">
+            <div className="portal-account-row">
+              {canManageRoles(role) && (
+                <button onClick={() => setTeamOpen(true)} className="portal-compact-action">
+                  <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">팀원 관리</span>
+                </button>
+              )}
+              <span className="portal-account-name hidden md:inline">{user.displayName || user.email}</span>
+              <button onClick={() => void signOut()} className="portal-compact-action" aria-label="로그아웃">
+                <span className="hidden sm:inline">로그아웃</span><span className="sm:hidden">↪</span>
               </button>
-            )}
-            <span className="portal-account-name hidden lg:inline">{user.displayName || user.email}</span>
-            <button onClick={() => void signOut()} className="portal-action" aria-label="로그아웃">
-              <span className="hidden sm:inline">로그아웃</span><span className="sm:hidden">↪</span>
-            </button>
+            </div>
+            <PortalSearch />
           </div>
         </div>
       </header>

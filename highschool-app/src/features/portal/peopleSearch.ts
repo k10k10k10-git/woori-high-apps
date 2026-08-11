@@ -1,0 +1,420 @@
+import { parseClassKey } from "@/lib/classKey";
+import { normalizeName, stripSuffix } from "@/lib/studentMatcher";
+
+export type PersonField = { label: string; value: string; sensitive?: boolean };
+
+export type PersonRecord = {
+  id: string;
+  category: "학적·출석" | "학기 중 사역" | "새친구" | "수련회";
+  period: string;
+  title: string;
+  fields: PersonField[];
+  sortKey: string;
+  private?: boolean;
+};
+
+export type PersonProfile = {
+  id: string;
+  name: string;
+  aliases: string[];
+  records: PersonRecord[];
+  years: string[];
+  latestClass?: string;
+  ambiguous: boolean;
+};
+
+export type PeopleSearchData = {
+  classes: Record<string, unknown>;
+  attendance: Record<string, unknown>;
+  retreats: Record<string, unknown>;
+  semesters: Record<string, unknown>;
+  retreatsPrivate: Record<string, unknown>;
+  semestersPrivate: Record<string, unknown>;
+};
+
+type Evidence = {
+  name: string;
+  normalizedName: string;
+  tokens: Set<string>;
+  births: Set<string>;
+  phones: Set<string>;
+  contextKey: string;
+  anchor: boolean;
+  record: PersonRecord;
+};
+
+type MutableProfile = {
+  evidence: Evidence[];
+  tokens: Set<string>;
+  births: Set<string>;
+  phones: Set<string>;
+  contexts: Set<string>;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+
+const text = (value: unknown): string => {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+};
+
+const digits = (value: unknown) => text(value).replace(/\D/g, "");
+const compactBirth = (value: unknown) => text(value).replace(/\D/g, "");
+
+function field(label: string, value: unknown, sensitive = false): PersonField | null {
+  const rendered = text(value);
+  return rendered ? { label, value: rendered, ...(sensitive ? { sensitive: true } : {}) } : null;
+}
+
+function fields(...values: Array<PersonField | null>): PersonField[] {
+  return values.filter((value): value is PersonField => value !== null);
+}
+
+function displayValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map(text).filter(Boolean).join(", ");
+  if (value && typeof value === "object") {
+    return Object.entries(asRecord(value))
+      .map(([key, item]) => `${key}: ${text(item) || JSON.stringify(item)}`)
+      .join(" · ");
+  }
+  return text(value);
+}
+
+function addExtraFields(target: PersonField[], source: Record<string, unknown>, labels: Record<string, string>, sensitive = false) {
+  for (const [key, label] of Object.entries(labels)) {
+    const value = displayValue(source[key]);
+    if (value && !target.some((item) => item.label === label)) target.push({ label, value, ...(sensitive ? { sensitive: true } : {}) });
+  }
+}
+
+function identityTokens(input: { studentId?: unknown; birth?: unknown; phone?: unknown; parentPhone?: unknown; pPhone?: unknown }) {
+  const result = new Set<string>();
+  const studentId = text(input.studentId);
+  if (studentId) {
+    result.add(`id:${studentId}`);
+    result.add(`id:${studentId.replace(/^[12]_/, "")}`);
+  }
+  const birth = compactBirth(input.birth);
+  if (birth.length >= 6) result.add(`birth:${birth}`);
+  for (const raw of [input.phone, input.parentPhone, input.pPhone]) {
+    const phone = digits(raw);
+    if (phone.length >= 8) result.add(`phone:${phone}`);
+  }
+  return result;
+}
+
+function evidence(input: {
+  name: unknown;
+  studentId?: unknown;
+  birth?: unknown;
+  phone?: unknown;
+  parentPhone?: unknown;
+  pPhone?: unknown;
+  contextKey: string;
+  anchor?: boolean;
+  record: PersonRecord;
+}): Evidence | null {
+  const name = text(input.name);
+  const normalizedName = stripSuffix(normalizeName(name));
+  if (normalizedName.length < 2) return null;
+  const birth = compactBirth(input.birth);
+  const phoneValues = [input.phone, input.parentPhone, input.pPhone].map(digits).filter((value) => value.length >= 8);
+  return {
+    name,
+    normalizedName,
+    tokens: identityTokens(input),
+    births: new Set(birth.length >= 6 ? [birth] : []),
+    phones: new Set(phoneValues),
+    contextKey: input.contextKey,
+    anchor: input.anchor ?? false,
+    record: input.record,
+  };
+}
+
+function attendanceCounts(value: unknown) {
+  const counts = { O: 0, T: 0, X: 0 };
+  function walk(current: unknown) {
+    if (typeof current === "string" && current in counts) counts[current as keyof typeof counts] += 1;
+    else if (current && typeof current === "object") Object.values(current).forEach(walk);
+  }
+  walk(value);
+  return counts;
+}
+
+function rosterStatus(color: unknown) {
+  return ({ blue: "입금완료", orange: "부분참", red: "신청취소", green: "신청", purple: "신청" } as Record<string, string>)[text(color)] ?? "";
+}
+
+function studentKeys(studentId: unknown, bu: unknown, fallback?: string) {
+  const values = new Set<string>();
+  if (fallback) values.add(fallback);
+  const id = text(studentId);
+  if (!id) return values;
+  values.add(id);
+  if (/^[12]_/.test(id)) values.add(id);
+  else {
+    const buNum = text(bu).includes("1") ? "1" : text(bu).includes("2") ? "2" : "";
+    if (buNum) values.add(`${buNum}_${id}`);
+  }
+  return values;
+}
+
+function findAssignment(source: unknown, keys: Set<string>) {
+  for (const [id, value] of Object.entries(asRecord(source))) {
+    const ids = Array.isArray(asRecord(value).studentIds) ? asRecord(value).studentIds as unknown[] : [];
+    if (ids.some((item) => keys.has(text(item)))) return { id, value: asRecord(value) };
+  }
+  return null;
+}
+
+function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
+  for (const [year, yearValue] of Object.entries(asRecord(data.classes))) {
+    for (const [classKey, classValue] of Object.entries(asRecord(yearValue))) {
+      const classData = asRecord(classValue);
+      const parsed = parseClassKey(classKey);
+      for (const [studentId, studentValue] of Object.entries(asRecord(classData.students))) {
+        const student = asRecord(studentValue);
+        const name = text(student.name);
+        if (!name) continue;
+        const counts = attendanceCounts(asRecord(asRecord(asRecord(data.attendance)[year])[classKey])[studentId]);
+        const history = fields(
+          field("부서", parsed ? `${parsed.buNum}부` : ""),
+          field("학년·반", parsed ? `${parsed.grade}학년 ${parsed.classNum}반` : classKey),
+          field("번호", student.num), field("담임", classData.teacher), field("학교", student.school),
+          field("생년월일", student.birth, true), field("학생 연락처", student.phone, true),
+          field("보호자 연락처", student.pphone, true), field("주소", student.addr, true),
+          field("장기결석", student.jang === true ? "예" : student.jang === false ? "아니오" : ""),
+          field("주일 출석", counts.O + counts.T + counts.X > 0 ? `출석 ${counts.O} · 지각 ${counts.T} · 결석 ${counts.X}` : "기록 없음"),
+        );
+        const item = evidence({
+          name, studentId: `${parsed?.buNum ?? ""}_${studentId}`, birth: student.birth,
+          phone: student.phone, pPhone: student.pphone, contextKey: `class:${year}`, anchor: true,
+          record: {
+            id: `class:${year}:${classKey}:${studentId}`, category: "학적·출석", period: `${year}년`,
+            title: parsed ? `${parsed.grade}학년 ${parsed.classNum}반` : classKey, fields: history, sortKey: `${year}-4`,
+          },
+        });
+        if (item) output.push(item);
+      }
+    }
+  }
+}
+
+function buildSemesterEvidence(data: PeopleSearchData, output: Evidence[]) {
+  for (const [sid, rawValue] of Object.entries(asRecord(data.semesters))) {
+    const semester = asRecord(rawValue);
+    const meta = asRecord(semester.meta);
+    const teams = asRecord(semester.teams);
+    const training = asRecord(semester.trainingClasses);
+    const applicationsPrivate = asRecord(asRecord(asRecord(data.semestersPrivate)[sid]).applicationsPrivate);
+    for (const [appKey, rawApp] of Object.entries(asRecord(semester.applications))) {
+      const app = asRecord(rawApp);
+      const priv = asRecord(applicationsPrivate[appKey]);
+      const attendance = { 출석: 0, 지각: 0, 결석: 0 };
+      for (const session of Object.values(asRecord(asRecord(semester.attendance).team))) {
+        const status = text(asRecord(asRecord(session)[appKey]).s) as keyof typeof attendance;
+        if (status in attendance) attendance[status] += 1;
+      }
+      const teamName = text(asRecord(teams[text(app.teamId)]).name);
+      const trainingName = text(asRecord(training[text(app.trainingClassId)]).name);
+      const choice = [app.choice1, app.choice2].map((id) => text(asRecord(teams[text(id)]).name)).filter(Boolean).join(" → ");
+      const completion = asRecord(asRecord(semester.completion)[appKey]);
+      const recordFields = fields(
+        field("신청 상태", app.status), field("부서", app.bu), field("학년·반", `${text(app.grade)}학년 ${text(app.class)}반`),
+        field("훈련", trainingName), field("사역팀", teamName), field("지원 순위", choice),
+        field("훈련만 신청", app.trainingOnly === true ? "예" : ""),
+        field("사역 출석", Object.values(attendance).some(Boolean) ? `출석 ${attendance.출석} · 지각 ${attendance.지각} · 결석 ${attendance.결석}` : "기록 없음"),
+        field("수료증", completion.certPrinted === true ? "제작 완료" : ""), field("사진 확인", completion.photoChecked === true ? "완료" : ""),
+        field("수료 메모", completion.note), field("학생 연락처", priv.phone, true), field("보호자 연락처", priv.parentPhone, true),
+        field("지원 동기", priv.motive, true), field("하고 싶은 활동", priv.wish, true), field("행정 메모", priv.memo, true),
+      );
+      const item = evidence({
+        name: app.name, studentId: app.studentId, phone: priv.phone, parentPhone: priv.parentPhone,
+        contextKey: `semester:${sid}`, anchor: true,
+        record: { id: `semester:${sid}:${appKey}`, category: "학기 중 사역", period: text(meta.title) || sid,
+          title: [trainingName, teamName].filter(Boolean).join(" · ") || "사역 신청", fields: recordFields, sortKey: `${sid}-3`, private: Object.keys(priv).length > 0 },
+      });
+      if (item) output.push(item);
+    }
+
+    const newFriendsPrivate = asRecord(asRecord(asRecord(data.semestersPrivate)[sid]).newFriendsPrivate);
+    for (const [friendId, rawFriend] of Object.entries(asRecord(semester.newFriends))) {
+      const friend = asRecord(rawFriend);
+      const priv = asRecord(newFriendsPrivate[friendId]);
+      const recordFields = fields(
+        field("진행 상태", friend.decision), field("부서", friend.part), field("학년", `${text(friend.grade)}학년`),
+        field("학교", friend.school), field("담당 바나바", friend.owner), field("인도자", friend.inviter),
+        field("1주차", friend.week1Date), field("2주차", friend.week2Date), field("신앙 단계", friend.faithStep),
+        field("배정 반", friend.assignedClassKey), field("선물 전달", friend.giftDate),
+        field("생년월일", priv.birth, true), field("학생 연락처", priv.phone, true), field("보호자 연락처", priv.parentPhone, true),
+        field("주소", priv.address, true), field("교회 친구", priv.churchFriend, true), field("바나바 메모", priv.teamMemo, true),
+        field("가족 사항", priv.familyNotes, true), field("목양 메모", priv.pastoralNotes, true),
+      );
+      const rosterSync = asRecord(friend.rosterSync);
+      const item = evidence({
+        name: friend.name, studentId: rosterSync.studentId, birth: priv.birth, phone: priv.phone, parentPhone: priv.parentPhone,
+        contextKey: `newfriend:${sid}`, anchor: true,
+        record: { id: `newfriend:${sid}:${friendId}`, category: "새친구", period: text(meta.title) || sid,
+          title: `새친구 ${text(friend.decision) || "접수"}`, fields: recordFields, sortKey: `${sid}-5`, private: Object.keys(priv).length > 0 },
+      });
+      if (item) output.push(item);
+    }
+  }
+}
+
+function retreatMeta(retreatId: string, retreat: Record<string, unknown>) {
+  return { period: text(retreat.name) || retreatId, year: text(retreat.year) || "0000" };
+}
+
+function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
+  for (const [retreatId, rawValue] of Object.entries(asRecord(data.retreats))) {
+    const retreat = asRecord(rawValue);
+    const meta = retreatMeta(retreatId, retreat);
+    for (const [participantKey, rawParticipant] of Object.entries(asRecord(retreat.participants))) {
+      const participant = asRecord(rawParticipant);
+      const keys = studentKeys(participant.studentId, participant.bu, participantKey);
+      const group = findAssignment(retreat.groups, keys);
+      const room = findAssignment(retreat.rooms, keys);
+      const partialMap = asRecord(retreat.partialAttendances);
+      const colorMap = asRecord(retreat.cellColors);
+      const partial = [...keys].map((key) => asRecord(partialMap[key])).find((value) => Object.keys(value).length > 0) ?? {};
+      const color = [...keys].map((key) => colorMap[key]).find(Boolean);
+      const recordFields = fields(
+        field("신청 상태", rosterStatus(color) || "신청"), field("부서", participant.bu),
+        field("학년·반", `${text(participant.grade)}학년 ${text(participant.class)}반`), field("성별", participant.gender),
+        field("조", group ? text(group.value.name) || group.id : ""),
+        field("숙소", room ? [room.value.dong, room.value.roomNumber].map(text).filter(Boolean).join(" ") || room.id : ""),
+        field("부분 참석", partial.type), field("참석 일차", partial.day ? `${text(partial.day)}일차` : ""), field("부분 참석 메모", partial.note),
+        field("신청일", participant.registeredAt), field("학생 연락처", participant.phone, true), field("보호자 연락처", participant.pPhone, true),
+        field("특이사항", participant.extra, true),
+      );
+      const item = evidence({
+        name: participant.name, studentId: participant.studentId, phone: participant.phone, pPhone: participant.pPhone,
+        contextKey: `retreat:${retreatId}`, anchor: true,
+        record: { id: `retreat:${retreatId}:participant:${participantKey}`, category: "수련회", period: meta.period,
+          title: "수련회 신청·배정", fields: recordFields, sortKey: `${meta.year}-2` },
+      });
+      if (item) output.push(item);
+    }
+
+    const auxiliary: Array<{ node: string; title: string; labels: Record<string, string>; private?: boolean }> = [
+      { node: "onSiteReg", title: "현장 등록", labels: { bu: "부서", grade: "학년", class: "반", gender: "성별", registeredAt: "등록 시각" } },
+      { node: "tshirtOrders", title: "단체티", labels: { bu: "부서", grade: "학년", class: "반", design: "디자인", size: "사이즈", note: "메모" } },
+      { node: "carpools", title: "차량 신청", labels: { bu: "부서", grade: "학년", class: "반", desiredTime: "희망 시간", location: "장소", teacherDriver: "배정 교사", note: "메모", phone: "학생 연락처", pPhone: "보호자 연락처" } },
+    ];
+    for (const config of auxiliary) {
+      for (const [entryId, rawEntry] of Object.entries(asRecord(retreat[config.node]))) {
+        const entry = asRecord(rawEntry);
+        const recordFields: PersonField[] = [];
+        addExtraFields(recordFields, entry, config.labels, config.node === "carpools");
+        const item = evidence({ name: entry.name ?? entry.studentName, studentId: entry.studentId, phone: entry.phone, pPhone: entry.pPhone,
+          contextKey: `retreat:${retreatId}`,
+          record: { id: `retreat:${retreatId}:${config.node}:${entryId}`, category: "수련회", period: meta.period,
+            title: config.title, fields: recordFields, sortKey: `${meta.year}-1`, private: config.private } });
+        if (item) output.push(item);
+      }
+    }
+
+    const privateRoot = asRecord(asRecord(data.retreatsPrivate)[retreatId]);
+    const privateNodes: Array<{ node: string; title: string; labels: Record<string, string> }> = [
+      { node: "cancellations", title: "수련회 취소", labels: { bu: "부서", grade: "학년", class: "반", phone: "학생 연락처", reason: "취소 사유", paymentAmount: "납부액", account: "환불 계좌", note: "메모" } },
+      { node: "medicalLogs", title: "의료 일지", labels: { bu: "부서", grade: "학년", classNum: "반", symptoms: "증상", medicines: "처방", outcome: "처리 결과", note: "메모", createdAt: "기록 시각" } },
+    ];
+    for (const config of privateNodes) {
+      for (const [entryId, rawEntry] of Object.entries(asRecord(privateRoot[config.node]))) {
+        const entry = asRecord(rawEntry);
+        const recordFields: PersonField[] = [];
+        addExtraFields(recordFields, entry, config.labels, true);
+        const item = evidence({ name: entry.name, studentId: entry.studentKey, phone: entry.phone,
+          contextKey: `retreat:${retreatId}`,
+          record: { id: `retreat-private:${retreatId}:${config.node}:${entryId}`, category: "수련회", period: meta.period,
+            title: config.title, fields: recordFields, sortKey: `${meta.year}-0`, private: true } });
+        if (item) output.push(item);
+      }
+    }
+  }
+}
+
+function intersects(a: Set<string>, b: Set<string>) {
+  for (const value of a) if (b.has(value)) return true;
+  return false;
+}
+
+function conflicts(profile: MutableProfile, item: Evidence) {
+  const birthConflict = profile.births.size > 0 && item.births.size > 0 && !intersects(profile.births, item.births);
+  const phoneConflict = profile.phones.size > 0 && item.phones.size > 0 && !intersects(profile.phones, item.phones);
+  const sameContextWithoutIdentity = item.anchor && profile.contexts.has(item.contextKey) && !intersects(profile.tokens, item.tokens);
+  return birthConflict || phoneConflict || sameContextWithoutIdentity;
+}
+
+function attach(profile: MutableProfile, item: Evidence) {
+  profile.evidence.push(item);
+  item.tokens.forEach((token) => profile.tokens.add(token));
+  item.births.forEach((birth) => profile.births.add(birth));
+  item.phones.forEach((phone) => profile.phones.add(phone));
+  if (item.anchor) profile.contexts.add(item.contextKey);
+}
+
+function makeMutable(item: Evidence): MutableProfile {
+  const profile = { evidence: [], tokens: new Set<string>(), births: new Set<string>(), phones: new Set<string>(), contexts: new Set<string>() };
+  attach(profile, item);
+  return profile;
+}
+
+export function buildPeopleProfiles(data: PeopleSearchData): PersonProfile[] {
+  const evidenceList: Evidence[] = [];
+  buildClassEvidence(data, evidenceList);
+  buildSemesterEvidence(data, evidenceList);
+  buildRetreatEvidence(data, evidenceList);
+
+  const byName = new Map<string, Evidence[]>();
+  evidenceList.forEach((item) => byName.set(item.normalizedName, [...(byName.get(item.normalizedName) ?? []), item]));
+  const output: PersonProfile[] = [];
+
+  for (const [normalizedName, items] of byName) {
+    items.sort((a, b) => Number(b.record.category === "학적·출석") - Number(a.record.category === "학적·출석"));
+    const profiles: MutableProfile[] = [];
+    for (const item of items) {
+      const exact = profiles
+        .map((profile, index) => ({ profile, index, score: [...item.tokens].filter((token) => profile.tokens.has(token)).length }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((a, b) => b.score - a.score)[0];
+      if (exact) {
+        attach(exact.profile, item);
+        continue;
+      }
+      const contextual = profiles.filter((profile) => profile.contexts.has(item.contextKey));
+      if (!item.anchor && contextual.length === 1) {
+        attach(contextual[0], item);
+        continue;
+      }
+      const compatible = profiles.filter((profile) => !conflicts(profile, item));
+      if (compatible.length === 1) attach(compatible[0], item);
+      else profiles.push(makeMutable(item));
+    }
+
+    profiles.forEach((profile, index) => {
+      const aliases = [...new Set(profile.evidence.map((item) => item.name))].sort((a, b) => a.localeCompare(b, "ko"));
+      const records = profile.evidence.map((item) => item.record).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+      const classRecords = records.filter((record) => record.category === "학적·출석");
+      const years = [...new Set(records.map((record) => record.period.match(/\d{4}/)?.[0]).filter((value): value is string => !!value))].sort().reverse();
+      output.push({
+        id: `${normalizedName}-${index + 1}`, name: aliases[0] ?? normalizedName, aliases, records, years,
+        latestClass: classRecords[0] ? `${classRecords[0].period} ${classRecords[0].title}` : undefined,
+        ambiguous: profiles.length > 1,
+      });
+    });
+  }
+  return output.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+export function searchPeople(profiles: PersonProfile[], query: string): PersonProfile[] {
+  const normalizedQuery = stripSuffix(normalizeName(query));
+  if (normalizedQuery.length < 2) return [];
+  return profiles
+    .filter((profile) => profile.aliases.some((alias) => stripSuffix(normalizeName(alias)).includes(normalizedQuery)))
+    .sort((a, b) => Number(stripSuffix(normalizeName(b.name)) === normalizedQuery) - Number(stripSuffix(normalizeName(a.name)) === normalizedQuery))
+    .slice(0, 30);
+}
