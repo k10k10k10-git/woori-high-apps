@@ -1099,8 +1099,10 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .portal-brand { order: 1; }
   .portal-header-tools { order: 2; }
   .portal-nav { order: 3; flex-basis: 100%; overflow-x: auto; scrollbar-width: none; }
+  .portal-nav.portal-nav-menu-open { overflow: visible; }
   .portal-nav::-webkit-scrollbar { display: none; }
   .portal-nav-link { min-height: 34px; white-space: nowrap; }
+  .portal-dropdown-panel { position: fixed; top: 104px; left: 10px; width: min(320px, calc(100vw - 20px)); padding-top: 4px; }
 }
 
 @media (max-width: 640px) {

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
@@ -13,6 +14,7 @@ import { Semester } from "@/features/semester/types";
 import LoginButton from "@/components/LoginButton";
 
 export default function SemestersPage() {
+  const pathname = usePathname();
   const { user, loading, role, signIn, signOut } = useAuth();
   const { toast } = useUI();
   const allowed = canAccessPortalArea("semester", role);
@@ -27,6 +29,7 @@ export default function SemestersPage() {
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null);
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const adminArea = pathname.startsWith("/semester-admin");
 
   async function load() {
     setListLoading(true);
@@ -42,7 +45,6 @@ export default function SemestersPage() {
 
   useEffect(() => {
     if (user && allowed) void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, allowed]);
 
   async function handleCreate() {
@@ -118,16 +120,25 @@ export default function SemestersPage() {
   return (
     <div className="semester-scope app-page">
       <main className="page-container max-w-5xl">
-        <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="section-kicker">SEMESTER MINISTRY</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-slate-900">학기 중 사역</h1>
-            <p className="mt-1 text-sm text-slate-500">훈련과 사역팀의 신청부터 수료까지 한 흐름으로 관리합니다.</p>
+            <h1 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-slate-900">{adminArea ? "행정·바나바" : "훈련·사역팀"}</h1>
+            <p className="mt-1 text-sm text-slate-500">{adminArea ? "새친구 정착과 학생 변동, 처리 대기와 변경 이력을 관리합니다." : "훈련과 사역팀의 신청부터 수료까지 한 흐름으로 관리합니다."}</p>
           </div>
           {!canEdit && (
             <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">조회 전용</span>
           )}
         </div>
+
+        <nav className="mb-7 grid gap-3 sm:grid-cols-2" aria-label="학기 중 사역 영역">
+          <Link href="/semesters" className={`rounded-2xl border p-4 transition ${!adminArea ? "border-emerald-300 bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+            <strong className="text-sm text-slate-900">훈련·사역팀</strong><span className="mt-1 block text-xs text-slate-500">신청 · 배치 · 출석 · 수료 · 커리큘럼 · 아카이브</span>
+          </Link>
+          <Link href="/semester-admin" className={`rounded-2xl border p-4 transition ${adminArea ? "border-emerald-300 bg-emerald-50 shadow-sm" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+            <strong className="text-sm text-slate-900">행정·바나바</strong><span className="mt-1 block text-xs text-slate-500">새친구 · 학생 변동 · 처리 대기 · 변경 이력</span>
+          </Link>
+        </nav>
 
         {loadError && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -144,7 +155,7 @@ export default function SemestersPage() {
           )}
           {semesters.map((s) => (
             <div key={s.id} className="card card-body relative" data-hover>
-              <Link href={`/semester/${s.id}`} className="flex flex-col gap-2">
+              <Link href={adminArea ? `/semester/${s.id}?area=admin` : `/semester/${s.id}`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span
                     className="rounded-full px-2.5 py-0.5 text-xs font-semibold"

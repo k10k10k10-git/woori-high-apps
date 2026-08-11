@@ -1,6 +1,7 @@
 import SemesterClient from "./SemesterClient";
 
-export default async function SemesterPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SemesterPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ area?: string; tab?: string }> }) {
   const { id } = await params;
-  return <SemesterClient semesterId={decodeURIComponent(id)} />;
+  const query = await searchParams;
+  return <SemesterClient semesterId={decodeURIComponent(id)} initialArea={query.area === "admin" ? "admin" : "training"} initialTab={query.tab} />;
 }

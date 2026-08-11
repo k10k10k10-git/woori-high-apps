@@ -1,12 +1,28 @@
-export const SEMESTER_TABS = [
+export const SEMESTER_TRAINING_TABS = [
   "신청",
-  "새친구",
   "배치",
   "출석",
   "수료",
   "커리큘럼",
   "아카이브",
   "설정",
+] as const;
+
+export const SEMESTER_ADMIN_TABS = [
+  "새친구",
+  "학생 변동",
+  "처리 대기",
+  "변경 이력",
+] as const;
+
+export const SEMESTER_TABS = [
+  ...SEMESTER_TRAINING_TABS,
+  ...SEMESTER_ADMIN_TABS,
+] as const;
+
+export const SEMESTER_WORKSPACE_GROUPS = [
+  { key: "training", label: "훈련·사역팀", tabs: SEMESTER_TRAINING_TABS },
+  { key: "admin", label: "행정·바나바", tabs: SEMESTER_ADMIN_TABS },
 ] as const;
 
 export const RETREAT_TAB_GROUPS = [
@@ -101,6 +117,7 @@ export const UNIFIED_ROUTES = [
   "/ministry-guide",
   "/suggestions",
   "/semesters",
+  "/semester-admin",
   "/semester/[id]",
   "/retreats",
   "/retreat/[id]",

@@ -29,9 +29,17 @@ import CurriculumTab from "./CurriculumTab";
 import ArchiveTab from "./ArchiveTab";
 import SettingsTab from "./SettingsTab";
 import NewFriendsTab from "./NewFriendsTab";
-import { SEMESTER_TABS } from "@/features/portal/featureCatalog";
+import { ChangeHistoryTab, PendingTab, StudentChangesTab } from "./SemesterAdminTabs";
+import {
+  SEMESTER_ADMIN_TABS,
+  SEMESTER_TRAINING_TABS,
+  SEMESTER_WORKSPACE_GROUPS,
+} from "@/features/portal/featureCatalog";
 
-type TabName = (typeof SEMESTER_TABS)[number];
+type TrainingTab = (typeof SEMESTER_TRAINING_TABS)[number];
+type AdminTab = (typeof SEMESTER_ADMIN_TABS)[number];
+type TabName = TrainingTab | AdminTab;
+type SemesterArea = "training" | "admin";
 
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   신청: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
@@ -42,14 +50,28 @@ const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 회차별 모임 계획을 작성하고 공유합니다." },
   아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
   설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 회차와 수료 기준을 관리합니다." },
+  "학생 변동": { title: "학생 변동", description: "새친구 등록으로 학생 출석부 원장에 반영된 변동을 확인합니다." },
+  "처리 대기": { title: "처리 대기", description: "2주 과정부터 등록 결정·반배정·출석부 반영까지 남은 일을 모아봅니다." },
+  "변경 이력": { title: "변경 이력", description: "새친구 접수·수정과 학생 출석부 반영 기록을 최신순으로 확인합니다." },
 };
 
-export default function SemesterClient({ semesterId }: { semesterId: string }) {
+function defaultTab(area: SemesterArea): TabName {
+  return area === "admin" ? SEMESTER_ADMIN_TABS[0] : SEMESTER_TRAINING_TABS[0];
+}
+
+function tabBelongsToArea(tab: string, area: SemesterArea): tab is TabName {
+  return area === "admin"
+    ? (SEMESTER_ADMIN_TABS as readonly string[]).includes(tab)
+    : (SEMESTER_TRAINING_TABS as readonly string[]).includes(tab);
+}
+
+export default function SemesterClient({ semesterId, initialArea = "training", initialTab }: { semesterId: string; initialArea?: SemesterArea; initialTab?: string }) {
   const router = useRouter();
   const { user, loading: authLoading, role, signIn } = useAuth();
   const allowed = canAccessPortalArea("semester", role);
   const canEdit = canEditPortalArea("semester", role);
-  const [tab, setTab] = useState<TabName>("신청");
+  const [area, setArea] = useState<SemesterArea>(initialArea);
+  const [tab, setTab] = useState<TabName>(() => initialTab && tabBelongsToArea(initialTab, initialArea) ? initialTab : defaultTab(initialArea));
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
@@ -84,12 +106,19 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
 
   // 설정 탭은 편집 전용이다 — 조회 권한만 있는 역할에게는 노출하지 않는다.
   const visibleTabs = useMemo<readonly TabName[]>(
-    () => (canEdit ? SEMESTER_TABS : SEMESTER_TABS.filter((name) => name !== "설정")),
-    [canEdit],
+    () => area === "admin"
+      ? SEMESTER_ADMIN_TABS
+      : canEdit ? SEMESTER_TRAINING_TABS : SEMESTER_TRAINING_TABS.filter((name) => name !== "설정"),
+    [area, canEdit],
   );
   // 허용되지 않은 탭(조회 전용 역할이 설정 탭에 있던 경우)은 파생값으로 되돌린다 —
   // effect에서 setState하면 cascading render가 된다.
   const activeTab = visibleTabs.includes(tab) ? tab : visibleTabs[0];
+
+  function changeArea(nextArea: SemesterArea) {
+    setArea(nextArea);
+    setTab(defaultTab(nextArea));
+  }
 
   if (authLoading) {
     return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
@@ -120,7 +149,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
           <div className="max-w-6xl mx-auto px-4">
             <div className="pt-2 sm:pt-3 pb-1.5 sm:pb-2 flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
-                onClick={() => router.push("/semesters")}
+                onClick={() => router.push(area === "admin" ? "/semester-admin" : "/semesters")}
                 className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs"
                 aria-label="학기 목록으로 돌아가기"
               >
@@ -138,6 +167,20 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
                   조회 전용
                 </span>
               )}
+            </div>
+            <div className="flex gap-1 overflow-x-auto scrollbar-hide" role="tablist" aria-label="학기 중 사역 영역">
+              {SEMESTER_WORKSPACE_GROUPS.map((group) => (
+                <button
+                  key={group.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={area === group.key}
+                  className="workspace-group-tab"
+                  onClick={() => changeArea(group.key)}
+                >
+                  {group.label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -176,13 +219,16 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
             <h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2>
             <p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p>
           </div>
-          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 회차 {sessions.length}회</p>
+          <p className="mt-2 text-xs text-slate-400 sm:mt-0">{area === "admin" ? `새친구 ${newFriends.length}명 · 처리 대기 ${newFriends.filter((friend) => !friend.giftDate && friend.decision !== "미등록" && friend.decision !== "보류").length}명` : `신청 ${applications.filter((item) => item.status !== "취소").length}명 · 사역팀 ${teams.length}개 · 훈련 반 ${trainingClasses.length}개 · 회차 ${sessions.length}회`}</p>
         </div>
 
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
             {activeTab === "새친구" && <NewFriendsTab sid={semesterId} friends={newFriends} privateMap={canEdit ? newFriendsPrivate : {}} canSyncRoster={canWriteStudentRoster(role)} />}
+            {activeTab === "학생 변동" && <StudentChangesTab friends={newFriends} />}
+            {activeTab === "처리 대기" && <PendingTab friends={newFriends} privateMap={canEdit ? newFriendsPrivate : {}} showPrivate={canEdit} onOpenNewFriends={() => setTab("새친구")} />}
+            {activeTab === "변경 이력" && <ChangeHistoryTab friends={newFriends} />}
             {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
             {activeTab === "출석" && (
               <AttendanceTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />

@@ -67,7 +67,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
     items.push({
       id: "semester-home",
       label: "학기 중 사역",
-      description: "학기 목록과 훈련·사역팀 운영",
+      description: "훈련·사역팀과 행정·바나바 운영",
       href: "/semesters",
       keywords: SEMESTER_TABS.join(" "),
       area: "semester",
@@ -76,7 +76,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
       items.push({
         id: `semester-${semester.id}`,
         label: semester.meta.title,
-        description: "훈련·사역팀 · 새친구·신청·배치·출석·수료·커리큘럼·아카이브",
+        description: "훈련·사역팀 · 행정·바나바",
         href: `/semester/${encodeURIComponent(semester.id)}`,
         keywords: `${semester.id} ${SEMESTER_TABS.join(" ")}`,
         area: "semester",

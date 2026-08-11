@@ -26,7 +26,7 @@ import {
   MINISTRY_ROLE_LABELS,
   retreatEntryHref,
 } from "./accessPolicy";
-import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS } from "./featureCatalog";
+import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_ADMIN_TABS, SEMESTER_TRAINING_TABS } from "./featureCatalog";
 import SharedMinistryCalendar, { type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
@@ -304,11 +304,17 @@ export default function PortalHome() {
             <p className="mt-1 text-sm text-slate-500">기존 사이트별 메뉴를 하나의 사역 흐름으로 정리했습니다.</p>
             </div>
           </div>
-          <div className="grid gap-4 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {semesterAllowed && (
               <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="home-workspace-card group">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">훈련·사역팀</h3><span className="text-[#2563eb] group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-4 flex flex-wrap gap-2">{SEMESTER_TABS.map((label) => <span key={label} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-[#2457b8] shadow-sm">{label}</span>)}</div>
+                <div className="mt-4 flex flex-wrap gap-2">{SEMESTER_TRAINING_TABS.map((label) => <span key={label} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-[#2457b8] shadow-sm">{label}</span>)}</div>
+              </Link>
+            )}
+            {semesterAllowed && (
+              <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}?area=admin` : "/semester-admin"} className="home-workspace-card group">
+                <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">행정·바나바</h3><span className="text-amber-600 group-hover:translate-x-0.5">→</span></div>
+                <div className="mt-4 space-y-2.5">{SEMESTER_ADMIN_TABS.map((label) => <div key={label} className="flex items-center gap-2 text-xs"><span className="size-1.5 rounded-full bg-amber-400"/><span className="text-slate-600">{label}</span></div>)}</div>
               </Link>
             )}
             {retreatAdminAllowed && (
@@ -355,8 +361,9 @@ export default function PortalHome() {
                 </div>
                 <p className="mt-1 text-xs text-slate-400">{MINISTRY_ROLE_HINTS[role]}</p>
               </div>
-              <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료" tone="emerald" />}
+                {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}?area=admin` : "/semester-admin"} label="행정·바나바" description="새친구·학생 변동·처리 대기" tone="amber" />}
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScope(role) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
               </div>
@@ -459,9 +466,10 @@ function HeroMetric({ label, value, detail }: { label: string; value: string; de
   );
 }
 
-function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "emerald" | "violet" | "fuchsia" }) {
+function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "emerald" | "amber" | "violet" | "fuchsia" }) {
   const toneClass = {
     emerald: "bg-[#edf4ff] text-[#2457b8] hover:bg-[#e4efff]",
+    amber: "bg-[#fff7e8] text-[#9a5b0b] hover:bg-[#ffefd1]",
     violet: "bg-[#edf7f3] text-[#087a57] hover:bg-[#e3f2ec]",
     fuchsia: "bg-[#f3f6f5] text-[#34423c] hover:bg-[#eaf0ed]",
   }[tone];

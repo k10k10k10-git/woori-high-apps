@@ -22,7 +22,9 @@ export default function GlobalPortalHeader() {
   const pathname = usePathname();
   const { user, loading, role, signOut } = useAuth();
   const [teamOpen, setTeamOpen] = useState(false);
+  const [semesterOpen, setSemesterOpen] = useState(false);
   const [vacationOpen, setVacationOpen] = useState(false);
+  const semesterRef = useRef<HTMLDivElement>(null);
   const vacationRef = useRef<HTMLDivElement>(null);
   const currentArea = activeArea(pathname);
   const openTeam = useCallback(() => setTeamOpen(true), []);
@@ -34,11 +36,15 @@ export default function GlobalPortalHeader() {
 
   // 드롭다운 닫기는 이벤트에서만 한다(effect에서 setState하면 cascading render).
   useEffect(() => {
-    if (!vacationOpen) return;
+    if (!vacationOpen && !semesterOpen) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setVacationOpen(false);
+      if (event.key === "Escape") {
+        setSemesterOpen(false);
+        setVacationOpen(false);
+      }
     }
     function onPointerDown(event: MouseEvent | TouchEvent) {
+      if (!semesterRef.current?.contains(event.target as Node)) setSemesterOpen(false);
       if (!vacationRef.current?.contains(event.target as Node)) setVacationOpen(false);
     }
     document.addEventListener("keydown", onKeyDown);
@@ -49,7 +55,7 @@ export default function GlobalPortalHeader() {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("touchstart", onPointerDown);
     };
-  }, [vacationOpen]);
+  }, [semesterOpen, vacationOpen]);
 
   if (loading || !user) return null;
 
@@ -71,21 +77,47 @@ export default function GlobalPortalHeader() {
             <span className="text-[13px] font-bold sm:hidden">홈</span>
           </Link>
 
-          <nav className="portal-nav" aria-label="통합 사역 메뉴">
+          <nav className={`portal-nav ${semesterOpen || vacationOpen ? "portal-nav-menu-open" : ""}`} aria-label="통합 사역 메뉴">
             {semesterAllowed && (
-              <Link
-                href="/semesters"
-                className="portal-nav-link"
-                aria-current={currentArea === "semester" ? "page" : undefined}
+              <div
+                ref={semesterRef}
+                className="portal-nav-dropdown relative"
+                onMouseEnter={() => setSemesterOpen(true)}
+                onMouseLeave={() => setSemesterOpen(false)}
               >
-                학기 중 사역
-              </Link>
+                <button
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded={semesterOpen}
+                  onClick={() => { setSemesterOpen(true); setVacationOpen(false); }}
+                  className="portal-nav-link"
+                  data-active={currentArea === "semester" ? "true" : undefined}
+                >
+                  학기 중 사역
+                  <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
+                </button>
+                {semesterOpen && (
+                  <div className="portal-dropdown-panel absolute left-0 top-full z-[70] w-64 pt-1.5">
+                    <div className="portal-menu">
+                      <Link href="/semesters" onClick={() => setSemesterOpen(false)} className="block rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white">
+                        훈련·사역팀
+                        <span className="mt-0.5 block text-[10px] font-normal text-[var(--color-on-dark-muted)]">신청 · 배치 · 출석 · 수료</span>
+                      </Link>
+                      <div className="my-1 border-t border-white/10" />
+                      <Link href="/semester-admin" onClick={() => setSemesterOpen(false)} className="block rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white">
+                        행정·바나바
+                        <span className="mt-0.5 block text-[10px] font-normal text-[var(--color-on-dark-muted)]">새친구 · 학생 변동 · 처리 대기 · 변경 이력</span>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {vacationItems.length > 0 && (
               <div
                 ref={vacationRef}
-                className="relative"
+                className="portal-nav-dropdown relative"
                 onMouseEnter={() => setVacationOpen(true)}
                 onMouseLeave={() => setVacationOpen(false)}
               >
@@ -93,8 +125,7 @@ export default function GlobalPortalHeader() {
                   type="button"
                   aria-haspopup="true"
                   aria-expanded={vacationOpen}
-                  onClick={() => setVacationOpen((open) => !open)}
-                  onFocus={() => setVacationOpen(true)}
+                  onClick={() => { setVacationOpen(true); setSemesterOpen(false); }}
                   className="portal-nav-link"
                   data-active={currentArea === "vacation" ? "true" : undefined}
                 >
@@ -102,7 +133,7 @@ export default function GlobalPortalHeader() {
                   <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
                 </button>
                 {vacationOpen && (
-                  <div className="absolute left-0 top-full z-[70] w-56 pt-1.5">
+                  <div className="portal-dropdown-panel absolute left-0 top-full z-[70] w-56 pt-1.5">
                     <div className="portal-menu">
                       {vacationItems.map((item) => (
                         <Link
