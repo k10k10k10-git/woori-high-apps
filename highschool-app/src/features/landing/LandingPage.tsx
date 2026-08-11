@@ -70,7 +70,7 @@ function FeatureSection() {
       <div className="landing-section-heading">
         <p className="landing-kicker">OFFER</p>
         <h2 id="features-title">사역의 처음과 끝을 잇는 하나의 도구</h2>
-        <p>각각의 기능을 모아 둔 것이 아니라, 같은 명단과 권한으로 다음 업무가 자연스럽게 이어집니다.</p>
+        <p>각각의 기능을 모아 둔 것이 아니라, 같은 명단과 권한으로 다음 사역으로 자연스럽게 이어집니다.</p>
       </div>
       <div className="landing-feature-tabs" role="tablist" aria-label="주요 기능">
         {LANDING_FEATURES.map((item) => (
@@ -139,7 +139,7 @@ export default function LandingPage({ signIn }: { signIn: () => Promise<void> })
 
         <section className="landing-section landing-target" id="for-whom" aria-labelledby="target-title">
           <div className="landing-section-heading">
-            <p className="landing-kicker">NARROW</p><h2 id="target-title">이런 고등부라면 더 잘 맞습니다.</h2>
+            <p className="landing-kicker">NARROW</p><h2 id="target-title">이런 부서라면 더 잘 맞습니다.</h2>
           </div>
           <div className="landing-target-grid">{TARGETS.map((target) => <article key={target}><span>✓</span><p>{target}</p></article>)}</div>
         </section>
@@ -149,7 +149,7 @@ export default function LandingPage({ signIn }: { signIn: () => Promise<void> })
           <ol>{START_STEPS.map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span><p>{step}</p></li>)}</ol>
         </section>
       </main>
-      <footer className="landing-footer"><Brand /><p>사람을 위한 준비가 정보 정리에 묻히지 않도록.</p><small>© {new Date().getFullYear()} Woori High Ministry</small></footer>
+      <footer className="landing-footer"><Brand /><p>한 영혼을 위한 사역이 될 수 있도록.</p><small>© {new Date().getFullYear()} Woori High Ministry</small></footer>
     </div>
   );
 }
