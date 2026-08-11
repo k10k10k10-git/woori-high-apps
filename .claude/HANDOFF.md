@@ -1,4 +1,23 @@
-# 인수인계 — 2026-08-09 (Claude Code → Codex)
+# 인수인계 — 2026-08-11 (Codex → Claude Code)
+
+## 2026-08-11 최신 상태 — 여기부터 읽을 것
+
+- 현재 사용자 요청은 **완료·검증·운영 배포** 상태다. 구현 커밋은 `20faf54` (`주일: 등반 및 배정 취소 구현`)이며, 최종 `main`의 `/api/version`과 Vercel Production `Ready`까지 확인했다.
+- `highschool-app` 주일 사역 → 새친구 상세의 기존 `등반 취소`를 **`등반 및 배정 취소`**로 바꿨다. 단순 문구 변경이 아니라 업무 의미도 맞췄다.
+  - 새친구 공개/비공개 기록, 접수·1/2주차·등록 결정·목양 메모는 보존한다.
+  - `assignedClassKey`, `giftDate`, `rosterSync`를 원자적으로 해제해 `반배정` 단계로 돌린다.
+  - 출석부에 반영된 학생이면 통합관리자만 실행할 수 있다. 결정적 `nf_` 학생과 이름을 재검증하고 `classes/{year}/*/students`, 해당 `attendance/{year}`를 제거한다.
+  - 삭제 전 전체 근거는 `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}/placementCancellations/{timestamp}`, 학생 복구본은 `trash/{year}/students/{studentId}`에 남긴다.
+  - 실행 뒤 새친구 보존, 연결 필드 해제, 학생·출석 제거, 백업·휴지통 존재를 재조회한다.
+  - 기존 **`명단·출석부 삭제`**는 새친구 기록까지 지우는 별도 명령으로 그대로 유지한다.
+- 검증 실측: `highschool-app` **63파일 494개 테스트 통과**, `npx tsc --noEmit` 통과, `npm run build` 성공. 로그인된 로컬 화면에서 버튼명과 경고문을 확인하고 확인창의 **취소**만 눌렀으므로 운영 DB 쓰기는 없었다. Rules 배포도 없었다.
+- 바로 직전 기능 커밋 `e295abe`는 인물 통합검색 상세를 학적/수련회 종류가 아닌 **연도 탭**으로 재구성하고 현장등록 중복 카드를 제외한 변경이다. 그보다 앞선 `a08aedb` 계열은 학생·교사·스탭 연도별 ID를 영구 `personId`에 연결한 작업이다.
+- Claude Code 다음 시작 순서: 루트 `CLAUDE.md` → 이 문서 → `highschool-app/CLAUDE.md` → `git log -3 --oneline` → `git status --short`. 새 작업 전 DB 안전 4문답을 먼저 답한다.
+- 미추적 사용자 파일은 계속 건드리지 않는다: `.agents/`, `.claude/LATEST_HANDOFF.md`, `outputs/`, `rayquaza-v2-upgrade/`, `tmp/`. 특히 `git add .` 금지.
+
+---
+
+## 2026-08-09 이전 인수인계 기록
 
 ## 0. 에이전트별 시작 지점
 
