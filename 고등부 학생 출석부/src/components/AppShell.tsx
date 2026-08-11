@@ -1,11 +1,18 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
 import { loadUserRole, cleanupOldYears } from '@/hooks/useFirebaseData';
-import { doLogout } from '@/hooks/useAuth';
+import { doDemoLogin, doLogout } from '@/hooks/useAuth';
+import {
+  DEMO_MODE, demoConfigured, isDemoAccount, buildDemoRole,
+  loadDemoSelection, saveDemoSelection, clearDemoSelection,
+  getAdminIntent, setAdminIntent, type DemoSelection,
+} from '@/lib/demo';
 import { getWindowYears } from '@/utils/dates';
+import DemoClassPicker from '@/components/DemoClassPicker';
 import LoginScreen from '@/components/LoginScreen';
 import TopBar from '@/components/TopBar';
 import TabNav from '@/components/TabNav';
@@ -13,22 +20,53 @@ import Toast from '@/components/Toast';
 import UpdateBanner from '@/components/UpdateBanner';
 import FirebaseDataLoader from '@/components/FirebaseDataLoader';
 
-type AuthState = 'loading' | 'login' | 'app';
+type AuthState = 'loading' | 'demo-pick' | 'login' | 'app';
+
+// 데모 계정은 실제로는 전체 권한(attendanceAdmins)을 가진다. 화면에서 탭을 감추는 것만으로는
+// 주소를 직접 입력하는 접근을 막지 못하므로, 관리자 전용 라우트는 셸에서 차단한다.
+const ADMIN_ONLY_PATHS = ['/admin', '/overall'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { state, dispatch } = useApp();
+  const pathname = usePathname();
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 데모 자동 로그인은 한 번만 시도한다 — 실패 시 재시도 루프를 막는다.
+  const demoTriedRef = useRef(false);
+
+  // 고른 반을 담임 교사 역할로 적용 (데모 전용)
+  const applyDemoSelection = useCallback((sel: DemoSelection): boolean => {
+    const role = buildDemoRole(sel);
+    if (!role) return false;
+    dispatch({ type: 'SET_USER_ROLE', payload: role });
+    dispatch({ type: 'SET_PART', payload: role.part! });
+    dispatch({ type: 'SET_GRADE', payload: role.grade! });
+    dispatch({ type: 'SET_CLASS', payload: role.class! });
+    return true;
+  }, [dispatch]);
 
   // Firebase Auth 감지
   useEffect(() => {
     dispatch({ type: 'SET_FB_READY' });
     const unsub = onAuthStateChanged(auth, async user => {
       if (user) {
+        // 데모 계정으로 로그인된 상태 — userRoles를 읽지 않고 고른 반을 그대로 적용한다.
+        if (isDemoAccount(user.email)) {
+          const saved = loadDemoSelection();
+          if (saved && applyDemoSelection(saved)) {
+            setDemoError(null);
+            setAuthState('app');
+          } else {
+            dispatch({ type: 'SET_USER_ROLE', payload: null });
+            setAuthState('demo-pick');
+          }
+          return;
+        }
         const result = await loadUserRole({ uid: user.uid, email: user.email }, dispatch);
         if (result === 'unauthorized') {
           await doLogout();
@@ -40,11 +78,66 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }
       } else {
         dispatch({ type: 'SET_USER_ROLE', payload: null });
+        // 데모 모드에서는 관리자 로그인을 명시적으로 누른 경우에만 로그인 화면을 띄운다.
+        if (DEMO_MODE && !getAdminIntent()) {
+          if (!demoConfigured) {
+            setDemoError('데모 계정이 설정되지 않았습니다.\n.env.local의 NEXT_PUBLIC_DEMO_EMAIL·NEXT_PUBLIC_DEMO_PASSWORD를 채운 뒤 다시 배포해 주세요.');
+            setAuthState('demo-pick');
+            return;
+          }
+          if (!demoTriedRef.current) {
+            demoTriedRef.current = true;
+            try {
+              await doDemoLogin(); // 성공하면 이 콜백이 다시 호출된다
+              return;
+            } catch (e) {
+              const code = (e as { code?: string })?.code ?? '';
+              setDemoError(
+                '데모 계정으로 접속하지 못했습니다.\n' +
+                (code.includes('invalid-credential') || code.includes('user-not-found') || code.includes('wrong-password')
+                  ? '데모 계정 정보가 맞는지 확인해 주세요.'
+                  : code || (e instanceof Error ? e.message : String(e))),
+              );
+            }
+          }
+          setAuthState('demo-pick');
+          return;
+        }
         setAuthState('login');
       }
     });
     return unsub;
+  }, [dispatch, applyDemoSelection]);
+
+  // 데모: 반 선택 → 그 반 담임 화면으로
+  const handleDemoPick = useCallback((sel: DemoSelection) => {
+    if (!applyDemoSelection(sel)) return;
+    saveDemoSelection(sel);
+    setAuthState('app');
+  }, [applyDemoSelection]);
+
+  // 데모: 다른 반 고르기 (로그인은 유지)
+  const handleDemoChangeClass = useCallback(() => {
+    clearDemoSelection();
+    dispatch({ type: 'SET_USER_ROLE', payload: null });
+    setAuthState('demo-pick');
   }, [dispatch]);
+
+  // 데모: 관리자 계정으로 접근 → 데모 세션을 끊고 원래 로그인 화면
+  const handleAdminLogin = useCallback(async () => {
+    setAdminIntent(true);
+    clearDemoSelection();
+    demoTriedRef.current = false;
+    setDemoError(null);
+    setAuthState('login');
+    await doLogout();
+  }, []);
+
+  // 관리자 로그인 화면 → 데모로 되돌아가기
+  const handleBackToDemo = useCallback(() => {
+    setAdminIntent(false);
+    window.location.reload();
+  }, []);
 
   // 로딩 게이트 타임아웃 — onAuthStateChanged가 끝내 안 오면(캐시 깨짐 등)
   // 무한 스피너 대신 새로고침 안내를 보여준다.
@@ -154,9 +247,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (authState === 'login') {
-    return <LoginScreen onLogin={() => { setAuthError(null); setAuthState('app'); }} authError={authError} />;
+  if (authState === 'demo-pick') {
+    return (
+      <DemoClassPicker
+        onPick={handleDemoPick}
+        onAdminLogin={() => void handleAdminLogin()}
+        signInError={demoError}
+      />
+    );
   }
+
+  if (authState === 'login') {
+    return (
+      <LoginScreen
+        onLogin={() => { setAuthError(null); setAuthState('app'); }}
+        authError={authError}
+        onBackToDemo={DEMO_MODE ? handleBackToDemo : undefined}
+      />
+    );
+  }
+
+  const isDemoRole = DEMO_MODE && isDemoAccount(auth.currentUser?.email);
 
   return (
     <div className="app">
@@ -169,10 +280,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {showUpdate && (
         <UpdateBanner onReload={() => window.location.reload()} />
       )}
-      <TopBar onLogout={doLogout} />
+      <TopBar
+        onLogout={doLogout}
+        demo={isDemoRole
+          ? { onChangeClass: handleDemoChangeClass, onAdminLogin: () => void handleAdminLogin() }
+          : undefined}
+      />
       <div className="content-area">
         <FirebaseDataLoader />
-        {children}
+        {isDemoRole && ADMIN_ONLY_PATHS.includes(pathname) ? (
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14, lineHeight: 1.7 }}>
+            관리자 전용 화면입니다.<br />
+            상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.
+          </div>
+        ) : children}
       </div>
       <TabNav />
     </div>

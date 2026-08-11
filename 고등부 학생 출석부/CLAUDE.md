@@ -234,6 +234,16 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 
 **읽기 권한도 본인 반으로 제한됨**: `classes`/`attendance`의 `.read`는 admin·retreatAdmins·iguardMembers(전체) + 교사는 `teacherClasses/{uid}===classKey`(본인 반만). `useFirebaseData.ts`가 교사 로그인 시 `classes/{year}/{ck}`(본인 반)만 구독하고, 관리자는 `classes/{year}` 전체를 구독한다. `loadUserRole`은 `teacherClasses/{uid}` 쓰기를 **await**해야 함 — read 규칙이 이 값을 즉시 참조하므로 구독 전에 반드시 기록돼 있어야 한다.
 
+### 데모 모드 (`src/lib/demo.ts`) — 교사 테스트 기간 한정, 끝나면 되돌린다
+
+로그인 대신 **부서·학년·반을 골라** 그 반 담임처럼 보게 하는 임시 접속 방식. 화면 뒤에서 **공용 데모 계정 하나로 로그인**하고, 고른 반만 보이도록 **화면에서** 제한한다 — 보안 규칙이 모든 읽기에 인증을 요구하므로 "로그인 없음"은 불가능하다.
+
+- 켜고 끄기: `.env.local`의 `NEXT_PUBLIC_DEMO_MODE`(`1`/`0`) + `NEXT_PUBLIC_DEMO_EMAIL`·`NEXT_PUBLIC_DEMO_PASSWORD`. **0으로 되돌리고 재배포하면 원래 로그인 화면으로 완전히 복귀**한다(다른 코드 경로를 건드리지 않는다).
+- 데모 계정에는 `attendanceAdmins`를 준다. 반마다 계정을 따로 두지 않는 이유: `teacherClasses/{uid}`를 반 선택마다 덮어쓰면 **동시에 테스트 중인 다른 교사의 구독이 권한 거부로 끊긴다**.
+- 반 제한은 UI 계약일 뿐 **보안 경계가 아니다**. 그래서 `AppShell`의 `ADMIN_ONLY_PATHS`가 `/admin`·`/overall`을 셸에서 막는다 — 탭만 감추면 주소를 직접 입력해 관리 기능(진급·명단 교체·계정 관리)에 닿을 수 있고, 데모 계정은 그게 실제로 성공한다.
+- 역할은 `buildDemoRole`이 만드는 `role: 'teacher'`다. `admin`으로 만들면 전체 반이 보인다. 이름에 `(데모)`가 붙어 학생 정보 수정 시 남는 `adminChanges.actor`에서 실제 담임과 구분된다.
+- ⚠ 데모 계정 정보는 정적 번들에 그대로 들어간다. 주소를 아는 사람은 누구나 쓸 수 있으므로 **테스트 종료 시 계정 삭제 + `DEMO_MODE=0` 재배포**가 한 세트다.
+
 ### Firebase 보안 규칙 (`database.rules.json`)
 
 > **이 파일이 Firebase 프로젝트 `woori-high`의 유일한 배포용 보안 규칙 원천이다.**

@@ -115,6 +115,51 @@ html, body, #root {
 }
 .login-check-row label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
 
+/* ─── 데모 모드 (테스트 기간 한정) ─────────────────────────────
+   테스트가 끝나면 NEXT_PUBLIC_DEMO_MODE=0으로 되돌리고 이 블록도 함께 지운다. */
+.demo-wrap {
+  width: 100%; max-width: 420px;
+  margin: auto;
+  padding: 24px 0 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.demo-topbar {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.demo-badge {
+  font-size: 11px; font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-bg);
+  padding: 5px 10px; border-radius: 999px;
+}
+.demo-admin-btn {
+  padding: 7px 12px;
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 12px; font-family: inherit; color: var(--text2);
+  cursor: pointer; white-space: nowrap;
+}
+.demo-field { margin-bottom: 10px; }
+.demo-label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text2); margin-bottom: 4px;
+}
+.demo-select { margin-bottom: 0; background: var(--surface); }
+.demo-note {
+  font-size: 11px; color: var(--text2); text-align: center;
+  line-height: 1.6; padding: 0 8px;
+}
+.demo-back-btn {
+  display: block; width: 100%;
+  margin-top: 14px; padding: 8px;
+  border: none; background: transparent;
+  font-size: 12px; font-family: inherit; color: var(--text2);
+  cursor: pointer;
+}
+.topbar-admin-btn { border-color: var(--primary); color: var(--primary); }
+
 /* ─── Update Toast ───────────────────────────────────────────── */
 .update-toast {
   position: fixed;

@@ -2,7 +2,9 @@
 import { useApp, useClassKey } from '@/store/AppContext';
 import { getWindowYears, getKSTYear } from '@/utils/dates';
 
-export default function TopBar({ onLogout }: { onLogout: () => void }) {
+type DemoActions = { onChangeClass: () => void; onAdminLogin: () => void };
+
+export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?: DemoActions }) {
   const { state, dispatch } = useApp();
   const { curYear, curPart, curGrade, userRole, saveStatus } = state;
   const isAdmin = !userRole || userRole.role === 'admin';
@@ -30,7 +32,14 @@ export default function TopBar({ onLogout }: { onLogout: () => void }) {
               {saveStatus === 'saving' ? '저장 중' : '저장됨'}
             </span>
           )}
-          <button className="logout-btn" onClick={onLogout} aria-label="로그아웃">로그아웃</button>
+          {demo ? (
+            <>
+              <button className="logout-btn" onClick={demo.onChangeClass} aria-label="반 바꾸기">반 바꾸기</button>
+              <button className="logout-btn topbar-admin-btn" onClick={demo.onAdminLogin} aria-label="관리자 계정으로 접근">관리자 접근</button>
+            </>
+          ) : (
+            <button className="logout-btn" onClick={onLogout} aria-label="로그아웃">로그아웃</button>
+          )}
         </div>
       </div>
 

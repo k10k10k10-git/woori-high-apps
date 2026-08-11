@@ -2,7 +2,12 @@
 import { useState, useEffect } from 'react';
 import { doLogin } from '@/hooks/useAuth';
 
-export default function LoginScreen({ onLogin, authError }: { onLogin: () => void; authError?: string | null }) {
+export default function LoginScreen({ onLogin, authError, onBackToDemo }: {
+  onLogin: () => void;
+  authError?: string | null;
+  /** 데모 모드에서만 넘어온다 — 관리자 로그인을 취소하고 반 선택 화면으로 되돌아간다. */
+  onBackToDemo?: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [pw, setPw] = useState('');
   const [saveEmail, setSaveEmail] = useState(false);
@@ -80,6 +85,11 @@ export default function LoginScreen({ onLogin, authError }: { onLogin: () => voi
           )}
           {!authError && err && <div className="login-err">{err}</div>}
         </form>
+        {onBackToDemo && (
+          <button type="button" className="demo-back-btn" onClick={onBackToDemo}>
+            ← 반 선택 화면으로 돌아가기
+          </button>
+        )}
       </div>
     </div>
   );

@@ -10,6 +10,8 @@ This app is the source of truth for student/class/attendance data and the only d
 
 Read `CLAUDE.md`, `../DB_OWNERSHIP.md`, and `../OPERATIONS.md` before significant changes.
 
+⚠ **Demo mode is temporary.** `src/lib/demo.ts` replaces the login screen with a class picker for a teacher trial run. It is off unless `.env.local` sets `NEXT_PUBLIC_DEMO_MODE=1` plus demo account credentials. When the trial ends, set it back to `0`, redeploy, and delete the demo account — details in `CLAUDE.md`의 "데모 모드".
+
 ## Database Ownership
 
 This app owns:

@@ -4,6 +4,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut,
   setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
+import { demoCredentials } from '@/lib/demo';
 import { loadUserRole } from './useFirebaseData';
 
 export function useAuth() {
@@ -39,6 +40,17 @@ export async function doLogin(
   } else {
     localStorage.removeItem('savedEmail');
   }
+}
+
+/**
+ * 데모 모드 전용 — 화면 뒤에서 공용 데모 계정으로 조용히 로그인한다.
+ * 테스트 기간에만 쓰이며, 계정 정보는 .env.local의 NEXT_PUBLIC_DEMO_* 값에서만 온다.
+ */
+export async function doDemoLogin() {
+  const { email, password } = demoCredentials();
+  if (!email || !password) throw new Error('데모 계정이 설정되지 않았습니다.');
+  await setPersistence(auth, browserLocalPersistence);
+  await signInWithEmailAndPassword(auth, email, password);
 }
 
 export async function doLogout() {
