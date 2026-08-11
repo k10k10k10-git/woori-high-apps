@@ -1,7 +1,16 @@
 import { parseClassKey } from "@/lib/classKey";
 import { normalizeName, stripSuffix } from "@/lib/studentMatcher";
+import { isStaffAppKey } from "@/features/semester/applicant";
 
 export type PersonField = { label: string; value: string; sensitive?: boolean };
+export type PersonKind = "student" | "teacher" | "staff" | "other";
+
+export const PERSON_KIND_LABEL: Record<PersonKind, string> = {
+  student: "학생",
+  teacher: "교사",
+  staff: "스탭",
+  other: "기타",
+};
 
 export type PersonRecord = {
   id: string;
@@ -17,6 +26,7 @@ export type PersonProfile = {
   id: string;
   name: string;
   aliases: string[];
+  kinds: PersonKind[];
   records: PersonRecord[];
   years: string[];
   latestClass?: string;
@@ -35,9 +45,9 @@ export type PeopleSearchData = {
 type Evidence = {
   name: string;
   normalizedName: string;
+  kind: PersonKind;
   tokens: Set<string>;
-  births: Set<string>;
-  phones: Set<string>;
+  ids: Set<string>;
   contextKey: string;
   anchor: boolean;
   record: PersonRecord;
@@ -46,8 +56,8 @@ type Evidence = {
 type MutableProfile = {
   evidence: Evidence[];
   tokens: Set<string>;
-  births: Set<string>;
-  phones: Set<string>;
+  ids: Set<string>;
+  kinds: Set<PersonKind>;
   contexts: Set<string>;
 };
 
@@ -89,20 +99,34 @@ function addExtraFields(target: PersonField[], source: Record<string, unknown>, 
   }
 }
 
-function identityTokens(input: { studentId?: unknown; birth?: unknown; phone?: unknown; parentPhone?: unknown; pPhone?: unknown }) {
-  const result = new Set<string>();
+function identityTokens(input: { kind: PersonKind; studentId?: unknown; birth?: unknown; phone?: unknown; parentPhone?: unknown; pPhone?: unknown }) {
+  const tokens = new Set<string>();
+  const ids = new Set<string>();
   const studentId = text(input.studentId);
   if (studentId) {
-    result.add(`id:${studentId}`);
-    result.add(`id:${studentId.replace(/^[12]_/, "")}`);
+    const values = input.kind === "student"
+      ? [studentId, studentId.replace(/^[12]_/, "")]
+      : [studentId];
+    values.forEach((value) => {
+      const token = `${input.kind}-id:${value}`;
+      tokens.add(token);
+      ids.add(token);
+    });
   }
   const birth = compactBirth(input.birth);
-  if (birth.length >= 6) result.add(`birth:${birth}`);
+  if (birth.length >= 6) tokens.add(`birth:${birth}`);
   for (const raw of [input.phone, input.parentPhone, input.pPhone]) {
     const phone = digits(raw);
-    if (phone.length >= 8) result.add(`phone:${phone}`);
+    if (phone.length >= 8) tokens.add(`phone:${phone}`);
   }
-  return result;
+  return { tokens, ids };
+}
+
+function kindForAffiliation(value: unknown, fallback: PersonKind = "student"): PersonKind {
+  const affiliation = text(value);
+  if (affiliation.includes("스탭")) return "staff";
+  if (affiliation.includes("교사") || affiliation.includes("교역자")) return "teacher";
+  return fallback;
 }
 
 function evidence(input: {
@@ -112,6 +136,7 @@ function evidence(input: {
   phone?: unknown;
   parentPhone?: unknown;
   pPhone?: unknown;
+  kind?: PersonKind;
   contextKey: string;
   anchor?: boolean;
   record: PersonRecord;
@@ -119,14 +144,14 @@ function evidence(input: {
   const name = text(input.name);
   const normalizedName = stripSuffix(normalizeName(name));
   if (normalizedName.length < 2) return null;
-  const birth = compactBirth(input.birth);
-  const phoneValues = [input.phone, input.parentPhone, input.pPhone].map(digits).filter((value) => value.length >= 8);
+  const kind = input.kind ?? "other";
+  const identity = identityTokens({ ...input, kind });
   return {
     name,
     normalizedName,
-    tokens: identityTokens(input),
-    births: new Set(birth.length >= 6 ? [birth] : []),
-    phones: new Set(phoneValues),
+    kind,
+    tokens: identity.tokens,
+    ids: identity.ids,
     contextKey: input.contextKey,
     anchor: input.anchor ?? false,
     record: input.record,
@@ -190,7 +215,7 @@ function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
         );
         const item = evidence({
           name, studentId: `${parsed?.buNum ?? ""}_${studentId}`, birth: student.birth,
-          phone: student.phone, pPhone: student.pphone, contextKey: `class:${year}`, anchor: true,
+          phone: student.phone, pPhone: student.pphone, kind: "student", contextKey: `class:${year}`, anchor: true,
           record: {
             id: `class:${year}:${classKey}:${studentId}`, category: "학적·출석", period: `${year}년`,
             title: parsed ? `${parsed.grade}학년 ${parsed.classNum}반` : classKey, fields: history, sortKey: `${year}-4`,
@@ -232,7 +257,7 @@ function buildSemesterEvidence(data: PeopleSearchData, output: Evidence[]) {
       );
       const item = evidence({
         name: app.name, studentId: app.studentId, phone: priv.phone, parentPhone: priv.parentPhone,
-        contextKey: `semester:${sid}`, anchor: true,
+        kind: isStaffAppKey(appKey) ? "staff" : kindForAffiliation(app.bu), contextKey: `semester:${sid}`, anchor: true,
         record: { id: `semester:${sid}:${appKey}`, category: "학기 중 사역", period: text(meta.title) || sid,
           title: [trainingName, teamName].filter(Boolean).join(" · ") || "사역 신청", fields: recordFields, sortKey: `${sid}-3`, private: Object.keys(priv).length > 0 },
       });
@@ -255,7 +280,7 @@ function buildSemesterEvidence(data: PeopleSearchData, output: Evidence[]) {
       const rosterSync = asRecord(friend.rosterSync);
       const item = evidence({
         name: friend.name, studentId: rosterSync.studentId, birth: priv.birth, phone: priv.phone, parentPhone: priv.parentPhone,
-        contextKey: `newfriend:${sid}`, anchor: true,
+        kind: "student", contextKey: `newfriend:${sid}`, anchor: true,
         record: { id: `newfriend:${sid}:${friendId}`, category: "새친구", period: text(meta.title) || sid,
           title: `새친구 ${text(friend.decision) || "접수"}`, fields: recordFields, sortKey: `${sid}-5`, private: Object.keys(priv).length > 0 },
       });
@@ -292,7 +317,7 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
       );
       const item = evidence({
         name: participant.name, studentId: participant.studentId, phone: participant.phone, pPhone: participant.pPhone,
-        contextKey: `retreat:${retreatId}`, anchor: true,
+        kind: kindForAffiliation(participant.bu), contextKey: `retreat:${retreatId}`, anchor: true,
         record: { id: `retreat:${retreatId}:participant:${participantKey}`, category: "수련회", period: meta.period,
           title: "수련회 신청·배정", fields: recordFields, sortKey: `${meta.year}-2` },
       });
@@ -310,6 +335,7 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
         const recordFields: PersonField[] = [];
         addExtraFields(recordFields, entry, config.labels, config.node === "carpools");
         const item = evidence({ name: entry.name ?? entry.studentName, studentId: entry.studentId, phone: entry.phone, pPhone: entry.pPhone,
+          kind: kindForAffiliation(entry.bu),
           contextKey: `retreat:${retreatId}`,
           record: { id: `retreat:${retreatId}:${config.node}:${entryId}`, category: "수련회", period: meta.period,
             title: config.title, fields: recordFields, sortKey: `${meta.year}-1`, private: config.private } });
@@ -328,6 +354,7 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
         const recordFields: PersonField[] = [];
         addExtraFields(recordFields, entry, config.labels, true);
         const item = evidence({ name: entry.name, studentId: entry.studentKey, phone: entry.phone,
+          kind: kindForAffiliation(entry.bu),
           contextKey: `retreat:${retreatId}`,
           record: { id: `retreat-private:${retreatId}:${config.node}:${entryId}`, category: "수련회", period: meta.period,
             title: config.title, fields: recordFields, sortKey: `${meta.year}-0`, private: true } });
@@ -342,23 +369,28 @@ function intersects(a: Set<string>, b: Set<string>) {
   return false;
 }
 
-function conflicts(profile: MutableProfile, item: Evidence) {
-  const birthConflict = profile.births.size > 0 && item.births.size > 0 && !intersects(profile.births, item.births);
-  const phoneConflict = profile.phones.size > 0 && item.phones.size > 0 && !intersects(profile.phones, item.phones);
-  const sameContextWithoutIdentity = item.anchor && profile.contexts.has(item.contextKey) && !intersects(profile.tokens, item.tokens);
-  return birthConflict || phoneConflict || sameContextWithoutIdentity;
+function canRepresentSamePerson(profile: MutableProfile, item: Evidence) {
+  if (!profile.kinds.has(item.kind)) return false;
+  const differentStableIds = profile.ids.size > 0 && item.ids.size > 0 && !intersects(profile.ids, item.ids);
+  return !differentStableIds;
 }
 
 function attach(profile: MutableProfile, item: Evidence) {
   profile.evidence.push(item);
   item.tokens.forEach((token) => profile.tokens.add(token));
-  item.births.forEach((birth) => profile.births.add(birth));
-  item.phones.forEach((phone) => profile.phones.add(phone));
+  item.ids.forEach((id) => profile.ids.add(id));
+  profile.kinds.add(item.kind);
   if (item.anchor) profile.contexts.add(item.contextKey);
 }
 
 function makeMutable(item: Evidence): MutableProfile {
-  const profile = { evidence: [], tokens: new Set<string>(), births: new Set<string>(), phones: new Set<string>(), contexts: new Set<string>() };
+  const profile = {
+    evidence: [],
+    tokens: new Set<string>(),
+    ids: new Set<string>(),
+    kinds: new Set<PersonKind>(),
+    contexts: new Set<string>(),
+  };
   attach(profile, item);
   return profile;
 }
@@ -377,22 +409,22 @@ export function buildPeopleProfiles(data: PeopleSearchData): PersonProfile[] {
     items.sort((a, b) => Number(b.record.category === "학적·출석") - Number(a.record.category === "학적·출석"));
     const profiles: MutableProfile[] = [];
     for (const item of items) {
-      const exact = profiles
+      const candidates = profiles
         .map((profile, index) => ({ profile, index, score: [...item.tokens].filter((token) => profile.tokens.has(token)).length }))
-        .filter((candidate) => candidate.score > 0)
-        .sort((a, b) => b.score - a.score)[0];
-      if (exact) {
-        attach(exact.profile, item);
+        .filter((candidate) => candidate.score > 0 && canRepresentSamePerson(candidate.profile, item))
+        .sort((a, b) => b.score - a.score);
+      const bestScore = candidates[0]?.score ?? 0;
+      const best = candidates.filter((candidate) => candidate.score === bestScore);
+      if (best.length === 1) {
+        attach(best[0].profile, item);
         continue;
       }
-      const contextual = profiles.filter((profile) => profile.contexts.has(item.contextKey));
+      const contextual = profiles.filter((profile) => profile.contexts.has(item.contextKey) && canRepresentSamePerson(profile, item));
       if (!item.anchor && contextual.length === 1) {
         attach(contextual[0], item);
         continue;
       }
-      const compatible = profiles.filter((profile) => !conflicts(profile, item));
-      if (compatible.length === 1) attach(compatible[0], item);
-      else profiles.push(makeMutable(item));
+      profiles.push(makeMutable(item));
     }
 
     profiles.forEach((profile, index) => {
@@ -401,7 +433,8 @@ export function buildPeopleProfiles(data: PeopleSearchData): PersonProfile[] {
       const classRecords = records.filter((record) => record.category === "학적·출석");
       const years = [...new Set(records.map((record) => record.period.match(/\d{4}/)?.[0]).filter((value): value is string => !!value))].sort().reverse();
       output.push({
-        id: `${normalizedName}-${index + 1}`, name: aliases[0] ?? normalizedName, aliases, records, years,
+        id: `${normalizedName}-${index + 1}`, name: aliases[0] ?? normalizedName, aliases,
+        kinds: [...profile.kinds].sort(), records, years,
         latestClass: classRecords[0] ? `${classRecords[0].period} ${classRecords[0].title}` : undefined,
         ambiguous: profiles.length > 1,
       });

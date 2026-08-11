@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessPortalArea } from "./accessPolicy";
-import { buildPeopleProfiles, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
+import { buildPeopleProfiles, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
 import { loadPeopleSearchData } from "./peopleSearchDb";
 
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
@@ -85,9 +85,9 @@ export default function PortalSearch() {
 
   return (
     <>
-      <button type="button" onClick={beginOpen} className="portal-search-trigger" aria-label="학생 통합검색 열기">
+      <button type="button" onClick={beginOpen} className="portal-search-trigger" aria-label="인물 통합검색 열기">
         <span aria-hidden="true">⌕</span>
-        <span>학생 통합검색</span>
+        <span>인물 통합검색</span>
         <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-on-dark-muted)] xl:inline">⌘K</kbd>
       </button>
       {open && (
@@ -95,7 +95,7 @@ export default function PortalSearch() {
           <section
             role="dialog"
             aria-modal="true"
-            aria-label="학생 통합검색"
+            aria-label="인물 통합검색"
             className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ${selected ? "max-w-5xl" : "max-w-2xl"}`}
             onMouseDown={(event) => event.stopPropagation()}
           >
@@ -109,8 +109,8 @@ export default function PortalSearch() {
                     ref={inputRef}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="학생 이름을 입력하세요 (예: 강민채)"
-                    aria-label="학생 이름"
+                    placeholder="학생·교사·스탭 이름을 입력하세요"
+                    aria-label="인물 이름"
                     className="min-h-11 flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
                   />
                   <button type="button" onClick={close} className="rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100">ESC</button>
@@ -118,13 +118,14 @@ export default function PortalSearch() {
                 <div className="min-h-52 flex-1 overflow-y-auto p-2.5">
                   {loading ? <SearchState title="고등부 인물 기록을 모으고 있습니다…" description="학적·출석, 학기 사역, 새친구, 수련회 데이터를 연결합니다." />
                     : error ? <SearchState title={error} description="창을 닫았다가 다시 열어 재시도할 수 있습니다." />
-                    : query.trim().length < 2 ? <SearchState title="학생 이름으로 검색하세요." description="두 글자 이상 입력하면 현재 DB의 모든 연도 기록을 한 번에 찾습니다." />
+                    : query.trim().length < 2 ? <SearchState title="인물 이름으로 검색하세요." description="학생·교사·스탭 이름을 두 글자 이상 입력하면 현재 DB 기록에서 찾습니다." />
                     : results.length > 0 ? results.map((profile) => (
                       <button key={profile.id} type="button" onClick={() => setSelectedId(profile.id)} className="group flex w-full items-start gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-slate-50 focus-visible:bg-slate-50">
                         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-sm font-extrabold text-emerald-700">{profile.name.slice(0, 1)}</span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
                             <strong className="text-[15px] text-slate-900">{profile.name}</strong>
+                            {profile.kinds.map((kind) => <span key={kind} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{PERSON_KIND_LABEL[kind]}</span>)}
                             {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">동명이인 구분</span>}
                           </span>
                           <span className="mt-1 block text-xs text-slate-500">
@@ -134,10 +135,10 @@ export default function PortalSearch() {
                         </span>
                         <span aria-hidden="true" className="mt-2 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-600">→</span>
                       </button>
-                    )) : <SearchState title="일치하는 학생이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
+                    )) : <SearchState title="일치하는 인물이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
                 </div>
                 <footer className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">
-                  현재 권한으로 열람할 수 있는 DB만 표시합니다. 동명이인은 생년·연락처·학생 ID로 분리합니다.
+                  이름만 같으면 연결하지 않습니다. 유형과 안정 ID·생년·연락처가 확인되는 기록만 동일인으로 묶습니다.
                 </footer>
               </>
             )}
@@ -170,6 +171,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{profile.name}</h2>
+            {profile.kinds.map((kind) => <span key={kind} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">{PERSON_KIND_LABEL[kind]}</span>)}
             {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">동명이인 후보</span>}
           </div>
           <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"} · 연결된 기록 {profile.records.length}건</p>
