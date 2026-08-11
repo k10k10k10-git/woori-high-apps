@@ -143,8 +143,18 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
           }),
         };
       })
-      .sort((a, b) => memberLabel(a).localeCompare(memberLabel(b), "ko"));
+      // 역할군(높은 권한 → 낮은 권한)으로 먼저 묶고, 같은 역할 안에서만 이름순으로 정렬한다.
+      .sort((a, b) => {
+        const byRole = ASSIGNABLE_ROLES.indexOf(a.role) - ASSIGNABLE_ROLES.indexOf(b.role);
+        return byRole !== 0 ? byRole : memberLabel(a).localeCompare(memberLabel(b), "ko");
+      });
   }, [admins, iguardMembers, iguardRoles, mainAdmins]);
+
+  const memberGroups = useMemo(
+    () => ASSIGNABLE_ROLES.map((role) => ({ role, list: members.filter((member) => member.role === role) }))
+      .filter((group) => group.list.length > 0),
+    [members],
+  );
 
   const roleCounts = useMemo(() => {
     const counts = new Map<MinistryRole, number>();
@@ -338,54 +348,62 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
           <section>
             <div className="mb-3">
               <h3 className="font-bold text-slate-800">승인된 팀원</h3>
-              <p className="mt-1 text-xs text-slate-400">역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
+              <p className="mt-1 text-xs text-slate-400">역할군 순으로 묶어 보여줍니다. 역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-5">
               {members.length === 0 && (
                 <div className="rounded-xl border border-dashed border-slate-200 py-7 text-center text-sm text-slate-400">승인된 팀원이 없습니다.</div>
               )}
-              {members.map((member) => {
-                const isMe = member.uid === user?.uid;
-                return (
-                  <div key={member.uid} className="rounded-xl border border-slate-200 p-3 sm:flex sm:items-center sm:gap-4">
-                    <div className="min-w-0 flex-1">
-                      {editingUid === member.uid ? (
-                        <div className="flex gap-2">
-                          <input className="input min-w-0 flex-1 text-sm" value={draftName} onChange={(event) => setDraftName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void saveName(member)} autoFocus aria-label="표시 이름" />
-                          <button onClick={() => void saveName(member)} className="rounded-lg bg-slate-900 px-3 text-xs font-bold text-white">저장</button>
-                          <button onClick={() => setEditingUid(null)} className="rounded-lg border border-slate-200 px-3 text-xs text-slate-500">취소</button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <p className="truncate font-semibold leading-6 text-slate-800">{memberLabel(member)}</p>
-                            {isMe && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] leading-none text-slate-500">나</span>}
-                            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[member.role]}`}>{MINISTRY_ROLE_LABELS[member.role]}</span>
-                            {(member.admin || member.iguard) && (
-                              <button onClick={() => { setEditingUid(member.uid); setDraftName(member.name); }} className="text-[11px] text-slate-400 underline">이름 수정</button>
-                            )}
-                          </div>
-                          {/* admins 노드에는 이메일이 없다 — 본인 계정이면 로그인 정보로 보완한다 */}
-                          <p className="truncate text-xs text-slate-400">{member.email || (isMe ? user?.email ?? member.uid : member.uid)}</p>
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-3 shrink-0 sm:mt-0 sm:w-40">
-                      <select
-                        className="input text-xs"
-                        aria-label={`${memberLabel(member)} 역할`}
-                        value={member.role}
-                        disabled={!canManage || isMe || busyUid === member.uid}
-                        onChange={(event) => void changeRole(member, event.target.value as MinistryRole)}
-                      >
-                        {ASSIGNABLE_ROLES.map((role) => (
-                          <option key={role} value={role}>{MINISTRY_ROLE_LABELS[role]}</option>
-                        ))}
-                      </select>
-                    </div>
+              {memberGroups.map((group) => (
+                <div key={group.role} className="space-y-2">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[group.role]}`}>{MINISTRY_ROLE_LABELS[group.role]}</span>
+                    <span className="text-xs font-semibold text-slate-400">{group.list.length}명</span>
                   </div>
-                );
-              })}
+                  {group.list.map((member) => {
+                    const isMe = member.uid === user?.uid;
+                    return (
+                      <div key={member.uid} className="rounded-xl border border-slate-200 p-3 sm:flex sm:items-center sm:gap-4">
+                        <div className="min-w-0 flex-1">
+                          {editingUid === member.uid ? (
+                            <div className="flex gap-2">
+                              <input className="input min-w-0 flex-1 text-sm" value={draftName} onChange={(event) => setDraftName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void saveName(member)} autoFocus aria-label="표시 이름" />
+                              <button onClick={() => void saveName(member)} className="rounded-lg bg-slate-900 px-3 text-xs font-bold text-white">저장</button>
+                              <button onClick={() => setEditingUid(null)} className="rounded-lg border border-slate-200 px-3 text-xs text-slate-500">취소</button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="truncate font-semibold leading-6 text-slate-800">{memberLabel(member)}</p>
+                                {isMe && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] leading-none text-slate-500">나</span>}
+                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[member.role]}`}>{MINISTRY_ROLE_LABELS[member.role]}</span>
+                                {(member.admin || member.iguard) && (
+                                  <button onClick={() => { setEditingUid(member.uid); setDraftName(member.name); }} className="text-[11px] text-slate-400 underline">이름 수정</button>
+                                )}
+                              </div>
+                              {/* admins 노드에는 이메일이 없다 — 본인 계정이면 로그인 정보로 보완한다 */}
+                              <p className="truncate text-xs text-slate-400">{member.email || (isMe ? user?.email ?? member.uid : member.uid)}</p>
+                            </>
+                          )}
+                        </div>
+                        <div className="mt-3 shrink-0 sm:mt-0 sm:w-40">
+                          <select
+                            className="input text-xs"
+                            aria-label={`${memberLabel(member)} 역할`}
+                            value={member.role}
+                            disabled={!canManage || isMe || busyUid === member.uid}
+                            onChange={(event) => void changeRole(member, event.target.value as MinistryRole)}
+                          >
+                            {ASSIGNABLE_ROLES.map((role) => (
+                              <option key={role} value={role}>{MINISTRY_ROLE_LABELS[role]}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           </section>
         </div>
