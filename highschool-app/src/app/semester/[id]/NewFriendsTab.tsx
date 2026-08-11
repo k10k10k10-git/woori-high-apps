@@ -354,40 +354,62 @@ export default function NewFriendsTab({
 
       <div className="card card-body">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><h3 className="font-semibold text-slate-900">새친구 진행 현황</h3><p className="mt-1 text-xs text-slate-400">접수부터 2주 과정, 반배정, 출석부 반영과 등반 선물까지 한 흐름으로 관리합니다.</p></div>
+          <div><h3 className="font-semibold text-slate-900">새친구 진행 현황</h3><p className="mt-1 text-xs text-slate-400">한 명씩 행으로 확인하고, 학생 이름을 누르면 상세 기록을 수정할 수 있습니다.</p></div>
           {canEdit && <button type="button" className="btn-primary" onClick={() => setEditing("new")}>+ 새친구 접수</button>}
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {friends.map((friend) => {
+        <div className="mt-4 max-h-[68vh] overflow-auto rounded-xl border border-slate-200">
+          <table className="w-full min-w-[1180px] border-collapse text-left text-xs">
+            <caption className="sr-only">새친구별 연락처, 담당자, 2주 과정, 등록 결정, 배정 반과 출석부 반영 현황</caption>
+            <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-semibold text-slate-500 shadow-[0_1px_0_#e2e8f0]">
+              <tr>
+                <th className="w-12 px-3 py-3 text-center">No.</th>
+                <th className="min-w-36 px-3 py-3">학생</th>
+                <th className="min-w-24 px-3 py-3">부서 / 학년</th>
+                <th className="min-w-24 px-3 py-3">바나바 담당</th>
+                <th className="min-w-24 px-3 py-3">1주차</th>
+                <th className="min-w-24 px-3 py-3">2주차</th>
+                <th className="min-w-24 px-3 py-3">등록 결정</th>
+                <th className="min-w-20 px-3 py-3">배정 반</th>
+                {canEdit && <th className="min-w-48 px-3 py-3">연락처 <span className="font-normal text-slate-400">(본인 / 주양육자)</span></th>}
+                <th className="min-w-24 px-3 py-3">진행 상태</th>
+                <th className="min-w-32 px-3 py-3">출석부</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+          {friends.map((friend, index) => {
             const stage = deriveNewFriendStage(friend);
             const priv = privateValueFor(friend);
             const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
             return (
-              <article key={recordKeyFor(friend)} className="rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <button type="button" className="min-w-0 text-left" onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
-                    <strong className="text-base text-slate-900">{friend.name}</strong>
-                    <span className="ml-2 text-xs text-slate-400">{friend.part} · {friend.grade}학년{friend.school ? ` · ${friend.school}` : ""}</span>
+              <tr key={recordKeyFor(friend)} className="transition-colors hover:bg-slate-50/80">
+                <td className="px-3 py-3 text-center tabular-nums text-slate-400">{index + 1}</td>
+                <td className="px-3 py-3">
+                  <button type="button" className={`block text-left ${canEdit ? "hover:text-emerald-700 hover:underline" : "cursor-default"}`} onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
+                    <strong className="block text-sm text-slate-900">{friend.name}</strong>
+                    <span className="mt-0.5 block max-w-40 truncate text-[11px] text-slate-400">{friend.school || "학교 미입력"}</span>
                   </button>
-                  <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${STAGE_STYLE[stage]}`}>{stage}</span>
-                </div>
-                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                  <div><dt className="text-slate-400">담당</dt><dd className="mt-0.5 text-slate-700">{friend.owner || "미배정"}</dd></div>
-                  <div><dt className="text-slate-400">등록 결정</dt><dd className="mt-0.5 text-slate-700">{friend.decision}</dd></div>
-                  <div><dt className="text-slate-400">1주차 / 2주차</dt><dd className="mt-0.5 text-slate-700">{friend.week1Date || "—"} / {friend.week2Date || "—"}</dd></div>
-                  <div><dt className="text-slate-400">배정 반</dt><dd className="mt-0.5 text-slate-700">{friend.assignedClassKey || "미배정"}</dd></div>
-                  {canEdit && <div className="col-span-2"><dt className="text-slate-400">연락처</dt><dd className="mt-0.5 text-slate-700">본인 {priv?.phone || "—"} · 주양육자 {priv?.parentPhone || "—"}</dd></div>}
-                </dl>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                  <p className="text-[11px] text-slate-400">{friend.rosterSync ? `출석부 ${friend.rosterSync.classKey} · ${friend.rosterSync.studentId}` : syncReady ? "출석부 반영 준비 완료" : "2주 과정·등록 결정·반배정을 확인해 주세요"}</p>
-                  {canSyncRoster && syncReady && <button type="button" className="btn-primary" onClick={() => handleSync(friend)} disabled={syncingId === friend.id}>{syncingId === friend.id ? "반영 중…" : "출석부 반영"}</button>}
-                  {!canSyncRoster && syncReady && <span className="rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">통합관리자 확인 대기</span>}
-                </div>
-              </article>
+                </td>
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600">{friend.part} · {friend.grade}학년</td>
+                <td className="px-3 py-3 text-slate-600">{friend.owner || "미배정"}</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week1Date || "—"}</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week2Date || "—"}</td>
+                <td className="px-3 py-3"><span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700">{friend.decision}</span></td>
+                <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{friend.assignedClassKey || "미배정"}</td>
+                {canEdit && <td className="px-3 py-3 leading-5 text-slate-600"><span className="block">본인 {priv?.phone || "—"}</span><span className="block text-slate-400">주양육자 {priv?.parentPhone || "—"}</span></td>}
+                <td className="px-3 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${STAGE_STYLE[stage]}`}>{stage}</span></td>
+                <td className="px-3 py-3">
+                  {friend.rosterSync ? <div><span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">반영 완료</span><span className="mt-1 block max-w-32 truncate text-[10px] text-slate-400">{friend.rosterSync.studentId}</span></div> : syncReady ? <>
+                    {canSyncRoster && <button type="button" className="btn-primary whitespace-nowrap px-2.5 py-1.5 text-[11px]" onClick={() => handleSync(friend)} disabled={syncingId === friend.id}>{syncingId === friend.id ? "반영 중…" : "출석부 반영"}</button>}
+                    {!canSyncRoster && <span className="inline-flex rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">관리자 확인 대기</span>}
+                  </> : <span className="text-[11px] text-slate-400">준비 필요</span>}
+                </td>
+              </tr>
             );
           })}
-          {friends.length === 0 && <div className="col-span-full rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">접수된 새친구가 없습니다.</div>}
+          {friends.length === 0 && <tr><td colSpan={canEdit ? 11 : 10} className="py-14 text-center text-sm text-slate-400">접수된 새친구가 없습니다.</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
 
