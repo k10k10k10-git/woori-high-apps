@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
+  cancelNewFriendAscension,
   getClassesByYear,
   registerNewFriendInRoster,
   removeNewFriend,
@@ -134,7 +135,7 @@ function NewFriendEditor({
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const { toast } = useUI();
+  const { toast, uiConfirm } = useUI();
   const [draft, setDraft] = useState(() => draftFor(friend, priv));
   const [saving, setSaving] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
@@ -224,6 +225,24 @@ function NewFriendEditor({
     }
   }
 
+  async function handleCancelAscension() {
+    if (!friend?.giftDate) return;
+    const confirmed = await uiConfirm(
+      `${friend.name}님의 등반 완료를 취소할까요? 명단과 출석부 연결은 유지하고 등반 선물 전달일만 비웁니다.`,
+    );
+    if (!confirmed) return;
+    setSaving(true);
+    try {
+      await cancelNewFriendAscension(sid, friend);
+      toast("등반 완료를 취소했습니다. 명단과 출석부는 그대로 유지됩니다.", "success");
+      onClose();
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "등반 취소에 실패했습니다.", "error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="modal-overlay center-modal" role="dialog" aria-modal="true" aria-label={friend ? "새친구 수정" : "새친구 접수"} onClick={onClose}>
       <div className="modal-dialog max-h-[90vh] w-[min(760px,calc(100vw-24px))] max-w-3xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
@@ -296,10 +315,15 @@ function NewFriendEditor({
         )}
 
         <div className="mt-5 flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4">
-          <div>
+          <div className="flex flex-wrap gap-2">
             {friend && (!friend.rosterSync || canSyncRoster) && !deleteConfirming && (
               <button type="button" className="btn-danger" onClick={() => setDeleteConfirming(true)} disabled={saving}>
                 {friend.rosterSync ? "명단·출석부 삭제" : "명단 삭제"}
+              </button>
+            )}
+            {friend?.giftDate && !deleteConfirming && (
+              <button type="button" className="btn-secondary border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" onClick={handleCancelAscension} disabled={saving}>
+                등반 취소
               </button>
             )}
             {friend?.rosterSync && !canSyncRoster && <p className="text-xs text-slate-400">출석부 연동 삭제는 통합관리자만 가능합니다.</p>}

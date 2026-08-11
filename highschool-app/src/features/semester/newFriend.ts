@@ -62,6 +62,17 @@ export function newFriendAssignmentCopyText(friend: NewFriend, priv: NewFriendPr
   ].join("\n");
 }
 
+export function buildNewFriendAscensionCancellationUpdates(input: {
+  sid: string;
+  friendId: string;
+  canceledAt: string;
+}): Record<string, string | null> {
+  return {
+    [`${paths.newFriend(input.sid, input.friendId)}/giftDate`]: null,
+    [`${paths.newFriend(input.sid, input.friendId)}/updatedAt`]: input.canceledAt,
+  };
+}
+
 export function deriveNewFriendStage(friend: NewFriend): NewFriendStage {
   if (friend.decision === "미등록") return "종료";
   if (friend.decision === "보류") return "보류";

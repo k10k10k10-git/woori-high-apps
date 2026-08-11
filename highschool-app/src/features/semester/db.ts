@@ -36,6 +36,7 @@ import { makeAppKey } from "./applicant";
 import { buildApplicationPrivateUpdates } from "./applicationPrivate";
 import type { SessionValue } from "./sessionKind";
 import {
+  buildNewFriendAscensionCancellationUpdates,
   buildNewFriendRosterRegistrationUpdates,
   buildNewFriendRosterRemovalUpdates,
   findNewFriendDuplicate,
@@ -434,6 +435,15 @@ export async function removeNewFriend(sid: string, friend: NewFriend): Promise<v
     [paths.newFriend(sid, friend.id)]: null,
     [paths.newFriendPrivate(sid, friend.id)]: null,
   });
+}
+
+export async function cancelNewFriendAscension(sid: string, friend: NewFriend): Promise<void> {
+  if (!friend.giftDate) throw new Error("등반 완료 기록이 없어 취소할 수 없습니다.");
+  await update(ref(db), buildNewFriendAscensionCancellationUpdates({
+    sid,
+    friendId: friend.id,
+    canceledAt: nowISO(),
+  }));
 }
 
 export interface RemoveNewFriendFromRosterResult {

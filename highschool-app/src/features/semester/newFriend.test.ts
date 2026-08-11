@@ -3,6 +3,7 @@ import {
   buildRosterStudent,
   buildNewFriendRosterRegistrationUpdates,
   buildNewFriendRosterRemovalUpdates,
+  buildNewFriendAscensionCancellationUpdates,
   deriveNewFriendRosterProgress,
   deriveNewFriendStage,
   findNewFriendDuplicate,
@@ -64,6 +65,17 @@ describe("새친구 진행 단계", () => {
       "본인 연락처 : 010-1111-2222",
       "보호자 연락처 : 010-3333-4444",
     ].join("\n"));
+  });
+
+  it("등반 취소는 명단·출석부 연결을 유지하고 선물 전달일만 해제한다", () => {
+    expect(buildNewFriendAscensionCancellationUpdates({
+      sid: "2026-sunday",
+      friendId: "friend-1",
+      canceledAt: "2026-08-11T13:30:00.000Z",
+    })).toEqual({
+      "semesters/2026-sunday/newFriends/friend-1/giftDate": null,
+      "semesters/2026-sunday/newFriends/friend-1/updatedAt": "2026-08-11T13:30:00.000Z",
+    });
   });
 });
 
