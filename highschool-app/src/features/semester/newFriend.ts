@@ -76,6 +76,24 @@ export function validateNewFriendRosterRegistration(friend: NewFriend): string |
   return null;
 }
 
+export function validateNewFriendRosterRemoval(
+  friend: NewFriend,
+  currentStudent: ClassStudent | null,
+): string | null {
+  if (!friend.rosterSync) return "출석부 반영 이력이 없어 연결 삭제할 수 없습니다.";
+  const expectedStudentId = studentIdForNewFriend(friend.id);
+  if (friend.rosterSync.studentId !== expectedStudentId) {
+    return "새친구 기록과 출석부 학생 ID가 일치하지 않아 삭제를 중단했습니다.";
+  }
+  if (currentStudent?.id && currentStudent.id !== expectedStudentId) {
+    return "출석부 학생 내부 ID가 반영 이력과 일치하지 않습니다.";
+  }
+  if (currentStudent && normalizedName(currentStudent.name) !== normalizedName(friend.name)) {
+    return "출석부의 현재 학생 이름과 새친구 기록이 달라 삭제를 중단했습니다.";
+  }
+  return null;
+}
+
 export function buildNewFriendRosterRegistrationUpdates(input: {
   sid: string;
   year: string;
@@ -105,4 +123,44 @@ export function buildNewFriendRosterRegistrationUpdates(input: {
     },
     [`${paths.newFriend(sid, friend.id)}/updatedAt`]: syncedAt,
   };
+}
+
+export function buildNewFriendRosterRemovalUpdates(input: {
+  sid: string;
+  year: string;
+  friend: NewFriend;
+  priv: NewFriendPrivate;
+  student: ClassStudent | null;
+  attendance: unknown;
+  removedAt: string;
+  removedAtMs: number;
+  removedBy?: string;
+}): Record<string, unknown> {
+  const { sid, year, friend, priv, student, attendance, removedAt, removedAtMs, removedBy } = input;
+  if (!friend.rosterSync) throw new Error("출석부 반영 이력이 필요합니다.");
+  const { studentId, classKey } = friend.rosterSync;
+  const updates: Record<string, unknown> = {
+    [paths.newFriendRemovalBackup(sid, friend.id, String(removedAtMs))]: {
+      createdAt: removedAt,
+      createdBy: removedBy ?? null,
+      studentPath: paths.classStudent(year, classKey, studentId),
+      attendancePath: paths.studentAttendance(year, classKey, studentId),
+      student,
+      attendance: attendance ?? null,
+      newFriend: friend,
+      newFriendPrivate: priv,
+    },
+    [paths.classStudent(year, classKey, studentId)]: null,
+    [paths.studentAttendance(year, classKey, studentId)]: null,
+    [paths.newFriend(sid, friend.id)]: null,
+    [paths.newFriendPrivate(sid, friend.id)]: null,
+  };
+  if (student) {
+    updates[paths.trashStudent(year, studentId)] = {
+      ...student,
+      ck: classKey,
+      deletedAt: removedAtMs,
+    };
+  }
+  return updates;
 }

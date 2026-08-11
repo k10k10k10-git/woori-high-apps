@@ -9,8 +9,8 @@
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
-| `classes/{year}` | 학생 앱 | 교사·스탭, 행정, 이가드 | 학생 앱 + 통합 앱의 통합관리자 새친구 단건 등록만 | **전체 영향** — 교사명단, 참가자 동기화, 이가드 반별 뷰 |
-| `attendance/{year}` | 학생 앱 | 행정 | 학생 앱만 | 행정 출석 통계 |
+| `classes/{year}` | 학생 앱 | 교사·스탭, 행정, 이가드 | 학생 앱 + 통합 앱의 통합관리자 새친구 단건 등록·검증된 되돌리기만 | **전체 영향** — 교사명단, 참가자 동기화, 이가드 반별 뷰 |
+| `attendance/{year}` | 학생 앱 | 행정 | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 출석 삭제만 | 행정 출석 통계 |
 | `events/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
 | `userRoles` | 학생 앱 | - | 학생 앱만 | 학생 앱 로그인/권한 |
 | `teacherClasses` | 학생 앱 | - | 학생 앱만 | 교사별 반 매핑 |
@@ -22,7 +22,7 @@
 | `teacherAdditional/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
 | `teacherPhones/{year}` | 학생 앱 | - | 학생 앱(읽기) | 없음 |
 | `suggestions/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
-| `trash/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
+| `trash/{year}` | 학생 앱 | - | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 복구 사본만 | 없음 |
 
 ## 교사·스탭 도메인 (소유: 교사·스탭 앱)
 
@@ -102,11 +102,11 @@
 | `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 | `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | - | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
 | `semestersPrivate/{sid}/newFriendsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 새친구 연락처·주소·가족·심방 메모 |
-| `semestersPrivate/{sid}/newFriendRosterBackups` | highschool-app 학기 모듈 | - | highschool-app | 출석부 신규 학생 단건 추가 직전 스냅샷·복구 근거 |
+| `semestersPrivate/{sid}/newFriendRosterBackups` | highschool-app 학기 모듈 | - | highschool-app | 출석부 신규 학생 단건 추가 직전 스냅샷과 삭제 직전 학생·출석·새친구 비공개 복구 근거 |
 | `semesters/{year}-sunday/newFriends` | highschool-app 주일 사역 | - | highschool-app | 신규 새친구의 학기 비종속 연도별 내부 작업공간. `meta`를 두지 않아 학기 목록에서 제외 |
 | `semestersPrivate/{year}-sunday/newFriendsPrivate` | highschool-app 주일 사역 | - | highschool-app | 주일 사역 신규 새친구의 연락처·주소·가족·심방 메모 |
 
-> `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 유일한 예외는 `highschool-app` 새친구 탭에서 통합관리자가 확인한 신규 학생 1명을 `classes/{year}/{classKey}/students/{studentId}`에 추가하는 흐름이다. 기존 학생 수정·이동·삭제와 출석 변경은 계속 학생 앱만 담당한다.
+> `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 예외는 `highschool-app` 새친구 탭에서 통합관리자가 확인한 신규 학생 1명을 결정적 `nf_` ID로 추가하는 흐름과, 그 흐름으로 연결된 동일 ID·동일 이름 학생만 사전 백업 후 `classes`·해당 `attendance`·새친구 기록에서 원자 삭제하고 `trash`에 복구 사본을 남기는 되돌리기뿐이다. 범용 기존 학생 수정·이동·삭제와 그 밖의 출석 변경은 계속 학생 앱만 담당한다.
 > **2026-08-09 권한 축소**: `teacherStaff`·`teacherSpecial`·`teacherExtra`·`teacherAdditional`·`teacherPhones`·`userRoles`의 `.read`가 `auth != null`이라 역할 없는 구글 계정도 교사 40명의 전화·생년월일과 계정 51건을 읽을 수 있었다. 읽는 주체를 grep으로 증명해 좁혔다 — 교사 명단 계열은 `admins`·`attendanceAdmins`·`retreatAdmins`·`iguardMembers`, 나머지는 관리자만, `userRoles`는 본인 레코드만 자기조회(`auth.token.email` 일치). 새 노드를 만들 때 `.read: "auth != null"`을 기본값처럼 쓰지 말 것.
 >
 > Rules는 2026-07-10 학생 앱에서 추가·배포 완료.

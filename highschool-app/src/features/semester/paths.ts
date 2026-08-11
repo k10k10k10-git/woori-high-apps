@@ -1,6 +1,6 @@
 // DB 경로 단일 원천 — 경로 문자열은 이 파일에만 존재한다 (모노레포 컨벤션).
 // 소유권: semester-app은 semesters/*, semestersPrivate/* 쓰기 소유.
-//         classes/*는 학생 앱 소유. 원칙상 읽기 전용이며 새친구 단건 등록만 통합관리자 예외.
+//         classes/*·attendance/*·trash/*는 학생 앱 소유. 새친구 단건 등록과 그 등록의 검증된 되돌리기만 통합관리자 예외.
 //         admins, retreatAdmins 는 읽기 전용 (다른 앱 소유).
 
 export const paths = {
@@ -38,11 +38,16 @@ export const paths = {
   newFriendPrivate: (sid: string, id: string) => `semestersPrivate/${sid}/newFriendsPrivate/${id}`,
   newFriendRosterBackup: (sid: string, id: string) =>
     `semestersPrivate/${sid}/newFriendRosterBackups/${id}`,
+  newFriendRemovalBackup: (sid: string, id: string, backupId: string) =>
+    `semestersPrivate/${sid}/newFriendRosterBackups/${id}/removals/${backupId}`,
 
-  // ── 읽기 전용 (다른 앱 소유 — 여기에 쓰기 함수를 만들지 말 것) ──
+  // ── 다른 앱 소유 (새친구 단건 등록·검증된 되돌리기 외 쓰기 함수 추가 금지) ──
   classesByYear: (year: string) => `classes/${year}`,
   classStudent: (year: string, classKey: string, studentId: string) =>
     `classes/${year}/${classKey}/students/${studentId}`,
+  studentAttendance: (year: string, classKey: string, studentId: string) =>
+    `attendance/${year}/${classKey}/${studentId}`,
+  trashStudent: (year: string, studentId: string) => `trash/${year}/students/${studentId}`,
   // 공식스탭 명단 (교사·스탭 출석부 앱 소유) — 접수 대상에 스탭을 포함하기 위해 읽는다
   teacherStaffByYear: (year: string) => `teacherStaff/${year}`,
   admins: (uid: string) => `admins/${uid}`,

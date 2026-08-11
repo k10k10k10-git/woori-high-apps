@@ -9,7 +9,7 @@
 - 학기: `semesters/*`, `semestersPrivate/*`
 - 수련회 행정: `retreats/{id}/*`, `retreatsPrivate/{id}/*`
 - 이가드: `retreats/{id}/iguard/*`
-- 공통 명단 `classes/{year}`는 원칙상 읽기 전용. 예외는 `registerNewFriendInRoster`의 통합관리자 신규 학생 단건 추가뿐이며, 이름 중복 검사·결정적 ID·원자 update를 유지한다.
+- 공통 명단 `classes/{year}`는 원칙상 읽기 전용. 예외는 통합관리자의 `registerNewFriendInRoster` 신규 학생 단건 추가와, 그 결정적 `nf_` 학생만 사전 백업·연결 검증 후 `classes`·해당 `attendance`·새친구 기록에서 원자 삭제하고 `trash`에 사본을 남기는 `removeNewFriendFromRoster`뿐이다.
 - Rules 배포 원천은 오직 `../고등부 학생 출석부/database.rules.json`
 
 통합 앱은 기존 경로와 스키마를 그대로 사용합니다. 도메인 간 소유 경계를 넘는 쓰기나 전체 노드 덮어쓰기를 추가하지 않습니다.
@@ -158,3 +158,8 @@ npm run build
 - **접근법**: 1→ `src/features/sundayMinistry/model.ts`에서 `semesters/*/newFriends`와 `semestersPrivate/*/newFriendsPrivate`를 `storageSid + friendId` 복합키로 통합한다. 2→ 신규 저장은 `sundayWorkspaceId(year)`가 만드는 `semesters/{year}-sunday`로 보내되 `meta`를 생성하지 않아 학기 목록에서 숨긴다. 3→ `src/app/sunday-ministry/SundayMinistryClient.tsx`에서 통합 구독과 네 개 탭을 제공하고 `NewFriendsTab` 콜백으로 각 기록의 원래 `storageSid`에 수정·삭제·출석부 반영을 보낸다. 4→ `/semester-admin`과 `?area=admin` 깊은 링크는 `/sunday-ministry`로 리디렉션하고, `GlobalPortalHeader`·`PortalHome`·검색 카탈로그의 진입점을 함께 교체한다. 5→ `model.test.ts`로 학기 간 ID 충돌·비공개 정보 결합·연도별 주일 작업공간 규칙을 고정한다.
 - **판단 질문**: 기존 학기별 새친구를 새 루트 노드로 이관하지 않았다. 이관은 운영 DB 쓰기·백업·Rules 설계가 필요하고 기존 사람 검색·출석부 반영 이력의 참조를 끊을 수 있다. 새 루트 `sundayMinistry/*`도 만들지 않았다 — 현재 Rules에 읽기·쓰기 계약이 없으므로 즉시 권한 거부되며 Rules 배포 금지 원칙과 충돌한다.
 - **재사용 규칙**: 기존 저장 스코프보다 새 업무 화면의 생명주기가 더 길면 `기존 스코프 통합 읽기 + 충돌 없는 복합키 + 기존 Rules가 허용하는 비가시 전용 작업공간 + 레거시 URL 리디렉션`으로 이관 없이 분류 구조를 바꾼다.
+
+### 다른 앱 원장에 자동 추가한 단건을 검증·백업 후 원자적으로 되돌리기 (2026-08-11)
+- **접근법**: 1→ 원장 소유 앱 `../고등부 학생 출석부/src/components/modals/StudentModal.tsx`의 삭제 계약이 `classes` 학생·해당 `attendance` 삭제와 `trash` 복구 사본임을 확인한다. 2→ `src/features/semester/newFriend.ts`에서 새친구 ID로 계산한 결정적 `nf_` 학생 ID, 저장된 연결 ID·반, 현재 학생 이름을 검증한다. 3→ 삭제 직전 학생·출석·새친구 공개/비공개 값을 `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}/removals/{timestamp}`에 담고, `trash` 사본과 네 삭제 경로를 하나의 루트 update로 계획한다. 4→ `removeNewFriendFromRoster`에서 현재 레코드를 다시 읽어 연결 변경을 차단하고 실행 뒤 삭제 경로·백업·휴지통을 재조회한다. 5→ 화면은 통합관리자에게만 버튼을 보이고 학생 이름 재입력 전에는 최종 삭제 버튼을 비활성화하며, 실제 화면 검증에서는 확인창만 열고 취소한다.
+- **판단 질문**: 통합 앱에 범용 학생 삭제를 열거나 `classes`만 단독 삭제하지 않는다. 전자는 학생 앱 소유권을 넘어 기존 학생까지 지울 수 있고, 후자는 출석 고아 레코드를 남긴다. 새친구 공개 기록만 먼저 지우거나 하드 삭제하지도 않는다 — 연결 근거와 복구 수단을 잃기 때문이다.
+- **재사용 규칙**: 다른 앱 소유 원장에 자동 생성한 단건을 되돌릴 때는 `생성 당시 결정적 연결 검증 → 소유 앱의 삭제 계약 복제 → 민감 사전 백업 + 원장 휴지통 → 한 번의 다중 경로 update → 재조회 검증 → 이름 입력 확인` 순서를 지킨다.

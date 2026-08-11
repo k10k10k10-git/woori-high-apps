@@ -17,6 +17,7 @@ import {
   ArchiveLink,
   AttendanceStatus,
   ClassInfo,
+  ClassStudent,
   CompletionEntry,
   CurriculumEntry,
   NewFriend,
@@ -36,9 +37,11 @@ import { buildApplicationPrivateUpdates } from "./applicationPrivate";
 import type { SessionValue } from "./sessionKind";
 import {
   buildNewFriendRosterRegistrationUpdates,
+  buildNewFriendRosterRemovalUpdates,
   findNewFriendDuplicate,
   studentIdForNewFriend,
   validateNewFriendRosterRegistration,
+  validateNewFriendRosterRemoval,
 } from "./newFriend";
 
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
@@ -430,6 +433,82 @@ export async function removeNewFriend(sid: string, friend: NewFriend): Promise<v
     [paths.newFriend(sid, friend.id)]: null,
     [paths.newFriendPrivate(sid, friend.id)]: null,
   });
+}
+
+export interface RemoveNewFriendFromRosterResult {
+  studentId: string;
+  classKey: string;
+}
+
+/**
+ * 통합관리자 전용 새친구 등록 되돌리기.
+ * 이 화면에서 만든 결정적 nf_ 학생만 대상으로 하고, 비공개 백업과 학생 앱 휴지통을 남긴 뒤
+ * 학생·출석·새친구 공개·비공개 기록을 하나의 루트 update로 삭제한다.
+ */
+export async function removeNewFriendFromRoster(
+  sid: string,
+  friend: NewFriend,
+  priv: NewFriendPrivate,
+  removedBy?: string,
+): Promise<RemoveNewFriendFromRosterResult> {
+  if (!friend.rosterSync) throw new Error("출석부 반영 이력이 없습니다.");
+  const year = sid.match(/^\d{4}/)?.[0];
+  if (!year) throw new Error("새친구 기록의 연도를 확인할 수 없습니다.");
+  const [friendSnap, privateSnap] = await Promise.all([
+    get(ref(db, paths.newFriend(sid, friend.id))),
+    get(ref(db, paths.newFriendPrivate(sid, friend.id))),
+  ]);
+  if (!friendSnap.exists()) throw new Error("새친구 기록을 찾을 수 없습니다. 목록을 새로고침해 주세요.");
+  const currentFriend = { ...friendSnap.val(), id: friend.id } as NewFriend;
+  if (!currentFriend.rosterSync) throw new Error("현재 새친구 기록에 출석부 반영 이력이 없습니다.");
+  if (
+    currentFriend.rosterSync.studentId !== friend.rosterSync.studentId
+    || currentFriend.rosterSync.classKey !== friend.rosterSync.classKey
+  ) {
+    throw new Error("출석부 연결 정보가 변경되었습니다. 목록을 새로고침한 뒤 다시 확인해 주세요.");
+  }
+  const currentPrivate = privateSnap.exists() ? privateSnap.val() as NewFriendPrivate : priv;
+  const { studentId, classKey } = currentFriend.rosterSync;
+  const studentPath = paths.classStudent(year, classKey, studentId);
+  const attendancePath = paths.studentAttendance(year, classKey, studentId);
+  const [studentSnap, attendanceSnap] = await Promise.all([
+    get(ref(db, studentPath)),
+    get(ref(db, attendancePath)),
+  ]);
+  const student = studentSnap.exists() ? studentSnap.val() as ClassStudent : null;
+  const validationError = validateNewFriendRosterRemoval(currentFriend, student);
+  if (validationError) throw new Error(validationError);
+
+  const removedAtMs = Date.now();
+  const removedAt = new Date(removedAtMs).toISOString();
+  const backupPath = paths.newFriendRemovalBackup(sid, friend.id, String(removedAtMs));
+  await update(ref(db), buildNewFriendRosterRemovalUpdates({
+    sid,
+    year,
+    friend: currentFriend,
+    priv: currentPrivate,
+    student,
+    attendance: attendanceSnap.val(),
+    removedAt,
+    removedAtMs,
+    removedBy,
+  }));
+
+  const verificationPaths = [
+    studentPath,
+    attendancePath,
+    paths.newFriend(sid, friend.id),
+    paths.newFriendPrivate(sid, friend.id),
+  ];
+  const [removedSnaps, backupSnap, trashSnap] = await Promise.all([
+    Promise.all(verificationPaths.map((path) => get(ref(db, path)))),
+    get(ref(db, backupPath)),
+    student ? get(ref(db, paths.trashStudent(year, studentId))) : Promise.resolve(null),
+  ]);
+  if (removedSnaps.some((snapshot) => snapshot.exists()) || !backupSnap.exists() || (trashSnap && !trashSnap.exists())) {
+    throw new Error("삭제 후 재조회 검증에 실패했습니다. 학생 출석부와 새친구 명단을 확인해 주세요.");
+  }
+  return { studentId, classKey };
 }
 
 export interface RegisterNewFriendResult {

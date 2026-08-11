@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildRosterStudent,
   buildNewFriendRosterRegistrationUpdates,
+  buildNewFriendRosterRemovalUpdates,
   deriveNewFriendStage,
   findNewFriendDuplicate,
   studentIdForNewFriend,
   validateNewFriendRosterRegistration,
+  validateNewFriendRosterRemoval,
 } from "./newFriend";
 import type { ClassInfo, NewFriend } from "./types";
 
@@ -107,5 +109,58 @@ describe("출석부 자동 반영 계획", () => {
       id: "nf_2026_new_1",
       name: "새친구",
     });
+  });
+});
+
+describe("출석부 반영 새친구 삭제 계획", () => {
+  const synced = friend({
+    name: "안정현",
+    decision: "등록",
+    assignedClassKey: "1-1-1",
+    rosterSync: {
+      studentId: "nf_2026_new_1",
+      classKey: "1-1-1",
+      syncedAt: "2026-08-11T10:00:00.000Z",
+    },
+  });
+
+  it("새친구 결정적 ID와 연결된 학생만 삭제한다", () => {
+    expect(validateNewFriendRosterRemoval(synced, { id: "nf_2026_new_1", name: "안 정현" })).toBeNull();
+    expect(validateNewFriendRosterRemoval({
+      ...synced,
+      rosterSync: { ...synced.rosterSync!, studentId: "other" },
+    }, { id: "other", name: "안정현" })).toContain("학생 ID");
+    expect(validateNewFriendRosterRemoval(synced, { id: "nf_2026_new_1", name: "다른 학생" })).toContain("이름");
+  });
+
+  it("비공개 사전 백업·출석부 휴지통·학생·출석·새친구를 하나의 루트 update로 계획한다", () => {
+    const updates = buildNewFriendRosterRemovalUpdates({
+      sid: "2026-sunday",
+      year: "2026",
+      friend: synced,
+      priv: { phone: "010-1111-2222" },
+      student: { id: "nf_2026_new_1", name: "안정현", phone: "010-1111-2222" },
+      attendance: { "2026-08-09": "O" },
+      removedAt: "2026-08-11T12:00:00.000Z",
+      removedAtMs: 1786449600000,
+      removedBy: "통합관리자",
+    });
+
+    expect(Object.keys(updates).sort()).toEqual([
+      "attendance/2026/1-1-1/nf_2026_new_1",
+      "classes/2026/1-1-1/students/nf_2026_new_1",
+      "semesters/2026-sunday/newFriends/2026_new_1",
+      "semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/removals/1786449600000",
+      "semestersPrivate/2026-sunday/newFriendsPrivate/2026_new_1",
+      "trash/2026/students/nf_2026_new_1",
+    ]);
+    expect(updates["attendance/2026/1-1-1/nf_2026_new_1"]).toBeNull();
+    expect(updates["trash/2026/students/nf_2026_new_1"]).toMatchObject({
+      name: "안정현",
+      ck: "1-1-1",
+      deletedAt: 1786449600000,
+    });
+    expect(updates["semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/removals/1786449600000"])
+      .toMatchObject({ attendance: { "2026-08-09": "O" } });
   });
 });

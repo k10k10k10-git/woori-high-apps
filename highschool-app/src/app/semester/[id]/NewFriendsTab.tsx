@@ -7,6 +7,7 @@ import {
   getClassesByYear,
   registerNewFriendInRoster,
   removeNewFriend,
+  removeNewFriendFromRoster,
   saveNewFriend,
 } from "@/features/semester/db";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
@@ -122,18 +123,22 @@ function NewFriendEditor({
   friend,
   priv,
   classes,
+  canSyncRoster,
   onClose,
 }: {
   sid: string;
   friend: NewFriend | null;
   priv?: NewFriendPrivate;
   classes: ClassInfo[];
+  canSyncRoster: boolean;
   onClose: () => void;
 }) {
   const { user } = useAuth();
-  const { toast, uiConfirm } = useUI();
+  const { toast } = useUI();
   const [draft, setDraft] = useState(() => draftFor(friend, priv));
   const [saving, setSaving] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
   const rosterLocked = Boolean(friend?.rosterSync);
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const classOptions = useMemo(() => classes
@@ -195,16 +200,27 @@ function NewFriendEditor({
 
   async function handleDelete() {
     if (!friend) return;
-    const confirmed = await uiConfirm(
-      `${friend.name}님의 새친구 기록을 삭제합니다. 출석부에 반영된 기록은 삭제할 수 없습니다.`,
-    );
-    if (!confirmed) return;
+    if (deleteInput.trim() !== friend.name) return toast("삭제할 학생의 이름을 정확히 입력해 주세요.", "error");
+    if (friend.rosterSync && !canSyncRoster) return toast("출석부 연동 삭제는 통합관리자만 할 수 있습니다.", "error");
+    setSaving(true);
     try {
-      await removeNewFriend(sid, friend);
-      toast("새친구 기록을 삭제했습니다.", "success");
+      if (friend.rosterSync) {
+        await removeNewFriendFromRoster(
+          sid,
+          friend,
+          priv ?? {},
+          user?.displayName || user?.email || user?.uid,
+        );
+        toast("새친구 명단과 학생 출석부에서 삭제했습니다.", "success");
+      } else {
+        await removeNewFriend(sid, friend);
+        toast("새친구 기록을 삭제했습니다.", "success");
+      }
       onClose();
     } catch (error) {
       toast(error instanceof Error ? error.message : "삭제에 실패했습니다.", "error");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -221,7 +237,7 @@ function NewFriendEditor({
 
         {rosterLocked && (
           <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-            출석부 반영이 완료되어 이름·부서·학년·연락처·배정 반은 잠겼습니다. 학생 정보 변경은 학생 출석부에서 처리하고, 여기서는 담당·선물·목양 메모만 갱신해 주세요.
+            출석부 반영이 완료되어 이름·부서·학년·연락처·배정 반은 잠겼습니다. 학생 정보 변경은 학생 출석부에서 처리하고, 여기서는 담당·선물·목양 메모만 갱신해 주세요. 명단 삭제는 통합관리자가 새친구 기록과 출석부를 함께 정리할 수 있습니다.
           </div>
         )}
 
@@ -252,8 +268,42 @@ function NewFriendEditor({
           <div className="sm:col-span-2"><Field label="교역자 심방·특이사항"><textarea className="input min-h-24" value={draft.pastoralNotes} onChange={(e) => set("pastoralNotes", e.target.value)} /></Field></div>
         </div>
 
+        {deleteConfirming && friend && (
+          <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
+            <p className="text-sm font-bold text-red-800">삭제 전 마지막 확인</p>
+            <p className="mt-1 text-xs leading-5 text-red-700">
+              {friend.rosterSync
+                ? "새친구 명단, 출석부 학생, 해당 학생의 출석 기록에서 함께 삭제됩니다. 비공개 사전 백업과 출석부 휴지통에는 복구용 사본이 남습니다."
+                : "새친구 공개·비공개 기록이 삭제됩니다."}
+            </p>
+            <label className="mt-3 block text-xs font-semibold text-red-800">
+              계속하려면 <strong>{friend.name}</strong>을(를) 입력하세요.
+              <input
+                className="input mt-1 border-red-200 bg-white"
+                value={deleteInput}
+                onChange={(event) => setDeleteInput(event.target.value)}
+                autoComplete="off"
+                aria-label="삭제할 학생 이름 확인"
+              />
+            </label>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" className="btn-secondary" onClick={() => { setDeleteConfirming(false); setDeleteInput(""); }} disabled={saving}>삭제 취소</button>
+              <button type="button" className="btn-danger" onClick={handleDelete} disabled={saving || deleteInput.trim() !== friend.name}>
+                {saving ? "삭제 중…" : friend.rosterSync ? "명단·출석부에서 삭제" : "명단에서 삭제"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="mt-5 flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4">
-          <div>{friend && !friend.rosterSync && <button type="button" className="btn-danger" onClick={handleDelete} disabled={saving}>삭제</button>}</div>
+          <div>
+            {friend && (!friend.rosterSync || canSyncRoster) && !deleteConfirming && (
+              <button type="button" className="btn-danger" onClick={() => setDeleteConfirming(true)} disabled={saving}>
+                {friend.rosterSync ? "명단·출석부 삭제" : "명단 삭제"}
+              </button>
+            )}
+            {friend?.rosterSync && !canSyncRoster && <p className="text-xs text-slate-400">출석부 연동 삭제는 통합관리자만 가능합니다.</p>}
+          </div>
           <div className="flex gap-2"><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>취소</button><button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? "저장 중…" : "저장"}</button></div>
         </div>
       </div>
@@ -421,6 +471,7 @@ export default function NewFriendsTab({
           friend={friend}
           priv={friend ? privateValueFor(friend) : undefined}
           classes={classesByYear[yearForStorageSid(editorSid)] ?? []}
+          canSyncRoster={canSyncRoster}
           onClose={() => setEditing(null)}
         />;
       })()}
