@@ -36,7 +36,7 @@ import { makeAppKey } from "./applicant";
 import { buildApplicationPrivateUpdates } from "./applicationPrivate";
 import type { SessionValue } from "./sessionKind";
 import {
-  buildNewFriendAscensionCancellationUpdates,
+  buildNewFriendPlacementCancellationUpdates,
   buildNewFriendRosterRegistrationUpdates,
   buildNewFriendRosterRemovalUpdates,
   findNewFriendDuplicate,
@@ -437,13 +437,101 @@ export async function removeNewFriend(sid: string, friend: NewFriend): Promise<v
   });
 }
 
-export async function cancelNewFriendAscension(sid: string, friend: NewFriend): Promise<void> {
-  if (!friend.giftDate) throw new Error("등반 완료 기록이 없어 취소할 수 없습니다.");
-  await update(ref(db), buildNewFriendAscensionCancellationUpdates({
+export interface CancelNewFriendPlacementResult {
+  removedFromRoster: boolean;
+  studentId?: string;
+  classKey?: string;
+}
+
+/**
+ * 새친구 기록은 보존하고 등반·반배정·출석부 연결만 안전하게 되돌린다.
+ * 출석부에 반영된 경우는 통합관리자만 호출하며, 사전 백업·휴지통·재조회 검증을 유지한다.
+ */
+export async function cancelNewFriendPlacement(
+  sid: string,
+  friend: NewFriend,
+  priv: NewFriendPrivate,
+  canceledBy?: string,
+): Promise<CancelNewFriendPlacementResult> {
+  if (!friend.giftDate && !friend.assignedClassKey && !friend.rosterSync) {
+    throw new Error("등반 또는 반 배정 기록이 없어 취소할 수 없습니다.");
+  }
+  const [friendSnap, privateSnap] = await Promise.all([
+    get(ref(db, paths.newFriend(sid, friend.id))),
+    get(ref(db, paths.newFriendPrivate(sid, friend.id))),
+  ]);
+  if (!friendSnap.exists()) throw new Error("새친구 기록을 찾을 수 없습니다. 목록을 새로고침해 주세요.");
+  const currentFriend = { ...friendSnap.val(), id: friend.id } as NewFriend;
+  const expectedSync = friend.rosterSync;
+  const currentSync = currentFriend.rosterSync;
+  if (
+    Boolean(expectedSync) !== Boolean(currentSync)
+    || (expectedSync && currentSync && (
+      expectedSync.studentId !== currentSync.studentId
+      || expectedSync.classKey !== currentSync.classKey
+    ))
+  ) {
+    throw new Error("출석부 연결 정보가 변경되었습니다. 목록을 새로고침한 뒤 다시 확인해 주세요.");
+  }
+
+  const currentPrivate = privateSnap.exists() ? privateSnap.val() as NewFriendPrivate : priv;
+  const canceledAtMs = Date.now();
+  const canceledAt = new Date(canceledAtMs).toISOString();
+  let student: ClassStudent | null = null;
+  let attendance: unknown = null;
+  let year: string | undefined;
+  let studentPath: string | undefined;
+  let attendancePath: string | undefined;
+  let backupPath: string | undefined;
+
+  if (currentSync) {
+    year = sid.match(/^\d{4}/)?.[0];
+    if (!year) throw new Error("새친구 기록의 연도를 확인할 수 없습니다.");
+    studentPath = paths.classStudent(year, currentSync.classKey, currentSync.studentId);
+    attendancePath = paths.studentAttendance(year, currentSync.classKey, currentSync.studentId);
+    const [studentSnap, attendanceSnap] = await Promise.all([
+      get(ref(db, studentPath)),
+      get(ref(db, attendancePath)),
+    ]);
+    student = studentSnap.exists() ? studentSnap.val() as ClassStudent : null;
+    attendance = attendanceSnap.val();
+    const validationError = validateNewFriendRosterRemoval(currentFriend, student);
+    if (validationError) throw new Error(validationError);
+    backupPath = paths.newFriendPlacementCancellationBackup(sid, friend.id, String(canceledAtMs));
+  }
+
+  await update(ref(db), buildNewFriendPlacementCancellationUpdates({
     sid,
-    friendId: friend.id,
-    canceledAt: nowISO(),
+    year,
+    friend: currentFriend,
+    priv: currentPrivate,
+    student,
+    attendance,
+    canceledAt,
+    canceledAtMs,
+    canceledBy,
   }));
+
+  const refreshedFriendSnap = await get(ref(db, paths.newFriend(sid, friend.id)));
+  if (!refreshedFriendSnap.exists()) throw new Error("취소 후 새친구 기록 보존 검증에 실패했습니다.");
+  const refreshedFriend = refreshedFriendSnap.val() as NewFriend;
+  if (refreshedFriend.assignedClassKey || refreshedFriend.giftDate || refreshedFriend.rosterSync) {
+    throw new Error("취소 후 등반·배정 정보 재조회 검증에 실패했습니다.");
+  }
+
+  if (currentSync && year && studentPath && attendancePath && backupPath) {
+    const [removedStudentSnap, removedAttendanceSnap, backupSnap, trashSnap] = await Promise.all([
+      get(ref(db, studentPath)),
+      get(ref(db, attendancePath)),
+      get(ref(db, backupPath)),
+      student ? get(ref(db, paths.trashStudent(year, currentSync.studentId))) : Promise.resolve(null),
+    ]);
+    if (removedStudentSnap.exists() || removedAttendanceSnap.exists() || !backupSnap.exists() || (trashSnap && !trashSnap.exists())) {
+      throw new Error("취소 후 출석부·백업 재조회 검증에 실패했습니다.");
+    }
+    return { removedFromRoster: true, studentId: currentSync.studentId, classKey: currentSync.classKey };
+  }
+  return { removedFromRoster: false };
 }
 
 export interface RemoveNewFriendFromRosterResult {

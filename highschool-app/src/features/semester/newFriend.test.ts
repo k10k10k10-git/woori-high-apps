@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRosterStudent,
+  buildNewFriendPlacementCancellationUpdates,
   buildNewFriendRosterRegistrationUpdates,
   buildNewFriendRosterRemovalUpdates,
-  buildNewFriendAscensionCancellationUpdates,
   deriveNewFriendRosterProgress,
   deriveNewFriendStage,
   findNewFriendDuplicate,
@@ -67,13 +67,19 @@ describe("새친구 진행 단계", () => {
     ].join("\n"));
   });
 
-  it("등반 취소는 명단·출석부 연결을 유지하고 선물 전달일만 해제한다", () => {
-    expect(buildNewFriendAscensionCancellationUpdates({
+  it("출석부 미반영 상태에서는 새친구 기록을 유지하고 등반·배정만 해제한다", () => {
+    expect(buildNewFriendPlacementCancellationUpdates({
       sid: "2026-sunday",
-      friendId: "friend-1",
+      friend: friend({ id: "friend-1", assignedClassKey: "1-1-1", giftDate: "2026-08-16" }),
+      priv: { phone: "010-1111-2222" },
+      student: null,
+      attendance: null,
       canceledAt: "2026-08-11T13:30:00.000Z",
+      canceledAtMs: 1786455000000,
     })).toEqual({
+      "semesters/2026-sunday/newFriends/friend-1/assignedClassKey": null,
       "semesters/2026-sunday/newFriends/friend-1/giftDate": null,
+      "semesters/2026-sunday/newFriends/friend-1/rosterSync": null,
       "semesters/2026-sunday/newFriends/friend-1/updatedAt": "2026-08-11T13:30:00.000Z",
     });
   });
@@ -214,5 +220,45 @@ describe("출석부 반영 새친구 삭제 계획", () => {
     });
     expect(updates["semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/removals/1786449600000"])
       .toMatchObject({ attendance: { "2026-08-09": "O" } });
+  });
+
+  it("등반·배정 취소는 새친구 기록을 보존하고 백업 후 명단·출석 연결만 해제한다", () => {
+    const updates = buildNewFriendPlacementCancellationUpdates({
+      sid: "2026-sunday",
+      year: "2026",
+      friend: { ...synced, giftDate: "2026-08-16" },
+      priv: { phone: "010-1111-2222" },
+      student: { id: "nf_2026_new_1", name: "안정현", phone: "010-1111-2222" },
+      attendance: { "2026-08-09": "O" },
+      canceledAt: "2026-08-11T13:30:00.000Z",
+      canceledAtMs: 1786455000000,
+      canceledBy: "통합관리자",
+    });
+
+    expect(Object.keys(updates).sort()).toEqual([
+      "attendance/2026/1-1-1/nf_2026_new_1",
+      "classes/2026/1-1-1/students/nf_2026_new_1",
+      "semesters/2026-sunday/newFriends/2026_new_1/assignedClassKey",
+      "semesters/2026-sunday/newFriends/2026_new_1/giftDate",
+      "semesters/2026-sunday/newFriends/2026_new_1/rosterSync",
+      "semesters/2026-sunday/newFriends/2026_new_1/updatedAt",
+      "semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/placementCancellations/1786455000000",
+      "trash/2026/students/nf_2026_new_1",
+    ]);
+    expect(updates["semesters/2026-sunday/newFriends/2026_new_1"]).toBeUndefined();
+    expect(updates["semestersPrivate/2026-sunday/newFriendsPrivate/2026_new_1"]).toBeUndefined();
+    expect(updates["classes/2026/1-1-1/students/nf_2026_new_1"]).toBeNull();
+    expect(updates["attendance/2026/1-1-1/nf_2026_new_1"]).toBeNull();
+    expect(updates["trash/2026/students/nf_2026_new_1"]).toMatchObject({
+      name: "안정현",
+      ck: "1-1-1",
+      deletedAt: 1786455000000,
+    });
+    expect(updates["semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/placementCancellations/1786455000000"])
+      .toMatchObject({
+        attendance: { "2026-08-09": "O" },
+        newFriendPrivate: { phone: "010-1111-2222" },
+        createdBy: "통합관리자",
+      });
   });
 });

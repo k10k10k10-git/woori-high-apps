@@ -62,17 +62,6 @@ export function newFriendAssignmentCopyText(friend: NewFriend, priv: NewFriendPr
   ].join("\n");
 }
 
-export function buildNewFriendAscensionCancellationUpdates(input: {
-  sid: string;
-  friendId: string;
-  canceledAt: string;
-}): Record<string, string | null> {
-  return {
-    [`${paths.newFriend(input.sid, input.friendId)}/giftDate`]: null,
-    [`${paths.newFriend(input.sid, input.friendId)}/updatedAt`]: input.canceledAt,
-  };
-}
-
 export function deriveNewFriendStage(friend: NewFriend): NewFriendStage {
   if (friend.decision === "미등록") return "종료";
   if (friend.decision === "보류") return "보류";
@@ -228,6 +217,50 @@ export function buildNewFriendRosterRemovalUpdates(input: {
       ...student,
       ck: classKey,
       deletedAt: removedAtMs,
+    };
+  }
+  return updates;
+}
+
+export function buildNewFriendPlacementCancellationUpdates(input: {
+  sid: string;
+  year?: string;
+  friend: NewFriend;
+  priv: NewFriendPrivate;
+  student: ClassStudent | null;
+  attendance: unknown;
+  canceledAt: string;
+  canceledAtMs: number;
+  canceledBy?: string;
+}): Record<string, unknown> {
+  const { sid, year, friend, priv, student, attendance, canceledAt, canceledAtMs, canceledBy } = input;
+  const updates: Record<string, unknown> = {
+    [`${paths.newFriend(sid, friend.id)}/assignedClassKey`]: null,
+    [`${paths.newFriend(sid, friend.id)}/giftDate`]: null,
+    [`${paths.newFriend(sid, friend.id)}/rosterSync`]: null,
+    [`${paths.newFriend(sid, friend.id)}/updatedAt`]: canceledAt,
+  };
+  if (!friend.rosterSync) return updates;
+  if (!year) throw new Error("새친구 기록의 연도가 필요합니다.");
+
+  const { studentId, classKey } = friend.rosterSync;
+  updates[paths.newFriendPlacementCancellationBackup(sid, friend.id, String(canceledAtMs))] = {
+    createdAt: canceledAt,
+    createdBy: canceledBy ?? null,
+    studentPath: paths.classStudent(year, classKey, studentId),
+    attendancePath: paths.studentAttendance(year, classKey, studentId),
+    student,
+    attendance: attendance ?? null,
+    newFriend: friend,
+    newFriendPrivate: priv,
+  };
+  updates[paths.classStudent(year, classKey, studentId)] = null;
+  updates[paths.studentAttendance(year, classKey, studentId)] = null;
+  if (student) {
+    updates[paths.trashStudent(year, studentId)] = {
+      ...student,
+      ck: classKey,
+      deletedAt: canceledAtMs,
     };
   }
   return updates;

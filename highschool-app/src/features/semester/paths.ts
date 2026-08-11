@@ -40,6 +40,8 @@ export const paths = {
     `semestersPrivate/${sid}/newFriendRosterBackups/${id}`,
   newFriendRemovalBackup: (sid: string, id: string, backupId: string) =>
     `semestersPrivate/${sid}/newFriendRosterBackups/${id}/removals/${backupId}`,
+  newFriendPlacementCancellationBackup: (sid: string, id: string, backupId: string) =>
+    `semestersPrivate/${sid}/newFriendRosterBackups/${id}/placementCancellations/${backupId}`,
 
   // ── 다른 앱 소유 (새친구 단건 등록·검증된 되돌리기 외 쓰기 함수 추가 금지) ──
   classes: () => `classes`,

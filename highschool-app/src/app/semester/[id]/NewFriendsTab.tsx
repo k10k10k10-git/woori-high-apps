@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
-  cancelNewFriendAscension,
+  cancelNewFriendPlacement,
   getClassesByYear,
   registerNewFriendInRoster,
   removeNewFriend,
@@ -225,19 +225,27 @@ function NewFriendEditor({
     }
   }
 
-  async function handleCancelAscension() {
-    if (!friend?.giftDate) return;
+  async function handleCancelPlacement() {
+    if (!friend || (!friend.giftDate && !friend.assignedClassKey && !friend.rosterSync)) return;
+    if (friend.rosterSync && !canSyncRoster) return toast("출석부 연동 배정 취소는 통합관리자만 할 수 있습니다.", "error");
     const confirmed = await uiConfirm(
-      `${friend.name}님의 등반 완료를 취소할까요? 명단과 출석부 연결은 유지하고 등반 선물 전달일만 비웁니다.`,
+      friend.rosterSync
+        ? `${friend.name}님의 등반과 반 배정을 취소할까요? 새친구 기록은 유지하지만 출석부 학생과 출석 기록은 백업 후 제거되며, 다시 반을 배정해야 합니다.`
+        : `${friend.name}님의 등반과 반 배정을 취소할까요? 등반 선물 전달일과 배정 반을 비웁니다.`,
     );
     if (!confirmed) return;
     setSaving(true);
     try {
-      await cancelNewFriendAscension(sid, friend);
-      toast("등반 완료를 취소했습니다. 명단과 출석부는 그대로 유지됩니다.", "success");
+      await cancelNewFriendPlacement(
+        sid,
+        friend,
+        priv ?? {},
+        user?.displayName || user?.email || user?.uid,
+      );
+      toast("등반 및 배정을 취소했습니다. 새친구 기록은 유지됩니다.", "success");
       onClose();
     } catch (error) {
-      toast(error instanceof Error ? error.message : "등반 취소에 실패했습니다.", "error");
+      toast(error instanceof Error ? error.message : "등반 및 배정 취소에 실패했습니다.", "error");
     } finally {
       setSaving(false);
     }
@@ -321,12 +329,12 @@ function NewFriendEditor({
                 {friend.rosterSync ? "명단·출석부 삭제" : "명단 삭제"}
               </button>
             )}
-            {friend?.giftDate && !deleteConfirming && (
-              <button type="button" className="btn-secondary border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" onClick={handleCancelAscension} disabled={saving}>
-                등반 취소
+            {friend && (friend.giftDate || friend.assignedClassKey || friend.rosterSync) && (!friend.rosterSync || canSyncRoster) && !deleteConfirming && (
+              <button type="button" className="btn-secondary border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" onClick={handleCancelPlacement} disabled={saving}>
+                등반 및 배정 취소
               </button>
             )}
-            {friend?.rosterSync && !canSyncRoster && <p className="text-xs text-slate-400">출석부 연동 삭제는 통합관리자만 가능합니다.</p>}
+            {friend?.rosterSync && !canSyncRoster && <p className="text-xs text-slate-400">출석부 연동 삭제·배정 취소는 통합관리자만 가능합니다.</p>}
           </div>
           <div className="flex gap-2"><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>취소</button><button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? "저장 중…" : "저장"}</button></div>
         </div>
