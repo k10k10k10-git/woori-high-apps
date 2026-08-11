@@ -8,15 +8,17 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLoadErrors } from "@/lib/useLoadErrors";
-import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessPortalArea, canEditPortalArea, canWriteStudentRoster } from "@/features/portal/accessPolicy";
 import {
   subscribeSemesterMeta,
   subscribeTeams,
   subscribeSessions,
   subscribeApplications,
   subscribeTrainingClasses,
+  subscribeNewFriends,
+  subscribeNewFriendsPrivate,
 } from "@/features/semester/db";
-import { Application, SemesterMeta, Session, Team, TrainingClass } from "@/features/semester/types";
+import { Application, NewFriend, NewFriendPrivate, SemesterMeta, Session, Team, TrainingClass } from "@/features/semester/types";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import IntakeTab from "./IntakeTab";
 import LoginButton from "@/components/LoginButton";
@@ -26,12 +28,14 @@ import CompletionTab from "./CompletionTab";
 import CurriculumTab from "./CurriculumTab";
 import ArchiveTab from "./ArchiveTab";
 import SettingsTab from "./SettingsTab";
+import NewFriendsTab from "./NewFriendsTab";
 import { SEMESTER_TABS } from "@/features/portal/featureCatalog";
 
 type TabName = (typeof SEMESTER_TABS)[number];
 
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   신청: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
+  새친구: { title: "새친구 정착 관리", description: "접수와 2주 과정, 등록 결정, 반배정과 학생 출석부 반영을 한 흐름으로 관리합니다." },
   배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
   출석: { title: "출석부", description: "사역팀 출석부와 훈련 출석부를 나눠 회차별로 기록합니다." },
   수료: { title: "훈련 및 사역팀 수료 현황", description: "출석 점수에 따른 수료 여부와 후속 제작 사역을 확인합니다." },
@@ -51,6 +55,8 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [newFriends, setNewFriends] = useState<NewFriend[]>([]);
+  const [newFriendsPrivate, setNewFriendsPrivate] = useState<Record<string, NewFriendPrivate>>({});
   // 실패는 경로별로 모은다 — 5개가 동시에 거부돼도 마지막 하나만 보이면 원인을 잘못 짚는다.
   const { fail, ok, message: loadError } = useLoadErrors(`${semesterId}|${user?.uid ?? ""}`);
 
@@ -62,9 +68,17 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
       subscribeTrainingClasses(semesterId, (v) => { setTrainingClasses(v); ok("훈련 반"); }, fail("훈련 반")),
       subscribeSessions(semesterId, (v) => { setSessions(v); ok("회차"); }, fail("회차")),
       subscribeApplications(semesterId, (v) => { setApplications(v); ok("신청 명단"); }, fail("신청 명단")),
+      subscribeNewFriends(semesterId, (v) => { setNewFriends(v); ok("새친구"); }, fail("새친구")),
     ];
+    if (canEdit) {
+      unsubs.push(subscribeNewFriendsPrivate(
+        semesterId,
+        (v) => { setNewFriendsPrivate(v); ok("새친구 비공개 정보"); },
+        fail("새친구 비공개 정보"),
+      ));
+    }
     return () => unsubs.forEach((u) => u());
-  }, [semesterId, user, allowed, fail, ok]);
+  }, [semesterId, user, allowed, canEdit, fail, ok]);
 
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
 
@@ -168,6 +182,7 @@ export default function SemesterClient({ semesterId }: { semesterId: string }) {
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
+            {activeTab === "새친구" && <NewFriendsTab sid={semesterId} friends={newFriends} privateMap={canEdit ? newFriendsPrivate : {}} canSyncRoster={canWriteStudentRoster(role)} />}
             {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
             {activeTab === "출석" && (
               <AttendanceTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />

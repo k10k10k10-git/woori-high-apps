@@ -43,6 +43,7 @@ This app owns:
 - Teacher users must only subscribe to their own class; admins subscribe to all classes.
 - `loadUserRole` must await `teacherClasses/{uid}` writes before class subscriptions because Rules read that path.
 - Do not overwrite an entire class student list for ordinary edits. Update only `classes/{year}/{ck}/students/{sid}`.
+- The unified app may add one new-friend student only through its super-admin `registerNewFriendInRoster` flow. Preserve deterministic `nf_` IDs, duplicate blocking, the private pre-write snapshot, and single-student atomic updates; all existing-student edits, moves, deletes, and attendance writes remain owned here.
 - `RosterModal` is the intentional full-replace exception.
 - Do not compute and persist student numbering on every save; `sortAndRenumber()` handles display order.
 - Compress student photos with `compressImage()` before storing base64.

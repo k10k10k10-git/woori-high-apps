@@ -1,5 +1,6 @@
 export const SEMESTER_TABS = [
   "신청",
+  "새친구",
   "배치",
   "출석",
   "수료",

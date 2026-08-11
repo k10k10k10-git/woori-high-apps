@@ -76,7 +76,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
       items.push({
         id: `semester-${semester.id}`,
         label: semester.meta.title,
-        description: "훈련·사역팀 · 신청·배치·출석·수료·커리큘럼·아카이브",
+        description: "훈련·사역팀 · 새친구·신청·배치·출석·수료·커리큘럼·아카이브",
         href: `/semester/${encodeURIComponent(semester.id)}`,
         keywords: `${semester.id} ${SEMESTER_TABS.join(" ")}`,
         area: "semester",

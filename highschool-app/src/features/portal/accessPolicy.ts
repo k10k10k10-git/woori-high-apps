@@ -104,6 +104,11 @@ export function canManageRoles(role: MinistryRole): boolean {
   return CAPABILITIES[role].manageRoles;
 }
 
+/** classes/{year} Rules와 일치하는 새친구 원장 단건 반영 권한. */
+export function canWriteStudentRoster(role: MinistryRole): boolean {
+  return role === "superAdmin";
+}
+
 export function retreatEntryHref(retreatId: string, role: MinistryRole): string {
   const encodedId = encodeURIComponent(retreatId);
   return canAccessPortalArea("retreat-admin", role)

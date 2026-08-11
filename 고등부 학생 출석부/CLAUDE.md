@@ -258,6 +258,8 @@ await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 ```
 번호(`num`)는 저장 시점에 계산하지 않는다 — 읽을 때 `sortAndRenumber()`가 항상 재계산하므로 저장값이 어긋나도 자동 보정된다. `RosterModal`(명단 일괄 교체)만 예외 — 사용자가 명시적으로 "교체"를 확인한 의도된 전체 덮어쓰기이므로 `set()` 유지.
 
+통합 앱의 새친구 탭은 현재 Rules가 허용하는 통합관리자(`admins`)에 한해 신규 학생 1명을 같은 단일 경로 규칙으로 추가할 수 있다. `highschool-app/src/features/semester/db.ts`의 `registerNewFriendInRoster`만 예외이며, 결정적 `nf_` 학생 ID·동명이인 차단·대상 반 확인·비공개 사전 스냅샷·새친구 반영 이력과의 원자 update를 유지한다. 기존 학생 수정·이동·삭제와 출석 쓰기는 계속 이 앱만 담당한다.
+
 ### 학생 사진 (`src/utils/image.ts`)
 
 `StudentModal`에서 사진 업로드 시 `compressImage()`로 캔버스 리사이즈(최대 320px)·JPEG 압축(품질 0.72) 후 base64로 저장한다. `classes/{year}` 전체를 4개 앱이 `onValue`로 구독하므로, 압축 없이 원본을 저장하면 트리 전체 로딩이 무거워진다.

@@ -19,6 +19,8 @@ import {
   ClassInfo,
   CompletionEntry,
   CurriculumEntry,
+  NewFriend,
+  NewFriendPrivate,
   Semester,
   SemesterMeta,
   Session,
@@ -32,6 +34,12 @@ import { buildTrainingClassRemovalUpdates } from "./trainingClass";
 import { makeAppKey } from "./applicant";
 import { buildApplicationPrivateUpdates } from "./applicationPrivate";
 import type { SessionValue } from "./sessionKind";
+import {
+  buildNewFriendRosterRegistrationUpdates,
+  findNewFriendDuplicate,
+  studentIdForNewFriend,
+  validateNewFriendRosterRegistration,
+} from "./newFriend";
 
 function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
   if (!snap.exists()) return [];
@@ -333,7 +341,8 @@ export async function removeArchiveLink(sid: string, linkId: string): Promise<vo
   await remove(ref(db, paths.archiveLink(sid, linkId)));
 }
 
-// ── 읽기 전용: 학생 원장 (classes — 학생 출석부 앱 소유. 쓰기 함수 추가 금지) ──
+// ── 학생 원장 조회 (classes — 학생 출석부 앱 소유) ──
+// 쓰기는 아래 registerNewFriendInRoster의 통합관리자 단건 등록 예외만 허용한다.
 
 export async function getClassesByYear(year: string): Promise<ClassInfo[]> {
   const snap = await get(ref(db, paths.classesByYear(year)));
@@ -357,4 +366,130 @@ export async function getStaffByYear(year: string): Promise<StaffPerson[]> {
       ...(value.phone?.trim() ? { phone: value.phone.trim() } : {}),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+// ── 새친구 ────────────────────────────────────────────────────────────
+// 운영 단계는 semesters, 연락처·주소·심방 메모는 semestersPrivate에 분리한다.
+
+export function subscribeNewFriends(
+  sid: string,
+  cb: (friends: NewFriend[]) => void,
+  onError?: (e: Error) => void,
+) {
+  return onValue(
+    ref(db, paths.newFriends(sid)),
+    (s) => cb(snapToList<NewFriend>(s).sort((a, b) => b.createdAt.localeCompare(a.createdAt))),
+    onError,
+  );
+}
+
+export function subscribeNewFriendsPrivate(
+  sid: string,
+  cb: (values: Record<string, NewFriendPrivate>) => void,
+  onError?: (e: Error) => void,
+) {
+  return onValue(ref(db, paths.newFriendsPrivate(sid)), (s) => cb(s.val() ?? {}), onError);
+}
+
+function privateFieldUpdates(
+  sid: string,
+  friendId: string,
+  value: NewFriendPrivate,
+): Record<string, string | null> {
+  return Object.fromEntries(Object.entries(value).map(([key, raw]) => [
+    `${paths.newFriendPrivate(sid, friendId)}/${key}`,
+    typeof raw === "string" && raw.trim() ? raw.trim() : null,
+  ]));
+}
+
+export async function saveNewFriend(
+  sid: string,
+  friend: Omit<NewFriend, "id"> & { id?: string },
+  priv: NewFriendPrivate,
+): Promise<string> {
+  const id = friend.id ?? newId();
+  const publicFields: Array<keyof Omit<NewFriend, "id">> = [
+    "name", "part", "gender", "school", "grade", "owner", "decision", "week1Date",
+    "week2Date", "inviter", "faithStep", "assignedClassKey", "giftDate", "createdAt",
+    "createdBy", "updatedAt", "rosterSync",
+  ];
+  const publicUpdates = Object.fromEntries(publicFields.map((key) => {
+    const value = friend[key];
+    return [`${paths.newFriend(sid, id)}/${key}`, value === undefined || value === "" ? null : value];
+  }));
+  await update(ref(db), {
+    ...publicUpdates,
+    ...privateFieldUpdates(sid, id, priv),
+  });
+  return id;
+}
+
+export async function removeNewFriend(sid: string, friend: NewFriend): Promise<void> {
+  if (friend.rosterSync) throw new Error("출석부에 반영된 새친구 기록은 삭제할 수 없습니다.");
+  await update(ref(db), {
+    [paths.newFriend(sid, friend.id)]: null,
+    [paths.newFriendPrivate(sid, friend.id)]: null,
+  });
+}
+
+export interface RegisterNewFriendResult {
+  studentId: string;
+  classKey: string;
+  alreadySynced: boolean;
+}
+
+/**
+ * 통합관리자 전용 출석부 반영.
+ * Rules가 admins만 classes 쓰기를 허용하므로 다른 역할의 호출은 서버가 아니라 Rules에서 최종 거부된다.
+ * 새친구 ID 기반 학생 ID를 사용하고 루트 다중 경로 update로 학생 생성+반영 이력을 원자 처리한다.
+ */
+export async function registerNewFriendInRoster(
+  sid: string,
+  friend: NewFriend,
+  priv: NewFriendPrivate,
+  syncedBy?: string,
+): Promise<RegisterNewFriendResult> {
+  const validationError = validateNewFriendRosterRegistration(friend);
+  if (validationError) throw new Error(validationError);
+
+  const year = sid.split("-")[0];
+  const classKey = friend.assignedClassKey!;
+  const studentId = studentIdForNewFriend(friend.id);
+  const classes = await getClassesByYear(year);
+  const targetClass = classes.find((item) => item.classKey === classKey);
+  if (!targetClass) throw new Error(`배정 반(${classKey})이 출석부에 없습니다.`);
+
+  const deterministicExisting = targetClass.students[studentId];
+  if (friend.rosterSync && deterministicExisting) {
+    return { studentId, classKey, alreadySynced: true };
+  }
+  if (deterministicExisting) {
+    const syncedAt = nowISO();
+    await update(ref(db, paths.newFriend(sid, friend.id)), {
+      rosterSync: { studentId, classKey, syncedAt, ...(syncedBy ? { syncedBy } : {}) },
+      updatedAt: syncedAt,
+    });
+    return { studentId, classKey, alreadySynced: true };
+  }
+
+  const duplicate = findNewFriendDuplicate(classes, friend, priv);
+  if (duplicate) {
+    throw new Error(`${duplicate.name} 학생이 ${duplicate.classKey}에 있습니다. ${duplicate.reason} — 자동 반영을 중단했습니다.`);
+  }
+
+  const syncedAt = nowISO();
+  await update(ref(db), buildNewFriendRosterRegistrationUpdates({
+    sid,
+    year,
+    friend,
+    priv,
+    studentId,
+    classKey,
+    syncedAt,
+    syncedBy,
+  }));
+
+  const verifySnap = await get(ref(db, paths.classStudent(year, classKey, studentId)));
+  if (!verifySnap.exists()) throw new Error("출석부 반영 후 재조회에 실패했습니다. 관리자에게 확인해 주세요.");
+  return { studentId, classKey, alreadySynced: false };
 }

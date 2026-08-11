@@ -27,7 +27,7 @@
 | 앱 | 소유 (쓰기 가능) | 다른 앱 노드 |
 |---|---|---|
 | 학생 출석부 | `classes/`, `attendance/`, `admins`, `teacher*`, Rules 배포 | — |
-| highschool-app 행정 모듈 | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용 |
+| highschool-app 행정 모듈 | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용. 단, 새친구 탭의 통합관리자 확인은 신규 학생 1명 경로만 원자 추가 |
 | highschool-app 현장 모듈 | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
 | 교사·스탭 출석부 | `staff_*` | — (여름수련회 이후까지 작업 보류) |
 | semester-app | `semesters/`, `semestersPrivate/` | `classes/`·`retreatAdmins` 읽기 전용 |

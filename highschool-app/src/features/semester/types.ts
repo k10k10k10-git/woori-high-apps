@@ -112,9 +112,14 @@ export interface StaffPerson {
 
 // classes/{year} 읽기용 (학생 출석부 앱 소유 스키마)
 export interface ClassStudent {
+  id?: string;
   name: string;
   num?: number;
+  birth?: string;
   phone?: string;
+  pphone?: string;
+  school?: string;
+  addr?: string;
   jang?: boolean; // 장결자
 }
 
@@ -123,3 +128,58 @@ export interface ClassInfo {
   teacher?: string;
   students: Record<string, ClassStudent>;
 }
+
+export type NewFriendDecision = "미정" | "등록" | "보류" | "미등록";
+
+export interface NewFriendRosterSync {
+  studentId: string;
+  classKey: string;
+  syncedAt: string;
+  syncedBy?: string;
+}
+
+/** 공개 운영 정보 — 연락처·주소·가족·심방 내용은 NewFriendPrivate로 분리한다. */
+export interface NewFriend {
+  id: string;
+  name: string;
+  part: "1부" | "2부";
+  gender?: "남" | "여";
+  school?: string;
+  grade: number;
+  owner?: string;
+  decision: NewFriendDecision;
+  week1Date?: string;
+  week2Date?: string;
+  inviter?: string;
+  faithStep?: string;
+  assignedClassKey?: string;
+  giftDate?: string;
+  createdAt: string;
+  createdBy?: string;
+  updatedAt?: string;
+  rosterSync?: NewFriendRosterSync;
+}
+
+/** 🔒 semestersPrivate 아래에만 저장한다. */
+export interface NewFriendPrivate {
+  birth?: string;
+  phone?: string;
+  parentPhone?: string;
+  address?: string;
+  churchFriend?: string;
+  teamMemo?: string;
+  familyNotes?: string;
+  pastoralNotes?: string;
+}
+
+export type NewFriendStage =
+  | "접수"
+  | "1주차"
+  | "2주차"
+  | "등록 결정"
+  | "반배정"
+  | "출석부 반영"
+  | "등반 확인"
+  | "완료"
+  | "보류"
+  | "종료";

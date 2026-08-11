@@ -9,7 +9,7 @@
 - 학기: `semesters/*`, `semestersPrivate/*`
 - 수련회 행정: `retreats/{id}/*`, `retreatsPrivate/{id}/*`
 - 이가드: `retreats/{id}/iguard/*`
-- 공통 명단 `classes/{year}` 등은 읽기 전용
+- 공통 명단 `classes/{year}`는 원칙상 읽기 전용. 예외는 `registerNewFriendInRoster`의 통합관리자 신규 학생 단건 추가뿐이며, 이름 중복 검사·결정적 ID·원자 update를 유지한다.
 - Rules 배포 원천은 오직 `../고등부 학생 출석부/database.rules.json`
 
 통합 앱은 기존 경로와 스키마를 그대로 사용합니다. 도메인 간 소유 경계를 넘는 쓰기나 전체 노드 덮어쓰기를 추가하지 않습니다.
@@ -137,3 +137,8 @@ npm run build
 - **접근법**: 1→ 원본 시트의 열·상태값·완료/미처리 건수를 개인정보 행과 분리해 집계한다. 2→ 자유 서술을 `접수 → 검토 → 승인 → 실행 → 검증` 상태와 명시적인 변동 유형으로 바꾼다. 3→ `../DB_OWNERSHIP.md`와 각 앱 `paths.ts`를 대조해 통합 사이트가 소유할 업무 기록과 학생 앱이 소유할 `classes/{year}` 실행을 나눈다. 4→ 요청과 실행 결과를 안정 ID로 연결하고, 학생 앱에서는 단일 학생 경로만 멱등적으로 갱신한 뒤 결과와 변경 전후를 기록한다. 5→ 기존 시트 이관은 매칭·중복·미처리 수를 먼저 보여주는 dry-run 뒤 스냅샷과 명시적 승인 하에 수행한다.
 - **판단 질문**: `highschool-app`에서 `classes/{year}`를 직접 수정하거나 운영 시트의 연락처·가정·심방 메모를 공개 학기 노드에 복사하지 않는다. 전자는 학생 앱 소유권과 다른 소비 앱의 계약을 깨고, 후자는 민감정보 권한을 넓히며 시트와 DB 사이에 두 번째 진실을 만들기 때문이다. 두 앱이 같은 요청 레코드를 함께 수정하는 공유 쓰기 노드도 피하고 요청 원문과 실행 결과의 소유 경로를 분리한다.
 - **재사용 규칙**: 다른 앱이 소유한 원장을 바꾸는 운영 시트를 제품화할 때는 통합 화면을 요청·승인 오케스트레이터로 두고, 실제 원장 변경과 검증은 소유 앱의 최소 단위 명령으로 실행하며 두 결과를 안정 ID와 감사 이력으로 연결한다.
+
+### Functions·Rules 변경 없이 다른 앱 소유 원장에 신규 1건만 안전하게 연결하기 (2026-08-11)
+- **접근법**: 1→ `../고등부 학생 출석부/database.rules.json`을 확인해 `classes/{year}` 쓰기가 이미 `admins`에만 허용됨을 고정하고 `accessPolicy.canWriteStudentRoster`를 같은 계약으로 테스트한다. 2→ `features/semester/newFriend.ts`에서 새친구 ID 기반 결정적 `nf_` 학생 ID, 2주 과정·등록 결정·반배정 검증, 이름·생년월일·연락처 중복 차단을 순수 함수로 만든다. 3→ `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}` 사전 스냅샷, `classes/{year}/{classKey}/students/{studentId}` 단일 신규 경로, `semesters/{sid}/newFriends/{friendId}/rosterSync` 이력을 하나의 루트 update 계획으로 만든다. 4→ 실행 뒤 생성한 학생 경로를 다시 읽어 검증하고, 재클릭은 같은 결정적 ID를 확인해 중복 생성 없이 연결만 복구한다. 5→ 출석부 반영 뒤에는 이름·부서·학년·연락처·반배정을 잠가 기존 학생 수정·이동·삭제가 학생 앱 소유로 돌아가게 한다.
+- **판단 질문**: Firebase Cloud Functions를 억지로 추가하지 않았다 — `npx firebase functions:list --project woori-high --debug`에서 Functions API 비활성, Cloud Billing API에서 `billingEnabled:false`를 실측했고 Functions 배포는 Blaze 요금제 연결이 필요했기 때문이다. `retreatAdmins`에 `classes` 쓰기를 여는 Rules 변경도 하지 않았다 — 권한 범위가 행정팀 전체의 기존 학생 수정까지 넓어진다. 통합 앱에 범용 학생 수정 함수도 만들지 않고 신규·미존재 경로 추가 하나로 예외를 닫았다.
+- **재사용 규칙**: 다른 앱 소유 원장에 자동 연결이 필요하지만 서버 함수·Rules 변경을 할 수 없으면, 기존 Rules가 이미 허용한 최상위 관리자에게만 `결정적 신규 ID + 중복 차단 + 비공개 사전 스냅샷 + 단일 경로 원자 추가 + 재조회 검증`을 제공하고 반영 직후 편집을 다시 소유 앱으로 잠근다.

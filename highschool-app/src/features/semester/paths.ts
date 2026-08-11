@@ -1,6 +1,7 @@
 // DB 경로 단일 원천 — 경로 문자열은 이 파일에만 존재한다 (모노레포 컨벤션).
 // 소유권: semester-app은 semesters/*, semestersPrivate/* 쓰기 소유.
-//         classes/*, admins, retreatAdmins 는 읽기 전용 (다른 앱 소유).
+//         classes/*는 학생 앱 소유. 원칙상 읽기 전용이며 새친구 단건 등록만 통합관리자 예외.
+//         admins, retreatAdmins 는 읽기 전용 (다른 앱 소유).
 
 export const paths = {
   // ── 소유 노드 ──
@@ -30,9 +31,17 @@ export const paths = {
   applicationPrivate: (sid: string, appKey: string) =>
     `semestersPrivate/${sid}/applicationsPrivate/${appKey}`,
   applicationsPrivate: (sid: string) => `semestersPrivate/${sid}/applicationsPrivate`,
+  newFriends: (sid: string) => `semesters/${sid}/newFriends`,
+  newFriend: (sid: string, id: string) => `semesters/${sid}/newFriends/${id}`,
+  newFriendsPrivate: (sid: string) => `semestersPrivate/${sid}/newFriendsPrivate`,
+  newFriendPrivate: (sid: string, id: string) => `semestersPrivate/${sid}/newFriendsPrivate/${id}`,
+  newFriendRosterBackup: (sid: string, id: string) =>
+    `semestersPrivate/${sid}/newFriendRosterBackups/${id}`,
 
   // ── 읽기 전용 (다른 앱 소유 — 여기에 쓰기 함수를 만들지 말 것) ──
   classesByYear: (year: string) => `classes/${year}`,
+  classStudent: (year: string, classKey: string, studentId: string) =>
+    `classes/${year}/${classKey}/students/${studentId}`,
   // 공식스탭 명단 (교사·스탭 출석부 앱 소유) — 접수 대상에 스탭을 포함하기 위해 읽는다
   teacherStaffByYear: (year: string) => `teacherStaff/${year}`,
   admins: (uid: string) => `admins/${uid}`,

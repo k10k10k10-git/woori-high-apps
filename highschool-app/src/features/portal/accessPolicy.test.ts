@@ -4,6 +4,7 @@ import {
   canAccessPortalArea,
   canEditPortalArea,
   canManageRoles,
+  canWriteStudentRoster,
   iguardScope,
   MINISTRY_ROLE_LABELS,
   resolveMinistryRole,
@@ -82,6 +83,11 @@ describe("6단계 역할 권한 표", () => {
   it("역할 배정은 통합관리자만 가능하다", () => {
     const managers = ASSIGNABLE_ROLES.filter(canManageRoles);
     expect(managers).toEqual(["superAdmin"]);
+  });
+
+  it("학생 출석부 원장 반영은 현재 Rules에 맞춰 통합관리자만 가능하다", () => {
+    const writers = ASSIGNABLE_ROLES.filter(canWriteStudentRoster);
+    expect(writers).toEqual(["superAdmin"]);
   });
 
   it("스탭은 학기 화면을 보되 수정하지 못한다", () => {
