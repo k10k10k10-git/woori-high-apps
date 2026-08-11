@@ -39,8 +39,19 @@ export default function DemoClassPicker({
           collected = buildDemoOptionsFromClasses(
             classSnap.exists() ? (classSnap.val() as Record<string, { teacher?: string }>) : null);
         }
+        // 교사 계정에 이름이 비어 있는 경우가 많다 — 반 노드의 담임 이름으로 채운다.
+        // 반 전체 트리는 사진 때문에 무거우므로 teacher 문자열 하나씩만 읽는다.
+        const withNames = await Promise.all(collected.map(async o => {
+          if (o.teacherName) return o;
+          try {
+            const snap = await get(ref(db, `classes/${getKSTYear()}/${o.ck}/teacher`));
+            return snap.exists() ? { ...o, teacherName: String(snap.val()) } : o;
+          } catch {
+            return o; // 이름은 거들 뿐 — 실패해도 반은 고를 수 있어야 한다
+          }
+        }));
         if (!alive) return;
-        setOptions(collected);
+        setOptions(withNames);
       } catch (e) {
         if (!alive) return;
         setLoadError(e instanceof Error ? e.message : String(e));
