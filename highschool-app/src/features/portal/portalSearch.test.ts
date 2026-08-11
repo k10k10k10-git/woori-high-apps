@@ -10,6 +10,7 @@ describe("portal search", () => {
     expect(items.some((item) => item.id === "retreat-home")).toBe(false);
     expect(items.some((item) => item.id === "field-home")).toBe(true);
     expect(items.some((item) => item.id === "semester-home")).toBe(true);
+    expect(items.some((item) => item.id === "sunday-ministry")).toBe(true);
   });
 
   it("이가드팀에게 학기·행정 검색 항목을 노출하지 않는다", () => {
@@ -23,6 +24,7 @@ describe("portal search", () => {
     const items = buildPortalSearchItems({ role: "superAdmin", semesters, retreats });
     expect(filterPortalSearchItems(items, "조편성").map((item) => item.id)).toContain("retreat-home");
     expect(filterPortalSearchItems(items, "커리큘럼").map((item) => item.id)).toContain("semester-home");
+    expect(filterPortalSearchItems(items, "처리 대기").map((item) => item.id)).toContain("sunday-ministry");
     expect(filterPortalSearchItems(items, "목양").map((item) => item.id)).toContain("ministry-guide");
   });
 });

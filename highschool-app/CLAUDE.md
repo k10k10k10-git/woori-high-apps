@@ -11,6 +11,7 @@
 - `/`: 통합 홈
 - `/ministry-guide`: 위키에서 추린 월별 사역 흐름·운영 플레이북·공지·수련회 회고
 - `/semesters`, `/semester/[id]`: 학기 중 사역
+- `/sunday-ministry`: 학기 구분 없는 주일 사역(행정·바나바, 새친구·학생 변동)
 - `/retreats`, `/retreat/[id]`: 수련회 행정
 - `/retreat/[id]/field`: 이가드 현장 운영
 
@@ -19,7 +20,7 @@
 ## 화면 셸 규칙
 
 - 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당합니다. 하위 화면에 "수련회 행정시스템" 같은 제목 줄을 다시 만들지 않습니다(제목 2줄 중복 금지).
-- 상단 메뉴는 **학기 중 사역 / 사역 가이드 / 방학 중 사역**이며, 방학 중 사역은 hover·클릭 시 `수련회 행정팀`(`/retreats`)·`수련회 이가드팀`(`/field`) 드롭다운으로 갈라집니다.
+- 상단 메뉴는 **학기 중 사역 / 주일 사역 / 방학 중 사역 / 사역 가이드 / 사이트 건의사항** 순서입니다. 방학 중 사역은 hover·클릭 시 `수련회 행정팀`(`/retreats`)·`수련회 이가드팀`(`/field`) 드롭다운으로 갈라집니다.
 - **방학 중 사역 홈은 화면 하나**입니다. 두 경로 모두 `features/portal/VacationHome.tsx`를 렌더하고, `mode`("admin"/"field")로 **수련회에 들어갔을 때의 목적지만** 달라집니다(행정 화면 / 현장 화면). 목록·수련회 기간·준비 일정 캘린더는 완전히 같은 컴포넌트를 씁니다. 각 라우트는 로그인·권한 게이트와 도메인 전용 요소(행정: 폼 가이드·삭제·브레인스토밍 / 현장: PIN 배지·현장 관리자)만 슬롯으로 넘깁니다.
 - 방학 중 사역 홈의 `새 수련회`는 항상 **수련회 목록 제목 옆**에 두고, 폼 가이드·PIN 잠금·현장 관리자처럼 목록 전체에 작용하는 도구는 `VacationHome.headerActions`를 통해 **화면 우측 상단**에 둡니다. 행정·현장 라우트가 이 위치를 따로 렌더링하지 않습니다.
 - 준비 일정 캘린더는 `RetreatCalendarPanel` 하나로 통일했습니다(구 `PrepCalendar` 삭제). 수련회 기간 편집은 Rules상 행정 권한이 필요하므로 `canEditPeriods`로 잠급니다 — `prepMilestones`는 이가드팀도 공유 편집합니다.
@@ -29,7 +30,7 @@
 
 ## 권한 — 6단계 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
 
-| 역할 | 학기 중 사역 | 수련회 행정 | 이가드 현장 | 역할 배정 | DB 저장 위치 |
+| 역할 | 학기·주일 사역 | 수련회 행정 | 이가드 현장 | 역할 배정 | DB 저장 위치 |
 |---|---|---|---|---|---|
 | 통합관리자 | 수정 | 수정 | 전체 | ✅ | `admins/{uid} = true` |
 | 교역자 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role = "pastor"` |
@@ -58,7 +59,7 @@
 - **배치·커리큘럼은 두 축**이다: 사역팀(`teams`)과 훈련 반(`trainingClasses`). 커리큘럼은 `curriculum/{id}` 한 맵을 공유한다(두 축의 id가 겹치지 않는다). 훈련 반에는 `goal`이 없으므로 학기 목표 박스는 사역팀에서만 보인다.
 - **홈 공유 캘린더**의 "공유 일정"은 `prepMilestones`다. 추가·수정·삭제는 Rules와 같게 스탭을 제외하고 열어 둔다(`canEditPortalArea("retreat-admin") || iguardScope === "all"`).
 - **사역 가이드**는 정적 운영 지식 화면이다. 위키 원문 중 반복 가능한 운영 원칙만 `features/ministryGuide/ministryGuideContent.ts`에 옮기며 Firebase를 읽거나 쓰지 않는다. 연간 계획은 반드시 `가안`으로 표시하고, 학생 실명·연락처·주소·가정·건강 특이사항과 미결 아이디어는 넣지 않는다.
-- **새친구 탭**은 공개 진행 정보는 `semesters/{sid}/newFriends`, 연락처·주소·가족·심방 메모는 `semestersPrivate/{sid}/newFriendsPrivate`에 분리한다. 행정팀은 접수·2주 과정·등록 결정·반배정을 관리하고, `classes/{year}` 반영은 현재 Rules와 일치하게 통합관리자만 `registerNewFriendInRoster`를 호출한다. 이 함수는 새친구 ID 기반 결정적 학생 ID, 이름 중복 차단, 대상 반 확인, `semestersPrivate/{sid}/newFriendRosterBackups` 사전 스냅샷, 단일 학생 경로+반영 이력의 원자 update와 재조회 검증을 유지한다. 일반적인 `classes` 쓰기 함수로 넓히지 않는다.
+- **주일 사역의 새친구 탭**은 학기 선택 없이 모든 `semesters/*/newFriends`를 통합 조회한다. 기존 학기별 기록은 이동하지 않고, 신규 기록만 학기가 아닌 연도별 내부 작업공간 `semesters/{year}-sunday/newFriends`와 `semestersPrivate/{year}-sunday/newFriendsPrivate`에 저장한다. 이 작업공간은 `meta`를 두지 않아 학기 목록에 나타나지 않는다. 행정팀은 접수·2주 과정·등록 결정·반배정을 관리하고, `classes/{year}` 반영은 현재 Rules와 일치하게 통합관리자만 `registerNewFriendInRoster`를 호출한다. 이 함수는 새친구 ID 기반 결정적 학생 ID, 중복 차단, 대상 반 확인, 비공개 사전 스냅샷, 단일 학생 경로+반영 이력의 원자 update와 재조회 검증을 유지한다. 일반적인 `classes` 쓰기 함수로 넓히지 않는다.
 - 큐싯 **구글 시트 연동은 2026-08-07 제거**했다(표 붙여넣기만 사용). `iguard/cueSheet` 노드와 db 함수는 남아 있지만 화면에서 쓰지 않는다 — 되살릴 때만 참고한다.
 - **인원체크 키에 배열 인덱스를 넣지 않는다** — `checklistKeys.ts`의 `stableMemberId`(`{kind}:{ownerId}:{name}`)만 쓴다. 인덱스를 넣으면 행사 중 한 명이 불참 처리될 때 뒤 사람들의 체크가 통째로 어긋난다. 운영 DB에는 구형 인덱스 키가 남아 있으므로 판정·해제는 반드시 `memberCheckKeys`/`isMemberChecked`를 거친다(신형·구형 동시 인식, 쓰기는 신형만).
 - **삭제는 짝이 되는 노드를 반드시 함께 지운다** — 수련회는 `buildRetreatRemovalUpdates`(`retreats` + `retreatsPrivate`), 팀·훈련 반은 `curriculum`까지. 한쪽만 지우면 화면에서 접근 불가능한 고아가 남는다(민감정보면 더 심각).

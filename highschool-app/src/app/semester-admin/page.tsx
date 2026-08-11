@@ -1,5 +1,5 @@
-import SemestersPage from "../semesters/page";
+import { redirect } from "next/navigation";
 
 export default function SemesterAdminPage() {
-  return <SemestersPage />;
+  redirect("/sunday-ministry");
 }

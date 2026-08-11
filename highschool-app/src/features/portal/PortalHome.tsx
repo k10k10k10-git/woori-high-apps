@@ -26,7 +26,7 @@ import {
   MINISTRY_ROLE_LABELS,
   retreatEntryHref,
 } from "./accessPolicy";
-import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_ADMIN_TABS, SEMESTER_TRAINING_TABS } from "./featureCatalog";
+import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TRAINING_TABS, SUNDAY_MINISTRY_TABS } from "./featureCatalog";
 import SharedMinistryCalendar, { type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
@@ -247,7 +247,7 @@ export default function PortalHome() {
           <div className="min-w-0">
             <p className="page-eyebrow">TODAY&apos;S MINISTRY</p>
             <h1 className="page-title">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
-            <p className="page-description">학기 운영, 수련회 행정, 현장 실행을 하나의 계정과 일관된 업무 흐름에서 이어갑니다.</p>
+            <p className="page-description">학기 운영, 주일 사역, 수련회 행정과 현장 실행을 하나의 계정에서 이어갑니다.</p>
           </div>
           <div className="grid grid-cols-3 gap-2.5 sm:gap-3" aria-label="오늘의 사역 요약">
             <HeroMetric label="오늘 일정" value={`${homeSummary.todayCount}건`} />
@@ -256,7 +256,7 @@ export default function PortalHome() {
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-2">
+        <section className="grid gap-5 lg:grid-cols-3">
           {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
               <span className="tag bg-[#edf4ff] px-3 py-1.5 text-[#2457b8]">학기 중 사역</span>
@@ -269,6 +269,15 @@ export default function PortalHome() {
             <h2 className="mt-5 text-2xl font-bold">통합관리자 승인 후 이용</h2>
             <p className="mt-2 text-sm">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
           </section>}
+
+          {semesterAllowed && <Link href="/sunday-ministry" className="card home-domain-card home-domain-card--sunday group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
+            <div className="flex items-center justify-between">
+              <span className="tag bg-amber-50 px-3 py-1.5 text-amber-700">주일 사역</span>
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-amber-50 group-hover:text-amber-700">→</span>
+            </div>
+            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">행정·바나바</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">학기 구분 없이 새친구 정착, 학생 변동과 처리 이력을 관리합니다.</p>
+          </Link>}
 
           <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, role) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
@@ -312,9 +321,9 @@ export default function PortalHome() {
               </Link>
             )}
             {semesterAllowed && (
-              <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}?area=admin` : "/semester-admin"} className="home-workspace-card group">
+              <Link href="/sunday-ministry" className="home-workspace-card group">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">행정·바나바</h3><span className="text-amber-600 group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-4 space-y-2.5">{SEMESTER_ADMIN_TABS.map((label) => <div key={label} className="flex items-center gap-2 text-xs"><span className="size-1.5 rounded-full bg-amber-400"/><span className="text-slate-600">{label}</span></div>)}</div>
+                <div className="mt-4 space-y-2.5">{SUNDAY_MINISTRY_TABS.map((label) => <div key={label} className="flex items-center gap-2 text-xs"><span className="size-1.5 rounded-full bg-amber-400"/><span className="text-slate-600">{label}</span></div>)}</div>
               </Link>
             )}
             {retreatAdminAllowed && (
@@ -363,7 +372,7 @@ export default function PortalHome() {
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료" tone="emerald" />}
-                {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}?area=admin` : "/semester-admin"} label="행정·바나바" description="새친구·학생 변동·처리 대기" tone="amber" />}
+                {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·학생 변동·처리 대기" tone="amber" />}
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScope(role) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
               </div>

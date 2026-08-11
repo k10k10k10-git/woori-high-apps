@@ -7,7 +7,7 @@ describe("공개 소개 페이지 콘텐츠", () => {
   });
 
   it("통합 홈·학기·수련회 행정·현장 기능을 모두 소개한다", () => {
-    expect(LANDING_FEATURES.map((item) => item.id)).toEqual(["home", "semester", "admin", "field"]);
+    expect(LANDING_FEATURES.map((item) => item.id)).toEqual(["home", "semester", "sunday", "admin", "field"]);
   });
 
   it("각 단계의 안내가 비어 있지 않다", () => {

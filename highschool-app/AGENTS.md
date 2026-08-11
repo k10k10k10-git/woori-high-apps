@@ -37,8 +37,8 @@
 ## 화면 셸 규칙
 
 - 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당한다. 하위 화면에 제목 줄을 다시 만들지 않는다(중복 제목 금지 — `/retreats`·`/field`에서 실제로 겹쳤다).
-- 상단 메뉴는 학기 중 사역 / 방학 중 사역 / 사역 가이드 / 사이트 건의사항 순서이며, 방학 중 사역이 수련회 행정팀·이가드팀 드롭다운으로 갈라진다. 우측 계정 영역의 학생 통합검색은 기능 메뉴가 아니라 기존 DB에서 인물 기록을 읽기 전용으로 파생한다.
-- 학기 중 사역은 `훈련·사역팀`과 `행정·바나바` 상위 영역으로 나눈다. 새친구는 행정·바나바 소속이며 학생 변동·처리 대기·변경 이력은 기존 새친구와 원장 반영 이력에서 파생한다.
+- 상단 메뉴는 학기 중 사역 / 주일 사역 / 방학 중 사역 / 사역 가이드 / 사이트 건의사항 순서이며, 방학 중 사역이 수련회 행정팀·이가드팀 드롭다운으로 갈라진다. 우측 계정 영역의 학생 통합검색은 기능 메뉴가 아니라 기존 DB에서 인물 기록을 읽기 전용으로 파생한다.
+- 학기 중 사역은 `훈련·사역팀`만 학기별로 관리한다. `행정·바나바`는 독립 `주일 사역` 영역이며, 새친구·학생 변동·처리 대기·변경 이력을 학기 구분 없이 보여준다.
 - 통합 브랜드 색: 학기·수련회 행정·이가드 모두 `globals.css`의 미드나이트 인디고·코발트·틸 토큰을 공유한다. `.semester-scope`와 `.iguard-scope`는 배경·최소 높이만 제공하며 도메인별 원색으로 토큰을 재정의하지 않는다. 상태 의미(정상·검토·위험)에만 에메랄드·앰버·로즈를 사용한다.
 - effect 안에서 `setState`를 직접 호출하지 않는다(eslint `react-hooks/set-state-in-effect`). 탭 유효성처럼 파생 가능한 값은 렌더 중 계산한다(`SemesterClient`의 `activeTab` 참고).
 
@@ -153,3 +153,8 @@ npm run build
 - **접근법**: 1→ `src/features/portal/featureCatalog.ts`에 `SEMESTER_TRAINING_TABS`, `SEMESTER_ADMIN_TABS`, `SEMESTER_WORKSPACE_GROUPS`를 선언해 정보구조를 단일 원천으로 만든다. 2→ `src/app/semester/[id]/SemesterClient.tsx`에서 상위 영역(`training`/`admin`)과 하위 탭을 분리하고 새친구를 행정·바나바로 이동한다. 3→ `/semesters`와 `/semester-admin`은 같은 학기 목록을 영역별 진입점으로 재사용하고, 상세 화면은 `?area=admin`으로 깊은 링크를 유지한다. 4→ 학생 변동·처리 대기·변경 이력은 새 노드 없이 `NewFriend.rosterSync`, `deriveNewFriendStage`, `createdAt`·`updatedAt`에서 읽기 전용으로 파생한다. 5→ PC와 375px에서 드롭다운·상위 탭·하위 탭을 검증하고, 모바일의 가로 스크롤이 절대 위치 메뉴를 자르면 메뉴가 열린 동안 `.portal-nav-menu-open`으로 overflow를 해제한다.
 - **판단 질문**: 화면 분류를 바꾸기 위해 기존 `semesters` 데이터를 이동하거나 `studentChanges` 같은 저장 노드를 먼저 만들지 않는다. 전자는 기존 기능과 검색의 키 계약을 깨고, 후자는 실제 입력·승인·감사 요구가 정해지기 전에 두 번째 진실을 만든다. 상단 드롭다운도 hover 전용으로 두지 않는다 — 모바일·키보드 클릭에서 열려야 하며 `onMouseEnter`와 토글 click을 같이 쓰면 첫 클릭이 다시 닫히므로 click은 명시적으로 open 상태를 쓴다.
 - **재사용 규칙**: 기존 기능을 계층형 업무영역으로 재편할 때는 `카탈로그 단일 원천 → 목록 진입점 → 상세 상위영역 → 하위 탭` 순서로 URL과 화면을 맞추고, 새 데이터 계약이 필요 없는 요약은 기존 기록에서 먼저 파생해 구조를 검증한다.
+
+### 학기별 기존 기록을 이동하지 않고 학기 비종속 주일 사역으로 통합하기 (2026-08-11)
+- **접근법**: 1→ `src/features/sundayMinistry/model.ts`에서 `semesters/*/newFriends`와 `semestersPrivate/*/newFriendsPrivate`를 `storageSid + friendId` 복합키로 통합한다. 2→ 신규 저장은 `sundayWorkspaceId(year)`가 만드는 `semesters/{year}-sunday`로 보내되 `meta`를 생성하지 않아 학기 목록에서 숨긴다. 3→ `src/app/sunday-ministry/SundayMinistryClient.tsx`에서 통합 구독과 네 개 탭을 제공하고 `NewFriendsTab` 콜백으로 각 기록의 원래 `storageSid`에 수정·삭제·출석부 반영을 보낸다. 4→ `/semester-admin`과 `?area=admin` 깊은 링크는 `/sunday-ministry`로 리디렉션하고, `GlobalPortalHeader`·`PortalHome`·검색 카탈로그의 진입점을 함께 교체한다. 5→ `model.test.ts`로 학기 간 ID 충돌·비공개 정보 결합·연도별 주일 작업공간 규칙을 고정한다.
+- **판단 질문**: 기존 학기별 새친구를 새 루트 노드로 이관하지 않았다. 이관은 운영 DB 쓰기·백업·Rules 설계가 필요하고 기존 사람 검색·출석부 반영 이력의 참조를 끊을 수 있다. 새 루트 `sundayMinistry/*`도 만들지 않았다 — 현재 Rules에 읽기·쓰기 계약이 없으므로 즉시 권한 거부되며 Rules 배포 금지 원칙과 충돌한다.
+- **재사용 규칙**: 기존 저장 스코프보다 새 업무 화면의 생명주기가 더 길면 `기존 스코프 통합 읽기 + 충돌 없는 복합키 + 기존 Rules가 허용하는 비가시 전용 작업공간 + 레거시 URL 리디렉션`으로 이관 없이 분류 구조를 바꾼다.

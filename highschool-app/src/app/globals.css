@@ -783,6 +783,7 @@ main .text-slate-400 { color: var(--color-text-faint); }
   background: var(--domain-color, var(--color-primary));
 }
 .home-domain-card--semester { --domain-color: #2563eb; }
+.home-domain-card--sunday { --domain-color: #d97706; }
 .home-domain-card--vacation { --domain-color: var(--color-primary); }
 .home-workspace-card {
   border-radius: 18px;

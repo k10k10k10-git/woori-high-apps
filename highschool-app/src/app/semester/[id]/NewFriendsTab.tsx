@@ -24,6 +24,9 @@ interface Props {
   friends: NewFriend[];
   privateMap: Record<string, NewFriendPrivate>;
   canSyncRoster: boolean;
+  getStorageSid?: (friend: NewFriend) => string;
+  getPrivateValue?: (friend: NewFriend) => NewFriendPrivate | undefined;
+  getRecordKey?: (friend: NewFriend) => string;
 }
 
 type Draft = {
@@ -262,22 +265,50 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   return <label className="block text-xs font-semibold text-slate-500"><span className="mb-1 block">{label}</span>{children}</label>;
 }
 
-export default function NewFriendsTab({ sid, friends, privateMap, canSyncRoster }: Props) {
+function yearForStorageSid(sid: string) {
+  const match = sid.match(/^\d{4}/);
+  return match?.[0] ?? String(new Date().getFullYear());
+}
+
+export default function NewFriendsTab({
+  sid,
+  friends,
+  privateMap,
+  canSyncRoster,
+  getStorageSid,
+  getPrivateValue,
+  getRecordKey,
+}: Props) {
   const { user } = useAuth();
   const { toast, uiConfirm } = useUI();
   const canEdit = useSemesterCanEdit();
   const [editing, setEditing] = useState<NewFriend | "new" | null>(null);
-  const [classes, setClasses] = useState<ClassInfo[]>([]);
+  const [classesByYear, setClassesByYear] = useState<Record<string, ClassInfo[]>>({});
   const [classError, setClassError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
-  const year = sid.split("-")[0];
+  const storageSidFor = (friend: NewFriend) => getStorageSid?.(friend) ?? sid;
+  const privateValueFor = (friend: NewFriend) => getPrivateValue?.(friend) ?? privateMap[friend.id];
+  const recordKeyFor = (friend: NewFriend) => getRecordKey?.(friend) ?? friend.id;
+  const years = useMemo(() => [...new Set([
+    yearForStorageSid(sid),
+    ...friends.map((friend) => yearForStorageSid(getStorageSid?.(friend) ?? sid)),
+  ])].sort(), [friends, getStorageSid, sid]);
 
   useEffect(() => {
-    getClassesByYear(year).then((value) => {
-      setClasses(value);
-      setClassError(null);
-    }).catch((error) => setClassError(error instanceof Error ? error.message : String(error)));
-  }, [year]);
+    let cancelled = false;
+    void Promise.allSettled(years.map(async (year) => [year, await getClassesByYear(year)] as const)).then((results) => {
+      if (cancelled) return;
+      const loaded: Record<string, ClassInfo[]> = {};
+      const errors: string[] = [];
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") loaded[result.value[0]] = result.value[1];
+        else errors.push(`${years[index]}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
+      });
+      setClassesByYear(loaded);
+      setClassError(errors.length > 0 ? errors.join(" / ") : null);
+    });
+    return () => { cancelled = true; };
+  }, [years]);
 
   const stageCounts = useMemo(() => friends.reduce<Record<string, number>>((acc, friend) => {
     const stage = deriveNewFriendStage(friend);
@@ -294,14 +325,17 @@ export default function NewFriendsTab({ sid, friends, privateMap, canSyncRoster 
     if (!confirmed) return;
     setSyncingId(friend.id);
     try {
+      const friendSid = storageSidFor(friend);
+      const year = yearForStorageSid(friendSid);
       const result = await registerNewFriendInRoster(
-        sid,
+        friendSid,
         friend,
-        privateMap[friend.id] ?? {},
+        privateValueFor(friend) ?? {},
         user?.displayName || user?.email || user?.uid,
       );
       toast(result.alreadySynced ? "이미 등록된 학생을 확인해 연결했습니다." : "학생 출석부에 반영했습니다.", "success");
-      setClasses(await getClassesByYear(year));
+      const refreshed = await getClassesByYear(year);
+      setClassesByYear((current) => ({ ...current, [year]: refreshed }));
     } catch (error) {
       toast(error instanceof Error ? error.message : "출석부 반영에 실패했습니다.", "error");
     } finally {
@@ -327,10 +361,10 @@ export default function NewFriendsTab({ sid, friends, privateMap, canSyncRoster 
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           {friends.map((friend) => {
             const stage = deriveNewFriendStage(friend);
-            const priv = privateMap[friend.id];
+            const priv = privateValueFor(friend);
             const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
             return (
-              <article key={friend.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <article key={recordKeyFor(friend)} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <button type="button" className="min-w-0 text-left" onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
                     <strong className="text-base text-slate-900">{friend.name}</strong>
@@ -357,7 +391,17 @@ export default function NewFriendsTab({ sid, friends, privateMap, canSyncRoster 
         </div>
       </div>
 
-      {editing && <NewFriendEditor sid={sid} friend={editing === "new" ? null : editing} priv={editing === "new" ? undefined : privateMap[editing.id]} classes={classes} onClose={() => setEditing(null)} />}
+      {editing && (() => {
+        const friend = editing === "new" ? null : editing;
+        const editorSid = friend ? storageSidFor(friend) : sid;
+        return <NewFriendEditor
+          sid={editorSid}
+          friend={friend}
+          priv={friend ? privateValueFor(friend) : undefined}
+          classes={classesByYear[yearForStorageSid(editorSid)] ?? []}
+          onClose={() => setEditing(null)}
+        />;
+      })()}
     </div>
   );
 }

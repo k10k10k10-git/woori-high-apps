@@ -1,9 +1,10 @@
 import { deriveNewFriendStage } from "@/features/semester/newFriend";
-import type { NewFriend, NewFriendPrivate } from "@/features/semester/types";
+import type { NewFriendPrivate } from "@/features/semester/types";
+import { sundayFriendKey, type SundayNewFriend } from "./model";
 
 type Props = {
-  friends: NewFriend[];
-  privateMap: Record<string, NewFriendPrivate>;
+  friends: SundayNewFriend[];
+  privateValueFor: (friend: SundayNewFriend) => NewFriendPrivate | undefined;
   showPrivate: boolean;
   onOpenNewFriends: () => void;
 };
@@ -13,6 +14,8 @@ const formatDate = (value?: string) => {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(date);
 };
+
+const recordKey = (friend: SundayNewFriend) => sundayFriendKey(friend.storageSid, friend.id);
 
 export function StudentChangesTab({ friends }: Pick<Props, "friends">) {
   const synced = friends
@@ -32,7 +35,7 @@ export function StudentChangesTab({ friends }: Pick<Props, "friends">) {
         <table className="min-w-full text-left text-xs">
           <thead><tr className="border-b border-slate-200 text-slate-400"><th className="px-3 py-2">학생</th><th className="px-3 py-2">변동 유형</th><th className="px-3 py-2">반영 위치</th><th className="px-3 py-2">처리 시각</th></tr></thead>
           <tbody>
-            {synced.map((friend) => <tr key={friend.id} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-800">{friend.name}</td><td className="px-3 py-3 text-slate-600">새친구 신규 등록</td><td className="px-3 py-3 text-slate-600">{friend.rosterSync?.classKey}</td><td className="px-3 py-3 text-slate-500">{formatDate(friend.rosterSync?.syncedAt)}</td></tr>)}
+            {synced.map((friend) => <tr key={recordKey(friend)} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-800">{friend.name}</td><td className="px-3 py-3 text-slate-600">새친구 신규 등록</td><td className="px-3 py-3 text-slate-600">{friend.rosterSync?.classKey}</td><td className="px-3 py-3 text-slate-500">{formatDate(friend.rosterSync?.syncedAt)}</td></tr>)}
           </tbody>
         </table>
         {synced.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">출석부에 반영된 학생 변동이 없습니다.</div>}
@@ -41,7 +44,7 @@ export function StudentChangesTab({ friends }: Pick<Props, "friends">) {
   );
 }
 
-export function PendingTab({ friends, privateMap, showPrivate, onOpenNewFriends }: Props) {
+export function PendingTab({ friends, privateValueFor, showPrivate, onOpenNewFriends }: Props) {
   const pending = friends.filter((friend) => !["완료", "종료", "보류"].includes(deriveNewFriendStage(friend)));
   return (
     <section className="card card-body">
@@ -52,8 +55,8 @@ export function PendingTab({ friends, privateMap, showPrivate, onOpenNewFriends 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {pending.map((friend) => {
           const stage = deriveNewFriendStage(friend);
-          const priv = privateMap[friend.id];
-          return <article key={friend.id} className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start justify-between gap-3"><strong className="text-slate-900">{friend.name}</strong><span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{stage}</span></div><p className="mt-2 text-xs text-slate-500">{friend.part} · {friend.grade}학년 · 담당 {friend.owner || "미배정"}</p>{showPrivate && <p className="mt-2 text-xs text-slate-500">연락처 {priv?.phone || "—"}</p>}<p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">다음 확인: {nextAction(friend)}</p></article>;
+          const priv = privateValueFor(friend);
+          return <article key={recordKey(friend)} className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start justify-between gap-3"><strong className="text-slate-900">{friend.name}</strong><span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{stage}</span></div><p className="mt-2 text-xs text-slate-500">{friend.part} · {friend.grade}학년 · 담당 {friend.owner || "미배정"}</p>{showPrivate && <p className="mt-2 text-xs text-slate-500">연락처 {priv?.phone || "—"}</p>}<p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">다음 확인: {nextAction(friend)}</p></article>;
         })}
         {pending.length === 0 && <div className="col-span-full rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">처리 대기 중인 새친구가 없습니다.</div>}
       </div>
@@ -64,9 +67,9 @@ export function PendingTab({ friends, privateMap, showPrivate, onOpenNewFriends 
 export function ChangeHistoryTab({ friends }: Pick<Props, "friends">) {
   const history = friends
     .flatMap((friend) => [
-      { id: `${friend.id}:created`, name: friend.name, action: "새친구 접수", at: friend.createdAt },
-      ...(friend.updatedAt && friend.updatedAt !== friend.createdAt ? [{ id: `${friend.id}:updated`, name: friend.name, action: "새친구 정보 수정", at: friend.updatedAt }] : []),
-      ...(friend.rosterSync ? [{ id: `${friend.id}:sync`, name: friend.name, action: `학생 출석부 반영 · ${friend.rosterSync.classKey}`, at: friend.rosterSync.syncedAt }] : []),
+      { id: `${recordKey(friend)}:created`, name: friend.name, action: "새친구 접수", at: friend.createdAt },
+      ...(friend.updatedAt && friend.updatedAt !== friend.createdAt ? [{ id: `${recordKey(friend)}:updated`, name: friend.name, action: "새친구 정보 수정", at: friend.updatedAt }] : []),
+      ...(friend.rosterSync ? [{ id: `${recordKey(friend)}:sync`, name: friend.name, action: `학생 출석부 반영 · ${friend.rosterSync.classKey}`, at: friend.rosterSync.syncedAt }] : []),
     ])
     .sort((a, b) => b.at.localeCompare(a.at));
 
@@ -81,7 +84,7 @@ export function ChangeHistoryTab({ friends }: Pick<Props, "friends">) {
   );
 }
 
-function nextAction(friend: NewFriend) {
+function nextAction(friend: SundayNewFriend) {
   if (!friend.week1Date) return "1주차 만남 기록";
   if (!friend.week2Date) return "2주차 만남 기록";
   if (friend.decision === "미정") return "등록 여부 결정";

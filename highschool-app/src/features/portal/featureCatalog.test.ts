@@ -2,19 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   IGUARD_VIEW_GROUPS,
   RETREAT_TAB_GROUPS,
-  SEMESTER_ADMIN_TABS,
   SEMESTER_TABS,
   SEMESTER_TRAINING_TABS,
-  SEMESTER_WORKSPACE_GROUPS,
+  SUNDAY_MINISTRY_TABS,
   UNIFIED_ROUTES,
 } from "./featureCatalog";
 
 describe("통합 앱 기능 카탈로그", () => {
-  it("학기 사역을 훈련·사역팀과 행정·바나바로 분리한다", () => {
-    expect(SEMESTER_WORKSPACE_GROUPS.map((group) => group.label)).toEqual(["훈련·사역팀", "행정·바나바"]);
+  it("학기 중 사역과 주일 사역의 탭을 분리한다", () => {
     expect(SEMESTER_TRAINING_TABS).toEqual(["신청", "배치", "출석", "수료", "커리큘럼", "아카이브", "설정"]);
-    expect(SEMESTER_ADMIN_TABS).toEqual(["새친구", "학생 변동", "처리 대기", "변경 이력"]);
-    expect(SEMESTER_TABS).toHaveLength(11);
+    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "학생 변동", "처리 대기", "변경 이력"]);
+    expect(SEMESTER_TABS).toEqual(SEMESTER_TRAINING_TABS);
   });
 
   it("수련회 행정의 5개 그룹과 17개 탭 인덱스를 빠짐없이 유지한다", () => {
@@ -34,6 +32,7 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(UNIFIED_ROUTES).toContain("/ministry-guide");
     expect(UNIFIED_ROUTES).toContain("/suggestions");
     expect(UNIFIED_ROUTES).toContain("/semesters");
+    expect(UNIFIED_ROUTES).toContain("/sunday-ministry");
     expect(UNIFIED_ROUTES).toContain("/semester-admin");
     expect(UNIFIED_ROUTES).toContain("/retreats");
     expect(UNIFIED_ROUTES).toContain("/field");

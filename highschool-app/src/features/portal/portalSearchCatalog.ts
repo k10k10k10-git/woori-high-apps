@@ -6,7 +6,7 @@ import {
   retreatEntryHref,
   type MinistryRole,
 } from "./accessPolicy";
-import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS } from "./featureCatalog";
+import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS, SUNDAY_MINISTRY_TABS } from "./featureCatalog";
 
 export type PortalSearchItem = {
   id: string;
@@ -14,7 +14,7 @@ export type PortalSearchItem = {
   description: string;
   href: string;
   keywords: string;
-  area: "home" | "semester" | "retreat" | "field" | "support";
+  area: "home" | "semester" | "sunday" | "retreat" | "field" | "support";
 };
 
 type BuildSearchInput = {
@@ -67,7 +67,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
     items.push({
       id: "semester-home",
       label: "학기 중 사역",
-      description: "훈련·사역팀과 행정·바나바 운영",
+      description: "훈련·사역팀 운영",
       href: "/semesters",
       keywords: SEMESTER_TABS.join(" "),
       area: "semester",
@@ -76,12 +76,20 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
       items.push({
         id: `semester-${semester.id}`,
         label: semester.meta.title,
-        description: "훈련·사역팀 · 행정·바나바",
+        description: "훈련·사역팀",
         href: `/semester/${encodeURIComponent(semester.id)}`,
         keywords: `${semester.id} ${SEMESTER_TABS.join(" ")}`,
         area: "semester",
       });
     }
+    items.push({
+      id: "sunday-ministry",
+      label: "주일 사역",
+      description: "행정·바나바 · 새친구와 학생 변동 관리",
+      href: "/sunday-ministry",
+      keywords: SUNDAY_MINISTRY_TABS.join(" "),
+      area: "sunday",
+    });
   }
 
   const adminAllowed = canAccessPortalArea("retreat-admin", role);

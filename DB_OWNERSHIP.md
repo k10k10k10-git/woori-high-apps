@@ -103,6 +103,8 @@
 | `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | - | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
 | `semestersPrivate/{sid}/newFriendsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 새친구 연락처·주소·가족·심방 메모 |
 | `semestersPrivate/{sid}/newFriendRosterBackups` | highschool-app 학기 모듈 | - | highschool-app | 출석부 신규 학생 단건 추가 직전 스냅샷·복구 근거 |
+| `semesters/{year}-sunday/newFriends` | highschool-app 주일 사역 | - | highschool-app | 신규 새친구의 학기 비종속 연도별 내부 작업공간. `meta`를 두지 않아 학기 목록에서 제외 |
+| `semestersPrivate/{year}-sunday/newFriendsPrivate` | highschool-app 주일 사역 | - | highschool-app | 주일 사역 신규 새친구의 연락처·주소·가족·심방 메모 |
 
 > `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 유일한 예외는 `highschool-app` 새친구 탭에서 통합관리자가 확인한 신규 학생 1명을 `classes/{year}/{classKey}/students/{studentId}`에 추가하는 흐름이다. 기존 학생 수정·이동·삭제와 출석 변경은 계속 학생 앱만 담당한다.
 > **2026-08-09 권한 축소**: `teacherStaff`·`teacherSpecial`·`teacherExtra`·`teacherAdditional`·`teacherPhones`·`userRoles`의 `.read`가 `auth != null`이라 역할 없는 구글 계정도 교사 40명의 전화·생년월일과 계정 51건을 읽을 수 있었다. 읽는 주체를 grep으로 증명해 좁혔다 — 교사 명단 계열은 `admins`·`attendanceAdmins`·`retreatAdmins`·`iguardMembers`, 나머지는 관리자만, `userRoles`는 본인 레코드만 자기조회(`auth.token.email` 일치). 새 노드를 만들 때 `.read: "auth != null"`을 기본값처럼 쓰지 말 것.

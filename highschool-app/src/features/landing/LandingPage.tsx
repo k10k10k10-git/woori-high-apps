@@ -41,7 +41,7 @@ function HeroDemo() {
       <div className="landing-demo-body">
         <aside>
           <div className="landing-demo-logo">W</div>
-          {["홈", "학기", "수련회", "현장"].map((item, index) => <i className={index === 0 ? "is-active" : ""} key={item}>{item}</i>)}
+          {["홈", "학기", "주일", "수련회", "현장"].map((item, index) => <i className={index === 0 ? "is-active" : ""} key={item}>{item}</i>)}
         </aside>
         <section>
           <p>안녕하세요, 선생님</p>
@@ -53,6 +53,7 @@ function HeroDemo() {
           </div>
           <div className="landing-demo-grid">
             <article><span>학기 중 사역</span><strong>2026년 2학기 훈련·사역팀</strong><small>출석 · 수료 · 커리큘럼</small></article>
+            <article><span>주일 사역</span><strong>행정·바나바</strong><small>새친구 · 학생 변동 · 처리 대기</small></article>
             <article><span>방학 중 사역</span><strong>2026년 여름수련회</strong><small>행정 · 이가드 현장 운영</small></article>
           </div>
         </section>
