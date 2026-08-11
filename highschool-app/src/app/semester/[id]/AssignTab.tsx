@@ -25,6 +25,19 @@ function byApplicant(a: Application, b: Application) {
   return applicantSortKey(a).localeCompare(applicantSortKey(b), "ko");
 }
 
+/**
+ * 팀 명단을 학생 칸·교사·스탭 칸으로 나눈다.
+ * 팀 카드와 명단 상세가 같은 구분을 쓰도록 여기 하나로 모은다 — 스탭은 지망·보호자 연락처
+ * 대상이 아니라 표시 항목 자체가 다르다.
+ */
+function groupByKind(members: Application[]): { key: string; label: string; rows: Application[] }[] {
+  const { students, staff } = splitStudentsAndStaff(members);
+  return [
+    { key: "students", label: `학생 ${students.length}명`, rows: students },
+    { key: "staff", label: `교사·스탭 ${staff.length}명`, rows: staff },
+  ].filter((section) => section.rows.length > 0);
+}
+
 export default function AssignTab({ sid, teams, trainingClasses, applications, teamById }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
@@ -177,27 +190,24 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                   명단 상세
                 </button>
               </div>
-              <ul className="grid gap-1 p-3">
-                {members.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-slate-50">
-                    <span>
-                      {a.name}
-                      <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
-                      {a.choice1 === t.id && <span className="ml-1 text-xs" style={{ color: "var(--color-primary)" }}>★</span>}
-                    </span>
-                    {canEdit && (
-                      <button
-                        aria-label={`${a.name} 배치 해제`}
-                        onClick={() => void assign(a, "")}
-                        className="text-xs text-slate-400 hover:text-red-500"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </li>
+              {/* 배치 해제(✕)는 명단 상세 안으로 옮겼다 — 목록에서 바로 지우면 실수로 누르기 쉽다. */}
+              <div className="grid gap-2 p-3">
+                {groupByKind(members).map((section) => (
+                  <div key={section.key}>
+                    <p className="mb-1 px-2 text-[11px] font-semibold text-slate-400">{section.label}</p>
+                    <ul className="grid gap-1">
+                      {section.rows.map((a) => (
+                        <li key={a.id} className="rounded px-2 py-1 text-sm hover:bg-slate-50">
+                          {a.name}
+                          <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
+                          {a.choice1 === t.id && <span className="ml-1 text-xs" style={{ color: "var(--color-primary)" }}>★</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-                {members.length === 0 && <li className="px-2 py-1 text-xs text-slate-300">아직 없음</li>}
-              </ul>
+                {members.length === 0 && <p className="px-2 py-1 text-xs text-slate-300">아직 없음</p>}
+              </div>
             </div>
           );
         })}
@@ -303,50 +313,79 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                 </div>
                 <button onClick={() => setDetailTeamId(null)} aria-label="닫기" className="rounded-lg px-2 py-1 text-lg text-slate-400 hover:bg-slate-100">✕</button>
               </div>
+              {/* 여기서 전원을 해제하면 명단이 빈다 — 빈 화면 대신 상태를 알린다. */}
+              {members.length === 0 && (
+                <p className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-400">
+                  배치된 인원이 없습니다.
+                </p>
+              )}
               {/* 학생과 교사·스탭을 나눠 보여준다. 스탭은 지망·보호자 연락처 대상이 아니라 항목도 다르다. */}
-              {(() => {
-                const { students, staff } = splitStudentsAndStaff(members);
-                const sections = staff.length === 0 || students.length === 0
-                  ? [{ label: null, rows: members }]
-                  : [{ label: `학생 ${students.length}명`, rows: students }, { label: `교사·스탭 ${staff.length}명`, rows: staff }];
-                return sections.map((section) => (
-                  <div key={section.label ?? "all"} className="mb-3 last:mb-0">
-                    {section.label && (
-                      <p className="mb-1.5 text-xs font-semibold text-slate-500">{section.label}</p>
-                    )}
-                    <ul className="grid gap-2">
-                      {section.rows.map((application) => {
-                        const detail = canEdit ? privateMap[application.id] : undefined;
-                        const expanded = expandedApplicantId === application.id;
-                        const staffMember = isStaffApplication(application);
-                        return (
-                          <li key={application.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                            <button
-                              onClick={() => setExpandedApplicantId(expanded ? null : application.id)}
-                              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
-                            >
-                              <span>
-                                <strong className="text-sm text-slate-800">{application.name}</strong>
-                                <span className="ml-2 text-xs text-slate-400">{describeApplicant(application)}</span>
-                                {!staffMember && application.choice1 === detailTeamId && <span className="ml-1 text-xs text-emerald-600">★ 1지망</span>}
-                              </span>
-                              <span className="text-xs text-slate-400">{expanded ? "접기" : "상세 보기"}</span>
-                            </button>
-                            {expanded && (
-                              <div className="grid gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-4 sm:grid-cols-2">
-                                <DetailField label="본인 연락처" value={canEdit ? detail?.phone : undefined} locked={!canEdit} />
-                                {!staffMember && <DetailField label="보호자 연락처" value={canEdit ? detail?.parentPhone : undefined} locked={!canEdit} />}
-                                {!staffMember && <DetailField label="지원 동기" value={canEdit ? detail?.motive : undefined} locked={!canEdit} wide />}
-                                {!staffMember && <DetailField label="하고 싶은 활동" value={canEdit ? detail?.wish : undefined} locked={!canEdit} wide />}
-                              </div>
+              {groupByKind(members).map((section) => (
+                <div key={section.key} className="mb-3 last:mb-0">
+                  <p className="mb-1.5 text-xs font-semibold text-slate-500">{section.label}</p>
+                  <ul className="grid gap-2">
+                    {section.rows.map((application) => {
+                      const detail = canEdit ? privateMap[application.id] : undefined;
+                      const expanded = expandedApplicantId === application.id;
+                      const staffMember = isStaffApplication(application);
+                      // 스탭에게는 지원 동기·하고 싶은 활동이 없다 — 펼칠 내용이 없으면 토글도 만들지 않는다.
+                      const canExpand = !staffMember;
+                      const heading = (
+                        <>
+                          <span className="flex flex-wrap items-baseline gap-x-2">
+                            <strong className="text-sm text-slate-800">{application.name}</strong>
+                            <span className="text-xs text-slate-400">{describeApplicant(application)}</span>
+                            {!staffMember && application.choice1 === detailTeamId && <span className="text-xs text-emerald-600">★ 1지망</span>}
+                          </span>
+                          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
+                            {canEdit ? (
+                              <>
+                                <span>본인 {detail?.phone?.trim() || "—"}</span>
+                                {!staffMember && <span>보호자 {detail?.parentPhone?.trim() || "—"}</span>}
+                              </>
+                            ) : (
+                              <span>연락처는 행정 권한에서 확인할 수 있습니다.</span>
                             )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ));
-              })()}
+                          </span>
+                        </>
+                      );
+                      return (
+                        <li key={application.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                          <div className="flex items-center">
+                            {canExpand ? (
+                              <button
+                                onClick={() => setExpandedApplicantId(expanded ? null : application.id)}
+                                className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                              >
+                                <span className="min-w-0">{heading}</span>
+                                <span className="shrink-0 text-xs text-slate-400">{expanded ? "접기" : "상세 보기"}</span>
+                              </button>
+                            ) : (
+                              <div className="min-w-0 flex-1 px-4 py-3">{heading}</div>
+                            )}
+                            {canEdit && (
+                              <button
+                                aria-label={`${application.name} 배치 해제`}
+                                title="배치 해제"
+                                onClick={() => void assign(application, "")}
+                                className="shrink-0 self-stretch px-4 text-sm text-slate-400 hover:bg-red-50 hover:text-red-500"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                          {expanded && (
+                            <div className="grid gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-4">
+                              <DetailField label="지원 동기" value={detail?.motive} locked={!canEdit} />
+                              <DetailField label="하고 싶은 활동" value={detail?.wish} locked={!canEdit} />
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </section>
           </div>
         );
@@ -355,9 +394,9 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
   );
 }
 
-function DetailField({ label, value, locked, wide = false }: { label: string; value?: string; locked: boolean; wide?: boolean }) {
+function DetailField({ label, value, locked }: { label: string; value?: string; locked: boolean }) {
   return (
-    <div className={wide ? "sm:col-span-2" : undefined}>
+    <div>
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
       <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{locked ? "행정 권한에서 확인할 수 있습니다." : value?.trim() || "입력된 내용이 없습니다."}</p>
     </div>
