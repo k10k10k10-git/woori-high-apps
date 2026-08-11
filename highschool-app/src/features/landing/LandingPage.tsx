@@ -70,7 +70,7 @@ function FeatureSection() {
       <div className="landing-section-heading">
         <p className="landing-kicker">OFFER</p>
         <h2 id="features-title">사역의 처음과 끝을 잇는 하나의 도구</h2>
-        <p>각각의 기능을 모아 둔 것이 아니라, 같은 명단과 권한으로 다음 사역으로 자연스럽게 이어집니다.</p>
+        <p>각각의 기능을 모아 둔 것이 아니라, 같은 명단과 권한 위에서 다음 사역으로 자연스럽게 이어집니다.</p>
       </div>
       <div className="landing-feature-tabs" role="tablist" aria-label="주요 기능">
         {LANDING_FEATURES.map((item) => (
