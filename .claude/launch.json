@@ -24,6 +24,20 @@
       "port": 3002
     },
     {
+      "name": "attendance-app",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "고등부 학생 출석부",
+        "--",
+        "-p",
+        "3003"
+      ],
+      "port": 3003
+    },
+    {
       "name": "agent-os",
       "runtimeExecutable": "node",
       "runtimeArgs": [
