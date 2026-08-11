@@ -57,6 +57,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
   const [staffError, setStaffError] = useState<string | null>(null);
   const [editing, setEditing] = useState<PersonRow | null>(null);
   const [query, setQuery] = useState("");
+  const [rosterCollapsed, setRosterCollapsed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -220,9 +221,23 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
 
       {/* 접수된 신청자 — 검색 없이도 현황을 바로 본다 */}
       <div className="card card-body">
-        <h3 className="font-semibold text-slate-800">
-          접수 명단 <span className="ml-1 text-sm font-normal text-slate-400">{applied.length}명</span>
-        </h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-slate-800">
+            접수 명단 <span className="ml-1 text-sm font-normal text-slate-400">{applied.length}명</span>
+          </h3>
+          <button
+            type="button"
+            className="min-h-9 shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700"
+            aria-expanded={!rosterCollapsed}
+            aria-controls="intake-applied-list"
+            onClick={() => setRosterCollapsed((value) => !value)}
+          >
+            {rosterCollapsed ? "펼치기 ▼" : "접기 ▲"}
+          </button>
+        </div>
+        {/* 접기 상태는 조건부 렌더로 처리한다 — hidden 속성은 .grid(display:grid)에 밀려 안 먹는다. */}
+        <div id="intake-applied-list">
+        {!rosterCollapsed && (
         <ul className="grid gap-1.5 sm:grid-cols-2">
           {applied.map(({ bucket, row }) => {
             const appKey = makeAppKey(row.bu, row.personId);
@@ -264,6 +279,8 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
             <li className="text-sm text-slate-400">아직 접수된 신청이 없습니다. 위에서 이름을 검색해 접수하세요.</li>
           )}
         </ul>
+        )}
+        </div>
       </div>
 
       {editing && (
