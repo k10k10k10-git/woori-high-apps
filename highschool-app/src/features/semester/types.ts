@@ -46,6 +46,7 @@ export type ApplicationStatus = "접수" | "배치" | "취소";
 export interface Application {
   id: string; // appKey = "{buNum}_{studentId}"
   studentId: string;
+  personId?: string;
   bu: string; // "1부" | "2부"
   grade: number;
   class: number;
@@ -105,6 +106,7 @@ export interface CurriculumEntry {
 // teacherStaff/{year} 읽기용 (교사·스탭 출석부 앱 소유 스키마) — 접수 대상에 스탭 포함
 export interface StaffPerson {
   staffId: string; // teacherStaff 노드키 (인물 단위 안정 키)
+  personId?: string;
   name: string;
   title?: string;
   phone?: string;
@@ -113,6 +115,7 @@ export interface StaffPerson {
 // classes/{year} 읽기용 (학생 출석부 앱 소유 스키마)
 export interface ClassStudent {
   id?: string;
+  personId?: string;
   name: string;
   num?: number;
   birth?: string;
@@ -133,6 +136,7 @@ export type NewFriendDecision = "미정" | "등록" | "보류" | "미등록";
 
 export interface NewFriendRosterSync {
   studentId: string;
+  personId?: string;
   classKey: string;
   syncedAt: string;
   syncedBy?: string;

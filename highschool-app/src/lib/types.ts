@@ -1,5 +1,6 @@
 export interface Student {
   id: string;
+  personId?: string;
   name: string;
   num: number;
   grade: number;

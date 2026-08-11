@@ -1,9 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { db, ref, update } from '@/lib/db';
+import { db, ref, get, push, update } from '@/lib/db';
 import { useApp, useClassKey } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import { compressImage } from '@/utils/image';
+import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
+import {
+  adminActor,
+  adminChangePath,
+  buildAdminChangeEntry,
+  changedStudentFieldLabels,
+} from '@/utils/adminChange';
 import type { Student } from '@/types';
 
 export default function StudentModal({
@@ -51,20 +58,39 @@ export default function StudentModal({
     if (!name.trim()) { showToast('이름을 입력하세요.'); return; }
     setSaving(true);
     const id = editId ?? `s_${Date.now()}`;
-    const newStudent: Student = { id, name: name.trim() };
-    if (birth)  newStudent.birth  = birth;
-    if (phone)  newStudent.phone  = phone;
-    if (pphone) newStudent.pphone = pphone;
-    if (school) newStudent.school = school;
-    if (addr)   newStudent.addr   = addr;
-    if (photo)  newStudent.photo  = photo;
 
     // 단일 학생만 갱신 — 반 전체 명단을 덮어쓰지 않아 동시 편집 충돌 방지.
     // (번호 num은 읽을 때 sortAndRenumber로 재계산되므로 여기서 저장 불필요)
     try {
-      await update(ref(db), {
+      let personId = student?.personId;
+      if (!personId) {
+        const allClassesSnap = await get(ref(db, 'classes'));
+        personId = findHistoricalStudentPersonId({ name, birth, phone }, [allClassesSnap.exists() ? allClassesSnap.val() : {}])
+          ?? createPersonId('student');
+      }
+      const newStudent: Student = { id, personId, name: name.trim() };
+      if (birth)  newStudent.birth  = birth;
+      if (phone)  newStudent.phone  = phone;
+      if (pphone) newStudent.pphone = pphone;
+      if (school) newStudent.school = school;
+      if (addr)   newStudent.addr   = addr;
+      if (photo)  newStudent.photo  = photo;
+      const updates: Record<string, unknown> = {
         [`classes/${state.curYear}/${ck}/students/${id}`]: newStudent,
-      });
+      };
+      const changedFields = student ? changedStudentFieldLabels(student, newStudent) : [];
+      if (!student || changedFields.length > 0) {
+        const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
+        updates[adminChangePath(state.curYear, ck, changeId)] = buildAdminChangeEntry({
+          classKey: ck,
+          teacher: state.classData[ck]?.teacher,
+          student: newStudent,
+          action: student ? '학생 정보 수정' : '학생 등록',
+          changeSummary: student ? `${changedFields.join('·')} 수정` : '출석부에 학생 신규 등록',
+          actor: adminActor(state.userRole),
+        });
+      }
+      await update(ref(db), updates);
     } catch {
       showToast('저장에 실패했습니다. 다시 시도해 주세요.');
       setSaving(false);
@@ -80,10 +106,19 @@ export default function StudentModal({
     setSaving(true);
     // 휴지통 보관 + 해당 학생/출석만 삭제 (원자적, 단일 경로)
     try {
+      const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
       await update(ref(db), {
         [`trash/${state.curYear}/students/${editId}`]: { ...student, ck, deletedAt: Date.now() },
         [`classes/${state.curYear}/${ck}/students/${editId}`]: null,
         [`attendance/${state.curYear}/${ck}/${editId}`]: null,
+        [adminChangePath(state.curYear, ck, changeId)]: buildAdminChangeEntry({
+          classKey: ck,
+          teacher: state.classData[ck]?.teacher,
+          student: student ?? { id: editId, name: '이름 미확인' },
+          action: '학생 삭제',
+          changeSummary: '출석부 명단 및 해당 학생 출석 기록 삭제',
+          actor: adminActor(state.userRole),
+        }),
       });
     } catch {
       showToast('삭제에 실패했습니다. 다시 시도해 주세요.');

@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { db, ref, get, set, update } from '@/lib/db';
+import { db, ref, get, push, set, update } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
-import { sortAndRenumber } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
+import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 import type { Student } from '@/types';
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -78,14 +78,21 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
   async function restoreStudent(item: TrashStudent) {
     setWorking(item.id);
     try {
-      const snap = await get(ref(db, `classes/${curYear}/${item.ck}/students`));
-      const existing: Record<string, Student> = snap.exists() ? snap.val() : {};
-      const list = sortAndRenumber([...Object.values(existing), { id: item.id, name: item.name, birth: item.birth, phone: item.phone, pphone: item.pphone, school: item.school, addr: item.addr, photo: item.photo }]);
-      const obj: Record<string, unknown> = {};
-      list.forEach(s => { obj[s.id] = s; });
+      const restoredStudent: Student = { ...item };
+      delete (restoredStudent as Partial<TrashStudent>).ck;
+      delete (restoredStudent as Partial<TrashStudent>).deletedAt;
+      const changeId = push(ref(db, `classes/${curYear}/${item.ck}/adminChanges`)).key ?? `change_${Date.now()}`;
       await update(ref(db), {
-        [`classes/${curYear}/${item.ck}/students`]: obj,
+        [`classes/${curYear}/${item.ck}/students/${item.id}`]: restoredStudent,
         [`trash/${curYear}/students/${item.id}`]: null,
+        [adminChangePath(curYear, item.ck, changeId)]: buildAdminChangeEntry({
+          classKey: item.ck,
+          teacher: state.classData[item.ck]?.teacher,
+          student: restoredStudent,
+          action: '학생 복원',
+          changeSummary: '최근 삭제 목록에서 학생 명단 복원',
+          actor: adminActor(state.userRole),
+        }),
       });
       setStudents(prev => prev.filter(s => s.id !== item.id));
       showToast(`${item.name} 학생이 복원되었습니다.`, 'success');
@@ -101,11 +108,21 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
     setWorking(trashKey);
     try {
       const studentsObj = item.students ?? {};
+      const changeId = push(ref(db, `classes/${curYear}/${item.ck}/adminChanges`)).key ?? `change_${Date.now()}`;
+      const change = buildAdminChangeEntry({
+        classKey: item.ck,
+        teacher: item.teacher,
+        studentName: `반 전체 (${Object.keys(studentsObj).length}명)`,
+        action: '학생 복원',
+        changeSummary: '최근 삭제 목록에서 반과 학생 명단 복원',
+        actor: adminActor(state.userRole),
+      });
       await update(ref(db), {
         [`classes/${curYear}/${item.ck}`]: {
           teacher: item.teacher,
           ...(item.teacherPhoto ? { teacherPhoto: item.teacherPhoto } : {}),
           students: studentsObj,
+          adminChanges: { [changeId]: change },
         },
         [`trash/${curYear}/classes/${trashKey}`]: null,
       });

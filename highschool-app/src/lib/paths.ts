@@ -121,4 +121,8 @@ export const paths = {
   teacherStaff: (year: number) => `teacherStaff/${year}`,
   teacherSpecial: (year: number) => `teacherSpecial/${year}`,
   teacherExtra: (year: number) => `teacherExtra/${year}`,
+  teacherStaffRoot: () => "teacherStaff",
+  teacherSpecialRoot: () => "teacherSpecial",
+  teacherExtraRoot: () => "teacherExtra",
+  teacherAdditionalRoot: () => "teacherAdditional",
 } as const;

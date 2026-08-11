@@ -11,7 +11,7 @@ import {
 describe("통합 앱 기능 카탈로그", () => {
   it("학기 중 사역과 주일 사역의 탭을 분리한다", () => {
     expect(SEMESTER_TRAINING_TABS).toEqual(["신청", "배치", "출석", "수료", "커리큘럼", "아카이브", "설정"]);
-    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "학생 변동", "처리 대기", "변경 이력"]);
+    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "등록 현황", "처리 대기", "행정 변동 사항"]);
     expect(SEMESTER_TABS).toEqual(SEMESTER_TRAINING_TABS);
   });
 

@@ -8,17 +8,18 @@ import { canAccessPortalArea, canEditPortalArea, canWriteStudentRoster } from "@
 import { SUNDAY_MINISTRY_TABS } from "@/features/portal/featureCatalog";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import type { NewFriend, NewFriendPrivate } from "@/features/semester/types";
-import { subscribeSundayNewFriends, subscribeSundayNewFriendsPrivate } from "@/features/sundayMinistry/db";
+import { subscribeSundayAdminChanges, subscribeSundayNewFriends, subscribeSundayNewFriendsPrivate } from "@/features/sundayMinistry/db";
 import {
   privateValueForSundayFriend,
   sundayFriendKey,
   sundayWorkspaceId,
   type SundayNewFriend,
+  type SundayAdminChange,
 } from "@/features/sundayMinistry/model";
 import {
-  ChangeHistoryTab,
+  AdminChangesTab,
   PendingTab,
-  StudentChangesTab,
+  RegistrationStatusTab,
 } from "@/features/sundayMinistry/SundayMinistryTabs";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import NewFriendsTab from "../semester/[id]/NewFriendsTab";
@@ -27,9 +28,9 @@ type SundayTab = (typeof SUNDAY_MINISTRY_TABS)[number];
 
 const TAB_INTRO: Record<SundayTab, { title: string; description: string }> = {
   "새친구": { title: "새친구 정착 관리", description: "학기 구분 없이 접수와 2주 과정, 등록 결정, 반배정과 학생 출석부 반영을 관리합니다." },
-  "학생 변동": { title: "학생 변동", description: "새친구 등록으로 학생 출석부 원장에 반영된 변동을 확인합니다." },
+  "등록 현황": { title: "등록 현황", description: "새친구 등록으로 학생 출석부 원장에 반영된 학생을 확인합니다." },
   "처리 대기": { title: "처리 대기", description: "2주 과정부터 등록 결정·반배정·출석부 반영까지 남은 일을 모아봅니다." },
-  "변경 이력": { title: "변경 이력", description: "새친구 접수·수정과 학생 출석부 반영 기록을 최신순으로 확인합니다." },
+  "행정 변동 사항": { title: "행정 변동 사항", description: "학생 출석부 관리자 화면에서 수정된 등록·이동·삭제 내역을 최신순으로 확인합니다." },
 };
 
 function validInitialTab(value?: string): SundayTab {
@@ -46,6 +47,7 @@ export default function SundayMinistryClient({ initialTab }: { initialTab?: stri
   const [tab, setTab] = useState<SundayTab>(() => validInitialTab(initialTab));
   const [friends, setFriends] = useState<SundayNewFriend[]>([]);
   const [privateMap, setPrivateMap] = useState<Record<string, NewFriendPrivate>>({});
+  const [adminChanges, setAdminChanges] = useState<SundayAdminChange[]>([]);
   const { fail, ok, message: loadError } = useLoadErrors(`sunday|${user?.uid ?? ""}`);
   const storageSid = sundayWorkspaceId(new Date().getFullYear());
 
@@ -53,6 +55,7 @@ export default function SundayMinistryClient({ initialTab }: { initialTab?: stri
     if (!user || !allowed) return;
     const unsubs = [
       subscribeSundayNewFriends((values) => { setFriends(values); ok("새친구"); }, fail("새친구")),
+      subscribeSundayAdminChanges((values) => { setAdminChanges(values); ok("행정 변동 사항"); }, fail("행정 변동 사항")),
     ];
     if (canEdit) {
       unsubs.push(subscribeSundayNewFriendsPrivate(
@@ -121,9 +124,9 @@ export default function SundayMinistryClient({ initialTab }: { initialTab?: stri
         <div role="tabpanel" id="sunday-tab-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
             {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(role)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
-            {tab === "학생 변동" && <StudentChangesTab friends={friends} />}
+            {tab === "등록 현황" && <RegistrationStatusTab friends={friends} />}
             {tab === "처리 대기" && <PendingTab friends={friends} privateValueFor={scopedPrivateValueFor} showPrivate={canEdit} onOpenNewFriends={() => setTab("새친구")} />}
-            {tab === "변경 이력" && <ChangeHistoryTab friends={friends} />}
+            {tab === "행정 변동 사항" && <AdminChangesTab changes={adminChanges} />}
           </SemesterEditProvider>
         </div>
       </main>

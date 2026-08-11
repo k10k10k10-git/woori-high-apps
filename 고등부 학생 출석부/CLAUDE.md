@@ -145,6 +145,8 @@ layout.tsx
 - 일괄 임포트된 학생: `S{grade}{class}_{num:02d}` (예: `S23_01`, `S311_01`)
 - 앱에서 추가된 학생: `s_${Date.now()}`
 
+`personId`는 연도별 sid와 별개인 영구 인물 식별자다. 기존 sid·`pid`·출석 경로는 절대 교체하지 않고, 학생 추가·명단 교체·시트 동기화·진급·이동·편집에서 `person_student_*` 값을 보존한다. 교사·스탭 명단은 각각 `person_teacher_*`, `person_staff_*` namespace를 사용한다.
+
 **출석 셀 키**: `evKey(mi, di)` = `"{monthIndex}-{sundayIndex}"` (예: `"0-0"` = 1월 첫 번째 주일, `"4-1"` = 5월 두 번째 주일). `mi`는 0부터 시작하는 월 인덱스, `di`는 해당 월의 주일 순번.
 
 **출석 값 (AttValue)**: `"O"` (출석) / `"X"` (결석) / `"T"` (지각) / `""` (미입력)
@@ -154,8 +156,9 @@ layout.tsx
 classes/{year}/{ck}/
   teacher          string
   teacherPhoto     string
-  students/{sid}/  { id, num, name, birth, phone, pphone, school, addr, photo, jang? }
+  students/{sid}/  { id, personId?, num, name, birth, phone, pphone, school, addr, photo, jang? }
                    # jang: true = 장결자(장기결석) — 구글 시트 동기화 시 자동 표시(아래 참조)
+  adminChanges/{changeId}/ { changedAt, classKey, teacher, studentName, action, changeSummary, result, actor }
 
 attendance/{year}/{ck}/{sid}/{cellKey}  → "O" | "X" | "T"
 
@@ -256,7 +259,9 @@ await update(ref(db), { [`classes/${year}/${ck}/students/${id}`]: newStudent });
 // ❌ 금지 — 반 전체를 덮어씀, 동시 편집 시 다른 사람의 변경이 사라짐
 await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 ```
-번호(`num`)는 저장 시점에 계산하지 않는다 — 읽을 때 `sortAndRenumber()`가 항상 재계산하므로 저장값이 어긋나도 자동 보정된다. `RosterModal`(명단 일괄 교체)만 예외 — 사용자가 명시적으로 "교체"를 확인한 의도된 전체 덮어쓰기이므로 `set()` 유지.
+관리자 명단 변경은 같은 루트 `update()`에 `classes/{year}/{ck}/adminChanges/{changeId}`도 함께 넣는다. 원본 변경만 성공하고 행정 이력이 빠지는 상태를 만들지 않으며, 감사기록에는 연락처·주소의 실제 이전/이후 값 대신 변경된 필드 이름만 저장한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
+
+번호(`num`)는 저장 시점에 계산하지 않는다 — 읽을 때 `sortAndRenumber()`가 항상 재계산하므로 저장값이 어긋나도 자동 보정된다. `RosterModal`(명단 일괄 교체)만 예외 — 사용자가 명시적으로 "교체"를 확인한 뒤 루트 `update()`에서 `students` 전체 값과 감사기록을 함께 반영한다.
 
 통합 앱의 새친구 탭은 현재 Rules가 허용하는 통합관리자(`admins`)에 한해 신규 학생 1명을 같은 단일 경로 규칙으로 추가할 수 있다. `highschool-app/src/features/semester/db.ts`의 `registerNewFriendInRoster`만 예외이며, 결정적 `nf_` 학생 ID·동명이인 차단·대상 반 확인·비공개 사전 스냅샷·새친구 반영 이력과의 원자 update를 유지한다. 기존 학생 수정·이동·삭제와 출석 쓰기는 계속 이 앱만 담당한다.
 

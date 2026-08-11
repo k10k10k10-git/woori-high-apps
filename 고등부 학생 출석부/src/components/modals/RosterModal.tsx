@@ -1,9 +1,11 @@
 'use client';
 import { useState } from 'react';
-import { db, ref, set } from '@/lib/db';
+import { db, ref, get, push, update } from '@/lib/db';
 import { useApp, useClassKey } from '@/store/AppContext';
 import { sortAndRenumber } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
+import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
+import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 import type { Student } from '@/types';
 
 function parseRosterLines(lines: string[]): Partial<Student>[] {
@@ -57,12 +59,29 @@ export default function RosterModal({ onClose }: { onClose: () => void }) {
     setSaving(true);
     try {
       const base = Date.now();
+      const allClassesSnap = await get(ref(db, 'classes'));
+      const historicalClasses = allClassesSnap.exists() ? allClassesSnap.val() : {};
       const students = sortAndRenumber(
-        parsed.map((s, i) => ({ id: `s_${base}_${i}_${Math.random().toString(36).slice(2, 6)}`, name: s.name ?? '', birth: s.birth, phone: s.phone }))
+        parsed.map((s, i) => ({
+          id: `s_${base}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+          personId: findHistoricalStudentPersonId(s, [historicalClasses]) ?? createPersonId('student'),
+          name: s.name ?? '', birth: s.birth, phone: s.phone,
+        }))
       );
       const obj: Record<string, unknown> = {};
       students.forEach(s => { obj[s.id] = s; });
-      await set(ref(db, `classes/${state.curYear}/${ck}/students`), obj);
+      const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
+      await update(ref(db), {
+        [`classes/${state.curYear}/${ck}/students`]: obj,
+        [adminChangePath(state.curYear, ck, changeId)]: buildAdminChangeEntry({
+          classKey: ck,
+          teacher: state.classData[ck]?.teacher,
+          studentName: `전체 명단 (${students.length}명)`,
+          action: '명단 일괄 반영',
+          changeSummary: `명단 ${students.length}명으로 일괄 교체`,
+          actor: adminActor(state.userRole),
+        }),
+      });
     } catch {
       showToast('적용에 실패했습니다. 다시 시도해 주세요.');
     } finally {

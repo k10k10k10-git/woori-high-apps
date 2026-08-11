@@ -10,9 +10,9 @@ export const SEMESTER_TRAINING_TABS = [
 
 export const SUNDAY_MINISTRY_TABS = [
   "새친구",
-  "학생 변동",
+  "등록 현황",
   "처리 대기",
-  "변경 이력",
+  "행정 변동 사항",
 ] as const;
 
 export const SEMESTER_TABS = [

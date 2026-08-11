@@ -12,6 +12,7 @@ export type UserRole = {
 // ─── 학생 ──────────────────────────────────────────────────────
 export type Student = {
   id: string;
+  personId?: string;
   name: string;
   num?: number;
   birth?: string;

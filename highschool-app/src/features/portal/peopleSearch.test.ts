@@ -152,6 +152,59 @@ describe("인물 통합검색", () => {
     expect(results.every((profile) => profile.kinds[0] === "student" && profile.ambiguous)).toBe(true);
   });
 
+  it("연도별 학생 ID가 달라도 생년월일과 본인 연락처가 함께 일치하면 연결한다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2024: { "2-2-6": { students: { old: { name: "김예원", birth: "2010-01-02", phone: "010-1111-2222" } } } },
+        2025: { "2-3-6": { students: { promoted: { name: "김예원", birth: "2010.01.02", phone: "01011112222" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    const results = searchPeople(buildPeopleProfiles(data), "김예원");
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ kinds: ["student"], ambiguous: false });
+    expect(results[0].records).toHaveLength(2);
+  });
+
+  it("같은 연도에 학생 ID가 다르면 생년월일과 본인 연락처가 같아도 분리한다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2026: {
+          "1-1-1": { students: { first: { name: "이동명", birth: "2011-01-02", phone: "010-2222-3333" } } },
+          "1-1-2": { students: { second: { name: "이동명", birth: "2011-01-02", phone: "010-2222-3333" } } },
+        },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    expect(searchPeople(buildPeopleProfiles(data), "이동명")).toHaveLength(2);
+  });
+
+  it("영구 personId가 같으면 연도별 연락처가 달라져도 같은 유형의 기록을 연결한다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2025: { "1-2-1": { students: { old: { name: "전화변경", personId: "person_student_fixed", birth: "2010-01-02", phone: "010-1111-1111" } } } },
+        2026: { "1-3-1": { students: { next: { name: "전화변경", personId: "person_student_fixed", birth: "2010-01-02", phone: "010-9999-9999" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    expect(searchPeople(buildPeopleProfiles(data), "전화변경")).toHaveLength(1);
+  });
+
+  it("교사와 스탭 명단은 personId가 같아도 유형이 다르면 분리한다", () => {
+    const data: PeopleSearchData = {
+      classes: {}, attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+      teacherExtra: { 2026: { 1: { "1_1_1": { name: "박동일", personId: "person_teacher_fixed", phone: "010-3333-4444" } } } },
+      teacherStaff: { 2026: { staff1: { name: "박동일", personId: "person_staff_fixed", phone: "010-3333-4444" } } },
+    };
+
+    const results = searchPeople(buildPeopleProfiles(data), "박동일");
+    expect(results).toHaveLength(2);
+    expect(results.map((profile) => profile.kinds[0]).sort()).toEqual(["staff", "teacher"]);
+  });
+
   it("두 글자 미만 검색은 전체 명단을 노출하지 않는다", () => {
     expect(searchPeople(buildPeopleProfiles(fixture()), "강")).toEqual([]);
   });

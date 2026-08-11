@@ -1,13 +1,25 @@
 import { getSemesters, subscribeNewFriends, subscribeNewFriendsPrivate } from "@/features/semester/db";
+import { paths } from "@/features/semester/paths";
+import { db } from "@/lib/firebase";
+import { onValue, ref } from "firebase/database";
 import {
+  collectSundayAdminChanges,
   collectSundayNewFriends,
   collectSundayNewFriendsPrivate,
   sundayStorageIds,
   type SundayNewFriend,
+  type SundayAdminChange,
 } from "./model";
 import type { NewFriendPrivate } from "@/features/semester/types";
 
 let storageIdsPromise: Promise<string[]> | null = null;
+
+export function subscribeSundayAdminChanges(
+  cb: (changes: SundayAdminChange[]) => void,
+  onError?: (error: Error) => void,
+) {
+  return onValue(ref(db, paths.classes()), (snapshot) => cb(collectSundayAdminChanges(snapshot.val())), onError);
+}
 
 function loadSundayStorageIds() {
   if (!storageIdsPromise) {

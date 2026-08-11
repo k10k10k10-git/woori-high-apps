@@ -1,6 +1,6 @@
-import { deriveNewFriendStage } from "@/features/semester/newFriend";
+import { deriveNewFriendStage, formatClassLabel } from "@/features/semester/newFriend";
 import type { NewFriendPrivate } from "@/features/semester/types";
-import { sundayFriendKey, type SundayNewFriend } from "./model";
+import { sundayFriendKey, type SundayAdminChange, type SundayNewFriend } from "./model";
 
 type Props = {
   friends: SundayNewFriend[];
@@ -17,7 +17,7 @@ const formatDate = (value?: string) => {
 
 const recordKey = (friend: SundayNewFriend) => sundayFriendKey(friend.storageSid, friend.id);
 
-export function StudentChangesTab({ friends }: Pick<Props, "friends">) {
+export function RegistrationStatusTab({ friends }: Pick<Props, "friends">) {
   const synced = friends
     .filter((friend) => friend.rosterSync)
     .sort((a, b) => (b.rosterSync?.syncedAt ?? "").localeCompare(a.rosterSync?.syncedAt ?? ""));
@@ -26,8 +26,8 @@ export function StudentChangesTab({ friends }: Pick<Props, "friends">) {
     <section className="card card-body">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-slate-900">학생 변동 현황</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">새친구 등록으로 학생 출석부 원장에 반영된 신규 학생 변동을 모아봅니다.</p>
+          <h3 className="font-semibold text-slate-900">등록 현황</h3>
+          <p className="mt-1 text-xs leading-5 text-slate-500">새친구 등록으로 학생 출석부 원장에 반영된 학생을 모아봅니다.</p>
         </div>
         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">신규 등록 {synced.length}건</span>
       </div>
@@ -35,10 +35,10 @@ export function StudentChangesTab({ friends }: Pick<Props, "friends">) {
         <table className="min-w-full text-left text-xs">
           <thead><tr className="border-b border-slate-200 text-slate-400"><th className="px-3 py-2">학생</th><th className="px-3 py-2">변동 유형</th><th className="px-3 py-2">반영 위치</th><th className="px-3 py-2">처리 시각</th></tr></thead>
           <tbody>
-            {synced.map((friend) => <tr key={recordKey(friend)} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-800">{friend.name}</td><td className="px-3 py-3 text-slate-600">새친구 신규 등록</td><td className="px-3 py-3 text-slate-600">{friend.rosterSync?.classKey}</td><td className="px-3 py-3 text-slate-500">{formatDate(friend.rosterSync?.syncedAt)}</td></tr>)}
+            {synced.map((friend) => <tr key={recordKey(friend)} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-800">{friend.name}</td><td className="px-3 py-3 text-slate-600">새친구 신규 등록</td><td className="px-3 py-3 text-slate-600">{formatClassLabel(friend.rosterSync?.classKey)}</td><td className="px-3 py-3 text-slate-500">{formatDate(friend.rosterSync?.syncedAt)}</td></tr>)}
           </tbody>
         </table>
-        {synced.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">출석부에 반영된 학생 변동이 없습니다.</div>}
+        {synced.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">출석부에 반영된 새친구가 없습니다.</div>}
       </div>
     </section>
   );
@@ -64,22 +64,34 @@ export function PendingTab({ friends, privateValueFor, showPrivate, onOpenNewFri
   );
 }
 
-export function ChangeHistoryTab({ friends }: Pick<Props, "friends">) {
-  const history = friends
-    .flatMap((friend) => [
-      { id: `${recordKey(friend)}:created`, name: friend.name, action: "새친구 접수", at: friend.createdAt },
-      ...(friend.updatedAt && friend.updatedAt !== friend.createdAt ? [{ id: `${recordKey(friend)}:updated`, name: friend.name, action: "새친구 정보 수정", at: friend.updatedAt }] : []),
-      ...(friend.rosterSync ? [{ id: `${recordKey(friend)}:sync`, name: friend.name, action: `학생 출석부 반영 · ${friend.rosterSync.classKey}`, at: friend.rosterSync.syncedAt }] : []),
-    ])
-    .sort((a, b) => b.at.localeCompare(a.at));
-
+export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
   return (
     <section className="card card-body">
-      <div><h3 className="font-semibold text-slate-900">변경 이력</h3><p className="mt-1 text-xs leading-5 text-slate-500">새친구 접수·수정과 학생 출석부 반영 시각을 최신순으로 확인합니다.</p></div>
-      <ol className="mt-4 divide-y divide-slate-100">
-        {history.map((item) => <li key={item.id} className="flex gap-3 py-3"><span className="mt-1 size-2 shrink-0 rounded-full bg-emerald-500"/><div className="min-w-0 flex-1"><p className="text-sm text-slate-800"><strong>{item.name}</strong> · {item.action}</p><p className="mt-1 text-[11px] text-slate-400">{formatDate(item.at)}</p></div></li>)}
-      </ol>
-      {history.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">표시할 변경 이력이 없습니다.</div>}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><h3 className="font-semibold text-slate-900">행정 변동 사항</h3><p className="mt-1 text-xs leading-5 text-slate-500">학생 출석부 관리자 화면에서 반영한 학생 등록·수정·삭제·이동 내역이 자동으로 기록됩니다.</p></div>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">총 {changes.length}건</span>
+      </div>
+      <div className="mt-4 max-h-[68vh] overflow-auto rounded-xl border border-slate-200">
+        <table className="w-full min-w-[1040px] border-collapse text-left text-xs">
+          <caption className="sr-only">출석부 관리자 수정 날짜, 반, 담당 교사, 학생, 변경 내용과 반영 결과</caption>
+          <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-semibold text-slate-500 shadow-[0_1px_0_#e2e8f0]">
+            <tr><th className="min-w-36 px-3 py-3">수정 날짜</th><th className="min-w-32 px-3 py-3">반</th><th className="min-w-28 px-3 py-3">반담당 교사</th><th className="min-w-28 px-3 py-3">학생</th><th className="min-w-72 px-3 py-3">변경내용</th><th className="min-w-36 px-3 py-3">반영결과 / 담당</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">
+            {changes.map((change) => (
+              <tr key={`${change.year}:${change.classKey}:${change.id}`} className="hover:bg-slate-50/80">
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-500">{formatDate(change.changedAt)}</td>
+                <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{change.year}년 · {formatClassLabel(change.classKey)}</td>
+                <td className="px-3 py-3 text-slate-600">{change.teacher}</td>
+                <td className="px-3 py-3 font-semibold text-slate-800">{change.studentName}</td>
+                <td className="px-3 py-3 leading-5 text-slate-700"><span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{change.action}</span>{change.changeSummary}</td>
+                <td className="px-3 py-3"><span className="font-semibold text-emerald-700">{change.result}</span><span className="mt-1 block text-[11px] text-slate-400">{change.actor}</span></td>
+              </tr>
+            ))}
+            {changes.length === 0 && <tr><td colSpan={6} className="py-14 text-center text-sm text-slate-400">출석부 관리자 수정 기록이 없습니다.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

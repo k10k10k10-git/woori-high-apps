@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react';
 import { db, ref, get, set } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
+import { createPersonId, findHistoricalPersonId } from '@/utils/personId';
 
-interface SpecialTeacher { title: string; name: string; phone: string; birth?: string; }
-interface TeacherExtra   { title?: string; name?: string; phone?: string; birth?: string; }
-interface StaffMember    { title: string; name: string; phone: string; birth?: string; }
+interface SpecialTeacher { title: string; name: string; phone: string; birth?: string; personId?: string; }
+interface TeacherExtra   { title?: string; name?: string; phone?: string; birth?: string; personId?: string; }
+interface StaffMember    { title: string; name: string; phone: string; birth?: string; personId?: string; }
 
 const DEFAULT_SPECIALS: SpecialTeacher[] = [
   { title: '부장', name: '', phone: '' },
@@ -130,29 +131,47 @@ export default function TeacherManagement() {
     setEditingTeacher({ kind: 'additional', key });
   }
 
+  async function resolveWorkerPersonId(kind: 'teacher' | 'staff', current?: TeacherExtra | StaffMember | SpecialTeacher) {
+    if (current?.personId?.startsWith(`person_${kind}_`)) return current.personId;
+    const rootNames = kind === 'staff'
+      ? ['teacherStaff']
+      : ['teacherSpecial', 'teacherExtra', 'teacherAdditional'];
+    const snapshots = await Promise.all(rootNames.map((path) => get(ref(db, path))));
+    const historical = findHistoricalPersonId(kind, teacherForm, snapshots.map((snapshot) => snapshot.exists() ? snapshot.val() : {}));
+    return historical ?? createPersonId(kind);
+  }
+
   async function saveTeacher() {
     if (!editingTeacher || saving) return;
     setSaving(true);
     try {
       if (editingTeacher.kind === 'special') {
-        const updated = specialTeachers.map((t, i) => i === editingTeacher.idx ? teacherForm : t);
+        const current = specialTeachers[editingTeacher.idx];
+        const personId = await resolveWorkerPersonId('teacher', current);
+        const updated = specialTeachers.map((t, i) => i === editingTeacher.idx ? { ...teacherForm, personId } : t);
         await set(ref(db, `teacherSpecial/${curYear}/${teacherPart}`), updated);
         setSpecialTeachers(updated);
       } else if (editingTeacher.kind === 'staff') {
         const staffKey = editingTeacher.key ?? `staff_${Date.now()}`;
         if (!teacherForm.name.trim()) { showToast('이름을 입력하세요.'); setSaving(false); return; }
-        await set(ref(db, `teacherStaff/${curYear}/${staffKey}`), teacherForm);
-        setStaffList(prev => ({ ...prev, [staffKey]: teacherForm }));
+        const personId = await resolveWorkerPersonId('staff', editingTeacher.key ? staffList[editingTeacher.key] : undefined);
+        const value = { ...teacherForm, personId };
+        await set(ref(db, `teacherStaff/${curYear}/${staffKey}`), value);
+        setStaffList(prev => ({ ...prev, [staffKey]: value }));
       } else if (editingTeacher.kind === 'additional') {
         const addKey = editingTeacher.key ?? `add_${Date.now()}`;
         if (!teacherForm.name.trim()) { showToast('이름을 입력하세요.'); setSaving(false); return; }
-        await set(ref(db, `teacherAdditional/${curYear}/${teacherPart}/${addKey}`), teacherForm);
-        setAdditionalTeachers(prev => ({ ...prev, [addKey]: teacherForm }));
+        const personId = await resolveWorkerPersonId('teacher', editingTeacher.key ? additionalTeachers[editingTeacher.key] : undefined);
+        const value = { ...teacherForm, personId };
+        await set(ref(db, `teacherAdditional/${curYear}/${teacherPart}/${addKey}`), value);
+        setAdditionalTeachers(prev => ({ ...prev, [addKey]: value }));
       } else {
         const part = editingTeacher.ck.split('-')[0];
         const key = editingTeacher.ck.replace(/-/g, '_');
-        await set(ref(db, `teacherExtra/${curYear}/${part}/${key}`), teacherForm);
-        setTeacherExtra(prev => ({ ...prev, [key]: teacherForm }));
+        const personId = await resolveWorkerPersonId('teacher', teacherExtra[key]);
+        const value = { ...teacherForm, personId };
+        await set(ref(db, `teacherExtra/${curYear}/${part}/${key}`), value);
+        setTeacherExtra(prev => ({ ...prev, [key]: value }));
       }
       setEditingTeacher(null);
     } catch {

@@ -12,8 +12,9 @@ async function read(path: string): Promise<Record<string, unknown>> {
 export async function loadPeopleSearchData(options: {
   includeSemester: boolean;
   includePrivate: boolean;
+  includeAttendancePrivate: boolean;
 }): Promise<PeopleSearchData> {
-  const [classes, attendance, retreats, semesters, retreatsPrivate, semestersPrivate] = await Promise.all([
+  const [classes, attendance, retreats, semesters, retreatsPrivate, semestersPrivate, teacherStaff, teacherSpecial, teacherExtra, teacherAdditional] = await Promise.all([
     read(paths.classesRoot()),
     read(paths.attendanceRoot()),
     read(paths.retreats()),
@@ -22,7 +23,11 @@ export async function loadPeopleSearchData(options: {
     options.includePrivate && options.includeSemester
       ? read(semesterPaths.semestersPrivate())
       : Promise.resolve({}),
+    read(paths.teacherStaffRoot()),
+    read(paths.teacherSpecialRoot()),
+    read(paths.teacherExtraRoot()),
+    options.includeAttendancePrivate ? read(paths.teacherAdditionalRoot()) : Promise.resolve({}),
   ]);
 
-  return { classes, attendance, retreats, semesters, retreatsPrivate, semestersPrivate };
+  return { classes, attendance, retreats, semesters, retreatsPrivate, semestersPrivate, teacherStaff, teacherSpecial, teacherExtra, teacherAdditional };
 }

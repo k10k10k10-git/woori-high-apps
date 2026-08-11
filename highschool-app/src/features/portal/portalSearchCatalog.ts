@@ -85,7 +85,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
     items.push({
       id: "sunday-ministry",
       label: "주일 사역",
-      description: "행정·바나바 · 새친구와 학생 변동 관리",
+      description: "행정·바나바 · 새친구와 등록·행정 변동 관리",
       href: "/sunday-ministry",
       keywords: SUNDAY_MINISTRY_TABS.join(" "),
       area: "sunday",

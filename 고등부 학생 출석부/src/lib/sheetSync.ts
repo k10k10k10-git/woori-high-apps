@@ -15,6 +15,7 @@
 // 탭 gid 목록은 htmlview에서 추출.
 // ────────────────────────────────────────────────────────────────
 import { getSundaysForYear } from '@/utils/dates';
+import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
 import type { Student, AttValue } from '@/types';
 
 export interface ParsedStudent {
@@ -231,6 +232,7 @@ interface CurrentStudent {
   sid: string;
   name: string;
   birth?: string; school?: string; addr?: string; phone?: string; pphone?: string;
+  personId?: string;
   photo?: string;
   raw: Student;  // 원본 (제외 학생 보존용)
 }
@@ -351,7 +353,8 @@ export function buildSyncPayload(
   plan: SyncPlan,
   year: number,
   current: Record<string, { students?: Record<string, Student> }>,
-  removeMissing = false
+  removeMissing = false,
+  historicalClasses?: unknown,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
 
@@ -375,7 +378,11 @@ export function buildSyncPayload(
       const sid = (matched && matched.ck === pc.ck) ? matched.sid : st.sid;
       const photo = matched?.photo;
       studentsObj[sid] = {
-        id: sid, num: st.num, name: st.name,
+        id: sid,
+        personId: matched?.personId
+          ?? findHistoricalStudentPersonId(st, historicalClasses ? [historicalClasses] : [])
+          ?? createPersonId('student'),
+        num: st.num, name: st.name,
         ...(st.birth ? { birth: st.birth } : {}),
         ...(st.phone ? { phone: st.phone } : {}),
         ...(st.pphone ? { pphone: st.pphone } : {}),

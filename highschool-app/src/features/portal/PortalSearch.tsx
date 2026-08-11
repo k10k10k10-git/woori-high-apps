@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessPortalArea } from "./accessPolicy";
+import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
 import { buildPeopleProfiles, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
 import { loadPeopleSearchData } from "./peopleSearchDb";
 
@@ -27,7 +27,8 @@ export default function PortalSearch() {
 
   const includeSemester = canAccessPortalArea("semester", role);
   const includePrivate = canAccessPortalArea("retreat-admin", role);
-  const loadKey = `${role}:${includeSemester}:${includePrivate}`;
+  const includeAttendancePrivate = canManageRoles(role);
+  const loadKey = `${role}:${includeSemester}:${includePrivate}:${includeAttendancePrivate}`;
 
   const beginOpen = useCallback(() => {
     setOpen(true);
@@ -35,7 +36,7 @@ export default function PortalSearch() {
     if (!cacheFresh) {
       setLoading(true);
       setError("");
-      void loadPeopleSearchData({ includeSemester, includePrivate })
+      void loadPeopleSearchData({ includeSemester, includePrivate, includeAttendancePrivate })
         .then((data) => {
           setProfiles(buildPeopleProfiles(data));
           loadedFor.current = loadKey;
@@ -47,7 +48,7 @@ export default function PortalSearch() {
         })
         .finally(() => setLoading(false));
     }
-  }, [includePrivate, includeSemester, loadKey]);
+  }, [includeAttendancePrivate, includePrivate, includeSemester, loadKey]);
 
   useEffect(() => {
     if (!open) return;

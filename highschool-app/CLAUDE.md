@@ -11,7 +11,7 @@
 - `/`: 통합 홈
 - `/ministry-guide`: 위키에서 추린 월별 사역 흐름·운영 플레이북·공지·수련회 회고
 - `/semesters`, `/semester/[id]`: 학기 중 사역
-- `/sunday-ministry`: 학기 구분 없는 주일 사역(행정·바나바, 새친구·학생 변동)
+- `/sunday-ministry`: 학기 구분 없는 주일 사역(행정·바나바, 새친구·등록 현황·행정 변동 사항)
 - `/retreats`, `/retreat/[id]`: 수련회 행정
 - `/retreat/[id]/field`: 이가드 현장 운영
 
@@ -49,8 +49,9 @@
 ## 인물 통합검색 계약
 
 - 이름은 검색 후보를 찾는 데만 사용하며 동일인 결합 근거로 쓰지 않습니다.
-- 학생·교사·스탭 유형과 유형별 안정 ID namespace를 보존합니다. 유형이 다르거나 양쪽 안정 ID가 다르면 생년·가족 전화번호가 같아도 별도 인물입니다.
-- 같은 유형에서 안정 ID·생년·전화번호 중 강한 토큰이 실제로 겹칠 때만 연도·사역 영역 간 기록을 연결합니다. 근거가 없으면 합치지 않는 것이 기본값입니다.
+- 학생·교사·스탭 유형과 `person_student_*`·`person_teacher_*`·`person_staff_*` namespace를 보존합니다. 유형이 다르거나 양쪽 영구 `personId`가 다르면 생년·연락처가 같아도 별도 인물입니다.
+- 학생은 같은 연도에 원본 ID가 다르면 분리하고, 다른 연도에서는 생년월일과 본인 연락처가 함께 일치할 때만 연결합니다. 보호자 연락처 하나만 같은 경우는 형제 가능성이 있어 근거로 쓰지 않습니다.
+- 영구 `personId`가 있으면 그것을 최우선으로 사용하고, 기존 연도별 학생·교사·스탭 ID는 출석·수련회·학기 참조 호환을 위해 교체하지 않습니다.
 - 수련회 단체티처럼 식별자가 없는 보조 기록만 같은 행사·같은 유형의 유일한 기준 레코드에 제한적으로 연결합니다.
 
 ## 학기 사역 계약 (2026-08-06)
@@ -67,6 +68,7 @@
 - **홈 공유 캘린더**의 "공유 일정"은 `prepMilestones`다. 추가·수정·삭제는 Rules와 같게 스탭을 제외하고 열어 둔다(`canEditPortalArea("retreat-admin") || iguardScope === "all"`).
 - **사역 가이드**는 정적 운영 지식 화면이다. 위키 원문 중 반복 가능한 운영 원칙만 `features/ministryGuide/ministryGuideContent.ts`에 옮기며 Firebase를 읽거나 쓰지 않는다. 연간 계획은 반드시 `가안`으로 표시하고, 학생 실명·연락처·주소·가정·건강 특이사항과 미결 아이디어는 넣지 않는다.
 - **주일 사역의 새친구 탭**은 학기 선택 없이 모든 `semesters/*/newFriends`를 통합 조회한다. 기존 학기별 기록은 이동하지 않고, 신규 기록만 학기가 아닌 연도별 내부 작업공간 `semesters/{year}-sunday/newFriends`와 `semestersPrivate/{year}-sunday/newFriendsPrivate`에 저장한다. 이 작업공간은 `meta`를 두지 않아 학기 목록에 나타나지 않는다. 행정팀은 접수·2주 과정·등록 결정·반배정을 관리하고, `classes/{year}` 반영은 현재 Rules와 일치하게 통합관리자만 `registerNewFriendInRoster`를 호출한다. 이 함수는 새친구 ID 기반 결정적 학생 ID, 중복 차단, 대상 반 확인, 비공개 사전 스냅샷, 단일 학생 경로+반영 이력의 원자 update와 재조회 검증을 유지한다. 반영된 새친구 삭제도 통합관리자만 가능하며, `removeNewFriendFromRoster`가 결정적 `nf_` ID·현재 이름·연결 반을 재검증하고 학생·해당 출석·새친구 공개/비공개 기록을 원자 삭제한다. 삭제 직전 전체 사본은 `newFriendRosterBackups/{friendId}/removals/{timestamp}`에, 학생 복구 사본은 `trash/{year}/students/{studentId}`에 남기고 결과를 재조회한다. 일반적인 `classes`·`attendance` 쓰기 함수로 넓히지 않는다.
+- **행정 변동 사항 탭**은 학생 앱 소유 `classes/{year}/{classKey}/adminChanges`를 읽기만 한다. 학생 앱이 학생 명단 수정과 같은 원자 update로 만든 감사기록이며, 통합 앱에서는 생성·수정·삭제하지 않는다. 기존 `변경 이력`은 제거하고 `학생 변동`은 `등록 현황`으로 표시한다.
 - 큐싯 **구글 시트 연동은 2026-08-07 제거**했다(표 붙여넣기만 사용). `iguard/cueSheet` 노드와 db 함수는 남아 있지만 화면에서 쓰지 않는다 — 되살릴 때만 참고한다.
 - **인원체크 키에 배열 인덱스를 넣지 않는다** — `checklistKeys.ts`의 `stableMemberId`(`{kind}:{ownerId}:{name}`)만 쓴다. 인덱스를 넣으면 행사 중 한 명이 불참 처리될 때 뒤 사람들의 체크가 통째로 어긋난다. 운영 DB에는 구형 인덱스 키가 남아 있으므로 판정·해제는 반드시 `memberCheckKeys`/`isMemberChecked`를 거친다(신형·구형 동시 인식, 쓰기는 신형만).
 - **삭제는 짝이 되는 노드를 반드시 함께 지운다** — 수련회는 `buildRetreatRemovalUpdates`(`retreats` + `retreatsPrivate`), 팀·훈련 반은 `curriculum`까지. 한쪽만 지우면 화면에서 접근 불가능한 고아가 남는다(민감정보면 더 심각).

@@ -276,7 +276,7 @@ export default function PortalHome() {
               <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-amber-50 group-hover:text-amber-700">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">행정·바나바</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">학기 구분 없이 새친구 정착, 학생 변동과 처리 이력을 관리합니다.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-500">학기 구분 없이 새친구 정착, 등록 현황과 행정 변동을 관리합니다.</p>
           </Link>}
 
           <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, role) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
@@ -372,7 +372,7 @@ export default function PortalHome() {
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료" tone="emerald" />}
-                {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·학생 변동·처리 대기" tone="amber" />}
+                {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·등록 현황·행정 변동" tone="amber" />}
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScope(role) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
               </div>

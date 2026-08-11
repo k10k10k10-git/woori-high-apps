@@ -10,6 +10,58 @@ import { paths } from "./paths";
 const digits = (value?: string) => (value ?? "").replace(/\D/g, "");
 const normalizedName = (value?: string) => (value ?? "").replace(/\s/g, "").toLocaleLowerCase("ko");
 
+export type NewFriendRosterProgress = "대기" | "처리중" | "완료";
+
+/** 새친구 진행표에서 사용하는 3단계 상태. 출석부 원장 반영을 완료 기준으로 삼는다. */
+export function deriveNewFriendRosterProgress(friend: NewFriend): NewFriendRosterProgress {
+  if (friend.rosterSync) return "완료";
+  if (friend.week2Date || friend.decision === "등록" || friend.assignedClassKey) return "처리중";
+  return "대기";
+}
+
+export function formatKoreanPhone(value?: string): string {
+  const number = digits(value).slice(0, 11);
+  if (!number) return "";
+  if (number.startsWith("02")) {
+    if (number.length <= 2) return number;
+    if (number.length <= 5) return `${number.slice(0, 2)}-${number.slice(2)}`;
+    if (number.length <= 9) return `${number.slice(0, 2)}-${number.slice(2, 5)}-${number.slice(5)}`;
+    return `${number.slice(0, 2)}-${number.slice(2, 6)}-${number.slice(6)}`;
+  }
+  if (number.length <= 3) return number;
+  if (number.length <= 7) return `${number.slice(0, 3)}-${number.slice(3)}`;
+  if (number.length <= 10) return `${number.slice(0, 3)}-${number.slice(3, 6)}-${number.slice(6)}`;
+  return `${number.slice(0, 3)}-${number.slice(3, 7)}-${number.slice(7)}`;
+}
+
+export function formatClassLabel(classKey?: string): string {
+  if (!classKey) return "미배정";
+  const match = classKey.match(/^(\d+)-(\d+)-(\d+)$/);
+  return match ? `${match[1]}부 ${match[2]}학년 ${match[3]}반` : classKey;
+}
+
+export function needsClassAssignment(friend: NewFriend): boolean {
+  return Boolean(
+    friend.week2Date
+    && !friend.assignedClassKey
+    && !friend.rosterSync
+    && friend.decision !== "미등록"
+    && friend.decision !== "보류",
+  );
+}
+
+export function newFriendAssignmentCopyText(friend: NewFriend, priv: NewFriendPrivate): string {
+  return [
+    `이름 : ${friend.name || ""}`,
+    `부서 : ${friend.part || ""}`,
+    `학년 : ${friend.grade ? `${friend.grade}학년` : ""}`,
+    `성별 : ${friend.gender || ""}`,
+    `학교 : ${friend.school || ""}`,
+    `본인 연락처 : ${formatKoreanPhone(priv.phone)}`,
+    `보호자 연락처 : ${formatKoreanPhone(priv.parentPhone)}`,
+  ].join("\n");
+}
+
 export function deriveNewFriendStage(friend: NewFriend): NewFriendStage {
   if (friend.decision === "미등록") return "종료";
   if (friend.decision === "보류") return "보류";
@@ -25,6 +77,10 @@ export function deriveNewFriendStage(friend: NewFriend): NewFriendStage {
 export function studentIdForNewFriend(friendId: string): string {
   const safe = friendId.replace(/[^a-zA-Z0-9_-]/g, "_");
   return `nf_${safe}`;
+}
+
+export function personIdForNewFriend(friendId: string): string {
+  return `person_student_${studentIdForNewFriend(friendId)}`;
 }
 
 export function findNewFriendDuplicate(
@@ -59,7 +115,7 @@ export function buildRosterStudent(
   friend: NewFriend,
   priv: NewFriendPrivate,
 ): ClassStudent {
-  const student: ClassStudent = { id: studentId, name: friend.name.trim() };
+  const student: ClassStudent = { id: studentId, personId: personIdForNewFriend(friend.id), name: friend.name.trim() };
   if (priv.birth?.trim()) student.birth = priv.birth.trim();
   if (priv.phone?.trim()) student.phone = priv.phone.trim();
   if (priv.parentPhone?.trim()) student.pphone = priv.parentPhone.trim();
@@ -117,6 +173,7 @@ export function buildNewFriendRosterRegistrationUpdates(input: {
     [paths.classStudent(year, classKey, studentId)]: buildRosterStudent(studentId, friend, priv),
     [`${paths.newFriend(sid, friend.id)}/rosterSync`]: {
       studentId,
+      personId: personIdForNewFriend(friend.id),
       classKey,
       syncedAt,
       ...(syncedBy ? { syncedBy } : {}),

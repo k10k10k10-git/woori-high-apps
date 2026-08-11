@@ -31,6 +31,7 @@ interface Props {
 
 interface PersonRow {
   personId: string;
+  canonicalPersonId?: string;
   name: string;
   bu: string;
   grade: number;
@@ -107,6 +108,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
         rows: Object.entries(c.students)
           .map(([studentId, student]): PersonRow => ({
             personId: studentId,
+            canonicalPersonId: student.personId,
             name: student.name,
             bu: p!.bu,
             grade: p!.grade,
@@ -124,6 +126,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           sub: `공식스탭 ${staff.length}명`,
           rows: staff.map((person): PersonRow => ({
             personId: person.staffId,
+            canonicalPersonId: person.personId,
             name: person.name,
             bu: STAFF_BU,
             grade: 0,
@@ -336,6 +339,7 @@ function IntakeModal({
         sid,
         {
           studentId: person.personId,
+          ...(person.canonicalPersonId ?? existing?.personId ? { personId: person.canonicalPersonId ?? existing?.personId } : {}),
           bu: person.bu,
           grade: person.grade,
           class: person.classNum,

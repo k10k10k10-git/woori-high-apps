@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { db, ref, update } from '@/lib/db';
+import { db, push, ref, update } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
+import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 import type { MoveTarget } from '@/types';
 
 export default function MoveStudentModal({ target, onClose }: { target: MoveTarget; onClose: () => void }) {
@@ -16,6 +17,10 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
   const [saving, setSaving] = useState(false);
 
   const toCk = toClass ? `${toPart}-${toGrade}-${toClass}` : '';
+  const classLabel = (value: string) => {
+    const [part, grade, classNumber] = value.split('-');
+    return `${part}부 ${grade}학년 ${classNumber}반`;
+  };
 
   async function handleMove() {
     if (!toCk || toCk === target.fromCk) { showToast('다른 반을 선택하세요.'); return; }
@@ -25,9 +30,18 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
     // 단일 학생만 이동 — 두 반 명단을 통째로 덮어쓰지 않아 동시 편집 충돌 방지.
     // (번호 num은 읽을 때 sortAndRenumber로 재계산됨)
     try {
+      const changeId = push(ref(db, `classes/${curYear}/${toCk}/adminChanges`)).key ?? `change_${Date.now()}`;
       await update(ref(db), {
         [`classes/${curYear}/${target.fromCk}/students/${target.sid}`]: null,
         [`classes/${curYear}/${toCk}/students/${target.sid}`]: { ...student },
+        [adminChangePath(curYear, toCk, changeId)]: buildAdminChangeEntry({
+          classKey: toCk,
+          teacher: classData[toCk]?.teacher,
+          student,
+          action: '반 이동',
+          changeSummary: `${classLabel(target.fromCk)}에서 ${classLabel(toCk)}으로 이동`,
+          actor: adminActor(state.userRole),
+        }),
       });
       dispatch({ type: 'SET_CLASS', payload: toClass });
     } catch {

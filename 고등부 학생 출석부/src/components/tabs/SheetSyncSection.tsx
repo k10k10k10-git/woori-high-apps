@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { db, ref, get, update, set } from '@/lib/db';
+import { db, ref, get, push, update, set } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import {
@@ -8,6 +8,7 @@ import {
   buildSyncPlan, buildSyncPayload, type SyncPlan, type ParsedClass,
 } from '@/lib/sheetSync';
 import type { Student } from '@/types';
+import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 
 type CurrentClasses = Record<string, { teacher?: string; students?: Record<string, Student> }>;
 
@@ -28,6 +29,7 @@ export default function SheetSyncSection() {
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<SyncPlan | null>(null);
   const [currentRef, setCurrentRef] = useState<CurrentClasses | null>(null);
+  const [historicalRef, setHistoricalRef] = useState<Record<string, unknown> | null>(null);
   const [removeMissing, setRemoveMissing] = useState(false);
 
   // 저장된 시트 URL 로드
@@ -60,8 +62,9 @@ export default function SheetSyncSection() {
     setLoading(true);
     setProgress('');
     try {
-      const curSnap = await get(ref(db, `classes/${curYear}`));
-      const current: CurrentClasses = curSnap.exists() ? curSnap.val() : {};
+      const allSnap = await get(ref(db, 'classes'));
+      const allClasses = allSnap.exists() ? allSnap.val() as Record<string, unknown> : {};
+      const current = (allClasses[String(curYear)] ?? {}) as CurrentClasses;
 
       const classes: ParsedClass[] = [];
       if (id1) {
@@ -80,6 +83,7 @@ export default function SheetSyncSection() {
         return;
       }
       setCurrentRef(current);
+      setHistoricalRef(allClasses);
       setPlan(buildSyncPlan(classes, current));
     } catch (e) {
       setError(e instanceof Error ? e.message : '시트를 불러오지 못했습니다.');
@@ -93,7 +97,18 @@ export default function SheetSyncSection() {
     if (!plan || !currentRef) return;
     setRunning(true);
     try {
-      const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing);
+      const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing, historicalRef);
+      plan.classes.forEach((classPlan) => {
+        const changeId = push(ref(db, `classes/${curYear}/${classPlan.ck}/adminChanges`)).key ?? `change_${Date.now()}_${classPlan.ck}`;
+        payload[adminChangePath(curYear, classPlan.ck, changeId)] = buildAdminChangeEntry({
+          classKey: classPlan.ck,
+          teacher: classPlan.teacher,
+          studentName: `반 전체 (${classPlan.students.length}명)`,
+          action: '시트 동기화',
+          changeSummary: `구글 시트 명단·출석 반영 · 신규 ${plan.added.filter((item) => item.ck === classPlan.ck).length}명 · 이동 ${plan.moved.filter((item) => item.toCk === classPlan.ck).length}명`,
+          actor: adminActor(state.userRole),
+        });
+      });
       await update(ref(db), payload);
       showToast(`${plan.classCount}개 반 · ${plan.totalStudents}명 동기화 완료`, 'success');
       setPlan(null);

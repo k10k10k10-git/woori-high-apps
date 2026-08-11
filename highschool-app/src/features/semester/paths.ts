@@ -42,6 +42,7 @@ export const paths = {
     `semestersPrivate/${sid}/newFriendRosterBackups/${id}/removals/${backupId}`,
 
   // ── 다른 앱 소유 (새친구 단건 등록·검증된 되돌리기 외 쓰기 함수 추가 금지) ──
+  classes: () => `classes`,
   classesByYear: (year: string) => `classes/${year}`,
   classStudent: (year: string, classKey: string, studentId: string) =>
     `classes/${year}/${classKey}/students/${studentId}`,

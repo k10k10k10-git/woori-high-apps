@@ -360,10 +360,11 @@ export async function getClassesByYear(year: string): Promise<ClassInfo[]> {
 export async function getStaffByYear(year: string): Promise<StaffPerson[]> {
   const snap = await get(ref(db, paths.teacherStaffByYear(year)));
   if (!snap.exists()) return [];
-  return Object.entries(snap.val() as Record<string, { name?: string; title?: string; phone?: string }>)
+  return Object.entries(snap.val() as Record<string, { name?: string; title?: string; phone?: string; personId?: string }>)
     .filter(([, value]) => value?.name?.trim())
     .map(([staffId, value]) => ({
       staffId,
+      ...(value.personId?.trim() ? { personId: value.personId.trim() } : {}),
       name: value.name!.trim(),
       ...(value.title?.trim() ? { title: value.title.trim() } : {}),
       ...(value.phone?.trim() ? { phone: value.phone.trim() } : {}),
