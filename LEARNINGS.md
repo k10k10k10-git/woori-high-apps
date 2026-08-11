@@ -101,3 +101,8 @@
 - **접근법**: 1→ 브라우저에서 `document.styleSheets`의 `cssRules`를 훑어 새 선택자(`.page-hero`, `.workspace-header`)가 실제 로드됐는지 확인한다. 2→ `curl -s http://localhost:3000/_next/static/chunks/<globals 청크>.css | rg '<선택자>'`로 브라우저 캐시와 서버 산출물을 분리해 진단한다. 3→ 소스에는 선택자가 있는데 청크에는 없으면 개발 서버를 중지하고 기존 `.next`를 `/tmp/highschool-next-cache-<timestamp>`로 이동한 뒤 `npm run dev`로 새 캐시를 만든다. 4→ 새 청크의 선택자 존재, 브라우저 계산 스타일, 데스크톱·375px 화면을 순서대로 다시 확인한다.
 - **판단 질문**: 컴포넌트에 인라인 스타일을 중복하거나 Tailwind 유틸리티로 새 디자인 시스템을 다시 쓰지 않았다. 소스 CSS 문제처럼 보였지만 서버가 과거 `.semester-scope`·`.iguard-scope` 토큰을 그대로 제공한다는 실증이 있었고, 표현 코드를 우회하면 원인은 남은 채 유지보수만 악화되기 때문이다.
 - **재사용 규칙**: Next/Turbopack에서 전역 CSS 수정이 보이지 않으면 새로고침만 반복하지 말고 `소스 → 서버 CSS 청크 → 브라우저 cssRules → 계산 스타일` 네 단계를 대조하고, 서버 청크부터 낡았을 때만 `.next`를 안전하게 이동해 재생성한다.
+
+### Next.js 빌드와 독립 `tsc`를 병렬 실행해 거짓 타입 오류가 날 때 (2026-08-11)
+- **접근법**: 1→ `npm run build` 중 `npx tsc --noEmit`가 `.next/types/app/**` 파일 분실(TS6053)로 실패하면 두 명령의 실행 시각을 확인한다. 2→ `ps -axo pid,ppid,etime,command | rg 'next build|npm run build'`로 배경에 남은 빌드가 있는지 확인하고 해당 프로세스가 완료될 때까지 기다린다. 3→ `npx tsc --noEmit`을 독립 실행해 0 errors를 확인한다. 4→ 이후 `npm run build`를 단독 실행해 TypeScript·정적 페이지·빌드 트레이스 완료를 확인한다.
+- **판단 질문**: TS6053 메시지만 보고 `tsconfig.json`에서 `.next/types/**/*.ts` include를 제거하지 않았다. Next.js 빌드가 그 디렉터리를 재생성하는 순간 독립 `tsc`가 읽은 경합이 원인이며, include 제거는 App Router가 생성한 타입 계약 검사를 약화한다.
+- **재사용 규칙**: `.next/types` 산출물을 공유하는 Next.js 프로젝트에서는 전체 검증을 `npm test → npx tsc --noEmit → npm run build` 순으로 직렬화하고, 테스트만 다른 두 명령과 병렬화한다.

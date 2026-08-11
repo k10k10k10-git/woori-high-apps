@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
-import { buildPeopleProfiles, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
+import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
 import { loadPeopleSearchData } from "./peopleSearchDb";
 
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
@@ -160,10 +160,9 @@ function SearchState({ title, description }: { title: string; description: strin
 }
 
 function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; onBack: () => void; onClose: () => void }) {
-  const grouped = profile.records.reduce((map, record) => {
-    map.set(record.category, [...(map.get(record.category) ?? []), record]);
-    return map;
-  }, new Map<PersonRecord["category"], PersonRecord[]>());
+  const yearGroups = useMemo(() => groupPersonRecordsByYear(profile.records), [profile.records]);
+  const [selectedYear, setSelectedYear] = useState(() => yearGroups[0]?.year ?? "");
+  const activeGroup = yearGroups.find((group) => group.year === selectedYear) ?? yearGroups[0];
 
   return (
     <>
@@ -185,23 +184,41 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
             같은 이름의 서로 다른 식별자가 있어 별도 인물로 나눴습니다. 학년·반과 연락처를 확인해 주세요.
           </div>
         )}
-        <div className="space-y-6">
-          {["학적·출석", "학기 중 사역", "새친구", "수련회"].map((category) => {
-            const records = grouped.get(category as PersonRecord["category"]);
-            if (!records?.length) return null;
-            return (
-              <section key={category}>
-                <div className="mb-2.5 flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-slate-900">{category}</h3>
-                  <span className="text-[11px] text-slate-400">{records.length}건</span>
+        {yearGroups.length > 0 && activeGroup ? (
+          <div>
+            <div className="mb-4 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+              <div className="flex min-w-max gap-1" role="tablist" aria-label="연도별 인물 기록">
+                {yearGroups.map((group) => (
+                  <button
+                    key={group.year}
+                    type="button"
+                    role="tab"
+                    aria-selected={group.year === activeGroup.year}
+                    onClick={() => setSelectedYear(group.year)}
+                    className={`rounded-lg px-5 py-2.5 text-sm font-extrabold transition ${group.year === activeGroup.year ? "bg-slate-900 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
+                  >
+                    {group.label}
+                    <span className={`ml-1.5 text-[10px] ${group.year === activeGroup.year ? "text-slate-300" : "text-slate-400"}`}>{group.records.length}건</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <section role="tabpanel" aria-label={`${activeGroup.label} 기록`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <header className="flex flex-wrap items-end justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-4 sm:px-5">
+                <div>
+                  <p className="text-[11px] font-bold text-emerald-700">연도별 통합 기록</p>
+                  <h3 className="mt-0.5 text-lg font-extrabold text-slate-950">{activeGroup.label}</h3>
                 </div>
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {records.map((record) => <RecordCard key={record.id} record={record} />)}
-                </div>
-              </section>
-            );
-          })}
-        </div>
+                <p className="text-xs font-semibold text-slate-500">{activeGroup.records.length}건의 연결된 정보</p>
+              </header>
+              <div className="space-y-3 p-3 sm:p-4">
+                {activeGroup.records.map((record) => <RecordCard key={record.id} record={record} />)}
+              </div>
+            </section>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-xs text-slate-400">표시할 연도별 기록이 없습니다.</p>
+        )}
       </div>
       <footer className="border-t border-slate-100 bg-white px-5 py-3 text-[11px] text-slate-500">
         표시 내용은 검색 창을 열 때 현재 DB를 조회해 묶은 결과이며, 이 화면에서 데이터는 수정되지 않습니다.
@@ -212,8 +229,8 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
 
 function RecordCard({ record }: { record: PersonRecord }) {
   return (
-    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-3">
+    <article className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <header className="flex items-start gap-3 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
         <span className={`mt-0.5 rounded-md px-2 py-1 text-[10px] font-extrabold ${CATEGORY_STYLE[record.category]}`}>{record.category}</span>
         <span className="min-w-0 flex-1">
           <strong className="block text-sm text-slate-900">{record.title}</strong>
@@ -222,9 +239,9 @@ function RecordCard({ record }: { record: PersonRecord }) {
         {record.private && <span className="text-[10px] font-semibold text-rose-500">민감정보 포함</span>}
       </header>
       {record.fields.length > 0 ? (
-        <dl className="grid grid-cols-1 gap-x-5 gap-y-2.5 px-4 py-3.5 sm:grid-cols-2">
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 px-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
           {record.fields.map((item, index) => (
-            <div key={`${item.label}-${index}`} className={item.value.length > 34 ? "sm:col-span-2" : ""}>
+            <div key={`${item.label}-${index}`} className={item.value.length > 34 ? "sm:col-span-2 lg:col-span-3" : ""}>
               <dt className="text-[10px] font-bold text-slate-400">{item.label}</dt>
               <dd className={`mt-0.5 whitespace-pre-wrap break-words text-xs leading-5 ${item.sensitive ? "text-slate-700" : "text-slate-800"}`}>{item.value}</dd>
             </div>

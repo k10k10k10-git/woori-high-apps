@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPeopleProfiles, searchPeople, type PeopleSearchData } from "./peopleSearch";
+import { buildPeopleProfiles, groupPersonRecordsByYear, searchPeople, type PeopleSearchData } from "./peopleSearch";
 
 function fixture(): PeopleSearchData {
   return {
@@ -32,6 +32,7 @@ function fixture(): PeopleSearchData {
         groups: { g1: { name: "3조", studentIds: ["1_minchae"] } },
         rooms: { r1: { roomNumber: "203호", studentIds: ["1_minchae"] } },
         cellColors: { "1_minchae": "blue" },
+        onSiteReg: { onsite1: { name: "강민채", studentId: "minchae", bu: "1부", grade: 2, class: 3 } },
         tshirtOrders: { t1: { name: "강민채", bu: "1부", grade: 2, class: 3, size: "M(95)", design: "1번" } },
       },
     },
@@ -46,6 +47,16 @@ describe("인물 통합검색", () => {
     expect(target?.records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 중 사역", "수련회"]));
     expect(target?.records.some((record) => record.fields.some((item) => item.value.includes("출석 1 · 지각 1 · 결석 1")))).toBe(true);
     expect(target?.records.some((record) => record.title === "단체티")).toBe(true);
+    expect(target?.records.some((record) => record.title === "현장 등록")).toBe(false);
+  });
+
+  it("인물 상세 기록을 최신 연도부터 묶고 해당 연도의 사역·수련회 정보를 함께 보여준다", () => {
+    const target = buildPeopleProfiles(fixture()).find((profile) => profile.records.some((record) => record.title.includes("기초훈련")));
+    const groups = groupPersonRecordsByYear(target?.records ?? []);
+
+    expect(groups.map((group) => group.label)).toEqual(["2026년", "2025년"]);
+    expect(groups[0].records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 중 사역", "수련회"]));
+    expect(groups[1].records.every((record) => record.period.includes("2025"))).toBe(true);
   });
 
   it("같은 이름이어도 생년과 연락처가 충돌하면 동명이인으로 분리한다", () => {

@@ -22,6 +22,39 @@ export type PersonRecord = {
   private?: boolean;
 };
 
+export type PersonYearGroup = {
+  year: string;
+  label: string;
+  records: PersonRecord[];
+};
+
+export function personRecordYear(record: PersonRecord): string {
+  for (const value of [record.period, record.sortKey]) {
+    const match = value.match(/(?:19|20)\d{2}/);
+    if (match) return match[0];
+  }
+  return "unknown";
+}
+
+export function groupPersonRecordsByYear(records: PersonRecord[]): PersonYearGroup[] {
+  const grouped = new Map<string, PersonRecord[]>();
+  records.forEach((record) => {
+    const year = personRecordYear(record);
+    grouped.set(year, [...(grouped.get(year) ?? []), record]);
+  });
+  return [...grouped.entries()]
+    .sort(([a], [b]) => {
+      if (a === "unknown") return 1;
+      if (b === "unknown") return -1;
+      return Number(b) - Number(a);
+    })
+    .map(([year, yearRecords]) => ({
+      year,
+      label: year === "unknown" ? "연도 미상" : `${year}년`,
+      records: yearRecords,
+    }));
+}
+
 export type PersonProfile = {
   id: string;
   name: string;
@@ -410,7 +443,6 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
     }
 
     const auxiliary: Array<{ node: string; title: string; labels: Record<string, string>; private?: boolean }> = [
-      { node: "onSiteReg", title: "현장 등록", labels: { bu: "부서", grade: "학년", class: "반", gender: "성별", registeredAt: "등록 시각" } },
       { node: "tshirtOrders", title: "단체티", labels: { bu: "부서", grade: "학년", class: "반", design: "디자인", size: "사이즈", note: "메모" } },
       { node: "carpools", title: "차량 신청", labels: { bu: "부서", grade: "학년", class: "반", desiredTime: "희망 시간", location: "장소", teacherDriver: "배정 교사", note: "메모", phone: "학생 연락처", pPhone: "보호자 연락처" } },
     ];
