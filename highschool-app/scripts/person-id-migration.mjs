@@ -160,6 +160,7 @@ function buildPlan(records) {
   });
 
   const updates = {};
+  const personIdByPath = new Map();
   const countsByKind = {};
   const peopleByKind = {};
   let reusedPersonIds = 0;
@@ -173,6 +174,7 @@ function buildPlan(records) {
     if (existing.length === 1) reusedPersonIds += 1;
     peopleByKind[canonical.kind] = (peopleByKind[canonical.kind] ?? 0) + 1;
     for (const record of cluster) {
+      personIdByPath.set(record.path, personId);
       countsByKind[record.kind] = (countsByKind[record.kind] ?? 0) + 1;
       if (record.personId !== personId) updates[`${record.path}/personId`] = personId;
     }
@@ -180,6 +182,7 @@ function buildPlan(records) {
 
   return {
     updates,
+    personIdByPath,
     report: {
       schemaVersion: 1,
       totalRecords: records.length,
@@ -194,12 +197,67 @@ function buildPlan(records) {
   };
 }
 
-const [classes, teacherStaff, teacherSpecial, teacherExtra, teacherAdditional] = await Promise.all([
+function applicationKind(value) {
+  return text(value.bu) === "스탭" || text(value.studentId).startsWith("staff_") ? "staff" : "student";
+}
+
+function sourceIdentityKey(kind, year, sourceId) {
+  return `${kind}|${year}|${sourceId}`;
+}
+
+function sourceIdentityForRecord(record) {
+  const segments = record.path.split("/");
+  if (record.kind === "student" && segments[0] === "classes") {
+    return sourceIdentityKey("student", segments[1], segments.at(-1));
+  }
+  if (record.kind === "staff" && segments[0] === "teacherStaff") {
+    return sourceIdentityKey("staff", segments[1], segments.at(-1));
+  }
+  return "";
+}
+
+function linkSemesterApplications(semesters, records, personIdByPath, updates) {
+  const candidates = new Map();
+  for (const record of records) {
+    const key = sourceIdentityForRecord(record);
+    if (!key) continue;
+    const ids = candidates.get(key) ?? new Set();
+    const personId = personIdByPath.get(record.path);
+    if (personId) ids.add(personId);
+    candidates.set(key, ids);
+  }
+
+  let total = 0;
+  let linked = 0;
+  let unmatched = 0;
+  for (const [sid, semester] of Object.entries(asRecord(semesters))) {
+    const year = sid.match(/^\d{4}/)?.[0] ?? "";
+    for (const [appKey, rawApplication] of Object.entries(asRecord(asRecord(semester).applications))) {
+      total += 1;
+      const application = asRecord(rawApplication);
+      const key = sourceIdentityKey(applicationKind(application), year, text(application.studentId));
+      const personIds = candidates.get(key);
+      if (!personIds || personIds.size !== 1) {
+        unmatched += 1;
+        continue;
+      }
+      const personId = [...personIds][0];
+      if (text(application.personId) !== personId) {
+        updates[`semesters/${sid}/applications/${appKey}/personId`] = personId;
+      }
+      linked += 1;
+    }
+  }
+  return { total, linked, unmatched };
+}
+
+const [classes, teacherStaff, teacherSpecial, teacherExtra, teacherAdditional, semesters] = await Promise.all([
   readRoot("classes"),
   readRoot("teacherStaff"),
   readRoot("teacherSpecial"),
   readRoot("teacherExtra"),
   readRoot("teacherAdditional"),
+  readRoot("semesters"),
 ]);
 
 const sourceRecords = {
@@ -211,7 +269,9 @@ const sourceRecords = {
 };
 const records = Object.values(sourceRecords).flat();
 
-const { updates, report } = buildPlan(records);
+const { updates, report, personIdByPath } = buildPlan(records);
+report.semesterApplications = linkSemesterApplications(semesters, records, personIdByPath, updates);
+report.updatePaths = Object.keys(updates).length;
 report.sourceCounts = Object.fromEntries(Object.entries(sourceRecords).map(([name, values]) => [name, values.length]));
 if (updatesFile) await writeFile(resolve(updatesFile), `${JSON.stringify(updates, null, 2)}\n`, { mode: 0o600 });
 if (reportFile) await writeFile(resolve(reportFile), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });

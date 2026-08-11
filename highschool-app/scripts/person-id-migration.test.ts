@@ -13,7 +13,7 @@ afterEach(() => {
 function runMigration(roots: Record<string, unknown>) {
   const dir = mkdtempSync(join(tmpdir(), "woori-person-id-test-"));
   tempDirs.push(dir);
-  for (const name of ["classes", "teacherStaff", "teacherSpecial", "teacherExtra", "teacherAdditional"]) {
+  for (const name of ["classes", "teacherStaff", "teacherSpecial", "teacherExtra", "teacherAdditional", "semesters"]) {
     writeFileSync(join(dir, `${name}.json`), JSON.stringify(roots[name] ?? null));
   }
   const updates = join(dir, "updates.json");
@@ -66,5 +66,26 @@ describe("personId 운영 DB 마이그레이션", () => {
 
     expect(updates["teacherStaff/2026/staff1/personId"])
       .not.toBe(updates["teacherExtra/2026/1/1_1_1/personId"]);
+  });
+
+  it("기존 학기 학생·스탭 신청을 같은 연도 공식 원장의 personId에 연결한다", () => {
+    const { updates, report } = runMigration({
+      classes: { 2026: { "1-1-2": { students: { S12_01: { name: "김학생" } } } } },
+      teacherStaff: { 2026: { staff_1: { name: "김스탭" } } },
+      semesters: {
+        "2026-1": { applications: {
+          student: { name: "김학생", bu: "1부", studentId: "S12_01" },
+          staff: { name: "김스탭", bu: "스탭", studentId: "staff_1" },
+          unknown: { name: "미확인", bu: "스탭", studentId: "staff_missing" },
+        } },
+      },
+    });
+
+    expect(updates["semesters/2026-1/applications/student/personId"])
+      .toBe(updates["classes/2026/1-1-2/students/S12_01/personId"]);
+    expect(updates["semesters/2026-1/applications/staff/personId"])
+      .toBe(updates["teacherStaff/2026/staff_1/personId"]);
+    expect(updates["semesters/2026-1/applications/unknown/personId"]).toBeUndefined();
+    expect(report).toMatchObject({ semesterApplications: { total: 3, linked: 2, unmatched: 1 } });
   });
 });
