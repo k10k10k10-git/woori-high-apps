@@ -146,9 +146,10 @@ const SEMESTER_CAPS: Record<SemesterRole, SemesterCapability> = {
   superAdmin: { semester: "write", sunday: "write", settings: true, destructive: true, rosterWrite: true, search: "write", manageRoles: true },
   pastor:     { semester: "write", sunday: "write", settings: true, destructive: true, rosterWrite: false, search: "write", manageRoles: true },
   leader:     { semester: "write", sunday: "write", settings: true, destructive: false, rosterWrite: false, search: "read", manageRoles: false },
-  // 행정팀의 출석부 반영은 Rules(classes 쓰기 = admins만)가 막는다.
-  // 화면에서 열어 두면 "눌렀는데 실패"가 되므로 Rules를 넓히기 전까지 false로 둔다.
-  adminTeam:  { semester: "write", sunday: "write", settings: true, destructive: false, rosterWrite: false, search: "read", manageRoles: false },
+  // 행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸다 —
+  // classes/attendance/trash의 **학생 1명 경로**만 `semesterRole === "adminTeam"`에게 허용된다.
+  // 반 노드 전체(students 통째·teacher)는 여전히 통합관리자·담임만 쓴다.
+  adminTeam:  { semester: "write", sunday: "write", settings: true, destructive: false, rosterWrite: true, search: "read", manageRoles: false },
   // 사역팀 계열은 학기 "내 팀만 편집"이 목표지만, 팀 단위 쓰기는 Rules가 없어 조회로 둔다.
   barnabas:   { semester: "read", sunday: "write", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
   worship:    { semester: "read", sunday: "read", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },

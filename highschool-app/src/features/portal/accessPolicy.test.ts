@@ -67,9 +67,15 @@ describe("학기 역할 — 학기·주일 화면", () => {
     expect(allowed).toEqual(["superAdmin", "pastor"]);
   });
 
-  it("출석부 원장 반영은 현재 Rules(classes 쓰기=admins)에 맞춰 통합관리자만 가능하다", () => {
+  it("출석부 원장 반영은 통합관리자와 행정팀만 가능하다 (2026-08-12 Rules 보강)", () => {
     const allowed = ASSIGNABLE_SEMESTER_ROLES.filter((role) => canWriteStudentRoster(roles(role, "none")));
-    expect(allowed).toEqual(["superAdmin"]);
+    expect(allowed).toEqual(["superAdmin", "adminTeam"]);
+  });
+
+  it("교역자·스탭팀장·바나바팀은 출석부 원장을 쓰지 못한다", () => {
+    for (const role of ["pastor", "leader", "barnabas", "worship", "staff"] as const) {
+      expect(canWriteStudentRoster(roles(role, "none"))).toBe(false);
+    }
   });
 });
 
