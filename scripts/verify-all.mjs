@@ -1,10 +1,9 @@
 import { spawnSync } from "node:child_process";
 
+// 운영 앱 2개. semester-app·교사·스탭 출석부는 2026-08-12 제거됐다.
 const apps = [
   "highschool-app",
-  "semester-app",
   "고등부 학생 출석부",
-  "고등부 교사·스탭 출석부",
 ];
 const tasks = ["lint", "typecheck", "test", "build"];
 
