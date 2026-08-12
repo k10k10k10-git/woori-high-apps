@@ -13,10 +13,10 @@ describe("portal search", () => {
     expect(items.some((item) => item.id === "sunday-ministry")).toBe(true);
   });
 
-  it("이가드팀에게 학기·행정 검색 항목을 노출하지 않는다", () => {
+  it("이가드팀에게 학기 항목은 감추고 행정은 조회용으로 남긴다", () => {
     const items = buildPortalSearchItems({ roles: { semester: "none", retreat: "iguardTeam" }, semesters, retreats });
     expect(items.some((item) => item.area === "semester")).toBe(false);
-    expect(items.some((item) => item.area === "retreat")).toBe(false);
+    expect(items.some((item) => item.area === "retreat")).toBe(true);
     expect(items.some((item) => item.area === "field")).toBe(true);
   });
 

@@ -78,9 +78,9 @@ describe("방학 역할 — 수련회 행정·현장 화면", () => {
   const cases: Array<[RetreatRole, { admin: boolean; adminEdit: boolean; field: "none" | "execution" | "all"; sensitive: boolean }]> = [
     ["superAdmin", { admin: true, adminEdit: true, field: "all", sensitive: true }],
     ["pastor", { admin: true, adminEdit: true, field: "all", sensitive: true }],
-    ["leader", { admin: true, adminEdit: true, field: "all", sensitive: false }],
+    ["leader", { admin: true, adminEdit: false, field: "all", sensitive: false }],
     ["adminTeam", { admin: true, adminEdit: true, field: "execution", sensitive: true }],
-    ["iguardTeam", { admin: false, adminEdit: false, field: "all", sensitive: false }],
+    ["iguardTeam", { admin: true, adminEdit: false, field: "all", sensitive: false }],
     ["fieldStaff", { admin: false, adminEdit: false, field: "execution", sensitive: false }],
     ["none", { admin: false, adminEdit: false, field: "none", sensitive: false }],
   ];
@@ -107,6 +107,15 @@ describe("방학 역할 — 수련회 행정·현장 화면", () => {
   it("수련회 생성은 통합관리자·교역자·행정팀만 가능하다", () => {
     const allowed = ASSIGNABLE_RETREAT_ROLES.filter((role) => canCreateRetreat(roles("none", role)));
     expect(allowed).toEqual(["superAdmin", "pastor", "adminTeam"]);
+  });
+
+  it("스탭팀장·이가드팀은 행정을 조회만 한다 — 저장은 화면에서 잠근다", () => {
+    for (const role of ["leader", "iguardTeam"] as const) {
+      expect(canAccessArea("retreat-admin", roles("none", role))).toBe(true);
+      expect(canEditArea("retreat-admin", roles("none", role))).toBe(false);
+      // 민감 탭은 Rules가 막으므로 화면에서도 반드시 감춘다(권한 오류 방지)
+      expect(canSeeSensitiveRetreat(roles("none", role))).toBe(false);
+    }
   });
 
   it("이가드팀은 학기 화면을 열 수 없다", () => {
@@ -226,6 +235,8 @@ describe("표시·이동", () => {
   it("행정 권한이 있으면 행정 화면으로, 아니면 현장 화면으로 연결한다", () => {
     expect(retreatEntryHref("summer 2026", roles("none", "adminTeam"))).toBe("/retreat/summer%202026");
     expect(retreatEntryHref("summer 2026", roles("praise", "fieldStaff"))).toBe("/retreat/summer%202026/field");
+    // 조회만 가능한 역할은 현장이 주 사용처다
     expect(retreatEntryHref("summer 2026", roles("none", "iguardTeam"))).toBe("/retreat/summer%202026/field");
+    expect(retreatEntryHref("summer 2026", roles("none", "leader"))).toBe("/retreat/summer%202026/field");
   });
 });

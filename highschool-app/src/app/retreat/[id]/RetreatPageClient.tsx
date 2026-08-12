@@ -23,7 +23,8 @@ import TshirtTab from "./TshirtTab";
 import MedicalLogTab from "./MedicalLogTab";
 import MealCountTab from "./MealCountTab";
 import AdminSuppliesTab from "./AdminSuppliesTab";
-import { canAccessArea, canSeeSensitiveRetreat } from "@/features/portal/accessPolicy";
+import { canAccessArea, canEditArea, canSeeSensitiveRetreat } from "@/features/portal/accessPolicy";
+import { RetreatEditProvider } from "@/features/portal/RetreatEditContext";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
@@ -67,6 +68,8 @@ export default function RetreatPageClient() {
   const { user, loading: authLoading, roles } = useAuth();
   const adminAllowed = canAccessArea("retreat-admin", roles);
   const canSeeSensitive = canSeeSensitiveRetreat(roles);
+  // 스탭팀장·이가드팀은 행정 화면을 조회만 한다.
+  const canEditAdmin = canEditArea("retreat-admin", roles);
   const { toast } = useUI();
   // 현장 화면과 같은 잠금 — 어느 쪽에서 PIN을 걸어도 행정·이가드 모두 잠긴다.
   const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(id, {
@@ -384,6 +387,16 @@ export default function RetreatPageClient() {
           - 기타 탭: 기존 conditional render 유지
       ══════════════════════════════════════════════════════ */}
         <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6" role="tabpanel" id="tab-content-panel">
+          {!canEditAdmin && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              조회 전용입니다. 명단·편성·이동·물품을 볼 수 있고 저장은 되지 않습니다.
+            </div>
+          )}
+          {/* fieldset disabled — 내부의 button·input·select·textarea를 브라우저가 전부 잠근다.
+              display:contents라 레이아웃에는 영향이 없다. 드래그처럼 폼 요소가 아닌 조작은
+              각 탭이 useRetreatCanEdit()으로 따로 잠근다. */}
+          <fieldset disabled={!canEditAdmin} className="contents">
+          <RetreatEditProvider canEdit={canEditAdmin}>
           {/* keep-alive 탭: 마운트 후 CSS display로 보여주기/숨기기 */}
           {mountedTabs.has(TAB_IDX.PARTICIPANTS) && (
             <div style={{ display: effectiveTab === TAB_IDX.PARTICIPANTS ? "block" : "none" }}>
@@ -420,6 +433,8 @@ export default function RetreatPageClient() {
           {effectiveTab === TAB_IDX.MEALCOUNT   && <MealCountTab          retreat={retreat} />}
           {effectiveTab === TAB_IDX.ADMINSUPPLIES && <AdminSuppliesTab    retreat={retreat} />}
           {effectiveTab === TAB_IDX.MEDICAL     && <MedicalLogTab         retreat={retreat} />}
+          </RetreatEditProvider>
+          </fieldset>
         </main>
     </div>
   );

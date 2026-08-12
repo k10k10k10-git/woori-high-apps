@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Group, Student, TeacherAttendance } from "@/lib/types";
 import { TEACHER_STATUS_CLS } from "@/lib/constants";
 import { resolveGroupRoleStudentId } from "@/lib/groupRoleStudent";
+import { useRetreatCanEdit } from "@/features/portal/RetreatEditContext";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 
@@ -27,10 +28,11 @@ function parseClassKey(classKey: string): { grade: number; cls: number } {
 export function StudentChip({ id, name, tag, bu, color, onDragStart }: {
   id: string; name: string; tag: string | null; bu?: string; color?: string; onDragStart: () => void
 }) {
+  const canEditRetreat = useRetreatCanEdit();
   const chipBase = color ? CHIP_COLOR_CLS[color] : "bg-white border-slate-200";
   return (
     <div
-      draggable
+      draggable={canEditRetreat}
       onDragStart={(e) => {
         e.dataTransfer.setData("dragType", "student");
         e.dataTransfer.setData("dragName", name);
@@ -53,10 +55,11 @@ export function TeacherChip({ teacher, onDragStart, onRemove }: {
   onDragStart: () => void;
   onRemove?: () => void;
 }) {
+  const canEditRetreat = useRetreatCanEdit();
   const statusCls = TEACHER_STATUS_CLS[teacher.status] || "bg-slate-100 border-slate-200 text-slate-600";
   return (
     <div
-      draggable
+      draggable={canEditRetreat}
       onDragStart={(e) => {
         e.dataTransfer.setData("dragType", "teacher");
         e.dataTransfer.setData("dragName", teacher.name);
@@ -181,6 +184,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
   onRemoveGroup: () => void;
   onAddStudent: (id: string) => void;
 }) {
+  const canEditRetreat = useRetreatCanEdit();
   const [editing, setEditing] = useState(false);
   const [editTeachers, setEditTeachers] = useState("");
   const [editLeader, setEditLeader] = useState("");
@@ -297,7 +301,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
             const cls = status ? TEACHER_STATUS_CLS[status] : "bg-slate-100 border-slate-200 text-slate-600";
             return (
               <div key={t}
-                draggable
+                draggable={canEditRetreat}
                 onDragStart={(e) => { e.dataTransfer.setData("dragType", "teacher"); e.dataTransfer.setData("dragName", t); onDragStart("teacher", t); }}
                 className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group cursor-grab ${cls}`}
               >
@@ -405,7 +409,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
           const chipCls = color ? CHIP_COLOR_CLS[color] : "bg-blue-50 border-blue-200";
           return (
             <div
-              draggable
+              draggable={canEditRetreat}
               onDragStart={(e) => { e.dataTransfer.setData("dragType", "student"); e.dataTransfer.setData("dragName", s?.name || sid); e.dataTransfer.setData("dragId", sid); onDragStart("student", sid); }}
               className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group cursor-grab ${chipCls}`}
             >

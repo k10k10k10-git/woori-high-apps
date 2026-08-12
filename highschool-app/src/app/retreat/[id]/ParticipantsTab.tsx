@@ -57,7 +57,9 @@ export default function ParticipantsTab({ retreat }: Props) {
       const [pData, sData, savedDups] = await Promise.all([
         getParticipants(retreat.id),
         getStudentsByYear(retreat.year),
-        getSyncDuplicates(retreat.id),
+        // 중복 후보는 retreatsPrivate에 있어 조회 전용 역할(스탭팀장·이가드팀)에게는 닫혀 있다.
+        // 보조 정보라 실패해도 명단 자체는 보여야 한다 — 여기서 삼키고 빈 목록으로 진행한다.
+        getSyncDuplicates(retreat.id).catch(() => []),
       ]);
       setParticipants(pData);
       setStudents(sData);

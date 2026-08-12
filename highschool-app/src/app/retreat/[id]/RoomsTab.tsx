@@ -18,6 +18,7 @@ import {
 import type { RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
 import RoomAutoAssignPanel, { type RoomClassOption } from "./RoomAutoAssignPanel";
 import RoomAutoAssignPreviewModal from "./RoomAutoAssignPreviewModal";
+import { useRetreatCanEdit } from "@/features/portal/RetreatEditContext";
 
 interface Props {
   retreat: Retreat;
@@ -1051,9 +1052,10 @@ function RoomUnassignedBySection({ unassigned, students, cellColors, unassignedT
 function RoomStudentChip({ id, student, color, onDragStart }: {
   id: string; student?: StudentInfo; color?: string; onDragStart: () => void;
 }) {
+  const canEditRetreat = useRetreatCanEdit();
   const chipBase = color ? CELL_COLOR_CLS[color] : "bg-white border-slate-200";
   return (
-    <div draggable onDragStart={onDragStart}
+    <div draggable={canEditRetreat} onDragStart={onDragStart}
       className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 hover:border-blue-300 transition-all select-none ${chipBase}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${student?.gender === "여" ? "bg-red-400" : "bg-blue-400"}`} />
       <span className="font-medium text-slate-700">{student?.name || id}</span>
@@ -1067,9 +1069,10 @@ function RoomTeacherChip({ teacher, onDragStart, onRemove }: {
   onDragStart: () => void;
   onRemove?: () => void;
 }) {
+  const canEditRetreat = useRetreatCanEdit();
   const statusCls = TEACHER_STATUS_CLS[teacher.status] || "bg-slate-100 border-slate-200 text-slate-600";
   return (
-    <div draggable onDragStart={onDragStart}
+    <div draggable={canEditRetreat} onDragStart={onDragStart}
       className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 cursor-grab hover:shadow-sm transition-all select-none ${statusCls}`}>
       <span>👨‍🏫 {teacher.name}</span>
       {teacher.status !== "전참" && <span className="text-[10px] opacity-75">({teacher.status})</span>}
@@ -1095,6 +1098,7 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
   onRemoveTeacher: (name: string) => void;
   onRemove: () => void;
 }) {
+  const canEditRetreat = useRetreatCanEdit();
   const [editing, setEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [capacityDraft, setCapacityDraft] = useState(String(room.capacity));
@@ -1261,7 +1265,7 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
       {teachers.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
           {teachers.map(name => (
-            <div key={name} draggable onDragStart={() => onDragStart("teacher", name)}
+            <div key={name} draggable={canEditRetreat} onDragStart={() => onDragStart("teacher", name)}
               className="drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group bg-green-50 border-green-200 text-green-700 cursor-grab">
               <span>👨‍🏫 {name}</span>
               <button onClick={() => onRemoveTeacher(name)}
@@ -1278,7 +1282,7 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
           const chipCls = color ? CELL_COLOR_CLS[color] : "bg-slate-50 border-slate-200";
           const s = students[sid];
           return (
-            <div key={sid} draggable onDragStart={() => onDragStart("student", sid)}
+            <div key={sid} draggable={canEditRetreat} onDragStart={() => onDragStart("student", sid)}
               className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group ${chipCls}`}>
               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s?.gender === "여" ? "bg-red-400" : "bg-blue-400"}`} />
               <span className="text-slate-700 font-medium">{s?.name || sid}</span>

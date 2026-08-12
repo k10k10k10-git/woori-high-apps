@@ -162,13 +162,12 @@ const SEMESTER_CAPS: Record<SemesterRole, SemesterCapability> = {
 const RETREAT_CAPS: Record<RetreatRole, RetreatCapability> = {
   superAdmin: { admin: "write", sensitive: true, field: "all", createRetreat: true, destructive: true, managePin: true, manageRoles: true },
   pastor:     { admin: "write", sensitive: true, field: "all", createRetreat: true, destructive: true, managePin: true, manageRoles: true },
-  // 스탭팀장은 합의상 "행정 조회 전용"이다. 행정 17탭에 읽기 전용 모드가 아직 없어
-  // 지금은 write로 두고 민감 탭만 가린다(다음 단계에서 read로 내린다).
-  leader:     { admin: "write", sensitive: false, field: "all", createRetreat: false, destructive: false, managePin: false, manageRoles: false },
+  // 조회 전용 — RetreatEditProvider + <fieldset disabled>가 화면에서 저장을 잠근다.
+  leader:     { admin: "read", sensitive: false, field: "all", createRetreat: false, destructive: false, managePin: false, manageRoles: false },
   adminTeam:  { admin: "write", sensitive: true, field: "execution", createRetreat: true, destructive: false, managePin: true, manageRoles: false },
-  // 이가드팀에게 행정 조회를 열려면 민감 탭을 함께 가려야 한다(retreatsPrivate는 Rules가 막는다).
-  // 읽기 전용 모드가 생기기 전까지는 기존대로 행정 화면을 열지 않는다.
-  iguardTeam: { admin: "none", sensitive: false, field: "all", createRetreat: false, destructive: false, managePin: true, manageRoles: false },
+  // 이가드팀도 행정 명단을 조회한다. 민감 탭(retreatsPrivate)은 Rules가 막으므로
+  // sensitive:false로 탭 자체를 감춰야 권한 오류가 나지 않는다.
+  iguardTeam: { admin: "read", sensitive: false, field: "all", createRetreat: false, destructive: false, managePin: true, manageRoles: false },
   fieldStaff: { admin: "none", sensitive: false, field: "execution", createRetreat: false, destructive: false, managePin: false, manageRoles: false },
   none:       { admin: "none", sensitive: false, field: "none", createRetreat: false, destructive: false, managePin: false, manageRoles: false },
 };
@@ -242,9 +241,14 @@ export function searchScope(roles: MinistryRoles): AreaPermission {
   return SEMESTER_CAPS[roles.semester].search;
 }
 
+/**
+ * 수련회를 눌렀을 때의 기본 목적지.
+ * 조회만 가능한 역할(스탭팀장·이가드팀)의 주 사용처는 현장이므로, **편집 가능 여부**로 가른다.
+ * 행정 조회는 상단 메뉴의 "수련회 행정팀"으로 따로 들어간다.
+ */
 export function retreatEntryHref(retreatId: string, roles: MinistryRoles): string {
   const encodedId = encodeURIComponent(retreatId);
-  return canAccessArea("retreat-admin", roles)
+  return canEditArea("retreat-admin", roles)
     ? `/retreat/${encodedId}`
     : `/retreat/${encodedId}/field`;
 }
