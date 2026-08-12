@@ -30,7 +30,9 @@ import {
   canManageRolesOf,
   isRetreatDowngrade,
   isSemesterDowngrade,
+  NO_ROLES,
   resolveMinistryRoles,
+  roleBadgeLabel,
   RETREAT_ROLE_HINTS,
   RETREAT_ROLE_LABELS,
   SEMESTER_ROLE_HINTS,
@@ -252,6 +254,39 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
     );
   }
 
+  /**
+   * 팀원 삭제 — 세 노드(admins·retreatAdmins·iguardMembers+iguardRoles)의 권한을 모두 회수한다.
+   * 구글 계정 자체는 지우지 않는다(그건 Firebase 콘솔의 몫). 다시 승인하면 복구된다.
+   */
+  async function removeMember(member: TeamMember) {
+    const steps = planRoleAssignment(NO_ROLES, {
+      mainAdmin: member.mainAdmin,
+      hasRetreatAdmin: member.admin != null,
+      retreatAdminRole: member.admin?.role,
+      hasIguardMember: member.iguard != null,
+      iguardRole: member.iguardRole,
+      roles: member.roles,
+    });
+    if (steps.length === 0) return;
+    const confirmed = await uiConfirm(
+      `${memberLabel(member)}님을 팀원에서 삭제할까요?\n`
+      + `현재 역할: ${roleBadgeLabel(member.roles)}\n\n`
+      + `모든 접근 권한이 회수되어 로그인해도 화면에 들어오지 못합니다.\n`
+      + `구글 계정 자체는 삭제되지 않으며, 다시 승인하면 복구됩니다.`,
+    );
+    if (!confirmed) return;
+    await run(
+      member.uid,
+      () => applyRoleSteps(steps, {
+        uid: member.uid,
+        email: member.email,
+        name: member.name,
+        hasIguardMember: member.iguard != null,
+      }),
+      `${memberLabel(member)} 팀원 삭제`,
+    );
+  }
+
   async function approvePending(request: (typeof pending)[number]) {
     const info = request.admin ?? request.iguard;
     if (!info) return;
@@ -443,9 +478,20 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <p className="truncate font-semibold leading-6 text-slate-800">{memberLabel(member)}</p>
                                 {isMe && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] leading-none text-slate-500">나</span>}
-                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${RETREAT_CHIP[member.roles.retreat]}`}>방학 {RETREAT_ROLE_LABELS[member.roles.retreat]}</span>
+                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${member.roles.semester === "none" ? RETREAT_CHIP[member.roles.retreat] : SEMESTER_CHIP[member.roles.semester]}`}>
+                                  {roleBadgeLabel(member.roles)}
+                                </span>
                                 {(member.admin || member.iguard) && (
                                   <button onClick={() => { setEditingUid(member.uid); setDraftName(member.name); }} className="text-[11px] text-slate-400 underline">이름 수정</button>
+                                )}
+                                {canManage && !isMe && (
+                                  <button
+                                    onClick={() => void removeMember(member)}
+                                    disabled={busyUid === member.uid}
+                                    className="text-[11px] text-slate-400 underline hover:text-red-500 disabled:opacity-50"
+                                  >
+                                    팀원 삭제
+                                  </button>
                                 )}
                               </div>
                               {/* admins 노드에는 이메일이 없다 — 본인 계정이면 로그인 정보로 보완한다 */}

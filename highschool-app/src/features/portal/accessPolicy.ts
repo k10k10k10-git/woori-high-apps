@@ -327,6 +327,15 @@ export function describeRoles(roles: MinistryRoles): string {
   return `학기 ${semester} · 방학 ${retreat}`;
 }
 
+/** 이름 옆 배지 — 학기·방학 구분 없이 역할 이름만. 두 축이 다르면 "A 및 B". */
+export function roleBadgeLabel(roles: MinistryRoles): string {
+  const semester = SEMESTER_ROLE_LABELS[roles.semester];
+  const retreat = RETREAT_ROLE_LABELS[roles.retreat];
+  if (roles.semester === "none") return retreat;
+  if (roles.retreat === "none") return semester;
+  return semester === retreat ? semester : `${semester} 및 ${retreat}`;
+}
+
 export function describeRolesHint(roles: MinistryRoles): string {
   const semester = SEMESTER_ROLE_HINTS[roles.semester];
   const retreat = RETREAT_ROLE_HINTS[roles.retreat];

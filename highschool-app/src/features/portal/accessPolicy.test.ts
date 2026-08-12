@@ -12,6 +12,7 @@ import {
   canWriteStudentRoster,
   describeRoles,
   iguardScopeOf,
+  roleBadgeLabel,
   resolveMinistryRoles,
   retreatEntryHref,
   type MinistryRoles,
@@ -236,6 +237,15 @@ describe("표시·이동", () => {
     expect(describeRoles(roles("leader", "adminTeam"))).toBe("학기 스탭팀장 · 방학 행정팀");
     expect(describeRoles(roles("none", "fieldStaff"))).toBe("방학 현장 스탭");
     expect(describeRoles(roles("praise", "none"))).toBe("학기 찬양팀");
+  });
+
+  it("이름 옆 배지는 학기·방학 구분 없이 역할 이름만 보여준다", () => {
+    expect(roleBadgeLabel(roles("leader", "adminTeam"))).toBe("스탭팀장 및 행정팀");
+    expect(roleBadgeLabel(roles("adminTeam", "adminTeam"))).toBe("행정팀");
+    expect(roleBadgeLabel(roles("praise", "fieldStaff"))).toBe("찬양팀 및 현장 스탭");
+    expect(roleBadgeLabel(roles("none", "iguardTeam"))).toBe("이가드팀");
+    expect(roleBadgeLabel(roles("barnabas", "none"))).toBe("바나바팀");
+    expect(roleBadgeLabel(roles("none", "none"))).toBe("권한 없음");
   });
 
   it("행정 권한이 있으면 행정 화면으로, 아니면 현장 화면으로 연결한다", () => {
