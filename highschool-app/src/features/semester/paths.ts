@@ -1,5 +1,6 @@
 // DB 경로 단일 원천 — 경로 문자열은 이 파일에만 존재한다 (모노레포 컨벤션).
-// 소유권: semester-app은 semesters/*, semestersPrivate/* 쓰기 소유.
+// 소유권: 이 모듈이 semesters/*, semestersPrivate/* 쓰기 소유.
+//         (구 semester-app이 함께 쓰던 노드였고, 그 앱은 2026-08-12 제거됐다.)
 //         classes/*·attendance/*·trash/*는 학생 앱 소유. 새친구 단건 등록과 그 등록의 검증된 되돌리기만 통합관리자 예외.
 //         admins, retreatAdmins 는 읽기 전용 (다른 앱 소유).
 

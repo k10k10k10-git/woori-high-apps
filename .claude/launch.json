@@ -13,17 +13,6 @@
       "port": 3000
     },
     {
-      "name": "semester-app",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev",
-        "--prefix",
-        "semester-app"
-      ],
-      "port": 3002
-    },
-    {
       "name": "attendance-app",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

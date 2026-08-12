@@ -9,7 +9,7 @@
       "domain": "배포·운영",
       "label": "통합 플랫폼 배포 상태",
       "desc": "통합 플랫폼과 학기 앱의 최신 Vercel 배포를 확인",
-      "prompt": "highschool-app과 semester-app의 Vercel 최신 배포 상태(Ready/Error)와 커밋을 확인하고 한국어 3~4줄로 요약해줘. 코드와 설정은 변경하지 마.",
+      "prompt": "highschool-app의 Vercel 최신 배포 상태(Ready/Error)와 커밋을 확인하고 한국어 3~4줄로 요약해줘. 코드와 설정은 변경하지 마.",
       "danger": false
     },
     {

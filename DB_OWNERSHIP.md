@@ -70,7 +70,7 @@
 | `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/medicalLogs` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
-| `retreatAdmins` | 행정 | 이가드, semester-app | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role}` — `role`은 `pastor`/`leader`/`adminTeam`(없으면 행정팀). 다른 앱은 존재 여부(`!= null`)만 보므로 필드 추가는 호환 |
+| `retreatAdmins` | 행정 | 이가드 | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role}` — `role`은 `pastor`/`leader`/`adminTeam`(없으면 행정팀). 다른 앱은 존재 여부(`!= null`)만 보므로 필드 추가는 호환 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
 ## 이가드 도메인 (소유: highschool-app 현장 모듈)
@@ -97,22 +97,25 @@
 | `iguardRoles` | 이가드 | 행정(역할 판정) | 이가드만 | `staff`(스탭) / `team`(이가드팀) — Rules validate가 이 두 값만 허용 |
 | `iguardPending` | 이가드 | - | 이가드만 | 없음 |
 
-## 학기 사역 도메인 (소유: highschool-app 학기 모듈, semester-app 호환 유지)
+## 학기 사역 도메인 (소유: highschool-app 학기 모듈)
+
+> 이 도메인을 함께 쓰던 `semester-app`은 2026-08-12 제거했습니다(복구 태그 `pre-semester-app-removal-2026-08-12`).
+> 기능은 `highschool-app` 학기 모듈로 통합돼 있었고, **데이터는 그대로 그 모듈이 계속 사용합니다.**
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
-| `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 두 화면의 호환 계약 |
+| `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | - | highschool-app | - |
 | `semesters/{sid}/trainingClasses/{id}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반. 삭제 시 `applications/*/trainingClassId`를 같은 루트 update로 함께 비운다(`trainingClass.ts`) |
 | `semesters/{sid}/teams/{id}/goal` | highschool-app 학기 모듈 | - | highschool-app | 팀별 이번 학기 목표 (커리큘럼 탭 상단) |
 | `semesters/{sid}/applications/{key}/trainingClassId` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반 배정. 값이 없으면 훈련 미신청 — 사역팀 지원은 고3 2학기·스탭만 가능(`intakeRule.ts`). `trainingOnly`는 파생 유지 |
-| `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | semester-app | highschool-app·semester-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
+| `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 | `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | - | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
 | `semestersPrivate/{sid}/newFriendsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 새친구 연락처·주소·가족·심방 메모 |
 | `semestersPrivate/{sid}/newFriendRosterBackups` | highschool-app 학기 모듈 | - | highschool-app | 출석부 신규 학생 단건 추가 직전 스냅샷과 삭제·등반/배정 취소 직전 학생·출석·새친구 비공개 복구 근거 |
 | `semesters/{year}-sunday/newFriends` | highschool-app 주일 사역 | - | highschool-app | 신규 새친구의 학기 비종속 연도별 내부 작업공간. `meta`를 두지 않아 학기 목록에서 제외 |
 | `semestersPrivate/{year}-sunday/newFriendsPrivate` | highschool-app 주일 사역 | - | highschool-app | 주일 사역 신규 새친구의 연락처·주소·가족·심방 메모 |
 
-> `highschool-app` 학기 모듈과 호환용 `semester-app`은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 예외는 `highschool-app` 새친구 탭에서 통합관리자가 확인한 신규 학생 1명을 결정적 `nf_` ID로 추가하는 흐름과, 그 흐름으로 연결된 동일 ID·동일 이름 학생만 사전 백업 후 `classes`·해당 `attendance`에서 제거하고 `trash`에 복구 사본을 남기는 되돌리기뿐이다. 되돌리기는 새친구 기록까지 삭제하는 `명단·출석부 삭제`와 새친구 기록은 보존하고 배정 연결만 해제하는 `등반 및 배정 취소`로 제한한다. 범용 기존 학생 수정·이동·삭제와 그 밖의 출석 변경은 계속 학생 앱만 담당한다.
+> `highschool-app` 학기 모듈은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 예외는 `highschool-app` 새친구 탭에서 통합관리자가 확인한 신규 학생 1명을 결정적 `nf_` ID로 추가하는 흐름과, 그 흐름으로 연결된 동일 ID·동일 이름 학생만 사전 백업 후 `classes`·해당 `attendance`에서 제거하고 `trash`에 복구 사본을 남기는 되돌리기뿐이다. 되돌리기는 새친구 기록까지 삭제하는 `명단·출석부 삭제`와 새친구 기록은 보존하고 배정 연결만 해제하는 `등반 및 배정 취소`로 제한한다. 범용 기존 학생 수정·이동·삭제와 그 밖의 출석 변경은 계속 학생 앱만 담당한다.
 > **2026-08-09 권한 축소**: `teacherStaff`·`teacherSpecial`·`teacherExtra`·`teacherAdditional`·`teacherPhones`·`userRoles`의 `.read`가 `auth != null`이라 역할 없는 구글 계정도 교사 40명의 전화·생년월일과 계정 51건을 읽을 수 있었다. 읽는 주체를 grep으로 증명해 좁혔다 — 교사 명단 계열은 `admins`·`attendanceAdmins`·`retreatAdmins`·`iguardMembers`, 나머지는 관리자만, `userRoles`는 본인 레코드만 자기조회(`auth.token.email` 일치). 새 노드를 만들 때 `.read: "auth != null"`을 기본값처럼 쓰지 말 것.
 >
 > Rules는 2026-07-10 학생 앱에서 추가·배포 완료.

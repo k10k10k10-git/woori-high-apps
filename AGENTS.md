@@ -24,7 +24,6 @@ Before changing code, always check whether the change can affect Firebase paths 
 |---|---|---|
 | `highschool-app/` | Unified semester, retreat admin, and on-site app — production URL `https://woorihigh-app.vercel.app` (the old `highschool-app-flame.vercel.app` still points at the same deployment) | `semesters/*`, `retreats/{id}/*`, `retreatsPrivate/{id}`, `retreatAdmins`, `retreats/{id}/iguard/*`, `iguard*` |
 | `고등부 학생 출석부/` | Student attendance PWA | `classes/`, `attendance/`, `events/`, `admins`, `teacherClasses` |
-| `semester-app/` | Semester ministry and training hub | `semesters/`, `semestersPrivate/` |
 
 Read these first for cross-app work:
 
@@ -70,7 +69,7 @@ Several nodes used to be readable by **any signed-in Google account** (no role a
 - Do not deploy rules from `highschool-app`; it consumes the student app's rules and data contracts.
 - Do not write across app ownership boundaries.
 - Keep sensitive retreat data under `retreatsPrivate/{id}`.
-- For `highschool-app` and `semester-app`, use their path helpers for database paths when adding or changing paths.
+- For `highschool-app`, use its path helpers for database paths when adding or changing paths.
 - Prefer single-path updates over full-node overwrites. Full overwrites require explicit backup/restore patterns where already established.
 
 ## Verification

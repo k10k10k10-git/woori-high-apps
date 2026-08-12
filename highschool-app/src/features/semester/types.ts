@@ -1,4 +1,4 @@
-// semester-app 전체 타입 정의
+// 학기 사역 타입 정의 (구 semester-app에서 이어받음)
 
 export interface SemesterMeta {
   title: string;
