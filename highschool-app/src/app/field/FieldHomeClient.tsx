@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/features/iguard/context/AuthContext";
-import { canAccessPortalArea, canManageRoles } from "@/features/portal/accessPolicy";
+import { canAccessArea, canManageRolesOf } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import type { Retreat as PortalRetreat } from "@/lib/types";
 import { getRetreats, requestIguardAccess, getMyIguardPending, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
@@ -31,8 +31,8 @@ function copyAddressFallback() {
 }
 
 export default function FieldHomeClient() {
-  const { user, loading: authLoading, role, signIn, signOut } = useAuth();
-  const fieldAllowed = canAccessPortalArea("retreat-field", role);
+  const { user, loading: authLoading, roles, signIn, signOut } = useAuth();
+  const fieldAllowed = canAccessArea("retreat-field", roles);
   const { toast } = useUI();
 
   const [retreats, setRetreats] = useState<Retreat[]>([]);
@@ -158,13 +158,13 @@ export default function FieldHomeClient() {
       ) : (
         <VacationHome
           mode="field"
-          role={role}
+          roles={roles}
           retreats={retreats as unknown as PortalRetreat[]}
           selectedId={selectedId}
           onSelect={setSelectedId}
           loadError={loadError}
           lockedIds={new Set(Object.keys(accessLocks))}
-          headerActions={canManageRoles(role) ? (
+          headerActions={canManageRolesOf(roles) ? (
             <button onClick={() => setShowAdmin(true)} aria-label="현장 관리자 도구"
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800">
               🔐 <span className="hidden sm:inline">현장 관리자</span>

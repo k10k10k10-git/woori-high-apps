@@ -7,16 +7,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
-import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessArea, canDestroySemester, canEditArea } from "@/features/portal/accessPolicy";
 import { getSemesters, createSemester, removeSemester } from "@/features/semester/db";
 import { Semester } from "@/features/semester/types";
 import LoginButton from "@/components/LoginButton";
 
 export default function SemestersPage() {
-  const { user, loading, role, signIn, signOut } = useAuth();
+  const { user, loading, roles, signIn, signOut } = useAuth();
   const { toast } = useUI();
-  const allowed = canAccessPortalArea("semester", role);
-  const canEdit = canEditPortalArea("semester", role);
+  const allowed = canAccessArea("semester", roles);
+  const canEdit = canEditArea("semester", roles);
+  // 학기 삭제·아카이브는 되돌릴 수 없다 — 통합관리자·교역자만.
+  const canDestroy = canDestroySemester(roles);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -158,7 +160,7 @@ export default function SemestersPage() {
                   <div className="text-xs text-slate-400">{s.meta.startDate} ~ {s.meta.endDate}</div>
                 )}
               </Link>
-              {canEdit && (
+              {canDestroy && (
                 <button
                   onClick={() => { setDeleteTarget(s); setDeleteInput(""); }}
                   className="self-end text-xs text-slate-300 transition-colors hover:text-red-500"

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { subscribeToIguardAccessLock } from "@/features/iguard/lib/db";
 import { hasRetreatSessionUnlock } from "@/features/iguard/lib/accessLock";
 import type { IguardAccessLock } from "@/features/iguard/lib/types";
-import { canManageRoles, type MinistryRole } from "./accessPolicy";
+import { canManageRolesOf, type MinistryRoles } from "./accessPolicy";
 
 type GateState = {
   scope: string;
@@ -36,10 +36,10 @@ function sessionUnlocked(retreatId: string, lock: IguardAccessLock): boolean {
  */
 export function useRetreatPinGate(
   retreatId: string,
-  options: { enabled: boolean; role: MinistryRole },
+  options: { enabled: boolean; roles: MinistryRoles },
 ) {
-  const { enabled, role } = options;
-  const bypass = canManageRoles(role);
+  const { enabled, roles } = options;
+  const bypass = canManageRolesOf(roles);
   const scope = `${retreatId}|${enabled}|${bypass}`;
   const [state, setState] = useState<GateState>({ scope, ...PENDING });
 

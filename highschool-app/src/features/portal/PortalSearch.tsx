@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
+import { canAccessArea, canManageRolesOf } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
 import { loadPeopleSearchData } from "./peopleSearchDb";
 
@@ -14,7 +14,7 @@ const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
 };
 
 export default function PortalSearch() {
-  const { role } = useAuth();
+  const { roles } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [profiles, setProfiles] = useState<PersonProfile[]>([]);
@@ -25,10 +25,10 @@ export default function PortalSearch() {
   const loadedAt = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const includeSemester = canAccessPortalArea("semester", role);
-  const includePrivate = canAccessPortalArea("retreat-admin", role);
-  const includeAttendancePrivate = canManageRoles(role);
-  const loadKey = `${role}:${includeSemester}:${includePrivate}:${includeAttendancePrivate}`;
+  const includeSemester = canAccessArea("semester", roles);
+  const includePrivate = canAccessArea("retreat-admin", roles);
+  const includeAttendancePrivate = canManageRolesOf(roles);
+  const loadKey = `${roles}:${includeSemester}:${includePrivate}:${includeAttendancePrivate}`;
 
   const beginOpen = useCallback(() => {
     setOpen(true);

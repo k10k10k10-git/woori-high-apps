@@ -8,14 +8,14 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import RetreatCalendarPanel from "@/app/RetreatCalendarPanel";
 import type { Retreat } from "@/lib/types";
-import { canEditPortalArea, type MinistryRole } from "./accessPolicy";
+import { canCreateRetreat, canEditArea, type MinistryRoles } from "./accessPolicy";
 import NewRetreatButton from "./NewRetreatButton";
 
 export type VacationMode = "admin" | "field";
 
 type Props = {
   mode: VacationMode;
-  role: MinistryRole;
+  roles: MinistryRoles;
   retreats: Retreat[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -34,11 +34,11 @@ type Props = {
 };
 
 export default function VacationHome({
-  mode, role, retreats, selectedId, onSelect, onCreated, onDelete,
+  mode, roles, retreats, selectedId, onSelect, onCreated, onDelete,
   lockedIds, headerActions, footer, loadError, onRetry, emptyLogo,
 }: Props) {
   const router = useRouter();
-  const canCreate = canEditPortalArea("retreat-admin", role);
+  const canCreate = canCreateRetreat(roles);
   const entryHref = (id: string) => (mode === "admin" ? `/retreat/${id}` : `/retreat/${id}/field`);
   const entryLabel = mode === "admin" ? "행정 화면 →" : "현장 화면 →";
   const selected = retreats.find((retreat) => retreat.id === selectedId);
@@ -180,7 +180,7 @@ export default function VacationHome({
             <RetreatCalendarPanel
               retreat={selected}
               retreats={retreats}
-              canEditPeriods={canEditPortalArea("retreat-admin", role)}
+              canEditPeriods={canEditArea("retreat-admin", roles)}
             />
             {footer}
           </div>

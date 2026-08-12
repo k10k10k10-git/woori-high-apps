@@ -28,19 +28,58 @@
 - **수련회 PIN 잠금은 `useRetreatPinGate` 하나로만 판정합니다**(`src/features/portal/useRetreatPinGate.ts`). 잠금은 `retreats/{id}/iguard/accessLock` 한 노드에만 있으므로 **행정·이가드 어느 쪽에서 잠가도 양쪽이 잠깁니다**. 화면마다 구독을 새로 짜면 한쪽만 잠기는 사고가 납니다. 설정 UI는 공용 `AdminModal`(현장·행정 홈이 함께 씀), PIN 우회는 통합관리자만.
 - **로드 실패 배너는 `useLoadErrors(scope)` 하나만 씁니다**(`src/lib/useLoadErrors.ts`). 실패를 경로별로 모아 **전부** 나열하고, `scope`(학기 id·계정 uid)가 바뀌면 렌더 중 파생으로 초기화합니다. 단일 `loadError` 문자열로 되돌리지 마세요 — 5개 구독이 동시에 거부돼도 마지막 하나만 보여 2026-08-08에 권한 공백의 원인을 두 번 잘못 짚었습니다. 저장·삭제 실패는 `actionError`로 분리합니다. ⚠ Firebase RTDB는 **한 번 거부된 리스너를 규칙이 바뀌어도 재시도하지 않습니다** — 권한을 열어도 그 탭은 새로고침(재구독) 전까지 실패 상태로 남습니다.
 
-## 권한 — 6단계 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
+## 권한 — 두 축 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
 
-| 역할 | 학기·주일 사역 | 수련회 행정 | 이가드 현장 | 역할 배정 | DB 저장 위치 |
+역할은 **두 축**입니다. 한 사람이 학기 역할과 방학 역할을 동시에 갖고, **화면이 자기 영역에 맞는 축을 골라 씁니다** — "지금이 학기인가"를 따지지 않습니다(수련회 준비는 학기 중에 시작하고, 개학 후에도 정산이 남습니다).
+
+| 화면 | 적용 축 |
+|---|---|
+| 학기 사역(`/semesters`, `/semester/[id]`) · 주일 사역(`/sunday-ministry`) | **학기 역할** |
+| 수련회 행정(`/retreats`, `/retreat/[id]`) · 현장(`/field`, `/retreat/[id]/field`) | **방학 역할** |
+| 홈 · 공유 일정 · 통합검색 · 사역 가이드 · 건의사항 | 두 축 중 열려 있는 쪽 |
+
+**학기 역할 (10종)** — 학기 화면 / 주일 화면
+
+| 역할 | 학기 | 주일 | 학기 설정 | 학기 삭제 | 출석부 반영 |
 |---|---|---|---|---|---|
-| 통합관리자 | 수정 | 수정 | 전체 | ✅ | `admins/{uid} = true` |
-| 교역자 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role = "pastor"` |
-| 팀장 | 수정 | 수정 | 전체 | — | `retreatAdmins/{uid}.role = "leader"` |
-| 행정팀 | 수정 | 수정 | 실행탭만 | — | `retreatAdmins/{uid}.role = "adminTeam"` (role 없는 레거시도 동일) |
-| 이가드팀 | ✕ | ✕ | 전체 | — | `iguardMembers/{uid}` + `iguardRoles/{uid} = "team"` |
-| 스탭 | 조회만 | ✕ | 실행탭만 | — | `iguardMembers/{uid}` + `iguardRoles/{uid} = "staff"` |
+| 통합관리자 | 수정 | 수정 | ✅ | ✅ | ✅ |
+| 교역자 | 수정 | 수정 | ✅ | ✅ | ✕ |
+| 스탭팀장 | 수정 | 수정 | ✅ | ✕ | ✕ |
+| 행정팀 | 수정 | 수정 | ✅ | ✕ | ✕ ※ |
+| 바나바팀 | 조회 | **수정** | ✕ | ✕ | ✕ |
+| 예배·찬양·미디어·기획디자인팀 | 조회 | 조회 | ✕ | ✕ | ✕ |
+| 사역팀(미지정) | 조회 | 조회 | ✕ | ✕ | ✕ |
 
-- 화면 게이트는 `canAccessPortalArea` / `canEditPortalArea` / `iguardScope` / `canManageRoles`만 사용합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
-- 역할 판정은 `resolveMinistryRole`(순수) 하나로, 통합 `AuthContext`와 이가드 `AuthContext`가 같은 결론을 냅니다.
+**방학 역할 (6종)** — 수련회 행정 / 현장
+
+| 역할 | 행정 | 민감정보 🔒 | 현장 | 생성·PIN | 삭제·복구 |
+|---|---|---|---|---|---|
+| 통합관리자 | 수정 | ✅ | 전체 | ✅ | ✅ |
+| 교역자 | 수정 | ✅ | 전체 | ✅ | ✅ |
+| 스탭팀장 | 수정 ※ | ✕ | 전체 | ✕ | ✕ |
+| 행정팀 | 수정 | ✅ | 실행탭만 | ✅ | ✕ |
+| 이가드팀 | ✕ ※ | ✕ | 전체 | PIN만 | ✕ |
+| 현장 스탭 | ✕ | ✕ | 실행탭만 | ✕ | ✕ |
+
+🔒 민감정보 = 취소·환불 계좌, 의료 일지, 교사 주민번호, 입금 미대조(`retreatsPrivate` 계열). 해당 탭은 `canSeeSensitiveRetreat`가 거짓이면 **탭 목록에서 빠지고, 주소를 직접 입력해도 첫 탭으로 되돌립니다**.
+
+**DB 저장** (Rules 변경 없음 — 버킷은 두 축의 **합집합**으로 결정)
+
+| 버킷 | 들어가는 역할 | 저장 |
+|---|---|---|
+| `admins/{uid} = true` | 어느 축이든 통합관리자 | — |
+| `retreatAdmins/{uid}` | 교역자·스탭팀장·행정팀·바나바팀(학기 쓰기 필요) | `{ role, semesterRole, retreatRole }` |
+| `iguardMembers/{uid}` + `iguardRoles/{uid}` | 이가드팀(`team`)·현장 스탭·사역팀(`staff`) | `{ semesterRole, retreatRole }` |
+
+※ **화면 차단 ≠ 실제 차단.** Rules는 여전히 세 버킷만 구분합니다. 아래는 화면에서만 막히며, 실제 차단은 Rules 변경이 필요합니다.
+- 행정팀의 **출석부 반영**은 `classes` 쓰기가 `admins` 전용이라 지금은 **기능 자체가 동작하지 않습니다** — 화면에서도 열지 않았습니다(`rosterWrite: false`). Rules를 넓힌 뒤 켜야 합니다.
+- 스탭팀장의 수련회 행정 **조회 전용**과 이가드팀의 **행정 조회 허용**은 행정 17탭에 읽기 전용 모드가 없어 보류했습니다(각각 수정 유지 / 접근 차단). 능력표에 주석으로 남아 있습니다.
+- 사역팀의 "내 팀만 편집", 민감정보 실차단, 스탭의 `classes` 전체 읽기 차단도 Rules 작업입니다.
+
+**원칙: 화면에서 막는 것은 언제나 안전하지만, 화면에서 여는 것은 Rules가 허용할 때만 합니다.** (Rules가 막는 걸 화면에서 열면 "눌렀는데 실패"가 됩니다.)
+
+- 화면 게이트는 `canAccessArea` / `canEditArea` / `iguardScopeOf` / `canManageRolesOf`와 목적별 함수(`canDestroySemester`·`canCreateRetreat`·`canSeeSensitiveRetreat` 등)만 사용합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
+- 역할 판정은 `resolveMinistryRoles`(순수) 하나로, 통합 `AuthContext`와 이가드 `AuthContext`가 같은 결론을 냅니다.
 - 역할 배정 쓰기는 `roleAssign.planRoleAssignment`(순수·테스트) → `applyRole.applyRoleSteps`(실행) 경로만 사용합니다. 부여를 먼저, 해제를 나중에 실행합니다.
 - 학기 화면의 편집 잠금은 `features/semester/EditContext`의 `useSemesterCanEdit()`으로만 판단합니다.
 - 스탭의 학기 **조회**는 2026-08-08 Rules 보강으로 열렸습니다 — `semesters` `.read`에 `iguardMembers`가 추가됐습니다. `.write`는 계속 `admins`/`retreatAdmins`만이고, 연락처가 있는 `semestersPrivate`는 **행정 전용 그대로**입니다. 즉 스탭은 `semesters/*`(명단·팀·훈련 반·회차·출석·커리큘럼)를 읽지만 저장은 못 합니다. Rules는 학생 앱에서만 배포합니다.

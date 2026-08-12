@@ -19,11 +19,11 @@ import type { Retreat } from "@/lib/types";
 import { getSemesters, subscribeSessions } from "@/features/semester/db";
 import type { Semester, Session } from "@/features/semester/types";
 import {
-  canAccessPortalArea,
-  canEditPortalArea,
-  iguardScope,
-  MINISTRY_ROLE_HINTS,
-  MINISTRY_ROLE_LABELS,
+  canAccessArea,
+  canEditArea,
+  iguardScopeOf,
+  describeRoles,
+  describeRolesHint,
   retreatEntryHref,
 } from "./accessPolicy";
 import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TRAINING_TABS, SUNDAY_MINISTRY_TABS } from "./featureCatalog";
@@ -48,7 +48,7 @@ function daysBetweenYmd(from: string, to: string) {
 }
 
 export default function PortalHome() {
-  const { user, loading, role, memberName, signIn, signOut } = useAuth();
+  const { user, loading, roles, memberName, signIn, signOut } = useAuth();
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
@@ -63,15 +63,15 @@ export default function PortalHome() {
   // 공유 일정(prepMilestones) — 행정·이가드가 함께 쓰는 전역 노드. 스탭은 Rules상 쓰기 불가.
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string } | null>(null);
-  const canEditSchedule = canEditPortalArea("retreat-admin", role) || iguardScope(role) === "all";
+  const canEditSchedule = canEditArea("retreat-admin", roles) || iguardScopeOf(roles) === "all";
   const monthlyMinistry = getMonthlyMinistry(new Date().getMonth() + 1);
 
-  const semesterAllowed = canAccessPortalArea("semester", role);
-  const fieldAllowed = canAccessPortalArea("retreat-field", role);
-  const retreatAdminAllowed = canAccessPortalArea("retreat-admin", role);
+  const semesterAllowed = canAccessArea("semester", roles);
+  const fieldAllowed = canAccessArea("retreat-field", roles);
+  const retreatAdminAllowed = canAccessArea("retreat-admin", roles);
 
   useEffect(() => {
-    if (!user || !canAccessPortalArea("home", role)) return;
+    if (!user || !canAccessArea("home", roles)) return;
 
     getRetreats()
       .then((retreatList) => {
@@ -80,12 +80,12 @@ export default function PortalHome() {
       })
       .catch((error: unknown) => fail("수련회 목록")(error instanceof Error ? error : new Error(String(error))));
 
-    if (canAccessPortalArea("semester", role)) {
+    if (canAccessArea("semester", roles)) {
       getSemesters()
         .then((list) => { setSemesters(list); ok("학기 목록"); })
         .catch((error: unknown) => fail("학기 목록")(error instanceof Error ? error : new Error(String(error))));
     }
-  }, [user, role, fail, ok]);
+  }, [user, roles, fail, ok]);
 
   const currentSemester = useMemo(() => {
     const today = todayYmd();
@@ -112,9 +112,9 @@ export default function PortalHome() {
   );
 
   useEffect(() => {
-    if (!user || !canAccessPortalArea("home", role)) return;
+    if (!user || !canAccessArea("home", roles)) return;
     return subscribeToMilestones((v) => { setMilestones(v); ok("공유 일정"); }, fail("공유 일정"));
-  }, [user, role, fail, ok]);
+  }, [user, roles, fail, ok]);
 
   // 회차 구독과 같은 이유로 user 가드가 필요하다 — 로그아웃해도 retreats 상태가 남아
   // 인증이 끊긴 채 재구독하면서 엉뚱한 permission_denied 배너가 뜬다.
@@ -153,7 +153,7 @@ export default function PortalHome() {
         endDate: period.endDate,
         title: `${retreat?.name ?? "수련회"}${period.label ? ` · ${period.label}` : ""}`,
         kind: "retreat" as const,
-        href: retreatEntryHref(period.retreatId, role),
+        href: retreatEntryHref(period.retreatId, roles),
       };
     });
     const sharedItems: SharedCalendarItem[] = milestones.map((milestone) => ({
@@ -164,7 +164,7 @@ export default function PortalHome() {
       done: milestone.done,
     }));
     return [...semesterItems, ...retreatItems, ...sharedItems].sort((a, b) => a.date.localeCompare(b.date));
-  }, [currentSemester, milestones, periods, retreats, role, sessions]);
+  }, [currentSemester, milestones, periods, retreats, roles, sessions]);
 
   const homeSummary = useMemo(() => {
     const today = todayYmd();
@@ -189,14 +189,14 @@ export default function PortalHome() {
     const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : undefined;
     return buildHomeActions({
       today: todayYmd(),
-      role,
+      roles,
       milestones,
       sessions: semesterAllowed ? sessions : [],
       semesterHref,
       periods,
       retreats,
     });
-  }, [currentSemester, milestones, periods, retreats, role, semesterAllowed, sessions]);
+  }, [currentSemester, milestones, periods, retreats, roles, semesterAllowed, sessions]);
 
   async function submitSchedule() {
     if (!scheduleDraft) return;
@@ -223,7 +223,7 @@ export default function PortalHome() {
     return <LandingPage signIn={signIn} />;
   }
 
-  if (!canAccessPortalArea("home", role)) {
+  if (!canAccessArea("home", roles)) {
     return (
       <main className="min-h-screen grid place-items-center px-6 text-center">
         <div>
@@ -279,7 +279,7 @@ export default function PortalHome() {
             <p className="mt-2 text-sm leading-6 text-slate-500">학기 구분 없이 새친구 정착, 등록 현황과 행정 변동을 관리합니다.</p>
           </Link>}
 
-          <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, role) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
+          <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
               <span className="tag bg-[#e9f6f1] px-3 py-1.5 text-[var(--color-primary)]">방학 중 사역</span>
               <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#e9f6f1] group-hover:text-[var(--color-primary)]">→</span>
@@ -336,7 +336,7 @@ export default function PortalHome() {
               <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} className="home-workspace-card group">
                 <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">수련회 이가드</h3><span className="text-[var(--color-primary)] group-hover:translate-x-0.5">→</span></div>
                 <div className="mt-4 space-y-2.5">{IGUARD_VIEW_GROUPS
-                  .filter((group) => iguardScope(role) === "all" || group.label === "실행")
+                  .filter((group) => iguardScopeOf(roles) === "all" || group.label === "실행")
                   .map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-9 font-bold text-[var(--color-primary)]">{group.label}</span><span className="line-clamp-2 leading-relaxed text-slate-500">{group.views.map((view) => view.label).join(" · ")}</span></div>)}</div>
               </Link>
             )}
@@ -366,15 +366,15 @@ export default function PortalHome() {
               <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
                 <div className="flex items-center gap-2">
                   <strong>{memberName || user.displayName || "승인된 사용자"}</strong>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 shadow-sm">{MINISTRY_ROLE_LABELS[role]}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 shadow-sm">{describeRoles(roles)}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-400">{MINISTRY_ROLE_HINTS[role]}</p>
+                <p className="mt-1 text-xs text-slate-400">{describeRolesHint(roles)}</p>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료" tone="emerald" />}
                 {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·등록 현황·행정 변동" tone="amber" />}
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
-                {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScope(role) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
+                {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
               </div>
             </section>
             <section className="surface-panel p-5 sm:p-6">

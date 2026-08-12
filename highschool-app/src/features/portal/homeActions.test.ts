@@ -5,7 +5,7 @@ describe("buildHomeActions", () => {
   it("완료 일정은 제외하고 지난 일정을 연체로 표시한다", () => {
     const actions = buildHomeActions({
       today: "2026-08-11",
-      role: "adminTeam",
+      roles: { semester: "adminTeam", retreat: "adminTeam" },
       milestones: [
         { id: "late", title: "늦은 준비", targetDate: "2026-08-10", done: false },
         { id: "done", title: "완료", targetDate: "2026-08-09", done: true },
@@ -21,7 +21,7 @@ describe("buildHomeActions", () => {
   it("다음 학기 일정과 수련회를 함께 정렬한다", () => {
     const actions = buildHomeActions({
       today: "2026-08-11",
-      role: "staff",
+      roles: { semester: "staff", retreat: "fieldStaff" },
       milestones: [],
       sessions: [{ id: "s1", date: "2026-08-12", type: "정규", label: "개강" }],
       semesterHref: "/semester/2026-2",

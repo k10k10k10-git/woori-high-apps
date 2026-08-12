@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessPortalArea, canEditPortalArea, canWriteStudentRoster } from "@/features/portal/accessPolicy";
+import { canAccessArea, canEditArea, canWriteStudentRoster } from "@/features/portal/accessPolicy";
 import { SUNDAY_MINISTRY_TABS } from "@/features/portal/featureCatalog";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import type { NewFriend, NewFriendPrivate } from "@/features/semester/types";
@@ -41,9 +41,9 @@ function validInitialTab(value?: string): SundayTab {
 
 export default function SundayMinistryClient({ initialTab }: { initialTab?: string }) {
   const router = useRouter();
-  const { user, loading: authLoading, role, signIn } = useAuth();
-  const allowed = canAccessPortalArea("semester", role);
-  const canEdit = canEditPortalArea("semester", role);
+  const { user, loading: authLoading, roles, signIn } = useAuth();
+  const allowed = canAccessArea("sunday", roles);
+  const canEdit = canEditArea("sunday", roles);
   const [tab, setTab] = useState<SundayTab>(() => validInitialTab(initialTab));
   const [friends, setFriends] = useState<SundayNewFriend[]>([]);
   const [privateMap, setPrivateMap] = useState<Record<string, NewFriendPrivate>>({});
@@ -123,7 +123,7 @@ export default function SundayMinistryClient({ initialTab }: { initialTab?: stri
         </div>
         <div role="tabpanel" id="sunday-tab-panel" className="min-h-[360px]">
           <SemesterEditProvider canEdit={canEdit}>
-            {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(role)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
+            {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(roles)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
             {tab === "등록 현황" && <RegistrationStatusTab friends={friends} />}
             {tab === "처리 대기" && <PendingTab friends={friends} privateValueFor={scopedPrivateValueFor} showPrivate={canEdit} onOpenNewFriends={() => setTab("새친구")} />}
             {tab === "행정 변동 사항" && <AdminChangesTab changes={adminChanges} />}

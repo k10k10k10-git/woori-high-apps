@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLoadErrors } from "@/lib/useLoadErrors";
-import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import {
   subscribeSemesterMeta,
   subscribeTeams,
@@ -47,9 +47,9 @@ function validInitialTab(value?: string): TabName {
 
 export default function SemesterClient({ semesterId, initialTab }: { semesterId: string; initialTab?: string }) {
   const router = useRouter();
-  const { user, loading: authLoading, role, signIn } = useAuth();
-  const allowed = canAccessPortalArea("semester", role);
-  const canEdit = canEditPortalArea("semester", role);
+  const { user, loading: authLoading, roles, signIn } = useAuth();
+  const allowed = canAccessArea("semester", roles);
+  const canEdit = canEditArea("semester", roles);
   const [tab, setTab] = useState<TabName>(() => validInitialTab(initialTab));
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);

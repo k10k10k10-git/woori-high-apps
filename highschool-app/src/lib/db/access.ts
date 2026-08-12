@@ -2,7 +2,10 @@ import { ref, get, set, remove } from "firebase/database";
 import { db } from "../firebase";
 import { paths } from "../paths";
 import { stripUndefined } from "./core";
-import { isAdminSideRole, type AdminSideRole } from "@/features/portal/accessPolicy";
+import {
+  isAdminSideRole, isRetreatRole, isSemesterRole,
+  type AdminSideRole, type MinistryRoles, type RetreatRole, type SemesterRole,
+} from "@/features/portal/accessPolicy";
 
 export interface RetreatAdminMember {
   email: string;
@@ -10,6 +13,9 @@ export interface RetreatAdminMember {
   approvedAt?: number;
   /** 교역자·팀장·행정팀 구분. 없으면 행정팀(레거시)으로 간주한다. */
   role?: AdminSideRole;
+  /** 두 축 역할 — 없으면 role에서 파생한다(resolveMinistryRoles) */
+  semesterRole?: SemesterRole;
+  retreatRole?: RetreatRole;
 }
 
 function normalizeRetreatAdminMember(value: unknown): RetreatAdminMember {
@@ -21,6 +27,8 @@ function normalizeRetreatAdminMember(value: unknown): RetreatAdminMember {
       ...(data.name ? { name: data.name } : {}),
       ...(data.approvedAt ? { approvedAt: data.approvedAt } : {}),
       ...(isAdminSideRole(data.role) ? { role: data.role } : {}),
+      ...(isSemesterRole(data.semesterRole) ? { semesterRole: data.semesterRole } : {}),
+      ...(isRetreatRole(data.retreatRole) ? { retreatRole: data.retreatRole } : {}),
     };
   }
   return { email: "" };
@@ -46,21 +54,27 @@ export async function addRetreatAdmin(
   email: string,
   name?: string,
   role: AdminSideRole = "adminTeam",
+  roles?: MinistryRoles,
 ): Promise<void> {
   await set(ref(db, paths.retreatAdmin(uid)), stripUndefined({
     email,
     name: name?.trim() || undefined,
     approvedAt: Date.now(),
     role,
+    semesterRole: roles?.semester,
+    retreatRole: roles?.retreat,
   }));
 }
 
 export async function updateRetreatAdminMemberName(uid: string, member: RetreatAdminMember, name: string): Promise<void> {
+  // ⚠ 노드 전체를 set으로 덮어쓴다 — 두 축 역할을 함께 넣지 않으면 이름만 고쳐도 역할이 지워진다.
   await set(ref(db, paths.retreatAdmin(uid)), stripUndefined({
     email: member.email,
     name: name.trim() || undefined,
     approvedAt: member.approvedAt ?? Date.now(),
     role: member.role ?? "adminTeam",
+    semesterRole: member.semesterRole,
+    retreatRole: member.retreatRole,
   }));
 }
 
@@ -70,7 +84,7 @@ export async function removeRetreatAdmin(uid: string): Promise<void> {
 
 // ── 통합관리자 (admins/{uid}) ──────────────────────────────
 // admins는 시스템 최상위 권한이다. 통합관리자만 쓸 수 있고(Rules), 화면에서도
-// canManageRoles(role)이 참일 때만 이 함수를 호출한다.
+// canManageRolesOf(role)이 참일 때만 이 함수를 호출한다.
 
 export async function setMainAdmin(uid: string, enabled: boolean): Promise<void> {
   if (enabled) await set(ref(db, paths.admins(uid)), true);

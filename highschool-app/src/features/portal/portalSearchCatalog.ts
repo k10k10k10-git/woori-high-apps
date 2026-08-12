@@ -1,10 +1,10 @@
 import type { Semester } from "@/features/semester/types";
 import type { Retreat } from "@/lib/types";
 import {
-  canAccessPortalArea,
-  iguardScope,
+  canAccessArea,
+  iguardScopeOf,
   retreatEntryHref,
-  type MinistryRole,
+  type MinistryRoles,
 } from "./accessPolicy";
 import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS, SUNDAY_MINISTRY_TABS } from "./featureCatalog";
 
@@ -18,7 +18,7 @@ export type PortalSearchItem = {
 };
 
 type BuildSearchInput = {
-  role: MinistryRole;
+  roles: MinistryRoles;
   semesters: Semester[];
   retreats: Retreat[];
 };
@@ -35,7 +35,7 @@ export function filterPortalSearchItems(items: PortalSearchItem[], query: string
     .slice(0, 12);
 }
 
-export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearchInput): PortalSearchItem[] {
+export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSearchInput): PortalSearchItem[] {
   const items: PortalSearchItem[] = [
     {
       id: "home",
@@ -63,7 +63,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
     },
   ];
 
-  if (canAccessPortalArea("semester", role)) {
+  if (canAccessArea("semester", roles)) {
     items.push({
       id: "semester-home",
       label: "학기 중 사역",
@@ -92,8 +92,8 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
     });
   }
 
-  const adminAllowed = canAccessPortalArea("retreat-admin", role);
-  const fieldAllowed = canAccessPortalArea("retreat-field", role);
+  const adminAllowed = canAccessArea("retreat-admin", roles);
+  const fieldAllowed = canAccessArea("retreat-field", roles);
   if (adminAllowed) {
     items.push({
       id: "retreat-home",
@@ -106,7 +106,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
   }
   if (fieldAllowed) {
     const visibleGroups = IGUARD_VIEW_GROUPS.filter(
-      (group) => iguardScope(role) === "all" || group.label === "실행",
+      (group) => iguardScopeOf(roles) === "all" || group.label === "실행",
     );
     items.push({
       id: "field-home",
@@ -119,7 +119,7 @@ export function buildPortalSearchItems({ role, semesters, retreats }: BuildSearc
   }
 
   for (const retreat of retreats) {
-    const href = retreatEntryHref(retreat.id, role);
+    const href = retreatEntryHref(retreat.id, roles);
     items.push({
       id: `retreat-${retreat.id}`,
       label: `${retreat.year}년 ${retreat.name}`,

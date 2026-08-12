@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessPortalArea, MINISTRY_ROLE_LABELS } from "@/features/portal/accessPolicy";
+import { canAccessArea, describeRoles } from "@/features/portal/accessPolicy";
 
 type Draft = {
   category: string;
@@ -47,7 +47,7 @@ async function copyText(text: string) {
 }
 
 export default function SuggestionClient() {
-  const { user, loading, role, memberName, signIn } = useAuth();
+  const { user, loading, roles, memberName, signIn } = useAuth();
   const [draft, setDraft] = useState(INITIAL);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [message, setMessage] = useState("");
@@ -60,7 +60,7 @@ export default function SuggestionClient() {
       `분류: ${draft.category}`,
       `중요도: ${draft.urgency}`,
       `작성자: ${reporter}`,
-      `권한: ${MINISTRY_ROLE_LABELS[role]}`,
+      `권한: ${describeRoles(roles)}`,
       `화면/주소: ${draft.page.trim() || "(미입력)"}`,
       "",
       "현상·제안 내용",
@@ -75,13 +75,13 @@ export default function SuggestionClient() {
       `첨부 파일: ${attachment?.name ?? "없음"}`,
       `작성 시간: ${new Date().toLocaleString("ko-KR")}`,
     ].join("\n");
-  }, [attachment?.name, draft, memberName, role, user]);
+  }, [attachment?.name, draft, memberName, roles, user]);
 
   if (loading) return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중…</main>;
   if (!user) {
     return <main className="min-h-screen grid place-items-center px-6 text-center"><div><h1 className="text-xl font-bold">로그인이 필요합니다</h1><button onClick={() => void signIn()} className="btn-primary mt-5">Google로 로그인</button></div></main>;
   }
-  if (!canAccessPortalArea("home", role)) {
+  if (!canAccessArea("home", roles)) {
     return <main className="min-h-screen grid place-items-center px-6 text-center"><div><h1 className="text-xl font-bold">접근 승인이 필요합니다</h1><Link href="/" className="btn-secondary mt-5">홈으로</Link></div></main>;
   }
 

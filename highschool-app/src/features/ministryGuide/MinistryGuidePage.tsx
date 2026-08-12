@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import LandingPage from "@/features/landing/LandingPage";
-import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessArea } from "@/features/portal/accessPolicy";
 import {
   buildAnnouncementTemplate,
   getMonthlyMinistry,
@@ -28,7 +28,7 @@ const CATEGORY_TONE: Record<MinistryGuideSection["category"], string> = {
 };
 
 export default function MinistryGuidePage() {
-  const { user, loading, role, signIn } = useAuth();
+  const { user, loading, roles, signIn } = useAuth();
   const [category, setCategory] = useState<Category>("전체");
   const [query, setQuery] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
@@ -72,7 +72,7 @@ export default function MinistryGuidePage() {
 
   if (loading) return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중…</main>;
   if (!user) return <LandingPage signIn={signIn} />;
-  if (!canAccessPortalArea("home", role)) {
+  if (!canAccessArea("home", roles)) {
     return (
       <main className="min-h-screen grid place-items-center px-6 text-center">
         <div>

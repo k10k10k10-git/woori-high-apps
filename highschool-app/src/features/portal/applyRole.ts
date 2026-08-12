@@ -8,32 +8,30 @@ import {
   removeRetreatAdmin,
   setMainAdmin,
 } from "@/lib/db";
-import { approveIguardMember, removeIguardMember, setIguardRole } from "@/features/iguard/lib/db";
+import { approveIguardMember, removeIguardMember } from "@/features/iguard/lib/db";
 import type { RoleAssignStep } from "./roleAssign";
 
 export type RoleTarget = { uid: string; email: string; name?: string; hasIguardMember: boolean };
 
 export async function applyRoleSteps(steps: RoleAssignStep[], target: RoleTarget): Promise<void> {
-  let iguardExists = target.hasIguardMember;
   for (const step of steps) {
     switch (step.kind) {
       case "setMainAdmin":
         await setMainAdmin(target.uid, step.enabled);
         break;
       case "setRetreatAdmin":
-        await addRetreatAdmin(target.uid, target.email, target.name, step.role);
+        await addRetreatAdmin(target.uid, target.email, target.name, step.role, step.roles);
         break;
       case "removeRetreatAdmin":
         await removeRetreatAdmin(target.uid);
         break;
       case "setIguardMember":
-        if (iguardExists) await setIguardRole(target.uid, step.role);
-        else await approveIguardMember(target.uid, target.email, step.role, target.name);
-        iguardExists = true;
+        // 이미 멤버여도 두 축 역할을 함께 저장해야 하므로 approve 경로 하나만 쓴다.
+        // (멤버·역할·대기열을 한 번의 multi-path update로 처리한다.)
+        await approveIguardMember(target.uid, target.email, step.role, target.name, step.roles);
         break;
       case "removeIguardMember":
         await removeIguardMember(target.uid);
-        iguardExists = false;
         break;
     }
   }

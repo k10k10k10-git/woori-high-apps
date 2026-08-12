@@ -17,6 +17,10 @@ import {
   reconcileSegmentSheetMovements,
   type SegmentSheetMovement,
 } from "./movementReconcile";
+import {
+  isRetreatRole, isSemesterRole,
+  type MinistryRoles, type RetreatRole, type SemesterRole,
+} from "@/features/portal/accessPolicy";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -988,7 +992,13 @@ export async function deleteIguardAccessLock(retreatId: string): Promise<void> {
 // ════════════════════════════════════════════════════════════
 
 export interface IguardPendingReq { uid: string; email: string; name: string; requestedAt: number; }
-export interface IguardMemberInfo { email: string; name?: string; }
+export interface IguardMemberInfo {
+  email: string;
+  name?: string;
+  /** 두 축 역할 — 없으면 iguardRoles에서 파생한다(resolveMinistryRoles) */
+  semesterRole?: SemesterRole;
+  retreatRole?: RetreatRole;
+}
 
 /** 로그인했지만 권한 없는 사용자가 접근 요청 */
 export async function requestIguardAccess(uid: string, email: string, name: string): Promise<void> {
@@ -1014,7 +1024,12 @@ function normalizeIguardMembers(raw: unknown): Record<string, IguardMemberInfo> 
   const entries: Array<[string, IguardMemberInfo]> = Object.entries(raw as Record<string, unknown>).map(([uid, value]) => {
     if (typeof value === "string") return [uid, { email: value }];
     const v = value as Partial<IguardMemberInfo> | null;
-    return [uid, { email: v?.email || "", name: v?.name || undefined }];
+    return [uid, {
+      email: v?.email || "",
+      name: v?.name || undefined,
+      ...(isSemesterRole(v?.semesterRole) ? { semesterRole: v.semesterRole } : {}),
+      ...(isRetreatRole(v?.retreatRole) ? { retreatRole: v.retreatRole } : {}),
+    }];
   });
   return Object.fromEntries(entries.filter(([, value]) => value.email || value.name));
 }
@@ -1035,9 +1050,20 @@ export async function setIguardRole(uid: string, role: IguardRole): Promise<void
 }
 
 /** 승인: 대기열 → 멤버로 이동 + 역할 부여 (단일 multi-path 업데이트) */
-export async function approveIguardMember(uid: string, email: string, role: IguardRole = "team", name?: string): Promise<void> {
+export async function approveIguardMember(
+  uid: string,
+  email: string,
+  role: IguardRole = "team",
+  name?: string,
+  roles?: MinistryRoles,
+): Promise<void> {
   await update(ref(db), {
-    [paths.iguardMember(uid)]: stripUndefined({ email, name: name?.trim() || undefined }),
+    [paths.iguardMember(uid)]: stripUndefined({
+      email,
+      name: name?.trim() || undefined,
+      semesterRole: roles?.semester,
+      retreatRole: roles?.retreat,
+    }),
     [paths.iguardRole(uid)]: role,
     [paths.iguardPendingEntry(uid)]: null,
   });

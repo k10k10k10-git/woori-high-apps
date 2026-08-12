@@ -1,6 +1,6 @@
 "use client";
 
-// 팀원 관리 — 6단계 역할을 한 화면에서 배정한다. 진입점은 전역 헤더의 "팀원 관리" 하나뿐.
+// 팀원 관리 — 두 축 역할(학기·방학)을 한 화면에서 배정한다. 진입점은 전역 헤더의 "팀원 관리" 하나뿐.
 // 역할 계약은 accessPolicy, 쓰기 계획은 roleAssign(순수) → applyRole(실행)이 담당한다.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,34 +25,55 @@ import {
   type IguardRole,
 } from "@/features/iguard/lib/db";
 import {
-  ASSIGNABLE_ROLES,
-  canManageRoles,
-  MINISTRY_ROLE_HINTS,
-  MINISTRY_ROLE_LABELS,
-  resolveMinistryRole,
-  type MinistryRole,
+  ASSIGNABLE_RETREAT_ROLES,
+  ASSIGNABLE_SEMESTER_ROLES,
+  canManageRolesOf,
+  isRetreatDowngrade,
+  isSemesterDowngrade,
+  resolveMinistryRoles,
+  RETREAT_ROLE_HINTS,
+  RETREAT_ROLE_LABELS,
+  SEMESTER_ROLE_HINTS,
+  SEMESTER_ROLE_LABELS,
+  type MinistryRoles,
+  type RetreatRole,
+  type SemesterRole,
 } from "./accessPolicy";
-import { isDowngrade, planRoleAssignment } from "./roleAssign";
+import { planRoleAssignment } from "./roleAssign";
 import { applyRoleSteps } from "./applyRole";
 
 type TeamMember = {
   uid: string;
   email: string;
   name: string;
-  role: MinistryRole;
+  roles: MinistryRoles;
   mainAdmin: boolean;
   admin?: RetreatAdminMember;
   iguard?: IguardMemberInfo;
   iguardRole?: IguardRole;
 };
 
-const ROLE_CHIP: Record<MinistryRole, string> = {
+const SEMESTER_CHIP: Record<SemesterRole, string> = {
+  superAdmin: "bg-slate-900 text-white",
+  pastor: "bg-emerald-100 text-emerald-800",
+  leader: "bg-teal-100 text-teal-800",
+  adminTeam: "bg-sky-100 text-sky-800",
+  barnabas: "bg-rose-100 text-rose-800",
+  worship: "bg-indigo-100 text-indigo-800",
+  praise: "bg-purple-100 text-purple-800",
+  media: "bg-cyan-100 text-cyan-800",
+  design: "bg-lime-100 text-lime-800",
+  staff: "bg-amber-100 text-amber-800",
+  none: "bg-slate-100 text-slate-500",
+};
+
+const RETREAT_CHIP: Record<RetreatRole, string> = {
   superAdmin: "bg-slate-900 text-white",
   pastor: "bg-emerald-100 text-emerald-800",
   leader: "bg-teal-100 text-teal-800",
   adminTeam: "bg-sky-100 text-sky-800",
   iguardTeam: "bg-violet-100 text-violet-800",
-  staff: "bg-amber-100 text-amber-800",
+  fieldStaff: "bg-amber-100 text-amber-800",
   none: "bg-slate-100 text-slate-500",
 };
 
@@ -61,10 +82,10 @@ function memberLabel(member: { name: string; email: string }) {
 }
 
 export default function TeamModal({ onClose }: { onClose: () => void }) {
-  const { user, role: myRole } = useAuth();
+  const { user, roles: myRoles } = useAuth();
   const { toast, uiConfirm } = useUI();
   const dialogRef = useRef<HTMLDivElement>(null);
-  const canManage = canManageRoles(myRole);
+  const canManage = canManageRolesOf(myRoles);
 
   const [mainAdmins, setMainAdmins] = useState<Record<string, boolean>>({});
   const [admins, setAdmins] = useState<Record<string, RetreatAdminMember>>({});
@@ -74,7 +95,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
   const [iguardRoles, setIguardRoles] = useState<Record<string, IguardRole>>({});
   const [editingUid, setEditingUid] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
-  const [pendingRoleChoice, setPendingRoleChoice] = useState<Record<string, MinistryRole>>({});
+  const [pendingRoleChoice, setPendingRoleChoice] = useState<Record<string, MinistryRoles>>({});
   const [busyUid, setBusyUid] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -126,6 +147,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
         const admin = admins[uid];
         const iguard = iguardMembers[uid];
         const mainAdmin = mainAdmins[uid] === true;
+        const roleSource = admin ?? iguard;
         return {
           uid,
           admin,
@@ -134,31 +156,40 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
           iguardRole: iguardRoles[uid],
           email: admin?.email || iguard?.email || "",
           name: admin?.name || iguard?.name || "",
-          role: resolveMinistryRole({
+          roles: resolveMinistryRoles({
             isMainAdmin: mainAdmin,
             hasRetreatAdmin: admin != null,
             retreatAdminRole: admin?.role,
             hasIguardMember: iguard != null,
             iguardRole: iguardRoles[uid],
+            semesterRole: roleSource?.semesterRole,
+            retreatRole: roleSource?.retreatRole,
           }),
         };
       })
-      // 역할군(높은 권한 → 낮은 권한)으로 먼저 묶고, 같은 역할 안에서만 이름순으로 정렬한다.
+      // 학기 역할군(높은 권한 → 낮은 권한)으로 먼저 묶고, 같은 역할 안에서만 이름순으로 정렬한다.
       .sort((a, b) => {
-        const byRole = ASSIGNABLE_ROLES.indexOf(a.role) - ASSIGNABLE_ROLES.indexOf(b.role);
+        const byRole = ASSIGNABLE_SEMESTER_ROLES.indexOf(a.roles.semester) - ASSIGNABLE_SEMESTER_ROLES.indexOf(b.roles.semester);
         return byRole !== 0 ? byRole : memberLabel(a).localeCompare(memberLabel(b), "ko");
       });
   }, [admins, iguardMembers, iguardRoles, mainAdmins]);
 
   const memberGroups = useMemo(
-    () => ASSIGNABLE_ROLES.map((role) => ({ role, list: members.filter((member) => member.role === role) }))
+    () => ASSIGNABLE_SEMESTER_ROLES
+      .map((role) => ({ role, list: members.filter((member) => member.roles.semester === role) }))
       .filter((group) => group.list.length > 0),
     [members],
   );
 
-  const roleCounts = useMemo(() => {
-    const counts = new Map<MinistryRole, number>();
-    for (const member of members) counts.set(member.role, (counts.get(member.role) ?? 0) + 1);
+  const semesterCounts = useMemo(() => {
+    const counts = new Map<SemesterRole, number>();
+    for (const member of members) counts.set(member.roles.semester, (counts.get(member.roles.semester) ?? 0) + 1);
+    return counts;
+  }, [members]);
+
+  const retreatCounts = useMemo(() => {
+    const counts = new Map<RetreatRole, number>();
+    for (const member of members) counts.set(member.roles.retreat, (counts.get(member.roles.retreat) ?? 0) + 1);
     return counts;
   }, [members]);
 
@@ -187,19 +218,25 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  async function changeRole(member: TeamMember, nextRole: MinistryRole) {
-    if (nextRole === member.role) return;
-    const steps = planRoleAssignment(nextRole, {
+  async function changeRoles(member: TeamMember, next: MinistryRoles) {
+    if (next.semester === member.roles.semester && next.retreat === member.roles.retreat) return;
+    const steps = planRoleAssignment(next, {
       mainAdmin: member.mainAdmin,
       hasRetreatAdmin: member.admin != null,
       retreatAdminRole: member.admin?.role,
       hasIguardMember: member.iguard != null,
       iguardRole: member.iguardRole,
+      roles: member.roles,
     });
     if (steps.length === 0) return;
-    if (isDowngrade(member.role, nextRole)) {
+
+    const downgraded = isSemesterDowngrade(member.roles.semester, next.semester)
+      || isRetreatDowngrade(member.roles.retreat, next.retreat);
+    if (downgraded) {
       const confirmed = await uiConfirm(
-        `${memberLabel(member)}님의 역할을 ${MINISTRY_ROLE_LABELS[member.role]} → ${MINISTRY_ROLE_LABELS[nextRole]}(으)로 낮출까요?`,
+        `${memberLabel(member)}님의 역할을 낮출까요?\n`
+        + `학기 ${SEMESTER_ROLE_LABELS[member.roles.semester]} → ${SEMESTER_ROLE_LABELS[next.semester]}\n`
+        + `방학 ${RETREAT_ROLE_LABELS[member.roles.retreat]} → ${RETREAT_ROLE_LABELS[next.retreat]}`,
       );
       if (!confirmed) return;
     }
@@ -211,22 +248,22 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
         name: member.name,
         hasIguardMember: member.iguard != null,
       }),
-      `${memberLabel(member)} → ${MINISTRY_ROLE_LABELS[nextRole]}`,
+      `${memberLabel(member)} → 학기 ${SEMESTER_ROLE_LABELS[next.semester]} · 방학 ${RETREAT_ROLE_LABELS[next.retreat]}`,
     );
   }
 
   async function approvePending(request: (typeof pending)[number]) {
     const info = request.admin ?? request.iguard;
     if (!info) return;
-    const nextRole = pendingRoleChoice[request.uid] ?? "staff";
-    if (nextRole === "none") {
+    const choice = pendingRoleChoice[request.uid] ?? { semester: "staff", retreat: "fieldStaff" };
+    if (choice.semester === "none" && choice.retreat === "none") {
       await run(request.uid, async () => {
         if (request.admin) await denyRetreatRequest(request.uid);
         if (request.iguard) await denyIguardPending(request.uid);
       }, "요청을 거절했습니다.");
       return;
     }
-    const steps = planRoleAssignment(nextRole, {
+    const steps = planRoleAssignment(choice, {
       mainAdmin: false,
       hasRetreatAdmin: false,
       hasIguardMember: false,
@@ -235,7 +272,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
       await applyRoleSteps(steps, { uid: request.uid, email: info.email, name: info.name, hasIguardMember: false });
       if (request.admin) await denyRetreatRequest(request.uid);
       if (request.iguard) await denyIguardPending(request.uid);
-    }, `${info.name || info.email} → ${MINISTRY_ROLE_LABELS[nextRole]} 승인`);
+    }, `${info.name || info.email} → 학기 ${SEMESTER_ROLE_LABELS[choice.semester]} · 방학 ${RETREAT_ROLE_LABELS[choice.retreat]} 승인`);
   }
 
   async function saveName(member: TeamMember) {
@@ -264,7 +301,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-emerald-600">PEOPLE &amp; ACCESS</p>
             <h2 className="mt-1 text-xl font-bold text-slate-900">팀원 관리</h2>
-            <p className="mt-1 text-xs text-slate-500">역할 하나로 학기·행정·현장 권한이 함께 정해집니다.</p>
+            <p className="mt-1 text-xs text-slate-500">학기 역할은 학기·주일 화면에, 방학 역할은 수련회 행정·현장 화면에 적용됩니다.</p>
           </div>
           <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-xl text-slate-500 hover:bg-slate-200" aria-label="닫기">×</button>
         </header>
@@ -273,18 +310,31 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
           {loadError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
           {!canManage && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              역할 배정은 통합관리자만 할 수 있습니다. 지금은 조회만 가능합니다.
+              역할 배정은 통합관리자·교역자만 할 수 있습니다. 지금은 조회만 가능합니다.
             </div>
           )}
 
           <section>
-            <h3 className="mb-2 font-bold text-slate-800">역할 정의</h3>
+            <h3 className="mb-2 font-bold text-slate-800">학기 역할 <span className="text-xs font-normal text-slate-400">학기 사역 · 주일 사역</span></h3>
             <div className="grid gap-1.5 sm:grid-cols-2">
-              {ASSIGNABLE_ROLES.filter((role) => role !== "none").map((role) => (
+              {ASSIGNABLE_SEMESTER_ROLES.filter((role) => role !== "none").map((role) => (
                 <div key={role} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2">
-                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[role]}`}>{MINISTRY_ROLE_LABELS[role]}</span>
-                  <span className="text-[11px] leading-snug text-slate-500">{MINISTRY_ROLE_HINTS[role]}</span>
-                  <span className="ml-auto shrink-0 text-xs font-bold text-slate-400">{roleCounts.get(role) ?? 0}명</span>
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${SEMESTER_CHIP[role]}`}>{SEMESTER_ROLE_LABELS[role]}</span>
+                  <span className="text-[11px] leading-snug text-slate-500">{SEMESTER_ROLE_HINTS[role]}</span>
+                  <span className="ml-auto shrink-0 text-xs font-bold text-slate-400">{semesterCounts.get(role) ?? 0}명</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="mb-2 font-bold text-slate-800">방학 역할 <span className="text-xs font-normal text-slate-400">수련회 행정 · 현장</span></h3>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              {ASSIGNABLE_RETREAT_ROLES.filter((role) => role !== "none").map((role) => (
+                <div key={role} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2">
+                  <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${RETREAT_CHIP[role]}`}>{RETREAT_ROLE_LABELS[role]}</span>
+                  <span className="text-[11px] leading-snug text-slate-500">{RETREAT_ROLE_HINTS[role]}</span>
+                  <span className="ml-auto shrink-0 text-xs font-bold text-slate-400">{retreatCounts.get(role) ?? 0}명</span>
                 </div>
               ))}
             </div>
@@ -301,25 +351,42 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
               <div className="space-y-2">
                 {pending.map((request) => {
                   const info = request.admin ?? request.iguard;
-                  const choice = pendingRoleChoice[request.uid] ?? "staff";
+                  const choice = pendingRoleChoice[request.uid] ?? { semester: "staff" as SemesterRole, retreat: "fieldStaff" as RetreatRole };
+                  const setChoice = (next: Partial<MinistryRoles>) =>
+                    setPendingRoleChoice((current) => ({ ...current, [request.uid]: { ...choice, ...next } }));
                   return (
-                    <div key={request.uid} className="rounded-xl border border-slate-200 p-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                    <div key={request.uid} className="rounded-xl border border-slate-200 p-3">
                       <div className="min-w-0">
                         <p className="font-semibold text-slate-800">{info?.name || "이름 없음"}</p>
                         <p className="truncate text-xs text-slate-400">{info?.email}</p>
                       </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-0 sm:justify-end">
-                        <select
-                          className="input text-xs sm:w-36"
-                          aria-label={`${info?.name || info?.email} 승인 역할`}
-                          value={choice}
-                          disabled={!canManage || busyUid === request.uid}
-                          onChange={(event) => setPendingRoleChoice((current) => ({ ...current, [request.uid]: event.target.value as MinistryRole }))}
-                        >
-                          {ASSIGNABLE_ROLES.filter((role) => role !== "none" && role !== "superAdmin").map((role) => (
-                            <option key={role} value={role}>{MINISTRY_ROLE_LABELS[role]}</option>
-                          ))}
-                        </select>
+                      <div className="mt-3 flex flex-wrap items-end gap-2">
+                        <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
+                          학기 역할
+                          <select
+                            className="input text-xs"
+                            value={choice.semester}
+                            disabled={!canManage || busyUid === request.uid}
+                            onChange={(event) => setChoice({ semester: event.target.value as SemesterRole })}
+                          >
+                            {ASSIGNABLE_SEMESTER_ROLES.filter((role) => role !== "superAdmin").map((role) => (
+                              <option key={role} value={role}>{SEMESTER_ROLE_LABELS[role]}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
+                          방학 역할
+                          <select
+                            className="input text-xs"
+                            value={choice.retreat}
+                            disabled={!canManage || busyUid === request.uid}
+                            onChange={(event) => setChoice({ retreat: event.target.value as RetreatRole })}
+                          >
+                            {ASSIGNABLE_RETREAT_ROLES.filter((role) => role !== "superAdmin").map((role) => (
+                              <option key={role} value={role}>{RETREAT_ROLE_LABELS[role]}</option>
+                            ))}
+                          </select>
+                        </label>
                         <button
                           disabled={!canManage || busyUid === request.uid}
                           onClick={() => void approvePending(request)}
@@ -348,7 +415,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
           <section>
             <div className="mb-3">
               <h3 className="font-bold text-slate-800">승인된 팀원</h3>
-              <p className="mt-1 text-xs text-slate-400">역할군 순으로 묶어 보여줍니다. 역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
+              <p className="mt-1 text-xs text-slate-400">학기 역할군 순으로 묶어 보여줍니다. 역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
             </div>
             <div className="space-y-5">
               {members.length === 0 && (
@@ -357,14 +424,14 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
               {memberGroups.map((group) => (
                 <div key={group.role} className="space-y-2">
                   <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[group.role]}`}>{MINISTRY_ROLE_LABELS[group.role]}</span>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${SEMESTER_CHIP[group.role]}`}>{SEMESTER_ROLE_LABELS[group.role]}</span>
                     <span className="text-xs font-semibold text-slate-400">{group.list.length}명</span>
                   </div>
                   {group.list.map((member) => {
                     const isMe = member.uid === user?.uid;
                     return (
-                      <div key={member.uid} className="rounded-xl border border-slate-200 p-3 sm:flex sm:items-center sm:gap-4">
-                        <div className="min-w-0 flex-1">
+                      <div key={member.uid} className="rounded-xl border border-slate-200 p-3">
+                        <div className="min-w-0">
                           {editingUid === member.uid ? (
                             <div className="flex gap-2">
                               <input className="input min-w-0 flex-1 text-sm" value={draftName} onChange={(event) => setDraftName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void saveName(member)} autoFocus aria-label="표시 이름" />
@@ -376,7 +443,7 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <p className="truncate font-semibold leading-6 text-slate-800">{memberLabel(member)}</p>
                                 {isMe && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] leading-none text-slate-500">나</span>}
-                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${ROLE_CHIP[member.role]}`}>{MINISTRY_ROLE_LABELS[member.role]}</span>
+                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${RETREAT_CHIP[member.roles.retreat]}`}>방학 {RETREAT_ROLE_LABELS[member.roles.retreat]}</span>
                                 {(member.admin || member.iguard) && (
                                   <button onClick={() => { setEditingUid(member.uid); setDraftName(member.name); }} className="text-[11px] text-slate-400 underline">이름 수정</button>
                                 )}
@@ -386,18 +453,35 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
                             </>
                           )}
                         </div>
-                        <div className="mt-3 shrink-0 sm:mt-0 sm:w-40">
-                          <select
-                            className="input text-xs"
-                            aria-label={`${memberLabel(member)} 역할`}
-                            value={member.role}
-                            disabled={!canManage || isMe || busyUid === member.uid}
-                            onChange={(event) => void changeRole(member, event.target.value as MinistryRole)}
-                          >
-                            {ASSIGNABLE_ROLES.map((role) => (
-                              <option key={role} value={role}>{MINISTRY_ROLE_LABELS[role]}</option>
-                            ))}
-                          </select>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
+                            학기 역할
+                            <select
+                              className="input text-xs"
+                              aria-label={`${memberLabel(member)} 학기 역할`}
+                              value={member.roles.semester}
+                              disabled={!canManage || isMe || busyUid === member.uid}
+                              onChange={(event) => void changeRoles(member, { ...member.roles, semester: event.target.value as SemesterRole })}
+                            >
+                              {ASSIGNABLE_SEMESTER_ROLES.map((role) => (
+                                <option key={role} value={role}>{SEMESTER_ROLE_LABELS[role]}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
+                            방학 역할
+                            <select
+                              className="input text-xs"
+                              aria-label={`${memberLabel(member)} 방학 역할`}
+                              value={member.roles.retreat}
+                              disabled={!canManage || isMe || busyUid === member.uid}
+                              onChange={(event) => void changeRoles(member, { ...member.roles, retreat: event.target.value as RetreatRole })}
+                            >
+                              {ASSIGNABLE_RETREAT_ROLES.map((role) => (
+                                <option key={role} value={role}>{RETREAT_ROLE_LABELS[role]}</option>
+                              ))}
+                            </select>
+                          </label>
                         </div>
                       </div>
                     );

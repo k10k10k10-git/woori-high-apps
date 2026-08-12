@@ -9,7 +9,7 @@ import { Retreat } from "@/lib/types";
 import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import BrainstormPanel from "./BrainstormPanel";
-import { canAccessPortalArea, canEditPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import AdminModal from "./field/AdminModal";
 import { subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
@@ -43,8 +43,8 @@ function DarkScreen({ children }: { children: React.ReactNode }) {
 }
 
 export default function HomePage() {
-  const { user, loading, role, signIn, signOut } = useAuth();
-  const canUseAdmin = canAccessPortalArea("retreat-admin", role);
+  const { user, loading, roles, signIn, signOut } = useAuth();
+  const canUseAdmin = canAccessArea("retreat-admin", roles);
   const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
@@ -56,7 +56,7 @@ export default function HomePage() {
   // 어느 화면에서 잠가도 행정·이가드 양쪽에 똑같이 반영된다.
   const [showLockAdmin, setShowLockAdmin] = useState(false);
   const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
-  const canManageLocks = canEditPortalArea("retreat-admin", role);
+  const canManageLocks = canEditArea("retreat-admin", roles);
 
   const loadRetreats = useCallback(async () => {
     setRetreatLoadError("");
@@ -246,7 +246,7 @@ export default function HomePage() {
       {/* 방학 중 사역 홈은 행정·이가드가 같은 화면(VacationHome)을 쓴다 — 다른 것은 입장 목적지뿐 */}
       <VacationHome
         mode="admin"
-        role={role}
+        roles={roles}
         retreats={retreats}
         selectedId={selectedRetreatId}
         onSelect={setSelectedRetreatId}

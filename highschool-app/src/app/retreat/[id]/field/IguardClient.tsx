@@ -33,7 +33,7 @@ import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
 import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
-import { canAccessPortalArea, iguardScope } from "@/features/portal/accessPolicy";
+import { canAccessArea, iguardScopeOf } from "@/features/portal/accessPolicy";
 
 function parseNames(value?: string): string[] {
   return (value || "")
@@ -74,12 +74,12 @@ function teachersToStaff(adminTeachers: TeacherAttendance[], groups: Group[], gr
 export default function IguardClient() {
   const router = useRouter();
   const id = (useParams().id as string);
-  const { user, loading: authLoading, role } = useAuth();
-  const fieldAllowed = canAccessPortalArea("retreat-field", role);
+  const { user, loading: authLoading, roles } = useAuth();
+  const fieldAllowed = canAccessArea("retreat-field", roles);
   // 잠금 판정은 행정 화면과 같은 훅을 쓴다 — 어느 쪽에서 잠가도 양쪽이 같은 결론을 낸다.
   const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(id, {
     enabled: !authLoading && !!user && fieldAllowed,
-    role,
+    roles,
   });
 
   useEffect(() => {
@@ -104,9 +104,9 @@ export default function IguardClient() {
 
 function IguardWorkspace({ id }: { id: string }) {
   const router = useRouter();
-  const { user, role, memberName } = useAuth();
-  const executionOnly = iguardScope(role) === "execution";
-  const fieldAllowed = canAccessPortalArea("retreat-field", role);
+  const { user, roles, memberName } = useAuth();
+  const executionOnly = iguardScopeOf(roles) === "execution";
+  const fieldAllowed = canAccessArea("retreat-field", roles);
 
   const [view, setView] = useState<string>("cue");
   const [searchOpen, setSearchOpen] = useState(false);

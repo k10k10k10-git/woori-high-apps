@@ -23,7 +23,7 @@ import TshirtTab from "./TshirtTab";
 import MedicalLogTab from "./MedicalLogTab";
 import MealCountTab from "./MealCountTab";
 import AdminSuppliesTab from "./AdminSuppliesTab";
-import { canAccessPortalArea } from "@/features/portal/accessPolicy";
+import { canAccessArea, canSeeSensitiveRetreat } from "@/features/portal/accessPolicy";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
@@ -64,13 +64,14 @@ export default function RetreatPageClient() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { user, loading: authLoading, role } = useAuth();
-  const adminAllowed = canAccessPortalArea("retreat-admin", role);
+  const { user, loading: authLoading, roles } = useAuth();
+  const adminAllowed = canAccessArea("retreat-admin", roles);
+  const canSeeSensitive = canSeeSensitiveRetreat(roles);
   const { toast } = useUI();
   // 현장 화면과 같은 잠금 — 어느 쪽에서 PIN을 걸어도 행정·이가드 모두 잠긴다.
   const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(id, {
     enabled: !authLoading && !!user && adminAllowed,
-    role,
+    roles,
   });
 
   const [retreat, setRetreat] = useState<Retreat | null>(null);
@@ -150,12 +151,19 @@ export default function RetreatPageClient() {
     }
   }
 
+  // 민감 탭(환불계좌·주민번호·의료 기록)은 역할이 허용할 때만 보여준다.
+  // retreatsPrivate는 Rules상 retreatAdmins 전체에 열려 있으므로, 화면이 마지막 방어선이다.
+  const sensitiveTabs: number[] = canSeeSensitive ? [] : [TAB_IDX.CANCELLATION, TAB_IDX.MEDICAL, TAB_IDX.INSURANCE, TAB_IDX.PAYMENTS];
+  const visibleGroups = RETREAT_TAB_GROUPS
+    .map((group) => ({ ...group, tabs: (group.tabs as ReadonlyArray<TabEntry>).filter((t) => !sensitiveTabs.includes(t.idx)) }))
+    .filter((group) => group.tabs.length > 0);
+
   // 현재 탭이 속한 그룹
-  const activeGroupIdx = RETREAT_TAB_GROUPS.findIndex(g =>
-    (g.tabs as ReadonlyArray<TabEntry>).some(t => t.idx === tab)
-  );
+  const activeGroupIdx = visibleGroups.findIndex(g => g.tabs.some(t => t.idx === tab));
   const safeGroupIdx = activeGroupIdx >= 0 ? activeGroupIdx : 0;
-  const activeGroup  = RETREAT_TAB_GROUPS[safeGroupIdx];
+  const activeGroup  = visibleGroups[safeGroupIdx];
+  // 주소를 직접 입력해 민감 탭으로 들어오는 경로도 막는다.
+  const effectiveTab = sensitiveTabs.includes(tab) ? (activeGroup?.tabs[0]?.idx ?? 0) : tab;
 
   // ── 로딩 화면 ────────────────────────────────────────────────
   if (authLoading || !user || (adminAllowed && loading)) return (
@@ -176,7 +184,7 @@ export default function RetreatPageClient() {
           이가드 전용 계정은 현장 운영 화면만 사용할 수 있습니다.
         </p>
         <div className="mt-5 flex justify-center gap-2">
-          {canAccessPortalArea("retreat-field", role) && (
+          {canAccessArea("retreat-field", roles) && (
             <button onClick={() => router.push(`/retreat/${encodeURIComponent(id)}/field`)} className="btn-primary">
               현장 화면으로
             </button>
@@ -264,12 +272,12 @@ export default function RetreatPageClient() {
 
             {/* 대그룹 탭 */}
             <div className="flex gap-0.5 sm:gap-1" role="tablist" aria-label="탭 그룹">
-              {RETREAT_TAB_GROUPS.map((g, gi) => {
+              {visibleGroups.map((g, gi) => {
                 const isActive = gi === safeGroupIdx;
                 return (
                   <button
                     key={g.label}
-                    onClick={() => setTab((g.tabs as ReadonlyArray<TabEntry>)[0].idx)}
+                    onClick={() => setTab(g.tabs[0].idx)}
                     className="workspace-group-tab"
                     role="tab"
                     aria-selected={isActive}
@@ -287,7 +295,7 @@ export default function RetreatPageClient() {
         <div className="workspace-tabs relative">
           <div className="max-w-6xl mx-auto px-0 sm:px-4">
             <div className="flex gap-0 overflow-x-auto scrollbar-hide tab-scroll-container" role="tablist" aria-label="세부 탭">
-              {(activeGroup.tabs as ReadonlyArray<TabEntry>).map((t) => (
+              {activeGroup.tabs.map((t) => (
                 <button
                   key={t.idx}
                   onClick={() => setTab(t.idx)}
@@ -378,40 +386,40 @@ export default function RetreatPageClient() {
         <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6" role="tabpanel" id="tab-content-panel">
           {/* keep-alive 탭: 마운트 후 CSS display로 보여주기/숨기기 */}
           {mountedTabs.has(TAB_IDX.PARTICIPANTS) && (
-            <div style={{ display: tab === TAB_IDX.PARTICIPANTS ? "block" : "none" }}>
+            <div style={{ display: effectiveTab === TAB_IDX.PARTICIPANTS ? "block" : "none" }}>
               <ParticipantsTab retreat={retreat} />
             </div>
           )}
           {mountedTabs.has(TAB_IDX.GROUPS) && (
-            <div style={{ display: tab === TAB_IDX.GROUPS ? "block" : "none" }}>
+            <div style={{ display: effectiveTab === TAB_IDX.GROUPS ? "block" : "none" }}>
               <GroupsTab retreat={retreat} />
             </div>
           )}
           {mountedTabs.has(TAB_IDX.ROOMS) && (
-            <div style={{ display: tab === TAB_IDX.ROOMS ? "block" : "none" }}>
+            <div style={{ display: effectiveTab === TAB_IDX.ROOMS ? "block" : "none" }}>
               <RoomsTab retreat={retreat} />
             </div>
           )}
           {mountedTabs.has(TAB_IDX.ROSTER) && (
-            <div style={{ display: tab === TAB_IDX.ROSTER ? "block" : "none" }}>
+            <div style={{ display: effectiveTab === TAB_IDX.ROSTER ? "block" : "none" }}>
               <ClassRosterTab retreat={retreat} />
             </div>
           )}
 
           {/* 일반 탭: conditional render (사용 빈도 낮아 재마운트 허용) */}
-          {tab === TAB_IDX.NOTES       && <NotesTab              retreat={retreat} />}
-          {tab === TAB_IDX.TEACHERS    && <TeachersTab           retreat={retreat} />}
-          {tab === TAB_IDX.CARPOOL     && <CarpoolTab            retreat={retreat} />}
-          {tab === TAB_IDX.PARTIAL     && <PartialAttendanceTab  retreat={retreat} />}
-          {tab === TAB_IDX.INSURANCE   && <InsuranceTab          retreat={retreat} />}
-          {tab === TAB_IDX.CANCELLATION&& <CancellationTab       retreat={retreat} />}
-          {tab === TAB_IDX.SUPPLIES    && <SuppliesTab           retreat={retreat} />}
-          {tab === TAB_IDX.ONSITE      && <OnSiteRegistrationTab  retreat={retreat} />}
-          {tab === TAB_IDX.PAYMENTS    && <UnmatchedPaymentsTab   retreat={retreat} />}
-          {tab === TAB_IDX.TSHIRT      && <TshirtTab             retreat={retreat} />}
-          {tab === TAB_IDX.MEALCOUNT   && <MealCountTab          retreat={retreat} />}
-          {tab === TAB_IDX.ADMINSUPPLIES && <AdminSuppliesTab    retreat={retreat} />}
-          {tab === TAB_IDX.MEDICAL     && <MedicalLogTab         retreat={retreat} />}
+          {effectiveTab === TAB_IDX.NOTES       && <NotesTab              retreat={retreat} />}
+          {effectiveTab === TAB_IDX.TEACHERS    && <TeachersTab           retreat={retreat} />}
+          {effectiveTab === TAB_IDX.CARPOOL     && <CarpoolTab            retreat={retreat} />}
+          {effectiveTab === TAB_IDX.PARTIAL     && <PartialAttendanceTab  retreat={retreat} />}
+          {effectiveTab === TAB_IDX.INSURANCE   && <InsuranceTab          retreat={retreat} />}
+          {effectiveTab === TAB_IDX.CANCELLATION&& <CancellationTab       retreat={retreat} />}
+          {effectiveTab === TAB_IDX.SUPPLIES    && <SuppliesTab           retreat={retreat} />}
+          {effectiveTab === TAB_IDX.ONSITE      && <OnSiteRegistrationTab  retreat={retreat} />}
+          {effectiveTab === TAB_IDX.PAYMENTS    && <UnmatchedPaymentsTab   retreat={retreat} />}
+          {effectiveTab === TAB_IDX.TSHIRT      && <TshirtTab             retreat={retreat} />}
+          {effectiveTab === TAB_IDX.MEALCOUNT   && <MealCountTab          retreat={retreat} />}
+          {effectiveTab === TAB_IDX.ADMINSUPPLIES && <AdminSuppliesTab    retreat={retreat} />}
+          {effectiveTab === TAB_IDX.MEDICAL     && <MedicalLogTab         retreat={retreat} />}
         </main>
     </div>
   );

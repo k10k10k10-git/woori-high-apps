@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import TeamModal from "./TeamModal";
 import PortalSearch from "./PortalSearch";
-import { canAccessPortalArea, canManageRoles } from "./accessPolicy";
+import { canAccessArea, canManageRolesOf } from "./accessPolicy";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
 
@@ -21,7 +21,7 @@ function activeArea(pathname: string): GlobalArea {
 
 export default function GlobalPortalHeader() {
   const pathname = usePathname();
-  const { user, loading, role, signOut } = useAuth();
+  const { user, loading, roles, signOut } = useAuth();
   const [teamOpen, setTeamOpen] = useState(false);
   const [vacationOpen, setVacationOpen] = useState(false);
   const vacationRef = useRef<HTMLDivElement>(null);
@@ -56,12 +56,12 @@ export default function GlobalPortalHeader() {
 
   if (loading || !user) return null;
 
-  const semesterAllowed = canAccessPortalArea("semester", role);
+  const semesterAllowed = canAccessArea("semester", roles);
   // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
   // 수련회에 들어갔을 때 행정 화면이냐 현장 화면이냐만 달라진다.
   const vacationItems = [
-    ...(canAccessPortalArea("retreat-admin", role) ? [{ href: "/retreats", label: "수련회 행정팀", hint: "신청·편성·물품" }] : []),
-    ...(canAccessPortalArea("retreat-field", role) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
+    ...(canAccessArea("retreat-admin", roles) ? [{ href: "/retreats", label: "수련회 행정팀", hint: "신청·편성·물품" }] : []),
+    ...(canAccessArea("retreat-field", roles) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
   ];
 
   return (
@@ -152,7 +152,7 @@ export default function GlobalPortalHeader() {
 
           <div className="portal-header-tools">
             <div className="portal-account-row">
-              {canManageRoles(role) && (
+              {canManageRolesOf(roles) && (
                 <button onClick={() => setTeamOpen(true)} className="portal-compact-action">
                   <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">팀원 관리</span>
                 </button>

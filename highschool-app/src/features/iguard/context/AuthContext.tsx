@@ -5,13 +5,13 @@ import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup }
 import { get, ref } from "firebase/database";
 import { auth, googleProvider, db } from "@/features/iguard/lib/firebase";
 import { paths } from "@/features/iguard/lib/paths";
-import { resolveMinistryRole, type MinistryRole } from "@/features/portal/accessPolicy";
+import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  /** 통합 6단계 역할 — 현장 탭 범위는 accessPolicy.iguardScope로만 판정한다 */
-  role: MinistryRole;
+  /** 통합 두 축 역할 — 현장 탭 범위는 accessPolicy.iguardScopeOf로만 판정한다 */
+  roles: MinistryRoles;
   memberName: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -31,7 +31,7 @@ async function canReadAsMainAdmin(uid: string): Promise<boolean> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<MinistryRole>("none");
+  const [roles, setRoles] = useState<MinistryRoles>(NO_ROLES);
   const [memberName, setMemberName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,19 +55,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           );
           if (nameSource) setMemberName(nameSource.name.trim() || null);
 
-          setRole(resolveMinistryRole({
+          const roleSource = (retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin : null)
+            ?? (memberValue && typeof memberValue === "object" ? memberValue : null);
+
+          setRoles(resolveMinistryRoles({
             isMainAdmin,
             hasRetreatAdmin: retreatAdmin != null,
             retreatAdminRole: retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin.role : undefined,
             hasIguardMember: memberValue != null,
             iguardRole: roleSnap.val(),
+            semesterRole: roleSource?.semesterRole,
+            retreatRole: roleSource?.retreatRole,
           }));
         } catch {
-          setRole("none");
+          setRoles(NO_ROLES);
           setMemberName(null);
         }
       } else {
-        setRole("none");
+        setRoles(NO_ROLES);
         setMemberName(null);
       }
       setLoading(false);
@@ -81,12 +86,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signOut() {
     await firebaseSignOut(auth);
-    setRole("none");
+    setRoles(NO_ROLES);
     setMemberName(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, role, memberName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, roles, memberName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,7 +1,7 @@
 import type { Session } from "@/features/semester/types";
 import type { Milestone, Retreat } from "@/lib/types";
 import type { RetreatPeriodWithOwner } from "@/lib/db";
-import { retreatEntryHref, type MinistryRole } from "./accessPolicy";
+import { retreatEntryHref, type MinistryRoles } from "./accessPolicy";
 
 export type HomeAction = {
   id: string;
@@ -14,7 +14,7 @@ export type HomeAction = {
 
 type BuildHomeActionsInput = {
   today: string;
-  role: MinistryRole;
+  roles: MinistryRoles;
   milestones: Milestone[];
   sessions: Session[];
   semesterHref?: string;
@@ -63,7 +63,7 @@ export function buildHomeActions(input: BuildHomeActionsInput): HomeAction[] {
       date: nextPeriod.startDate,
       title: retreat?.name ?? "수련회",
       meta: nextPeriod.startDate <= input.today ? "현재 진행 중" : "다음 수련회",
-      href: retreatEntryHref(nextPeriod.retreatId, input.role),
+      href: retreatEntryHref(nextPeriod.retreatId, input.roles),
       urgency: urgencyFor(nextPeriod.startDate, input.today),
     });
   }
