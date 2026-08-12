@@ -1,6 +1,6 @@
 # 워크스페이스 운영 매뉴얼 (통합 플랫폼 모노레포)
 
-이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 통합 플랫폼과 관련 앱을 담는다. 독립 `retreat-app`·`iguard-app`은 2026-08-05에 `highschool-app`으로 통합 후 제거했다.
+이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 통합 플랫폼과 관련 앱을 담는다. 독립 `retreat-app`·`iguard-app`은 2026-08-05에 `highschool-app`으로 통합 후 제거했고, `교사·스탭 출석부`는 2026-08-12에 사용 중단으로 제거했다(복구 태그 `pre-staff-app-removal-2026-08-12`).
 **이 문서는 "이 저장소에서 일하는 방법" 전체를 규정한다.** 개별 앱의 코드 패턴은 각 앱의 CLAUDE.md가 원천이며, 충돌 시 이 문서의 안전 규칙이 우선한다.
 
 작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md`.
@@ -29,7 +29,6 @@
 | 학생 출석부 | `classes/`, `attendance/`, `admins`, `teacher*`, Rules 배포 | — |
 | highschool-app 행정 모듈 | `retreats/{id}` 행정 데이터, `retreatsPrivate/{id}`, `retreatAdmins` | `classes/` 읽기 전용. 단, 새친구 탭의 통합관리자 확인은 신규 학생 1명 경로만 원자 추가 |
 | highschool-app 현장 모듈 | `retreats/{id}/iguard/*`, `iguardMembers/Roles/Pending` | 행정 노드 전부 **읽기 전용** |
-| 교사·스탭 출석부 | `staff_*` | — (여름수련회 이후까지 작업 보류) |
 | semester-app | `semesters/`, `semestersPrivate/` | `classes/`·`retreatAdmins` 읽기 전용 |
 
 - 공유 쓰기 노드는 단 하나: `prepMilestones/` (통합 앱의 행정↔현장 모듈 양방향). `retreats/{id}/milestones`는 레거시이며 코드(`paths.ts`) 기준으로 이 문장이 진실이다.
@@ -124,7 +123,7 @@
 
 - 배포·커밋·푸시·Ready 확인은 `/ship` 스킬 절차를 따른다.
 - `highschool-app`은 Vercel의 `highschool-app` 프로젝트로 배포한다. push 후 `/api/version`과 `npx vercel ls`로 Ready를 확인한다.
-- 학생 앱은 Firebase Hosting(`firebase deploy --only hosting`, predeploy가 SW 캐시명 갱신). 교사·스탭 앱은 미배포·작업 보류.
+- 학생 앱은 Firebase Hosting(`firebase deploy --only hosting`, predeploy가 SW 캐시명 갱신).
 - 배포 전 `npx tsc --noEmit` 0 errors + `npm test` 통과 필수.
 
 ## 스킬 지도 (반복 작업은 손으로 하지 말 것)

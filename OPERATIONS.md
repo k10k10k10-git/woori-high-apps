@@ -27,8 +27,10 @@ npx vercel --prod
 - 배포 후 `curl -s https://woorihigh-app.vercel.app/api/version`의 `buildId`와 `git rev-parse HEAD`를 대조하고 `npx vercel ls`에서 Ready를 확인한다.
 - 독립 `retreat-app`·`iguard-app` Vercel 프로젝트와 Firebase Hosting 사이트는 2026-08-05 제거했다.
 
-### 교사·스탭 앱
-- 아직 배포 설정 없음 (로컬 개발만)
+### 교사·스탭 앱 (제거됨 — 2026-08-12)
+- 사용 중단으로 코드를 제거했다. 배포된 적이 없어 끊을 주소도 없다.
+- 복구가 필요하면 태그 `pre-staff-app-removal-2026-08-12`를 사용한다.
+- ⚠ Firebase의 `staff_*` 노드와 Rules는 **그대로 남아 있다** — 앱 제거로 자동 정리되지 않는다.
 
 ### Firebase Rules 배포
 ```bash

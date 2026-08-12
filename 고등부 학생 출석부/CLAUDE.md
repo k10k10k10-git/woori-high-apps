@@ -6,11 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 분당우리교회 고등부 출석 관리 PWA. Firebase Realtime Database를 백엔드로 사용하는 Next.js App Router 앱이며, Firebase Hosting에 정적 배포된다.
 
-동일한 Firebase 프로젝트(`woori-high`)를 공유하는 앱이 4개 있다:
+동일한 Firebase 프로젝트(`woori-high`)를 공유하는 앱이 3개 있다:
 - **이 앱** (`woori-attendance-next`) — 학생 출석부 (`classes/`, `attendance/`, `events/` 경로 사용)
 - **수련회 행정 사이트** — 동일한 `classes/`, `attendance/` 경로를 공유하므로 이 앱의 변경이 수련회 앱에도 반영됨
 - **수련회 이가드 사이트** — `retreats/`, `iguard*`, `prepMilestones/` 경로 사용
-- **교사/스탭 앱** (`woori-staff-nextjs`) — `staff_members/`, `staff_attendance/` 등 `staff_` prefix 경로를 따로 사용
 
 ## 개발 명령어
 
@@ -101,7 +100,7 @@ __tests__/                   # Vitest 단위 테스트
   calcStats.test.ts
   dates.test.ts
 vitest.config.ts
-database.rules.json          # Firebase RTDB 보안 규칙 (4개 앱 공유!)
+database.rules.json          # Firebase RTDB 보안 규칙 (3개 앱 공유!)
 ```
 
 ### 라우팅 vs. 탭 구조
@@ -253,6 +252,7 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 주요 규칙 특이사항:
 - `admins` 노드: bootstrap 조건 제거됨 — 최초 admin은 Firebase Console에서 직접 추가해야 함
 - `teacherExtra` 쓰기 규칙: classKey에 하이픈(`-`)이 포함되므로 `.replace('-','_')`을 3회 체이닝하여 Firebase 경로의 `_`와 매칭 (`replace`는 첫 매치만 치환하므로 3번 호출)
+- `staff_*` 규칙은 2026-08-12 제거했다 — 교사·스탭 앱을 함께 없앴고 데이터도 0건이었다. 루트에 기본 규칙이 없어 이 경로들은 전면 거부 상태다(`teacherStaff`는 별개 노드이니 혼동 금지).
 - `attendanceAdmins`: 출석부 전용 관리자. 이 앱이 쓰는 21개 규칙(`classes`·`attendance`·`events`·`teacher*`·`config`·`trash`·`suggestions`·`userRoles`·`teacherClasses`)에만 OR로 포함되고, 플랫폼 노드(`retreats*`·`iguard*`·`semesters*`)와 `admins`에는 **절대 넣지 않는다** — 이게 권한 분리의 전부다.
 - `classes`/`attendance`: read 규칙이 관리자(admin·attendanceAdmins·retreatAdmins·iguardMembers) 전체 + 교사는 본인 반(`teacherClasses` 매칭)만 — 행정·이가드 앱이 비관리자 계정으로 전체 `classes`를 읽으므로 단순 admin-only로 잠그면 그 앱들이 깨진다(반드시 `retreatAdmins`/`iguardMembers`도 허용목록에 포함).
 - `semesters`: read는 `admins`·`retreatAdmins`·`iguardMembers`(2026-08-08 추가 — 고등부 사역 플랫폼의 "스탭=학기 조회만" 역할), **write는 `admins`·`retreatAdmins`만**. 연락처·지원 동기가 있는 `semestersPrivate`는 read/write 모두 행정 전용으로 유지한다 — 학기 쪽 새 민감 필드는 반드시 `semestersPrivate` 아래에 둔다.

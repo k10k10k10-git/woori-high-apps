@@ -84,13 +84,18 @@ describe('database.rules.json 권한 계약', () => {
       });
     });
 
-    it.each(['staff_roles', 'staff_attendance', 'staff_events'])(
-      '%s는 쓰기와 같은 범위(admins·staff_admins)로만 읽는다',
+    // 교사·스탭 앱은 2026-08-12 제거했고 staff_* 노드도 데이터가 비어 있어 규칙에서 뺐다.
+    // 루트에 기본 규칙이 없으므로 이 경로들은 이제 "규칙 없음 = 전면 거부" 상태다.
+    it.each(['staff_admins', 'staff_roles', 'staff_attendance', 'staff_events'])(
+      '%s 규칙은 제거된 상태를 유지한다 (되살리려면 앱부터 복원할 것)',
       (node) => {
-        expect(rules[node]['.read']).not.toBe('auth != null');
-        expect(refers(rules[node]['.read'], 'staff_admins')).toBe(true);
+        expect(rules[node]).toBeUndefined();
       },
     );
+
+    it('teacherStaff는 남아 있다 — 통합 앱의 스탭 접수가 읽는 다른 노드다', () => {
+      expect(rules.teacherStaff).toBeDefined();
+    });
 
     it('userRoles 전체 목록은 관리자만, 본인 레코드는 이메일이 일치할 때만 읽는다', () => {
       expect(refers(rules.userRoles['.read'], 'attendanceAdmins')).toBe(true);

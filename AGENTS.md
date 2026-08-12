@@ -25,7 +25,6 @@ Before changing code, always check whether the change can affect Firebase paths 
 | `highschool-app/` | Unified semester, retreat admin, and on-site app — production URL `https://woorihigh-app.vercel.app` (the old `highschool-app-flame.vercel.app` still points at the same deployment) | `semesters/*`, `retreats/{id}/*`, `retreatsPrivate/{id}`, `retreatAdmins`, `retreats/{id}/iguard/*`, `iguard*` |
 | `고등부 학생 출석부/` | Student attendance PWA | `classes/`, `attendance/`, `events/`, `admins`, `teacherClasses` |
 | `semester-app/` | Semester ministry and training hub | `semesters/`, `semestersPrivate/` |
-| `고등부 교사·스탭 출석부/` | Teacher/staff attendance app | `staff_*` paths only |
 
 Read these first for cross-app work:
 
@@ -60,7 +59,7 @@ Several nodes used to be readable by **any signed-in Google account** (no role a
 - `teacherAdditional`, `teacherPhones` → `admins` / `attendanceAdmins` only.
 - `userRoles` → list read is admin-only; **each record keeps a self-read rule** (`data.child('email').val() === auth.token.email`) because `loadUserRole` reads `userRoles/{emailKey}` to decide login. Remove it and every homeroom teacher is locked out.
 - `retreatAdmins`, `iguardMembers`, `iguardRoles` → list read is role holders only, and **each keeps `$uid` self-read** (`auth.uid === $uid`). Both AuthContexts read their own uid from these three; on failure the `catch` sets role `"none"`, so removing self-read locks out every non-admin.
-- `staff_*` → `admins` / `staff_admins` (0 records today, app not deployed).
+- `staff_*` → removed from Rules on 2026-08-12 together with the teacher/staff app (0 records, never deployed).
 - `events` stays `auth != null` on purpose — month/day/label only, no personal data.
 
 `고등부 학생 출석부/__tests__/rulesContract.test.ts` pins all of this. Run it before touching rules.
