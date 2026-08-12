@@ -111,3 +111,8 @@
 - **접근법**: 1→ `documents/render_docx.py`로 만든 페이지 PNG에서 한글만 빈칸이 되는지 확인하고, DOCX 텍스트 추출로 원문 손상과 렌더링 폰트 문제를 분리한다. 2→ macOS의 `/Users/sunghoon/Library/Fonts/NanumSquareR.ttf`·`NanumSquareB.ttf`를 가져와 Word의 폰트 난독화 규칙(폰트 파일 앞 32바이트에 문서별 GUID를 역순 반복 XOR)으로 변환한다. 3→ DOCX ZIP의 `word/fonts/*.odttf`에 넣고 `word/fontTable.xml`, `word/_rels/fontTable.xml.rels`, `[Content_Types].xml`에 regular/bold 임베딩 관계를 추가한다. 4→ 문서 스타일을 `NanumSquare`로 통일한 뒤 `render_docx.py`로 전 페이지를 다시 렌더해 한글 표시·표 행 분할·페이지 넘침을 육안 확인한다.
 - **판단 질문**: 시스템 전역 폰트 설치나 LibreOffice 설정 변경을 요구하지 않았다 — 다른 실행 환경에서 결과가 재현되지 않고 워크스페이스 밖 상태에 의존한다. 문서를 PNG/PDF로만 굳히지도 않았다 — 사용자가 Google Forms에 문항을 복사·수정할 수 있는 편집 가능한 DOCX가 필요했다.
 - **재사용 규칙**: DOCX 원문은 정상인데 Linux 렌더에서 한글만 사라지면 시스템 폰트 설치보다 `fontTable.xml` + `.odttf` 임베딩을 우선하고, 폰트 GUID XOR 난독화와 전 페이지 재렌더까지 한 세트로 검증한다.
+
+### 참고 이미지 톤을 유지하면서 글자가 정확한 안내 PDF를 다시 만드는 법 (2026-08-12)
+- **접근법**: 1→ `/Users/sunghoon/Downloads/KakaoTalk_Photo_2026-08-12-16-45-56 001.png`에서 공통 시각 언어(연한 물방울 모서리·하늘색 테이프·점선 하늘색 카드·보라색 구름 메모)를 분리한다. 2→ ImageGen 편집으로 참고 이미지의 글자와 테이프만 지운 1:1 물방울 배경을 만들고 `tmp/pdfs/attendance-guide-redesign/water-background.png`에 저장한다. 3→ 한글과 화면 도식은 ImageGen에 맡기지 않고 Pillow로 `/Users/sunghoon/Library/Fonts/BMJUA_otf.otf`·`KyoboHandwriting2021sjy.otf`를 사용해 결정적으로 배치하고, 기존 13쪽 설명을 화면당 핵심 1~3문장인 10쪽으로 압축한다. 4→ ReportLab으로 PNG 10장을 PDF로 묶은 뒤 `pdftoppm`으로 전 페이지를 재렌더하고 몽타주와 원본 크기 페이지를 모두 확인한다.
+- **판단 질문**: 참고 PNG를 그대로 배경으로 사용하지 않았다 — 기존 행사 문구가 남고 재사용 권리가 불명확한 정보까지 섞인다. 안내 문장까지 ImageGen으로 생성하지도 않았다 — 한글 오탈자·글리프 깨짐·화면마다 다른 서식이 생길 수 있어 실제 배포용 가이드에는 부적합하다.
+- **재사용 규칙**: 스타일 참고 이미지가 있는 안내 PDF는 생성형 도구로 ‘글자 없는 공통 배경’만 확보하고, 모든 텍스트·표·화면 도식은 코드와 로컬 한글 폰트로 만든 뒤 PDF 전 페이지를 다시 렌더해 검수한다.
