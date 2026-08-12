@@ -100,4 +100,37 @@ describe('database.rules.json 권한 계약', () => {
       expect(selfRead).toContain('auth.token.email');
     });
   });
+  describe('행정팀의 새친구 원장 반영 (2026-08-12 신설)', () => {
+    // 통합 앱의 retreatAdmins/{uid}.semesterRole === "adminTeam"만 학생 1명 경로를 쓴다.
+    // 반 전체(students 통째·teacher)나 출석 전체를 열면 안 된다 — 범위가 넓어지면 여기서 깨진다.
+    const ADMIN_TEAM = "root.child('retreatAdmins').child(auth.uid).child('semesterRole').val() === 'adminTeam'";
+    const classes = rules.classes as unknown as Record<string, any>;
+    const attendance = rules.attendance as unknown as Record<string, any>;
+    const trash = rules.trash as unknown as Record<string, any>;
+
+    it('classes는 학생 1명 경로에만 열린다 — 반 노드 자체는 그대로다', () => {
+      expect(classes.$year.$classKey.students.$studentId['.write']).toContain(ADMIN_TEAM);
+      expect(classes.$year.$classKey['.write']).not.toContain('semesterRole');
+    });
+
+    it('attendance도 학생 1명 경로에만 열린다', () => {
+      expect(attendance.$year.$classKey.$studentId['.write']).toContain(ADMIN_TEAM);
+      expect(attendance.$year.$classKey['.write']).not.toContain('semesterRole');
+    });
+
+    it('trash는 학생 복구본 경로에만 열린다 — 노드 전체는 관리자 전용 그대로다', () => {
+      expect(trash.$year.students.$studentId['.write']).toContain(ADMIN_TEAM);
+      expect(trash.$year.students.$studentId['.read']).toContain(ADMIN_TEAM);
+      expect(trash['.write']).not.toContain('semesterRole');
+    });
+
+    it('교사의 본인 반 쓰기와 관리자 조건은 그대로 남아 있다 (회귀)', () => {
+      for (const node of [classes, attendance]) {
+        const write = node.$year.$classKey['.write'] as string;
+        expect(write).toContain("root.child('teacherClasses').child(auth.uid).val() === $classKey");
+        expect(write).toContain("root.child('admins').child(auth.uid).val() === true");
+        expect(write).toContain("root.child('attendanceAdmins').child(auth.uid).val() === true");
+      }
+    });
+  });
 });
