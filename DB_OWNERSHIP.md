@@ -95,7 +95,7 @@
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |
 | `iguardMembers` | 이가드 | - | 이가드만 | 이가드 멤버 인증 |
 | `iguardRoles` | 이가드 | 행정(역할 판정) | 이가드만 | `staff`(스탭) / `team`(이가드팀) — Rules validate가 이 두 값만 허용 |
-| `iguardPending` | 이가드 | - | 이가드만 | 없음 |
+| `iguardPending` | highschool-app 접근 관리 | - | highschool-app | 사용자별 접근 요청 필드 + `siteRequests/{requestId}`. 팀원 승인·거절은 접근 필드만 지우고 사이트 요청을 보존해야 함 |
 
 ## 학기 사역 도메인 (소유: highschool-app 학기 모듈)
 

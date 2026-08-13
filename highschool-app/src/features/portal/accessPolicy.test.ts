@@ -8,6 +8,7 @@ import {
   canDestroySemester,
   canEditArea,
   canManageRolesOf,
+  canManageSiteRequests,
   canSeeSensitiveRetreat,
   canWriteStudentRoster,
   describeRoles,
@@ -133,6 +134,12 @@ describe("방학 역할 — 수련회 행정·현장 화면", () => {
 
 // ─── 두 축 조합 ───────────────────────────────────────────────
 describe("두 축을 각자 적용한다", () => {
+  it("사이트 요청함은 통합관리자에게만 열린다", () => {
+    expect(canManageSiteRequests(roles("superAdmin", "superAdmin"))).toBe(true);
+    expect(canManageSiteRequests(roles("pastor", "pastor"))).toBe(false);
+    expect(canManageSiteRequests(roles("adminTeam", "adminTeam"))).toBe(false);
+  });
+
   it("학기=스탭팀장 / 방학=행정팀 — 화면마다 다른 역할이 적용된다", () => {
     const r = roles("leader", "adminTeam");
     expect(canEditArea("semester", r)).toBe(true);   // 스탭팀장

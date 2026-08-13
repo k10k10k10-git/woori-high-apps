@@ -61,4 +61,7 @@ export const paths = {
   iguardRole: (uid: string) => `iguardRoles/${uid}`,
   iguardPending: () => "iguardPending",
   iguardPendingEntry: (uid: string) => `iguardPending/${uid}`,
+  iguardPendingEmail: (uid: string) => `iguardPending/${uid}/email`,
+  iguardPendingName: (uid: string) => `iguardPending/${uid}/name`,
+  iguardPendingRequestedAt: (uid: string) => `iguardPending/${uid}/requestedAt`,
 } as const;

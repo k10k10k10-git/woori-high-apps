@@ -48,7 +48,7 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
     {
       id: "suggestions",
       label: "사이트 건의사항 작성",
-      description: "오류와 개선 아이디어를 정리해 안전하게 공유",
+      description: "오류와 개선 아이디어를 통합관리자 요청함으로 전송",
       href: "/suggestions",
       keywords: "피드백 문의 오류 버그 아이디어 건의",
       area: "support",

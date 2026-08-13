@@ -108,6 +108,10 @@ export const paths = {
   retreatPendingEntry: (uid: string) => `retreatPending/${uid}`,
   iguardMember: (uid: string) => `iguardMembers/${uid}`,
   iguardRole: (uid: string) => `iguardRoles/${uid}`,
+  iguardPending: () => "iguardPending",
+  iguardPendingEntry: (uid: string) => `iguardPending/${uid}`,
+  siteRequests: (uid: string) => `iguardPending/${uid}/siteRequests`,
+  siteRequest: (uid: string, requestId: string) => `iguardPending/${uid}/siteRequests/${requestId}`,
 
   // ── 마일스톤 (전역) ──
   prepMilestones: () => "prepMilestones",

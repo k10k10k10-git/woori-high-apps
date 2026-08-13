@@ -21,6 +21,7 @@ import {
   isRetreatRole, isSemesterRole,
   type MinistryRoles, type RetreatRole, type SemesterRole,
 } from "@/features/portal/accessPolicy";
+import { normalizeIguardPendingRequests, type IguardPendingReq } from "./pendingAccess";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -991,7 +992,7 @@ export async function deleteIguardAccessLock(retreatId: string): Promise<void> {
 //   iguardPending/{uid} = { email, name, requestedAt }  (승인 대기)
 // ════════════════════════════════════════════════════════════
 
-export interface IguardPendingReq { uid: string; email: string; name: string; requestedAt: number; }
+export type { IguardPendingReq } from "./pendingAccess";
 export interface IguardMemberInfo {
   email: string;
   name?: string;
@@ -1002,20 +1003,19 @@ export interface IguardMemberInfo {
 
 /** 로그인했지만 권한 없는 사용자가 접근 요청 */
 export async function requestIguardAccess(uid: string, email: string, name: string): Promise<void> {
-  await set(ref(db, paths.iguardPendingEntry(uid)), { email, name, requestedAt: Date.now() });
+  // siteRequests 하위 노드를 덮지 않도록 접근 요청 필드만 갱신한다.
+  await update(ref(db, paths.iguardPendingEntry(uid)), { email, name, requestedAt: Date.now() });
 }
 
 /** 본인이 이미 요청 보냈는지 확인 (대기 화면 표시용) */
 export async function getMyIguardPending(uid: string): Promise<boolean> {
-  const snap = await get(ref(db, paths.iguardPendingEntry(uid)));
+  const snap = await get(ref(db, paths.iguardPendingRequestedAt(uid)));
   return snap.exists();
 }
 
 export function subscribeToIguardPending(cb: (list: IguardPendingReq[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(ref(db, paths.iguardPending()), (snap) => {
-    if (!snap.exists()) return cb([]);
-    cb(Object.entries(snap.val()).map(([uid, v]) => ({ uid, ...(v as Omit<IguardPendingReq, "uid">) }))
-      .sort((a, b) => a.requestedAt - b.requestedAt));
+    cb(normalizeIguardPendingRequests(snap.exists() ? snap.val() : null));
   }, (error) => { console.warn("subscribeToIguardPending error:", error); onError?.(error); });
 }
 
@@ -1065,7 +1065,9 @@ export async function approveIguardMember(
       retreatRole: roles?.retreat,
     }),
     [paths.iguardRole(uid)]: role,
-    [paths.iguardPendingEntry(uid)]: null,
+    [paths.iguardPendingEmail(uid)]: null,
+    [paths.iguardPendingName(uid)]: null,
+    [paths.iguardPendingRequestedAt(uid)]: null,
   });
 }
 
@@ -1077,7 +1079,11 @@ export async function updateIguardMemberName(uid: string, email: string, name: s
 }
 
 export async function denyIguardPending(uid: string): Promise<void> {
-  await remove(ref(db, paths.iguardPendingEntry(uid)));
+  await update(ref(db), {
+    [paths.iguardPendingEmail(uid)]: null,
+    [paths.iguardPendingName(uid)]: null,
+    [paths.iguardPendingRequestedAt(uid)]: null,
+  });
 }
 
 export async function removeIguardMember(uid: string): Promise<void> {

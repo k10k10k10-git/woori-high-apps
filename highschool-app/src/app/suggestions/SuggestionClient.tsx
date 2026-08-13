@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, describeRoles } from "@/features/portal/accessPolicy";
+import { prepareSiteRequestAttachment } from "@/features/suggestions/attachment";
+import { createSiteRequest } from "@/features/suggestions/db";
 
 type Draft = {
   category: string;
@@ -29,28 +31,14 @@ const INITIAL: Draft = {
   anonymous: false,
 };
 
-async function copyText(text: string) {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.style.position = "fixed";
-  textarea.style.opacity = "0";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  textarea.remove();
-  if (!copied) throw new Error("클립보드 복사를 지원하지 않는 브라우저입니다.");
-}
-
 export default function SuggestionClient() {
   const { user, loading, roles, memberName, signIn } = useAuth();
   const [draft, setDraft] = useState(INITIAL);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"success" | "error">("success");
+  const [sending, setSending] = useState(false);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const report = useMemo(() => {
     const reporter = draft.anonymous ? "익명" : (memberName || user?.displayName || user?.email || "이름 미확인");
@@ -87,28 +75,39 @@ export default function SuggestionClient() {
 
   const canPrepare = draft.title.trim().length > 1 && draft.description.trim().length > 4;
 
-  async function copyReport() {
+  async function sendReport() {
+    if (!user || sending) return;
+    setSending(true);
+    setMessage(attachment ? "첨부 이미지를 최적화하고 있습니다…" : "요청을 전송하고 있습니다…");
+    setMessageType("success");
     try {
-      await copyText(report);
-      setMessage("제안 내용을 복사했습니다. 팀 채널에 붙여넣어 공유해 주세요.");
+      const preparedAttachment = attachment ? await prepareSiteRequestAttachment(attachment) : undefined;
+      const requestId = await createSiteRequest({
+        ownerUid: user.uid,
+        kind: draft.kind,
+        category: draft.category,
+        title: draft.title.trim(),
+        description: draft.description.trim(),
+        page: draft.page.trim(),
+        urgency: draft.urgency,
+        reproduction: draft.reproduction.trim(),
+        expected: draft.expected.trim(),
+        anonymous: draft.anonymous,
+        reporterName: draft.anonymous ? "익명" : (memberName || user.displayName || "이름 미확인"),
+        roleLabel: describeRoles(roles),
+        createdAt: Date.now(),
+        ...(preparedAttachment ? { attachment: preparedAttachment } : {}),
+      });
+      setDraft(INITIAL);
+      setAttachment(null);
+      setFileInputKey((value) => value + 1);
+      setMessage(`요청을 전송했습니다. 접수번호 ${requestId.slice(-6)}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "제안 내용을 복사하지 못했습니다.");
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "요청을 전송하지 못했습니다.");
+    } finally {
+      setSending(false);
     }
-  }
-
-  async function shareReport() {
-    const files = attachment ? [attachment] : [];
-    const canShareFiles = files.length === 0 || (navigator.canShare?.({ files }) ?? false);
-    if (navigator.share && canShareFiles) {
-      try {
-        await navigator.share({ title: draft.title, text: report, files });
-        setMessage("공유했습니다.");
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-      }
-    }
-    await copyReport();
   }
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]) {
@@ -136,21 +135,18 @@ export default function SuggestionClient() {
               <Field label="중요도"><select value={draft.urgency} onChange={(event) => update("urgency", event.target.value)} className="form-control"><option>낮음</option><option>보통</option><option>높음</option><option>긴급 · 사역 진행 불가</option></select></Field>
               <Field label="재현 방법" wide><textarea value={draft.reproduction} onChange={(event) => update("reproduction", event.target.value)} className="form-control min-h-24" placeholder="1. 어느 메뉴를 누르고  2. 무엇을 입력하면…" /></Field>
               <Field label="원하는 결과" wide><textarea value={draft.expected} onChange={(event) => update("expected", event.target.value)} className="form-control min-h-24" placeholder="정상적이라면 어떻게 보여야 하는지 적어 주세요." /></Field>
-              <Field label="스크린샷 첨부" wide><input type="file" accept="image/*" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} className="form-control file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-semibold" /><p className="mt-1.5 text-[11px] text-slate-500">파일은 서버에 저장하지 않고 공유할 때만 사용합니다.</p></Field>
+              <Field label="스크린샷 첨부" wide><input key={fileInputKey} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => { setAttachment(event.target.files?.[0] ?? null); setMessage(""); }} className="form-control file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-xs file:font-semibold" /><p className="mt-1.5 text-[11px] text-slate-500">JPG·PNG·WEBP, 원본 12MB 이하. 전송할 때 최대 1600px·1.2MB로 안전하게 줄여 요청에 함께 보관합니다.</p></Field>
             </div>
             <label className="mt-5 flex min-h-11 cursor-pointer items-center gap-3 rounded-xl bg-slate-50 px-4 text-sm text-slate-700"><input type="checkbox" checked={draft.anonymous} onChange={(event) => update("anonymous", event.target.checked)} className="h-4 w-4" />작성자 이름을 익명으로 표시</label>
           </section>
 
           <aside className="surface-panel self-start p-5 sm:p-6 xl:sticky xl:top-24">
             <p className="section-kicker">PREVIEW</p>
-            <h2 className="mt-1 text-lg font-bold">공유할 내용</h2>
+            <h2 className="mt-1 text-lg font-bold">전송할 내용</h2>
             <pre className="mt-4 max-h-[480px] whitespace-pre-wrap overflow-y-auto rounded-xl bg-slate-950 p-4 text-[11px] leading-5 text-slate-200">{report}</pre>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button type="button" disabled={!canPrepare} onClick={() => void copyReport()} className="btn-secondary justify-center disabled:opacity-40">복사</button>
-              <button type="button" disabled={!canPrepare} onClick={() => void shareReport()} className="btn-primary justify-center disabled:opacity-40">공유</button>
-            </div>
-            {message && <p role="status" className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{message}</p>}
-            <p className="mt-4 text-[11px] leading-5 text-slate-500">새 DB 경로나 개인정보를 만들지 않습니다. 복사한 내용을 운영 팀 채널에 전달해 주세요.</p>
+            <button type="button" disabled={!canPrepare || sending} onClick={() => void sendReport()} className="btn-primary mt-4 w-full justify-center disabled:opacity-40">{sending ? "전송 중…" : "전송"}</button>
+            {message && <p role="status" className={`mt-3 rounded-lg px-3 py-2 text-xs ${messageType === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{message}</p>}
+            <p className="mt-4 text-[11px] leading-5 text-slate-500">전송한 내용은 통합관리자 마이페이지의 요청사항에 쌓입니다. 해결되면 다음 로그인 때 알림을 받습니다.</p>
           </aside>
         </div>
       </main>

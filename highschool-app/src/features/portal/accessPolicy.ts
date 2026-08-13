@@ -205,6 +205,11 @@ export function canManageRolesOf(roles: MinistryRoles): boolean {
   return SEMESTER_CAPS[roles.semester].manageRoles || RETREAT_CAPS[roles.retreat].manageRoles;
 }
 
+/** 마이페이지 요청함은 모든 사용자 UID·첨부를 읽으므로 통합관리자에게만 연다. */
+export function canManageSiteRequests(roles: MinistryRoles): boolean {
+  return roles.semester === "superAdmin" || roles.retreat === "superAdmin";
+}
+
 /** classes/{year} Rules와 일치하는 새친구 원장 반영·등반 취소 권한. */
 export function canWriteStudentRoster(roles: MinistryRoles): boolean {
   return SEMESTER_CAPS[roles.semester].rosterWrite;

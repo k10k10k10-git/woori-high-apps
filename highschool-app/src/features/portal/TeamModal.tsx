@@ -83,7 +83,7 @@ function memberLabel(member: { name: string; email: string }) {
   return member.name || member.email || "이름 미설정";
 }
 
-export default function TeamModal({ onClose }: { onClose: () => void }) {
+export default function TeamModal({ onClose, embedded = false }: { onClose?: () => void; embedded?: boolean }) {
   const { user, roles: myRoles } = useAuth();
   const { toast, uiConfirm } = useUI();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -130,17 +130,18 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
   }, [loadDirectAccess]);
 
   useEffect(() => {
+    if (embedded) return;
     const previousFocus = document.activeElement as HTMLElement | null;
     dialogRef.current?.focus();
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onClose?.();
     }
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, [embedded, onClose]);
 
   const members = useMemo<TeamMember[]>(() => {
     const ids = new Set([...Object.keys(mainAdmins), ...Object.keys(admins), ...Object.keys(iguardMembers)]);
@@ -321,25 +322,16 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
     setEditingUid(null);
   }
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm" onClick={onClose}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="팀원 관리"
-        tabIndex={-1}
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
+  const content = (
+    <>
+        {!embedded && <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
             <p className="text-xs font-bold tracking-[0.14em] text-emerald-600">PEOPLE &amp; ACCESS</p>
             <h2 className="mt-1 text-xl font-bold text-slate-900">팀원 관리</h2>
             <p className="mt-1 text-xs text-slate-500">학기 역할은 학기·주일 화면에, 방학 역할은 수련회 행정·현장 화면에 적용됩니다.</p>
           </div>
           <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-xl text-slate-500 hover:bg-slate-200" aria-label="닫기">×</button>
-        </header>
+        </header>}
 
         <div className="space-y-6 p-5 sm:p-6">
           {loadError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
@@ -537,6 +529,22 @@ export default function TeamModal({ onClose }: { onClose: () => void }) {
             </div>
           </section>
         </div>
+    </>
+  );
+
+  if (embedded) return <div className="rounded-2xl border border-slate-200 bg-white">{content}</div>;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="팀원 관리"
+        tabIndex={-1}
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {content}
       </div>
     </div>
   );

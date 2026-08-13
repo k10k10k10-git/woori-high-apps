@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import TeamModal from "./TeamModal";
+import MyPageModal from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
-import { canAccessArea, canManageRolesOf } from "./accessPolicy";
+import { canAccessArea, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
 
@@ -23,6 +24,7 @@ export default function GlobalPortalHeader() {
   const pathname = usePathname();
   const { user, loading, roles, signOut } = useAuth();
   const [teamOpen, setTeamOpen] = useState(false);
+  const [myPageOpen, setMyPageOpen] = useState(false);
   const [vacationOpen, setVacationOpen] = useState(false);
   const vacationRef = useRef<HTMLDivElement>(null);
   const currentArea = activeArea(pathname);
@@ -57,6 +59,7 @@ export default function GlobalPortalHeader() {
   if (loading || !user) return null;
 
   const semesterAllowed = canAccessArea("semester", roles);
+  const siteRequestAdmin = canManageSiteRequests(roles);
   // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
   // 수련회에 들어갔을 때 행정 화면이냐 현장 화면이냐만 달라진다.
   const vacationItems = [
@@ -153,8 +156,8 @@ export default function GlobalPortalHeader() {
           <div className="portal-header-tools">
             <div className="portal-account-row">
               {canManageRolesOf(roles) && (
-                <button onClick={() => setTeamOpen(true)} className="portal-compact-action">
-                  <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">팀원 관리</span>
+                <button onClick={() => siteRequestAdmin ? setMyPageOpen(true) : setTeamOpen(true)} className="portal-compact-action">
+                  <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">{siteRequestAdmin ? "마이페이지" : "팀원 관리"}</span>
                 </button>
               )}
               <span className="portal-account-name hidden md:inline">{user.displayName || user.email}</span>
@@ -167,6 +170,7 @@ export default function GlobalPortalHeader() {
         </div>
       </header>
       {teamOpen && <TeamModal onClose={() => setTeamOpen(false)} />}
+      {myPageOpen && <MyPageModal onClose={() => setMyPageOpen(false)} />}
     </>
   );
 }
