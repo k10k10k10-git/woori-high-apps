@@ -27,12 +27,44 @@ describe('영구 personId', () => {
     expect(findHistoricalPersonId('staff', { name: '이동명', phone: '01033334444' }, roots)).toBeNull();
   });
 
-  it('학생은 생년월일과 본인 연락처가 모두 같은 유일한 과거 ID만 재사용한다', () => {
-    const roots = [{ 2025: { cls: { students: {
+  it('학생은 연락처가 달라도 이름·생년월일·부서·정상 진급이 유일한 과거 ID를 재사용한다', () => {
+    const roots = [{ 2025: { '1-2-6': { students: {
       one: { name: '김예원', birth: '2010-01-02', phone: '010-1111-2222', personId: 'person_student_fixed' },
     } } } }];
-    expect(findHistoricalStudentPersonId({ name: '김 예원', birth: '2010.01.02', phone: '01011112222' }, roots))
-      .toBe('person_student_fixed');
-    expect(findHistoricalStudentPersonId({ name: '김예원', birth: '2010.01.02', phone: '' }, roots)).toBeNull();
+    expect(findHistoricalStudentPersonId(
+      { name: '김 예원', birth: '2010.01.02', phone: '' },
+      roots,
+      { year: 2026, classKey: '1-3-4' },
+    )).toBe('person_student_fixed');
+  });
+
+  it('같은 연도에 이름·생년월일 후보가 둘이면 자동 재사용하지 않는다', () => {
+    const roots = [{
+      2025: {
+        '1-2-1': { students: { one: { name: '이동명', birth: '2010-01-02', personId: 'person_student_one' } } },
+        '1-2-2': { students: { two: { name: '이동명', birth: '2010-01-02', personId: 'person_student_two' } } },
+      },
+    }];
+    expect(findHistoricalStudentPersonId(
+      { name: '이동명', birth: '2010-01-02' },
+      roots,
+      { year: 2026, classKey: '1-3-1' },
+    )).toBeNull();
+  });
+
+  it('부서가 다르거나 정상 진급이 아니면 과거 ID를 재사용하지 않는다', () => {
+    const roots = [{ 2025: { '2-2-6': { students: {
+      one: { name: '김예원', birth: '2010-01-02', personId: 'person_student_fixed' },
+    } } } }];
+    expect(findHistoricalStudentPersonId(
+      { name: '김예원', birth: '2010-01-02' },
+      roots,
+      { year: 2026, classKey: '1-3-4' },
+    )).toBeNull();
+    expect(findHistoricalStudentPersonId(
+      { name: '김예원', birth: '2010-01-02' },
+      roots,
+      { year: 2026, classKey: '2-2-4' },
+    )).toBeNull();
   });
 });

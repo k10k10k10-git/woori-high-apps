@@ -380,7 +380,11 @@ export function buildSyncPayload(
       studentsObj[sid] = {
         id: sid,
         personId: matched?.personId
-          ?? findHistoricalStudentPersonId(st, historicalClasses ? [historicalClasses] : [])
+          ?? findHistoricalStudentPersonId(
+            st,
+            historicalClasses ? [historicalClasses] : [],
+            { year, classKey: pc.ck },
+          )
           ?? createPersonId('student'),
         num: st.num, name: st.name,
         ...(st.birth ? { birth: st.birth } : {}),

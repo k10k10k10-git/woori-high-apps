@@ -178,12 +178,56 @@ describe("인물 통합검색", () => {
     expect(results[0].records).toHaveLength(2);
   });
 
+  it("연락처가 변경되거나 누락되어도 이름·생년월일·부서·정상 진급이 유일하면 연결한다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2024: { "2-1-6": { students: { first: { name: "이수인", personId: "person_student_2024", birth: "2010-05-01" } } } },
+        2025: { "2-2-6": { students: { second: { name: "이수인", personId: "person_student_2025", birth: "2010.05.01", phone: "010-1111-2222" } } } },
+        2026: { "2-3-6": { students: { third: { name: "이수인", personId: "person_student_2026", birth: "2010-05-01", phone: "010-9999-8888" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    const results = searchPeople(buildPeopleProfiles(data), "이수인");
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ kinds: ["student"], ambiguous: false });
+    expect(results[0].records).toHaveLength(3);
+  });
+
+  it("생년월일이 같아도 부서가 다르거나 정상 진급이 아니면 연결하지 않는다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2024: { "1-1-1": { students: { first: { name: "진급확인", birth: "2010-05-01" } } } },
+        2025: { "2-2-1": { students: { otherDepartment: { name: "진급확인", birth: "2010-05-01" } } } },
+        2026: { "1-2-1": { students: { wrongGrade: { name: "진급확인", birth: "2010-05-01" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    expect(searchPeople(buildPeopleProfiles(data), "진급확인")).toHaveLength(3);
+  });
+
+  it("같은 이름·생년월일 후보가 같은 연도에 둘이면 다른 연도 기록도 자동 연결하지 않는다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2025: {
+          "1-2-1": { students: { first: { name: "중복후보", birth: "2010-05-01" } } },
+          "1-2-2": { students: { second: { name: "중복후보", birth: "2010-05-01" } } },
+        },
+        2026: { "1-3-1": { students: { third: { name: "중복후보", birth: "2010-05-01" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    expect(searchPeople(buildPeopleProfiles(data), "중복후보")).toHaveLength(3);
+  });
+
   it("같은 연도에 학생 ID가 다르면 생년월일과 본인 연락처가 같아도 분리한다", () => {
     const data: PeopleSearchData = {
       classes: {
         2026: {
-          "1-1-1": { students: { first: { name: "이동명", birth: "2011-01-02", phone: "010-2222-3333" } } },
-          "1-1-2": { students: { second: { name: "이동명", birth: "2011-01-02", phone: "010-2222-3333" } } },
+          "1-1-1": { students: { first: { name: "이동명", personId: "person_student_wrongly_shared", birth: "2011-01-02", phone: "010-2222-3333" } } },
+          "1-1-2": { students: { second: { name: "이동명", personId: "person_student_wrongly_shared", birth: "2011-01-02", phone: "010-2222-3333" } } },
         },
       },
       attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
@@ -202,6 +246,27 @@ describe("인물 통합검색", () => {
     };
 
     expect(searchPeople(buildPeopleProfiles(data), "전화변경")).toHaveLength(1);
+  });
+
+  it("대표 이름은 최신 출석부 이름을 우선하고 수련회 순번 접두어는 표시에서 제거한다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2024: { "1-1-2": { students: { old: { name: "이예원", personId: "person_student_fixed", birth: "2010-01-02" } } } },
+        2026: { "1-3-4": { students: { current: { name: "이예원", personId: "person_student_fixed", birth: "2010-01-02" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreatsPrivate: {},
+      retreats: {
+        winter: {
+          name: "2026 겨울수련회", year: 2026,
+          participants: { p1: { name: "134 이예원", studentId: "current", bu: "1부", grade: 3, class: 4 } },
+        },
+      },
+    };
+
+    const [result] = searchPeople(buildPeopleProfiles(data), "이예원");
+    expect(result.name).toBe("이예원");
+    expect(result.aliases).toEqual(["이예원"]);
+    expect(result.records).toHaveLength(3);
   });
 
   it("교사와 스탭 명단은 personId가 같아도 유형이 다르면 분리한다", () => {

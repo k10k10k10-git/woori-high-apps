@@ -48,7 +48,7 @@ This app owns:
 - The unified app may add one new-friend student only through its super-admin `registerNewFriendInRoster` flow. Preserve deterministic `nf_` IDs, duplicate blocking, the private pre-write snapshot, and single-student atomic updates; all existing-student edits, moves, deletes, and attendance writes remain owned here.
 - `RosterModal` is the intentional full-replace exception.
 - Do not compute and persist student numbering on every save; `sortAndRenumber()` handles display order.
-- Preserve `personId` on every student/teacher/staff edit, move, promotion, roster replacement, and sheet sync. New records receive a type-namespaced ID; historical reuse requires the unique strong-field rules in `src/utils/personId.ts`.
+- Preserve `personId` on every student/teacher/staff edit, move, promotion, roster replacement, and sheet sync. New records receive a type-namespaced ID; student historical reuse requires the unique name+birth+department+grade-progression rules in `src/utils/personId.ts`.
 - Admin roster writes must append `classes/{year}/{ck}/adminChanges/{changeId}` in the same root multi-location update. Store changed field labels, not old/new phone or address values; teacher attendance edits are not roster audit events.
 - Compress student photos with `compressImage()` before storing base64.
 - Preserve service worker exclusions for Firebase, Google APIs, `/_next/`, `/__nextjs`, and RSC payload files.
@@ -63,9 +63,9 @@ This app owns:
 
 ### 연도별 원본 키를 유지하며 영구 personId 보존하기 (2026-08-11)
 
-- **접근법**: 1→ `src/utils/personId.ts`에서 학생·교사·스탭 namespace ID 생성과 과거 강한 필드의 유일 후보 재사용을 순수 함수로 고정한다. 2→ 학생 추가·명단 교체·시트 동기화는 과거 이름+생년월일+본인 연락처가 모두 일치하는 유일한 학생 ID를 재사용하고, 편집·이동·진급은 기존 `personId`를 그대로 복사한다. 3→ 교사·스탭 편집은 기존 값을 보존하고 새 연도 레코드는 같은 유형의 이름+생년 또는 본인 연락처가 일치하는 유일한 과거 ID만 재사용한다. 4→ 기존 `id`·`pid`·출석 참조키를 바꾸지 않고 선택 필드 하나만 추가해 공유 앱 호환을 유지한다.
-- **판단 질문**: `classes/{year}` 키를 personId로 교체하거나 새 최상위 `people` 노드를 만들지 않는다. 전자는 출석·수련회·학기 참조를 전부 끊고, 후자는 배포된 Rules에 경로가 없어 즉시 거부된다. 보호자 연락처만 같은 학생도 형제일 수 있으므로 연결하지 않는다.
-- **재사용 규칙**: 연도별 원장을 세로로 연결할 때는 기존 업무 키를 유지하고 선택적 유형별 `personId`만 추가하며, 생성·이관·편집의 모든 저장 경로에서 그 필드를 보존하는 테스트를 함께 둔다.
+- **접근법**: 1→ `src/utils/personId.ts`에서 학생·교사·스탭 namespace ID 생성과 과거 후보 재사용을 순수 함수로 고정한다. 2→ 학생 추가·명단 교체·시트 동기화는 다른 연도의 정규화 이름+생년월일+같은 부서+정상 진급선(`학년 차이 === 연도 차이`)이 일치하고 매년 후보가 한 명뿐인 ID를 재사용하며, 편집·이동·진급은 기존 `personId`를 그대로 복사한다. 3→ 본인 연락처 변경·누락은 허용하지만 같은 연도 다른 ID가 하나라도 있으면 자동 재사용을 중단하고, 보호자 연락처는 근거로 쓰지 않는다. 4→ 교사·스탭은 기존 값을 보존하고 같은 유형의 이름+생년 또는 본인 연락처가 일치하는 유일한 과거 ID만 재사용한다. 5→ 기존 `id`·`pid`·출석 참조키를 바꾸지 않고 선택 필드 하나만 추가해 공유 앱 호환을 유지한다.
+- **판단 질문**: `classes/{year}` 키를 personId로 교체하거나 새 최상위 `people` 노드를 만들지 않는다. 전자는 출석·수련회·학기 참조를 전부 끊고, 후자는 배포된 Rules에 경로가 없어 즉시 거부된다. 연락처를 필수값으로 두면 번호 변경·누락 학생의 진급선이 끊기고, 보호자 연락처만 쓰면 형제를 합칠 수 있으므로 둘 다 학생 자동 연결의 기준으로 사용하지 않는다.
+- **재사용 규칙**: 연도별 학생 원장을 세로로 연결할 때는 `유형 분리 → 같은 연도 중복 차단 → 이름·생년·부서·진급선의 유일 후보 확인 → 기존 업무 키 유지 → 모든 생성·이관 경로에서 personId 보존` 순서와 회귀 테스트를 함께 적용한다.
 
 ### Rules 변경 없이 원장 수정과 교차 앱 행정 이력을 함께 보장하기 (2026-08-11)
 

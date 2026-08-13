@@ -88,9 +88,12 @@ type Evidence = {
   births: Set<string>;
   phones: Set<string>;
   parentPhones: Set<string>;
+  progressionIds: Set<string>;
   year: string;
   contextKey: string;
   anchor: boolean;
+  studentBu: number;
+  studentGrade: number;
   record: PersonRecord;
 };
 
@@ -101,6 +104,7 @@ type MutableProfile = {
   births: Set<string>;
   phones: Set<string>;
   parentPhones: Set<string>;
+  progressionIds: Set<string>;
   years: Set<string>;
   kinds: Set<PersonKind>;
   contexts: Set<string>;
@@ -117,6 +121,7 @@ const text = (value: unknown): string => {
 
 const digits = (value: unknown) => text(value).replace(/\D/g, "");
 const compactBirth = (value: unknown) => text(value).replace(/\D/g, "");
+const cleanDisplayName = (value: unknown) => text(value).replace(/^\d+\s*/, "").trim();
 
 function field(label: string, value: unknown, sensitive = false): PersonField | null {
   const rendered = text(value);
@@ -182,6 +187,8 @@ function evidence(input: {
   pPhone?: unknown;
   kind?: PersonKind;
   year?: unknown;
+  bu?: unknown;
+  grade?: unknown;
   contextKey: string;
   anchor?: boolean;
   record: PersonRecord;
@@ -196,9 +203,12 @@ function evidence(input: {
     normalizedName,
     kind,
     ...identity,
+    progressionIds: new Set<string>(),
     year: text(input.year),
     contextKey: input.contextKey,
     anchor: input.anchor ?? false,
+    studentBu: Number(input.bu) || 0,
+    studentGrade: Number(input.grade) || 0,
     record: input.record,
   };
 }
@@ -278,7 +288,8 @@ function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
         );
         const item = evidence({
           name, personId: student.personId, sourceId: sourceIdFor("student", year, studentId, parsed?.buNum), birth: student.birth,
-          phone: student.phone, pPhone: student.pphone ?? student.pPhone, kind: "student", year, contextKey: `class:${year}`, anchor: true,
+          phone: student.phone, pPhone: student.pphone ?? student.pPhone, kind: "student", year,
+          bu: parsed?.buNum, grade: parsed?.grade, contextKey: `class:${year}`, anchor: true,
           record: {
             id: `class:${year}:${classKey}:${studentId}`, category: "학적·출석", period: `${year}년`,
             title: parsed ? `${parsed.grade}학년 ${parsed.classNum}반` : classKey, fields: history, sortKey: `${year}-4`,
@@ -490,19 +501,48 @@ function intersects(a: Set<string>, b: Set<string>) {
   return false;
 }
 
+function assignStudentProgressionIds(items: Evidence[]) {
+  const byNameBirth = new Map<string, Evidence[]>();
+  for (const item of items) {
+    if (item.kind !== "student" || !item.anchor || item.births.size !== 1 || !item.year || !item.studentBu || !item.studentGrade) continue;
+    const birth = [...item.births][0];
+    const key = `${item.normalizedName}|${birth}`;
+    byNameBirth.set(key, [...(byNameBirth.get(key) ?? []), item]);
+  }
+
+  for (const [nameBirthKey, candidates] of byNameBirth) {
+    const byYear = new Map<string, Evidence[]>();
+    candidates.forEach((item) => byYear.set(item.year, [...(byYear.get(item.year) ?? []), item]));
+    if ([...byYear.values()].some((sameYear) => sameYear.length > 1)) continue;
+
+    const progressions = new Map<string, Evidence[]>();
+    for (const item of candidates) {
+      const key = `${item.studentBu}|${item.studentGrade - Number(item.year)}`;
+      progressions.set(key, [...(progressions.get(key) ?? []), item]);
+    }
+    for (const [progressionKey, progression] of progressions) {
+      if (progression.length < 2) continue;
+      const identity = `student-progression:${nameBirthKey}|${progressionKey}`;
+      progression.forEach((item) => item.progressionIds.add(identity));
+    }
+  }
+}
+
 function hasHardIdentityConflict(profile: MutableProfile, item: Evidence) {
   if (!profile.kinds.has(item.kind)) return true;
-  if (profile.personIds.size > 0 && item.personIds.size > 0 && !intersects(profile.personIds, item.personIds)) return true;
   if (item.kind === "student" && item.anchor && item.year) {
     const sameYearAnchor = profile.evidence.some((current) => current.anchor && current.year === item.year);
-    if (sameYearAnchor && !intersects(profile.sourceIds, item.sourceIds) && !intersects(profile.personIds, item.personIds)) return true;
+    if (sameYearAnchor && !intersects(profile.sourceIds, item.sourceIds)) return true;
   }
+  if (intersects(profile.sourceIds, item.sourceIds) || intersects(profile.progressionIds, item.progressionIds)) return false;
+  if (profile.personIds.size > 0 && item.personIds.size > 0 && !intersects(profile.personIds, item.personIds)) return true;
   return false;
 }
 
 function matchScore(profile: MutableProfile, item: Evidence) {
   if (hasHardIdentityConflict(profile, item)) return -1;
   if (intersects(profile.personIds, item.personIds)) return 1000;
+  if (intersects(profile.progressionIds, item.progressionIds)) return 750;
   if (intersects(profile.sourceIds, item.sourceIds)) return 500;
 
   const sameBirth = intersects(profile.births, item.births);
@@ -527,6 +567,7 @@ function attach(profile: MutableProfile, item: Evidence) {
   item.births.forEach((birth) => profile.births.add(birth));
   item.phones.forEach((phone) => profile.phones.add(phone));
   item.parentPhones.forEach((phone) => profile.parentPhones.add(phone));
+  item.progressionIds.forEach((id) => profile.progressionIds.add(id));
   if (item.year) profile.years.add(item.year);
   profile.kinds.add(item.kind);
   if (item.anchor) profile.contexts.add(item.contextKey);
@@ -540,6 +581,7 @@ function makeMutable(item: Evidence): MutableProfile {
     births: new Set<string>(),
     phones: new Set<string>(),
     parentPhones: new Set<string>(),
+    progressionIds: new Set<string>(),
     years: new Set<string>(),
     kinds: new Set<PersonKind>(),
     contexts: new Set<string>(),
@@ -554,6 +596,7 @@ export function buildPeopleProfiles(data: PeopleSearchData): PersonProfile[] {
   buildTeacherRosterEvidence(data, evidenceList);
   buildSemesterEvidence(data, evidenceList);
   buildRetreatEvidence(data, evidenceList);
+  assignStudentProgressionIds(evidenceList);
 
   const byName = new Map<string, Evidence[]>();
   evidenceList.forEach((item) => byName.set(item.normalizedName, [...(byName.get(item.normalizedName) ?? []), item]));
@@ -582,13 +625,19 @@ export function buildPeopleProfiles(data: PeopleSearchData): PersonProfile[] {
     }
 
     profiles.forEach((profile, index) => {
-      const aliases = [...new Set(profile.evidence.map((item) => item.name))].sort((a, b) => a.localeCompare(b, "ko"));
+      const aliases = [...new Set(profile.evidence.map((item) => cleanDisplayName(item.name)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "ko"));
       const records = profile.evidence.map((item) => item.record).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
       const classRecords = records.filter((record) => record.category === "학적·출석");
       const years = [...new Set(records.map((record) => record.period.match(/\d{4}/)?.[0]).filter((value): value is string => !!value))].sort().reverse();
       const personId = profile.personIds.size === 1 ? [...profile.personIds][0] : "";
+      const latestRosterName = profile.evidence
+        .filter((item) => item.kind === "student" && item.anchor && item.record.category === "학적·출석")
+        .sort((a, b) => Number(b.year) - Number(a.year))[0]?.name;
       output.push({
-        id: personId || `${normalizedName}-${index + 1}`, name: aliases[0] ?? normalizedName, aliases,
+        id: personId || `${normalizedName}-${index + 1}`,
+        name: cleanDisplayName(latestRosterName) || aliases[0] || normalizedName,
+        aliases,
         kinds: [...profile.kinds].sort(), records, years,
         latestClass: classRecords[0] ? `${classRecords[0].period} ${classRecords[0].title}` : undefined,
         ambiguous: profiles.length > 1,

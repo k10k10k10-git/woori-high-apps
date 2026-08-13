@@ -64,7 +64,11 @@ export default function RosterModal({ onClose }: { onClose: () => void }) {
       const students = sortAndRenumber(
         parsed.map((s, i) => ({
           id: `s_${base}_${i}_${Math.random().toString(36).slice(2, 6)}`,
-          personId: findHistoricalStudentPersonId(s, [historicalClasses]) ?? createPersonId('student'),
+          personId: findHistoricalStudentPersonId(
+            s,
+            [historicalClasses],
+            { year: state.curYear, classKey: ck, allowSameYearClassMatch: true },
+          ) ?? createPersonId('student'),
           name: s.name ?? '', birth: s.birth, phone: s.phone,
         }))
       );

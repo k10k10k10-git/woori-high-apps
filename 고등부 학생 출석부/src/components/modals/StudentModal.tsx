@@ -65,7 +65,11 @@ export default function StudentModal({
       let personId = student?.personId;
       if (!personId) {
         const allClassesSnap = await get(ref(db, 'classes'));
-        personId = findHistoricalStudentPersonId({ name, birth, phone }, [allClassesSnap.exists() ? allClassesSnap.val() : {}])
+        personId = findHistoricalStudentPersonId(
+          { name, birth, phone },
+          [allClassesSnap.exists() ? allClassesSnap.val() : {}],
+          { year: state.curYear, classKey: ck },
+        )
           ?? createPersonId('student');
       }
       const newStudent: Student = { id, personId, name: name.trim() };

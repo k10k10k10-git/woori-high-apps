@@ -38,6 +38,8 @@ function addRecord(records, input) {
     birth: compactBirth(input.value.birth),
     phone: digits(input.value.phone),
     personId: text(input.value.personId),
+    bu: Number(input.bu) || 0,
+    grade: Number(input.grade) || 0,
   });
 }
 
@@ -45,11 +47,14 @@ function collectStudents(classes) {
   const records = [];
   for (const [year, yearValue] of Object.entries(classes)) {
     for (const [classKey, classValue] of Object.entries(asRecord(yearValue))) {
+      const parsed = classKey.match(/^(1|2)-(\d+)-(\d+)$/);
       for (const [studentId, studentValue] of Object.entries(asRecord(asRecord(classValue).students))) {
         addRecord(records, {
           path: `classes/${year}/${classKey}/students/${studentId}`,
           year,
           kind: "student",
+          bu: parsed ? Number(parsed[1]) : 0,
+          grade: parsed ? Number(parsed[2]) : 0,
           value: asRecord(studentValue),
         });
       }
@@ -98,9 +103,14 @@ class UnionFind {
   }
 }
 
-function studentStrongKey(record) {
-  if (record.birth.length < 6 || record.phone.length < 8) return "";
-  return `${record.name}|${record.birth}|${record.phone}`;
+function studentNameBirthKey(record) {
+  if (record.birth.length < 6) return "";
+  return `${record.name}|${record.birth}`;
+}
+
+function studentProgressionKey(record) {
+  if (!record.bu || !record.grade || !record.year) return "";
+  return `${record.bu}|${record.grade - Number(record.year)}`;
 }
 
 function canMergeWorker(left, right) {
@@ -119,18 +129,18 @@ function deterministicPersonId(kind, canonicalPath) {
 function buildPlan(records) {
   const groups = new UnionFind(records.length);
   const ambiguousStudentIndexes = new Set();
-  const studentsByStrongKey = new Map();
+  const studentsByNameBirth = new Map();
 
   records.forEach((record, index) => {
     if (record.kind !== "student") return;
-    const key = studentStrongKey(record);
+    const key = studentNameBirthKey(record);
     if (!key) return;
-    const indexes = studentsByStrongKey.get(key) ?? [];
+    const indexes = studentsByNameBirth.get(key) ?? [];
     indexes.push(index);
-    studentsByStrongKey.set(key, indexes);
+    studentsByNameBirth.set(key, indexes);
   });
 
-  for (const indexes of studentsByStrongKey.values()) {
+  for (const indexes of studentsByNameBirth.values()) {
     const years = new Map();
     for (const index of indexes) {
       const values = years.get(records[index].year) ?? [];
@@ -141,7 +151,17 @@ function buildPlan(records) {
       indexes.forEach((index) => ambiguousStudentIndexes.add(index));
       continue;
     }
-    for (let index = 1; index < indexes.length; index += 1) groups.union(indexes[0], indexes[index]);
+    const progressions = new Map();
+    for (const index of indexes) {
+      const key = studentProgressionKey(records[index]);
+      if (!key) continue;
+      const values = progressions.get(key) ?? [];
+      values.push(index);
+      progressions.set(key, values);
+    }
+    for (const progression of progressions.values()) {
+      for (let index = 1; index < progression.length; index += 1) groups.union(progression[0], progression[index]);
+    }
   }
 
   for (let left = 0; left < records.length; left += 1) {
@@ -164,14 +184,31 @@ function buildPlan(records) {
   const countsByKind = {};
   const peopleByKind = {};
   let reusedPersonIds = 0;
+  let mergedExistingStudentGroups = 0;
+  let retiredStudentPersonIds = 0;
   for (const cluster of clusters.values()) {
     const existing = [...new Set(cluster.map((record) => record.personId).filter(Boolean))];
-    if (existing.length > 1) {
+    const canonical = [...cluster].sort((a, b) => a.path.localeCompare(b.path))[0];
+    if (existing.length > 1 && canonical.kind !== "student") {
       throw new Error(`서로 다른 기존 personId가 한 동일인 후보에 포함됐습니다: ${cluster.map((record) => record.path).join(", ")}`);
     }
-    const canonical = [...cluster].sort((a, b) => a.path.localeCompare(b.path))[0];
-    const personId = existing[0] || deterministicPersonId(canonical.kind, canonical.path);
-    if (existing.length === 1) reusedPersonIds += 1;
+    const existingStats = new Map();
+    cluster.forEach((record) => {
+      if (!record.personId) return;
+      const current = existingStats.get(record.personId) ?? { count: 0, firstPath: record.path };
+      existingStats.set(record.personId, {
+        count: current.count + 1,
+        firstPath: current.firstPath.localeCompare(record.path) <= 0 ? current.firstPath : record.path,
+      });
+    });
+    const personId = [...existingStats.entries()]
+      .sort(([, left], [, right]) => right.count - left.count || left.firstPath.localeCompare(right.firstPath))[0]?.[0]
+      || deterministicPersonId(canonical.kind, canonical.path);
+    if (existing.length >= 1) reusedPersonIds += 1;
+    if (canonical.kind === "student" && existing.length > 1) {
+      mergedExistingStudentGroups += 1;
+      retiredStudentPersonIds += existing.length - 1;
+    }
     peopleByKind[canonical.kind] = (peopleByKind[canonical.kind] ?? 0) + 1;
     for (const record of cluster) {
       personIdByPath.set(record.path, personId);
@@ -184,15 +221,17 @@ function buildPlan(records) {
     updates,
     personIdByPath,
     report: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       totalRecords: records.length,
       updatePaths: Object.keys(updates).length,
       countsByKind,
       peopleByKind,
       linkedRecordSavings: records.length - clusters.size,
       ambiguousStudentRecords: ambiguousStudentIndexes.size,
-      ambiguousStudentGroups: [...studentsByStrongKey.values()].filter((indexes) => indexes.some((index) => ambiguousStudentIndexes.has(index))).length,
+      ambiguousStudentGroups: [...studentsByNameBirth.values()].filter((indexes) => indexes.some((index) => ambiguousStudentIndexes.has(index))).length,
       reusedPersonIds,
+      mergedExistingStudentGroups,
+      retiredStudentPersonIds,
     },
   };
 }
