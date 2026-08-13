@@ -1,4 +1,4 @@
-import { get, onValue, push, ref, set, update } from "firebase/database";
+import { get, onValue, push, ref, remove, set, update } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import {
@@ -51,6 +51,11 @@ export async function resolveSiteRequest(
     resolutionNote: resolutionNote.trim() || null,
     notifiedAt: null,
   });
+}
+
+/** 통합관리자 전용: 다른 사용자 정보는 유지하고 선택한 요청 한 건만 삭제한다. */
+export async function deleteSiteRequest(ownerUid: string, requestId: string): Promise<void> {
+  await remove(ref(db, paths.siteRequest(ownerUid, requestId)));
 }
 
 export async function markSiteRequestNotified(ownerUid: string, requestId: string): Promise<void> {

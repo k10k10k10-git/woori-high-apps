@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
-import { resolveSiteRequest, subscribeToAdminSiteRequests } from "@/features/suggestions/db";
+import { deleteSiteRequest, resolveSiteRequest, subscribeToAdminSiteRequests } from "@/features/suggestions/db";
 import type { SiteRequest } from "@/features/suggestions/siteRequest";
 
 type Filter = "received" | "resolved" | "all";
+type BusyAction = { key: string; type: "resolve" | "delete" };
 
 function keyOf(request: SiteRequest) {
   return `${request.ownerUid}:${request.id}`;
@@ -24,12 +25,12 @@ function formatDate(value: number) {
 
 export default function SiteRequestsPanel() {
   const { user, memberName } = useAuth();
-  const { toast } = useUI();
+  const { toast, uiConfirm } = useUI();
   const [requests, setRequests] = useState<SiteRequest[]>([]);
   const [filter, setFilter] = useState<Filter>("received");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => subscribeToAdminSiteRequests(
@@ -49,7 +50,7 @@ export default function SiteRequestsPanel() {
 
   async function resolveRequest(request: SiteRequest) {
     const requestKey = keyOf(request);
-    setBusyKey(requestKey);
+    setBusyAction({ key: requestKey, type: "resolve" });
     try {
       await resolveSiteRequest(
         request.ownerUid,
@@ -61,7 +62,31 @@ export default function SiteRequestsPanel() {
     } catch (error) {
       toast(error instanceof Error ? error.message : "요청 상태를 저장하지 못했습니다.", "error");
     } finally {
-      setBusyKey(null);
+      setBusyAction(null);
+    }
+  }
+
+  async function deleteRequest(request: SiteRequest) {
+    const confirmed = await uiConfirm(
+      `“${request.title}” 요청을 삭제할까요? 첨부 파일과 해결 기록, 작성자에게 전달될 해결 알림도 함께 영구 삭제됩니다.`,
+    );
+    if (!confirmed) return;
+
+    const requestKey = keyOf(request);
+    setBusyAction({ key: requestKey, type: "delete" });
+    try {
+      await deleteSiteRequest(request.ownerUid, request.id);
+      setSelectedKey(null);
+      setNotes((current) => {
+        const next = { ...current };
+        delete next[requestKey];
+        return next;
+      });
+      toast("요청을 삭제했습니다.", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "요청을 삭제하지 못했습니다.", "error");
+    } finally {
+      setBusyAction(null);
     }
   }
 
@@ -172,20 +197,38 @@ export default function SiteRequestsPanel() {
                       placeholder="무엇을 반영했는지 간단히 남길 수 있습니다."
                     />
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => void resolveRequest(selected)}
-                    disabled={busyKey === keyOf(selected)}
-                    className="btn-primary mt-3 justify-center disabled:opacity-50"
-                  >
-                    {busyKey === keyOf(selected) ? "처리 중…" : "해결 완료"}
-                  </button>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void resolveRequest(selected)}
+                      disabled={busyAction?.key === keyOf(selected)}
+                      className="btn-primary justify-center disabled:opacity-50"
+                    >
+                      {busyAction?.key === keyOf(selected) && busyAction.type === "resolve" ? "처리 중…" : "해결 완료"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteRequest(selected)}
+                      disabled={busyAction?.key === keyOf(selected)}
+                      className="btn-secondary justify-center border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {busyAction?.key === keyOf(selected) && busyAction.type === "delete" ? "삭제 중…" : "요청 삭제"}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                   <p className="font-bold">{formatDate(selected.resolvedAt ?? selected.createdAt)} 해결 완료</p>
                   <p className="mt-1 text-xs text-emerald-700">처리: {selected.resolvedBy || "통합관리자"}{selected.notifiedAt ? ` · 사용자 알림 확인 ${formatDate(selected.notifiedAt)}` : " · 사용자 다음 로그인 알림 대기"}</p>
                   {selected.resolutionNote && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-white/70 p-3">{selected.resolutionNote}</p>}
+                  <button
+                    type="button"
+                    onClick={() => void deleteRequest(selected)}
+                    disabled={busyAction?.key === keyOf(selected)}
+                    className="btn-secondary mt-3 justify-center border-red-200 bg-white text-red-600 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {busyAction?.key === keyOf(selected) && busyAction.type === "delete" ? "삭제 중…" : "요청 삭제"}
+                  </button>
                 </div>
               )}
             </article>
