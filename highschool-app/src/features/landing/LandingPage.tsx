@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useState } from "react";
 import LoginButton from "@/components/LoginButton";
+import ThemeToggle from "@/components/ThemeToggle";
 import {
   LANDING_FEATURES,
   PROBLEMS,
@@ -30,7 +31,10 @@ function LandingHeader({ signIn }: { signIn: () => Promise<void> }) {
           <a href="#features">주요 기능</a>
           <a href="#for-whom">추천 대상</a>
         </nav>
-        <div className="landing-header-login"><LoginButton signIn={signIn} /></div>
+        <div className="landing-header-actions">
+          <ThemeToggle showLabel />
+          <div className="landing-header-login"><LoginButton signIn={signIn} /></div>
+        </div>
       </div>
     </header>
   );

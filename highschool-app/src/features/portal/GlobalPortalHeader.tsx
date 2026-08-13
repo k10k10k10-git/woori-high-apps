@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import TeamModal from "./TeamModal";
 import MyPageModal from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
+import ThemeToggle from "@/components/ThemeToggle";
 import { canAccessArea, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
@@ -155,6 +156,7 @@ export default function GlobalPortalHeader() {
 
           <div className="portal-header-tools">
             <div className="portal-account-row">
+              <ThemeToggle />
               {canManageRolesOf(roles) && (
                 <button onClick={() => siteRequestAdmin ? setMyPageOpen(true) : setTeamOpen(true)} className="portal-compact-action">
                   <span>{siteRequestAdmin ? "마이페이지" : "팀원 관리"}</span>

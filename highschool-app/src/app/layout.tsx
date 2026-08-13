@@ -20,8 +20,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var savedTheme = localStorage.getItem('woori-high-theme');
+              var theme = savedTheme === 'light' || savedTheme === 'dark'
+                ? savedTheme
+                : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+              document.documentElement.dataset.theme = theme;
+              document.documentElement.style.colorScheme = theme;
+            } catch (_) {
+              document.documentElement.dataset.theme = 'light';
+              document.documentElement.style.colorScheme = 'light';
+            }
+          })();
+        `}} />
         {/*
           dangerouslySetInnerHTML 사용 이유:
           카카오톡, 네이버 등 인앱 브라우저에서 Firebase Auth(Google OAuth)가

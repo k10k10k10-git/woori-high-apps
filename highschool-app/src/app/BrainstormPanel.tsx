@@ -262,11 +262,11 @@ export default function BrainstormPanel({ authorName }: Props) {
       </div>
 
       {/* ── 캔버스 (가로 스크롤 가능) ── */}
-      <div className="rounded-2xl overflow-auto shadow-sm" style={{ border: "1px solid #e2e8f0", maxHeight: 620 }}>
+      <div className="brainstorm-shell rounded-2xl overflow-auto shadow-sm" style={{ border: "1px solid #e2e8f0", maxHeight: 620 }}>
         <div
           ref={canvasRef}
           onDoubleClick={handleCanvasDoubleClick}
-          className="relative"
+          className="brainstorm-canvas relative"
           style={{
             width: CANVAS_W,
             height: CANVAS_H,
@@ -303,7 +303,7 @@ export default function BrainstormPanel({ authorName }: Props) {
                 onPointerDown={e => handleCardPointerDown(e, note)}
                 onPointerMove={handleCardPointerMove}
                 onPointerUp={handleCardPointerUp}
-                className="absolute rounded-xl select-none group"
+                className="brainstorm-note absolute rounded-xl select-none group"
                 style={{
                   left: pos.x, top: pos.y, width: CARD_W,
                   background: c.bg,
@@ -414,7 +414,7 @@ export default function BrainstormPanel({ authorName }: Props) {
           {/* ── 새 카드 composer ── */}
           {composerPos && (
             <div
-              className="absolute rounded-xl p-3"
+              className="brainstorm-note absolute rounded-xl p-3"
               style={{
                 left: composerPos.x, top: composerPos.y, width: CARD_W, zIndex: 60,
                 background: NOTE_COLORS[draftColor].bg,
