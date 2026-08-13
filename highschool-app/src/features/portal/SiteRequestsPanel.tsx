@@ -164,7 +164,17 @@ export default function SiteRequestsPanel() {
                   <h4 className="mt-3 break-words text-xl font-bold text-slate-950">{selected.title}</h4>
                   <p className="mt-2 text-xs text-slate-500">{selected.anonymous ? "익명 요청" : `${selected.reporterName || "이름 미확인"} · ${selected.roleLabel || "권한 미확인"}`} · {formatDate(selected.createdAt)}</p>
                 </div>
-                <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${selected.status === "resolved" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{selected.status === "resolved" ? "해결 완료" : "처리 대기"}</span>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${selected.status === "resolved" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{selected.status === "resolved" ? "해결 완료" : "처리 대기"}</span>
+                  <button
+                    type="button"
+                    onClick={() => void deleteRequest(selected)}
+                    disabled={busyAction?.key === keyOf(selected)}
+                    className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {busyAction?.key === keyOf(selected) && busyAction.type === "delete" ? "삭제 중…" : "요청 삭제"}
+                  </button>
+                </div>
               </div>
 
               <div className="mt-5 space-y-5 text-sm leading-6 text-slate-700">
@@ -197,7 +207,7 @@ export default function SiteRequestsPanel() {
                       placeholder="무엇을 반영했는지 간단히 남길 수 있습니다."
                     />
                   </label>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:flex">
                     <button
                       type="button"
                       onClick={() => void resolveRequest(selected)}
