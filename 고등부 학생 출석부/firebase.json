@@ -8,9 +8,82 @@
       "node tools/update-cache-version.js out/sw.js"
     ],
     "public": "out",
+    "cleanUrls": true,
     "headers": [
       {
         "source": "/sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/attendance",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/manage",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/stats",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/overall",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/admin",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.txt",
         "headers": [
           {
             "key": "Cache-Control",

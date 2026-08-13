@@ -75,9 +75,9 @@ This app owns:
 
 ### 같은 날 Firebase Hosting 재배포가 이전 화면으로 남는 문제 (2026-08-13)
 
-- **접근법**: 1→ 운영 `https://woori-high.web.app/sw.js`와 `public/sw.js`의 `CACHE_NAME`을 비교한다. 2→ 날짜만 쓰는 `tools/update-cache-version.js`를 배포마다 다른 밀리초 버전으로 바꾸고, 추적 파일이 더러워지지 않도록 `firebase.json` predeploy를 `npm run build → out/sw.js 버전 교체` 순서로 실행한다. 3→ `/sw.js`에 `no-cache, no-store, must-revalidate` 헤더를 적용하고 `AppShell.tsx` 등록에 `updateViaCache: 'none'`과 `registration.update()`를 연결한다. 4→ 같은 날짜의 두 버전을 연속 교체하는 회귀 테스트와 운영 응답 헤더·캐시 이름으로 재검증한다.
-- **판단 질문**: 사용자에게 강력 새로고침만 안내하거나 날짜 문자열을 유지하지 않는다. 전자는 다음 배포에도 반복되고, 후자는 같은 날 여러 번 배포하면 새 서비스워커의 install/activate와 `NEW_VERSION` 알림이 발생하지 않는다. `public/sw.js`에 매번 타임스탬프를 직접 쓰지도 않는다 — 배포할 때마다 추적 파일이 불필요하게 변경되므로 빌드 산출물 `out/sw.js`만 수정한다.
-- **재사용 규칙**: PWA 배포 후 화면이 그대로면 코드보다 먼저 `운영 sw.js의 캐시 이름 → sw.js HTTP 캐시 헤더 → 배포 산출물 생성 순서`를 확인하고, 캐시 버전은 날짜가 아니라 배포마다 고유하게 만든다.
+- **접근법**: 1→ 운영 `https://woori-high.web.app/sw.js`와 `public/sw.js`의 `CACHE_NAME`을 비교한다. 2→ 날짜만 쓰는 `tools/update-cache-version.js`를 배포마다 다른 밀리초 버전으로 바꾸고, 추적 파일이 더러워지지 않도록 `firebase.json` predeploy를 `npm run build → out/sw.js 버전 교체` 순서로 실행한다. 3→ `/sw.js`에 `no-cache, no-store, must-revalidate` 헤더를 적용하고 `AppShell.tsx` 등록에 `updateViaCache: 'none'`과 `registration.update()`를 연결한다. 4→ `/`, `/attendance`, `/stats` 응답의 ETag가 모두 같으면 rewrite가 `index.html`을 돌려주는지 확인하고, `cleanUrls: true`와 HTML·Next 라우트 `*.txt`의 `no-cache`를 적용한다. 5→ 같은 날짜의 두 캐시 버전 교체 테스트와 운영 주소의 ETag·헤더·실제 DOM으로 재검증한다.
+- **판단 질문**: 사용자에게 강력 새로고침만 안내하거나 날짜 문자열을 유지하지 않는다. 전자는 다음 배포에도 반복되고, 후자는 같은 날 여러 번 배포하면 새 서비스워커의 install/activate와 `NEW_VERSION` 알림이 발생하지 않는다. 서비스워커만 고치고 HTML·`*.txt`의 기본 `max-age=3600`을 남기지도 않는다 — Next 클라이언트 라우팅은 이 이전 문서가 가리키는 낡은 청크를 계속 불러온다. `public/sw.js`에 매번 타임스탬프를 직접 쓰지도 않는다 — 배포할 때마다 추적 파일이 불필요하게 변경되므로 빌드 산출물 `out/sw.js`만 수정한다.
+- **재사용 규칙**: PWA 배포 후 화면이 그대로면 `운영 sw.js 캐시 이름 → 화면 경로별 ETag → HTML·라우트 txt 캐시 헤더 → cleanUrls/rewrite 우선순위 → 실제 브라우저 DOM` 순서로 확인하고, 캐시 버전은 배포마다 고유하게 만든다.
 
 ## Commands
 
