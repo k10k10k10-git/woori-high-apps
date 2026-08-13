@@ -193,7 +193,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
 
       {session?.type === "휴강" && (
         <div className="mb-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-          이 회차는 휴강입니다 — 출석 집계(만점)에서 제외됩니다.
+          이 회차는 휴강입니다 - 출석 집계(만점)에서 제외됩니다.
         </div>
       )}
 

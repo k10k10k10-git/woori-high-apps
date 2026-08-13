@@ -702,7 +702,7 @@ export async function registerNewFriendInRoster(
 
   const duplicate = findNewFriendDuplicate(classes, friend, priv);
   if (duplicate) {
-    throw new Error(`${duplicate.name} 학생이 ${duplicate.classKey}에 있습니다. ${duplicate.reason} — 자동 반영을 중단했습니다.`);
+    throw new Error(`${duplicate.name} 학생이 ${duplicate.classKey}에 있습니다. ${duplicate.reason} - 자동 반영을 중단했습니다.`);
   }
 
   const syncedAt = nowISO();

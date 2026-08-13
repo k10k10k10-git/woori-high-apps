@@ -314,11 +314,11 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
             </div>
             <div className="flex items-start gap-2">
               <span className="w-12 shrink-0 text-xs font-semibold text-slate-500">학생</span>
-              <span className="text-xs leading-relaxed text-slate-700">{selection.room.studentNames.join(", ") || "—"}</span>
+              <span className="text-xs leading-relaxed text-slate-700">{selection.room.studentNames.join(", ") || "-"}</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="w-12 shrink-0 text-xs font-semibold text-emerald-600">교사</span>
-              <span className="text-xs leading-relaxed text-slate-700">{selection.room.teacherNames.join(", ") || "—"}</span>
+              <span className="text-xs leading-relaxed text-slate-700">{selection.room.teacherNames.join(", ") || "-"}</span>
             </div>
           </div>
         </aside>,

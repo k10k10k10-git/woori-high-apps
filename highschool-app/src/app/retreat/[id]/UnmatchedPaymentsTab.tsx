@@ -70,13 +70,13 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
     }, (error) => setLoadError(error.message));
 
     const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubColors   = subscribeToCellColors(retreat.id, setCellColors_,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubPayments = subscribeToUnmatchedPayments(retreat.id, list => {
       setPayments(list);
       setLoading(false);
-    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
+    }, e => { setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); setLoading(false); });
     return () => { unsubClasses(); unsubParticipants(); unsubColors(); unsubPayments(); };
   }, [retreat.id, retreat.year]);
 
@@ -304,9 +304,9 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                       <td className="px-2 sm:px-3 py-2 font-semibold text-slate-800">{p.name}</td>
                       <td className="px-2 sm:px-3 py-2 text-slate-500 text-xs">
                         {p.grade ? `${p.grade}학년` : ""}{p.class ? ` ${p.class}반` : ""}
-                        {!p.grade && !p.class ? "—" : ""}
+                        {!p.grade && !p.class ? "-" : ""}
                       </td>
-                      <td className="px-2 sm:px-3 py-2 text-slate-500 text-xs hidden sm:table-cell">{p.phone || "—"}</td>
+                      <td className="px-2 sm:px-3 py-2 text-slate-500 text-xs hidden sm:table-cell">{p.phone || "-"}</td>
                       <td className="px-2 sm:px-3 py-2">
                         <span className="text-[10px] sm:text-xs bg-slate-100 text-slate-500 px-1.5 sm:px-2 py-0.5 rounded-full border border-slate-200">
                           미처리
@@ -332,9 +332,9 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                     <td className="px-2 sm:px-3 py-2 font-medium text-slate-400">{p.name}</td>
                     <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs">
                       {p.grade ? `${p.grade}학년` : ""}{p.class ? ` ${p.class}반` : ""}
-                      {!p.grade && !p.class ? "—" : ""}
+                      {!p.grade && !p.class ? "-" : ""}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs hidden sm:table-cell">{p.phone || "—"}</td>
+                    <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs hidden sm:table-cell">{p.phone || "-"}</td>
                     <td className="px-2 sm:px-3 py-2">
                       {status === "blue" ? (
                         <span className="text-[10px] sm:text-xs bg-blue-100 text-blue-600 px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-200">

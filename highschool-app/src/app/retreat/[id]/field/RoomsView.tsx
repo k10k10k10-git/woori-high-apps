@@ -94,12 +94,12 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
     if (data.length === 0) return toast("조편성 데이터가 없습니다.", "warning");
     const chips = (arr: RoomChip[]) => arr.length
       ? escapeHtml(arr.map(c => `${c.roomNumber}(${c.count}) · ${c.studentNames.join(", ")}`).join(" / "))
-      : "—";
+      : "-";
     let html = `<h1>조장용 방배정표</h1><div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · 출력 ${new Date().toLocaleString("ko-KR")}</div>
       <table><thead><tr><th>조</th><th>교사</th><th>조장</th><th>스탭</th><th>당일참석</th><th>GBS 장소</th><th>남자 숙소</th><th>여자 숙소</th></tr></thead><tbody>`;
     data.forEach(d => {
-      const dayVisitors = d.dayVisitors.map(visitor => `${visitor.name}(${visitor.day ?? "?"}일차)`).join(", ") || "—";
-      html += `<tr><td>${escapeHtml(d.group.bu)} ${escapeHtml(groupDisplayName(d.group, groups))}</td><td>${escapeHtml(d.teachers.join(", ") || "—")}</td><td>${escapeHtml(d.leader.join(", ") || "—")}</td><td>${escapeHtml(d.staff.join(", ") || "—")}</td><td>${escapeHtml(dayVisitors)}</td><td>${escapeHtml(d.gbs || "—")}</td><td>${chips(d.nam)}${d.etc.length ? " / " + chips(d.etc) : ""}</td><td>${chips(d.yeo)}</td></tr>`;
+      const dayVisitors = d.dayVisitors.map(visitor => `${visitor.name}(${visitor.day ?? "?"}일차)`).join(", ") || "-";
+      html += `<tr><td>${escapeHtml(d.group.bu)} ${escapeHtml(groupDisplayName(d.group, groups))}</td><td>${escapeHtml(d.teachers.join(", ") || "-")}</td><td>${escapeHtml(d.leader.join(", ") || "-")}</td><td>${escapeHtml(d.staff.join(", ") || "-")}</td><td>${escapeHtml(dayVisitors)}</td><td>${escapeHtml(d.gbs || "-")}</td><td>${chips(d.nam)}${d.etc.length ? " / " + chips(d.etc) : ""}</td><td>${chips(d.yeo)}</td></tr>`;
     });
     html += `</tbody></table>`;
     printAsPDF(html, "조장용-방배정표", true);
@@ -163,9 +163,9 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
               <span className="px-2 py-0.5 mr-2 rounded text-xs bg-slate-200 text-slate-600">{d.group.bu}</span>{groupDisplayName(d.group, groups)}
             </h3>
             <div className="space-y-1.5 text-sm">
-              <InfoRow label="교사" cls="text-slate-600">{d.teachers.length ? d.teachers.join(", ") : <span className="text-slate-300">—</span>}</InfoRow>
-              <InfoRow label="조장" cls="text-emerald-600">{d.leader.length ? d.leader.join(", ") : <span className="text-slate-300">—</span>}</InfoRow>
-              <InfoRow label="스탭" cls="text-slate-600">{d.staff.length ? d.staff.join(", ") : <span className="text-slate-300">—</span>}</InfoRow>
+              <InfoRow label="교사" cls="text-slate-600">{d.teachers.length ? d.teachers.join(", ") : <span className="text-slate-300">-</span>}</InfoRow>
+              <InfoRow label="조장" cls="text-emerald-600">{d.leader.length ? d.leader.join(", ") : <span className="text-slate-300">-</span>}</InfoRow>
+              <InfoRow label="스탭" cls="text-slate-600">{d.staff.length ? d.staff.join(", ") : <span className="text-slate-300">-</span>}</InfoRow>
               {d.dayVisitors.length > 0 && (
                 <InfoRow label="당일참석" cls="text-violet-600">
                   <span className="flex flex-wrap gap-1">
@@ -177,7 +177,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
                   </span>
                 </InfoRow>
               )}
-              <InfoRow label="GBS 장소" cls="text-indigo-600">{d.gbs ? d.gbs : <span className="text-slate-300">—</span>}</InfoRow>
+              <InfoRow label="GBS 장소" cls="text-indigo-600">{d.gbs ? d.gbs : <span className="text-slate-300">-</span>}</InfoRow>
               <RoomRow label="남자 숙소" cls="text-fuchsia-700" chips={[...d.nam, ...d.etc]} />
               <RoomRow label="여자 숙소" cls="text-rose-500" chips={d.yeo} />
               <InfoRow label="버스" cls="text-sky-600">
@@ -189,7 +189,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
                       </span>
                     ))}
                   </span>
-                ) : <span className="text-slate-300">—</span>}
+                ) : <span className="text-slate-300">-</span>}
               </InfoRow>
             </div>
             {d.unassigned > 0 && (
@@ -218,7 +218,7 @@ function RoomRow({ label, cls, chips }: { label: string; cls: string; chips: Roo
     <div className="flex items-start gap-2">
       <span className={`text-xs font-medium w-[4.5rem] shrink-0 ${cls}`}>{label}</span>
       <div className="flex flex-wrap gap-1">
-        {chips.length === 0 ? <span className="text-slate-300 text-xs">—</span> :
+        {chips.length === 0 ? <span className="text-slate-300 text-xs">-</span> :
           chips.map((c, i) => (
             <span key={i} className="max-w-full rounded border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700">
               <span className="flex items-center gap-1 font-medium">

@@ -225,7 +225,7 @@ export default function MedicalLogTab({ retreat }: Props) {
     try {
       const unsub = subscribeToMedicalLogs(retreat.id, list => {
         if (alive) setLogs(list);
-      }, e => { if (alive) setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); });
+      }, e => { if (alive) setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); });
       return () => { alive = false; unsub(); unsubPresets(); unsubParticipants(); };
     } catch (e) {
       if (alive) setLoadError(e instanceof Error ? e.message : "의료 기록을 불러오지 못했습니다.");

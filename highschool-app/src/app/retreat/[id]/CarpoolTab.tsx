@@ -281,10 +281,10 @@ export default function CarpoolTab({ retreat }: Props) {
                   <td className="px-4 py-2.5 font-medium text-slate-800">{c.studentName}</td>
                   <td className="px-4 py-2.5">
                     <span className={`tag ${c.bu === "1부" ? "tag-green" : "tag-purple"} mr-1`}>{c.bu}</span>
-                    <span className="text-slate-600">{c.grade > 0 ? `${c.grade}학년 ${c.class}반` : "—"}</span>
+                    <span className="text-slate-600">{c.grade > 0 ? `${c.grade}학년 ${c.class}반` : "-"}</span>
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{c.desiredTime}</td>
-                  <td className="px-4 py-2.5 text-slate-500 text-xs">{c.location || "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-500 text-xs">{c.location || "-"}</td>
                   <td className="px-4 py-2.5">
                     {c.teacherDriver
                       ? <span className="tag tag-purple">{c.teacherDriver}</span>

@@ -162,10 +162,10 @@ export default function GroupsTab({ retreat }: Props) {
         setUnassigned(excludeAssignedStudents(ids, prev));
         return prev;
       });
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: cell colors
-    unsubs.push(subscribeToCellColors(retreat.id, setCellColors, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    unsubs.push(subscribeToCellColors(retreat.id, setCellColors, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: teachers
     unsubs.push(subscribeToTeachers(retreat.id, (teachers) => {
@@ -173,7 +173,7 @@ export default function GroupsTab({ retreat }: Props) {
       const sm: Record<string, string> = {};
       teachers.forEach(t => { sm[t.name] = t.status; });
       setTeacherStatusMap(sm);
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: groups
     unsubs.push(subscribeToGroups(retreat.id, (newGroups) => {
@@ -196,9 +196,9 @@ export default function GroupsTab({ retreat }: Props) {
         latestRemoteGroupsRef.current = newGroups;
         setRemoteUpdated(true);
       }
-    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); }));
+    }, e => { setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); setLoading(false); }));
 
-    unsubs.push(subscribeToIguardGroupStaff(retreat.id, setIguardGroupStaff, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    unsubs.push(subscribeToIguardGroupStaff(retreat.id, setIguardGroupStaff, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     return () => { unsubs.forEach(fn => fn()); initialLoaded.current = false; };
   }, [retreat.id, retreat.year]);
@@ -435,7 +435,7 @@ export default function GroupsTab({ retreat }: Props) {
       .chk    { display: inline-block; width: 8px; height: 8px; border: 1px solid #64748b; border-radius: 1px; }
       .badge  { font-size: 5.5px; font-weight: 700; background: rgba(0,0,0,0.08); border-radius: 2px; padding: 0 1px; margin-left: 1px; color: #475569; vertical-align: middle; }
 
-      /* 반 구분선 — 반이 바뀌는 첫 행에 두꺼운 위쪽 테두리 */
+      /* 반 구분선 - 반이 바뀌는 첫 행에 두꺼운 위쪽 테두리 */
       tr.cls-div td { border-top: 2px solid #64748b !important; }
 
       /* 행 색상 */

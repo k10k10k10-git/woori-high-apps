@@ -84,7 +84,7 @@ export default function CompletionTab({ sid, meta, sessions, applications, teamB
           수료 {completedCount} / {rows.length}명
         </span>
         <span className="text-slate-500">
-          기준: 출석점수 {Math.round(minRate * 100)}% 이상 (출석2·지각1, 휴강 제외 — 설정에서 변경)
+          기준: 출석점수 {Math.round(minRate * 100)}% 이상 (출석2·지각1, 휴강 제외 - 설정에서 변경)
         </span>
       </div>
 

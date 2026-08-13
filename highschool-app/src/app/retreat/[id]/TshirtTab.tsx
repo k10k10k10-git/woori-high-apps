@@ -94,7 +94,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
       const unsub = subscribeToTshirtOrders(retreat.id, list => {
         setOrders(list);
         setLoading(false);
-      }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
+      }, e => { setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); setLoading(false); });
       return unsub;
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
@@ -466,7 +466,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
                       }`}>{o.bu}</span>
                     </td>
                     <td className="px-4 py-2.5 text-slate-500 text-xs">
-                      {o.grade > 0 ? `${o.grade}학년 ${o.class}반` : "—"}
+                      {o.grade > 0 ? `${o.grade}학년 ${o.class}반` : "-"}
                     </td>
 
                     {/* 디자인 셀 */}
@@ -505,7 +505,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
                           placeholder="메모"
                           onChange={e => setEditForm(p => ({ ...p, note: e.target.value }))} />
                       ) : (
-                        o.note || "—"
+                        o.note || "-"
                       )}
                     </td>
 

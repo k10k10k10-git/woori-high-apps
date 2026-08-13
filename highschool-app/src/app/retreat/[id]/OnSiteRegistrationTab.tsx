@@ -75,17 +75,17 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       setLoading(false);
     }, (error) => { setLoadError(error.message); setLoading(false); });
     const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubCellColors = subscribeToCellColors(retreat.id, setCellColors,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubOnSite = subscribeToOnSiteReg(retreat.id, setOnSiteReg,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubGroups = subscribeToGroups(retreat.id, setGroups,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubTeachers = subscribeToTeachers(retreat.id, setTeachers,
-      e => setLoadError(prev => prev ?? `교사 명단 구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `교사 명단 구독 실패 - ${e.message}`));
     const unsubPartial = subscribeToPartialAttendances(retreat.id, setPartialAttendances,
-      e => setLoadError(prev => prev ?? `부분참 명단 구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `부분참 명단 구독 실패 - ${e.message}`));
     const unsubConn = subscribeToConnection(setConnected);
     return () => {
       unsubClasses(); unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups();
@@ -480,8 +480,8 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                                   disabled={isPending}
                                   title={
                                     m.isOnSite ? `${m.name} (현장추가)${groupName ? ` · ${groupName}` : ""}`
-                                    : m.registered ? `${m.name} — 클릭하여 등록 취소${m.status ? ` · ${m.status.label}` : ""}${groupName ? ` · ${groupName}` : ""}`
-                                    : `${m.name} — 클릭하여 등록${m.status ? ` · ${m.status.label}` : ""}${groupName ? ` · ${groupName}` : ""}`
+                                    : m.registered ? `${m.name} - 클릭하여 등록 취소${m.status ? ` · ${m.status.label}` : ""}${groupName ? ` · ${groupName}` : ""}`
+                                    : `${m.name} - 클릭하여 등록${m.status ? ` · ${m.status.label}` : ""}${groupName ? ` · ${groupName}` : ""}`
                                   }
                                   className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors inline-flex items-center gap-1 ${
                                     isPending ? "opacity-40 cursor-wait" :

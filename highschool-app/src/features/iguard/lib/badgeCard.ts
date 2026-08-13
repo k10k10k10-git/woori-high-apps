@@ -181,7 +181,7 @@ export function buildBadgeCard(staffId: string, input: BadgeCardInput): BadgeCar
 }
 
 function row(label: string, value: string): string {
-  return `<div class="badge-row"><b>${escapeHtml(label)}</b><span>${escapeHtml(value || "—")}</span></div>`;
+  return `<div class="badge-row"><b>${escapeHtml(label)}</b><span>${escapeHtml(value || "-")}</span></div>`;
 }
 
 export function splitGbsPrintColumns(
@@ -212,7 +212,7 @@ function gbsGrid(items: BadgeCardData["gbs"]): string {
     .join("");
   return `<div class="badge-row badge-gbs-row">
     <b>GBS 장소</b>
-    <div class="badge-gbs-grid">${columns || '<span class="badge-empty">—</span>'}</div>
+    <div class="badge-gbs-grid">${columns || '<span class="badge-empty">-</span>'}</div>
   </div>`;
 }
 
@@ -234,7 +234,7 @@ function timelineGrid(items: BadgeCardData["timeline"]): string {
   }).join("");
   return `<div class="badge-timeline-row">
     <b>전체 일정</b>
-    <div class="badge-timeline-grid">${columns || '<span class="badge-empty">—</span>'}</div>
+    <div class="badge-timeline-grid">${columns || '<span class="badge-empty">-</span>'}</div>
   </div>`;
 }
 

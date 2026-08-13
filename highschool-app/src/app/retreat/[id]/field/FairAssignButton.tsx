@@ -32,7 +32,7 @@ export default function FairAssignButton({ retreatId, groups, meals, seatings }:
         ...r.seatings.map(s => updateIguardSeating(retreatId, s.id, { zones: s.zones })),
       ]);
       setResult(r);
-      toast(`공정 배정 완료 — 식사 ${r.counts.meals}개 · 집회 ${r.counts.seatings}개`, "success");
+      toast(`공정 배정 완료 - 식사 ${r.counts.meals}개 · 집회 ${r.counts.seatings}개`, "success");
     } catch (e) {
       toast(`배정 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {

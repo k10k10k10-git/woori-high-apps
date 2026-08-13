@@ -245,7 +245,7 @@ export default function InsuranceTab({ retreat }: Props) {
                       t.bu === "2부" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
                     }`}>{t.bu}</span>
                   </td>
-                  <td className="px-4 py-2 text-slate-500 text-xs">{t.classKey || "—"}</td>
+                  <td className="px-4 py-2 text-slate-500 text-xs">{t.classKey || "-"}</td>
                   <td className="px-4 py-2">
                     <input
                       className="input font-mono text-sm py-1"

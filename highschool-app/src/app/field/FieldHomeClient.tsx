@@ -87,7 +87,7 @@ export default function FieldHomeClient() {
     if (!user || !fieldAllowed) return;
     const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
     return subscribeToAllRetreatPeriods(ids, setPeriods,
-      (error) => setLoadError((previous) => previous ?? `수련회 기간 구독 실패 — ${error.message}`));
+      (error) => setLoadError((previous) => previous ?? `수련회 기간 구독 실패 - ${error.message}`));
   }, [user, fieldAllowed, retreatIdsKey]);
 
   // 승인 사용자에게 수련회별 PIN 잠금 상태를 표시한다. 실제 PIN 검증은 내부 화면 진입 전에 다시 수행한다.
@@ -95,7 +95,7 @@ export default function FieldHomeClient() {
     if (!user || !fieldAllowed) { setAccessLocks({}); return; }
     const ids = retreats.map(r => r.id);
     return subscribeToIguardAccessLocks(ids, setAccessLocks,
-      e => setLoadError(prev => prev ?? `PIN 잠금 상태 구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `PIN 잠금 상태 구독 실패 - ${e.message}`));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, fieldAllowed, retreats.map(r => r.id).join(",")]);
 
@@ -136,7 +136,7 @@ export default function FieldHomeClient() {
         // 사용자가 팝업을 직접 닫은 경우는 조용히 — 그 외(팝업 차단·네트워크 등)는 안내해야 현장에서 "눌러도 무반응"이 안 된다.
         const code = (e as { code?: string })?.code ?? "";
         if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
-        toast(`로그인 실패 — ${code === "auth/popup-blocked" ? "브라우저가 팝업을 차단했습니다. 팝업 허용 후 다시 시도해주세요." : (e instanceof Error ? e.message : String(e))}`, "error");
+        toast(`로그인 실패 - ${code === "auth/popup-blocked" ? "브라우저가 팝업을 차단했습니다. 팝업 허용 후 다시 시도해주세요." : (e instanceof Error ? e.message : String(e))}`, "error");
       })} className="btn-primary px-6 py-3 text-base">Google 계정으로 로그인</button>
       <p className="text-xs text-slate-500 mt-4 text-center max-w-xs">처음이면 로그인 후 <strong>접근 요청</strong>을 보내면 관리자가 승인합니다.</p>
     </div>

@@ -139,16 +139,16 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   useEffect(() => {
     void load();
     const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubParts = subscribeToParticipants(retreat.id, (parts) => {
       setParticipants(Object.values(parts));
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubPartial = subscribeToPartialAttendances(retreat.id, (list) => {
       setPartialMap(buildPartialMap(list));
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubClasses = subscribeToClassesByYear(retreat.year, (next) => {
       setClasses(buildClassInfos(next));
-    }, e => setLoadError(prev => prev ?? `출석부 반 구독 실패 — ${e.message}`));
+    }, e => setLoadError(prev => prev ?? `출석부 반 구독 실패 - ${e.message}`));
     return () => { unsubColors(); unsubParts(); unsubPartial(); unsubClasses(); };
   }, [load, retreat.id, retreat.year]);
 
@@ -450,7 +450,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     ).join("");
 
     const teacherHeader = visibleClasses.map(cls =>
-      `<th style="${C};padding:2px 3px;background:#f8fafc;font-size:8px;font-weight:400;text-align:center;color:#64748b;white-space:nowrap;overflow:hidden;max-width:48px">${escapeHtml(cls.teacher || "—")}</th>`
+      `<th style="${C};padding:2px 3px;background:#f8fafc;font-size:8px;font-weight:400;text-align:center;color:#64748b;white-space:nowrap;overflow:hidden;max-width:48px">${escapeHtml(cls.teacher || "-")}</th>`
     ).join("");
 
     const buildRow = (cols: typeof regularClasses, rowIdx: number) => {
@@ -477,7 +477,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     };
     const regBody = Array.from({ length: maxRows }).map((_, r) => buildRow(regularClasses, r)).join("");
     const jangBody = hasJang
-      ? `<tr><td colspan="${visibleClasses.length + 1}" style="${C};padding:3px 4px;background:#fffbeb;color:#b45309;font-weight:700;font-size:9px;text-align:left">장결자 명단 (평시 미출석 — 집계 제외)</td></tr>`
+      ? `<tr><td colspan="${visibleClasses.length + 1}" style="${C};padding:3px 4px;background:#fffbeb;color:#b45309;font-weight:700;font-size:9px;text-align:left">장결자 명단 (평시 미출석 - 집계 제외)</td></tr>`
         + Array.from({ length: jangMaxRows }).map((_, r) => buildRow(jangClasses, r)).join("")
       : "";
     const bodyRows = regBody + jangBody;
@@ -545,12 +545,12 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     const titleText = color
       ? `${student.name} [${COLOR_LABELS[color]}${color === "orange" && partialType ? ` · ${partialType}` : ""}] (클릭하여 변경)`
       : isMismatch
-        ? `${student.name} ⚠ 신청서 불일치 — 클릭하여 색 지정`
+        ? `${student.name} ⚠ 신청서 불일치 - 클릭하여 색 지정`
       : isCandidate
-        ? `${student.name} ⚠ 동명이인 후보 — 클릭하여 색 지정`
+        ? `${student.name} ⚠ 동명이인 후보 - 클릭하여 색 지정`
         : isParticipant
-          ? `${student.name} (${bu} 신청) — 클릭하여 색 지정`
-          : `${student.name} — 클릭하여 색 지정`;
+          ? `${student.name} (${bu} 신청) - 클릭하여 색 지정`
+          : `${student.name} - 클릭하여 색 지정`;
     return (
       <td key={`s-${keyPrefix}-${cls.grade}-${cls.classNum}-${rowIdx}`}
         title={titleText}
@@ -730,7 +730,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
                 {visibleClasses.map(cls => (
                   <th key={`t-${cls.buNum}-${cls.grade}-${cls.classNum}`}
                     className="border border-slate-200 px-1 py-1 text-slate-500 font-normal text-center">
-                    {cls.teacher || "—"}
+                    {cls.teacher || "-"}
                   </th>
                 ))}
               </tr>
@@ -749,7 +749,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
                   <tr>
                     <td colSpan={visibleClasses.length + 1}
                       className="border border-slate-200 bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700 text-left">
-                      장결자 명단 <span className="font-normal text-amber-600">(평시 미출석 — 집계 제외)</span>
+                      장결자 명단 <span className="font-normal text-amber-600">(평시 미출석 - 집계 제외)</span>
                     </td>
                   </tr>
                   {Array.from({ length: jangMaxRows }).map((_, rowIdx) => (
@@ -779,7 +779,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
                   return (
                     <td key={`cs-${cls.buNum}-${cls.grade}-${cls.classNum}`}
                       className={`border border-slate-200 px-1 py-1 text-center ${cnt > 0 ? statActive : cancelled > 0 ? "text-red-400" : "text-slate-300"}`}>
-                      {formParts.length === 0 && lateInClass === 0 ? "—" : cnt > 0 ? cnt : "—"}
+                      {formParts.length === 0 && lateInClass === 0 ? "-" : cnt > 0 ? cnt : "-"}
                     </td>
                   );
                 })}
@@ -803,7 +803,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
         <div className="mb-3">
           <h3 className="text-sm font-semibold text-slate-500 mb-2">
             DB 미매칭 {bu} 신청자
-            <span className="text-slate-400 font-normal ml-1">({unmatchedParts.length}명 — 표에 미표시)</span>
+            <span className="text-slate-400 font-normal ml-1">({unmatchedParts.length}명 - 표에 미표시)</span>
           </h3>
           <div className="card p-3 flex flex-wrap gap-1">
             {unmatchedParts.map((p) => (

@@ -121,7 +121,7 @@ export default function MealCountTab({ retreat }: Props) {
         setLoading(false);
       }, (error) => { setLoadError(error.message); setLoading(false); }),
       subscribeToRetreatPeriods(retreat.id, setPeriods,
-        e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)),
+        e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [retreat.id, retreat.year]);
@@ -327,7 +327,7 @@ export default function MealCountTab({ retreat }: Props) {
       {/* 저장 바 */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400">
-          끼니별 식사 인원을 계산합니다 — 후발대는 <strong>첫 식사</strong>, 선복귀는 <strong>마지막 식사</strong>, 당일참석은 <strong>지정 일차의 식사만</strong> 포함됩니다.
+          끼니별 식사 인원을 계산합니다 - 후발대는 <strong>첫 식사</strong>, 선복귀는 <strong>마지막 식사</strong>, 당일참석은 <strong>지정 일차의 식사만</strong> 포함됩니다.
         </p>
         <button onClick={handleSave} disabled={saving || !dirty} className="btn-primary text-xs px-4 py-2 shrink-0">
           {saving ? "저장 중…" : dirty ? "저장" : "저장됨"}
@@ -404,7 +404,7 @@ export default function MealCountTab({ retreat }: Props) {
         {/* ③-a DB 명단 — 교사 참석·부분 참석 탭의 데이터를 자동으로 끌어옴 */}
         <div className="mb-5">
           <h4 className="text-sm font-semibold text-slate-600 mb-1">
-            DB 명단 <span className="font-normal text-slate-400">(교사 부분참 · 스탭 후발대 · 학생 부분참 — {dbPersons.length}명)</span>
+            DB 명단 <span className="font-normal text-slate-400">(교사 부분참 · 스탭 후발대 · 학생 부분참 - {dbPersons.length}명)</span>
           </h4>
           <p className="text-xs text-slate-400 mb-2">
             각 사람의 <strong>{`후발=첫 식사 / 선복귀=마지막 식사`}</strong> 끼니를 지정하면 표에서 1명씩 자동 차감됩니다.
@@ -440,7 +440,7 @@ export default function MealCountTab({ retreat }: Props) {
                     <div key={p.key}>
                     {showDivider && (
                       <div className="pt-2 pb-1 text-[11px] font-semibold text-slate-400 first:pt-0">
-                        {p.role === "student" ? "— 학생 —" : "— 교사·스탭 —"}
+                        {p.role === "student" ? "- 학생 -" : "- 교사·스탭 -"}
                       </div>
                     )}
                     <div

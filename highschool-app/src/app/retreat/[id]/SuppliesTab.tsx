@@ -154,7 +154,7 @@ export default function SuppliesTab({ retreat }: Props) {
   const snackTotal = snacks.reduce((acc, s) => acc + (s.price || 0), 0);
   const snackBudgetTotal = SNACK_CATEGORIES.reduce((acc, c) => acc + (snackBudgets[c] || 0), 0);
 
-  const formatPrice = (p: number) => p > 0 ? `${p.toLocaleString()}원` : "—";
+  const formatPrice = (p: number) => p > 0 ? `${p.toLocaleString()}원` : "-";
 
   async function handleSaveBudget() {
     const newSupplyBudget = parseInt(supplyBudgetInput.replace(/,/g, "")) || 0;
@@ -363,16 +363,16 @@ export default function SuppliesTab({ retreat }: Props) {
                   {supplies.map(s => (
                     <tr key={s.id} className="hover:bg-slate-50">
                       <td className="px-4 py-2.5 font-medium text-slate-800">{s.name}</td>
-                      <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{s.actualQty || "—"}</td>
-                      <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{s.buyQty || "—"}</td>
+                      <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{s.actualQty || "-"}</td>
+                      <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{s.buyQty || "-"}</td>
                       <td className="px-4 py-2.5 text-right text-slate-700 font-medium text-xs">{formatPrice(s.price || 0)}</td>
                       <td className="px-4 py-2.5 text-xs max-w-[160px]">
                         {s.link ? (
                           <a href={s.link} target="_blank" rel="noopener noreferrer"
                             className="text-blue-500 hover:underline truncate block">🔗 링크</a>
-                        ) : <span className="text-slate-300">—</span>}
+                        ) : <span className="text-slate-300">-</span>}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-slate-400">{s.note || "—"}</td>
+                      <td className="px-4 py-2.5 text-xs text-slate-400">{s.note || "-"}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex gap-2">
                           <button onClick={() => startEditSupply(s)} className="text-xs text-slate-400 hover:text-blue-500 whitespace-nowrap">수정</button>
@@ -497,7 +497,7 @@ export default function SuppliesTab({ retreat }: Props) {
                         {items.map(s => (
                           <tr key={s.id} className="hover:bg-slate-50">
                             <td className="px-4 py-2.5 font-medium text-slate-800">{s.name}</td>
-                            <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{s.qty || "—"}</td>
+                            <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{s.qty || "-"}</td>
                             <td className="px-4 py-2.5 text-right text-slate-500 text-xs">{formatPrice(s.unitPrice || 0)}</td>
                             <td className="px-4 py-2.5 text-right font-medium text-xs">{formatPrice(s.price || 0)}</td>
                             <td className="px-4 py-2.5 text-xs max-w-[160px]">
@@ -508,9 +508,9 @@ export default function SuppliesTab({ retreat }: Props) {
                                 ) : (
                                   <span className="text-slate-500">{s.link}</span>
                                 )
-                              ) : <span className="text-slate-300">—</span>}
+                              ) : <span className="text-slate-300">-</span>}
                             </td>
-                            <td className="px-4 py-2.5 text-xs text-slate-400">{s.note || "—"}</td>
+                            <td className="px-4 py-2.5 text-xs text-slate-400">{s.note || "-"}</td>
                             <td className="px-4 py-2.5">
                               <div className="flex gap-2">
                                 <button onClick={() => startEditSnack(s)} className="text-xs text-slate-400 hover:text-blue-500 whitespace-nowrap">수정</button>

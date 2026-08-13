@@ -503,14 +503,14 @@ export default function NewFriendsTab({
                     <strong className="block text-sm text-slate-900">{friend.name}</strong>
                   </button>
                 </td>
-                <td className="max-w-40 truncate px-3 py-3 text-slate-600">{friend.school || "—"}</td>
+                <td className="max-w-40 truncate px-3 py-3 text-slate-600">{friend.school || "-"}</td>
                 <td className="whitespace-nowrap px-3 py-3 text-slate-600">{friend.part} · {friend.grade}학년</td>
                 <td className="px-3 py-3 text-slate-600">{friend.owner || "미배정"}</td>
-                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week1Date || "—"}</td>
-                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week2Date || "—"}</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week1Date || "-"}</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week2Date || "-"}</td>
                 <td className="px-3 py-3"><span className="rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700">{friend.decision}</span></td>
                 <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{formatClassLabel(friend.assignedClassKey)}</td>
-                {canEdit && <td className="px-3 py-3 leading-5 text-slate-600"><span className="block">본인 {formatKoreanPhone(priv?.phone) || "—"}</span><span className="block text-slate-400">보호자 {formatKoreanPhone(priv?.parentPhone) || "—"}</span></td>}
+                {canEdit && <td className="px-3 py-3 leading-5 text-slate-600"><span className="block">본인 {formatKoreanPhone(priv?.phone) || "-"}</span><span className="block text-slate-400">보호자 {formatKoreanPhone(priv?.parentPhone) || "-"}</span></td>}
                 <td className="px-3 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${PROGRESS_STYLE[progress]}`}>{progress}</span></td>
                 <td className="px-3 py-3">
                   {friend.rosterSync ? <div><span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">반영 완료</span><span className="mt-1 block max-w-32 truncate text-[10px] text-slate-400">{friend.rosterSync.studentId}</span></div> : syncReady ? <>

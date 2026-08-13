@@ -57,7 +57,7 @@ export default function ScheduleOverviewView({ schedule }: { schedule: IguardSch
                             </div>
                           ))}
                         </div>
-                      ) : <span className="text-slate-200">—</span>}
+                      ) : <span className="text-slate-200">-</span>}
                     </td>
                   );
                 })}

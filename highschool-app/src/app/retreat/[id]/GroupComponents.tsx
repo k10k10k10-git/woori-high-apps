@@ -295,7 +295,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
       {!editing && (
         <div className="flex flex-wrap items-center gap-1 mb-1">
           <span className="text-xs text-slate-400">👨‍🏫 교사:</span>
-          {(group.teachers || []).length === 0 && <span className="text-xs text-slate-300">—</span>}
+          {(group.teachers || []).length === 0 && <span className="text-xs text-slate-300">-</span>}
           {(group.teachers || []).map(t => {
             const status = teacherStatusMap[t];
             const cls = status ? TEACHER_STATUS_CLS[status] : "bg-slate-100 border-slate-200 text-slate-600";
@@ -320,7 +320,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
         return (
           <div className="flex flex-wrap items-center gap-1 mb-1">
             <span className="text-xs text-slate-400">⭐ 조장:</span>
-            {names.length === 0 && <span className="text-xs text-slate-300">—</span>}
+            {names.length === 0 && <span className="text-xs text-slate-300">-</span>}
             {names.map(name => {
               const sid = resolveGroupRoleStudentId(students, group, name);
               const s = sid ? students[sid] : null;
@@ -345,7 +345,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
         return (
           <div className="flex flex-wrap items-center gap-1 mb-1">
             <span className="text-xs text-slate-400">🧑‍💼 스탭:</span>
-            {names.length === 0 && iguardOnly.length === 0 && <span className="text-xs text-slate-300">—</span>}
+            {names.length === 0 && iguardOnly.length === 0 && <span className="text-xs text-slate-300">-</span>}
             {names.map(name => {
               const sid = resolveGroupRoleStudentId(students, group, name);
               return (
@@ -369,7 +369,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
         );
       })()}
       {!editing && (
-        <div className="text-xs text-blue-500 mb-2">📍 GBS: {group.gbs ? group.gbs : <span className="text-slate-300">—</span>}</div>
+        <div className="text-xs text-blue-500 mb-2">📍 GBS: {group.gbs ? group.gbs : <span className="text-slate-300">-</span>}</div>
       )}
 
       {(() => {

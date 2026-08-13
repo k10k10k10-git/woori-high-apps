@@ -218,7 +218,7 @@ export default function NotesTab({ retreat }: Props) {
                           <span className="text-slate-700 text-xs">{noteText || p.extra}</span>
                         </div>
                       ) : (
-                        <span className="text-slate-300 text-xs">—</span>
+                        <span className="text-slate-300 text-xs">-</span>
                       )}
                     </td>
                     <td className="px-4 py-2.5">

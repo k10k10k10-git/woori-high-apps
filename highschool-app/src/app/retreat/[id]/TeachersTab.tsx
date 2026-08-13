@@ -631,8 +631,8 @@ async function handleSave() {
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                     <span className={`tag ${t.bu === "1부" ? "tag-green" : t.bu === "2부" ? "tag-purple" : "tag-blue"}`}>{t.bu}</span>
                   </td>
-                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600">{resolveTeacherGender(t) || "—"}</td>
-                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600 whitespace-nowrap">{t.classKey || "—"}</td>
+                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600">{resolveTeacherGender(t) || "-"}</td>
+                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-600 whitespace-nowrap">{t.classKey || "-"}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                     <span className={`tag ${STATUS_COLORS[getVisibleTeacherAttendanceLabel(t)]}`}>
                       {getVisibleTeacherAttendanceLabel(t)}
@@ -643,7 +643,7 @@ async function handleSave() {
                     {t.lateArrival && <div>입소: {t.lateArrival}</div>}
                     {t.transport && <div className="text-slate-400">{t.transport}</div>}
                   </td>
-                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-400 text-xs">{t.note || "—"}</td>
+                  <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-slate-400 text-xs">{t.note || "-"}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                     <div className="flex gap-2">
                       <button onClick={() => startEdit(t)} className="text-slate-400 hover:text-blue-500 text-xs whitespace-nowrap">수정</button>

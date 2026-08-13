@@ -174,23 +174,23 @@ export default function RoomsTab({ retreat }: Props) {
         setUnassigned(excludeAssignedStudents(ids, prev));
         return prev;
       });
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: cell colors
-    unsubs.push(subscribeToCellColors(retreat.id, setCellColors, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    unsubs.push(subscribeToCellColors(retreat.id, setCellColors, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: teachers
     unsubs.push(subscribeToTeachers(retreat.id, (teachers) => {
       setAllTeachers(teachers);
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: partial attendance — 당일참석자는 숙박하지 않으므로 자동배정·미배정 풀에서 제외
     unsubs.push(subscribeToPartialAttendances(retreat.id, setPartialAttendances,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: groups — 도면 인쇄에서 방별 조 표기용
     unsubs.push(subscribeToGroups(retreat.id, setGroups,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)));
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)));
 
     // Real-time: rooms
     unsubs.push(subscribeToRooms(retreat.id, (newRooms) => {
@@ -213,7 +213,7 @@ export default function RoomsTab({ retreat }: Props) {
         latestRemoteRoomsRef.current = newRooms;
         setRemoteUpdated(true);
       }
-    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); }));
+    }, e => { setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); setLoading(false); }));
 
     return () => { unsubs.forEach(fn => fn()); initialLoaded.current = false; };
   }, [retreat.id, retreat.year]);

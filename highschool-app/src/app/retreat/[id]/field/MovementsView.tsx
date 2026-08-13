@@ -81,7 +81,7 @@ export default function MovementsView({ staff, schedule, posts, movements }: Pro
                           )}
                           {mv.note && <div className="text-[11px] text-slate-500 mt-0.5 truncate">• {mv.note}</div>}
                         </div>
-                      ) : "—"}
+                      ) : "-"}
                     </td>
                   );
                 })}

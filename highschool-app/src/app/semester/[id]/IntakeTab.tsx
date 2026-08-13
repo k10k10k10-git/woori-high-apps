@@ -166,7 +166,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
       )}
       {staffError && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          스탭 명단(teacherStaff/{year})을 불러오지 못했습니다 — {staffError}
+          스탭 명단(teacherStaff/{year})을 불러오지 못했습니다 - {staffError}
         </div>
       )}
       {!canEdit && (
@@ -210,7 +210,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
             {queryResults.length === 0 && <p className="col-span-full py-3 text-center text-sm text-slate-400">검색 결과가 없습니다.</p>}
             {matched.length > queryResults.length && (
               <p className="col-span-full text-center text-xs text-slate-400">
-                {matched.length}명 중 {queryResults.length}명만 표시했습니다 — 이름을 더 입력해주세요.
+                {matched.length}명 중 {queryResults.length}명만 표시했습니다 - 이름을 더 입력해주세요.
               </p>
             )}
           </div>
@@ -266,8 +266,8 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
                     {!isStaffApplication(row) && (
                       <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>
                     )}
-                    <span>본인 {phone || "—"}</span>
-                    {!isStaffApplication(row) && <span>보호자 {priv?.parentPhone || "—"}</span>}
+                    <span>본인 {phone || "-"}</span>
+                    {!isStaffApplication(row) && <span>보호자 {priv?.parentPhone || "-"}</span>}
                   </span>
                 </button>
               </li>
@@ -485,7 +485,7 @@ function IntakeModal({
         )}
         {check.ok && trainingOnly && !isStaff && (
           <p className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            훈련만 신청 — 사역팀 배치 대상에서 제외됩니다.
+            훈련만 신청 - 사역팀 배치 대상에서 제외됩니다.
           </p>
         )}
 

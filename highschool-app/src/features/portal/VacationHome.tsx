@@ -173,7 +173,7 @@ export default function VacationHome({
                 준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span>
               </h2>
               <p className="mt-0.5 text-xs text-slate-400">
-                날짜를 클릭해 일정을 추가하세요 — 모든 수련회·행정·이가드와 공유됩니다.
+                날짜를 클릭해 일정을 추가하세요 - 모든 수련회·행정·이가드와 공유됩니다.
                 {selected ? ` 새 기간 추가 대상: ${selected.name}` : ""}
               </p>
             </div>

@@ -274,7 +274,7 @@ function IguardWorkspace({ id }: { id: string }) {
             <ul className="mt-1.5 space-y-1">
               {compatWarnings.map((w, i) => (
                 <li key={i} className="text-xs leading-relaxed">
-                  • <strong>{w.text}</strong>{w.hint ? <span className="text-amber-600"> — {w.hint}</span> : null}
+                  • <strong>{w.text}</strong>{w.hint ? <span className="text-amber-600"> - {w.hint}</span> : null}
                 </li>
               ))}
             </ul>

@@ -91,7 +91,7 @@ export default function HomePage() {
     if (!user || !canUseAdmin) return;
     const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
     return subscribeToAllRetreatPeriods(ids, setPeriods,
-      (error) => setRetreatLoadError((previous) => previous || `수련회 기간 구독 실패 — ${error.message}`));
+      (error) => setRetreatLoadError((previous) => previous || `수련회 기간 구독 실패 - ${error.message}`));
   }, [user, canUseAdmin, retreatIdsKey]);
 
   // 잠금 상태 — 목록의 자물쇠 배지와 관리자 모달이 함께 쓴다(현장 화면과 같은 노드).
@@ -100,7 +100,7 @@ export default function HomePage() {
     if (!user || !canUseAdmin) return;
     const ids = sortedRetreatIdsKey ? sortedRetreatIdsKey.split(",") : [];
     return subscribeToIguardAccessLocks(ids, setAccessLocks,
-      (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 — ${e.message}`));
+      (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 - ${e.message}`));
   }, [user, canUseAdmin, sortedRetreatIdsKey]);
 
   async function handleRequestAccess() {

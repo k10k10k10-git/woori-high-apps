@@ -82,7 +82,7 @@ export default function BrainstormPanel({ authorName }: Props) {
       // 최근에 만진 카드가 위에 오도록 (렌더 순서 = z 순서)
       setNotes([...list].sort((a, b) => (a.updatedAt ?? a.createdAt) - (b.updatedAt ?? b.createdAt)));
       setLoading(false);
-    }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
+    }, e => { setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); setLoading(false); });
     return unsubscribe;
   }, []);
 
@@ -253,7 +253,7 @@ export default function BrainstormPanel({ authorName }: Props) {
             💡 브레인스토밍 <span className="text-xs font-normal text-slate-400">(공유 · 실시간)</span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5 truncate">
-            팀 공용 아이디어 보드 — 카드를 드래그해 자유롭게 배치하고, 빈 곳을 더블클릭해 새 카드를 만드세요.
+            팀 공용 아이디어 보드 - 카드를 드래그해 자유롭게 배치하고, 빈 곳을 더블클릭해 새 카드를 만드세요.
           </p>
         </div>
         <button onClick={handleAddButton} className="btn-primary text-xs px-3 py-1.5 shrink-0">

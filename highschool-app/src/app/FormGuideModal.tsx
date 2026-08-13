@@ -28,7 +28,7 @@ export default function FormGuideModal({ onClose }: Props) {
           <div>
             <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-red-100 text-red-600 text-xs flex items-center justify-center font-bold flex-shrink-0">!</span>
-              A~D열 순서 — 반드시 이 순서대로
+              A~D열 순서 - 반드시 이 순서대로
             </h4>
             <div className="rounded-xl overflow-x-auto border border-slate-200">
               <table className="w-full text-xs">
@@ -41,7 +41,7 @@ export default function FormGuideModal({ onClose }: Props) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {[
-                    { col: "A", q: "타임스탬프", note: "구글폼 자동 생성 — 건드리지 않음", noteColor: "text-slate-400" },
+                    { col: "A", q: "타임스탬프", note: "구글폼 자동 생성 - 건드리지 않음", noteColor: "text-slate-400" },
                     { col: "B", q: "이름", note: "질문 문구 무관", noteColor: "text-slate-400" },
                     { col: "C", q: "성별", note: "반드시  남  /  여  (두 글자)", noteColor: "text-orange-600 font-semibold" },
                     { col: "D", q: "몇 부인가요?", note: "반드시  1부  /  2부", noteColor: "text-orange-600 font-semibold" },
@@ -64,7 +64,7 @@ export default function FormGuideModal({ onClose }: Props) {
           <div>
             <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-1.5">
               <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 text-xs flex items-center justify-center font-bold flex-shrink-0">E+</span>
-              E열 이후 — 순서 무관, 키워드로 자동 인식
+              E열 이후 - 순서 무관, 키워드로 자동 인식
             </h4>
             <div className="space-y-2">
               {[
@@ -183,7 +183,7 @@ export default function FormGuideModal({ onClose }: Props) {
             </h4>
             <div className="space-y-2 text-xs">
               {[
-                { num: 1, title: "타임스탬프", type: "자동 생성", options: null, note: "구글폼이 자동으로 추가 — 건드리지 않음", role: null, tag: null, tagColor: null },
+                { num: 1, title: "타임스탬프", type: "자동 생성", options: null, note: "구글폼이 자동으로 추가 - 건드리지 않음", role: null, tag: null, tagColor: null },
                 { num: 2, title: "이름을 입력해주세요", type: "단답형", options: null, note: "질문 문구는 자유", role: "이름 매칭", tag: "필수", tagColor: "red" },
                 { num: 3, title: "성별을 선택해주세요", type: "객관식", options: "남 / 여", note: "반드시 두 글자 그대로 사용", role: "조편성·방배정", tag: "필수 ⚠", tagColor: "red" },
                 { num: 4, title: "몇 부인가요?", type: "객관식", options: "1부 / 2부", note: "반드시 이 두 선택지만 사용", role: "전체 필터링", tag: "필수 ⚠", tagColor: "red" },

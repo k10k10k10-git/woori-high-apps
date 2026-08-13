@@ -346,13 +346,13 @@ export function validateClassRelations(
   // 1) 서로 다른 부의 반 결합 — 부별로 따로 배정하므로 같은 조가 될 수 없다
   classAffinities.forEach(({ a, b }) => {
     if (a.split("_")[0] !== b.split("_")[0])
-      errors.push(`붙임 불가: ${label(a)} ↔ ${label(b)} — 서로 다른 부는 같은 조가 될 수 없습니다`);
+      errors.push(`붙임 불가: ${label(a)} ↔ ${label(b)} - 서로 다른 부는 같은 조가 될 수 없습니다`);
   });
   // 2) 같은 쌍이 붙임·분리 양쪽에 (직접 모순)
   const samePair = (p: ConflictPair, q: ConflictPair) => (p.a === q.a && p.b === q.b) || (p.a === q.b && p.b === q.a);
   classAffinities.forEach(ca => {
     if (classConflicts.some(cc => samePair(ca, cc)))
-      errors.push(`모순: ${label(ca.a)} ↔ ${label(ca.b)} — 같은 쌍이 붙임과 분리에 동시에 있습니다`);
+      errors.push(`모순: ${label(ca.a)} ↔ ${label(ca.b)} - 같은 쌍이 붙임과 분리에 동시에 있습니다`);
   });
   // 부별 번들 기반 검사 (연쇄 결합의 결과까지 반영)
   for (const bu of ["1부", "2부"] as const) {
@@ -365,19 +365,19 @@ export function validateClassRelations(
       // 3) 연쇄 모순: 붙임으로 연결된 묶음 안에 분리 쌍이 존재
       classConflicts.forEach(({ a, b }) => {
         if (keys.has(a) && keys.has(b))
-          errors.push(`모순: ${label(a)} ↔ ${label(b)} — 붙임으로 연결된 묶음(${names}) 안에 분리 쌍이 있습니다`);
+          errors.push(`모순: ${label(a)} ↔ ${label(b)} - 붙임으로 연결된 묶음(${names}) 안에 분리 쌍이 있습니다`);
       });
       // 4) 동성 규칙과 혼성 묶음
       if (ruleFlags.sameGender) {
         const male = bundle.filter(u => u.gender === "남").length;
         if (male > 0 && male < bundle.length)
-          errors.push(`모순: ${names} — 남·여 반 묶음은 '동성으로만 조 구성' 규칙과 함께 쓸 수 없습니다`);
+          errors.push(`모순: ${names} - 남·여 반 묶음은 '동성으로만 조 구성' 규칙과 함께 쓸 수 없습니다`);
       }
       // 5) 묶음이 조당 최대 인원 초과
       if (ruleFlags.maxGroupSize > 0) {
         const total = bundle.reduce((acc, u) => acc + u.studentIds.length, 0);
         if (total > ruleFlags.maxGroupSize)
-          errors.push(`실현 불가: ${names} = ${total}명 — 조당 최대 인원(${ruleFlags.maxGroupSize}명)을 초과합니다`);
+          errors.push(`실현 불가: ${names} = ${total}명 - 조당 최대 인원(${ruleFlags.maxGroupSize}명)을 초과합니다`);
       }
     }
   }

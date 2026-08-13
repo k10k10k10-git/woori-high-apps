@@ -112,7 +112,7 @@ export default function RetreatCalendarPanel({
   useEffect(() => {
     const unsubM = subscribeToMilestones(list =>
       setMilestones(list.sort((a, b) => a.targetDate.localeCompare(b.targetDate))),
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)
+      e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`)
     );
     return () => unsubM();
   }, []);
@@ -131,7 +131,7 @@ export default function RetreatCalendarPanel({
         setCalMonth(d.getMonth());
         setSelectedDate(earliest.startDate);
       }
-    }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
+    }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     return () => unsubP();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retreatIds.join(",")]);

@@ -53,7 +53,7 @@ export function useRetreatPinGate(
         lockError: null,
       });
     }, error => {
-      setState({ scope, ...PENDING, lockError: `PIN 잠금 상태를 확인하지 못했습니다 — ${error.message}` });
+      setState({ scope, ...PENDING, lockError: `PIN 잠금 상태를 확인하지 못했습니다 - ${error.message}` });
     });
   }, [enabled, bypass, retreatId, scope]);
 

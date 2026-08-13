@@ -585,7 +585,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
         <label className="text-xs text-slate-500 block mb-1">
           시간 블록
           {curDay != null && day === curDay ? <span className="text-fuchsia-700"> · 현재 일자·시각 자동선택</span>
-            : curDay == null ? <span className="text-slate-400"> · 오늘이 수련회 기간이 아니에요 — 일자를 직접 선택하세요</span> : null}
+            : curDay == null ? <span className="text-slate-400"> · 오늘이 수련회 기간이 아니에요 - 일자를 직접 선택하세요</span> : null}
         </label>
         <select className="input" value={blockId} onChange={e => { blockPicked.current = true; setBlockId(e.target.value); }}>
           {dayBlocks.map(b => <option key={b.id} value={b.id}>{b.start} {b.label}{isNowOn(b, curDay, clock.time) ? " ← 지금" : ""}</option>)}
@@ -657,7 +657,7 @@ export function LeaderCueView({ schedule, retreat, periods }: {
       <div className={`card p-4 mb-4 border-2 ${currentBlock ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`}>
         <div className="flex items-start justify-between gap-3 mb-2">
           <div>
-            <div className="text-xs font-semibold text-emerald-700 mb-1">조장 — 지금 할 일</div>
+            <div className="text-xs font-semibold text-emerald-700 mb-1">조장 - 지금 할 일</div>
             <div className="text-lg font-bold text-slate-800">
               {currentBlock ? currentBlock.label : curDay == null ? "수련회 기간 밖입니다" : nextBlock ? "다음 일정 대기" : "오늘 일정이 종료되었습니다"}
             </div>

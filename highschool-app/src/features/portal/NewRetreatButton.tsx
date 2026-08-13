@@ -125,7 +125,7 @@ export default function NewRetreatButton({ hrefAfterCreate, onCreated, className
                   onChange={(e) => setForm((p) => ({ ...p, sheetUrl: e.target.value }))}
                 />
                 {form.sheetUrl && parsed && (
-                  <span className="mt-1 block text-xs text-green-600">✅ 파싱 성공 — Sheet ID: <span className="font-mono">{parsed.sheetId.slice(0, 20)}…</span></span>
+                  <span className="mt-1 block text-xs text-green-600">✅ 파싱 성공 - Sheet ID: <span className="font-mono">{parsed.sheetId.slice(0, 20)}…</span></span>
                 )}
                 {form.sheetUrl && !parsed && (
                   <span className="mt-1 block text-xs text-red-500">시트 URL 형식이 아닙니다.</span>

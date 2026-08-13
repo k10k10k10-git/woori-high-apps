@@ -30,5 +30,5 @@ export function withoutError(prev: LoadErrorMap, key: string): LoadErrorMap {
 export function formatLoadErrors(errors: LoadErrorMap): string | null {
   const keys = Object.keys(errors);
   if (keys.length === 0) return null;
-  return `${keys.join(" · ")} 불러오기 실패 — ${errors[keys[0]]}`;
+  return `${keys.join(" · ")} 불러오기 실패 - ${errors[keys[0]]}`;
 }

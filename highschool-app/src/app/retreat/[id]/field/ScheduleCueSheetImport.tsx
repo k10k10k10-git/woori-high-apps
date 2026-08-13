@@ -324,7 +324,7 @@ export default function CueSheetImportPanel({ retreatId, schedule, staff, posts,
       toast(`갱신 ${updates.length}개, 신규 ${creates.length}개${mode === "replace" && deletedCount ? `, 삭제 ${deletedCount}개` : ""}${autoCreatePosts && createdPostCount ? `, 신규 포스트 ${createdPostCount}개` : ""}${autoAssign ? `, 구간 +${segmentCreateCount}/수정 ${segmentUpdateCount}/삭제 ${segmentRemoveCount}, 동선 반영 ${assignmentCount}건/정리 ${removedAssignmentCount}건` : ""}${autoApplyBusStaff && busStaffCount ? `, 버스 ${busStaffCount}건` : ""}${leaderNoteCount ? `, 조장 큐싯 ${leaderNoteCount}개` : ""} 반영했습니다.`, "success");
       const allUnmatched = [...new Set([...unmatchedStaffNames, ...unmatchedMovementStaff])];
       if (allUnmatched.length > 0) {
-        toast(`행정 명단에 없는 스탭 ${allUnmatched.length}명은 배정에서 제외됐습니다: ${allUnmatched.join(", ")} — 행정 사이트에 먼저 추가해주세요.`, "warning");
+        toast(`행정 명단에 없는 스탭 ${allUnmatched.length}명은 배정에서 제외됐습니다: ${allUnmatched.join(", ")} - 행정 사이트에 먼저 추가해주세요.`, "warning");
       }
       if (preservedManualSegmentCount > 0) {
         toast(`시트에서 사라진 구간 ${preservedManualSegmentCount}개에는 사이트 수동 배정이 있어 보존했습니다.`, "warning");

@@ -210,7 +210,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              ⚠️ <strong>사라진 조에 걸려 있는 조스탭 배정 {orphanEntries.length}건</strong>이 있습니다 —
+              ⚠️ <strong>사라진 조에 걸려 있는 조스탭 배정 {orphanEntries.length}건</strong>이 있습니다 -
               행정에서 조편성이 새로 만들어졌거나 조가 삭제된 경우입니다. 해당 스탭은 미배정으로 표시되며, 아래 조 카드에서 다시 배정해 주세요.
               <div className="mt-1 text-amber-700">
                 대상: {[...new Set(orphanEntries.flatMap(([, ids]) => ids))].map(sid => staffById.get(sid)?.name ?? "(미상)").join(", ")}
@@ -275,7 +275,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
                           : assigned ? "border-sky-300 bg-sky-50 hover:bg-sky-100"
                           : "border-slate-200 bg-white hover:border-fuchsia-300 hover:bg-fuchsia-50"
                         }`}
-                        title={assignedElsewhere ? `이미 배정됨 — 누르면 ${activeGroup ? groupDisplayName(activeGroup, groups) : ""}로 이동` : assigned ? "배정됨" : "미배정"}
+                        title={assignedElsewhere ? `이미 배정됨 - 누르면 ${activeGroup ? groupDisplayName(activeGroup, groups) : ""}로 이동` : assigned ? "배정됨" : "미배정"}
                       >
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${inActive ? "bg-fuchsia-500" : assigned ? "bg-sky-500" : "bg-slate-200"}`} aria-hidden />
                         <span className={nameClasses(s)}>{s.name}</span>

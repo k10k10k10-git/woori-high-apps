@@ -61,7 +61,7 @@ export default function AutoAssignPreviewModal({
             return (
               <div key={bu}>
                 <h4 className={`text-sm font-bold mb-3 pb-1 border-b ${bu === "1부" ? "text-green-700 border-green-200" : "text-purple-700 border-purple-200"}`}>
-                  {bu} — {buGroups.length}조
+                  {bu} - {buGroups.length}조
                 </h4>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {buGroups.map(g => {

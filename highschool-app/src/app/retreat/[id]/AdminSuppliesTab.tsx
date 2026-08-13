@@ -210,9 +210,9 @@ export default function AdminSuppliesTab({ retreat }: Props) {
                             aria-label={`${it.name} 준비 완료`} />
                         </td>
                         <td className={`px-4 py-2.5 font-medium ${it.checked ? "text-slate-400 line-through" : "text-slate-800"}`}>{it.name}</td>
-                        <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{it.neededQty || "—"}</td>
-                        <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{it.stockQty || "—"}</td>
-                        <td className="px-4 py-2.5 text-xs text-slate-400">{it.note || "—"}</td>
+                        <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{it.neededQty || "-"}</td>
+                        <td className="px-4 py-2.5 text-center text-slate-500 text-xs">{it.stockQty || "-"}</td>
+                        <td className="px-4 py-2.5 text-xs text-slate-400">{it.note || "-"}</td>
                         <td className="px-4 py-2.5">
                           <div className="flex gap-2">
                             <button onClick={() => startEdit(it)} className="text-xs text-slate-400 hover:text-blue-500 whitespace-nowrap">수정</button>

@@ -10,7 +10,7 @@ type Props = {
 };
 
 const formatDate = (value?: string) => {
-  if (!value) return "—";
+  if (!value) return "-";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(date);
 };
@@ -56,7 +56,7 @@ export function PendingTab({ friends, privateValueFor, showPrivate, onOpenNewFri
         {pending.map((friend) => {
           const stage = deriveNewFriendStage(friend);
           const priv = privateValueFor(friend);
-          return <article key={recordKey(friend)} className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start justify-between gap-3"><strong className="text-slate-900">{friend.name}</strong><span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{stage}</span></div><p className="mt-2 text-xs text-slate-500">{friend.part} · {friend.grade}학년 · 담당 {friend.owner || "미배정"}</p>{showPrivate && <p className="mt-2 text-xs text-slate-500">연락처 {priv?.phone || "—"}</p>}<p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">다음 확인: {nextAction(friend)}</p></article>;
+          return <article key={recordKey(friend)} className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex items-start justify-between gap-3"><strong className="text-slate-900">{friend.name}</strong><span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{stage}</span></div><p className="mt-2 text-xs text-slate-500">{friend.part} · {friend.grade}학년 · 담당 {friend.owner || "미배정"}</p>{showPrivate && <p className="mt-2 text-xs text-slate-500">연락처 {priv?.phone || "-"}</p>}<p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">다음 확인: {nextAction(friend)}</p></article>;
         })}
         {pending.length === 0 && <div className="col-span-full rounded-xl border border-dashed border-slate-200 py-12 text-center text-sm text-slate-400">처리 대기 중인 새친구가 없습니다.</div>}
       </div>

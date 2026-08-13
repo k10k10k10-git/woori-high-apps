@@ -28,7 +28,7 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
 
   useEffect(() => {
     // onError 없으면 권한 오류 시 "대기자 0명"과 구분이 안 된다 (패턴 16)
-    const fail = (e: Error) => setLoadError(prev => prev ?? `명단 구독 실패 — ${e.message}`);
+    const fail = (e: Error) => setLoadError(prev => prev ?? `명단 구독 실패 - ${e.message}`);
     const u1 = subscribeToIguardPending(setPending, fail);
     const u2 = subscribeToIguardMembers(setMembers, fail);
     const u3 = subscribeToIguardRoles(setRoles, fail);
@@ -106,7 +106,7 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
 
         {loadError && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-2.5 text-xs text-red-700">
-            ⚠ {loadError} — 아래 명단이 비어 보여도 실제 상태가 아닐 수 있습니다.
+            ⚠ {loadError} - 아래 명단이 비어 보여도 실제 상태가 아닐 수 있습니다.
           </div>
         )}
 

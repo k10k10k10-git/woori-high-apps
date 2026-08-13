@@ -270,17 +270,17 @@ export default function CancellationTab({ retreat }: Props) {
                   <td className="px-4 py-2.5 font-medium text-slate-800">{r.name}</td>
                   <td className="px-4 py-2.5">
                     <span className={`tag ${r.bu === "1부" ? "tag-green" : "tag-purple"} mr-1`}>{r.bu}</span>
-                    <span className="text-slate-600 text-xs">{r.grade > 0 ? `${r.grade}학년 ${r.class}반` : "—"}</span>
+                    <span className="text-slate-600 text-xs">{r.grade > 0 ? `${r.grade}학년 ${r.class}반` : "-"}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">{r.phone || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-600">{r.reason || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500">{r.phone || "-"}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-600">{r.reason || "-"}</td>
                   <td className="px-4 py-2.5 text-xs font-medium">
                     {r.paymentAmount != null
                       ? <span className="text-blue-600">{r.paymentAmount.toLocaleString()}원</span>
-                      : <span className="text-slate-300">—</span>}
+                      : <span className="text-slate-300">-</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500 max-w-[180px] truncate">{r.account || "—"}</td>
-                  <td className="px-4 py-2.5 text-xs text-slate-400">{r.note || "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 max-w-[180px] truncate">{r.account || "-"}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-400">{r.note || "-"}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex gap-2">
                       <button onClick={() => startEdit(r)} className="text-xs text-slate-400 hover:text-blue-500 whitespace-nowrap">수정</button>

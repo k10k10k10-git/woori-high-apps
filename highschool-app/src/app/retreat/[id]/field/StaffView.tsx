@@ -5,7 +5,7 @@ import { IguardStaff } from "@/features/iguard/lib/types";
 // 행정 사이트(teachers)가 단일 원천. 이가드는 읽기 전용 표시만 한다.
 // (이전엔 이가드에서 staffMeta로 편집했으나 행정값이 우선이라 편집이 묻혀 혼란이 있었음.)
 
-const dash = <span className="text-xs text-slate-300">—</span>;
+const dash = <span className="text-xs text-slate-300">-</span>;
 
 export default function StaffView({ staff }: { retreatId: string; staff: IguardStaff[] }) {
   return (

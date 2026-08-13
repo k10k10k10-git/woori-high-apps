@@ -159,7 +159,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
         sub: mergedStaff.length > 0 ? `선탑/동승: ${mergedStaff.join(", ")}` : undefined,
         summary,
         warning: busFieldParse.suspicious || mergedStaff.length > 8
-          ? `선탑/동승에 이름 아닌 문장 조각이 섞인 것 같아요${busFieldParse.rejected.length ? ` — 제외됨: ${busFieldParse.rejected.slice(0, 8).join(", ")}${busFieldParse.rejected.length > 8 ? "…" : ""}` : ""}. 큐싯 시트의 이 호차 칸을 확인하세요.`
+          ? `선탑/동승에 이름 아닌 문장 조각이 섞인 것 같아요${busFieldParse.rejected.length ? ` - 제외됨: ${busFieldParse.rejected.slice(0, 8).join(", ")}${busFieldParse.rejected.length > 8 ? "…" : ""}` : ""}. 큐싯 시트의 이 호차 칸을 확인하세요.`
           : undefined,
         members: allMembers,
       };
@@ -227,7 +227,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
   function print() {
     if (units.length === 0) return toast("데이터가 없습니다.", "warning");
     const printedAt = new Date().toLocaleString("ko-KR");
-    const printHeader = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 — ${dayLabel}</h1>
+    const printHeader = `<h1>${mode === "조별" ? "조장/선탑용" : "선탑(호차)용"} 인원 체크리스트 - ${dayLabel}</h1>
       <div class="subtitle">${escapeHtml(retreatName)} · ${year}년 · ${mode} · ${dayLabel} · 출력 ${printedAt}</div>`;
     const renderUnit = (u: Unit, compact: boolean) => {
       const rows = u.members.map((m, i) => {
@@ -286,7 +286,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
           <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
         </div>
       </div>
-      <p className="text-xs text-slate-400 mb-1">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 — 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
+      <p className="text-xs text-slate-400 mb-1">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 - 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
       <p className="text-xs text-fuchsia-600 mb-3">
         {mode === "호차별"
           ? "교사 불참·자차는 제외하고, 당일참석자는 지정한 1·3일차 호차별 인원체크에 포함됩니다."

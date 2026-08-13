@@ -16,7 +16,7 @@ export type MinistryGuideSection = {
 };
 
 export const MINISTRY_THEME = {
-  title: "Glorify the LORD — 그의 이름을 높이세",
+  title: "Glorify the LORD - 그의 이름을 높이세",
   verse: "나와 함께 여호와를 광대하시다 하며 함께 그의 이름을 높이세 · 시편 34편 3절",
   status: "2026 사역계획 가안 기준",
 } as const;

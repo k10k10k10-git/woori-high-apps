@@ -340,8 +340,8 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                           <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
                             {canEdit ? (
                               <>
-                                <span>본인 {detail?.phone?.trim() || "—"}</span>
-                                {!staffMember && <span>보호자 {detail?.parentPhone?.trim() || "—"}</span>}
+                                <span>본인 {detail?.phone?.trim() || "-"}</span>
+                                {!staffMember && <span>보호자 {detail?.parentPhone?.trim() || "-"}</span>}
                               </>
                             ) : (
                               <span>연락처는 행정 권한에서 확인할 수 있습니다.</span>
