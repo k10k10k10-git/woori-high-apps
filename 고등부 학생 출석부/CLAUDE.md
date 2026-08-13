@@ -243,6 +243,11 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 - 역할은 `buildDemoRole`이 만드는 `role: 'teacher'`다. `admin`으로 만들면 전체 반이 보인다. 이름에 `(데모)`가 붙어 학생 정보 수정 시 남는 `adminChanges.actor`에서 실제 담임과 구분된다.
 - ⚠ 데모 계정 정보는 정적 번들에 그대로 들어간다. 주소를 아는 사람은 누구나 쓸 수 있으므로 **테스트 종료 시 계정 삭제 + `DEMO_MODE=0` 재배포**가 한 세트다.
 
+### 통계 임시 노출 플래그 — 정식 버전에서 되돌린다
+
+- 교사 테스트 기간에는 `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS = false`로 통계 탭의 `출석 등급 분포`와 `주의 학생` 영역을 숨긴다.
+- 정식 버전 출시 시 이 값을 `true`로 바꾸고 재배포하면 두 영역이 기존 계산 로직과 함께 다시 표시된다.
+
 ### Firebase 보안 규칙 (`database.rules.json`)
 
 > **이 파일이 Firebase 프로젝트 `woori-high`의 유일한 배포용 보안 규칙 원천이다.**

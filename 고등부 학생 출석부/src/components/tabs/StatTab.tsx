@@ -4,6 +4,7 @@ import { useApp, useClassKey, useClassKeys, calcStats } from '@/store/AppContext
 import { evKey } from '@/utils/dates';
 import { getChart } from '@/utils/chartSetup';
 import ClassTabBar from '@/components/ClassTabBar';
+import { SHOW_ATTENDANCE_RISK_SECTIONS } from '@/lib/releaseFlags';
 
 // 모바일에서 롤오버 없이도 숫자를 항상 표시하는 커스텀 플러그인
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -347,10 +348,12 @@ export default function StatTab() {
         </div>
       ) : (
         <div className="charts-container">
-          <div className="chart-card">
-            <div className="chart-title">출석 등급 분포</div>
-            <div className="chart-canvas-wrap"><canvas ref={chart3Ref} /></div>
-          </div>
+          {SHOW_ATTENDANCE_RISK_SECTIONS && (
+            <div className="chart-card">
+              <div className="chart-title">출석 등급 분포</div>
+              <div className="chart-canvas-wrap"><canvas ref={chart3Ref} /></div>
+            </div>
+          )}
           <div className="chart-card">
             <div className="chart-title">학생별 출석 현황</div>
             <div className="chart-canvas-wrap"><canvas ref={chart2Ref} /></div>
@@ -367,7 +370,7 @@ export default function StatTab() {
       )}
 
       {/* 주의 학생 목록 */}
-      {students.length > 0 && (
+      {SHOW_ATTENDANCE_RISK_SECTIONS && students.length > 0 && (
         <div className="warning-card">
           <button className="warning-card-header" onClick={() => setWarningOpen(o => !o)}>
             <span className="warning-card-title">
