@@ -4,12 +4,13 @@
 // ⚠ 셀은 토글이 아니다. 셀을 누르면 출석/지각/결석/지우기를 명시적으로 고른다
 //   (같은 값을 다시 골라도 결과가 같은 멱등 기록 — 모노레포 실수 규칙 11).
 
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { describeApplicant } from "@/features/semester/db";
 import { splitStudentsAndStaff } from "@/features/semester/roster";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Application, AttendanceStatus, Session, SessionAttendance } from "@/features/semester/types";
+import { attendanceMenuPosition } from "./attendanceGridPosition";
 
 type Props = {
   members: Application[];
@@ -58,40 +59,47 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
   const sections = useMemo(() => memberSections(members), [members]);
   const columnCount = sessions.length + 2;
 
-  // 위치는 레이아웃 확정 직후 계산한다(스크롤·리사이즈에도 따라붙는다).
-  useLayoutEffect(() => {
-    // 닫을 때 위치를 비우지 않는다 — 렌더는 openCell로 막고, 다시 열릴 때 페인트 전에
-    // place()가 새 위치를 잡는다(effect 안 setState 금지 — 실수 규칙 13).
+  function closeMenu() {
+    setOpenCell(null);
+    setMenuAt(null);
+    anchorRef.current = null;
+  }
+
+  function openMenu(event: React.MouseEvent<HTMLButtonElement>, appKey: string, sessId: string, open: boolean) {
+    if (open) {
+      closeMenu();
+      return;
+    }
+    const anchor = event.currentTarget;
+    anchorRef.current = anchor;
+    setMenuAt(attendanceMenuPosition(anchor.getBoundingClientRect(), {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    }));
+    setOpenCell({ appKey, sessId });
+  }
+
+  useEffect(() => {
     if (!openCell) return;
     const place = () => {
       const anchor = anchorRef.current;
       if (!anchor) return;
-      const rect = anchor.getBoundingClientRect();
-      const width = 148;
-      const left = Math.min(Math.max(rect.left + rect.width / 2 - width / 2, 8), window.innerWidth - width - 8);
-      // 아래 공간이 부족하면 위로 띄운다 — 화면 밖으로 나가지 않게.
-      const below = window.innerHeight - rect.bottom;
-      const top = below < 150 ? rect.top - 150 : rect.bottom + 4;
-      setMenuAt({ left, top: Math.max(top, 8) });
+      setMenuAt(attendanceMenuPosition(anchor.getBoundingClientRect(), {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      }));
     };
-    place();
     window.addEventListener("scroll", place, true);
     window.addEventListener("resize", place);
-    return () => {
-      window.removeEventListener("scroll", place, true);
-      window.removeEventListener("resize", place);
-    };
-  }, [openCell]);
-
-  useEffect(() => {
-    if (!openCell) return;
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setOpenCell(null); };
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") closeMenu(); };
     const onPointerDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setOpenCell(null);
+      if (!menuRef.current?.contains(event.target as Node) && !anchorRef.current?.contains(event.target as Node)) closeMenu();
     };
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("mousedown", onPointerDown);
     return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("mousedown", onPointerDown);
     };
@@ -165,7 +173,7 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
                         <button
                           ref={open ? anchorRef : undefined}
                           disabled={!canEdit || holiday}
-                          onClick={() => setOpenCell(open ? null : { appKey: member.id, sessId: session.id })}
+                          onClick={(event) => openMenu(event, member.id, session.id, open)}
                           aria-label={`${member.name} ${session.date} 출석 상태${entry ? ` (현재 ${entry.s})` : ""}`}
                           aria-expanded={open}
                           className={`h-9 w-full text-sm font-semibold transition-colors disabled:cursor-default ${
@@ -195,13 +203,13 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
               className="fixed z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
               {(Object.keys(MARK) as AttendanceStatus[]).map((status) => (
                 <button key={status} role="menuitem"
-                  onClick={() => { onMark(openCell.appKey, openCell.sessId, status); setOpenCell(null); }}
-                  className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:bg-slate-50 ${entry?.s === status ? "text-slate-900" : "text-slate-500"}`}>
+                  onClick={() => { onMark(openCell.appKey, openCell.sessId, status); closeMenu(); }}
+                  className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:bg-slate-50 ${entry?.s === status ? MARK[status].cell : "text-slate-500"}`}>
                   {MARK[status].text} {status}{entry?.s === status ? " (현재)" : ""}
                 </button>
               ))}
               {entry && (
-                <button role="menuitem" onClick={() => { onClear(openCell.appKey, openCell.sessId); setOpenCell(null); }}
+                <button role="menuitem" onClick={() => { onClear(openCell.appKey, openCell.sessId); closeMenu(); }}
                   className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-400 hover:bg-slate-50">
                   ⌫ 기록 지우기
                 </button>

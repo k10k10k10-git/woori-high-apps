@@ -32,6 +32,11 @@ export interface SiteRequest {
 
 export type NewSiteRequest = Omit<SiteRequest, "id" | "status" | "resolvedAt" | "resolvedBy" | "resolutionNote" | "notifiedAt">;
 
+/** 짧은 제안도 유효하다. 제목과 본문이 비어 있지 않은지만 확인한다. */
+export function canSendSiteRequest(input: Pick<SiteRequest, "title" | "description">): boolean {
+  return input.title.trim().length > 0 && input.description.trim().length > 0;
+}
+
 function text(value: unknown, maxLength = 5000): string {
   return typeof value === "string" ? value.slice(0, maxLength) : "";
 }

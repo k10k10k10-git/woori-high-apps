@@ -49,7 +49,7 @@ This app owns:
 - `RosterModal` is the intentional full-replace exception.
 - Do not compute and persist student numbering on every save; `sortAndRenumber()` handles display order.
 - Preserve `personId` on every student/teacher/staff edit, move, promotion, roster replacement, and sheet sync. New records receive a type-namespaced ID; student historical reuse requires the unique name+birth+department+grade-progression rules in `src/utils/personId.ts`.
-- Admin roster writes must append `classes/{year}/{ck}/adminChanges/{changeId}` in the same root multi-location update. Store changed field labels, not old/new phone or address values; teacher attendance edits are not roster audit events.
+- Admin roster writes must append `classes/{year}/{ck}/adminChanges/{changeId}` in the same root multi-location update. Store field labels plus input/change/delete actions, never old/new phone or address values; teacher attendance edits are not roster audit events.
 - Compress student photos with `compressImage()` before storing base64.
 - Preserve service worker exclusions for Firebase, Google APIs, `/_next/`, `/__nextjs`, and RSC payload files.
 

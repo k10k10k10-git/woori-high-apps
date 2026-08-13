@@ -1225,7 +1225,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .guide-card-topline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .guide-card-topline span:first-child { border-radius: 999px; background: var(--guide-soft); padding: 5px 8px; color: var(--guide-ink); font-size: 10px; font-weight: 800; }
 .guide-card-topline span:last-child { overflow: hidden; color: var(--color-text-faint); font-size: 10px; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
-.guide-card > h3 { margin-top: 18px; font-size: 19px; letter-spacing: -.02em; }
+.guide-card > h3, .guide-card > div > h3 { margin-top: 18px; font-size: 19px; letter-spacing: -.02em; }
 .guide-card-summary { margin-top: 7px; color: var(--color-text-muted); font-size: 12px; line-height: 1.7; }
 .guide-card-block { margin-top: 20px; }
 .guide-card-block h4 { margin-bottom: 9px; color: var(--color-text-secondary); font-size: 11px; font-weight: 800; }
@@ -1238,6 +1238,11 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .guide-card-checklist li::before { display: none; }
 .guide-card-checklist li span { flex: 0 0 auto; }
 .guide-card-caution { margin-top: 14px; border-radius: 11px; background: #fff8e7; padding: 10px 12px; color: #7f611a; font-size: 10px; line-height: 1.6; }
+.guide-edit-panel { display: grid; margin-top: 14px; gap: 14px; border-radius: 17px; background: #edf7f3; padding: 22px 24px; }
+.guide-edit-panel label > span, .guide-editor-fields label > span { display: block; margin: 0 0 6px 2px; color: var(--color-text-muted); font-size: 10px; font-weight: 750; }
+.guide-card-editor { grid-column: 1 / -1; }
+.guide-editor-fields { display: grid; margin-top: 18px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; }
+.guide-editor-fields label:nth-child(n+4) { grid-column: 1 / -1; }
 .guide-tools-grid { display: grid; align-items: start; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 16px; }
 .guide-tool-card { padding: 26px; }
 .guide-form-grid { display: grid; margin-top: 20px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; }
@@ -1294,6 +1299,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .guide-search { width: 100%; }
   .guide-month-tabs { overflow-x: auto; grid-template-columns: repeat(12, 52px); padding-bottom: 4px; }
   .guide-month-brief { padding: 18px; grid-template-columns: 1fr; }
+  .guide-edit-panel { padding: 18px; }
   .guide-month-brief > div:last-child { grid-column: auto; }
   .guide-card-grid { grid-template-columns: 1fr; }
   .guide-card { padding: 22px 19px; }
@@ -1303,6 +1309,8 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .guide-form-grid .sm\:col-span-2 { grid-column: auto; }
   .guide-notice-preview pre { min-height: 230px; padding: 0 0 54px; }
   .guide-card-checklist ul { grid-template-columns: 1fr; }
+  .guide-editor-fields { grid-template-columns: 1fr; }
+  .guide-editor-fields label { grid-column: auto !important; }
   .home-ministry-brief { align-items: start; padding: 20px; grid-template-columns: 56px minmax(0, 1fr); }
   .home-ministry-brief__month span { font-size: 27px; }
   .home-ministry-brief__action { grid-column: 1 / -1; justify-content: space-between; }

@@ -269,7 +269,7 @@ await update(ref(db), { [`classes/${year}/${ck}/students/${id}`]: newStudent });
 // ❌ 금지 — 반 전체를 덮어씀, 동시 편집 시 다른 사람의 변경이 사라짐
 await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 ```
-관리자 명단 변경은 같은 루트 `update()`에 `classes/{year}/{ck}/adminChanges/{changeId}`도 함께 넣는다. 원본 변경만 성공하고 행정 이력이 빠지는 상태를 만들지 않으며, 감사기록에는 연락처·주소의 실제 이전/이후 값 대신 변경된 필드 이름만 저장한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
+관리자 명단 변경은 같은 루트 `update()`에 `classes/{year}/{ck}/adminChanges/{changeId}`도 함께 넣는다. 원본 변경만 성공하고 행정 이력이 빠지는 상태를 만들지 않으며, 감사기록에는 연락처·주소의 실제 이전/이후 값 대신 `학교 입력`·`학교 변경`·`학교 삭제`처럼 필드 이름과 작업만 저장한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
 
 번호(`num`)는 저장 시점에 계산하지 않는다 — 읽을 때 `sortAndRenumber()`가 항상 재계산하므로 저장값이 어긋나도 자동 보정된다. `RosterModal`(명단 일괄 교체)만 예외 — 사용자가 명시적으로 "교체"를 확인한 뒤 루트 `update()`에서 `students` 전체 값과 감사기록을 함께 반영한다.
 

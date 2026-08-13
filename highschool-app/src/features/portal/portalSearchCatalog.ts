@@ -56,7 +56,7 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
     {
       id: "ministry-guide",
       label: "사역 가이드",
-      description: "월별 사역 흐름, 운영 플레이북, 공지와 수련회 회고",
+      description: "월별 사역 흐름과 부서 운영 가이드 라인",
       href: "/ministry-guide",
       keywords: "예배 목양 출석 훈련 사역팀 수련회 행정 공지 특별사역 피드백 피드포워드",
       area: "support",

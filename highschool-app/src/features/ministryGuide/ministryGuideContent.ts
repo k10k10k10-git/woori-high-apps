@@ -154,37 +154,6 @@ export const MINISTRY_GUIDE_SECTIONS: MinistryGuideSection[] = [
   },
 ];
 
-export const RETREAT_FEEDFORWARD_QUESTIONS = [
-  "학생들의 표정과 태도가 달라진 은혜의 결정적 장면은 무엇이었나요?",
-  "다음 수련회에서 빼거나 새로 더하고 싶은 프로그램은 무엇인가요?",
-  "학생에게 집중하지 못하게 만든 행정·운영상 어려움은 무엇이었나요?",
-  "함께 수고한 섬김이에게 전할 격려 또는 다음 제안은 무엇인가요?",
-] as const;
-
 export function getMonthlyMinistry(month: number) {
   return MONTHLY_MINISTRIES.find((item) => item.month === month) ?? MONTHLY_MINISTRIES[0];
-}
-
-export function buildAnnouncementTemplate(input: {
-  background: string;
-  audience: string;
-  schedule: string;
-  method: string;
-  deadline: string;
-  closing: string;
-}) {
-  const lines = [
-    "샬롬! 고등부입니다.",
-    "",
-    input.background.trim() || "[공지 배경을 한 문장으로 적어주세요.]",
-    "",
-    `📢 대상: ${input.audience.trim() || "[대상]"}`,
-    `📅 일정: ${input.schedule.trim() || "[일정과 장소]"}`,
-    `✅ 방법: ${input.method.trim() || "[신청·참여 방법]"}`,
-    "",
-    `**${input.deadline.trim() || "[마감일]"}까지 부탁드립니다!**`,
-    "",
-    input.closing.trim() || "함께 준비해주셔서 감사합니다.",
-  ];
-  return lines.join("\n");
 }

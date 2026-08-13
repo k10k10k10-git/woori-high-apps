@@ -22,6 +22,7 @@ import {
   type MinistryRoles, type RetreatRole, type SemesterRole,
 } from "@/features/portal/accessPolicy";
 import { normalizeIguardPendingRequests, type IguardPendingReq } from "./pendingAccess";
+import { isMinistryGuideMilestone } from "@/features/ministryGuide/ministryGuidePersistence";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -165,7 +166,11 @@ const GLOBAL_MILESTONES_PATH = paths.prepMilestones();
 export function subscribeToMilestones(cb: (milestones: Milestone[]) => void, onError?: (error: Error) => void): () => void {
   return onValue(
     ref(db, GLOBAL_MILESTONES_PATH),
-    (snap) => cb(snapToList<Milestone>(snap).sort((a, b) => a.targetDate.localeCompare(b.targetDate))),
+    (snap) => cb(
+      snapToList<Milestone>(snap)
+        .filter((item) => !isMinistryGuideMilestone(item))
+        .sort((a, b) => a.targetDate.localeCompare(b.targetDate)),
+    ),
     (error) => {
       console.warn(`Failed to subscribe ${GLOBAL_MILESTONES_PATH}:`, error);
       cb([]);

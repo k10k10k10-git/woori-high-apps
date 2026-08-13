@@ -34,6 +34,21 @@ export function changedStudentFieldLabels(before: Student, after: Student): stri
     .map(([, label]) => label);
 }
 
+/**
+ * 실제 개인정보 값은 남기지 않되, 제3자가 무엇이 일어났는지는 알 수 있게
+ * 빈 값과 값 사이의 이동을 입력·삭제로 구분한다.
+ */
+export function describeStudentFieldChanges(before: Student, after: Student): string[] {
+  return FIELD_LABELS.flatMap(([key, label]) => {
+    const previous = comparable(before[key]);
+    const next = comparable(after[key]);
+    if (previous === next) return [];
+    if (previous === '' && next !== '') return [`${label} ${label === '사진' ? '등록' : '입력'}`];
+    if (previous !== '' && next === '') return [`${label} 삭제`];
+    return [`${label} 변경`];
+  });
+}
+
 export function adminActor(role: UserRole | null): string {
   return role?.name?.trim() || '출석부 관리자';
 }

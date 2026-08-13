@@ -91,7 +91,7 @@
 | `retreats/{id}/iguard/guide` | 이가드 | - | 이가드만 | 없음 |
 | `retreats/{id}/iguard/accessLock` | 이가드 | - | 이가드만(admin UI) | 수련회별 PIN 진입 장벽 — 삭제 시 승인 팀원 모두 즉시 입장 |
 | `retreats/{id}/milestones` | (레거시) | - | 없음 | **미사용** — 전역 `prepMilestones`로 이관됨(코드에 쓰기 함수 없음) |
-| `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 (유일한 공유 쓰기 노드) |
+| `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 + `sourceSite=ministry-guide*` 사역 가이드 편집 조각. 일반 일정 구독은 가이드 조각을 필터링 (유일한 공유 쓰기 노드) |
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |
 | `iguardMembers` | 이가드 | - | 이가드만 | 이가드 멤버 인증 |
 | `iguardRoles` | 이가드 | 행정(역할 판정) | 이가드만 | `staff`(스탭) / `team`(이가드팀) — Rules validate가 이 두 값만 허용 |

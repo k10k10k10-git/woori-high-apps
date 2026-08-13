@@ -9,7 +9,7 @@ import {
   adminActor,
   adminChangePath,
   buildAdminChangeEntry,
-  changedStudentFieldLabels,
+  describeStudentFieldChanges,
 } from '@/utils/adminChange';
 import type { Student } from '@/types';
 
@@ -82,7 +82,7 @@ export default function StudentModal({
       const updates: Record<string, unknown> = {
         [`classes/${state.curYear}/${ck}/students/${id}`]: newStudent,
       };
-      const changedFields = student ? changedStudentFieldLabels(student, newStudent) : [];
+      const changedFields = student ? describeStudentFieldChanges(student, newStudent) : [];
       if (!student || changedFields.length > 0) {
         const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
         updates[adminChangePath(state.curYear, ck, changeId)] = buildAdminChangeEntry({
@@ -90,7 +90,7 @@ export default function StudentModal({
           teacher: state.classData[ck]?.teacher,
           student: newStudent,
           action: student ? '학생 정보 수정' : '학생 등록',
-          changeSummary: student ? `${changedFields.join('·')} 수정` : '출석부에 학생 신규 등록',
+          changeSummary: student ? changedFields.join(' · ') : '출석부에 학생 신규 등록',
           actor: adminActor(state.userRole),
         });
       }

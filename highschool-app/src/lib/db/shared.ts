@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { BrainstormNote, BrainstormComment, Milestone, RetreatPeriod } from "../types";
 import { paths } from "../paths";
 import { snapToList, stripUndefined } from "./core";
+import { isMinistryGuideMilestone } from "@/features/ministryGuide/ministryGuidePersistence";
 
 export const RETREAT_ADMIN_SOURCE_SITE = "retreat-admin";
 
@@ -76,7 +77,7 @@ export function subscribeToMilestones(callback: (milestones: Milestone[]) => voi
   const r = ref(db, GLOBAL_MILESTONES_PATH);
   return onValue(
     r,
-    (snap) => callback(snapToList<Milestone>(snap)),
+    (snap) => callback(snapToList<Milestone>(snap).filter((item) => !isMinistryGuideMilestone(item))),
     (error) => {
       console.warn(`Failed to subscribe ${GLOBAL_MILESTONES_PATH}:`, error);
       callback([]);

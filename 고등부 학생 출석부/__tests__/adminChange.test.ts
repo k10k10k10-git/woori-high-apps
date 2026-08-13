@@ -4,6 +4,7 @@ import {
   adminChangePath,
   buildAdminChangeEntry,
   changedStudentFieldLabels,
+  describeStudentFieldChanges,
 } from '@/utils/adminChange';
 
 describe('행정 변동 감사 기록', () => {
@@ -12,6 +13,13 @@ describe('행정 변동 감사 기록', () => {
       { id: 's1', name: '김학생', phone: '010-1111-1111', school: '우리중' },
       { id: 's1', name: '김학생', phone: '010-9999-9999', school: '우리서고' },
     )).toEqual(['본인 연락처', '학교']);
+  });
+
+  it('학교 입력·변경·삭제를 실제 값 없이 구분한다', () => {
+    const base = { id: 's1', name: '김학생', school: '' };
+    expect(describeStudentFieldChanges(base, { ...base, school: '우리중' })).toEqual(['학교 입력']);
+    expect(describeStudentFieldChanges({ ...base, school: '우리중' }, { ...base, school: '우리서고' })).toEqual(['학교 변경']);
+    expect(describeStudentFieldChanges({ ...base, school: '우리중' }, base)).toEqual(['학교 삭제']);
   });
 
   it('반 내부 선택 하위 경로와 완료 기록을 만든다', () => {

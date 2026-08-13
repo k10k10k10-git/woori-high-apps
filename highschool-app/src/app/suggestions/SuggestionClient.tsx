@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, describeRoles } from "@/features/portal/accessPolicy";
 import { prepareSiteRequestAttachment } from "@/features/suggestions/attachment";
 import { createSiteRequest } from "@/features/suggestions/db";
+import { canSendSiteRequest } from "@/features/suggestions/siteRequest";
 
 type Draft = {
   category: string;
@@ -73,7 +74,7 @@ export default function SuggestionClient() {
     return <main className="min-h-screen grid place-items-center px-6 text-center"><div><h1 className="text-xl font-bold">접근 승인이 필요합니다</h1><Link href="/" className="btn-secondary mt-5">홈으로</Link></div></main>;
   }
 
-  const canPrepare = draft.title.trim().length > 1 && draft.description.trim().length > 4;
+  const canPrepare = canSendSiteRequest(draft);
 
   async function sendReport() {
     if (!user || sending) return;

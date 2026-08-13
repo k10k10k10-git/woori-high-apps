@@ -9,7 +9,7 @@
 ## 라우트
 
 - `/`: 통합 홈
-- `/ministry-guide`: 위키에서 추린 월별 사역 흐름·운영 플레이북·공지·수련회 회고
+- `/ministry-guide`: 위키에서 추린 월별 사역 흐름·부서 운영 가이드 라인(권한 있는 담당자 편집 가능)
 - `/semesters`, `/semester/[id]`: 학기 중 사역
 - `/sunday-ministry`: 학기 구분 없는 주일 사역(행정·바나바, 새친구·등록 현황·행정 변동 사항)
 - `/retreats`, `/retreat/[id]`: 수련회 행정
@@ -111,7 +111,7 @@
 - **교사·스탭 접수**는 학생과 다른 경로다: 훈련·지망 없이 사역팀에 바로 배정한다(`intakeRule.isStaffApplicant`). 저장 시 `teamId`를 직접 채우고 `choice1/2`·`trainingClassId`는 비운다.
 - **배치·커리큘럼은 두 축**이다: 사역팀(`teams`)과 훈련 반(`trainingClasses`). 커리큘럼은 `curriculum/{id}` 한 맵을 공유한다(두 축의 id가 겹치지 않는다). 훈련 반에는 `goal`이 없으므로 학기 목표 박스는 사역팀에서만 보인다.
 - **홈 공유 캘린더**의 "공유 일정"은 `prepMilestones`다. 추가·수정·삭제는 Rules와 같게 스탭을 제외하고 열어 둔다(`canEditPortalArea("retreat-admin") || iguardScope === "all"`).
-- **사역 가이드**는 정적 운영 지식 화면이다. 위키 원문 중 반복 가능한 운영 원칙만 `features/ministryGuide/ministryGuideContent.ts`에 옮기며 Firebase를 읽거나 쓰지 않는다. 연간 계획은 반드시 `가안`으로 표시하고, 학생 실명·연락처·주소·가정·건강 특이사항과 미결 아이디어는 넣지 않는다.
+- **사역 가이드**의 기본값은 `features/ministryGuide/ministryGuideContent.ts`의 정적 운영 원칙이다. 권한 있는 담당자의 월별 흐름·부서 운영 가이드 수정본은 기존 공유 경로 `prepMilestones/*`에 `sourceSite=ministry-guide*`인 결정적 레코드로 나눠 저장하고, 일반 일정 구독은 이를 반드시 필터링한다. 연간 계획은 `가안`으로 표시하며 학생 실명·연락처·주소·가정·건강 특이사항과 미결 아이디어는 넣지 않는다.
 - **주일 사역의 새친구 탭**은 학기 선택 없이 모든 `semesters/*/newFriends`를 통합 조회한다. 기존 학기별 기록은 이동하지 않고, 신규 기록만 학기가 아닌 연도별 내부 작업공간 `semesters/{year}-sunday/newFriends`와 `semestersPrivate/{year}-sunday/newFriendsPrivate`에 저장한다. 이 작업공간은 `meta`를 두지 않아 학기 목록에 나타나지 않는다. 행정팀은 접수·2주 과정·등록 결정·반배정을 관리하고, `classes/{year}` 반영은 현재 Rules와 일치하게 통합관리자만 `registerNewFriendInRoster`를 호출한다. 이 함수는 새친구 ID 기반 결정적 학생 ID, 중복 차단, 대상 반 확인, 비공개 사전 스냅샷, 단일 학생 경로+반영 이력의 원자 update와 재조회 검증을 유지한다. 반영된 새친구 삭제도 통합관리자만 가능하며, `removeNewFriendFromRoster`가 결정적 `nf_` ID·현재 이름·연결 반을 재검증하고 학생·해당 출석·새친구 공개/비공개 기록을 원자 삭제한다. 삭제 직전 전체 사본은 `newFriendRosterBackups/{friendId}/removals/{timestamp}`에, 학생 복구 사본은 `trash/{year}/students/{studentId}`에 남기고 결과를 재조회한다. 일반적인 `classes`·`attendance` 쓰기 함수로 넓히지 않는다.
 - **행정 변동 사항 탭**은 학생 앱 소유 `classes/{year}/{classKey}/adminChanges`를 읽기만 한다. 학생 앱이 학생 명단 수정과 같은 원자 update로 만든 감사기록이며, 통합 앱에서는 생성·수정·삭제하지 않는다. 기존 `변경 이력`은 제거하고 `학생 변동`은 `등록 현황`으로 표시한다.
 - **등반 및 배정 취소**는 새친구 공개·비공개 기록과 등록 결정·2주차 기록을 보존하고 `assignedClassKey`·`giftDate`·`rosterSync`를 해제해 `반배정` 단계로 되돌린다. 출석부 반영 후에는 통합관리자만 실행하며, 결정적 `nf_` 학생·해당 출석을 사전 백업과 `trash`를 남긴 뒤 원자적으로 제거한다. 새친구 기록까지 지우는 `명단·출석부 삭제`와 구분한다.
@@ -119,7 +119,7 @@
 - **인원체크 키에 배열 인덱스를 넣지 않는다** — `checklistKeys.ts`의 `stableMemberId`(`{kind}:{ownerId}:{name}`)만 쓴다. 인덱스를 넣으면 행사 중 한 명이 불참 처리될 때 뒤 사람들의 체크가 통째로 어긋난다. 운영 DB에는 구형 인덱스 키가 남아 있으므로 판정·해제는 반드시 `memberCheckKeys`/`isMemberChecked`를 거친다(신형·구형 동시 인식, 쓰기는 신형만).
 - **삭제는 짝이 되는 노드를 반드시 함께 지운다** — 수련회는 `buildRetreatRemovalUpdates`(`retreats` + `retreatsPrivate`), 팀·훈련 반은 `curriculum`까지. 한쪽만 지우면 화면에서 접근 불가능한 고아가 남는다(민감정보면 더 심각).
 - **전체 덮어쓰기 복구는 사전 백업 성공을 확인한 뒤에만** — `backupNodeBeforeOverwrite`의 반환값을 반드시 검사한다(`if (!backedUp) throw`). 스로틀된 상시 저장 백업만 예외다.
-- **출석 표**(`AttendanceGrid`)의 셀은 토글이 아니다. 셀을 누르면 출석·지각·결석·지우기를 명시적으로 고른다(멱등 기록 — 실수 규칙 11).
+- **출석 표**(`AttendanceGrid`)의 셀은 토글이 아니다. 셀을 누르면 출석·지각·결석·지우기를 명시적으로 고른다(멱등 기록 — 실수 규칙 11). 상태 메뉴 좌표는 클릭한 셀에서 즉시 계산하고 닫을 때 좌표도 비워 이전 셀의 흰 메뉴가 한 프레임 튀지 않게 한다.
 - `.input`은 `@layer` 밖 규칙이라 `width:100%`가 유틸리티 `w-*`를 이긴다. 폭은 감싼 div로 주고, 높이는 `h-*`로 고정하지 않는다(모바일 16px 글꼴에서 글자가 잘린다).
 
 ## Firebase 안전
