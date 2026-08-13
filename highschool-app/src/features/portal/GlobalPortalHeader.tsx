@@ -157,7 +157,7 @@ export default function GlobalPortalHeader() {
             <div className="portal-account-row">
               {canManageRolesOf(roles) && (
                 <button onClick={() => siteRequestAdmin ? setMyPageOpen(true) : setTeamOpen(true)} className="portal-compact-action">
-                  <span aria-hidden="true" className="text-[var(--color-on-dark-accent)]">●</span><span className="hidden sm:inline">{siteRequestAdmin ? "마이페이지" : "팀원 관리"}</span>
+                  <span>{siteRequestAdmin ? "마이페이지" : "팀원 관리"}</span>
                 </button>
               )}
               <span className="portal-account-name hidden md:inline">{user.displayName || user.email}</span>

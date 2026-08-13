@@ -88,11 +88,11 @@ export default function ParticipantsTab({ retreat }: Props) {
   useEffect(() => {
     void loadData();
     const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
-      e => setError(prev => prev || `참가자 구독 실패 — ${e.message}`));
+      e => setError(prev => prev || `참가자 구독 실패: ${e.message}`));
     const unsubStudents = subscribeToStudentsByYear(retreat.year, setStudents,
-      e => setError(prev => prev || `출석부 학생 구독 실패 — ${e.message}`));
+      e => setError(prev => prev || `출석부 학생 구독 실패: ${e.message}`));
     const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState,
-      e => setError(prev => prev || `구독 실패 — ${e.message}`));
+      e => setError(prev => prev || `구독 실패: ${e.message}`));
     return () => { unsubParticipants(); unsubStudents(); unsubColors(); };
   }, [loadData, retreat.id, retreat.year]);
 
@@ -438,8 +438,8 @@ export default function ParticipantsTab({ retreat }: Props) {
           <span className="text-sm font-semibold text-purple-700">
             🔁 중복 신청 {duplicates.length}명
             {duplicates.length === 0
-              ? <span className="ml-2 font-normal text-green-500 text-xs">— 중복 없음 ✓</span>
-              : <span className="ml-2 font-normal text-purple-500 text-xs">— 기본은 최초 신청 유지, 필요 시 아래에서 다른 신청 선택 가능</span>}
+              ? <span className="ml-2 font-normal text-green-500 text-xs">중복 없음 ✓</span>
+              : <span className="ml-2 font-normal text-purple-500 text-xs">기본은 최초 신청 유지, 필요 시 아래에서 다른 신청 선택 가능</span>}
           </span>
           <span className="text-purple-400 text-xs">{showDuplicates ? "▲ 접기" : "▼ 펼치기"}</span>
         </button>
@@ -494,15 +494,15 @@ export default function ParticipantsTab({ retreat }: Props) {
                               />
                             </td>
                             <td className="px-4 py-2 text-slate-400 whitespace-nowrap">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
-                            <td className="px-4 py-2 text-slate-700 font-medium whitespace-nowrap">{e.registeredAt || "—"}</td>
-                            <td className="px-4 py-2 text-slate-500">{e.gender || "—"}</td>
+                            <td className="px-4 py-2 text-slate-700 font-medium whitespace-nowrap">{e.registeredAt || "없음"}</td>
+                            <td className="px-4 py-2 text-slate-500">{e.gender || "없음"}</td>
                             <td className="px-4 py-2 whitespace-nowrap"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
-                            <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "—"}</td>
+                            <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "없음"}</td>
                             <td className="px-4 py-2 whitespace-nowrap">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
                             {rawHeaders.map(h => {
                               const v = pairs.get(h) || "";
                               return (
-                                <td key={h} className="px-4 py-2 text-slate-500 whitespace-nowrap max-w-[220px] truncate" title={v}>{v || "—"}</td>
+                                <td key={h} className="px-4 py-2 text-slate-500 whitespace-nowrap max-w-[220px] truncate" title={v}>{v || "없음"}</td>
                               );
                             })}
                           </tr>
@@ -528,10 +528,10 @@ export default function ParticipantsTab({ retreat }: Props) {
             · 자동 매칭 불가 {unresolvedAmbiguous}명
             {manualMatchedCount > 0 && <span className="ml-1 text-green-600">· ✓ 수동 매칭 {manualMatchedCount}명</span>}
             {mismatches.length === 0 && unresolvedAmbiguous === 0 && manualMatchedCount === 0 && (
-              <span className="ml-2 font-normal text-green-500 text-xs">— 이상 없음 ✓</span>
+              <span className="ml-2 font-normal text-green-500 text-xs">이상 없음 ✓</span>
             )}
             {(mismatches.length > 0 || unresolvedAmbiguous > 0) && (
-              <span className="ml-2 font-normal text-orange-500 text-xs">— 부서·학년·반 오기재 가능성</span>
+              <span className="ml-2 font-normal text-orange-500 text-xs">부서·학년·반 오기재 가능성</span>
             )}
           </span>
           <span className="text-orange-400 text-xs">{showMismatch ? "▲ 접기" : "▼ 펼치기"}</span>
@@ -585,7 +585,7 @@ export default function ParticipantsTab({ retreat }: Props) {
               <thead>
                 <tr className="bg-yellow-50">
                   <th className="px-4 py-2 text-left text-xs font-semibold text-yellow-700" colSpan={4}>
-                    🔀 자동 매칭 불가 {unresolvedAmbiguous}명 — 수동 확인 필요
+                    🔀 자동 매칭 불가 {unresolvedAmbiguous}명: 수동 확인 필요
                     {manualMatchedCount > 0 && (
                       <span className="ml-2 text-green-600">· ✓ 수동 매칭 완료 {manualMatchedCount}명</span>
                     )}
@@ -618,7 +618,7 @@ export default function ParticipantsTab({ retreat }: Props) {
                             ✓ {a.resolvedColor!.bu} {a.resolvedColor!.grade}학년 {a.resolvedColor!.cls}반 색칠됨
                           </span>
                         ) : a.dbAll.length === 0 ? (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className="text-xs text-slate-400">없음</span>
                         ) : (
                           <div className="flex flex-col gap-1">
                             {a.dbAll.map((d, i) => (
@@ -655,7 +655,7 @@ export default function ParticipantsTab({ retreat }: Props) {
             <span className="text-sm font-semibold text-teal-700">
               📋 후기 신청자 {lateRegistrants.length}명
             </span>
-            <span className="text-xs text-teal-500">— 반별 명단 탭 색칠로 처리된 인원</span>
+            <span className="text-xs text-teal-500">반별 명단 탭 색칠로 처리된 인원</span>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -679,7 +679,7 @@ export default function ParticipantsTab({ retreat }: Props) {
                   <td className="px-4 py-2.5 text-slate-600">
                     {lr.grade}학년 {lr.cls}반
                   </td>
-                  <td className="px-4 py-2.5 text-slate-500 text-xs">{lr.phone || "—"}</td>
+                  <td className="px-4 py-2.5 text-slate-500 text-xs">{lr.phone || "없음"}</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${
                       lr.color === "blue"   ? "bg-blue-100 text-blue-700 border-blue-200"
@@ -698,7 +698,7 @@ export default function ParticipantsTab({ retreat }: Props) {
       )}
 
       {/* Table */}
-      <div className="card overflow-x-auto">
+      <div className="card retreat-roster-table overflow-x-auto">
         {loading ? (
           <div className="p-8 text-center text-slate-400">로딩 중...</div>
         ) : list.length === 0 ? (
@@ -752,13 +752,13 @@ export default function ParticipantsTab({ retreat }: Props) {
                     <span className={`tag ${p.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{p.bu}</span>
                   </td>
                   <td className="px-2 sm:px-4 py-2 text-slate-600 whitespace-nowrap">
-                    {p.grade > 0 ? `${p.grade}학년 ${p.class > 0 ? p.class + "반" : ""}` : "—"}
+                    {p.grade > 0 ? `${p.grade}학년 ${p.class > 0 ? p.class + "반" : ""}` : "없음"}
                   </td>
                   <td className="border-l-2 border-slate-100 bg-blue-50/20 px-2 sm:px-4 py-2 text-slate-600 whitespace-nowrap">
-                    {p.phone || "—"}
+                    {p.phone || "없음"}
                   </td>
                   <td className="bg-blue-50/20 px-2 sm:px-4 py-2 text-slate-600 whitespace-nowrap">
-                    {p.pPhone || "—"}
+                    {p.pPhone || "없음"}
                   </td>
                   <td className="border-l-2 border-slate-100 px-2 sm:px-4 py-2 text-slate-500 whitespace-nowrap">{p.registeredAt}</td>
                 </tr>

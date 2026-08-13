@@ -113,8 +113,7 @@ export default function SemestersPage() {
       <main className="page-container max-w-5xl">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="section-kicker">SEMESTER MINISTRY</p>
-            <h1 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-slate-900">훈련·사역팀</h1>
+            <h1 className="text-2xl font-bold tracking-[-0.025em] text-slate-900">훈련·사역팀</h1>
             <p className="mt-1 text-sm text-slate-500">훈련과 사역팀의 신청부터 수료까지 한 흐름으로 관리합니다.</p>
           </div>
           {!canEdit && (
@@ -167,21 +166,15 @@ export default function SemestersPage() {
         {canEdit && (
           <section className="card card-body">
             <h2 className="font-semibold text-slate-800">새 학기 만들기</h2>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                value={newId}
-                onChange={(e) => setNewId(e.target.value)}
-                placeholder="학기 ID (예: 2026-1)"
-                aria-label="학기 ID"
-                className="input flex-1"
-              />
-              <input
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="제목 (비우면 자동)"
-                aria-label="학기 제목"
-                className="input flex-1"
-              />
+            <div className="flex flex-col items-end gap-2 sm:flex-row">
+              <label className="w-full flex-1 text-xs font-semibold text-slate-500">
+                학기 ID
+                <input value={newId} onChange={(e) => setNewId(e.target.value)} placeholder="예: 2026-1" className="input mt-1 w-full" />
+              </label>
+              <label className="w-full flex-1 text-xs font-semibold text-slate-500">
+                학기 제목
+                <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="비우면 자동 입력" className="input mt-1 w-full" />
+              </label>
               <button onClick={() => void handleCreate()} disabled={creating || !newId.trim()} className="btn-primary justify-center">
                 {creating ? "생성 중…" : "생성"}
               </button>

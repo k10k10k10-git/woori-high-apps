@@ -100,6 +100,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
   const [pendingRoleChoice, setPendingRoleChoice] = useState<Record<string, MinistryRoles>>({});
   const [busyUid, setBusyUid] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [memberQuery, setMemberQuery] = useState("");
 
   useEffect(() => {
     const fail = (error: Error) => setLoadError((current) => current ?? error.message);
@@ -162,11 +163,22 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
       });
   }, [admins, iguardMembers, iguardRoles, mainAdmins]);
 
+  const filteredMembers = useMemo(() => {
+    const query = memberQuery.trim().toLocaleLowerCase("ko");
+    if (!query) return members;
+    return members.filter((member) => [
+      member.name,
+      member.email,
+      SEMESTER_ROLE_LABELS[member.roles.semester],
+      RETREAT_ROLE_LABELS[member.roles.retreat],
+    ].some((value) => value.toLocaleLowerCase("ko").includes(query)));
+  }, [memberQuery, members]);
+
   const memberGroups = useMemo(
     () => ASSIGNABLE_SEMESTER_ROLES
-      .map((role) => ({ role, list: members.filter((member) => member.roles.semester === role) }))
+      .map((role) => ({ role, list: filteredMembers.filter((member) => member.roles.semester === role) }))
       .filter((group) => group.list.length > 0),
-    [members],
+    [filteredMembers],
   );
 
   const semesterCounts = useMemo(() => {
@@ -310,8 +322,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
     <>
         {!embedded && <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
-            <p className="text-xs font-bold tracking-[0.14em] text-emerald-600">PEOPLE &amp; ACCESS</p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">팀원 관리</h2>
+            <h2 className="text-xl font-bold text-slate-900">팀원 관리</h2>
             <p className="mt-1 text-xs text-slate-500">학기 역할은 학기·주일 화면에, 방학 역할은 수련회 행정·현장 화면에 적용됩니다.</p>
           </div>
           <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-xl text-slate-500 hover:bg-slate-200" aria-label="닫기">×</button>
@@ -424,13 +435,24 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
           </section>
 
           <section>
-            <div className="mb-3">
-              <h3 className="font-bold text-slate-800">승인된 팀원</h3>
-              <p className="mt-1 text-xs text-slate-400">학기 역할군 순으로 묶어 보여줍니다. 역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
+            <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800">승인된 팀원</h3>
+                <p className="mt-1 text-xs text-slate-400">학기 역할군 순으로 묶어 보여줍니다. 역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
+              </div>
+              <label className="team-member-search">
+                <span className="sr-only">팀원 검색</span>
+                <input
+                  value={memberQuery}
+                  onChange={(event) => setMemberQuery(event.target.value)}
+                  placeholder="이름, 이메일, 역할 검색"
+                  className="input"
+                />
+              </label>
             </div>
             <div className="space-y-5">
-              {members.length === 0 && (
-                <div className="rounded-xl border border-dashed border-slate-200 py-7 text-center text-sm text-slate-400">승인된 팀원이 없습니다.</div>
+              {filteredMembers.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-200 py-7 text-center text-sm text-slate-400">{members.length === 0 ? "승인된 팀원이 없습니다." : "검색 결과가 없습니다."}</div>
               )}
               {memberGroups.map((group) => (
                 <div key={group.role} className="space-y-2">
@@ -441,7 +463,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
                   {group.list.map((member) => {
                     const isMe = member.uid === user?.uid;
                     return (
-                      <div key={member.uid} className="rounded-xl border border-slate-200 p-3">
+                      <div key={member.uid} className="team-member-card rounded-xl border border-slate-200 p-3">
                         <div className="min-w-0">
                           {editingUid === member.uid ? (
                             <div className="flex gap-2">
@@ -475,7 +497,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
                             </>
                           )}
                         </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="team-member-roles mt-3 flex flex-wrap gap-2">
                           <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
                             학기 역할
                             <select

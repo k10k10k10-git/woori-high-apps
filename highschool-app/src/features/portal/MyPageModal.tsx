@@ -49,14 +49,13 @@ export default function MyPageModal({ onClose, initialTab = "team" }: { onClose:
         aria-modal="true"
         aria-label="통합관리자 마이페이지"
         tabIndex={-1}
-        className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-slate-50 shadow-2xl"
+        className="admin-mypage-dialog max-h-[92vh] w-full max-w-6xl overflow-y-auto bg-slate-50 shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 backdrop-blur sm:px-6">
+        <header className="admin-mypage-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 backdrop-blur sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold tracking-[0.14em] text-emerald-600">ADMIN MY PAGE</p>
-              <h2 className="mt-1 text-xl font-bold text-slate-950">통합관리자 마이페이지</h2>
+              <h2 className="text-xl font-bold text-slate-950">통합관리자 마이페이지</h2>
               <p className="mt-1 text-xs text-slate-500">팀원 권한과 사이트 요청사항을 한곳에서 관리합니다.</p>
             </div>
             <button onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xl text-slate-500 hover:bg-slate-200" aria-label="마이페이지 닫기">×</button>
@@ -67,7 +66,7 @@ export default function MyPageModal({ onClose, initialTab = "team" }: { onClose:
           </div>
         </header>
 
-        <div role="tabpanel" className="p-3 sm:p-5">
+        <div role="tabpanel" className="admin-mypage-content p-3 sm:p-5">
           {tab === "team" ? <TeamModal embedded /> : <SiteRequestsPanel />}
         </div>
       </div>

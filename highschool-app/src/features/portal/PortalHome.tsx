@@ -26,7 +26,6 @@ import {
   describeRolesHint,
   retreatEntryHref,
 } from "./accessPolicy";
-import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TRAINING_TABS, SUNDAY_MINISTRY_TABS } from "./featureCatalog";
 import SharedMinistryCalendar, { type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
@@ -247,9 +246,8 @@ export default function PortalHome() {
       <main className="page-container">
         {loadError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
 
-        <section className="page-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
+        <section className="page-hero home-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
           <div className="min-w-0">
-            <p className="page-eyebrow">TODAY&apos;S MINISTRY</p>
             <h1 className="page-title">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
             <p className="page-description">학기 운영, 주일 사역, 수련회 행정과 현장 실행을 하나의 계정에서 이어갑니다.</p>
           </div>
@@ -310,43 +308,6 @@ export default function PortalHome() {
           <span className="home-ministry-brief__action">사역 가이드 <b aria-hidden="true">→</b></span>
         </Link>
 
-        <section className="surface-panel mt-7 p-5 sm:p-7">
-          <div className="section-heading">
-            <div><p className="section-kicker">WORKSPACES</p>
-            <h2 className="section-title">사역 바로가기</h2>
-            <p className="mt-1 text-sm text-slate-500">기존 사이트별 메뉴를 하나의 사역 흐름으로 정리했습니다.</p>
-            </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {semesterAllowed && (
-              <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="home-workspace-card group">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">훈련·사역팀</h3><span className="text-[#2563eb] group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-4 flex flex-wrap gap-2">{SEMESTER_TRAINING_TABS.map((label) => <span key={label} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-[#2457b8] shadow-sm">{label}</span>)}</div>
-              </Link>
-            )}
-            {semesterAllowed && (
-              <Link href="/sunday-ministry" className="home-workspace-card group">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">행정·바나바</h3><span className="text-amber-600 group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-4 space-y-2.5">{SUNDAY_MINISTRY_TABS.map((label) => <div key={label} className="flex items-center gap-2 text-xs"><span className="size-1.5 rounded-full bg-amber-400"/><span className="text-slate-600">{label}</span></div>)}</div>
-              </Link>
-            )}
-            {retreatAdminAllowed && (
-              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} className="home-workspace-card group">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">수련회 행정</h3><span className="text-[var(--color-primary)] group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-4 space-y-2.5">{RETREAT_TAB_GROUPS.map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-14 font-bold text-[var(--color-primary)]">{group.label}</span><span className="leading-relaxed text-slate-500">{group.tabs.map((tab) => tab.label).join(" · ")}</span></div>)}</div>
-              </Link>
-            )}
-            {fieldAllowed && (
-              <Link href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} className="home-workspace-card group">
-                <div className="flex items-center justify-between"><h3 className="font-bold text-[var(--color-text-primary)]">수련회 이가드</h3><span className="text-[var(--color-primary)] group-hover:translate-x-0.5">→</span></div>
-                <div className="mt-4 space-y-2.5">{IGUARD_VIEW_GROUPS
-                  .filter((group) => iguardScopeOf(roles) === "all" || group.label === "실행")
-                  .map((group) => <div key={group.label} className="flex items-start gap-2 text-xs"><span className="min-w-9 font-bold text-[var(--color-primary)]">{group.label}</span><span className="line-clamp-2 leading-relaxed text-slate-500">{group.views.map((view) => view.label).join(" · ")}</span></div>)}</div>
-              </Link>
-            )}
-          </div>
-        </section>
-
         <section className="mt-7 grid gap-6">
           <SharedMinistryCalendar
             items={calendarItems}
@@ -364,7 +325,7 @@ export default function PortalHome() {
           />
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <section className="surface-panel p-5 sm:p-6">
+            <section className="surface-panel order-2 p-5 sm:p-6">
               <h2 className="text-lg font-bold">내 담당 사역</h2>
               <p className="mt-1 text-xs text-slate-400">현재 계정이 맡은 운영 영역과 권한을 표시합니다.</p>
               <div className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
@@ -381,11 +342,10 @@ export default function PortalHome() {
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
               </div>
             </section>
-            <section className="surface-panel p-5 sm:p-6">
+            <section className="surface-panel order-1 p-5 sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="section-kicker">ACTION INBOX</p>
-                  <h2 className="mt-1 text-lg font-bold">지금 확인할 일</h2>
+                  <h2 className="text-lg font-bold">지금 확인할 일</h2>
                   <p className="mt-1 text-xs text-slate-500">공유 준비 일정과 다음 사역을 날짜순으로 모았습니다.</p>
                 </div>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-600">{homeActions.length}건</span>
