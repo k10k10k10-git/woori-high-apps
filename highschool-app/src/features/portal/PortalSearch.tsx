@@ -139,7 +139,7 @@ export default function PortalSearch() {
                     )) : <SearchState title="일치하는 인물이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
                 </div>
                 <footer className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">
-                  이름만 같으면 연결하지 않습니다. 유형과 안정 ID·생년·연락처가 확인되는 기록만 동일인으로 묶습니다.
+                  유형이 다르거나 같은 연도에 후보가 여럿이면 분리합니다. 학생은 이름·생년·부서·진급 흐름이 유일할 때만 연도별 기록을 묶습니다.
                 </footer>
               </>
             )}
