@@ -1,9 +1,8 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getRetreats, deleteRetreat,
-  requestRetreatAccess, getEarliestPeriodDateByRetreat,
+  deleteRetreat, requestRetreatAccess, subscribeToAllRetreatPeriods, subscribeToRetreats,
 } from "@/lib/db";
 import { Retreat } from "@/lib/types";
 import FormGuideModal from "./FormGuideModal";
@@ -47,8 +46,10 @@ export default function HomePage() {
   const canUseAdmin = canAccessArea("retreat-admin", roles);
   const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
-  const [retreats, setRetreats] = useState<Retreat[]>([]);
+  const [retreatRecords, setRetreatRecords] = useState<Retreat[]>([]);
+  const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string }>>([]);
   const [retreatLoadError, setRetreatLoadError] = useState("");
+  const [subscriptionGeneration, setSubscriptionGeneration] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [selectedRetreatId, setSelectedRetreatId] = useState<string | null>(null);
@@ -58,41 +59,49 @@ export default function HomePage() {
   const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
   const canManageLocks = canEditArea("retreat-admin", roles);
 
-  const loadRetreats = useCallback(async () => {
-    setRetreatLoadError("");
-    try {
-      const list = await getRetreats();
-      // 수련회 기간(실제 행사 날짜) 최신순 정렬 — 기간 미등록 수련회는 생성일 기준으로 뒤에 정렬
-      const earliestByRetreat = await getEarliestPeriodDateByRetreat(list.map(r => r.id));
-      const sorted = [...list].sort((a, b) => {
-        const da = earliestByRetreat[a.id];
-        const db = earliestByRetreat[b.id];
-        if (da && db) return db.localeCompare(da);
-        if (da) return -1;
-        if (db) return 1;
-        return b.createdAt - a.createdAt;
-      });
-      setRetreats(sorted);
-      setSelectedRetreatId(prev => prev ?? sorted[0]?.id ?? null);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "수련회 목록을 불러오지 못했습니다.";
-      setRetreatLoadError(message);
-      toast(message, "error");
-    }
-  }, [toast]);
+  const earliestByRetreat = useMemo(() => {
+    const result: Record<string, string> = {};
+    periods.forEach((period) => {
+      if (!result[period.retreatId] || period.startDate < result[period.retreatId]) result[period.retreatId] = period.startDate;
+    });
+    return result;
+  }, [periods]);
+  const retreats = useMemo(() => [...retreatRecords].sort((a, b) => {
+    const da = earliestByRetreat[a.id];
+    const db = earliestByRetreat[b.id];
+    if (da && db) return db.localeCompare(da);
+    if (da) return -1;
+    if (db) return 1;
+    return b.createdAt - a.createdAt;
+  }), [earliestByRetreat, retreatRecords]);
 
   useEffect(() => {
-    if (!loading && canUseAdmin && user) void loadRetreats();
-  }, [loading, canUseAdmin, user, loadRetreats]);
+    if (loading || !canUseAdmin || !user) return;
+    return subscribeToRetreats((list) => {
+      setRetreatRecords(list);
+      setSelectedRetreatId((previous) => previous && list.some((item) => item.id === previous) ? previous : list[0]?.id ?? null);
+    }, (error) => {
+      setRetreatLoadError(error.message);
+      toast(error.message, "error");
+    });
+  }, [loading, canUseAdmin, user, toast, subscriptionGeneration]);
 
-  // 잠금 상태 — 목록의 자물쇠 배지와 관리자 모달이 함께 쓴다(현장 화면과 같은 노드).
-  const retreatIdsKey = retreats.map((r) => r.id).join(",");
+  const retreatIdsKey = retreatRecords.map((r) => r.id).join(",");
   useEffect(() => {
     if (!user || !canUseAdmin) return;
     const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
+    return subscribeToAllRetreatPeriods(ids, setPeriods,
+      (error) => setRetreatLoadError((previous) => previous || `수련회 기간 구독 실패 — ${error.message}`));
+  }, [user, canUseAdmin, retreatIdsKey]);
+
+  // 잠금 상태 — 목록의 자물쇠 배지와 관리자 모달이 함께 쓴다(현장 화면과 같은 노드).
+  const sortedRetreatIdsKey = retreats.map((r) => r.id).join(",");
+  useEffect(() => {
+    if (!user || !canUseAdmin) return;
+    const ids = sortedRetreatIdsKey ? sortedRetreatIdsKey.split(",") : [];
     return subscribeToIguardAccessLocks(ids, setAccessLocks,
       (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 — ${e.message}`));
-  }, [user, canUseAdmin, retreatIdsKey]);
+  }, [user, canUseAdmin, sortedRetreatIdsKey]);
 
   async function handleRequestAccess() {
     if (!user) return;
@@ -115,7 +124,6 @@ export default function HomePage() {
       await deleteRetreat(deletedId);
       setDeleteTarget(null);
       if (selectedRetreatId === deletedId) setSelectedRetreatId(null);
-      await loadRetreats();
       toast("수련회를 삭제했습니다.", "success");
     } catch (e) {
       toast(e instanceof Error ? e.message : "수련회를 삭제하지 못했습니다.", "error");
@@ -250,10 +258,12 @@ export default function HomePage() {
         retreats={retreats}
         selectedId={selectedRetreatId}
         onSelect={setSelectedRetreatId}
-        onCreated={loadRetreats}
         onDelete={handleDelete}
         loadError={retreatLoadError || null}
-        onRetry={loadRetreats}
+        onRetry={() => {
+          setRetreatLoadError("");
+          setSubscriptionGeneration((value) => value + 1);
+        }}
         emptyLogo={<RetreatLogo size={64} />}
         lockedIds={new Set(Object.keys(accessLocks))}
         headerActions={

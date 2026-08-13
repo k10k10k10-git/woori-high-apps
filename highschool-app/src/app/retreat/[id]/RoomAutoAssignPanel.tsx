@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { Room } from "@/lib/types";
 import type { RoomGender } from "@/lib/roomAutoAssign";
 import { DEFAULT_ROOM_AUTO_ASSIGN_SETTINGS, type RoomAutoAssignSettings } from "@/lib/roomAutoAssignConfig";
-import { getRoomAutoAssignConfig, saveRoomAutoAssignConfig } from "@/lib/db";
+import { subscribeToRoomAutoAssignConfig, saveRoomAutoAssignConfig } from "@/lib/db";
 import { roomLabel, sortRooms } from "@/lib/roomLabel";
 
 export interface RoomClassOption {
@@ -70,15 +70,17 @@ export default function RoomAutoAssignPanel({
   const targetAdultCount = adultCount - (settings.includeStaff ? 0 : staffCount);
 
   useEffect(() => {
-    let cancelled = false;
     setSettings({ ...DEFAULT_ROOM_AUTO_ASSIGN_SETTINGS, classPins: [] });
     setSelectedClassKey("");
     setSelectedRoomId("");
     setConfigLoading(true);
     setConfigNotice(null);
     setConfigError(null);
-    getRoomAutoAssignConfig(retreatId).then(config => {
-      if (cancelled || !config) return;
+    return subscribeToRoomAutoAssignConfig(retreatId, config => {
+      if (!config) {
+        setConfigLoading(false);
+        return;
+      }
       setSettings({
         includeStaff: config.includeStaff,
         audioCount: config.audioCount,
@@ -88,12 +90,11 @@ export default function RoomAutoAssignPanel({
         classPins: config.classPins,
       });
       setConfigNotice("저장된 방배정 설정을 불러왔습니다.");
-    }).catch(error => {
-      if (!cancelled) setConfigError(error instanceof Error ? error.message : "방배정 설정을 불러오지 못했습니다.");
-    }).finally(() => {
-      if (!cancelled) setConfigLoading(false);
+      setConfigLoading(false);
+    }, error => {
+      setConfigError(error.message || "방배정 설정을 불러오지 못했습니다.");
+      setConfigLoading(false);
     });
-    return () => { cancelled = true; };
   }, [retreatId]);
 
   async function saveConfig() {

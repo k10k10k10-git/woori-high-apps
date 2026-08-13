@@ -5,6 +5,7 @@ export const paths = {
   // ── 수련회 (행정 소유, 읽기 전용) ──
   retreats: () => "retreats",
   retreat: (id: string) => `retreats/${id}`,
+  retreatMetaField: (id: string, field: "name" | "year" | "createdAt" | "groupCount" | "startDate" | "endDate") => `retreats/${id}/${field}`,
 
   // ── 참가자 (행정 소유, 읽기 전용) ──
   participants: (id: string) => `retreats/${id}/participants`,

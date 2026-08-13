@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/iguard/context/AuthContext";
 import { canAccessArea, canManageRolesOf } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import type { Retreat as PortalRetreat } from "@/lib/types";
-import { getRetreats, requestIguardAccess, getMyIguardPending, getEarliestPeriodDateByRetreat, subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
+import { subscribeToRetreats, requestIguardAccess, getMyIguardPending, subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
+import { subscribeToAllRetreatPeriods } from "@/lib/db";
 import { Retreat, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
 import AdminModal from "./AdminModal";
@@ -35,7 +36,8 @@ export default function FieldHomeClient() {
   const fieldAllowed = canAccessArea("retreat-field", roles);
   const { toast } = useUI();
 
-  const [retreats, setRetreats] = useState<Retreat[]>([]);
+  const [retreatRecords, setRetreatRecords] = useState<Retreat[]>([]);
+  const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -44,6 +46,21 @@ export default function FieldHomeClient() {
   const [kind, setKind] = useState<InAppBrowserKind | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const earliestByRetreat = useMemo(() => {
+    const result: Record<string, string> = {};
+    periods.forEach((period) => {
+      if (!result[period.retreatId] || period.startDate < result[period.retreatId]) result[period.retreatId] = period.startDate;
+    });
+    return result;
+  }, [periods]);
+  const retreats = useMemo(() => [...retreatRecords].sort((a, b) => {
+    const da = earliestByRetreat[a.id];
+    const db = earliestByRetreat[b.id];
+    if (da && db) return db.localeCompare(da);
+    if (da) return -1;
+    if (db) return 1;
+    return (b.createdAt ?? 0) - (a.createdAt ?? 0);
+  }), [earliestByRetreat, retreatRecords]);
 
   useEffect(() => {
     const detected = detectInAppBrowser(navigator.userAgent || "");
@@ -58,24 +75,20 @@ export default function FieldHomeClient() {
     if (!user || !fieldAllowed) return;
     setLoading(true);
     setLoadError(null);
-    getRetreats()
-      .then(async list => {
-        // 수련회 기간(실제 행사 날짜) 최신순 정렬 — 기간 미등록 수련회는 생성일 기준으로 뒤에 정렬
-        const earliestByRetreat = await getEarliestPeriodDateByRetreat(list.map(r => r.id));
-        const sorted = [...list].sort((a, b) => {
-          const da = earliestByRetreat[a.id];
-          const db = earliestByRetreat[b.id];
-          if (da && db) return db.localeCompare(da);
-          if (da) return -1;
-          if (db) return 1;
-          return (b.createdAt ?? 0) - (a.createdAt ?? 0);
-        });
-        setRetreats(sorted);
-        setSelectedId(prev => prev ?? sorted[0]?.id ?? null);
-      })
-      .catch(e => setLoadError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
+    return subscribeToRetreats((list) => {
+      setRetreatRecords(list);
+      setSelectedId((previous) => previous && list.some((item) => item.id === previous) ? previous : list[0]?.id ?? null);
+      setLoading(false);
+    }, (error) => { setLoadError(error.message); setLoading(false); });
   }, [user, fieldAllowed]);
+
+  const retreatIdsKey = retreatRecords.map((retreat) => retreat.id).join(",");
+  useEffect(() => {
+    if (!user || !fieldAllowed) return;
+    const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
+    return subscribeToAllRetreatPeriods(ids, setPeriods,
+      (error) => setLoadError((previous) => previous ?? `수련회 기간 구독 실패 — ${error.message}`));
+  }, [user, fieldAllowed, retreatIdsKey]);
 
   // 승인 사용자에게 수련회별 PIN 잠금 상태를 표시한다. 실제 PIN 검증은 내부 화면 진입 전에 다시 수행한다.
   useEffect(() => {

@@ -13,6 +13,10 @@ export async function getCancellations(retreatId: string): Promise<Cancellation[
   return snapToList<Cancellation>(snap);
 }
 
+export function subscribeToCancellations(retreatId: string, callback: (items: Cancellation[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.cancellations(retreatId)), (snap) => callback(snapToList<Cancellation>(snap)), onError);
+}
+
 export async function saveCancellation(retreatId: string, data: Omit<Cancellation, "id">): Promise<string> {
   const newRef = push(ref(db, paths.cancellations(retreatId)));
   await set(newRef, stripUndefined(data));

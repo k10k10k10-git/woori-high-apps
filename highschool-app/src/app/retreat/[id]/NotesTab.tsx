@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Retreat, Participant } from "@/lib/types";
-import { getParticipants, updateParticipantExtra } from "@/lib/db";
+import { subscribeToParticipants, updateParticipantExtra } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -29,20 +29,17 @@ export default function NotesTab({ retreat }: Props) {
   const [buFilter, setBuFilter] = useState("전체");
   const [showAll, setShowAll] = useState(false);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
     setLoadError(null);
-    try {
-      const parts = await getParticipants(retreat.id);
-      setParticipants(parts);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
+    return subscribeToParticipants(retreat.id, (next) => {
+      setParticipants(next);
       setLoading(false);
-    }
+    }, (error) => {
+      setLoadError(error.message);
+      setLoading(false);
+    });
   }, [retreat.id]);
-
-  useEffect(() => { void load(); }, [load]);
 
   async function handleSaveNote() {
     if (!editKey) return;

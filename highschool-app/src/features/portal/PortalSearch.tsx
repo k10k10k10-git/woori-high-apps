@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canManageRolesOf } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
-import { loadPeopleSearchData } from "./peopleSearchDb";
+import { subscribePeopleSearchData } from "./peopleSearchDb";
 
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
   "학적·출석": "bg-blue-50 text-blue-700",
@@ -21,8 +21,6 @@ export default function PortalSearch() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const loadedFor = useRef("");
-  const loadedAt = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const includeSemester = canAccessArea("semester", roles);
@@ -32,23 +30,22 @@ export default function PortalSearch() {
 
   const beginOpen = useCallback(() => {
     setOpen(true);
-    const cacheFresh = loadedFor.current === loadKey && Date.now() - loadedAt.current < 60_000;
-    if (!cacheFresh) {
-      setLoading(true);
-      setError("");
-      void loadPeopleSearchData({ includeSemester, includePrivate, includeAttendancePrivate })
-        .then((data) => {
-          setProfiles(buildPeopleProfiles(data));
-          loadedFor.current = loadKey;
-          loadedAt.current = Date.now();
-        })
-        .catch((cause: unknown) => {
-          console.error("people search load failed", cause);
-          setError("인물 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [includeAttendancePrivate, includePrivate, includeSemester, loadKey]);
+    setLoading(true);
+    setError("");
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    return subscribePeopleSearchData(
+      { includeSemester, includePrivate, includeAttendancePrivate },
+      (data) => { setProfiles(buildPeopleProfiles(data)); setLoading(false); },
+      (source, cause) => {
+        console.error(`people search subscription failed: ${source}`, cause);
+        setError("인물 데이터를 실시간으로 불러오지 못했습니다. 잠시 후 다시 열어 주세요.");
+        setLoading(false);
+      },
+    );
+  }, [includeAttendancePrivate, includePrivate, includeSemester, loadKey, open]);
 
   useEffect(() => {
     if (!open) return;

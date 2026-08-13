@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { getRetreat, updateRetreat } from "@/lib/db";
+import { subscribeToRetreat, updateRetreat } from "@/lib/db";
 import { Retreat } from "@/lib/types";
 import { parseSheetUrl, buildSheetUrl } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
@@ -81,11 +81,16 @@ export default function RetreatPageClient() {
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [editingSheet, setEditingSheet] = useState(false);
+  const editingSheetRef = useRef(false);
   const [sheetForm, setSheetForm] = useState({ name: "", sheetUrl: "" });
 
   // keep-alive 탭: 한 번이라도 열린 탭은 언마운트하지 않고 CSS로 숨김
   const [mountedTabs, setMountedTabs] = useState<Set<number>>(new Set());
   const mountedTabsRef = useRef(mountedTabs);
+
+  useEffect(() => {
+    editingSheetRef.current = editingSheet;
+  }, [editingSheet]);
 
   useEffect(() => {
     if (KEEP_ALIVE_TABS.has(tab) && !mountedTabsRef.current.has(tab)) {
@@ -106,26 +111,21 @@ export default function RetreatPageClient() {
     }
     if (!adminAllowed || !id) return;
 
-    let cancelled = false;
-    getRetreat(id)
-      .then((r) => {
-        if (cancelled) return;
+    return subscribeToRetreat(id,
+      (r) => {
         setRetreat(r);
-        if (r) setSheetForm({
+        if (r && !editingSheetRef.current) setSheetForm({
           name: r.name || "",
           sheetUrl: buildSheetUrl(r.sheetId || "", r.sheetGid || ""),
         });
-      })
-      .catch((e) => {
-        if (cancelled) return;
+        setLoading(false);
+      },
+      (e) => {
         toast(e instanceof Error ? e.message : "수련회 정보를 불러오지 못했습니다.", "error");
         setRetreat(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => { cancelled = true; };
+        setLoading(false);
+      },
+    );
   }, [adminAllowed, authLoading, id, router, toast, user]);
 
   const parsedSheetUrl = useMemo(() => parseSheetUrl(sheetForm.sheetUrl), [sheetForm.sheetUrl]);

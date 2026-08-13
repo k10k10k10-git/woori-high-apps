@@ -1,4 +1,4 @@
-import { ref, get } from "firebase/database";
+import { ref, get, onValue } from "firebase/database";
 import { db } from "../firebase";
 import { Student, ClassData } from "../types";
 import { paths } from "../paths";
@@ -38,6 +38,36 @@ export async function getStudentsByYear(year: number): Promise<Record<string, St
   return result;
 }
 
+function normalizeStudentsByYear(value: Record<string, ClassData> | null): Record<string, Student> {
+  if (!value) return {};
+  const result: Record<string, Student> = {};
+  Object.entries(value).forEach(([classKey, classData]) => {
+    const parsed = parseClassKey(classKey) ?? { buNum: NaN, grade: NaN, classNum: NaN };
+    if (!classData.students) return;
+    Object.entries(classData.students).forEach(([studentId, student]) => {
+      const uniqueKey = `${parsed.buNum}_${studentId}`;
+      result[uniqueKey] = {
+        ...student,
+        id: uniqueKey,
+        buNum: parsed.buNum,
+        grade: parsed.grade,
+        class: parsed.classNum,
+      };
+    });
+  });
+  return result;
+}
+
+export function subscribeToStudentsByYear(
+  year: number,
+  callback: (students: Record<string, Student>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.classes(year)), (snap) => {
+    callback(normalizeStudentsByYear(snap.exists() ? snap.val() as Record<string, ClassData> : null));
+  }, onError);
+}
+
 /** classes/{year} 전체를 원시 형태로 반환 — 직접 Firebase 접근 대신 사용 */
 export async function getClassesByYear(year: number): Promise<Record<string, {
   teacher?: string;
@@ -47,9 +77,25 @@ export async function getClassesByYear(year: number): Promise<Record<string, {
   return snap.exists() ? snap.val() : {};
 }
 
+export function subscribeToClassesByYear(
+  year: number,
+  callback: (classes: Record<string, { teacher?: string; students?: Record<string, { name: string; num?: number; phone?: string; jang?: boolean }> }>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.classes(year)), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
+}
+
 export async function getAttendanceByYear(year: number): Promise<Record<string, Record<string, Record<string, string>>>> {
   const snap = await get(ref(db, paths.attendance(year)));
   return snap.exists() ? snap.val() : {};
+}
+
+export function subscribeToAttendanceByYear(
+  year: number,
+  callback: (attendance: Record<string, Record<string, Record<string, string>>>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.attendance(year)), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
 }
 
 // ── Teachers from DB (classes node) ──────────────────────

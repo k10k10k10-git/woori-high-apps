@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Retreat, PartialAttendance, Participant, Student } from "@/lib/types";
-import { getPartialAttendances, savePartialAttendance, deletePartialAttendance, getParticipants, getCellColors, getStudentsByYear } from "@/lib/db";
+import { savePartialAttendance, deletePartialAttendance, subscribeToPartialAttendances, subscribeToParticipants, subscribeToCellColors, subscribeToStudentsByYear } from "@/lib/db";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { buildPartialPool, PartialPoolRow } from "@/lib/partialPool";
 import { isDayAttendanceOn } from "@/lib/partialAttendanceType";
@@ -56,28 +56,23 @@ export default function PartialAttendanceTab({ retreat }: Props) {
   const [editingDay, setEditingDay] = useState<1 | 2 | 3>(2);
   const [editingNote, setEditingNote] = useState("");
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
     setLoadError(null);
-    try {
-      const [recs, parts, colors, studs] = await Promise.all([
-        getPartialAttendances(retreat.id),
-        getParticipants(retreat.id),
-        getCellColors(retreat.id),
-        getStudentsByYear(retreat.year),
-      ]);
-      setRecords(recs);
-      setParticipants(parts);
-      setCellColors(colors);
-      setStudents(studs);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    const ready = new Set<string>();
+    const markReady = (source: string) => {
+      ready.add(source);
+      if (ready.size === 4) setLoading(false);
+    };
+    const onError = (error: Error) => { setLoadError(error.message); setLoading(false); };
+    const unsubs = [
+      subscribeToPartialAttendances(retreat.id, (next) => { setRecords(next); markReady("partial"); }, onError),
+      subscribeToParticipants(retreat.id, (next) => { setParticipants(next); markReady("participants"); }, onError),
+      subscribeToCellColors(retreat.id, (next) => { setCellColors(next); markReady("colors"); }, onError),
+      subscribeToStudentsByYear(retreat.year, (next) => { setStudents(next); markReady("students"); }, onError),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [retreat.id, retreat.year]);
-
-  useEffect(() => { void load(); }, [load]);
 
   const recordMap = useMemo(() => new Map(records.map(r => [r.id, r])), [records]);
 
@@ -179,10 +174,6 @@ export default function PartialAttendanceTab({ retreat }: Props) {
         updatedAt: Date.now(),
       };
       await savePartialAttendance(retreat.id, row.studentKey, data);
-      setRecords(prev => [
-        ...prev.filter(r => r.id !== row.studentKey),
-        { id: row.studentKey, ...data },
-      ]);
       setEditingKey(null);
       toast(`${row.name} ${statusLabel({ id: row.studentKey, ...data })} 지정 완료`, "success");
     } catch (e) {
@@ -197,7 +188,6 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     setSavingKey(row.studentKey);
     try {
       await deletePartialAttendance(retreat.id, row.studentKey);
-      setRecords(prev => prev.filter(r => r.id !== row.studentKey));
       setEditingKey(null);
       toast(`${row.name} 미지정으로 되돌림 (부분참 지정 해제)`, "success");
     } catch (e) {

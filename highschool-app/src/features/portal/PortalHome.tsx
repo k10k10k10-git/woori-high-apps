@@ -7,16 +7,16 @@ import LandingPage from "@/features/landing/LandingPage";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import {
   deleteMilestone,
-  getRetreats,
   saveMilestone,
   subscribeToAllRetreatPeriods,
   subscribeToMilestones,
+  subscribeToRetreats,
   updateMilestone,
   type RetreatPeriodWithOwner,
 } from "@/lib/db";
 import type { Milestone } from "@/lib/types";
 import type { Retreat } from "@/lib/types";
-import { getSemesters, subscribeSessions } from "@/features/semester/db";
+import { subscribeSemesters, subscribeSessions } from "@/features/semester/db";
 import type { Semester, Session } from "@/features/semester/types";
 import {
   canAccessArea,
@@ -73,18 +73,22 @@ export default function PortalHome() {
   useEffect(() => {
     if (!user || !canAccessArea("home", roles)) return;
 
-    getRetreats()
-      .then((retreatList) => {
-        setRetreats([...retreatList].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
-        ok("수련회 목록");
-      })
-      .catch((error: unknown) => fail("수련회 목록")(error instanceof Error ? error : new Error(String(error))));
-
+    const unsubs = [
+      subscribeToRetreats(
+        (retreatList) => {
+          setRetreats([...retreatList].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
+          ok("수련회 목록");
+        },
+        fail("수련회 목록"),
+      ),
+    ];
     if (canAccessArea("semester", roles)) {
-      getSemesters()
-        .then((list) => { setSemesters(list); ok("학기 목록"); })
-        .catch((error: unknown) => fail("학기 목록")(error instanceof Error ? error : new Error(String(error))));
+      unsubs.push(subscribeSemesters(
+        (list) => { setSemesters(list); ok("학기 목록"); },
+        fail("학기 목록"),
+      ));
     }
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [user, roles, fail, ok]);
 
   const currentSemester = useMemo(() => {

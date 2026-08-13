@@ -8,8 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
-  getClassesByYear,
-  getStaffByYear,
+  subscribeClassesByYear,
+  subscribeStaffByYear,
   makeAppKey,
   removeApplication,
   subscribeApplicationsPrivate,
@@ -52,6 +52,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
   const [classes, setClasses] = useState<ClassInfo[]>([]);
   const [staff, setStaff] = useState<StaffPerson[]>([]);
   const [privateMap, setPrivateMap] = useState<Record<string, ApplicationPrivate>>({});
+  const visiblePrivateMap = useMemo(() => canEdit ? privateMap : {}, [canEdit, privateMap]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -60,32 +61,29 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
   const [rosterCollapsed, setRosterCollapsed] = useState(false);
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setLoadError(null);
-      setStaffError(null);
-      try {
-        setClasses(await getClassesByYear(year));
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : String(e));
-      }
-      try {
-        setStaff(await getStaffByYear(year));
-      } catch (e) {
-        // 스탭 명단은 보조 원천이다 — 실패해도 학생 접수는 계속 가능해야 한다.
-        setStaffError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    })();
+    const ready = new Set<string>();
+    const markReady = (source: string) => {
+      ready.add(source);
+      if (ready.size === 2) setLoading(false);
+    };
+    const unsubClasses = subscribeClassesByYear(year, (next) => {
+      setClasses(next);
+      markReady("classes");
+    }, (error) => { setLoadError(error.message); setLoading(false); });
+    const unsubStaff = subscribeStaffByYear(year, (next) => {
+      setStaff(next);
+      markReady("staff");
+    }, (error) => {
+      // 스탭 명단은 보조 원천이다 — 실패해도 학생 접수는 계속 가능해야 한다.
+      setStaffError(error.message);
+      setLoading(false);
+    });
+    return () => { unsubClasses(); unsubStaff(); };
   }, [year]);
 
   // 🔒 연락처는 행정 계열만 읽을 수 있다(Rules). 조회 전용 역할에서는 구독하지 않는다.
   useEffect(() => {
-    if (!canEdit) {
-      setPrivateMap({});
-      return;
-    }
+    if (!canEdit) return;
     return subscribeApplicationsPrivate(sid, setPrivateMap, (e) => setLoadError(e.message));
   }, [sid, canEdit]);
 
@@ -242,7 +240,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           {applied.map(({ bucket, row }) => {
             const appKey = makeAppKey(row.bu, row.personId);
             const app = appByKey.get(appKey);
-            const priv = privateMap[appKey];
+            const priv = visiblePrivateMap[appKey];
             const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
             const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
             const trainingClass = app?.trainingClassId ? trainingClasses.find((c) => c.id === app.trainingClassId) : undefined;
@@ -290,7 +288,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           trainingClasses={trainingClasses}
           person={editing}
           existing={appByKey.get(makeAppKey(editing.bu, editing.personId))}
-          existingPrivate={privateMap[makeAppKey(editing.bu, editing.personId)]}
+          existingPrivate={visiblePrivateMap[makeAppKey(editing.bu, editing.personId)]}
           canEdit={canEdit}
           byUid={user?.uid}
           onClose={() => setEditing(null)}

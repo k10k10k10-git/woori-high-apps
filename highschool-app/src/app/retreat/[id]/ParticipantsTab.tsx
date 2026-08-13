@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
-import { getStudentsByYear, saveParticipants, getParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
+import { getStudentsByYear, subscribeToStudentsByYear, saveParticipants, getParticipants, subscribeToParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
 import { buildExtraPreservationMaps, dedupeSheetParticipants, identityKeyOf } from "@/lib/syncParticipants";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
@@ -87,10 +87,14 @@ export default function ParticipantsTab({ retreat }: Props) {
 
   useEffect(() => {
     void loadData();
+    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
+      e => setError(prev => prev || `참가자 구독 실패 — ${e.message}`));
+    const unsubStudents = subscribeToStudentsByYear(retreat.year, setStudents,
+      e => setError(prev => prev || `출석부 학생 구독 실패 — ${e.message}`));
     const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState,
       e => setError(prev => prev || `구독 실패 — ${e.message}`));
-    return () => unsubColors();
-  }, [loadData, retreat.id]);
+    return () => { unsubParticipants(); unsubStudents(); unsubColors(); };
+  }, [loadData, retreat.id, retreat.year]);
 
   async function syncFromSheet() {
     if (!retreat.sheetId) {

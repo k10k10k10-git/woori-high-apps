@@ -5,6 +5,7 @@ export const paths = {
   // ── 수련회 ──
   retreats: () => "retreats",
   retreat: (id: string) => `retreats/${id}`,
+  retreatMetaField: (id: string, field: "name" | "year" | "sheetId" | "sheetGid" | "createdAt" | "groupCount" | "startDate" | "endDate") => `retreats/${id}/${field}`,
 
   // ── 참가자 ──
   participants: (id: string) => `retreats/${id}/participants`,

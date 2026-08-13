@@ -3,7 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Retreat, MedicalLog, Participant } from "@/lib/types";
 import {
   subscribeToMedicalLogs, saveMedicalLog, updateMedicalLog, deleteMedicalLog,
-  getMedicinePresets, saveMedicinePresets, getParticipants,
+  subscribeToMedicinePresets, saveMedicinePresets, subscribeToParticipants,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
@@ -197,13 +197,13 @@ export default function MedicalLogTab({ retreat }: Props) {
     let alive = true;
     setLoadError(null);
 
-    getMedicinePresets(retreat.id)
-      .then(p => { if (alive) setPresets(p); })
-      .catch(() => {
-        if (alive) toast("약 목록을 불러오지 못했습니다. 기본 목록으로 진행합니다.", "warning");
-      });
+    const unsubPresets = subscribeToMedicinePresets(retreat.id, (p) => {
+      if (alive) setPresets(p);
+    }, () => {
+      if (alive) toast("약 목록을 불러오지 못했습니다. 기본 목록으로 진행합니다.", "warning");
+    });
 
-    getParticipants(retreat.id).then(rec => {
+    const unsubParticipants = subscribeToParticipants(retreat.id, (rec) => {
       if (!alive) return;
       const list: ParticipantSuggestion[] = Object.values(rec as Record<string, Participant>).map(p => ({
         name:     p.name,
@@ -218,7 +218,7 @@ export default function MedicalLogTab({ retreat }: Props) {
         seen.add(key);
         return true;
       }));
-    }).catch(e => {
+    }, (e) => {
       if (alive) setLoadError(e instanceof Error ? e.message : "참가자 데이터를 불러오지 못했습니다.");
     });
 
@@ -226,10 +226,10 @@ export default function MedicalLogTab({ retreat }: Props) {
       const unsub = subscribeToMedicalLogs(retreat.id, list => {
         if (alive) setLogs(list);
       }, e => { if (alive) setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); });
-      return () => { alive = false; unsub(); };
+      return () => { alive = false; unsub(); unsubPresets(); unsubParticipants(); };
     } catch (e) {
       if (alive) setLoadError(e instanceof Error ? e.message : "의료 기록을 불러오지 못했습니다.");
-      return () => { alive = false; };
+      return () => { alive = false; unsubPresets(); unsubParticipants(); };
     }
   }, [retreat.id, toast]);
 

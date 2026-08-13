@@ -66,6 +66,23 @@ export async function getSemesters(): Promise<Semester[]> {
     .sort((a, b) => b.id.localeCompare(a.id)); // 최신 학기 먼저
 }
 
+export function subscribeSemesters(
+  cb: (semesters: Semester[]) => void,
+  onError?: (e: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.semesters()), (snap) => {
+    if (!snap.exists()) {
+      cb([]);
+      return;
+    }
+    const semesters = Object.entries(snap.val() as Record<string, { meta?: SemesterMeta }>)
+      .filter(([, value]) => !!value.meta)
+      .map(([id, value]) => ({ id, meta: value.meta! }))
+      .sort((a, b) => b.id.localeCompare(a.id));
+    cb(semesters);
+  }, onError);
+}
+
 export async function createSemester(id: string, title: string): Promise<void> {
   const meta: SemesterMeta = {
     title,
@@ -356,6 +373,19 @@ export async function getClassesByYear(year: string): Promise<ClassInfo[]> {
   );
 }
 
+export function subscribeClassesByYear(
+  year: string,
+  cb: (classes: ClassInfo[]) => void,
+  onError?: (e: Error) => void,
+) {
+  return onValue(ref(db, paths.classesByYear(year)), (snap) => {
+    if (!snap.exists()) return cb([]);
+    cb(Object.entries(snap.val() as Record<string, Omit<ClassInfo, "classKey">>).map(
+      ([classKey, data]) => ({ classKey, teacher: data.teacher, students: data.students ?? {} }),
+    ));
+  }, onError);
+}
+
 // ── 읽기 전용: 공식스탭 명단 (teacherStaff — 교사·스탭 출석부 앱 소유. 쓰기 함수 추가 금지) ──
 
 export async function getStaffByYear(year: string): Promise<StaffPerson[]> {
@@ -371,6 +401,26 @@ export async function getStaffByYear(year: string): Promise<StaffPerson[]> {
       ...(value.phone?.trim() ? { phone: value.phone.trim() } : {}),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+export function subscribeStaffByYear(
+  year: string,
+  cb: (staff: StaffPerson[]) => void,
+  onError?: (e: Error) => void,
+) {
+  return onValue(ref(db, paths.teacherStaffByYear(year)), (snap) => {
+    if (!snap.exists()) return cb([]);
+    cb(Object.entries(snap.val() as Record<string, { name?: string; title?: string; phone?: string; personId?: string }>)
+      .filter(([, value]) => value?.name?.trim())
+      .map(([staffId, value]) => ({
+        staffId,
+        ...(value.personId?.trim() ? { personId: value.personId.trim() } : {}),
+        name: value.name!.trim(),
+        ...(value.title?.trim() ? { title: value.title.trim() } : {}),
+        ...(value.phone?.trim() ? { phone: value.phone.trim() } : {}),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko")));
+  }, onError);
 }
 
 // ── 새친구 ────────────────────────────────────────────────────────────

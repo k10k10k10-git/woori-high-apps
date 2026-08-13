@@ -1,4 +1,4 @@
-import { ref, get, set, remove } from "firebase/database";
+import { ref, get, onValue, set, remove } from "firebase/database";
 import { db } from "../firebase";
 import { paths } from "../paths";
 import { stripUndefined } from "./core";
@@ -49,6 +49,15 @@ export async function getRetreatAdmins(): Promise<Record<string, RetreatAdminMem
   );
 }
 
+export function subscribeToRetreatAdmins(
+  callback: (admins: Record<string, RetreatAdminMember>) => void,
+  onError?: (error: Error) => void,
+) {
+  return onValue(ref(db, paths.retreatAdmins()), (snap) => callback(snap.exists()
+    ? Object.fromEntries(Object.entries(snap.val()).map(([uid, value]) => [uid, normalizeRetreatAdminMember(value)]))
+    : {}), onError);
+}
+
 export async function addRetreatAdmin(
   uid: string,
   email: string,
@@ -96,6 +105,10 @@ export async function getMainAdmins(): Promise<Record<string, boolean>> {
   return snap.exists() ? snap.val() : {};
 }
 
+export function subscribeToMainAdmins(callback: (admins: Record<string, boolean>) => void, onError?: (error: Error) => void) {
+  return onValue(ref(db, paths.mainAdmins()), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
+}
+
 export async function requestRetreatAccess(uid: string, email: string, name: string): Promise<void> {
   await set(ref(db, paths.retreatPendingEntry(uid)), stripUndefined({ email, name, requestedAt: Date.now() }));
 }
@@ -103,6 +116,13 @@ export async function requestRetreatAccess(uid: string, email: string, name: str
 export async function getPendingRequests(): Promise<Record<string, { email: string; name: string; requestedAt: number }>> {
   const snap = await get(ref(db, paths.retreatPending()));
   return snap.exists() ? snap.val() : {};
+}
+
+export function subscribeToPendingRequests(
+  callback: (requests: Record<string, { email: string; name: string; requestedAt: number }>) => void,
+  onError?: (error: Error) => void,
+) {
+  return onValue(ref(db, paths.retreatPending()), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
 }
 
 export async function approveRetreatRequest(uid: string, request: { email: string; name?: string } | string): Promise<void> {

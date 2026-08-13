@@ -3,14 +3,14 @@
 // 팀원 관리 — 두 축 역할(학기·방학)을 한 화면에서 배정한다. 진입점은 전역 헤더의 "팀원 관리" 하나뿐.
 // 역할 계약은 accessPolicy, 쓰기 계획은 roleAssign(순수) → applyRole(실행)이 담당한다.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
   denyRetreatRequest,
-  getMainAdmins,
-  getPendingRequests,
-  getRetreatAdmins,
+  subscribeToMainAdmins,
+  subscribeToPendingRequests,
+  subscribeToRetreatAdmins,
   updateRetreatAdminMemberName,
   type RetreatAdminMember,
 } from "@/lib/db";
@@ -101,33 +101,18 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
   const [busyUid, setBusyUid] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadDirectAccess = useCallback(async () => {
-    try {
-      const [nextAdmins, nextPending] = await Promise.all([getRetreatAdmins(), getPendingRequests()]);
-      setAdmins(nextAdmins);
-      setAdminPending(nextPending);
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : String(error));
-    }
-    if (!canManage) return;
-    try {
-      setMainAdmins(await getMainAdmins());
-    } catch (error) {
-      // admins 노드는 통합관리자만 읽는다 — 실패해도 나머지 화면은 사용 가능해야 한다.
-      setLoadError((current) => current ?? (error instanceof Error ? error.message : String(error)));
-    }
-  }, [canManage]);
-
   useEffect(() => {
-    void loadDirectAccess();
     const fail = (error: Error) => setLoadError((current) => current ?? error.message);
     const unsubs = [
+      subscribeToRetreatAdmins(setAdmins, fail),
+      subscribeToPendingRequests(setAdminPending, fail),
       subscribeToIguardMembers(setIguardMembers, fail),
       subscribeToIguardPending(setIguardPending, fail),
       subscribeToIguardRoles(setIguardRoles, fail),
     ];
+    if (canManage) unsubs.push(subscribeToMainAdmins(setMainAdmins, fail));
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [loadDirectAccess]);
+  }, [canManage]);
 
   useEffect(() => {
     if (embedded) return;
@@ -212,7 +197,6 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
     setBusyUid(uid);
     try {
       await action();
-      await loadDirectAccess();
       toast(success, "success");
     } catch (error) {
       toast(error instanceof Error ? error.message : String(error), "error");

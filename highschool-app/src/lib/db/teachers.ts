@@ -38,6 +38,10 @@ export async function getTeacherIdNumbers(retreatId: string): Promise<Record<str
   return snap.exists() ? (snap.val() as Record<string, string>) : {};
 }
 
+export function subscribeToTeacherIdNumbers(retreatId: string, callback: (values: Record<string, string>) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.teacherIdNumbers(retreatId)), (snap) => callback(snap.exists() ? snap.val() as Record<string, string> : {}), onError);
+}
+
 export async function updateTeacherIdNumber(retreatId: string, teacherId: string, idNumber: string): Promise<void> {
   const path = paths.teacherIdNumber(retreatId, teacherId);
   if (idNumber.trim()) {

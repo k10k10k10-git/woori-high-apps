@@ -6,7 +6,7 @@ import { normalizeName } from "@/lib/studentMatcher";
 import { resolvePaymentColorKey } from "@/lib/paymentColorKey";
 type BuTab = "1부" | "2부";
 import {
-  subscribeToParticipants, getClassesByYear, subscribeToCellColors,
+  subscribeToParticipants, subscribeToClassesByYear, subscribeToCellColors,
   subscribeToUnmatchedPayments,
   addUnmatchedPayment, resolveUnmatchedPayment,
   unresolveUnmatchedPayment, deleteUnmatchedPayment, updateUnmatchedPayment,
@@ -47,7 +47,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   useEffect(() => {
     // 클래스 DB 로드 (이름 맵 구성용)
     setLoadError(null);
-    getClassesByYear(retreat.year).then((classesRaw) => {
+    const unsubClasses = subscribeToClassesByYear(retreat.year, (classesRaw) => {
       // 이름 변형 → cellColor키 맵 구성
       // ClassRosterTab과 동일한 키 형식: "${buNum}_${studentId}"
       const map = new Map<string, string>();
@@ -67,9 +67,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
         });
       });
       setNameToColorKey(map);
-    }).catch(e => {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    });
+    }, (error) => setLoadError(error.message));
 
     const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
       e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
@@ -79,7 +77,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       setPayments(list);
       setLoading(false);
     }, e => { setLoadError(prev => prev ?? `구독 실패 — ${e.message}`); setLoading(false); });
-    return () => { unsubParticipants(); unsubColors(); unsubPayments(); };
+    return () => { unsubClasses(); unsubParticipants(); unsubColors(); unsubPayments(); };
   }, [retreat.id, retreat.year]);
 
   // 연결 패널 열릴 때 포커스

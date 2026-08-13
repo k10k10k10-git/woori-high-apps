@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { Retreat, TeacherAttendance } from "@/lib/types";
-import { getCancellations, getTeachers, getTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
+import { useEffect, useState } from "react";
+import { Cancellation, Retreat, TeacherAttendance } from "@/lib/types";
+import { subscribeToCancellations, subscribeToTeachers, subscribeToTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
@@ -26,43 +26,70 @@ interface Props {
 export default function InsuranceTab({ retreat }: Props) {
   const { toast } = useUI();
   const [studentEntries, setStudentEntries] = useState<StudentEntry[]>([]);
+  const [sheetStudentEntries, setSheetStudentEntries] = useState<StudentEntry[]>([]);
+  const [teachers, setTeachers] = useState<TeacherAttendance[]>([]);
+  const [teacherIdNumbers, setTeacherIdNumbers] = useState<Record<string, string>>({});
+  const [cancellations, setCancellations] = useState<Cancellation[]>([]);
   const [teacherRows, setTeacherRows] = useState<TeacherRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showIds, setShowIds] = useState(false);
   const [buFilter, setBuFilter] = useState("전체");
   const [idColName, setIdColName] = useState("");
+  const [sheetRefreshGeneration, setSheetRefreshGeneration] = useState(0);
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
     setError("");
-    try {
-      // 교사 참석·취소 상태와 분리된 private 주민번호를 함께 대조한다.
-      const [teachers, idMap, cancellations] = await Promise.all([
-        getTeachers(retreat.id),
-        getTeacherIdNumbers(retreat.id),
-        getCancellations(retreat.id),
-      ]);
-      setTeacherRows(
-        excludeAbsentInsuranceTeachers(teachers)
-          .sort((a, b) => a.bu.localeCompare(b.bu) || a.classKey.localeCompare(b.classKey, "ko"))
-          .map(t => ({ ...t, idNumber: idMap[t.id] || "", idDraft: idMap[t.id] || "", saving: false }))
-      );
-
-      // 학생: 시트에서 주민등록번호 있는 행
-      if (retreat.sheetId) {
+    let active = true;
+    if (retreat.sheetId) {
+      void (async () => {
+        try {
         const result = await fetchInsuranceFromSheet(retreat.sheetId, retreat.sheetGid);
-        setStudentEntries(excludeCancelledInsuranceStudents(result.entries, cancellations));
-        setIdColName(result.idCol);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
-    } finally {
+          if (!active) return;
+          setSheetStudentEntries(result.entries);
+          setIdColName(result.idCol);
+        } catch (error) {
+          if (active) setError(error instanceof Error ? error.message : "오류가 발생했습니다.");
+        } finally {
+          if (active) setLoading(false);
+        }
+      })();
+    } else {
+      setSheetStudentEntries([]);
       setLoading(false);
     }
-  }, [retreat.id, retreat.sheetGid, retreat.sheetId]);
+    return () => { active = false; };
+  }, [retreat.sheetGid, retreat.sheetId, sheetRefreshGeneration]);
 
-  useEffect(() => { void loadData(); }, [loadData]);
+  useEffect(() => {
+    const onError = (error: Error) => setError(error.message);
+    const unsubs = [
+      subscribeToTeachers(retreat.id, setTeachers, onError),
+      subscribeToTeacherIdNumbers(retreat.id, setTeacherIdNumbers, onError),
+      subscribeToCancellations(retreat.id, setCancellations, onError),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [retreat.id]);
+
+  useEffect(() => {
+    setStudentEntries(excludeCancelledInsuranceStudents(sheetStudentEntries, cancellations));
+  }, [cancellations, sheetStudentEntries]);
+
+  useEffect(() => {
+    setTeacherRows((previous) => excludeAbsentInsuranceTeachers(teachers)
+      .sort((a, b) => a.bu.localeCompare(b.bu) || a.classKey.localeCompare(b.classKey, "ko"))
+      .map((teacher) => {
+        const idNumber = teacherIdNumbers[teacher.id] || "";
+        const old = previous.find((row) => row.id === teacher.id);
+        return {
+          ...teacher,
+          idNumber,
+          idDraft: old && old.idNumber === idNumber ? old.idDraft : idNumber,
+          saving: old?.saving ?? false,
+        };
+      }));
+  }, [teacherIdNumbers, teachers]);
 
   async function saveTeacherIdNumber(teacherId: string, idNumber: string) {
     setTeacherRows(prev => prev.map(t => t.id === teacherId ? { ...t, saving: true } : t));
@@ -167,7 +194,7 @@ export default function InsuranceTab({ retreat }: Props) {
           <button onClick={exportXLSX} disabled={allInsured.length === 0} className="btn-secondary text-xs">📥 XLSX</button>
           <button onClick={exportPDF} disabled={allInsured.length === 0} className="btn-secondary text-xs">🖨️ PDF</button>
           <button onClick={exportJPG} disabled={allInsured.length === 0} className="btn-secondary text-xs">🖼️ JPG</button>
-          <button onClick={loadData} className="btn-secondary text-xs">🔄 새로고침</button>
+          <button onClick={() => setSheetRefreshGeneration((value) => value + 1)} className="btn-secondary text-xs">🔄 시트 새로고침</button>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import { canAccessArea, canDestroySemester, canEditArea } from "@/features/portal/accessPolicy";
-import { getSemesters, createSemester, removeSemester } from "@/features/semester/db";
+import { subscribeSemesters, createSemester, removeSemester } from "@/features/semester/db";
 import { Semester } from "@/features/semester/types";
 import LoginButton from "@/components/LoginButton";
 
@@ -30,20 +30,14 @@ export default function SemestersPage() {
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  async function load() {
+  useEffect(() => {
+    if (!user || !allowed) return;
     setListLoading(true);
     setLoadError(null);
-    try {
-      setSemesters(await getSemesters());
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setListLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (user && allowed) void load();
+    return subscribeSemesters(
+      (list) => { setSemesters(list); setListLoading(false); },
+      (error) => { setLoadError(error.message); setListLoading(false); },
+    );
   }, [user, allowed]);
 
   async function handleCreate() {
@@ -62,7 +56,6 @@ export default function SemestersPage() {
       setNewId("");
       setNewTitle("");
       toast("학기가 생성되었습니다", "success");
-      await load();
     } catch (e) {
       toast(`생성 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {
@@ -78,7 +71,6 @@ export default function SemestersPage() {
       toast(`${deleteTarget.id} 학기를 삭제했습니다`, "success");
       setDeleteTarget(null);
       setDeleteInput("");
-      await load();
     } catch (e) {
       toast(`삭제 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
     } finally {

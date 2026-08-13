@@ -1,10 +1,10 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Retreat, SupplyItem, SnackItem } from "@/lib/types";
 import {
-  getSupplies, saveSupply, updateSupply, deleteSupply,
-  getSnacks, saveSnack, updateSnack, deleteSnack,
-  getSuppliesBudget, updateSuppliesBudget,
+  subscribeToSupplies, saveSupply, updateSupply, deleteSupply,
+  subscribeToSnacks, saveSnack, updateSnack, deleteSnack,
+  subscribeToSuppliesBudget, updateSuppliesBudget,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 
@@ -50,42 +50,25 @@ export default function SuppliesTab({ retreat }: Props) {
   // 예산 항목별 "인당 단가 × 총원" 계산기 입력값 (key: "물품" 또는 간식 카테고리명) — DB에 저장하지 않는 보조 입력
   const [budgetCalc, setBudgetCalc] = useState<Record<string, { unitPrice: string; headcount: string }>>({});
 
-  const loadSupplies = useCallback(async () => {
-    setSupplyLoading(true);
-    setSupplyError(null);
-    try {
-      setSupplies(await getSupplies(retreat.id));
-    } catch (e) {
-      setSupplyError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSupplyLoading(false);
-    }
-  }, [retreat.id]);
-
-  const loadSnacks = useCallback(async () => {
-    setSnackLoading(true);
-    setSnackError(null);
-    try {
-      setSnacks(await getSnacks(retreat.id));
-    } catch (e) {
-      setSnackError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSnackLoading(false);
-    }
-  }, [retreat.id]);
-
   useEffect(() => {
-    void loadSupplies();
-    void loadSnacks();
-    void getSuppliesBudget(retreat.id).then(b => {
+    const unsubSupplies = subscribeToSupplies(retreat.id, (next) => {
+      setSupplies(next);
+      setSupplyLoading(false);
+    }, (error) => { setSupplyError(error.message); setSupplyLoading(false); });
+    const unsubSnacks = subscribeToSnacks(retreat.id, (next) => {
+      setSnacks(next);
+      setSnackLoading(false);
+    }, (error) => { setSnackError(error.message); setSnackLoading(false); });
+    const unsubBudget = subscribeToSuppliesBudget(retreat.id, (b) => {
       const sBudget = b?.supplyBudget || 0;
       const cBudgets = b?.snackBudgets || {};
       setSupplyBudget(sBudget);
       setSnackBudgets(cBudgets);
       setSupplyBudgetInput(sBudget > 0 ? String(sBudget) : "");
       setSnackBudgetInputs(Object.fromEntries(SNACK_CATEGORIES.map(c => [c, cBudgets[c] > 0 ? String(cBudgets[c]) : ""])));
-    });
-  }, [loadSupplies, loadSnacks, retreat.id]);
+    }, (error) => setSupplyError((previous) => previous ?? error.message));
+    return () => { unsubSupplies(); unsubSnacks(); unsubBudget(); };
+  }, [retreat.id]);
 
   // ─── 물품 CRUD ───────────────────────────────────────────
 
@@ -94,10 +77,8 @@ export default function SuppliesTab({ retreat }: Props) {
     try {
       if (editSupplyId) {
         await updateSupply(retreat.id, editSupplyId, supplyForm);
-        setSupplies(prev => prev.map(s => s.id === editSupplyId ? { ...s, ...supplyForm } : s));
       } else {
-        const id = await saveSupply(retreat.id, supplyForm);
-        setSupplies(prev => [...prev, { id, ...supplyForm }]);
+        await saveSupply(retreat.id, supplyForm);
       }
       setSupplyForm(EMPTY_SUPPLY);
       setShowSupplyModal(false);
@@ -111,7 +92,6 @@ export default function SuppliesTab({ retreat }: Props) {
     if (!await uiConfirm("삭제하시겠습니까?")) return;
     try {
       await deleteSupply(retreat.id, id);
-      setSupplies(prev => prev.filter(s => s.id !== id));
     } catch (e) {
       toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
@@ -131,10 +111,8 @@ export default function SuppliesTab({ retreat }: Props) {
     try {
       if (editSnackId) {
         await updateSnack(retreat.id, editSnackId, snackForm);
-        setSnacks(prev => prev.map(s => s.id === editSnackId ? { ...s, ...snackForm } : s));
       } else {
-        const id = await saveSnack(retreat.id, snackForm);
-        setSnacks(prev => [...prev, { id, ...snackForm }]);
+        await saveSnack(retreat.id, snackForm);
       }
       setSnackForm(EMPTY_SNACK);
       setShowSnackModal(false);
@@ -148,7 +126,6 @@ export default function SuppliesTab({ retreat }: Props) {
     if (!await uiConfirm("삭제하시겠습니까?")) return;
     try {
       await deleteSnack(retreat.id, id);
-      setSnacks(prev => prev.filter(s => s.id !== id));
     } catch (e) {
       toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

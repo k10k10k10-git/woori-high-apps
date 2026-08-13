@@ -1,8 +1,9 @@
 "use client";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Retreat, Cancellation } from "@/lib/types";
 import {
   deleteCancellation, deleteCancellationWithRosterMarker, getCancellations, getCellColors, getClassesByYear,
+  subscribeToCancellations, subscribeToClassesByYear,
   saveCancellation, saveCancellationWithRosterMarker, setCellColor,
   updateCancellationWithRosterMarker,
 } from "@/lib/db";
@@ -34,6 +35,7 @@ export default function CancellationTab({ retreat }: Props) {
   const [form, setForm] = useState<Omit<Cancellation, "id">>(EMPTY_FORM);
   const [filter, setFilter] = useState<"전체" | "1부" | "2부">("전체");
   const [rosterStudents, setRosterStudents] = useState<CancellationRosterStudent[]>([]);
+  const rosterStudentsRef = useRef<CancellationRosterStudent[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,6 +49,7 @@ export default function CancellationTab({ retreat }: Props) {
       ]);
       const roster = buildCancellationRosterStudents(classesRaw);
       setRosterStudents(roster);
+      rosterStudentsRef.current = roster;
 
       // 2) 빨간색 셀 → 취소명단 자동 동기화
       const existingKeys = new Set(existing.map(c => c.studentKey).filter(Boolean));
@@ -97,7 +100,26 @@ export default function CancellationTab({ retreat }: Props) {
     }
   }, [retreat.id, retreat.year]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+    const unsubRecords = subscribeToCancellations(retreat.id, (next) => {
+      setRecords(next.map((record) => {
+        const studentKey = resolveCancellationStudentKey(record, rosterStudentsRef.current);
+        return studentKey ? { ...record, studentKey } : record;
+      }));
+    },
+      (error) => setLoadError((previous) => previous ?? error.message));
+    const unsubClasses = subscribeToClassesByYear(retreat.year, (classesRaw) => {
+      const roster = buildCancellationRosterStudents(classesRaw);
+      rosterStudentsRef.current = roster;
+      setRosterStudents(roster);
+      setRecords((current) => current.map((record) => {
+        const studentKey = resolveCancellationStudentKey(record, roster);
+        return studentKey ? { ...record, studentKey } : record;
+      }));
+    }, (error) => setLoadError((previous) => previous ?? error.message));
+    return () => { unsubRecords(); unsubClasses(); };
+  }, [load, retreat.id, retreat.year]);
 
   async function handleSave() {
     if (!form.name.trim()) return toast("학생 이름을 입력해주세요.", "warning");

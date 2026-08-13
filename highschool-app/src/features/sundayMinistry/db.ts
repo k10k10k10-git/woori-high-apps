@@ -1,4 +1,4 @@
-import { getSemesters, subscribeNewFriends, subscribeNewFriendsPrivate } from "@/features/semester/db";
+import { subscribeSemesters, subscribeNewFriends, subscribeNewFriendsPrivate } from "@/features/semester/db";
 import { paths } from "@/features/semester/paths";
 import { db } from "@/lib/firebase";
 import { onValue, ref } from "firebase/database";
@@ -12,25 +12,11 @@ import {
 } from "./model";
 import type { NewFriendPrivate } from "@/features/semester/types";
 
-let storageIdsPromise: Promise<string[]> | null = null;
-
 export function subscribeSundayAdminChanges(
   cb: (changes: SundayAdminChange[]) => void,
   onError?: (error: Error) => void,
 ) {
   return onValue(ref(db, paths.classes()), (snapshot) => cb(collectSundayAdminChanges(snapshot.val())), onError);
-}
-
-function loadSundayStorageIds() {
-  if (!storageIdsPromise) {
-    storageIdsPromise = getSemesters()
-      .then((semesters) => sundayStorageIds(semesters.map((semester) => semester.id), new Date().getFullYear()))
-      .catch((error: unknown) => {
-        storageIdsPromise = null;
-        throw error;
-      });
-  }
-  return storageIdsPromise;
 }
 
 export function subscribeSundayNewFriends(
@@ -39,27 +25,44 @@ export function subscribeSundayNewFriends(
 ) {
   let disposed = false;
   const unsubs: Array<() => void> = [];
+  const sourceUnsubs = new Map<string, () => void>();
   const valuesByStorage = new Map<string, Record<string, Omit<SundayNewFriend, "id" | "storageSid">>>();
   const loaded = new Set<string>();
+  let currentStorageIds: string[] = [];
 
-  void loadSundayStorageIds().then((storageIds) => {
+  const emit = () => {
+    if (loaded.size !== currentStorageIds.length) return;
+    cb(collectSundayNewFriends(Object.fromEntries(
+      [...valuesByStorage].map(([sid, publicValues]) => [sid, { newFriends: publicValues }]),
+    )));
+  };
+
+  unsubs.push(subscribeSemesters((semesters) => {
     if (disposed) return;
-    storageIds.forEach((storageSid) => {
-      unsubs.push(subscribeNewFriends(storageSid, (friends) => {
+    currentStorageIds = sundayStorageIds(semesters.map((semester) => semester.id), new Date().getFullYear());
+    const desired = new Set(currentStorageIds);
+    sourceUnsubs.forEach((unsubscribe, sid) => {
+      if (desired.has(sid)) return;
+      unsubscribe();
+      sourceUnsubs.delete(sid);
+      valuesByStorage.delete(sid);
+      loaded.delete(sid);
+    });
+    currentStorageIds.forEach((storageSid) => {
+      if (sourceUnsubs.has(storageSid)) return;
+      sourceUnsubs.set(storageSid, subscribeNewFriends(storageSid, (friends) => {
         valuesByStorage.set(storageSid, Object.fromEntries(friends.map(({ id, ...friend }) => [id, friend])));
         loaded.add(storageSid);
-        if (loaded.size === storageIds.length) {
-          cb(collectSundayNewFriends(Object.fromEntries(
-            [...valuesByStorage].map(([sid, publicValues]) => [sid, { newFriends: publicValues }]),
-          )));
-        }
+        emit();
       }, onError));
     });
-  }).catch((error: unknown) => onError?.(error instanceof Error ? error : new Error(String(error))));
+    emit();
+  }, onError));
 
   return () => {
     disposed = true;
     unsubs.forEach((unsubscribe) => unsubscribe());
+    sourceUnsubs.forEach((unsubscribe) => unsubscribe());
   };
 }
 
@@ -69,26 +72,43 @@ export function subscribeSundayNewFriendsPrivate(
 ) {
   let disposed = false;
   const unsubs: Array<() => void> = [];
+  const sourceUnsubs = new Map<string, () => void>();
   const valuesByStorage = new Map<string, Record<string, NewFriendPrivate>>();
   const loaded = new Set<string>();
+  let currentStorageIds: string[] = [];
 
-  void loadSundayStorageIds().then((storageIds) => {
+  const emit = () => {
+    if (loaded.size !== currentStorageIds.length) return;
+    cb(collectSundayNewFriendsPrivate(Object.fromEntries(
+      [...valuesByStorage].map(([sid, privateValues]) => [sid, { newFriendsPrivate: privateValues }]),
+    )));
+  };
+
+  unsubs.push(subscribeSemesters((semesters) => {
     if (disposed) return;
-    storageIds.forEach((storageSid) => {
-      unsubs.push(subscribeNewFriendsPrivate(storageSid, (values) => {
+    currentStorageIds = sundayStorageIds(semesters.map((semester) => semester.id), new Date().getFullYear());
+    const desired = new Set(currentStorageIds);
+    sourceUnsubs.forEach((unsubscribe, sid) => {
+      if (desired.has(sid)) return;
+      unsubscribe();
+      sourceUnsubs.delete(sid);
+      valuesByStorage.delete(sid);
+      loaded.delete(sid);
+    });
+    currentStorageIds.forEach((storageSid) => {
+      if (sourceUnsubs.has(storageSid)) return;
+      sourceUnsubs.set(storageSid, subscribeNewFriendsPrivate(storageSid, (values) => {
         valuesByStorage.set(storageSid, values);
         loaded.add(storageSid);
-        if (loaded.size === storageIds.length) {
-          cb(collectSundayNewFriendsPrivate(Object.fromEntries(
-            [...valuesByStorage].map(([sid, privateValues]) => [sid, { newFriendsPrivate: privateValues }]),
-          )));
-        }
+        emit();
       }, onError));
     });
-  }).catch((error: unknown) => onError?.(error instanceof Error ? error : new Error(String(error))));
+    emit();
+  }, onError));
 
   return () => {
     disposed = true;
     unsubs.forEach((unsubscribe) => unsubscribe());
+    sourceUnsubs.forEach((unsubscribe) => unsubscribe());
   };
 }

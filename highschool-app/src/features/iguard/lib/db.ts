@@ -23,6 +23,10 @@ import {
 } from "@/features/portal/accessPolicy";
 import { normalizeIguardPendingRequests, type IguardPendingReq } from "./pendingAccess";
 import { isMinistryGuideMilestone } from "@/features/ministryGuide/ministryGuidePersistence";
+import {
+  subscribeToRetreat as subscribeToAdminRetreat,
+  subscribeToRetreats as subscribeToAdminRetreats,
+} from "@/lib/db/retreats";
 
 // ════════════════════════════════════════════════════════════
 // 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
@@ -34,6 +38,10 @@ export async function getRetreats(): Promise<Retreat[]> {
   return snapToList<Retreat>(snap);
 }
 
+export function subscribeToRetreats(callback: (retreats: Retreat[]) => void, onError?: (error: Error) => void): () => void {
+  return subscribeToAdminRetreats(callback, onError);
+}
+
 export async function getRetreat(id: string): Promise<Retreat | null> {
   const snap = await get(ref(db, paths.retreat(id)));
   if (!snap.exists()) return null;
@@ -41,9 +49,7 @@ export async function getRetreat(id: string): Promise<Retreat | null> {
 }
 
 export function subscribeToRetreat(id: string, cb: (retreat: Retreat | null) => void, onError?: (error: Error) => void): () => void {
-  return onValue(ref(db, paths.retreat(id)), (snap) =>
-    cb(snap.exists() ? ({ id, ...snap.val() } as Retreat) : null),
-    (error) => { console.warn("subscribeToRetreat error:", error); onError?.(error); });
+  return subscribeToAdminRetreat(id, cb, onError);
 }
 
 export function subscribeToGroups(retreatId: string, callback: (groups: Group[]) => void, onError?: (error: Error) => void): () => void {

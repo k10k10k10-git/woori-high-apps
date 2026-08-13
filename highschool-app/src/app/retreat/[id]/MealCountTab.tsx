@@ -1,12 +1,13 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Retreat, MealSlot, MealAdjustment, MealRoleCounts, MealPersonAssignment, MealRole,
   RetreatPeriod, TeacherAttendance, Participant, PartialAttendance, Student,
 } from "@/lib/types";
 import {
-  getMealCount, saveMealCount, getParticipants, getCellColors, getTeachers,
-  getPartialAttendances, getStudentsByYear, subscribeToRetreatPeriods,
+  subscribeToMealCount, saveMealCount, getParticipants, getCellColors, getTeachers,
+  subscribeToParticipants, subscribeToTeachers, subscribeToPartialAttendances,
+  subscribeToStudentsByYear, subscribeToRetreatPeriods,
 } from "@/lib/db";
 import { toYMD } from "@/lib/dateFormat";
 import { useUI } from "@/context/UIContext";
@@ -99,48 +100,31 @@ export default function MealCountTab({ retreat }: Props) {
   // 새 끼니 추가 입력
   const [newMeal, setNewMeal] = useState({ date: "", name: "점심" });
 
-  const loadDbList = useCallback(async () => {
+  useEffect(() => {
     setDbListError(null);
-    try {
-      const [teachers, parts, students, partials] = await Promise.all([
-        getTeachers(retreat.id), getParticipants(retreat.id), getStudentsByYear(retreat.year),
-        getPartialAttendances(retreat.id),
-      ]);
-      setDbTeachers(teachers);
-      setDbParticipants(parts);
-      setDbStudents(students);
-      setDbPartials(partials);
-    } catch (e) {
-      setDbListError(e instanceof Error ? e.message : String(e));
-    }
-  }, [retreat.id, retreat.year]);
-
-  const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
-    try {
-      const data = await getMealCount(retreat.id);
-      if (data) {
-        setBase({ ...EMPTY_COUNTS, ...(data.base || {}) });
-        setExtraLabel(data.extraLabel ?? "음향/조명");
-        setMeals(sortMeals(data.meals || []));
-        setAdjustments(data.adjustments || []);
-        setPersonAssignments(data.personAssignments || {});
-      }
-      await loadDbList();
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [retreat.id, loadDbList]);
-
-  useEffect(() => {
-    void load();
-    const unsub = subscribeToRetreatPeriods(retreat.id, setPeriods,
-      e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
-    return unsub;
-  }, [load, retreat.id]);
+    const onDbError = (error: Error) => setDbListError(error.message);
+    const unsubs = [
+      subscribeToTeachers(retreat.id, setDbTeachers, onDbError),
+      subscribeToParticipants(retreat.id, setDbParticipants, onDbError),
+      subscribeToStudentsByYear(retreat.year, setDbStudents, onDbError),
+      subscribeToPartialAttendances(retreat.id, setDbPartials, onDbError),
+      subscribeToMealCount(retreat.id, (data) => {
+        if (data) {
+          setBase({ ...EMPTY_COUNTS, ...(data.base || {}) });
+          setExtraLabel(data.extraLabel ?? "음향/조명");
+          setMeals(sortMeals(data.meals || []));
+          setAdjustments(data.adjustments || []);
+          setPersonAssignments(data.personAssignments || {});
+        }
+        setLoading(false);
+      }, (error) => { setLoadError(error.message); setLoading(false); }),
+      subscribeToRetreatPeriods(retreat.id, setPeriods,
+        e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`)),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [retreat.id, retreat.year]);
 
   async function handleSave() {
     setSaving(true);
@@ -414,8 +398,7 @@ export default function MealCountTab({ retreat }: Props) {
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-slate-700">③ 후발 · 선복귀 조정</h3>
-          <button onClick={() => void loadDbList().then(() => toast("명단을 새로고침했습니다.", "success"))}
-            className="btn-secondary text-xs px-3 py-1.5">🔄 DB 명단 새로고침</button>
+          <span className="text-xs font-medium text-emerald-600">● DB 명단 실시간 동기화</span>
         </div>
 
         {/* ③-a DB 명단 — 교사 참석·부분 참석 탭의 데이터를 자동으로 끌어옴 */}

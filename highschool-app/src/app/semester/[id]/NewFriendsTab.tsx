@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
   cancelNewFriendPlacement,
-  getClassesByYear,
+  subscribeClassesByYear,
   registerNewFriendInRoster,
   removeNewFriend,
   removeNewFriendFromRoster,
@@ -377,19 +377,11 @@ export default function NewFriendsTab({
   ])].sort(), [friends, getStorageSid, sid]);
 
   useEffect(() => {
-    let cancelled = false;
-    void Promise.allSettled(years.map(async (year) => [year, await getClassesByYear(year)] as const)).then((results) => {
-      if (cancelled) return;
-      const loaded: Record<string, ClassInfo[]> = {};
-      const errors: string[] = [];
-      results.forEach((result, index) => {
-        if (result.status === "fulfilled") loaded[result.value[0]] = result.value[1];
-        else errors.push(`${years[index]}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
-      });
-      setClassesByYear(loaded);
-      setClassError(errors.length > 0 ? errors.join(" / ") : null);
-    });
-    return () => { cancelled = true; };
+    setClassError(null);
+    const unsubs = years.map((year) => subscribeClassesByYear(year, (next) => {
+      setClassesByYear((current) => ({ ...current, [year]: next }));
+    }, (error) => setClassError((current) => [current, `${year}: ${error.message}`].filter(Boolean).join(" / "))));
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [years]);
 
   const stageCounts = useMemo(() => friends.reduce<Record<string, number>>((acc, friend) => {
@@ -421,7 +413,6 @@ export default function NewFriendsTab({
     setSyncingId(friend.id);
     try {
       const friendSid = storageSidFor(friend);
-      const year = yearForStorageSid(friendSid);
       const result = await registerNewFriendInRoster(
         friendSid,
         friend,
@@ -429,8 +420,6 @@ export default function NewFriendsTab({
         user?.displayName || user?.email || user?.uid,
       );
       toast(result.alreadySynced ? "이미 등록된 학생을 확인해 연결했습니다." : "학생 출석부에 반영했습니다.", "success");
-      const refreshed = await getClassesByYear(year);
-      setClassesByYear((current) => ({ ...current, [year]: refreshed }));
     } catch (error) {
       toast(error instanceof Error ? error.message : "출석부 반영에 실패했습니다.", "error");
     } finally {

@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
-import { getTeachers, saveTeacher, updateTeacher, deleteTeacher, loadTeachersFromDB, getRetreats } from "@/lib/db";
+import { getTeachers, subscribeToTeachers, saveTeacher, updateTeacher, deleteTeacher, loadTeachersFromDB, getRetreats } from "@/lib/db";
 import { prepareTeacherUpdate } from "@/lib/teacherWrite";
 import { resolveTeacherGender } from "@/lib/teacherGender";
 import {
@@ -95,23 +95,20 @@ export default function TeachersTab({ retreat }: Props) {
   const [importList, setImportList] = useState<{ name: string; bu: string; classKey: string; originKey: string; gender?: "남" | "여"; selected: boolean }[]>([]);
   const [importing, setImporting] = useState(false);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     setLoading(true);
     setLoadError(null);
-    try {
-      const list = await getTeachers(retreat.id);
+    return subscribeToTeachers(retreat.id, (list) => {
       setTeachers(list.sort((a, b) => {
         if (a.bu !== b.bu) return a.bu < b.bu ? -1 : 1;
         return a.classKey.localeCompare(b.classKey, "ko");
       }));
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
       setLoading(false);
-    }
+    }, (error) => {
+      setLoadError(error.message);
+      setLoading(false);
+    });
   }, [retreat.id]);
-
-  useEffect(() => { void load(); }, [load]);
 
 async function handleSave() {
     if (!form.name.trim()) return toast("이름을 입력해주세요.", "warning");
@@ -135,10 +132,8 @@ async function handleSave() {
     try {
       if (editId) {
         await updateTeacher(retreat.id, editId, prepareTeacherUpdate(payload));
-        setTeachers(prev => prev.map(t => t.id === editId ? { ...t, ...payload } : t));
       } else {
-        const id = await saveTeacher(retreat.id, payload);
-        setTeachers(prev => [...prev, { id, ...payload }]);
+        await saveTeacher(retreat.id, payload);
       }
       setForm(EMPTY_FORM);
       setShowAdd(false);
@@ -152,7 +147,6 @@ async function handleSave() {
     if (!await uiConfirm("삭제하시겠습니까?")) return;
     try {
       await deleteTeacher(retreat.id, id);
-      setTeachers(prev => prev.filter(t => t.id !== id));
     } catch (e) {
       toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
@@ -264,15 +258,12 @@ async function handleSave() {
       currentTeachers.filter(t => t.originKey).forEach(t => byOrigin.set(t.originKey!, t));
       const byLegacy = new Map(currentTeachers.map(t => [teacherExactKey(t), t]));
       const byName = new Map(currentTeachers.map(t => [teacherNameKey(t), t]));
-      const added: TeacherAttendance[] = [];
-      const updated: TeacherAttendance[] = [];
       for (const t of toAdd) {
         const existing = byOrigin.get(t.originKey) ?? byLegacy.get(teacherExactKey(t)) ?? byName.get(teacherNameKey(t));
         if (existing) {
           // 이름/부/반만 출석부 원본 기준으로 갱신, 나머지 수련회 입력값은 보존
           const sourceGender = t.gender || resolveTeacherGender(existing) || undefined;
           await updateTeacher(retreat.id, existing.id, { name: t.name, bu: t.bu, classKey: t.classKey, originKey: t.originKey, ...(sourceGender ? { gender: sourceGender } : {}) });
-          updated.push({ ...existing, name: t.name, bu: t.bu, classKey: t.classKey, originKey: t.originKey, ...(sourceGender ? { gender: sourceGender } : {}) });
           continue;
         }
         const payload: TeacherFormState = {
@@ -288,16 +279,8 @@ async function handleSave() {
           originType: t.bu === "스탭" ? "official-staff" : "class-teacher",
           originKey: t.originKey,
         };
-        const id = await saveTeacher(retreat.id, payload);
-        added.push({ id, ...payload });
+        await saveTeacher(retreat.id, payload);
       }
-      setTeachers(prev => {
-        const upMap = new Map(updated.map(u => [u.id, u]));
-        return [...prev.map(t => upMap.get(t.id) ?? t), ...added].sort((a, b) => {
-          if (a.bu !== b.bu) return a.bu < b.bu ? -1 : 1;
-          return a.classKey.localeCompare(b.classKey, "ko");
-        });
-      });
       setShowImport(false);
     } catch (e) {
       toast(`저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");

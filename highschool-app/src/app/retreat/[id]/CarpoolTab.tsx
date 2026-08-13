@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Retreat, CarPool, Participant } from "@/lib/types";
-import { getCarpools, saveCarpool, updateCarpool, deleteCarpool, getParticipants } from "@/lib/db";
+import { subscribeToCarpools, saveCarpool, updateCarpool, deleteCarpool, subscribeToParticipants } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { useSubmitLock } from "@/lib/useSubmitLock";
 import NameAutocomplete from "./NameAutocomplete";
@@ -28,21 +28,20 @@ export default function CarpoolTab({ retreat }: Props) {
   const [customTime, setCustomTime] = useState("");
   const [filter, setFilter] = useState("전체");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const [cp, parts] = await Promise.all([getCarpools(retreat.id), getParticipants(retreat.id)]);
-      setCarpools(cp);
-      setParticipants(parts);
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
+  useEffect(() => {
+    const ready = new Set<string>();
+    const markReady = (source: string) => {
+      ready.add(source);
+      if (ready.size === 2) setLoading(false);
+    };
+    const onError = (error: Error) => {
+      setLoadError(error.message);
       setLoading(false);
-    }
+    };
+    const unsubCarpools = subscribeToCarpools(retreat.id, (next) => { setCarpools(next); markReady("carpools"); }, onError);
+    const unsubParticipants = subscribeToParticipants(retreat.id, (next) => { setParticipants(next); markReady("participants"); }, onError);
+    return () => { unsubCarpools(); unsubParticipants(); };
   }, [retreat.id]);
-
-  useEffect(() => { void load(); }, [load]);
 
   // 이름 자동완성 후보 — 참가자 명단 기반 (이름 + 부/학년/반 표시, 클릭 시 자동 입력)
   const suggestions = useMemo(() =>
@@ -81,10 +80,8 @@ export default function CarpoolTab({ retreat }: Props) {
     try {
       if (editId) {
         await updateCarpool(retreat.id, editId, data);
-        setCarpools(prev => prev.map(c => c.id === editId ? { ...c, ...data } : c));
       } else {
-        const id = await saveCarpool(retreat.id, data);
-        setCarpools(prev => [...prev, { id, ...data }]);
+        await saveCarpool(retreat.id, data);
       }
       setForm(EMPTY_FORM);
       setCustomTime("");
@@ -99,7 +96,6 @@ export default function CarpoolTab({ retreat }: Props) {
     if (!await uiConfirm("삭제하시겠습니까?")) return;
     try {
       await deleteCarpool(retreat.id, id);
-      setCarpools(prev => prev.filter(c => c.id !== id));
     } catch (e) {
       toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

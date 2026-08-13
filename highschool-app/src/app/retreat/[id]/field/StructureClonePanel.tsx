@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Retreat } from "@/features/iguard/lib/types";
-import { cloneIguardStructure, getRetreats } from "@/features/iguard/lib/db";
+import { cloneIguardStructure, subscribeToRetreats } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
 
 export default function StructureClonePanel({ retreatId }: { retreatId: string }) {
@@ -12,9 +12,10 @@ export default function StructureClonePanel({ retreatId }: { retreatId: string }
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
-    getRetreats()
-      .then(list => setRetreats(list.filter(item => item.id !== retreatId).sort((a, b) => b.year - a.year)))
-      .catch(error => toast(`수련회 목록 조회 오류: ${error instanceof Error ? error.message : String(error)}`, "error"));
+    return subscribeToRetreats(
+      list => setRetreats(list.filter(item => item.id !== retreatId).sort((a, b) => b.year - a.year)),
+      error => toast(`수련회 목록 조회 오류: ${error.message}`, "error"),
+    );
   }, [retreatId, toast]);
 
   async function clone() {

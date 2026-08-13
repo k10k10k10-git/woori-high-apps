@@ -1,7 +1,7 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Retreat, AdminSupplyItem, AdminSupplyKind, ADMIN_SUPPLY_KINDS } from "@/lib/types";
-import { getAdminSupplies, saveAdminSupply, updateAdminSupply, deleteAdminSupply } from "@/lib/db";
+import { subscribeToAdminSupplies, saveAdminSupply, updateAdminSupply, deleteAdminSupply } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 
 interface Props { retreat: Retreat; }
@@ -24,29 +24,23 @@ export default function AdminSuppliesTab({ retreat }: Props) {
   const [form, setForm] = useState<Omit<AdminSupplyItem, "id">>(emptyItem("행정물품"));
   const [hideChecked, setHideChecked] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      setItems(await getAdminSupplies(retreat.id));
-    } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
-    } finally {
+  useEffect(() => {
+    return subscribeToAdminSupplies(retreat.id, (next) => {
+      setItems(next);
       setLoading(false);
-    }
+    }, (error) => {
+      setLoadError(error.message);
+      setLoading(false);
+    });
   }, [retreat.id]);
-
-  useEffect(() => { void load(); }, [load]);
 
   async function handleSave() {
     if (!form.name.trim()) return toast("품목명을 입력해주세요.", "warning");
     try {
       if (editId) {
         await updateAdminSupply(retreat.id, editId, form);
-        setItems(prev => prev.map(it => it.id === editId ? { ...it, ...form } : it));
       } else {
-        const id = await saveAdminSupply(retreat.id, form);
-        setItems(prev => [...prev, { id, ...form }]);
+        await saveAdminSupply(retreat.id, form);
       }
       setForm(emptyItem(innerTab));
       setShowModal(false);
@@ -60,7 +54,6 @@ export default function AdminSuppliesTab({ retreat }: Props) {
     if (!await uiConfirm("삭제하시겠습니까?")) return;
     try {
       await deleteAdminSupply(retreat.id, id);
-      setItems(prev => prev.filter(it => it.id !== id));
     } catch (e) {
       toast(`삭제 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }

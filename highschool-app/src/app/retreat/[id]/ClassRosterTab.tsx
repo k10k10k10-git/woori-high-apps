@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { Retreat, Participant, PartialAttendance } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
-import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear, getPartialAttendances, subscribeToPartialAttendances } from "@/lib/db";
+import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear, subscribeToClassesByYear, getPartialAttendances, subscribeToPartialAttendances } from "@/lib/db";
 import * as XLSX from "xlsx";
 import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
@@ -52,6 +52,20 @@ function stripSuffix(n: string) {
   return n.replace(/[A-Za-z]+$/, "").trim();
 }
 
+function buildClassInfos(classesRaw: Awaited<ReturnType<typeof getClassesByYear>>): ClassInfo[] {
+  const infos: ClassInfo[] = [];
+  Object.entries(classesRaw).forEach(([classKey, cd]) => {
+    const parsed = parseClassKey(classKey);
+    if (!parsed) return;
+    const { buNum, grade, classNum } = parsed;
+    const students: StudentInfo[] = Object.entries(cd.students || {})
+      .map(([id, s]) => ({ id, grade, classNum, name: s.name, num: s.num ?? 0, phone: s.phone, jang: !!s.jang }))
+      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    infos.push({ buNum, grade, classNum, teacher: cd.teacher || "", students });
+  });
+  return infos.sort((a, b) => a.buNum - b.buNum || a.grade - b.grade || a.classNum - b.classNum);
+}
+
 export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   const { toast } = useUI();
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -91,17 +105,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       setCellColorsState(colors);
       setPartialMap(buildPartialMap(partials));
 
-      const infos: ClassInfo[] = [];
-      Object.entries(classesRaw).forEach(([classKey, cd]) => {
-        const parsed = parseClassKey(classKey);
-        if (!parsed) return;
-        const { buNum, grade, classNum } = parsed;
-        const studs: StudentInfo[] = Object.entries(cd.students || {})
-          .map(([id, s]) => ({ id, grade, classNum, name: s.name, num: s.num ?? 0, phone: s.phone, jang: !!s.jang }))
-          .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-        infos.push({ buNum, grade, classNum, teacher: cd.teacher || "", students: studs });
-      });
-      infos.sort((a, b) => a.buNum - b.buNum || a.grade - b.grade || a.classNum - b.classNum);
+      const infos = buildClassInfos(classesRaw);
       setClasses(infos);
 
       // 기존 빨간색 셀 → 취소명단 자동 동기화 (세션 내 최초 1회만 실행)
@@ -142,8 +146,11 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     const unsubPartial = subscribeToPartialAttendances(retreat.id, (list) => {
       setPartialMap(buildPartialMap(list));
     }, e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
-    return () => { unsubColors(); unsubParts(); unsubPartial(); };
-  }, [load, retreat.id]);
+    const unsubClasses = subscribeToClassesByYear(retreat.year, (next) => {
+      setClasses(buildClassInfos(next));
+    }, e => setLoadError(prev => prev ?? `출석부 반 구독 실패 — ${e.message}`));
+    return () => { unsubColors(); unsubParts(); unsubPartial(); unsubClasses(); };
+  }, [load, retreat.id, retreat.year]);
 
   // 선택한 부의 클래스만
   const visibleClasses = useMemo(() => {

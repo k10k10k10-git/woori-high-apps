@@ -2,7 +2,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Group, Participant, TeacherAttendance } from "@/lib/types";
 import { DEFAULT_AUTO_ASSIGN_RULES, emptyLeaderEntry } from "@/lib/autoAssignConfig";
-import { getAutoAssignConfig, saveAutoAssignConfig } from "@/lib/db";
+import { subscribeToAutoAssignConfig, saveAutoAssignConfig } from "@/lib/db";
 import {
   AutoAssignScope, ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
   buildAffinityBundles, buildAssignmentUnits, buildClassUnits, calculateEvenGroupCountsForMaxSize, ensureEvenCombinedGroupCounts,
@@ -60,7 +60,6 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
   const [configError, setConfigError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
     setConfigLoading(true);
     setConfigNotice(null);
     setConfigError(null);
@@ -81,8 +80,11 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
     setNewTSC({ teacher: emptyTpicker(), student: emptyPicker() });
     setNewCC({ a: emptyClsPick(), b: emptyClsPick() });
     setNewCA({ a: emptyClsPick(), b: emptyClsPick() });
-    getAutoAssignConfig(retreatId).then(config => {
-      if (cancelled || !config) return;
+    return subscribeToAutoAssignConfig(retreatId, config => {
+      if (!config) {
+        setConfigLoading(false);
+        return;
+      }
       setGroupCount1bu(config.groupCount1bu);
       setGroupCount2bu(config.groupCount2bu);
       setRules(config.rules);
@@ -94,12 +96,11 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
       setLeaderEntries1(config.leaderEntries1);
       setLeaderEntries2(config.leaderEntries2);
       setConfigNotice("저장된 설정을 불러왔습니다.");
-    }).catch(error => {
-      if (!cancelled) setConfigError(error instanceof Error ? error.message : "설정을 불러오지 못했습니다.");
-    }).finally(() => {
-      if (!cancelled) setConfigLoading(false);
+      setConfigLoading(false);
+    }, error => {
+      setConfigError(error.message || "설정을 불러오지 못했습니다.");
+      setConfigLoading(false);
     });
-    return () => { cancelled = true; };
   }, [retreatId]);
 
   async function saveConfig() {

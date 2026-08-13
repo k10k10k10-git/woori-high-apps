@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Room, Group, Student, Participant, TeacherAttendance, PartialAttendance } from "@/lib/types";
-import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, subscribeToPartialAttendances, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, subscribeToStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, subscribeToPartialAttendances, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
 import { groupDisplayName } from "@/lib/groupNumber";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
@@ -126,8 +126,8 @@ export default function RoomsTab({ retreat }: Props) {
     const unsubs: (() => void)[] = [];
 
     setLoadError(null);
-    // Load students (one-time)
-    getStudentsByYear(retreat.year).then(stds => {
+    // 출석부 학생 변경도 열린 방배정 화면에 즉시 반영한다.
+    unsubs.push(subscribeToStudentsByYear(retreat.year, stds => {
       studentsBaseRef.current = stds;
       // Re-process if participants already loaded
       const parts = participantsRef.current;
@@ -142,10 +142,10 @@ export default function RoomsTab({ retreat }: Props) {
         }
       });
       setStudents(studentMap);
-    }).catch(e => {
-      setLoadError(e instanceof Error ? e.message : "학생 데이터를 불러오지 못했습니다.");
+    }, e => {
+      setLoadError(e.message || "학생 데이터를 불러오지 못했습니다.");
       setLoading(false);
-    });
+    }));
 
     // Real-time: participants
     unsubs.push(subscribeToParticipants(retreat.id, (parts) => {
@@ -1104,7 +1104,7 @@ function RoomCard({ room, students, cellColors, studentCandidateIds, allTeachers
   const [capacityDraft, setCapacityDraft] = useState(String(room.capacity));
   const totalCount = (room.studentIds || []).length;
   const cancelledCount = (room.studentIds || []).filter(sid => cellColors[sid] === "red").length;
-  const teachers = room.teachers || [];
+  const teachers = useMemo(() => room.teachers || [], [room.teachers]);
   const activeStudentCount = totalCount - cancelledCount;
   const occupancy = activeStudentCount + teachers.length;
   const isFull = occupancy >= room.capacity;

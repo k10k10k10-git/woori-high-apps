@@ -12,6 +12,10 @@ export async function getCarpools(retreatId: string): Promise<CarPool[]> {
   return snapToList<CarPool>(snap);
 }
 
+export function subscribeToCarpools(retreatId: string, callback: (items: CarPool[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.carpools(retreatId)), (snap) => callback(snapToList<CarPool>(snap)), onError);
+}
+
 export async function saveCarpool(retreatId: string, carpool: Omit<CarPool, "id">): Promise<string> {
   const newRef = push(ref(db, paths.carpools(retreatId)));
   await set(newRef, stripUndefined(carpool));
@@ -98,6 +102,10 @@ export async function getSupplies(retreatId: string): Promise<SupplyItem[]> {
   return snapToList<SupplyItem>(snap);
 }
 
+export function subscribeToSupplies(retreatId: string, callback: (items: SupplyItem[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.supplies(retreatId)), (snap) => callback(snapToList<SupplyItem>(snap)), onError);
+}
+
 export async function saveSupply(retreatId: string, data: Omit<SupplyItem, "id">): Promise<string> {
   const newRef = push(ref(db, paths.supplies(retreatId)));
   await set(newRef, stripUndefined(data));
@@ -119,6 +127,10 @@ export async function getAdminSupplies(retreatId: string): Promise<AdminSupplyIt
   return snapToList<AdminSupplyItem>(snap);
 }
 
+export function subscribeToAdminSupplies(retreatId: string, callback: (items: AdminSupplyItem[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.adminSupplies(retreatId)), (snap) => callback(snapToList<AdminSupplyItem>(snap)), onError);
+}
+
 export async function saveAdminSupply(retreatId: string, data: Omit<AdminSupplyItem, "id">): Promise<string> {
   const newRef = push(ref(db, paths.adminSupplies(retreatId)));
   await set(newRef, stripUndefined(data));
@@ -138,6 +150,10 @@ export async function deleteAdminSupply(retreatId: string, sId: string): Promise
 export async function getSnacks(retreatId: string): Promise<SnackItem[]> {
   const snap = await get(ref(db, paths.snacks(retreatId)));
   return snapToList<SnackItem>(snap);
+}
+
+export function subscribeToSnacks(retreatId: string, callback: (items: SnackItem[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.snacks(retreatId)), (snap) => callback(snapToList<SnackItem>(snap)), onError);
 }
 
 export async function saveSnack(retreatId: string, data: Omit<SnackItem, "id">): Promise<string> {
@@ -162,6 +178,10 @@ export async function getSuppliesBudget(retreatId: string): Promise<SuppliesBudg
   return snap.val() as SuppliesBudget;
 }
 
+export function subscribeToSuppliesBudget(retreatId: string, callback: (budget: SuppliesBudget | null) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.suppliesBudget(retreatId)), (snap) => callback(snap.exists() ? snap.val() as SuppliesBudget : null), onError);
+}
+
 export async function updateSuppliesBudget(retreatId: string, data: SuppliesBudget): Promise<void> {
   await set(ref(db, paths.suppliesBudget(retreatId)), data);
 }
@@ -172,6 +192,10 @@ export async function getMealCount(retreatId: string): Promise<MealCountData | n
   const snap = await get(ref(db, paths.mealCount(retreatId)));
   if (!snap.exists()) return null;
   return snap.val() as MealCountData;
+}
+
+export function subscribeToMealCount(retreatId: string, callback: (data: MealCountData | null) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.mealCount(retreatId)), (snap) => callback(snap.exists() ? snap.val() as MealCountData : null), onError);
 }
 
 export async function saveMealCount(retreatId: string, data: MealCountData): Promise<void> {
@@ -313,6 +337,13 @@ export async function getMedicinePresets(retreatId: string): Promise<string[]> {
   if (!snap.exists()) return DEFAULT_MEDICINE_PRESETS;
   const val = snap.val();
   return Array.isArray(val) ? val : DEFAULT_MEDICINE_PRESETS;
+}
+
+export function subscribeToMedicinePresets(retreatId: string, callback: (items: string[]) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, paths.medicinePresets(retreatId)), (snap) => {
+    const value = snap.exists() ? snap.val() : null;
+    callback(Array.isArray(value) ? value : DEFAULT_MEDICINE_PRESETS);
+  }, onError);
 }
 
 export async function saveMedicinePresets(retreatId: string, items: string[]): Promise<void> {

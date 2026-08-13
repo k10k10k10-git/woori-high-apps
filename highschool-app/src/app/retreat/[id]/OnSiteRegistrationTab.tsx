@@ -4,7 +4,7 @@ import { Retreat, Participant, OnSiteEntry, Group, TeacherAttendance, PartialAtt
 import {
   subscribeToParticipants, subscribeToCellColors,
   subscribeToOnSiteReg, unregisterOnSite, addWalkIn, toggleOnSiteCheckIn,
-  subscribeToGroups, getClassesByYear, subscribeToConnection,
+  subscribeToGroups, subscribeToClassesByYear, subscribeToConnection,
   subscribeToTeachers, subscribeToPartialAttendances,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
@@ -59,31 +59,21 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const classesRaw = await getClassesByYear(retreat.year);
-
-        // 실제 반 명단 파싱
-        const students: ClassStudent[] = [];
-        Object.entries(classesRaw).forEach(([classKey, cd]) => {
-          const parsed = parseClassKey(classKey);
-          if (!parsed) return;
-          const { buNum: b, grade: g, classNum: c } = parsed;
-          Object.entries(cd.students || {}).forEach(([rawId, s]) => {
-            const cs: ClassStudent = { rawId, buNum: b, grade: g, classNum: c, name: s.name };
-            students.push(cs);
-          });
+    setLoading(true);
+    setLoadError(null);
+    const unsubClasses = subscribeToClassesByYear(retreat.year, (classesRaw) => {
+      const students: ClassStudent[] = [];
+      Object.entries(classesRaw).forEach(([classKey, cd]) => {
+        const parsed = parseClassKey(classKey);
+        if (!parsed) return;
+        const { buNum: b, grade: g, classNum: c } = parsed;
+        Object.entries(cd.students || {}).forEach(([rawId, s]) => {
+          students.push({ rawId, buNum: b, grade: g, classNum: c, name: s.name });
         });
-        setClassStudents(students);
-      } catch (e) {
-        setLoadError(e instanceof Error ? e.message : String(e));
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadData();
+      });
+      setClassStudents(students);
+      setLoading(false);
+    }, (error) => { setLoadError(error.message); setLoading(false); });
     const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
       e => setLoadError(prev => prev ?? `구독 실패 — ${e.message}`));
     const unsubCellColors = subscribeToCellColors(retreat.id, setCellColors,
@@ -98,7 +88,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       e => setLoadError(prev => prev ?? `부분참 명단 구독 실패 — ${e.message}`));
     const unsubConn = subscribeToConnection(setConnected);
     return () => {
-      unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups();
+      unsubClasses(); unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups();
       unsubTeachers(); unsubPartial(); unsubConn();
     };
   }, [retreat.id, retreat.year]);

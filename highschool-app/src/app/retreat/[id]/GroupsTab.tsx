@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { clearGroups, saveGroups, subscribeToGroups, getStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
+import { clearGroups, saveGroups, subscribeToGroups, subscribeToStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
 import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
@@ -113,8 +113,8 @@ export default function GroupsTab({ retreat }: Props) {
     const unsubs: (() => void)[] = [];
 
     setLoadError(null);
-    // Load students (one-time, they don't change during session)
-    getStudentsByYear(retreat.year).then(stds => {
+    // 출석부 학생 변경도 열린 조편성 화면에 즉시 반영한다.
+    unsubs.push(subscribeToStudentsByYear(retreat.year, stds => {
       studentsBaseRef.current = stds;
       // Re-process any already-loaded participants with student data
       const parts = participantsRef.current;
@@ -129,10 +129,10 @@ export default function GroupsTab({ retreat }: Props) {
         }
       });
       setStudents(studentMap);
-    }).catch(e => {
-      setLoadError(e instanceof Error ? e.message : "학생 데이터를 불러오지 못했습니다.");
+    }, e => {
+      setLoadError(e.message || "학생 데이터를 불러오지 못했습니다.");
       setLoading(false);
-    });
+    }));
 
     // Real-time: participants
     unsubs.push(subscribeToParticipants(retreat.id, (parts) => {
