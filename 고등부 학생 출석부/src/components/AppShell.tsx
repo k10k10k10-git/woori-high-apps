@@ -170,8 +170,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
     navigator.serviceWorker.addEventListener('message', handler);
 
-    // SW 등록 — 없으면 아무것도 안 된다
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    // HTTP 캐시를 우회해 배포 때마다 최신 SW를 확인한다.
+    navigator.serviceWorker
+      .register('/sw.js', { updateViaCache: 'none' })
+      .then(registration => registration.update())
+      .catch(() => {});
 
     return () => navigator.serviceWorker.removeEventListener('message', handler);
   }, []);

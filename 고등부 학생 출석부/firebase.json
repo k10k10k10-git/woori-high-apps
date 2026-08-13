@@ -4,10 +4,21 @@
   },
   "hosting": {
     "predeploy": [
-      "node tools/update-cache-version.js",
-      "npm run build"
+      "npm run build",
+      "node tools/update-cache-version.js out/sw.js"
     ],
     "public": "out",
+    "headers": [
+      {
+        "source": "/sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
     "ignore": [
       "firebase.json",
       "tools/**",

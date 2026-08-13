@@ -247,6 +247,7 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 
 - 교사 테스트 기간에는 `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS = false`로 통계 탭의 `출석 등급 분포`와 `주의 학생` 영역을 숨긴다.
 - 정식 버전 출시 시 이 값을 `true`로 바꾸고 재배포하면 두 영역이 기존 계산 로직과 함께 다시 표시된다.
+- Firebase Hosting predeploy는 빌드가 끝난 뒤 `out/sw.js`에 밀리초 단위 고유 캐시 버전을 넣는다. 날짜 단위 버전으로 되돌리면 같은 날 재배포한 화면이 기존 서비스워커 캐시에 남는다.
 
 ### Firebase 보안 규칙 (`database.rules.json`)
 
