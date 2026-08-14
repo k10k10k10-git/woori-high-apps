@@ -699,7 +699,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
               ))}
             </div>
           </div>
-          <table className="text-xs border-collapse">
+          <table className="class-roster-grid text-xs border-collapse">
             <thead>
               {/* 학년 헤더 */}
               <tr className="bg-slate-100">

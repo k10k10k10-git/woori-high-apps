@@ -36,12 +36,12 @@ export default function UpdateBanner() {
   if (!show) return null;
 
   return (
-    <div className="fixed top-0 inset-x-0 z-[100] flex items-center justify-center gap-3 px-4 py-2.5 text-sm text-white shadow-lg"
+    <div className="fixed top-0 inset-x-0 z-[100] flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-white shadow-lg sm:gap-3 sm:px-4"
       style={{ background: "var(--color-header-bg)" }}>
-      <span>새 버전이 있습니다. 새로고침하면 최신 버전으로 전환됩니다.</span>
+      <span className="min-w-0 truncate">새 버전이 있습니다. 새로고침하면 최신 버전으로 전환됩니다.</span>
       <button
         onClick={() => window.location.reload()}
-        className="px-3 py-1 rounded-lg font-semibold text-xs transition-colors"
+        className="shrink-0 whitespace-nowrap px-3 py-1 rounded-lg font-semibold text-xs transition-colors"
         style={{ background: "var(--color-primary)" }}
       >
         새로고침

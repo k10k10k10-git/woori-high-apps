@@ -252,7 +252,7 @@ export default function RetreatPageClient() {
               <h1 className="font-bold text-white text-xs sm:text-base truncate min-w-0">{retreat.name}</h1>
               <button
                 onClick={() => router.push(`/retreat/${id}/field`)}
-                className="ml-auto rounded-lg border border-white/10 bg-white/[0.07] px-2.5 py-1.5 text-[11px] font-semibold text-[var(--color-on-dark-accent)] transition hover:bg-white/[0.12] sm:text-xs"
+                className="ml-auto shrink-0 whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.07] px-2 py-1.5 text-[11px] font-semibold text-[var(--color-on-dark-accent)] transition hover:bg-white/[0.12] sm:px-2.5 sm:text-xs"
               >
                 이가드 현장 →
               </button>
@@ -265,7 +265,7 @@ export default function RetreatPageClient() {
               </button>
               <button
                 onClick={() => setEditingSheet(true)}
-                className="ml-auto text-xs transition-colors shrink-0 sm:hidden p-1.5"
+                className="shrink-0 p-1.5 text-xs transition-colors sm:hidden"
                 aria-label="시트 설정 열기"
                 style={{ color: "#6b7280" }}
               >

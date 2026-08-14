@@ -46,4 +46,19 @@ describe("모바일 운영 화면 계약", () => {
     expect(sundayTabs).toContain("행정 변동 사항 모바일 목록");
     expect(sundayTabs).toContain("hidden overflow-x-auto sm:block");
   });
+
+  it("모바일 상단의 새로고침과 이가드 현장 행동은 한 줄을 유지한다", () => {
+    expect(source("src/app/UpdateBanner.tsx")).toContain("shrink-0 whitespace-nowrap");
+    const retreatHeader = source("src/app/retreat/[id]/RetreatPageClient.tsx");
+    expect(retreatHeader).toContain("ml-auto shrink-0 whitespace-nowrap");
+  });
+
+  it("반별 명단 학생 셀은 전역 카드 표보다 조밀한 전용 행간을 사용한다", () => {
+    expect(source("src/app/retreat/[id]/ClassRosterTab.tsx")).toContain("class-roster-grid text-xs");
+    const css = source("src/app/globals.css");
+    expect(css).toContain(".card table.class-roster-grid tbody td");
+    expect(css).toContain("height: 26px;");
+    expect(css).toContain("padding-top: 1px;");
+    expect(css).toContain("padding-bottom: 1px;");
+  });
 });
