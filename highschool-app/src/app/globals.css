@@ -141,10 +141,15 @@
    Base
 ════════════════════════════════════════════════════ */
 * { box-sizing: border-box; }
-html { color-scheme: light; scroll-behavior: smooth; }
+html {
+  min-height: 100%;
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
 html[data-theme="dark"] { color-scheme: dark; }
 
 body {
+  min-height: 100%;
   margin: 0;
   font-family: "Pretendard Variable", Pretendard, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
   background: var(--color-bg);
@@ -152,6 +157,23 @@ body {
   font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* PC에서는 루트 요소를 명시적인 스크롤 컨테이너로 둔다.
+   sticky 헤더가 중첩된 긴 운영 화면에서도 휠 입력이 body/html 사이에서 유실되지 않게 한다. */
+@media (min-width: 901px) {
+  html {
+    overflow-y: scroll;
+    overscroll-behavior-y: auto;
+    scroll-behavior: auto;
+  }
+
+  body,
+  .app-page,
+  .semester-scope,
+  .iguard-scope {
+    overflow-y: visible;
+  }
 }
 
 button, input, select, textarea { font: inherit; }
