@@ -1,8 +1,29 @@
-# 인수인계 — 2026-08-13
+# 인수인계 — 2026-08-14
 
 > **이 파일이 인수인계의 유일한 원천이다.** `LATEST_HANDOFF.md`처럼 "더 최신"을 자처하는
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
+
+## 2026-08-14 오전 최신 작업 — 통합사이트 리디자인·다크모드
+
+- `design-taste-frontend`의 Preserve 모드로 통합사이트를 재정비했다. 기존 에메랄드 브랜드 색, 글꼴 체계, W 로고, URL 구조, 주요 내비게이션 이름, 폼 필드 이름과 법적 문구는 유지했다. 홈·공개 랜딩·학기 목록·수련회 명단·마이페이지·팀원 관리의 정보 위계와 여백을 정리한 기능 커밋은 `40cec1e`다.
+- 화면에 노출되는 em dash를 일반 구두점으로 정리한 커밋은 `f8f53c0`이다. URL·내비게이션·폼 필드·앵커 변경은 없었다.
+- 시스템 테마를 초기값으로 사용하고 사용자의 선택을 저장하는 다크모드를 `8e271a8`로 추가했다. 로그인 전 랜딩과 로그인 후 포털 모두 같은 테마 계약을 쓰며, 헤더의 테마 버튼으로 전환한다.
+- 프로덕션 URL은 계속 `https://woorihigh-app.vercel.app`이고, 옛 `highschool-app-flame.vercel.app` 별칭도 같은 프로젝트를 가리킨다.
+
+## 2026-08-14 오전 최신 작업 — 모바일 운영 화면·오버레이·반별 명단 보완
+
+- 모바일 현장 화면의 상단을 W 로고·현재 영역·검색·더보기 중심으로 단순화하고, 중복 내비게이션과 과도한 카드 높이를 줄였다(`22377ef`). 이 변경 뒤 PC 스크롤이 잠긴 회귀는 모바일과 데스크톱의 overflow 계약을 분리해 즉시 복구했다(`13c87ff`).
+- 공용 `OverlayShell`과 `ModalScrollManager`를 추가해 포털 검색, 모바일 메뉴, 자동 배정 미리보기, 주일 사역, 새친구 접수 같은 오버레이에서 배경 스크롤을 잠그고 모달 내부만 스크롤하도록 통일했다(`a0e32b1`). 새친구·등록 현황·행정 변동 사항은 모바일 카드, 데스크톱 표를 사용한다.
+- 새친구 접수 모달은 모바일에서 화면 너비에 고정하고 `min-width: 0`, `max-width: 100%`, `overflow-x: hidden`, `touch-action: pan-y` 계약을 적용했다. 320·390·430px에서 입력칸 너비와 패널 `scrollWidth`를 실측해 좌우 이동 없이 위아래로만 스크롤됨을 확인했다(`c7a8ab5`).
+- 모바일 업데이트 배너의 `새로고침`과 수련회 상단의 `이가드 현장`이 두 줄로 갈라지지 않도록 nowrap·말줄임 계약을 추가했다. 수련회 행정 `반별 명단`은 전역 표 여백과 별도의 `class-roster-grid` 밀도 규칙으로 분리해, 학생 셀 높이를 모바일 약 26px·PC 약 24px로 줄이고 이름은 한 줄로 고정했다(`a875245`, `7cebbc0`). 재발 방지 패턴은 `highschool-app/AGENTS.md`에 기록했다(`7268d83`).
+- 최종 검증은 `highschool-app` 70파일 **554개 테스트**, `npx tsc --noEmit`, production build, 변경 파일 ESLint 통과다. 로그인된 실제 프로덕션 화면에서 모바일·PC 스크롤과 320·390·430px 폭을 확인했고, Vercel Production `Ready` 및 `/api/version` buildId가 `7268d83`과 일치함을 확인했다.
+- 위 작업은 Firebase DB 쓰기와 Rules 변경이 전혀 없는 UI·클라이언트 동작 변경이다.
+
+## 2026-08-13 후속 작업 — 운영 데이터 실시간 구독·요청 삭제
+
+- 통합사이트가 읽는 운영 데이터의 일회성 `get`을 RTDB `onValue` 구독으로 전환했다(`f4cd558`). 출석부 등 다른 화면에서 DB를 변경하면 연결된 통합사이트 화면도 별도 새로고침 없이 갱신된다. 구독 해제와 오류 콜백을 함께 배선했고 DB 구조·Rules는 바꾸지 않았다.
+- 통합관리자 마이페이지 요청함에 `요청 삭제`를 추가했다(`7c0431d`). 긴 첨부가 있는 요청에서도 버튼을 바로 찾을 수 있도록 해결 영역 상단에 고정했다(`91dc09d`). 삭제는 사용자가 실제 버튼을 누를 때만 해당 `iguardPending/{uid}/siteRequests/{requestId}` 한 건에 쓰며, 구현·QA·배포 과정에서는 운영 DB를 직접 수정하지 않았다.
 
 ## 2026-08-13 오후 최신 작업 — 행정 이력·출석 표·사역 가이드 보완
 
@@ -34,9 +55,9 @@
 
 ## 지금 상태 (한 문장)
 
-사용자 요청은 **전부 완료·검증·배포**됐고, 남은 것은 **학생 출석부 데모 모드 정리** 하나다.
+사용자 요청은 **전부 완료·검증·배포**됐고, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
 
-- 최신 기능 커밋: `606a7b5` (`통합사이트: 행정 이력과 사역 가이드 보완`) — 이 문서 갱신 커밋이 바로 뒤에 붙는다.
+- 최신 배포 앱 커밋: `7268d83` (`문서: 고밀도 명단 압축 패턴 기록`). 직전 UI 커밋은 `7cebbc0`이다. 이 인수인계 문서 커밋은 앱 코드 변경이 아니다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
 - 브랜치는 `main` 하나뿐 (병합 완료된 `codex/unified-highschool`·`refactor/2026-07-plan`을 2026-08-13 삭제)
 - 작업 트리 깨끗 (미추적 `.agents/` `outputs/` `tmp/` + 학생 앱 `tmp/` 제외 — **`git add .` 금지**)
@@ -75,15 +96,17 @@
 
 **하위호환이 이 모델의 핵심**이다. 새 필드(`semesterRole`·`retreatRole`)가 없는 기존 구성원은 레거시 `role`에서 파생해 **이전과 똑같은 권한**을 받는다. `accessPolicy.test.ts`가 이걸 회귀로 고정한다 — 여기가 깨지면 43명이 로그인해도 화면이 빈다.
 
-## 검증 상태 (2026-08-12 실측)
+## 검증 상태 (2026-08-14 마지막 실측)
 
 | | 결과 |
 |---|---|
 | `highschool-app` `npx tsc --noEmit` | 0 errors |
-| `highschool-app` `npm test` | 63파일 **526개 통과** |
+| `highschool-app` `npm test` | 70파일 **554개 통과** |
+| `highschool-app` `npm run build` | 성공 |
 | `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
-| `고등부 학생 출석부` `npm test` | 8파일 **102개 통과** |
-| `highschool-app` lint | **10 errors** / 4 warnings (아래 "미완인 것" 참고) |
+| `고등부 학생 출석부` `npm test` | 8파일 **105개 통과** (마지막 학생 앱 변경 기준) |
+| `highschool-app` 변경 파일 lint | 통과 |
+| `highschool-app` 전체 lint | **10 errors** / 3 warnings (React Hooks 규칙 부채, 아래 "미완인 것" 참고) |
 
 ## 이번 세션에 한 일 (전부 푸시·배포됨)
 
@@ -124,7 +147,7 @@
 ## 미완인 것 — 정확한 다음 단계
 
 - [ ] **(최우선) 학생 출석부 데모 모드 정리.** 지금 `NEXT_PUBLIC_DEMO_MODE=1`에 계정 정보가 채워진 채 배포돼 있다. **비밀번호가 공개 JS 번들 안에 있어 주소를 아는 누구나 전교생 개인정보에 접근할 수 있다.** 교사 테스트가 끝나면 ① Firebase 콘솔에서 `demo@woorihigh.com` 계정 삭제 + `attendanceAdmins`의 그 uid 삭제 ② `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE=0` ③ `firebase deploy --only hosting`. 구조는 `고등부 학생 출석부/CLAUDE.md`의 "데모 모드" 참고.
-- [ ] **lint 에러 10건** — 전부 `react-hooks/set-state-in-effect`. `ExecutionViews`(3), `LodgingMapView`(2), `RetreatsHome`, `ConnectivityBanner`, `RoomsTab`, `ScheduleSheetEditor`. **이 저장소가 실제로 사고를 낸 패턴**이다(실수 13 — 30초마다 선택이 리셋됐다). 렌더 중 파생으로 하나씩 바꿀 것.
+- [ ] **lint 에러 10건 / 경고 3건** — 2026-08-14 재실측. `set-state-in-effect`는 `ConnectivityBanner`(1), `ExecutionViews`(3), `LodgingMapView`(2), `ScheduleSheetEditor`(1), `SettingsTab`(1), `useRetreatData`(1)이고, `OverlayShell`의 렌더 중 ref 갱신이 1건이다. 경고는 `LodgingMapView`의 `<img>` 1건과 `ScheduleView` 미사용 인자 2건이다. UI 동작·타입·테스트·빌드는 통과하지만 전체 lint는 아직 실패하므로 다음 정리 작업에서 렌더 파생·구독 초기화·최신 콜백 참조 패턴으로 각각 분리해 고칠 것.
 - [ ] **화면 차단 ≠ 실제 차단 5건** — Rules는 여전히 세 버킷(`admins`/`retreatAdmins`/`iguardMembers`)만 구분한다. 화면에서만 막히는 것: 스탭팀장의 행정 조회 전용, 스탭팀장·바나바팀의 민감정보 제외, 사역팀의 "내 팀만 편집", 이가드팀의 학기 차단, **스탭 32명의 `classes` 전체 읽기**. 마지막 항목이 위험도가 가장 높다(전교생 주소·연락처).
 - [ ] **(대기) 조장 큐싯 붙여넣기 경로**를 만들지 여부 — 사용자 답변 대기.
 - [ ] **(대기) 훈련 반 `goal` 필드** 추가 여부 — 사용자 답변 대기.
