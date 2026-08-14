@@ -445,6 +445,54 @@ table th {
 /* ════════════════════════════════════════════════════
    Modal backdrop — 프리미엄 느낌
 ════════════════════════════════════════════════════ */
+.overlay-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(3,8,6,.58);
+  backdrop-filter: blur(3px);
+  overscroll-behavior: contain;
+  animation: backdropIn .15s var(--ease-out) both;
+}
+.overlay-shell__panel {
+  width: min(100%, 760px);
+  max-height: min(90dvh, 900px);
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+  animation: modalIn .2s var(--ease-out) both;
+}
+.overlay-shell--bottom-sheet { align-items: flex-end; padding: 0; }
+.overlay-shell--bottom-sheet .overlay-shell__panel {
+  width: min(100%, 720px);
+  max-height: min(82dvh, 720px);
+  border-radius: 22px 22px 0 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.overlay-panel-header,
+.overlay-panel-footer { flex: 0 0 auto; background: var(--color-surface); }
+.overlay-panel-header { border-bottom: 1px solid var(--color-border); padding: 18px 20px; }
+.overlay-panel-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 20px;
+  -webkit-overflow-scrolling: touch;
+}
+.overlay-panel-footer {
+  border-top: 1px solid var(--color-border);
+  padding: 14px 20px max(14px, env(safe-area-inset-bottom));
+}
+.new-friend-editor { display: flex; flex-direction: column; }
+
 .modal-backdrop {
   animation: backdropIn 0.15s var(--ease-out) both;
 }
@@ -517,13 +565,13 @@ table th {
 @media (max-width: 640px) {
   /* 터치 타겟 최소 44px */
   button {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 44px;
+    min-height: 44px;
     touch-action: manipulation;
   }
 
   .btn-sm {
-    min-height: 36px;
+    min-height: 44px;
     padding: 6px 10px !important;
   }
 
@@ -536,7 +584,9 @@ table th {
   .card.overflow-x-auto,
   .overflow-x-auto {
     -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
   }
 
   .card.overflow-x-auto > table,
@@ -562,6 +612,18 @@ table th {
     max-height: 90vh !important;
     max-height: 90dvh !important;
   }
+
+  .overlay-shell { padding: 0; }
+  .overlay-shell--dialog { padding: 12px; }
+  .overlay-shell--fullscreen-mobile .overlay-shell__panel {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh !important;
+    border-radius: 0;
+  }
+  .overlay-panel-header { padding: 14px 16px; }
+  .overlay-panel-body { padding: 14px 16px 24px; }
+  .overlay-panel-footer { padding: 10px 16px max(10px, env(safe-area-inset-bottom)); }
 
   /* 탭 바 스크롤 개선 — 스냅 + 모멘텀 */
   .tab-scroll-container {
@@ -1152,7 +1214,13 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 
 @media (max-width: 900px) {
   .global-portal-header { height: 60px; }
-  .workspace-sticky-header { top: 60px; }
+  .workspace-sticky-header {
+    position: relative;
+    top: auto;
+    z-index: 20;
+  }
+  .iguard-route-active .global-portal-header { position: relative; top: auto; }
+  .iguard-route-active .iguard-workspace-header { position: sticky; top: 0; }
   .global-portal-inner { width: calc(100% - 24px); flex-wrap: nowrap; gap: 8px; }
   .portal-brand { flex: 0 0 auto; }
   .portal-nav,

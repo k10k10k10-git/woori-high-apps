@@ -31,7 +31,22 @@ export function RegistrationStatusTab({ friends }: Pick<Props, "friends">) {
         </div>
         <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">신규 등록 {synced.length}건</span>
       </div>
-      <div className="mt-4 overflow-x-auto">
+      <div className="mt-4 space-y-3 sm:hidden" aria-label="출석부 등록 현황 모바일 목록">
+        {synced.map((friend) => (
+          <article key={`mobile:${recordKey(friend)}`} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <strong className="text-slate-900">{friend.name}</strong>
+              <span className="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">신규 등록</span>
+            </div>
+            <dl className="mt-4 grid gap-3 text-xs">
+              <div><dt className="text-slate-400">반영 위치</dt><dd className="mt-1 font-medium text-slate-700">{formatClassLabel(friend.rosterSync?.classKey)}</dd></div>
+              <div><dt className="text-slate-400">처리 시각</dt><dd className="mt-1 text-slate-600">{formatDate(friend.rosterSync?.syncedAt)}</dd></div>
+            </dl>
+          </article>
+        ))}
+        {synced.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">출석부에 반영된 새친구가 없습니다.</div>}
+      </div>
+      <div className="mt-4 hidden overflow-x-auto sm:block">
         <table className="min-w-full text-left text-xs">
           <thead><tr className="border-b border-slate-200 text-slate-400"><th className="px-3 py-2">학생</th><th className="px-3 py-2">변동 유형</th><th className="px-3 py-2">반영 위치</th><th className="px-3 py-2">처리 시각</th></tr></thead>
           <tbody>
@@ -71,7 +86,26 @@ export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
         <div><h3 className="font-semibold text-slate-900">행정 변동 사항</h3><p className="mt-1 text-xs leading-5 text-slate-500">학생 출석부 관리자 화면에서 반영한 학생 등록·수정·삭제·이동 내역이 자동으로 기록됩니다.</p></div>
         <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">총 {changes.length}건</span>
       </div>
-      <div className="mt-4 max-h-[68vh] overflow-auto rounded-xl border border-slate-200">
+      <div className="mt-4 space-y-3 sm:hidden" aria-label="행정 변동 사항 모바일 목록">
+        {changes.map((change) => (
+          <article key={`mobile:${change.year}:${change.classKey}:${change.id}`} className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <strong className="text-slate-900">{change.studentName}</strong>
+                <p className="mt-1 text-xs text-slate-500">{change.year}년 / {formatClassLabel(change.classKey)} / {change.teacher}</p>
+              </div>
+              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{change.action}</span>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-slate-700">{change.changeSummary}</p>
+            <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 text-xs">
+              <span className="text-slate-400">{formatDate(change.changedAt)}</span>
+              <span className="text-right"><strong className="block text-emerald-700">{change.result}</strong><span className="mt-1 block text-slate-400">{change.actor}</span></span>
+            </div>
+          </article>
+        ))}
+        {changes.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">출석부 관리자 수정 기록이 없습니다.</div>}
+      </div>
+      <div className="mt-4 hidden max-h-[68vh] overflow-auto rounded-xl border border-slate-200 sm:block">
         <table className="w-full min-w-[1040px] border-collapse text-left text-xs">
           <caption className="sr-only">출석부 관리자 수정 날짜, 반, 담당 교사, 학생, 변경 내용과 반영 결과</caption>
           <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-semibold text-slate-500 shadow-[0_1px_0_#e2e8f0]">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
+import OverlayShell from "@/components/OverlayShell";
 import {
   cancelNewFriendPlacement,
   subscribeClassesByYear,
@@ -146,12 +147,6 @@ function NewFriendEditor({
     .filter((item) => item.classKey.startsWith(`${draft.part === "1부" ? "1" : "2"}-${draft.grade}-`))
     .sort((a, b) => a.classKey.localeCompare(b.classKey, "ko")), [classes, draft.part, draft.grade]);
 
-  useEffect(() => {
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
-  }, [onClose]);
-
   async function handleSave() {
     if (!draft.name.trim()) return toast("이름을 입력해 주세요.", "error");
     setSaving(true);
@@ -252,9 +247,13 @@ function NewFriendEditor({
   }
 
   return (
-    <div className="modal-overlay center-modal" role="dialog" aria-modal="true" aria-label={friend ? "새친구 수정" : "새친구 접수"} onClick={onClose}>
-      <div className="modal-dialog max-h-[90vh] w-[min(760px,calc(100vw-24px))] max-w-3xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3">
+    <OverlayShell
+      label={friend ? `${friend.name} 새친구 수정` : "새친구 접수"}
+      onClose={onClose}
+      variant="fullscreen-mobile"
+      panelClassName="new-friend-editor"
+    >
+        <div className="overlay-panel-header flex items-start justify-between gap-3">
           <div>
             <p className="section-kicker">새친구</p>
             <h3 className="text-lg font-bold text-slate-900">{friend ? `${friend.name} 기록 수정` : "새친구 접수"}</h3>
@@ -262,8 +261,9 @@ function NewFriendEditor({
           <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100" aria-label="닫기">✕</button>
         </div>
 
+        <div className="overlay-panel-body">
         {rosterLocked && (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
             출석부 반영이 완료되어 이름·부서·학년·연락처·배정 반은 잠겼습니다. 학생 정보 변경은 학생 출석부에서 처리하고, 여기서는 담당·선물·목양 메모만 갱신해 주세요. 명단 삭제는 통합관리자가 새친구 기록과 출석부를 함께 정리할 수 있습니다.
           </div>
         )}
@@ -321,8 +321,9 @@ function NewFriendEditor({
             </div>
           </div>
         )}
+        </div>
 
-        <div className="mt-5 flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-4">
+        <div className="overlay-panel-footer flex flex-wrap justify-between gap-2">
           <div className="flex flex-wrap gap-2">
             {friend && (!friend.rosterSync || canSyncRoster) && !deleteConfirming && (
               <button type="button" className="btn-danger" onClick={() => setDeleteConfirming(true)} disabled={saving}>
@@ -338,8 +339,7 @@ function NewFriendEditor({
           </div>
           <div className="flex gap-2"><button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>취소</button><button type="button" className="btn-primary" onClick={handleSave} disabled={saving}>{saving ? "저장 중…" : "저장"}</button></div>
         </div>
-      </div>
-    </div>
+    </OverlayShell>
   );
 }
 
@@ -471,7 +471,52 @@ export default function NewFriendsTab({
           {canEdit && <button type="button" className="btn-primary" onClick={() => setEditing("new")}>+ 새친구 접수</button>}
         </div>
 
-        <div className="mt-4 max-h-[68vh] overflow-auto rounded-xl border border-slate-200">
+        <div className="mt-4 space-y-3 sm:hidden" aria-label="새친구 진행 현황 모바일 목록">
+          {friends.map((friend, index) => {
+            const progress = deriveNewFriendRosterProgress(friend);
+            const priv = privateValueFor(friend);
+            const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
+            return (
+              <article key={`mobile:${recordKeyFor(friend)}`} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-slate-400">No. {index + 1}</p>
+                    <button type="button" className="mt-0.5 text-left" onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
+                      <strong className="text-base text-slate-900">{friend.name}</strong>
+                    </button>
+                    <p className="mt-1 text-xs text-slate-500">{friend.school || "학교 미입력"}</p>
+                  </div>
+                  <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${PROGRESS_STYLE[progress]}`}>{progress}</span>
+                </div>
+                <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                  <div><dt className="text-slate-400">부서 / 학년</dt><dd className="mt-1 font-medium text-slate-700">{friend.part} / {friend.grade}학년</dd></div>
+                  <div><dt className="text-slate-400">바나바 담당</dt><dd className="mt-1 font-medium text-slate-700">{friend.owner || "미배정"}</dd></div>
+                  <div><dt className="text-slate-400">1주차</dt><dd className="mt-1 tabular-nums text-slate-700">{friend.week1Date || "-"}</dd></div>
+                  <div><dt className="text-slate-400">2주차</dt><dd className="mt-1 tabular-nums text-slate-700">{friend.week2Date || "-"}</dd></div>
+                  <div><dt className="text-slate-400">등록 결정</dt><dd className="mt-1 font-medium text-slate-700">{friend.decision}</dd></div>
+                  <div><dt className="text-slate-400">배정 반</dt><dd className="mt-1 font-medium text-slate-700">{formatClassLabel(friend.assignedClassKey)}</dd></div>
+                </dl>
+                {canEdit && (
+                  <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                    <span className="block">본인 {formatKoreanPhone(priv?.phone) || "-"}</span>
+                    <span className="block text-slate-400">보호자 {formatKoreanPhone(priv?.parentPhone) || "-"}</span>
+                  </div>
+                )}
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                  {friend.rosterSync ? (
+                    <span className="text-xs font-semibold text-emerald-700">출석부 반영 완료</span>
+                  ) : syncReady ? (
+                    canSyncRoster ? <button type="button" className="btn-primary w-full justify-center text-xs" onClick={() => handleSync(friend)} disabled={syncingId === friend.id}>{syncingId === friend.id ? "반영 중…" : "출석부 반영"}</button>
+                      : <span className="text-xs font-medium text-amber-700">관리자 확인 대기</span>
+                  ) : <span className="text-xs text-slate-400">출석부 반영 준비 필요</span>}
+                </div>
+              </article>
+            );
+          })}
+          {friends.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">접수된 새친구가 없습니다.</div>}
+        </div>
+
+        <div className="mt-4 hidden max-h-[68vh] overflow-auto rounded-xl border border-slate-200 sm:block">
           <table className="w-full min-w-[1280px] border-collapse text-left text-xs">
             <caption className="sr-only">새친구별 연락처, 담당자, 2주 과정, 등록 결정, 배정 반과 출석부 반영 현황</caption>
             <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-semibold text-slate-500 shadow-[0_1px_0_#e2e8f0]">

@@ -118,6 +118,11 @@ function IguardWorkspace({ id }: { id: string }) {
   const router = useRouter();
   const { user, roles, memberName } = useAuth();
   const executionOnly = iguardScopeOf(roles) === "execution";
+
+  useEffect(() => {
+    document.body.classList.add("iguard-route-active");
+    return () => document.body.classList.remove("iguard-route-active");
+  }, []);
   const fieldAllowed = canAccessArea("retreat-field", roles);
 
   const [view, setView] = useState<string>("cue");

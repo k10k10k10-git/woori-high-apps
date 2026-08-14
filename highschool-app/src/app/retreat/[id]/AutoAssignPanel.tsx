@@ -128,21 +128,10 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
     }
   }
 
-  // 버그#1: 모달 열릴 때 스크롤 위치 보존
-  const closePreview = useCallback(() => {
-    const scrollY = parseInt(document.body.style.top || "0") * -1;
-    document.body.style.overflow = "";
-    document.body.style.top = "";
-    window.scrollTo(0, scrollY || 0);
-    setPreview(null);
-  }, []);
+  const closePreview = useCallback(() => setPreview(null), []);
 
   useEffect(() => {
     if (!preview) return;
-    const y = window.scrollY;
-    document.body.style.top = `-${y}px`;
-    document.body.style.overflow = "hidden";
-    // 버그#4: ESC 닫기
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") closePreview(); };
     window.addEventListener("keydown", onKey);
     return () => {

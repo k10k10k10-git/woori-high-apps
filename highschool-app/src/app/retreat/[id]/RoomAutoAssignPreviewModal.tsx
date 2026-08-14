@@ -16,14 +16,9 @@ interface Props {
 
 export default function RoomAutoAssignPreviewModal({ result, students, runCount, onClose, onRerun, onApply }: Props) {
   useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKeyDown);
-    };
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
 
   const canApply = result.hardViolations.length === 0;

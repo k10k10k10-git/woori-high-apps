@@ -9,6 +9,7 @@ import TeamModal from "./TeamModal";
 import MyPageModal from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
+import OverlayShell from "@/components/OverlayShell";
 import { canAccessArea, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
@@ -212,14 +213,12 @@ export default function GlobalPortalHeader() {
         </div>
       </header>
       {mobileMenuOpen && (
-        <div className="portal-mobile-backdrop" onMouseDown={() => setMobileMenuOpen(false)}>
-          <section
-            className="portal-mobile-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-label="사이트 메뉴"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
+        <OverlayShell
+          label="사이트 메뉴"
+          onClose={() => setMobileMenuOpen(false)}
+          variant="bottom-sheet"
+          panelClassName="portal-mobile-sheet"
+        >
             <div className="portal-mobile-sheet-handle" aria-hidden="true" />
             <p className="portal-mobile-sheet-title">사역 메뉴</p>
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
@@ -251,8 +250,7 @@ export default function GlobalPortalHeader() {
                 <span>로그아웃</span>
               </button>
             </div>
-          </section>
-        </div>
+        </OverlayShell>
       )}
       {teamOpen && <TeamModal onClose={() => setTeamOpen(false)} />}
       {myPageOpen && <MyPageModal onClose={() => setMyPageOpen(false)} />}

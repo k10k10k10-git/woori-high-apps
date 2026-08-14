@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MagnifyingGlass } from "@phosphor-icons/react";
+import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canManageRolesOf } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
@@ -90,14 +91,12 @@ export default function PortalSearch() {
         <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-on-dark-muted)] xl:inline">⌘K</kbd>
       </button>
       {open && (
-        <div className="modal-backdrop fixed inset-0 z-[100] flex items-start justify-center bg-slate-950/60 px-3 pt-[5vh] backdrop-blur-[2px] sm:px-5 sm:pt-[8vh]" onMouseDown={close}>
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-label="인물 통합검색"
-            className={`flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ${selected ? "max-w-5xl" : "max-w-2xl"}`}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
+        <OverlayShell
+          label="인물 통합검색"
+          onClose={close}
+          variant="fullscreen-mobile"
+          panelClassName={`portal-search-dialog flex w-full flex-col overflow-hidden ${selected ? "max-w-5xl" : "max-w-2xl"}`}
+        >
             {selected ? (
               <PersonDetail profile={selected} onBack={() => setSelectedId(null)} onClose={close} />
             ) : (
@@ -141,8 +140,7 @@ export default function PortalSearch() {
                 </footer>
               </>
             )}
-          </section>
-        </div>
+        </OverlayShell>
       )}
     </>
   );
