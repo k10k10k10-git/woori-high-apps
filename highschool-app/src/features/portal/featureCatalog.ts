@@ -69,11 +69,11 @@ export const IGUARD_VIEW_GROUPS = [
     label: "실행",
     hint: "현장·모바일",
     views: [
-      { key: "cue", label: "개인 큐카드", icon: "📋" },
-      { key: "board", label: "포스트 현황", icon: "📍" },
-      { key: "rooms", label: "조별 정보", icon: "👥" },
-      { key: "lodging", label: "숙소 안내", icon: "🗺️" },
-      { key: "check", label: "인원체크", icon: "✅" },
+      { key: "cue", label: "개인 큐카드" },
+      { key: "board", label: "포스트 현황" },
+      { key: "rooms", label: "조별 정보" },
+      { key: "lodging", label: "숙소 안내" },
+      { key: "check", label: "인원체크" },
     ],
   },
   {

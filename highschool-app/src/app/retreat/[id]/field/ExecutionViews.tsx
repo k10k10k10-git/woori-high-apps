@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IdentificationCard, MapPinLine, Radio } from "@phosphor-icons/react";
 import { Group, IguardGbsPlace, IguardStaff, IguardScheduleBlock, IguardPost, AssignedIguardMovement, Retreat, RetreatPeriod } from "@/features/iguard/lib/types";
 import {
   nowHHMM, todayStr, formatShortDate, activePeriod, retreatDateForDay,
@@ -35,9 +36,9 @@ function useClock() {
   }, []);
   return clock;
 }
-function TextBlock({ title, children, tone = "slate" }: { title: string; children: string; tone?: "slate" | "fuchsia" | "amber" }) {
-  const cls = tone === "fuchsia"
-    ? "bg-fuchsia-50 border-fuchsia-100 text-fuchsia-800"
+function TextBlock({ title, children, tone = "slate" }: { title: string; children: string; tone?: "slate" | "accent" | "amber" }) {
+  const cls = tone === "accent"
+    ? "bg-emerald-50 border-emerald-100 text-emerald-800"
     : tone === "amber"
       ? "bg-amber-50 border-amber-100 text-amber-800"
       : "bg-white border-slate-100 text-slate-700";
@@ -55,7 +56,7 @@ function BlockTextSummary({ block }: { block: IguardScheduleBlock }) {
   return (
     <div className="grid gap-2">
       {block.detail && <TextBlock title="진행 내용">{block.detail}</TextBlock>}
-      {block.owner && <TextBlock title="담당자 / 역할" tone="fuchsia">{block.owner}</TextBlock>}
+      {block.owner && <TextBlock title="담당자 / 역할" tone="accent">{block.owner}</TextBlock>}
       {notice && <TextBlock title="특이사항" tone="amber">{notice}</TextBlock>}
     </div>
   );
@@ -180,16 +181,16 @@ export function CueCardView({
   }, [initialVisibleBlockId, timelinePhase]);
 
   if (staff.length === 0 || schedule.length === 0) return (
-    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🪪</div>
+    <div className="card p-8 text-center text-slate-400"><IdentificationCard aria-hidden="true" className="mx-auto mb-2" size={30} weight="regular" />
       <p>스탭·스탭 전체 큐싯·동선 매트릭스를 먼저 입력하면<br />여기에 개인 큐카드가 자동 생성됩니다.</p></div>
   );
 
   return (
-    <div>
-      <div className="mb-4">
-        <label className="mb-1 block text-xs font-semibold text-slate-500">스탭 선택 · 본인 우선, 나머지 가나다순</label>
+    <div className="cue-card-view">
+      <div className="cue-staff-picker mb-4">
+        <label className="mb-1 block text-xs font-semibold text-slate-500">스탭 선택 <span className="font-normal text-slate-400">· 본인 우선</span></label>
         <select
-          className="input h-12 w-full border-fuchsia-300 bg-white text-base font-semibold text-slate-800 shadow-sm focus:border-fuchsia-500"
+          className="input h-12 w-full bg-white text-base font-semibold text-slate-800 focus:border-emerald-500"
           value={staffId}
           onChange={e => {
             staffPicked.current = true;
@@ -201,10 +202,10 @@ export function CueCardView({
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        <div className="mt-2 flex min-h-10 items-start gap-2 rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs">
-          <span className="shrink-0 font-semibold text-indigo-700">우리 조 GBS 장소</span>
+        <div className="cue-gbs-summary mt-2 flex min-h-10 items-start gap-2 px-1 py-2 text-xs">
+          <span className="shrink-0 font-semibold text-emerald-700">우리 조 GBS 장소</span>
           {selectedStaffGbs.length > 0 ? (
-            <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-indigo-900">
+            <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1 text-slate-700">
               {selectedStaffGbs.flatMap(summary =>
                 summary.groups.map(group => (
                   <span key={`${summary.place}-${group.id}`}>
@@ -214,19 +215,19 @@ export function CueCardView({
               )}
             </span>
           ) : (
-            <span className="text-indigo-400">담당 조 또는 장소가 지정되지 않았습니다.</span>
+            <span className="text-slate-400">담당 조 또는 장소가 지정되지 않았습니다.</span>
           )}
         </div>
       </div>
       <div
         ref={pinnedCardsRef}
-        className={`sticky z-10 -mx-3 mb-4 bg-slate-50/95 px-3 py-2 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.45)] backdrop-blur sm:-mx-4 sm:px-4 ${pinnedCardsCollapsed ? "space-y-1" : "space-y-2"}`}
+        className={`cue-pinned-summary sticky z-10 -mx-3 mb-4 bg-slate-50/95 px-3 py-2 backdrop-blur sm:-mx-4 sm:px-4 ${pinnedCardsCollapsed ? "space-y-1" : "space-y-2"}`}
         style={{ top: "var(--ig-header-h, 0px)" }}
       >
-      <div className={`card border-2 ${pinnedCardsCollapsed ? "p-3" : "min-h-[116px] p-4 sm:min-h-[132px] sm:p-5"} ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/80" : "border-slate-200 bg-white/95"}`}>
+      <div className={`cue-current-card ${pinnedCardsCollapsed ? "p-3" : "min-h-[108px] p-4 sm:min-h-[124px] sm:p-5"} ${currentBlock ? "is-active" : ""}`}>
         <div className={`flex items-start justify-between gap-3 ${pinnedCardsCollapsed ? "mb-0" : "mb-2"}`}>
           <div>
-            <div className="text-xs font-semibold text-fuchsia-700 mb-1">지금 해야 할 일</div>
+            <div className="mb-1 text-xs font-semibold text-emerald-700">지금 해야 할 일</div>
             <div className={`${pinnedCardsCollapsed ? "text-base" : "text-lg sm:text-xl"} font-bold text-slate-800`}>
               {currentBlock
                 ? currentBlock.label
@@ -250,7 +251,7 @@ export function CueCardView({
             </div>
             <button
               type="button"
-              className="min-h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-fuchsia-300 hover:text-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400"
+              className="cue-collapse-button min-h-10 rounded-lg px-2.5 text-xs font-semibold text-slate-600 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
               aria-expanded={!pinnedCardsCollapsed}
               aria-controls="cue-card-current-details cue-card-next-details"
               onClick={() => setPinnedCardsCollapsed(value => !value)}
@@ -265,15 +266,15 @@ export function CueCardView({
             <div className="text-xs text-slate-500">
               {timeRangeLabel(currentBlock)}
             </div>
-            <div className="rounded-lg bg-white border border-fuchsia-100 p-3">
+            <div className="cue-location-block p-3">
               {currentMoves.length > 0 ? (
                 <div className="space-y-2">
                   {currentMoves.map(move => (
                     <div key={move.id}>
-                      <div className="text-sm font-semibold text-slate-800">📍 {postName(move.postId)}</div>
+                      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800"><MapPinLine aria-hidden="true" size={16} />{postName(move.postId)}</div>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {move.round && <span className={`px-2 py-0.5 rounded-full text-xs ${move.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{move.round}</span>}
-                        {move.note && <span className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">{move.note}</span>}
+                        {move.note && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">{move.note}</span>}
                       </div>
                     </div>
                   ))}
@@ -284,7 +285,7 @@ export function CueCardView({
             </div>
 
             {currentDutyLabels.length > 0 && (
-              <TextBlock title="담당 역할" tone="fuchsia">{currentDutyLabels.join("\n")}</TextBlock>
+              <TextBlock title="담당 역할" tone="accent">{currentDutyLabels.join("\n")}</TextBlock>
             )}
             {currentBlock.detail && <div className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">{currentBlock.detail}</div>}
           </div>
@@ -303,10 +304,10 @@ export function CueCardView({
         ))}
         </div>
       </div>
-      <div className={`card border ${pinnedCardsCollapsed ? "p-3" : "min-h-[96px] p-4 sm:min-h-[110px] sm:p-5"} ${nextBlock ? "border-violet-200 bg-violet-50/90" : "border-slate-200 bg-white/95"}`}>
+      <div className={`cue-next-card ${pinnedCardsCollapsed ? "p-3" : "min-h-[88px] p-4 sm:min-h-[102px] sm:p-5"}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className={`${pinnedCardsCollapsed ? "mb-0.5" : "mb-1"} text-xs font-semibold text-violet-700`}>다음 해야 할 일</div>
+            <div className={`${pinnedCardsCollapsed ? "mb-0.5" : "mb-1"} text-xs font-semibold text-emerald-700`}>다음 해야 할 일</div>
             <div className={`truncate font-bold text-slate-800 ${pinnedCardsCollapsed ? "text-base" : "text-lg"}`}>
               {nextBlock ? nextBlock.label : "예정된 다음 일정이 없습니다"}
             </div>
@@ -324,23 +325,23 @@ export function CueCardView({
             {nextMoves.length > 0 ? (
               nextMoves.map(move => (
                 <span key={move.id} className="inline-flex flex-wrap items-center gap-1">
-                  <span className="rounded-md bg-white px-2 py-1 font-semibold text-slate-700">📍 {postName(move.postId)}</span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 font-semibold text-slate-700"><MapPinLine aria-hidden="true" size={14} />{postName(move.postId)}</span>
                   {move.round && <span className={`rounded-full px-2 py-0.5 ${move.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{move.round}</span>}
-                  {move.note && <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-fuchsia-700">{move.note}</span>}
+                  {move.note && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-emerald-700">{move.note}</span>}
                 </span>
               ))
             ) : (
               <span className="text-slate-500">배치 없음 · 조와 함께</span>
             )}
             {nextDutyLabels.length > 0 && (
-              <span className="rounded-md bg-white px-2 py-1 text-violet-800">담당 · {nextDutyLabels.join(" · ")}</span>
+              <span className="rounded-md bg-white px-2 py-1 text-emerald-800">담당 · {nextDutyLabels.join(" · ")}</span>
             )}
           </div>
         )}
         </div>
       </div>
       </div>
-      <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+      <div className="cue-timeline-heading mb-3 flex items-center justify-between gap-3 px-1 py-2.5">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-slate-700">전체 일정 {listBlocks.length}개</div>
           <div className="truncate text-xs text-slate-400">
@@ -349,10 +350,10 @@ export function CueCardView({
         </div>
         <button
           type="button"
-          className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-400 ${
+          className={`min-h-10 shrink-0 rounded-lg border px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
             timelineCompact
-              ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700"
-              : "border-slate-200 bg-white text-slate-600 hover:border-fuchsia-300 hover:text-fuchsia-700"
+              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+              : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700"
           }`}
           aria-pressed={timelineCompact}
           onClick={() => {
@@ -385,12 +386,12 @@ export function CueCardView({
                 <div
                   key={b.id}
                   ref={b.id === initialVisibleBlockId ? timelineAnchorRef : undefined}
-                  className={`card ${timelineCompact ? "p-2.5" : "p-3"} ${now ? "ring-2 ring-fuchsia-400" : ""}`}
+                  className={`card cue-timeline-card ${timelineCompact ? "p-2.5" : "p-3"} ${now ? "is-current" : ""}`}
                 >
                   <div className={`flex items-start ${timelineCompact ? "gap-2" : "gap-3"}`}>
                     <div className={`shrink-0 pt-0.5 text-center ${timelineCompact ? "w-12" : "w-14"}`}>
                       <div className="font-mono text-xs text-slate-500">{timeRangeLabel(b).split("~")[0]}</div>
-                      {now && <div className="text-[11px] font-bold text-fuchsia-700">지금</div>}
+                      {now && <div className="text-[11px] font-bold text-emerald-700">지금</div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       {timelineCompact ? (
@@ -398,7 +399,7 @@ export function CueCardView({
                           <div className="truncate text-sm font-semibold text-slate-800">{b.label}</div>
                           <div className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
                             <span className="truncate">
-                              {blockMoves.length ? `📍 ${blockMoves.map(move => postName(move.postId)).join(" · ")}` : "조와 함께"}
+                              {blockMoves.length ? `위치 · ${blockMoves.map(move => postName(move.postId)).join(" · ")}` : "조와 함께"}
                             </span>
                             {blockMoves[0]?.round && (
                               <span className={`shrink-0 rounded px-1.5 py-0.5 ${blockMoves[0].round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
@@ -407,7 +408,7 @@ export function CueCardView({
                             )}
                           </div>
                           {dutyLabels.length > 0 && (
-                            <div className="mt-0.5 truncate text-xs font-medium text-fuchsia-700">
+                            <div className="mt-0.5 truncate text-xs font-medium text-emerald-700">
                               담당 · {dutyLabels.join(" · ")}
                             </div>
                           )}
@@ -418,16 +419,16 @@ export function CueCardView({
                           {blockMoves.length ? (
                             <div className="space-y-1">
                               {blockMoves.map(move => (
-                                <div key={move.id} className="font-semibold text-slate-800">
-                                  📍 {postName(move.postId)}
+                                <div key={move.id} className="flex flex-wrap items-center gap-x-1.5 font-semibold text-slate-800">
+                                  <MapPinLine aria-hidden="true" size={15} />{postName(move.postId)}
                                   {move.round && <span className={`ml-2 px-1.5 py-0.5 rounded text-xs ${move.round === "선밥" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>{move.round}</span>}
-                                  {move.note && <span className="ml-2 text-xs font-normal text-fuchsia-700">• {move.note}</span>}
+                                  {move.note && <span className="ml-2 text-xs font-normal text-emerald-700">• {move.note}</span>}
                                 </div>
                               ))}
                             </div>
                           ) : <div className="text-sm text-slate-300">배치 없음 (조와 함께)</div>}
                           {dutyLabels.length > 0 && (
-                            <div className="mt-1 rounded-lg bg-fuchsia-50 border border-fuchsia-100 px-2 py-1.5 text-xs text-fuchsia-800 whitespace-pre-line leading-relaxed">
+                            <div className="mt-1 rounded-lg bg-emerald-50 border border-emerald-100 px-2 py-1.5 text-xs text-emerald-800 whitespace-pre-line leading-relaxed">
                               담당 역할 · {dutyLabels.join(" · ")}
                             </div>
                           )}
@@ -435,7 +436,7 @@ export function CueCardView({
                       )}
                     </div>
                     {!timelineCompact && (b.detail || b.owner || b.notice) && (
-                      <button onClick={() => toggleOpen(b.id)} className="min-h-9 shrink-0 whitespace-nowrap rounded px-2 text-xs text-slate-500 hover:bg-fuchsia-50 hover:text-fuchsia-700">
+                      <button onClick={() => toggleOpen(b.id)} className="min-h-9 shrink-0 whitespace-nowrap rounded px-2 text-xs text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
                         {isOpen ? "접기" : "상세 ▾"}
                       </button>
                     )}
@@ -513,15 +514,15 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
   const currentDate = curDay == null ? null : retreatDateForDay(periods, retreat, curDay);
 
   if (schedule.length === 0) return (
-    <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">📡</div><p>스탭 전체 큐싯·동선을 먼저 입력해주세요.</p></div>
+    <div className="card p-8 text-center text-slate-400"><Radio aria-hidden="true" className="mx-auto mb-2" size={30} weight="regular" /><p>스탭 전체 큐싯·동선을 먼저 입력해주세요.</p></div>
   );
 
   return (
     <div>
-      <div className={`card p-4 mb-4 border-2 ${currentBlock ? "border-fuchsia-300 bg-fuchsia-50/50" : "border-slate-200"}`}>
+      <div className={`card mb-4 p-4 ${currentBlock ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200"}`}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <div className="text-xs font-semibold text-fuchsia-700 mb-1">현재 포스트 상황</div>
+            <div className="mb-1 text-xs font-semibold text-emerald-700">현재 포스트 상황</div>
             <div className="text-lg font-bold text-slate-800">
               {currentBlock ? currentBlock.label : curDay == null ? "수련회 기간 밖입니다" : nextBlock ? "다음 일정 대기" : "오늘 일정이 종료되었습니다"}
             </div>
@@ -540,11 +541,11 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
             {currentAssigned && currentAssigned.byPost.size > 0 ? (
               <div className="grid gap-2 sm:grid-cols-2">
                 {posts.filter(p => currentAssigned.byPost.has(p.id)).map(p => (
-                  <div key={p.id} className="rounded-lg bg-white border border-fuchsia-100 p-3">
-                    <div className="text-sm font-semibold text-slate-700 mb-1">📍 {p.area ? `[${p.area}] ` : ""}{p.name}</div>
+                  <div key={p.id} className="rounded-lg border border-emerald-100 bg-white p-3">
+                    <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700"><MapPinLine aria-hidden="true" size={15} />{p.area ? `[${p.area}] ` : ""}{p.name}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {currentAssigned.byPost.get(p.id)!.map((x, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">
+                        <span key={i} className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
                           {x.name}{x.round ? ` (${x.round})` : ""}
                         </span>
                       ))}
@@ -569,7 +570,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
       <div className="flex gap-1 mb-3 flex-wrap">
         {days.map(d => (
           <button key={d} onClick={() => { userPicked.current = true; setDay(d); }}
-            className={`min-h-10 rounded-lg px-4 text-sm font-medium ${day === d ? "bg-fuchsia-600 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+            className={`min-h-10 rounded-lg px-4 text-sm font-medium ${day === d ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
             {(() => {
               const date = retreatDateForDay(periods, retreat, d);
               return `${d}일차${date ? ` · ${formatShortDate(date)}${curDay === d ? " · 오늘" : ""}` : ""}`;
@@ -579,12 +580,12 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
       </div>
       <div className="text-xs text-slate-400 mb-3">
         시간 블록 · {selectedDateLabel ? `${selectedDateLabel} (${day}일차)` : periodRangeLabel(periods, retreat)}
-        {curDay === day ? <span className="text-fuchsia-700"> · 현재 날짜</span> : null}
+        {curDay === day ? <span className="text-emerald-700"> · 현재 날짜</span> : null}
       </div>
       <div className="mb-3">
         <label className="text-xs text-slate-500 block mb-1">
           시간 블록
-          {curDay != null && day === curDay ? <span className="text-fuchsia-700"> · 현재 일자·시각 자동선택</span>
+          {curDay != null && day === curDay ? <span className="text-emerald-700"> · 현재 일자·시각 자동선택</span>
             : curDay == null ? <span className="text-slate-400"> · 오늘이 수련회 기간이 아니에요 - 일자를 직접 선택하세요</span> : null}
         </label>
         <select className="input" value={blockId} onChange={e => { blockPicked.current = true; setBlockId(e.target.value); }}>
@@ -601,10 +602,10 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
           <div className="grid gap-2 sm:grid-cols-2 mb-4">
             {posts.filter(p => assigned.byPost.has(p.id)).map(p => (
               <div key={p.id} className="card p-3">
-                <div className="text-sm font-semibold text-slate-700 mb-1">📍 {p.area ? `[${p.area}] ` : ""}{p.name}</div>
+                <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700"><MapPinLine aria-hidden="true" size={15} />{p.area ? `[${p.area}] ` : ""}{p.name}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {assigned.byPost.get(p.id)!.map((x, i) => (
-                    <span key={i} className="px-2 py-0.5 rounded-full text-xs bg-fuchsia-100 text-fuchsia-700">
+                    <span key={i} className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
                       {x.name}{x.round ? ` (${x.round})` : ""}
                     </span>
                   ))}

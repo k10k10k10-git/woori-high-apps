@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import {
+  ArrowLeft, CheckSquare, DownloadSimple, DotsThreeVertical, IdentificationCard,
+  MagnifyingGlass, MapPinLine, MapTrifold, UsersThree, WarningCircle, WifiSlash,
+} from "@phosphor-icons/react";
 import { useAuth } from "@/features/iguard/context/AuthContext";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import { checkAdminCompat } from "@/features/iguard/lib/compat";
@@ -34,6 +38,14 @@ import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
 import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
 import { canAccessArea, iguardScopeOf } from "@/features/portal/accessPolicy";
+
+const EXECUTION_ICON = {
+  cue: IdentificationCard,
+  board: MapPinLine,
+  rooms: UsersThree,
+  lodging: MapTrifold,
+  check: CheckSquare,
+} as const;
 
 function parseNames(value?: string): string[] {
   return (value || "")
@@ -90,7 +102,7 @@ export default function IguardClient() {
   if (!user || !fieldAllowed) return null;
   if (lockError) return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <div className="mb-3 text-3xl" aria-hidden="true">⚠️</div>
+      <WarningCircle aria-hidden="true" className="mb-3 text-red-600" size={32} weight="regular" />
       <p className="mb-4 max-w-md text-sm text-red-700" role="alert">{lockError}</p>
       <button onClick={() => router.push(`/retreat/${id}`)} className="btn-secondary">행정 화면으로</button>
     </div>
@@ -111,8 +123,10 @@ function IguardWorkspace({ id }: { id: string }) {
   const [view, setView] = useState<string>("cue");
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
+  const [fieldToolsOpen, setFieldToolsOpen] = useState(false);
   const [compatDismissed, setCompatDismissed] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
+  const fieldToolsRef = useRef<HTMLDivElement | null>(null);
 
   // 데이터 허브 — 모든 구독을 커스텀 훅에서 관리
   const {
@@ -181,6 +195,24 @@ function IguardWorkspace({ id }: { id: string }) {
     return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
   }, [retreat, activeView]);
 
+  useEffect(() => {
+    if (!fieldToolsOpen) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setFieldToolsOpen(false);
+    }
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      if (!fieldToolsRef.current?.contains(event.target as Node)) setFieldToolsOpen(false);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [fieldToolsOpen]);
+
   if (retreatLoading) return <CenterSpinner />;
   if (!user || !fieldAllowed) return null;
   if (!retreat) return (
@@ -196,21 +228,23 @@ function IguardWorkspace({ id }: { id: string }) {
   const shellWidth = activeGroup.label === "기획" ? "max-w-[1760px]" : "max-w-6xl";
 
   return (
-    <div className="iguard-scope min-h-screen overflow-x-clip pb-24 sm:pb-12">
-      <header ref={headerRef} className="workspace-sticky-header workspace-header">
+    <div className="iguard-scope min-h-screen overflow-x-clip pb-20 sm:pb-12">
+      <header ref={headerRef} className="workspace-sticky-header workspace-header iguard-workspace-header">
         <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
-          <div className="pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
-            <button onClick={() => router.push("/")} className="min-h-10 shrink-0 rounded-lg px-2 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white" aria-label="수련회 목록으로 돌아가기">← 목록</button>
+          <div className="field-title-row pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
+            <button onClick={() => router.push("/")} className="field-header-back min-h-10 shrink-0 rounded-lg px-2 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white" aria-label="수련회 목록으로 돌아가기">
+              <ArrowLeft aria-hidden="true" size={17} weight="bold" /><span>목록</span>
+            </button>
             <span className="hidden text-slate-600 sm:inline">|</span>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold shrink-0" style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
+            <span className="hidden px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 sm:inline-flex" style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
             <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
             <button
               onClick={() => setSearchOpen(true)}
               disabled={dataLoading}
-              className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+              className="hidden min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40 sm:flex"
               aria-label="이름·조·호실·호차 검색"
             >
-              <span aria-hidden="true">🔍</span><span className="hidden sm:inline">검색</span>
+              <MagnifyingGlass aria-hidden="true" size={17} weight="regular" /><span>검색</span>
             </button>
             {!executionOnly && (
               <button
@@ -218,15 +252,40 @@ function IguardWorkspace({ id }: { id: string }) {
                   setView("schedule");
                   setSheetSettingsOpen(true);
                 }}
-                className="flex min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-[var(--color-on-dark-accent)]"
+                className="hidden min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-[var(--color-on-dark-accent)] sm:flex"
                 aria-label="큐싯 가져오기 열기"
               >
-                <span className="sm:hidden" aria-hidden="true">⬇</span><span className="hidden sm:inline">⬇ 큐싯 가져오기</span>
+                <DownloadSimple aria-hidden="true" size={17} weight="regular" /><span>큐싯 가져오기</span>
               </button>
             )}
+            <div ref={fieldToolsRef} className="relative shrink-0 sm:hidden">
+              <button
+                type="button"
+                className="field-header-more"
+                onClick={() => setFieldToolsOpen(value => !value)}
+                aria-label="수련회 도구 열기"
+                aria-haspopup="menu"
+                aria-expanded={fieldToolsOpen}
+              >
+                <DotsThreeVertical aria-hidden="true" size={20} weight="bold" />
+              </button>
+              {fieldToolsOpen && (
+                <div className="field-tools-menu" role="menu">
+                  <p>{retreat.year}년 수련회</p>
+                  <button type="button" role="menuitem" disabled={dataLoading} onClick={() => { setFieldToolsOpen(false); setSearchOpen(true); }}>
+                    <MagnifyingGlass aria-hidden="true" size={18} /> 이름·조·숙소 검색
+                  </button>
+                  {!executionOnly && (
+                    <button type="button" role="menuitem" onClick={() => { setFieldToolsOpen(false); setView("schedule"); setSheetSettingsOpen(true); }}>
+                      <DownloadSimple aria-hidden="true" size={18} /> 큐싯 가져오기
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {/* 대그룹 */}
-          <div className="flex gap-1 overflow-x-auto" role="tablist" aria-label="뷰 그룹">
+          <div className="field-group-tabs flex gap-1 overflow-x-auto" role="tablist" aria-label="뷰 그룹">
             {visibleGroups.map(g => {
               const active = g.label === activeGroup.label;
               return (
@@ -256,19 +315,19 @@ function IguardWorkspace({ id }: { id: string }) {
         </div>
       </header>
 
-      <main className={`${shellWidth} mx-auto px-3 py-4 sm:px-4 sm:py-6`}>
+      <main className={`${shellWidth} mx-auto px-3 py-4 sm:px-4 sm:py-6 ${activeGroup.label === "실행" ? "field-execution-main" : ""}`}>
         {!connected && (
           <div className="mb-4 bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700 flex items-center gap-2 animate-pulse" role="alert">
-            <span className="text-lg" aria-hidden="true">📡</span>
+            <WifiSlash aria-hidden="true" className="shrink-0" size={18} />
             <span><strong>네트워크 연결이 끊겼습니다.</strong> 인원체크·동선 변경이 서버에 저장되지 않을 수 있어요. 와이파이를 확인한 뒤, 연결이 돌아오면 방금 한 작업이 반영됐는지 다시 확인해주세요.</span>
           </div>
         )}
-        {loadError && <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
+        {loadError && <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><WarningCircle aria-hidden="true" className="mt-0.5 shrink-0" size={17} /><span>로드 오류: {loadError}</span></div>}
 
         {!dataLoading && !compatDismissed && compatWarnings.length > 0 && (
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <div className="flex items-start justify-between gap-3">
-              <div className="font-semibold">⚠ 행정 데이터 호환성 경고</div>
+              <div className="flex items-center gap-1.5 font-semibold"><WarningCircle aria-hidden="true" size={17} />행정 데이터 호환성 경고</div>
               <button onClick={() => setCompatDismissed(true)} className="min-h-9 shrink-0 rounded px-2 text-xs text-amber-600 hover:bg-amber-100 hover:text-amber-800">닫기</button>
             </div>
             <ul className="mt-1.5 space-y-1">
@@ -342,10 +401,11 @@ function IguardWorkspace({ id }: { id: string }) {
 
       {/* 하단 탭바는 실행 뷰에서만 — 기획·정보 화면에서는 숨겨 세로 공간 확보 + 오탐 이동 방지 (2026-07-12) */}
       {executionViews.some(v => v.key === activeView) && (
-        <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden" aria-label="실행 뷰 탐색">
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1" role="tablist">
+        <nav className="field-bottom-nav fixed inset-x-0 bottom-0 z-30 sm:hidden" aria-label="실행 뷰 탐색">
+          <div className="mx-auto grid max-w-md grid-cols-5" role="tablist">
             {executionViews.map(v => {
               const active = activeView === v.key;
+              const Icon = EXECUTION_ICON[v.key as keyof typeof EXECUTION_ICON];
               return (
                 <button
                   key={v.key}
@@ -353,12 +413,10 @@ function IguardWorkspace({ id }: { id: string }) {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setView(v.key)}
-                  className={`min-h-14 rounded-lg px-1.5 text-xs font-semibold transition-colors ${
-                    active ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"
-                  }`}
+                  className="field-bottom-nav-item"
                 >
-                  <span aria-hidden="true" className="mb-1 block text-base leading-none">{v.icon}</span>
-                  {v.label}
+                  <Icon aria-hidden="true" size={21} weight={active ? "fill" : "regular"} />
+                  <span>{v.label}</span>
                 </button>
               );
             })}

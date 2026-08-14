@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canManageRolesOf } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
@@ -84,8 +85,8 @@ export default function PortalSearch() {
   return (
     <>
       <button type="button" onClick={beginOpen} className="portal-search-trigger" aria-label="인물 통합검색 열기">
-        <span aria-hidden="true">⌕</span>
-        <span>인물 통합검색</span>
+        <MagnifyingGlass aria-hidden="true" size={15} weight="regular" />
+        <span className="portal-search-label">인물 통합검색</span>
         <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-on-dark-muted)] xl:inline">⌘K</kbd>
       </button>
       {open && (
@@ -102,7 +103,7 @@ export default function PortalSearch() {
             ) : (
               <>
                 <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
-                  <span aria-hidden="true" className="text-lg text-slate-400">⌕</span>
+                  <MagnifyingGlass aria-hidden="true" className="text-slate-400" size={20} weight="regular" />
                   <input
                     ref={inputRef}
                     value={query}

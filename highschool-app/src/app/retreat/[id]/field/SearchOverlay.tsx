@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 import { buildSearchIndex, searchIndex, type SearchEntry, type SearchEntryKind, type SearchIndexInput } from "@/features/iguard/lib/personIndex";
 
 const KIND_LABEL: Record<SearchEntryKind, string> = {
@@ -81,7 +82,7 @@ export default function SearchOverlay({
       aria-label="전역 검색"
     >
       <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2.5">
-        <span className="text-lg" aria-hidden="true">🔍</span>
+        <MagnifyingGlass aria-hidden="true" className="shrink-0 text-slate-400" size={20} />
         <input
           ref={inputRef}
           type="search"
@@ -107,7 +108,7 @@ export default function SearchOverlay({
 
         {!query.trim() && (
           <div className="mx-auto max-w-sm py-10 text-center text-sm leading-relaxed text-slate-400">
-            <p className="mb-3 text-4xl" aria-hidden="true">🔎</p>
+            <MagnifyingGlass aria-hidden="true" className="mx-auto mb-3" size={36} weight="regular" />
             <p className="mb-2 font-medium text-slate-500">이름만 알아도 바로 찾을 수 있어요</p>
             <p>학생·교사·스탭을 이름이나 초성으로,<br />조·호실·호차는 번호로 검색하세요.</p>
             <p className="mt-3 text-xs text-slate-400">예: <span className="font-mono">김현민</span> · <span className="font-mono">ㄱㅎㅁ</span> · <span className="font-mono">17조</span> · <span className="font-mono">305</span> · <span className="font-mono">2호차</span></p>
