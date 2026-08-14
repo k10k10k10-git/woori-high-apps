@@ -193,3 +193,8 @@ npm run build
 - **접근법**: 1→ 로그인된 390px 화면에서 모달 전후 `body` 스타일, 문서 `scrollY`, 대화상자 위치와 `scrollHeight`를 측정한다. 2→ `rg`로 `fixed inset-0`, `role="dialog"`, `document.body.style.overflow`를 대조해 화면 수와 스크롤 잠금 구현 수의 차이를 확인한다. 3→ `src/components/ModalScrollManager.tsx`가 모든 `[aria-modal="true"]`를 감지해 iOS에서도 현재 스크롤 위치를 보존하며 `html/body`를 잠그게 한다. 4→ 새 화면은 `src/components/OverlayShell.tsx`로 포털·ESC·포커스 순환·포커스 복귀·`100dvh`·safe area·내부 스크롤을 함께 적용한다. 5→ 사람 단위 데이터는 640px 이하에서 목록으로, 비교가 필요한 수련회 표는 `overscroll-behavior-x: contain` 가로 표로 분리하고 320px·390px·430px 계약 테스트와 실제 화면으로 검증한다.
 - **판단 질문**: 각 모달이 직접 `document.body.style.overflow`를 저장·복원하게 두지 않는다. 중첩 모달이나 공통 관리자가 함께 열리면 한 컴포넌트의 cleanup이 다른 모달의 잠금을 풀거나 `overflow:hidden`을 영구히 남길 수 있기 때문이다. 모든 표를 카드로 바꾸지도 않는다. 참가자 비교·행렬 편집은 열 관계가 핵심이라 가로 표를 유지하되, 새친구·등록·변동처럼 레코드 하나가 독립적인 화면만 모바일 목록으로 바꾼다.
 - **재사용 규칙**: 운영 앱의 모바일 오버레이는 `aria-modal 단일 감지 → 포털 기반 공통 셸 → 배경 스크롤 잠금 → 내부 본문만 overscroll contain → 고정 헤더·푸터 → 폭별 회귀 검증` 순서로 만들고, 개별 컴포넌트의 body 스타일 조작은 금지한다.
+
+### 전역 표 여백과 셀 줄바꿈을 분리해 고밀도 명단을 압축하기 (2026-08-14)
+- **접근법**: 1→ `src/app/globals.css`의 `.card table tbody td` 전역 여백과 `src/app/retreat/[id]/ClassRosterTab.tsx`의 셀 유틸리티를 함께 확인한다. 2→ 반별 명단 표에 `class-roster-grid` 전용 클래스를 부여하고 더 높은 선택자 우선순위로 학생 셀 높이와 `padding-block`을 제한한다. 3→ 긴 이름이 좁은 열에서 두 줄이 되어 행 전체를 키우는지 실제 운영 데이터 40개 셀의 높이로 측정하고 `white-space: nowrap`을 적용한다. 4→ 390px과 1280px에서 모든 표본 행의 최소·최대 높이가 각각 26px·24px로 같은지, 상단 행동 문구가 `white-space: nowrap`인지 브라우저에서 확인한다.
+- **판단 질문**: 전역 `--table-cell-y`를 줄이지 않는다. 일반 데이터 표는 읽기 여백이 필요하고 반별 명단만 열 간 비교를 위해 고밀도가 필요하기 때문이다. 모바일 반별 명단을 카드 목록으로 바꾸지도 않는다. 반과 학년을 열로 비교하고 셀 색상을 편집하는 업무 의미가 사라진다.
+- **재사용 규칙**: 특정 표만 조밀해야 하면 `전역 표 규칙 실측 → 표 전용 클래스 → 더 높은 선택자 우선순위 → 셀 nowrap → 모바일·PC 실제 데이터 행 높이 측정` 순서로 해결한다.
