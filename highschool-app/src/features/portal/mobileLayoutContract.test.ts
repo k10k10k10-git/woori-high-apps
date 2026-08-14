@@ -57,8 +57,10 @@ describe("모바일 운영 화면 계약", () => {
     expect(source("src/app/retreat/[id]/ClassRosterTab.tsx")).toContain("class-roster-grid text-xs");
     const css = source("src/app/globals.css");
     expect(css).toContain(".card table.class-roster-grid tbody td");
+    expect(css).toContain("height: 24px;");
     expect(css).toContain("height: 26px;");
     expect(css).toContain("padding-top: 1px;");
     expect(css).toContain("padding-bottom: 1px;");
+    expect(css).toContain("white-space: nowrap;");
   });
 });
