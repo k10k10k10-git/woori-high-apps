@@ -28,6 +28,17 @@ describe("모바일 운영 화면 계약", () => {
     expect(css).toContain(".workspace-sticky-header {\n    position: relative;");
   });
 
+  it("새친구 편집기는 필드 고유 너비가 달라도 세로축으로만 스크롤한다", () => {
+    const css = source("src/app/globals.css");
+    const newFriends = source("src/app/semester/[id]/NewFriendsTab.tsx");
+    expect(newFriends).toContain("block min-w-0 text-xs");
+    expect(css).toContain(".new-friend-editor .input");
+    expect(css).toContain("min-width: 0;");
+    expect(css).toContain("max-width: 100%;");
+    expect(css).toContain("overflow-x: hidden;");
+    expect(css).toContain("touch-action: pan-y;");
+  });
+
   it("새친구, 등록 현황, 행정 변동은 모바일 전용 목록과 데스크톱 표를 함께 제공한다", () => {
     expect(source("src/app/semester/[id]/NewFriendsTab.tsx")).toContain("새친구 진행 현황 모바일 목록");
     const sundayTabs = source("src/features/sundayMinistry/SundayMinistryTabs.tsx");

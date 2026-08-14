@@ -344,7 +344,7 @@ function NewFriendEditor({
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="block text-xs font-semibold text-slate-500"><span className="mb-1 block">{label}</span>{children}</label>;
+  return <label className="block min-w-0 text-xs font-semibold text-slate-500"><span className="mb-1 block">{label}</span>{children}</label>;
 }
 
 function yearForStorageSid(sid: string) {

@@ -492,6 +492,19 @@ table th {
   padding: 14px 20px max(14px, env(safe-area-inset-bottom));
 }
 .new-friend-editor { display: flex; flex-direction: column; }
+.new-friend-editor .overlay-panel-body,
+.new-friend-editor .overlay-panel-body > *,
+.new-friend-editor label {
+  min-width: 0;
+  max-width: 100%;
+}
+.new-friend-editor .input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
 
 .modal-backdrop {
   animation: backdropIn 0.15s var(--ease-out) both;
@@ -620,6 +633,16 @@ table th {
     height: 100dvh;
     max-height: 100dvh !important;
     border-radius: 0;
+  }
+  .overlay-shell--fullscreen-mobile .new-friend-editor {
+    width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
+  }
+  .new-friend-editor .overlay-panel-body {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
   }
   .overlay-panel-header { padding: 14px 16px; }
   .overlay-panel-body { padding: 14px 16px 24px; }
