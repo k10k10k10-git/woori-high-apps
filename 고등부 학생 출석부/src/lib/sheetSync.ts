@@ -46,10 +46,45 @@ export interface SyncPlan {
   moved:     { name: string; fromCk: string; toCk: string }[];
   removed:   { ck: string; name: string }[];
   ambiguous: { ck: string; name: string }[]; // 동명이인이나 일치 필드 부족으로 신원 확정 불가 → 신규로 처리됨
+  attendanceMoves: AttendanceMove[];
   attendanceChanges: number;
   totalStudents: number;
   classCount: number;
   jangCount: number; // 장결자로 표시될 학생 수
+}
+
+/**
+ * 반이 바뀐 학생의 옛 반 출석 기록 처리 내역.
+ * carried  = 시트에 값이 없어 옛 기록에서 새 반으로 옮겨오는 칸 수
+ * superseded = 시트에 이미 값이 있어 옛 값이 대체되는 칸 수(관리자가 확인할 수 있게 노출한다)
+ */
+export interface AttendanceMove {
+  name: string;
+  fromCk: string;
+  toCk: string;
+  carried: number;
+  superseded: number;
+}
+
+/** attendance/{year} 하위 구조 — ck → sid → cellKey → 출석값 */
+export type AttendanceYear = Record<string, Record<string, Record<string, AttValue>>>;
+
+/**
+ * 반이 바뀐 학생의 옛 출석 기록을 훑어 이관·대체 칸을 가른다.
+ * 시트가 원본이므로 **시트에 값이 있는 칸은 건드리지 않고**, 비어 있는 칸만 옛 기록으로 채운다.
+ */
+function splitOldAttendance(
+  oldMarks: Record<string, AttValue> | undefined,
+  sheetMarks: Record<string, AttValue>,
+): { carry: [string, AttValue][]; superseded: number } {
+  const carry: [string, AttValue][] = [];
+  let superseded = 0;
+  for (const [cellKey, mark] of Object.entries(oldMarks ?? {})) {
+    if (!mark) continue;
+    if (cellKey in sheetMarks) superseded++;
+    else carry.push([cellKey, mark]);
+  }
+  return { carry, superseded };
 }
 
 const csvUrl = (id: string, gid: string) =>
@@ -305,7 +340,8 @@ function matchCurrent(
 
 export function buildSyncPlan(
   classes: ParsedClass[],
-  current: Record<string, { teacher?: string; students?: Record<string, Student> }>
+  current: Record<string, { teacher?: string; students?: Record<string, Student> }>,
+  currentAttendance?: AttendanceYear,
 ): SyncPlan {
   const curList = flattenCurrent(current);
   const byName = new Map<string, CurrentStudent[]>();
@@ -317,6 +353,7 @@ export function buildSyncPlan(
   const added: SyncPlan['added'] = [];
   const moved: SyncPlan['moved'] = [];
   const ambiguous: SyncPlan['ambiguous'] = [];
+  const attendanceMoves: AttendanceMove[] = [];
   const consumed = new Set<string>();
   let attendanceChanges = 0;
   let totalStudents = 0;
@@ -331,7 +368,14 @@ export function buildSyncPlan(
       if (m === null) { added.push({ ck: pc.ck, name: st.name }); continue; }
       if (m === 'ambiguous') { ambiguous.push({ ck: pc.ck, name: st.name }); continue; }
       consumed.add(m.uid);
-      if (m.ck !== pc.ck) moved.push({ name: st.name, fromCk: m.ck, toCk: pc.ck });
+      if (m.ck !== pc.ck) {
+        moved.push({ name: st.name, fromCk: m.ck, toCk: pc.ck });
+        const oldMarks = currentAttendance?.[m.ck]?.[m.sid];
+        if (oldMarks && Object.keys(oldMarks).length > 0) {
+          const { carry, superseded } = splitOldAttendance(oldMarks, st.attendance);
+          attendanceMoves.push({ name: st.name, fromCk: m.ck, toCk: pc.ck, carried: carry.length, superseded });
+        }
+      }
     }
   }
 
@@ -342,7 +386,7 @@ export function buildSyncPlan(
     if (syncedCks.has(c.ck) && !consumed.has(c.uid)) removed.push({ ck: c.ck, name: c.name });
   }
 
-  return { classes, added, moved, removed, ambiguous, attendanceChanges, totalStudents, classCount: classes.length, jangCount };
+  return { classes, added, moved, removed, ambiguous, attendanceMoves, attendanceChanges, totalStudents, classCount: classes.length, jangCount };
 }
 
 /**
@@ -355,6 +399,7 @@ export function buildSyncPayload(
   current: Record<string, { students?: Record<string, Student> }>,
   removeMissing = false,
   historicalClasses?: unknown,
+  currentAttendance?: AttendanceYear,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
 
@@ -397,6 +442,18 @@ export function buildSyncPayload(
       };
       for (const [cellKey, mark] of Object.entries(st.attendance)) {
         payload[`attendance/${year}/${pc.ck}/${sid}/${cellKey}`] = mark;
+      }
+      // 반이 바뀐 학생은 새 sid·새 경로를 받으므로, 옛 반의 출석 기록이 아무도 참조하지 않는
+      // 고아로 남는다. 시트에 없는 칸만 새 경로로 옮긴 뒤 옛 기록을 지운다.
+      // (시트가 원본이므로 시트에 값이 있는 칸은 덮지 않는다 — 대체 건수는 미리보기에 표시된다.)
+      if (matched && matched.ck !== pc.ck) {
+        const oldMarks = currentAttendance?.[matched.ck]?.[matched.sid];
+        if (oldMarks && Object.keys(oldMarks).length > 0) {
+          for (const [cellKey, mark] of splitOldAttendance(oldMarks, st.attendance).carry) {
+            payload[`attendance/${year}/${pc.ck}/${sid}/${cellKey}`] = mark;
+          }
+          payload[`attendance/${year}/${matched.ck}/${matched.sid}`] = null;
+        }
       }
     }
   }

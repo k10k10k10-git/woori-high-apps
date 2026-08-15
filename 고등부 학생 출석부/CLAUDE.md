@@ -302,6 +302,12 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 
 `buildSyncPayload`가 `jang: true`를 Firebase에 함께 기록하며, 수련회 행정 사이트의 신청자 취합 화면(`ClassRosterTab`)이 이 필드를 읽어 장결자를 별도 구역으로 분리 표시한다. 1부·2부를 반드시 함께 동기화해야 부 간 이동 학생이 정확히 잡히는 점은 기존과 동일.
 
+**반 이동 학생의 출석 기록은 이관하고 옛 경로를 지운다.** 반이 바뀌면 새 반 기준 sid를 새로 받으므로 `attendance/{year}/{옛반}/{옛sid}`가 아무도 참조하지 않는 고아로 남던 문제가 있었다. `buildSyncPlan`·`buildSyncPayload`는 `attendance/{year}` 스냅샷을 선택 인자로 받아, **시트에 값이 없는 칸만** 새 경로로 옮긴 뒤 옛 경로를 `null`로 지운다. 시트가 원본이므로 시트에 값이 있는 칸은 덮지 않으며, 대체되는 칸 수는 미리보기의 `출석 기록 이관`에 그대로 노출한다(관리자가 적용 전에 확인). 출석 스냅샷을 넘기지 않으면 삭제도 이관도 하지 않는다 — `__tests__/sheetSync.test.ts`의 "반 이동 시 옛 반 출석 기록 이관·정리"가 이 계약을 지킨다.
+
+⚠ 휴지통에 백업하지 않는다. `TrashModal`의 7일 자동 정리는 `trash/{year}/students`·`classes`만 훑으므로 `trash/{year}/attendance`를 만들면 **영원히 정리되지 않는 새 더미**가 생겨 고아를 옮기는 것에 그친다. 이관 자체가 보존 수단이다.
+
+**`removeMissing`(시트에 없는 학생 삭제)으로 빠지는 학생의 출석은 아직 정리하지 않는다** — 이관할 목적지가 없어 지우면 순수 손실이라 의도적으로 남겨 둔 상태다.
+
 ### 외부 데이터 임포트
 
 스프레드시트 → Firebase 일괄 임포트가 필요할 때는 `~/.config/configstore/firebase-tools.json`의 Firebase CLI access token을 사용해 RTDB REST API(`{DB_URL}/{path}.json?access_token={token}`)로 직접 쓴다. `firebase deploy`로 이미 인증된 상태라면 별도 서비스 계정 없이 가능하다.

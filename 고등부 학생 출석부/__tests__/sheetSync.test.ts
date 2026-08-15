@@ -153,3 +153,63 @@ describe('parseCSV', () => {
     expect(rows[1]).toEqual(['1', '2,3', '4']);
   });
 });
+
+describe('반 이동 시 옛 반 출석 기록 이관·정리', () => {
+  // 시트에서 1부1-1 → 1부1-2로 옮긴 학생. 옛 경로의 출석이 고아로 남던 문제.
+  const movedClasses = () => [cls('1-1-2', [st({
+    name: '홍길동', sid: 'S12_01', num: 1,
+    birth: '2010. 02. 02', phone: '010-1234-5678',
+    attendance: { '0-0': 'O', '0-1': 'X' },
+  })])];
+  const movedCurrent = (): Cur => ({
+    '1-1-1': { students: { S11_01: { id: 'S11_01', name: '홍길동', birth: '2010.02.02', phone: '01012345678' } } },
+    '1-1-2': { students: {} },
+  });
+  const oldAttendance = () => ({
+    '1-1-1': { S11_01: { '0-0': 'O', '0-1': 'O', '1-0': 'T', '2-3': 'O' } },
+  } as Record<string, Record<string, Record<string, 'O' | 'X' | 'T'>>>);
+
+  it('옛 반의 출석 경로를 지워 고아 기록을 남기지 않는다', () => {
+    const plan = buildSyncPlan(movedClasses(), movedCurrent(), oldAttendance());
+    const payload = buildSyncPayload(plan, 2026, movedCurrent(), false, undefined, oldAttendance());
+    expect(payload['attendance/2026/1-1-1/S11_01']).toBeNull();
+  });
+
+  it('시트에 없는 칸은 새 반으로 옮겨 이력을 보존한다', () => {
+    const plan = buildSyncPlan(movedClasses(), movedCurrent(), oldAttendance());
+    const payload = buildSyncPayload(plan, 2026, movedCurrent(), false, undefined, oldAttendance());
+    // 시트에 없던 '1-0'(지각)과 '2-3'은 새 경로로 이관된다
+    expect(payload['attendance/2026/1-1-2/S12_01/1-0']).toBe('T');
+    expect(payload['attendance/2026/1-1-2/S12_01/2-3']).toBe('O');
+  });
+
+  it('시트에 값이 있는 칸은 시트 값을 유지한다(옛 값이 덮지 않는다)', () => {
+    const plan = buildSyncPlan(movedClasses(), movedCurrent(), oldAttendance());
+    const payload = buildSyncPayload(plan, 2026, movedCurrent(), false, undefined, oldAttendance());
+    // 옛 기록은 '0-1'이 'O'였지만 시트가 'X'이므로 시트가 이긴다
+    expect(payload['attendance/2026/1-1-2/S12_01/0-1']).toBe('X');
+    expect(payload['attendance/2026/1-1-2/S12_01/0-0']).toBe('O');
+  });
+
+  it('미리보기가 이관·대체 칸 수를 알려준다', () => {
+    const plan = buildSyncPlan(movedClasses(), movedCurrent(), oldAttendance());
+    expect(plan.attendanceMoves).toEqual([
+      { name: '홍길동', fromCk: '1-1-1', toCk: '1-1-2', carried: 2, superseded: 2 },
+    ]);
+  });
+
+  it('같은 반에 남은 학생의 출석은 건드리지 않는다', () => {
+    const classes = [cls('1-1-1', [st({ name: '홍길동', sid: 'S11_01', num: 1, attendance: { '0-0': 'O' } })])];
+    const cur: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '홍길동' } } } };
+    const att = { '1-1-1': { S11_01: { '5-2': 'O' } } } as Record<string, Record<string, Record<string, 'O' | 'X' | 'T'>>>;
+    const payload = buildSyncPayload(buildSyncPlan(classes, cur, att), 2026, cur, false, undefined, att);
+    expect(payload['attendance/2026/1-1-1/S11_01']).toBeUndefined();
+  });
+
+  it('출석 데이터를 넘기지 않으면 삭제도 이관도 하지 않는다(기존 동작 유지)', () => {
+    const plan = buildSyncPlan(movedClasses(), movedCurrent());
+    const payload = buildSyncPayload(plan, 2026, movedCurrent(), false, undefined);
+    expect(payload['attendance/2026/1-1-1/S11_01']).toBeUndefined();
+    expect(plan.attendanceMoves).toEqual([]);
+  });
+});

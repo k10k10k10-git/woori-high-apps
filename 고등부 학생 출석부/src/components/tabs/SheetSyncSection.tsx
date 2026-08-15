@@ -5,7 +5,7 @@ import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import {
   extractSheetId, fetchClassTabs,
-  buildSyncPlan, buildSyncPayload, type SyncPlan, type ParsedClass,
+  buildSyncPlan, buildSyncPayload, type SyncPlan, type ParsedClass, type AttendanceYear,
 } from '@/lib/sheetSync';
 import type { Student } from '@/types';
 import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
@@ -30,6 +30,7 @@ export default function SheetSyncSection() {
   const [plan, setPlan] = useState<SyncPlan | null>(null);
   const [currentRef, setCurrentRef] = useState<CurrentClasses | null>(null);
   const [historicalRef, setHistoricalRef] = useState<Record<string, unknown> | null>(null);
+  const [attendanceRef, setAttendanceRef] = useState<AttendanceYear | null>(null);
   const [removeMissing, setRemoveMissing] = useState(false);
 
   // 저장된 시트 URL 로드
@@ -62,9 +63,14 @@ export default function SheetSyncSection() {
     setLoading(true);
     setProgress('');
     try {
-      const allSnap = await get(ref(db, 'classes'));
+      const [allSnap, attSnap] = await Promise.all([
+        get(ref(db, 'classes')),
+        // 반이 바뀐 학생의 옛 출석을 새 반으로 이관하려면 올해 출석 기록이 필요하다.
+        get(ref(db, `attendance/${curYear}`)),
+      ]);
       const allClasses = allSnap.exists() ? allSnap.val() as Record<string, unknown> : {};
       const current = (allClasses[String(curYear)] ?? {}) as CurrentClasses;
+      const attendance = attSnap.exists() ? attSnap.val() as AttendanceYear : {};
 
       const classes: ParsedClass[] = [];
       if (id1) {
@@ -84,7 +90,8 @@ export default function SheetSyncSection() {
       }
       setCurrentRef(current);
       setHistoricalRef(allClasses);
-      setPlan(buildSyncPlan(classes, current));
+      setAttendanceRef(attendance);
+      setPlan(buildSyncPlan(classes, current, attendance));
     } catch (e) {
       setError(e instanceof Error ? e.message : '시트를 불러오지 못했습니다.');
     } finally {
@@ -97,7 +104,7 @@ export default function SheetSyncSection() {
     if (!plan || !currentRef) return;
     setRunning(true);
     try {
-      const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing, historicalRef);
+      const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing, historicalRef, attendanceRef ?? undefined);
       plan.classes.forEach((classPlan) => {
         const changeId = push(ref(db, `classes/${curYear}/${classPlan.ck}/adminChanges`)).key ?? `change_${Date.now()}_${classPlan.ck}`;
         payload[adminChangePath(curYear, classPlan.ck, changeId)] = buildAdminChangeEntry({
@@ -178,6 +185,27 @@ export default function SheetSyncSection() {
                 {plan.moved.map((m, i) => (
                   <div key={i} style={{ fontSize: 12, padding: '2px 0', color: 'var(--text2)' }}>
                     {m.name}: {ckLabel(m.fromCk)} → <strong>{ckLabel(m.toCk)}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {plan.attendanceMoves.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text2)', marginBottom: 4 }}>
+                출석 기록 이관 ({plan.attendanceMoves.length}명)
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>
+                반이 바뀐 학생의 옛 반 출석을 새 반으로 옮기고 옛 기록을 정리합니다. 시트에 값이 있는 칸은 시트 값을 따릅니다.
+              </div>
+              <div style={{ maxHeight: 140, overflowY: 'auto' }}>
+                {plan.attendanceMoves.map((a, i) => (
+                  <div key={i} style={{ fontSize: 12, padding: '2px 0', color: 'var(--text2)' }}>
+                    {a.name}: {ckLabel(a.fromCk)} → <strong>{ckLabel(a.toCk)}</strong>
+                    <span style={{ color: 'var(--text3)' }}>
+                      {' '}· 이관 {a.carried}칸{a.superseded > 0 ? ` · 시트 값으로 대체 ${a.superseded}칸` : ''}
+                    </span>
                   </div>
                 ))}
               </div>
