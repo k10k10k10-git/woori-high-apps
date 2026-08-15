@@ -13,6 +13,7 @@ export const SUNDAY_MINISTRY_TABS = [
   "등록 현황",
   "처리 대기",
   "행정 변동 사항",
+  "자리 배치",
 ] as const;
 
 /**
@@ -23,7 +24,7 @@ export const SUNDAY_MINISTRY_TABS = [
 export const SUNDAY_MINISTRY_TEAMS = [
   { key: "admin", label: "행정팀", hint: "행정 변동 사항", tabs: ["행정 변동 사항"] },
   { key: "barnabas", label: "바나바팀", hint: "새친구·등록·처리", tabs: ["새친구", "등록 현황", "처리 대기"] },
-  { key: "worship", label: "예배팀", hint: "준비 중", tabs: [] },
+  { key: "worship", label: "예배팀", hint: "자리 배치", tabs: ["자리 배치"] },
   { key: "praise", label: "찬양팀", hint: "준비 중", tabs: [] },
   { key: "media", label: "미디어팀", hint: "준비 중", tabs: [] },
   { key: "design", label: "기획디자인팀", hint: "준비 중", tabs: [] },

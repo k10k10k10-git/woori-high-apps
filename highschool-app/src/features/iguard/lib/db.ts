@@ -23,6 +23,7 @@ import {
 } from "@/features/portal/accessPolicy";
 import { normalizeIguardPendingRequests, type IguardPendingReq } from "./pendingAccess";
 import { isMinistryGuideMilestone } from "@/features/ministryGuide/ministryGuidePersistence";
+import { isWorshipMilestone } from "@/features/sundayWorship/worshipSeating";
 import {
   subscribeToRetreat as subscribeToAdminRetreat,
   subscribeToRetreats as subscribeToAdminRetreats,
@@ -174,7 +175,7 @@ export function subscribeToMilestones(cb: (milestones: Milestone[]) => void, onE
     ref(db, GLOBAL_MILESTONES_PATH),
     (snap) => cb(
       snapToList<Milestone>(snap)
-        .filter((item) => !isMinistryGuideMilestone(item))
+        .filter((item) => !isMinistryGuideMilestone(item) && !isWorshipMilestone(item))
         .sort((a, b) => a.targetDate.localeCompare(b.targetDate)),
     ),
     (error) => {

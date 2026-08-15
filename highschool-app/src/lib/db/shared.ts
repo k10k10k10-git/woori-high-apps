@@ -4,6 +4,7 @@ import { BrainstormNote, BrainstormComment, Milestone, RetreatPeriod } from "../
 import { paths } from "../paths";
 import { snapToList, stripUndefined } from "./core";
 import { isMinistryGuideMilestone } from "@/features/ministryGuide/ministryGuidePersistence";
+import { isWorshipMilestone } from "@/features/sundayWorship/worshipSeating";
 
 export const RETREAT_ADMIN_SOURCE_SITE = "retreat-admin";
 
@@ -77,7 +78,7 @@ export function subscribeToMilestones(callback: (milestones: Milestone[]) => voi
   const r = ref(db, GLOBAL_MILESTONES_PATH);
   return onValue(
     r,
-    (snap) => callback(snapToList<Milestone>(snap).filter((item) => !isMinistryGuideMilestone(item))),
+    (snap) => callback(snapToList<Milestone>(snap).filter((item) => !isMinistryGuideMilestone(item) && !isWorshipMilestone(item))),
     (error) => {
       console.warn(`Failed to subscribe ${GLOBAL_MILESTONES_PATH}:`, error);
       callback([]);
