@@ -15,6 +15,30 @@ export const SUNDAY_MINISTRY_TABS = [
   "행정 변동 사항",
 ] as const;
 
+/**
+ * 주일 사역은 방학 중 사역과 같은 드롭다운 구조다 — 팀마다 자기 탭만 본다.
+ * `tabs`의 합집합은 반드시 `SUNDAY_MINISTRY_TABS`와 같아야 한다(탭 유실 방지, featureCatalog.test.ts가 지킨다).
+ * 예배팀은 기능 확정 전까지 빈 화면이므로 `tabs`가 비어 있다.
+ */
+export const SUNDAY_MINISTRY_TEAMS = [
+  { key: "admin", label: "행정팀", hint: "행정 변동 사항", tabs: ["행정 변동 사항"] },
+  { key: "barnabas", label: "바나바팀", hint: "새친구·등록·처리", tabs: ["새친구", "등록 현황", "처리 대기"] },
+  { key: "worship", label: "예배팀", hint: "준비 중", tabs: [] },
+] as const;
+
+export type SundayTeamKey = (typeof SUNDAY_MINISTRY_TEAMS)[number]["key"];
+
+/** `/sunday-ministry`(팀 없는 기존 주소)가 도착하는 팀. 개편 전 첫 화면이 새친구였으므로 바나바팀을 유지한다. */
+export const SUNDAY_MINISTRY_DEFAULT_TEAM: SundayTeamKey = "barnabas";
+
+export function sundayTeamHref(key: SundayTeamKey) {
+  return `/sunday-ministry/${key}`;
+}
+
+export function sundayTeamOf(key?: string) {
+  return SUNDAY_MINISTRY_TEAMS.find((team) => team.key === key);
+}
+
 export const SEMESTER_TABS = [
   ...SEMESTER_TRAINING_TABS,
 ] as const;
@@ -112,6 +136,7 @@ export const UNIFIED_ROUTES = [
   "/suggestions",
   "/semesters",
   "/sunday-ministry",
+  "/sunday-ministry/[team]",
   "/semester-admin",
   "/semester/[id]",
   "/retreats",

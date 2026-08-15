@@ -4,8 +4,12 @@ import {
   RETREAT_TAB_GROUPS,
   SEMESTER_TABS,
   SEMESTER_TRAINING_TABS,
+  SUNDAY_MINISTRY_DEFAULT_TEAM,
   SUNDAY_MINISTRY_TABS,
+  SUNDAY_MINISTRY_TEAMS,
   UNIFIED_ROUTES,
+  sundayTeamHref,
+  sundayTeamOf,
 } from "./featureCatalog";
 
 describe("통합 앱 기능 카탈로그", () => {
@@ -13,6 +17,37 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(SEMESTER_TRAINING_TABS).toEqual(["신청", "배치", "출석", "수료", "커리큘럼", "아카이브", "설정"]);
     expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "등록 현황", "처리 대기", "행정 변동 사항"]);
     expect(SEMESTER_TABS).toEqual(SEMESTER_TRAINING_TABS);
+  });
+
+  it("주일 사역을 행정팀·바나바팀·예배팀 순서로 가른다", () => {
+    expect(SUNDAY_MINISTRY_TEAMS.map((team) => team.key)).toEqual(["admin", "barnabas", "worship"]);
+    expect(SUNDAY_MINISTRY_TEAMS.map((team) => team.label)).toEqual(["행정팀", "바나바팀", "예배팀"]);
+  });
+
+  it("팀별 탭의 합집합이 주일 사역 전체 탭과 같다 — 개편으로 탭이 유실되지 않는다", () => {
+    const assigned = SUNDAY_MINISTRY_TEAMS.flatMap((team) => team.tabs);
+    expect(new Set(assigned).size).toBe(assigned.length); // 같은 탭이 두 팀에 중복 배치되지 않는다
+    expect([...assigned].sort()).toEqual([...SUNDAY_MINISTRY_TABS].sort());
+  });
+
+  it("새친구·등록 현황·처리 대기는 바나바팀, 행정 변동 사항은 행정팀에 둔다", () => {
+    expect(sundayTeamOf("barnabas")?.tabs).toEqual(["새친구", "등록 현황", "처리 대기"]);
+    expect(sundayTeamOf("admin")?.tabs).toEqual(["행정 변동 사항"]);
+  });
+
+  it("예배팀은 기능 확정 전까지 빈 화면이다", () => {
+    expect(sundayTeamOf("worship")?.tabs).toEqual([]);
+  });
+
+  it("팀 없는 기존 주소는 바나바팀으로 유지해 첫 화면이 새친구 그대로다", () => {
+    expect(SUNDAY_MINISTRY_DEFAULT_TEAM).toBe("barnabas");
+    expect(sundayTeamOf(SUNDAY_MINISTRY_DEFAULT_TEAM)?.tabs[0]).toBe("새친구");
+  });
+
+  it("알 수 없는 팀 키는 찾지 못한다", () => {
+    expect(sundayTeamOf("unknown")).toBeUndefined();
+    expect(sundayTeamOf(undefined)).toBeUndefined();
+    expect(sundayTeamHref("worship")).toBe("/sunday-ministry/worship");
   });
 
   it("수련회 행정의 5개 그룹과 17개 탭 인덱스를 빠짐없이 유지한다", () => {

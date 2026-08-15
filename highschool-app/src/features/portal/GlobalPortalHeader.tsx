@@ -11,8 +11,84 @@ import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import OverlayShell from "@/components/OverlayShell";
 import { canAccessArea, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
+import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
+
+type NavItem = { href: string; label: string; hint: string };
+
+/**
+ * 상단 메뉴의 hover 드롭다운. 주일 사역과 방학 중 사역이 **같은 컴포넌트**를 써야
+ * 두 메뉴의 여닫힘·키보드·바깥클릭 동작이 갈라지지 않는다.
+ * 열림 상태는 부모가 들고 있어 한쪽을 열면 다른 쪽이 닫힌다.
+ */
+function NavDropdown({ label, items, active, open, onOpen, onClose }: {
+  label: string;
+  items: NavItem[];
+  active: boolean;
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // 드롭다운 닫기는 이벤트에서만 한다(effect에서 setState하면 cascading render).
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    function onPointerDown(event: MouseEvent | TouchEvent) {
+      if (!ref.current?.contains(event.target as Node)) onClose();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("touchstart", onPointerDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("touchstart", onPointerDown);
+    };
+  }, [open, onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="portal-nav-dropdown relative"
+      onMouseEnter={onOpen}
+      onMouseLeave={onClose}
+    >
+      <button
+        type="button"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onClick={onOpen}
+        className="portal-nav-link"
+        data-active={active ? "true" : undefined}
+      >
+        {label}
+        <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
+      </button>
+      {open && (
+        <div className="portal-dropdown-panel absolute left-0 top-full z-[70] w-56 pt-1.5">
+          <div className="portal-menu">
+            {items.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className="block rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
+              >
+                {item.label}
+                <span className="mt-0.5 block text-[10px] font-normal text-[var(--color-on-dark-muted)]">{item.hint}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function activeArea(pathname: string): GlobalArea {
   if (pathname === "/") return "home";
@@ -37,37 +113,18 @@ export default function GlobalPortalHeader() {
   const { user, loading, roles, signOut } = useAuth();
   const [teamOpen, setTeamOpen] = useState(false);
   const [myPageOpen, setMyPageOpen] = useState(false);
-  const [vacationOpen, setVacationOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<"sunday" | "vacation" | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const vacationRef = useRef<HTMLDivElement>(null);
   const currentArea = activeArea(pathname);
   const openTeam = useCallback(() => setTeamOpen(true), []);
+  const closeMenu = useCallback(() => setOpenMenu(null), []);
+  const openSunday = useCallback(() => setOpenMenu("sunday"), []);
+  const openVacation = useCallback(() => setOpenMenu("vacation"), []);
 
   useEffect(() => {
     window.addEventListener("portal:open-team", openTeam);
     return () => window.removeEventListener("portal:open-team", openTeam);
   }, [openTeam]);
-
-  // 드롭다운 닫기는 이벤트에서만 한다(effect에서 setState하면 cascading render).
-  useEffect(() => {
-    if (!vacationOpen) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setVacationOpen(false);
-      }
-    }
-    function onPointerDown(event: MouseEvent | TouchEvent) {
-      if (!vacationRef.current?.contains(event.target as Node)) setVacationOpen(false);
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
-    };
-  }, [vacationOpen]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -84,10 +141,16 @@ export default function GlobalPortalHeader() {
   const siteRequestAdmin = canManageSiteRequests(roles);
   // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
   // 수련회에 들어갔을 때 행정 화면이냐 현장 화면이냐만 달라진다.
-  const vacationItems = [
+  const vacationItems: NavItem[] = [
     ...(canAccessArea("retreat-admin", roles) ? [{ href: "/retreats", label: "수련회 행정팀", hint: "신청·편성·물품" }] : []),
     ...(canAccessArea("retreat-field", roles) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
   ];
+  // 주일 사역도 같은 드롭다운 구조다. 팀 목록은 featureCatalog가 단일 원천.
+  const sundayItems: NavItem[] = SUNDAY_MINISTRY_TEAMS.map((team) => ({
+    href: sundayTeamHref(team.key),
+    label: team.label,
+    hint: team.hint,
+  }));
 
   return (
     <>
@@ -109,7 +172,7 @@ export default function GlobalPortalHeader() {
             <CaretDown aria-hidden="true" size={13} weight="bold" />
           </button>
 
-          <nav className={`portal-nav ${vacationOpen ? "portal-nav-menu-open" : ""}`} aria-label="통합 사역 메뉴">
+          <nav className={`portal-nav ${openMenu ? "portal-nav-menu-open" : ""}`} aria-label="통합 사역 메뉴">
             {semesterAllowed && (
               <Link
                 href="/semesters"
@@ -121,51 +184,25 @@ export default function GlobalPortalHeader() {
             )}
 
             {semesterAllowed && (
-              <Link
-                href="/sunday-ministry"
-                className="portal-nav-link"
-                aria-current={currentArea === "sunday" ? "page" : undefined}
-              >
-                주일 사역
-              </Link>
+              <NavDropdown
+                label="주일 사역"
+                items={sundayItems}
+                active={currentArea === "sunday"}
+                open={openMenu === "sunday"}
+                onOpen={openSunday}
+                onClose={closeMenu}
+              />
             )}
 
             {vacationItems.length > 0 && (
-              <div
-                ref={vacationRef}
-                className="portal-nav-dropdown relative"
-                onMouseEnter={() => setVacationOpen(true)}
-                onMouseLeave={() => setVacationOpen(false)}
-              >
-                <button
-                  type="button"
-                  aria-haspopup="true"
-                  aria-expanded={vacationOpen}
-                  onClick={() => setVacationOpen(true)}
-                  className="portal-nav-link"
-                  data-active={currentArea === "vacation" ? "true" : undefined}
-                >
-                  방학 중 사역
-                  <span aria-hidden="true" className="text-[9px] opacity-70">▼</span>
-                </button>
-                {vacationOpen && (
-                  <div className="portal-dropdown-panel absolute left-0 top-full z-[70] w-56 pt-1.5">
-                    <div className="portal-menu">
-                      {vacationItems.map((item) => (
-                        <Link
-                          key={item.href}
-                          href={item.href}
-                          onClick={() => setVacationOpen(false)}
-                          className="block rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white"
-                        >
-                          {item.label}
-                          <span className="mt-0.5 block text-[10px] font-normal text-[var(--color-on-dark-muted)]">{item.hint}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NavDropdown
+                label="방학 중 사역"
+                items={vacationItems}
+                active={currentArea === "vacation"}
+                open={openMenu === "vacation"}
+                onOpen={openVacation}
+                onClose={closeMenu}
+              />
             )}
 
             <Link
@@ -224,7 +261,11 @@ export default function GlobalPortalHeader() {
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
               <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>통합 홈</Link>
               {semesterAllowed && <Link href="/semesters" aria-current={currentArea === "semester" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>학기 중 사역</Link>}
-              {semesterAllowed && <Link href="/sunday-ministry" aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>주일 사역</Link>}
+              {semesterAllowed && sundayItems.map((item) => (
+                <Link key={item.href} href={item.href} aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>
+                  <span>주일 사역 · {item.label}</span><small>{item.hint}</small>
+                </Link>
+              ))}
               {vacationItems.map((item) => (
                 <Link key={item.href} href={item.href} aria-current={currentArea === "vacation" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>
                   <span>{item.label}</span><small>{item.hint}</small>

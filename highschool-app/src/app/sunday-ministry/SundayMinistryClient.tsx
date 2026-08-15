@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canEditArea, canWriteStudentRoster } from "@/features/portal/accessPolicy";
-import { SUNDAY_MINISTRY_TABS } from "@/features/portal/featureCatalog";
+import {
+  SUNDAY_MINISTRY_DEFAULT_TEAM,
+  SUNDAY_MINISTRY_TABS,
+  sundayTeamOf,
+  type SundayTeamKey,
+} from "@/features/portal/featureCatalog";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import type { NewFriend, NewFriendPrivate } from "@/features/semester/types";
 import { subscribeSundayAdminChanges, subscribeSundayNewFriends, subscribeSundayNewFriendsPrivate } from "@/features/sundayMinistry/db";
@@ -33,38 +38,42 @@ const TAB_INTRO: Record<SundayTab, { title: string; description: string }> = {
   "행정 변동 사항": { title: "행정 변동 사항", description: "학생 출석부 관리자 화면에서 수정된 등록·이동·삭제 내역을 최신순으로 확인합니다." },
 };
 
-function validInitialTab(value?: string): SundayTab {
-  return value && (SUNDAY_MINISTRY_TABS as readonly string[]).includes(value)
-    ? value as SundayTab
-    : SUNDAY_MINISTRY_TABS[0];
-}
-
-export default function SundayMinistryClient({ initialTab }: { initialTab?: string }) {
+export default function SundayMinistryClient({ team, initialTab }: { team?: SundayTeamKey; initialTab?: string }) {
   const router = useRouter();
   const { user, loading: authLoading, roles, signIn } = useAuth();
   const allowed = canAccessArea("sunday", roles);
   const canEdit = canEditArea("sunday", roles);
-  const [tab, setTab] = useState<SundayTab>(() => validInitialTab(initialTab));
+  const teamMeta = sundayTeamOf(team) ?? sundayTeamOf(SUNDAY_MINISTRY_DEFAULT_TEAM)!;
+  const tabs = teamMeta.tabs as readonly SundayTab[];
+  // 팀 라우트를 오갈 때 컴포넌트가 재사용될 수 있으므로, 선택 탭은 렌더 중 파생으로 보정한다
+  // (effect에서 setState하면 실수 13 — 사용자의 선택이 덮인다).
+  const [pickedTab, setPickedTab] = useState<string | undefined>(initialTab);
+  const tab: SundayTab | undefined = tabs.find((name) => name === pickedTab) ?? tabs[0];
+  const needsFriends = tabs.some((name) => name !== "행정 변동 사항");
+  const needsAdminChanges = tabs.includes("행정 변동 사항");
   const [friends, setFriends] = useState<SundayNewFriend[]>([]);
   const [privateMap, setPrivateMap] = useState<Record<string, NewFriendPrivate>>({});
   const [adminChanges, setAdminChanges] = useState<SundayAdminChange[]>([]);
-  const { fail, ok, message: loadError } = useLoadErrors(`sunday|${user?.uid ?? ""}`);
+  const { fail, ok, message: loadError } = useLoadErrors(`sunday|${teamMeta.key}|${user?.uid ?? ""}`);
   const storageSid = sundayWorkspaceId(new Date().getFullYear());
 
   useEffect(() => {
     if (!user || !allowed) return;
-    const unsubs = [
-      subscribeSundayNewFriends((values) => { setFriends(values); ok("새친구"); }, fail("새친구")),
-      subscribeSundayAdminChanges((values) => { setAdminChanges(values); ok("행정 변동 사항"); }, fail("행정 변동 사항")),
-    ];
-    if (canEdit) {
-      unsubs.push(subscribeSundayNewFriendsPrivate(
-        (values) => { setPrivateMap(values); ok("새친구 비공개 정보"); },
-        fail("새친구 비공개 정보"),
-      ));
+    const unsubs: Array<() => void> = [];
+    if (needsFriends) {
+      unsubs.push(subscribeSundayNewFriends((values) => { setFriends(values); ok("새친구"); }, fail("새친구")));
+      if (canEdit) {
+        unsubs.push(subscribeSundayNewFriendsPrivate(
+          (values) => { setPrivateMap(values); ok("새친구 비공개 정보"); },
+          fail("새친구 비공개 정보"),
+        ));
+      }
+    }
+    if (needsAdminChanges) {
+      unsubs.push(subscribeSundayAdminChanges((values) => { setAdminChanges(values); ok("행정 변동 사항"); }, fail("행정 변동 사항")));
     }
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [allowed, canEdit, fail, ok, user]);
+  }, [allowed, canEdit, fail, needsAdminChanges, needsFriends, ok, user]);
 
   const pendingCount = useMemo(() => friends.filter((friend) =>
     !friend.giftDate && friend.decision !== "미등록" && friend.decision !== "보류",
@@ -101,34 +110,47 @@ export default function SundayMinistryClient({ initialTab }: { initialTab?: stri
             <div className="flex min-w-0 items-center gap-2 py-3 sm:gap-3">
               <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="통합 홈으로 돌아가기">← 홈</button>
               <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">주일 사역</span>
-              <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">행정·바나바</h1>
+              <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
               {!canEdit && <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 sm:text-xs">조회 전용</span>}
             </div>
           </div>
         </div>
-        <div className="workspace-tabs">
-          <div className="mx-auto max-w-6xl px-0 sm:px-4">
-            <div className="tab-scroll-container flex gap-0 overflow-x-auto scrollbar-hide" role="tablist" aria-label="주일 사역 탭">
-              {SUNDAY_MINISTRY_TABS.map((name) => <button key={name} role="tab" aria-selected={tab === name} aria-controls="sunday-tab-panel" onClick={() => setTab(name)} className="workspace-tab">{name}</button>)}
+        {tabs.length > 0 && (
+          <div className="workspace-tabs">
+            <div className="mx-auto max-w-6xl px-0 sm:px-4">
+              <div className="tab-scroll-container flex gap-0 overflow-x-auto scrollbar-hide" role="tablist" aria-label={`주일 사역 ${teamMeta.label} 탭`}>
+                {tabs.map((name) => <button key={name} role="tab" aria-selected={tab === name} aria-controls="sunday-tab-panel" onClick={() => setPickedTab(name)} className="workspace-tab">{name}</button>)}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {loadError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
-        <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="section-kicker">{tab}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[tab].title}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[tab].description}</p></div>
-          <p className="mt-2 text-xs text-slate-400 sm:mt-0">새친구 {friends.length}명 · 처리 대기 {pendingCount}명</p>
-        </div>
-        <div role="tabpanel" id="sunday-tab-panel" className="min-h-[360px]">
-          <SemesterEditProvider canEdit={canEdit}>
-            {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(roles)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
-            {tab === "등록 현황" && <RegistrationStatusTab friends={friends} />}
-            {tab === "처리 대기" && <PendingTab friends={friends} privateValueFor={scopedPrivateValueFor} showPrivate={canEdit} onOpenNewFriends={() => setTab("새친구")} />}
-            {tab === "행정 변동 사항" && <AdminChangesTab changes={adminChanges} />}
-          </SemesterEditProvider>
-        </div>
+        {!tab ? (
+          <section className="card card-body">
+            <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center">
+              <p className="text-sm font-semibold text-slate-500">{teamMeta.label} 화면은 준비 중입니다.</p>
+              <p className="mt-2 text-xs text-slate-400">사용할 기능이 정해지면 이 자리에 추가합니다.</p>
+            </div>
+          </section>
+        ) : (
+          <>
+            <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div><p className="section-kicker">{tab}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[tab].title}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[tab].description}</p></div>
+              {needsFriends && <p className="mt-2 text-xs text-slate-400 sm:mt-0">새친구 {friends.length}명 · 처리 대기 {pendingCount}명</p>}
+            </div>
+            <div role="tabpanel" id="sunday-tab-panel" className="min-h-[360px]">
+              <SemesterEditProvider canEdit={canEdit}>
+                {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(roles)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
+                {tab === "등록 현황" && <RegistrationStatusTab friends={friends} />}
+                {tab === "처리 대기" && <PendingTab friends={friends} privateValueFor={scopedPrivateValueFor} showPrivate={canEdit} onOpenNewFriends={() => setPickedTab("새친구")} />}
+                {tab === "행정 변동 사항" && <AdminChangesTab changes={adminChanges} />}
+              </SemesterEditProvider>
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
