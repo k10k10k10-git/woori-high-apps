@@ -18,7 +18,7 @@ export const SUNDAY_MINISTRY_TABS = [
 /**
  * 주일 사역은 방학 중 사역과 같은 드롭다운 구조다 — 팀마다 자기 탭만 본다.
  * `tabs`의 합집합은 반드시 `SUNDAY_MINISTRY_TABS`와 같아야 한다(탭 유실 방지, featureCatalog.test.ts가 지킨다).
- * 예배·찬양·미디어팀은 기능 확정 전까지 빈 화면이므로 `tabs`가 비어 있다.
+ * 예배·찬양·미디어·기획디자인팀은 기능 확정 전까지 빈 화면이므로 `tabs`가 비어 있다.
  */
 export const SUNDAY_MINISTRY_TEAMS = [
   { key: "admin", label: "행정팀", hint: "행정 변동 사항", tabs: ["행정 변동 사항"] },
@@ -26,6 +26,7 @@ export const SUNDAY_MINISTRY_TEAMS = [
   { key: "worship", label: "예배팀", hint: "준비 중", tabs: [] },
   { key: "praise", label: "찬양팀", hint: "준비 중", tabs: [] },
   { key: "media", label: "미디어팀", hint: "준비 중", tabs: [] },
+  { key: "design", label: "기획디자인팀", hint: "준비 중", tabs: [] },
 ] as const;
 
 export type SundayTeamKey = (typeof SUNDAY_MINISTRY_TEAMS)[number]["key"];
