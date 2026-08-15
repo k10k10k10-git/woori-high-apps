@@ -22,7 +22,7 @@ export default function AutoAssignPreviewModal({
   groups, units1, units2, teachers, scope, onApply, onRerun, onClose,
 }: AutoAssignPreviewModalProps) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    <div role="dialog" aria-modal="true" aria-label="자동 배정 결과 미리보기" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={onClose}>
       <div className="card p-6 w-full max-w-4xl max-h-[88vh] flex flex-col"
         onClick={e => e.stopPropagation()}>

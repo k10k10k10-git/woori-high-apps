@@ -130,7 +130,7 @@ export default function NotesTab({ retreat }: Props) {
 
       {/* Edit Modal */}
       {editKey && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="특이사항 입력" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-1">특이사항 입력</h3>
             <p className="text-sm text-slate-500 mb-4">

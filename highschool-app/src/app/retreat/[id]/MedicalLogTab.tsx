@@ -389,7 +389,7 @@ export default function MedicalLogTab({ retreat }: Props) {
 
       {/* 기록 추가 모달 */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="새 의료 기록" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg text-slate-800">새 의료 기록</h3>
@@ -476,7 +476,7 @@ export default function MedicalLogTab({ retreat }: Props) {
 
       {/* 약 프리셋 편집 모달 */}
       {showPresetModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="약 목록 편집" className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">약 목록 편집</h3>

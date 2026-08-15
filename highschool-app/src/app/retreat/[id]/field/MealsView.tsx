@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import OverlayShell from "@/components/OverlayShell";
 import { Group, IguardMeal, IguardMealEntry, IguardSeating } from "@/features/iguard/lib/types";
 import { saveIguardMeal, updateIguardMeal, deleteIguardMeal } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
@@ -58,8 +59,12 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
       </div>
 
       {show && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 modal-backdrop">
-          <div className="card p-6 w-full max-w-md modal-card">
+        <OverlayShell
+          label={editId ? "식사 세션 수정" : "식사 세션 추가"}
+          onClose={() => { setShow(false); setEditId(null); }}
+          panelClassName="w-full max-w-md"
+        >
+          <div className="max-h-[85dvh] overflow-y-auto p-6">
             <h3 className="font-bold text-lg mb-4">{editId ? "식사 세션 수정" : "식사 세션 추가"}</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -74,7 +79,7 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
             <div className="flex gap-2 mt-5"><button onClick={saveMeal} className="btn-primary flex-1 justify-center">저장</button>
               <button onClick={() => { setShow(false); setEditId(null); }} className="btn-secondary flex-1 justify-center">취소</button></div>
           </div>
-        </div>
+        </OverlayShell>
       )}
 
       {meals.length === 0 ? (

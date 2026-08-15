@@ -163,7 +163,7 @@ export default function CarpoolTab({ retreat }: Props) {
 
       {/* Add/Edit Modal */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="카풀 편집" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-4">{editId ? "카풀 수정" : "카풀 추가"}</h3>
 

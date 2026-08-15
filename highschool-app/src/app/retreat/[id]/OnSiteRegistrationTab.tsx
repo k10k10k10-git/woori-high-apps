@@ -536,7 +536,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
 
       {/* ─── 현장 추가 등록 모달 ─── */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="현장 추가 등록" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-1">현장 추가 등록</h3>
             <p className="text-xs text-slate-400 mb-4">{bu} · 신청 명단에 없는 학생을 즉석 추가합니다.</p>

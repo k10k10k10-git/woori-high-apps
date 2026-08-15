@@ -36,6 +36,7 @@
 - 준비 일정 캘린더는 `RetreatCalendarPanel` 하나로 통일했습니다(구 `PrepCalendar` 삭제). 수련회 기간 편집은 Rules상 행정 권한이 필요하므로 `canEditPeriods`로 잠급니다 — `prepMilestones`는 이가드팀도 공유 편집합니다.
 - 통합 브랜드 색: 학기·수련회 행정·이가드 모두 `globals.css`의 미드나이트 인디고·코발트·틸 토큰을 공유합니다. `.semester-scope`와 `.iguard-scope`는 배경·최소 높이만 제공하며 도메인별 원색으로 토큰을 재정의하지 않습니다. 상태 의미(정상·검토·위험)에만 에메랄드·앰버·로즈를 사용합니다.
 - **수련회 PIN 잠금은 `useRetreatPinGate` 하나로만 판정합니다**(`src/features/portal/useRetreatPinGate.ts`). 잠금은 `retreats/{id}/iguard/accessLock` 한 노드에만 있으므로 **행정·이가드 어느 쪽에서 잠가도 양쪽이 잠깁니다**. 화면마다 구독을 새로 짜면 한쪽만 잠기는 사고가 납니다. 설정 UI는 공용 `AdminModal`(현장·행정 홈이 함께 씀), PIN 우회는 통합관리자만.
+- **모달은 `aria-modal="true"`가 있어야 배경 스크롤이 잠깁니다.** `ModalScrollManager`(`providers.tsx`)가 OverlayShell이 아니라 **`[aria-modal="true"]` 존재 여부**를 MutationObserver로 보고 `body`를 고정합니다. 새 모달을 만들 때는 공용 `OverlayShell`을 쓰고(ESC·포커스 트랩·백드롭까지 함께 옵니다), 기존 모달을 손댈 수 없으면 최소한 `role="dialog" aria-modal="true" aria-label`을 붙이세요. 2026-08-16에 수련회 행정·이가드 모달 14곳에 이 속성이 없어 모바일에서 배경이 밀리던 것을 일괄 보강했습니다.
 - **로드 실패 배너는 `useLoadErrors(scope)` 하나만 씁니다**(`src/lib/useLoadErrors.ts`). 실패를 경로별로 모아 **전부** 나열하고, `scope`(학기 id·계정 uid)가 바뀌면 렌더 중 파생으로 초기화합니다. 단일 `loadError` 문자열로 되돌리지 마세요 — 5개 구독이 동시에 거부돼도 마지막 하나만 보여 2026-08-08에 권한 공백의 원인을 두 번 잘못 짚었습니다. 저장·삭제 실패는 `actionError`로 분리합니다. ⚠ Firebase RTDB는 **한 번 거부된 리스너를 규칙이 바뀌어도 재시도하지 않습니다** — 권한을 열어도 그 탭은 새로고침(재구독) 전까지 실패 상태로 남습니다.
 
 ## 권한 — 두 축 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)

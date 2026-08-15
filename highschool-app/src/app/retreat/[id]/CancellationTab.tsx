@@ -205,7 +205,7 @@ export default function CancellationTab({ retreat }: Props) {
 
       {/* Modal */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="취소 편집" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-4">{editId ? "취소 수정" : "취소 추가"}</h3>
             <div className="space-y-3">

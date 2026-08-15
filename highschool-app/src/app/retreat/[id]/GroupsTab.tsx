@@ -773,7 +773,7 @@ export default function GroupsTab({ retreat }: Props) {
       </div>
 
       {showAddGroup && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="조 추가" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold mb-4">조 추가</h3>
             <div className="space-y-3">

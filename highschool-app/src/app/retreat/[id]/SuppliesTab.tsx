@@ -251,7 +251,7 @@ export default function SuppliesTab({ retreat }: Props) {
 
       {/* 예산 설정 Modal */}
       {showBudgetEdit && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="예산 설정" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-4">예산 설정</h3>
             <div className="space-y-3">
@@ -309,7 +309,7 @@ export default function SuppliesTab({ retreat }: Props) {
 
           {/* 물품 Modal */}
           {showSupplyModal && (
-            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div role="dialog" aria-modal="true" aria-label="물품 편집" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
               <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
                 <h3 className="font-bold text-lg mb-4">{editSupplyId ? "물품 수정" : "물품 추가"}</h3>
                 <div className="space-y-3">
@@ -414,7 +414,7 @@ export default function SuppliesTab({ retreat }: Props) {
 
           {/* 간식 Modal */}
           {showSnackModal && (
-            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div role="dialog" aria-modal="true" aria-label="간식 편집" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
               <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
                 <h3 className="font-bold text-lg mb-4">{editSnackId ? "간식 수정" : "간식 추가"}</h3>
                 <div className="space-y-3">

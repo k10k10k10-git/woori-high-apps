@@ -377,7 +377,7 @@ async function handleSave() {
 
       {/* DB 불러오기 모달 */}
       {showImport && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="출석부 DB에서 교사 불러오기" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-1">출석부 DB에서 교사 불러오기</h3>
             <p className="text-sm text-slate-500 mb-4">{retreat.year}년도 출석부 DB에서 교사 명단을 가져옵니다. 이미 추가된 교사는 체크 해제되어 있습니다.</p>
@@ -414,7 +414,7 @@ async function handleSave() {
 
       {/* Add/Edit Modal */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div role="dialog" aria-modal="true" aria-label="교사 편집" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="card w-full max-w-md max-h-[88vh] flex flex-col overflow-hidden">
             <h3 className="font-bold text-lg px-6 pt-6 pb-3 shrink-0">
               {editId ? "교사 수정" : form.source === "manual-assistant" ? "보조스탭 추가" : "교사 추가"}

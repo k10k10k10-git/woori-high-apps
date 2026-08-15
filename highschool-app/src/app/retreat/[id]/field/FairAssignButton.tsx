@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import OverlayShell from "@/components/OverlayShell";
 import { Group, IguardMeal, IguardSeating } from "@/features/iguard/lib/types";
 import { computeFairAssignment, FairResult } from "@/features/iguard/lib/fairAssign";
 import { groupDisplayName } from "@/features/iguard/lib/groupNumber";
@@ -61,8 +62,8 @@ export default function FairAssignButton({ retreatId, groups, meals, seatings }:
       </button>
 
       {result && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 modal-backdrop" onClick={() => setResult(null)}>
-          <div className="card p-6 w-full max-w-lg modal-card max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <OverlayShell label="공정 배정 결과" onClose={() => setResult(null)} panelClassName="w-full max-w-lg">
+          <div className="max-h-[85dvh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-lg">⚖️ 공정 배정 결과</h3>
               <button onClick={() => setResult(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
@@ -95,7 +96,7 @@ export default function FairAssignButton({ retreatId, groups, meals, seatings }:
               </tbody>
             </table>
           </div>
-        </div>
+        </OverlayShell>
       )}
     </>
   );
