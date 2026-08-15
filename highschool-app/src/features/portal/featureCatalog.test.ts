@@ -19,9 +19,9 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(SEMESTER_TABS).toEqual(SEMESTER_TRAINING_TABS);
   });
 
-  it("주일 사역을 행정팀·바나바팀·예배팀 순서로 가른다", () => {
-    expect(SUNDAY_MINISTRY_TEAMS.map((team) => team.key)).toEqual(["admin", "barnabas", "worship"]);
-    expect(SUNDAY_MINISTRY_TEAMS.map((team) => team.label)).toEqual(["행정팀", "바나바팀", "예배팀"]);
+  it("주일 사역 팀 순서를 행정·바나바·예배·찬양·미디어로 고정한다", () => {
+    expect(SUNDAY_MINISTRY_TEAMS.map((team) => team.key)).toEqual(["admin", "barnabas", "worship", "praise", "media"]);
+    expect(SUNDAY_MINISTRY_TEAMS.map((team) => team.label)).toEqual(["행정팀", "바나바팀", "예배팀", "찬양팀", "미디어팀"]);
   });
 
   it("팀별 탭의 합집합이 주일 사역 전체 탭과 같다 — 개편으로 탭이 유실되지 않는다", () => {
@@ -35,8 +35,10 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(sundayTeamOf("admin")?.tabs).toEqual(["행정 변동 사항"]);
   });
 
-  it("예배팀은 기능 확정 전까지 빈 화면이다", () => {
+  it("예배·찬양·미디어팀은 기능 확정 전까지 빈 화면이다", () => {
     expect(sundayTeamOf("worship")?.tabs).toEqual([]);
+    expect(sundayTeamOf("praise")?.tabs).toEqual([]);
+    expect(sundayTeamOf("media")?.tabs).toEqual([]);
   });
 
   it("팀 없는 기존 주소는 바나바팀으로 유지해 첫 화면이 새친구 그대로다", () => {
