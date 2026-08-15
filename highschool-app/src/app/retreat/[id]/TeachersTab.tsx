@@ -462,7 +462,7 @@ async function handleSave() {
                 </div>
               )}
               {form.source === "manual-assistant" && (
-                <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-3 py-2 text-xs text-fuchsia-700">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
                   이 항목은 <strong>수련회 전용 보조스탭</strong>으로 저장됩니다. 출석부 연도 원본에는 쓰지 않고, 현재 수련회 명단과 이가드에만 반영됩니다.
                 </div>
               )}

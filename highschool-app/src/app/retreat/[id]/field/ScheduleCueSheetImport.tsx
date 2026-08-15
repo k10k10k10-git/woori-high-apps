@@ -377,14 +377,14 @@ export default function CueSheetImportPanel({ retreatId, schedule, staff, posts,
         value={text}
         onChange={e => setText(e.target.value)}
         placeholder={"구분\t시간\t내용\t담당\t기타\n등록\t09:00~10:00\t08:50 등록부스 설치...\t진행 및 총괄: 박세원\t특이사항..."}
-        className="w-full min-h-[150px] text-sm leading-relaxed text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-fuchsia-400 resize-y"
+        className="w-full min-h-[150px] text-sm leading-relaxed text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-emerald-400 resize-y"
       />
       {text.trim() && (
         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="text-sm font-semibold text-slate-700">미리보기 &middot; {parsed.blocks.length}개</span>
             {Object.entries(parsed.dayCounts).map(([day, count]) => (
-              <span key={day} className="text-[11px] text-fuchsia-700 bg-fuchsia-50 border border-fuchsia-100 rounded-full px-2 py-0.5">{day}일차 {count}개</span>
+              <span key={day} className="text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5">{day}일차 {count}개</span>
             ))}
             {parsed.importStats.detailCount > 0 && (
               <span className="text-[11px] text-slate-600 bg-white border border-slate-200 rounded-full px-2 py-0.5">세부내용 {parsed.importStats.detailCount}개</span>
@@ -422,7 +422,7 @@ export default function CueSheetImportPanel({ retreatId, schedule, staff, posts,
             <div className="space-y-1">
               {preview.map((b, i) => (
                 <div key={i} className="grid gap-2 rounded-lg bg-white border border-slate-100 px-3 py-2 text-xs text-slate-600 md:grid-cols-[70px_110px_1fr_1fr]">
-                  <span className="font-semibold text-fuchsia-700">{b.day}일차</span>
+                  <span className="font-semibold text-emerald-700">{b.day}일차</span>
                   <span className="font-mono">{timeRangeLabel(b.start, b.end)}</span>
                   <span className="font-semibold text-slate-800 truncate">{b.label}</span>
                   <span className="truncate">{b.owner || b.notice || b.detail || "내용 없음"}</span>

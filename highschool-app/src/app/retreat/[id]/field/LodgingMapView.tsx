@@ -136,7 +136,7 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-700">
         {mode === "manage"
           ? "ℹ️ 숙소 PDF를 올리면 건물명과 호실 번호를 자동 분석합니다. 인식하지 못한 호실은 PDF 위에 직접 배치할 수 있습니다."
           : "ℹ️ 행정사이트 방배정과 조편성을 실시간으로 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다."}
@@ -175,11 +175,11 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
                   }}
                   className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
                     active
-                      ? "border-fuchsia-600 bg-fuchsia-600 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-fuchsia-300"
+                      ? "border-emerald-600 bg-emerald-600 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-300"
                   }`}
                 >
-                  {item.label}<span className={`ml-1 ${active ? "text-fuchsia-100" : "text-slate-400"}`}>{count}</span>
+                  {item.label}<span className={`ml-1 ${active ? "text-emerald-100" : "text-slate-400"}`}>{count}</span>
                 </button>
               );
             })}
@@ -249,11 +249,11 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
                     aria-expanded={active}
                     aria-controls={active ? "lodging-room-popover" : undefined}
                     aria-label={`${roomLabel(summary.room)} ${summary.classLabels.join(", ") || "교사 배정"}${summary.groupLabels.length > 0 ? ` ${summary.groupLabels.join(", ")}` : ""} 상세 보기`}
-                    className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-md border px-1.5 py-1 text-center text-[10px] font-bold leading-tight shadow-md transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 ${
+                    className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-md border px-1.5 py-1 text-center text-[10px] font-bold leading-tight shadow-md transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-emerald-500 ${
                       female
                         ? "border-rose-400 bg-rose-50/95 text-rose-700"
                         : "border-sky-400 bg-sky-50/95 text-sky-700"
-                    } ${active ? "ring-2 ring-fuchsia-500" : ""}`}
+                    } ${active ? "ring-2 ring-emerald-500" : ""}`}
                     style={{ left: `${hotspot.left}%`, top: `${hotspot.top}%` }}
                   >
                     <span className="block text-[9px] font-medium opacity-70">{hotspot.roomNumber}</span>
@@ -278,12 +278,12 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
           id="lodging-room-popover"
           role="dialog"
           aria-label={`${roomLabel(selection.room.room)} 배정 상세`}
-          className="fixed z-[100] max-h-[calc(100vh-24px)] overflow-y-auto rounded-xl border border-fuchsia-200 bg-white p-4 shadow-2xl"
+          className="fixed z-[100] max-h-[calc(100vh-24px)] overflow-y-auto rounded-xl border border-emerald-200 bg-white p-4 shadow-2xl"
           style={{ left: popoverPosition.left, top: popoverPosition.top, width: popoverPosition.width }}
         >
           <i
             aria-hidden="true"
-            className={`absolute h-3 w-3 rotate-45 border border-fuchsia-200 bg-white ${
+            className={`absolute h-3 w-3 rotate-45 border border-emerald-200 bg-white ${
               popoverPosition.side === "right" ? "-left-1.5 border-r-0 border-t-0" : "-right-1.5 border-b-0 border-l-0"
             }`}
             style={{ top: popoverPosition.arrowTop - 6 }}
@@ -297,10 +297,10 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
           </div>
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex items-start gap-2">
-              <span className="w-12 shrink-0 text-xs font-semibold text-fuchsia-600">반</span>
+              <span className="w-12 shrink-0 text-xs font-semibold text-emerald-600">반</span>
               <div className="flex flex-wrap gap-1">
                 {selection.room.classLabels.length > 0
-                  ? selection.room.classLabels.map(label => <span key={label} className="rounded bg-fuchsia-50 px-2 py-0.5 text-xs text-fuchsia-700">{label}</span>)
+                  ? selection.room.classLabels.map(label => <span key={label} className="rounded bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">{label}</span>)
                   : <span className="text-xs text-slate-400">학생 배정 없음</span>}
               </div>
             </div>

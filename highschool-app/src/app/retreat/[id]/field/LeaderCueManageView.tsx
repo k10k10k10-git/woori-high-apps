@@ -38,7 +38,7 @@ function LeaderNoteEditor({ retreatId, block }: { retreatId: string; block: Igua
         rows={Math.max(3, Math.min(10, text.split("\n").length + 1))}
         onChange={e => setText(e.target.value)}
         onBlur={save}
-        className="w-full min-h-[96px] resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700 outline-none focus:border-fuchsia-400"
+        className="w-full min-h-[96px] resize-y rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700 outline-none focus:border-emerald-400"
       />
     </div>
   );

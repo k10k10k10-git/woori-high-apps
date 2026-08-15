@@ -270,7 +270,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg" role="tablist" aria-label="일차 선택">
             {(mode === "조별" ? [1, 2, 3] as const : [1, 3] as const).map(d => (
               <button key={d} onClick={() => setDay(d)} role="tab" aria-selected={day === d}
-                className={`min-h-10 rounded-md px-4 text-sm font-medium ${day === d ? "bg-white shadow text-fuchsia-700" : "text-slate-500"}`}>{d}일차</button>
+                className={`min-h-10 rounded-md px-4 text-sm font-medium ${day === d ? "bg-white shadow text-emerald-700" : "text-slate-500"}`}>{d}일차</button>
             ))}
           </div>
           <div className="flex gap-1 bg-slate-100 p-1 rounded-lg" role="tablist" aria-label="보기 모드">
@@ -280,14 +280,14 @@ export default function ChecklistView({ retreatId, groups, students, participant
             ))}
           </div>
         </div>
-        <div className="text-sm"><span className="text-slate-500">체크 </span><strong className="text-fuchsia-700">{checkedCount}</strong><span className="text-slate-400"> / {total}명</span></div>
+        <div className="text-sm"><span className="text-slate-500">체크 </span><strong className="text-emerald-700">{checkedCount}</strong><span className="text-slate-400"> / {total}명</span></div>
         <div className="flex gap-2">
           <button onClick={resetDay} className="btn-secondary btn-sm" aria-label={`${dayLabel} 체크 전체 초기화`}>↺ 초기화</button>
           <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
         </div>
       </div>
       <p className="text-xs text-slate-400 mb-1">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 - 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
-      <p className="text-xs text-fuchsia-600 mb-3">
+      <p className="text-xs text-emerald-600 mb-3">
         {mode === "호차별"
           ? "교사 불참·자차는 제외하고, 당일참석자는 지정한 1·3일차 호차별 인원체크에 포함됩니다."
           : "조별 인원체크는 선택한 일차의 실제 현장 참석자를 표시합니다. 당일참석자는 지정 일차에만 포함됩니다."}
@@ -311,7 +311,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
                         {mode === "호차별" ? <><span aria-hidden="true">↺</span><span className="hidden sm:inline">초기화</span></> : "초기화"}
                       </button>
                     )}
-                    <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-fuchsia-700"}`}>{c}/{u.members.length}</span>
+                    <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-emerald-700"}`}>{c}/{u.members.length}</span>
                   </div>
                 </div>
                 {(u.summary || u.sub) && (
@@ -332,25 +332,25 @@ export default function ChecklistView({ retreatId, groups, students, participant
                       const nameNode = m.name === "(명단 미상)" ? <span className="text-amber-500">{m.name}</span> : m.name;
                       return (
                         <li key={m.id}>
-                          <button onClick={() => on ? uncheck(m) : check(m.id)} className={`w-full text-left ${mode === "호차별" ? "grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-2 px-2 py-2.5 sm:flex sm:gap-3 sm:px-4 sm:py-3" : "flex items-center gap-3 px-4 py-3"} ${on ? "bg-fuchsia-50" : "hover:bg-slate-50"}`}>
+                          <button onClick={() => on ? uncheck(m) : check(m.id)} className={`w-full text-left ${mode === "호차별" ? "grid grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-x-2 px-2 py-2.5 sm:flex sm:gap-3 sm:px-4 sm:py-3" : "flex items-center gap-3 px-4 py-3"} ${on ? "bg-emerald-50" : "hover:bg-slate-50"}`}>
                             <span className={`w-6 h-6 rounded-md border-2 flex items-center justify-center text-sm shrink-0 ${on ? "bg-green-500 border-green-500 text-white" : "border-slate-300 text-transparent"}`}>✓</span>
                             {mode === "호차별" ? (
                               <>
                                 <span className="min-w-0 sm:hidden">
                                   <span className={`block break-words text-sm font-medium leading-tight ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
                                   <span className="mt-1 block break-words text-[11px] leading-snug text-slate-500">{i + 1}. {m.meta}</span>
-                                  {by && <span className="mt-1 block break-words text-[10px] leading-snug text-fuchsia-500" title={`${by} 체크`}>✓{by}</span>}
+                                  {by && <span className="mt-1 block break-words text-[10px] leading-snug text-emerald-500" title={`${by} 체크`}>✓{by}</span>}
                                 </span>
                                 <span className="hidden w-5 text-xs text-slate-400 sm:inline-block">{i + 1}</span>
                                 <span className={`hidden font-medium sm:inline ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
-                                {by && <span className="hidden shrink-0 text-[10px] text-fuchsia-400 sm:inline" title={`${by} 체크`}>✓{by}</span>}
+                                {by && <span className="hidden shrink-0 text-[10px] text-emerald-400 sm:inline" title={`${by} 체크`}>✓{by}</span>}
                                 <span className="ml-auto hidden text-xs text-slate-400 sm:inline">{m.meta}</span>
                               </>
                             ) : (
                               <>
                                 <span className="w-5 text-xs text-slate-400">{i + 1}</span>
                                 <span className={`font-medium ${on ? "text-slate-400 line-through" : "text-slate-800"}`}>{nameNode}</span>
-                                {by && <span className="shrink-0 text-[10px] text-fuchsia-400" title={`${by} 체크`}>✓{by}</span>}
+                                {by && <span className="shrink-0 text-[10px] text-emerald-400" title={`${by} 체크`}>✓{by}</span>}
                                 <span className="ml-auto text-xs text-slate-400">{m.meta}</span>
                               </>
                             )}

@@ -8,7 +8,7 @@ import { todayStr } from "@/features/iguard/lib/scheduleTime";
 function todoCheckClass(t: Milestone): string {
   if (!t.done) return "border-slate-300 text-transparent";
   return t.sourceSite === "move-guide"
-    ? "bg-fuchsia-600 border-fuchsia-600 text-white"
+    ? "bg-emerald-600 border-emerald-600 text-white"
     : "bg-sky-500 border-sky-500 text-white";
 }
 
@@ -70,7 +70,7 @@ export function TodosView({ todos }: { todos: Milestone[] }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-slate-500">완료 <strong className="text-fuchsia-700">{done}</strong> / {todos.length}</span>
+        <span className="text-sm text-slate-500">완료 <strong className="text-emerald-700">{done}</strong> / {todos.length}</span>
         <span className="text-xs text-slate-400">행정 사이트 준비 일정과 실시간 공유</span>
       </div>
       <div className="grid gap-2 sm:grid-cols-[160px_1fr_auto] mb-2">

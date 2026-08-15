@@ -11,7 +11,7 @@ const KIND_LABEL: Record<SearchEntryKind, string> = {
 const KIND_STYLE: Record<SearchEntryKind, string> = {
   student: "bg-blue-100 text-blue-700",
   teacher: "bg-emerald-100 text-emerald-700",
-  staff: "bg-fuchsia-100 text-fuchsia-700",
+  staff: "bg-emerald-100 text-emerald-700",
   group: "bg-amber-100 text-amber-700",
   room: "bg-violet-100 text-violet-700",
   bus: "bg-sky-100 text-sky-700",
@@ -90,7 +90,7 @@ export default function SearchOverlay({
           onChange={e => setQuery(e.target.value)}
           placeholder="이름 · 초성(ㄱㅎㅁ) · 조 · 호실 · 호차"
           aria-label="이름, 초성, 조 번호, 호실, 호차로 검색"
-          className="min-w-0 flex-1 rounded-lg bg-slate-100 px-3 py-2.5 text-base text-slate-800 outline-none placeholder:text-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-fuchsia-300"
+          className="min-w-0 flex-1 rounded-lg bg-slate-100 px-3 py-2.5 text-base text-slate-800 outline-none placeholder:text-slate-400 focus:bg-slate-50 focus:ring-2 focus:ring-emerald-300"
         />
         <button
           type="button"

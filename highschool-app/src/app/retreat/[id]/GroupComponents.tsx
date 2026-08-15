@@ -361,7 +361,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
             {iguardOnly.map(name => (
               <span key={`ig_${name}`}
                 title="이가드 사이트의 조스탭 배정 탭에서 배정됨 — 해제도 이가드에서"
-                className="rounded bg-fuchsia-50 border border-fuchsia-100 px-1.5 py-0.5 text-xs text-fuchsia-700">
+                className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">
                 🧩 {name}
               </span>
             ))}

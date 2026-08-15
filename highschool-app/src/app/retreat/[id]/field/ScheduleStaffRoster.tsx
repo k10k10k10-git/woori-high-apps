@@ -156,7 +156,7 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, segment
       assigned
         ? "border-sky-300 bg-sky-50 hover:bg-sky-100"
         : "border-slate-200 bg-white hover:border-slate-300"
-    } ${active ? "ring-2 ring-fuchsia-300" : ""}`;
+    } ${active ? "ring-2 ring-emerald-300" : ""}`;
   }
 
   function nameClasses(staffMember: IguardStaff): string {
@@ -252,7 +252,7 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, segment
                   <div className="font-bold text-slate-800">{openStaff.name}</div>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {openStaff.age && <div className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{openStaff.age}</div>}
-                    {openStaff.role && <div className="inline-flex rounded-full bg-fuchsia-50 px-2 py-0.5 text-[11px] font-medium text-fuchsia-700">{openStaff.role}</div>}
+                    {openStaff.role && <div className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">{openStaff.role}</div>}
                   </div>
                 </div>
                 <button type="button" onClick={() => setOpenStaffId(null)} className="text-slate-300 hover:text-slate-500">&times;</button>
@@ -315,12 +315,12 @@ export default function StaffRosterBar({ staff, groups, schedule, posts, segment
                         }
                         const { block, labels } = item;
                         return (
-                          <div key={`duty-${block.id}`} className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 px-2.5 py-2">
+                          <div key={`duty-${block.id}`} className="rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-2">
                             <div className="flex items-center gap-2 text-xs">
                               <span className="font-mono text-slate-500">{block.day}일차 {timeRangeLabel(block.start, block.end)}</span>
                               <span className="font-medium text-slate-700">{block.label}</span>
                             </div>
-                            <div className="mt-1 text-xs font-medium text-fuchsia-700">담당 · {labels.join(" · ")}</div>
+                            <div className="mt-1 text-xs font-medium text-emerald-700">담당 · {labels.join(" · ")}</div>
                           </div>
                         );
                       })}

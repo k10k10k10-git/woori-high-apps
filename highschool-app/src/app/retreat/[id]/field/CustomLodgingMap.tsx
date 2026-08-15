@@ -182,7 +182,7 @@ export default function CustomLodgingMap({
   }
 
   const uploader = canManage ? (
-    <section className="card border-dashed border-fuchsia-200 p-4">
+    <section className="card border-dashed border-emerald-200 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-bold text-slate-800">숙소 배치도 PDF 적용</h2>
@@ -194,8 +194,8 @@ export default function CustomLodgingMap({
         </label>
       </div>
       {uploading && (
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-fuchsia-100" aria-live="polite">
-          <div className="h-full w-2/3 animate-pulse rounded-full bg-fuchsia-500" />
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-emerald-100" aria-live="polite">
+          <div className="h-full w-2/3 animate-pulse rounded-full bg-emerald-500" />
         </div>
       )}
     </section>
@@ -237,7 +237,7 @@ export default function CustomLodgingMap({
             </>
           )}
         </div>
-        {canManage && <p className="mt-2 text-xs text-fuchsia-600">{roomId ? "도면에서 호실 중심을 눌러 배치하세요." : "호실을 선택하면 도면에 핀을 놓을 수 있습니다."}</p>}
+        {canManage && <p className="mt-2 text-xs text-emerald-600">{roomId ? "도면에서 호실 중심을 눌러 배치하세요." : "호실을 선택하면 도면에 핀을 놓을 수 있습니다."}</p>}
       </div>
       <div className="overflow-x-auto bg-slate-100 p-2 sm:p-4">
         <div className={`relative mx-auto min-w-[760px] max-w-[1400px] overflow-hidden rounded-lg border border-slate-300 bg-white ${canManage && roomId ? "cursor-crosshair" : ""}`} onClick={event => void place(event)}>

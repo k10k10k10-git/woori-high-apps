@@ -339,7 +339,7 @@ export default function PortalHome() {
                 {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료" tone="emerald" />}
                 {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·등록 현황·행정 변동" tone="amber" />}
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
-                {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="fuchsia" />}
+                {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="field" />}
               </div>
             </section>
             <section className="surface-panel order-1 p-5 sm:p-6">
@@ -439,12 +439,12 @@ function HeroMetric({ label, value, detail }: { label: string; value: string; de
   );
 }
 
-function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "emerald" | "amber" | "violet" | "fuchsia" }) {
+function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "emerald" | "amber" | "violet" | "field" }) {
   const toneClass = {
     emerald: "bg-[#edf4ff] text-[#2457b8] hover:bg-[#e4efff]",
     amber: "bg-[#fff7e8] text-[#9a5b0b] hover:bg-[#ffefd1]",
     violet: "bg-[#edf7f3] text-[#087a57] hover:bg-[#e3f2ec]",
-    fuchsia: "bg-[#f3f6f5] text-[#34423c] hover:bg-[#eaf0ed]",
+    field: "bg-[#f3f6f5] text-[#34423c] hover:bg-[#eaf0ed]",
   }[tone];
   return <Link href={href} className={`rounded-xl p-3.5 transition hover:-translate-y-0.5 ${toneClass}`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
 }

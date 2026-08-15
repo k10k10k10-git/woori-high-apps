@@ -111,7 +111,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
 
   return (
     <div>
-      <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
+      <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
         ℹ️ 조별 교사·스탭·GBS·숙소입니다. 방·조 정보는 <strong>행정 사이트</strong>, GBS 장소는 <strong>이가드 기획 탭</strong> 값을 우선해 실시간 반영합니다.
       </div>
 
@@ -178,7 +178,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
                 </InfoRow>
               )}
               <InfoRow label="GBS 장소" cls="text-indigo-600">{d.gbs ? d.gbs : <span className="text-slate-300">-</span>}</InfoRow>
-              <RoomRow label="남자 숙소" cls="text-fuchsia-700" chips={[...d.nam, ...d.etc]} />
+              <RoomRow label="남자 숙소" cls="text-emerald-700" chips={[...d.nam, ...d.etc]} />
               <RoomRow label="여자 숙소" cls="text-rose-500" chips={d.yeo} />
               <InfoRow label="버스" cls="text-sky-600">
                 {d.buses.length ? (

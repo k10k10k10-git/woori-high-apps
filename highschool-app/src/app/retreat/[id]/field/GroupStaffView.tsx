@@ -231,7 +231,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
       >
         <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
           <span className="text-sm font-semibold text-slate-700">
-            스탭 명단 {activeGroup ? <span className="text-fuchsia-600">→ {groupDisplayName(activeGroup, groups)}에 배정</span> : <span className="text-slate-400">(조를 먼저 선택)</span>}
+            스탭 명단 {activeGroup ? <span className="text-emerald-600">→ {groupDisplayName(activeGroup, groups)}에 배정</span> : <span className="text-slate-400">(조를 먼저 선택)</span>}
           </span>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <label className="flex items-center gap-1 text-[11px] text-slate-500">
@@ -271,13 +271,13 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
                         type="button"
                         onClick={() => toggleStaffOnActive(s.id)}
                         className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                          inActive ? "border-fuchsia-400 bg-fuchsia-100 ring-1 ring-fuchsia-300"
+                          inActive ? "border-emerald-400 bg-emerald-100 ring-1 ring-emerald-300"
                           : assigned ? "border-sky-300 bg-sky-50 hover:bg-sky-100"
-                          : "border-slate-200 bg-white hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                          : "border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50"
                         }`}
                         title={assignedElsewhere ? `이미 배정됨 - 누르면 ${activeGroup ? groupDisplayName(activeGroup, groups) : ""}로 이동` : assigned ? "배정됨" : "미배정"}
                       >
-                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${inActive ? "bg-fuchsia-500" : assigned ? "bg-sky-500" : "bg-slate-200"}`} aria-hidden />
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${inActive ? "bg-emerald-500" : assigned ? "bg-sky-500" : "bg-slate-200"}`} aria-hidden />
                         <span className={nameClasses(s)}>{s.name}</span>
                         {assignedElsewhere && (
                           <span className="text-[10px] text-slate-400">
@@ -311,7 +311,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
               type="button"
               onClick={() => setActiveGroupId(active ? null : g.id)}
               className={`flex flex-col rounded-xl border p-2.5 text-left transition-colors ${
-                active ? "border-fuchsia-400 bg-fuchsia-50 ring-1 ring-fuchsia-300" : "border-slate-200 bg-white hover:border-slate-300"
+                active ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300" : "border-slate-200 bg-white hover:border-slate-300"
               }`}
             >
               <div className="flex items-center justify-between gap-1">
@@ -324,11 +324,11 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
                 ) : ids.map(sid => (
                   <span
                     key={sid}
-                    className="inline-flex items-center gap-0.5 rounded-full bg-fuchsia-100 px-1.5 py-0.5 text-[11px] font-medium text-fuchsia-700"
+                    className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700"
                     onClick={e => { e.stopPropagation(); removeFromGroup(g.id, sid); }}
                   >
                     {staffById.get(sid)?.name ?? "(미상)"}
-                    <span className="text-fuchsia-400">✕</span>
+                    <span className="text-emerald-400">✕</span>
                   </span>
                 ))}
               </div>

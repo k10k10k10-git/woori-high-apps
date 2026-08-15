@@ -112,7 +112,7 @@ export default function VacationHome({
                       {entryLabel}
                     </button>
                     {mode === "field" && lockedIds?.has(selected.id) && (
-                      <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[11px] font-semibold text-fuchsia-700">🔒 PIN</span>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">🔒 PIN</span>
                     )}
                   </div>
                 </div>
@@ -142,7 +142,7 @@ export default function VacationHome({
                       </span>
                       <span className="flex items-center gap-1.5">
                         {mode === "field" && lockedIds?.has(retreat.id) && (
-                          <span className="rounded-full bg-fuchsia-100 px-2 py-0.5 text-[10px] font-semibold text-fuchsia-700">🔒 PIN</span>
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">🔒 PIN</span>
                         )}
                         {mode === "admin" && onDelete && (
                           <button

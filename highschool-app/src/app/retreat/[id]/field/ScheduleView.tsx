@@ -70,7 +70,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
   }
   return (
     <div>
-      <div className="mb-3 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-2.5 text-xs text-fuchsia-700">
+      <div className="mb-3 bg-emerald-50 border border-emerald-100 rounded-lg p-2.5 text-xs text-emerald-700">
         ℹ️ 시간·구분·내용·담당·특이사항을 한 행에서 바로 수정합니다. 구간·포스트·담당자 구조는 각 행의 상세 설정에서 관리하며, 큐싯 가져오기는 새 수련회 초기 설정용 보조 도구입니다.
       </div>
       <StaffRosterBar staff={staff} groups={groups} schedule={schedule} posts={posts} segments={segments} movements={movementRecords} absentStaffNames={absentStaffNames} />
@@ -93,7 +93,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
       </div>
 
       {addingBlock && (
-        <div className="card mb-4 border-fuchsia-100 p-3">
+        <div className="card mb-4 border-emerald-100 p-3">
           <div className="grid gap-2.5 md:grid-cols-[100px_115px_115px_minmax(220px,1fr)_auto]">
             <div><label className="mb-1 block text-xs text-slate-500">일자</label>
               <select className="input w-full" value={form.day} onChange={e => setForm(p => ({ ...p, day: parseInt(e.target.value) }))}>
@@ -116,7 +116,7 @@ export default function ScheduleView({ retreatId, retreatName, schedule, staff, 
             type="button"
             onClick={() => setAddingDetails(value => !value)}
             aria-expanded={addingDetails}
-            className="mt-2 min-h-9 text-xs font-semibold text-fuchsia-600"
+            className="mt-2 min-h-9 text-xs font-semibold text-emerald-600"
           >
             {addingDetails ? "내용·담당·특이사항 접기 ▲" : "내용·담당·특이사항 함께 입력 ▼"}
           </button>

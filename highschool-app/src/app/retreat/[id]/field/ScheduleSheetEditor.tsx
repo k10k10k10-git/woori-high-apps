@@ -116,7 +116,7 @@ function SaveBadge({ state }: { state: SaveState }) {
       className={`text-[11px] font-medium ${
         state === "error" ? "text-red-500"
           : state === "saved" ? "text-emerald-600"
-            : "text-fuchsia-600"
+            : "text-emerald-600"
       }`}
     >
       {label}
@@ -348,7 +348,7 @@ function ScheduleSheetRow({
         <div className="mt-1.5 space-y-1">
           {assignmentLines.map(line => (
             <div key={`${line.segmentId}-${line.postId}`} className="whitespace-pre-wrap break-words text-[10px] leading-relaxed text-slate-500">
-              <span className="font-semibold text-fuchsia-600">{line.segmentLabel}</span>
+              <span className="font-semibold text-emerald-600">{line.segmentLabel}</span>
               {" · "}{line.postLabel}: {line.assignees.join(", ")}
             </div>
           ))}
@@ -447,7 +447,7 @@ function AdvancedDrawer({
       >
         <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-4">
           <div>
-            <div className="text-xs font-semibold text-fuchsia-600">{block.day}일차 · {timeRangeLabel(block.start, block.end)}</div>
+            <div className="text-xs font-semibold text-emerald-600">{block.day}일차 · {timeRangeLabel(block.start, block.end)}</div>
             <h2 id="schedule-advanced-title" className="mt-1 text-lg font-bold text-slate-900">{block.label} 상세 설정</h2>
             <p className="mt-1 text-xs text-slate-500">구간·포스트·담당자의 세부 구조가 필요할 때만 사용합니다.</p>
           </div>
@@ -536,7 +536,7 @@ export default function ScheduleSheetEditor({
               onClick={() => setSelectedDay(day)}
               aria-pressed={activeDay === day}
               className={`min-h-10 rounded-lg border px-3 text-sm font-semibold ${
-                activeDay === day ? "border-fuchsia-500 bg-fuchsia-50 text-fuchsia-700" : "border-slate-200 bg-white text-slate-500"
+                activeDay === day ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-white text-slate-500"
               }`}
             >
               {day}일차 {schedule.filter(block => block.day === day).length}

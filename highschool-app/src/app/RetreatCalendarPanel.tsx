@@ -36,7 +36,7 @@ function getCalendarCells(year: number, month: number): (number | null)[] {
 function getMilestoneColor(m: Milestone): { bg: string; text: string; border: string; dot: string } {
   if (m.done) {
     return m.sourceSite === "move-guide"
-      ? { bg: "bg-fuchsia-100", text: "text-fuchsia-700", border: "border-fuchsia-200", dot: "bg-fuchsia-500" }
+      ? { bg: "bg-emerald-100", text: "text-emerald-700", border: "border-emerald-200", dot: "bg-emerald-500" }
       : { bg: "bg-sky-100", text: "text-sky-700", border: "border-sky-200", dot: "bg-sky-500" };
   }
   const d = diffDays(m.targetDate);

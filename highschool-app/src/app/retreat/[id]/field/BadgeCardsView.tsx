@@ -45,7 +45,7 @@ export default function BadgeCardsView(props: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-700">
         버스·식사·GBS·집회 자리·담당 구역을 한 장에 모아 명찰용 카드를 만듭니다. 담당 구역은 큐싯의 괄호 상세와 방배정을 연결합니다.
       </div>
       <div className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
@@ -143,7 +143,7 @@ function TimelinePreview({ entries }: { entries: NonNullable<ReturnType<typeof b
                     <span className="font-mono text-slate-400">{entry.time}</span>
                     <span className="min-w-0">
                       <strong className="block text-slate-700">{entry.label}</strong>
-                      <span className={entry.assignments.length ? "text-fuchsia-700" : "text-slate-300"}>
+                      <span className={entry.assignments.length ? "text-emerald-700" : "text-slate-300"}>
                         {entry.assignments.length ? `📍 ${entry.assignments.join(" / ")}` : "조와 함께"}
                       </span>
                     </span>

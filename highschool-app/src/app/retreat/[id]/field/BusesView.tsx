@@ -269,20 +269,20 @@ export default function BusesView({ retreatId, buses, groups, students, particip
 
   return (
     <div>
-      <div className="mb-4 bg-fuchsia-50 border border-fuchsia-100 rounded-lg p-3 text-xs text-fuchsia-700">
+      <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
         ℹ️ 인승은 호차별로 설정할 수 있고(기본 {DEFAULT_BUS_CAPACITY}인승), 자동배정은 각 호차의 인승에 맞춰 <strong>인원 균등(정원 비례)</strong>을 우선으로 잡고, 가능하면 스탭 좌석 {RESERVED_STAFF_SEATS}석을 남깁니다.
-        <span className="mt-1 block text-fuchsia-600"><strong>혼합</strong>은 기존처럼 조 전체를 유지하고, <strong>남녀 분리</strong>는 한 조의 같은 성별 학생을 한 묶음으로 유지해 성별 호차에 배정합니다.</span>
-        <span className="mt-1 block text-fuchsia-600">행정의 교사 불참·자차와 학생 부분참 당일참여는 단체 버스 인원에서 제외됩니다.</span>
+        <span className="mt-1 block text-emerald-600"><strong>혼합</strong>은 기존처럼 조 전체를 유지하고, <strong>남녀 분리</strong>는 한 조의 같은 성별 학생을 한 묶음으로 유지해 성별 호차에 배정합니다.</span>
+        <span className="mt-1 block text-emerald-600">행정의 교사 불참·자차와 학생 부분참 당일참여는 단체 버스 인원에서 제외됩니다.</span>
       </div>
 
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {([1, 3] as const).map(d => (
             <button key={d} onClick={() => setDay(d)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium ${day === d ? "bg-white shadow text-fuchsia-700" : "text-slate-500"}`}>{d}일차</button>
+              className={`px-4 py-1.5 rounded-md text-sm font-medium ${day === d ? "bg-white shadow text-emerald-700" : "text-slate-500"}`}>{d}일차</button>
           ))}
         </div>
-        <span className="text-sm text-slate-500">버스 <strong className="text-slate-800">{dayBuses.length}</strong>대 · 총 탑승 <strong className="text-fuchsia-700">{totalHeadcount}</strong>명</span>
+        <span className="text-sm text-slate-500">버스 <strong className="text-slate-800">{dayBuses.length}</strong>대 · 총 탑승 <strong className="text-emerald-700">{totalHeadcount}</strong>명</span>
         <div className="flex gap-2 flex-wrap">
           <label className="sr-only" htmlFor={`bus-auto-mode-${day}`}>자동배정 방식</label>
           <select
@@ -329,7 +329,7 @@ export default function BusesView({ retreatId, buses, groups, students, particip
                 <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto p-1">
                   {sortedGroups.map(g => (
                     <button key={g.id} onClick={() => toggle(g.id)}
-                      className={`px-2 py-1 rounded text-xs border ${groupIds.includes(g.id) ? "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-300" : "bg-white text-slate-500 border-slate-200"}`}>
+                      className={`px-2 py-1 rounded text-xs border ${groupIds.includes(g.id) ? "bg-emerald-100 text-emerald-700 border-emerald-300" : "bg-white text-slate-500 border-slate-200"}`}>
                       {g.bu.replace("부", "")} {groupDisplayName(g, groups)} ({groupPassengerCount(g)})
                     </button>
                   ))}
@@ -363,8 +363,8 @@ export default function BusesView({ retreatId, buses, groups, students, particip
             return (
               <div key={b.id} className={`card p-4 ${remain < 0 ? "border-red-300" : count > cap - RESERVED_STAFF_SEATS ? "border-amber-300" : ""}`}>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-bold text-slate-800">{b.busNo}호차 <span className="text-xs font-normal text-slate-400">{cap}인승</span> {busGender && <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${busGender === "남" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"}`}>{busGender}</span>} <span className="text-sm font-normal text-fuchsia-700">· {count + totalStaff}명</span></h3>
-                  <div className="flex gap-2"><button onClick={() => openEdit(b)} className="text-xs text-slate-400 hover:text-fuchsia-600">수정</button>
+                  <h3 className="font-bold text-slate-800">{b.busNo}호차 <span className="text-xs font-normal text-slate-400">{cap}인승</span> {busGender && <span className={`rounded px-1.5 py-0.5 text-[11px] font-semibold ${busGender === "남" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"}`}>{busGender}</span>} <span className="text-sm font-normal text-emerald-700">· {count + totalStaff}명</span></h3>
+                  <div className="flex gap-2"><button onClick={() => openEdit(b)} className="text-xs text-slate-400 hover:text-emerald-600">수정</button>
                     <button onClick={() => del(b)} className="text-xs text-slate-300 hover:text-red-400">삭제</button></div>
                 </div>
                 <div className="mb-2 text-xs text-slate-400">학생+교사 {count} · 스탭 {totalStaff} · 잔여 {remain}석</div>

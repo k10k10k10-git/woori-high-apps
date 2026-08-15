@@ -95,7 +95,7 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                     <span className="px-2 py-0.5 rounded text-xs bg-indigo-100 text-indigo-600">{meal.day}일차 {SLOT_LABELS[meal.slot]}</span>
                     <span>{meal.label}</span>
                   </h3>
-                  <div className="flex gap-2"><button onClick={() => { setForm({ label: meal.label, day: meal.day, slot: meal.slot }); setEditId(meal.id); setShow(true); }} className="text-xs text-slate-400 hover:text-fuchsia-600">수정</button>
+                  <div className="flex gap-2"><button onClick={() => { setForm({ label: meal.label, day: meal.day, slot: meal.slot }); setEditId(meal.id); setShow(true); }} className="text-xs text-slate-400 hover:text-emerald-600">수정</button>
                     <button onClick={() => delMeal(meal)} className="text-xs text-slate-300 hover:text-red-400">삭제</button></div>
                 </div>
                 <div className="px-4 py-2.5 bg-white border-b border-slate-100 flex items-center gap-2">
@@ -122,13 +122,13 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                                 <button
                                   onClick={() => move(meal, i, -1)}
                                   disabled={i === 0}
-                                  className="rounded px-1.5 text-xs text-slate-400 hover:bg-white hover:text-fuchsia-600 disabled:opacity-20"
+                                  className="rounded px-1.5 text-xs text-slate-400 hover:bg-white hover:text-emerald-600 disabled:opacity-20"
                                   aria-label={`${item.label}을 한 순서 앞으로 이동`}
                                 >◀</button>
                                 <button
                                   onClick={() => move(meal, i, 1)}
                                   disabled={i === ordered.length - 1}
-                                  className="rounded px-1.5 text-xs text-slate-400 hover:bg-white hover:text-fuchsia-600 disabled:opacity-20"
+                                  className="rounded px-1.5 text-xs text-slate-400 hover:bg-white hover:text-emerald-600 disabled:opacity-20"
                                   aria-label={`${item.label}을 한 순서 뒤로 이동`}
                                 >▶</button>
                               </div>

@@ -111,11 +111,11 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
         )}
 
         <div className="mb-5">
-          <h4 className="text-sm font-semibold text-fuchsia-700 mb-2">👑 관리자</h4>
-          <div className="bg-fuchsia-50 border border-fuchsia-100 rounded-lg px-3 py-2.5">
+          <h4 className="text-sm font-semibold text-emerald-700 mb-2">👑 관리자</h4>
+          <div className="bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2.5">
             <div className="flex items-center gap-2 min-w-0">
               <div className="text-sm font-semibold text-slate-800 truncate">{MAIN_ADMIN.name}</div>
-              <span className="text-[11px] px-1.5 py-0.5 rounded border border-fuchsia-200 bg-white text-fuchsia-700 shrink-0">관리자</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded border border-emerald-200 bg-white text-emerald-700 shrink-0">관리자</span>
             </div>
             <div className="text-xs text-slate-500 truncate mt-0.5">{MAIN_ADMIN.email}</div>
           </div>

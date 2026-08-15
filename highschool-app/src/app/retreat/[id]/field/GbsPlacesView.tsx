@@ -51,7 +51,7 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-700">
         조별 GBS 장소는 이가드에 저장됩니다. 기존 행정 조편성의 GBS 값은 새 값을 저장하기 전까지만 폴백으로 표시합니다.
       </div>
 
@@ -100,11 +100,11 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
                 key={group.id}
                 type="button"
                 onClick={() => selectGroup(group.id)}
-                className="min-h-16 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-fuchsia-300 hover:bg-fuchsia-50"
+                className="min-h-16 rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-emerald-300 hover:bg-emerald-50"
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-slate-800">{groupDisplayName(group, groups)}</span>
-                  <span className={`text-[11px] ${gbs[group.id]?.place ? "text-fuchsia-600" : "text-slate-400"}`}>
+                  <span className={`text-[11px] ${gbs[group.id]?.place ? "text-emerald-600" : "text-slate-400"}`}>
                     {gbs[group.id]?.place ? "이가드" : group.gbs ? "행정 폴백" : "미지정"}
                   </span>
                 </div>
@@ -127,7 +127,7 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
                 <div className="text-sm font-semibold text-slate-800">{summary.place}</div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {summary.groups.map(group => (
-                    <span key={group.id} className="rounded-full border border-fuchsia-200 bg-white px-2 py-1 text-xs text-fuchsia-700">
+                    <span key={group.id} className="rounded-full border border-emerald-200 bg-white px-2 py-1 text-xs text-emerald-700">
                       {group.label}
                     </span>
                   ))}

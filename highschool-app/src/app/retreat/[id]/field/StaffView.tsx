@@ -42,7 +42,7 @@ export default function StaffView({ staff }: { retreatId: string; staff: IguardS
                   <td className="px-3 py-2.5 text-slate-700">{s.corps || dash}</td>
                   <td className="px-3 py-2.5 text-slate-700">{s.corps === "후발대" ? (s.lateArrival || dash) : dash}</td>
                   <td className="px-3 py-2.5 text-slate-700">{s.programTeam || dash}</td>
-                  <td className="px-3 py-2.5">{s.worship ? <span className="text-xs text-fuchsia-700">✓ 찬양팀</span> : dash}</td>
+                  <td className="px-3 py-2.5">{s.worship ? <span className="text-xs text-emerald-700">✓ 찬양팀</span> : dash}</td>
                   <td className="px-3 py-2.5">
                     {s.adminStatus ? (
                       <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${

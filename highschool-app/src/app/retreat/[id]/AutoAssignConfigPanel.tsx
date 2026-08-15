@@ -533,8 +533,8 @@ export default function AutoAssignConfigPanel({
         <p className="text-xs font-semibold text-slate-500 mb-2">⭐ 조장 설정</p>
         <p className="text-[10px] text-slate-400 mb-2">
           {rules.keepSameClass
-            ? <>기본은 본인반 동반입니다. 본인반 없이 다른 조를 섬기는 조장만 <strong className="text-fuchsia-600">파송</strong>을 체크하세요.</>
-            : <>같은 반 유지가 꺼져 있어 조장 본인만 해당 조에 고정됩니다. 본인반 학생을 해당 조에서 제외하려면 <strong className="text-fuchsia-600">파송</strong>을 체크하세요.</>}
+            ? <>기본은 본인반 동반입니다. 본인반 없이 다른 조를 섬기는 조장만 <strong className="text-emerald-600">파송</strong>을 체크하세요.</>
+            : <>같은 반 유지가 꺼져 있어 조장 본인만 해당 조에 고정됩니다. 본인반 학생을 해당 조에서 제외하려면 <strong className="text-emerald-600">파송</strong>을 체크하세요.</>}
         </p>
         {([
           { bu: "1부" as const, count: groupCount1bu, entries: leaderEntries1, setEntries: setLeaderEntries1, show: bu1Count > 0, tagCls: "tag-green", units: classUnits1 },
@@ -578,8 +578,8 @@ export default function AutoAssignConfigPanel({
                       }}
                     />
                     {entry.name && (
-                      <label className={`flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-1 text-[10px] cursor-pointer ${entry.mode === "sent" ? "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700 font-semibold" : "border-slate-200 bg-white text-slate-500"}`}>
-                        <input type="checkbox" className="accent-fuchsia-600"
+                      <label className={`flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-1 text-[10px] cursor-pointer ${entry.mode === "sent" ? "border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold" : "border-slate-200 bg-white text-slate-500"}`}>
+                        <input type="checkbox" className="accent-emerald-600"
                           aria-label={`${entry.name} 파송`}
                           checked={entry.mode === "sent"}
                           onChange={e => {

@@ -53,7 +53,7 @@ export default function ValidationView({ staff, schedule, posts, movements }: Pr
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-fuchsia-100 bg-fuchsia-50 p-3 text-xs leading-relaxed text-fuchsia-700">
+      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-700">
         ℹ️ 겹치는 시간에 서로 다른 장소로 배정된 경우와 명단 불일치를 점검합니다.
         스탭별 배정 횟수는 상대적인 과부하 판정 없이 실제 동선 수 그대로 표시합니다.
       </div>
