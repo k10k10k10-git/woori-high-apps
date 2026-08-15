@@ -42,6 +42,11 @@
 - **판단 질문**: Vercel 대시보드의 Root Directory를 임시로 지우거나 앱 소스를 이중 디렉터리로 복사하지 않는다. 전자는 Git 자동배포 설정을 깨뜨리고, 후자는 잘못된 소스·환경변수로 배포할 위험이 있다. 저장소 루트 드라이런 없이 바로 업로드하지도 않는다. 다른 앱과 대용량 산출물이 입력에 섞이는지 먼저 확인해야 하기 때문이다.
 - **재사용 규칙**: 원격 Root Directory가 앱 폴더로 지정된 모노리포의 수동 Vercel 배포는 저장소 루트에서 프로젝트 ID와 팀 ID를 명시하고, 반드시 드라이런 → 운영 배포 → inspect/HTTP 확인 순서로 실행한다.
 
+### `vercel --prod`만 "Not authorized"로 실패할 때 (로그인은 멀쩡한데 배포만 막힘) (2026-08-14)
+- **접근법**: 1→ `npx vercel --prod --yes`가 `{"status":"error","reason":"deploy_failed","message":"Not authorized"}`만 뱉으면 **로그인 만료로 단정하지 말고** `npx vercel whoami`를 먼저 실행한다. 계정 이름이 정상 출력되면 인증이 아니라 **스코프 문제**다. 2→ `npx vercel project ls`로 대상 프로젝트가 현재 스코프에서 보이는지 확인한다. 보이면 CLI는 접근 가능하지만 배포 명령만 다른 스코프로 해석되고 있는 것이다. 3→ `npx vercel teams ls`로 팀 **슬러그**를 얻는다(`highschool-app/.vercel/project.json`의 `orgId`는 `team_...` 내부 ID라 `--scope`에 그대로 넣으면 안 된다). 4→ `npx vercel --prod --yes --scope <팀슬러그>`로 재실행한다. 5→ `curl -s https://woorihigh-app.vercel.app/api/version`의 `buildId`를 `git rev-parse HEAD`와 대조해 별칭이 새 빌드를 가리키는지 확인한다.
+- **판단 질문**: `vercel login`을 다시 하지 않았다 — `whoami`가 성공하는데 재로그인하면 원인을 못 찾은 채 토큰만 갈아치우고, 실패가 재현될 때 같은 자리에서 다시 막힌다. `.vercel/project.json`을 지우고 `vercel link`를 새로 하지도 않았다 — 링크는 정상이었고, 다시 걸면 프로젝트를 잘못 고르거나 새 프로젝트를 만들 위험이 있다. 원인은 링크가 아니라 **배포 명령의 기본 스코프 해석**이었다.
+- **재사용 규칙**: Vercel 배포가 "Not authorized"로 실패하면 `whoami` → `project ls` → `teams ls` 순으로 3줄 확인한 뒤 `--scope <팀슬러그>`를 붙여 재실행한다. 재로그인·재링크는 이 3줄이 전부 실패했을 때만 한다.
+
 ### 수련회 학부모 문자 명단을 운영 DB와 출석부 기준으로 안전하게 갱신하는 법 (2026-07-20)
 - **접근법**: ① Firebase CLI의 읽기 전용 조회로 `retreats/{retreatId}/participants`, `cellColors`, `partialAttendances`와 `classes/{year}`를 각각 JSON으로 저장 → ② `participant.studentId`를 `${부}_${rawStudentId}` 형태의 출석부 학생 키에 연결하고, 실패할 때만 부·학년·반·이름의 유일 일치로 보완 → ③ 빨간색 취소자는 제외하고 `classes/{year}/*/students/*/pphone`을 학부모 연락처의 최우선 값으로 사용 → ④ 당일참석·후발대·선복귀를 날짜별 참석 여부로 변환해 1일차·2일차 번호를 중복 제거 → ⑤ `@oai/artifact-tool`로 원본 XLSX의 값만 갱신하고 부분참 행 강조를 다시 적용한 뒤, 결과 XLSX를 재임포트해 행 수·추가/제외 명단·번호 중복·수식 오류·렌더링을 검증.
 - **판단 질문**: `participants/*/phone`을 곧바로 학부모 번호로 쓰지 않았다 — 신청자 본인 연락처일 수 있어 출석부의 `pphone`과 의미가 다르다. 운영 DB에 정리 결과를 다시 쓰거나 취소자를 삭제하지도 않았다 — 이 작업의 산출물은 문자 발송용 엑셀이며, 읽기 전용 대조만으로 충분하다.
