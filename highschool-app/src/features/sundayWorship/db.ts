@@ -11,6 +11,17 @@ import {
   type SeatingPlans,
   type WorshipService,
 } from "./worshipSeating";
+import {
+  MAX_DOC_CHUNKS,
+  MAX_DUTY_ROWS,
+  docRecords,
+  dutyRecords,
+  parseDutyPlans,
+  parseWorshipDocs,
+  type DutyPlans,
+  type DutyRow,
+  type WorshipDoc,
+} from "./worshipContent";
 
 // Rules를 바꾸지 않기 위해 사역 가이드와 같은 공유 노드(prepMilestones)를 쓴다.
 // 이 노드는 일정 화면도 읽으므로 sourceSite로 서로를 걸러낸다(worshipSeating.ts 참고).
@@ -40,6 +51,46 @@ export async function saveSeatingPlan(
       paths.prepMilestone(record.id),
       record.value,
     ]),
+  );
+  await update(ref(db), updates);
+}
+
+// ── 예배 담당표 ───────────────────────────────────────────────
+
+export function subscribeToDutyPlans(
+  callback: (plans: DutyPlans) => void,
+  onError?: (error: Error) => void,
+) {
+  return onValue(
+    ref(db, paths.prepMilestones()),
+    (snapshot) => callback(parseDutyPlans(snapToList<Milestone>(snapshot))),
+    (error) => { callback({}); onError?.(error); },
+  );
+}
+
+export async function saveDutyPlan(week: string, service: WorshipService, rows: DutyRow[]) {
+  const updates = Object.fromEntries(
+    dutyRecords(week, service, rows, MAX_DUTY_ROWS).map((record) => [paths.prepMilestone(record.id), record.value]),
+  );
+  await update(ref(db), updates);
+}
+
+// ── 예배 자료 ─────────────────────────────────────────────────
+
+export function subscribeToWorshipDocs(
+  callback: (docs: Record<string, WorshipDoc>) => void,
+  onError?: (error: Error) => void,
+) {
+  return onValue(
+    ref(db, paths.prepMilestones()),
+    (snapshot) => callback(parseWorshipDocs(snapToList<Milestone>(snapshot))),
+    (error) => { callback({}); onError?.(error); },
+  );
+}
+
+export async function saveWorshipDoc(doc: WorshipDoc) {
+  const updates = Object.fromEntries(
+    docRecords(doc, MAX_DOC_CHUNKS).map((record) => [paths.prepMilestone(record.id), record.value]),
   );
   await update(ref(db), updates);
 }

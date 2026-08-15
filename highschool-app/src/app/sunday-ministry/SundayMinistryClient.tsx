@@ -26,6 +26,8 @@ import {
   PendingTab,
   RegistrationStatusTab,
 } from "@/features/sundayMinistry/SundayMinistryTabs";
+import WorshipDocsTab from "@/features/sundayWorship/WorshipDocsTab";
+import WorshipDutyTab from "@/features/sundayWorship/WorshipDutyTab";
 import WorshipSeatingTab from "@/features/sundayWorship/WorshipSeatingTab";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import NewFriendsTab from "../semester/[id]/NewFriendsTab";
@@ -38,6 +40,8 @@ const TAB_INTRO: Record<SundayTab, { title: string; description: string }> = {
   "처리 대기": { title: "처리 대기", description: "2주 과정부터 등록 결정·반배정·출석부 반영까지 남은 일을 모아봅니다." },
   "행정 변동 사항": { title: "행정 변동 사항", description: "학생 출석부 관리자 화면에서 수정된 등록·이동·삭제 내역을 최신순으로 확인합니다." },
   "자리 배치": { title: "주일 자리 배치", description: "분단과 줄을 정하고 반을 앉힌 뒤 PDF로 인쇄합니다. 위에서 두 줄이 앞자리입니다." },
+  "예배 담당표": { title: "예배 담당표", description: "헌금위원·안내처럼 주차마다 정하는 담당을 적고 PDF로 인쇄합니다." },
+  "예배 자료": { title: "예배 자료", description: "헌금 기도문 양식처럼 자주 바뀌지 않는 문서를 글로 두고 복사·인쇄합니다." },
 };
 
 export default function SundayMinistryClient({ team, initialTab }: { team?: SundayTeamKey; initialTab?: string }) {
@@ -151,6 +155,8 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
                 {tab === "처리 대기" && <PendingTab friends={friends} privateValueFor={scopedPrivateValueFor} showPrivate={canEdit} onOpenNewFriends={() => setPickedTab("새친구")} />}
                 {tab === "행정 변동 사항" && <AdminChangesTab changes={adminChanges} />}
                 {tab === "자리 배치" && <WorshipSeatingTab canEdit={canEdit} />}
+                {tab === "예배 담당표" && <WorshipDutyTab canEdit={canEdit} />}
+                {tab === "예배 자료" && <WorshipDocsTab canEdit={canEdit} />}
               </SemesterEditProvider>
             </div>
           </>

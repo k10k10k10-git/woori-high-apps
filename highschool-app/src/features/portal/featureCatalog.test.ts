@@ -15,7 +15,7 @@ import {
 describe("통합 앱 기능 카탈로그", () => {
   it("학기 중 사역과 주일 사역의 탭을 분리한다", () => {
     expect(SEMESTER_TRAINING_TABS).toEqual(["신청", "배치", "출석", "수료", "커리큘럼", "아카이브", "설정"]);
-    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "등록 현황", "처리 대기", "행정 변동 사항", "자리 배치"]);
+    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "등록 현황", "처리 대기", "행정 변동 사항", "자리 배치", "예배 담당표", "예배 자료"]);
     expect(SEMESTER_TABS).toEqual(SEMESTER_TRAINING_TABS);
   });
 
@@ -35,8 +35,8 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(sundayTeamOf("admin")?.tabs).toEqual(["행정 변동 사항"]);
   });
 
-  it("예배팀은 자리 배치를 맡는다", () => {
-    expect(sundayTeamOf("worship")?.tabs).toEqual(["자리 배치"]);
+  it("예배팀은 자리 배치·담당표·자료 세 화면을 맡는다", () => {
+    expect(sundayTeamOf("worship")?.tabs).toEqual(["자리 배치", "예배 담당표", "예배 자료"]);
   });
 
   it("찬양·미디어·기획디자인팀은 기능 확정 전까지 빈 화면이다", () => {
