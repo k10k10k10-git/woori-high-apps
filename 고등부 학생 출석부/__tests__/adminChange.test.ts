@@ -17,9 +17,29 @@ describe('행정 변동 감사 기록', () => {
 
   it('학교 입력·변경·삭제를 실제 값 없이 구분한다', () => {
     const base = { id: 's1', name: '김학생', school: '' };
-    expect(describeStudentFieldChanges(base, { ...base, school: '우리중' })).toEqual(['학교 입력']);
-    expect(describeStudentFieldChanges({ ...base, school: '우리중' }, { ...base, school: '우리서고' })).toEqual(['학교 변경']);
-    expect(describeStudentFieldChanges({ ...base, school: '우리중' }, base)).toEqual(['학교 삭제']);
+    expect(describeStudentFieldChanges(base, { ...base, school: '우리중' })).toEqual(['학교 「우리중」 입력']);
+    expect(describeStudentFieldChanges({ ...base, school: '우리중' }, { ...base, school: '우리서고' })).toEqual(['학교 「우리중」 → 「우리서고」']);
+    expect(describeStudentFieldChanges({ ...base, school: '우리중' }, base)).toEqual(['학교 「우리중」 삭제']);
+  });
+
+  it('학교·이름은 값을 남기고 연락처·주소·생년월일은 필드명만 남긴다', () => {
+    // 감사 기록은 행정 변동 사항에 그대로 노출된다 — 연락처가 평문으로 쌓이면 안 된다.
+    const before: Student = { id: 's1', name: '김학생', birth: '2009-03-11', phone: '010-1111-1111', pphone: '010-2222-2222', school: '우리중', addr: '분당구 정자일로 123' };
+    const after: Student = { ...before, name: '김학생2', birth: '2009-03-12', phone: '010-9999-9999', pphone: '010-8888-8888', school: '우리서고', addr: '수지구 대지로 9' };
+    expect(describeStudentFieldChanges(before, after)).toEqual([
+      '이름 「김학생」 → 「김학생2」',
+      '생년월일 변경',
+      '본인 연락처 변경',
+      '보호자 연락처 변경',
+      '학교 「우리중」 → 「우리서고」',
+      '주소 변경',
+    ]);
+  });
+
+  it('긴 값도 자르지 않는다 - 표시 쪽에서 접었다 편다', () => {
+    const long = '한국디지털미디어고등학교부설방송통신고등학교';
+    const base: Student = { id: 's1', name: '김학생' };
+    expect(describeStudentFieldChanges(base, { ...base, school: long })).toEqual([`학교 「${long}」 입력`]);
   });
 
   it('반 내부 선택 하위 경로와 완료 기록을 만든다', () => {

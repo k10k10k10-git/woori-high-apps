@@ -276,7 +276,9 @@ await update(ref(db), { [`classes/${year}/${ck}/students/${id}`]: newStudent });
 // ❌ 금지 — 반 전체를 덮어씀, 동시 편집 시 다른 사람의 변경이 사라짐
 await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 ```
-관리자 명단 변경은 같은 루트 `update()`에 `classes/{year}/{ck}/adminChanges/{changeId}`도 함께 넣는다. 원본 변경만 성공하고 행정 이력이 빠지는 상태를 만들지 않으며, 감사기록에는 연락처·주소의 실제 이전/이후 값 대신 `학교 입력`·`학교 변경`·`학교 삭제`처럼 필드 이름과 작업만 저장한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
+관리자 명단 변경은 같은 루트 `update()`에 `classes/{year}/{ck}/adminChanges/{changeId}`도 함께 넣는다. 원본 변경만 성공하고 행정 이력이 빠지는 상태를 만들지 않는다.
+
+감사기록의 값 노출 범위는 `adminChange.ts`의 **`VALUE_FIELDS`가 유일한 기준**이다. 여기 든 필드(`name`·`school`)만 `학교 「한빛고」 → 「서현고」`처럼 실제 값을 남기고, 나머지(생년월일·본인/보호자 연락처·주소·사진)는 `보호자 연락처 변경`처럼 필드 이름과 작업만 남긴다. **연락처·주소를 `VALUE_FIELDS`에 넣지 않는다** — 이 기록은 통합 플랫폼의 행정 변동 사항에 그대로 노출돼, 목록을 보는 사람 누구나 학생·보호자 연락처를 평문으로 보게 된다. 학교·이름은 반 명단에서 이미 보이는 값이라 새로 드러나는 정보가 없다. 값은 **자르지 않는다** — 표시 쪽(`SundayMinistryTabs.tsx`의 `ChangeSummary`)이 접었다 펴므로 기록은 온전해야 한다. `__tests__/adminChange.test.ts`가 이 경계를 지킨다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
 
 번호(`num`)는 저장 시점에 계산하지 않는다 — 읽을 때 `sortAndRenumber()`가 항상 재계산하므로 저장값이 어긋나도 자동 보정된다. `RosterModal`(명단 일괄 교체)만 예외 — 사용자가 명시적으로 "교체"를 확인한 뒤 루트 `update()`에서 `students` 전체 값과 감사기록을 함께 반영한다.
 

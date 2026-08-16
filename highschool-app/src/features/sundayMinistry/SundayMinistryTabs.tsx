@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { deriveNewFriendStage, formatClassLabel } from "@/features/semester/newFriend";
 import type { NewFriendPrivate } from "@/features/semester/types";
 import { sundayFriendKey, type SundayAdminChange, type SundayNewFriend } from "./model";
@@ -79,6 +80,45 @@ export function PendingTab({ friends, privateValueFor, showPrivate, onOpenNewFri
   );
 }
 
+/**
+ * 변경 내용은 자르지 않는다 — 학교가 무엇에서 무엇으로 바뀌었는지, 시트 동기화로 누가
+ * 들어왔는지가 이 칸의 존재 이유다. 대신 한 줄에 안 들어갈 만큼 길면 접어 두고 버튼으로
+ * 편다. 펼치면 ` · `로 이어 붙인 항목을 줄로 나눠 어느 필드가 몇 개 바뀌었는지 센다.
+ */
+const SUMMARY_CAP = 42;
+
+function ChangeSummary({ action, summary }: { action: string; summary: string }) {
+  const [open, setOpen] = useState(false);
+  const long = summary.length > SUMMARY_CAP;
+  const parts = summary.split(" · ");
+  return (
+    <>
+      <span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{action}</span>
+      {!long || !open ? <span>{long ? `${summary.slice(0, SUMMARY_CAP)}…` : summary}</span> : null}
+      {long && open && (
+        <ul className="mt-1.5 grid gap-1">
+          {parts.map((part, index) => (
+            <li key={`${index}-${part}`} className="flex gap-1.5">
+              <span aria-hidden className="text-slate-300">·</span>
+              <span className="min-w-0 break-words">{part}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {long && (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+          className={`rounded px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 ${open ? "mt-1.5" : "ml-1"}`}
+        >
+          {open ? "접기" : `자세히 (${parts.length}건)`}
+        </button>
+      )}
+    </>
+  );
+}
+
 export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
   return (
     <section className="card card-body">
@@ -94,9 +134,8 @@ export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
                 <strong className="text-slate-900">{change.studentName}</strong>
                 <p className="mt-1 text-xs text-slate-500">{change.year}년 / {formatClassLabel(change.classKey)} / {change.teacher}</p>
               </div>
-              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{change.action}</span>
             </div>
-            <p className="mt-4 text-sm leading-6 text-slate-700">{change.changeSummary}</p>
+            <div className="mt-4 text-sm leading-6 text-slate-700"><ChangeSummary action={change.action} summary={change.changeSummary} /></div>
             <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 text-xs">
               <span className="text-slate-400">{formatDate(change.changedAt)}</span>
               <span className="text-right"><strong className="block text-emerald-700">{change.result}</strong><span className="mt-1 block text-slate-400">{change.actor}</span></span>
@@ -118,7 +157,7 @@ export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
                 <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{change.year}년 · {formatClassLabel(change.classKey)}</td>
                 <td className="px-3 py-3 text-slate-600">{change.teacher}</td>
                 <td className="px-3 py-3 font-semibold text-slate-800">{change.studentName}</td>
-                <td className="px-3 py-3 leading-5 text-slate-700"><span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">{change.action}</span>{change.changeSummary}</td>
+                <td className="px-3 py-3 align-top leading-5 text-slate-700"><ChangeSummary action={change.action} summary={change.changeSummary} /></td>
                 <td className="px-3 py-3"><span className="font-semibold text-emerald-700">{change.result}</span><span className="mt-1 block text-[11px] text-slate-400">{change.actor}</span></td>
               </tr>
             ))}
