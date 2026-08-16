@@ -40,6 +40,8 @@ const SERVICES: WorshipService[] = ["1", "2"];
 // 폭은 감싼 div로 주고, 한두 자리 숫자 칸의 글꼴·여백은 인라인 style로만 눌러야 한다
 // (기본 좌우 패딩 14px씩이면 콘텐츠 폭이 14px밖에 안 남아 숫자가 잘린다).
 const NUMBER_INPUT: React.CSSProperties = { fontSize: 12, paddingLeft: 6, paddingRight: 6, textAlign: "center" };
+/** 표 안 숫자는 글자처럼 납작하게. 테두리·배경을 지워 줄 높이를 밀어 올리지 않는다. */
+const CELL_NUMBER: React.CSSProperties = { background: "transparent", border: "none", padding: "0 2px", outline: "none", appearance: "textfield" };
 type AttendanceYear = Record<string, Record<string, Record<string, string>>>;
 type ClassesYear = Record<string, { teacher?: string; students?: Record<string, unknown> }>;
 
@@ -166,7 +168,12 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
     }
   };
 
+
   const anyOver = sections.some(isOverCapacity);
+  const maxRows = Math.max(...sections.map((s) => s.totalRows), 1);
+  // 자동 계산값과 다르면 예배팀이 손댄 칸이다. 별도 저장 없이 파생한다.
+  const isEdited = (key: string, rows: number) =>
+    !key.startsWith("fixed:") && rows !== rowsForAverage(averageFor(key));
 
   return (
     <section className="card card-body">
@@ -205,74 +212,110 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
       </div>
 
       <p className="mt-3 text-xs text-slate-500">
-        줄 수는 <strong>지난 3주 출석 평균 + 담임 1명</strong>을 한 줄 의자 {SEATS_PER_ROW}개로 나눠 올림합니다. 위 {FRONT_ROWS}줄이 앞자리입니다. 사용 {totalRowsUsed(sections)}줄
+        줄 수는 <strong>지난 3주 출석 평균 + 담임 1명</strong>을 한 줄 의자 {SEATS_PER_ROW}개로 나눠 올립니다. 위 {FRONT_ROWS}줄이 앞자리입니다. 사용 {totalRowsUsed(sections)}줄
         {dirty && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">저장하지 않은 변경</span>}
       </p>
       {anyOver && <p className="mt-1 text-xs font-semibold text-red-600">줄 수가 분단 용량을 넘은 분단이 있습니다. 반을 옮기거나 분단 줄 수를 늘려주세요.</p>}
 
+      {/* 줄 × 분단 표. 한 반이 차지하는 줄 수만큼 세로로 칸을 잡아 실제 좌석표와 같은 모양이 된다. */}
       <div className="mt-4 overflow-x-auto">
-        <div className="flex min-w-max items-start gap-3">
+        <div
+          className="grid min-w-max gap-1.5"
+          style={{
+            gridTemplateColumns: `2.5rem repeat(${sections.length}, minmax(7.5rem, 1fr))`,
+            // 모든 줄을 같은 높이로 고정한다. 자동 높이로 두면 내용이 있는 줄만 커져
+            // 분단끼리 줄이 어긋나고, 좌석표에서 줄 정렬은 장식이 아니라 기능이다.
+            gridTemplateRows: `auto repeat(${maxRows}, 3.75rem)`,
+          }}
+        >
           {sections.map((section, sectionIndex) => (
-            <div key={section.id} className={`w-48 shrink-0 rounded-xl border bg-white p-2 ${isOverCapacity(section) ? "border-red-300" : "border-slate-200"}`}>
-              <div className="mb-2 flex items-center justify-between gap-1">
-                <span className="text-xs font-bold text-slate-600">{section.label}</span>
-                {/* .input은 @layer 밖이라 width:100%가 w-* 유틸리티를 이긴다. 폭은 감싼 div로 준다. */}
-                <span className="flex items-center gap-1 text-[10px] text-slate-400">
-                  줄
-                  <span className="block w-14">
-                    <input type="number" min={1} max={MAX_ROWS} aria-label={`${section.label} 줄 수`}
-                      className="input" style={NUMBER_INPUT} disabled={!canEdit} value={section.totalRows}
-                      onChange={(event) => patchSection(sectionIndex, (s) => ({ ...s, totalRows: Math.min(MAX_ROWS, Math.max(1, Number(event.target.value) || 1)) }))} />
-                  </span>
+            <div key={`head-${section.id}`} className="flex items-center justify-between gap-1 pb-1"
+              style={{ gridColumn: sectionIndex + 2, gridRow: 1 }}>
+              <span className="text-xs font-bold text-slate-600">{section.label}</span>
+              <span className="flex items-center gap-1 text-[10px] text-slate-400">
+                줄
+                <span className="block w-14">
+                  <input type="number" min={1} max={MAX_ROWS} aria-label={`${section.label} 줄 수`}
+                    className="input" style={NUMBER_INPUT} disabled={!canEdit} value={section.totalRows}
+                    onChange={(event) => patchSection(sectionIndex, (s) => ({ ...s, totalRows: Math.min(MAX_ROWS, Math.max(1, Number(event.target.value) || 1)) }))} />
                 </span>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                {section.blocks.map((block, blockIndex) => {
-                  const average = averageFor(block.key);
-                  return (
-                    <div key={`${block.key}:${blockIndex}`}
-                      style={{ minHeight: block.rows * 30 }}
-                      className={`flex flex-col justify-center rounded-lg border px-2 py-1 ${isFrontBlock(section, blockIndex) ? "border-emerald-300 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
-                      <div className="flex items-center gap-1">
-                        <span className="w-8 shrink-0 text-[10px] text-slate-400">{blockStartRow(section, blockIndex)}줄</span>
-                        <strong className="min-w-0 flex-1 truncate text-xs text-slate-800">{seatLabel(block.key)}</strong>
-                        <span className="block w-14 shrink-0">
-                          <input type="number" min={1} max={MAX_ROWS} aria-label={`${seatLabel(block.key)} 줄 수`}
-                            className="input" style={NUMBER_INPUT} disabled={!canEdit} value={block.rows}
-                            onChange={(event) => setBlockRows(sectionIndex, blockIndex, Math.min(MAX_ROWS, Math.max(1, Number(event.target.value) || 1)))} />
-                        </span>
-                        <button type="button" aria-label={`${seatLabel(block.key)} 빼기`} disabled={!canEdit}
-                          onClick={() => removeBlock(sectionIndex, blockIndex)}
-                          className="shrink-0 rounded px-1 text-xs text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">✕</button>
-                      </div>
-                      {average !== null && (
-                        <span className="pl-9 text-[10px] text-slate-400">3주 평균 {average.toFixed(1)}명</span>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {section.blocks.length === 0 && (
-                  <p className="rounded-lg border border-dashed border-slate-200 py-4 text-center text-[11px] text-slate-400">반을 추가하세요</p>
-                )}
-              </div>
-
-              <select aria-label={`${section.label}에 반 추가`} className="input mt-2 text-xs" disabled={!canEdit} value=""
-                onChange={(event) => { addBlock(sectionIndex, event.target.value); event.target.value = ""; }}>
-                <option value="">반 추가…</option>
-                {available.map((key) => <option key={key} value={key}>{seatLabel(key)}</option>)}
-              </select>
-              <p className={`mt-1 text-center text-[10px] ${remainingRows(section) < 0 ? "font-semibold text-red-600" : "text-slate-400"}`}>
-                {usedRows(section)} / {section.totalRows}줄
-              </p>
+              </span>
             </div>
           ))}
+
+          {Array.from({ length: maxRows }, (_, rowIndex) => (
+            <div key={`rownum-${rowIndex}`} className="flex items-center justify-end pr-1 text-[11px] text-slate-400"
+              style={{ gridColumn: 1, gridRow: rowIndex + 2 }}>
+              {rowIndex + 1}줄
+            </div>
+          ))}
+
+          {sections.flatMap((section, sectionIndex) => {
+            const cells = section.blocks.map((block, blockIndex) => {
+              const start = blockStartRow(section, blockIndex);
+              const front = isFrontBlock(section, blockIndex);
+              const fixed = block.key.startsWith("fixed:");
+              const edited = isEdited(block.key, block.rows);
+              const tone = fixed
+                ? "border-emerald-300 bg-emerald-50/60"
+                : edited
+                  ? "border-amber-300 bg-amber-50/60"
+                  : front
+                    ? "border-emerald-200 bg-white"
+                    : "border-slate-200 bg-white";
+              return (
+                <div
+                  key={`${section.id}-${block.key}-${blockIndex}`}
+                  style={{ gridColumn: sectionIndex + 2, gridRow: `${start + 1} / span ${block.rows}` }}
+                  className={`group relative flex flex-col items-center justify-center rounded-lg border px-1.5 py-2 ${tone}`}
+                >
+                  <span className="truncate text-sm font-bold text-slate-800">{seatLabel(block.key)}</span>
+                  {/* 표 안에서는 숫자가 글자처럼 보여야 줄 높이가 안 늘어난다. `.input`을 쓰지 않고
+                      직접 그려 @layer 밖 규칙과의 싸움도 피한다. 편집 기능은 그대로다. */}
+                  <input type="number" min={1} max={MAX_ROWS} aria-label={`${seatLabel(block.key)} 줄 수`}
+                    className={`mt-0.5 w-10 rounded text-center text-xs font-semibold focus-visible:ring-2 focus-visible:ring-emerald-400 ${edited ? "text-amber-700" : "text-slate-500"}`}
+                    style={CELL_NUMBER} disabled={!canEdit} value={block.rows}
+                    onChange={(event) => setBlockRows(sectionIndex, blockIndex, Math.min(MAX_ROWS, Math.max(1, Number(event.target.value) || 1)))} />
+                  <button type="button" aria-label={`${seatLabel(block.key)} 빼기`} disabled={!canEdit}
+                    onClick={() => removeBlock(sectionIndex, blockIndex)}
+                    className="absolute right-0.5 top-0.5 rounded px-1 text-[11px] text-slate-300 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:text-slate-700">✕</button>
+                </div>
+              );
+            });
+
+            const free = remainingRows(section);
+            if (free > 0) {
+              cells.push(
+                <div key={`${section.id}-add`}
+                  style={{ gridColumn: sectionIndex + 2, gridRow: `${usedRows(section) + 2} / span ${free}` }}
+                  className="flex items-center justify-center rounded-lg border border-dashed border-slate-200 p-1">
+                  <select aria-label={`${section.label}에 반 추가`} className="input" style={{ fontSize: 12, paddingLeft: 8, paddingRight: 8 }}
+                    disabled={!canEdit} value=""
+                    onChange={(event) => { addBlock(sectionIndex, event.target.value); event.target.value = ""; }}>
+                    <option value="">반 추가…</option>
+                    {available.map((key) => <option key={key} value={key}>{seatLabel(key)}</option>)}
+                  </select>
+                </div>,
+              );
+            }
+            return cells;
+          })}
         </div>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-slate-200 bg-white" />출석 기록으로 자동 계산</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-amber-300 bg-amber-50" />예배팀이 고친 칸</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-emerald-300 bg-emerald-50" />고정석</span>
+        {sections.map((section) => (
+          <span key={`cap-${section.id}`} className={remainingRows(section) < 0 ? "font-semibold text-red-600" : ""}>
+            {section.label} {usedRows(section)}/{section.totalRows}줄
+          </span>
+        ))}
+      </div>
+
       {available.length > 0 && (
-        <p className="mt-4 text-xs text-slate-500">아직 자리가 없는 반: {available.map((key) => seatLabel(key)).join(", ")}</p>
+        <p className="mt-3 text-xs text-slate-500">아직 자리가 없는 반: {available.map((key) => seatLabel(key)).join(", ")}</p>
       )}
     </section>
   );
