@@ -59,6 +59,8 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
   const [editing, setEditing] = useState<PersonRow | null>(null);
   const [query, setQuery] = useState("");
   const [rosterCollapsed, setRosterCollapsed] = useState(false);
+  // 교사·스탭은 기본으로 접어 둔다. 매번 확인하는 쪽은 학생 접수 현황이다.
+  const [staffCollapsed, setStaffCollapsed] = useState(true);
 
   useEffect(() => {
     const ready = new Set<string>();
@@ -157,6 +159,48 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
     [buckets, appByKey],
   );
 
+  // 교사·스탭은 훈련·지망·보호자 항목이 모두 없어 학생과 읽는 방식이 다르다.
+  // 명단에 섞어 두면 학생 접수 현황을 훑기 어려워 따로 묶어 접어 둔다.
+  const appliedStudents = useMemo(() => applied.filter(({ row }) => !isStaffApplication(row)), [applied]);
+  const appliedStaff = useMemo(() => applied.filter(({ row }) => isStaffApplication(row)), [applied]);
+
+  const renderAppliedCard = (entry: (typeof applied)[number]) => {
+    const { bucket, row } = entry;
+    const appKey = makeAppKey(row.bu, row.personId);
+    const app = appByKey.get(appKey);
+    const priv = visiblePrivateMap[appKey];
+    const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
+    const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
+    const trainingClass = app?.trainingClassId ? trainingClasses.find((c) => c.id === app.trainingClassId) : undefined;
+    const phone = priv?.phone || row.rosterPhone;
+    const staffRow = isStaffApplication(row);
+    return (
+      <li key={appKey}>
+        <button
+          onClick={() => setEditing(row)}
+          disabled={!canEdit}
+          className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-sm transition disabled:cursor-default"
+        >
+          <span className="flex items-center justify-between gap-2">
+            <span className="min-w-0">
+              <span className="font-medium text-slate-800">{row.name}</span>
+              <span className="ml-1.5 text-xs text-slate-400">{bucket.label}</span>
+            </span>
+            <span className="shrink-0 text-xs text-slate-500">
+              {team?.name ?? (choice1 ? `지망: ${choice1.name}` : app?.trainingOnly ? "훈련만" : "접수됨")}
+            </span>
+          </span>
+          {/* 교사·스탭은 훈련 대상도, 보호자 연락처 대상도 아니다 - 빈 칸으로 두지 말고 아예 감춘다. */}
+          <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
+            {!staffRow && <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>}
+            <span>본인 {phone || "-"}</span>
+            {!staffRow && <span>보호자 {priv?.parentPhone || "-"}</span>}
+          </span>
+        </button>
+      </li>
+    );
+  };
+
   return (
     <div>
       {loadError && (
@@ -221,7 +265,10 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
       <div className="card card-body">
         <div className="flex items-center justify-between gap-2">
           <h3 className="font-semibold text-slate-800">
-            접수 명단 <span className="ml-1 text-sm font-normal text-slate-400">{applied.length}명</span>
+            접수 명단{" "}
+            <span className="ml-1 text-sm font-normal text-slate-400">
+              학생 {appliedStudents.length}명{appliedStaff.length > 0 && ` · 교사·스탭 ${appliedStaff.length}명`}
+            </span>
           </h3>
           <button
             type="button"
@@ -233,50 +280,40 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
             {rosterCollapsed ? "펼치기 ▼" : "접기 ▲"}
           </button>
         </div>
-        {/* 접기 상태는 조건부 렌더로 처리한다 — hidden 속성은 .grid(display:grid)에 밀려 안 먹는다. */}
+        {/* 접기 상태는 조건부 렌더로 처리한다 - hidden 속성은 .grid(display:grid)에 밀려 안 먹는다. */}
         <div id="intake-applied-list">
         {!rosterCollapsed && (
-        <ul className="grid gap-1.5 sm:grid-cols-2">
-          {applied.map(({ bucket, row }) => {
-            const appKey = makeAppKey(row.bu, row.personId);
-            const app = appByKey.get(appKey);
-            const priv = visiblePrivateMap[appKey];
-            const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
-            const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
-            const trainingClass = app?.trainingClassId ? trainingClasses.find((c) => c.id === app.trainingClassId) : undefined;
-            const phone = priv?.phone || row.rosterPhone;
-            return (
-              <li key={appKey}>
+          <>
+            <ul className="grid gap-1.5 sm:grid-cols-2">
+              {appliedStudents.map(renderAppliedCard)}
+              {applied.length === 0 && (
+                <li className="text-sm text-slate-400">아직 접수된 신청이 없습니다. 위에서 이름을 검색해 접수하세요.</li>
+              )}
+              {applied.length > 0 && appliedStudents.length === 0 && (
+                <li className="text-sm text-slate-400">접수된 학생이 아직 없습니다.</li>
+              )}
+            </ul>
+
+            {appliedStaff.length > 0 && (
+              <div className="mt-3 border-t border-slate-100 pt-3">
                 <button
-                  onClick={() => setEditing(row)}
-                  disabled={!canEdit}
-                  className="w-full rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-sm transition disabled:cursor-default"
+                  type="button"
+                  className="flex min-h-9 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-slate-600 transition hover:text-emerald-700"
+                  aria-expanded={!staffCollapsed}
+                  aria-controls="intake-staff-list"
+                  onClick={() => setStaffCollapsed((value) => !value)}
                 >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="min-w-0">
-                      <span className="font-medium text-slate-800">{row.name}</span>
-                      <span className="ml-1.5 text-xs text-slate-400">{bucket.label}</span>
-                    </span>
-                    <span className="shrink-0 text-xs text-slate-500">
-                      {team?.name ?? (choice1 ? `지망: ${choice1.name}` : app?.trainingOnly ? "훈련만" : "접수됨")}
-                    </span>
-                  </span>
-                  {/* 교사·스탭은 훈련 대상도, 보호자 연락처 대상도 아니다 — 빈 칸으로 두지 말고 아예 감춘다. */}
-                  <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
-                    {!isStaffApplication(row) && (
-                      <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>
-                    )}
-                    <span>본인 {phone || "-"}</span>
-                    {!isStaffApplication(row) && <span>보호자 {priv?.parentPhone || "-"}</span>}
-                  </span>
+                  교사·스탭 <span className="font-normal text-slate-400">{appliedStaff.length}명</span>
+                  <span className="text-xs font-normal text-slate-400">{staffCollapsed ? "펼치기 ▼" : "접기 ▲"}</span>
                 </button>
-              </li>
-            );
-          })}
-          {applied.length === 0 && (
-            <li className="text-sm text-slate-400">아직 접수된 신청이 없습니다. 위에서 이름을 검색해 접수하세요.</li>
-          )}
-        </ul>
+                <div id="intake-staff-list">
+                  {!staffCollapsed && (
+                    <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">{appliedStaff.map(renderAppliedCard)}</ul>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
         </div>
       </div>

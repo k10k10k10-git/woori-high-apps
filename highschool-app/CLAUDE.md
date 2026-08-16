@@ -131,6 +131,7 @@
 - 훈련 반 삭제는 `trainingClass.ts`의 루트 다중 경로 update로 신청자 참조까지 함께 정리한다(팀 삭제와 같은 패턴).
 - **학기 삭제**(`removeSemester`)는 `semesters/{sid}`와 `semestersPrivate/{sid}`를 한 번의 루트 update로 지운다. 되돌릴 수 없으므로 화면에서 **학기 ID를 직접 입력받아** 확인한 뒤에만 호출한다.
 - **수련회 생성**은 행정·이가드 공용 컴포넌트 `features/portal/NewRetreatButton.tsx` 하나만 쓴다. `retreats/{id}`가 공유 노드라 어느 화면에서 만들어도 양쪽 목록에 나타난다. 쓰기는 행정 db(`@/lib/db`)가 담당하고 버튼은 `canEditPortalArea("retreat-admin")`로 게이트한다.
+- **화면에서 교사·스탭은 학생과 섞지 않는다.** 스탭은 훈련·지망·보호자 연락처가 모두 없어 읽는 항목 자체가 다르고, 팀마다 고정으로 붙어 있어 같이 나열하면 학생 현황이 묻힌다. 신청 탭 접수 명단은 스탭을 **접힌 그룹**으로 따로 두고(기본 접힘), 배치 탭 팀 카드는 명단에 학생만 두고 스탭은 **카드 헤더 우측 토글**로 펼친다(한 번에 하나만). 구분은 `splitStudentsAndStaff`/`isStaffApplication` 하나만 쓴다. **명단 상세 모달은 예외로 학생·스탭을 모두 보여준다** — 거기가 전체를 확인하는 자리다.
 - **교사·스탭 접수**는 학생과 다른 경로다: 훈련·지망 없이 사역팀에 바로 배정한다(`intakeRule.isStaffApplicant`). 저장 시 `teamId`를 직접 채우고 `choice1/2`·`trainingClassId`는 비운다.
 - **배치·커리큘럼은 두 축**이다: 사역팀(`teams`)과 훈련 반(`trainingClasses`). 커리큘럼은 `curriculum/{id}` 한 맵을 공유한다(두 축의 id가 겹치지 않는다). 훈련 반에는 `goal`이 없으므로 학기 목표 박스는 사역팀에서만 보인다.
 - **홈 공유 캘린더**의 "공유 일정"은 `prepMilestones`다. 추가·수정·삭제는 Rules와 같게 스탭을 제외하고 열어 둔다(`canEditPortalArea("retreat-admin") || iguardScope === "all"`).

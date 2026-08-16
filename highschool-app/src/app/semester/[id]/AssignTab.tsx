@@ -45,6 +45,8 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
   const [detailTeamId, setDetailTeamId] = useState<string | null>(null);
   useDialogEscape(!!detailTeamId, () => setDetailTeamId(null));
   const [expandedApplicantId, setExpandedApplicantId] = useState<string | null>(null);
+  // 팀 카드의 스탭 목록은 한 번에 하나만 펼친다. 여러 개를 열어두면 카드 높이가 들쭉날쭉해진다.
+  const [staffOpenTeamId, setStaffOpenTeamId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canEdit) return;
@@ -176,37 +178,58 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
       <section className="grid gap-3 sm:grid-cols-2">
         {teams.map((t) => {
           const members = [...(byTeam.get(t.id) ?? [])].sort(byApplicant);
+          // 카드 명단은 학생만 둔다. 스탭은 팀마다 몇 명씩 고정으로 붙어 있어
+          // 같이 나열하면 학생 배치 현황이 묻힌다. 헤더에서 펼쳐 확인한다.
+          const { students, staff } = splitStudentsAndStaff(members);
+          const staffOpen = staffOpenTeamId === t.id;
           return (
             <div key={t.id} className="card overflow-hidden">
               <div className={`flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold ${t.color}`}>
                 <span>{t.name} <span className="font-normal text-slate-600">{members.length}명</span></span>
-                <button
-                  onClick={() => {
-                    setDetailTeamId(t.id);
-                    setExpandedApplicantId(null);
-                  }}
-                  className="rounded-lg bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-white"
-                >
-                  명단 상세
-                </button>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  {staff.length > 0 && (
+                    <button
+                      type="button"
+                      aria-expanded={staffOpen}
+                      aria-controls={`team-staff-${t.id}`}
+                      onClick={() => setStaffOpenTeamId(staffOpen ? null : t.id)}
+                      className="rounded-lg bg-white/80 px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-white"
+                    >
+                      스탭 {staff.length}명 <span className="font-normal text-slate-500">{staffOpen ? "▲" : "▼"}</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setDetailTeamId(t.id);
+                      setExpandedApplicantId(null);
+                    }}
+                    className="rounded-lg bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-white"
+                  >
+                    명단 상세
+                  </button>
+                </span>
               </div>
-              {/* 배치 해제(✕)는 명단 상세 안으로 옮겼다 — 목록에서 바로 지우면 실수로 누르기 쉽다. */}
+              <div id={`team-staff-${t.id}`}>
+                {staff.length > 0 && staffOpen && (
+                  <p className="flex flex-wrap gap-x-3 gap-y-1 border-b border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+                    {staff.map((a) => <span key={a.id}>{a.name}</span>)}
+                  </p>
+                )}
+              </div>
+              {/* 배치 해제(✕)는 명단 상세 안으로 옮겼다 - 목록에서 바로 지우면 실수로 누르기 쉽다. */}
               <div className="grid gap-2 p-3">
-                {groupByKind(members).map((section) => (
-                  <div key={section.key}>
-                    <p className="mb-1 px-2 text-[11px] font-semibold text-slate-400">{section.label}</p>
-                    <ul className="grid gap-1">
-                      {section.rows.map((a) => (
-                        <li key={a.id} className="rounded px-2 py-1 text-sm hover:bg-slate-50">
-                          {a.name}
-                          <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
-                          {a.choice1 === t.id && <span className="ml-1 text-xs" style={{ color: "var(--color-primary)" }}>★</span>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-                {members.length === 0 && <p className="px-2 py-1 text-xs text-slate-300">아직 없음</p>}
+                <ul className="grid gap-1">
+                  {students.map((a) => (
+                    <li key={a.id} className="rounded px-2 py-1 text-sm hover:bg-slate-50">
+                      {a.name}
+                      <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
+                      {a.choice1 === t.id && <span className="ml-1 text-xs" style={{ color: "var(--color-primary)" }}>★</span>}
+                    </li>
+                  ))}
+                </ul>
+                {students.length === 0 && (
+                  <p className="px-2 py-1 text-xs text-slate-300">{members.length === 0 ? "아직 없음" : "배치된 학생 없음"}</p>
+                )}
               </div>
             </div>
           );
