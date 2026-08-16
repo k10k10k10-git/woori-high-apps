@@ -31,7 +31,9 @@ function sessionUnlocked(retreatId: string, lock: IguardAccessLock): boolean {
  * - `lock === null`      : 잠금 없음
  * - `unlocked`           : 이번 세션에서 PIN을 통과했거나 잠금이 없음
  *
- * PIN 우회는 통합관리자만 — 기존 범위를 넓히지 않는다.
+ * PIN 우회는 역할을 배정할 수 있는 사람 — 통합관리자와 교역자다(`canManageRolesOf`).
+ * 남의 역할을 바꿀 수 있는 사람은 자기 역할도 바꿔 어차피 통과할 수 있으므로,
+ * 이들에게 PIN을 거는 건 잠금이 아니라 절차만 늘리는 일이다. 이 범위를 더 넓히지 않는다.
  * 상태는 scope 파생으로 초기화한다(effect 안 setState 금지 — 루트 CLAUDE.md 실수 13).
  */
 export function useRetreatPinGate(
@@ -61,7 +63,7 @@ export function useRetreatPinGate(
     setState(prev => (prev.scope === scope ? { ...prev, unlocked: true } : prev));
   }, [scope]);
 
-  // 통합관리자는 구독 없이 통과. 그 외에는 이번 scope의 구독 결과만 신뢰한다.
+  // 우회 대상(통합관리자·교역자)은 구독 없이 통과. 그 외에는 이번 scope의 구독 결과만 신뢰한다.
   if (bypass) return { lock: null, unlocked: true, lockError: null, markUnlocked };
   const current = state.scope === scope ? state : { scope, ...PENDING };
   return { lock: current.lock, unlocked: current.unlocked, lockError: current.lockError, markUnlocked };
