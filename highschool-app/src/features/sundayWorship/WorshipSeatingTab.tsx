@@ -222,10 +222,10 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
         <div
           className="grid min-w-max gap-1.5"
           style={{
-            gridTemplateColumns: `2.5rem repeat(${sections.length}, minmax(7.5rem, 1fr))`,
+            gridTemplateColumns: `2.5rem repeat(${sections.length}, minmax(8.5rem, 1fr))`,
             // 모든 줄을 같은 높이로 고정한다. 자동 높이로 두면 내용이 있는 줄만 커져
             // 분단끼리 줄이 어긋나고, 좌석표에서 줄 정렬은 장식이 아니라 기능이다.
-            gridTemplateRows: `auto repeat(${maxRows}, 3.75rem)`,
+            gridTemplateRows: `auto repeat(${maxRows}, 4.25rem)`,
           }}
         >
           {sections.map((section, sectionIndex) => (
@@ -269,7 +269,9 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
                   style={{ gridColumn: sectionIndex + 2, gridRow: `${start + 1} / span ${block.rows}` }}
                   className={`group relative flex flex-col items-center justify-center rounded-lg border px-1.5 py-2 ${tone}`}
                 >
-                  <span className="truncate text-sm font-bold text-slate-800">{seatLabel(block.key)}</span>
+                  {/* 이 앱의 타입 스케일은 text-sm=13px, text-base=14px, text-lg=17px로 좁다.
+                      반 이름은 표에서 가장 먼저 읽는 값이라 text-lg를 쓴다. */}
+                  <span className="w-full truncate text-center text-lg font-bold leading-tight text-slate-800">{seatLabel(block.key)}</span>
                   {/* 표 안에서는 숫자가 글자처럼 보여야 줄 높이가 안 늘어난다. `.input`을 쓰지 않고
                       직접 그려 @layer 밖 규칙과의 싸움도 피한다. 편집 기능은 그대로다. */}
                   <input type="number" min={1} max={MAX_ROWS} aria-label={`${seatLabel(block.key)} 줄 수`}
@@ -303,15 +305,20 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
+      {/* 분단별 사용 줄 수는 표 바로 아래 가운데에 둔다. 범례와 한 줄에 섞으면
+          어느 분단이 몇 줄을 썼는지 훑기 어렵다. */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 border-t border-slate-100 pt-3 text-xs text-slate-500">
+        {sections.map((section) => (
+          <span key={`cap-${section.id}`} className={remainingRows(section) < 0 ? "font-semibold text-red-600" : ""}>
+            {section.label} <strong className="font-semibold text-slate-700">{usedRows(section)}</strong>/{section.totalRows}줄
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-400">
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-slate-200 bg-white" />출석 기록으로 자동 계산</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-amber-300 bg-amber-50" />예배팀이 고친 칸</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-emerald-300 bg-emerald-50" />고정석</span>
-        {sections.map((section) => (
-          <span key={`cap-${section.id}`} className={remainingRows(section) < 0 ? "font-semibold text-red-600" : ""}>
-            {section.label} {usedRows(section)}/{section.totalRows}줄
-          </span>
-        ))}
       </div>
 
       {available.length > 0 && (
