@@ -10,7 +10,7 @@ import MyPageModal from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import OverlayShell from "@/components/OverlayShell";
-import { canAccessArea, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
@@ -146,11 +146,14 @@ export default function GlobalPortalHeader() {
     ...(canAccessArea("retreat-field", roles) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
   ];
   // 주일 사역도 같은 드롭다운 구조다. 팀 목록은 featureCatalog가 단일 원천.
-  const sundayItems: NavItem[] = SUNDAY_MINISTRY_TEAMS.map((team) => ({
-    href: sundayTeamHref(team.key),
-    label: team.label,
-    hint: team.hint,
-  }));
+  // 들어갈 수 없는 팀은 메뉴에서 뺀다 — 눌러도 막히는 항목을 남겨두면 목록이 거짓말이 된다.
+  const sundayItems: NavItem[] = SUNDAY_MINISTRY_TEAMS
+    .filter((team) => canAccessSundayTeam(team.key, roles))
+    .map((team) => ({
+      href: sundayTeamHref(team.key),
+      label: team.label,
+      hint: team.hint,
+    }));
 
   return (
     <>

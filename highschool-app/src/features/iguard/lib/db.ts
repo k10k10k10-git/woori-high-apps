@@ -18,7 +18,7 @@ import {
   type SegmentSheetMovement,
 } from "./movementReconcile";
 import {
-  isRetreatRole, isSemesterRole,
+  isRetreatRole, isSemesterRole, ownSundayTeam,
   type MinistryRoles, type RetreatRole, type SemesterRole,
 } from "@/features/portal/accessPolicy";
 import { normalizeIguardPendingRequests, type IguardPendingReq } from "./pendingAccess";
@@ -1075,6 +1075,10 @@ export async function approveIguardMember(
       name: name?.trim() || undefined,
       semesterRole: roles?.semester,
       retreatRole: roles?.retreat,
+      // 주일 사역 자기 팀 저장을 Rules가 확인하는 플래그.
+      // iguardRoles는 'staff'|'team'만 허용(validate)이라 여기에 따로 둔다.
+      // 이 경로는 노드를 통째로 교체하므로, 자격을 잃으면 키가 사라져 플래그도 함께 꺼진다.
+      sundayWrite: roles && ownSundayTeam(roles) ? true : undefined,
     }),
     [paths.iguardRole(uid)]: role,
     [paths.iguardPendingEmail(uid)]: null,

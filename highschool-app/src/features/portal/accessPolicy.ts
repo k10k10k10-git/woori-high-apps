@@ -1,3 +1,5 @@
+import type { SundayTeamKey } from "./featureCatalog";
+
 /**
  * 통합 앱의 역할·화면 접근 계약 (단일 원천).
  *
@@ -89,12 +91,12 @@ export const SEMESTER_ROLE_HINTS: Record<SemesterRole, string> = {
   pastor: "학기·주일 전체 (출석부 반영 제외)",
   leader: "학기·주일 수정 (학기 삭제 제외)",
   adminTeam: "학기·주일 수정",
-  barnabas: "주일 수정, 학기는 조회",
-  worship: "학기·주일 조회",
-  praise: "학기·주일 조회",
-  media: "학기·주일 조회",
-  design: "학기·주일 조회",
-  staff: "학기·주일 조회",
+  barnabas: "주일 바나바팀 수정, 학기는 조회",
+  worship: "주일 예배팀 수정, 학기는 조회",
+  praise: "주일 찬양팀 수정, 학기는 조회",
+  media: "주일 미디어팀 수정, 학기는 조회",
+  design: "주일 기획디자인팀 수정, 학기는 조회",
+  staff: "학기 조회 (주일은 팀 배정 후)",
   none: "접근 불가",
 };
 
@@ -117,7 +119,14 @@ export type IguardScope = "none" | "execution" | "all";
 
 type SemesterCapability = {
   semester: AreaPermission;
+  /**
+   * **다른 팀까지 포함한** 주일 사역 권한.
+   * 사역팀은 여기가 "none"이고 아래 `sundayTeam`으로 자기 팀만 연다 — 옆 팀 화면은
+   * 보이지도 않는다. 남의 팀 명단·자리표가 서로 보일 이유가 없다.
+   */
   sunday: AreaPermission;
+  /** 자기 팀 하나만 쓰기로 여는 경우의 팀 키. 전체 권한이면 null. */
+  sundayTeam: SundayTeamKey | null;
   /** 팀·훈련 반·회차 생성 등 학기 설정 */
   settings: boolean;
   /** 학기 삭제·아카이브 (되돌릴 수 없음) */
@@ -143,21 +152,27 @@ type RetreatCapability = {
 };
 
 const SEMESTER_CAPS: Record<SemesterRole, SemesterCapability> = {
-  superAdmin: { semester: "write", sunday: "write", settings: true, destructive: true, rosterWrite: true, search: "write", manageRoles: true },
-  pastor:     { semester: "write", sunday: "write", settings: true, destructive: true, rosterWrite: false, search: "write", manageRoles: true },
-  leader:     { semester: "write", sunday: "write", settings: true, destructive: false, rosterWrite: false, search: "read", manageRoles: false },
+  superAdmin: { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: true, rosterWrite: true, search: "write", manageRoles: true },
+  pastor:     { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: true, rosterWrite: false, search: "write", manageRoles: true },
+  leader:     { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: false, rosterWrite: false, search: "read", manageRoles: false },
   // 행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸다 —
   // classes/attendance/trash의 **학생 1명 경로**만 `semesterRole === "adminTeam"`에게 허용된다.
   // 반 노드 전체(students 통째·teacher)는 여전히 통합관리자·담임만 쓴다.
-  adminTeam:  { semester: "write", sunday: "write", settings: true, destructive: false, rosterWrite: true, search: "read", manageRoles: false },
-  // 사역팀 계열은 학기 "내 팀만 편집"이 목표지만, 팀 단위 쓰기는 Rules가 없어 조회로 둔다.
-  barnabas:   { semester: "read", sunday: "write", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
-  worship:    { semester: "read", sunday: "read", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
-  praise:     { semester: "read", sunday: "read", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
-  media:      { semester: "read", sunday: "read", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
-  design:     { semester: "read", sunday: "read", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
-  staff:      { semester: "read", sunday: "read", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
-  none:       { semester: "none", sunday: "none", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  // 주일도 팀 경계 없이 전부 본다 — 행정 변동 사항이 전 팀 공통 기록이다.
+  adminTeam:  { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: false, rosterWrite: true, search: "read", manageRoles: false },
+  // ── 사역팀 계열: 주일은 자기 팀 하나만 쓰고, 옆 팀은 보이지도 않는다 ──
+  // 팀마다 저장 노드가 달라 Rules 근거도 다르다.
+  //   바나바팀 → semesters      : retreatAdmins 버킷이라 이미 쓰기 가능
+  //   예배팀   → prepMilestones : iguardMembers/{uid}/sundayWrite === true 로 열린다
+  //   찬양·미디어·기획디자인     : 아직 탭이 없어 쓸 노드도 없다
+  barnabas:   { semester: "read", sunday: "none", sundayTeam: "barnabas", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  worship:    { semester: "read", sunday: "none", sundayTeam: "worship", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  praise:     { semester: "read", sunday: "none", sundayTeam: "praise", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  media:      { semester: "read", sunday: "none", sundayTeam: "media", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  design:     { semester: "read", sunday: "none", sundayTeam: "design", settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  // 팀이 정해지지 않았으면 주일에서 볼 화면이 없다 — 메뉴 자체를 닫는다.
+  staff:      { semester: "read", sunday: "none", sundayTeam: null, settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
+  none:       { semester: "none", sunday: "none", sundayTeam: null, settings: false, destructive: false, rosterWrite: false, search: "none", manageRoles: false },
 };
 
 const RETREAT_CAPS: Record<RetreatRole, RetreatCapability> = {
@@ -179,11 +194,12 @@ function permissionFor(area: PortalArea, roles: MinistryRoles): AreaPermission {
   const sem = SEMESTER_CAPS[roles.semester];
   const ret = RETREAT_CAPS[roles.retreat];
   if (area === "semester") return sem.semester;
-  if (area === "sunday") return sem.sunday;
+  // 사역팀은 sunday가 "none"이어도 자기 팀이 있으면 주일에 들어간다.
+  if (area === "sunday") return sem.sunday !== "none" ? sem.sunday : sem.sundayTeam ? "write" : "none";
   if (area === "retreat-admin") return ret.admin;
   if (area === "retreat-field") return ret.field === "none" ? "none" : "write";
   // home — 어느 한 영역이라도 열려 있으면 진입 가능
-  const anyArea = sem.semester !== "none" || sem.sunday !== "none"
+  const anyArea = sem.semester !== "none" || sem.sunday !== "none" || sem.sundayTeam !== null
     || ret.admin !== "none" || ret.field !== "none";
   return anyArea ? "write" : "none";
 }
@@ -195,6 +211,26 @@ export function canAccessArea(area: PortalArea, roles: MinistryRoles): boolean {
 /** 저장·수정 가능 여부. 사역팀의 학기 화면처럼 "보기만" 되는 조합을 구분한다. */
 export function canEditArea(area: PortalArea, roles: MinistryRoles): boolean {
   return permissionFor(area, roles) === "write";
+}
+
+/**
+ * 주일 사역에서 이 사람이 들어갈 수 있는 팀인가.
+ * 사역팀은 자기 팀 하나만 참이다 — 옆 팀은 메뉴에서도 빠지고 주소를 직접 쳐도 막힌다.
+ */
+export function canAccessSundayTeam(team: SundayTeamKey, roles: MinistryRoles): boolean {
+  const sem = SEMESTER_CAPS[roles.semester];
+  return sem.sunday !== "none" || sem.sundayTeam === team;
+}
+
+/** 그 팀 화면을 저장까지 할 수 있는가. */
+export function canEditSundayTeam(team: SundayTeamKey, roles: MinistryRoles): boolean {
+  const sem = SEMESTER_CAPS[roles.semester];
+  return sem.sunday === "write" || sem.sundayTeam === team;
+}
+
+/** 자기 팀 하나만 여는 역할이면 그 팀 키, 전체 권한이거나 접근 불가면 null. */
+export function ownSundayTeam(roles: MinistryRoles): SundayTeamKey | null {
+  return SEMESTER_CAPS[roles.semester].sundayTeam;
 }
 
 export function iguardScopeOf(roles: MinistryRoles): IguardScope {

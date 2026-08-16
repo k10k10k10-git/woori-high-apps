@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessArea, canEditArea, canWriteStudentRoster } from "@/features/portal/accessPolicy";
+import { canAccessArea, canAccessSundayTeam, canEditSundayTeam, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
 import {
   SUNDAY_MINISTRY_DEFAULT_TEAM,
   SUNDAY_MINISTRY_TABS,
@@ -47,9 +47,12 @@ const TAB_INTRO: Record<SundayTab, { title: string; description: string }> = {
 export default function SundayMinistryClient({ team, initialTab }: { team?: SundayTeamKey; initialTab?: string }) {
   const router = useRouter();
   const { user, loading: authLoading, roles, signIn } = useAuth();
-  const allowed = canAccessArea("sunday", roles);
-  const canEdit = canEditArea("sunday", roles);
-  const teamMeta = sundayTeamOf(team) ?? sundayTeamOf(SUNDAY_MINISTRY_DEFAULT_TEAM)!;
+  // 팀 단위로 판정한다. 사역팀은 자기 팀 하나만 열리고 옆 팀은 주소를 직접 쳐도 막힌다.
+  // 팀이 배정되지 않은 사람은 들어갈 팀이 없으므로 진입 자체가 막힌다.
+  const landingTeam = ownSundayTeam(roles) ?? SUNDAY_MINISTRY_DEFAULT_TEAM;
+  const teamMeta = sundayTeamOf(team) ?? sundayTeamOf(landingTeam)!;
+  const allowed = canAccessArea("sunday", roles) && canAccessSundayTeam(teamMeta.key, roles);
+  const canEdit = canEditSundayTeam(teamMeta.key, roles);
   const tabs = teamMeta.tabs as readonly SundayTab[];
   // 팀 라우트를 오갈 때 컴포넌트가 재사용될 수 있으므로, 선택 탭은 렌더 중 파생으로 보정한다
   // (effect에서 setState하면 실수 13 — 사용자의 선택이 덮인다).

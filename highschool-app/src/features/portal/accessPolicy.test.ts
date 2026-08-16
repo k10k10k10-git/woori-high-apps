@@ -3,13 +3,16 @@ import {
   ASSIGNABLE_RETREAT_ROLES,
   ASSIGNABLE_SEMESTER_ROLES,
   canAccessArea,
+  canAccessSundayTeam,
   canCreateRetreat,
   canDestroyRetreat,
   canDestroySemester,
   canEditArea,
+  canEditSundayTeam,
   canManageRolesOf,
   canManageSiteRequests,
   canSeeSensitiveRetreat,
+  ownSundayTeam,
   canWriteStudentRoster,
   describeRoles,
   iguardScopeOf,
@@ -20,6 +23,7 @@ import {
   type RetreatRole,
   type SemesterRole,
 } from "./accessPolicy";
+import { SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 
 function roles(semester: SemesterRole, retreat: RetreatRole): MinistryRoles {
   return { semester, retreat };
@@ -33,12 +37,15 @@ describe("학기 역할 — 학기·주일 화면", () => {
     ["pastor", { semester: "write", sunday: "write" }],
     ["leader", { semester: "write", sunday: "write" }],
     ["adminTeam", { semester: "write", sunday: "write" }],
+    // 사역팀은 자기 팀 하나만 열린다 — canAccessArea("sunday")는 "어느 팀이든 있는가"다.
+    // 어느 팀인지는 아래 "주일 사역 - 팀 경계"가 검사한다.
     ["barnabas", { semester: "read", sunday: "write" }],
-    ["worship", { semester: "read", sunday: "read" }],
-    ["praise", { semester: "read", sunday: "read" }],
-    ["media", { semester: "read", sunday: "read" }],
-    ["design", { semester: "read", sunday: "read" }],
-    ["staff", { semester: "read", sunday: "read" }],
+    ["worship", { semester: "read", sunday: "write" }],
+    ["praise", { semester: "read", sunday: "write" }],
+    ["media", { semester: "read", sunday: "write" }],
+    ["design", { semester: "read", sunday: "write" }],
+    // 팀 미배정은 주일에 들어갈 곳이 없다.
+    ["staff", { semester: "read", sunday: "none" }],
     ["none", { semester: "none", sunday: "none" }],
   ];
 
@@ -52,15 +59,17 @@ describe("학기 역할 — 학기·주일 화면", () => {
     });
   }
 
-  it("바나바팀은 주일을 편집하지만 학기는 조회만 한다", () => {
+  it("바나바팀은 주일 자기 팀을 편집하지만 학기는 조회만 한다", () => {
     const r = roles("barnabas", "fieldStaff");
-    expect(canEditArea("sunday", r)).toBe(true);
+    expect(canEditSundayTeam("barnabas", r)).toBe(true);
     expect(canEditArea("semester", r)).toBe(false);
   });
 
-  it("사역팀 4개는 주일을 편집하지 못한다", () => {
+  it("사역팀 4개는 자기 팀만 편집하고 남의 팀은 열지 못한다", () => {
     for (const team of ["worship", "praise", "media", "design"] as const) {
-      expect(canEditArea("sunday", roles(team, "fieldStaff"))).toBe(false);
+      const r = roles(team, "fieldStaff");
+      expect(canEditSundayTeam(team, r)).toBe(true);
+      expect(canAccessSundayTeam("barnabas", r)).toBe(false);
     }
   });
 
@@ -261,5 +270,59 @@ describe("표시·이동", () => {
     // 조회만 가능한 역할은 현장이 주 사용처다
     expect(retreatEntryHref("summer 2026", roles("none", "iguardTeam"))).toBe("/retreat/summer%202026/field");
     expect(retreatEntryHref("summer 2026", roles("none", "leader"))).toBe("/retreat/summer%202026/field");
+  });
+});
+
+describe("주일 사역 - 팀 경계", () => {
+  const semester = (role: SemesterRole): MinistryRoles => ({ semester: role, retreat: "none" });
+
+  it("사역팀은 자기 팀만 열리고 옆 팀은 조회도 안 된다", () => {
+    const worship = semester("worship");
+    expect(canAccessSundayTeam("worship", worship)).toBe(true);
+    expect(canEditSundayTeam("worship", worship)).toBe(true);
+    for (const other of ["barnabas", "praise", "media", "design", "admin"] as const) {
+      expect(canAccessSundayTeam(other, worship)).toBe(false);
+      expect(canEditSundayTeam(other, worship)).toBe(false);
+    }
+  });
+
+  it("바나바팀도 같은 규칙을 받는다 - 예배팀 자리 배치가 보이지 않는다", () => {
+    const barnabas = semester("barnabas");
+    expect(canEditSundayTeam("barnabas", barnabas)).toBe(true);
+    expect(canAccessSundayTeam("worship", barnabas)).toBe(false);
+  });
+
+  it("행정팀·스탭팀장·교역자·통합관리자는 팀 경계 없이 전부 쓴다", () => {
+    for (const role of ["adminTeam", "leader", "pastor", "superAdmin"] as const) {
+      const roles = semester(role);
+      expect(ownSundayTeam(roles)).toBeNull();
+      for (const team of ["admin", "barnabas", "worship", "praise", "media", "design"] as const) {
+        expect(canAccessSundayTeam(team, roles)).toBe(true);
+        expect(canEditSundayTeam(team, roles)).toBe(true);
+      }
+    }
+  });
+
+  it("팀이 배정되지 않으면 주일에 들어가지 못한다", () => {
+    for (const role of ["staff", "none"] as const) {
+      const roles = semester(role);
+      expect(canAccessArea("sunday", roles)).toBe(false);
+      expect(ownSundayTeam(roles)).toBeNull();
+      expect(canAccessSundayTeam("worship", roles)).toBe(false);
+    }
+    // 방학 역할만 있는 사람(이가드팀)도 주일은 닫힌다.
+    expect(canAccessArea("sunday", { semester: "none", retreat: "iguardTeam" })).toBe(false);
+  });
+
+  it("사역팀도 주일 하나로 홈에는 들어간다 - 로그인은 되는데 갈 곳이 없으면 안 된다", () => {
+    expect(canAccessArea("home", semester("worship"))).toBe(true);
+  });
+
+  it("팀 키는 카탈로그와 일치한다", () => {
+    // 여기가 어긋나면 메뉴에서 팀이 통째로 사라진다.
+    const owned = ASSIGNABLE_SEMESTER_ROLES.map((role) => ownSundayTeam({ semester: role, retreat: "none" }))
+      .filter((team): team is NonNullable<typeof team> => team !== null);
+    const catalog = SUNDAY_MINISTRY_TEAMS.map((team) => team.key);
+    for (const team of owned) expect(catalog).toContain(team);
   });
 });
