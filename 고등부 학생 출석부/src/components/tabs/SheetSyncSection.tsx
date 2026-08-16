@@ -5,7 +5,8 @@ import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import {
   extractSheetId, fetchClassTabs,
-  buildSyncPlan, buildSyncPayload, type SyncPlan, type ParsedClass, type AttendanceYear,
+  buildSyncPlan, buildSyncPayload, describeSheetSyncForClass,
+  type SyncPlan, type ParsedClass, type AttendanceYear,
 } from '@/lib/sheetSync';
 import type { Student } from '@/types';
 import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
@@ -105,14 +106,18 @@ export default function SheetSyncSection() {
     setRunning(true);
     try {
       const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing, historicalRef, attendanceRef ?? undefined);
+      // 변동이 없는 반은 기록을 남기지 않는다. 예전에는 동기화할 때마다 모든 반에
+      // "신규 0명 · 이동 0명"이 쌓여 정작 사람이 바뀐 반을 찾을 수 없었다.
       plan.classes.forEach((classPlan) => {
+        const change = describeSheetSyncForClass(plan, classPlan.ck, removeMissing);
+        if (!change) return;
         const changeId = push(ref(db, `classes/${curYear}/${classPlan.ck}/adminChanges`)).key ?? `change_${Date.now()}_${classPlan.ck}`;
         payload[adminChangePath(curYear, classPlan.ck, changeId)] = buildAdminChangeEntry({
           classKey: classPlan.ck,
           teacher: classPlan.teacher,
-          studentName: `반 전체 (${classPlan.students.length}명)`,
+          studentName: change.studentName,
           action: '시트 동기화',
-          changeSummary: `구글 시트 명단·출석 반영 · 신규 ${plan.added.filter((item) => item.ck === classPlan.ck).length}명 · 이동 ${plan.moved.filter((item) => item.toCk === classPlan.ck).length}명`,
+          changeSummary: change.changeSummary,
           actor: adminActor(state.userRole),
         });
       });

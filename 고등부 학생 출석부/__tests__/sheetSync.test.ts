@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSyncPlan, buildSyncPayload, parseCSV, parseClassCsv, type ParsedClass, type ParsedStudent } from '@/lib/sheetSync';
+import { buildSyncPlan, buildSyncPayload, describeSheetSyncForClass, parseCSV, parseClassCsv, type ParsedClass, type ParsedStudent, type SyncPlan } from '@/lib/sheetSync';
 import type { Student } from '@/types';
 
 function st(o: Partial<ParsedStudent> & { name: string; sid: string; num: number }): ParsedStudent {
@@ -211,5 +211,57 @@ describe('반 이동 시 옛 반 출석 기록 이관·정리', () => {
     const payload = buildSyncPayload(plan, 2026, movedCurrent(), false, undefined);
     expect(payload['attendance/2026/1-1-1/S11_01']).toBeUndefined();
     expect(plan.attendanceMoves).toEqual([]);
+  });
+});
+
+describe('행정 변동 사항 - 시트 동기화 기록', () => {
+  const plan = (over: Partial<SyncPlan> = {}): SyncPlan => ({
+    classes: [], added: [], moved: [], removed: [], ambiguous: [],
+    attendanceMoves: [], attendanceChanges: 0, totalStudents: 0, classCount: 0, jangCount: 0,
+    ...over,
+  });
+
+  it('변동이 없는 반은 기록을 만들지 않는다', () => {
+    // 예전에는 모든 반에 "신규 0명 · 이동 0명"이 쌓여 정작 바뀐 반을 찾을 수 없었다.
+    expect(describeSheetSyncForClass(plan(), '1-2-9', false)).toBeNull();
+    const other = plan({ added: [{ ck: '1-1-1', name: '김철수' }] });
+    expect(describeSheetSyncForClass(other, '1-2-9', false)).toBeNull();
+  });
+
+  it('신규 학생의 이름을 적는다', () => {
+    const p = plan({ added: [{ ck: '1-2-9', name: '김철수' }, { ck: '1-2-9', name: '이민수' }] });
+    const out = describeSheetSyncForClass(p, '1-2-9', false);
+    expect(out?.studentName).toBe('신규 2명');
+    expect(out?.changeSummary).toContain('신규 2명 (김철수, 이민수)');
+  });
+
+  it('전입은 어느 반에서 왔는지, 전출은 어느 반으로 갔는지 적는다', () => {
+    const p = plan({ moved: [{ name: '박영희', fromCk: '1-2-3', toCk: '1-2-9' }] });
+    expect(describeSheetSyncForClass(p, '1-2-9', false)?.changeSummary).toContain('전입 1명 (박영희←1부 2-3)');
+    // 보내는 반에도 기록이 남아야 한다 — 받는 반에만 남기면 명단이 조용히 줄어든다.
+    expect(describeSheetSyncForClass(p, '1-2-3', false)?.changeSummary).toContain('전출 1명 (박영희→1부 2-9)');
+  });
+
+  it('제외는 removeMissing을 켠 동기화에서만 기록한다', () => {
+    const p = plan({ removed: [{ ck: '1-2-9', name: '최지훈' }] });
+    expect(describeSheetSyncForClass(p, '1-2-9', false)).toBeNull();
+    expect(describeSheetSyncForClass(p, '1-2-9', true)?.changeSummary).toContain('제외 1명 (최지훈)');
+  });
+
+  it('이름이 많으면 앞 5명만 적고 나머지는 수로 줄인다', () => {
+    const names = ['가', '나', '다', '라', '마', '바', '사'];
+    const p = plan({ added: names.map((name) => ({ ck: '1-2-9', name })) });
+    const out = describeSheetSyncForClass(p, '1-2-9', false);
+    expect(out?.changeSummary).toContain('신규 7명 (가, 나, 다, 라, 마 외 2명)');
+  });
+
+  it('여러 종류가 겹치면 학생 칸엔 건수만, 변경내용엔 이름을 적는다', () => {
+    const p = plan({
+      added: [{ ck: '1-2-9', name: '김철수' }],
+      moved: [{ name: '박영희', fromCk: '1-2-3', toCk: '1-2-9' }],
+    });
+    const out = describeSheetSyncForClass(p, '1-2-9', false);
+    expect(out?.studentName).toBe('신규 1명 · 전입 1명');
+    expect(out?.changeSummary).toBe('구글 시트 명단·출석 반영 · 신규 1명 (김철수) · 전입 1명 (박영희←1부 2-3)');
   });
 });

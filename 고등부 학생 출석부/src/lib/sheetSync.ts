@@ -474,3 +474,66 @@ export function buildSyncPayload(
   }
   return payload;
 }
+
+// ── 행정 변동 사항 기록 ────────────────────────────────────────
+
+/** "1-2-3" → "1부 2-3". 이동 기록에서 어느 반에서 왔는지 밝히는 용도. */
+function ckLabel(ck: string): string {
+  const [part, grade, cls] = ck.split('-');
+  return part && grade && cls ? `${part}부 ${grade}-${cls}` : ck;
+}
+
+/** 이름이 많으면 앞 몇 개만 적고 나머지는 수로 줄인다 — 표 한 칸에 들어가야 한다. */
+const NAME_CAP = 5;
+function joinNames(names: string[]): string {
+  if (names.length <= NAME_CAP) return names.join(', ');
+  return `${names.slice(0, NAME_CAP).join(', ')} 외 ${names.length - NAME_CAP}명`;
+}
+
+export type SheetSyncClassChange = { studentName: string; changeSummary: string };
+
+/**
+ * 반 하나의 시트 동기화 기록. **실제 변동이 없으면 null** — 기록을 만들지 않는다.
+ *
+ * 예전에는 동기화할 때마다 모든 반에 "신규 0명 · 이동 0명"을 남겨, 변동 사항 목록이
+ * 아무 일도 없었던 기록으로 가득 찼다. 누가 신규고 누가 이동인지도 알 수 없었다.
+ *
+ * 전출(이 반을 떠난 학생)도 변동으로 센다. 받는 반에만 남기면 명단에서 사람이 빠진
+ * 반은 아무 기록 없이 조용히 줄어든다.
+ * 제외(시트에 없어 삭제)도 같은 이유로 센다 — removeMissing을 켠 동기화에서만 생긴다.
+ */
+export function describeSheetSyncForClass(
+  plan: SyncPlan,
+  ck: string,
+  removeMissing: boolean,
+): SheetSyncClassChange | null {
+  const added = plan.added.filter((item) => item.ck === ck).map((item) => item.name);
+  const movedIn = plan.moved.filter((item) => item.toCk === ck);
+  const movedOut = plan.moved.filter((item) => item.fromCk === ck);
+  const removed = removeMissing ? plan.removed.filter((item) => item.ck === ck).map((item) => item.name) : [];
+
+  if (added.length + movedIn.length + movedOut.length + removed.length === 0) return null;
+
+  const parts: string[] = [];
+  if (added.length) parts.push(`신규 ${added.length}명 (${joinNames(added)})`);
+  if (movedIn.length) {
+    parts.push(`전입 ${movedIn.length}명 (${joinNames(movedIn.map((item) => `${item.name}←${ckLabel(item.fromCk)}`))})`);
+  }
+  if (movedOut.length) {
+    parts.push(`전출 ${movedOut.length}명 (${joinNames(movedOut.map((item) => `${item.name}→${ckLabel(item.toCk)}`))})`);
+  }
+  if (removed.length) parts.push(`제외 ${removed.length}명 (${joinNames(removed)})`);
+
+  // 학생 칸은 좁다 — 이름은 변경내용에 두고 여기엔 무엇이 몇 건인지만 적는다.
+  const counts = [
+    added.length && `신규 ${added.length}명`,
+    movedIn.length && `전입 ${movedIn.length}명`,
+    movedOut.length && `전출 ${movedOut.length}명`,
+    removed.length && `제외 ${removed.length}명`,
+  ].filter(Boolean) as string[];
+
+  return {
+    studentName: counts.join(' · '),
+    changeSummary: `구글 시트 명단·출석 반영 · ${parts.join(' · ')}`,
+  };
+}
