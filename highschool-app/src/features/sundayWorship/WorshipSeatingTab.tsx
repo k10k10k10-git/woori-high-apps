@@ -321,7 +321,10 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
               cells.push(
                 <div key={`${section.id}-add`}
                   style={{ gridColumn: sectionIndex + 2, gridRow: `${usedRows(section) + 2} / span ${free}` }}
-                  className="flex items-center justify-center rounded-lg border border-dashed border-slate-200 p-1">
+                  /* 점선 칸은 남은 줄만큼 늘려 여유를 보여주되, 입력칸은 그 안에서
+                     가운데로 떠다니지 않게 맨 위 한 줄에 붙인다. 남은 줄이 많을수록
+                     입력칸이 아래로 내려가 분단마다 높이가 제각각이었다. */
+                  className="flex items-start justify-center rounded-lg border border-dashed border-slate-200 p-1">
                   {/* 한 부의 반이 수십 개라 select로는 목록을 끝까지 끌어내려야 했다.
                       타이핑으로 좁히고 Enter로 넣는다. */}
                   <SeatCombobox ariaLabel={`${section.label}에 반 추가`} disabled={!canEdit}
