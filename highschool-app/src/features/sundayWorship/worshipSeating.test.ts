@@ -12,6 +12,7 @@ import {
   parseSeatingPlans,
   planKey,
   previousSunday,
+  recentAttendedSundays,
   recentSundays,
   remainingRows,
   resizeSections,
@@ -62,6 +63,45 @@ describe("줄 수 계산 - 지난 3주 출석 평균 + 담임 1명", () => {
     expect(attendanceAverage(undefined, ["7-0"])).toBeNull();
     expect(attendanceAverage({ a: {} }, ["7-0"])).toBeNull();
     expect(rowsForAverage(null)).toBe(1);
+  });
+});
+
+describe("평균 기준 주 고르기 - 수련회·방학 주는 건너뛴다", () => {
+  // 2026-08-16 기준 직전 주일 → 08-09="7-1", 08-02="7-0", 07-26="6-3", 07-19="6-2", 07-12="6-1"
+  const WEEK = "2026-08-16";
+  const on = (...cells: string[]): ClassAttendance => ({ s1: Object.fromEntries(cells.map((c) => [c, "O"])) });
+
+  it("부 전체 출석이 0인 주는 빼고 그만큼 더 거슬러 올라간다", () => {
+    // 08-09(7-1)이 수련회라 출석부가 통째로 비었다.
+    const attendance = { "1-1-1": on("7-0", "6-3", "6-2", "6-1"), "1-1-2": on("7-0", "6-3") };
+    expect(recentAttendedSundays(attendance, ["1-1-1", "1-1-2"], WEEK)).toEqual(["7-0", "6-3", "6-2"]);
+  });
+
+  it("빈 주가 없으면 그냥 직전 3주다", () => {
+    const attendance = { "1-1-1": on("7-1", "7-0", "6-3", "6-2") };
+    expect(recentAttendedSundays(attendance, ["1-1-1"], WEEK)).toEqual(["7-1", "7-0", "6-3"]);
+  });
+
+  it("한 반만 비어 있는 주는 빼지 않는다 - 그 반 입력 누락일 수 있다", () => {
+    // 08-09에 1-1-2만 기록이 없다. 이걸 빼면 그 반 평균만 부풀어 남의 자리를 가져간다.
+    const attendance = { "1-1-1": on("7-1", "7-0", "6-3"), "1-1-2": on("7-0", "6-3") };
+    expect(recentAttendedSundays(attendance, ["1-1-1", "1-1-2"], WEEK)).toEqual(["7-1", "7-0", "6-3"]);
+  });
+
+  it("출석이 3주치가 안 되면 있는 만큼만 준다", () => {
+    const attendance = { "1-1-1": on("7-0") };
+    expect(recentAttendedSundays(attendance, ["1-1-1"], WEEK)).toEqual(["7-0"]);
+  });
+
+  it("기록이 아예 없으면 빈 배열 - 평균 계산 근거가 없다", () => {
+    expect(recentAttendedSundays({}, ["1-1-1"], WEEK)).toEqual([]);
+    expect(attendanceAverage({ s1: { "7-0": "O" } }, [])).toBeNull();
+  });
+
+  it("해가 바뀌면 멈춘다 - 셀 키에 연도가 없어 작년 키와 겹친다", () => {
+    // 2026-01-04의 직전 주일은 2025-12-28이다. 작년 "11-3"을 올해 것으로 세면 안 된다.
+    const attendance = { "1-1-1": on("11-3", "11-2", "11-1") };
+    expect(recentAttendedSundays(attendance, ["1-1-1"], "2026-01-04")).toEqual([]);
   });
 });
 

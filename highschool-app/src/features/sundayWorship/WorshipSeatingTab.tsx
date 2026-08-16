@@ -21,12 +21,11 @@ import {
   isOverCapacity,
   planKey,
   previousSunday,
-  recentSundays,
+  recentAttendedSundays,
   remainingRows,
   resizeSections,
   rowsForAverage,
   seatLabel,
-  sundayCellKey,
   sundayOf,
   totalRowsUsed,
   usedRows,
@@ -78,10 +77,11 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
   const sections = draft ?? saved ?? defaultSections();
   const dirty = draft !== null;
 
-  // 지난 3주. 해가 바뀌는 주는 다른 연도 노드라 빼고 계산한다(근거 없으면 1줄).
+  // 출석이 있었던 최근 3주. 수련회·교사 방학처럼 예배가 없던 주를 그냥 세면
+  // 그 주가 0으로 들어가 평균이 실제보다 낮아진다(근거가 하나도 없으면 1줄).
   const cellKeys = useMemo(
-    () => recentSundays(week).filter((day) => day.slice(0, 4) === week.slice(0, 4)).map(sundayCellKey),
-    [week],
+    () => recentAttendedSundays(attendance, classKeysForService(Object.keys(classes), service), week),
+    [attendance, classes, service, week],
   );
 
   const averageFor = useCallback(
@@ -126,7 +126,7 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
       blocks: section.blocks.map((block) =>
         block.key.startsWith("fixed:") ? block : { ...block, rows: rowsForAverage(averageFor(block.key)) }),
     })));
-    setNotice("지난 3주 출석으로 줄 수를 다시 계산했습니다. 저장해야 반영됩니다.");
+    setNotice(`출석이 있었던 최근 ${cellKeys.length}주 출석으로 줄 수를 다시 계산했습니다. 저장해야 반영됩니다.`);
   };
 
   const loadPreviousWeek = () => {
@@ -219,7 +219,10 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
       </div>
 
       <p className="mt-3 text-xs text-slate-500">
-        줄 수는 <strong>지난 3주 출석 평균 + 담임 1명</strong>을 한 줄 의자 {SEATS_PER_ROW}개로 나눠 올립니다. 위 {FRONT_ROWS}줄이 앞자리입니다. 사용 {totalRowsUsed(sections)}줄
+        {/* 몇 주가 실제로 쓰였는지 밝힌다. 수련회·방학으로 건너뛴 주가 있으면 3주가
+            아닐 수 있는데, 그냥 "지난 3주"라고 쓰면 숫자가 안 맞는 것으로 보인다. */}
+        줄 수는 <strong>출석이 있었던 최근 {cellKeys.length || 3}주 평균 + 담임 1명</strong>을 한 줄 의자 {SEATS_PER_ROW}개로 나눠 올립니다.
+        {" "}수련회·방학처럼 출석이 없던 주는 건너뜁니다. 위 {FRONT_ROWS}줄이 앞자리입니다. 사용 {totalRowsUsed(sections)}줄
         {dirty && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">저장하지 않은 변경</span>}
       </p>
       {anyOver && <p className="mt-1 text-xs font-semibold text-red-600">줄 수가 분단 용량을 넘은 분단이 있습니다. 반을 옮기거나 분단 줄 수를 늘려주세요.</p>}

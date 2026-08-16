@@ -85,13 +85,46 @@ export function recentSundays(week: string, count = 3): string[] {
 export type ClassAttendance = Record<string, Record<string, string>>;
 
 /** 그 주일에 온 사람 수 — 출석(O)과 지각(T)을 센다. 결석·미입력은 뺀다. */
-function presentOn(students: ClassAttendance, cellKey: string): number {
+function presentOn(students: ClassAttendance | undefined, cellKey: string): number {
+  if (!students) return 0;
   let count = 0;
   for (const marks of Object.values(students)) {
     const mark = marks?.[cellKey];
     if (mark === "O" || mark === "T") count++;
   }
   return count;
+}
+
+/** 이 이상은 거슬러 올라가지 않는다 — 한 학기 밖 출석은 지금 반 편성과 무관하다. */
+const ATTENDED_LOOKBACK_WEEKS = 12;
+
+/**
+ * 출석이 실제로 있었던 최근 주일들의 셀 키.
+ *
+ * 수련회·교사 방학 주는 출석부가 통째로 비는데, 달력상 지난 3주를 그냥 세면 그 주가
+ * 0으로 들어가 평균이 실제보다 낮아진다. 부 전체 출석이 0인 주는 건너뛰고 그만큼 더
+ * 거슬러 올라간다.
+ *
+ * 반별로 판단하지 않는다. 한 반만 0인 건 그 주 입력 누락일 수 있는데, 그걸 빼면 그
+ * 반만 평균이 부풀어 남의 자리를 가져간다. 부 전체가 0인 주라야 "예배가 없던 주"다.
+ *
+ * 해가 바뀌면 멈춘다. 셀 키에 연도가 없어(`{월}-{주차}`) 작년 키와 그대로 겹친다.
+ */
+export function recentAttendedSundays(
+  attendance: Record<string, ClassAttendance>,
+  classKeys: string[],
+  week: string,
+  want = 3,
+): string[] {
+  const out: string[] = [];
+  let cursor = week;
+  for (let i = 0; i < ATTENDED_LOOKBACK_WEEKS && out.length < want; i++) {
+    cursor = previousSunday(cursor);
+    if (cursor.slice(0, 4) !== week.slice(0, 4)) break;
+    const cellKey = sundayCellKey(cursor);
+    if (classKeys.some((key) => presentOn(attendance[key], cellKey) > 0)) out.push(cellKey);
+  }
+  return out;
 }
 
 /** 지난 주일들의 출석 평균. 기록이 하나도 없으면 null(계산 근거 없음). */
