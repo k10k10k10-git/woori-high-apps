@@ -41,7 +41,11 @@ const SERVICES: WorshipService[] = ["1", "2"];
 // (기본 좌우 패딩 14px씩이면 콘텐츠 폭이 14px밖에 안 남아 숫자가 잘린다).
 const NUMBER_INPUT: React.CSSProperties = { fontSize: 12, paddingLeft: 6, paddingRight: 6, textAlign: "center" };
 /** 표 안 숫자는 글자처럼 납작하게. 테두리·배경을 지워 줄 높이를 밀어 올리지 않는다. */
-const CELL_NUMBER: React.CSSProperties = { background: "transparent", border: "none", padding: "0 2px", outline: "none", appearance: "textfield" };
+const CELL_NUMBER: React.CSSProperties = {
+  background: "transparent", border: "none", padding: 0, outline: "none",
+  // 단위 "줄"과 붙여 한 덩어리로 읽히게 오른쪽 정렬하고, 글꼴·색은 감싼 span에서 물려받는다.
+  textAlign: "right", font: "inherit", color: "inherit",
+};
 type AttendanceYear = Record<string, Record<string, Record<string, string>>>;
 type ClassesYear = Record<string, { teacher?: string; students?: Record<string, unknown> }>;
 
@@ -272,12 +276,23 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
                   {/* 이 앱의 타입 스케일은 text-sm=13px, text-base=14px, text-lg=17px로 좁다.
                       반 이름은 표에서 가장 먼저 읽는 값이라 text-lg를 쓴다. */}
                   <span className="w-full truncate text-center text-lg font-bold leading-tight text-slate-800">{seatLabel(block.key)}</span>
-                  {/* 표 안에서는 숫자가 글자처럼 보여야 줄 높이가 안 늘어난다. `.input`을 쓰지 않고
-                      직접 그려 @layer 밖 규칙과의 싸움도 피한다. 편집 기능은 그대로다. */}
-                  <input type="number" min={1} max={MAX_ROWS} aria-label={`${seatLabel(block.key)} 줄 수`}
-                    className={`mt-0.5 w-10 rounded text-center text-xs font-semibold focus-visible:ring-2 focus-visible:ring-emerald-400 ${edited ? "text-amber-700" : "text-slate-500"}`}
-                    style={CELL_NUMBER} disabled={!canEdit} value={block.rows}
-                    onChange={(event) => setBlockRows(sectionIndex, blockIndex, Math.min(MAX_ROWS, Math.max(1, Number(event.target.value) || 1)))} />
+                  {/* 숫자만 있으면 무엇을 세는 값인지 읽히지 않아 "줄"을 붙인다. number 입력은
+                      접미사를 못 넣으므로 입력칸과 단위를 나란히 두고 한 덩어리처럼 보이게 한다.
+                      `.input`을 쓰지 않고 직접 그려야 줄 높이가 안 늘어난다. */}
+                  {/* label로 감싸 "줄" 글자를 눌러도 입력칸이 잡힌다. 그래서 입력칸 폭을
+                      글자 수에 딱 맞춰도 클릭이 어렵지 않고, 숫자와 단위가 붙어 보인다. */}
+                  <label className={`mt-0.5 flex cursor-text items-baseline justify-center rounded px-1 text-xs font-semibold focus-within:ring-2 focus-within:ring-emerald-400 ${edited ? "text-amber-700" : "text-slate-500"}`}>
+                    {/* number 입력은 웹킷 스피너가 좁은 폭을 다 먹어 숫자가 사라진다.
+                        스피너가 없는 text + inputMode=numeric으로 두고 숫자만 걸러 받는다. */}
+                    <input type="text" inputMode="numeric" aria-label={`${seatLabel(block.key)} 줄 수`}
+                      style={{ ...CELL_NUMBER, width: `calc(${String(block.rows).length}ch + 2px)` }}
+                      disabled={!canEdit} value={block.rows}
+                      onChange={(event) => {
+                        const digits = event.target.value.replace(/\D/g, "");
+                        setBlockRows(sectionIndex, blockIndex, Math.min(MAX_ROWS, Math.max(1, Number(digits) || 1)));
+                      }} />
+                    줄
+                  </label>
                   <button type="button" aria-label={`${seatLabel(block.key)} 빼기`} disabled={!canEdit}
                     onClick={() => removeBlock(sectionIndex, blockIndex)}
                     className="absolute right-0.5 top-0.5 rounded px-1 text-[11px] text-slate-300 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:text-slate-700">✕</button>
