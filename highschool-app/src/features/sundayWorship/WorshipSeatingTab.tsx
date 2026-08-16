@@ -5,6 +5,7 @@ import { subscribeToAttendanceByYear, subscribeToClassesByYear } from "@/lib/db/
 import { escapeHtml, printAsPDF } from "@/lib/exportUtils";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import { saveSeatingPlan, subscribeToSeatingPlans } from "./db";
+import SeatCombobox from "./SeatCombobox";
 import {
   FIXED_SEATS,
   FRONT_ROWS,
@@ -318,12 +319,11 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
                 <div key={`${section.id}-add`}
                   style={{ gridColumn: sectionIndex + 2, gridRow: `${usedRows(section) + 2} / span ${free}` }}
                   className="flex items-center justify-center rounded-lg border border-dashed border-slate-200 p-1">
-                  <select aria-label={`${section.label}에 반 추가`} className="input" style={{ fontSize: 12, paddingLeft: 8, paddingRight: 8 }}
-                    disabled={!canEdit} value=""
-                    onChange={(event) => { addBlock(sectionIndex, event.target.value); event.target.value = ""; }}>
-                    <option value="">반 추가…</option>
-                    {available.map((key) => <option key={key} value={key}>{seatLabel(key)}</option>)}
-                  </select>
+                  {/* 한 부의 반이 수십 개라 select로는 목록을 끝까지 끌어내려야 했다.
+                      타이핑으로 좁히고 Enter로 넣는다. */}
+                  <SeatCombobox ariaLabel={`${section.label}에 반 추가`} disabled={!canEdit}
+                    options={available} labelOf={seatLabel}
+                    onPick={(key) => addBlock(sectionIndex, key)} />
                 </div>,
               );
             }
