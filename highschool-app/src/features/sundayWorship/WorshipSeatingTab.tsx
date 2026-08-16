@@ -158,7 +158,9 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
         const start = blockStartRow(section, bi);
         for (let r = 0; r < block.rows; r++) {
           const row = start - 1 + r;
-          if (row < maxRows) grid[row][si] = r === 0 ? `${seatLabel(block.key)} (${block.rows})` : "〃";
+          // 화면 칸이 "1-5 (5명)"으로 평균 인원을 병기하므로, 인쇄본의 괄호도 단위를
+          // 붙여야 한다. 그냥 "(2)"면 줄 수인지 인원인지 읽는 사람이 알 수 없다.
+          if (row < maxRows) grid[row][si] = r === 0 ? `${seatLabel(block.key)} (${block.rows}줄)` : "〃";
         }
       });
     });
@@ -260,6 +262,7 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
               const front = isFrontBlock(section, blockIndex);
               const fixed = block.key.startsWith("fixed:");
               const edited = isEdited(block.key, block.rows);
+              const average = averageFor(block.key);
               const tone = fixed
                 ? "border-emerald-300 bg-emerald-50/60"
                 : edited
@@ -274,8 +277,17 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
                   className={`group relative flex flex-col items-center justify-center rounded-lg border px-1.5 py-2 ${tone}`}
                 >
                   {/* 이 앱의 타입 스케일은 text-sm=13px, text-base=14px, text-lg=17px로 좁다.
-                      반 이름은 표에서 가장 먼저 읽는 값이라 text-lg를 쓴다. */}
-                  <span className="w-full truncate text-center text-lg font-bold leading-tight text-slate-800">{seatLabel(block.key)}</span>
+                      반 이름은 표에서 가장 먼저 읽는 값이라 text-lg를 쓴다.
+                      줄 수의 근거가 되는 평균 인원을 옆에 병기한다 — 왜 이 줄 수인지
+                      표에서 바로 읽히고, 손으로 고칠 때 판단 근거가 된다.
+                      평균은 3주 합을 나눈 값이라 소수가 나오므로 반올림한다.
+                      출석 근거가 없는 반과 고정석(무대·음향 등)은 평균 자체가 없어 생략한다. */}
+                  <span className="flex w-full items-baseline justify-center gap-1">
+                    <span className="truncate text-lg font-bold leading-tight text-slate-800">{seatLabel(block.key)}</span>
+                    {average !== null && (
+                      <span className="shrink-0 text-xs font-medium text-slate-400">({Math.round(average)}명)</span>
+                    )}
+                  </span>
                   {/* 숫자만 있으면 무엇을 세는 값인지 읽히지 않아 "줄"을 붙인다. number 입력은
                       접미사를 못 넣으므로 입력칸과 단위를 나란히 두고 한 덩어리처럼 보이게 한다.
                       `.input`을 쓰지 않고 직접 그려야 줄 높이가 안 늘어난다. */}
