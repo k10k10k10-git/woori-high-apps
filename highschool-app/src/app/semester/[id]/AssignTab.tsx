@@ -47,6 +47,8 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
   const [expandedApplicantId, setExpandedApplicantId] = useState<string | null>(null);
   // 팀 카드의 스탭 목록은 한 번에 하나만 펼친다. 여러 개를 열어두면 카드 높이가 들쭉날쭉해진다.
   const [staffOpenTeamId, setStaffOpenTeamId] = useState<string | null>(null);
+  // 명단 상세도 팀 카드와 같게 스탭을 접어 연다 — 열자마자 눈에 들어와야 하는 쪽은 학생 명단이다.
+  const [detailStaffOpen, setDetailStaffOpen] = useState(false);
 
   useEffect(() => {
     if (!canEdit) return;
@@ -202,6 +204,8 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                     onClick={() => {
                       setDetailTeamId(t.id);
                       setExpandedApplicantId(null);
+                      // 학생이 없는 팀은 접을 이유가 없다 — 접어 두면 모달이 빈 채로 열린다.
+                      setDetailStaffOpen(students.length === 0);
                     }}
                     className="rounded-lg bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-white"
                   >
@@ -332,7 +336,10 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                     <h3 className="text-xl font-bold text-slate-900">{detailTeam.name}</h3>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${detailTeam.color}`}>{members.length}명</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 지원 동기와 하고 싶은 활동을 확인할 수 있습니다.</p>
+                  {/* 스탭에게는 지원 동기가 없다 — 학생이 없으면 이 안내는 사실과 다르다. */}
+                  {members.some((application) => !isStaffApplication(application)) && (
+                    <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 지원 동기와 하고 싶은 활동을 확인할 수 있습니다.</p>
+                  )}
                 </div>
                 <button onClick={() => setDetailTeamId(null)} aria-label="닫기" className="rounded-lg px-2 py-1 text-lg text-slate-400 hover:bg-slate-100">✕</button>
               </div>
@@ -343,10 +350,27 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                 </p>
               )}
               {/* 학생과 교사·스탭을 나눠 보여준다. 스탭은 지망·보호자 연락처 대상이 아니라 항목도 다르다. */}
-              {groupByKind(members).map((section) => (
+              {groupByKind(members).map((section) => {
+                // 스탭 칸만 접는다. 학생은 이 모달을 여는 이유 그 자체라 항상 펼쳐 둔다.
+                const collapsible = section.key === "staff";
+                const sectionOpen = !collapsible || detailStaffOpen;
+                return (
                 <div key={section.key} className="mb-3 last:mb-0">
-                  <p className="mb-1.5 text-xs font-semibold text-slate-500">{section.label}</p>
-                  <ul className="grid gap-2">
+                  {collapsible ? (
+                    <button
+                      type="button"
+                      className="mb-1.5 flex min-h-9 items-center gap-2 rounded-lg px-1 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
+                      aria-expanded={detailStaffOpen}
+                      aria-controls="detail-staff-list"
+                      onClick={() => setDetailStaffOpen((value) => !value)}
+                    >
+                      {section.label}
+                      <span className="font-normal text-slate-400">{detailStaffOpen ? "접기 ▲" : "펼치기 ▼"}</span>
+                    </button>
+                  ) : (
+                    <p className="mb-1.5 text-xs font-semibold text-slate-500">{section.label}</p>
+                  )}
+                  <ul className="grid gap-2" id={collapsible ? "detail-staff-list" : undefined} hidden={!sectionOpen}>
                     {section.rows.map((application) => {
                       const detail = canEdit ? privateMap[application.id] : undefined;
                       const expanded = expandedApplicantId === application.id;
@@ -408,7 +432,8 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                     })}
                   </ul>
                 </div>
-              ))}
+                );
+              })}
             </section>
           </div>
         );
