@@ -4,6 +4,7 @@
 // "눌러도 아무 일 없음"이 되는 것을 방지한다 (auth/unauthorized-domain 실사고, 2026-07-10).
 
 import { useState } from "react";
+import InAppBrowserNotice from "./InAppBrowserNotice";
 
 const FRIENDLY: Record<string, string> = {
   "auth/unauthorized-domain":
@@ -32,6 +33,9 @@ export default function LoginButton({ signIn }: { signIn: () => Promise<void> })
 
   return (
     <div className="flex flex-col items-center gap-3">
+      {/* 카톡 등 인앱브라우저면 로그인 버튼 위에 탈출 안내가 먼저 뜬다.
+          아니면 아무것도 그리지 않으므로 기존 화면은 그대로다. */}
+      <InAppBrowserNotice />
       <button
         onClick={() => void handleClick()}
         disabled={busy}

@@ -16,6 +16,7 @@ import {
   subscribeTrainingClasses,
 } from "@/features/semester/db";
 import type { Application, SemesterMeta, Session, Team, TrainingClass } from "@/features/semester/types";
+import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import { SEMESTER_TRAINING_TABS } from "@/features/portal/featureCatalog";
 import LoginButton from "@/components/LoginButton";
@@ -112,6 +113,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
           <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 회차 {sessions.length}회</p>
         </div>
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
+          {!canEdit && <ReadOnlyBanner what="학기 사역 자료" why="편집은 행정팀·스탭팀장·교역자·통합관리자만 가능합니다." />}
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
             {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}

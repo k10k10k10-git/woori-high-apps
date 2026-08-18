@@ -25,6 +25,7 @@ import MealCountTab from "./MealCountTab";
 import AdminSuppliesTab from "./AdminSuppliesTab";
 import { canAccessArea, canEditArea, canSeeSensitiveRetreat } from "@/features/portal/accessPolicy";
 import { RetreatEditProvider } from "@/features/portal/RetreatEditContext";
+import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
@@ -395,6 +396,7 @@ export default function RetreatPageClient() {
           {/* fieldset disabled — 내부의 button·input·select·textarea를 브라우저가 전부 잠근다.
               display:contents라 레이아웃에는 영향이 없다. 드래그처럼 폼 요소가 아닌 조작은
               각 탭이 useRetreatCanEdit()으로 따로 잠근다. */}
+          {!canEditAdmin && <ReadOnlyBanner what="수련회 행정 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
           <fieldset disabled={!canEditAdmin} className="contents">
           <RetreatEditProvider canEdit={canEditAdmin}>
           {/* keep-alive 탭: 마운트 후 CSS display로 보여주기/숨기기 */}

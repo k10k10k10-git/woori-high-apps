@@ -228,14 +228,32 @@ export default function PortalHome() {
 
   if (!canAccessArea("home", roles)) {
     return (
-      <main className="min-h-screen grid place-items-center px-6 text-center">
-        <div>
+      // 여기까지 온 사람은 로그인은 됐는데 맡은 영역이 없다. 예전엔 "이가드 접근 요청"
+      // 버튼 하나뿐이라, 이가드와 무관한 신규 스탭·담임교사는 무엇을 어디에 요청해야
+      // 하는지 알 수 없는 막다른 길이었다. 로그인한 계정과 다음 행동을 함께 보여준다.
+      <main className="min-h-screen grid place-items-center px-6 py-10">
+        <div className="w-full max-w-md text-center">
           <h1 className="text-xl font-bold">접근 승인이 필요합니다</h1>
-          <p className="mt-2 text-sm text-slate-500">통합관리자 승인 후 사역 메뉴를 사용할 수 있습니다.</p>
-          <div className="mt-5 flex items-center justify-center gap-3">
-            <Link href="/field" className="btn-primary">이가드 접근 요청</Link>
-            <button onClick={() => void signOut()} className="text-sm text-slate-500 underline">로그아웃</button>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            로그인은 되었지만 이 계정에 배정된 사역이 아직 없습니다.
+            통합관리자가 역할을 배정하면 바로 사용할 수 있습니다.
+          </p>
+          {user.email && (
+            <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              로그인한 계정 <strong className="text-slate-700">{user.email}</strong>
+              <span className="mt-1 block text-[11px]">이 주소를 통합관리자에게 알려주시면 배정이 빠릅니다.</span>
+            </p>
+          )}
+          <div className="mt-5 grid gap-2 text-left">
+            <p className="text-xs font-semibold text-slate-500">요청 방법</p>
+            <Link href="/field" className="btn-primary justify-center">수련회 이가드 접근 요청</Link>
+            <p className="text-xs leading-5 text-slate-500">
+              주일 사역·학기 사역·수련회 행정은 요청 버튼이 따로 없습니다.
+              담당 교역자나 통합관리자에게 위 이메일과 맡을 사역을 알려주세요.
+            </p>
+            <Link href="/suggestions" className="btn-secondary justify-center">건의사항으로 문의하기</Link>
           </div>
+          <button onClick={() => void signOut()} className="mt-6 text-sm text-slate-500 underline">다른 계정으로 로그인</button>
         </div>
       </main>
     );
