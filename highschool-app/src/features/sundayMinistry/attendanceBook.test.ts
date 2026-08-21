@@ -9,6 +9,17 @@ describe("주일 사역 출석부 조회 모델", () => {
     expect(weeks.every((week) => week.month <= 6)).toBe(true);
   });
 
+  it("1학기·2학기 구분을 유지하면서 1년 전체 주차도 제공한다", () => {
+    const first = attendanceWeeks(2026, "first", {});
+    const second = attendanceWeeks(2026, "second", {});
+    const all = attendanceWeeks(2026, "all", {});
+
+    expect(first.every((week) => week.month <= 6)).toBe(true);
+    expect(second.every((week) => week.month >= 7)).toBe(true);
+    expect(all).toEqual([...first, ...second]);
+    expect(new Set(all.map((week) => week.month))).toEqual(new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]));
+  });
+
   it("부별 반과 학생을 안정된 순서로 정렬한다", () => {
     expect(classKeysForPart(["2-1-1", "1-2-2", "1-1-9", "1-1-2"], 1)).toEqual(["1-1-2", "1-1-9", "1-2-2"]);
     expect(classLabel("2-3-4")).toBe("2부 3학년 4반");

@@ -89,9 +89,15 @@
 - 학생 앱 소유 경로에 대한 쓰기 함수는 추가하지 않았고 Rules 변경·운영 DB 쓰기·배포는 없었다.
 - 검증: `highschool-app` 77파일 **637개 테스트**, `npx tsc --noEmit`, production build, `git diff --check` 통과.
 
+## 2026-08-22 후속 작업 — 출석부 고정 열·1년 전체 보기
+
+- 주일 행정팀 출석부의 고정 `No./이름` 열에 사용한 `--color-bg-subtle`이 실제 전역 토큰에 정의되지 않아 배경 선언이 무효화되고, 가로 스크롤 시 뒤쪽 날짜가 이름 위로 비쳤다. 양 테마에서 정의된 불투명 `--color-surface-hover`로 교체하고 이름 열 오른쪽 경계·그림자를 추가했다.
+- 기존 `1학기`, `2학기` 선택을 유지하면서 `1년 전체` 선택을 추가했다. 전체 보기는 1월부터 12월까지 원본 출석부의 같은 cellKey 순서를 사용하며 출석률 집계도 선택 범위에 맞춘다.
+- 검증: `highschool-app` 77파일 **638개 테스트**, `npx tsc --noEmit`, 변경 파일 ESLint, production build, `git diff --check` 통과. 운영 DB 쓰기·Rules 변경·배포는 없었다.
+
 ## 지금 상태 (한 문장)
 
-최신 요청은 **구현·검증 완료, 아직 미배포**이며, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
+최신 후속 요청은 **구현·검증 완료, 아직 미배포**이며, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
 
 - 최신 배포 앱 기능 커밋: `eeacef5` (`통합사이트: 양 테마 대비와 홈 디데이 보완`). 이 인수인계 문서 커밋은 앱 코드 변경이 아니며 최종 배포 buildId는 그 문서 커밋 SHA다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
@@ -137,7 +143,7 @@
 | | 결과 |
 |---|---|
 | `highschool-app` `npx tsc --noEmit` | 0 errors |
-| `highschool-app` `npm test` | 77파일 **637개 통과** |
+| `highschool-app` `npm test` | 77파일 **638개 통과** |
 | `highschool-app` `npm run build` | 성공 |
 | `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
 | `고등부 학생 출석부` `npm test` | 8파일 **105개 통과** (마지막 학생 앱 변경 기준) |

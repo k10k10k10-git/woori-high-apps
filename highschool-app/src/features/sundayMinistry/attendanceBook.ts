@@ -2,7 +2,7 @@ import { parseClassKey } from "@/lib/classKey";
 import type { AttendanceEventRecord } from "@/lib/db/students";
 
 export type AttendanceMark = "O" | "X" | "T" | "";
-export type AttendanceSemester = "first" | "second";
+export type AttendanceSemester = "first" | "second" | "all";
 
 export type AttendanceWeek = {
   cellKey: string;
@@ -35,7 +35,7 @@ export function attendanceWeeks(
     }
   });
 
-  const startMonthIndex = semester === "first" ? 0 : 6;
+  const startMonthIndex = semester === "second" ? 6 : 0;
   const endMonthIndex = semester === "first" ? 5 : 11;
   const weeks: AttendanceWeek[] = [];
   for (let monthIndex = startMonthIndex; monthIndex <= endMonthIndex; monthIndex += 1) {

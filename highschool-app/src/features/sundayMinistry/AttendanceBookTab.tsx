@@ -71,6 +71,7 @@ export default function AttendanceBookTab() {
           <div className="sunday-attendance-segment" role="group" aria-label="학기 선택">
             <button type="button" aria-pressed={semester === "first"} onClick={() => setSemester("first")}>1학기</button>
             <button type="button" aria-pressed={semester === "second"} onClick={() => setSemester("second")}>2학기</button>
+            <button type="button" aria-pressed={semester === "all"} onClick={() => setSemester("all")}>1년 전체</button>
           </div>
           <div className="sunday-attendance-segment" role="group" aria-label="부서 선택">
             <button type="button" aria-pressed={part === 1} onClick={() => { setPart(1); setPickedClassKey(""); }}>1부</button>

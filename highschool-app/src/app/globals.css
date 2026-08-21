@@ -1573,7 +1573,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .sunday-attendance-filters label > span { margin-left: 2px; color: var(--color-text-muted); font-size: 10px; font-weight: 750; }
 .sunday-attendance-filters .form-control { min-width: 112px; min-height: 42px; font-size: 12px; }
 .sunday-attendance-class-select .form-control { min-width: 190px; }
-.sunday-attendance-segment { display: flex; min-height: 42px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-bg-subtle); }
+.sunday-attendance-segment { display: flex; min-height: 42px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface-hover); }
 .sunday-attendance-segment button { min-width: 62px; border: 0; background: transparent; padding: 0 12px; color: var(--color-text-muted); cursor: pointer; font-size: 12px; font-weight: 750; }
 .sunday-attendance-segment button[aria-pressed="true"] { background: var(--color-primary); color: white; box-shadow: var(--shadow-xs); }
 .sunday-attendance-source-link { flex: 0 0 auto; white-space: nowrap; }
@@ -1583,19 +1583,20 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .sunday-attendance-summary > div > strong { display: block; margin-top: 3px; color: var(--color-text-primary); font-size: 18px; }
 .sunday-attendance-summary > div > p { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; }
 .sunday-attendance-summary dl { display: flex; gap: 8px; }
-.sunday-attendance-summary dl > div { min-width: 96px; border-radius: 12px; background: var(--color-bg-subtle); padding: 10px 12px; }
+.sunday-attendance-summary dl > div { min-width: 96px; border-radius: 12px; background: var(--color-surface-hover); padding: 10px 12px; }
 .sunday-attendance-summary dt { color: var(--color-text-faint); font-size: 9px; font-weight: 700; }
 .sunday-attendance-summary dd { margin-top: 3px; color: var(--color-text-primary); font-size: 14px; font-weight: 800; }
 .sunday-attendance-table-wrap { overflow-x: auto; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); outline: 0; scrollbar-gutter: stable; }
 .sunday-attendance-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; color: var(--color-text-secondary); font-size: 11px; }
 .sunday-attendance-table :where(th, td) { min-width: 48px; height: 44px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: 7px 8px; background: var(--color-surface); text-align: center; }
-.sunday-attendance-table thead th { position: sticky; z-index: 3; top: 0; height: 54px; background: var(--color-bg-subtle); color: var(--color-text-muted); font-size: 10px; font-weight: 800; }
+.sunday-attendance-table thead th { position: sticky; z-index: 3; top: 0; height: 54px; background: var(--color-surface-hover); color: var(--color-text-muted); font-size: 10px; font-weight: 800; }
 .sunday-attendance-table thead th small { display: block; max-width: 54px; overflow: hidden; margin-top: 3px; color: #a26f18; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .sunday-attendance-table .is-sticky { position: sticky; z-index: 2; }
 .sunday-attendance-table .is-number { left: 0; width: 46px; min-width: 46px; color: var(--color-text-faint); }
 .sunday-attendance-table .is-name { left: 46px; width: 128px; min-width: 128px; text-align: left; }
-.sunday-attendance-table thead .is-sticky { z-index: 5; background: var(--color-bg-subtle); }
+.sunday-attendance-table thead .is-sticky { z-index: 5; background: var(--color-surface-hover); }
 .sunday-attendance-table tbody .is-sticky { background: var(--color-surface); }
+.sunday-attendance-table .is-name { box-shadow: 1px 0 0 var(--color-border), 8px 0 12px rgba(18,28,24,.06); }
 .sunday-attendance-table tbody tr:hover :where(td, th) { background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
 .sunday-attendance-table .is-name small { margin-left: 5px; border-radius: 999px; background: #fff2d5; padding: 2px 4px; color: #a26f18; font-size: 8px; }
 .sunday-attendance-table td.mark-o, .sunday-attendance-legend .mark-o { background: #e4f8ef; color: #087a57; font-weight: 850; }
