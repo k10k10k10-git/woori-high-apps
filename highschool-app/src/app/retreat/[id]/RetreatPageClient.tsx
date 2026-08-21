@@ -247,7 +247,7 @@ export default function RetreatPageClient() {
                 ← 목록
               </button>
               <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0"
-                style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>
+                style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>
                 {retreat.year}년
               </span>
               <h1 className="font-bold text-white text-xs sm:text-base truncate min-w-0">{retreat.name}</h1>

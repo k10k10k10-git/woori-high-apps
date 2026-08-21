@@ -16,7 +16,7 @@ export default function FormGuideModal({ onClose }: Props) {
           style={{ background: "var(--color-header-bg)" }}>
           <div>
             <h3 className="font-bold text-white text-base">📋 구글폼 생성 가이드라인</h3>
-            <p className="text-xs mt-0.5" style={{ color: "var(--color-primary-light)" }}>앱과 정상 연동되는 폼을 만들기 위한 규칙</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-on-dark-accent)" }}>앱과 정상 연동되는 폼을 만들기 위한 규칙</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none transition-colors" aria-label="닫기">×</button>
         </div>
@@ -34,9 +34,9 @@ export default function FormGuideModal({ onClose }: Props) {
               <table className="w-full text-xs">
                 <thead>
                   <tr style={{ background: "var(--color-header-bg)" }}>
-                    <th className="px-3 py-2 text-left font-semibold w-10" style={{ color: "var(--color-primary-light)" }}>열</th>
-                    <th className="px-3 py-2 text-left font-semibold" style={{ color: "var(--color-primary-light)" }}>질문</th>
-                    <th className="px-3 py-2 text-left font-semibold" style={{ color: "var(--color-primary-light)" }}>응답값 형식</th>
+                    <th className="px-3 py-2 text-left font-semibold w-10" style={{ color: "var(--color-on-dark-accent)" }}>열</th>
+                    <th className="px-3 py-2 text-left font-semibold" style={{ color: "var(--color-on-dark-accent)" }}>질문</th>
+                    <th className="px-3 py-2 text-left font-semibold" style={{ color: "var(--color-on-dark-accent)" }}>응답값 형식</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">

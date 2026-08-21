@@ -243,7 +243,7 @@ export default function PortalHome() {
                 <div key={item.id} className="hero-agenda__row">
                   <span className={`hero-agenda__dot ${CALENDAR_KIND_STYLE[item.kind].dot}`} />
                   <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                  <span className="shrink-0 tabular-nums text-slate-300">{item.urgency === "today" ? "오늘" : item.date.slice(5).replace("-", ".")}</span>
+                  <span className="shrink-0 tabular-nums text-slate-300">{item.dayLabel}</span>
                 </div>
               ))}
               {homeActions.length === 0 && <p className="py-2 text-xs text-slate-300">예정된 일정이 없습니다.</p>}
@@ -254,8 +254,8 @@ export default function PortalHome() {
         <section className="grid gap-5 lg:grid-cols-3">
           {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag bg-[#edf4ff] px-3 py-1.5 text-[#2457b8]">학기 중 사역</span>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#edf4ff] group-hover:text-[#2457b8]">→</span>
+              <span className="tag home-domain-chip--semester bg-[#edf4ff] px-3 py-1.5 text-[#2457b8]">학기 중 사역</span>
+              <span className="home-domain-arrow--semester grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#edf4ff] group-hover:text-[#2457b8]">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
@@ -276,8 +276,8 @@ export default function PortalHome() {
 
           <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag bg-[#e9f6f1] px-3 py-1.5 text-[var(--color-primary)]">방학 중 사역</span>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#e9f6f1] group-hover:text-[var(--color-primary)]">→</span>
+              <span className="tag home-domain-chip--vacation bg-[#e9f6f1] px-3 py-1.5 text-[var(--color-primary)]">방학 중 사역</span>
+              <span className="home-domain-arrow--vacation grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#e9f6f1] group-hover:text-[var(--color-primary)]">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
@@ -347,7 +347,7 @@ export default function PortalHome() {
                 {homeActions.length > 0 ? homeActions.map((item) => {
                   const content = (
                     <>
-                      <span className={`home-action-date home-action-date--${item.urgency}`}>{item.date.slice(5).replace("-", ".")}</span>
+                      <span className={`home-action-date home-action-date--${item.urgency}`}>{item.dayLabel}</span>
                       <span className="min-w-0 flex-1">
                         <strong className="block truncate text-sm text-slate-800">{item.title}</strong>
                         <span className="mt-0.5 block text-[11px] text-slate-500">{item.meta}</span>

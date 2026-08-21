@@ -144,7 +144,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             role="tab"
             aria-selected={scope === "team"}
             onClick={() => setScope("team")}
-            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "team" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "team" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700"}`}
           >
             사역팀 출석부
           </button>
@@ -155,7 +155,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
               setScope("training");
               setTeamFilter("");
             }}
-            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "training" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}
+            className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === "training" ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700"}`}
           >
             훈련 출석부 <span className="ml-1 text-xs">{semesterRoster(applications, "training").length}명</span>
           </button>

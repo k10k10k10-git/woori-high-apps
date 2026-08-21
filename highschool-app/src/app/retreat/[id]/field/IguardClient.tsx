@@ -241,7 +241,7 @@ function IguardWorkspace({ id }: { id: string }) {
               <ArrowLeft aria-hidden="true" size={17} weight="bold" /><span>목록</span>
             </button>
             <span className="hidden text-slate-600 sm:inline">|</span>
-            <span className="hidden px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 sm:inline-flex" style={{ background: "var(--color-badge-bg)", color: "var(--color-primary-light)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
+            <span className="hidden px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 sm:inline-flex" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
             <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
             <button
               onClick={() => setSearchOpen(true)}
