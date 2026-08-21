@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AdminDashboard from "./AdminDashboardPanel";
 import TeamModal from "./TeamModal";
 import SiteRequestsPanel from "./SiteRequestsPanel";
 
-type Tab = "team" | "requests";
+type Tab = "dashboard" | "team" | "requests";
 
-export default function MyPageModal({ onClose, initialTab = "team" }: { onClose: () => void; initialTab?: Tab }) {
+export default function MyPageModal({ onClose, initialTab = "dashboard" }: { onClose: () => void; initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -56,18 +57,21 @@ export default function MyPageModal({ onClose, initialTab = "team" }: { onClose:
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-slate-950">통합관리자 마이페이지</h2>
-              <p className="mt-1 text-xs text-slate-500">팀원 권한과 사이트 요청사항을 한곳에서 관리합니다.</p>
+              <p className="mt-1 text-xs text-slate-500">운영 현황, 팀원 권한과 사이트 요청사항을 한곳에서 관리합니다.</p>
             </div>
             <button onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-xl text-slate-500 hover:bg-slate-200" aria-label="마이페이지 닫기">×</button>
           </div>
           <div className="mt-4 flex gap-1" role="tablist" aria-label="마이페이지 메뉴">
+            <TabButton selected={tab === "dashboard"} onClick={() => setTab("dashboard")}>대시보드</TabButton>
             <TabButton selected={tab === "team"} onClick={() => setTab("team")}>팀원 관리</TabButton>
             <TabButton selected={tab === "requests"} onClick={() => setTab("requests")}>요청사항</TabButton>
           </div>
         </header>
 
         <div role="tabpanel" className="admin-mypage-content p-3 sm:p-5">
-          {tab === "team" ? <TeamModal embedded /> : <SiteRequestsPanel />}
+          {tab === "dashboard" && <AdminDashboard onNavigate={setTab} />}
+          {tab === "team" && <TeamModal embedded />}
+          {tab === "requests" && <SiteRequestsPanel />}
         </div>
       </div>
     </div>

@@ -63,4 +63,13 @@ describe("모바일 운영 화면 계약", () => {
     expect(css).toContain("padding-bottom: 1px;");
     expect(css).toContain("white-space: nowrap;");
   });
+
+  it("통합관리자 마이페이지는 대시보드를 첫 탭으로 제공하고 기존 탭 이름을 보존한다", () => {
+    const myPage = source("src/features/portal/MyPageModal.tsx");
+    expect(myPage).toContain('initialTab = "dashboard"');
+    expect(myPage).toContain(">대시보드</TabButton>");
+    expect(myPage).toContain(">팀원 관리</TabButton>");
+    expect(myPage).toContain(">요청사항</TabButton>");
+    expect(myPage).toContain("<AdminDashboard onNavigate={setTab} />");
+  });
 });
