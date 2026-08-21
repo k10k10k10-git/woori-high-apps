@@ -235,3 +235,8 @@ npm run build
 - **접근법**: 1→ `src/features/portal/accessPolicy.ts`에서 줄일 권한(`manageRoles`)과 유지할 권한(`search`, `managePin`)을 별도 capability로 확인한다. 2→ `rg "canManageRolesOf" src`로 역할 관리 판정을 재사용한 검색·PIN·현장 도구 소비자를 전수 찾는다. 3→ 팀원 관리 진입과 역할 쓰기만 `canManageRolesOf`에 남기고 `PortalSearch.tsx`는 `searchScope`, `useRetreatPinGate.ts`와 `FieldHomeClient.tsx`는 `canManageRetreatPin`을 사용한다. 4→ 승인 대기는 `NO_ROLES`로 시작해 명시적 역할 선택 전 저장을 막고, 기존 팀원의 권한 상승은 개인정보 범위 확대 확인창을 거친다. 5→ 통합관리자 단독 역할 관리, 교역자 검색 유지, PIN 운영 역할 유지, 행정팀 주일 자기 팀 편집을 `accessPolicy.test.ts`에 고정한다.
 - **판단 질문**: 교역자의 `manageRoles`만 false로 바꾸고 소비자를 그대로 두지 않는다. 그렇게 하면 팀원 관리와 무관한 인물검색 연락처·수련회 PIN 우회·현장 관리자 도구까지 함께 사라진다. 반대로 UI 권한표를 세분화했다는 이유로 이 작업에서 Firebase Rules를 바꾸지도 않는다. Rules는 학생 앱 단일 원천과 별도 승인·검증 절차를 따라야 한다.
 - **재사용 규칙**: 역할 권한을 축소할 때는 `변경 capability 정의 → 기존 판정 소비자 전수 검색 → 기능별 전용 capability로 분리 → 최소 승인 기본값·상승 확인 → 역할 조합 회귀 테스트` 순서로 진행한다.
+
+### 유형 분리 규칙과 실제 역할 전환을 구분해 동일인 오진 진단하기 (2026-08-22)
+- **접근법**: 1→ 검색 결과의 연도·유형 조합을 보고 `src/features/portal/peopleSearch.ts`의 `hasHardIdentityConflict`와 `scripts/person-id-migration.mjs`의 `canMergeWorker`에서 학생·교사·스탭 유형 경계를 확인한다. 2→ Firebase CLI로 `classes/{학생연도}`와 `teacherStaff/{스탭연도}`만 읽고, 로컬 파일을 만들지 않은 인메모리 스크립트로 이름·경로·personId 및 생년·본인 연락처의 존재·일치 여부만 출력한다. 3→ 같은 이름이라는 사실, 강한 식별자 일치, 기존 personId 일치, 유형 전환 가능성을 각각 분리해 보고한다. 4→ 강한 근거가 없는 사례는 자동 통합 대상이 아니라 수동 검토 대상으로 남긴다.
+- **판단 질문**: 이름과 `3학년 → 2년 뒤 스탭` 흐름만으로 즉시 personId를 합치지 않는다. 동명이인을 합치면 여러 해 출석·수련회·학기 기록이 복구하기 어렵게 섞이고, 특히 스탭 원장에 생년월일이 없는 경우 역할 전환은 개연성이지 확정 근거가 아니기 때문이다. 반대로 유형이 다르다는 이유만으로 영구 분리를 정상으로 단정하지도 않는다. 실제 학생이 졸업 후 스탭이 되는 운영 생애주기가 존재한다.
+- **재사용 규칙**: 학생→스탭 동일인 의심은 `유형 하드가드 확인 → 두 원장 최소 범위 읽기 → 강한 식별자 일치·충돌 분리 → 유일 후보만 자동 연결 / 나머지는 수동 검토` 순서로 판단한다.
