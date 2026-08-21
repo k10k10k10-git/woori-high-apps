@@ -10,7 +10,7 @@
 - 통합은 이미 동일인 판정을 통과해 한 프로필 안에 모인 기록에서만 수행하므로 이름이 같은 다른 사람의 수련회 기록을 합치지 않는다.
 - 대표 카드는 최신 신청일을 우선하고, 날짜가 없으면 신청취소·부분참·입금완료·신청의 상태 우선순위와 정보량으로 결정한다. 대표 카드에 없는 성별 등 필드는 이전 중복 행에서 보충한다.
 - Firebase 원본 참가자·백업·수련회 기록은 수정하지 않는다. `peopleSearch.ts`의 읽기 모델만 바꿨다.
-- 검증: `peopleSearch.test.ts` 17개, 전체 `npm test` 78파일 649개, `npx tsc --noEmit`, 변경 파일 ESLint, production build 통과. **Production 미배포**.
+- 검증: `peopleSearch.test.ts` 17개, 전체 `npm test` 78파일 649개, `npx tsc --noEmit`, 변경 파일 ESLint, production build 통과. Vercel Production 배포 완료.
 
 ## 2026-08-22 최신 작업 — 매일 바뀌는 홈 응원·말씀
 
@@ -123,9 +123,9 @@
 
 ## 지금 상태 (한 문장)
 
-최신 인물조회 수련회 카드 통합 요청은 **구현·검증·푸시 완료, Production 미배포**이며, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
+최신 인물조회 수련회 카드 통합 요청은 **구현·검증·푸시·배포 완료**이며, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
 
-- 최신 배포 앱 기능 커밋: `6b2fcbd` (`통합사이트: 매일 응원과 말씀 홈 인사 추가`).
+- 최신 배포 앱 기능 커밋: `a7c8dcd` (`인물조회: 동일 수련회 참가 카드 통합`). 이 인수인계 문서 커밋도 같은 Production 빌드에 포함된다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
 - 브랜치는 `main` 하나뿐 (병합 완료된 `codex/unified-highschool`·`refactor/2026-07-plan`을 2026-08-13 삭제)
 - 작업 트리 깨끗 (미추적 `.agents/` `outputs/` `tmp/` + 학생 앱 `tmp/` 제외 — **`git add .` 금지**)
