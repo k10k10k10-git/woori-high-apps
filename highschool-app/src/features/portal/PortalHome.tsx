@@ -30,14 +30,7 @@ import {
 import SharedMinistryCalendar, { calendarKindForSourceSite, CALENDAR_KIND_STYLE, type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
-
-function todayYmd() {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dailyMinistryMessage";
 
 export default function PortalHome() {
   const { user, loading, roles, memberName, signIn, signOut } = useAuth();
@@ -56,7 +49,10 @@ export default function PortalHome() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string } | null>(null);
   const canEditSchedule = canEditArea("retreat-admin", roles) || iguardScopeOf(roles) === "all";
-  const monthlyMinistry = getMonthlyMinistry(new Date().getMonth() + 1);
+  const [today] = useState(seoulDateKey);
+  const monthlyMinistry = getMonthlyMinistry(Number(today.slice(5, 7)));
+  const dailyMessage = dailyMinistryMessage(today);
+  const friendlyName = friendlyMinistryName(memberName || user?.displayName);
 
   const semesterAllowed = canAccessArea("semester", roles);
   const fieldAllowed = canAccessArea("retreat-field", roles);
@@ -84,12 +80,11 @@ export default function PortalHome() {
   }, [user, roles, fail, ok]);
 
   const currentSemester = useMemo(() => {
-    const today = todayYmd();
     return semesters.find((semester) => {
       const { startDate, endDate } = semester.meta;
       return !!startDate && !!endDate && startDate <= today && today <= endDate;
     }) ?? semesters[0] ?? null;
-  }, [semesters]);
+  }, [semesters, today]);
 
   // user 가드가 필요하다 — 로그아웃해도 semesters 상태는 남아 currentSemester가 유지되므로,
   // 가드가 없으면 인증이 끊긴 채 재구독해 엉뚱한 permission_denied 배너가 뜬다.
@@ -124,12 +119,11 @@ export default function PortalHome() {
   }, [user, retreats, fail, ok]);
 
   const currentRetreat = useMemo(() => {
-    const today = todayYmd();
     const active = periods.find((period) => period.startDate <= today && today <= period.endDate);
     if (active) return retreats.find((retreat) => retreat.id === active.retreatId) ?? null;
     const next = periods.find((period) => period.startDate >= today);
     return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
-  }, [periods, retreats]);
+  }, [periods, retreats, today]);
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
     const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters";
     const semesterItems: SharedCalendarItem[] = currentSemester
@@ -165,8 +159,8 @@ export default function PortalHome() {
   }, [currentSemester, milestones, periods, retreats, roles, sessions]);
 
   const homeActions = useMemo(() => {
-    return buildHomeActions(calendarItems, todayYmd());
-  }, [calendarItems]);
+    return buildHomeActions(calendarItems, today);
+  }, [calendarItems, today]);
 
   async function submitSchedule() {
     if (!scheduleDraft) return;
@@ -233,8 +227,8 @@ export default function PortalHome() {
 
         <section className="page-hero home-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
           <div className="min-w-0">
-            <h1 className="page-title">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
-            <p className="page-description">학기 운영, 주일 사역, 수련회 행정과 현장 실행을 하나의 계정에서 이어갑니다.</p>
+            <h1 className="page-title">{friendlyName}, {dailyMessage.encouragement}</h1>
+            <p className="page-description">{dailyMessage.verse.text} · {dailyMessage.verse.reference}</p>
           </div>
           <div className="hero-agenda" aria-label="공유 사역 캘린더 할 일">
             <p className="hero-agenda__title">공유 캘린더 할 일</p>
