@@ -59,6 +59,32 @@ describe("인물 통합검색", () => {
     expect(groups[1].records.every((record) => record.period.includes("2025"))).toBe(true);
   });
 
+  it("같은 수련회의 중복 참가 행은 최신 신청·배정 카드 하나로 합치고 이전 필드도 보존한다", () => {
+    const data = fixture();
+    const summer = data.retreats.summer as Record<string, unknown>;
+    summer.participants = {
+      old: {
+        name: "강민채", studentId: "minchae", bu: "1부", grade: 2, class: 3,
+        gender: "여", registeredAt: "2026. 1. 4 오전 10:25:06",
+      },
+      latest: {
+        name: "강민채", studentId: "minchae", bu: "1부", grade: 2, class: 3,
+        phone: "010-1111-2222", registeredAt: "2026. 6. 21 오전 9:24:18",
+      },
+    };
+    summer.cellColors = { old: "green", latest: "blue" };
+
+    const target = buildPeopleProfiles(data).find((profile) => profile.records.some((record) => record.title.includes("기초훈련")));
+    const retreatRecords = target?.records.filter((record) => record.title === "수련회 신청·배정") ?? [];
+
+    expect(retreatRecords).toHaveLength(1);
+    expect(retreatRecords[0].fields).toEqual(expect.arrayContaining([
+      { label: "신청 상태", value: "입금완료" },
+      { label: "신청일", value: "2026. 6. 21 오전 9:24:18" },
+      { label: "성별", value: "여" },
+    ]));
+  });
+
   it("같은 이름이어도 생년과 연락처가 충돌하면 동명이인으로 분리한다", () => {
     const results = searchPeople(buildPeopleProfiles(fixture()), "강민채");
     expect(results).toHaveLength(2);

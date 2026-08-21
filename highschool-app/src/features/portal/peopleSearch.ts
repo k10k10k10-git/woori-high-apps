@@ -55,6 +55,63 @@ export function groupPersonRecordsByYear(records: PersonRecord[]): PersonYearGro
     }));
 }
 
+function recordFieldValue(record: PersonRecord, label: string) {
+  return record.fields.find((item) => item.label === label)?.value ?? "";
+}
+
+function recordDateValue(value: string) {
+  const iso = Date.parse(value);
+  if (Number.isFinite(iso)) return iso;
+  const match = value.match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\s*(오전|오후)?\s*(\d{1,2})?:?(\d{2})?:?(\d{2})?/);
+  if (!match) return 0;
+  let hour = Number(match[5]) || 0;
+  if (match[4] === "오후" && hour < 12) hour += 12;
+  if (match[4] === "오전" && hour === 12) hour = 0;
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), hour, Number(match[6]) || 0, Number(match[7]) || 0).getTime();
+}
+
+function retreatRecordPriority(record: PersonRecord) {
+  const status = recordFieldValue(record, "신청 상태");
+  const statusRank = ({ 신청취소: 4, 부분참: 3, 입금완료: 2, 신청: 1 } as Record<string, number>)[status] ?? 0;
+  return [recordDateValue(recordFieldValue(record, "신청일")), statusRank, record.fields.length] as const;
+}
+
+function compareRetreatRecords(a: PersonRecord, b: PersonRecord) {
+  const left = retreatRecordPriority(a);
+  const right = retreatRecordPriority(b);
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return right[index] - left[index];
+  }
+  return b.id.localeCompare(a.id);
+}
+
+/** 같은 사람 프로필 안에서 같은 수련회의 참가자 중복 행만 하나의 신청·배정 카드로 합친다. */
+export function consolidatePersonRecords(records: PersonRecord[]): PersonRecord[] {
+  const participantGroups = new Map<string, PersonRecord[]>();
+  const untouched: PersonRecord[] = [];
+  for (const record of records) {
+    const markerIndex = record.id.indexOf(":participant:");
+    if (!record.id.startsWith("retreat:") || markerIndex < 0 || record.title !== "수련회 신청·배정") {
+      untouched.push(record);
+      continue;
+    }
+    const retreatKey = record.id.slice(0, markerIndex);
+    participantGroups.set(retreatKey, [...(participantGroups.get(retreatKey) ?? []), record]);
+  }
+
+  const consolidated = [...participantGroups.values()].map((group) => {
+    const [primary, ...secondary] = [...group].sort(compareRetreatRecords);
+    const mergedFields = [...primary.fields];
+    for (const record of secondary) {
+      for (const item of record.fields) {
+        if (!mergedFields.some((current) => current.label === item.label)) mergedFields.push(item);
+      }
+    }
+    return { ...primary, fields: mergedFields, private: group.some((record) => record.private) || undefined };
+  });
+  return [...untouched, ...consolidated];
+}
+
 export type PersonProfile = {
   id: string;
   name: string;
@@ -627,7 +684,8 @@ export function buildPeopleProfiles(data: PeopleSearchData): PersonProfile[] {
     profiles.forEach((profile, index) => {
       const aliases = [...new Set(profile.evidence.map((item) => cleanDisplayName(item.name)).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, "ko"));
-      const records = profile.evidence.map((item) => item.record).sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+      const records = consolidatePersonRecords(profile.evidence.map((item) => item.record))
+        .sort((a, b) => b.sortKey.localeCompare(a.sortKey));
       const classRecords = records.filter((record) => record.category === "학적·출석");
       const years = [...new Set(records.map((record) => record.period.match(/\d{4}/)?.[0]).filter((value): value is string => !!value))].sort().reverse();
       const personId = profile.personIds.size === 1 ? [...profile.personIds][0] : "";
