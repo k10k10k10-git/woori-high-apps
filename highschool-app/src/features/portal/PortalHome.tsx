@@ -27,7 +27,7 @@ import {
   describeRolesHint,
   retreatEntryHref,
 } from "./accessPolicy";
-import SharedMinistryCalendar, { type SharedCalendarItem } from "./SharedMinistryCalendar";
+import SharedMinistryCalendar, { calendarKindForSourceSite, CALENDAR_KIND_STYLE, type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
 
@@ -37,14 +37,6 @@ function todayYmd() {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-function daysBetweenYmd(from: string, to: string) {
-  const toUtc = (value: string) => {
-    const [year, month, day] = value.split("-").map(Number);
-    return Date.UTC(year, month - 1, day);
-  };
-  return Math.round((toUtc(to) - toUtc(from)) / 86_400_000);
 }
 
 export default function PortalHome() {
@@ -165,43 +157,16 @@ export default function PortalHome() {
       id: `shared-${milestone.id}`,
       date: milestone.targetDate,
       title: milestone.title,
-      kind: "shared" as const,
+      kind: calendarKindForSourceSite(milestone.sourceSite),
       done: milestone.done,
+      editable: true,
     }));
     return [...semesterItems, ...retreatItems, ...sharedItems].sort((a, b) => a.date.localeCompare(b.date));
   }, [currentSemester, milestones, periods, retreats, roles, sessions]);
 
-  const homeSummary = useMemo(() => {
-    const today = todayYmd();
-    const todayCount = calendarItems.filter((item) => item.date <= today && (item.endDate ?? item.date) >= today).length;
-    const pendingCount = milestones.filter((item) => !item.done).length;
-    const nextPeriod = [...periods]
-      .filter((period) => period.endDate >= today)
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
-    const nextRetreat = nextPeriod
-      ? retreats.find((retreat) => retreat.id === nextPeriod.retreatId)
-      : null;
-    const daysUntil = nextPeriod ? daysBetweenYmd(today, nextPeriod.startDate) : null;
-    return {
-      todayCount,
-      pendingCount,
-      retreatName: nextRetreat?.name ?? "예정 없음",
-      retreatTiming: daysUntil === null ? "-" : daysUntil <= 0 ? "진행 중" : `D-${daysUntil}`,
-    };
-  }, [calendarItems, milestones, periods, retreats]);
-
   const homeActions = useMemo(() => {
-    const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : undefined;
-    return buildHomeActions({
-      today: todayYmd(),
-      roles,
-      milestones,
-      sessions: semesterAllowed ? sessions : [],
-      semesterHref,
-      periods,
-      retreats,
-    });
-  }, [currentSemester, milestones, periods, retreats, roles, semesterAllowed, sessions]);
+    return buildHomeActions(calendarItems, todayYmd());
+  }, [calendarItems]);
 
   async function submitSchedule() {
     if (!scheduleDraft) return;
@@ -271,10 +236,18 @@ export default function PortalHome() {
             <h1 className="page-title">{memberName || user.displayName || "선생님"}, 오늘도 함께 준비해요.</h1>
             <p className="page-description">학기 운영, 주일 사역, 수련회 행정과 현장 실행을 하나의 계정에서 이어갑니다.</p>
           </div>
-          <div className="grid grid-cols-3 gap-2.5 sm:gap-3" aria-label="오늘의 사역 요약">
-            <HeroMetric label="오늘 일정" value={`${homeSummary.todayCount}건`} />
-            <HeroMetric label="다음 수련회" value={homeSummary.retreatTiming} detail={homeSummary.retreatName} />
-            <HeroMetric label="미완료 준비" value={`${homeSummary.pendingCount}건`} />
+          <div className="hero-agenda" aria-label="공유 사역 캘린더 할 일">
+            <p className="hero-agenda__title">공유 캘린더 할 일</p>
+            <div className="mt-2 grid gap-1.5">
+              {homeActions.slice(0, 3).map((item) => (
+                <div key={item.id} className="hero-agenda__row">
+                  <span className={`hero-agenda__dot ${CALENDAR_KIND_STYLE[item.kind].dot}`} />
+                  <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                  <span className="shrink-0 tabular-nums text-slate-300">{item.urgency === "today" ? "오늘" : item.date.slice(5).replace("-", ".")}</span>
+                </div>
+              ))}
+              {homeActions.length === 0 && <p className="py-2 text-xs text-slate-300">예정된 일정이 없습니다.</p>}
+            </div>
           </div>
         </section>
 
@@ -356,9 +329,9 @@ export default function PortalHome() {
                 <p className="mt-1 text-xs text-slate-400">{describeRolesHint(roles)}</p>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료" tone="emerald" />}
-                {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·등록 현황·행정 변동" tone="amber" />}
-                {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="violet" />}
+                {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료 판정" tone="semester" />}
+                {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·등록 현황·행정 변동" tone="sunday" />}
+                {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="retreat" />}
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="field" />}
               </div>
             </section>
@@ -449,22 +422,12 @@ export default function PortalHome() {
   );
 }
 
-function HeroMetric({ label, value, detail }: { label: string; value: string; detail?: string }) {
-  return (
-    <div className="hero-metric">
-      <p className="text-xs font-medium text-slate-300">{label}</p>
-      <p className="mt-1 text-lg font-bold tabular-nums text-white sm:text-xl">{value}</p>
-      {detail && <p className="mt-1 truncate text-[11px] text-slate-300" title={detail}>{detail}</p>}
-    </div>
-  );
-}
-
-function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "emerald" | "amber" | "violet" | "field" }) {
+function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "semester" | "sunday" | "retreat" | "field" }) {
   const toneClass = {
-    emerald: "bg-[#edf4ff] text-[#2457b8] hover:bg-[#e4efff]",
-    amber: "bg-[#fff7e8] text-[#9a5b0b] hover:bg-[#ffefd1]",
-    violet: "bg-[#edf7f3] text-[#087a57] hover:bg-[#e3f2ec]",
+    semester: "bg-[#edf4ff] text-[#2457b8] hover:bg-[#e4efff]",
+    sunday: "bg-[#fff7e8] text-[#9a5b0b] hover:bg-[#ffefd1]",
+    retreat: "bg-[#edf7f3] text-[#087a57] hover:bg-[#e3f2ec]",
     field: "bg-[#f3f6f5] text-[#34423c] hover:bg-[#eaf0ed]",
   }[tone];
-  return <Link href={href} className={`rounded-xl p-3.5 transition hover:-translate-y-0.5 ${toneClass}`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
+  return <Link href={href} className={`ministry-area ministry-area--${tone} rounded-xl p-3.5 transition hover:-translate-y-0.5 ${toneClass}`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
 }

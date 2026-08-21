@@ -1,75 +1,45 @@
-import type { Session } from "@/features/semester/types";
-import { sessionDisplayLabel } from "@/features/semester/sessionKind";
-import type { Milestone, Retreat } from "@/lib/types";
-import type { RetreatPeriodWithOwner } from "@/lib/db";
-import { retreatEntryHref, type MinistryRoles } from "./accessPolicy";
+import type { SharedCalendarItem } from "./SharedMinistryCalendar";
 
 export type HomeAction = {
   id: string;
   date: string;
   title: string;
   meta: string;
+  kind: SharedCalendarItem["kind"];
   href?: string;
   urgency: "overdue" | "today" | "upcoming";
 };
 
-type BuildHomeActionsInput = {
-  today: string;
-  roles: MinistryRoles;
-  milestones: Milestone[];
-  sessions: Session[];
-  semesterHref?: string;
-  periods: RetreatPeriodWithOwner[];
-  retreats: Retreat[];
+const KIND_META: Record<SharedCalendarItem["kind"], string> = {
+  semester: "훈련·사역팀",
+  sunday: "주일 사역",
+  retreat: "수련회 행정",
+  field: "수련회 이가드",
 };
 
-function urgencyFor(date: string, today: string, endDate?: string): HomeAction["urgency"] {
-  if (date <= today && today <= (endDate ?? date)) return "today";
-  if (date < today) return "overdue";
+function urgencyFor(item: SharedCalendarItem, today: string): HomeAction["urgency"] {
+  if (item.date <= today && today <= (item.endDate ?? item.date)) return "today";
+  if (item.date < today) return "overdue";
   return "upcoming";
 }
 
-export function buildHomeActions(input: BuildHomeActionsInput): HomeAction[] {
-  const actions: HomeAction[] = input.milestones
-    .filter((item) => !item.done)
-    .map((item) => ({
-      id: `milestone-${item.id}`,
-      date: item.targetDate,
-      title: item.title,
-      meta: "공유 준비 일정",
-      urgency: urgencyFor(item.targetDate, input.today),
-    }));
-
-  const nextSession = input.sessions
-    .filter((item) => (item.endDate ?? item.date) >= input.today)
-    .sort((a, b) => a.date.localeCompare(b.date))[0];
-  if (nextSession) {
-    actions.push({
-      id: `session-${nextSession.id}`,
-      date: nextSession.date,
-      title: sessionDisplayLabel(nextSession),
-      meta: "다음 학기 일정",
-      href: input.semesterHref,
-      urgency: urgencyFor(nextSession.date, input.today, nextSession.endDate),
-    });
-  }
-
-  const nextPeriod = input.periods
-    .filter((period) => period.endDate >= input.today)
-    .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
-  if (nextPeriod) {
-    const retreat = input.retreats.find((item) => item.id === nextPeriod.retreatId);
-    actions.push({
-      id: `period-${nextPeriod.retreatId}-${nextPeriod.id}`,
-      date: nextPeriod.startDate,
-      title: retreat?.name ?? "수련회",
-      meta: nextPeriod.startDate <= input.today ? "현재 진행 중" : "다음 수련회",
-      href: retreatEntryHref(nextPeriod.retreatId, input.roles),
-      urgency: urgencyFor(nextPeriod.startDate, input.today),
-    });
-  }
-
-  return actions
-    .sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title, "ko"))
-    .slice(0, 6);
+/** 홈 할 일은 공유 사역 캘린더와 같은 항목을 그대로 쓴다. 과거 일정은 미완료 공유 준비만 남긴다. */
+export function buildHomeActions(items: SharedCalendarItem[], today: string, limit = 6): HomeAction[] {
+  const priority: Record<HomeAction["urgency"], number> = { overdue: 0, today: 1, upcoming: 2 };
+  return items
+    .filter((item) => !item.done && ((item.endDate ?? item.date) >= today || item.editable))
+    .map((item) => {
+      const urgency = urgencyFor(item, today);
+      return {
+        id: item.id,
+        date: item.date,
+        title: item.title,
+        meta: urgency === "overdue" ? `${KIND_META[item.kind]} · 기한 지남` : KIND_META[item.kind],
+        kind: item.kind,
+        href: item.href,
+        urgency,
+      };
+    })
+    .sort((a, b) => priority[a.urgency] - priority[b.urgency] || a.date.localeCompare(b.date) || a.title.localeCompare(b.title, "ko"))
+    .slice(0, limit);
 }

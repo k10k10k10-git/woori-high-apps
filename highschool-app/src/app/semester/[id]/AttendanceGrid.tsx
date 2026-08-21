@@ -7,10 +7,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { describeApplicant } from "@/features/semester/db";
-import { splitStudentsAndStaff } from "@/features/semester/roster";
+import { calcCompletion } from "@/features/semester/completion";
+import { isStaffApplication, splitStudentsAndStaff } from "@/features/semester/roster";
 import { sessionDateLabel, sessionDayLabel } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
-import type { Application, AttendanceStatus, Session, SessionAttendance } from "@/features/semester/types";
+import type { Application, AttendanceStatus, CompletionEntry, Session, SessionAttendance } from "@/features/semester/types";
 import { attendanceMenuPosition } from "./attendanceGridPosition";
 
 type Props = {
@@ -18,8 +19,11 @@ type Props = {
   sessions: Session[];
   attBySession: Record<string, SessionAttendance>;
   canEdit: boolean;
+  completion: Record<string, CompletionEntry>;
+  completionMinRate: number;
   onMark: (appKey: string, sessId: string, status: AttendanceStatus) => void;
   onClear: (appKey: string, sessId: string) => void;
+  onToggleCompletion: (appKey: string, field: "certPrinted" | "photoChecked", value: boolean) => void;
 };
 
 const MARK: Record<AttendanceStatus, { text: string; cell: string }> = {
@@ -50,7 +54,17 @@ function memberSections(members: Application[]): { label: string | null; rows: A
   ];
 }
 
-export default function AttendanceGrid({ members, sessions, attBySession, canEdit, onMark, onClear }: Props) {
+export default function AttendanceGrid({
+  members,
+  sessions,
+  attBySession,
+  canEdit,
+  completion,
+  completionMinRate,
+  onMark,
+  onClear,
+  onToggleCompletion,
+}: Props) {
   const [openCell, setOpenCell] = useState<{ appKey: string; sessId: string } | null>(null);
   // 메뉴는 body로 포털한다 — 표 컨테이너가 overflow-x:auto라 절대배치 메뉴가 아래에서 잘렸다.
   const [menuAt, setMenuAt] = useState<{ left: number; top: number } | null>(null);
@@ -58,7 +72,7 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const groups = useMemo(() => monthGroups(sessions), [sessions]);
   const sections = useMemo(() => memberSections(members), [members]);
-  const columnCount = sessions.length + 2;
+  const columnCount = sessions.length + 7;
 
   function closeMenu() {
     setOpenCell(null);
@@ -119,7 +133,7 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
     // 카드가 내용만큼만 차지하게 한다 — 회차가 적을 때 오른쪽에 빈 카드가 넓게 남지 않도록.
     <div className="card relative inline-block max-w-full overflow-x-auto align-top">
       {/* 회차가 적을 때 열이 늘어나지 않도록 내용 폭(w-max)으로 둔다 */}
-      <table className="semester-attendance-grid w-max border-collapse text-center text-sm">
+      <table className="semester-attendance-grid cell-action-grid w-max border-collapse text-center text-sm">
         <thead>
           <tr>
             <th rowSpan={2} className="sticky left-0 z-10 bg-white px-2 py-2 text-xs font-semibold text-slate-400">순</th>
@@ -129,6 +143,11 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
                 className="border-b px-2 py-1 text-xs font-bold"
                 style={{ borderColor: "var(--color-border)", color: "var(--color-primary)" }}>
                 {group.month}월
+              </th>
+            ))}
+            {(["점수", "출석률", "판정", "수료증", "사진"] as const).map((label) => (
+              <th key={label} rowSpan={2} className="min-w-16 border-l px-2 py-2 text-xs font-semibold text-slate-500" style={{ borderColor: "var(--color-border)" }}>
+                {label}
               </th>
             ))}
           </tr>
@@ -158,7 +177,11 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
                   </th>
                 </tr>
               )}
-              {section.rows.map((member, index) => (
+              {section.rows.map((member, index) => {
+                const staffMember = isStaffApplication(member);
+                const result = staffMember ? null : calcCompletion(member.id, sessions, attBySession, completionMinRate);
+                const check = completion[member.id] ?? {};
+                return (
                 <tr key={member.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
                   <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-xs text-slate-400">{index + 1}</td>
                   <td className="sticky left-8 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left">
@@ -189,8 +212,22 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
                       </td>
                     );
                   })}
+                  <td className="border-l px-2 py-1.5 text-xs tabular-nums text-slate-600" style={{ borderColor: "var(--color-border)" }}>
+                    {result ? `${result.score}/${result.maxScore}` : "-"}
+                  </td>
+                  <td className="px-2 py-1.5 text-xs tabular-nums text-slate-600">{result ? `${Math.round(result.rate * 100)}%` : "-"}</td>
+                  <td className="px-2 py-1.5">
+                    {result ? <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${result.completed ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-500"}`}>{result.completed ? "수료" : "미수료"}</span> : <span className="text-xs text-slate-400">대상 아님</span>}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {!staffMember && <input type="checkbox" aria-label={`${member.name} 수료증 제작`} disabled={!canEdit} checked={check.certPrinted ?? false} onChange={(event) => onToggleCompletion(member.id, "certPrinted", event.target.checked)} />}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {!staffMember && <input type="checkbox" aria-label={`${member.name} 사진 확인`} disabled={!canEdit} checked={check.photoChecked ?? false} onChange={(event) => onToggleCompletion(member.id, "photoChecked", event.target.checked)} />}
+                  </td>
                 </tr>
-              ))}
+                );
+              })}
             </Fragment>
           ))}
         </tbody>

@@ -2,7 +2,6 @@ export const SEMESTER_TRAINING_TABS = [
   "신청",
   "배치",
   "출석",
-  "수료",
   "커리큘럼",
   "아카이브",
   "설정",

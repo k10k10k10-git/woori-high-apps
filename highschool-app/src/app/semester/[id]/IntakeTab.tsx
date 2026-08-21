@@ -20,6 +20,7 @@ import { deriveTrainingOnly, isStaffApplicant, validateIntake } from "@/features
 import { isStaffApplication } from "@/features/semester/roster";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { parseClassKey } from "@/features/semester/classKey";
+import { contactOverrideValue, resolvedContact } from "@/features/semester/rosterContact";
 import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
@@ -39,6 +40,7 @@ interface PersonRow {
   jang?: boolean;
   /** 명단(classes/teacherStaff)에 등록된 연락처 — 읽기 전용 원천 */
   rosterPhone?: string;
+  rosterParentPhone?: string;
   title?: string;
 }
 
@@ -116,6 +118,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
             classNum: p!.classNum,
             jang: student.jang,
             rosterPhone: student.phone,
+            rosterParentPhone: student.pphone,
           }))
           .sort((a, b) => a.name.localeCompare(b.name, "ko")),
       }));
@@ -172,7 +175,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
     const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
     const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
     const trainingClass = app?.trainingClassId ? trainingClasses.find((c) => c.id === app.trainingClassId) : undefined;
-    const phone = priv?.phone || row.rosterPhone;
+    const contact = resolvedContact(priv, { phone: row.rosterPhone, parentPhone: row.rosterParentPhone });
     const staffRow = isStaffApplication(row);
     return (
       <li key={appKey}>
@@ -193,8 +196,8 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           {/* 교사·스탭은 훈련 대상도, 보호자 연락처 대상도 아니다 - 빈 칸으로 두지 말고 아예 감춘다. */}
           <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-500">
             {!staffRow && <span>훈련 {trainingClass?.name ?? (app?.trainingOnly ? "신청" : "미신청")}</span>}
-            <span>본인 {phone || "-"}</span>
-            {!staffRow && <span>보호자 {priv?.parentPhone || "-"}</span>}
+            <span>본인 {contact.phone || "-"}</span>
+            {!staffRow && <span>보호자 {contact.parentPhone || "-"}</span>}
           </span>
         </button>
       </li>
@@ -370,8 +373,9 @@ function IntakeModal({
   const [trainingClassId, setTrainingClassId] = useState(existing?.trainingClassId ?? "");
   const [assignedTeamId, setAssignedTeamId] = useState(existing?.teamId ?? "");
   const isStaff = isStaffApplicant({ grade: person.grade, bu: person.bu });
-  const [phone, setPhone] = useState(existingPrivate?.phone ?? person.rosterPhone ?? "");
-  const [parentPhone, setParentPhone] = useState(existingPrivate?.parentPhone ?? "");
+  const initialContact = resolvedContact(existingPrivate, { phone: person.rosterPhone, parentPhone: person.rosterParentPhone });
+  const [phone, setPhone] = useState(initialContact.phone ?? "");
+  const [parentPhone, setParentPhone] = useState(initialContact.parentPhone ?? "");
   const [motive, setMotive] = useState(existingPrivate?.motive ?? "");
   const [wish, setWish] = useState(existingPrivate?.wish ?? "");
   const [saving, setSaving] = useState(false);
@@ -408,8 +412,8 @@ function IntakeModal({
         {
           motive: motive.trim(),
           wish: wish.trim(),
-          phone: phone.trim(),
-          parentPhone: parentPhone.trim(),
+          phone: contactOverrideValue(phone, person.rosterPhone),
+          parentPhone: contactOverrideValue(parentPhone, person.rosterParentPhone),
         },
       );
       toast(`${person.name} 접수 완료`, "success");

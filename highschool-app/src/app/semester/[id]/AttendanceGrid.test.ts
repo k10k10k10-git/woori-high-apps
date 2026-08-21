@@ -25,9 +25,11 @@ describe("출석 상태 셀 밀도", () => {
     const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
 
     expect(source).toContain("semester-attendance-grid");
+    expect(source).toContain("cell-action-grid");
     expect(source).toContain("attendance-status-cell");
     expect(source).toContain("attendance-status-button");
     expect(css).toContain("table.semester-attendance-grid tbody td.attendance-status-cell");
+    expect(css).toContain("table.cell-action-grid tbody tr:hover");
     expect(css).toContain("padding: 0;");
     expect(css).toContain("padding-block: var(--table-cell-y);");
   });

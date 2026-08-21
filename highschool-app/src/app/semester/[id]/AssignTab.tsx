@@ -5,13 +5,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useUI } from "@/context/UIContext";
-import { describeApplicant, subscribeApplicationsPrivate, updateApplication } from "@/features/semester/db";
+import {
+  describeApplicant,
+  subscribeApplicationsPrivate,
+  subscribeClassesByYear,
+  subscribeStaffByYear,
+  updateApplication,
+} from "@/features/semester/db";
 import { STAFF_BU } from "@/features/semester/applicant";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { isStaffApplication, splitStudentsAndStaff } from "@/features/semester/roster";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { useDialogEscape } from "@/components/useDialogEscape";
-import { Application, ApplicationPrivate, Team, TrainingClass } from "@/features/semester/types";
+import { buildRosterContactMap, resolvedContact } from "@/features/semester/rosterContact";
+import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
   sid: string;
@@ -41,9 +48,16 @@ function groupByKind(members: Application[]): { key: string; label: string; rows
 export default function AssignTab({ sid, teams, trainingClasses, applications, teamById }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
+  const year = sid.split("-")[0];
   const [privateMap, setPrivateMap] = useState<Record<string, ApplicationPrivate>>({});
+  const [classes, setClasses] = useState<ClassInfo[]>([]);
+  const [staff, setStaff] = useState<StaffPerson[]>([]);
   const [detailTeamId, setDetailTeamId] = useState<string | null>(null);
-  useDialogEscape(!!detailTeamId, () => setDetailTeamId(null));
+  const [detailTrainingClassId, setDetailTrainingClassId] = useState<string | null>(null);
+  useDialogEscape(!!detailTeamId || !!detailTrainingClassId, () => {
+    setDetailTeamId(null);
+    setDetailTrainingClassId(null);
+  });
   const [expandedApplicantId, setExpandedApplicantId] = useState<string | null>(null);
   // 팀 카드의 스탭 목록은 한 번에 하나만 펼친다. 여러 개를 열어두면 카드 높이가 들쭉날쭉해진다.
   const [staffOpenTeamId, setStaffOpenTeamId] = useState<string | null>(null);
@@ -52,8 +66,16 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
 
   useEffect(() => {
     if (!canEdit) return;
-    return subscribeApplicationsPrivate(sid, setPrivateMap, (error) => toast(`상세정보 로드 실패: ${error.message}`, "error"));
-  }, [sid, canEdit, toast]);
+    const fail = (error: Error) => toast(`상세정보 로드 실패: ${error.message}`, "error");
+    const unsubs = [
+      subscribeApplicationsPrivate(sid, setPrivateMap, fail),
+      subscribeClassesByYear(year, setClasses, fail),
+      subscribeStaffByYear(year, setStaff, fail),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+  }, [sid, year, canEdit, toast]);
+
+  const rosterContactMap = useMemo(() => buildRosterContactMap(classes, staff), [classes, staff]);
 
   const targets = useMemo(
     () => applications.filter((a) => a.status !== "취소" && !a.trainingOnly),
@@ -291,26 +313,27 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
               const members = [...(byTrainingClass.get(c.id) ?? [])].sort(byApplicant);
               return (
                 <div key={c.id} className="card overflow-hidden">
-                  <div className={`px-4 py-2.5 text-sm font-semibold ${c.color}`}>
-                    {c.name} <span className="font-normal text-slate-600">{members.length}명</span>
-                    {c.teacher && <span className="ml-1 text-xs font-normal text-slate-500">담당 {c.teacher}</span>}
+                  <div className={`flex items-center justify-between gap-2 px-4 py-2.5 text-sm font-semibold ${c.color}`}>
+                    <span>
+                      {c.name} <span className="font-normal text-slate-600">{members.length}명</span>
+                      {c.teacher && <span className="ml-1 text-xs font-normal text-slate-500">담당 {c.teacher}</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDetailTrainingClassId(c.id);
+                        setExpandedApplicantId(null);
+                      }}
+                      className="shrink-0 rounded-lg bg-white/80 px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm hover:bg-white"
+                    >
+                      명단 상세
+                    </button>
                   </div>
                   <ul className="grid gap-1 p-3">
                     {members.map((a) => (
-                      <li key={a.id} className="flex items-center justify-between rounded px-2 py-1 text-sm hover:bg-slate-50">
-                        <span>
-                          {a.name}
-                          <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
-                        </span>
-                        {canEdit && (
-                          <button
-                            aria-label={`${a.name} 훈련 반 해제`}
-                            onClick={() => void assignTraining(a, "")}
-                            className="text-xs text-slate-400 hover:text-red-500"
-                          >
-                            ✕
-                          </button>
-                        )}
+                      <li key={a.id} className="rounded px-2 py-1 text-sm hover:bg-slate-50">
+                        {a.name}
+                        <span className="ml-1.5 text-xs text-slate-400">{describeApplicant(a)}</span>
                       </li>
                     ))}
                     {members.length === 0 && <li className="px-2 py-1 text-xs text-slate-300">아직 없음</li>}
@@ -373,6 +396,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                   <ul className="grid gap-2" id={collapsible ? "detail-staff-list" : undefined} hidden={!sectionOpen}>
                     {section.rows.map((application) => {
                       const detail = canEdit ? privateMap[application.id] : undefined;
+                      const contact = resolvedContact(detail, rosterContactMap[application.id]);
                       const expanded = expandedApplicantId === application.id;
                       const staffMember = isStaffApplication(application);
                       // 스탭에게는 지원 동기·하고 싶은 활동이 없다 — 펼칠 내용이 없으면 토글도 만들지 않는다.
@@ -387,8 +411,8 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                           <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
                             {canEdit ? (
                               <>
-                                <span>본인 {detail?.phone?.trim() || "-"}</span>
-                                {!staffMember && <span>보호자 {detail?.parentPhone?.trim() || "-"}</span>}
+                                <span>본인 {contact.phone || "-"}</span>
+                                {!staffMember && <span>보호자 {contact.parentPhone || "-"}</span>}
                               </>
                             ) : (
                               <span>연락처는 행정 권한에서 확인할 수 있습니다.</span>
@@ -434,6 +458,75 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                 </div>
                 );
               })}
+            </section>
+          </div>
+        );
+      })()}
+
+      {detailTrainingClassId && (() => {
+        const trainingClass = trainingClasses.find((item) => item.id === detailTrainingClassId);
+        const members = [...(byTrainingClass.get(detailTrainingClassId) ?? [])].sort(byApplicant);
+        if (!trainingClass) return null;
+        return (
+          <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4" onClick={() => setDetailTrainingClassId(null)}>
+            <section role="dialog" aria-modal="true" aria-label={`${trainingClass.name} 명단 상세`} className="card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-xl font-bold text-slate-900">{trainingClass.name}</h3>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${trainingClass.color}`}>{members.length}명</span>
+                    {trainingClass.teacher && <span className="text-xs text-slate-500">담당 {trainingClass.teacher}</span>}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 신청 내용과 연락처를 확인할 수 있습니다.</p>
+                </div>
+                <button onClick={() => setDetailTrainingClassId(null)} aria-label="닫기" className="rounded-lg px-2 py-1 text-lg text-slate-400 hover:bg-slate-100">✕</button>
+              </div>
+              {members.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-400">배정된 인원이 없습니다.</p>
+              ) : (
+                <ul className="grid gap-2">
+                  {members.map((application) => {
+                    const detail = canEdit ? privateMap[application.id] : undefined;
+                    const contact = resolvedContact(detail, rosterContactMap[application.id]);
+                    const expanded = expandedApplicantId === application.id;
+                    return (
+                      <li key={application.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => setExpandedApplicantId(expanded ? null : application.id)}
+                            className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                          >
+                            <span className="min-w-0">
+                              <span className="flex flex-wrap items-baseline gap-x-2">
+                                <strong className="text-sm text-slate-800">{application.name}</strong>
+                                <span className="text-xs text-slate-400">{describeApplicant(application)}</span>
+                              </span>
+                              <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-slate-500">
+                                {canEdit ? <><span>본인 {contact.phone || "-"}</span><span>보호자 {contact.parentPhone || "-"}</span></> : <span>연락처는 행정 권한에서 확인할 수 있습니다.</span>}
+                              </span>
+                            </span>
+                            <span className="shrink-0 text-xs text-slate-400">{expanded ? "접기" : "상세 보기"}</span>
+                          </button>
+                          {canEdit && (
+                            <button
+                              aria-label={`${application.name} 훈련 반 해제`}
+                              title="훈련 반 해제"
+                              onClick={() => void assignTraining(application, "")}
+                              className="shrink-0 self-stretch px-4 text-sm text-slate-400 hover:bg-red-50 hover:text-red-500"
+                            >✕</button>
+                          )}
+                        </div>
+                        {expanded && (
+                          <div className="grid gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-4">
+                            <DetailField label="지원 동기" value={detail?.motive} locked={!canEdit} />
+                            <DetailField label="하고 싶은 활동" value={detail?.wish} locked={!canEdit} />
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </section>
           </div>
         );

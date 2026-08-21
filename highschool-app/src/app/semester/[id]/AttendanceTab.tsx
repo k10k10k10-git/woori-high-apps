@@ -7,14 +7,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
-import { clearAttendance, describeApplicant, setAttendance, subscribeAllAttendance, subscribeSessionAttendance } from "@/features/semester/db";
+import {
+  clearAttendance,
+  describeApplicant,
+  setAttendance,
+  subscribeAllAttendance,
+  subscribeCompletion,
+  subscribeSessionAttendance,
+  updateCompletionEntry,
+} from "@/features/semester/db";
 import AttendanceGrid from "./AttendanceGrid";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
 import { sessionDateLabel, sessionIncludesDate } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
-import { Application, AttendanceStatus, Session, SessionAttendance, Team, TrainingClass } from "@/features/semester/types";
+import { Application, AttendanceStatus, CompletionEntry, SemesterMeta, Session, SessionAttendance, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
   sid: string;
@@ -23,6 +31,7 @@ interface Props {
   sessions: Session[];
   applications: Application[];
   teamById: Map<string, Team>;
+  meta: SemesterMeta | null;
 }
 
 const STATUS_BTN: { s: AttendanceStatus; on: string }[] = [
@@ -36,7 +45,7 @@ function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById }: Props) {
+export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
@@ -46,6 +55,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [scope, setScope] = useState<SemesterRosterScope>("team");
   const [att, setAtt] = useState<SessionAttendance>({});
   const [attAll, setAttAll] = useState<Record<string, SessionAttendance>>({});
+  const [completion, setCompletion] = useState<Record<string, CompletionEntry>>({});
   const [view, setView] = useState<"grid" | "session">("grid");
   const [loadError, setLoadError] = useState<string | null>(null);
   const defaultSessId = useMemo(() => {
@@ -67,7 +77,12 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   // 표 보기는 전 회차를 한 번에 본다 (수료 탭과 같은 경로를 재사용)
   useEffect(() => {
     if (view !== "grid") return;
-    return subscribeAllAttendance(sid, setAttAll, (e) => setLoadError(e.message));
+    const fail = (error: Error) => setLoadError(error.message);
+    const unsubs = [
+      subscribeAllAttendance(sid, setAttAll, fail),
+      subscribeCompletion(sid, setCompletion, fail),
+    ];
+    return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [sid, view]);
 
   const session = sessions.find((s) => s.id === activeSessId);
@@ -95,6 +110,14 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   }
 
   const mark = (appKey: string, status: AttendanceStatus) => markAt(appKey, activeSessId, status);
+
+  async function toggleCompletion(appKey: string, field: "certPrinted" | "photoChecked", value: boolean) {
+    try {
+      await updateCompletionEntry(sid, appKey, { [field]: value });
+    } catch (error) {
+      toast(`수료 후속 작업 저장 실패: ${error instanceof Error ? error.message : String(error)}`, "error");
+    }
+  }
 
   if (sessions.length === 0) {
     return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
@@ -216,8 +239,11 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           sessions={sessions}
           attBySession={attAll}
           canEdit={canEdit}
+          completion={completion}
+          completionMinRate={meta?.completionRule?.minRate ?? 0.7}
           onMark={(appKey, sessionId, status) => void markAt(appKey, sessionId, status)}
           onClear={(appKey, sessionId) => void clearAttendance(sid, sessionId, appKey)}
+          onToggleCompletion={(appKey, field, value) => void toggleCompletion(appKey, field, value)}
         />
       ) : (
       <>

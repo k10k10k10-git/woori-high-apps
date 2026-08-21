@@ -377,6 +377,16 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
                     }}
                     className="input w-40 px-2 py-1 text-xs"
                   />
+                ) : kind === "직접" ? (
+                  <button
+                    type="button"
+                    aria-label={`${sessionDateLabel(s)} 회차 이름 수정`}
+                    title="직접 입력한 회차 이름 수정"
+                    onClick={() => setLabelDraft({ sessionId: s.id, text: customLabel })}
+                    className="rounded bg-slate-100 px-1.5 py-0.5 text-xs transition hover:bg-slate-200"
+                  >
+                    {sessionDisplayLabel(s)} <span aria-hidden="true">✎</span>
+                  </button>
                 ) : (
                   <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{sessionDisplayLabel(s)}</span>
                 )}

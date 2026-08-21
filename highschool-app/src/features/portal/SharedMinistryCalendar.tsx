@@ -8,17 +8,32 @@ export type SharedCalendarItem = {
   date: string;
   endDate?: string;
   title: string;
-  /** shared = 직접 등록한 공유 일정(prepMilestones) — 이 화면에서 추가·수정·삭제한다 */
-  kind: "semester" | "retreat" | "shared";
+  kind: "semester" | "sunday" | "retreat" | "field";
   href?: string;
   done?: boolean;
+  /** prepMilestones에서 온 일정만 이 화면에서 수정·삭제한다. */
+  editable?: boolean;
 };
 
 const KIND_LABEL: Record<SharedCalendarItem["kind"], string> = {
-  semester: "학기 중 사역",
-  retreat: "방학 중 사역",
-  shared: "공유 일정",
+  semester: "훈련·사역팀",
+  sunday: "주일 사역",
+  retreat: "수련회 행정",
+  field: "수련회 이가드",
 };
+
+export const CALENDAR_KIND_STYLE: Record<SharedCalendarItem["kind"], { chip: string; detail: string; dot: string }> = {
+  semester: { chip: "bg-blue-100 text-blue-800", detail: "text-blue-300", dot: "bg-blue-500" },
+  sunday: { chip: "bg-amber-100 text-amber-800", detail: "text-amber-300", dot: "bg-amber-500" },
+  retreat: { chip: "bg-emerald-100 text-emerald-800", detail: "text-emerald-300", dot: "bg-emerald-500" },
+  field: { chip: "bg-slate-100 text-slate-700", detail: "text-slate-300", dot: "bg-slate-400" },
+};
+
+export function calendarKindForSourceSite(sourceSite?: string): SharedCalendarItem["kind"] {
+  if (sourceSite?.startsWith("sunday-")) return "sunday";
+  if (sourceSite === "move-guide" || sourceSite?.startsWith("iguard")) return "field";
+  return "retreat";
+}
 
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -91,11 +106,11 @@ export default function SharedMinistryCalendar({
                 <button
                   key={date}
                   onClick={() => setSelectedDate(date)}
-                  className={`min-h-20 border-t border-slate-100 p-1.5 text-left align-top transition sm:min-h-24 sm:p-2 ${selected ? "calendar-selected" : "hover:bg-slate-50"}`}
+                  className={`calendar-day min-h-20 border-t border-slate-100 p-1.5 text-left align-top transition sm:min-h-24 sm:p-2 ${selected ? "calendar-selected" : ""}`}
                 >
                   <span className={`grid h-6 w-6 place-items-center rounded-full text-xs font-semibold ${date === ymd(today.getFullYear(), today.getMonth(), today.getDate()) ? "calendar-today text-white" : "text-slate-600"}`}>{day}</span>
                   <span className="mt-1 grid gap-1">
-                    {dayItems.slice(0, 2).map((item) => <span key={item.id} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium ${item.kind === "semester" ? "bg-emerald-100 text-emerald-800" : item.kind === "retreat" ? "bg-violet-100 text-violet-800" : "bg-sky-100 text-sky-800"}`}>{item.title}</span>)}
+                    {dayItems.slice(0, 2).map((item) => <span key={item.id} className={`truncate rounded px-1.5 py-1 text-[10px] font-medium ${CALENDAR_KIND_STYLE[item.kind].chip}`}>{item.title}</span>)}
                     {dayItems.length > 2 && <span className="px-1 text-[10px] text-slate-400">+{dayItems.length - 2}개</span>}
                   </span>
                 </button>
@@ -123,13 +138,13 @@ export default function SharedMinistryCalendar({
             {selectedItems.map((item) => {
               const body = (
                 <>
-                  <span className={`text-[10px] font-bold ${item.kind === "semester" ? "text-emerald-300" : item.kind === "retreat" ? "text-violet-300" : "text-sky-300"}`}>
+                  <span className={`text-[10px] font-bold ${CALENDAR_KIND_STYLE[item.kind].detail}`}>
                     {KIND_LABEL[item.kind]}
                   </span>
                   <p className={`mt-1 text-sm font-semibold leading-snug ${item.done ? "text-slate-400 line-through" : ""}`}>{item.title}</p>
                 </>
               );
-              if (item.kind === "shared") {
+              if (item.editable) {
                 return (
                   <div key={item.id} className="rounded-xl border border-white/10 bg-white/5 p-3">
                     {body}

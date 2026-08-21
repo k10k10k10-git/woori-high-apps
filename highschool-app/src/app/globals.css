@@ -439,6 +439,10 @@ table th {
 .card table tbody tr:hover {
   background: #f2f8f5;
 }
+/* 셀 자체가 액션인 격자에서는 행 전체를 칠하지 않는다. 현재 마우스가 있는 셀만 각 컴포넌트의 hover를 쓴다. */
+.card table.cell-action-grid tbody tr:hover {
+  background: transparent;
+}
 .card table tbody td {
   padding-top: var(--table-cell-y);
   padding-bottom: var(--table-cell-y);
@@ -459,6 +463,10 @@ table th {
   display: block;
   padding-block: var(--table-cell-y);
   line-height: 1.2;
+}
+.card table.semester-attendance-grid .attendance-status-button:not(:disabled):hover {
+  box-shadow: inset 0 0 0 1px var(--color-border-hover);
+  background: color-mix(in srgb, currentColor 5%, transparent);
 }
 .card table tbody tr + tr { box-shadow: inset 0 1px rgba(227,233,230,.82); }
 
@@ -1069,6 +1077,17 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
   backdrop-filter: blur(8px);
 }
+.hero-agenda {
+  min-width: 0;
+  border-radius: 18px;
+  background: rgba(255,255,255,.075);
+  padding: 13px 15px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.09);
+  backdrop-filter: blur(8px);
+}
+.hero-agenda__title { color: var(--color-on-dark-secondary); font-size: 11px; font-weight: 700; }
+.hero-agenda__row { display: flex; min-height: 28px; align-items: center; gap: 8px; color: white; font-size: 12px; font-weight: 650; }
+.hero-agenda__dot { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 999px; }
 
 .calendar-shell { overflow: hidden; }
 .calendar-grid {
@@ -1079,6 +1098,8 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   background: #eaf6f1;
   box-shadow: inset 0 0 0 2px #75c9aa;
 }
+.calendar-day:hover { background: var(--color-surface-hover); }
+.calendar-day.calendar-selected:hover { background: #eaf6f1; }
 .calendar-today { background: var(--color-header-bg); }
 .calendar-detail-panel {
   background:
@@ -1811,6 +1832,11 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 [data-theme="dark"] .table-header th { border-color: var(--color-border); background: #202823; color: var(--color-text-muted); }
 [data-theme="dark"] .card table tbody tr:hover,
 [data-theme="dark"] .overflow-x-auto > table tbody tr:hover { background: #1c2721; }
+[data-theme="dark"] .card table.cell-action-grid tbody tr:hover,
+[data-theme="dark"] .overflow-x-auto > table.cell-action-grid tbody tr:hover { background: transparent; }
+[data-theme="dark"] :where(.hover\:bg-white:hover, .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover) {
+  background-color: var(--color-surface-hover) !important;
+}
 [data-theme="dark"] .card table tbody tr + tr { box-shadow: inset 0 1px var(--color-border); }
 [data-theme="dark"] .overflow-x-auto > table :where(td, th) { border-bottom-color: var(--color-border); }
 [data-theme="dark"] .surface-panel { background: rgba(23,29,26,.95); box-shadow: 0 0 0 1px rgba(255,255,255,.055), var(--shadow-sm); }
@@ -1828,6 +1854,13 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 [data-theme="dark"] .form-control { background: var(--color-surface); }
 [data-theme="dark"] .calendar-grid { background: var(--color-surface); }
 [data-theme="dark"] .calendar-selected { background: #183d30; box-shadow: inset 0 0 0 2px #3b9c78; }
+[data-theme="dark"] .calendar-day:hover { background: #202a24; }
+[data-theme="dark"] .calendar-day.calendar-selected:hover { background: #183d30; }
+[data-theme="dark"] .ministry-area { background: #1b2420 !important; }
+[data-theme="dark"] .ministry-area--semester { color: #8ab7ff !important; }
+[data-theme="dark"] .ministry-area--sunday { color: #f3c16d !important; }
+[data-theme="dark"] .ministry-area--retreat { color: #69dcb0 !important; }
+[data-theme="dark"] .ministry-area--field { color: var(--color-text-secondary) !important; }
 [data-theme="dark"] .ministry-guide-page { background: linear-gradient(180deg, #102018 0, var(--color-bg) 330px); }
 
 /* 브레인스토밍 노트는 종이 메타포이므로 밝은 색을 보존한다. */

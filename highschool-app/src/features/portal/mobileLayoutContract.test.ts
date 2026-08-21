@@ -54,7 +54,7 @@ describe("모바일 운영 화면 계약", () => {
   });
 
   it("반별 명단 학생 셀은 전역 카드 표보다 조밀한 전용 행간을 사용한다", () => {
-    expect(source("src/app/retreat/[id]/ClassRosterTab.tsx")).toContain("class-roster-grid text-xs");
+    expect(source("src/app/retreat/[id]/ClassRosterTab.tsx")).toContain("class-roster-grid cell-action-grid text-xs");
     const css = source("src/app/globals.css");
     expect(css).toContain(".card table.class-roster-grid tbody td");
     expect(css).toContain("height: 24px;");
