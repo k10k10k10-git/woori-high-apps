@@ -98,6 +98,20 @@ export function subscribeToAttendanceByYear(
   return onValue(ref(db, paths.attendance(year)), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
 }
 
+export type AttendanceEventRecord = {
+  month?: string | number;
+  day?: string | number;
+  label?: string;
+};
+
+export function subscribeToAttendanceEventsByYear(
+  year: number,
+  callback: (events: Record<string, AttendanceEventRecord>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(ref(db, paths.events(year)), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
+}
+
 // ── Teachers from DB (classes node) ──────────────────────
 
 export interface LoadableTeacher { name: string; bu: string; classKey: string; originKey: string; gender?: "남" | "여"; }

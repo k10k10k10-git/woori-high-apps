@@ -15,6 +15,8 @@ export type MinistryGuideSection = {
   caution?: string;
 };
 
+export const MINISTRY_GUIDE_BASE_YEAR = 2026;
+
 export const MINISTRY_THEME = {
   title: "Glorify the LORD - 그의 이름을 높이세",
   verse: "나와 함께 여호와를 광대하시다 하며 함께 그의 이름을 높이세 · 시편 34편 3절",
@@ -35,6 +37,19 @@ export const MONTHLY_MINISTRIES: MonthlyMinistry[] = [
   { month: 11, curriculum: "수험생 축복예배", focus: ["수험생 목양", "수능기도회"] },
   { month: 12, curriculum: "크리스마스 섬김 프로젝트", focus: ["시험기간 격려", "연말·신년 준비"] },
 ];
+
+/**
+ * 2026년은 기존 가안과 운영 중 편집값을 그대로 이어간다.
+ * 다른 연도는 이전 계획을 자동 복제하지 않고 빈 12개월로 시작한다.
+ */
+export function monthlyMinistriesForYear(year: number): MonthlyMinistry[] {
+  if (year === MINISTRY_GUIDE_BASE_YEAR) return MONTHLY_MINISTRIES;
+  return Array.from({ length: 12 }, (_, index) => ({
+    month: index + 1,
+    curriculum: "",
+    focus: [],
+  }));
+}
 
 export const MINISTRY_GUIDE_SECTIONS: MinistryGuideSection[] = [
   {

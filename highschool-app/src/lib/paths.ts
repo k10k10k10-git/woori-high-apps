@@ -123,6 +123,7 @@ export const paths = {
   classes: (year: number) => `classes/${year}`,
   attendanceRoot: () => "attendance",
   attendance: (year: number) => `attendance/${year}`,
+  events: (year: number) => `events/${year}`,
   teacherStaff: (year: number) => `teacherStaff/${year}`,
   teacherSpecial: (year: number) => `teacherSpecial/${year}`,
   teacherExtra: (year: number) => `teacherExtra/${year}`,

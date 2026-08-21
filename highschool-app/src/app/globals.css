@@ -1474,6 +1474,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .guide-month-panel { margin-top: 28px; padding: 26px; }
 .guide-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .guide-section-heading > div > p:last-child { margin-top: 6px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.guide-year-heading { display: flex; align-items: center; gap: 9px; }
+.guide-year-heading button { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); color: var(--color-text-secondary); cursor: pointer; font-size: 21px; line-height: 1; transition: border-color var(--duration-fast), color var(--duration-fast), background var(--duration-fast); }
+.guide-year-heading button:hover { border-color: #84c9b2; background: #edf7f3; color: var(--color-primary); }
 .guide-month-tabs { display: grid; margin-top: 22px; grid-template-columns: repeat(12, minmax(48px, 1fr)); gap: 6px; }
 .guide-month-tabs button { min-height: 40px; border: 0; border-radius: 10px; background: #f3f6f4; color: var(--color-text-muted); cursor: pointer; font-size: 12px; font-weight: 700; transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast); }
 .guide-month-tabs button:hover { background: #e4efe9; color: var(--color-primary); }
@@ -1485,6 +1488,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .guide-month-brief h3 { font-size: 16px; line-height: 1.5; }
 .guide-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .guide-chip-list span { border-radius: 999px; background: white; padding: 7px 10px; color: var(--color-text-secondary); font-size: 11px; font-weight: 650; box-shadow: var(--shadow-xs); }
+.guide-chip-list .guide-empty-chip { color: var(--color-text-faint); font-weight: 600; }
 .guide-search { display: flex; width: min(310px, 100%); min-height: 42px; align-items: center; gap: 8px; border-radius: 12px; background: white; padding: 0 13px; box-shadow: inset 0 0 0 1px var(--color-border), var(--shadow-xs); }
 .guide-search span { color: var(--color-text-faint); font-size: 18px; }
 .guide-search input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--color-text-primary); font-size: 12px; }
@@ -1561,6 +1565,48 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .home-ministry-brief__action b { transition: transform var(--duration-fast); }
 .home-ministry-brief:hover .home-ministry-brief__action b { transform: translateX(3px); }
 
+/* ── 주일 행정팀 출석부 (학생 앱 소유 원장 읽기 전용) ── */
+.sunday-attendance-book { overflow: hidden; padding: 0; }
+.sunday-attendance-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 18px; border-bottom: 1px solid var(--color-border); padding: 20px 22px; }
+.sunday-attendance-filters { display: flex; min-width: 0; align-items: end; flex-wrap: wrap; gap: 10px; }
+.sunday-attendance-filters label { display: grid; gap: 6px; }
+.sunday-attendance-filters label > span { margin-left: 2px; color: var(--color-text-muted); font-size: 10px; font-weight: 750; }
+.sunday-attendance-filters .form-control { min-width: 112px; min-height: 42px; font-size: 12px; }
+.sunday-attendance-class-select .form-control { min-width: 190px; }
+.sunday-attendance-segment { display: flex; min-height: 42px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-bg-subtle); }
+.sunday-attendance-segment button { min-width: 62px; border: 0; background: transparent; padding: 0 12px; color: var(--color-text-muted); cursor: pointer; font-size: 12px; font-weight: 750; }
+.sunday-attendance-segment button[aria-pressed="true"] { background: var(--color-primary); color: white; box-shadow: var(--shadow-xs); }
+.sunday-attendance-source-link { flex: 0 0 auto; white-space: nowrap; }
+.sunday-attendance-error { margin: 16px 22px 0; border: 1px solid #f3c5c5; border-radius: 12px; background: #fff0f0; padding: 11px 13px; color: #a33b3b; font-size: 12px; }
+.sunday-attendance-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 22px; }
+.sunday-attendance-summary > div > span { color: var(--color-text-faint); font-size: 10px; font-weight: 700; }
+.sunday-attendance-summary > div > strong { display: block; margin-top: 3px; color: var(--color-text-primary); font-size: 18px; }
+.sunday-attendance-summary > div > p { margin-top: 3px; color: var(--color-text-muted); font-size: 11px; }
+.sunday-attendance-summary dl { display: flex; gap: 8px; }
+.sunday-attendance-summary dl > div { min-width: 96px; border-radius: 12px; background: var(--color-bg-subtle); padding: 10px 12px; }
+.sunday-attendance-summary dt { color: var(--color-text-faint); font-size: 9px; font-weight: 700; }
+.sunday-attendance-summary dd { margin-top: 3px; color: var(--color-text-primary); font-size: 14px; font-weight: 800; }
+.sunday-attendance-table-wrap { overflow-x: auto; border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); outline: 0; scrollbar-gutter: stable; }
+.sunday-attendance-table { width: max-content; min-width: 100%; border-collapse: separate; border-spacing: 0; color: var(--color-text-secondary); font-size: 11px; }
+.sunday-attendance-table :where(th, td) { min-width: 48px; height: 44px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); padding: 7px 8px; background: var(--color-surface); text-align: center; }
+.sunday-attendance-table thead th { position: sticky; z-index: 3; top: 0; height: 54px; background: var(--color-bg-subtle); color: var(--color-text-muted); font-size: 10px; font-weight: 800; }
+.sunday-attendance-table thead th small { display: block; max-width: 54px; overflow: hidden; margin-top: 3px; color: #a26f18; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.sunday-attendance-table .is-sticky { position: sticky; z-index: 2; }
+.sunday-attendance-table .is-number { left: 0; width: 46px; min-width: 46px; color: var(--color-text-faint); }
+.sunday-attendance-table .is-name { left: 46px; width: 128px; min-width: 128px; text-align: left; }
+.sunday-attendance-table thead .is-sticky { z-index: 5; background: var(--color-bg-subtle); }
+.sunday-attendance-table tbody .is-sticky { background: var(--color-surface); }
+.sunday-attendance-table tbody tr:hover :where(td, th) { background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
+.sunday-attendance-table .is-name small { margin-left: 5px; border-radius: 999px; background: #fff2d5; padding: 2px 4px; color: #a26f18; font-size: 8px; }
+.sunday-attendance-table td.mark-o, .sunday-attendance-legend .mark-o { background: #e4f8ef; color: #087a57; font-weight: 850; }
+.sunday-attendance-table td.mark-t, .sunday-attendance-legend .mark-t { background: #fff4d8; color: #a1690d; font-weight: 850; }
+.sunday-attendance-table td.mark-x, .sunday-attendance-legend .mark-x { background: #ffebeb; color: #b54141; font-weight: 850; }
+.sunday-attendance-table td.is-event, .sunday-attendance-legend .is-event { background: #f4f0e7; color: #8c6c31; font-weight: 800; }
+.sunday-attendance-empty { height: 150px !important; color: var(--color-text-faint); }
+.sunday-attendance-legend { display: flex; padding: 14px 22px 20px; flex-wrap: wrap; gap: 7px; }
+.sunday-attendance-legend span { border-radius: 999px; padding: 5px 8px; font-size: 9px; }
+.sunday-attendance-empty-state { padding: 70px 22px; color: var(--color-text-faint); text-align: center; font-size: 12px; }
+
 @media (max-width: 900px) {
   .ministry-guide-hero, .guide-tools-grid { grid-template-columns: 1fr; }
   .guide-month-tabs { grid-template-columns: repeat(6, minmax(48px, 1fr)); }
@@ -1591,6 +1637,19 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .home-ministry-brief { align-items: start; padding: 20px; grid-template-columns: 56px minmax(0, 1fr); }
   .home-ministry-brief__month span { font-size: 27px; }
   .home-ministry-brief__action { grid-column: 1 / -1; justify-content: space-between; }
+  .guide-year-heading { justify-content: space-between; }
+  .guide-year-heading h2 { text-align: center; }
+  .sunday-attendance-toolbar { align-items: stretch; flex-direction: column; padding: 16px; }
+  .sunday-attendance-filters { display: grid; align-items: end; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sunday-attendance-filters label, .sunday-attendance-filters .form-control, .sunday-attendance-segment { width: 100%; min-width: 0; }
+  .sunday-attendance-segment button { flex: 1; min-width: 0; }
+  .sunday-attendance-class-select { grid-column: 1 / -1; }
+  .sunday-attendance-source-link { justify-content: center; }
+  .sunday-attendance-summary { align-items: stretch; flex-direction: column; padding: 17px 16px; }
+  .sunday-attendance-summary dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sunday-attendance-summary dl > div { min-width: 0; padding: 9px; }
+  .sunday-attendance-table .is-name { width: 104px; min-width: 104px; }
+  .sunday-attendance-legend { padding-inline: 16px; }
 }
 
 /* ── 2026 Preserve redesign ──
@@ -1891,6 +1950,8 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 [data-theme="dark"] .guide-form-grid input,
 [data-theme="dark"] .guide-question-list li { background: #202923; }
 [data-theme="dark"] .guide-month-tabs button:hover { background: #28382f; }
+[data-theme="dark"] .guide-year-heading button { background: #202923; }
+[data-theme="dark"] .guide-year-heading button:hover { background: #28382f; }
 [data-theme="dark"] .guide-month-brief,
 [data-theme="dark"] .guide-edit-panel { background: #152b22; }
 [data-theme="dark"] .guide-chip-list span,
@@ -1901,6 +1962,16 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 [data-theme="dark"] .guide-card-topline span:first-child { background: color-mix(in srgb, var(--guide-tone) 15%, var(--color-surface)); color: color-mix(in srgb, var(--guide-tone) 70%, white); }
 [data-theme="dark"] .guide-form-grid input:focus { background: #1e2823; }
 [data-theme="dark"] .guide-review-principles :where(h3, ul) { color: #e4c981; }
+[data-theme="dark"] .sunday-attendance-error { border-color: #653a3a; background: #2d1b1b; color: #f0a6a6; }
+[data-theme="dark"] .sunday-attendance-table td.mark-o,
+[data-theme="dark"] .sunday-attendance-legend .mark-o { background: #15352a; color: #7fe0b8; }
+[data-theme="dark"] .sunday-attendance-table td.mark-t,
+[data-theme="dark"] .sunday-attendance-legend .mark-t { background: #382d18; color: #edc56e; }
+[data-theme="dark"] .sunday-attendance-table td.mark-x,
+[data-theme="dark"] .sunday-attendance-legend .mark-x { background: #382020; color: #f0a0a0; }
+[data-theme="dark"] .sunday-attendance-table td.is-event,
+[data-theme="dark"] .sunday-attendance-legend .is-event { background: #302b21; color: #d9bc7f; }
+[data-theme="dark"] .sunday-attendance-table .is-name small { background: #3a2d18; color: #edc56e; }
 
 /* 공개 소개 화면 */
 [data-theme="dark"] .landing-page { --landing-ink: #eef5f1; background: #0d1210; color: var(--color-text-primary); }

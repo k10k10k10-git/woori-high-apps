@@ -81,9 +81,17 @@
 - 검증: 변경 파일 ESLint 통과, `highschool-app` 65파일 **530개 테스트 통과**, `npx tsc --noEmit` 통과, `npm run build` 성공. QA에서 전송·해결 버튼은 누르지 않아 운영 DB 직접 쓰기는 없었고 Rules 배포도 없었다.
 - 다음 에이전트는 요청함 작업을 이어서 수정할 때 `highschool-app/CLAUDE.md`의 마이페이지 계약과 `highschool-app/AGENTS.md`의 “Rules 변경 없이 기존 사용자별 노드에 독립 요청함을 격리하기”를 먼저 읽는다.
 
+## 2026-08-22 최신 작업 — 연도별 사역 흐름·주일 행정팀 출석부
+
+- 사역 가이드의 월별 사역 흐름에 이전·다음 연도 전환을 추가했다. 2026년 기본 가안과 기존 `mg_month_MM` 편집 레코드는 그대로 유지하며, 다른 연도는 빈 12개월로 시작하고 저장 시에만 `mg_month_{year}_MM`으로 분리된다.
+- 기존 연도 정보 없는 `ministry-guide-month` note는 2026년으로 해석한다. 운영 DB 마이그레이션이나 자동 복제는 하지 않았고, UI에서 저장 버튼도 누르지 않았다.
+- 주일 사역 `행정팀`에 `출석부` 탭을 추가했다. `classes/{year}`, `attendance/{year}`, `events/{year}`를 읽기 전용 실시간 구독해 연도·학기·부·반별 명단과 주차별 출석, 평균 출석률을 보여 준다. 수정은 학생 앱 원본 `https://woori-high.web.app/attendance`로 이동한다.
+- 학생 앱 소유 경로에 대한 쓰기 함수는 추가하지 않았고 Rules 변경·운영 DB 쓰기·배포는 없었다.
+- 검증: `highschool-app` 77파일 **637개 테스트**, `npx tsc --noEmit`, production build, `git diff --check` 통과.
+
 ## 지금 상태 (한 문장)
 
-사용자 요청은 **전부 완료·검증·배포**됐고, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
+최신 요청은 **구현·검증 완료, 아직 미배포**이며, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
 
 - 최신 배포 앱 기능 커밋: `eeacef5` (`통합사이트: 양 테마 대비와 홈 디데이 보완`). 이 인수인계 문서 커밋은 앱 코드 변경이 아니며 최종 배포 buildId는 그 문서 커밋 SHA다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
@@ -129,7 +137,7 @@
 | | 결과 |
 |---|---|
 | `highschool-app` `npx tsc --noEmit` | 0 errors |
-| `highschool-app` `npm test` | 75파일 **626개 통과** |
+| `highschool-app` `npm test` | 77파일 **637개 통과** |
 | `highschool-app` `npm run build` | 성공 |
 | `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
 | `고등부 학생 출석부` `npm test` | 8파일 **105개 통과** (마지막 학생 앱 변경 기준) |

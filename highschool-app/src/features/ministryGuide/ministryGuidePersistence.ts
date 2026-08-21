@@ -1,5 +1,9 @@
 import type { Milestone } from "@/lib/types";
-import type { MinistryGuideSection, MonthlyMinistry } from "./ministryGuideContent";
+import {
+  MINISTRY_GUIDE_BASE_YEAR,
+  type MinistryGuideSection,
+  type MonthlyMinistry,
+} from "./ministryGuideContent";
 
 export const MINISTRY_GUIDE_SOURCE_PREFIX = "ministry-guide";
 const MONTH_SOURCE = `${MINISTRY_GUIDE_SOURCE_PREFIX}-month`;
@@ -8,7 +12,7 @@ const SECTION_PRINCIPLES_SOURCE = `${MINISTRY_GUIDE_SOURCE_PREFIX}-principles`;
 const SECTION_CHECKLIST_SOURCE = `${MINISTRY_GUIDE_SOURCE_PREFIX}-checklist`;
 
 export type MinistryGuideOverrides = {
-  monthly: Record<number, MonthlyMinistry>;
+  monthly: Record<number, Record<number, MonthlyMinistry>>;
   sections: Record<string, MinistryGuideSection>;
 };
 
@@ -32,9 +36,11 @@ export function parseMinistryGuideOverrides(records: Milestone[]): MinistryGuide
 
   for (const record of records) {
     if (record.sourceSite === MONTH_SOURCE) {
-      const value = parseNote<MonthlyMinistry>(record.note);
+      const value = parseNote<MonthlyMinistry & { year?: number }>(record.note);
       if (value && Number.isInteger(value.month) && typeof value.curriculum === "string" && Array.isArray(value.focus)) {
-        monthly[value.month] = { month: value.month, curriculum: value.curriculum, focus: value.focus.filter((item): item is string => typeof item === "string") };
+        const year = Number.isInteger(value.year) ? Number(value.year) : MINISTRY_GUIDE_BASE_YEAR;
+        monthly[year] ??= {};
+        monthly[year][value.month] = { month: value.month, curriculum: value.curriculum, focus: value.focus.filter((item): item is string => typeof item === "string") };
       }
       continue;
     }
@@ -58,9 +64,10 @@ export function applyMinistryGuideOverrides(
   monthlyDefaults: MonthlyMinistry[],
   sectionDefaults: MinistryGuideSection[],
   overrides: MinistryGuideOverrides,
+  year = MINISTRY_GUIDE_BASE_YEAR,
 ) {
   return {
-    monthly: monthlyDefaults.map((item) => overrides.monthly[item.month] ?? item),
+    monthly: monthlyDefaults.map((item) => overrides.monthly[year]?.[item.month] ?? item),
     sections: sectionDefaults.map((item) => ({ ...item, ...(overrides.sections[item.id] ?? {}) })),
   };
 }
@@ -75,10 +82,14 @@ function baseRecord(sourceSite: string, title: string, noteValue: string, now: n
   return { title: title.slice(0, 120), targetDate: "2099-12-31", done: false, note: noteValue, sourceSite, createdAt: now, updatedAt: now };
 }
 
-export function monthlyMinistryRecord(item: MonthlyMinistry, now = Date.now()) {
+export function monthlyMinistryRecord(year: number, item: MonthlyMinistry, now = Date.now()) {
+  // 2026년은 이미 운영 중인 기존 ID를 그대로 사용해 중복 레코드를 만들지 않는다.
+  const id = year === MINISTRY_GUIDE_BASE_YEAR
+    ? `mg_month_${String(item.month).padStart(2, "0")}`
+    : `mg_month_${year}_${String(item.month).padStart(2, "0")}`;
   return {
-    id: `mg_month_${String(item.month).padStart(2, "0")}`,
-    value: baseRecord(MONTH_SOURCE, `월별 사역 흐름 ${item.month}월`, note(item), now),
+    id,
+    value: baseRecord(MONTH_SOURCE, `${year}년 월별 사역 흐름 ${item.month}월`, note({ year, ...item }), now),
   };
 }
 

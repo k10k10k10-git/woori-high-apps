@@ -9,11 +9,11 @@ import { saveMinistryGuideSection, saveMonthlyMinistry, subscribeToMinistryGuide
 import {
   MINISTRY_GUIDE_SECTIONS,
   MINISTRY_THEME,
-  MONTHLY_MINISTRIES,
+  monthlyMinistriesForYear,
   type MinistryGuideSection,
   type MonthlyMinistry,
 } from "./ministryGuideContent";
-import { applyMinistryGuideOverrides } from "./ministryGuidePersistence";
+import { applyMinistryGuideOverrides, type MinistryGuideOverrides } from "./ministryGuidePersistence";
 
 const CATEGORIES = ["전체", "예배·목양", "훈련·리더십", "수련회", "행정·소통", "특별사역"] as const;
 type Category = (typeof CATEGORIES)[number];
@@ -33,8 +33,8 @@ export default function MinistryGuidePage() {
   const [category, setCategory] = useState<Category>("전체");
   const [query, setQuery] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().getMonth() + 1);
-  const [monthlyItems, setMonthlyItems] = useState(MONTHLY_MINISTRIES);
-  const [sections, setSections] = useState(MINISTRY_GUIDE_SECTIONS);
+  const [selectedYear, setSelectedYear] = useState(() => new Date().getFullYear());
+  const [overrides, setOverrides] = useState<MinistryGuideOverrides>({ monthly: {}, sections: {} });
   const [monthDraft, setMonthDraft] = useState<MonthlyMinistry | null>(null);
   const [sectionDraft, setSectionDraft] = useState<MinistryGuideSection | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -46,14 +46,22 @@ export default function MinistryGuidePage() {
     if (!user || !canAccessArea("home", roles)) return;
     return subscribeToMinistryGuideOverrides(
       (overrides) => {
-        const merged = applyMinistryGuideOverrides(MONTHLY_MINISTRIES, MINISTRY_GUIDE_SECTIONS, overrides);
-        setMonthlyItems(merged.monthly);
-        setSections(merged.sections);
+        setOverrides(overrides);
         setLoadError(null);
       },
       () => setLoadError("편집된 가이드 내용을 불러오지 못해 기본 내용을 표시합니다."),
     );
   }, [roles, user]);
+
+  const { monthly: monthlyItems, sections } = useMemo(
+    () => applyMinistryGuideOverrides(
+      monthlyMinistriesForYear(selectedYear),
+      MINISTRY_GUIDE_SECTIONS,
+      overrides,
+      selectedYear,
+    ),
+    [overrides, selectedYear],
+  );
 
   const monthly = monthlyItems.find((item) => item.month === selectedMonth) ?? monthlyItems[0];
   const filteredSections = useMemo(() => {
@@ -74,9 +82,9 @@ export default function MinistryGuidePage() {
     setSavingKey(`month-${monthDraft.month}`);
     setMessage(null);
     try {
-      await saveMonthlyMinistry({ ...monthDraft, curriculum: monthDraft.curriculum.trim() });
+      await saveMonthlyMinistry(selectedYear, { ...monthDraft, curriculum: monthDraft.curriculum.trim() });
       setMonthDraft(null);
-      setMessage(`${monthDraft.month}월 사역 흐름을 저장했습니다.`);
+      setMessage(`${selectedYear}년 ${monthDraft.month}월 사역 흐름을 저장했습니다.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "월별 사역 흐름을 저장하지 못했습니다.");
     } finally {
@@ -146,7 +154,11 @@ export default function MinistryGuidePage() {
           <div className="guide-section-heading">
             <div>
               <p className="section-kicker">YEARLY RHYTHM</p>
-              <h2 className="section-title">2026 월별 사역 흐름</h2>
+              <div className="guide-year-heading">
+                <button type="button" aria-label="이전 연도" onClick={() => { setSelectedYear((year) => year - 1); setMonthDraft(null); setMessage(null); }}>‹</button>
+                <h2 className="section-title">{selectedYear} 월별 사역 흐름</h2>
+                <button type="button" aria-label="다음 연도" onClick={() => { setSelectedYear((year) => year + 1); setMonthDraft(null); setMessage(null); }}>›</button>
+              </div>
               <p>월을 선택하면 커리큘럼과 집중 사역을 확인하고 권한 있는 담당자는 내용을 수정할 수 있습니다.</p>
             </div>
             <div className="flex items-center gap-2">
@@ -169,8 +181,8 @@ export default function MinistryGuidePage() {
           ) : (
             <div className="guide-month-brief" role="tabpanel">
               <div className="guide-month-number"><span>{monthly.month}</span>월</div>
-              <div><span className="guide-field-label">커리큘럼</span><h3>{monthly.curriculum}</h3></div>
-              <div><span className="guide-field-label">집중 사역</span><div className="guide-chip-list">{monthly.focus.map((focus) => <span key={focus}>{focus}</span>)}</div></div>
+              <div><span className="guide-field-label">커리큘럼</span><h3>{monthly.curriculum || "아직 입력된 계획이 없습니다."}</h3></div>
+              <div><span className="guide-field-label">집중 사역</span><div className="guide-chip-list">{monthly.focus.length > 0 ? monthly.focus.map((focus) => <span key={focus}>{focus}</span>) : <span className="guide-empty-chip">미입력</span>}</div></div>
             </div>
           )}
         </section>

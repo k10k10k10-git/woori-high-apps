@@ -22,8 +22,8 @@ export function subscribeToMinistryGuideOverrides(
   );
 }
 
-export async function saveMonthlyMinistry(item: MonthlyMinistry) {
-  const record = monthlyMinistryRecord(item);
+export async function saveMonthlyMinistry(year: number, item: MonthlyMinistry) {
+  const record = monthlyMinistryRecord(year, item);
   await update(ref(db), { [paths.prepMilestone(record.id)]: record.value });
 }
 
