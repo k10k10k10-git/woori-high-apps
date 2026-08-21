@@ -32,7 +32,7 @@
 - 역할 판정은 `resolveMinistryRole`(순수) 하나 — 통합 `AuthContext`와 이가드 `AuthContext`가 공유한다. 두 컨텍스트는 `role`만 노출하고 예전 `accessLevel`/`iguardAccessLevel`은 없다.
 - 역할 배정 쓰기는 `planRoleAssignment`(순수, 부여→해제) → `applyRoleSteps`(실행). UI에서 `addRetreatAdmin`·`approveIguardMember`를 직접 부르지 않는다.
 - 학기 화면 편집 잠금은 `useSemesterCanEdit()`. 새 저장 컨트롤을 추가하면 이 값으로 `disabled` 또는 미렌더 처리한다.
-- PIN 우회(`RetreatPinGate`)는 통합관리자(`canManageRoles`)만. 이가드 전체 권한(`iguardScope === "all"`)으로 넓히지 않는다.
+- 역할 배정(`canManageRolesOf`)은 통합관리자만 가능하다. 교역자의 개인정보 통합검색은 `searchScope`, 수련회 PIN 운영은 `canManageRetreatPin`으로 각각 판정해 역할 배정 권한과 결합하지 않는다.
 
 ## 화면 셸 규칙
 
@@ -230,3 +230,8 @@ npm run build
 - **접근법**: 1→ `src/app/globals.css`의 `.sunday-attendance-table`에서 sticky `No./이름` 열의 computed background가 투명한지 확인한다. 2→ `rg --fixed-strings -- '--color-…:' src/app/globals.css`로 참조한 CSS 변수가 실제 정의돼 있는지 검증한다. 3→ 정의되지 않은 `--color-bg-subtle`을 라이트·다크에 모두 정의된 불투명 `--color-surface-hover`로 교체한다. 4→ 이름 열에 오른쪽 경계와 약한 그림자를 추가하고 sticky 열의 z-index를 일반 날짜 셀보다 높게 유지한다. 5→ 같은 가로 표에서 범위 선택을 늘릴 때는 `attendanceWeeks`의 순수 범위 모델을 확장하고 1학기·2학기·1년 전체의 연결 관계를 테스트한다.
 - **판단 질문**: 날짜 셀을 숨기거나 이름 열의 sticky 동작을 제거하지 않는다. 전자는 가로 스크롤 중 필요한 주차를 잃고, 후자는 긴 1년 표에서 학생과 출석 기록의 대응을 확인하기 어려워지기 때문이다. 존재하지 않는 새 토큰을 추가로 만들지도 않는다. 이미 양 테마에서 검증된 불투명 표면 토큰을 재사용해야 같은 문제가 다른 테마에서 반복되지 않는다.
 - **재사용 규칙**: sticky 열 뒤로 내용이 비치면 `computed background 확인 → 변수 정의 존재 여부 검색 → 양 테마 불투명 표면 토큰 적용 → z-index·경계 보강 → 긴 범위 스크롤 회귀 테스트` 순서로 해결한다.
+
+### 상위 역할 권한을 줄일 때 결합된 파생 기능을 capability별로 분리하기 (2026-08-22)
+- **접근법**: 1→ `src/features/portal/accessPolicy.ts`에서 줄일 권한(`manageRoles`)과 유지할 권한(`search`, `managePin`)을 별도 capability로 확인한다. 2→ `rg "canManageRolesOf" src`로 역할 관리 판정을 재사용한 검색·PIN·현장 도구 소비자를 전수 찾는다. 3→ 팀원 관리 진입과 역할 쓰기만 `canManageRolesOf`에 남기고 `PortalSearch.tsx`는 `searchScope`, `useRetreatPinGate.ts`와 `FieldHomeClient.tsx`는 `canManageRetreatPin`을 사용한다. 4→ 승인 대기는 `NO_ROLES`로 시작해 명시적 역할 선택 전 저장을 막고, 기존 팀원의 권한 상승은 개인정보 범위 확대 확인창을 거친다. 5→ 통합관리자 단독 역할 관리, 교역자 검색 유지, PIN 운영 역할 유지, 행정팀 주일 자기 팀 편집을 `accessPolicy.test.ts`에 고정한다.
+- **판단 질문**: 교역자의 `manageRoles`만 false로 바꾸고 소비자를 그대로 두지 않는다. 그렇게 하면 팀원 관리와 무관한 인물검색 연락처·수련회 PIN 우회·현장 관리자 도구까지 함께 사라진다. 반대로 UI 권한표를 세분화했다는 이유로 이 작업에서 Firebase Rules를 바꾸지도 않는다. Rules는 학생 앱 단일 원천과 별도 승인·검증 절차를 따라야 한다.
+- **재사용 규칙**: 역할 권한을 축소할 때는 `변경 capability 정의 → 기존 판정 소비자 전수 검색 → 기능별 전용 capability로 분리 → 최소 승인 기본값·상승 확인 → 역할 조합 회귀 테스트` 순서로 진행한다.

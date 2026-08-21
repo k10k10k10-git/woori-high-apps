@@ -90,13 +90,13 @@ export const SEMESTER_ROLE_HINTS: Record<SemesterRole, string> = {
   superAdmin: "학기·주일 전체 + 출석부 반영",
   pastor: "학기·주일 전체 (출석부 반영 제외)",
   leader: "학기·주일 수정 (학기 삭제 제외)",
-  adminTeam: "학기·주일 수정",
+  adminTeam: "학기·주일 행정팀 수정, 다른 주일팀 조회",
   barnabas: "주일 바나바팀 수정, 학기는 조회",
   worship: "주일 예배팀 수정, 학기는 조회",
-  praise: "주일 찬양팀 수정, 학기는 조회",
-  media: "주일 미디어팀 수정, 학기는 조회",
-  design: "주일 기획디자인팀 수정, 학기는 조회",
-  staff: "학기 조회 (주일은 팀 배정 후)",
+  praise: "주일 찬양팀 수정(기능 준비 중), 학기는 조회",
+  media: "주일 미디어팀 수정(기능 준비 중), 학기는 조회",
+  design: "주일 기획디자인팀 수정(기능 준비 중), 학기는 조회",
+  staff: "학기 조회만 · 주일 팀 미배정",
   none: "접근 불가",
 };
 
@@ -153,13 +153,14 @@ type RetreatCapability = {
 
 const SEMESTER_CAPS: Record<SemesterRole, SemesterCapability> = {
   superAdmin: { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: true, rosterWrite: true, search: "write", manageRoles: true },
-  pastor:     { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: true, rosterWrite: false, search: "write", manageRoles: true },
+  pastor:     { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: true, rosterWrite: false, search: "write", manageRoles: false },
   leader:     { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: false, rosterWrite: false, search: "read", manageRoles: false },
   // 행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸다 —
   // classes/attendance/trash의 **학생 1명 경로**만 `semesterRole === "adminTeam"`에게 허용된다.
   // 반 노드 전체(students 통째·teacher)는 여전히 통합관리자·담임만 쓴다.
-  // 주일도 팀 경계 없이 전부 본다 — 행정 변동 사항이 전 팀 공통 기록이다.
-  adminTeam:  { semester: "write", sunday: "write", sundayTeam: null, settings: true, destructive: false, rosterWrite: true, search: "read", manageRoles: false },
+  // 주일은 모든 팀을 조회하되 행정팀 화면만 수정한다. 다른 팀의 실무 데이터까지
+  // 행정팀이 바꾸는 권한은 운영상 필요하지 않으므로 최소 권한으로 닫는다.
+  adminTeam:  { semester: "write", sunday: "read", sundayTeam: "admin", settings: true, destructive: false, rosterWrite: true, search: "read", manageRoles: false },
   // ── 사역팀 계열: 주일은 자기 팀 하나만 쓰고, 옆 팀은 보이지도 않는다 ──
   // 팀마다 저장 노드가 달라 Rules 근거도 다르다.
   //   바나바팀 → semesters      : retreatAdmins 버킷이라 이미 쓰기 가능
@@ -177,7 +178,7 @@ const SEMESTER_CAPS: Record<SemesterRole, SemesterCapability> = {
 
 const RETREAT_CAPS: Record<RetreatRole, RetreatCapability> = {
   superAdmin: { admin: "write", sensitive: true, field: "all", createRetreat: true, destructive: true, managePin: true, manageRoles: true },
-  pastor:     { admin: "write", sensitive: true, field: "all", createRetreat: true, destructive: true, managePin: true, manageRoles: true },
+  pastor:     { admin: "write", sensitive: true, field: "all", createRetreat: true, destructive: true, managePin: true, manageRoles: false },
   // 조회 전용 — RetreatEditProvider + <fieldset disabled>가 화면에서 저장을 잠근다.
   leader:     { admin: "read", sensitive: false, field: "all", createRetreat: false, destructive: false, managePin: false, manageRoles: false },
   adminTeam:  { admin: "write", sensitive: true, field: "execution", createRetreat: true, destructive: false, managePin: true, manageRoles: false },
@@ -239,6 +240,11 @@ export function iguardScopeOf(roles: MinistryRoles): IguardScope {
 
 export function canManageRolesOf(roles: MinistryRoles): boolean {
   return SEMESTER_CAPS[roles.semester].manageRoles || RETREAT_CAPS[roles.retreat].manageRoles;
+}
+
+/** 승인 대기 요청에 실제 역할이 하나 이상 골라졌는지 확인한다. */
+export function hasAnyMinistryRole(roles: MinistryRoles): boolean {
+  return roles.semester !== "none" || roles.retreat !== "none";
 }
 
 /** 마이페이지 요청함은 모든 사용자 UID·첨부를 읽으므로 통합관리자에게만 연다. */
@@ -397,4 +403,13 @@ export function isSemesterDowngrade(from: SemesterRole, to: SemesterRole): boole
 
 export function isRetreatDowngrade(from: RetreatRole, to: RetreatRole): boolean {
   return ASSIGNABLE_RETREAT_ROLES.indexOf(to) > ASSIGNABLE_RETREAT_ROLES.indexOf(from);
+}
+
+/** 낮은 역할에서 높은 역할로 바뀌는지 판정한다. 권한 상승 확인창에 사용한다. */
+export function isSemesterUpgrade(from: SemesterRole, to: SemesterRole): boolean {
+  return ASSIGNABLE_SEMESTER_ROLES.indexOf(to) < ASSIGNABLE_SEMESTER_ROLES.indexOf(from);
+}
+
+export function isRetreatUpgrade(from: RetreatRole, to: RetreatRole): boolean {
+  return ASSIGNABLE_RETREAT_ROLES.indexOf(to) < ASSIGNABLE_RETREAT_ROLES.indexOf(from);
 }

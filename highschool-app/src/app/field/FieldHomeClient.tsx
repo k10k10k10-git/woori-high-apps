@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/iguard/context/AuthContext";
-import { canAccessArea, canManageRolesOf } from "@/features/portal/accessPolicy";
+import { canAccessArea, canManageRetreatPin } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import type { Retreat as PortalRetreat } from "@/lib/types";
 import { subscribeToRetreats, requestIguardAccess, getMyIguardPending, subscribeToIguardAccessLocks } from "@/features/iguard/lib/db";
@@ -144,7 +144,7 @@ export default function FieldHomeClient() {
           onSelect={setSelectedId}
           loadError={loadError}
           lockedIds={new Set(Object.keys(accessLocks))}
-          headerActions={canManageRolesOf(roles) ? (
+          headerActions={canManageRetreatPin(roles) ? (
             <button onClick={() => setShowAdmin(true)} aria-label="현장 관리자 도구"
               className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition-colors hover:text-slate-800">
               🔐 <span className="hidden sm:inline">현장 관리자</span>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { subscribeToIguardAccessLock } from "@/features/iguard/lib/db";
 import { hasRetreatSessionUnlock } from "@/features/iguard/lib/accessLock";
 import type { IguardAccessLock } from "@/features/iguard/lib/types";
-import { canManageRolesOf, type MinistryRoles } from "./accessPolicy";
+import { canManageRetreatPin, type MinistryRoles } from "./accessPolicy";
 
 type GateState = {
   scope: string;
@@ -31,9 +31,9 @@ function sessionUnlocked(retreatId: string, lock: IguardAccessLock): boolean {
  * - `lock === null`      : 잠금 없음
  * - `unlocked`           : 이번 세션에서 PIN을 통과했거나 잠금이 없음
  *
- * PIN 우회는 역할을 배정할 수 있는 사람 — 통합관리자와 교역자다(`canManageRolesOf`).
- * 남의 역할을 바꿀 수 있는 사람은 자기 역할도 바꿔 어차피 통과할 수 있으므로,
- * 이들에게 PIN을 거는 건 잠금이 아니라 절차만 늘리는 일이다. 이 범위를 더 넓히지 않는다.
+ * PIN 우회는 수련회 PIN 관리 권한이 있는 역할이다(`canManageRetreatPin`).
+ * 역할 배정 권한과 결합하지 않아, 역할 관리를 통합관리자 전용으로 좁혀도
+ * 교역자·행정팀·이가드팀의 기존 현장 운영 흐름은 유지된다.
  * 상태는 scope 파생으로 초기화한다(effect 안 setState 금지 — 루트 CLAUDE.md 실수 13).
  */
 export function useRetreatPinGate(
@@ -41,7 +41,7 @@ export function useRetreatPinGate(
   options: { enabled: boolean; roles: MinistryRoles },
 ) {
   const { enabled, roles } = options;
-  const bypass = canManageRolesOf(roles);
+  const bypass = canManageRetreatPin(roles);
   const scope = `${retreatId}|${enabled}|${bypass}`;
   const [state, setState] = useState<GateState>({ scope, ...PENDING });
 

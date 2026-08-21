@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MagnifyingGlass } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessArea, canManageRolesOf } from "./accessPolicy";
+import { canAccessArea, searchScope } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
 import { subscribePeopleSearchData } from "./peopleSearchDb";
 
@@ -27,7 +27,9 @@ export default function PortalSearch() {
 
   const includeSemester = canAccessArea("semester", roles);
   const includePrivate = canAccessArea("retreat-admin", roles);
-  const includeAttendancePrivate = canManageRolesOf(roles);
+  // 역할 관리 권한과 인물검색 범위는 별개다. 교역자는 팀원을 배정하지 않아도
+  // 기존처럼 출석부 연락처를 포함한 통합검색을 사용할 수 있다.
+  const includeAttendancePrivate = searchScope(roles) === "write";
   const loadKey = `${roles}:${includeSemester}:${includePrivate}:${includeAttendancePrivate}`;
 
   const beginOpen = useCallback(() => {

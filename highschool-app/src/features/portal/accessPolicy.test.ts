@@ -10,8 +10,14 @@ import {
   canEditArea,
   canEditSundayTeam,
   canManageRolesOf,
+  canManageRetreatPin,
   canManageSiteRequests,
   canSeeSensitiveRetreat,
+  hasAnyMinistryRole,
+  isRetreatDowngrade,
+  isRetreatUpgrade,
+  isSemesterDowngrade,
+  isSemesterUpgrade,
   ownSundayTeam,
   canWriteStudentRoster,
   describeRoles,
@@ -36,7 +42,7 @@ describe("학기 역할 — 학기·주일 화면", () => {
     ["superAdmin", { semester: "write", sunday: "write" }],
     ["pastor", { semester: "write", sunday: "write" }],
     ["leader", { semester: "write", sunday: "write" }],
-    ["adminTeam", { semester: "write", sunday: "write" }],
+    ["adminTeam", { semester: "write", sunday: "read" }],
     // 사역팀은 자기 팀 하나만 열린다 — canAccessArea("sunday")는 "어느 팀이든 있는가"다.
     // 어느 팀인지는 아래 "주일 사역 - 팀 경계"가 검사한다.
     ["barnabas", { semester: "read", sunday: "write" }],
@@ -126,6 +132,11 @@ describe("방학 역할 — 수련회 행정·현장 화면", () => {
     expect(allowed).toEqual(["superAdmin", "pastor", "adminTeam"]);
   });
 
+  it("PIN 관리는 역할 배정과 분리해 통합관리자·교역자·행정팀·이가드팀에 연다", () => {
+    const allowed = ASSIGNABLE_RETREAT_ROLES.filter((role) => canManageRetreatPin(roles("none", role)));
+    expect(allowed).toEqual(["superAdmin", "pastor", "adminTeam", "iguardTeam"]);
+  });
+
   it("스탭팀장·이가드팀은 행정을 조회만 한다 — 저장은 화면에서 잠근다", () => {
     for (const role of ["leader", "iguardTeam"] as const) {
       expect(canAccessArea("retreat-admin", roles("none", role))).toBe(true);
@@ -172,11 +183,17 @@ describe("두 축을 각자 적용한다", () => {
     expect(canAccessArea("home", roles("none", "none"))).toBe(false);
   });
 
-  it("역할 배정은 통합관리자·교역자만 가능하다", () => {
+  it("역할 배정은 통합관리자만 가능하다", () => {
     expect(canManageRolesOf(roles("superAdmin", "superAdmin"))).toBe(true);
-    expect(canManageRolesOf(roles("pastor", "pastor"))).toBe(true);
+    expect(canManageRolesOf(roles("pastor", "pastor"))).toBe(false);
     expect(canManageRolesOf(roles("leader", "adminTeam"))).toBe(false);
     expect(canManageRolesOf(roles("barnabas", "fieldStaff"))).toBe(false);
+  });
+
+  it("승인 대기는 학기·방학 중 하나 이상의 역할을 명시해야 한다", () => {
+    expect(hasAnyMinistryRole(roles("none", "none"))).toBe(false);
+    expect(hasAnyMinistryRole(roles("staff", "none"))).toBe(true);
+    expect(hasAnyMinistryRole(roles("none", "fieldStaff"))).toBe(true);
   });
 });
 
@@ -292,14 +309,24 @@ describe("주일 사역 - 팀 경계", () => {
     expect(canAccessSundayTeam("worship", barnabas)).toBe(false);
   });
 
-  it("행정팀·스탭팀장·교역자·통합관리자는 팀 경계 없이 전부 쓴다", () => {
-    for (const role of ["adminTeam", "leader", "pastor", "superAdmin"] as const) {
+  it("스탭팀장·교역자·통합관리자는 팀 경계 없이 전부 쓴다", () => {
+    for (const role of ["leader", "pastor", "superAdmin"] as const) {
       const roles = semester(role);
       expect(ownSundayTeam(roles)).toBeNull();
       for (const team of ["admin", "barnabas", "worship", "praise", "media", "design"] as const) {
         expect(canAccessSundayTeam(team, roles)).toBe(true);
         expect(canEditSundayTeam(team, roles)).toBe(true);
       }
+    }
+  });
+
+  it("행정팀은 모든 주일팀을 조회하되 행정팀만 수정한다", () => {
+    const admin = semester("adminTeam");
+    expect(canAccessArea("sunday", admin)).toBe(true);
+    expect(canEditArea("sunday", admin)).toBe(false);
+    for (const team of ["admin", "barnabas", "worship", "praise", "media", "design"] as const) {
+      expect(canAccessSundayTeam(team, admin)).toBe(true);
+      expect(canEditSundayTeam(team, admin)).toBe(team === "admin");
     }
   });
 
@@ -324,5 +351,26 @@ describe("주일 사역 - 팀 경계", () => {
       .filter((team): team is NonNullable<typeof team> => team !== null);
     const catalog = SUNDAY_MINISTRY_TEAMS.map((team) => team.key);
     for (const team of owned) expect(catalog).toContain(team);
+  });
+});
+
+describe("역할 변경 방향", () => {
+  it("권한 상승과 강등을 두 축에서 각각 판정한다", () => {
+    expect(isSemesterUpgrade("staff", "leader")).toBe(true);
+    expect(isSemesterUpgrade("leader", "staff")).toBe(false);
+    expect(isSemesterDowngrade("leader", "staff")).toBe(true);
+    expect(isSemesterDowngrade("staff", "leader")).toBe(false);
+
+    expect(isRetreatUpgrade("fieldStaff", "adminTeam")).toBe(true);
+    expect(isRetreatUpgrade("adminTeam", "fieldStaff")).toBe(false);
+    expect(isRetreatDowngrade("adminTeam", "fieldStaff")).toBe(true);
+    expect(isRetreatDowngrade("fieldStaff", "adminTeam")).toBe(false);
+  });
+
+  it("같은 역할은 상승도 강등도 아니다", () => {
+    expect(isSemesterUpgrade("pastor", "pastor")).toBe(false);
+    expect(isSemesterDowngrade("pastor", "pastor")).toBe(false);
+    expect(isRetreatUpgrade("iguardTeam", "iguardTeam")).toBe(false);
+    expect(isRetreatDowngrade("iguardTeam", "iguardTeam")).toBe(false);
   });
 });

@@ -28,8 +28,11 @@ import {
   ASSIGNABLE_RETREAT_ROLES,
   ASSIGNABLE_SEMESTER_ROLES,
   canManageRolesOf,
+  hasAnyMinistryRole,
   isRetreatDowngrade,
+  isRetreatUpgrade,
   isSemesterDowngrade,
+  isSemesterUpgrade,
   NO_ROLES,
   resolveMinistryRoles,
   roleBadgeLabel,
@@ -229,9 +232,19 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
     });
     if (steps.length === 0) return;
 
+    const upgraded = isSemesterUpgrade(member.roles.semester, next.semester)
+      || isRetreatUpgrade(member.roles.retreat, next.retreat);
     const downgraded = isSemesterDowngrade(member.roles.semester, next.semester)
       || isRetreatDowngrade(member.roles.retreat, next.retreat);
-    if (downgraded) {
+    if (upgraded) {
+      const confirmed = await uiConfirm(
+        `${memberLabel(member)}님의 권한을 높일까요?\n`
+        + `학기 ${SEMESTER_ROLE_LABELS[member.roles.semester]} → ${SEMESTER_ROLE_LABELS[next.semester]}\n`
+        + `방학 ${RETREAT_ROLE_LABELS[member.roles.retreat]} → ${RETREAT_ROLE_LABELS[next.retreat]}\n\n`
+        + `높아진 역할에 따라 개인정보 조회·수정 범위가 넓어질 수 있습니다.`,
+      );
+      if (!confirmed) return;
+    } else if (downgraded) {
       const confirmed = await uiConfirm(
         `${memberLabel(member)}님의 역할을 낮출까요?\n`
         + `학기 ${SEMESTER_ROLE_LABELS[member.roles.semester]} → ${SEMESTER_ROLE_LABELS[next.semester]}\n`
@@ -287,12 +300,9 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
   async function approvePending(request: (typeof pending)[number]) {
     const info = request.admin ?? request.iguard;
     if (!info) return;
-    const choice = pendingRoleChoice[request.uid] ?? { semester: "staff", retreat: "fieldStaff" };
-    if (choice.semester === "none" && choice.retreat === "none") {
-      await run(request.uid, async () => {
-        if (request.admin) await denyRetreatRequest(request.uid);
-        if (request.iguard) await denyIguardPending(request.uid);
-      }, "요청을 거절했습니다.");
+    const choice = pendingRoleChoice[request.uid] ?? NO_ROLES;
+    if (!hasAnyMinistryRole(choice)) {
+      toast("학기 또는 방학 역할을 하나 이상 선택해 주세요.", "error");
       return;
     }
     const steps = planRoleAssignment(choice, {
@@ -332,7 +342,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
           {loadError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
           {!canManage && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-              역할 배정은 통합관리자·교역자만 할 수 있습니다. 지금은 조회만 가능합니다.
+              역할 배정은 통합관리자만 할 수 있습니다. 지금은 조회만 가능합니다.
             </div>
           )}
 
@@ -373,7 +383,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
               <div className="space-y-2">
                 {pending.map((request) => {
                   const info = request.admin ?? request.iguard;
-                  const choice = pendingRoleChoice[request.uid] ?? { semester: "staff" as SemesterRole, retreat: "fieldStaff" as RetreatRole };
+                  const choice = pendingRoleChoice[request.uid] ?? NO_ROLES;
                   const setChoice = (next: Partial<MinistryRoles>) =>
                     setPendingRoleChoice((current) => ({ ...current, [request.uid]: { ...choice, ...next } }));
                   return (
@@ -410,7 +420,8 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
                           </select>
                         </label>
                         <button
-                          disabled={!canManage || busyUid === request.uid}
+                          disabled={!canManage || busyUid === request.uid || !hasAnyMinistryRole(choice)}
+                          title={hasAnyMinistryRole(choice) ? undefined : "학기 또는 방학 역할을 먼저 선택해 주세요."}
                           onClick={() => void approvePending(request)}
                           className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
                         >
