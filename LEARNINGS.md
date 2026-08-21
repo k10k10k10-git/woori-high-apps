@@ -126,3 +126,8 @@
 - **접근법**: 1→ 사용자가 로그인해 둔 Chrome 탭을 claim하고 `setViewportSize({width:390,height:844})`로 모바일 화면을 만든다. 2→ 출석 상태 버튼처럼 DB 쓰기가 가능한 UI는 건드리지 않고, 탭 전환·학생 이름·반 바꾸기처럼 읽기/로컬 선택만 쓰며 출석 체크·학생 이력·전체 출석부·통계·반 선택 화면을 캡처한다. 3→ `/Users/sunghoon/Desktop/ai개발/tmp/pdfs/attendance-guide-redesign/anonymize_mobile_screens.py`에서 교사명·학생명·아바타 글자·차트 축 이름을 흰색 또는 원래 배경색으로 완전히 덮고 가명을 다시 그린다. 4→ 가명 처리된 PNG만 PDF 빌더에 넣고 `pdftoppm`으로 전 페이지를 재렌더하여 확대 검수한다. 5→ 원시 개인정보 캡처는 산출물 검증 후 삭제한다.
 - **판단 질문**: 페이지 DOM을 직접 바꿔 캡처하지 않았다 — 브라우저 제어의 읽기 전용 평가 원칙을 깨고 앱 상태를 예상치 못하게 바꿀 수 있다. 생성형 이미지 편집에도 맡기지 않았다 — 실제 UI의 숫자·버튼·표 위치가 달라질 수 있고, 원본 개인정보를 외부 생성 서비스로 전송하게 된다. 대신 로컬 Pillow 오버레이로 치환 범위를 좌표 단위로 통제했다.
 - **재사용 규칙**: 로그인 뒤 실제 화면을 문서에 넣을 때는 `읽기 전용 탐색 → 원본 캡처 → 로컬 가명 치환 → 가명본만 삽입 → 전 페이지 렌더 검수 → 원본 삭제` 순서를 고정하고, 개인정보가 있는 원본 이미지를 최종 파일이나 외부 편집 도구에 넘기지 않는다.
+
+### Git 미연결 Vercel 프로젝트에서 만료된 CLI 인증을 복구해 배포하기 (2026-08-21)
+- **접근법**: 1→ `npx vercel --prod`의 `Not authorized`를 확인한 뒤 운영 `/api/version`과 새 Git 커밋을 대조해 미배포를 확정한다. 2→ Vercel 대시보드 프로젝트 카드에 `Connect Git Repository`가 보이는지 확인해 `main` 푸시 자동 배포 가정을 폐기한다. 3→ `npx vercel login`을 실행하고 표시된 device URL을 같은 계정으로 로그인된 브라우저에서 승인한다. 4→ `highschool-app/.vercel/project.json` 연결을 유지한 채 `npx vercel --prod`를 재실행한다. 5→ 배포 출력의 `readyState=READY`, `npx vercel ls highschool-app`의 Production Ready, 운영 `/api/version.buildId`와 앱 커밋 SHA 일치를 모두 확인한다.
+- **판단 질문**: 자동 배포를 기다리며 푸시를 반복하거나 빈 커밋을 만들지 않았다. 프로젝트가 Git에 연결되지 않았으므로 같은 결과만 반복한다. Vercel API 토큰을 새로 만들거나 Git 저장소 연결 권한을 바꾸지도 않았다. 기존 브라우저 로그인과 device authorization만으로 CLI 세션을 복구할 수 있고 권한 범위가 더 좁기 때문이다.
+- **재사용 규칙**: Vercel 배포가 인증에서 막히면 `운영 buildId 대조 → 대시보드 Git 연결 여부 실측 → vercel login device 승인 → 기존 project.json으로 재배포 → Ready와 buildId 확인` 순서로 복구하고, 문서의 자동 배포 가정을 실제 프로젝트 카드보다 우선하지 않는다.

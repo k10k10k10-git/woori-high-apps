@@ -23,7 +23,8 @@ npx vercel --prod
 ```
 - 배포 URL: https://woorihigh-app.vercel.app (구 주소 `highschool-app-flame.vercel.app`도 같은 배포를 가리키게 남겨 둠 — 기존 링크·북마크 보호)
 - 주소 변경/이관: `npx vercel alias set <배포 URL> woorihigh-app.vercel.app`
-- GitHub 연동: main 브랜치 머지 시 자동 배포 (Root Directory: `highschool-app`)
+- **2026-08-21 실측: Git 저장소 미연결.** 대시보드에 `Connect Git Repository`가 표시되므로 `main` 푸시만으로는 자동 배포되지 않는다. 현재는 검증·커밋·푸시 뒤 `npx vercel --prod`를 반드시 직접 실행한다.
+- CLI가 `Not authorized`이면 `npx vercel login`의 device URL을 **이미 로그인된 Vercel 브라우저**에서 승인한 뒤 같은 배포 명령을 다시 실행한다. 새 토큰 생성이나 프로젝트 재연결은 필요 없다.
 - 배포 후 `curl -s https://woorihigh-app.vercel.app/api/version`의 `buildId`와 `git rev-parse HEAD`를 대조하고 `npx vercel ls`에서 Ready를 확인한다.
 - 독립 `retreat-app`·`iguard-app` Vercel 프로젝트와 Firebase Hosting 사이트는 2026-08-05 제거했다.
 
