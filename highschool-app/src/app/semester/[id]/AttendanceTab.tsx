@@ -12,6 +12,7 @@ import AttendanceGrid from "./AttendanceGrid";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
+import { sessionDateLabel, sessionIncludesDate } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import { Application, AttendanceStatus, Session, SessionAttendance, Team, TrainingClass } from "@/features/semester/types";
 
@@ -51,7 +52,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     if (sessions.length === 0) return "";
     const today = todayYMD();
     const candidate =
-      sessions.find((s) => s.date === today) ??
+      sessions.find((s) => sessionIncludesDate(s, today)) ??
       sessions.find((s) => s.date >= today) ??
       sessions[sessions.length - 1];
     return candidate.id;
@@ -153,7 +154,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           >
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.date} · {sessionDisplayLabel(s)}
+                {sessionDateLabel(s)} · {sessionDisplayLabel(s)}
               </option>
             ))}
           </select>

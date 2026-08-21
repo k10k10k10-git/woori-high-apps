@@ -128,6 +128,7 @@
 - `trainingOnly`는 계속 저장하되 `deriveTrainingOnly`로 파생한다 — 출석·수료 명단(`roster.ts`)이 쓰는 기존 계약이라 직접 세팅하지 않는다.
 - **훈련 명단**은 훈련 반 배정자 전원이다(사역팀을 겸하는 사람 포함). 레거시 `trainingOnly=true`도 훈련 신청으로 흡수한다.
 - **회차 유형**은 `sessionKind.ts`로만 변환한다. 저장 스키마(`type`/`label`)는 그대로이고, **출석 집계(만점)에서 빠지는 것은 `휴강`뿐**이다(`completion.regularSessions`).
+- **1박 2일 이상의 회차**는 기존 `date`를 시작일로 유지하고 같은 회차에 선택 필드 `endDate`를 붙인다. 출석·커리큘럼 키는 계속 회차 `id` 하나를 사용해 날짜 수만큼 중복 집계하지 않는다. 날짜 검증·표시는 `sessionDate.ts`, 저장 시 종료일 삭제는 `updateSessionDates`가 담당한다.
 - 훈련 반 삭제는 `trainingClass.ts`의 루트 다중 경로 update로 신청자 참조까지 함께 정리한다(팀 삭제와 같은 패턴).
 - **학기 삭제**(`removeSemester`)는 `semesters/{sid}`와 `semestersPrivate/{sid}`를 한 번의 루트 update로 지운다. 되돌릴 수 없으므로 화면에서 **학기 ID를 직접 입력받아** 확인한 뒤에만 호출한다.
 - **수련회 생성**은 행정·이가드 공용 컴포넌트 `features/portal/NewRetreatButton.tsx` 하나만 쓴다. `retreats/{id}`가 공유 노드라 어느 화면에서 만들어도 양쪽 목록에 나타난다. 쓰기는 행정 db(`@/lib/db`)가 담당하고 버튼은 `canEditPortalArea("retreat-admin")`로 게이트한다.

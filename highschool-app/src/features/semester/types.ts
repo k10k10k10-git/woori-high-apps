@@ -36,7 +36,8 @@ export type SessionType = "정규" | "휴강" | "행사";
 
 export interface Session {
   id: string;
-  date: string; // YYYY-MM-DD
+  date: string; // 시작일 YYYY-MM-DD (기존 단일 날짜 회차와 호환)
+  endDate?: string; // 선택 종료일 YYYY-MM-DD — 1박 2일도 출석 회차는 하나로 유지
   type: SessionType;
   label?: string; // "개강예배", "종강예배" 등
 }

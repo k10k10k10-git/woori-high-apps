@@ -31,4 +31,24 @@ describe("buildHomeActions", () => {
     expect(actions.map((item) => item.title)).toEqual(["개강", "겨울수련회"]);
     expect(actions[1].href).toBe("/retreat/winter/field");
   });
+
+  it("1박 2일 회차의 둘째 날에도 현재 학기 일정으로 남긴다", () => {
+    const actions = buildHomeActions({
+      today: "2026-10-24",
+      roles: { semester: "adminTeam", retreat: "none" },
+      milestones: [],
+      sessions: [{
+        id: "overnight",
+        date: "2026-10-23",
+        endDate: "2026-10-24",
+        type: "정규",
+        label: "철야기도회",
+      }],
+      periods: [],
+      retreats: [],
+    });
+
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatchObject({ title: "철야기도회", urgency: "today" });
+  });
 });

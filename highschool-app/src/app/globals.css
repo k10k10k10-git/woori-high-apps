@@ -450,6 +450,16 @@ table th {
   line-height: 1.2;
   white-space: nowrap;
 }
+/* 학기 출석 상태는 버튼의 작은 색상 박스가 아니라 셀 전체를 채운다.
+   전역 td 여백보다 높은 선택자로 상태 셀만 0으로 만들고, 같은 여백을 버튼 클릭 영역에 준다. */
+.card table.semester-attendance-grid tbody td.attendance-status-cell {
+  padding: 0;
+}
+.card table.semester-attendance-grid .attendance-status-button {
+  display: block;
+  padding-block: var(--table-cell-y);
+  line-height: 1.2;
+}
 .card table tbody tr + tr { box-shadow: inset 0 1px rgba(227,233,230,.82); }
 
 /* ════════════════════════════════════════════════════

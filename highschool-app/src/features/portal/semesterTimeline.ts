@@ -20,7 +20,7 @@ export const SEMESTER_REGULAR_TITLE = "한 학기 사역팀 모임 전체 기간
 export function buildSemesterTimeline(sessions: Session[]): SemesterTimelineEntry[] {
   const regularDates = sessions
     .filter((session) => session.type === "정규")
-    .map((session) => session.date)
+    .flatMap((session) => [session.date, session.endDate].filter((date): date is string => !!date))
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b));
 
@@ -41,6 +41,7 @@ export function buildSemesterTimeline(sessions: Session[]): SemesterTimelineEntr
     entries.push({
       key: `semester-${session.id}`,
       date: session.date,
+      ...(session.endDate ? { endDate: session.endDate } : {}),
       title: session.label?.trim() || session.type,
     });
   }

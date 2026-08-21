@@ -46,7 +46,7 @@
 
 - 접수 원칙: 훈련 신청이 사역팀 지원의 전제. 예외는 고3 2학기·스탭. 판정은 `src/features/semester/intakeRule.ts`(순수)만 사용한다.
 - `trainingOnly`는 `deriveTrainingOnly`가 파생한다. 출석·수료 명단은 `roster.ts`(훈련 명단 = 훈련 반 배정자 전원 + 레거시 `trainingOnly`).
-- 회차 유형 변환은 `sessionKind.ts`. 출석 만점에서 빠지는 유형은 휴강뿐이다.
+- 회차 유형 변환은 `sessionKind.ts`. 출석 만점에서 빠지는 유형은 휴강뿐이다. 다일 회차는 기존 `date` + 선택 `endDate`로 표현하고 회차 ID·출석 집계는 하나로 유지한다(`sessionDate.ts`).
 - 훈련 반: `semesters/{sid}/trainingClasses/{id}`. 삭제는 `trainingClass.ts`의 루트 다중 경로 update(신청자 `trainingClassId`까지 정리).
 - `.input`은 레이어 밖 규칙이라 `width:100%`가 유틸리티를 이긴다 — 폭은 감싼 div로, 높이는 `h-*` 금지.
 
@@ -198,3 +198,8 @@ npm run build
 - **접근법**: 1→ `src/app/globals.css`의 `.card table tbody td` 전역 여백과 `src/app/retreat/[id]/ClassRosterTab.tsx`의 셀 유틸리티를 함께 확인한다. 2→ 반별 명단 표에 `class-roster-grid` 전용 클래스를 부여하고 더 높은 선택자 우선순위로 학생 셀 높이와 `padding-block`을 제한한다. 3→ 긴 이름이 좁은 열에서 두 줄이 되어 행 전체를 키우는지 실제 운영 데이터 40개 셀의 높이로 측정하고 `white-space: nowrap`을 적용한다. 4→ 390px과 1280px에서 모든 표본 행의 최소·최대 높이가 각각 26px·24px로 같은지, 상단 행동 문구가 `white-space: nowrap`인지 브라우저에서 확인한다.
 - **판단 질문**: 전역 `--table-cell-y`를 줄이지 않는다. 일반 데이터 표는 읽기 여백이 필요하고 반별 명단만 열 간 비교를 위해 고밀도가 필요하기 때문이다. 모바일 반별 명단을 카드 목록으로 바꾸지도 않는다. 반과 학년을 열로 비교하고 셀 색상을 편집하는 업무 의미가 사라진다.
 - **재사용 규칙**: 특정 표만 조밀해야 하면 `전역 표 규칙 실측 → 표 전용 클래스 → 더 높은 선택자 우선순위 → 셀 nowrap → 모바일·PC 실제 데이터 행 높이 측정` 순서로 해결한다.
+
+### 회차 식별자와 출석 집계를 유지하며 다일 일정을 표현하기 (2026-08-21)
+- **접근법**: 1→ `src/features/semester/types.ts`의 기존 `Session.date`와 `attendance/team/{sessionId}` 참조를 함께 확인한다. 2→ 회차를 날짜별로 복제하지 않고 같은 세션에 선택 `endDate`만 추가한다. 3→ `sessionDate.ts`에서 범위 검증·전체/축약 표기·오늘 포함 여부를 한 번만 계산한다. 4→ `SettingsTab.tsx`는 시작일·종료일을 추가·수정하고 `db.updateSessionDates`가 종료일 삭제를 `null` 최소 update로 처리한다. 5→ 출석 선택·표 머리글·커리큘럼·홈 캘린더·업무함에 같은 범위를 전달하고 단일 날짜 하위호환, 역전 차단, 둘째 날 현재 일정 판정을 테스트한다.
+- **판단 질문**: 1박 2일을 이틀짜리 회차 두 개로 만들지 않는다. 회차가 둘이면 출석 만점과 수료 분모가 두 번 늘고 커리큘럼·출석 기록도 중복된다. `date`를 객체로 바꾸지도 않는다. 기존 정렬·비교·화면과 운영 DB 레코드가 문자열을 전제로 하기 때문이다.
+- **재사용 규칙**: 기존 ID가 출석·수료 같은 집계 단위이면 다일 지원은 `기존 시작일 보존 → 선택 종료일 추가 → 범위 계산 공용화 → 모든 표시·현재 일정 판정에 전달 → 집계 키 불변 테스트` 순서로 확장한다.

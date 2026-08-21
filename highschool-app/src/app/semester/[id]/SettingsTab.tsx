@@ -3,7 +3,7 @@
 // 설정 — 학기 메타(제목·수료 기준), 사역팀 CRUD, 훈련 반 CRUD, 회차 CRUD.
 // 사역팀과 훈련 반은 같은 형태의 다른 축이라 좌우 2열로 나란히 둔다.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useUI } from "@/context/UIContext";
 import {
   addSession,
@@ -13,6 +13,7 @@ import {
   removeTeam,
   removeTrainingClass,
   updateSemesterMeta,
+  updateSessionDates,
   updateSessionKind,
   updateTeam,
   updateTrainingClass,
@@ -21,6 +22,11 @@ import { Application, SemesterMeta, Session, Team, TrainingClass } from "@/featu
 import { createSettingsDraft, editSettingsDraft, syncSettingsDraft } from "@/features/semester/settingsDraft";
 import { teamRemovalImpact } from "@/features/semester/teamRemoval";
 import { trainingClassRemovalImpact } from "@/features/semester/trainingClass";
+import {
+  normalizedSessionEndDate,
+  sessionDateLabel,
+  sessionDateRangeError,
+} from "@/features/semester/sessionDate";
 import {
   needsCustomLabel,
   SESSION_KINDS,
@@ -52,18 +58,19 @@ interface Props {
 
 export default function SettingsTab({ sid, meta, teams, trainingClasses, sessions, applications }: Props) {
   const { toast, uiConfirm } = useUI();
-  const [draft, setDraft] = useState(() => createSettingsDraft(sid, meta));
+  const [storedDraft, setDraft] = useState(() => createSettingsDraft(sid, meta));
+  // meta가 비동기로 도착하거나 sid가 바뀔 때만 렌더 중 파생으로 보정한다.
+  // 사용자가 먼저 편집한 dirty draft는 syncSettingsDraft가 그대로 보존한다.
+  const draft = syncSettingsDraft(storedDraft, sid, meta);
+  if (draft !== storedDraft) setDraft(draft);
   const [teamName, setTeamName] = useState("");
   const [className, setClassName] = useState("");
   const [sessDate, setSessDate] = useState("");
+  const [sessEndDate, setSessEndDate] = useState("");
   const [sessKind, setSessKind] = useState<SessionKind>("정규");
   const [sessCustomLabel, setSessCustomLabel] = useState("");
   // 기존 회차의 "직접 입력" 편집 — 한 번에 한 행만 연다
   const [labelDraft, setLabelDraft] = useState<{ sessionId: string; text: string } | null>(null);
-
-  useEffect(() => {
-    setDraft((current) => syncSettingsDraft(current, sid, meta));
-  }, [sid, meta]);
 
   async function saveMeta() {
     try {
@@ -103,8 +110,9 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
   }
 
   async function handleAddSession() {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(sessDate)) {
-      toast("날짜는 YYYY-MM-DD 형식이어야 합니다", "warning");
+    const rangeError = sessionDateRangeError(sessDate, sessEndDate || undefined);
+    if (rangeError) {
+      toast(rangeError, "warning");
       return;
     }
     if (needsCustomLabel(sessKind, sessCustomLabel)) {
@@ -113,12 +121,32 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
     }
     try {
       const value = sessionValueFor(sessKind, sessCustomLabel);
-      await addSession(sid, { date: sessDate, type: value.type, ...(value.label ? { label: value.label } : {}) });
+      const endDate = normalizedSessionEndDate(sessDate, sessEndDate || undefined);
+      await addSession(sid, {
+        date: sessDate,
+        ...(endDate ? { endDate } : {}),
+        type: value.type,
+        ...(value.label ? { label: value.label } : {}),
+      });
       setSessDate("");
+      setSessEndDate("");
       setSessKind("정규");
       setSessCustomLabel("");
     } catch (e) {
       toast(`회차 추가 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async function handleUpdateSessionDates(session: Session, date: string, endDate?: string) {
+    const rangeError = sessionDateRangeError(date, endDate);
+    if (rangeError) {
+      toast(rangeError, "warning");
+      return;
+    }
+    try {
+      await updateSessionDates(sid, session.id, date, normalizedSessionEndDate(date, endDate));
+    } catch (e) {
+      toast(`회차 날짜 변경 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 
@@ -289,9 +317,30 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
             return (
               <li key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="w-12 shrink-0 text-xs text-slate-400">{i + 1}회차</span>
-                <span className="tabular-nums">{s.date}</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="w-36 sm:w-40">
+                    <input
+                      type="date"
+                      value={s.date}
+                      onChange={(e) => void handleUpdateSessionDates(s, e.target.value, s.endDate)}
+                      aria-label={`${i + 1}회차 시작일`}
+                      className="input text-xs tabular-nums"
+                    />
+                  </div>
+                  <span className="text-slate-400" aria-hidden="true">~</span>
+                  <div className="w-36 sm:w-40">
+                    <input
+                      type="date"
+                      value={s.endDate ?? ""}
+                      min={s.date}
+                      onChange={(e) => void handleUpdateSessionDates(s, s.date, e.target.value || undefined)}
+                      aria-label={`${i + 1}회차 종료일 (선택)`}
+                      className="input text-xs tabular-nums"
+                    />
+                  </div>
+                </div>
                 <select
-                  aria-label={`${s.date} 유형`}
+                  aria-label={`${sessionDateLabel(s)} 유형`}
                   value={editingCustom ? "직접" : kind}
                   onChange={(e) => {
                     const nextKind = e.target.value as SessionKind;
@@ -313,7 +362,7 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
                 {editingCustom ? (
                   <input
                     autoFocus
-                    aria-label={`${s.date} 회차 이름`}
+                    aria-label={`${sessionDateLabel(s)} 회차 이름`}
                     value={labelDraft.text}
                     placeholder="회차 이름"
                     onChange={(e) => setLabelDraft({ sessionId: s.id, text: e.target.value })}
@@ -330,9 +379,9 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
                   s.label && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{s.label}</span>
                 )}
                 <button
-                  aria-label={`${s.date} 회차 삭제`}
+                  aria-label={`${sessionDateLabel(s)} 회차 삭제`}
                   onClick={async () => {
-                    if (await uiConfirm(`${s.date} 회차를 삭제할까요? 해당 회차 출석 기록은 집계에서 빠집니다.`)) {
+                    if (await uiConfirm(`${sessionDateLabel(s)} 회차를 삭제할까요? 해당 회차 출석 기록은 집계에서 빠집니다.`)) {
                       await removeSession(sid, s.id);
                     }
                   }}
@@ -346,17 +395,30 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
           {sessions.length === 0 && <li className="text-sm text-slate-400">아직 회차가 없습니다</li>}
         </ul>
         {/* .input은 레이어 밖 규칙(width:100%)이라 유틸리티 w-*를 이긴다 → 폭은 감싼 div로 준다 */}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="sm:w-44">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="sm:w-44">
+            <span className="mb-1 block text-xs text-slate-500">시작일</span>
             <input
               type="date"
               value={sessDate}
               onChange={(e) => setSessDate(e.target.value)}
-              aria-label="회차 날짜"
+              aria-label="회차 시작일"
               className="input text-sm"
             />
-          </div>
-          <div className="sm:w-52">
+          </label>
+          <label className="sm:w-44">
+            <span className="mb-1 block text-xs text-slate-500">종료일 (선택)</span>
+            <input
+              type="date"
+              value={sessEndDate}
+              min={sessDate || undefined}
+              onChange={(e) => setSessEndDate(e.target.value)}
+              aria-label="회차 종료일 (선택)"
+              className="input text-sm"
+            />
+          </label>
+          <label className="sm:w-52">
+            <span className="mb-1 block text-xs text-slate-500">회차 유형</span>
             <select
               aria-label="회차 유형"
               value={sessKind}
@@ -367,21 +429,24 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
                 <option key={option} value={option}>{SESSION_KIND_LABEL[option]}</option>
               ))}
             </select>
-          </div>
+          </label>
           {sessKind === "직접" && (
-            <input
-              value={sessCustomLabel}
-              onChange={(e) => setSessCustomLabel(e.target.value)}
-              placeholder="회차 이름 (예: 수련회 준비)"
-              aria-label="회차 이름 직접 입력"
-              className="input min-w-0 flex-1 text-sm"
-            />
+            <label className="min-w-0 flex-1">
+              <span className="mb-1 block text-xs text-slate-500">회차 이름</span>
+              <input
+                value={sessCustomLabel}
+                onChange={(e) => setSessCustomLabel(e.target.value)}
+                placeholder="예: 철야기도회"
+                aria-label="회차 이름 직접 입력"
+                className="input min-w-0 flex-1 text-sm"
+              />
+            </label>
           )}
           <button onClick={() => void handleAddSession()} disabled={!sessDate} className="btn-primary justify-center">
             회차 추가
           </button>
         </div>
-        <p className="text-xs text-slate-400">출석 집계(만점)에서 빠지는 유형은 휴강뿐입니다.</p>
+        <p className="text-xs text-slate-400">1박 2일 일정은 시작일과 종료일을 함께 고릅니다. 출석 회차는 한 번만 집계되며, 만점에서 빠지는 유형은 휴강뿐입니다.</p>
       </section>
     </div>
   );

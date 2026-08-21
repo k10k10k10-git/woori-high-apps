@@ -22,9 +22,9 @@ type BuildHomeActionsInput = {
   retreats: Retreat[];
 };
 
-function urgencyFor(date: string, today: string): HomeAction["urgency"] {
+function urgencyFor(date: string, today: string, endDate?: string): HomeAction["urgency"] {
+  if (date <= today && today <= (endDate ?? date)) return "today";
   if (date < today) return "overdue";
-  if (date === today) return "today";
   return "upcoming";
 }
 
@@ -40,7 +40,7 @@ export function buildHomeActions(input: BuildHomeActionsInput): HomeAction[] {
     }));
 
   const nextSession = input.sessions
-    .filter((item) => item.date >= input.today)
+    .filter((item) => (item.endDate ?? item.date) >= input.today)
     .sort((a, b) => a.date.localeCompare(b.date))[0];
   if (nextSession) {
     actions.push({
@@ -49,7 +49,7 @@ export function buildHomeActions(input: BuildHomeActionsInput): HomeAction[] {
       title: nextSession.label?.trim() || `${nextSession.type} 모임`,
       meta: "다음 학기 일정",
       href: input.semesterHref,
-      urgency: urgencyFor(nextSession.date, input.today),
+      urgency: urgencyFor(nextSession.date, input.today, nextSession.endDate),
     });
   }
 

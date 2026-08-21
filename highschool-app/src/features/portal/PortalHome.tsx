@@ -143,6 +143,7 @@ export default function PortalHome() {
       ? sessions.map((session) => ({
           id: `semester-${session.id}`,
           date: session.date,
+          ...(session.endDate ? { endDate: session.endDate } : {}),
           title: session.label?.trim() || `${session.type} 모임`,
           kind: "semester" as const,
           href: semesterHref,

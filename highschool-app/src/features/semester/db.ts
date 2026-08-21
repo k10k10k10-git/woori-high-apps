@@ -200,6 +200,16 @@ export async function updateSession(sid: string, sessId: string, partial: Partia
   await update(ref(db, paths.session(sid, sessId)), partial);
 }
 
+/** 시작·종료일만 최소 경로로 갱신한다. 종료일을 비우면 기존 값을 실제로 제거한다. */
+export async function updateSessionDates(
+  sid: string,
+  sessId: string,
+  date: string,
+  endDate?: string,
+): Promise<void> {
+  await update(ref(db, paths.session(sid, sessId)), { date, endDate: endDate ?? null });
+}
+
 /** 유형 변경 — 라벨을 비우려면 null을 써야 하므로 별도 함수로 둔다(sessionKind가 값을 만든다). */
 export async function updateSessionKind(sid: string, sessId: string, value: SessionValue): Promise<void> {
   await update(ref(db, paths.session(sid, sessId)), { type: value.type, label: value.label });

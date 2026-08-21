@@ -105,6 +105,7 @@
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
 | `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | - | highschool-app | - |
+| `semesters/{sid}/sessions/{sessionId}/endDate` | highschool-app 학기 모듈 | - | highschool-app | 선택 종료일. 없으면 기존 단일 날짜 회차, 있으면 `date`~`endDate` 다일 회차이며 출석은 sessionId 하나로 집계 |
 | `semesters/{sid}/trainingClasses/{id}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반. 삭제 시 `applications/*/trainingClassId`를 같은 루트 update로 함께 비운다(`trainingClass.ts`) |
 | `semesters/{sid}/teams/{id}/goal` | highschool-app 학기 모듈 | - | highschool-app | 팀별 이번 학기 목표 (커리큘럼 탭 상단) |
 | `semesters/{sid}/applications/{key}/trainingClassId` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반 배정. 값이 없으면 훈련 미신청 — 사역팀 지원은 고3 2학기·스탭만 가능(`intakeRule.ts`). `trainingOnly`는 파생 유지 |

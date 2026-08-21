@@ -40,4 +40,18 @@ describe("buildSemesterTimeline", () => {
   it("회차가 없으면 빈 배열이다", () => {
     expect(buildSemesterTimeline([])).toEqual([]);
   });
+
+  it("다일 회차의 종료일을 정규 기간과 개별 일정에 보존한다", () => {
+    expect(buildSemesterTimeline([
+      { id: "regular", date: "2026-10-23", endDate: "2026-10-24", type: "정규" },
+    ])).toEqual([
+      { key: "semester-regular", date: "2026-10-23", endDate: "2026-10-24", title: SEMESTER_REGULAR_TITLE },
+    ]);
+
+    expect(buildSemesterTimeline([
+      { id: "event", date: "2026-10-23", endDate: "2026-10-24", type: "행사", label: "철야기도회" },
+    ])).toEqual([
+      { key: "semester-event", date: "2026-10-23", endDate: "2026-10-24", title: "철야기도회" },
+    ]);
+  });
 });

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { attendanceMenuPosition } from "./attendanceGridPosition";
 
@@ -14,5 +16,19 @@ describe("출석 표 상태 메뉴 위치", () => {
       { left: 760, top: 620, right: 804, bottom: 656, width: 44 },
       { width: 800, height: 700 },
     )).toEqual({ left: 644, top: 476 });
+  });
+});
+
+describe("출석 상태 셀 밀도", () => {
+  it("상태 배경이 셀 전체를 채우도록 전역 표 여백을 상태 셀에서 제거한다", () => {
+    const source = readFileSync(join(process.cwd(), "src/app/semester/[id]/AttendanceGrid.tsx"), "utf8");
+    const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+
+    expect(source).toContain("semester-attendance-grid");
+    expect(source).toContain("attendance-status-cell");
+    expect(source).toContain("attendance-status-button");
+    expect(css).toContain("table.semester-attendance-grid tbody td.attendance-status-cell");
+    expect(css).toContain("padding: 0;");
+    expect(css).toContain("padding-block: var(--table-cell-y);");
   });
 });

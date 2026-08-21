@@ -8,6 +8,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { describeApplicant } from "@/features/semester/db";
 import { splitStudentsAndStaff } from "@/features/semester/roster";
+import { sessionDateLabel, sessionDayLabel } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Application, AttendanceStatus, Session, SessionAttendance } from "@/features/semester/types";
 import { attendanceMenuPosition } from "./attendanceGridPosition";
@@ -118,7 +119,7 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
     // 카드가 내용만큼만 차지하게 한다 — 회차가 적을 때 오른쪽에 빈 카드가 넓게 남지 않도록.
     <div className="card relative inline-block max-w-full overflow-x-auto align-top">
       {/* 회차가 적을 때 열이 늘어나지 않도록 내용 폭(w-max)으로 둔다 */}
-      <table className="w-max border-collapse text-center text-sm">
+      <table className="semester-attendance-grid w-max border-collapse text-center text-sm">
         <thead>
           <tr>
             <th rowSpan={2} className="sticky left-0 z-10 bg-white px-2 py-2 text-xs font-semibold text-slate-400">순</th>
@@ -137,10 +138,10 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
               const special = session.type === "휴강" || label !== "정규";
               return (
                 <th key={session.id}
-                  title={`${session.date} · ${label}`}
+                  title={`${sessionDateLabel(session)} · ${label}`}
                   className={`min-w-11 border-b px-1 py-1 text-xs font-semibold ${special ? "bg-amber-50 text-amber-700" : "text-slate-500"}`}
                   style={{ borderColor: "var(--color-border)" }}>
-                  {Number(session.date.slice(8, 10))}
+                  {sessionDayLabel(session)}
                 </th>
               );
             })}
@@ -169,15 +170,17 @@ export default function AttendanceGrid({ members, sessions, attBySession, canEdi
                     const holiday = session.type === "휴강";
                     const open = openCell?.appKey === member.id && openCell?.sessId === session.id;
                     return (
-                      <td key={session.id} className={`p-0 ${holiday ? "bg-amber-50/60" : ""}`}>
+                      <td key={session.id} className={`attendance-status-cell p-0 ${
+                        holiday ? "bg-amber-50/60" : entry ? MARK[entry.s].cell : ""
+                      }`}>
                         <button
                           ref={open ? anchorRef : undefined}
                           disabled={!canEdit || holiday}
                           onClick={(event) => openMenu(event, member.id, session.id, open)}
-                          aria-label={`${member.name} ${session.date} 출석 상태${entry ? ` (현재 ${entry.s})` : ""}`}
+                          aria-label={`${member.name} ${sessionDateLabel(session)} 출석 상태${entry ? ` (현재 ${entry.s})` : ""}`}
                           aria-expanded={open}
-                          className={`h-9 w-full text-sm font-semibold transition-colors disabled:cursor-default ${
-                            entry ? MARK[entry.s].cell : "text-slate-200 hover:bg-slate-50"
+                          className={`attendance-status-button w-full text-sm font-semibold transition-colors disabled:cursor-default ${
+                            entry ? "" : "text-slate-200 hover:bg-slate-50"
                           }`}
                           style={open ? { boxShadow: "inset 0 0 0 2px var(--color-primary)" } : undefined}
                         >
