@@ -7,6 +7,7 @@
  */
 
 import type { Session } from "@/features/semester/types";
+import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 
 export type SemesterTimelineEntry = {
   key: string;
@@ -42,7 +43,7 @@ export function buildSemesterTimeline(sessions: Session[]): SemesterTimelineEntr
       key: `semester-${session.id}`,
       date: session.date,
       ...(session.endDate ? { endDate: session.endDate } : {}),
-      title: session.label?.trim() || session.type,
+      title: sessionDisplayLabel(session),
     });
   }
 

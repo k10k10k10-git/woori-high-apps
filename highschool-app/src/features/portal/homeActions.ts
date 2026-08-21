@@ -1,4 +1,5 @@
 import type { Session } from "@/features/semester/types";
+import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Milestone, Retreat } from "@/lib/types";
 import type { RetreatPeriodWithOwner } from "@/lib/db";
 import { retreatEntryHref, type MinistryRoles } from "./accessPolicy";
@@ -46,7 +47,7 @@ export function buildHomeActions(input: BuildHomeActionsInput): HomeAction[] {
     actions.push({
       id: `session-${nextSession.id}`,
       date: nextSession.date,
-      title: nextSession.label?.trim() || `${nextSession.type} 모임`,
+      title: sessionDisplayLabel(nextSession),
       meta: "다음 학기 일정",
       href: input.semesterHref,
       urgency: urgencyFor(nextSession.date, input.today, nextSession.endDate),

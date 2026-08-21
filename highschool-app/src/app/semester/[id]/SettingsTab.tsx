@@ -28,9 +28,11 @@ import {
   sessionDateRangeError,
 } from "@/features/semester/sessionDate";
 import {
+  DEFAULT_SESSION_KIND,
   needsCustomLabel,
   SESSION_KINDS,
   SESSION_KIND_LABEL,
+  sessionDisplayLabel,
   sessionKindOf,
   sessionValueFor,
   type SessionKind,
@@ -67,7 +69,7 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
   const [className, setClassName] = useState("");
   const [sessDate, setSessDate] = useState("");
   const [sessEndDate, setSessEndDate] = useState("");
-  const [sessKind, setSessKind] = useState<SessionKind>("정규");
+  const [sessKind, setSessKind] = useState<SessionKind>(DEFAULT_SESSION_KIND);
   const [sessCustomLabel, setSessCustomLabel] = useState("");
   // 기존 회차의 "직접 입력" 편집 — 한 번에 한 행만 연다
   const [labelDraft, setLabelDraft] = useState<{ sessionId: string; text: string } | null>(null);
@@ -130,7 +132,7 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
       });
       setSessDate("");
       setSessEndDate("");
-      setSessKind("정규");
+      setSessKind(DEFAULT_SESSION_KIND);
       setSessCustomLabel("");
     } catch (e) {
       toast(`회차 추가 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -376,7 +378,7 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
                     className="input w-40 px-2 py-1 text-xs"
                   />
                 ) : (
-                  s.label && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{s.label}</span>
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs">{sessionDisplayLabel(s)}</span>
                 )}
                 <button
                   aria-label={`${sessionDateLabel(s)} 회차 삭제`}
@@ -442,7 +444,11 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
               />
             </label>
           )}
-          <button onClick={() => void handleAddSession()} disabled={!sessDate} className="btn-primary justify-center">
+          <button
+            onClick={() => void handleAddSession()}
+            disabled={!sessDate || needsCustomLabel(sessKind, sessCustomLabel)}
+            className="btn-primary justify-center"
+          >
             회차 추가
           </button>
         </div>

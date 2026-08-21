@@ -28,7 +28,7 @@ describe("buildHomeActions", () => {
       periods: [{ id: "p1", retreatId: "winter", startDate: "2026-12-28", endDate: "2026-12-30" }],
       retreats: [{ id: "winter", name: "겨울수련회", year: 2026, sheetId: "", sheetGid: "", createdAt: 1, groupCount: 0 }],
     });
-    expect(actions.map((item) => item.title)).toEqual(["개강", "겨울수련회"]);
+    expect(actions.map((item) => item.title)).toEqual(["훈련&사역팀 개강", "겨울수련회"]);
     expect(actions[1].href).toBe("/retreat/winter/field");
   });
 

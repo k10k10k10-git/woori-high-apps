@@ -32,7 +32,7 @@ describe("buildSemesterTimeline", () => {
     ]);
     expect(entries.map((entry) => [entry.date, entry.title])).toEqual([
       ["2026-03-08", SEMESTER_REGULAR_TITLE],
-      ["2026-05-03", "휴강"],
+      ["2026-05-03", "훈련&사역팀 휴강"],
       ["2026-06-21", "종강예배"],
     ]);
   });

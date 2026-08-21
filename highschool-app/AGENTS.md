@@ -46,7 +46,7 @@
 
 - 접수 원칙: 훈련 신청이 사역팀 지원의 전제. 예외는 고3 2학기·스탭. 판정은 `src/features/semester/intakeRule.ts`(순수)만 사용한다.
 - `trainingOnly`는 `deriveTrainingOnly`가 파생한다. 출석·수료 명단은 `roster.ts`(훈련 명단 = 훈련 반 배정자 전원 + 레거시 `trainingOnly`).
-- 회차 유형 변환은 `sessionKind.ts`. 출석 만점에서 빠지는 유형은 휴강뿐이다. 다일 회차는 기존 `date` + 선택 `endDate`로 표현하고 회차 ID·출석 집계는 하나로 유지한다(`sessionDate.ts`).
+- 회차 유형 변환은 `sessionKind.ts`. UI 선택지는 개강·종강·휴강·직접 입력이고 신규 기본값은 직접 입력이다. 표준 일정 문구는 `훈련&사역팀 …`이며 레거시 짧은 라벨도 표시 단계에서 정규화한다. 출석 만점에서 빠지는 유형은 휴강뿐이다. 다일 회차는 기존 `date` + 선택 `endDate`로 표현하고 회차 ID·출석 집계는 하나로 유지한다(`sessionDate.ts`).
 - 훈련 반: `semesters/{sid}/trainingClasses/{id}`. 삭제는 `trainingClass.ts`의 루트 다중 경로 update(신청자 `trainingClassId`까지 정리).
 - `.input`은 레이어 밖 규칙이라 `width:100%`가 유틸리티를 이긴다 — 폭은 감싼 div로, 높이는 `h-*` 금지.
 

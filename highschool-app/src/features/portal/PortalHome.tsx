@@ -17,6 +17,7 @@ import {
 import type { Milestone } from "@/lib/types";
 import type { Retreat } from "@/lib/types";
 import { subscribeSemesters, subscribeSessions } from "@/features/semester/db";
+import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Semester, Session } from "@/features/semester/types";
 import {
   canAccessArea,
@@ -144,7 +145,7 @@ export default function PortalHome() {
           id: `semester-${session.id}`,
           date: session.date,
           ...(session.endDate ? { endDate: session.endDate } : {}),
-          title: session.label?.trim() || `${session.type} 모임`,
+          title: sessionDisplayLabel(session),
           kind: "semester" as const,
           href: semesterHref,
         }))
