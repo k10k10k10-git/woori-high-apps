@@ -28,6 +28,29 @@ export function subscribeToAdminSiteRequests(
   );
 }
 
+/** 로그인 사용자 전용: 자기 요청함을 실시간 구독한다. */
+export function subscribeToMySiteRequests(
+  uid: string,
+  callback: (requests: SiteRequest[]) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(
+    ref(db, paths.siteRequests(uid)),
+    (snapshot) => {
+      if (!snapshot.exists()) {
+        callback([]);
+        return;
+      }
+      const requests = Object.entries(snapshot.val() as Record<string, unknown>)
+        .map(([id, value]) => normalizeSiteRequest(uid, id, value))
+        .filter((request): request is SiteRequest => request != null)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      callback(requests);
+    },
+    (error) => onError?.(error),
+  );
+}
+
 /** 로그인 직후 한 번만 읽어 아직 전달하지 않은 해결 알림을 찾는다. */
 export async function getMyUnnotifiedResolvedRequests(uid: string): Promise<SiteRequest[]> {
   const snapshot = await get(ref(db, paths.siteRequests(uid)));

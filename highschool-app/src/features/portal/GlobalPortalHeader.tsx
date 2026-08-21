@@ -3,14 +3,13 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CaretDown, DotsThree, SignOut, UserCircle, UsersThree } from "@phosphor-icons/react";
+import { CaretDown, DotsThree, SignOut, UserCircle } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
-import TeamModal from "./TeamModal";
-import MyPageModal from "./MyPageModal";
+import MyPageModal, { type MyPageTab } from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import OverlayShell from "@/components/OverlayShell";
-import { canAccessArea, canAccessSundayTeam, canManageRolesOf, canManageSiteRequests } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, canManageRolesOf } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
@@ -111,12 +110,20 @@ const AREA_LABEL: Record<GlobalArea, string> = {
 export default function GlobalPortalHeader() {
   const pathname = usePathname();
   const { user, loading, roles, signOut } = useAuth();
-  const [teamOpen, setTeamOpen] = useState(false);
   const [myPageOpen, setMyPageOpen] = useState(false);
+  const [myPageInitialTab, setMyPageInitialTab] = useState<MyPageTab>("dashboard");
   const [openMenu, setOpenMenu] = useState<"sunday" | "vacation" | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const currentArea = activeArea(pathname);
-  const openTeam = useCallback(() => setTeamOpen(true), []);
+  const openTeam = useCallback(() => {
+    if (!canManageRolesOf(roles)) return;
+    setMyPageInitialTab("team");
+    setMyPageOpen(true);
+  }, [roles]);
+  const openMyPage = useCallback((tab: MyPageTab = "dashboard") => {
+    setMyPageInitialTab(tab);
+    setMyPageOpen(true);
+  }, []);
   const closeMenu = useCallback(() => setOpenMenu(null), []);
   const openSunday = useCallback(() => setOpenMenu("sunday"), []);
   const openVacation = useCallback(() => setOpenMenu("vacation"), []);
@@ -138,7 +145,6 @@ export default function GlobalPortalHeader() {
   if (loading || !user) return null;
 
   const semesterAllowed = canAccessArea("semester", roles);
-  const siteRequestAdmin = canManageSiteRequests(roles);
   // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
   // 수련회에 들어갔을 때 행정 화면이냐 현장 화면이냐만 달라진다.
   const vacationItems: NavItem[] = [
@@ -228,11 +234,9 @@ export default function GlobalPortalHeader() {
           <div className="portal-header-tools">
             <div className="portal-account-row portal-account-row--desktop">
               <ThemeToggle />
-              {canManageRolesOf(roles) && (
-                <button onClick={() => siteRequestAdmin ? setMyPageOpen(true) : setTeamOpen(true)} className="portal-compact-action">
-                  <span>{siteRequestAdmin ? "마이페이지" : "팀원 관리"}</span>
-                </button>
-              )}
+              <button onClick={() => openMyPage()} className="portal-compact-action">
+                <span>마이페이지</span>
+              </button>
               <span className="portal-account-name hidden md:inline">{user.displayName || user.email}</span>
               <button onClick={() => void signOut()} className="portal-compact-action" aria-label="로그아웃">
                 <span className="hidden sm:inline">로그아웃</span><span className="sm:hidden">↪</span>
@@ -279,16 +283,13 @@ export default function GlobalPortalHeader() {
             </nav>
             <div className="portal-mobile-account">
               <ThemeToggle showLabel />
-              {canManageRolesOf(roles) && (
-                <button onClick={() => {
-                  setMobileMenuOpen(false);
-                  if (siteRequestAdmin) setMyPageOpen(true);
-                  else setTeamOpen(true);
-                }}>
-                  {siteRequestAdmin ? <UserCircle aria-hidden="true" size={18} /> : <UsersThree aria-hidden="true" size={18} />}
-                  <span>{siteRequestAdmin ? "마이페이지" : "팀원 관리"}</span>
-                </button>
-              )}
+              <button onClick={() => {
+                setMobileMenuOpen(false);
+                openMyPage();
+              }}>
+                <UserCircle aria-hidden="true" size={18} />
+                <span>마이페이지</span>
+              </button>
               <button onClick={() => void signOut()}>
                 <SignOut aria-hidden="true" size={18} />
                 <span>로그아웃</span>
@@ -296,8 +297,7 @@ export default function GlobalPortalHeader() {
             </div>
         </OverlayShell>
       )}
-      {teamOpen && <TeamModal onClose={() => setTeamOpen(false)} />}
-      {myPageOpen && <MyPageModal onClose={() => setMyPageOpen(false)} />}
+      {myPageOpen && <MyPageModal initialTab={myPageInitialTab} onClose={() => setMyPageOpen(false)} />}
     </>
   );
 }
