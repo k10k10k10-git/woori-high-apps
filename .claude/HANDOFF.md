@@ -174,12 +174,12 @@
 
 ## 지금 상태 (한 문장)
 
-최신 인물조회 수련회 카드 통합 요청은 **구현·검증·푸시·배포 완료**이며, 운영상 남은 우선 과제는 **학생 출석부 데모 모드 정리**와 React Hooks lint 부채다.
+휴강 주차 제외·공유 일정 분류까지 **구현·검증·푸시·배포 완료**이며, 운영상 남은 최우선 위험은 여전히 **학생 출석부 데모 모드**(공개 번들에 계정 비밀번호)다.
 
-- 최신 배포 앱 기능 커밋: `a7c8dcd` (`인물조회: 동일 수련회 참가 카드 통합`). 이 인수인계 문서 커밋도 같은 Production 빌드에 포함된다.
+- 최신 커밋 = 최신 배포: `b67f1d3` (`학기·캘린더: 휴강 주차 제외와 일정 분류 추가`). `/api/version`이 이 SHA와 일치함을 2026-08-22에 확인했다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
 - 브랜치는 `main` 하나뿐 (병합 완료된 `codex/unified-highschool`·`refactor/2026-07-plan`을 2026-08-13 삭제)
-- 작업 트리 깨끗 (미추적 `.agents/` `outputs/` `tmp/` + 학생 앱 `tmp/` 제외 — **`git add .` 금지**)
+- 작업 트리 깨끗 (미추적 `.agents/` `outputs/` + 학생 앱 `tmp/` 제외 — **`git add .` 금지**)
 - 폴더 1.5GB (8/12 아침 4.5GB에서 정리)
 
 ## 현재 운영 구조 (2026-08-13 기준)
@@ -215,17 +215,25 @@
 
 **하위호환이 이 모델의 핵심**이다. 새 필드(`semesterRole`·`retreatRole`)가 없는 기존 구성원은 레거시 `role`에서 파생해 **이전과 똑같은 권한**을 받는다. `accessPolicy.test.ts`가 이걸 회귀로 고정한다 — 여기가 깨지면 43명이 로그인해도 화면이 빈다.
 
-## 검증 상태 (2026-08-21 마지막 실측)
+## 검증 상태 (2026-08-22 실측 — HEAD `b67f1d3`)
 
 | | 결과 |
 |---|---|
 | `highschool-app` `npx tsc --noEmit` | 0 errors |
-| `highschool-app` `npm test` | 78파일 **649개 통과** |
+| `highschool-app` `npm test` | 82파일 **689개 통과** |
+| `highschool-app` `npm run lint` | **0 errors / 0 warnings** |
 | `highschool-app` `npm run build` | 성공 |
 | `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
-| `고등부 학생 출석부` `npm test` | 8파일 **105개 통과** (마지막 학생 앱 변경 기준) |
-| `highschool-app` 변경 파일 lint | 통과 |
-| `highschool-app` 전체 lint | **10 errors** / 3 warnings (React Hooks 규칙 부채, 아래 "미완인 것" 참고) |
+| `고등부 학생 출석부` `npm test` | 9파일 **122개 통과** |
+| `고등부 학생 출석부` `npm run lint` | 0 errors / **34 warnings** |
+| `고등부 학생 출석부` `npm run build` | 성공 |
+| 배포 일치 | `/api/version` = `b67f1d3…` = 로컬 HEAD |
+| 운영 응답 | `woorihigh-app.vercel.app` 200 / `woori-high.web.app` 200 |
+
+> 이 표는 2026-08-22에 두 앱 모두 직접 실행해 얻은 값이다. 직전 표(08-21)는 통합 앱
+> 전체 lint를 `10 errors`로 적고 있었는데, 그 부채는 같은 날 "품질 개선 2~10차"에서
+> 해소됐고 표만 남아 있었다. **다음 세션이 있지도 않은 부채를 잡으러 가지 않도록**
+> 검증값을 바꿀 때는 표와 "미완인 것"을 함께 고칠 것.
 
 ## 이번 세션에 한 일 (전부 푸시·배포됨)
 
@@ -266,7 +274,7 @@
 ## 미완인 것 — 정확한 다음 단계
 
 - [ ] **(최우선) 학생 출석부 데모 모드 정리.** 지금 `NEXT_PUBLIC_DEMO_MODE=1`에 계정 정보가 채워진 채 배포돼 있다. **비밀번호가 공개 JS 번들 안에 있어 주소를 아는 누구나 전교생 개인정보에 접근할 수 있다.** 교사 테스트가 끝나면 ① Firebase 콘솔에서 `demo@woorihigh.com` 계정 삭제 + `attendanceAdmins`의 그 uid 삭제 ② `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE=0` ③ `firebase deploy --only hosting`. 구조는 `고등부 학생 출석부/CLAUDE.md`의 "데모 모드" 참고.
-- [ ] **lint 에러 10건 / 경고 3건** — 2026-08-14 재실측. `set-state-in-effect`는 `ConnectivityBanner`(1), `ExecutionViews`(3), `LodgingMapView`(2), `ScheduleSheetEditor`(1), `SettingsTab`(1), `useRetreatData`(1)이고, `OverlayShell`의 렌더 중 ref 갱신이 1건이다. 경고는 `LodgingMapView`의 `<img>` 1건과 `ScheduleView` 미사용 인자 2건이다. UI 동작·타입·테스트·빌드는 통과하지만 전체 lint는 아직 실패하므로 다음 정리 작업에서 렌더 파생·구독 초기화·최신 콜백 참조 패턴으로 각각 분리해 고칠 것.
+- [x] ~~**lint 에러 10건 / 경고 3건**~~ — 2026-08-22 해소. 통합 앱 전체 `npm run lint`가 **0 errors / 0 warnings**다. effect 안 동기 setState는 초기값·렌더 파생값·`requestAnimationFrame`·구독 완료 스코프로 나눴고 `LodgingMapView`의 `<img>`는 Next Image 계약으로 바꿨다. 남은 것은 **학생 출석부의 경고 34건**(errors 0)이며 빌드·테스트·타입에는 영향이 없다.
 - [ ] **화면 차단 ≠ 실제 차단 5건** — Rules는 여전히 세 버킷(`admins`/`retreatAdmins`/`iguardMembers`)만 구분한다. 화면에서만 막히는 것: 스탭팀장의 행정 조회 전용, 스탭팀장·바나바팀의 민감정보 제외, 사역팀의 "내 팀만 편집", 이가드팀의 학기 차단, **스탭 32명의 `classes` 전체 읽기**. 마지막 항목이 위험도가 가장 높다(전교생 주소·연락처).
 - [ ] **(대기) 조장 큐싯 붙여넣기 경로**를 만들지 여부 — 사용자 답변 대기.
 - [ ] **(대기) 훈련 반 `goal` 필드** 추가 여부 — 사용자 답변 대기.
