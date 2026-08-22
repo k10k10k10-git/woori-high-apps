@@ -14,6 +14,7 @@ import {
 import { gbsPlacesForStaff } from "@/features/iguard/lib/gbsPlaces";
 import { dutyLabelsForStaff, dutyLinesForStaff, visibleNoticeLines } from "@/features/iguard/lib/personalDuty";
 import { staffDisplayText } from "@/features/iguard/lib/cueSheet";
+import { resolveSelectedBlockId, resolveSelectedDay, type PickedBlock } from "@/features/iguard/lib/cueSelection";
 
 interface Data {
   retreatId?: string;
@@ -74,6 +75,7 @@ export function CueCardView({
   const curDay = currentRetreatDay(periods, retreat);
   const [staffId, setStaffId] = useState("");
   const staffPicked = useRef(false);
+  const restoredStaffId = useRef<string | null>(null);
   const initialTimelinePositioned = useRef(false);
   const timelineAnchorRef = useRef<HTMLDivElement | null>(null);
   const timelineEndRef = useRef<HTMLDivElement | null>(null);
@@ -113,21 +115,23 @@ export function CueCardView({
   }, [movements, staffId]);
   const sortedSchedule = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
 
-  useEffect(() => {
-    if (!staffSelectionKey || staffPicked.current) return;
-    const saved = window.localStorage.getItem(staffSelectionKey);
-    if (saved && sortedStaff.some(member => member.id === saved)) {
-      staffPicked.current = true;
-      const frame = window.requestAnimationFrame(() => setStaffId(saved));
-      return () => window.cancelAnimationFrame(frame);
-    }
-  }, [sortedStaff, staffSelectionKey]);
-
+  // 저장된 선택 복원과 자동 선택은 같은 결정("이 사람의 큐카드를 연다")이라 한 effect에서 처리한다.
+  // localStorage는 서버 렌더에 없어 렌더 중 파생이 불가하므로 effect가 맞다 — 대신 판정은
+  // chooseCueCardStaffId(순수) 한 곳에 모아 두고 staffIdentity.test.ts가 지킨다.
   useEffect(() => {
     if (!sortedStaff.length) return;
-    const nextStaffId = chooseCueCardStaffId(sortedStaff, staffId, preferredStaffId, staffPicked.current);
+    let restored = restoredStaffId.current;
+    if (!staffPicked.current && staffSelectionKey) {
+      const saved = window.localStorage.getItem(staffSelectionKey);
+      if (saved && sortedStaff.some(member => member.id === saved)) {
+        staffPicked.current = true;
+        restored = saved;
+        restoredStaffId.current = saved;
+      }
+    }
+    const nextStaffId = chooseCueCardStaffId(sortedStaff, restored ?? staffId, preferredStaffId, staffPicked.current);
     if (staffId !== nextStaffId) setStaffId(nextStaffId);
-  }, [preferredStaffId, sortedStaff, staffId]);
+  }, [preferredStaffId, sortedStaff, staffId, staffSelectionKey]);
 
   const currentBlock = currentBlockFor(schedule, curDay, clock.time);
   const effectiveDay = curDay;
@@ -468,19 +472,19 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
   const days = useMemo(() => [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b), [schedule]);
   const sorted = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
 
+  // 선택 판정은 cueSelection의 순수 함수만 쓴다 — ★ 사고 이력(실수 13)이라 회귀 테스트가 지킨다.
   const [pickedDay, setPickedDay] = useState<number | null>(null);
-  const day = pickedDay != null && days.includes(pickedDay)
-    ? pickedDay
-    : (curDay != null && days.includes(curDay) ? curDay : (days[0] ?? 1));
+  const day = useMemo(() => resolveSelectedDay(days, pickedDay, curDay), [days, pickedDay, curDay]);
 
   const dayBlocks = useMemo(() => sorted.filter(b => b.day === day), [sorted, day]);
   const selectedDate = retreatDateForDay(periods, retreat, day);
   const selectedDateLabel = selectedDate ? formatShortDate(selectedDate) : null;
-  const [pickedBlock, setPickedBlock] = useState<{ day: number; id: string } | null>(null);
+  const [pickedBlock, setPickedBlock] = useState<PickedBlock | null>(null);
   const automaticBlock = dayBlocks.find(b => isNowOn(b, curDay, clock.time)) ?? dayBlocks[0];
-  const blockId = pickedBlock?.day === day && dayBlocks.some(block => block.id === pickedBlock.id)
-    ? pickedBlock.id
-    : (automaticBlock?.id ?? "");
+  const blockId = useMemo(
+    () => resolveSelectedBlockId(dayBlocks.map(b => b.id), pickedBlock, day, automaticBlock?.id),
+    [dayBlocks, pickedBlock, day, automaticBlock],
+  );
 
   const block = sorted.find(b => b.id === blockId);
   const staffName = useMemo(() => new Map(staff.map(s => [s.id, s.name])), [staff]);
