@@ -41,6 +41,22 @@ describe("reduceConnectivityBanner", () => {
     expect(afterGrace.hasShownOffline).toBe(true);
   });
 
+  it("연결된 뒤 끊기면(현장 와이파이 단절) 유예 없이 곧바로 경고한다", () => {
+    // 구독 실패 콜백도 같은 이벤트를 보내므로 이 경로가 함께 검증된다.
+    const connected = reduceConnectivityBanner(INITIAL_CONNECTIVITY_BANNER_STATE, {
+      type: "connection-changed",
+      connected: true,
+    });
+    const afterGrace = reduceConnectivityBanner(connected, { type: "grace-elapsed" });
+    const dropped = reduceConnectivityBanner(afterGrace, {
+      type: "connection-changed",
+      connected: false,
+    });
+
+    expect(afterGrace.mode).toBe("hidden");
+    expect(dropped.mode).toBe("offline");
+  });
+
   it("실제 오프라인 표시 후 재연결되면 복구 안내를 한 번 표시한다", () => {
     const afterGrace = reduceConnectivityBanner(
       reduceConnectivityBanner(INITIAL_CONNECTIVITY_BANNER_STATE, {

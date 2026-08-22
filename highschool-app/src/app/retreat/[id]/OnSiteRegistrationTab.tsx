@@ -86,7 +86,11 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
       e => setLoadError(prev => prev ?? `교사 명단 구독 실패 - ${e.message}`));
     const unsubPartial = subscribeToPartialAttendances(retreat.id, setPartialAttendances,
       e => setLoadError(prev => prev ?? `부분참 명단 구독 실패 - ${e.message}`));
-    const unsubConn = subscribeToConnection(setConnected);
+    // 연결 구독이 실패하면 저장 성공 여부를 확인할 길이 없다 — 끊긴 것으로 보고 경고한다.
+    const unsubConn = subscribeToConnection(setConnected, e => {
+      setConnected(false);
+      setLoadError(prev => prev ?? `연결 상태 구독 실패 - ${e.message}`);
+    });
     return () => {
       unsubClasses(); unsubParticipants(); unsubCellColors(); unsubOnSite(); unsubGroups();
       unsubTeachers(); unsubPartial(); unsubConn();

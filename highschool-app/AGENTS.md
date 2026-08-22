@@ -72,7 +72,7 @@ npm run build
 - **전체 덮어쓰기 복구는 사전 백업 성공을 확인한 뒤에만** — `backupNodeBeforeOverwrite`의 반환값을 검사한다(`if (!backedUp) throw`). 스로틀된 상시 저장 백업만 예외.
 - **인앱 브라우저 탈출은 `features/iguard/lib/inAppBrowser.ts`만.** 화면에 복제하지 말 것 — 복제본에는 "이동 주소 ≠ 현재 주소" 불변식과 세션 1회 가드가 빠져 무한 리로드가 났다.
 - **`.input`은 `globals.css`의 `@layer` 밖 규칙이라 Tailwind 유틸리티를 이긴다.** `h-*`로 높이를 고정하면 글자가 잘리고, `w-*`·`text-*`·`px-*`는 무시된다. 폭은 **감싼 div**로, 글꼴은 **인라인 style**로 준다.
-- 남은 `set-state-in-effect` 9건은 의도적으로 남긴 것이 대부분이다: `ExecutionViews` 3건은 `staffPicked`/`userPicked` ref 가드 자동 선택(루트 CLAUDE.md 실수 13이 **처방한** 패턴), `LodgingMapView` 2건은 레이아웃·팝오버, `useRetreatData`·`RetreatsHome`은 로딩/fetch. 나머지 2건(`ScheduleSheetEditor`·`SettingsTab`)만 draft 동기화라 `key` 부여로 정리 가능하다.
+- **전체 ESLint는 0 errors / 0 warnings다(2026-08-22 기준).** 이전에 "의도적 부채"로 남겨 두던 `set-state-in-effect` 9건은 전부 정리됐다 — 자동 선택은 렌더 중 파생(`cueSelection.ts`·`chooseCueCardStaffId`), 로딩은 스코프 비교(`useRetreatData`의 `loadedScope`)로 바뀌었다. **lint 실패를 새 부채로 남기지 말 것**: `npm run verify`가 lint부터 돌기 때문에 한 건이라도 남으면 저장소 전체 게이트가 상시 빨간불이 되고, 그러면 아무도 그 게이트를 믿지 않게 된다.
 
 ## 핵심 코드 패턴
 
@@ -270,3 +270,8 @@ npm run build
 - **접근법**: 1→ 로그인된 학기 출석표에서 `getBoundingClientRect()`로 날짜 머리글 폭을 전부 측정해 9/5만 142px이고 나머지는 50px임을 확인한다. 2→ `src/app/operations-tables.css`의 이름 열 규칙 `:nth-child(2)`가 두 번째 머리글 행의 두 번째 날짜에도 적용되는지 대조한다. 3→ `AttendanceGrid.tsx`의 이름 열에 `attendance-name-cell`, 날짜 머리글과 상태 셀에 `attendance-session-cell` 역할 클래스를 붙인다. 4→ 이름 열 142px과 모든 회차 열 52px을 역할 클래스에만 적용하고 범용 nth-child 선택자를 제거한다. 5→ 소스 계약 테스트와 배포된 운영 화면의 실제 열 폭을 다시 측정한다.
 - **판단 질문**: 9/5 하나만 `nth-child` 예외로 덮거나 표 전체 폭을 줄이지 않는다. 날짜 순서가 바뀌면 같은 버그가 다른 회차로 이동하고, 표 폭 조정은 이름 열 선택자가 다른 머리글 행에 누출되는 직접 원인을 해결하지 못하기 때문이다.
 - **재사용 규칙**: `rowSpan`·`colSpan`·여러 `tr`이 있는 표의 열 폭은 `nth-child`가 아니라 의미 기반 열 클래스로 지정하고, 수정 전후 모든 머리글의 실제 폭을 배열로 측정한다.
+
+### effect 안 setState를 순수 함수로 걷어낼 때 React Compiler에 막히지 않기 (2026-08-22)
+- **접근법**: 1→ `react-hooks/set-state-in-effect`가 걸린 자리에서 "무엇을 정하는 결정인가"를 한 문장으로 적고 그 판정만 `src/features/iguard/lib/cueSelection.ts`처럼 순수 함수로 뺀다. 2→ 컴포넌트는 `const day = resolveSelectedDay(days, pickedDay, curDay)`처럼 **렌더 중 파생**으로 부른다. 3→ `npx eslint <파일>`을 돌리면 이번에는 `react-hooks/preserve-manual-memoization`이 뜬다 — 그 파생값을 dep로 쓰는 아래쪽 `useMemo`에서 "This dependency may be modified later"가 난다. 4→ 파생값 자체를 `useMemo(() => resolveSelectedDay(days, pickedDay, curDay), [days, pickedDay, curDay])`로 감싸면 사라진다. 5→ `npx tsc --noEmit`·`npx vitest run`·`npx eslint .`을 차례로 돌려 0을 확인한다.
+- **판단 질문**: 순수 함수 추출을 포기하고 로직을 컴포넌트에 인라인으로 되돌리지 않는다. 컴파일러가 통과시킨다는 이유로 테스트 불가능한 자리에 ★ 사고 이력 로직을 두는 것이 실제 위험이고, `useMemo` 한 겹이 그 대가로 충분히 싸다. `eslint-disable`로 덮지도 않는다 — 이 규칙은 메모이제이션이 실제로 깨졌다는 신호라 끄면 렌더 성능이 조용히 나빠진다. localStorage 복원처럼 서버 렌더에 값이 없는 경우까지 억지로 렌더 파생으로 바꾸지 않는다(하이드레이션 불일치). 그때는 effect를 쓰되 판정만 순수 함수에 위임한다.
+- **재사용 규칙**: React Compiler가 켜진 이 저장소에서 순수 함수를 추출하면 **그 반환값이 다른 `useMemo`의 dep로 들어가는 순간 함께 `useMemo`로 감싼다** — 컴파일러는 외부 함수 안을 못 보므로 인자로 넘긴 배열이 변형될 수 있다고 보수적으로 판단한다.

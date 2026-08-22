@@ -78,7 +78,7 @@
 10. **동기화 보존 가드 제거** ★ — `syncFromSheet`의 ambiguous 충돌 가드를 지우면 특이사항이 엉뚱한 사람에게 영구 복사된다(실제 12명 오염). → 규칙: `syncParticipants.ts`를 통해서만 수정, `syncParticipants.test.ts` A2가 지킨다.
 11. **인원체크를 토글로 회귀** ★ — 탭=토글로 바꾸면 "확인하려다 해제" 사고 재발. → 규칙: 멱등 체크 + 트랜잭션 + 톰스톤(iguard 패턴 15) 유지. `set`/`remove` 직접 쓰기 금지.
 12. **민감정보 위치 실수** — 취소계좌·의료·주민번호를 `retreats/{id}` 아래 저장. → 규칙: 신규 민감 필드는 무조건 `paths.ts`의 retreatsPrivate 계열로.
-13. **시계 tick이 사용자 선택을 덮음** ★ — `clock.time` 의존 effect에서 선택 상태를 setState하면 30초마다 리셋. → 규칙: 자동 선택 effect에는 `userPicked`/`blockPicked` ref 가드(iguard 패턴 17).
+13. **시계 tick이 사용자 선택을 덮음** ★ — `clock.time` 의존 effect에서 선택 상태를 setState하면 30초마다 리셋. → 규칙: 선택은 **effect가 아니라 렌더 중 파생**으로 정한다 — 사용자가 고른 값을 `picked*` 상태에 담고 유효할 때만 자동값을 이긴다. 판정 함수는 `iguard/lib/cueSelection.ts`(일자·블록)와 `staffIdentity.ts`(큐카드 스탭)뿐이고 각각의 테스트가 지킨다. localStorage 복원처럼 서버 렌더에 값이 없어 파생이 불가한 경우에만 effect를 쓰되, 판정은 위 순수 함수에 위임한다.
 14. **useRetreatData 밖 구독** — 이가드에서 컴포넌트가 직접 구독을 추가. → 규칙: 모든 이가드 구독은 이 훅에만 추가하고 `fail(key)`를 배선.
 15. **인쇄 HTML XSS** ★ — 사용자 입력을 `printAsPDF` HTML에 그대로 삽입. → 규칙: 인쇄/내보내기 HTML의 사용자 데이터는 전부 `escapeHtml()`.
 
