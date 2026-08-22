@@ -260,3 +260,8 @@ npm run build
 - **접근법**: 1→ `playwright.config.ts`에서 인증 상태를 코드에 넣지 않고 `E2E_STORAGE_STATE` 파일 경로로만 받는다. 2→ 인증 파일이 없으면 로그인 시나리오를 명시적으로 skip하고, 있으면 홈·학기·주일·수련회·가이드의 페이지 오류와 문서 가로 넘침을 PC·모바일 프로젝트에서 검사한다. 3→ 오버레이는 열기·ESC 닫기 뒤 `ModalScrollManager`가 `body.position`을 복구했는지 확인한다. 4→ Playwright 파일은 `e2e/*.e2e.ts`와 `testMatch`로 격리하고 Vitest의 `*.test.ts`·`*.spec.ts` 탐색에 포함시키지 않는다. 5→ `npx playwright test --list`, 전체 Vitest, 타입, lint, production build를 차례로 실행한다.
 - **판단 질문**: Google OAuth 토큰이나 쿠키를 저장소에 커밋하지 않고, 인증이 없는 CI에서 로그인 테스트를 억지로 통과시키지 않는다. E2E 파일을 `*.spec.ts`로 만들지도 않는다 — 이 저장소의 Vitest 기본 탐색과 겹쳐 Playwright의 `test.describe`가 Vitest 프로세스에서 실행된다. 브라우저 검증을 이유로 운영 DB의 저장 버튼도 누르지 않는다.
 - **재사용 규칙**: 인증형 Next.js 운영 앱의 E2E는 `외부 storage state 주입 → 미설정 skip → PC·모바일 핵심 경로 smoke → 오버레이 스크롤 복구 → *.e2e.ts로 러너 격리 → 단위·타입·lint·build 동시 검증` 순서를 지킨다.
+
+### 브라우저 온라인 추정값 대신 실제 저장 서버 연결로 경고하기 (2026-08-22)
+- **접근법**: 1→ `src/app/ConnectivityBanner.tsx`의 `navigator.onLine` 초기값·이벤트와 `src/lib/db/core.ts`의 Firebase `.info/connected` 구독을 대조한다. 2→ 배너 판정을 `.info/connected` 하나로 옮기고 첫 연결의 일시적인 `false`는 3초 유예한다. 3→ `src/lib/connectivity.ts`에 연결·유예·복구 안내를 순수 상태 전이로 분리한다. 4→ 초기 false, 유예 내 연결, 지속 단절, 재연결 안내 종료를 `connectivity.test.ts`로 고정한다. 5→ 전체 테스트·lint·타입·production build와 배포본 버전을 확인한다.
+- **판단 질문**: `navigator.onLine`과 Firebase 연결을 단순 AND로 묶지 않는다. 브라우저 값은 네트워크 어댑터·캐시·확장 프로그램 상태에 따라 실제 저장 가능 여부와 다를 수 있고, AND 조건은 Firebase가 정상이어도 거짓 오프라인을 유지한다. Firebase의 첫 `false`도 즉시 경고하지 않는다. SDK 연결 수립 중 정상적으로 잠깐 발생할 수 있기 때문이다.
+- **재사용 규칙**: 저장 실패 경고는 `실제 저장 서버 연결 구독 → 초기 false 유예 → 순수 상태 전이 테스트 → 단절 지속 시에만 경고 → 실제 경고 뒤 재연결 안내` 순서로 구현하고 브라우저의 `navigator.onLine`은 보조 진단값으로만 사용한다.
