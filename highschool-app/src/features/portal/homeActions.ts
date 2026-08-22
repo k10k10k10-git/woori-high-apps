@@ -12,6 +12,7 @@ export type HomeAction = {
 };
 
 const KIND_META: Record<SharedCalendarItem["kind"], string> = {
+  main: "고등부 메인",
   semester: "훈련·사역팀",
   sunday: "주일 사역",
   retreat: "수련회 행정",

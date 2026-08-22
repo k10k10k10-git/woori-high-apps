@@ -8,7 +8,7 @@ export type SharedCalendarItem = {
   date: string;
   endDate?: string;
   title: string;
-  kind: "semester" | "sunday" | "retreat" | "field";
+  kind: "main" | "semester" | "sunday" | "retreat" | "field";
   href?: string;
   done?: boolean;
   /** prepMilestones에서 온 일정만 이 화면에서 수정·삭제한다. */
@@ -16,6 +16,7 @@ export type SharedCalendarItem = {
 };
 
 const KIND_LABEL: Record<SharedCalendarItem["kind"], string> = {
+  main: "고등부 메인",
   semester: "훈련·사역팀",
   sunday: "주일 사역",
   retreat: "수련회 행정",
@@ -23,13 +24,32 @@ const KIND_LABEL: Record<SharedCalendarItem["kind"], string> = {
 };
 
 export const CALENDAR_KIND_STYLE: Record<SharedCalendarItem["kind"], { chip: string; detail: string; dot: string }> = {
+  main: { chip: "bg-violet-100 text-violet-800", detail: "text-violet-300", dot: "bg-violet-500" },
   semester: { chip: "bg-blue-100 text-blue-800", detail: "text-blue-300", dot: "bg-blue-500" },
   sunday: { chip: "bg-amber-100 text-amber-800", detail: "text-amber-300", dot: "bg-amber-500" },
   retreat: { chip: "bg-emerald-100 text-emerald-800", detail: "text-emerald-300", dot: "bg-emerald-500" },
   field: { chip: "bg-slate-100 text-slate-700", detail: "text-slate-300", dot: "bg-slate-400" },
 };
 
+export const SHARED_CALENDAR_KIND_OPTIONS: ReadonlyArray<{
+  value: SharedCalendarItem["kind"];
+  label: string;
+  sourceSite: string;
+}> = [
+  { value: "main", label: "고등부 메인", sourceSite: "portal-main" },
+  { value: "semester", label: "훈련·사역팀", sourceSite: "semester-calendar" },
+  { value: "sunday", label: "주일 사역", sourceSite: "sunday-calendar" },
+  { value: "retreat", label: "수련회 행정", sourceSite: "retreat-admin" },
+  { value: "field", label: "수련회 이가드", sourceSite: "move-guide" },
+];
+
+export function calendarSourceSiteForKind(kind: SharedCalendarItem["kind"]): string {
+  return SHARED_CALENDAR_KIND_OPTIONS.find((option) => option.value === kind)?.sourceSite ?? "portal-main";
+}
+
 export function calendarKindForSourceSite(sourceSite?: string): SharedCalendarItem["kind"] {
+  if (sourceSite === "portal-main") return "main";
+  if (sourceSite === "semester-calendar" || sourceSite?.startsWith("semester-")) return "semester";
   if (sourceSite?.startsWith("sunday-")) return "sunday";
   if (sourceSite === "move-guide" || sourceSite?.startsWith("iguard")) return "field";
   return "retreat";

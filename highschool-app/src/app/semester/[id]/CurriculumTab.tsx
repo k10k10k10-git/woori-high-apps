@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { useUI } from "@/context/UIContext";
 import { subscribeCurriculum, updateCurriculumEntry, updateTeam } from "@/features/semester/db";
-import { sessionDisplayLabel } from "@/features/semester/sessionKind";
+import { sessionDisplayLabel, sessionWeekLabel } from "@/features/semester/sessionKind";
 import { sessionDateLabel } from "@/features/semester/sessionDate";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { CurriculumEntry, Session, Team, TrainingClass } from "@/features/semester/types";
@@ -132,7 +132,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions }:
         {sessions.map((s, i) => (
           <li key={s.id} className="card p-4">
             <div className="flex items-center gap-2 mb-1.5 text-sm">
-              <span className="font-semibold">{i + 1}회차</span>
+              <span className="font-semibold">{sessionWeekLabel(sessions, i)}</span>
               <span className="text-slate-400">{sessionDateLabel(s)}</span>
               <span className={`rounded px-1.5 py-0.5 text-xs ${s.type === "휴강" ? "bg-yellow-100 text-yellow-800" : "bg-slate-100 text-slate-600"}`}>
                 {sessionDisplayLabel(s)}

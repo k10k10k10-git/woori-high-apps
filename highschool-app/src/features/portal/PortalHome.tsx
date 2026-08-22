@@ -27,7 +27,7 @@ import {
   describeRolesHint,
   retreatEntryHref,
 } from "./accessPolicy";
-import SharedMinistryCalendar, { calendarKindForSourceSite, CALENDAR_KIND_STYLE, type SharedCalendarItem } from "./SharedMinistryCalendar";
+import SharedMinistryCalendar, { calendarKindForSourceSite, calendarSourceSiteForKind, CALENDAR_KIND_STYLE, SHARED_CALENDAR_KIND_OPTIONS, type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
 import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dailyMinistryMessage";
@@ -47,7 +47,7 @@ export default function PortalHome() {
   const loadError = dataError ?? actionError;
   // 공유 일정(prepMilestones) — 행정·이가드가 함께 쓰는 전역 노드. 스탭은 Rules상 쓰기 불가.
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string } | null>(null);
+  const [scheduleDraft, setScheduleDraft] = useState<{ id?: string; date: string; title: string; kind: SharedCalendarItem["kind"] } | null>(null);
   const canEditSchedule = canEditArea("retreat-admin", roles) || iguardScopeOf(roles) === "all";
   const [today] = useState(seoulDateKey);
   const monthlyMinistry = getMonthlyMinistry(Number(today.slice(5, 7)));
@@ -169,9 +169,18 @@ export default function PortalHome() {
     setActionError(null);
     try {
       if (scheduleDraft.id) {
-        await updateMilestone(scheduleDraft.id, { title, targetDate: scheduleDraft.date });
+        await updateMilestone(scheduleDraft.id, {
+          title,
+          targetDate: scheduleDraft.date,
+          sourceSite: calendarSourceSiteForKind(scheduleDraft.kind),
+        });
       } else {
-        await saveMilestone({ title, targetDate: scheduleDraft.date, done: false });
+        await saveMilestone({
+          title,
+          targetDate: scheduleDraft.date,
+          done: false,
+          sourceSite: calendarSourceSiteForKind(scheduleDraft.kind),
+        });
       }
       setScheduleDraft(null);
     } catch (error) {
@@ -299,8 +308,8 @@ export default function PortalHome() {
           <SharedMinistryCalendar
             items={calendarItems}
             canEdit={canEditSchedule}
-            onAdd={(date) => setScheduleDraft({ date, title: "" })}
-            onEdit={(item) => setScheduleDraft({ id: item.id.replace(/^shared-/, ""), date: item.date, title: item.title })}
+            onAdd={(date) => setScheduleDraft({ date, title: "", kind: "main" })}
+            onEdit={(item) => setScheduleDraft({ id: item.id.replace(/^shared-/, ""), date: item.date, title: item.title, kind: item.kind })}
             onDelete={async (item) => {
               setActionError(null);
               try {
@@ -377,7 +386,7 @@ export default function PortalHome() {
               onClick={(event) => event.stopPropagation()}
             >
               <h3 className="font-bold text-slate-900">{scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}</h3>
-              <p className="mt-1 text-xs text-slate-500">행정·이가드가 함께 보는 준비 일정입니다.</p>
+              <p className="mt-1 text-xs text-slate-500">고등부 전체가 함께 보는 일정입니다. 일정이 속한 사역 영역을 선택해 주세요.</p>
               <label className="mt-4 block text-sm">
                 <span className="text-xs text-slate-500">날짜</span>
                 <input
@@ -386,6 +395,18 @@ export default function PortalHome() {
                   onChange={(event) => setScheduleDraft({ ...scheduleDraft, date: event.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
+              </label>
+              <label className="mt-3 block text-sm">
+                <span className="text-xs text-slate-500">일정 분류</span>
+                <select
+                  value={scheduleDraft.kind}
+                  onChange={(event) => setScheduleDraft({ ...scheduleDraft, kind: event.target.value as SharedCalendarItem["kind"] })}
+                  className="input mt-1 text-sm"
+                >
+                  {SHARED_CALENDAR_KIND_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </label>
               <label className="mt-3 block text-sm">
                 <span className="text-xs text-slate-500">일정 내용</span>

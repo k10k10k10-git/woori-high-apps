@@ -62,6 +62,16 @@ export function sessionDisplayLabel(session: Pick<Session, "type" | "label">): s
   return label || (session.type === "행사" ? "행사" : "훈련&사역팀 모임");
 }
 
+/**
+ * 화면에 표시할 주차명. 휴강은 주차 수에 포함하지 않고, 그 뒤 모임도 연속 번호를 유지한다.
+ * 저장 순서나 세션 ID는 건드리지 않는 표시 전용 계산이다.
+ */
+export function sessionWeekLabel(sessions: Pick<Session, "type">[], index: number): string {
+  if (sessions[index]?.type === "휴강") return "휴강";
+  const week = sessions.slice(0, index + 1).filter((session) => session.type !== "휴강").length;
+  return `${week}주차`;
+}
+
 /** 직접 입력을 골랐는데 텍스트가 비었는지 — 저장 전에 막는다 */
 export function needsCustomLabel(kind: SessionKind, customLabel: string): boolean {
   return kind === "직접" && customLabel.trim() === "";

@@ -30,6 +30,7 @@ describe("역할별 마이페이지 읽기 모델", () => {
 
   it("공유 일정도 역할이 열 수 있는 도메인만 노출한다", () => {
     const fieldOnly = roles("none", "fieldStaff");
+    expect(canSeeCalendarKind("main", fieldOnly)).toBe(true);
     expect(canSeeCalendarKind("field", fieldOnly)).toBe(true);
     expect(canSeeCalendarKind("semester", fieldOnly)).toBe(false);
     expect(canSeeCalendarKind("retreat", fieldOnly)).toBe(false);

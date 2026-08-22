@@ -200,6 +200,7 @@ export function roleContextLabel(roles: MinistryRoles) {
 }
 
 export function canSeeCalendarKind(kind: SharedCalendarItem["kind"], roles: MinistryRoles): boolean {
+  if (kind === "main") return canAccessArea("home", roles);
   if (kind === "semester") return canAccessArea("semester", roles);
   if (kind === "sunday") return canAccessArea("sunday", roles);
   if (kind === "retreat") return canAccessArea("retreat-admin", roles);

@@ -6,6 +6,7 @@ import {
   SESSION_KIND_LABEL,
   sessionDisplayLabel,
   sessionKindOf,
+  sessionWeekLabel,
   sessionValueFor,
 } from "./sessionKind";
 
@@ -78,5 +79,20 @@ describe("needsCustomLabel", () => {
     expect(needsCustomLabel("직접", "")).toBe(true);
     expect(needsCustomLabel("직접", "특별 모임")).toBe(false);
     expect(needsCustomLabel("휴강", "")).toBe(false);
+  });
+});
+
+describe("sessionWeekLabel", () => {
+  it("휴강은 주차 번호에서 제외하고 다음 모임 번호를 이어간다", () => {
+    const sessions = [
+      { type: "정규" as const },
+      { type: "정규" as const },
+      { type: "휴강" as const },
+      { type: "휴강" as const },
+      { type: "정규" as const },
+    ];
+
+    expect(sessions.map((_, index) => sessionWeekLabel(sessions, index)))
+      .toEqual(["1주차", "2주차", "휴강", "휴강", "3주차"]);
   });
 });

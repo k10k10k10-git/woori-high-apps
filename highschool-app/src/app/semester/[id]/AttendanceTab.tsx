@@ -167,7 +167,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
       <div className="mb-3 grid gap-2 sm:grid-cols-2 lg:max-w-2xl">
         {view === "session" && <div>
           <select
-            aria-label="회차 선택"
+            aria-label="주차 선택"
             value={activeSessId}
             onChange={(e) => {
               setLoadError(null);
@@ -217,13 +217,13 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
 
       {session?.type === "휴강" && (
         <div className="mb-3 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
-          이 회차는 휴강입니다 - 출석 집계(만점)에서 제외됩니다.
+          이 날은 휴강입니다. 주차 번호와 출석 집계(만점)에서 제외됩니다.
         </div>
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="출석 보기 방식">
-          {([["grid", "표로 보기"], ["session", "회차별 체크"]] as const).map(([key, label]) => (
+          {([["grid", "표로 보기"], ["session", "주차별 체크"]] as const).map(([key, label]) => (
             <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
               {label}

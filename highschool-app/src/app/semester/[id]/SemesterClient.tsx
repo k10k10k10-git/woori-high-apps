@@ -32,10 +32,10 @@ type TabName = (typeof SEMESTER_TRAINING_TABS)[number];
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   신청: { title: "훈련·사역팀 신청", description: "이름으로 찾아 훈련 반과 사역팀 지망, 연락처를 접수합니다." },
   배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
-  출석: { title: "출석부", description: "회차별 출석과 점수·출석률·수료 판정, 수료증·사진 작업을 한 표에서 관리합니다." },
-  커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 회차별 모임 계획을 작성하고 공유합니다." },
+  출석: { title: "출석부", description: "주차별 출석과 점수·출석률·수료 판정, 수료증·사진 작업을 한 표에서 관리합니다." },
+  커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 주차별 모임 계획을 작성하고 공유합니다." },
   아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
-  설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 회차와 수료 기준을 관리합니다." },
+  설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 주차와 수료 기준을 관리합니다." },
 };
 
 function validInitialTab(value?: string): TabName {
@@ -109,7 +109,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
         {loadError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="section-kicker">{activeTab}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p></div>
-          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 회차 {sessions.length}회</p>
+          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 주차 {sessions.filter((session) => session.type !== "휴강").length}주{sessions.some((session) => session.type === "휴강") ? ` · 휴강 ${sessions.filter((session) => session.type === "휴강").length}일` : ""}</p>
         </div>
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
           {!canEdit && <ReadOnlyBanner what="학기 사역 자료" why="편집은 행정팀·스탭팀장·교역자·통합관리자만 가능합니다." />}
