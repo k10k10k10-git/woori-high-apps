@@ -265,3 +265,8 @@ npm run build
 - **접근법**: 1→ `src/app/ConnectivityBanner.tsx`의 `navigator.onLine` 초기값·이벤트와 `src/lib/db/core.ts`의 Firebase `.info/connected` 구독을 대조한다. 2→ 배너 판정을 `.info/connected` 하나로 옮기고 첫 연결의 일시적인 `false`는 3초 유예한다. 3→ `src/lib/connectivity.ts`에 연결·유예·복구 안내를 순수 상태 전이로 분리한다. 4→ 초기 false, 유예 내 연결, 지속 단절, 재연결 안내 종료를 `connectivity.test.ts`로 고정한다. 5→ 전체 테스트·lint·타입·production build와 배포본 버전을 확인한다.
 - **판단 질문**: `navigator.onLine`과 Firebase 연결을 단순 AND로 묶지 않는다. 브라우저 값은 네트워크 어댑터·캐시·확장 프로그램 상태에 따라 실제 저장 가능 여부와 다를 수 있고, AND 조건은 Firebase가 정상이어도 거짓 오프라인을 유지한다. Firebase의 첫 `false`도 즉시 경고하지 않는다. SDK 연결 수립 중 정상적으로 잠깐 발생할 수 있기 때문이다.
 - **재사용 규칙**: 저장 실패 경고는 `실제 저장 서버 연결 구독 → 초기 false 유예 → 순수 상태 전이 테스트 → 단절 지속 시에만 경고 → 실제 경고 뒤 재연결 안내` 순서로 구현하고 브라우저의 `navigator.onLine`은 보조 진단값으로만 사용한다.
+
+### 여러 머리글 행이 있는 표에서 열 역할을 nth-child로 지정하지 않기 (2026-08-22)
+- **접근법**: 1→ 로그인된 학기 출석표에서 `getBoundingClientRect()`로 날짜 머리글 폭을 전부 측정해 9/5만 142px이고 나머지는 50px임을 확인한다. 2→ `src/app/operations-tables.css`의 이름 열 규칙 `:nth-child(2)`가 두 번째 머리글 행의 두 번째 날짜에도 적용되는지 대조한다. 3→ `AttendanceGrid.tsx`의 이름 열에 `attendance-name-cell`, 날짜 머리글과 상태 셀에 `attendance-session-cell` 역할 클래스를 붙인다. 4→ 이름 열 142px과 모든 회차 열 52px을 역할 클래스에만 적용하고 범용 nth-child 선택자를 제거한다. 5→ 소스 계약 테스트와 배포된 운영 화면의 실제 열 폭을 다시 측정한다.
+- **판단 질문**: 9/5 하나만 `nth-child` 예외로 덮거나 표 전체 폭을 줄이지 않는다. 날짜 순서가 바뀌면 같은 버그가 다른 회차로 이동하고, 표 폭 조정은 이름 열 선택자가 다른 머리글 행에 누출되는 직접 원인을 해결하지 못하기 때문이다.
+- **재사용 규칙**: `rowSpan`·`colSpan`·여러 `tr`이 있는 표의 열 폭은 `nth-child`가 아니라 의미 기반 열 클래스로 지정하고, 수정 전후 모든 머리글의 실제 폭을 배열로 측정한다.

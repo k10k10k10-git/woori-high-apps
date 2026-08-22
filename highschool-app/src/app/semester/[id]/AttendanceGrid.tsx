@@ -137,7 +137,7 @@ export default function AttendanceGrid({
         <thead>
           <tr>
             <th rowSpan={2} className="sticky left-0 z-10 bg-white px-2 py-2 text-xs font-semibold text-slate-400">순</th>
-            <th rowSpan={2} className="sticky left-8 z-10 min-w-28 bg-white px-2 py-2 text-xs font-semibold text-slate-400">이름</th>
+            <th rowSpan={2} className="attendance-name-cell sticky left-8 z-10 bg-white px-2 py-2 text-xs font-semibold text-slate-400">이름</th>
             {groups.map((group) => (
               <th key={group.month} colSpan={group.sessions.length}
                 className="border-b px-2 py-1 text-xs font-bold"
@@ -158,7 +158,7 @@ export default function AttendanceGrid({
               return (
                 <th key={session.id}
                   title={`${sessionDateLabel(session)} · ${label}`}
-                  className={`min-w-11 border-b px-1 py-1 text-xs font-semibold ${special ? "bg-amber-50 text-amber-700" : "text-slate-500"}`}
+                  className={`attendance-session-cell border-b px-1 py-1 text-xs font-semibold ${special ? "bg-amber-50 text-amber-700" : "text-slate-500"}`}
                   style={{ borderColor: "var(--color-border)" }}>
                   {sessionDayLabel(session)}
                 </th>
@@ -184,7 +184,7 @@ export default function AttendanceGrid({
                 return (
                 <tr key={member.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
                   <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-xs text-slate-400">{index + 1}</td>
-                  <td className="sticky left-8 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left">
+                  <td className="attendance-name-cell sticky left-8 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left">
                     <span className="font-medium text-slate-800">{member.name}</span>
                     <span className="ml-1.5 text-[11px] text-slate-400">{describeApplicant(member)}</span>
                   </td>
@@ -193,7 +193,7 @@ export default function AttendanceGrid({
                     const holiday = session.type === "휴강";
                     const open = openCell?.appKey === member.id && openCell?.sessId === session.id;
                     return (
-                      <td key={session.id} className={`attendance-status-cell p-0 ${
+                      <td key={session.id} className={`attendance-session-cell attendance-status-cell p-0 ${
                         holiday ? "bg-amber-50/60" : entry ? MARK[entry.s].cell : ""
                       }`}>
                         <button

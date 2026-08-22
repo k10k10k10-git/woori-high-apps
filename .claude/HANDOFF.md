@@ -4,6 +4,12 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
+## 2026-08-22 최신 작업 - 학기 출석표 9/5 열 너비 정상화
+
+- 운영 학기 출석표에서 9/5 머리글만 142px, 다른 회차는 50px으로 측정됐다. 이름 열 폭을 주던 `.semester-attendance-grid :where(th, td):nth-child(2)`가 날짜 머리글 두 번째 행의 두 번째 칸인 9/5에도 적용된 것이 원인이었다.
+- 이름 열은 `attendance-name-cell` 142px, 날짜 머리글·출석 상태 셀은 `attendance-session-cell` 52px 역할 클래스로 분리했다. 출석 데이터·클릭·저장 로직은 변경하지 않았다.
+- 검증: `highschool-app` 80파일 666개 테스트, 전체 lint, `npx tsc --noEmit`, production build, `git diff --check` 통과. 운영 DB 쓰기·Rules 변경 없음.
+
 ## 2026-08-22 최신 작업 - 오프라인 배너 실제 Firebase 연결 기준화
 
 - 전역 `ConnectivityBanner`가 실제 Firebase 연결과 무관한 `navigator.onLine`만 보고 있어, 인터넷과 데이터 구독이 정상이어도 브라우저 휴리스틱 때문에 오프라인 경고가 남을 수 있었다.

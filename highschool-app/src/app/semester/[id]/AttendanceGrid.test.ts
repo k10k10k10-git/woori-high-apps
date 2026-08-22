@@ -33,4 +33,15 @@ describe("출석 상태 셀 밀도", () => {
     expect(css).toContain("padding: 0;");
     expect(css).toContain("padding-block: var(--table-cell-y);");
   });
+
+  it("월별 머리글의 남는 폭과 관계없이 모든 회차 열을 같은 폭으로 고정한다", () => {
+    const source = readFileSync(join(process.cwd(), "src/app/semester/[id]/AttendanceGrid.tsx"), "utf8");
+    const css = readFileSync(join(process.cwd(), "src/app/operations-tables.css"), "utf8");
+
+    expect(source.match(/attendance-session-cell/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(source.match(/attendance-name-cell/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(css).toContain(".semester-attendance-grid .attendance-name-cell { min-width: 142px; }");
+    expect(css).toContain(".semester-attendance-grid .attendance-session-cell { width: 52px; min-width: 52px; max-width: 52px; }");
+    expect(css).not.toContain(".semester-attendance-grid :where(th, td):nth-child(2)");
+  });
 });
