@@ -4,6 +4,15 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
+## 2026-08-22 최신 작업 - 전체 재리뷰와 선택 판정 회귀 테스트
+
+- 전수 재리뷰 결과 코드 규율은 양호했다: `any` 0건, 경로 리터럴 2건(둘 다 `.info/connected` 메타 경로), 인쇄 HTML은 제목까지 전부 `escapeHtml` 적용(실수 15 준수), tsc 0 errors, 전체 ESLint 0 errors, `npm audit` 0 vulnerabilities.
+- **보완 1 — 선택 판정 순수화.** ★ 사고 이력(실수 13) 영역인 포스트 현황의 일자·블록 선택과 큐카드 스탭 선택이 컴포넌트 안에만 있어 자동 검증이 없었다. `iguard/lib/cueSelection.ts`를 신설해 순수 함수로 분리하고 `cueSelection.test.ts` 9개·`staffIdentity.test.ts` 11개를 붙였다. CueCardView의 lint 회피용 `requestAnimationFrame`은 두 effect를 합치며 제거했다. 파생값은 `useMemo`로 감싸야 한다 — React Compiler가 순수 함수 호출을 통과하지 못해 `preserve-manual-memoization` 오류를 낸다.
+- **보완 2 — 연결 구독 침묵 제거.** `subscribeToConnection`의 onError를 `ConnectivityBanner`·`OnSiteRegistrationTab`이 쓰지 않아 구독 거부 시 배너가 영원히 숨었다. 둘 다 끊김으로 처리하도록 배선하고 회귀 테스트를 추가했다.
+- **보완 3 — 문서 정합성.** `AGENTS.md`의 "set-state-in-effect 9건은 의도적 부채" 문단이 lint 0이 된 뒤에도 남아 있었고, 루트 CLAUDE.md 실수 13은 사라진 `userPicked`/`blockPicked` ref 가드를 계속 처방하고 있었다. 둘 다 현재 코드(렌더 중 파생)에 맞췄다.
+- **미착수로 남긴 것(승인·별도 작업 필요).** ① RTDB Rules 최소권한 정리 — `docs/FIREBASE_MINIMUM_PERMISSION_REVIEW.md`의 절차대로 학생 출석부 저장소에서 승인 후 진행. ② 사이트 요청 첨부의 base64→Storage 이전(통합관리자 대시보드가 `iguardPending` 루트를 통째로 구독해 첨부까지 매번 내려받는다). ③ `sheet-import` API의 역할 게이트(현재 로그인만 확인). ④ 모바일 명단의 실제 연락처 미전송화. ⑤ Playwright E2E는 12개 정의돼 있으나 `E2E_STORAGE_STATE` 없이는 전부 skip이라 자동 검증량은 아직 0이다.
+- 운영 DB 쓰기·경로·데이터 형태 변경 없음. Rules 배포 없음.
+
 ## 2026-08-22 최신 작업 - 오프라인 배너 실제 Firebase 연결 기준화
 
 - 전역 `ConnectivityBanner`가 실제 Firebase 연결과 무관한 `navigator.onLine`만 보고 있어, 인터넷과 데이터 구독이 정상이어도 브라우저 휴리스틱 때문에 오프라인 경고가 남을 수 있었다.
@@ -15,7 +24,7 @@
 
 - 사용자 요청에 따라 이전 전수 점검의 1번인 학생 출석부 데모 모드는 건드리지 않고, 나머지 권장 개선을 통합사이트에 적용했다.
 - 전체 React Hooks lint 부채를 제거했다. effect 안 동기 setState는 초기값·렌더 파생값·`requestAnimationFrame`·구독 완료 스코프로 나눴고, `LodgingMapView`의 원본 이미지도 Next Image 계약으로 바꿨다. 전체 `npm run lint`가 이제 0 errors / 0 warnings다.
-- PC 학기·주일 출석표의 최소 글자 크기, 이름 열 폭, 셀 높이와 대비를 높였다. 수련회 신청 명단은 데스크톱 상세 표를 유지하고 모바일에서는 이름·부/학년/반·접수일·매칭 상태만 보이는 핵심 카드로 분리해 연락처의 불필요한 상시 노출을 줄였다.
+- PC 학기·주일 출석표의 최소 글자 크기, 이름 열 폭, 셀 높이와 대비를 높였다. 수련회 신청 명단은 데스크톱 상세 표를 유지하고 모바일에서는 이름·부/학년/반·접수일·매칭 상태만 보이는 핵심 카드로 분리했다. ⚠ 이는 **화면 가독성 개선이지 개인정보 노출 축소가 아니다** — 두 목록을 모두 렌더한 뒤 `@media (max-width: 767px)`에서 데스크톱 표를 `display:none` 하는 방식이라 연락처는 여전히 모바일 DOM에 있고 네트워크로 내려온다. 실제 노출을 줄이려면 데이터 단계에서 잘라야 한다(미착수).
 - `MyPageModal`, 전역·이가드 `TeamModal`, `FormGuideModal`, `NewRetreatButton`, `AdminModal`을 `OverlayShell`로 옮겨 ESC·포커스 순환·포커스 복귀·배경 스크롤 잠금·모바일 fullscreen 계약을 공유한다.
 - 수련회 행정·현장·참가자 첫 로드는 spinner/문자 대신 운영 표 구조를 미리 보여주는 `WorkspaceSkeleton`을 사용한다. 운영 표·모바일 카드·스켈레톤 CSS는 `operations-tables.css`, 모바일 명단은 `RetreatParticipantMobileList.tsx`로 분리했다.
 - 큐시트의 `김성훈sf` 같은 스탭 구분 접미사는 화면에서만 `김성훈`으로 정규화한다. Firebase와 시트 원본은 수정하지 않으며 순수 함수 테스트를 추가했다.

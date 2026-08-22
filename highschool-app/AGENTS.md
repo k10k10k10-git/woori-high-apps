@@ -72,7 +72,7 @@ npm run build
 - **전체 덮어쓰기 복구는 사전 백업 성공을 확인한 뒤에만** — `backupNodeBeforeOverwrite`의 반환값을 검사한다(`if (!backedUp) throw`). 스로틀된 상시 저장 백업만 예외.
 - **인앱 브라우저 탈출은 `features/iguard/lib/inAppBrowser.ts`만.** 화면에 복제하지 말 것 — 복제본에는 "이동 주소 ≠ 현재 주소" 불변식과 세션 1회 가드가 빠져 무한 리로드가 났다.
 - **`.input`은 `globals.css`의 `@layer` 밖 규칙이라 Tailwind 유틸리티를 이긴다.** `h-*`로 높이를 고정하면 글자가 잘리고, `w-*`·`text-*`·`px-*`는 무시된다. 폭은 **감싼 div**로, 글꼴은 **인라인 style**로 준다.
-- 남은 `set-state-in-effect` 9건은 의도적으로 남긴 것이 대부분이다: `ExecutionViews` 3건은 `staffPicked`/`userPicked` ref 가드 자동 선택(루트 CLAUDE.md 실수 13이 **처방한** 패턴), `LodgingMapView` 2건은 레이아웃·팝오버, `useRetreatData`·`RetreatsHome`은 로딩/fetch. 나머지 2건(`ScheduleSheetEditor`·`SettingsTab`)만 draft 동기화라 `key` 부여로 정리 가능하다.
+- **전체 ESLint는 0 errors / 0 warnings다(2026-08-22 기준).** 이전에 "의도적 부채"로 남겨 두던 `set-state-in-effect` 9건은 전부 정리됐다 — 자동 선택은 렌더 중 파생(`cueSelection.ts`·`chooseCueCardStaffId`), 로딩은 스코프 비교(`useRetreatData`의 `loadedScope`)로 바뀌었다. **lint 실패를 새 부채로 남기지 말 것**: `npm run verify`가 lint부터 돌기 때문에 한 건이라도 남으면 저장소 전체 게이트가 상시 빨간불이 되고, 그러면 아무도 그 게이트를 믿지 않게 된다.
 
 ## 핵심 코드 패턴
 
