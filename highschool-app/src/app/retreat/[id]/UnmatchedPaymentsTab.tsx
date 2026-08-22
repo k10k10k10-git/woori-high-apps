@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo, useRef } from "react";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 import { Retreat, Participant, UnmatchedPayment } from "@/lib/types";
 import { parseClassKey } from "@/lib/classKey";
 import { normalizeName } from "@/lib/studentMatcher";
@@ -14,6 +15,8 @@ import {
 import { useUI } from "@/context/UIContext";
 
 export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) {
+  // 연락처 열은 CSS로 숨기지 않고 렌더를 가른다 — hidden은 DOM에 값이 남는다.
+  const isDesktop = useIsDesktop();
   const { toast, uiConfirm } = useUI();
   const [payments, setPayments]         = useState<UnmatchedPayment[]>([]);
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
@@ -285,7 +288,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                   <th className="px-2 sm:px-3 py-2 text-left text-[10px] sm:text-xs font-semibold text-slate-500 w-6 sm:w-8">#</th>
                   <th className="px-2 sm:px-3 py-2 text-left text-[10px] sm:text-xs font-semibold text-slate-500">이름</th>
                   <th className="px-2 sm:px-3 py-2 text-left text-[10px] sm:text-xs font-semibold text-slate-500">학년/반</th>
-                  <th className="px-2 sm:px-3 py-2 text-left text-[10px] sm:text-xs font-semibold text-slate-500 hidden sm:table-cell">연락처</th>
+                  {isDesktop && <th className="px-2 sm:px-3 py-2 text-left text-[10px] sm:text-xs font-semibold text-slate-500">연락처</th>}
                   <th className="px-2 sm:px-3 py-2 text-left text-[10px] sm:text-xs font-semibold text-slate-500">상태</th>
                 </tr>
               </thead>
@@ -306,7 +309,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                         {p.grade ? `${p.grade}학년` : ""}{p.class ? ` ${p.class}반` : ""}
                         {!p.grade && !p.class ? "-" : ""}
                       </td>
-                      <td className="px-2 sm:px-3 py-2 text-slate-500 text-xs hidden sm:table-cell">{p.phone || "-"}</td>
+                      {isDesktop && <td className="px-2 sm:px-3 py-2 text-slate-500 text-xs">{p.phone || "-"}</td>}
                       <td className="px-2 sm:px-3 py-2">
                         <span className="text-[10px] sm:text-xs bg-slate-100 text-slate-500 px-1.5 sm:px-2 py-0.5 rounded-full border border-slate-200">
                           미처리
@@ -334,7 +337,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
                       {p.grade ? `${p.grade}학년` : ""}{p.class ? ` ${p.class}반` : ""}
                       {!p.grade && !p.class ? "-" : ""}
                     </td>
-                    <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs hidden sm:table-cell">{p.phone || "-"}</td>
+                    {isDesktop && <td className="px-2 sm:px-3 py-2 text-slate-400 text-xs">{p.phone || "-"}</td>}
                     <td className="px-2 sm:px-3 py-2">
                       {status === "blue" ? (
                         <span className="text-[10px] sm:text-xs bg-blue-100 text-blue-600 px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-200">

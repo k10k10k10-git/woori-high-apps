@@ -8,6 +8,7 @@ import { buildExtraPreservationMaps, dedupeSheetParticipants, identityKeyOf } fr
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import RetreatParticipantMobileList from "./RetreatParticipantMobileList";
+import { useIsDesktop } from "@/lib/useIsDesktop";
 
 interface Props {
   retreat: Retreat;
@@ -38,6 +39,8 @@ function rawPairsOf(raw: unknown): { h: string; v: string }[] {
 }
 
 export default function ParticipantsTab({ retreat }: Props) {
+  // 데스크톱 표에는 연락처가 들어 있어 CSS로 숨기지 않고 렌더를 가른다.
+  const isDesktop = useIsDesktop();
   const [participants, setParticipants] = useState<Record<string, Participant>>({});
   const [students, setStudents] = useState<Record<string, Student>>({});
   const [cellColors, setCellColorsState] = useState<Record<string, string>>({});
@@ -711,7 +714,10 @@ export default function ParticipantsTab({ retreat }: Props) {
           </div>
         ) : (
           <>
-          <RetreatParticipantMobileList list={list} mismatchKeys={mismatchKeys} ambiguousKeys={ambiguousKeys} />
+          {/* CSS로 숨기지 않고 렌더 자체를 가른다. 데스크톱 표에는 본인·보호자 연락처가
+              들어 있어, display:none으로만 감추면 휴대폰 DOM에 그대로 남는다. */}
+          {!isDesktop && <RetreatParticipantMobileList list={list} mismatchKeys={mismatchKeys} ambiguousKeys={ambiguousKeys} />}
+          {isDesktop && (
           <table className="retreat-roster-desktop w-full text-sm" style={{ minWidth: 900 }}>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-100/80 text-[11px] font-semibold tracking-wide text-slate-500">
@@ -769,6 +775,7 @@ export default function ParticipantsTab({ retreat }: Props) {
               ))}
             </tbody>
           </table>
+          )}
           </>
         )}
       </div>
