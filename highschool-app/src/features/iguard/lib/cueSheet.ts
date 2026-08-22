@@ -150,6 +150,14 @@ export function parseNames(value?: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * 큐시트에서 스탭을 구분하려고 붙인 sf 접미사는 화면에만 숨긴다.
+ * 원본 큐시트와 Firebase 값은 그대로 두어 재동기화 및 매칭 키를 훼손하지 않는다.
+ */
+export function staffDisplayText(value?: string): string {
+  return (value || "").replace(/([가-힣]{2,5})\s*sf\b/gi, "$1");
+}
+
 export function scheduleSortValue(block?: IguardScheduleBlock): string {
   if (!block) return "99__99:99";
   return `${String(block.day).padStart(2, "0")}__${block.start}`;

@@ -4,6 +4,19 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
+## 2026-08-22 최신 작업 - 통합사이트 품질 개선 2~10차
+
+- 사용자 요청에 따라 이전 전수 점검의 1번인 학생 출석부 데모 모드는 건드리지 않고, 나머지 권장 개선을 통합사이트에 적용했다.
+- 전체 React Hooks lint 부채를 제거했다. effect 안 동기 setState는 초기값·렌더 파생값·`requestAnimationFrame`·구독 완료 스코프로 나눴고, `LodgingMapView`의 원본 이미지도 Next Image 계약으로 바꿨다. 전체 `npm run lint`가 이제 0 errors / 0 warnings다.
+- PC 학기·주일 출석표의 최소 글자 크기, 이름 열 폭, 셀 높이와 대비를 높였다. 수련회 신청 명단은 데스크톱 상세 표를 유지하고 모바일에서는 이름·부/학년/반·접수일·매칭 상태만 보이는 핵심 카드로 분리해 연락처의 불필요한 상시 노출을 줄였다.
+- `MyPageModal`, 전역·이가드 `TeamModal`, `FormGuideModal`, `NewRetreatButton`, `AdminModal`을 `OverlayShell`로 옮겨 ESC·포커스 순환·포커스 복귀·배경 스크롤 잠금·모바일 fullscreen 계약을 공유한다.
+- 수련회 행정·현장·참가자 첫 로드는 spinner/문자 대신 운영 표 구조를 미리 보여주는 `WorkspaceSkeleton`을 사용한다. 운영 표·모바일 카드·스켈레톤 CSS는 `operations-tables.css`, 모바일 명단은 `RetreatParticipantMobileList.tsx`로 분리했다.
+- 큐시트의 `김성훈sf` 같은 스탭 구분 접미사는 화면에서만 `김성훈`으로 정규화한다. Firebase와 시트 원본은 수정하지 않으며 순수 함수 테스트를 추가했다.
+- Playwright 로그인 smoke 기반을 추가했다. `E2E_STORAGE_STATE`가 있으면 홈·학기·주일·수련회·가이드와 마이페이지 오버레이를 PC Chrome·모바일 Safari로 검사하고, 인증 파일이 없으면 명시적으로 skip한다. 파일은 `*.e2e.ts`로 Vitest와 격리한다.
+- 의존성 감사의 호환 패치를 적용해 Next.js 16.3.2, pdfjs-dist 6.2.108 등으로 갱신했다. PDF.js 6의 `getDocument` 객체 인자 계약을 반영했고 전체 검증 뒤 `npm audit --omit=dev` 0 vulnerabilities를 확인했다.
+- RTDB Rules는 저장소 안전 계약상 수정·배포하지 않았다. 현재 클라이언트 세부 역할과 서버의 `retreatAdmins`/`iguardMembers` 버킷 권한 차이, 목표 행렬과 별도 승인 절차를 `highschool-app/docs/FIREBASE_MINIMUM_PERMISSION_REVIEW.md`에 기록했다.
+- 운영 DB 쓰기·경로·데이터 형태 변경은 없다. Rules 배포도 없다. 전체 테스트 79파일 661개, 타입, lint, production build와 Playwright 12개 시나리오 목록 생성을 통과했다.
+
 ## 2026-08-22 최신 작업 - 모든 역할의 마이페이지 대시보드
 
 - 상단 `마이페이지`를 통합관리자 전용에서 모든 로그인 사용자 공통 진입점으로 바꿨다. 공통 탭은 `대시보드`·`내 사역`·`내 요청`이고, 통합관리자에게만 기존 `팀원 관리`·전체 `요청사항` 탭이 추가된다. `portal:open-team` 이벤트는 별도 모달이 아니라 마이페이지의 팀원 관리 탭을 연다.

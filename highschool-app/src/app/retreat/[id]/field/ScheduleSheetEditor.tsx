@@ -159,7 +159,11 @@ function ScheduleSheetRow({
     const next = draftOf(block);
     committedRef.current = next;
     draftRef.current = next;
-    setDraft(next);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setDraft(next);
+    });
+    return () => { cancelled = true; };
   }, [block]);
 
   const assignmentLines = useMemo(

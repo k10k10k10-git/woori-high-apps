@@ -42,7 +42,7 @@ function PdfPage({ url, page, onPageCount }: {
           "pdfjs-dist/build/pdf.worker.mjs",
           import.meta.url,
         ).toString();
-        const document = await pdfjs.getDocument(url).promise;
+        const document = await pdfjs.getDocument({ url }).promise;
         if (cancelled) return;
         onPageCount(document.numPages);
         const pdfPage = await document.getPage(Math.min(page, document.numPages));

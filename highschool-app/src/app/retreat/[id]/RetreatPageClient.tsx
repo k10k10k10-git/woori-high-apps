@@ -29,6 +29,7 @@ import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
+import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 
 // 자주 사용하는 탭은 한번 마운트되면 CSS display로 보여주기/숨기기 (keep-alive).
 // 이를 통해 탭 전환 시 Firebase 재구독과 상태 초기화를 방지합니다.
@@ -172,11 +173,7 @@ export default function RetreatPageClient() {
   // ── 로딩 화면 ────────────────────────────────────────────────
   if (authLoading || !user || (adminAllowed && loading)) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-screen-bg)" }}>
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
-          style={{ borderColor: "var(--color-primary)", borderTopColor: "transparent" }} />
-        <div className="text-slate-400 text-sm">로딩 중...</div>
-      </div>
+      <div className="w-full max-w-5xl px-4"><WorkspaceSkeleton label="수련회 행정 화면을 불러오는 중입니다." rows={7} variant="page" /></div>
     </div>
   );
 

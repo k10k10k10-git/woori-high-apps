@@ -60,7 +60,7 @@ export interface RetreatData {
 export function useRetreatData(id: string): RetreatData {
   const [retreat, setRetreat] = useState<Retreat | null>(null);
   const [retreatLoading, setRetreatLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
   // 21개 구독의 실패를 경로별로 모은다 — 하나로 합치면 첫 실패만 보여 원인을 잘못 짚는다
   // (2026-08-08 학기·홈에서 실제로 두 번 오진했다). scope가 id라 수련회를 옮기면 초기화된다.
   const { fail: failPath, ok: okPath, message: loadError } = useLoadErrors(id);
@@ -103,13 +103,18 @@ export function useRetreatData(id: string): RetreatData {
   }, [id, failPath, okPath]);
 
   // 연결 상태 구독 — 수련회와 무관한 앱 전역 상태라 별도 useEffect
-  useEffect(() => subscribeToConnection(setConnected), []);
+  useEffect(() => subscribeToConnection(
+    value => { setConnected(value); okPath("연결 상태"); },
+    failPath("연결 상태"),
+  ), [failPath, okPath]);
 
   // 데이터 구독은 id·연도에만 의존 — 메타(이름/날짜) 실시간 변경 시 재구독하지 않도록
   const retreatYear = retreat?.year;
+  const dataScope = retreatYear == null ? null : `${id}:${retreatYear}`;
+  const dataLoading = dataScope == null || loadedScope !== dataScope;
   useEffect(() => {
     if (!id || retreatYear == null) return;
-    setDataLoading(true);
+    const scope = `${id}:${retreatYear}`;
     let alive = true;
     const pending = new Set([
       "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "segments", "posts",
@@ -117,7 +122,7 @@ export function useRetreatData(id: string): RetreatData {
     ]);
     const markReady = (key: string) => {
       pending.delete(key);
-      if (alive && pending.size === 0) setDataLoading(false);
+      if (alive && pending.size === 0) setLoadedScope(scope);
     };
     // 성공하면 그 경로의 이전 실패를 지운다 — 권한이 열린 뒤 재구독하면 배너가 사라진다.
     const ready = (key: string) => {

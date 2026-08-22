@@ -1,15 +1,19 @@
 "use client";
 
+import OverlayShell from "@/components/OverlayShell";
+
 interface Props {
   onClose: () => void;
 }
 
 export default function FormGuideModal({ onClose }: Props) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}
-      onKeyDown={e => { if (e.key === 'Escape') onClose(); }}>
-      <div className="card p-0 w-full max-w-2xl max-h-[88vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}
-        role="dialog" aria-modal="true" aria-label="구글폼 생성 가이드라인">
+    <OverlayShell
+      label="구글폼 생성 가이드라인"
+      onClose={onClose}
+      variant="fullscreen-mobile"
+      panelClassName="card flex max-h-[88dvh] w-full max-w-2xl flex-col overflow-hidden p-0"
+    >
 
         {/* 헤더 */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-shrink-0"
@@ -276,7 +280,6 @@ export default function FormGuideModal({ onClose }: Props) {
         <div className="px-6 py-3 border-t border-slate-100 flex-shrink-0 bg-slate-50">
           <button onClick={onClose} className="btn-primary w-full justify-center text-sm">확인</button>
         </div>
-      </div>
-    </div>
+    </OverlayShell>
   );
 }

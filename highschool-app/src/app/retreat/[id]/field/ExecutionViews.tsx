@@ -13,6 +13,7 @@ import {
 } from "@/features/iguard/lib/cueCardTimeline";
 import { gbsPlacesForStaff } from "@/features/iguard/lib/gbsPlaces";
 import { dutyLabelsForStaff, dutyLinesForStaff, visibleNoticeLines } from "@/features/iguard/lib/personalDuty";
+import { staffDisplayText } from "@/features/iguard/lib/cueSheet";
 
 interface Data {
   retreatId?: string;
@@ -55,9 +56,9 @@ function BlockTextSummary({ block }: { block: IguardScheduleBlock }) {
   if (!hasAny) return null;
   return (
     <div className="grid gap-2">
-      {block.detail && <TextBlock title="진행 내용">{block.detail}</TextBlock>}
-      {block.owner && <TextBlock title="담당자 / 역할" tone="accent">{block.owner}</TextBlock>}
-      {notice && <TextBlock title="특이사항" tone="amber">{notice}</TextBlock>}
+      {block.detail && <TextBlock title="진행 내용">{staffDisplayText(block.detail)}</TextBlock>}
+      {block.owner && <TextBlock title="담당자 / 역할" tone="accent">{staffDisplayText(block.owner)}</TextBlock>}
+      {notice && <TextBlock title="특이사항" tone="amber">{staffDisplayText(notice)}</TextBlock>}
     </div>
   );
 }
@@ -117,7 +118,8 @@ export function CueCardView({
     const saved = window.localStorage.getItem(staffSelectionKey);
     if (saved && sortedStaff.some(member => member.id === saved)) {
       staffPicked.current = true;
-      setStaffId(saved);
+      const frame = window.requestAnimationFrame(() => setStaffId(saved));
+      return () => window.cancelAnimationFrame(frame);
     }
   }, [sortedStaff, staffSelectionKey]);
 
@@ -466,31 +468,19 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
   const days = useMemo(() => [...new Set(schedule.map(b => b.day))].sort((a, b) => a - b), [schedule]);
   const sorted = useMemo(() => [...schedule].sort(compareBlocks), [schedule]);
 
-  const [day, setDay] = useState<number>(() => (curDay != null && days.includes(curDay)) ? curDay : (days[0] ?? 1));
-  const userPicked = useRef(false);
-  // 데이터 로드/날짜 변화 시 오늘 일자로 자동 스냅 (사용자가 직접 고르기 전까지)
-  useEffect(() => {
-    if (userPicked.current) return;
-    if (curDay != null && days.includes(curDay)) setDay(curDay);
-    else if (days.length && !days.includes(day)) setDay(days[0]);
-  }, [curDay, days, day]);
+  const [pickedDay, setPickedDay] = useState<number | null>(null);
+  const day = pickedDay != null && days.includes(pickedDay)
+    ? pickedDay
+    : (curDay != null && days.includes(curDay) ? curDay : (days[0] ?? 1));
 
   const dayBlocks = useMemo(() => sorted.filter(b => b.day === day), [sorted, day]);
   const selectedDate = retreatDateForDay(periods, retreat, day);
   const selectedDateLabel = selectedDate ? formatShortDate(selectedDate) : null;
-  const [blockId, setBlockId] = useState<string>("");
-  const blockPicked = useRef(false);
-  // 일자가 바뀌면 자동 선택 플래그 리셋 — 새 일자에선 다시 "지금" 블록으로 자동 스냅.
-  // (이 effect가 아래 자동 선택 effect보다 먼저 선언돼야 같은 day 변경에서 리셋이 선행됨)
-  useEffect(() => { blockPicked.current = false; }, [day]);
-  // 일자 변경/시각 경과 시 "지금" 블록(없으면 첫 블록) 자동 선택.
-  // ⚠ 사용자가 드롭다운으로 직접 고른 뒤엔 유지 — 이 가드가 없으면 30초 시계 tick마다
-  //   선택이 첫 블록(1일차 기도회)으로 되돌아가던 버그가 됨.
-  useEffect(() => {
-    if (blockPicked.current) return;
-    const target = dayBlocks.find(b => isNowOn(b, curDay, clock.time)) ?? dayBlocks[0];
-    setBlockId(target?.id ?? "");
-  }, [day, dayBlocks, curDay, clock.time]);
+  const [pickedBlock, setPickedBlock] = useState<{ day: number; id: string } | null>(null);
+  const automaticBlock = dayBlocks.find(b => isNowOn(b, curDay, clock.time)) ?? dayBlocks[0];
+  const blockId = pickedBlock?.day === day && dayBlocks.some(block => block.id === pickedBlock.id)
+    ? pickedBlock.id
+    : (automaticBlock?.id ?? "");
 
   const block = sorted.find(b => b.id === blockId);
   const staffName = useMemo(() => new Map(staff.map(s => [s.id, s.name])), [staff]);
@@ -569,7 +559,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
       {/* 일자 선택 */}
       <div className="flex gap-1 mb-3 flex-wrap">
         {days.map(d => (
-          <button key={d} onClick={() => { userPicked.current = true; setDay(d); }}
+          <button key={d} onClick={() => setPickedDay(d)}
             className={`min-h-10 rounded-lg px-4 text-sm font-medium ${day === d ? "bg-emerald-700 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
             {(() => {
               const date = retreatDateForDay(periods, retreat, d);
@@ -588,7 +578,7 @@ export function PostBoardView({ staff, schedule, posts, movements, retreat, peri
           {curDay != null && day === curDay ? <span className="text-emerald-700"> · 현재 일자·시각 자동선택</span>
             : curDay == null ? <span className="text-slate-400"> · 오늘이 수련회 기간이 아니에요 - 일자를 직접 선택하세요</span> : null}
         </label>
-        <select className="input" value={blockId} onChange={e => { blockPicked.current = true; setBlockId(e.target.value); }}>
+        <select className="input" value={blockId} onChange={e => setPickedBlock({ day, id: e.target.value })}>
           {dayBlocks.map(b => <option key={b.id} value={b.id}>{b.start} {b.label}{isNowOn(b, curDay, clock.time) ? " ← 지금" : ""}</option>)}
         </select>
       </div>

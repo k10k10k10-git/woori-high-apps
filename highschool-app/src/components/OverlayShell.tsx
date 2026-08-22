@@ -32,7 +32,10 @@ export default function OverlayShell({
   const panelRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   const labelId = useId();
-  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;

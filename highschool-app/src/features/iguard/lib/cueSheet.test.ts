@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseCueSheetText, resolveOvernight, isValidTime, normalizeTime, normalizeEnd, toMinutes } from "./cueSheet";
+import { parseCueSheetText, resolveOvernight, isValidTime, normalizeTime, normalizeEnd, toMinutes, staffDisplayText } from "./cueSheet";
 
 // 루트 CLAUDE.md 실수 규칙 8(★ 실제 사고): 날짜 마커 검사를 시간 검사보다 먼저 하면
 // "둘째날 오전 프로그램" 행이 통째로 사라진다. 문서는 scheduleUtils.test.ts의 D2가
@@ -103,5 +103,15 @@ describe("시간 파싱 보조", () => {
 
   it("24시+ 표기도 분으로 환산한다", () => {
     expect(toMinutes("24:30")).toBe(24 * 60 + 30);
+  });
+});
+
+describe("staffDisplayText", () => {
+  it("스탭 구분용 sf 접미사만 화면 문구에서 숨긴다", () => {
+    expect(staffDisplayText("서약서 배부: 김성훈sf, 박세원 SF")).toBe("서약서 배부: 김성훈, 박세원");
+  });
+
+  it("sf가 이름 접미사가 아니면 원문을 유지한다", () => {
+    expect(staffDisplayText("SF 장비 확인")).toBe("SF 장비 확인");
   });
 });

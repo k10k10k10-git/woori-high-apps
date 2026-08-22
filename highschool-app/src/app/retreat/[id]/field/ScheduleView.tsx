@@ -18,7 +18,7 @@ import CueSheetImportPanel from "./ScheduleCueSheetImport";
 import StructureClonePanel from "./StructureClonePanel";
 import ScheduleSheetEditor from "./ScheduleSheetEditor";
 
-export default function ScheduleView({ retreatId, retreatName, schedule, staff, posts, segments, movements, movementRecords, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
+export default function ScheduleView({ retreatId, schedule, staff, posts, segments, movementRecords, buses, groups, absentStaffNames = [], sheetSettingsOpen = false, onSheetSettingsClose }: {
   retreatId: string;
   retreatName: string;
   schedule: IguardScheduleBlock[];

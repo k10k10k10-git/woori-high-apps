@@ -3,7 +3,7 @@
 // 팀원 관리 — 두 축 역할(학기·방학)을 한 화면에서 배정한다. 진입점은 전역 헤더의 "팀원 관리" 하나뿐.
 // 역할 계약은 accessPolicy, 쓰기 계획은 roleAssign(순수) → applyRole(실행)이 담당한다.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
@@ -46,6 +46,7 @@ import {
 } from "./accessPolicy";
 import { planRoleAssignment } from "./roleAssign";
 import { applyRoleSteps } from "./applyRole";
+import OverlayShell from "@/components/OverlayShell";
 
 type TeamMember = {
   uid: string;
@@ -89,7 +90,6 @@ function memberLabel(member: { name: string; email: string }) {
 export default function TeamModal({ onClose, embedded = false }: { onClose?: () => void; embedded?: boolean }) {
   const { user, roles: myRoles } = useAuth();
   const { toast, uiConfirm } = useUI();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const canManage = canManageRolesOf(myRoles);
 
   const [mainAdmins, setMainAdmins] = useState<Record<string, boolean>>({});
@@ -117,20 +117,6 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
     if (canManage) unsubs.push(subscribeToMainAdmins(setMainAdmins, fail));
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [canManage]);
-
-  useEffect(() => {
-    if (embedded) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose?.();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      previousFocus?.focus();
-    };
-  }, [embedded, onClose]);
 
   const members = useMemo<TeamMember[]>(() => {
     const ids = new Set([...Object.keys(mainAdmins), ...Object.keys(admins), ...Object.keys(iguardMembers)]);
@@ -551,18 +537,13 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
 
   if (embedded) return <div className="rounded-2xl border border-slate-200 bg-white">{content}</div>;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm" onClick={onClose}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="팀원 관리"
-        tabIndex={-1}
-        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <OverlayShell
+      label="팀원 관리"
+      onClose={onClose ?? (() => undefined)}
+      variant="fullscreen-mobile"
+      panelClassName="max-h-[90dvh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+    >
         {content}
-      </div>
-    </div>
+    </OverlayShell>
   );
 }

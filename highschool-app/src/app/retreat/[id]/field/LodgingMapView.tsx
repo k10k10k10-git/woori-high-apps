@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Image from "next/image";
 import { Group, IguardLodgingMap, PartialAttendanceMap, Room, Student } from "@/features/iguard/lib/types";
 import {
   buildLodgingMapResult,
@@ -87,19 +88,12 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
     setPopoverPosition({ left, top, width, arrowTop, side });
   }, [selection]);
 
-  // pageId 정규화는 필요 없다 — 위의 `page`가 이미 없는 id면 첫 장으로 폴백하고,
-  // 화면은 pageId가 아니라 page를 쓴다. effect에서 setState하면 cascading render만 는다.
-  useEffect(() => {
-    closePopover();
-  }, [building, closePopover]);
-
   useEffect(() => {
     mapScrollRef.current?.scrollTo({ left: 0, behavior: "auto" });
   }, [page.id]);
 
   useEffect(() => {
     if (!selection) return;
-    updatePopoverPosition();
     const frame = window.requestAnimationFrame(updatePopoverPosition);
     window.addEventListener("resize", updatePopoverPosition);
     window.addEventListener("scroll", updatePopoverPosition, true);
@@ -170,6 +164,7 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
                   role="tab"
                   aria-selected={active}
                   onClick={() => {
+                    closePopover();
                     setBuildingId(item.id);
                     setPageId(item.pages[0].id);
                   }}
@@ -193,7 +188,10 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
                   type="button"
                   role="tab"
                   aria-selected={item.id === page.id}
-                  onClick={() => setPageId(item.id)}
+                  onClick={() => {
+                    closePopover();
+                    setPageId(item.id);
+                  }}
                   className={`rounded-md px-3 py-1.5 text-xs font-medium ${
                     item.id === page.id ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
                   }`}
@@ -213,7 +211,15 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
           <div ref={mapScrollRef} className="overflow-x-auto overscroll-x-contain rounded-lg border border-slate-200 bg-slate-100 [-webkit-overflow-scrolling:touch]">
             <div className="relative" style={{ minWidth: `${page.minWidth}px` }}>
               {page.image ? (
-                <img src={page.image} alt={`${building.label} ${page.floorLabel} 숙소 도면`} className="block h-auto w-full select-none" draggable={false} />
+                <Image
+                  src={page.image}
+                  alt={`${building.label} ${page.floorLabel} 숙소 도면`}
+                  width={page.minWidth}
+                  height={Math.max(1, Math.round(page.minWidth * 0.7))}
+                  unoptimized
+                  className="block h-auto w-full select-none"
+                  draggable={false}
+                />
               ) : (
                 <div
                   role="img"

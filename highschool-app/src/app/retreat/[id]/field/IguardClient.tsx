@@ -14,6 +14,7 @@ import {
   TeacherAttendance,
 } from "@/features/iguard/lib/types";
 import CenterSpinner from "@/components/CenterSpinner";
+import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import ChecklistView from "./ChecklistView";
 import RoomsView from "./RoomsView";
 import LodgingMapView from "./LodgingMapView";
@@ -347,10 +348,7 @@ function IguardWorkspace({ id }: { id: string }) {
         )}
 
         {dataLoading && (
-          <div className="card p-8 text-center text-slate-400">
-            <div className="mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-            <p className="text-sm">수련회 데이터를 불러오는 중입니다.</p>
-          </div>
+          <WorkspaceSkeleton label="수련회 현장 데이터를 불러오는 중입니다." rows={6} />
         )}
 
         {!dataLoading && activeView === "check" && <ChecklistView retreatId={id} groups={groups} students={students} participants={participants} teachers={adminTeachers} buses={buses} retreatName={retreat.name} year={retreat.year} checkedKeys={attendanceKeys} attendanceInfo={attendanceInfo} partial={partial} cellColors={cellColors} schedule={schedule} />}

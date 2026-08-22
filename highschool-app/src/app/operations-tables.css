@@ -1,0 +1,91 @@
+/* 운영 화면의 표·명단·로딩 상태. globals.css의 전역 토큰만 사용한다. */
+
+.overlay-shell__panel.admin-mypage-dialog { width: min(100%, 1152px); }
+
+.workspace-skeleton {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  padding: 22px;
+  box-shadow: var(--shadow-xs);
+}
+.workspace-skeleton--page { background: color-mix(in srgb, var(--color-surface) 94%, var(--color-primary)); }
+.workspace-skeleton__eyebrow,
+.workspace-skeleton__title,
+.workspace-skeleton__toolbar > div,
+.workspace-skeleton__row > span {
+  background: color-mix(in srgb, var(--color-border) 72%, var(--color-surface));
+  animation: workspace-skeleton-pulse 1.35s ease-in-out infinite alternate;
+}
+.workspace-skeleton__eyebrow { width: 72px; height: 10px; border-radius: 999px; }
+.workspace-skeleton__title { width: min(280px, 64%); height: 25px; margin-top: 12px; border-radius: 8px; }
+.workspace-skeleton__toolbar { display: grid; grid-template-columns: minmax(150px, 1.5fr) 1fr 110px; gap: 10px; margin-top: 24px; }
+.workspace-skeleton__toolbar > div { height: 42px; border-radius: 11px; }
+.workspace-skeleton__rows { margin-top: 14px; border: 1px solid var(--color-border); border-radius: 13px; }
+.workspace-skeleton__row { display: grid; grid-template-columns: minmax(140px, 1.4fr) 1fr .7fr; gap: 18px; padding: 13px 15px; }
+.workspace-skeleton__row + .workspace-skeleton__row { border-top: 1px solid var(--color-border); }
+.workspace-skeleton__row > span { height: 13px; border-radius: 6px; }
+.workspace-skeleton__row > span:nth-child(2) { width: 76%; }
+.workspace-skeleton__row > span:nth-child(3) { width: 62%; justify-self: end; }
+@keyframes workspace-skeleton-pulse { to { opacity: .48; } }
+
+/* 학기 출석표: 좌측 식별 열과 상태 열을 읽을 수 있는 최소 크기로 고정한다. */
+.semester-attendance-grid { min-width: 100%; font-size: 13px; line-height: 1.35; }
+.semester-attendance-grid :where(th, td) { min-width: 50px; }
+.semester-attendance-grid thead th { color: var(--color-text-secondary); font-size: 12px; font-weight: 800; }
+.semester-attendance-grid tbody td { color: var(--color-text-primary); }
+.semester-attendance-grid :where(th, td):nth-child(2) { min-width: 142px; }
+.semester-attendance-grid .attendance-status-button { min-height: 38px; font-size: 13px; }
+
+/* 주일 출석부는 50~60대 운영자도 확대 없이 읽을 수 있게 한다. */
+.sunday-attendance-filters label > span,
+.sunday-attendance-summary > div > span { font-size: 12px; }
+.sunday-attendance-filters .form-control,
+.sunday-attendance-segment button { font-size: 13px; }
+.sunday-attendance-summary > div > p { font-size: 13px; }
+.sunday-attendance-summary dt { font-size: 11px; }
+.sunday-attendance-table { font-size: 13px; }
+.sunday-attendance-table :where(th, td) { min-width: 52px; height: 48px; padding: 8px 9px; }
+.sunday-attendance-table thead th { font-size: 12px; }
+.sunday-attendance-table thead th small,
+.sunday-attendance-table .is-name small { font-size: 10px; }
+.sunday-attendance-table .is-name { width: 148px; min-width: 148px; }
+.sunday-attendance-legend span { font-size: 11px; }
+.sunday-attendance-empty-state { font-size: 14px; }
+
+/* 수련회 신청 명단: 데스크톱은 상세 표, 모바일은 핵심 정보 카드만 보여준다. */
+.retreat-roster-mobile { display: none; }
+.retreat-roster-desktop { color: var(--color-text-secondary); }
+.retreat-roster-desktop thead th { color: var(--color-text-muted); font-size: 12px; }
+.retreat-roster-desktop tbody td { min-height: 44px; color: var(--color-text-secondary); font-size: 13px; }
+
+@media (max-width: 767px) {
+  .workspace-skeleton { padding: 17px; border-radius: 15px; }
+  .workspace-skeleton__toolbar { grid-template-columns: 1fr 1fr; }
+  .workspace-skeleton__toolbar > div:first-child { grid-column: 1 / -1; }
+  .workspace-skeleton__row { grid-template-columns: 1.4fr .8fr; gap: 12px; padding: 12px; }
+  .workspace-skeleton__row > span:nth-child(3) { display: none; }
+
+  .retreat-roster-table { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+  .retreat-roster-desktop { display: none; }
+  .retreat-roster-mobile { display: grid; gap: 10px; }
+  .retreat-roster-mobile__card { border: 1px solid var(--color-border); border-radius: 15px; background: var(--color-surface); padding: 14px; box-shadow: var(--shadow-xs); }
+  .retreat-roster-mobile__heading { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+  .retreat-roster-mobile__number { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: var(--color-surface-hover); color: var(--color-text-muted); font-size: 12px; font-weight: 800; }
+  .retreat-roster-mobile__heading strong { display: block; overflow: hidden; color: var(--color-text-primary); font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+  .retreat-roster-mobile__heading p { margin-top: 3px; color: var(--color-text-muted); font-size: 12px; }
+  .retreat-roster-mobile dl { display: grid; grid-template-columns: 1fr .72fr; gap: 10px; margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+  .retreat-roster-mobile dl > div { min-width: 0; }
+  .retreat-roster-mobile dt { color: var(--color-text-faint); font-size: 10px; font-weight: 800; }
+  .retreat-roster-mobile dd { overflow: hidden; margin-top: 3px; color: var(--color-text-secondary); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+  .sunday-attendance-table .is-name { width: 118px; min-width: 118px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-skeleton__eyebrow,
+  .workspace-skeleton__title,
+  .workspace-skeleton__toolbar > div,
+  .workspace-skeleton__row > span { animation: none; }
+}

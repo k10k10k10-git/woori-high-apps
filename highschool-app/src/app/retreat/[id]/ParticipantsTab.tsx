@@ -6,6 +6,8 @@ import { getStudentsByYear, subscribeToStudentsByYear, saveParticipants, getPart
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
 import { buildExtraPreservationMaps, dedupeSheetParticipants, identityKeyOf } from "@/lib/syncParticipants";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
+import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
+import RetreatParticipantMobileList from "./RetreatParticipantMobileList";
 
 interface Props {
   retreat: Retreat;
@@ -700,7 +702,7 @@ export default function ParticipantsTab({ retreat }: Props) {
       {/* Table */}
       <div className="card retreat-roster-table overflow-x-auto">
         {loading ? (
-          <div className="p-8 text-center text-slate-400">로딩 중...</div>
+          <WorkspaceSkeleton label="참가자 명단을 불러오는 중입니다." rows={6} />
         ) : list.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
             <div className="text-3xl mb-2">📋</div>
@@ -708,7 +710,9 @@ export default function ParticipantsTab({ retreat }: Props) {
             <p className="text-sm mt-1">구글시트 동기화를 눌러 데이터를 불러오세요.</p>
           </div>
         ) : (
-          <table className="w-full text-xs sm:text-sm" style={{ minWidth: 900 }}>
+          <>
+          <RetreatParticipantMobileList list={list} mismatchKeys={mismatchKeys} ambiguousKeys={ambiguousKeys} />
+          <table className="retreat-roster-desktop w-full text-sm" style={{ minWidth: 900 }}>
             <thead>
               <tr className="border-b border-slate-200 bg-slate-100/80 text-[11px] font-semibold tracking-wide text-slate-500">
                 <th colSpan={5} className="px-4 py-2 text-left">신청자 정보</th>
@@ -765,6 +769,7 @@ export default function ParticipantsTab({ retreat }: Props) {
               ))}
             </tbody>
           </table>
+          </>
         )}
       </div>
     </div>

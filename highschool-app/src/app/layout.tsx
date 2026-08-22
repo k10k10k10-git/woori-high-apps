@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./operations-tables.css";
 import Providers from "./providers";
 import UpdateBanner from "./UpdateBanner";
 import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";

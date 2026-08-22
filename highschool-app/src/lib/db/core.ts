@@ -62,9 +62,9 @@ async function backupNodeBeforeOverwrite(
 }
 
 /** Firebase 연결 상태 구독 (".info/connected") — 오프라인 안내 배너용 */
-export function subscribeToConnection(callback: (connected: boolean) => void): () => void {
+export function subscribeToConnection(callback: (connected: boolean) => void, onError?: (error: Error) => void): () => void {
   const r = ref(db, ".info/connected");
-  return onValue(r, (snap) => callback(snap.val() === true));
+  return onValue(r, (snap) => callback(snap.val() === true), onError);
 }
 
 export { snapToList, stripUndefined, backupNodeBeforeOverwrite };

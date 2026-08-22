@@ -1109,6 +1109,6 @@ export async function removeIguardMember(uid: string): Promise<void> {
 // ── 연결 상태 (오프라인 안내용) ──────────────────────────────
 /** Firebase 연결 상태 구독 (".info/connected") — 현장 와이파이 끊김 시 인원체크 유실 경고용.
  *  데이터 노드가 아닌 클라이언트 메타 경로라 읽기 전용 원칙과 무관하다. */
-export function subscribeToConnection(callback: (connected: boolean) => void): () => void {
-  return onValue(ref(db, ".info/connected"), (snap) => callback(snap.val() === true));
+export function subscribeToConnection(callback: (connected: boolean) => void, onError?: (error: Error) => void): () => void {
+  return onValue(ref(db, ".info/connected"), (snap) => callback(snap.val() === true), onError);
 }

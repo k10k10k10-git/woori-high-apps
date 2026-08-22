@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { createRetreatAccessLock, PIN_MAX_LENGTH, PIN_MIN_LENGTH } from "@/features/iguard/lib/accessLock";
 import { deleteIguardAccessLock, saveIguardAccessLock } from "@/features/iguard/lib/db";
 import type { IguardAccessLock, Retreat } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
+import OverlayShell from "@/components/OverlayShell";
 
 interface AdminModalProps {
   onClose: () => void;
@@ -15,28 +16,8 @@ interface AdminModalProps {
 
 export default function AdminModal({ onClose, retreats, locks, adminId }: AdminModalProps) {
   const { toast, uiConfirm } = useUI();
-  const dialogRef = useRef<HTMLDivElement>(null);
   const [pins, setPins] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") { onClose(); return; }
-      if (e.key !== "Tab" || !dialogRef.current) return;
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      );
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => { document.removeEventListener("keydown", handleKeyDown); prev?.focus(); };
-  }, [onClose]);
 
   async function savePin(retreat: Retreat) {
     const pin = pins[retreat.id] || "";
@@ -68,9 +49,8 @@ export default function AdminModal({ onClose, retreats, locks, adminId }: AdminM
   }
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 modal-backdrop"
-      onClick={onClose} role="dialog" aria-modal="true" aria-label="수련회 접근 관리자" tabIndex={-1}>
-      <div className="card max-h-[88vh] w-full max-w-xl overflow-y-auto p-5 sm:p-6 modal-card" onClick={e => e.stopPropagation()}>
+    <OverlayShell label="수련회 접근 관리자" onClose={onClose} variant="fullscreen-mobile"
+      panelClassName="card modal-card max-h-[88dvh] w-full max-w-xl overflow-y-auto p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-bold text-slate-800">🔐 관리자</h3>
@@ -133,7 +113,6 @@ export default function AdminModal({ onClose, retreats, locks, adminId }: AdminM
             })}
           </div>
         )}
-      </div>
-    </div>
+    </OverlayShell>
   );
 }

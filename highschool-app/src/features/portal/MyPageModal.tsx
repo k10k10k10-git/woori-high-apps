@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import AdminDashboard from "./AdminDashboardPanel";
@@ -11,6 +11,7 @@ import MyMinistryPanel from "./MyMinistryPanel";
 import MyRequestsPanel from "./MyRequestsPanel";
 import { canManageRolesOf, canManageSiteRequests, describeRoles } from "./accessPolicy";
 import { friendlyMinistryName } from "./dailyMinistryMessage";
+import OverlayShell from "@/components/OverlayShell";
 
 export type MyPageTab = "dashboard" | "ministry" | "myRequests" | "team" | "requests";
 
@@ -23,50 +24,17 @@ export default function MyPageModal({ onClose, initialTab = "dashboard" }: { onC
     if (initialTab === "requests" && !canManageRequests) return "dashboard";
     return initialTab;
   });
-  const dialogRef = useRef<HTMLDivElement>(null);
   const displayName = friendlyMinistryName(memberName || user?.displayName);
 
-  useEffect(() => {
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !dialogRef.current) return;
-      const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )].filter((element) => !element.hasAttribute("hidden"));
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      previousFocus?.focus();
-    };
-  }, [onClose]);
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm" onClick={onClose}>
+    <OverlayShell
+      label="마이페이지"
+      onClose={onClose}
+      variant="fullscreen-mobile"
+      panelClassName="admin-mypage-dialog flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden bg-slate-50 shadow-2xl"
+    >
       <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="마이페이지"
-        tabIndex={-1}
-        className="admin-mypage-dialog max-h-[92vh] w-full max-w-6xl overflow-y-auto bg-slate-50 shadow-2xl"
-        onClick={(event) => event.stopPropagation()}
+        className="flex min-h-0 flex-1 flex-col"
       >
         <header className="admin-mypage-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 backdrop-blur sm:px-6">
           <div className="flex items-start justify-between gap-4">
@@ -85,7 +53,7 @@ export default function MyPageModal({ onClose, initialTab = "dashboard" }: { onC
           </div>
         </header>
 
-        <div role="tabpanel" className="admin-mypage-content p-3 sm:p-5">
+        <div role="tabpanel" className="admin-mypage-content min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
           {tab === "dashboard" && (canManageRequests ? <AdminDashboard onNavigate={setTab} /> : <RoleDashboardPanel />)}
           {tab === "ministry" && <MyMinistryPanel />}
           {tab === "myRequests" && <MyRequestsPanel />}
@@ -93,7 +61,7 @@ export default function MyPageModal({ onClose, initialTab = "dashboard" }: { onC
           {tab === "requests" && canManageRequests && <SiteRequestsPanel />}
         </div>
       </div>
-    </div>
+    </OverlayShell>
   );
 }
 

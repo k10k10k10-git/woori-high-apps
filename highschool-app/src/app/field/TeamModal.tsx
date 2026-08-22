@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   subscribeToIguardPending, subscribeToIguardMembers, subscribeToIguardRoles,
   approveIguardMember, denyIguardPending, removeIguardMember, setIguardRole,
@@ -7,6 +7,7 @@ import {
   IguardPendingReq, IguardMemberInfo, IguardRole,
 } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
+import OverlayShell from "@/components/OverlayShell";
 
 const ROLE_LABEL: Record<IguardRole, string> = { team: "이가드팀", staff: "스탭" };
 const MAIN_ADMIN = {
@@ -24,8 +25,6 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
   const [draftEmail, setDraftEmail] = useState("");
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const dialogRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     // onError 없으면 권한 오류 시 "대기자 0명"과 구분이 안 된다 (패턴 16)
     const fail = (e: Error) => setLoadError(prev => prev ?? `명단 구독 실패 - ${e.message}`);
@@ -34,34 +33,6 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
     const u3 = subscribeToIguardRoles(setRoles, fail);
     return () => { u1(); u2(); u3(); };
   }, []);
-
-  // ESC 키로 닫기 + 포커스 트랩
-  useEffect(() => {
-    const prev = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") { onClose(); return; }
-      if (e.key === "Tab" && dialogRef.current) {
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault(); last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault(); first.focus();
-        }
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      prev?.focus();
-    };
-  }, [onClose]);
 
   async function approve(r: IguardPendingReq, role: IguardRole) {
     try { await approveIguardMember(r.uid, r.email, role, r.name); toast(`${r.name || r.email} → ${ROLE_LABEL[role]} 승인`, "success"); }
@@ -97,8 +68,8 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
     .sort(([, a], [, b]) => (a.name || a.email).localeCompare(b.name || b.email, "ko"));
 
   return (
-    <div ref={dialogRef} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label="팀원 관리" tabIndex={-1}>
-      <div className="card p-6 w-full max-w-md modal-card max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <OverlayShell label="이가드 팀원 관리" onClose={onClose} variant="fullscreen-mobile"
+      panelClassName="card modal-card max-h-[85dvh] w-full max-w-md overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg">팀원 관리</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none" aria-label="닫기">×</button>
@@ -211,7 +182,6 @@ export default function TeamModal({ onClose, myEmail }: { onClose: () => void; m
         </div>
 
         <p className="text-xs text-slate-400 mt-4">팀원이 로그인 후 <strong>&apos;접근 요청 보내기&apos;</strong>를 누르면 여기서 승인할 수 있습니다.</p>
-      </div>
-    </div>
+    </OverlayShell>
   );
 }

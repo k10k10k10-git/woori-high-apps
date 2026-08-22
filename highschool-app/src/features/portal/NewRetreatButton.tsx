@@ -4,10 +4,11 @@
 // 수련회는 `retreats/{id}` 하나에만 저장되므로, 어느 쪽에서 만들어도 양쪽 목록에 함께 나타난다.
 // 쓰기는 행정 db 모듈(@/lib/db)만 담당하고, 권한은 retreat-admin 수정 권한으로 게이트한다.
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useUI } from "@/context/UIContext";
 import { createRetreat } from "@/lib/db";
 import { parseSheetUrl } from "@/lib/sheetsParser";
+import OverlayShell from "@/components/OverlayShell";
 
 type Props = {
   /** 생성 후 이동할 경로를 만든다 (행정은 /retreat/{id}, 이가드는 /retreat/{id}/field) */
@@ -22,20 +23,6 @@ export default function NewRetreatButton({ hrefAfterCreate, onCreated, className
   const [form, setForm] = useState({ name: "", year: String(new Date().getFullYear()), sheetUrl: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const previousFocus = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      previousFocus?.focus();
-    };
-  }, [open]);
-
   const parsed = form.sheetUrl.trim() ? parseSheetUrl(form.sheetUrl) : null;
 
   async function submit() {
@@ -81,19 +68,12 @@ export default function NewRetreatButton({ hrefAfterCreate, onCreated, className
       </button>
 
       {open && (
-        <div
-          className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setOpen(false)}
+        <OverlayShell
+          label="새 수련회 만들기"
+          onClose={() => setOpen(false)}
+          variant="fullscreen-mobile"
+          panelClassName="modal-card card w-full max-w-md p-6"
         >
-          <div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-label="새 수련회 만들기"
-            tabIndex={-1}
-            className="modal-card card w-full max-w-md p-6"
-            onClick={(event) => event.stopPropagation()}
-          >
             <h3 className="mb-4 text-lg font-bold text-slate-800">새 수련회 만들기</h3>
             <div className="space-y-3">
               <label className="block text-sm">
@@ -139,8 +119,7 @@ export default function NewRetreatButton({ hrefAfterCreate, onCreated, className
                 {saving ? "만드는 중…" : "만들기"}
               </button>
             </div>
-          </div>
-        </div>
+        </OverlayShell>
       )}
     </>
   );
