@@ -17,9 +17,13 @@ export default function ConnectivityBanner() {
   );
 
   useEffect(() => {
-    const unsubscribe = subscribeToConnection((connected) => {
-      dispatch({ type: "connection-changed", connected });
-    });
+    const unsubscribe = subscribeToConnection(
+      (connected) => dispatch({ type: "connection-changed", connected }),
+      // 연결 상태 구독 자체가 실패하면 저장이 서버에 닿았는지 확인할 방법이 없다.
+      // 이 배너가 사용자에게 가는 유일한 신호라 조용히 숨기지 않고 끊김으로 알린다
+      // (유예 3초가 있어 일시적인 흔들림으로는 뜨지 않는다).
+      () => dispatch({ type: "connection-changed", connected: false }),
+    );
     const graceTimer = window.setTimeout(() => {
       dispatch({ type: "grace-elapsed" });
     }, INITIAL_CONNECTION_GRACE_MS);
