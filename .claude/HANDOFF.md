@@ -18,7 +18,7 @@
 - **보완 1 — 선택 판정 순수화.** ★ 사고 이력(실수 13) 영역인 포스트 현황의 일자·블록 선택과 큐카드 스탭 선택이 컴포넌트 안에만 있어 자동 검증이 없었다. `iguard/lib/cueSelection.ts`를 신설해 순수 함수로 분리하고 `cueSelection.test.ts` 9개·`staffIdentity.test.ts` 11개를 붙였다. CueCardView의 lint 회피용 `requestAnimationFrame`은 두 effect를 합치며 제거했다. 파생값은 `useMemo`로 감싸야 한다 — React Compiler가 순수 함수 호출을 통과하지 못해 `preserve-manual-memoization` 오류를 낸다.
 - **보완 2 — 연결 구독 침묵 제거.** `subscribeToConnection`의 onError를 `ConnectivityBanner`·`OnSiteRegistrationTab`이 쓰지 않아 구독 거부 시 배너가 영원히 숨었다. 둘 다 끊김으로 처리하도록 배선하고 회귀 테스트를 추가했다.
 - **보완 3 — 문서 정합성.** `AGENTS.md`의 "set-state-in-effect 9건은 의도적 부채" 문단이 lint 0이 된 뒤에도 남아 있었고, 루트 CLAUDE.md 실수 13은 사라진 `userPicked`/`blockPicked` ref 가드를 계속 처방하고 있었다. 둘 다 현재 코드(렌더 중 파생)에 맞췄다.
-- **미착수로 남긴 것(승인·별도 작업 필요).** ① RTDB Rules 최소권한 정리 — `docs/FIREBASE_MINIMUM_PERMISSION_REVIEW.md`의 절차대로 학생 출석부 저장소에서 승인 후 진행. ② 사이트 요청 첨부의 base64→Storage 이전(통합관리자 대시보드가 `iguardPending` 루트를 통째로 구독해 첨부까지 매번 내려받는다). ③ `sheet-import` API의 역할 게이트(현재 로그인만 확인). ④ 모바일 명단의 실제 연락처 미전송화. ⑤ Playwright E2E는 12개 정의돼 있으나 `E2E_STORAGE_STATE` 없이는 전부 skip이라 자동 검증량은 아직 0이다.
+- **미착수로 남긴 것(승인·별도 작업 필요).** ① RTDB Rules 최소권한 정리 — `docs/FIREBASE_MINIMUM_PERMISSION_REVIEW.md`의 절차대로 학생 출석부 저장소에서 승인 후 진행. ② 사이트 요청 첨부의 base64→Storage 이전(통합관리자 대시보드가 `iguardPending` 루트를 통째로 구독해 첨부까지 매번 내려받는다). **2026-08-23 실측: 이 노드는 현재 완전히 비어 있다(사용자 0·요청 0·첨부 0KB).** 즉 지금은 실제 피해가 없는 구조적 결함이고, 뒤집으면 **옮길 데이터가 없어 지금이 가장 싸게 고칠 수 있는 시점**이다. 다만 `siteRequests`를 별도 루트로 빼려면 Rules에 새 노드를 정의해야 하고(규칙 없는 노드는 즉시 권한 거부 — 함정 5), 이는 승인 사안이라 미착수로 둔다. ③ `sheet-import` API의 역할 게이트(현재 로그인만 확인). ④ 모바일 명단의 실제 연락처 미전송화. ⑤ Playwright E2E는 12개 정의돼 있으나 `E2E_STORAGE_STATE` 없이는 전부 skip이라 자동 검증량은 아직 0이다.
 - 운영 DB 쓰기·경로·데이터 형태 변경 없음. Rules 배포 없음.
 
 ## 2026-08-22 최신 작업 - 학기 출석표 9/5 열 너비 정상화
@@ -273,7 +273,7 @@
 
 ## 미완인 것 — 정확한 다음 단계
 
-- [ ] **(최우선) 학생 출석부 데모 모드 정리.** 지금 `NEXT_PUBLIC_DEMO_MODE=1`에 계정 정보가 채워진 채 배포돼 있다. **비밀번호가 공개 JS 번들 안에 있어 주소를 아는 누구나 전교생 개인정보에 접근할 수 있다.** 교사 테스트가 끝나면 ① Firebase 콘솔에서 `demo@woorihigh.com` 계정 삭제 + `attendanceAdmins`의 그 uid 삭제 ② `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE=0` ③ `firebase deploy --only hosting`. 구조는 `고등부 학생 출석부/CLAUDE.md`의 "데모 모드" 참고.
+- [ ] **(최우선·오늘은 유지) 학생 출석부 데모 모드 정리.** 지금 `NEXT_PUBLIC_DEMO_MODE=1`에 계정 정보가 채워진 채 배포돼 있다. **비밀번호가 공개 JS 번들 안에 있어 주소를 아는 누구나 전교생 개인정보에 접근할 수 있다.** ⚠ **2026-08-23은 교사 테스트 당일이라 사용자가 유지를 지시했다 — 이날은 지우지 말 것.** 테스트가 끝나면 ① Firebase 콘솔에서 `demo@woorihigh.com` 계정 삭제 + `attendanceAdmins`의 그 uid 삭제 ② `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE=0` ③ `firebase deploy --only hosting`. 구조는 `고등부 학생 출석부/CLAUDE.md`의 "데모 모드" 참고. **테스트 다음 날 가장 먼저 확인할 항목이다.**
 - [x] ~~**lint 에러 10건 / 경고 3건**~~ — 2026-08-22 해소. 통합 앱 전체 `npm run lint`가 **0 errors / 0 warnings**다. effect 안 동기 setState는 초기값·렌더 파생값·`requestAnimationFrame`·구독 완료 스코프로 나눴고 `LodgingMapView`의 `<img>`는 Next Image 계약으로 바꿨다. 남은 것은 **학생 출석부의 경고 34건**(errors 0)이며 빌드·테스트·타입에는 영향이 없다.
 - [ ] **화면 차단 ≠ 실제 차단 5건** — Rules는 여전히 세 버킷(`admins`/`retreatAdmins`/`iguardMembers`)만 구분한다. 화면에서만 막히는 것: 스탭팀장의 행정 조회 전용, 스탭팀장·바나바팀의 민감정보 제외, 사역팀의 "내 팀만 편집", 이가드팀의 학기 차단, **스탭 32명의 `classes` 전체 읽기**. 마지막 항목이 위험도가 가장 높다(전교생 주소·연락처).
 - [ ] **(대기) 조장 큐싯 붙여넣기 경로**를 만들지 여부 — 사용자 답변 대기.
