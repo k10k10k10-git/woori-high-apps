@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildSyncPlan, buildSyncPayload, describeSheetSyncForClass, parseCSV, parseClassCsv, type ParsedClass, type ParsedStudent, type SyncPlan } from '@/lib/sheetSync';
 import type { Student } from '@/types';
 
@@ -263,5 +263,49 @@ describe('행정 변동 사항 - 시트 동기화 기록', () => {
     const out = describeSheetSyncForClass(p, '1-2-9', false);
     expect(out?.studentName).toBe('신규 1명 · 전입 1명');
     expect(out?.changeSummary).toBe('구글 시트 명단·출석 반영 · 신규 1명 (김철수) · 전입 1명 (박영희←1부 2-3)');
+  });
+});
+
+describe('주일 당일 동기화 - 앱에서 입력한 출석을 덮지 않는다', () => {
+  // 2026-08-23(일)에 실제로 겪은 사고. 시트에는 아직 그날 출석을 안 옮겨 적었는데
+  // 동기화하면 빈칸이 "지난 주일인데 결석"으로 해석돼 앱 입력이 전부 X로 덮였다.
+  // 경계가 하루만 밀려도 출석이 통째로 뒤집히므로 양쪽을 다 고정한다.
+  //
+  // 시트 구조: 0행 제목 / 1행 월 / 2행 일 / 3행부터 학생. 출석 열은 4열부터.
+  const rows = (): string[][] => [
+    ['1부 1학년 1반 김태훈 선생님'],
+    ['', '', '', '', '8월', '', '', ''],
+    ['', '', '', '', '16', '23', '', ''],
+    ['1', '홍길동', '우리중', '2009-03-11', '', ''],
+  ];
+
+  afterEach(() => { vi.useRealTimers(); });
+
+  function attendanceOf(nowIso: string) {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(nowIso));
+    const pc = parseClassCsv(rows(), '1', 2026);
+    return pc?.students[0]?.attendance ?? {};
+  }
+
+  it('일요일 당일에는 그날 열을 건드리지 않는다', () => {
+    // 8/23(일) 낮. 시트의 8/23 칸이 비어 있어도 결석으로 기록하면 안 된다.
+    const att = attendanceOf('2026-08-23T03:00:00Z');
+    const keys = Object.keys(att);
+    expect(keys).not.toHaveLength(0);           // 8/16은 판정돼야 한다
+    const todayCell = Object.entries(att).find(([, v]) => v === 'X' && keys.length === 2);
+    expect(todayCell).toBeUndefined();
+    expect(Object.values(att).filter(v => v === 'X')).toHaveLength(1); // 8/16만 X
+  });
+
+  it('다음 날(월)에는 지난 주일이 되어 결석으로 기록한다', () => {
+    // 8/24(월). 이제 8/23은 끝난 예배이므로 빈칸은 결석이 맞다.
+    const att = attendanceOf('2026-08-24T03:00:00Z');
+    expect(Object.values(att).filter(v => v === 'X')).toHaveLength(2); // 8/16·8/23 둘 다
+  });
+
+  it('토요일에도 다가올 주일을 미리 결석 처리하지 않는다', () => {
+    const att = attendanceOf('2026-08-22T03:00:00Z');
+    expect(Object.values(att).filter(v => v === 'X')).toHaveLength(1);
   });
 });

@@ -136,10 +136,22 @@ function cell(rows: string[][], r: number, c: number): string {
   return (rows[r]?.[c] ?? '').toString().trim();
 }
 
+/**
+ * **이미 지나간** 마지막 주일(KST 기준 자정, UTC ms).
+ *
+ * 이 값 이하인 날짜 열은 "예배가 끝난 주"로 보고, 시트에서 빈칸이면 결석(X)으로 기록한다.
+ * 그래서 경계가 하루만 밀려도 출석 데이터가 통째로 뒤집힌다.
+ *
+ * ⚠ 일요일 당일은 포함하지 않는다. 예전에는 요일 수만큼만 되감아서, 일요일에는
+ * `getUTCDay() === 0` 때문에 오늘 자신이 기준이 됐다. 그 상태로 동기화하면 아직 시트에
+ * 옮겨 적지 않은 **그날 앱에서 입력한 출석이 전부 결석으로 덮였다.** 주일 사역 도구가
+ * 하필 주일에 가장 위험했다. 일요일이면 7일을 되감아 직전 주일을 기준으로 삼는다.
+ */
 function lastElapsedSundayUTC(year: number): number {
   const nowKst = new Date(Date.now() + 9 * 3600 * 1000);
   const today = new Date(Date.UTC(nowKst.getUTCFullYear(), nowKst.getUTCMonth(), nowKst.getUTCDate()));
-  today.setUTCDate(today.getUTCDate() - today.getUTCDay());
+  const dayOfWeek = today.getUTCDay();
+  today.setUTCDate(today.getUTCDate() - (dayOfWeek === 0 ? 7 : dayOfWeek));
   return today.getTime();
 }
 
