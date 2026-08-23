@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e:smoke": "playwright test e2e/authenticated-smoke.e2e.ts"
+    "test:e2e:smoke": "playwright test e2e/authenticated-smoke.e2e.ts",
+    "e2e:auth": "node scripts/save-e2e-auth.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
