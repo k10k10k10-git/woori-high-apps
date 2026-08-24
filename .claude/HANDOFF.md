@@ -4,17 +4,18 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
-## 2026-08-24 최신 작업 — 출석 동기화·홈 밀도·모바일 중복 신청·참가자 연락처 분리 준비
+## 2026-08-24 최신 작업 — 참가자 연락처 운영 이관·요청 첨부 Storage 분리 완료
 
 - 학생 출석부는 **데모 모드를 그대로 유지**한 채 `d952800`을 Firebase Hosting에 배포했다. 같은 주일에 관리자 시트 동기화를 다시 해도 그날 입력한 출석을 덮지 않는 회귀 테스트가 포함된다. 사용자가 9월 1일에 데모를 정리하기로 했으므로 그 전에는 데모 계정·환경변수·배포를 끄지 않는다.
 - 통합 홈 상단의 캘린더 할 일 3건과 아래 전체 업무함이 중복되던 구성을 정리했다. 히어로는 가장 가까운 일정 1건·D-Day·남은 건수만 요약하고 전체 목록은 아래 `지금 확인할 일`에만 둔다.
 - 주일 사역의 찬양·미디어·기획디자인팀은 `기능 기획 중` 상태를 카탈로그에 명시했다. 통합관리자 메뉴에서는 완성 기능처럼 열리지 않고, 실제 배정 팀원은 자기 준비 화면과 건의사항 진입을 계속 쓴다.
 - 수련회 신청 명단의 중복 신청 원본 표는 기본 접힘으로 바꿨다. 모바일은 접수일·부·학년·반·유지 여부만 카드로 렌더하고 연락처·시트 원문은 PC 상세에서만 표시한다.
-- 수련회 참가자 연락처 분리 코드를 준비했다. 공개 `retreats/{id}/participants/{participantKey}`의 키·명단·배정 필드는 유지하고 `phone`·`pPhone`만 같은 키의 `retreatsPrivate/{id}/participantContacts/{participantKey}`로 분리한다. 이가드는 계속 공개 명단만 구독하고, 행정 화면 중 연락처가 필요한 참가자·차량·부분참·입금대조·인물검색만 private를 합친다.
+- 수련회 참가자 연락처 분리 코드와 운영 이관을 완료했다. 공개 `retreats/{id}/participants/{participantKey}`의 키·명단·배정 필드는 유지하고 `phone`·`pPhone`만 같은 키의 `retreatsPrivate/{id}/participantContacts/{participantKey}`로 분리한다. 이가드는 계속 공개 명단만 구독하고, 행정 화면 중 연락처가 필요한 참가자·차량·부분참·입금대조·인물검색만 private를 합친다.
 - 참가자 전체 저장·단건 수정·재매칭·옛 백업 복구는 공개/비공개 루트 원자 update를 사용한다. 공개 명단과 연락처 백업은 같은 타임스탬프로 묶고 빈 연락처도 `__empty` 마커로 기록해 복구 시 서로 다른 시점이 섞이지 않는다. 기존 공개 `participantsBackups`는 수정·이관하지 않는다.
-- 운영 DB dry-run 결과는 수련회 2개, 참가자 503명, 공개 연락처 보유 503명, private 연락처 0명이다. 예상 원자 update는 1,006경로(비공개 레코드 503 + 공개 phone 삭제 503), 충돌 0이다. **실제 운영 DB update는 아직 실행하지 않았고, 이 정확한 범위에 대한 사용자 승인 대기다.** 스크립트는 `highschool-app/scripts/participant-contact-migration.mjs`이며 기본적으로 계획 JSON만 만든다.
+- 사용자 승인 후 운영 DB 스냅샷에서 계획을 다시 만들고 루트 원자 update 1,006경로를 실행했다. 결과는 수련회 2개·참가자 503명 유지, 공개 연락처 필드 503→0, 비공개 연락처 0→503, 충돌 0이다. 연락처를 제외한 공개 참가자 데이터 해시가 전후 일치했고 기존 `participantsBackups`·`participantContactsBackups`는 건드리지 않았다. 검증 후 개인정보가 든 임시 스냅샷 디렉터리는 삭제했다.
+- 사이트 요청 첨부 본문을 RTDB에서 Firebase Storage `site-requests/{uid}/{requestId}/attachment.jpg`로 분리했다(`b1811bc`). RTDB 요청에는 이름·크기·Storage 경로·다운로드 주소만 남긴다. 기존 요청은 0건이라 이관할 base64가 없었고, 분리 전 `dataUrl` 형식은 읽기 호환만 유지한다. 요청 삭제 시 Storage 파일을 먼저 삭제한다. 새 RTDB 경로·Rules 변경·Rules 배포는 없다.
 - Playwright Firebase 인증 저장 스크립트는 `storageState({ indexedDB: true })`로 고쳤다. 수동 Google 로그인 5분 제한 안에 완료되지 않아 자동 E2E 12개는 아직 실실행 전이다. 대신 로그인된 Chrome 운영 화면에서 홈과 수련회 신청 접수를 읽기 전용으로 확인했다.
-- 검증: 통합 앱 전체 **85파일 704개 테스트**, 전체 ESLint, `npx tsc --noEmit`, production build 통과. 커밋은 `993af6b`, `2a157bf`, `44cb55d`, `2205829`이며 main push 완료. Vercel CLI 재인증 후 Production 배포를 완료했고, 운영 홈의 `다음 공유 일정` 요약과 수련회 중복 신청 기본 접힘을 확인했다. 모바일 390×844에서는 중복 신청 카드에 날짜·부·학년·반만 나오고 연락처·원본 응답이 나오지 않는다. Firebase Rules는 수정·배포하지 않았다.
+- 검증: 통합 앱 전체 **86파일 707개 테스트**, 전체 ESLint, `npx tsc --noEmit`, production build 통과. 기능 커밋 `b1811bc`와 이 문서 갱신을 main에 push하고 Vercel Production에 배포한다. Firebase Rules는 수정·배포하지 않았다.
 
 ## 2026-08-22 최신 작업 - 휴강 주차 제외와 공유 일정 분류 선택
 
@@ -186,9 +187,9 @@
 
 ## 지금 상태 (한 문장)
 
-학생 출석부 당일 동기화와 통합 앱의 홈·모바일·연락처 분리 코드는 **구현·검증·푸시·Production 배포 완료**다. 운영 DB 연락처 1,006경로 이관은 정확한 범위 승인 전까지 실행하지 않는다.
+학생 출석부 데모는 9월 1일까지 유지한다. 참가자 연락처 1,006경로 운영 이관과 요청 첨부 Storage 분리는 **구현·검증 완료**이며 최종 문서 커밋까지 Production 배포한다.
 
-- 최신 기능 커밋: `2205829` (`feat: 수련회 참가자 연락처 비공개 경로 분리`). GitHub main push와 Vercel Production 배포 완료. 첫 운영 재검증 커밋은 `9ed1c59`였고 `/api/version`의 `buildId`가 당시 Git HEAD와 일치했으며 `vercel ls`의 최신 Production은 `Ready`였다. 이후 인수인계 문서만 갱신해 같은 코드로 다시 배포한다.
+- 최신 기능 커밋: `b1811bc` (`건의: 첨부 파일을 Storage로 분리`). 연락처 운영 이관 결과는 공개 연락처 0·비공개 503·비연락처 데이터 해시 동일이다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
 - 브랜치는 `main` 하나뿐 (병합 완료된 `codex/unified-highschool`·`refactor/2026-07-plan`을 2026-08-13 삭제)
 - 작업 트리 깨끗 (미추적 `.agents/` `outputs/` + 학생 앱 `tmp/` 제외 — **`git add .` 금지**)
@@ -227,12 +228,12 @@
 
 **하위호환이 이 모델의 핵심**이다. 새 필드(`semesterRole`·`retreatRole`)가 없는 기존 구성원은 레거시 `role`에서 파생해 **이전과 똑같은 권한**을 받는다. `accessPolicy.test.ts`가 이걸 회귀로 고정한다 — 여기가 깨지면 43명이 로그인해도 화면이 빈다.
 
-## 검증 상태 (2026-08-24 실측 — 기능 기준 HEAD `2205829`)
+## 검증 상태 (2026-08-24 실측 — 기능 기준 HEAD `b1811bc`)
 
 | | 결과 |
 |---|---|
 | `highschool-app` `npx tsc --noEmit` | 0 errors |
-| `highschool-app` `npm test` | 85파일 **704개 통과** |
+| `highschool-app` `npm test` | 86파일 **707개 통과** |
 | `highschool-app` `npm run lint` | **0 errors / 0 warnings** |
 | `highschool-app` `npm run build` | 성공 |
 | `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
@@ -286,8 +287,8 @@
 ## 미완인 것 — 정확한 다음 단계
 
 - [ ] **(9월 1일 정리 예정) 학생 출석부 데모 모드.** 지금 `NEXT_PUBLIC_DEMO_MODE=1`에 계정 정보가 채워진 채 배포돼 있다. 사용자가 돌아오는 주까지 테스트하고 **2026-09-01에 직접 정리 일정을 잡았다. 그 전에는 끄지 말 것.** 정리 시 ① Firebase 콘솔에서 `demo@woorihigh.com` 계정 삭제 + `attendanceAdmins`의 그 uid 삭제 ② `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE=0` ③ `firebase deploy --only hosting` 순서다.
-- [ ] **수련회 참가자 연락처 운영 이관 승인 대기.** 승인 문구에 수련회 2개·참가자 503명·원자 update 1,006경로·현재 public/private 스냅샷·충돌 0·기존 백업 미수정을 모두 포함해야 한다. 승인 후에만 스냅샷 → 계획 재생성 → 루트 update → public 연락처 0/private 503 재검증을 실행한다.
-- [ ] **사이트 요청 첨부 분리.** `iguardPending/{uid}/siteRequests` 부모 구독은 base64 첨부까지 내려받는다. 별도 inbox/attachment 경로는 새 Rules가 필요하지만 저장소 안전 계약상 이번 작업에서 Rules 수정·배포가 금지돼 미착수다. 현재 요청 노드는 비어 있어 즉시 데이터 피해는 없다.
+- [x] ~~**수련회 참가자 연락처 운영 이관 승인 대기.**~~ — 2026-08-24 승인 후 스냅샷 → 계획 재생성 → 루트 원자 update 1,006경로 → public 연락처 0/private 503 → 비연락처 데이터 해시 동일까지 검증 완료. 임시 개인정보 스냅샷 삭제 완료.
+- [x] ~~**사이트 요청 첨부 분리.**~~ — 2026-08-24 기존 Firebase Storage를 재사용해 `site-requests/{uid}/{requestId}/attachment.jpg`로 분리. 기존 요청 0건이라 이관 대상 없음. RTDB에는 메타데이터만 저장하고 Rules는 수정·배포하지 않음.
 - [x] ~~**lint 에러 10건 / 경고 3건**~~ — 2026-08-22 해소. 통합 앱 전체 `npm run lint`가 **0 errors / 0 warnings**다. effect 안 동기 setState는 초기값·렌더 파생값·`requestAnimationFrame`·구독 완료 스코프로 나눴고 `LodgingMapView`의 `<img>`는 Next Image 계약으로 바꿨다. 남은 것은 **학생 출석부의 경고 34건**(errors 0)이며 빌드·테스트·타입에는 영향이 없다.
 - [ ] **화면 차단 ≠ 실제 차단 5건** — Rules는 여전히 세 버킷(`admins`/`retreatAdmins`/`iguardMembers`)만 구분한다. 화면에서만 막히는 것: 스탭팀장의 행정 조회 전용, 스탭팀장·바나바팀의 민감정보 제외, 사역팀의 "내 팀만 편집", 이가드팀의 학기 차단, **스탭 32명의 `classes` 전체 읽기**. 마지막 항목이 위험도가 가장 높다(전교생 주소·연락처).
 - [ ] **(대기) 조장 큐싯 붙여넣기 경로**를 만들지 여부 — 사용자 답변 대기.
