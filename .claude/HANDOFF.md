@@ -13,8 +13,8 @@
 - 수련회 참가자 연락처 분리 코드를 준비했다. 공개 `retreats/{id}/participants/{participantKey}`의 키·명단·배정 필드는 유지하고 `phone`·`pPhone`만 같은 키의 `retreatsPrivate/{id}/participantContacts/{participantKey}`로 분리한다. 이가드는 계속 공개 명단만 구독하고, 행정 화면 중 연락처가 필요한 참가자·차량·부분참·입금대조·인물검색만 private를 합친다.
 - 참가자 전체 저장·단건 수정·재매칭·옛 백업 복구는 공개/비공개 루트 원자 update를 사용한다. 공개 명단과 연락처 백업은 같은 타임스탬프로 묶고 빈 연락처도 `__empty` 마커로 기록해 복구 시 서로 다른 시점이 섞이지 않는다. 기존 공개 `participantsBackups`는 수정·이관하지 않는다.
 - 운영 DB dry-run 결과는 수련회 2개, 참가자 503명, 공개 연락처 보유 503명, private 연락처 0명이다. 예상 원자 update는 1,006경로(비공개 레코드 503 + 공개 phone 삭제 503), 충돌 0이다. **실제 운영 DB update는 아직 실행하지 않았고, 이 정확한 범위에 대한 사용자 승인 대기다.** 스크립트는 `highschool-app/scripts/participant-contact-migration.mjs`이며 기본적으로 계획 JSON만 만든다.
-- Playwright Firebase 인증 저장 스크립트는 `storageState({ indexedDB: true })`로 고쳤다. 수동 Google 로그인 5분 제한 안에 완료되지 않아 자동 E2E 12개는 아직 실실행 전이다. Chrome 확장에는 로그인된 홈·학기·학생 출석부 탭이 있어 배포 후 읽기 전용 실화면 검증에 사용할 수 있다.
-- 검증: 통합 앱 전체 **85파일 704개 테스트**, 전체 ESLint, `npx tsc --noEmit`, production build 통과. 커밋은 `993af6b`, `2a157bf`, `44cb55d`, `2205829`이며 main push 완료. Vercel CLI 인증이 만료돼 기기 승인 `Allow` 대기 중이라 통합 앱 새 배포만 아직 미완료다. Firebase Rules는 수정·배포하지 않았다.
+- Playwright Firebase 인증 저장 스크립트는 `storageState({ indexedDB: true })`로 고쳤다. 수동 Google 로그인 5분 제한 안에 완료되지 않아 자동 E2E 12개는 아직 실실행 전이다. 대신 로그인된 Chrome 운영 화면에서 홈과 수련회 신청 접수를 읽기 전용으로 확인했다.
+- 검증: 통합 앱 전체 **85파일 704개 테스트**, 전체 ESLint, `npx tsc --noEmit`, production build 통과. 커밋은 `993af6b`, `2a157bf`, `44cb55d`, `2205829`이며 main push 완료. Vercel CLI 재인증 후 Production 배포를 완료했고, 운영 홈의 `다음 공유 일정` 요약과 수련회 중복 신청 기본 접힘을 확인했다. 모바일 390×844에서는 중복 신청 카드에 날짜·부·학년·반만 나오고 연락처·원본 응답이 나오지 않는다. Firebase Rules는 수정·배포하지 않았다.
 
 ## 2026-08-22 최신 작업 - 휴강 주차 제외와 공유 일정 분류 선택
 
@@ -186,9 +186,9 @@
 
 ## 지금 상태 (한 문장)
 
-학생 출석부 당일 동기화 수정은 배포 완료했고, 통합 앱의 홈·모바일·연락처 분리 코드는 **구현·검증·푸시 완료 / Vercel 재인증 후 배포 대기**다. 운영 DB 연락처 1,006경로 이관은 정확한 범위 승인 전까지 실행하지 않는다.
+학생 출석부 당일 동기화와 통합 앱의 홈·모바일·연락처 분리 코드는 **구현·검증·푸시·Production 배포 완료**다. 운영 DB 연락처 1,006경로 이관은 정확한 범위 승인 전까지 실행하지 않는다.
 
-- 최신 커밋: `2205829` (`feat: 수련회 참가자 연락처 비공개 경로 분리`). GitHub main push 완료. Vercel 최신 배포 SHA는 재인증 완료 후 `/api/version`으로 다시 대조할 것.
+- 최신 기능 커밋: `2205829` (`feat: 수련회 참가자 연락처 비공개 경로 분리`). GitHub main push와 Vercel Production 배포 완료. 첫 운영 재검증 커밋은 `9ed1c59`였고 `/api/version`의 `buildId`가 당시 Git HEAD와 일치했으며 `vercel ls`의 최신 Production은 `Ready`였다. 이후 인수인계 문서만 갱신해 같은 코드로 다시 배포한다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
 - 브랜치는 `main` 하나뿐 (병합 완료된 `codex/unified-highschool`·`refactor/2026-07-plan`을 2026-08-13 삭제)
 - 작업 트리 깨끗 (미추적 `.agents/` `outputs/` + 학생 앱 `tmp/` 제외 — **`git add .` 금지**)
@@ -227,7 +227,7 @@
 
 **하위호환이 이 모델의 핵심**이다. 새 필드(`semesterRole`·`retreatRole`)가 없는 기존 구성원은 레거시 `role`에서 파생해 **이전과 똑같은 권한**을 받는다. `accessPolicy.test.ts`가 이걸 회귀로 고정한다 — 여기가 깨지면 43명이 로그인해도 화면이 빈다.
 
-## 검증 상태 (2026-08-24 실측 — HEAD `2205829`)
+## 검증 상태 (2026-08-24 실측 — 기능 기준 HEAD `2205829`)
 
 | | 결과 |
 |---|---|
@@ -236,10 +236,10 @@
 | `highschool-app` `npm run lint` | **0 errors / 0 warnings** |
 | `highschool-app` `npm run build` | 성공 |
 | `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
-| `고등부 학생 출석부` `npm test` | 9파일 **122개 통과** |
+| `고등부 학생 출석부` `npm test` | 9파일 **125개 통과** |
 | `고등부 학생 출석부` `npm run lint` | 0 errors / **34 warnings** |
 | `고등부 학생 출석부` `npm run build` | 성공 |
-| 배포 일치 | **대기** — Vercel CLI 기기 승인 후 새 Production 배포·SHA 대조 필요 |
+| 배포 일치 | **완료** — `/api/version` buildId = Git HEAD, Vercel Production `Ready` |
 | 운영 응답 | `woorihigh-app.vercel.app` 200 / `woori-high.web.app` 200 |
 
 > 이 표는 2026-08-22에 두 앱 모두 직접 실행해 얻은 값이다. 직전 표(08-21)는 통합 앱
