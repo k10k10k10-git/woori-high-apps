@@ -4,6 +4,17 @@ export interface SiteRequestAttachment {
   name: string;
   type: "image/jpeg";
   size: number;
+  /** 새 요청은 파일 본문을 Storage에 두고 RTDB에는 경로와 다운로드 주소만 저장한다. */
+  filePath?: string;
+  fileUrl?: string;
+  /** 분리 전 요청의 읽기 호환 전용. 새 요청 저장에는 사용하지 않는다. */
+  dataUrl?: string;
+}
+
+export interface PreparedSiteRequestAttachment {
+  name: string;
+  type: "image/jpeg";
+  size: number;
   dataUrl: string;
 }
 
@@ -30,7 +41,9 @@ export interface SiteRequest {
   notifiedAt?: number;
 }
 
-export type NewSiteRequest = Omit<SiteRequest, "id" | "status" | "resolvedAt" | "resolvedBy" | "resolutionNote" | "notifiedAt">;
+export type NewSiteRequest = Omit<SiteRequest, "id" | "status" | "attachment" | "resolvedAt" | "resolvedBy" | "resolutionNote" | "notifiedAt"> & {
+  attachment?: PreparedSiteRequestAttachment;
+};
 
 /** 짧은 제안도 유효하다. 제목과 본문이 비어 있지 않은지만 확인한다. */
 export function canSendSiteRequest(input: Pick<SiteRequest, "title" | "description">): boolean {
@@ -45,22 +58,37 @@ function number(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-function attachment(value: unknown): SiteRequestAttachment | undefined {
+function attachment(ownerUid: string, requestId: string, value: unknown): SiteRequestAttachment | undefined {
   if (!value || typeof value !== "object") return undefined;
   const item = value as Partial<SiteRequestAttachment>;
   if (
     item.type !== "image/jpeg"
     || typeof item.name !== "string"
     || typeof item.size !== "number"
-    || typeof item.dataUrl !== "string"
-    || !item.dataUrl.startsWith("data:image/jpeg;base64,")
   ) return undefined;
-  return {
+  const base = {
     name: item.name.slice(0, 120),
-    type: "image/jpeg",
+    type: "image/jpeg" as const,
     size: item.size,
+  };
+  const expectedPrefix = `site-requests/${ownerUid}/${requestId}/`;
+  if (
+    typeof item.filePath === "string"
+    && item.filePath.startsWith(expectedPrefix)
+    && typeof item.fileUrl === "string"
+    && item.fileUrl.startsWith("https://firebasestorage.googleapis.com/")
+  ) {
+    return { ...base, filePath: item.filePath, fileUrl: item.fileUrl };
+  }
+  if (typeof item.dataUrl !== "string" || !item.dataUrl.startsWith("data:image/jpeg;base64,")) return undefined;
+  return {
+    ...base,
     dataUrl: item.dataUrl,
   };
+}
+
+export function siteRequestAttachmentUrl(value: SiteRequestAttachment): string {
+  return value.fileUrl || value.dataUrl || "";
 }
 
 export function normalizeSiteRequest(ownerUid: string, id: string, value: unknown): SiteRequest | null {
@@ -87,7 +115,7 @@ export function normalizeSiteRequest(ownerUid: string, id: string, value: unknow
     roleLabel: text(item.roleLabel, 120),
     createdAt,
     status,
-    ...(attachment(item.attachment) ? { attachment: attachment(item.attachment) } : {}),
+    ...(attachment(ownerUid, id, item.attachment) ? { attachment: attachment(ownerUid, id, item.attachment) } : {}),
     ...(number(item.resolvedAt) ? { resolvedAt: number(item.resolvedAt) } : {}),
     ...(text(item.resolvedBy, 80) ? { resolvedBy: text(item.resolvedBy, 80) } : {}),
     ...(text(item.resolutionNote, 1000) ? { resolutionNote: text(item.resolutionNote, 1000) } : {}),

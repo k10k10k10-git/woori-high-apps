@@ -1,4 +1,4 @@
-import type { SiteRequestAttachment } from "./siteRequest";
+import type { PreparedSiteRequestAttachment } from "./siteRequest";
 
 const MAX_INPUT_BYTES = 12 * 1024 * 1024;
 const MAX_OUTPUT_BYTES = 1_200_000;
@@ -43,8 +43,8 @@ function safeJpegName(name: string): string {
   return `${stem.slice(0, 100)}.jpg`;
 }
 
-/** RTDB 요청함이 무거워지지 않도록 스크린샷을 최대 1600px·1.2MB JPEG로 축소한다. */
-export async function prepareSiteRequestAttachment(file: File): Promise<SiteRequestAttachment> {
+/** Storage 업로드 전에 스크린샷을 최대 1600px·1.2MB JPEG로 축소한다. */
+export async function prepareSiteRequestAttachment(file: File): Promise<PreparedSiteRequestAttachment> {
   if (!/^image\/(?:jpeg|png|webp)$/i.test(file.type)) throw new Error("JPG, PNG, WEBP 이미지만 첨부할 수 있습니다.");
   if (file.size > MAX_INPUT_BYTES) throw new Error("첨부 이미지는 12MB 이하여야 합니다.");
 

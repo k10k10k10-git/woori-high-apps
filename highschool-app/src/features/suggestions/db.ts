@@ -8,12 +8,33 @@ import {
   type NewSiteRequest,
   type SiteRequest,
 } from "./siteRequest";
+import { deleteSiteRequestAttachment, uploadSiteRequestAttachment } from "./attachmentStorage";
 
 export async function createSiteRequest(request: NewSiteRequest): Promise<string> {
   const target = push(ref(db, paths.siteRequests(request.ownerUid)));
   if (!target.key) throw new Error("요청 번호를 만들지 못했습니다.");
-  await set(target, { ...request, status: "received" });
-  return target.key;
+  const { attachment, ...requestBody } = request;
+  let storedAttachment;
+  try {
+    storedAttachment = attachment
+      ? await uploadSiteRequestAttachment(request.ownerUid, target.key, attachment)
+      : undefined;
+    await set(target, {
+      ...requestBody,
+      status: "received",
+      ...(storedAttachment ? { attachment: storedAttachment } : {}),
+    });
+    return target.key;
+  } catch (error) {
+    if (storedAttachment?.filePath) {
+      try {
+        await deleteSiteRequestAttachment(storedAttachment.filePath);
+      } catch {
+        // 원래 전송 오류를 보존한다. 정리 실패 파일은 Storage 감사 대상으로 남는다.
+      }
+    }
+    throw error;
+  }
 }
 
 /** 통합관리자 전용: 모든 사용자 요청을 메일함처럼 실시간 구독한다. */
@@ -78,7 +99,13 @@ export async function resolveSiteRequest(
 
 /** 통합관리자 전용: 다른 사용자 정보는 유지하고 선택한 요청 한 건만 삭제한다. */
 export async function deleteSiteRequest(ownerUid: string, requestId: string): Promise<void> {
-  await remove(ref(db, paths.siteRequest(ownerUid, requestId)));
+  const target = ref(db, paths.siteRequest(ownerUid, requestId));
+  const snapshot = await get(target);
+  const request = snapshot.exists() ? normalizeSiteRequest(ownerUid, requestId, snapshot.val()) : null;
+  if (request?.attachment?.filePath) {
+    await deleteSiteRequestAttachment(request.attachment.filePath);
+  }
+  await remove(target);
 }
 
 export async function markSiteRequestNotified(ownerUid: string, requestId: string): Promise<void> {

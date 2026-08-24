@@ -143,6 +143,10 @@ firebase deploy --only database
 | `retreatsPrivate/{id}/participantContacts` | 수련회 참가자 본인·보호자 연락처 | admins + retreatAdmins만 |
 | `retreatsPrivate/{id}/participantContactsBackups` | 공개 명단과 같은 시점의 연락처 롤링 백업 | admins + retreatAdmins만 |
 
+사이트 요청의 첨부 이미지 본문은 RTDB가 아니라 Firebase Storage의
+`site-requests/{uid}/{requestId}/attachment.jpg`에 저장한다. RTDB
+`iguardPending/{uid}/siteRequests/{requestId}/attachment`에는 파일 이름·크기·Storage 경로·다운로드 주소만 남긴다.
+
 **주의:** 이 데이터가 포함된 백업 파일은 git에 커밋하지 마세요.
 
 ---

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import { deleteSiteRequest, resolveSiteRequest, subscribeToAdminSiteRequests } from "@/features/suggestions/db";
-import type { SiteRequest } from "@/features/suggestions/siteRequest";
+import { siteRequestAttachmentUrl, type SiteRequest } from "@/features/suggestions/siteRequest";
 
 type Filter = "received" | "resolved" | "all";
 type BusyAction = { key: string; type: "resolve" | "delete" };
@@ -182,13 +182,13 @@ export default function SiteRequestsPanel() {
                 <RequestBlock label="화면/주소" value={selected.page || "미입력"} />
                 <RequestBlock label="재현 방법" value={selected.reproduction || "해당 없음"} />
                 <RequestBlock label="원하는 결과" value={selected.expected || "미입력"} />
-                {selected.attachment && (
+                {selected.attachment && siteRequestAttachmentUrl(selected.attachment) && (
                   <section>
                     <p className="mb-2 text-xs font-bold text-slate-500">첨부 이미지</p>
-                    <a href={selected.attachment.dataUrl} download={selected.attachment.name} className="block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-                      {/* data URL은 전송 시 JPEG로 재인코딩되어 SVG/스크립트가 들어올 수 없다. */}
+                    <a href={siteRequestAttachmentUrl(selected.attachment)} download={selected.attachment.name} className="block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                      {/* Storage URL과 레거시 data URL 모두 전송 전에 JPEG로 재인코딩된 결과만 허용한다. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={selected.attachment.dataUrl} alt={`${selected.title} 첨부`} className="max-h-80 w-full object-contain" />
+                      <img src={siteRequestAttachmentUrl(selected.attachment)} alt={`${selected.title} 첨부`} className="max-h-80 w-full object-contain" />
                       <span className="block border-t border-slate-200 px-3 py-2 text-xs text-slate-500">{selected.attachment.name} · {(selected.attachment.size / 1024).toFixed(0)}KB · 눌러서 저장</span>
                     </a>
                   </section>
