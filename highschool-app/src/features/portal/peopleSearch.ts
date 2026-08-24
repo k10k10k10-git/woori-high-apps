@@ -482,8 +482,13 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
   for (const [retreatId, rawValue] of Object.entries(asRecord(data.retreats))) {
     const retreat = asRecord(rawValue);
     const meta = retreatMeta(retreatId, retreat);
+    const privateRoot = asRecord(asRecord(data.retreatsPrivate)[retreatId]);
+    const participantContacts = asRecord(privateRoot.participantContacts);
     for (const [participantKey, rawParticipant] of Object.entries(asRecord(retreat.participants))) {
       const participant = asRecord(rawParticipant);
+      const privateContact = asRecord(participantContacts[participantKey]);
+      const phone = privateContact.phone ?? participant.phone;
+      const pPhone = privateContact.pPhone ?? participant.pPhone;
       const keys = studentKeys(participant.studentId, participant.bu, participantKey);
       const group = findAssignment(retreat.groups, keys);
       const room = findAssignment(retreat.rooms, keys);
@@ -497,12 +502,12 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
         field("조", group ? text(group.value.name) || group.id : ""),
         field("숙소", room ? [room.value.dong, room.value.roomNumber].map(text).filter(Boolean).join(" ") || room.id : ""),
         field("부분 참석", partial.type), field("참석 일차", partial.day ? `${text(partial.day)}일차` : ""), field("부분 참석 메모", partial.note),
-        field("신청일", participant.registeredAt), field("학생 연락처", participant.phone, true), field("보호자 연락처", participant.pPhone, true),
+        field("신청일", participant.registeredAt), field("학생 연락처", phone, true), field("보호자 연락처", pPhone, true),
         field("특이사항", participant.extra, true),
       );
       const item = evidence({
         name: participant.name, personId: participant.personId,
-        sourceId: sourceIdFor(kindForAffiliation(participant.bu), meta.year, participant.studentId, participant.bu), phone: participant.phone, pPhone: participant.pPhone,
+        sourceId: sourceIdFor(kindForAffiliation(participant.bu), meta.year, participant.studentId, participant.bu), phone, pPhone,
         kind: kindForAffiliation(participant.bu), year: meta.year, contextKey: `retreat:${retreatId}`, anchor: true,
         record: { id: `retreat:${retreatId}:participant:${participantKey}`, category: "수련회", period: meta.period,
           title: "수련회 신청·배정", fields: recordFields, sortKey: `${meta.year}-2` },
@@ -530,7 +535,6 @@ function buildRetreatEvidence(data: PeopleSearchData, output: Evidence[]) {
       }
     }
 
-    const privateRoot = asRecord(asRecord(data.retreatsPrivate)[retreatId]);
     const privateNodes: Array<{ node: string; title: string; labels: Record<string, string> }> = [
       { node: "cancellations", title: "수련회 취소", labels: { bu: "부서", grade: "학년", class: "반", phone: "학생 연락처", reason: "취소 사유", paymentAmount: "납부액", account: "환불 계좌", note: "메모" } },
       { node: "medicalLogs", title: "의료 일지", labels: { bu: "부서", grade: "학년", classNum: "반", symptoms: "증상", medicines: "처방", outcome: "처리 결과", note: "메모", createdAt: "기록 시각" } },

@@ -7,7 +7,7 @@ import { normalizeName } from "@/lib/studentMatcher";
 import { resolvePaymentColorKey } from "@/lib/paymentColorKey";
 type BuTab = "1부" | "2부";
 import {
-  subscribeToParticipants, subscribeToClassesByYear, subscribeToCellColors,
+  subscribeToParticipants, subscribeToParticipantsWithContacts, subscribeToClassesByYear, subscribeToCellColors,
   subscribeToUnmatchedPayments,
   addUnmatchedPayment, resolveUnmatchedPayment,
   unresolveUnmatchedPayment, deleteUnmatchedPayment, updateUnmatchedPayment,
@@ -72,7 +72,8 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       setNameToColorKey(map);
     }, (error) => setLoadError(error.message));
 
-    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
+    const subscribeParticipants = isDesktop ? subscribeToParticipantsWithContacts : subscribeToParticipants;
+    const unsubParticipants = subscribeParticipants(retreat.id, setParticipants,
       e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
     const unsubColors   = subscribeToCellColors(retreat.id, setCellColors_,
       e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
@@ -81,7 +82,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
       setLoading(false);
     }, e => { setLoadError(prev => prev ?? `구독 실패 - ${e.message}`); setLoading(false); });
     return () => { unsubClasses(); unsubParticipants(); unsubColors(); unsubPayments(); };
-  }, [retreat.id, retreat.year]);
+  }, [isDesktop, retreat.id, retreat.year]);
 
   // 연결 패널 열릴 때 포커스
   useEffect(() => {

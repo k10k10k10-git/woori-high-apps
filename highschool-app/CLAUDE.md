@@ -150,6 +150,7 @@
 ## Firebase 안전
 
 - 기존 앱의 경로·스키마·민감정보 분리를 그대로 유지합니다. `classes`·`attendance`·`trash` 쓰기는 위 새친구 신규 학생 단건과 그 결정적 `nf_` 학생의 검증된 되돌리기 외에는 추가하지 않습니다.
+- 수련회 참가자의 본인·보호자 연락처는 `retreatsPrivate/{id}/participantContacts/{participantKey}`가 쓰기 원천입니다. `retreats/{id}/participants`에는 명단·배정용 공개 필드만 두고, 행정 화면만 필요할 때 비공개 연락처를 구독합니다. 이가드 구독에는 합치지 않습니다. 기존 공개 연락처는 마이그레이션 완료 전 읽기 하위호환만 허용합니다.
 - 새 경로는 반드시 해당 도메인의 `paths.ts`에 먼저 추가합니다.
 - `retreatsPrivate/*`, `semestersPrivate/*` 데이터가 현장 화면이나 일반 사용자에게 노출되지 않게 합니다.
 - Firebase Rules는 이 앱에서 배포하지 않습니다.

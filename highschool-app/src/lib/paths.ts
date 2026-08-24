@@ -99,6 +99,9 @@ export const paths = {
   medicalLog: (id: string, lid: string) => `retreatsPrivate/${id}/medicalLogs/${lid}`,
   teacherIdNumbers: (id: string) => `retreatsPrivate/${id}/teacherIdNumbers`,
   teacherIdNumber: (id: string, tid: string) => `retreatsPrivate/${id}/teacherIdNumbers/${tid}`,
+  participantContacts: (id: string) => `retreatsPrivate/${id}/participantContacts`,
+  participantContact: (id: string, participantKey: string) => `retreatsPrivate/${id}/participantContacts/${participantKey}`,
+  participantContactsBackups: (id: string) => `retreatsPrivate/${id}/participantContactsBackups`,
 
   // ── 접근 관리 ──
   admins: (uid: string) => `admins/${uid}`,

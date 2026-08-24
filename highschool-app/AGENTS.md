@@ -285,3 +285,8 @@ npm run build
 - **접근법**: 1→ `scripts/save-e2e-auth.mjs`로 수동 Google 로그인 뒤 로그아웃 버튼이 나타나는지 기다린다. 2→ Firebase Auth가 세션을 쿠키가 아니라 IndexedDB에 저장하는지 확인한다. 3→ `context.storageState({ path, indexedDB: true })`로 쿠키·localStorage와 IndexedDB를 함께 저장한다. 4→ 생성된 `.auth/user.json`은 gitignore 상태를 유지하고 `E2E_STORAGE_STATE=.auth/user.json npm run test:e2e:smoke`로 PC·모바일 스모크를 실행한다. 5→ 인증 파일이 없거나 만료됐을 때는 실패를 숨기지 말고 다시 수동 로그인해 갱신한다.
 - **판단 질문**: 로그인 성공 후 쿠키만 복사하거나 운영 계정 토큰을 환경변수·저장소에 넣지 않는다. Firebase 세션의 실제 원천인 IndexedDB가 빠지면 새 브라우저 컨텍스트는 다시 비로그인 상태가 되고, 토큰을 코드로 다루면 운영 계정 비밀이 유출될 수 있다.
 - **재사용 규칙**: Firebase Auth 기반 Playwright 인증은 `수동 로그인 감지 → storageState의 IndexedDB 포함 → 인증 파일 gitignore → 실제 스모크 실행 → 만료 시 재생성` 순서로 다룬다.
+
+### 공개 참가자 키를 유지하며 연락처만 비공개 경로로 옮기기 (2026-08-24)
+- **접근법**: 1→ `retreats/{id}/participants/{participantKey}`를 이가드·조편성·방배정의 공개 원장으로 유지하고 `phone`·`pPhone`만 민감 필드로 식별한다. 2→ 같은 키의 `retreatsPrivate/{id}/participantContacts/{participantKey}`를 비공개 쓰기 원천으로 추가한다. 3→ `participantPrivacy.ts`에서 공개 값과 연락처를 분리하고, 과도기 읽기는 비공개 값을 우선하되 공개 레거시 값으로 폴백한다. 4→ 전체 저장·단건 수정·재매칭·옛 백업 복구를 루트 원자 update로 바꾸고, 공개 백업 복구가 연락처를 다시 노출하지 않게 재분리한다. 5→ 운영 이관은 읽기 전용 스냅샷에서 업데이트 계획과 충돌을 먼저 만들고, 정확한 경로 수 승인 뒤 현재 노드 스냅샷·원자 update·재검증 순서로 실행하며 기존 백업은 건드리지 않는다.
+- **판단 질문**: participant key를 새로 발급하거나 공개 참가자 전체를 private로 옮기지 않는다. 키가 바뀌면 조·방·부분참·이가드 참조가 끊기고, 전체를 숨기면 현장 운영이 명단을 읽지 못한다. 옛 공개 백업의 연락처를 일괄 삭제하지도 않는다. 사용자 요청상 기존 수련회 기록과 백업은 보존해야 하고, 복구 경계에서 공개 재노출만 차단하면 된다.
+- **재사용 규칙**: 공유 원장의 일부 필드만 민감해졌다면 `공유 키 불변 → 민감 필드만 같은 키의 private sibling으로 분리 → private 우선·legacy 폴백 → 모든 쓰기·복구에서 원자 분리 → 스냅샷 dry-run과 승인 후 이관` 순서를 따른다.

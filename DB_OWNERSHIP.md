@@ -47,7 +47,7 @@
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
 | `retreats` (목록) | 행정 | 이가드 | 행정만 | 이가드 수련회 선택 화면 |
-| `retreats/{id}/participants` | 행정 | 이가드 | 행정만 | **이가드 조편성, 방배정, 부분참 전부 영향** |
+| `retreats/{id}/participants` | 행정 | 이가드 | 행정만 | **이가드 조편성, 방배정, 부분참 전부 영향**. 본인·보호자 연락처 저장 금지 |
 | `retreats/{id}/teachers` | 행정 | 이가드 | 행정만 | **이가드 스탭 명단, 조스탭, 동선·버스 성별 배정 영향** (`gender?: 남\|여`는 행정이 관리) |
 | `retreats/{id}/groups` | 행정 | 이가드 | 행정만 | 이가드 조별 뷰 |
 | `retreats/{id}/autoAssignConfig` | 행정 | - | 행정만 | 없음 (자동 조편성 입력 설정, groups 결과와 분리) |
@@ -70,6 +70,8 @@
 | `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/medicalLogs` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
+| `retreatsPrivate/{id}/participantContacts` | 행정 | - | 행정만 | 참가자 키별 본인·보호자 연락처. 공개 명단과 키를 같게 유지 |
+| `retreatsPrivate/{id}/participantContactsBackups` | 행정 | - | 행정만 | 연락처 전체 덮어쓰기 전 롤링 백업. 기존 공개 participants 백업은 이관하지 않음 |
 | `retreatAdmins` | 행정 | 이가드 | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role}` — `role`은 `pastor`/`leader`/`adminTeam`(없으면 행정팀). 다른 앱은 존재 여부(`!= null`)만 보므로 필드 추가는 호환 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
@@ -143,6 +145,7 @@
 ### 2순위: `retreats/{id}/participants`
 - 행정이 소유, 이가드가 읽음
 - 조편성(`groups`), 방배정(`rooms`), 부분참(`partialAttendances`) 참조가 participant key에 의존
+- 연락처는 같은 키의 `retreatsPrivate/{id}/participantContacts/{participantKey}`에 두고, 공개 참가자에는 저장하지 않는다. 관리자 화면은 과도기 동안 공개 레거시 값을 읽되 비공개 값을 우선한다.
 - participant key 형식이 바뀌면 이가드 전체 뷰가 깨질 수 있음
 
 ### 3순위: `retreats/{id}/teachers`

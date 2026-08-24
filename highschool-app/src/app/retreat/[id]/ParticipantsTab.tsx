@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
-import { getStudentsByYear, subscribeToStudentsByYear, saveParticipants, getParticipants, subscribeToParticipants, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
+import { getStudentsByYear, subscribeToStudentsByYear, saveParticipants, getParticipants, getParticipantsWithContacts, subscribeToParticipants, subscribeToParticipantsWithContacts, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
 import { buildExtraPreservationMaps, dedupeSheetParticipants, identityKeyOf } from "@/lib/syncParticipants";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
@@ -44,7 +44,7 @@ export default function ParticipantsTab({ retreat }: Props) {
     setError("");
     try {
       const [pData, sData, savedDups] = await Promise.all([
-        getParticipants(retreat.id),
+        isDesktop ? getParticipantsWithContacts(retreat.id) : getParticipants(retreat.id),
         getStudentsByYear(retreat.year),
         // 중복 후보는 retreatsPrivate에 있어 조회 전용 역할(스탭팀장·이가드팀)에게는 닫혀 있다.
         // 보조 정보라 실패해도 명단 자체는 보여야 한다 — 여기서 삼키고 빈 목록으로 진행한다.
@@ -72,18 +72,19 @@ export default function ParticipantsTab({ retreat }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [retreat.id, retreat.year]);
+  }, [isDesktop, retreat.id, retreat.year]);
 
   useEffect(() => {
     void loadData();
-    const unsubParticipants = subscribeToParticipants(retreat.id, setParticipants,
+    const subscribeParticipants = isDesktop ? subscribeToParticipantsWithContacts : subscribeToParticipants;
+    const unsubParticipants = subscribeParticipants(retreat.id, setParticipants,
       e => setError(prev => prev || `참가자 구독 실패: ${e.message}`));
     const unsubStudents = subscribeToStudentsByYear(retreat.year, setStudents,
       e => setError(prev => prev || `출석부 학생 구독 실패: ${e.message}`));
     const unsubColors = subscribeToCellColors(retreat.id, setCellColorsState,
       e => setError(prev => prev || `구독 실패: ${e.message}`));
     return () => { unsubParticipants(); unsubStudents(); unsubColors(); };
-  }, [loadData, retreat.id, retreat.year]);
+  }, [isDesktop, loadData, retreat.id, retreat.year]);
 
   async function syncFromSheet() {
     if (!retreat.sheetId) {

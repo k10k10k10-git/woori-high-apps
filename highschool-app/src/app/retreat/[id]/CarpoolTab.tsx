@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import { Retreat, CarPool, Participant } from "@/lib/types";
-import { subscribeToCarpools, saveCarpool, updateCarpool, deleteCarpool, subscribeToParticipants } from "@/lib/db";
+import { subscribeToCarpools, saveCarpool, updateCarpool, deleteCarpool, subscribeToParticipantsWithContacts } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
 import { useSubmitLock } from "@/lib/useSubmitLock";
 import NameAutocomplete from "./NameAutocomplete";
@@ -39,7 +39,7 @@ export default function CarpoolTab({ retreat }: Props) {
       setLoading(false);
     };
     const unsubCarpools = subscribeToCarpools(retreat.id, (next) => { setCarpools(next); markReady("carpools"); }, onError);
-    const unsubParticipants = subscribeToParticipants(retreat.id, (next) => { setParticipants(next); markReady("participants"); }, onError);
+    const unsubParticipants = subscribeToParticipantsWithContacts(retreat.id, (next) => { setParticipants(next); markReady("participants"); }, onError);
     return () => { unsubCarpools(); unsubParticipants(); };
   }, [retreat.id]);
 

@@ -140,6 +140,8 @@ firebase deploy --only database
 | `retreatsPrivate/{id}/teacherIdNumbers` | 교사 주민등록번호 | admins + retreatAdmins만 |
 | `retreatsPrivate/{id}/medicalLogs` | 의료 일지 | admins + retreatAdmins만 |
 | `retreatsPrivate/{id}/unmatchedPayments` | 미매칭 입금 정보 | admins + retreatAdmins만 |
+| `retreatsPrivate/{id}/participantContacts` | 수련회 참가자 본인·보호자 연락처 | admins + retreatAdmins만 |
+| `retreatsPrivate/{id}/participantContactsBackups` | 공개 명단과 같은 시점의 연락처 롤링 백업 | admins + retreatAdmins만 |
 
 **주의:** 이 데이터가 포함된 백업 파일은 git에 커밋하지 마세요.
 

@@ -85,6 +85,21 @@ describe("인물 통합검색", () => {
     ]));
   });
 
+  it("수련회 참가자 연락처는 비공개 경로를 우선하고 공개 레거시 값도 하위호환한다", () => {
+    const data = fixture();
+    const summer = data.retreats.summer as Record<string, unknown>;
+    summer.participants = {
+      p1: { name: "강민채", studentId: "minchae", bu: "1부", grade: 2, class: 3, phone: "010-old", pPhone: "010-parent-old" },
+    };
+    data.retreatsPrivate = { summer: { participantContacts: { p1: { phone: "010-new" } } } };
+
+    const target = buildPeopleProfiles(data).find((profile) => profile.records.some((record) => record.title === "수련회 신청·배정"));
+    const fields = target?.records.find((record) => record.title === "수련회 신청·배정")?.fields ?? [];
+
+    expect(fields).toContainEqual({ label: "학생 연락처", value: "010-new", sensitive: true });
+    expect(fields).toContainEqual({ label: "보호자 연락처", value: "010-parent-old", sensitive: true });
+  });
+
   it("같은 이름이어도 생년과 연락처가 충돌하면 동명이인으로 분리한다", () => {
     const results = searchPeople(buildPeopleProfiles(fixture()), "강민채");
     expect(results).toHaveLength(2);

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { Retreat, PartialAttendance, Participant, Student } from "@/lib/types";
-import { savePartialAttendance, deletePartialAttendance, subscribeToPartialAttendances, subscribeToParticipants, subscribeToCellColors, subscribeToStudentsByYear } from "@/lib/db";
+import { savePartialAttendance, deletePartialAttendance, subscribeToPartialAttendances, subscribeToParticipantsWithContacts, subscribeToCellColors, subscribeToStudentsByYear } from "@/lib/db";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { buildPartialPool, PartialPoolRow } from "@/lib/partialPool";
 import { isDayAttendanceOn } from "@/lib/partialAttendanceType";
@@ -67,7 +67,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
     const onError = (error: Error) => { setLoadError(error.message); setLoading(false); };
     const unsubs = [
       subscribeToPartialAttendances(retreat.id, (next) => { setRecords(next); markReady("partial"); }, onError),
-      subscribeToParticipants(retreat.id, (next) => { setParticipants(next); markReady("participants"); }, onError),
+      subscribeToParticipantsWithContacts(retreat.id, (next) => { setParticipants(next); markReady("participants"); }, onError),
       subscribeToCellColors(retreat.id, (next) => { setCellColors(next); markReady("colors"); }, onError),
       subscribeToStudentsByYear(retreat.year, (next) => { setStudents(next); markReady("students"); }, onError),
     ];
