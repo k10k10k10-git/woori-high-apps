@@ -15,7 +15,7 @@
 - 사용자 승인 후 운영 DB 스냅샷에서 계획을 다시 만들고 루트 원자 update 1,006경로를 실행했다. 결과는 수련회 2개·참가자 503명 유지, 공개 연락처 필드 503→0, 비공개 연락처 0→503, 충돌 0이다. 연락처를 제외한 공개 참가자 데이터 해시가 전후 일치했고 기존 `participantsBackups`·`participantContactsBackups`는 건드리지 않았다. 검증 후 개인정보가 든 임시 스냅샷 디렉터리는 삭제했다.
 - 사이트 요청 첨부 본문을 RTDB에서 Firebase Storage `site-requests/{uid}/{requestId}/attachment.jpg`로 분리했다(`b1811bc`). RTDB 요청에는 이름·크기·Storage 경로·다운로드 주소만 남긴다. 기존 요청은 0건이라 이관할 base64가 없었고, 분리 전 `dataUrl` 형식은 읽기 호환만 유지한다. 요청 삭제 시 Storage 파일을 먼저 삭제한다. 새 RTDB 경로·Rules 변경·Rules 배포는 없다.
 - Playwright Firebase 인증 저장 스크립트는 `storageState({ indexedDB: true })`로 고쳤다. 수동 Google 로그인 5분 제한 안에 완료되지 않아 자동 E2E 12개는 아직 실실행 전이다. 대신 로그인된 Chrome 운영 화면에서 홈과 수련회 신청 접수를 읽기 전용으로 확인했다.
-- 검증: 통합 앱 전체 **86파일 707개 테스트**, 전체 ESLint, `npx tsc --noEmit`, production build 통과. 기능 커밋 `b1811bc`와 이 문서 갱신을 main에 push하고 Vercel Production에 배포한다. Firebase Rules는 수정·배포하지 않았다.
+- 검증: 통합 앱 전체 **86파일 707개 테스트**, 전체 ESLint, `npx tsc --noEmit`, production build 통과. 기능 커밋 `b1811bc`와 문서 갱신을 main에 push하고 Vercel Production에 배포했다. 운영 `/api/version`·GitHub main 일치와 최신 Production `Ready`를 확인했다. Firebase Rules는 수정·배포하지 않았다.
 
 ## 2026-08-22 최신 작업 - 휴강 주차 제외와 공유 일정 분류 선택
 
@@ -187,7 +187,7 @@
 
 ## 지금 상태 (한 문장)
 
-학생 출석부 데모는 9월 1일까지 유지한다. 참가자 연락처 1,006경로 운영 이관과 요청 첨부 Storage 분리는 **구현·검증 완료**이며 최종 문서 커밋까지 Production 배포한다.
+학생 출석부 데모는 9월 1일까지 유지한다. 참가자 연락처 1,006경로 운영 이관과 요청 첨부 Storage 분리는 **구현·검증·main push·Production 배포 완료**다.
 
 - 최신 기능 커밋: `b1811bc` (`건의: 첨부 파일을 Storage로 분리`). 연락처 운영 이관 결과는 공개 연락처 0·비공개 503·비연락처 데이터 해시 동일이다.
 - 운영: `woorihigh-app.vercel.app` HTTP 200 / `woori-high.web.app` HTTP 200
