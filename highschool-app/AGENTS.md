@@ -280,3 +280,8 @@ npm run build
 - **접근법**: 1→ `src/features/semester/sessionKind.ts`의 `sessionWeekLabel`에서 현재 행까지 휴강이 아닌 세션만 세어 `n주차`를 만들고 휴강 행은 번호 대신 `휴강`을 반환한다. 2→ 설정·커리큘럼은 같은 함수를 써서 번호가 어긋나지 않게 한다. 3→ `src/features/portal/SharedMinistryCalendar.tsx`에 화면 분류와 기존 `sourceSite` 문자열의 양방향 매핑을 한곳에 선언한다. 4→ 일정 추가·수정 모달에서 고등부 메인·훈련·주일·수련회 행정·이가드를 명시적으로 선택하고 기존 `prepMilestones/{id}/sourceSite`에 저장한다. 5→ 휴강 전후 연속 번호와 분류별 sourceSite 왕복을 순수 테스트로 고정한다.
 - **판단 질문**: 휴강 세션을 삭제하거나 세션 ID·출석 경로를 다시 매기지 않는다. 기존 출석·커리큘럼은 세션 ID를 참조하므로 번호 때문에 원본을 바꾸면 참조가 끊긴다. 일정 분류용 새 Firebase 노드나 Rules도 만들지 않는다. `prepMilestones.sourceSite`가 이미 40자 문자열을 허용하고 있어 별도 스키마는 두 번째 진실만 만든다.
 - **재사용 규칙**: 운영 순번에서 제외할 기록이 생기면 `원본 순서·ID 유지 → 표시 번호만 순수 파생 → 모든 소비 화면에서 같은 함수 재사용`하고, 공유 레코드 분류는 새 경로보다 기존 discriminator 필드의 중앙 매핑을 먼저 확장한다.
+
+### Playwright에서 Firebase 로그인 세션을 실제 저장소까지 보존하기 (2026-08-24)
+- **접근법**: 1→ `scripts/save-e2e-auth.mjs`로 수동 Google 로그인 뒤 로그아웃 버튼이 나타나는지 기다린다. 2→ Firebase Auth가 세션을 쿠키가 아니라 IndexedDB에 저장하는지 확인한다. 3→ `context.storageState({ path, indexedDB: true })`로 쿠키·localStorage와 IndexedDB를 함께 저장한다. 4→ 생성된 `.auth/user.json`은 gitignore 상태를 유지하고 `E2E_STORAGE_STATE=.auth/user.json npm run test:e2e:smoke`로 PC·모바일 스모크를 실행한다. 5→ 인증 파일이 없거나 만료됐을 때는 실패를 숨기지 말고 다시 수동 로그인해 갱신한다.
+- **판단 질문**: 로그인 성공 후 쿠키만 복사하거나 운영 계정 토큰을 환경변수·저장소에 넣지 않는다. Firebase 세션의 실제 원천인 IndexedDB가 빠지면 새 브라우저 컨텍스트는 다시 비로그인 상태가 되고, 토큰을 코드로 다루면 운영 계정 비밀이 유출될 수 있다.
+- **재사용 규칙**: Firebase Auth 기반 Playwright 인증은 `수동 로그인 감지 → storageState의 IndexedDB 포함 → 인증 파일 gitignore → 실제 스모크 실행 → 만료 시 재생성` 순서로 다룬다.
