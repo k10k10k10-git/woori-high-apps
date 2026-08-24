@@ -43,6 +43,8 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(sundayTeamOf("praise")?.tabs).toEqual([]);
     expect(sundayTeamOf("media")?.tabs).toEqual([]);
     expect(sundayTeamOf("design")?.tabs).toEqual([]);
+    expect(SUNDAY_MINISTRY_TEAMS.filter((team) => team.status === "planned").map((team) => team.key)).toEqual(["praise", "media", "design"]);
+    expect(SUNDAY_MINISTRY_TEAMS.filter((team) => team.status === "ready").map((team) => team.key)).toEqual(["admin", "barnabas", "worship"]);
   });
 
   it("팀 없는 기존 주소는 바나바팀으로 유지해 첫 화면이 새친구 그대로다", () => {

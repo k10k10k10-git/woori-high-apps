@@ -142,9 +142,11 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
         {loadError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
         {!tab ? (
           <section className="card card-body">
-            <div className="rounded-xl border border-dashed border-slate-200 py-16 text-center">
-              <p className="text-sm font-semibold text-slate-500">{teamMeta.label} 화면은 준비 중입니다.</p>
-              <p className="mt-2 text-xs text-slate-400">사용할 기능이 정해지면 이 자리에 추가합니다.</p>
+            <div className="rounded-xl border border-dashed border-slate-200 px-5 py-14 text-center">
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-[11px] font-bold text-amber-700">기능 기획 중</span>
+              <p className="mt-4 text-base font-semibold text-slate-700">{teamMeta.label}의 실제 운영 흐름을 먼저 정리하고 있습니다.</p>
+              <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-slate-500">필요한 명단, 주간 업무, 자료 관리 방식을 사이트 건의사항으로 알려주시면 팀 화면 기획에 반영합니다.</p>
+              <button type="button" onClick={() => router.push("/suggestions")} className="btn-secondary mt-5">필요 기능 제안하기</button>
             </div>
           </section>
         ) : (

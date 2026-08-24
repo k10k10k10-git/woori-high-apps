@@ -9,12 +9,12 @@ import MyPageModal, { type MyPageTab } from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import OverlayShell from "@/components/OverlayShell";
-import { canAccessArea, canAccessSundayTeam, canManageRolesOf } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, canManageRolesOf, ownSundayTeam } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
 
-type NavItem = { href: string; label: string; hint: string };
+type NavItem = { href: string; label: string; hint: string; disabled?: boolean };
 
 /**
  * 상단 메뉴의 hover 드롭다운. 주일 사역과 방학 중 사역이 **같은 컴포넌트**를 써야
@@ -71,7 +71,16 @@ function NavDropdown({ label, items, active, open, onOpen, onClose }: {
       {open && (
         <div className="portal-dropdown-panel absolute left-0 top-full z-[70] w-56 pt-1.5">
           <div className="portal-menu">
-            {items.map((item) => (
+            {items.map((item) => item.disabled ? (
+              <div
+                key={item.href}
+                aria-disabled="true"
+                className="rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-500"
+              >
+                {item.label}
+                <span className="mt-0.5 block text-[10px] font-normal text-slate-600">{item.hint}</span>
+              </div>
+            ) : (
               <Link
                 key={item.href}
                 href={item.href}
@@ -145,6 +154,7 @@ export default function GlobalPortalHeader() {
   if (loading || !user) return null;
 
   const semesterAllowed = canAccessArea("semester", roles);
+  const assignedSundayTeam = ownSundayTeam(roles);
   // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
   // 수련회에 들어갔을 때 행정 화면이냐 현장 화면이냐만 달라진다.
   const vacationItems: NavItem[] = [
@@ -159,6 +169,9 @@ export default function GlobalPortalHeader() {
       href: sundayTeamHref(team.key),
       label: team.label,
       hint: team.hint,
+      // 기획 중 팀은 완성된 기능처럼 열지 않는다. 다만 그 팀으로 배정된
+      // 사용자는 자신의 준비 화면과 건의사항 진입을 계속 쓸 수 있다.
+      disabled: team.status === "planned" && assignedSundayTeam !== team.key,
     }));
 
   return (
@@ -268,7 +281,11 @@ export default function GlobalPortalHeader() {
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
               <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>통합 홈</Link>
               {semesterAllowed && <Link href="/semesters" aria-current={currentArea === "semester" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>학기 중 사역</Link>}
-              {semesterAllowed && sundayItems.map((item) => (
+              {semesterAllowed && sundayItems.map((item) => item.disabled ? (
+                <div key={item.href} aria-disabled="true" className="portal-mobile-link-disabled">
+                  <span>주일 사역 · {item.label}</span><small>{item.hint}</small>
+                </div>
+              ) : (
                 <Link key={item.href} href={item.href} aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>
                   <span>주일 사역 · {item.label}</span><small>{item.hint}</small>
                 </Link>

@@ -27,8 +27,9 @@ import {
   describeRolesHint,
   retreatEntryHref,
 } from "./accessPolicy";
-import SharedMinistryCalendar, { calendarKindForSourceSite, calendarSourceSiteForKind, CALENDAR_KIND_STYLE, SHARED_CALENDAR_KIND_OPTIONS, type SharedCalendarItem } from "./SharedMinistryCalendar";
+import SharedMinistryCalendar, { calendarKindForSourceSite, calendarSourceSiteForKind, SHARED_CALENDAR_KIND_OPTIONS, type SharedCalendarItem } from "./SharedMinistryCalendar";
 import { buildHomeActions } from "./homeActions";
+import HomeAgendaSummary from "./HomeAgendaSummary";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
 import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dailyMinistryMessage";
 
@@ -239,19 +240,7 @@ export default function PortalHome() {
             <h1 className="page-title">{friendlyName}, {dailyMessage.encouragement}</h1>
             <p className="page-description">{dailyMessage.verse.text} · {dailyMessage.verse.reference}</p>
           </div>
-          <div className="hero-agenda" aria-label="공유 사역 캘린더 할 일">
-            <p className="hero-agenda__title">공유 캘린더 할 일</p>
-            <div className="mt-2 grid gap-1.5">
-              {homeActions.slice(0, 3).map((item) => (
-                <div key={item.id} className="hero-agenda__row">
-                  <span className={`hero-agenda__dot ${CALENDAR_KIND_STYLE[item.kind].dot}`} />
-                  <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                  <span className="shrink-0 tabular-nums text-slate-300">{item.dayLabel}</span>
-                </div>
-              ))}
-              {homeActions.length === 0 && <p className="py-2 text-xs text-slate-300">예정된 일정이 없습니다.</p>}
-            </div>
-          </div>
+          <HomeAgendaSummary actions={homeActions} />
         </section>
 
         <section className="grid gap-5 lg:grid-cols-3">
