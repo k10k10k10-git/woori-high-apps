@@ -9,6 +9,7 @@ import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import RetreatParticipantMobileList from "./RetreatParticipantMobileList";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import DuplicateApplicationsSection from "./DuplicateApplicationsSection";
 
 interface Props {
   retreat: Retreat;
@@ -19,23 +20,6 @@ function stripRaw(p: Participant): Omit<Participant, "raw"> {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- raw는 의도적으로 버림
   const { raw: _raw, ...rest } = p;
   return rest;
-}
-
-/** raw를 {h,v} 쌍 배열로 정규화 — 배열(현행) 외에 구버전 Record 형태가 저장돼 있어도 안전하게 처리.
- *  값이 빈 열도 유지한다(예: "기타 사항" — 안 적은 사람이 많아도 열은 항상 표시). */
-function rawPairsOf(raw: unknown): { h: string; v: string }[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) {
-    return (raw as { h?: string; v?: string }[])
-      .filter(p => p?.h)
-      .map(p => ({ h: p.h!, v: p.v ?? "" }));
-  }
-  if (typeof raw === "object") {
-    return Object.entries(raw as Record<string, string>)
-      .filter(([h]) => h)
-      .map(([h, v]) => ({ h, v: String(v ?? "") }));
-  }
-  return [];
 }
 
 export default function ParticipantsTab({ retreat }: Props) {
@@ -53,7 +37,7 @@ export default function ParticipantsTab({ retreat }: Props) {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState<SyncDuplicateGroup[]>([]);
-  const [showDuplicates, setShowDuplicates] = useState(true);
+  const [showDuplicates, setShowDuplicates] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -434,93 +418,13 @@ export default function ParticipantsTab({ retreat }: Props) {
         </div>
       )}
 
-      {/* 중복 신청 — 항상 표시 */}
-      <div className="mb-4 border border-purple-200 rounded-lg overflow-hidden">
-        <button
-          className="w-full flex items-center justify-between px-4 py-3 bg-purple-50 text-left"
-          onClick={() => setShowDuplicates(v => !v)}
-        >
-          <span className="text-sm font-semibold text-purple-700">
-            🔁 중복 신청 {duplicates.length}명
-            {duplicates.length === 0
-              ? <span className="ml-2 font-normal text-green-500 text-xs">중복 없음 ✓</span>
-              : <span className="ml-2 font-normal text-purple-500 text-xs">기본은 최초 신청 유지, 필요 시 아래에서 다른 신청 선택 가능</span>}
-          </span>
-          <span className="text-purple-400 text-xs">{showDuplicates ? "▲ 접기" : "▼ 펼치기"}</span>
-        </button>
-        {showDuplicates && duplicates.map((d, i) => (
-          <div key={i} className="border-t border-purple-100">
-            <div className="px-4 py-2 bg-purple-50/50">
-              <span className="text-sm font-bold text-purple-800">{d.name}</span>
-              <span className="text-xs text-purple-500 ml-2">{d.bu} · {d.entries.length}회 신청</span>
-            </div>
-            {(() => {
-              const resolvedIndex = d.resolvedIndex ?? 0;
-              // 그룹 내 모든 신청의 시트 열 헤더 합집합 — 첫 등장 순서 유지 (같은 시트라 대부분 동일)
-              const rawHeaders: string[] = [];
-              d.entries.forEach(e => rawPairsOf(e.raw).forEach(({ h }) => { if (!rawHeaders.includes(h)) rawHeaders.push(h); }));
-              return (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-purple-50/30">
-                        <th className="px-4 py-1.5 text-center text-purple-600 font-medium">유지</th>
-                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium">#</th>
-                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium whitespace-nowrap">신청일시</th>
-                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium">성별</th>
-                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium">부</th>
-                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium whitespace-nowrap">학년/반</th>
-                        <th className="px-4 py-1.5 text-left text-purple-600 font-medium whitespace-nowrap">상태</th>
-                        {rawHeaders.map(h => (
-                          <th key={h} className="px-4 py-1.5 text-left text-purple-600 font-medium max-w-[220px] truncate" title={h}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-purple-50">
-                      {d.entries.map((e, j) => {
-                        // 구글폼이 1부/2부 등으로 분기되면 같은 질문 텍스트("몇 학년 인가요?" 등)의 열이
-                        // 시트에 중복으로 존재할 수 있다 — 응답자가 실제로 답한 분기의 값이 먼저 나와도
-                        // 뒤에 나오는 미응답 분기의 빈 값에 덮여 "—"로 보이는 문제가 있었다.
-                        // 값이 있는 쪽을 우선하도록(빈 값이 이미 채워진 값을 덮지 않도록) 처리.
-                        const pairs = new Map<string, string>();
-                        rawPairsOf(e.raw).forEach(({ h, v }) => {
-                          if (!pairs.has(h) || (!pairs.get(h) && v)) pairs.set(h, v);
-                        });
-                        return (
-                          <tr key={j} className={j === resolvedIndex ? "bg-green-50/40" : "bg-white"}>
-                            <td className="px-4 py-2 text-center">
-                              <input
-                                type="radio"
-                                name={`dup-${i}`}
-                                checked={j === resolvedIndex}
-                                disabled={!d.participantKey}
-                                onChange={() => chooseDuplicateEntry(i, j)}
-                                aria-label={`${d.name}의 ${j + 1}번째 신청을 유지`}
-                              />
-                            </td>
-                            <td className="px-4 py-2 text-slate-400 whitespace-nowrap">{j + 1}{j === resolvedIndex && <span className="ml-1 text-green-600 font-semibold">유지</span>}</td>
-                            <td className="px-4 py-2 text-slate-700 font-medium whitespace-nowrap">{e.registeredAt || "없음"}</td>
-                            <td className="px-4 py-2 text-slate-500">{e.gender || "없음"}</td>
-                            <td className="px-4 py-2 whitespace-nowrap"><span className={`tag ${e.bu?.includes("1") ? "tag-green" : "tag-purple"}`}>{e.bu}</span></td>
-                            <td className="px-4 py-2 text-slate-600 whitespace-nowrap">{e.grade > 0 ? `${e.grade}학년 ${e.class > 0 ? e.class + "반" : ""}` : "없음"}</td>
-                            <td className="px-4 py-2 whitespace-nowrap">{j !== resolvedIndex && <span className="text-red-400 font-medium">제거됨</span>}</td>
-                            {rawHeaders.map(h => {
-                              const v = pairs.get(h) || "";
-                              return (
-                                <td key={h} className="px-4 py-2 text-slate-500 whitespace-nowrap max-w-[220px] truncate" title={v}>{v || "없음"}</td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
-          </div>
-        ))}
-      </div>
+      <DuplicateApplicationsSection
+        duplicates={duplicates}
+        expanded={showDuplicates}
+        isDesktop={isDesktop}
+        onToggle={() => setShowDuplicates(value => !value)}
+        onChoose={chooseDuplicateEntry}
+      />
 
       {/* 불일치 / 미매칭 / 수동매칭 — 항상 표시 */}
       <div className="mb-4 border border-orange-200 rounded-lg overflow-x-auto">
