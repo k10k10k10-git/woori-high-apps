@@ -10,6 +10,7 @@ import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import OverlayShell from "@/components/OverlayShell";
+import { useViewMode } from "@/context/ViewModeContext";
 import { canAccessArea, canAccessSundayTeam, canManageRolesOf, ownSundayTeam } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
@@ -120,6 +121,7 @@ const AREA_LABEL: Record<GlobalArea, string> = {
 export default function GlobalPortalHeader() {
   const pathname = usePathname();
   const { user, loading, roles, signOut } = useAuth();
+  const { mode, isViewportMobile } = useViewMode();
   const [myPageOpen, setMyPageOpen] = useState(false);
   const [myPageInitialTab, setMyPageInitialTab] = useState<MyPageTab>("dashboard");
   const [openMenu, setOpenMenu] = useState<"sunday" | "vacation" | null>(null);
@@ -154,6 +156,8 @@ export default function GlobalPortalHeader() {
 
   if (loading || !user) return null;
 
+  const isMobilePreview = !isViewportMobile && mode === "mobile";
+
   const semesterAllowed = canAccessArea("semester", roles);
   const assignedSundayTeam = ownSundayTeam(roles);
   // 방학 중 사역은 드롭다운 두 갈래. 두 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고,
@@ -174,6 +178,35 @@ export default function GlobalPortalHeader() {
       // 사용자는 자신의 준비 화면과 건의사항 진입을 계속 쓸 수 있다.
       disabled: team.status === "planned" && assignedSundayTeam !== team.key,
     }));
+
+  // PC에서 모바일버전을 볼 때 이 헤더는 사이트 내비게이션이 아니라 미리보기
+  // 제어 막대만 담당한다. 실제 모바일 헤더와 메뉴는 430px 프레임 안의 앱이 렌더한다.
+  if (isMobilePreview) {
+    return (
+      <>
+        <header className="portal-preview-toolbar" aria-label="모바일 미리보기 제어">
+          <div className="portal-preview-toolbar__inner">
+            <Link href="/" className="portal-preview-toolbar__brand" aria-label="분당우리교회 서현고등부 홈으로">
+              <span className="portal-brand-mark">W</span>
+              <span>모바일 화면 미리보기</span>
+            </Link>
+            <div className="portal-preview-toolbar__controls">
+              <ViewModeToggle />
+              <ThemeToggle showLabel />
+              <button onClick={() => openMyPage()} className="portal-compact-action">
+                <span>마이페이지</span>
+              </button>
+              <span className="portal-account-name">{user.displayName || user.email}</span>
+              <button onClick={() => void signOut()} className="portal-compact-action" aria-label="로그아웃">
+                <span>로그아웃</span>
+              </button>
+            </div>
+          </div>
+        </header>
+        {myPageOpen && <MyPageModal initialTab={myPageInitialTab} onClose={() => setMyPageOpen(false)} />}
+      </>
+    );
+  }
 
   return (
     <>

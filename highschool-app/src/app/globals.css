@@ -953,20 +953,55 @@ table th {
 .view-mode-toggle button[aria-pressed="true"] { background: rgba(125,226,188,.14); color: var(--color-on-dark-primary); }
 .view-mode-toggle button:hover { background: rgba(255,255,255,.07); color: white; }
 .portal-content-frame { min-width: 0; }
-html[data-view-preview="true"] body { background: #dfe5e2; }
-html[data-view-preview="true"] .portal-content-frame {
-  width: min(430px, calc(100vw - 32px));
-  min-height: calc(100dvh - 70px);
-  margin: 16px auto 28px;
-  overflow-x: clip;
-  border-radius: 22px;
-  background: var(--color-bg);
-  box-shadow: 0 24px 80px rgba(16,32,25,.2);
-}
+html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
 [data-theme="dark"][data-view-preview="true"] body { background: #070c09; }
 
-/* Mobile workspaces are rendered from the same routes. These selectors also power
-   the desktop-side mobile preview, where viewport media queries do not fire. */
+.portal-preview-toolbar {
+  height: 52px;
+  border-bottom: 1px solid rgba(255,255,255,.09);
+  background: #202423;
+  color: var(--color-on-dark-primary);
+}
+.portal-preview-toolbar__inner {
+  display: flex;
+  width: calc(100% - 24px);
+  height: 100%;
+  margin-inline: auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.portal-preview-toolbar__brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-on-dark-primary);
+  font-size: 13px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+.portal-preview-toolbar__brand .portal-brand-mark { width: 32px; height: 32px; border-radius: 10px; }
+.portal-preview-toolbar__controls { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 7px; }
+.portal-mobile-preview-stage {
+  display: grid;
+  height: calc(100dvh - 52px);
+  overflow: auto;
+  place-items: start center;
+  padding: 16px;
+  overscroll-behavior: contain;
+}
+.portal-mobile-preview-frame {
+  width: min(430px, calc(100vw - 32px));
+  height: min(844px, calc(100dvh - 84px));
+  border: 0;
+  border-radius: 24px;
+  background: var(--color-bg);
+  box-shadow: 0 24px 80px rgba(16,32,25,.24);
+}
+[data-theme="dark"] .portal-mobile-preview-frame { box-shadow: 0 24px 80px rgba(0,0,0,.55); }
+
+/* 모바일 업무 화면은 실제 휴대폰과 PC의 430px 미리보기 iframe이 같은 규칙을 쓴다. */
 .mobile-workspace-tabs,
 .iguard-mobile-tabs {
   display: grid;
@@ -1102,46 +1137,7 @@ html[data-view-mode="mobile"] .overlay-shell--fullscreen-mobile .overlay-shell__
 }
 html[data-view-mode="mobile"] .overlay-panel-body { overscroll-behavior: contain; }
 
-/* A manually selected mobile view keeps the global controls on desktop while
-   reproducing the compact area header inside the preview frame. */
-html[data-view-preview="true"] .global-portal-header { height: 60px; }
-html[data-view-preview="true"] .global-portal-inner { width: calc(100% - 24px); flex-wrap: nowrap; gap: 8px; }
-html[data-view-preview="true"] .portal-nav { display: none; }
-html[data-view-preview="true"] .portal-mobile-area { display: flex; max-width: 240px; min-height: 38px; flex: 1; }
-html[data-view-preview="true"] .portal-brand-name { display: none; }
-html[data-view-preview="true"] .portal-header-tools { margin-left: auto; }
-html[data-view-preview="true"] .workspace-sticky-header { position: relative; top: auto; }
-html[data-view-preview="true"] .portal-content-frame main { max-width: 100%; padding-left: 16px; padding-right: 16px; }
-html[data-view-preview="true"] .portal-content-frame .sm\:px-4,
-html[data-view-preview="true"] .portal-content-frame .sm\:px-6 { padding-left: 16px; padding-right: 16px; }
-html[data-view-preview="true"] .portal-content-frame .sm\:py-8 { padding-top: 24px; padding-bottom: 24px; }
-html[data-view-preview="true"] .portal-content-frame .sm\:grid-cols-2,
-html[data-view-preview="true"] .portal-content-frame .sm\:grid-cols-3,
-html[data-view-preview="true"] .portal-content-frame .sm\:grid-cols-4,
-html[data-view-preview="true"] .portal-content-frame .md\:grid-cols-2,
-html[data-view-preview="true"] .portal-content-frame .md\:grid-cols-3,
-html[data-view-preview="true"] .portal-content-frame .md\:grid-cols-4,
-html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-2,
-html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-3,
-html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-4,
-html[data-view-preview="true"] .portal-content-frame .xl\:grid-cols-2,
-html[data-view-preview="true"] .portal-content-frame .xl\:grid-cols-3,
-html[data-view-preview="true"] .portal-content-frame .xl\:grid-cols-4,
-html[data-view-preview="true"] .portal-content-frame [class*="sm:grid-cols-["],
-html[data-view-preview="true"] .portal-content-frame [class*="md:grid-cols-["],
-html[data-view-preview="true"] .portal-content-frame [class*="lg:grid-cols-["],
-html[data-view-preview="true"] .portal-content-frame [class*="xl:grid-cols-["] { grid-template-columns: minmax(0, 1fr) !important; }
-html[data-view-preview="true"] .portal-content-frame :where(.sm\:flex-row, .md\:flex-row, .lg\:flex-row, .xl\:flex-row) { flex-direction: column !important; }
-html[data-view-preview="true"] .home-hero {
-  min-height: 0;
-  align-items: stretch !important;
-  grid-template-columns: minmax(0, 1fr) !important;
-  gap: 18px;
-  border-radius: 18px;
-  padding: 24px 20px;
-}
-html[data-view-preview="true"] .home-hero .page-title { font-size: 27px; line-height: 1.28; word-break: keep-all; }
-html[data-view-preview="true"] .home-hero .page-description { font-size: 13px; line-height: 1.65; }
+/* 바깥 PC 제어 막대에서 여는 마이페이지도 휴대폰 너비 안에서 확인한다. */
 html[data-view-preview="true"] .overlay-shell--fullscreen-mobile .overlay-shell__panel {
   width: min(430px, calc(100vw - 32px));
   height: min(860px, calc(100dvh - 32px));

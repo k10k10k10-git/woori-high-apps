@@ -80,11 +80,19 @@ describe("모바일 운영 화면 계약", () => {
     expect(header).not.toContain("teamOpen");
   });
 
-  it("PC 모바일 미리보기는 임의값 반응형 그리드와 홈 히어로를 한 열로 되돌린다", () => {
+  it("PC 모바일 미리보기는 CSS 축소가 아니라 실제 430px 모바일 앱을 실행한다", () => {
+    const layout = source("src/app/layout.tsx");
+    const shell = source("src/components/PortalViewportShell.tsx");
+    const header = source("src/features/portal/GlobalPortalHeader.tsx");
     const css = source("src/app/globals.css");
-    expect(css).toContain('[class*="lg:grid-cols-["]');
-    expect(css).toContain('html[data-view-preview="true"] .home-hero');
-    expect(css).toContain("grid-template-columns: minmax(0, 1fr) !important;");
-    expect(css).toContain('html[data-view-preview="true"] .home-hero .page-title { font-size: 27px;');
+    expect(layout).toContain("<PortalViewportShell>{children}</PortalViewportShell>");
+    expect(shell).toContain('const isMobilePreview = !isViewportMobile && mode === "mobile"');
+    expect(shell).toContain('<iframe');
+    expect(shell).toContain('className="portal-mobile-preview-frame"');
+    expect(shell).toContain('title="고등부 통합사이트 모바일 화면"');
+    expect(header).toContain("모바일 화면 미리보기");
+    expect(css).toContain("width: min(430px, calc(100vw - 32px));");
+    expect(css).toContain("height: min(844px, calc(100dvh - 84px));");
+    expect(css).not.toContain('html[data-view-preview="true"] .home-hero');
   });
 });

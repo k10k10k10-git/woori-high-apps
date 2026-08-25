@@ -3,9 +3,7 @@ import "./globals.css";
 import "./operations-tables.css";
 import Providers from "./providers";
 import UpdateBanner from "./UpdateBanner";
-import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
-import ConnectivityBanner from "./ConnectivityBanner";
-import SuggestionResolutionNotifier from "@/features/suggestions/SuggestionResolutionNotifier";
+import PortalViewportShell from "@/components/PortalViewportShell";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://woorihigh-app.vercel.app"),
@@ -64,10 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <UpdateBanner />
         <Providers>
-          <ConnectivityBanner />
-          <SuggestionResolutionNotifier />
-          <GlobalPortalHeader />
-          <div className="portal-content-frame">{children}</div>
+          <PortalViewportShell>{children}</PortalViewportShell>
         </Providers>
       </body>
     </html>
