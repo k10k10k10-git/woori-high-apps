@@ -235,7 +235,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           placeholder="학생·스탭 이름 검색"
           className="input mt-1.5 text-sm"
         />
-        <p className="mt-2 text-xs text-slate-400">이름을 입력해 신청을 접수하거나 수정합니다.</p>
+        <p className="mt-2 text-xs text-slate-400">이름을 검색해 신청을 접수하거나 삭제합니다.</p>
         {query.trim() && (
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {queryResults.map(({ bucket, row }) => {
