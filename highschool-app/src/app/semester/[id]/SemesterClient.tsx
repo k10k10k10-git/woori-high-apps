@@ -20,6 +20,7 @@ import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import { SEMESTER_TRAINING_TABS } from "@/features/portal/featureCatalog";
 import LoginButton from "@/components/LoginButton";
+import { useViewMode } from "@/context/ViewModeContext";
 import IntakeTab from "./IntakeTab";
 import AssignTab from "./AssignTab";
 import AttendanceTab from "./AttendanceTab";
@@ -28,6 +29,15 @@ import ArchiveTab from "./ArchiveTab";
 import SettingsTab from "./SettingsTab";
 
 type TabName = (typeof SEMESTER_TRAINING_TABS)[number];
+type MobileSection = "출석" | "신청·배치" | "커리큘럼" | "운영";
+
+const MOBILE_SECTIONS: readonly MobileSection[] = ["출석", "신청·배치", "커리큘럼", "운영"];
+
+function mobileSectionOf(tab: TabName): MobileSection {
+  if (tab === "신청" || tab === "배치") return "신청·배치";
+  if (tab === "아카이브" || tab === "설정") return "운영";
+  return tab;
+}
 
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   신청: { title: "훈련·사역팀 신청 및 삭제", description: "이름으로 찾아 신청을 접수하거나 삭제합니다." },
@@ -52,9 +62,10 @@ function validInitialTab(value?: string): TabName {
 export default function SemesterClient({ semesterId, initialTab }: { semesterId: string; initialTab?: string }) {
   const router = useRouter();
   const { user, loading: authLoading, roles, signIn } = useAuth();
+  const { isMobileView } = useViewMode();
   const allowed = canAccessArea("semester", roles);
   const canEdit = canEditArea("semester", roles);
-  const [tab, setTab] = useState<TabName>(() => validInitialTab(initialTab));
+  const [pickedTab, setPickedTab] = useState<TabName | null>(null);
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
@@ -79,7 +90,24 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
     () => canEdit ? SEMESTER_TRAINING_TABS : SEMESTER_TRAINING_TABS.filter((name) => name !== "설정"),
     [canEdit],
   );
-  const activeTab = visibleTabs.includes(tab) ? tab : visibleTabs[0];
+  const defaultTab = isMobileView ? "출석" : validInitialTab(initialTab);
+  const activeTab = pickedTab && visibleTabs.includes(pickedTab)
+    ? pickedTab
+    : visibleTabs.includes(defaultTab) ? defaultTab : visibleTabs[0];
+  const mobileSection = mobileSectionOf(activeTab);
+
+  function selectMobileSection(section: MobileSection) {
+    if (section === "신청·배치") {
+      setPickedTab(activeTab === "신청" || activeTab === "배치" ? activeTab : "신청");
+      return;
+    }
+    if (section === "운영") {
+      const operatingTab = activeTab === "아카이브" || activeTab === "설정" ? activeTab : "아카이브";
+      setPickedTab(operatingTab === "설정" && !canEdit ? "아카이브" : operatingTab);
+      return;
+    }
+    setPickedTab(section);
+  }
 
   if (authLoading) return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
   if (!user) return <main className="min-h-screen flex flex-col items-center justify-center gap-4"><p className="text-sm text-slate-500">로그인이 필요합니다</p><LoginButton signIn={signIn} /></main>;
@@ -94,7 +122,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
           <div className="mx-auto max-w-6xl px-4">
             <div className="flex min-w-0 items-center gap-1.5 py-3 sm:gap-3">
               <button onClick={() => router.push("/semesters")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="학기 목록으로 돌아가기">← 목록</button>
-              <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>{semesterId}</span>
+              <button onClick={() => router.push("/semesters")} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }} aria-label="학기 선택">{semesterId}</button>
               <h1 className="min-w-0 flex-1 truncate text-xs font-bold text-white sm:text-base">{meta?.title ?? "학기 중 사역"}</h1>
               {!canEdit && <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">조회 전용</span>}
             </div>
@@ -102,15 +130,32 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
         </div>
         <div className="workspace-tabs">
           <div className="mx-auto max-w-6xl px-0 sm:px-4">
-            <div className="tab-scroll-container flex gap-0 overflow-x-auto scrollbar-hide" role="tablist" aria-label="훈련·사역팀 탭">
-              {visibleTabs.map((name) => <button key={name} role="tab" aria-selected={activeTab === name} aria-controls="tab-content-panel" onClick={() => setTab(name)} className="workspace-tab">{tabLabel(name)}</button>)}
-            </div>
+            {isMobileView ? (
+              <div className="mobile-workspace-tabs" role="tablist" aria-label="학기 중 사역 주요 업무">
+                {MOBILE_SECTIONS.map((section) => <button key={section} role="tab" aria-selected={mobileSection === section} aria-controls="tab-content-panel" onClick={() => selectMobileSection(section)}>{section}</button>)}
+              </div>
+            ) : (
+              <div className="tab-scroll-container flex gap-0 overflow-x-auto scrollbar-hide" role="tablist" aria-label="훈련·사역팀 탭">
+                {visibleTabs.map((name) => <button key={name} role="tab" aria-selected={activeTab === name} aria-controls="tab-content-panel" onClick={() => setPickedTab(name)} className="workspace-tab">{tabLabel(name)}</button>)}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {loadError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
+        {isMobileView && mobileSection === "신청·배치" && (
+          <div className="mobile-subtabs" role="tablist" aria-label="신청과 배치">
+            {(["신청", "배치"] as const).map((name) => <button key={name} role="tab" aria-selected={activeTab === name} onClick={() => setPickedTab(name)}>{name === "신청" ? "신청 및 삭제" : name}</button>)}
+          </div>
+        )}
+        {isMobileView && mobileSection === "운영" && (
+          <div className="mobile-subtabs" role="tablist" aria-label="학기 운영">
+            <button role="tab" aria-selected={activeTab === "아카이브"} onClick={() => setPickedTab("아카이브")}>자료 보관</button>
+            {canEdit && <button role="tab" aria-selected={activeTab === "설정"} onClick={() => setPickedTab("설정")}>학기 설정</button>}
+          </div>
+        )}
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="section-kicker">{tabLabel(activeTab)}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p></div>
           <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 주차 {sessions.filter((session) => session.type !== "휴강").length}주{sessions.some((session) => session.type === "휴강") ? ` · 휴강 ${sessions.filter((session) => session.type === "휴강").length}일` : ""}</p>

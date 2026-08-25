@@ -67,7 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ConnectivityBanner />
           <SuggestionResolutionNotifier />
           <GlobalPortalHeader />
-          {children}
+          <div className="portal-content-frame">{children}</div>
         </Providers>
       </body>
     </html>

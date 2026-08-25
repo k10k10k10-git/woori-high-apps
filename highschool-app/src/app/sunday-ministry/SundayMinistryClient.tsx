@@ -7,7 +7,9 @@ import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canAccessSundayTeam, canEditSundayTeam, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
 import {
   SUNDAY_MINISTRY_DEFAULT_TEAM,
+  SUNDAY_MINISTRY_TEAMS,
   SUNDAY_MINISTRY_TABS,
+  sundayTeamHref,
   sundayTeamOf,
   type SundayTeamKey,
 } from "@/features/portal/featureCatalog";
@@ -32,6 +34,7 @@ import WorshipDutyTab from "@/features/sundayWorship/WorshipDutyTab";
 import WorshipSeatingTab from "@/features/sundayWorship/WorshipSeatingTab";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import NewFriendsTab from "../semester/[id]/NewFriendsTab";
+import { useViewMode } from "@/context/ViewModeContext";
 
 type SundayTab = (typeof SUNDAY_MINISTRY_TABS)[number];
 
@@ -49,10 +52,13 @@ const TAB_INTRO: Record<SundayTab, { title: string; description: string }> = {
 export default function SundayMinistryClient({ team, initialTab }: { team?: SundayTeamKey; initialTab?: string }) {
   const router = useRouter();
   const { user, loading: authLoading, roles, signIn } = useAuth();
+  const { isMobileView } = useViewMode();
   // 팀 단위로 판정한다. 사역팀은 자기 팀 하나만 열리고 옆 팀은 주소를 직접 쳐도 막힌다.
   // 팀이 배정되지 않은 사람은 들어갈 팀이 없으므로 진입 자체가 막힌다.
   const landingTeam = ownSundayTeam(roles) ?? SUNDAY_MINISTRY_DEFAULT_TEAM;
   const teamMeta = sundayTeamOf(team) ?? sundayTeamOf(landingTeam)!;
+  const mobileTeamChooser = isMobileView && team === undefined;
+  const accessibleTeams = SUNDAY_MINISTRY_TEAMS.filter((item) => canAccessSundayTeam(item.key, roles));
   const allowed = canAccessArea("sunday", roles) && canAccessSundayTeam(teamMeta.key, roles);
   const canEdit = canEditSundayTeam(teamMeta.key, roles);
   const tabs = teamMeta.tabs as readonly SundayTab[];
@@ -114,6 +120,36 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
     );
   }
 
+  if (mobileTeamChooser) {
+    return (
+      <div className="semester-scope">
+        <header className="workspace-sticky-header workspace-header">
+          <div className="mx-auto max-w-6xl px-4">
+            <div className="flex min-w-0 items-center gap-2 py-3">
+              <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white">← 홈</button>
+              <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200">주일 사역</span>
+              <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white">팀 선택</h1>
+            </div>
+          </div>
+        </header>
+        <main className="mx-auto max-w-xl px-4 py-5">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-slate-900">어느 팀의 업무를 볼까요?</h2>
+            <p className="mt-1 text-sm text-slate-500">팀을 선택하면 해당 주일 업무만 보여줍니다.</p>
+          </div>
+          <div className="sunday-team-picker">
+            {accessibleTeams.map((item) => (
+              <button key={item.key} type="button" onClick={() => router.push(sundayTeamHref(item.key))} disabled={item.status === "planned" && ownSundayTeam(roles) !== item.key}>
+                <span><strong>{item.label}</strong><small>{item.hint}</small></span>
+                <span aria-hidden="true">→</span>
+              </button>
+            ))}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="semester-scope">
       <header className="workspace-sticky-header">
@@ -122,7 +158,11 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
             <div className="flex min-w-0 items-center gap-2 py-3 sm:gap-3">
               <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="통합 홈으로 돌아가기">← 홈</button>
               <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">주일 사역</span>
-              <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
+              {isMobileView ? (
+                <button type="button" onClick={() => router.push("/sunday-ministry")} className="min-w-0 flex-1 truncate text-left text-sm font-bold text-white" aria-label="주일 사역 팀 변경">{teamMeta.label} ▼</button>
+              ) : (
+                <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
+              )}
               {!canEdit && <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 sm:text-xs">조회 전용</span>}
             </div>
           </div>

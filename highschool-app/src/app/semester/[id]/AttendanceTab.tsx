@@ -23,6 +23,7 @@ import { semesterRoster, type SemesterRosterScope } from "@/features/semester/ro
 import { sessionDateLabel, sessionIncludesDate } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import { Application, AttendanceStatus, CompletionEntry, SemesterMeta, Session, SessionAttendance, Team, TrainingClass } from "@/features/semester/types";
+import { useViewMode } from "@/context/ViewModeContext";
 
 interface Props {
   sid: string;
@@ -48,6 +49,7 @@ function todayYMD(): string {
 export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
+  const { isMobileView } = useViewMode();
   const canEdit = useSemesterCanEdit();
   const [sessId, setSessId] = useState<string>("");
   const [teamFilter, setTeamFilter] = useState<string>("");
@@ -56,8 +58,10 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [att, setAtt] = useState<SessionAttendance>({});
   const [attAll, setAttAll] = useState<Record<string, SessionAttendance>>({});
   const [completion, setCompletion] = useState<Record<string, CompletionEntry>>({});
-  const [view, setView] = useState<"grid" | "session">("grid");
+  const [pickedView, setPickedView] = useState<"grid" | "session" | null>(null);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const view = pickedView ?? (isMobileView ? "session" : "grid");
   const defaultSessId = useMemo(() => {
     if (sessions.length === 0) return "";
     const today = todayYMD();
@@ -102,10 +106,24 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   );
 
   async function markAt(appKey: string, sessionId: string, status: AttendanceStatus) {
+    setSaveState("saving");
     try {
       await setAttendance(sid, sessionId, appKey, status, user?.uid);
+      setSaveState("saved");
     } catch (e) {
+      setSaveState("error");
       toast(`기록 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async function clearAt(appKey: string, sessionId: string) {
+    setSaveState("saving");
+    try {
+      await clearAttendance(sid, sessionId, appKey);
+      setSaveState("saved");
+    } catch (error) {
+      setSaveState("error");
+      toast(`기록 삭제 실패: ${error instanceof Error ? error.message : String(error)}`, "error");
     }
   }
 
@@ -138,7 +156,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         </div>
       )}
 
-      <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+      <div className="mobile-sticky-controls mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="출석 명단 구분">
           <button
             role="tab"
@@ -224,7 +242,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="출석 보기 방식">
           {([["grid", "표로 보기"], ["session", "주차별 체크"]] as const).map(([key, label]) => (
-            <button key={key} role="tab" aria-selected={view === key} onClick={() => setView(key)}
+            <button key={key} role="tab" aria-selected={view === key} onClick={() => setPickedView(key)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${view === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
               {label}
             </button>
@@ -242,7 +260,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           completion={completion}
           completionMinRate={meta?.completionRule?.minRate ?? 0.7}
           onMark={(appKey, sessionId, status) => void markAt(appKey, sessionId, status)}
-          onClear={(appKey, sessionId) => void clearAttendance(sid, sessionId, appKey)}
+          onClear={(appKey, sessionId) => void clearAt(appKey, sessionId)}
           onToggleCompletion={(appKey, field, value) => void toggleCompletion(appKey, field, value)}
         />
       ) : (
@@ -291,7 +309,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                 ))}
                 {entry && canEdit && (
                   <button
-                    onClick={() => void clearAttendance(sid, activeSessId, m.id)}
+                    onClick={() => void clearAt(m.id, activeSessId)}
                     aria-label={`${m.name} 기록 지우기`}
                     className="px-1.5 text-xs text-slate-300 hover:text-slate-600"
                   >
@@ -309,6 +327,11 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         )}
       </ul>
       </>
+      )}
+      {isMobileView && canEdit && saveState !== "idle" && (
+        <div className={`mobile-save-state mobile-save-state--${saveState}`} role="status" aria-live="polite">
+          {saveState === "saving" ? "출석을 저장하고 있습니다" : saveState === "saved" ? "출석이 저장되었습니다" : "저장하지 못했습니다. 다시 선택해 주세요"}
+        </div>
       )}
     </div>
   );

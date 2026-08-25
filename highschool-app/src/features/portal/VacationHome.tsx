@@ -8,8 +8,9 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import RetreatCalendarPanel from "@/app/RetreatCalendarPanel";
 import type { Retreat } from "@/lib/types";
-import { canCreateRetreat, canEditArea, type MinistryRoles } from "./accessPolicy";
+import { canAccessArea, canCreateRetreat, canEditArea, type MinistryRoles } from "./accessPolicy";
 import NewRetreatButton from "./NewRetreatButton";
+import { useViewMode } from "@/context/ViewModeContext";
 
 export type VacationMode = "admin" | "field";
 
@@ -38,6 +39,7 @@ export default function VacationHome({
   lockedIds, headerActions, footer, loadError, onRetry, emptyLogo,
 }: Props) {
   const router = useRouter();
+  const { isMobileView } = useViewMode();
   const canCreate = canCreateRetreat(roles);
   const entryHref = (id: string) => (mode === "admin" ? `/retreat/${id}` : `/retreat/${id}/field`);
   const entryLabel = mode === "admin" ? "행정 화면 →" : "현장 화면 →";
@@ -58,7 +60,54 @@ export default function VacationHome({
         </div>
       )}
 
-      {retreats.length === 0 ? (
+      {isMobileView && retreats.length > 0 && selected ? (
+        <div className="vacation-mobile-home">
+          <label className="vacation-mobile-select">
+            <span>수련회 선택</span>
+            <select className="input" value={selected.id} onChange={(event) => onSelect(event.target.value)}>
+              {retreats.map((retreat) => <option key={retreat.id} value={retreat.id}>{retreat.year}년 {retreat.name}</option>)}
+            </select>
+          </label>
+
+          <section className="vacation-mobile-primary">
+            <p>{selected.year}년 수련회</p>
+            <h1>{selected.name}</h1>
+            {mode === "field" ? (
+              <>
+                <span>지금 해야 할 일은 개인 큐카드에서 바로 확인합니다.</span>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=cue`)} className="btn-primary">개인 큐카드 열기</button>
+              </>
+            ) : (
+              <>
+                <span>신청 명단과 편성, 물품, 비용을 관리합니다.</span>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}`)} className="btn-primary">수련회 행정 열기</button>
+              </>
+            )}
+          </section>
+
+          {mode === "field" && (
+            <section className="vacation-mobile-actions" aria-label="현장 바로가기">
+              <h2>현장 바로가기</h2>
+              <div>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=board`)}><strong>포스트 현황</strong><span>배치와 현재 위치</span></button>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=check`)}><strong>인원체크</strong><span>조·버스·전체 확인</span></button>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=rooms`)}><strong>조별 정보</strong><span>조원과 담당 스탭</span></button>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=lodging`)}><strong>숙소 안내</strong><span>호실과 배치 확인</span></button>
+              </div>
+              {canAccessArea("retreat-admin", roles) && <button type="button" className="vacation-mobile-admin-link" onClick={() => router.push(`/retreat/${selected.id}`)}>수련회 행정 보기 →</button>}
+            </section>
+          )}
+
+          {mode === "admin" && canAccessArea("retreat-field", roles) && (
+            <button type="button" className="vacation-mobile-field-link" onClick={() => router.push(`/retreat/${selected.id}/field`)}>이가드 현장으로 이동 →</button>
+          )}
+
+          <details className="vacation-mobile-calendar">
+            <summary>공유 준비 일정 보기</summary>
+            <RetreatCalendarPanel retreat={selected} retreats={retreats} canEditPeriods={canEditArea("retreat-admin", roles)} />
+          </details>
+        </div>
+      ) : retreats.length === 0 ? (
         <div className="card mx-auto max-w-md p-16 text-center">
           {emptyLogo && <div className="mb-4 flex justify-center">{emptyLogo}</div>}
           <p className="font-medium text-slate-500">아직 수련회가 없습니다</p>

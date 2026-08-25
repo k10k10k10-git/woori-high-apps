@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft, CheckSquare, DownloadSimple, DotsThreeVertical, IdentificationCard,
-  MagnifyingGlass, MapPinLine, MapTrifold, UsersThree, WarningCircle, WifiSlash,
+  ArrowLeft, DownloadSimple, DotsThreeVertical,
+  MagnifyingGlass, WarningCircle, WifiSlash,
 } from "@phosphor-icons/react";
 import { useAuth } from "@/features/iguard/context/AuthContext";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
@@ -39,14 +39,7 @@ import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
 import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
 import { canAccessArea, iguardScopeOf } from "@/features/portal/accessPolicy";
-
-const EXECUTION_ICON = {
-  cue: IdentificationCard,
-  board: MapPinLine,
-  rooms: UsersThree,
-  lodging: MapTrifold,
-  check: CheckSquare,
-} as const;
+import { useViewMode } from "@/context/ViewModeContext";
 
 function parseNames(value?: string): string[] {
   return (value || "")
@@ -117,7 +110,9 @@ export default function IguardClient() {
 
 function IguardWorkspace({ id }: { id: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, roles, memberName } = useAuth();
+  const { isMobileView } = useViewMode();
   const executionOnly = iguardScopeOf(roles) === "execution";
 
   useEffect(() => {
@@ -126,7 +121,7 @@ function IguardWorkspace({ id }: { id: string }) {
   }, []);
   const fieldAllowed = canAccessArea("retreat-field", roles);
 
-  const [view, setView] = useState<string>("cue");
+  const [view, setView] = useState<string>(() => searchParams.get("view") ?? "cue");
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
   const [fieldToolsOpen, setFieldToolsOpen] = useState(false);
@@ -228,13 +223,20 @@ function IguardWorkspace({ id }: { id: string }) {
     </div>
   );
 
-  const executionViews = IGUARD_VIEW_GROUPS[0].views;
+  const mobileInfoKeys = ["rooms", "lodging", "buses", "seating", "meals"] as const;
+  const mobileInfoActive = mobileInfoKeys.some((key) => key === activeView);
+  const mobileExecutionTabs = [
+    { key: "cue", label: "큐카드" },
+    { key: "board", label: "포스트" },
+    { key: "check", label: "인원체크" },
+    { key: "rooms", label: "정보" },
+  ] as const;
   // 기획 탭은 큐싯 5열 편집처럼 가로가 필요한 PC 화면이라 컨테이너를 넓힌다.
   // 실행 탭은 현장·모바일 기준이므로 기존 폭을 유지한다(밀도 튜닝이 이 폭 기준).
   const shellWidth = activeGroup.label === "기획" ? "max-w-[1760px]" : "max-w-6xl";
 
   return (
-    <div className="iguard-scope min-h-screen overflow-x-clip pb-20 sm:pb-12">
+    <div className="iguard-scope min-h-screen overflow-x-clip pb-8 sm:pb-12">
       <header ref={headerRef} className="workspace-sticky-header workspace-header iguard-workspace-header">
         <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
           <div className="field-title-row pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
@@ -290,23 +292,31 @@ function IguardWorkspace({ id }: { id: string }) {
               )}
             </div>
           </div>
-          {/* 대그룹 */}
-          <div className="field-group-tabs flex gap-1 overflow-x-auto" role="tablist" aria-label="뷰 그룹">
-            {visibleGroups.map(g => {
-              const active = g.label === activeGroup.label;
-              return (
-                <button key={g.label} onClick={() => setView(g.views[0].key)}
-                  role="tab"
-                  aria-selected={active}
-                  className="workspace-group-tab">
-                  {g.label}
-                </button>
-              );
-            })}
-          </div>
+          {isMobileView ? (
+            <div className="iguard-mobile-tabs" role="tablist" aria-label="수련회 현장 주요 업무">
+              {mobileExecutionTabs.map((item) => {
+                const selected = item.key === "rooms" ? mobileInfoActive : activeView === item.key;
+                return <button key={item.key} role="tab" aria-selected={selected} onClick={() => setView(item.key)}>{item.label}</button>;
+              })}
+            </div>
+          ) : (
+            <div className="field-group-tabs flex gap-1 overflow-x-auto" role="tablist" aria-label="뷰 그룹">
+              {visibleGroups.map(g => {
+                const active = g.label === activeGroup.label;
+                return (
+                  <button key={g.label} onClick={() => setView(g.views[0].key)}
+                    role="tab"
+                    aria-selected={active}
+                    className="workspace-group-tab">
+                    {g.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
         {/* 소그룹 */}
-        <div className={`workspace-tabs ${activeGroup.label === "실행" ? "hidden sm:block" : "block"}`}>
+        {!isMobileView && <div className="workspace-tabs">
           <div className={`${shellWidth} mx-auto px-4 flex gap-0 overflow-x-auto`} role="tablist" aria-label={`${activeGroup.label} 하위 탭`}>
             {activeGroup.views.map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
@@ -318,10 +328,17 @@ function IguardWorkspace({ id }: { id: string }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </header>
 
       <main className={`${shellWidth} mx-auto px-3 py-4 sm:px-4 sm:py-6 ${activeGroup.label === "실행" ? "field-execution-main" : ""}`}>
+        {isMobileView && mobileInfoActive && (
+          <div className="mobile-subtabs iguard-info-tabs" role="tablist" aria-label="수련회 현장 정보">
+            {([
+              ["rooms", "조별 정보"], ["lodging", "숙소 안내"], ["buses", "버스"], ["seating", "자리"], ["meals", "식사"],
+            ] as const).map(([key, label]) => <button key={key} role="tab" aria-selected={activeView === key} onClick={() => setView(key)}>{label}</button>)}
+          </div>
+        )}
         {!connected && (
           <div className="mb-4 bg-red-50 border border-red-300 rounded-lg p-3 text-sm text-red-700 flex items-center gap-2 animate-pulse" role="alert">
             <WifiSlash aria-hidden="true" className="shrink-0" size={18} />
@@ -402,30 +419,6 @@ function IguardWorkspace({ id }: { id: string }) {
         />
       )}
 
-      {/* 하단 탭바는 실행 뷰에서만 — 기획·정보 화면에서는 숨겨 세로 공간 확보 + 오탐 이동 방지 (2026-07-12) */}
-      {executionViews.some(v => v.key === activeView) && (
-        <nav className="field-bottom-nav fixed inset-x-0 bottom-0 z-30 sm:hidden" aria-label="실행 뷰 탐색">
-          <div className="mx-auto grid max-w-md grid-cols-5" role="tablist">
-            {executionViews.map(v => {
-              const active = activeView === v.key;
-              const Icon = EXECUTION_ICON[v.key as keyof typeof EXECUTION_ICON];
-              return (
-                <button
-                  key={v.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setView(v.key)}
-                  className="field-bottom-nav-item"
-                >
-                  <Icon aria-hidden="true" size={21} weight={active ? "fill" : "regular"} />
-                  <span>{v.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </nav>
-      )}
     </div>
   );
 }

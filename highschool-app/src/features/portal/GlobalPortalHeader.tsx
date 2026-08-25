@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import MyPageModal, { type MyPageTab } from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
+import ViewModeToggle from "@/components/ViewModeToggle";
 import OverlayShell from "@/components/OverlayShell";
 import { canAccessArea, canAccessSundayTeam, canManageRolesOf, ownSundayTeam } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
@@ -246,7 +247,8 @@ export default function GlobalPortalHeader() {
 
           <div className="portal-header-tools">
             <div className="portal-account-row portal-account-row--desktop">
-              <ThemeToggle />
+              <ViewModeToggle />
+              <ThemeToggle showLabel />
               <button onClick={() => openMyPage()} className="portal-compact-action">
                 <span>마이페이지</span>
               </button>
@@ -281,20 +283,8 @@ export default function GlobalPortalHeader() {
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
               <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>통합 홈</Link>
               {semesterAllowed && <Link href="/semesters" aria-current={currentArea === "semester" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>학기 중 사역</Link>}
-              {semesterAllowed && sundayItems.map((item) => item.disabled ? (
-                <div key={item.href} aria-disabled="true" className="portal-mobile-link-disabled">
-                  <span>주일 사역 · {item.label}</span><small>{item.hint}</small>
-                </div>
-              ) : (
-                <Link key={item.href} href={item.href} aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>
-                  <span>주일 사역 · {item.label}</span><small>{item.hint}</small>
-                </Link>
-              ))}
-              {vacationItems.map((item) => (
-                <Link key={item.href} href={item.href} aria-current={currentArea === "vacation" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>
-                  <span>{item.label}</span><small>{item.hint}</small>
-                </Link>
-              ))}
+              {semesterAllowed && sundayItems.length > 0 && <Link href="/sunday-ministry" aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>주일 사역</Link>}
+              {vacationItems.length > 0 && <Link href={(vacationItems.find((item) => item.href === "/field") ?? vacationItems[0]).href} aria-current={currentArea === "vacation" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>방학 중 사역</Link>}
               <Link href="/ministry-guide" aria-current={currentArea === "guide" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사역 가이드</Link>
               <Link href="/suggestions" aria-current={currentArea === "suggestions" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사이트 건의사항</Link>
             </nav>
