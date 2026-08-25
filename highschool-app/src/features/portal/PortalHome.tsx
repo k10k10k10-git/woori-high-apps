@@ -237,8 +237,11 @@ export default function PortalHome() {
 
         <section className="page-hero home-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
           <div className="min-w-0">
-            <h1 className="page-title">{friendlyName}, {dailyMessage.encouragement}</h1>
-            <p className="page-description">{dailyMessage.verse.text} · {dailyMessage.verse.reference}</p>
+            <h1 className="page-title">
+              <span className="block">{friendlyName},</span>
+              <span className="block">{dailyMessage.encouragement}</span>
+            </h1>
+            <p className="page-description">{dailyMessage.verse.text} {dailyMessage.verse.reference}</p>
           </div>
           <HomeAgendaSummary actions={homeActions} />
         </section>
