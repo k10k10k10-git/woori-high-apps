@@ -18,14 +18,14 @@ export async function getChart(): Promise<any> {
       PointElement, LineElement, LineController,
       BarElement, BarController,
       ArcElement, DoughnutController,
-      Tooltip, Legend,
+      Tooltip, Legend, Filler,
     }) => {
       Chart.register(
         CategoryScale, LinearScale,
         PointElement, LineElement, LineController,
         BarElement, BarController,
         ArcElement, DoughnutController,
-        Tooltip, Legend,
+        Tooltip, Legend, Filler,
       );
       chartClass = Chart;
     });

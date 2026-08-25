@@ -1,10 +1,16 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, useClassKey, useClassKeys, calcStats } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
 import { getChart } from '@/utils/chartSetup';
 import ClassTabBar from '@/components/ClassTabBar';
 import { SHOW_ATTENDANCE_RISK_SECTIONS } from '@/lib/releaseFlags';
+import {
+  activeAndLongAbsentStudents,
+  consecutiveAbsentStudentIds,
+  recentEditableWeeks,
+  unenteredStudentIds,
+} from '@/utils/attendanceWorkflow';
 
 // 모바일에서 롤오버 없이도 숫자를 항상 표시하는 커스텀 플러그인
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,11 +62,32 @@ const dataLabelPlugin: any = {
   },
 };
 export default function StatTab() {
-  const { state, dispatch } = useApp();
-  const { months, attData, classData, events, curView } = state;
+  const { state } = useApp();
+  const { curYear, months, attData, classData, events, curView } = state;
   const classKeys = useClassKeys(state);
   const ck = useClassKey(state);
-  const students = classData[ck]?.students ?? [];
+  const allStudents = useMemo(() => classData[ck]?.students ?? [], [classData, ck]);
+  const { active: students, longAbsent: longAbsentStudents } = useMemo(
+    () => activeAndLongAbsentStudents(allStudents),
+    [allStudents],
+  );
+  const recentWeeks = useMemo(
+    () => recentEditableWeeks(curYear, months, events, Date.now(), 4),
+    [curYear, months, events],
+  );
+  const missingIds = useMemo(
+    () => unenteredStudentIds(students, attData[ck], recentWeeks[0]?.key),
+    [students, attData, ck, recentWeeks],
+  );
+  const repeatedAbsentIds = useMemo(
+    () => consecutiveAbsentStudentIds(students, attData[ck], recentWeeks.map(week => week.key), 3),
+    [students, attData, ck, recentWeeks],
+  );
+  const studentNames = useMemo(
+    () => new Map(allStudents.map(student => [student.id, student.name])),
+    [allStudents],
+  );
+  const namesFor = (ids: string[]) => ids.slice(0, 5).map(id => studentNames.get(id)).filter(Boolean).join(', ');
 
   const [warningOpen, setWarningOpen] = useState(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -342,31 +369,61 @@ export default function StatTab() {
       {/* 반 탭 */}
       <ClassTabBar />
 
-      {students.length === 0 ? (
+      {allStudents.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text3)', padding: 40, fontSize: 13 }}>
           학생 데이터가 없습니다.
         </div>
       ) : (
-        <div className="charts-container">
-          {SHOW_ATTENDANCE_RISK_SECTIONS && (
-            <div className="chart-card">
-              <div className="chart-title">출석 등급 분포</div>
-              <div className="chart-canvas-wrap"><canvas ref={chart3Ref} /></div>
+        <>
+          <section className="attendance-action-section" aria-labelledby="attendance-action-title">
+            <div className="attendance-action-heading">
+              <div>
+                <h2 id="attendance-action-title">목양 확인</h2>
+                <p>통계 수치보다 먼저 확인할 실제 후속 업무입니다.</p>
+              </div>
+              <span>{recentWeeks[0]?.label ?? '최근 출석 없음'} 기준</span>
+            </div>
+            <div className="attendance-action-grid">
+              <article className="attendance-action-card missing">
+                <span>미입력 확인</span>
+                <strong>{missingIds.length}명</strong>
+                <p>{missingIds.length ? namesFor(missingIds) + (missingIds.length > 5 ? ` 외 ${missingIds.length - 5}명` : '') : '모두 입력되었습니다.'}</p>
+              </article>
+              <article className="attendance-action-card absent">
+                <span>최근 3회 연속 결석</span>
+                <strong>{repeatedAbsentIds.length}명</strong>
+                <p>{repeatedAbsentIds.length ? namesFor(repeatedAbsentIds) + (repeatedAbsentIds.length > 5 ? ` 외 ${repeatedAbsentIds.length - 5}명` : '') : '확인 대상이 없습니다.'}</p>
+              </article>
+              <article className="attendance-action-card long">
+                <span>장결 별도 관리</span>
+                <strong>{longAbsentStudents.length}명</strong>
+                <p>{longAbsentStudents.length ? longAbsentStudents.slice(0, 5).map(student => student.name).join(', ') + (longAbsentStudents.length > 5 ? ` 외 ${longAbsentStudents.length - 5}명` : '') : '장결자가 없습니다.'}</p>
+              </article>
+            </div>
+          </section>
+          {students.length > 0 && (
+            <div className="charts-container">
+              {SHOW_ATTENDANCE_RISK_SECTIONS && (
+                <div className="chart-card">
+                  <div className="chart-title">출석 등급 분포</div>
+                  <div className="chart-canvas-wrap"><canvas ref={chart3Ref} /></div>
+                </div>
+              )}
+              <div className="chart-card">
+                <div className="chart-title">학생별 출석 현황</div>
+                <div className="chart-canvas-wrap"><canvas ref={chart2Ref} /></div>
+              </div>
+              <div className="chart-card">
+                <div className="chart-title">월별 평균 출석률</div>
+                <div className="chart-canvas-wrap"><canvas ref={chart1Ref} /></div>
+              </div>
+              <div className="chart-card">
+                <div className="chart-title">주차별 출석 인원</div>
+                <div className="chart-canvas-wrap"><canvas ref={chart4Ref} /></div>
+              </div>
             </div>
           )}
-          <div className="chart-card">
-            <div className="chart-title">학생별 출석 현황</div>
-            <div className="chart-canvas-wrap"><canvas ref={chart2Ref} /></div>
-          </div>
-          <div className="chart-card">
-            <div className="chart-title">월별 평균 출석률</div>
-            <div className="chart-canvas-wrap"><canvas ref={chart1Ref} /></div>
-          </div>
-          <div className="chart-card">
-            <div className="chart-title">주차별 출석 인원</div>
-            <div className="chart-canvas-wrap"><canvas ref={chart4Ref} /></div>
-          </div>
-        </div>
+        </>
       )}
 
       {/* 주의 학생 목록 */}

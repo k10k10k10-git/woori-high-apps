@@ -5,17 +5,21 @@ import { useApp, useClassKey, calcStats } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
 import { downloadCSV, downloadXLSX, openPrintWindow } from '@/utils/export';
+import { activeAndLongAbsentStudents, recentEditableWeeks } from '@/utils/attendanceWorkflow';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
 import type { AttEditTarget, ViewKey } from '@/types';
-import type { AppState } from '@/store/AppContext';
 
 export default function AttendanceTab() {
   const { state, dispatch } = useApp();
   const { curYear, months, events, attData, classData, curView } = state;
   const ck = useClassKey(state);
-  const students = classData[ck]?.students ?? [];
+  const students = useMemo(() => classData[ck]?.students ?? [], [classData, ck]);
+  const { active: activeStudents, longAbsent: longAbsentStudents } = useMemo(
+    () => activeAndLongAbsentStudents(students),
+    [students],
+  );
   const isTeacher = state.userRole?.role === 'teacher';
   const [attSubView, setAttSubView] = useState<'check' | 'table' | 'suggest'>('check');
 
@@ -28,7 +32,6 @@ export default function AttendanceTab() {
   useEffect(() => {
     if (attSubView !== 'suggest') return;
     const sugRef = ref(db, `suggestions/${curYear}/${ck}`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onValue(sugRef, snap => {
       if (!snap.exists()) { setSuggestions([]); return; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,41 +63,35 @@ export default function AttendanceTab() {
   const exportRef = useRef<HTMLDivElement>(null);
   const [sortByName, setSortByName] = useState(false);
 
-  // 이번 주 키 계산 (KST 기준 가장 최근 일요일)
-  const thisWeekKey = useMemo(() => {
-    const now = new Date(Date.now() + 9 * 3600 * 1000);
-    const dayOfWeek = now.getUTCDay();
-    const lastSun = new Date(now);
-    lastSun.setUTCDate(now.getUTCDate() - dayOfWeek);
-    const sunMonth = lastSun.getUTCMonth() + 1;
-    const sunDate = lastSun.getUTCDate();
-    for (let mi = 0; mi < months.length; mi++) {
-      if (months[mi].month === sunMonth) {
-        for (let di = 0; di < months[mi].sundays.length; di++) {
-          if (months[mi].sundays[di] === sunDate) return evKey(mi, di);
-        }
-      }
-    }
-    return null;
-  }, [months]);
+  const editableWeeks = useMemo(
+    () => recentEditableWeeks(curYear, months, events, Date.now(), 4),
+    [curYear, months, events],
+  );
+  const [pickedWeekKey, setPickedWeekKey] = useState('');
+  const selectedWeek = editableWeeks.find(week => week.key === pickedWeekKey) ?? editableWeeks[0] ?? null;
+  const selectedWeekKey = selectedWeek?.key ?? null;
 
-  const thisWeekLabel = useMemo(() => {
-    if (!thisWeekKey) return null;
-    const [mi, di] = thisWeekKey.split('-').map(Number);
-    return `${months[mi]?.month}월 ${months[mi]?.sundays[di]}일`;
-  }, [thisWeekKey, months]);
+  type SaveFeedback = {
+    status: 'saving' | 'saved' | 'error';
+    sid: string;
+    studentName: string;
+    target: AttEditTarget;
+    value: string;
+    savedAt?: number;
+  };
+  const [saveFeedback, setSaveFeedback] = useState<SaveFeedback | null>(null);
 
   const displayStudents = sortByName
-    ? [...students].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
-    : students;
+    ? [...activeStudents].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+    : activeStudents;
 
   const checkedCount = useMemo(() =>
-    displayStudents.filter(s => thisWeekKey && !!(attData[ck]?.[s.id]?.[thisWeekKey])).length,
-    [displayStudents, thisWeekKey, attData, ck]
+    displayStudents.filter(s => selectedWeekKey && !!(attData[ck]?.[s.id]?.[selectedWeekKey])).length,
+    [displayStudents, selectedWeekKey, attData, ck]
   );
 
   // 현재 반의 총 학생 수, 주차 수 등 통계
-  const totalStudents = students.length;
+  const totalStudents = activeStudents.length;
   const allWeeks = months.flatMap(({ sundays }, mi) =>
     sundays.map((_, di) => evKey(mi, di))
   ).filter(k => !events[k]);
@@ -109,63 +106,63 @@ export default function AttendanceTab() {
 
   const avgRate = useMemo(() => {
     if (totalStudents === 0) return 0;
-    const statsArr = students.map(s => calcStats(state, ck, s.id)).filter(st => (st.present + st.absent + st.tardy) > 0);
+    const statsArr = activeStudents.map(s => calcStats(state, ck, s.id)).filter(st => (st.present + st.absent + st.tardy) > 0);
     if (statsArr.length === 0) return 0;
     const sum = statsArr.reduce((acc, st) => {
       const rec = st.present + st.absent + st.tardy;
       return acc + Math.round((st.present / rec) * 100);
     }, 0);
     return Math.round(sum / statsArr.length);
-  }, [totalStudents, students, state, ck]);
+  }, [totalStudents, activeStudents, state, ck]);
 
   const teacher = classData[ck]?.teacher ?? '';
 
   // 이번 주 출석/지각/결석/미입력 카운트
-  const thisWeekStats = useMemo(() => {
-    if (!thisWeekKey || events[thisWeekKey]) {
+  const selectedWeekStats = useMemo(() => {
+    if (!selectedWeekKey) {
       return { O: 0, T: 0, X: 0, empty: displayStudents.length };
     }
     let O = 0, T = 0, X = 0, empty = 0;
     displayStudents.forEach(s => {
-      const val = attData[ck]?.[s.id]?.[thisWeekKey] ?? '';
+      const val = attData[ck]?.[s.id]?.[selectedWeekKey] ?? '';
       if (val === 'O') O++;
       else if (val === 'T') T++;
       else if (val === 'X') X++;
       else empty++;
     });
     return { O, T, X, empty };
-  }, [displayStudents, thisWeekKey, events, attData, ck]);
+  }, [displayStudents, selectedWeekKey, attData, ck]);
 
   function onCellClick(sid: string, k: string) {
     dispatch({ type: 'OPEN_ATT_MODAL', payload: { ck, sid, k } });
   }
 
-  async function handleQuickCheck(sid: string, val: string) {
-    if (!thisWeekKey) return;
-    const current = attData[ck]?.[sid]?.[thisWeekKey] ?? '';
-    const newVal = current === val ? '' : val;
-    dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
-    const path = `attendance/${curYear}/${ck}/${sid}/${thisWeekKey}`;
-    try {
-      await set(ref(db, path), newVal === '' ? null : newVal);
-      dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' });
-    } catch {
-      dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' });
-      showToast('출석 저장에 실패했습니다. 네트워크를 확인해 주세요.');
-    }
-  }
-
-  async function handleAttChange(target: AttEditTarget, value: string) {
-    dispatch({ type: 'CLOSE_ATT_MODAL' });
+  async function saveAttendance(target: AttEditTarget, value: string) {
+    const studentName = classData[target.ck]?.students?.find(student => student.id === target.sid)?.name ?? '학생';
+    setSaveFeedback({ status: 'saving', sid: target.sid, studentName, target, value });
     dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
     const path = `attendance/${curYear}/${target.ck}/${target.sid}/${target.k}`;
     try {
       await set(ref(db, path), value === '' ? null : value);
+      setSaveFeedback({ status: 'saved', sid: target.sid, studentName, target, value, savedAt: Date.now() });
       dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' });
     } catch {
+      setSaveFeedback({ status: 'error', sid: target.sid, studentName, target, value });
       dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' });
-      showToast('출석 저장에 실패했습니다. 네트워크를 확인해 주세요.');
+      showToast('출석 저장에 실패했습니다. 아래 재시도 버튼을 눌러 주세요.');
     }
+  }
+
+  async function handleQuickCheck(sid: string, val: string) {
+    if (!selectedWeekKey) return;
+    const current = attData[ck]?.[sid]?.[selectedWeekKey] ?? '';
+    const newVal = current === val ? '' : val;
+    await saveAttendance({ ck, sid, k: selectedWeekKey }, newVal);
+  }
+
+  async function handleAttChange(target: AttEditTarget, value: string) {
+    dispatch({ type: 'CLOSE_ATT_MODAL' });
+    await saveAttendance(target, value);
   }
 
   function exportCSV() {
@@ -173,7 +170,7 @@ export default function AttendanceTab() {
       const [mi, di] = k.split('-').map(Number);
       return `${months[mi]?.month}/${months[mi]?.sundays[di]}`;
     })];
-    const rows = [header, ...students.map(s => [
+    const rows = [header, ...activeStudents.map(s => [
       String(s.num ?? ''),
       s.name,
       ...viewWeeks.map(k => attData[ck]?.[s.id]?.[k] ?? ''),
@@ -187,7 +184,7 @@ export default function AttendanceTab() {
       const [mi, di] = k.split('-').map(Number);
       return `${months[mi]?.month}/${months[mi]?.sundays[di]}`;
     })];
-    const rows = [header, ...students.map(s => [
+    const rows = [header, ...activeStudents.map(s => [
       String(s.num ?? ''),
       s.name,
       ...viewWeeks.map(k => attData[ck]?.[s.id]?.[k] ?? ''),
@@ -199,8 +196,8 @@ export default function AttendanceTab() {
   function exportPDF() {
     setExportOpen(false);
     const PAGE_SIZE = 10;
-    const pages: typeof students[] = [];
-    for (let i = 0; i < students.length; i += PAGE_SIZE) pages.push(students.slice(i, i + PAGE_SIZE));
+    const pages: typeof activeStudents[] = [];
+    for (let i = 0; i < activeStudents.length; i += PAGE_SIZE) pages.push(activeStudents.slice(i, i + PAGE_SIZE));
     if (pages.length === 0) return;
 
     // PDF용 주차: 이벤트 포함, 학기 필터만 적용
@@ -349,7 +346,7 @@ export default function AttendanceTab() {
       {/* 통계 카드 */}
       <div className="stat-row">
         <div className="stat-card">
-          <div className="stat-card-label">학생 수</div>
+          <div className="stat-card-label">일반 출석 학생</div>
           <div className="stat-card-value">{totalStudents}명</div>
         </div>
         {state.userRole?.role !== 'teacher' && (
@@ -373,27 +370,44 @@ export default function AttendanceTab() {
       {/* ── 출석 체크 뷰 ── */}
       {attSubView === 'check' && (
         <>
+          <div className="attendance-week-picker">
+            <label htmlFor="attendance-week">출석 날짜</label>
+            <select
+              id="attendance-week"
+              value={selectedWeekKey ?? ''}
+              onChange={event => setPickedWeekKey(event.target.value)}
+              disabled={editableWeeks.length === 0}
+            >
+              {editableWeeks.length === 0 ? (
+                <option value="">입력 가능한 주일이 없습니다</option>
+              ) : editableWeeks.map((week, index) => (
+                <option key={week.key} value={week.key}>{week.label}{index === 0 ? ' · 최근' : ''}</option>
+              ))}
+            </select>
+            <span>담임 교사는 최근 4회의 출석을 확인하고 바로 수정할 수 있습니다.</span>
+          </div>
+
           {/* 이번 주 요약 카드 */}
-          {thisWeekKey && !events[thisWeekKey] && students.length > 0 && (
+          {selectedWeekKey && activeStudents.length > 0 && (
             <div className="week-summary-row">
               <div className="week-summary-card green">
                 <div className="week-summary-icon">✓</div>
-                <div className="week-summary-count">{thisWeekStats.O}</div>
+                <div className="week-summary-count">{selectedWeekStats.O}</div>
                 <div className="week-summary-label">출석</div>
               </div>
               <div className="week-summary-card amber">
                 <div className="week-summary-icon">△</div>
-                <div className="week-summary-count">{thisWeekStats.T}</div>
+                <div className="week-summary-count">{selectedWeekStats.T}</div>
                 <div className="week-summary-label">지각</div>
               </div>
               <div className="week-summary-card red">
                 <div className="week-summary-icon">✕</div>
-                <div className="week-summary-count">{thisWeekStats.X}</div>
+                <div className="week-summary-count">{selectedWeekStats.X}</div>
                 <div className="week-summary-label">결석</div>
               </div>
               <div className="week-summary-card gray">
                 <div className="week-summary-icon">○</div>
-                <div className="week-summary-count">{thisWeekStats.empty}</div>
+                <div className="week-summary-count">{selectedWeekStats.empty}</div>
                 <div className="week-summary-label">미입력</div>
               </div>
             </div>
@@ -402,25 +416,25 @@ export default function AttendanceTab() {
           {/* 출석 체크 리스트 */}
           <div className="check-list-wrap">
             <div className="check-list-header">
-              {thisWeekKey && !events[thisWeekKey] ? (
+              {selectedWeekKey ? (
                 <>
-                  <span className="check-week-label">{thisWeekLabel}</span>
+                  <span className="check-week-label">{selectedWeek?.label}</span>
                   <span className="check-progress">{checkedCount} / {displayStudents.length}명 완료</span>
                 </>
               ) : (
                 <span className="check-week-label" style={{ color: 'var(--text3)' }}>
-                  {events[thisWeekKey ?? ''] ? `이번 주는 ${events[thisWeekKey!]} 입니다` : '이번 주 출석 날짜가 없습니다'}
+                  입력 가능한 출석 날짜가 없습니다
                 </span>
               )}
             </div>
-            {students.length === 0 ? (
+            {activeStudents.length === 0 ? (
               <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '40px', fontSize: 14 }}>
-                학생이 없습니다. 관리 탭에서 추가하세요.
+                일반 출석 대상 학생이 없습니다.
               </div>
             ) : (
               <div className="check-list">
                 {displayStudents.map(student => {
-                  const val = thisWeekKey ? (attData[ck]?.[student.id]?.[thisWeekKey] ?? '') : '';
+                  const val = selectedWeekKey ? (attData[ck]?.[student.id]?.[selectedWeekKey] ?? '') : '';
                   const rowCls = val === 'O' ? ' row-o' : val === 'T' ? ' row-t' : val === 'X' ? ' row-x' : '';
                   return (
                     <div key={student.id} className={`check-row${rowCls}`}>
@@ -432,14 +446,19 @@ export default function AttendanceTab() {
                           <div className="check-avatar">{student.name.charAt(0)}</div>
                         )}
                         <span className="check-name">{student.name}</span>
+                        {saveFeedback?.sid === student.id && (
+                          <span className={`attendance-row-save ${saveFeedback.status}`}>
+                            {saveFeedback.status === 'saving' ? '저장 중' : saveFeedback.status === 'saved' ? '저장됨' : '저장 실패'}
+                          </span>
+                        )}
                       </div>
                       <div className="check-btns">
                         {(['O', 'T', 'X'] as const).map(v => (
                           <button
                             key={v}
                             className={`check-btn ${v}${val === v ? ' active' : ''}`}
-                            onClick={() => thisWeekKey && handleQuickCheck(student.id, v)}
-                            disabled={!thisWeekKey || !!events[thisWeekKey]}
+                            onClick={() => selectedWeekKey && handleQuickCheck(student.id, v)}
+                            disabled={!selectedWeekKey || saveFeedback?.status === 'saving'}
                           >
                             {v === 'O' ? '출석' : v === 'T' ? '지각' : '결석'}
                           </button>
@@ -545,9 +564,9 @@ export default function AttendanceTab() {
 
       {/* 출석 테이블 */}
       <div className="att-table-wrap">
-        {students.length === 0 ? (
+        {activeStudents.length === 0 ? (
           <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '40px', fontSize: 13 }}>
-            학생이 없습니다. 관리 탭에서 추가하세요.
+            일반 출석 대상 학생이 없습니다.
           </div>
         ) : (
           <table className="att-table">
@@ -613,11 +632,14 @@ export default function AttendanceTab() {
                             </td>
                           );
                         }
+                        const teacherCanEdit = editableWeeks.some(week => week.key === k);
+                        const canEdit = !isTeacher || teacherCanEdit;
                         return (
                           <td
                             key={k}
-                            className={`att-cell${val ? ' ' + val : ''}${isTeacher ? ' readonly' : ''}`}
-                            onClick={isTeacher ? undefined : () => onCellClick(student.id, k)}
+                            className={`att-cell${val ? ' ' + val : ''}${canEdit ? '' : ' readonly'}`}
+                            onClick={canEdit ? () => onCellClick(student.id, k) : undefined}
+                            title={isTeacher && !teacherCanEdit ? '최근 4회 출석만 수정할 수 있습니다' : undefined}
                           >
                             {val}
                           </td>
@@ -645,6 +667,40 @@ export default function AttendanceTab() {
         )}
       </div>
       </> }
+
+      {attSubView !== 'suggest' && longAbsentStudents.length > 0 && (
+        <details className="long-absent-panel">
+          <summary>
+            <span>장결자 {longAbsentStudents.length}명</span>
+            <small>기본 출석 대상과 통계에서 분리됨</small>
+          </summary>
+          <div className="long-absent-list">
+            {longAbsentStudents.map(student => (
+              <button
+                type="button"
+                key={student.id}
+                onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: student.id, ck } })}
+              >
+                <strong>{student.name}</strong>
+                <span>출석 이력 보기 →</span>
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {saveFeedback && attSubView !== 'suggest' && (
+        <div className={`attendance-save-banner ${saveFeedback.status}`} role="status" aria-live="polite">
+          <span>
+            {saveFeedback.status === 'saving' && `${saveFeedback.studentName} 출석을 저장하고 있습니다.`}
+            {saveFeedback.status === 'saved' && `${saveFeedback.studentName} 출석이 저장되었습니다.`}
+            {saveFeedback.status === 'error' && `${saveFeedback.studentName} 출석을 저장하지 못했습니다.`}
+          </span>
+          {saveFeedback.status === 'error' && (
+            <button type="button" onClick={() => saveAttendance(saveFeedback.target, saveFeedback.value)}>재시도</button>
+          )}
+        </div>
+      )}
 
       {/* 출석 모달 */}
       {state.attModal.open && state.attModal.target && (

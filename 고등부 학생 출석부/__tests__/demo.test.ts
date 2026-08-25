@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseClassKey, buildDemoRole,
   buildDemoOptionsFromRoles, buildDemoOptionsFromClasses,
+  clearDemoSelection, loadDemoSelection, loadLastDemoSelection, saveDemoSelection,
 } from '@/lib/demo';
 
 // 데모 모드는 테스트 기간 한정 기능이지만, 반 키 해석이 틀리면
@@ -85,5 +86,27 @@ describe('buildDemoOptionsFromClasses', () => {
 
   it('담임이 비어 있어도 목록에는 남는다', () => {
     expect(buildDemoOptionsFromClasses({ '1-3-2': {} })[0]).toMatchObject({ ck: '1-3-2', teacherName: '' });
+  });
+});
+
+describe('데모 최근 반 선택', () => {
+  it('현재 반을 비워도 최근 반은 유지한다', () => {
+    const storage = new Map<string, string>();
+    Object.defineProperty(globalThis, 'window', { value: globalThis, configurable: true });
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => storage.set(key, value),
+        removeItem: (key: string) => storage.delete(key),
+      },
+      configurable: true,
+    });
+
+    const selection = { ck: '2-3-4', teacherName: '김선생' };
+    saveDemoSelection(selection);
+    clearDemoSelection();
+
+    expect(loadDemoSelection()).toBeNull();
+    expect(loadLastDemoSelection()).toEqual(selection);
   });
 });

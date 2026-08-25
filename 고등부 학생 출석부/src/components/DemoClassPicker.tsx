@@ -6,6 +6,7 @@ import { db, ref, get } from '@/lib/db';
 import { getKSTYear } from '@/utils/dates';
 import {
   buildDemoOptionsFromClasses, buildDemoOptionsFromRoles,
+  loadLastDemoSelection,
   type DemoOption, type DemoSelection,
 } from '@/lib/demo';
 import type { UserRole } from '@/types';
@@ -24,6 +25,9 @@ export default function DemoClassPicker({
   const [part, setPart] = useState('1');
   const [grade, setGrade] = useState('1');
   const [cls, setCls] = useState('');
+  const [lastSelection, setLastSelection] = useState<DemoSelection | null>(null);
+
+  useEffect(() => setLastSelection(loadLastDemoSelection()), []);
 
   useEffect(() => {
     if (signInError) return; // 로그인 자체가 실패하면 읽기도 실패한다 — 헛된 요청을 보내지 않는다
@@ -107,6 +111,20 @@ export default function DemoClassPicker({
             </div>
           ) : (
             <>
+              {lastSelection && (
+                <button
+                  type="button"
+                  className="demo-recent-btn"
+                  onClick={() => onPick(lastSelection)}
+                >
+                  <span>
+                    <strong>최근 선택한 반</strong>
+                    <small>{lastSelection.ck.split('-').map((v, i) => `${v}${i === 0 ? '부' : i === 1 ? '학년' : '반'}`).join(' ')}</small>
+                  </span>
+                  <span aria-hidden="true">바로 들어가기 →</span>
+                </button>
+              )}
+
               <div className="demo-field">
                 <label className="demo-label" htmlFor="demo-part">부서</label>
                 <select id="demo-part" className="login-input demo-select" value={part} onChange={e => setPart(e.target.value)}>
@@ -155,6 +173,13 @@ export default function DemoClassPicker({
               >
                 이 반으로 들어가기
               </button>
+
+              {selected && (
+                <div className="demo-selection-summary" aria-live="polite">
+                  선택: <strong>{selected.part}부 {selected.grade}학년 {selected.cls}반</strong>
+                  {selected.teacherName ? ` · ${selected.teacherName} 선생님` : ''}
+                </div>
+              )}
 
               {loadError && <div className="login-err">반 목록을 불러오지 못했습니다: {loadError}</div>}
               {!loadError && options.length === 0 && (

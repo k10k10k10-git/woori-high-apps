@@ -96,12 +96,13 @@ export function buildDemoOptionsFromClasses(classes: Record<string, { teacher?: 
 
 // ─── 브라우저 저장 (새로고침해도 고른 반 유지) ─────────────────
 const SELECTION_KEY = 'demoSelection';
+const LAST_SELECTION_KEY = 'demoLastSelection';
 const ADMIN_INTENT_KEY = 'demoAdminIntent';
 
-export function loadDemoSelection(): DemoSelection | null {
+function readStoredSelection(key: string): DemoSelection | null {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(SELECTION_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<DemoSelection>;
     if (!parsed?.ck || !parseClassKey(parsed.ck)) return null;
@@ -111,9 +112,22 @@ export function loadDemoSelection(): DemoSelection | null {
   }
 }
 
+export function loadDemoSelection(): DemoSelection | null {
+  return readStoredSelection(SELECTION_KEY);
+}
+
+/** 반 바꾸기로 현재 선택을 비운 뒤에도 직전 반을 한 번에 다시 열 수 있게 한다. */
+export function loadLastDemoSelection(): DemoSelection | null {
+  return readStoredSelection(LAST_SELECTION_KEY);
+}
+
 export function saveDemoSelection(sel: DemoSelection) {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(SELECTION_KEY, JSON.stringify(sel)); } catch { /* 사파리 프라이빗 모드 */ }
+  try {
+    const value = JSON.stringify(sel);
+    localStorage.setItem(SELECTION_KEY, value);
+    localStorage.setItem(LAST_SELECTION_KEY, value);
+  } catch { /* 사파리 프라이빗 모드 */ }
 }
 
 export function clearDemoSelection() {
