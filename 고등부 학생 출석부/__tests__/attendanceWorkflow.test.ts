@@ -29,6 +29,19 @@ describe('출석 현장 업무 파생', () => {
 
     expect(result.map((week) => week.key)).toEqual(['0-2', '0-1', '0-0']);
     expect(result.map((week) => week.label)).toEqual(['8월 16일', '8월 9일', '8월 2일']);
+    expect(result.every((week) => !week.isCurrentWeek)).toBe(true);
+  });
+
+  it('현재 주간의 주일을 기본 후보로 표시한다', () => {
+    const result = recentEditableWeeks(
+      2026,
+      months,
+      {},
+      Date.parse('2026-08-25T03:00:00.000Z'),
+    );
+
+    expect(result[0]).toMatchObject({ key: '0-3', label: '8월 23일', isCurrentWeek: true });
+    expect(result.slice(1).every((week) => !week.isCurrentWeek)).toBe(true);
   });
 
   it('장결자를 일상 출석 대상에서 분리한다', () => {

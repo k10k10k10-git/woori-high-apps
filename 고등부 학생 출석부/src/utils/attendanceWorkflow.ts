@@ -5,6 +5,7 @@ export type EditableWeek = {
   key: string;
   label: string;
   dateValue: number;
+  isCurrentWeek: boolean;
 };
 
 function kstDateValue(nowMs: number): number {
@@ -21,11 +22,18 @@ export function recentEditableWeeks(
   limit = 4,
 ): EditableWeek[] {
   const today = kstDateValue(nowMs);
+  const todayKst = new Date(nowMs + 9 * 60 * 60 * 1000);
+  const currentSunday = Date.UTC(
+    todayKst.getUTCFullYear(),
+    todayKst.getUTCMonth(),
+    todayKst.getUTCDate() - todayKst.getUTCDay(),
+  );
   return months
     .flatMap(({ month, sundays }, mi) => sundays.map((day, di) => ({
       key: evKey(mi, di),
       label: `${month}월 ${day}일`,
       dateValue: Date.UTC(year, month - 1, day),
+      isCurrentWeek: Date.UTC(year, month - 1, day) === currentSunday,
     })))
     .filter((week) => week.dateValue <= today && !events[week.key])
     .sort((a, b) => b.dateValue - a.dateValue)

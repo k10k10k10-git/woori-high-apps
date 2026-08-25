@@ -380,8 +380,8 @@ export default function AttendanceTab() {
             >
               {editableWeeks.length === 0 ? (
                 <option value="">입력 가능한 주일이 없습니다</option>
-              ) : editableWeeks.map((week, index) => (
-                <option key={week.key} value={week.key}>{week.label}{index === 0 ? ' · 최근' : ''}</option>
+              ) : editableWeeks.map(week => (
+                <option key={week.key} value={week.key}>{week.label}{week.isCurrentWeek ? ' · 금일 주일' : ''}</option>
               ))}
             </select>
             <span>담임 교사는 최근 4회의 출석을 확인하고 바로 수정할 수 있습니다.</span>
