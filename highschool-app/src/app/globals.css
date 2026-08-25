@@ -1116,9 +1116,32 @@ html[data-view-preview="true"] .portal-content-frame .sm\:px-4,
 html[data-view-preview="true"] .portal-content-frame .sm\:px-6 { padding-left: 16px; padding-right: 16px; }
 html[data-view-preview="true"] .portal-content-frame .sm\:py-8 { padding-top: 24px; padding-bottom: 24px; }
 html[data-view-preview="true"] .portal-content-frame .sm\:grid-cols-2,
+html[data-view-preview="true"] .portal-content-frame .sm\:grid-cols-3,
+html[data-view-preview="true"] .portal-content-frame .sm\:grid-cols-4,
+html[data-view-preview="true"] .portal-content-frame .md\:grid-cols-2,
+html[data-view-preview="true"] .portal-content-frame .md\:grid-cols-3,
+html[data-view-preview="true"] .portal-content-frame .md\:grid-cols-4,
 html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-2,
 html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-3,
-html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-\[1fr_2fr\] { grid-template-columns: minmax(0, 1fr) !important; }
+html[data-view-preview="true"] .portal-content-frame .lg\:grid-cols-4,
+html[data-view-preview="true"] .portal-content-frame .xl\:grid-cols-2,
+html[data-view-preview="true"] .portal-content-frame .xl\:grid-cols-3,
+html[data-view-preview="true"] .portal-content-frame .xl\:grid-cols-4,
+html[data-view-preview="true"] .portal-content-frame [class*="sm:grid-cols-["],
+html[data-view-preview="true"] .portal-content-frame [class*="md:grid-cols-["],
+html[data-view-preview="true"] .portal-content-frame [class*="lg:grid-cols-["],
+html[data-view-preview="true"] .portal-content-frame [class*="xl:grid-cols-["] { grid-template-columns: minmax(0, 1fr) !important; }
+html[data-view-preview="true"] .portal-content-frame :where(.sm\:flex-row, .md\:flex-row, .lg\:flex-row, .xl\:flex-row) { flex-direction: column !important; }
+html[data-view-preview="true"] .home-hero {
+  min-height: 0;
+  align-items: stretch !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  gap: 18px;
+  border-radius: 18px;
+  padding: 24px 20px;
+}
+html[data-view-preview="true"] .home-hero .page-title { font-size: 27px; line-height: 1.28; word-break: keep-all; }
+html[data-view-preview="true"] .home-hero .page-description { font-size: 13px; line-height: 1.65; }
 html[data-view-preview="true"] .overlay-shell--fullscreen-mobile .overlay-shell__panel {
   width: min(430px, calc(100vw - 32px));
   height: min(860px, calc(100dvh - 32px));

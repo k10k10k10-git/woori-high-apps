@@ -79,4 +79,12 @@ describe("모바일 운영 화면 계약", () => {
     expect(header).toContain("<span>마이페이지</span>");
     expect(header).not.toContain("teamOpen");
   });
+
+  it("PC 모바일 미리보기는 임의값 반응형 그리드와 홈 히어로를 한 열로 되돌린다", () => {
+    const css = source("src/app/globals.css");
+    expect(css).toContain('[class*="lg:grid-cols-["]');
+    expect(css).toContain('html[data-view-preview="true"] .home-hero');
+    expect(css).toContain("grid-template-columns: minmax(0, 1fr) !important;");
+    expect(css).toContain('html[data-view-preview="true"] .home-hero .page-title { font-size: 27px;');
+  });
 });
