@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type {
   Group,
   IguardLodgingMap,
@@ -168,17 +168,30 @@ export default function CustomLodgingMap({
     }
   }
 
-  async function place(event: MouseEvent<HTMLDivElement>) {
+  async function savePlacement(left: number, top: number) {
     if (!canManage || !map || !roomId) return;
-    if ((event.target as HTMLElement).closest("button")) return;
-    const rect = event.currentTarget.getBoundingClientRect();
     await saveIguardLodgingHotspot(retreatId, map.id, {
       roomId,
       page,
-      left: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
-      top: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100)),
+      left: Math.max(0, Math.min(100, left)),
+      top: Math.max(0, Math.min(100, top)),
     });
     toast("호실 위치를 저장했습니다.", "success");
+  }
+
+  async function place(event: MouseEvent<HTMLDivElement>) {
+    if ((event.target as HTMLElement).closest("button")) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    await savePlacement(
+      ((event.clientX - rect.left) / rect.width) * 100,
+      ((event.clientY - rect.top) / rect.height) * 100,
+    );
+  }
+
+  function placeWithKeyboard(event: KeyboardEvent<HTMLDivElement>) {
+    if (!canManage || !roomId || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    void savePlacement(50, 50);
   }
 
   const uploader = canManage ? (
@@ -240,7 +253,14 @@ export default function CustomLodgingMap({
         {canManage && <p className="mt-2 text-xs text-emerald-600">{roomId ? "도면에서 호실 중심을 눌러 배치하세요." : "호실을 선택하면 도면에 핀을 놓을 수 있습니다."}</p>}
       </div>
       <div className="overflow-x-auto bg-slate-100 p-2 sm:p-4">
-        <div className={`relative mx-auto min-w-[760px] max-w-[1400px] overflow-hidden rounded-lg border border-slate-300 bg-white ${canManage && roomId ? "cursor-crosshair" : ""}`} onClick={event => void place(event)}>
+        <div
+          className={`relative mx-auto min-w-[760px] max-w-[1400px] overflow-hidden rounded-lg border border-slate-300 bg-white ${canManage && roomId ? "cursor-crosshair" : ""}`}
+          onClick={event => void place(event)}
+          onKeyDown={placeWithKeyboard}
+          role={canManage && roomId ? "button" : "group"}
+          tabIndex={canManage && roomId ? 0 : -1}
+          aria-label={canManage && roomId ? "선택한 호실을 도면 중앙에 배치" : "숙소 배치도"}
+        >
           <PdfPage
             url={map.fileUrl}
             page={page}

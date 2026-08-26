@@ -289,12 +289,12 @@ export default function AutoAssignPanel({ retreatId, participants, teachers, stu
 
   if (collapsed) {
     return (
-      <div className="card p-3 cursor-pointer hover:bg-slate-50" onClick={() => setCollapsed(false)}>
+      <button type="button" className="card w-full p-3 text-left hover:bg-slate-50" onClick={() => setCollapsed(false)}>
         <div className="text-sm font-semibold text-slate-600 flex items-center gap-2">
           <span>🎲</span> 자동 배정
           <span className="text-slate-300 text-xs ml-auto">▶</span>
         </div>
-      </div>
+      </button>
     );
   }
 
