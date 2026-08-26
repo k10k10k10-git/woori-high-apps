@@ -1,0 +1,20 @@
+/* Shared interaction primitives: keyboard, coarse pointers, and long mobile rosters. */
+.export-action {
+  align-items: center;
+  gap: 6px;
+}
+
+.retreat-participant-mobile-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 156px;
+}
+
+@media (pointer: coarse) {
+  button[aria-label],
+  a[aria-label],
+  .export-action,
+  .pagination-control {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

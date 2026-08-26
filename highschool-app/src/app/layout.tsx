@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./operations-tables.css";
+import "./theme-compat.css";
+import "./interaction-controls.css";
 import Providers from "./providers";
 import UpdateBanner from "./UpdateBanner";
 import PortalViewportShell from "@/components/PortalViewportShell";

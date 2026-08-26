@@ -18,7 +18,7 @@ describe("라이트·다크 공통 대비 계약", () => {
   });
 
   it("다크 모드에서 200단계 상태 배경과 반투명 휴강 배경을 어두운 면으로 재매핑한다", () => {
-    const css = source("src/app/globals.css");
+    const css = source("src/app/globals.css") + source("src/app/theme-compat.css");
     expect(css).toContain(".bg-amber-50\\/60");
     expect(css).toContain(".bg-blue-200");
     expect(css).toContain(".bg-orange-200");
