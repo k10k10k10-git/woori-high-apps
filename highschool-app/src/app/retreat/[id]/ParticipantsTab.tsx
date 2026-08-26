@@ -621,7 +621,7 @@ export default function ParticipantsTab({ retreat }: Props) {
           <>
           {/* CSS로 숨기지 않고 렌더 자체를 가른다. 데스크톱 표에는 본인·보호자 연락처가
               들어 있어, display:none으로만 감추면 휴대폰 DOM에 그대로 남는다. */}
-          {!isDesktop && <RetreatParticipantMobileList list={list} mismatchKeys={mismatchKeys} ambiguousKeys={ambiguousKeys} />}
+          {!isDesktop && <RetreatParticipantMobileList key={`${search}|${buFilter}|${gradeFilter}|${sortBy}|${sortDir}`} list={list} mismatchKeys={mismatchKeys} ambiguousKeys={ambiguousKeys} />}
           {isDesktop && (
           <table className="retreat-roster-desktop w-full text-sm" style={{ minWidth: 900 }}>
             <thead>
