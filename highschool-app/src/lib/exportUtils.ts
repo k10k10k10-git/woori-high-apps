@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import type { WorkBook } from "xlsx";
 
 /**
  * HTML 이스케이프 — 인쇄/JPG 출력 HTML에 사용자 입력(이름·특이사항 등)을 넣기 전 반드시 통과시킨다.
@@ -14,7 +14,12 @@ export function escapeHtml(value: unknown): string {
     .replace(/'/g, "&#39;");
 }
 
-export function saveWorkbook(wb: XLSX.WorkBook, filename: string) {
+export async function loadXlsx() {
+  return import("xlsx");
+}
+
+export async function saveWorkbook(wb: WorkBook, filename: string) {
+  const XLSX = await loadXlsx();
   XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 

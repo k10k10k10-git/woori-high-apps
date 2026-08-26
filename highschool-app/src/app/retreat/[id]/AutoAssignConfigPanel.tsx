@@ -1,101 +1,18 @@
 "use client";
-import { useState } from "react";
 import { TeacherAttendance } from "@/lib/types";
 import {
   AutoAssignScope, ClassUnit, ConflictPair, RuleFlags, LeaderEntry,
   ensureEvenCombinedGroupCounts, ensureEvenScopedGroupCount, parseClassKey,
 } from "./autoAssignUtils";
-
-// ── 타입 ─────────────────────────────────────────────────────────────
-
-interface StudentPicker { bu: string; grade: string; cls: string; name: string; studentId: string; }
-interface TeacherPicker { bu: string; name: string; }
-interface ClassPicker { bu: string; grade: string; cls: string; }
-
-interface StudentCandidate { name: string; bu: string; grade: number; cls: number; studentId: string; }
-interface TeacherCandidate { name: string; bu: string; }
-
-// ── 이름 우선 선택 컴포넌트 ─────────────────────────────────────────────
-// 부서·학년·반을 먼저 고르지 않고, 이름을 입력하면 하단에 후보(부·학년·반)가 떠서 고르는 방식.
-// 저장은 이름만(기존 로직과 동일) — 후보의 부/학년/반은 동명이인 확인·표시용.
-
-function StudentNamePicker({ value, candidates, placeholder, onPick }: {
-  value: StudentPicker;
-  candidates: StudentCandidate[];
-  placeholder: string;
-  onPick: (p: StudentPicker) => void;
-}) {
-  const [query, setQuery] = useState("");
-  if (value.name) {
-    return (
-      <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-white border border-green-300 rounded-lg px-2 py-1 text-xs">
-        <span className="font-semibold text-slate-700 truncate">{value.name}</span>
-        <span className="text-slate-400 shrink-0">{value.bu} {value.grade}학년 {value.cls}반</span>
-        <button type="button" aria-label="선택 취소" onClick={() => { onPick({ bu: "", grade: "", cls: "", name: "", studentId: "" }); setQuery(""); }}
-          className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none shrink-0">×</button>
-      </div>
-    );
-  }
-  const q = query.trim();
-  const matches = q ? candidates.filter(c => c.name.includes(q)).slice(0, 8) : [];
-  return (
-    <div className="relative flex-1 min-w-0">
-      <input className="input w-full text-xs py-0.5" placeholder={placeholder}
-        value={query} onChange={e => setQuery(e.target.value)} />
-      {matches.length > 0 && (
-        <div className="absolute z-10 left-0 right-0 mt-0.5 rounded-lg border border-slate-200 bg-white shadow-lg max-h-40 overflow-y-auto">
-          {matches.map((c, i) => (
-            <button type="button" key={c.studentId || `${c.bu}_${c.grade}_${c.cls}_${c.name}_${i}`}
-              onClick={() => { onPick({ bu: c.bu, grade: String(c.grade), cls: String(c.cls), name: c.name, studentId: c.studentId }); setQuery(""); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 text-xs">
-              <span className="font-semibold text-slate-700">{c.name}</span>
-              <span className="text-slate-400 ml-auto">{c.bu} {c.grade}학년 {c.cls}반</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TeacherNamePicker({ value, candidates, placeholder, onPick }: {
-  value: TeacherPicker;
-  candidates: TeacherCandidate[];
-  placeholder: string;
-  onPick: (p: TeacherPicker) => void;
-}) {
-  const [query, setQuery] = useState("");
-  if (value.name) {
-    return (
-      <div className="flex items-center gap-1.5 flex-1 min-w-0 bg-white border border-green-300 rounded-lg px-2 py-1 text-xs">
-        <span className="font-semibold text-slate-700 truncate">{value.name}</span>
-        <span className="text-slate-400 shrink-0">{value.bu}</span>
-        <button type="button" aria-label="선택 취소" onClick={() => { onPick({ bu: "", name: "" }); setQuery(""); }}
-          className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none shrink-0">×</button>
-      </div>
-    );
-  }
-  const q = query.trim();
-  const matches = q ? candidates.filter(c => c.name.includes(q)).slice(0, 8) : [];
-  return (
-    <div className="relative flex-1 min-w-0">
-      <input className="input w-full text-xs py-0.5" placeholder={placeholder}
-        value={query} onChange={e => setQuery(e.target.value)} />
-      {matches.length > 0 && (
-        <div className="absolute z-10 left-0 right-0 mt-0.5 rounded-lg border border-slate-200 bg-white shadow-lg max-h-40 overflow-y-auto">
-          {matches.map((c, i) => (
-            <button type="button" key={`${c.bu}_${c.name}_${i}`}
-              onClick={() => { onPick({ bu: c.bu, name: c.name }); setQuery(""); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 text-xs">
-              <span className="font-semibold text-slate-700">{c.name}</span>
-              <span className="text-slate-400 ml-auto">{c.bu}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+import {
+  ClassPicker,
+  StudentCandidate,
+  StudentNamePicker,
+  StudentPicker,
+  TeacherCandidate,
+  TeacherNamePicker,
+  TeacherPicker,
+} from "./AutoAssignNamePickers";
 
 export interface AutoAssignConfigPanelProps {
   // 조 수

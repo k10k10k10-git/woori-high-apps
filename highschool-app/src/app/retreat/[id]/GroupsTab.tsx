@@ -3,9 +3,9 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
 import { clearGroups, saveGroups, subscribeToGroups, subscribeToStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
-import * as XLSX from "xlsx";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
+import { loadXlsx, saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
+import ExportButton from "./ExportButton";
 import AutoAssignPanel from "./AutoAssignPanel";
 import { AutoAssignScope, mergeAutoAssignedGroups } from "./autoAssignUtils";
 import { findLateRegistrantIds, findUnassignedStudentIds, excludeAssignedStudents } from "@/lib/assignmentBoard";
@@ -328,7 +328,8 @@ export default function GroupsTab({ retreat }: Props) {
     return map;
   }
 
-  function exportGroupsXLSX() {
+  async function exportGroupsXLSX() {
+    const XLSX = await loadXlsx();
     // 신청자 취합 그리드 느낌: 조=열, 세로 나열, 성별·역할·상태별 셀 색 (xlsx-js-style)
     const FILL: Record<GroupsGridCell["kind"], string> = {
       header: "E2E8F0",  // 조명 — slate-200
@@ -378,7 +379,7 @@ export default function GroupsTab({ retreat }: Props) {
       ws["!cols"] = columns.map(() => ({ wch: 14 }));
       XLSX.utils.book_append_sheet(wb, ws, bu);
     });
-    saveWorkbook(wb, `${retreat.name}_조편성`);
+    await saveWorkbook(wb, `${retreat.name}_조편성`);
   }
 
   function buildGroupsHtml(onlyBu?: string) {
@@ -756,9 +757,9 @@ export default function GroupsTab({ retreat }: Props) {
             disabled={groups.length === 0}
             className="btn-secondary btn-sm text-red-600"
           >취소자 제거</button>
-          <button onClick={exportGroupsXLSX} disabled={groups.length === 0} className="btn-secondary btn-sm">📥 XLSX</button>
-          <button onClick={exportGroupsPDF} disabled={groups.length === 0} className="btn-secondary btn-sm">🖨️ PDF</button>
-          <button onClick={exportGroupsJPG} disabled={groups.length === 0} className="btn-secondary btn-sm">🖼️ JPG</button>
+          <ExportButton kind="xlsx" onClick={exportGroupsXLSX} disabled={groups.length === 0} />
+          <ExportButton kind="pdf" onClick={exportGroupsPDF} disabled={groups.length === 0} />
+          <ExportButton kind="jpg" onClick={exportGroupsJPG} disabled={groups.length === 0} />
           <BackupRestoreButton label="조편성" loadBackups={() => getGroupsBackups(retreat.id)} restore={key => restoreGroupsBackup(retreat.id, key)} />
           <button
             onClick={removeAllGroups}

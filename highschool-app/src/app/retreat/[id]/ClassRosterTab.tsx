@@ -3,68 +3,26 @@ import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { Retreat, Participant, PartialAttendance } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
 import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear, subscribeToClassesByYear, getPartialAttendances, subscribeToPartialAttendances } from "@/lib/db";
-import * as XLSX from "xlsx";
-import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
+import { loadXlsx, saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
-import { parseClassKey } from "@/lib/classKey";
 import { resolveEffectiveColor } from "@/lib/rosterColor";
 import { uniqueMatchedParticipants, summarizeRoster } from "@/lib/rosterStats";
 import { resolvePrintGender } from "@/lib/groupPrint";
-
-interface StudentInfo {
-  id: string;
-  name: string;
-  num: number;
-  grade: number;
-  classNum: number;
-  phone?: string;
-  jang?: boolean; // 장결자(장기결석) — 명단에서 별도 구역으로 분리 표시
-}
-
-interface ClassInfo {
-  buNum: number;   // 1=1부, 2=2부
-  grade: number;   // 학년 (1/2/3)
-  classNum: number; // 반 번호
-  teacher: string;
-  students: StudentInfo[];
-}
+import {
+  buildClassInfos,
+  CELL_COLORS,
+  CellColor,
+  COLOR_CLASSES,
+  COLOR_LABELS,
+  ClassInfo,
+  StudentInfo,
+  stripRosterSuffix,
+} from "./classRosterModel";
+import ExportButton from "./ExportButton";
 
 type BuTab = "1부" | "2부";
 
-const CELL_COLORS = ["green", "purple", "blue", "orange", "red"] as const;
-type CellColor = typeof CELL_COLORS[number];
-// 사용자가 명시적으로 지정한 색상 — "단순 참가자 표시(cellActive)"보다 진하게 해 뚜렷이 구분되게 함.
-// 초록/보라(신청자 태그)는 파스텔 톤으로, 파랑/주황/빨강은 진하게 유지.
-const COLOR_CLASSES: Record<CellColor, string> = {
-  green:  "bg-green-100 text-green-800 font-semibold border-green-300 cursor-pointer",
-  purple: "bg-purple-100 text-purple-800 font-semibold border-purple-300 cursor-pointer",
-  blue:   "bg-blue-200 text-blue-900 font-semibold border-blue-400 cursor-pointer",
-  orange: "bg-orange-200 text-orange-900 font-semibold border-orange-400 cursor-pointer",
-  red:    "bg-red-200 text-red-900 font-semibold border-red-400 cursor-pointer",
-};
-const COLOR_LABELS: Record<CellColor, string> = {
-  green: "1부 신청자", purple: "2부 신청자", blue: "입금완료", orange: "부분참", red: "신청취소",
-};
-
-// 느슨한 접미사 제거 (매칭 인덱스용) — studentMatcher의 stripSuffix(엄격)와 다름
-function stripSuffix(n: string) {
-  return n.replace(/[A-Za-z]+$/, "").trim();
-}
-
-function buildClassInfos(classesRaw: Awaited<ReturnType<typeof getClassesByYear>>): ClassInfo[] {
-  const infos: ClassInfo[] = [];
-  Object.entries(classesRaw).forEach(([classKey, cd]) => {
-    const parsed = parseClassKey(classKey);
-    if (!parsed) return;
-    const { buNum, grade, classNum } = parsed;
-    const students: StudentInfo[] = Object.entries(cd.students || {})
-      .map(([id, s]) => ({ id, grade, classNum, name: s.name, num: s.num ?? 0, phone: s.phone, jang: !!s.jang }))
-      .sort((a, b) => a.name.localeCompare(b.name, "ko"));
-    infos.push({ buNum, grade, classNum, teacher: cd.teacher || "", students });
-  });
-  return infos.sort((a, b) => a.buNum - b.buNum || a.grade - b.grade || a.classNum - b.classNum);
-}
 
 export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
   const { toast } = useUI();
@@ -189,7 +147,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       const push = <K,>(m: Map<K, StudentInfo[]>, k: K) => { const a = m.get(k) ?? []; a.push(s); m.set(k, a); };
       push(byName, s.name);
       push(byNorm, normalizeName(s.name));
-      push(byStripped, stripSuffix(s.name));
+      push(byStripped, stripRosterSuffix(s.name));
     });
 
     buParts.forEach(p => {
@@ -410,7 +368,8 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     return "";
   }
 
-  function exportRosterXLSX() {
+  async function exportRosterXLSX() {
+    const XLSX = await loadXlsx();
     const buNum = bu === "1부" ? 1 : 2;
     const rows: Record<string, string | number>[] = [];
     const pushRows = (cols: typeof regularClasses, gubun: string) => {
@@ -428,7 +387,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     ws["!cols"] = [{ wch: 7 }, { wch: 6 }, { wch: 8 }, { wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `신청자취합_${bu}`);
-    saveWorkbook(wb, `${retreat.name}_신청자취합_${bu}`);
+    await saveWorkbook(wb, `${retreat.name}_신청자취합_${bu}`);
   }
 
   function buildRosterHtml() {
@@ -616,9 +575,9 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
           ))}
         </div>
         <div className="flex gap-2 ml-auto">
-          <button onClick={exportRosterXLSX} disabled={visibleClasses.length === 0} className="btn-secondary text-xs">📥 XLSX</button>
-          <button onClick={exportRosterPDF} disabled={visibleClasses.length === 0} className="btn-secondary text-xs">🖨️ PDF</button>
-          <button onClick={exportRosterJPG} disabled={visibleClasses.length === 0} className="btn-secondary text-xs">🖼️ JPG</button>
+          <ExportButton kind="xlsx" onClick={exportRosterXLSX} disabled={visibleClasses.length === 0} />
+          <ExportButton kind="pdf" onClick={exportRosterPDF} disabled={visibleClasses.length === 0} />
+          <ExportButton kind="jpg" onClick={exportRosterJPG} disabled={visibleClasses.length === 0} />
         </div>
       </div>
 
