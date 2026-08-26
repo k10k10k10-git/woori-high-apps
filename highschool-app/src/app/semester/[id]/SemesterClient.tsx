@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLoadErrors } from "@/lib/useLoadErrors";
+import { createSubscriptionReadinessGate } from "@/lib/subscriptionReadiness";
+import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import {
   subscribeSemesterMeta,
@@ -71,18 +73,29 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
   const { fail, ok, message: loadError } = useLoadErrors(`${semesterId}|${user?.uid ?? ""}`);
+  const dataScope = user && allowed ? `${semesterId}|${user.uid}` : null;
+  const dataLoading = dataScope == null || loadedScope !== dataScope;
 
   useEffect(() => {
     if (!user || !allowed) return;
+    const scope = `${semesterId}|${user.uid}`;
+    let alive = true;
+    const readiness = createSubscriptionReadinessGate(
+      ["학기 정보", "사역팀", "훈련 반", "회차", "신청 명단"],
+      () => { if (alive) setLoadedScope(scope); },
+    );
+    const ready = (key: string) => { ok(key); readiness.markReady(key); };
+    const failed = (key: string) => (error: Error) => { fail(key)(error); readiness.markReady(key); };
     const unsubs = [
-      subscribeSemesterMeta(semesterId, (value) => { setMeta(value); ok("학기 정보"); }, fail("학기 정보")),
-      subscribeTeams(semesterId, (value) => { setTeams(value); ok("사역팀"); }, fail("사역팀")),
-      subscribeTrainingClasses(semesterId, (value) => { setTrainingClasses(value); ok("훈련 반"); }, fail("훈련 반")),
-      subscribeSessions(semesterId, (value) => { setSessions(value); ok("회차"); }, fail("회차")),
-      subscribeApplications(semesterId, (value) => { setApplications(value); ok("신청 명단"); }, fail("신청 명단")),
+      subscribeSemesterMeta(semesterId, (value) => { setMeta(value); ready("학기 정보"); }, failed("학기 정보")),
+      subscribeTeams(semesterId, (value) => { setTeams(value); ready("사역팀"); }, failed("사역팀")),
+      subscribeTrainingClasses(semesterId, (value) => { setTrainingClasses(value); ready("훈련 반"); }, failed("훈련 반")),
+      subscribeSessions(semesterId, (value) => { setSessions(value); ready("회차"); }, failed("회차")),
+      subscribeApplications(semesterId, (value) => { setApplications(value); ready("신청 명단"); }, failed("신청 명단")),
     ];
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
+    return () => { alive = false; unsubs.forEach((unsubscribe) => unsubscribe()); };
   }, [allowed, fail, ok, semesterId, user]);
 
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
@@ -145,6 +158,10 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         {loadError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
+        {dataLoading ? (
+          <WorkspaceSkeleton label="학기 사역 데이터를 불러오는 중입니다." rows={7} variant="page" />
+        ) : (
+          <>
         {isMobileView && mobileSection === "신청·배치" && (
           <div className="mobile-subtabs" role="tablist" aria-label="신청과 배치">
             {(["신청", "배치"] as const).map((name) => <button key={name} role="tab" aria-selected={activeTab === name} onClick={() => setPickedTab(name)}>{name === "신청" ? "신청 및 삭제" : name}</button>)}
@@ -171,6 +188,8 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
             {activeTab === "설정" && canEdit && <SettingsTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} />}
           </SemesterEditProvider>
         </div>
+          </>
+        )}
       </main>
     </div>
   );

@@ -19,6 +19,7 @@ import {
 } from "@/features/iguard/lib/types";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import { movementsForDefaultSegments } from "@/features/iguard/lib/defaultSegment";
+import { createSubscriptionReadinessGate } from "@/lib/subscriptionReadiness";
 
 export interface RetreatData {
   retreat: Retreat | null;
@@ -116,24 +117,20 @@ export function useRetreatData(id: string): RetreatData {
     if (!id || retreatYear == null) return;
     const scope = `${id}:${retreatYear}`;
     let alive = true;
-    const pending = new Set([
+    const readiness = createSubscriptionReadinessGate([
       "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "segments", "posts",
       "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff", "gbs", "lodgingMaps",
-    ]);
-    const markReady = (key: string) => {
-      pending.delete(key);
-      if (alive && pending.size === 0) setLoadedScope(scope);
-    };
+    ], () => { if (alive) setLoadedScope(scope); });
     // 성공하면 그 경로의 이전 실패를 지운다 — 권한이 열린 뒤 재구독하면 배너가 사라진다.
     const ready = (key: string) => {
       if (alive) okPath(key);
-      markReady(key);
+      readiness.markReady(key);
     };
     // 구독 에러(권한 거부·규칙 변경 등) 시: 실패한 경로를 배너에 모으고 해당 키를 ready 처리해
     // dataLoading이 영원히 true로 남는 "무한 스피너"를 방지한다.
     const fail = (key: string) => (error: Error) => {
       if (alive) failPath(key)(error);
-      markReady(key);
+      readiness.markReady(key);
     };
     const unsubs = [
       subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }, fail("students")),
