@@ -8,8 +8,7 @@ import {
   deleteTshirtOrder,
   replaceSheetTshirtOrders,
 } from "@/lib/db";
-import * as XLSX from "xlsx";
-import { saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
+import { loadXlsx, saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 
@@ -203,7 +202,8 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
     }));
   }
 
-  function exportXLSX() {
+  async function exportXLSX() {
+    const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(buildTshirtRows());
     ws["!cols"] = [
       { wch: 5 }, { wch: 10 }, { wch: 5 }, { wch: 7 }, { wch: 5 },
@@ -211,7 +211,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "단체티 신청");
-    saveWorkbook(wb, `${retreat.name}_단체티신청`);
+    await saveWorkbook(wb, `${retreat.name}_단체티신청`);
   }
 
   async function exportJPG() {

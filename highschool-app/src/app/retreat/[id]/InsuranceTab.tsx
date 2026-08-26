@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { Cancellation, Retreat, TeacherAttendance } from "@/lib/types";
 import { subscribeToCancellations, subscribeToTeachers, subscribeToTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
-import * as XLSX from "xlsx";
-import { saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
+import { loadXlsx, saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
+import ExportButton from "./ExportButton";
 import { fetchSheetCSV } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 import {
@@ -127,7 +127,8 @@ export default function InsuranceTab({ retreat }: Props) {
     ? teacherRows
     : teacherRows.filter(t => t.bu === buFilter);
 
-  function exportXLSX() {
+  async function exportXLSX() {
+    const XLSX = await loadXlsx();
     const data = filteredInsured.map((e, i) => ({
       "번호": i + 1,
       "구분": e.type,
@@ -141,7 +142,7 @@ export default function InsuranceTab({ retreat }: Props) {
     ws["!cols"] = [{ wch: 6 }, { wch: 10 }, { wch: 10 }, { wch: 6 }, { wch: 8 }, { wch: 6 }, { wch: 16 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "여행자보험");
-    saveWorkbook(wb, `${retreat.name}_여행자보험`);
+    await saveWorkbook(wb, `${retreat.name}_여행자보험`);
   }
 
   function buildInsuranceHtml() {
@@ -191,9 +192,9 @@ export default function InsuranceTab({ retreat }: Props) {
           {idColName && <p className="text-xs text-slate-400 mt-0.5">학생 주민번호 컬럼: <span className="font-mono bg-slate-100 px-1 rounded">{idColName}</span></p>}
         </div>
         <div className="flex gap-2">
-          <button onClick={exportXLSX} disabled={allInsured.length === 0} className="btn-secondary text-xs">📥 XLSX</button>
-          <button onClick={exportPDF} disabled={allInsured.length === 0} className="btn-secondary text-xs">🖨️ PDF</button>
-          <button onClick={exportJPG} disabled={allInsured.length === 0} className="btn-secondary text-xs">🖼️ JPG</button>
+          <ExportButton kind="xlsx" onClick={exportXLSX} disabled={allInsured.length === 0} />
+          <ExportButton kind="pdf" onClick={exportPDF} disabled={allInsured.length === 0} />
+          <ExportButton kind="jpg" onClick={exportJPG} disabled={allInsured.length === 0} />
           <button onClick={() => setSheetRefreshGeneration((value) => value + 1)} className="btn-secondary text-xs">🔄 시트 새로고침</button>
         </div>
       </div>

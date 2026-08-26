@@ -6,8 +6,7 @@ import {
   subscribeToMedicinePresets, saveMedicinePresets, subscribeToParticipants,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
-import { saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
-import * as XLSX from "xlsx";
+import { loadXlsx, saveWorkbook, rowsToHtmlTable, exportAsJPG } from "@/lib/exportUtils";
 import NameAutocomplete, { type NameSuggestionBase } from "./NameAutocomplete";
 
 const OUTCOME_PRESETS = ["약 처방 후 복귀", "휴식 권고", "보호자 연락", "병원 이송", "관찰 중"];
@@ -247,13 +246,14 @@ export default function MedicalLogTab({ retreat }: Props) {
     }));
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (logs.length === 0) return toast("내보낼 기록이 없습니다.", "warning");
+    const XLSX = await loadXlsx();
     const ws = XLSX.utils.json_to_sheet(buildMedicalLogRows());
     ws["!cols"] = [10, 8, 6, 4, 4, 30, 20, 12, 20].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "의료일지");
-    saveWorkbook(wb, `${retreat.name}_의료일지`);
+    await saveWorkbook(wb, `${retreat.name}_의료일지`);
   }
 
   async function handleExportJPG() {
