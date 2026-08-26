@@ -318,6 +318,8 @@
 
 ## 미완인 것 — 정확한 다음 단계
 
+- [ ] **(2026-08-27 CI 인증 1회 설정)** `highschool-app`의 로그인 E2E/axe 품질 관문은 구현 완료했지만 GitHub Secret `E2E_STORAGE_STATE_B64`는 로컬 Chrome에서 로그인 상태를 만든 뒤 등록해야 한다. `npm run e2e:auth`로 `.auth/user.json`을 생성하고 `base64 < .auth/user.json | gh secret set E2E_STORAGE_STATE_B64 --repo k10k10k10-git/woori-high-apps`로만 전달한다. 파일 내용 출력·커밋 금지.
+
 - [ ] **(9월 1일 정리 예정) 학생 출석부 데모 모드.** 지금 `NEXT_PUBLIC_DEMO_MODE=1`에 계정 정보가 채워진 채 배포돼 있다. 사용자가 돌아오는 주까지 테스트하고 **2026-09-01에 직접 정리 일정을 잡았다. 그 전에는 끄지 말 것.** 정리 시 ① Firebase 콘솔에서 `demo@woorihigh.com` 계정 삭제 + `attendanceAdmins`의 그 uid 삭제 ② `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE=0` ③ `firebase deploy --only hosting` 순서다.
 - [x] ~~**수련회 참가자 연락처 운영 이관 승인 대기.**~~ — 2026-08-24 승인 후 스냅샷 → 계획 재생성 → 루트 원자 update 1,006경로 → public 연락처 0/private 503 → 비연락처 데이터 해시 동일까지 검증 완료. 임시 개인정보 스냅샷 삭제 완료.
 - [x] ~~**사이트 요청 첨부 분리.**~~ — 2026-08-24 기존 Firebase Storage를 재사용해 `site-requests/{uid}/{requestId}/attachment.jpg`로 분리. 기존 요청 0건이라 이관 대상 없음. RTDB에는 메타데이터만 저장하고 Rules는 수정·배포하지 않음.

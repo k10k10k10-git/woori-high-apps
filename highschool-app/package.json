@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e:smoke": "playwright test e2e/authenticated-smoke.e2e.ts",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e:smoke": "node scripts/require-e2e-auth.mjs && playwright test e2e/authenticated-smoke.e2e.ts",
+    "test:e2e:a11y": "node scripts/require-e2e-auth.mjs && playwright test e2e/accessibility.e2e.ts",
+    "quality:lighthouse": "lhci autorun",
+    "quality:ci": "npm run lint && npm run typecheck && npm run test:coverage && npm run build",
     "e2e:auth": "node scripts/save-e2e-auth.mjs"
   },
   "dependencies": {
@@ -17,20 +21,23 @@
     "firebase": "^12.15.0",
     "next": "^16.3.2",
     "pdfjs-dist": "^6.2.108",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "xlsx": "npm:xlsx-js-style@^1.2.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitest/coverage-v8": "^4.1.11",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }
