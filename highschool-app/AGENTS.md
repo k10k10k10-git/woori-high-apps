@@ -305,6 +305,11 @@ npm run build
 - **판단 질문**: 데스크톱 DOM의 폭만 430px로 줄이고 반응형 유틸리티를 CSS로 하나씩 되돌리지 않는다. 미디어 쿼리는 바깥 브라우저 폭을 계속 보고 일부 컴포넌트는 실제 뷰포트 상태로 JSX를 고르므로, 이런 방식은 휴대폰 화면이 아니라 데스크톱과 모바일이 섞인 세 번째 화면을 만든다. 모바일 UI를 별도 컴포넌트 트리로 복제하지도 않는다. 실제 휴대폰과 미리보기의 수정 시점이 갈라진다. 같은 출처 iframe은 기존 Firebase Auth·로컬 설정을 재사용하고 실제 모바일 코드 경로를 그대로 실행하므로 이 요구에 맞는 의도적인 격리 경계다.
 - **재사용 규칙**: 데스크톱에서 실제 모바일 앱을 미리 보여 줄 때는 `기존 모바일 정보구조 확인 → 바깥 PC 제어와 안쪽 앱 셸 분리 → same-origin 고정 뷰포트 iframe → URL·테마 상태 동기화 → 실제 휴대폰 헤더·스크롤·왕복 QA` 순서를 따른다.
 
+### 사용자가 고른 PC 화면을 브라우저 너비와 분리하기 (2026-08-27)
+- **접근법**: 1→ `ViewModeContext.tsx`에서 저장 모드와 `matchMedia` 결과를 합쳐 모바일을 강제하는 지점을 찾는다. 2→ 저장값이 없을 때만 실제 뷰포트로 최초 모드를 정하고, 이후 `isMobileView`는 저장된 선택만 보게 한다. 3→ `PortalViewportShell.tsx`에서 `desktop + 900px 이하` 조합을 감지해 같은 출처의 1280px iframe으로 연다. 4→ 프레임 안의 화면 전환은 `storage` 이벤트로 바깥 셸에 동기화하고, 순수 판정 함수와 계약 테스트로 `저장된 PC + 좁은 창 = PC 고정`을 잠근다.
+- **판단 질문**: React의 `isMobileView`만 바꾸고 CSS 미디어 쿼리를 그대로 두지 않는다. 그러면 JSX는 PC인데 CSS는 모바일인 혼합 화면이 된다. 모든 모바일 미디어 쿼리에 `data-view-mode` 예외를 덧붙이지도 않는다. 누락 위험과 `!important`가 계속 늘어난다. 사용자가 PC 화면을 명시했으므로 좁은 창에서 가로 스크롤이 생기더라도 고정된 실제 PC 뷰포트를 제공하는 편이 요구에 맞다.
+- **재사용 규칙**: 명시적 보기 모드가 반응형 자동 전환보다 우선해야 하면 `최초 기본값과 지속 선택 분리 → JS·CSS가 같은 고정 뷰포트를 보게 격리 → 프레임 간 상태 동기화 → 좁은 창 회귀 테스트` 순서로 구현한다.
+
 ### 실시간 운영 화면의 로딩·대용량 UI·CI를 한 번에 품질 경계로 묶기 (2026-08-27)
 - **접근법**: 1→ `src/lib/subscriptionReadiness.ts`에서 여러 Firebase 구독의 첫 성공·오류 응답을 모두 준비 완료로 합치고 `WorkspaceSkeleton`을 준비 전 화면에 둔다. 2→ `RetreatParticipantMobileList.tsx`는 `pagination.ts`로 40명씩 자르고 `interaction-controls.css`의 `content-visibility:auto`를 더해 DOM과 페인트를 함께 제한한다. 3→ 800줄 이상 화면은 이름 선택기·순수 명단 모델·방 카드 같은 책임 단위로 분리하고 `componentBoundaries.test.ts`와 특성 테스트로 정렬·표기 계약을 고정한다. 4→ `exportUtils.loadXlsx()`의 동적 import로 무거운 XLSX 런타임을 내보내기 시점까지 미루고 빌드 manifest에서 별도 chunk 생성을 확인한다. 5→ CSS를 기반·운영표·테마 호환·상호작용 파일로 나누고 `cssArchitecture.test.ts`로 파일 크기와 `!important` 예산을 고정한다. 6→ `.github/workflows/highschool-quality.yml`에 lint·typecheck·coverage·build·Lighthouse·인증 smoke·axe를 순서대로 연결하고 인증 파일 누락은 `scripts/require-e2e-auth.mjs`가 즉시 실패하게 한다.
 - **판단 질문**: 모든 `get`을 구독으로 바꾸거나 스켈레톤을 시간 지연으로 끄지 않는다. 전자는 거래 검증과 명시적 명령까지 장기 리스너로 만들고, 후자는 네트워크 오류에서 빈 화면을 정상처럼 보이게 한다. 모바일 명단 전체를 숨김 CSS로만 처리하지 않고 실제 배열을 페이지 단위로 잘라 DOM 수를 제한한다. XLSX를 앱 시작 시 정적 import하거나 로그인 E2E를 인증 파일 없을 때 skip하지 않는다. 둘 다 번들·CI가 정상인 것처럼 보이게 하는 거짓 통과다.

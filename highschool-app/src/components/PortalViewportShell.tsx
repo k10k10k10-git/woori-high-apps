@@ -6,6 +6,7 @@ import { useViewMode } from "@/context/ViewModeContext";
 import ConnectivityBanner from "@/app/ConnectivityBanner";
 import SuggestionResolutionNotifier from "@/features/suggestions/SuggestionResolutionNotifier";
 import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
+import { shouldLockDesktopViewport, shouldUseMobilePreview } from "@/context/viewMode";
 
 /**
  * PC의 모바일 미리보기는 CSS로 데스크톱 레이아웃을 접지 않는다.
@@ -18,12 +19,14 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const { mode, isViewportMobile } = useViewMode();
-  const isMobilePreview = !isViewportMobile && mode === "mobile";
+  const isMobilePreview = shouldUseMobilePreview(mode, isViewportMobile);
+  const isDesktopLocked = shouldLockDesktopViewport(mode, isViewportMobile);
+  const isFramedView = isMobilePreview || isDesktopLocked;
 
   // 모바일 프레임 안에서 이동한 URL을 바깥 주소에도 반영한다. 그래야 PC버전으로
   // 돌아갈 때 방금 보고 있던 업무 화면이 그대로 열린다. 같은 출처만 읽고 쓰기는 없다.
   useEffect(() => {
-    if (!isMobilePreview) return;
+    if (!isFramedView) return;
     const timer = window.setInterval(() => {
       try {
         const frameLocation = frameRef.current?.contentWindow?.location;
@@ -36,7 +39,20 @@ export default function PortalViewportShell({ children }: { children: React.Reac
       }
     }, 350);
     return () => window.clearInterval(timer);
-  }, [isMobilePreview, router]);
+  }, [isFramedView, router]);
+
+  if (isDesktopLocked) {
+    return (
+      <main className="portal-desktop-lock-stage" aria-label="PC 화면 고정 보기">
+        <iframe
+          ref={frameRef}
+          className="portal-desktop-lock-frame"
+          src={pathname}
+          title="고등부 통합사이트 PC 화면"
+        />
+      </main>
+    );
+  }
 
   if (isMobilePreview) {
     return (

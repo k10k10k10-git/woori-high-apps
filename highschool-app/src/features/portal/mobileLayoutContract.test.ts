@@ -86,7 +86,7 @@ describe("모바일 운영 화면 계약", () => {
     const header = source("src/features/portal/GlobalPortalHeader.tsx");
     const css = source("src/app/globals.css");
     expect(layout).toContain("<PortalViewportShell>{children}</PortalViewportShell>");
-    expect(shell).toContain('const isMobilePreview = !isViewportMobile && mode === "mobile"');
+    expect(shell).toContain("shouldUseMobilePreview(mode, isViewportMobile)");
     expect(shell).toContain('<iframe');
     expect(shell).toContain('className="portal-mobile-preview-frame"');
     expect(shell).toContain('title="고등부 통합사이트 모바일 화면"');
@@ -94,5 +94,15 @@ describe("모바일 운영 화면 계약", () => {
     expect(css).toContain("width: min(430px, calc(100vw - 32px));");
     expect(css).toContain("height: min(844px, calc(100dvh - 84px));");
     expect(css).not.toContain('html[data-view-preview="true"] .home-hero');
+  });
+
+  it("PC버전은 좁은 브라우저에서도 1280px 데스크톱 화면을 유지한다", () => {
+    const shell = source("src/components/PortalViewportShell.tsx");
+    const css = source("src/app/globals.css");
+    expect(shell).toContain("shouldLockDesktopViewport(mode, isViewportMobile)");
+    expect(shell).toContain('className="portal-desktop-lock-frame"');
+    expect(shell).toContain('title="고등부 통합사이트 PC 화면"');
+    expect(css).toContain(".portal-desktop-lock-frame");
+    expect(css).toContain("min-width: 1280px;");
   });
 });
