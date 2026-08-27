@@ -177,7 +177,8 @@ describe('sortAndRenumber', () => {
   });
 
   it('sorts by name when num is undefined', () => {
-    const students = [
+    // num을 일부러 비워 둔 입력 — 타입에는 남겨야 결과의 num을 검사할 수 있다.
+    const students: { name: string; num?: number }[] = [
       { name: '김철수' },
       { name: '가나다' },
       { name: '박영희' },

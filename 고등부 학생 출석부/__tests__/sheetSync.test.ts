@@ -3,7 +3,9 @@ import { buildSyncPlan, buildSyncPayload, describeSheetSyncForClass, parseCSV, p
 import type { Student } from '@/types';
 
 function st(o: Partial<ParsedStudent> & { name: string; sid: string; num: number }): ParsedStudent {
-  return { school: '', birth: '', phone: '', pphone: '', addr: '', attendance: {}, ...o };
+  // jang은 ParsedStudent에서 필수다. 모든 사용처가 참/거짓 판정뿐이라 false와 undefined의
+  // 동작은 같으므로(sheetSync.ts는 `st.jang ? {jang:true} : {}`) 기존 케이스 의미가 바뀌지 않는다.
+  return { school: '', birth: '', phone: '', pphone: '', addr: '', jang: false, attendance: {}, ...o };
 }
 function cls(ck: string, students: ParsedStudent[]): ParsedClass {
   const [part, grade, classNum] = ck.split('-');

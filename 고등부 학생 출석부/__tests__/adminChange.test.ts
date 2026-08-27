@@ -6,6 +6,7 @@ import {
   changedStudentFieldLabels,
   describeStudentFieldChanges,
 } from '@/utils/adminChange';
+import type { Student } from '@/types';
 
 describe('행정 변동 감사 기록', () => {
   it('민감한 실제 값 대신 변경된 필드 이름만 요약한다', () => {
