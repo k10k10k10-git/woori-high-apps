@@ -9,7 +9,7 @@ import { effectiveGbsPlace } from "./gbsPlaces";
 import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import { parseAssignedAreas, roomMatchesAssignedAreas } from "./assignedArea";
 import { isCancelledStudent } from "./busParticipation";
-import { escapeHtml } from "./exportUtils";
+import { escapeHtml } from "@/lib/exportUtils";
 import { compareBlocks, timeRangeLabel } from "./scheduleTime";
 import { personalAssignmentLabel } from "./personalDuty";
 

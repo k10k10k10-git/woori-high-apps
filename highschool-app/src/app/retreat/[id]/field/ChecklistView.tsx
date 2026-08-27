@@ -2,7 +2,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { Group, Student, IguardBus, IguardScheduleBlock, IguardAttendanceInfo, Participant, PartialAttendanceMap, TeacherAttendance } from "@/features/iguard/lib/types";
 import { clearIguardAttendance, updateIguardAttendance } from "@/features/iguard/lib/db";
-import { printAsPDF, escapeHtml } from "@/features/iguard/lib/exportUtils";
+import { printAsPDF } from "@/features/iguard/lib/exportUtils";
+import { escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/features/iguard/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";

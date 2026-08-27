@@ -1,18 +1,10 @@
-/**
- * HTML 이스케이프 — 인쇄 HTML에 사용자 입력(이름·특이사항 등)을 넣기 전 반드시 통과시킨다.
- * 학생이 신청폼에 넣은 값이 관리자 인쇄 화면에서 스크립트로 실행되는 저장형 XSS 방지.
- */
-export function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { escapeHtml } from "@/lib/exportUtils";
 
 /** 인쇄용 HTML을 새 창에 띄워 브라우저 인쇄(PDF 저장 포함)로 출력.
- *  retreat-app 의 printAsPDF 와 동일 동작 (xlsx 의존성 없음). */
+ *  lib/exportUtils의 printAsPDF와 이름은 같지만 계약이 다르다 — 이쪽은 팝업 차단 시
+ *  alert로 직접 알리고 void를 반환하고, lib판은 false를 반환해 호출부가 토스트로
+ *  처리한다. 현장 화면은 토스트 컨텍스트 없이 쓰이는 곳이 있어 분리해 둔다.
+ *  xlsx에 의존하지 않는 것도 이 파일이 따로 있는 이유다. */
 export function printAsPDF(htmlContent: string, title: string, landscape = false) {
   const win = window.open("", "_blank");
   if (!win) { alert("팝업을 허용해주세요."); return; }

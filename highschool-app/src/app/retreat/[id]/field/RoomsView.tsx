@@ -1,7 +1,8 @@
 "use client";
 import { useMemo } from "react";
 import { Group, Room, IguardBus, IguardGbsPlace, IguardMeal, IguardStaff, PartialAttendanceMap, Student } from "@/features/iguard/lib/types";
-import { printAsPDF, escapeHtml } from "@/features/iguard/lib/exportUtils";
+import { printAsPDF } from "@/features/iguard/lib/exportUtils";
+import { escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { resolveGroupStaffNames } from "@/features/iguard/lib/groupStaffNames";
