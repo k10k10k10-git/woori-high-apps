@@ -13,7 +13,7 @@
 
 1. **Firebase DB 데이터를 변경하는가?** (운영 DB 직접 쓰기는 사용자 명시 승인 + 사전 스냅샷 백업 없이는 금지)
 2. **실제 배포를 실행하는가?** (`npx vercel --prod` 등 — 사용자가 요청했거나 /ship 절차일 때만)
-3. **Firebase Rules 배포가 포함되는가?** (답은 항상 "아니오"여야 함 — Rules 배포 원천은 `고등부 학생 출석부/database.rules.json` 하나뿐)
+3. **Firebase Rules 배포가 포함되는가?** (답은 항상 "아니오"여야 함 — Rules 배포 원천은 `attendance-app/database.rules.json` 하나뿐)
 4. **조심해야 할 DB 경로는 무엇인가?** (예: 다른 앱 소유 노드, `retreatsPrivate/*` 민감 데이터, 전체 덮어쓰기 노드)
 
 이 4문답 없이 작업을 시작하지 말 것. 사용자가 별도 안전 헤더를 붙이지 않아도 항상 적용된다.

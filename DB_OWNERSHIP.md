@@ -35,7 +35,7 @@
 >
 > **Rules에서도 제거했습니다.** 루트에 기본 규칙이 없으므로 이 경로들은 이제 "규칙 없음 = 전면 거부"입니다.
 > 되살리려면 앱을 먼저 복원하고 Rules를 다시 추가해야 합니다.
-> 계약은 `고등부 학생 출석부/__tests__/rulesContract.test.ts`가 지킵니다(제거 상태 유지 + `teacherStaff` 보존).
+> 계약은 `attendance-app/__tests__/rulesContract.test.ts`가 지킵니다(제거 상태 유지 + `teacherStaff` 보존).
 
 ⚠ **`teacherStaff/{year}`는 이름이 비슷하지만 전혀 다른 노드입니다** — 학생 앱이 소유하고 통합 앱의
 스탭 접수(`IntakeTab`)가 읽습니다. 지우면 안 됩니다.

@@ -12,7 +12,7 @@ Before any work (including code changes, investigation, or documentation), answe
 
 > **DB 안전 4문답:** ① DB writes: none *(if any: paths, count, backup plan)* ② Deployment: none *(if any: which app)* ③ Rules deployment: no ④ Paths to watch: none *(if any: path and why)*
 
-Rules for the answers: production DB writes require explicit user approval plus a snapshot backup; Rules deployment must always be "no" (single source: `고등부 학생 출석부/database.rules.json`); deployment only when requested or as part of the /ship procedure.
+Rules for the answers: production DB writes require explicit user approval plus a snapshot backup; Rules deployment must always be "no" (single source: `attendance-app/database.rules.json`); deployment only when requested or as part of the /ship procedure.
 
 Also: after solving any non-trivial problem, run the `extract-approach` skill before moving on (learning law — see root `CLAUDE.md`).
 
@@ -23,7 +23,7 @@ Before changing code, always check whether the change can affect Firebase paths 
 | Path | Purpose | Main DB ownership |
 |---|---|---|
 | `highschool-app/` | Unified semester, retreat admin, and on-site app — production URL `https://woorihigh-app.vercel.app` (the old `highschool-app-flame.vercel.app` still points at the same deployment) | `semesters/*`, `retreats/{id}/*`, `retreatsPrivate/{id}`, `retreatAdmins`, `retreats/{id}/iguard/*`, `iguard*` |
-| `고등부 학생 출석부/` | Student attendance PWA | `classes/`, `attendance/`, `events/`, `admins`, `teacherClasses` |
+| `attendance-app/` | Student attendance PWA | `classes/`, `attendance/`, `events/`, `admins`, `teacherClasses` |
 
 Read these first for cross-app work:
 
@@ -61,11 +61,11 @@ Several nodes used to be readable by **any signed-in Google account** (no role a
 - `staff_*` → removed from Rules on 2026-08-12 together with the teacher/staff app (0 records, never deployed).
 - `events` stays `auth != null` on purpose — month/day/label only, no personal data.
 
-`고등부 학생 출석부/__tests__/rulesContract.test.ts` pins all of this. Run it before touching rules.
+`attendance-app/__tests__/rulesContract.test.ts` pins all of this. Run it before touching rules.
 
 ## Firebase Safety Rules
 
-- Rules deployment source is only `고등부 학생 출석부/database.rules.json`.
+- Rules deployment source is only `attendance-app/database.rules.json`.
 - Do not deploy rules from `highschool-app`; it consumes the student app's rules and data contracts.
 - Do not write across app ownership boundaries.
 - Keep sensitive retreat data under `retreatsPrivate/{id}`.

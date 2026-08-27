@@ -19,7 +19,7 @@
         "run",
         "dev",
         "--prefix",
-        "고등부 학생 출석부",
+        "attendance-app",
         "--",
         "-p",
         "3003"

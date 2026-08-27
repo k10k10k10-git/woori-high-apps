@@ -9,7 +9,7 @@
 
 ### 학생 앱 (Firebase Hosting)
 ```bash
-cd "고등부 학생 출석부"
+cd attendance-app
 npm run build
 firebase deploy --only hosting
 ```
@@ -35,7 +35,7 @@ npx vercel --prod
 
 ### Firebase Rules 배포
 ```bash
-cd "고등부 학생 출석부"
+cd attendance-app
 firebase deploy --only database
 ```
 - **반드시 학생 앱 폴더에서만 실행** (단일 원천)
@@ -85,7 +85,7 @@ curl -s "https://woori-high-default-rtdb.firebaseio.com/retreatsPrivate.json?aut
 
 ### 수동 Rules 백업
 ```bash
-cd "고등부 학생 출석부"
+cd attendance-app
 cp database.rules.json "database.rules.backup.$(date +%Y%m%d).json"
 ```
 
@@ -105,7 +105,7 @@ cp database.rules.json "database.rules.backup.$(date +%Y%m%d).json"
 
 ### Rules 복구
 ```bash
-cd "고등부 학생 출석부"
+cd attendance-app
 # 백업 파일로 복원
 cp database.rules.backup.YYYYMMDD.json database.rules.json
 firebase deploy --only database

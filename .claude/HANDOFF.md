@@ -242,7 +242,7 @@
 | 앱 | 배포 | 소유 DB |
 |---|---|---|
 | `highschool-app` | Vercel `woorihigh-app.vercel.app` (별칭 `highschool-app-flame`도 같은 배포) | `semesters/`·`semestersPrivate/`, `retreats/{id}` 행정, `retreatsPrivate/`, `retreatAdmins`, `iguard*`, `prepMilestones/` |
-| `고등부 학생 출석부` | Firebase Hosting `woori-high.web.app` | `classes/`, `attendance/`, `events/`, `admins`, `teacher*`, `trash/`, **Rules 배포 원천** |
+| `attendance-app` | Firebase Hosting `woori-high.web.app` | `classes/`, `attendance/`, `events/`, `admins`, `teacher*`, `trash/`, **Rules 배포 원천** |
 
 제거된 앱 (복구 태그는 전부 원격 푸시됨):
 
@@ -276,10 +276,10 @@
 | `highschool-app` `npm test` | 86파일 **707개 통과** |
 | `highschool-app` `npm run lint` | **0 errors / 0 warnings** |
 | `highschool-app` `npm run build` | 성공 |
-| `고등부 학생 출석부` `npx tsc --noEmit` | 0 errors |
-| `고등부 학생 출석부` `npm test` | 9파일 **125개 통과** |
-| `고등부 학생 출석부` `npm run lint` | 0 errors / **34 warnings** |
-| `고등부 학생 출석부` `npm run build` | 성공 |
+| `attendance-app` `npx tsc --noEmit` | 0 errors |
+| `attendance-app` `npm test` | 9파일 **125개 통과** |
+| `attendance-app` `npm run lint` | 0 errors / **34 warnings** |
+| `attendance-app` `npm run build` | 성공 |
 | 배포 일치 | **완료** — `/api/version` buildId = Git HEAD, Vercel Production `Ready` |
 | 운영 응답 | `woorihigh-app.vercel.app` 200 / `woori-high.web.app` 200 |
 
@@ -371,8 +371,8 @@
 
 - 진입점: 루트 `CLAUDE.md`(운영 매뉴얼·안전 4문답) → 대상 앱 `CLAUDE.md` → `DB_OWNERSHIP.md` → `OPERATIONS.md` → `LEARNINGS.md`
 - 권한 계약: `highschool-app/CLAUDE.md`의 "권한 — 두 축 역할"
-- Rules 계약 테스트: `고등부 학생 출석부/__tests__/rulesContract.test.ts`
-- Rules 배포 전 스냅샷: `고등부 학생 출석부/tmp/rules-backup/` (미추적)
+- Rules 계약 테스트: `attendance-app/__tests__/rulesContract.test.ts`
+- Rules 배포 전 스냅샷: `attendance-app/tmp/rules-backup/` (미추적)
 - 복구 태그: `pre-legacy-app-removal-2026-08-05`, `pre-unified-apps-2026-08-05`, `pre-staff-app-removal-2026-08-12`, `pre-semester-app-removal-2026-08-12`
 - 완성 산출물: `outputs/` (출석부 사용 가이드 PDF, 수련회 발송용 명단 + 각 `build-scripts/`)
 - 마이그레이션 감사 기록: `tmp/db-backups/person-id-20260811-2139/` (개인정보 없음, README 포함)

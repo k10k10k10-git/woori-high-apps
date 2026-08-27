@@ -89,7 +89,7 @@
 | `retreatAdmins/{uid}` | 교역자·스탭팀장·행정팀·바나바팀(학기 쓰기 필요) | `{ role, semesterRole, retreatRole }` |
 | `iguardMembers/{uid}` + `iguardRoles/{uid}` | 이가드팀(`team`)·현장 스탭·사역팀(`staff`) | `{ semesterRole, retreatRole }` |
 
-**행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸습니다.** `retreatAdmins/{uid}.semesterRole === "adminTeam"`인 계정만 `classes/{year}/{ck}/students/{sid}`·`attendance/{year}/{ck}/{sid}`·`trash/{year}/students/{sid}` **학생 1명 경로**를 씁니다. 반 노드 전체(`students` 통째·`teacher`)와 `trash` 노드 전체는 통합관리자·담임 그대로입니다. `semesterRole`은 `retreatAdmins` 쓰기가 통합관리자 전용이라 자가 승급이 불가능합니다. 계약은 `고등부 학생 출석부/__tests__/rulesContract.test.ts`가 지킵니다.
+**행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸습니다.** `retreatAdmins/{uid}.semesterRole === "adminTeam"`인 계정만 `classes/{year}/{ck}/students/{sid}`·`attendance/{year}/{ck}/{sid}`·`trash/{year}/students/{sid}` **학생 1명 경로**를 씁니다. 반 노드 전체(`students` 통째·`teacher`)와 `trash` 노드 전체는 통합관리자·담임 그대로입니다. `semesterRole`은 `retreatAdmins` 쓰기가 통합관리자 전용이라 자가 승급이 불가능합니다. 계약은 `attendance-app/__tests__/rulesContract.test.ts`가 지킵니다.
 
 ※ **화면 차단 ≠ 실제 차단.** Rules는 그 외에는 세 버킷만 구분합니다. 아래는 화면에서만 막히며, 실제 차단은 Rules 변경이 필요합니다.
 - 행정 화면의 **조회 전용 모드**는 `RetreatEditProvider`(`features/portal/RetreatEditContext.tsx`) + `RetreatPageClient`의 `<fieldset disabled className="contents">` 두 겹입니다. fieldset이 내부 `button`·`input`·`select`·`textarea`를 브라우저 수준에서 잠그고(클릭 이벤트도 발생하지 않음), `display:contents`라 레이아웃에는 영향이 없습니다. 드래그처럼 폼 요소가 아닌 조작은 각 컴포넌트가 `useRetreatCanEdit()`으로 따로 잠급니다(`GroupComponents`·`RoomsTab`의 `draggable`). 새 행정 탭을 만들 때 드래그·div 클릭 편집이 있으면 이 훅을 반드시 쓰세요.

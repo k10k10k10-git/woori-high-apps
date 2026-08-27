@@ -10,7 +10,7 @@
 - 수련회 행정: `retreats/{id}/*`, `retreatsPrivate/{id}/*`
 - 이가드: `retreats/{id}/iguard/*`
 - 공통 명단 `classes/{year}`는 원칙상 읽기 전용. 예외는 통합관리자의 `registerNewFriendInRoster` 신규 학생 단건 추가와, 그 결정적 `nf_` 학생만 사전 백업·연결 검증 후 `classes`·해당 `attendance`·새친구 기록에서 원자 삭제하고 `trash`에 사본을 남기는 `removeNewFriendFromRoster`뿐이다.
-- Rules 배포 원천은 오직 `../고등부 학생 출석부/database.rules.json`
+- Rules 배포 원천은 오직 `../attendance-app/database.rules.json`
 
 통합 앱은 기존 경로와 스키마를 그대로 사용합니다. 도메인 간 소유 경계를 넘는 쓰기나 전체 노드 덮어쓰기를 추가하지 않습니다.
 
@@ -101,7 +101,7 @@ npm run build
 - **재사용 규칙**: 여러 앱의 권한 관리 UI를 합칠 때는 UID 기반 읽기 모델만 합치고, 쓰기는 "필요한 변경만 계산하는 순수 함수 + 경로별 최소 단위 실행"으로 분리한다.
 
 ### 역할을 늘릴 때 Rules 대신 기존 노드 조합으로 표현하기 (2026-08-06)
-- **접근법**: 1→ 요구된 역할×영역 표를 `src/features/portal/accessPolicy.test.ts`에 먼저 옮겨 계약으로 고정한다. 2→ `../고등부 학생 출석부/database.rules.json`을 읽어 기존 노드 중 무엇을 확장할 수 있는지 확인한다 — `retreatAdmins/{uid}`는 객체이고 `.validate`가 없어 `role` 필드 추가가 자유롭고, `iguardRoles`는 `staff`/`team`만 허용한다. 3→ 다른 앱이 그 노드를 어떻게 읽는지 grep으로 증명한다(`semester-app`은 `!= null` 존재 확인만 → 필드 추가 호환). 4→ 판정은 순수 함수 1개, 쓰기는 계획+실행 분리. 5→ Rules로만 가능한 잔여 항목(스탭의 `semesters` 읽기)은 코드를 완성한 뒤 스니펫과 함께 `.claude/HANDOFF.md`에 블로커로 남긴다.
+- **접근법**: 1→ 요구된 역할×영역 표를 `src/features/portal/accessPolicy.test.ts`에 먼저 옮겨 계약으로 고정한다. 2→ `../attendance-app/database.rules.json`을 읽어 기존 노드 중 무엇을 확장할 수 있는지 확인한다 — `retreatAdmins/{uid}`는 객체이고 `.validate`가 없어 `role` 필드 추가가 자유롭고, `iguardRoles`는 `staff`/`team`만 허용한다. 3→ 다른 앱이 그 노드를 어떻게 읽는지 grep으로 증명한다(`semester-app`은 `!= null` 존재 확인만 → 필드 추가 호환). 4→ 판정은 순수 함수 1개, 쓰기는 계획+실행 분리. 5→ Rules로만 가능한 잔여 항목(스탭의 `semesters` 읽기)은 코드를 완성한 뒤 스니펫과 함께 `.claude/HANDOFF.md`에 블로커로 남긴다.
 - **판단 질문**: `portalRoles/{uid}` 같은 새 노드를 만들지 않았다 — Rules에 `.read`/`.write`가 없어 즉시 권한 거부이고, Rules 배포 원천은 학생 앱 하나뿐이라 이 앱에서 열 수 없다. 화면에서 역할 문자열을 직접 비교하지도 않았다 — 권한이 늘 때마다 전 컴포넌트를 다시 훑어야 한다.
 - **재사용 규칙**: 권한 모델 확장은 (1) 표를 테스트로 고정 → (2) Rules 파일을 읽고 "기존 노드 + 옵션 필드"로 표현 → (3) 다른 앱의 읽기 방식으로 호환 증명 → (4) Rules 필요한 부분만 블로커로 인수인계, 순서로 진행한다.
 
@@ -151,7 +151,7 @@ npm run build
 - **재사용 규칙**: 다른 앱이 소유한 원장을 바꾸는 운영 시트를 제품화할 때는 통합 화면을 요청·승인 오케스트레이터로 두고, 실제 원장 변경과 검증은 소유 앱의 최소 단위 명령으로 실행하며 두 결과를 안정 ID와 감사 이력으로 연결한다.
 
 ### Functions·Rules 변경 없이 다른 앱 소유 원장에 신규 1건만 안전하게 연결하기 (2026-08-11)
-- **접근법**: 1→ `../고등부 학생 출석부/database.rules.json`을 확인해 `classes/{year}` 쓰기가 이미 `admins`에만 허용됨을 고정하고 `accessPolicy.canWriteStudentRoster`를 같은 계약으로 테스트한다. 2→ `features/semester/newFriend.ts`에서 새친구 ID 기반 결정적 `nf_` 학생 ID, 2주 과정·등록 결정·반배정 검증, 이름·생년월일·연락처 중복 차단을 순수 함수로 만든다. 3→ `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}` 사전 스냅샷, `classes/{year}/{classKey}/students/{studentId}` 단일 신규 경로, `semesters/{sid}/newFriends/{friendId}/rosterSync` 이력을 하나의 루트 update 계획으로 만든다. 4→ 실행 뒤 생성한 학생 경로를 다시 읽어 검증하고, 재클릭은 같은 결정적 ID를 확인해 중복 생성 없이 연결만 복구한다. 5→ 출석부 반영 뒤에는 이름·부서·학년·연락처·반배정을 잠가 기존 학생 수정·이동·삭제가 학생 앱 소유로 돌아가게 한다.
+- **접근법**: 1→ `../attendance-app/database.rules.json`을 확인해 `classes/{year}` 쓰기가 이미 `admins`에만 허용됨을 고정하고 `accessPolicy.canWriteStudentRoster`를 같은 계약으로 테스트한다. 2→ `features/semester/newFriend.ts`에서 새친구 ID 기반 결정적 `nf_` 학생 ID, 2주 과정·등록 결정·반배정 검증, 이름·생년월일·연락처 중복 차단을 순수 함수로 만든다. 3→ `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}` 사전 스냅샷, `classes/{year}/{classKey}/students/{studentId}` 단일 신규 경로, `semesters/{sid}/newFriends/{friendId}/rosterSync` 이력을 하나의 루트 update 계획으로 만든다. 4→ 실행 뒤 생성한 학생 경로를 다시 읽어 검증하고, 재클릭은 같은 결정적 ID를 확인해 중복 생성 없이 연결만 복구한다. 5→ 출석부 반영 뒤에는 이름·부서·학년·연락처·반배정을 잠가 기존 학생 수정·이동·삭제가 학생 앱 소유로 돌아가게 한다.
 - **판단 질문**: Firebase Cloud Functions를 억지로 추가하지 않았다 — `npx firebase functions:list --project woori-high --debug`에서 Functions API 비활성, Cloud Billing API에서 `billingEnabled:false`를 실측했고 Functions 배포는 Blaze 요금제 연결이 필요했기 때문이다. `retreatAdmins`에 `classes` 쓰기를 여는 Rules 변경도 하지 않았다 — 권한 범위가 행정팀 전체의 기존 학생 수정까지 넓어진다. 통합 앱에 범용 학생 수정 함수도 만들지 않고 신규·미존재 경로 추가 하나로 예외를 닫았다.
 - **재사용 규칙**: 다른 앱 소유 원장에 자동 연결이 필요하지만 서버 함수·Rules 변경을 할 수 없으면, 기존 Rules가 이미 허용한 최상위 관리자에게만 `결정적 신규 ID + 중복 차단 + 비공개 사전 스냅샷 + 단일 경로 원자 추가 + 재조회 검증`을 제공하고 반영 직후 편집을 다시 소유 앱으로 잠근다.
 
@@ -171,7 +171,7 @@ npm run build
 - **재사용 규칙**: 기존 저장 스코프보다 새 업무 화면의 생명주기가 더 길면 `기존 스코프 통합 읽기 + 충돌 없는 복합키 + 기존 Rules가 허용하는 비가시 전용 작업공간 + 레거시 URL 리디렉션`으로 이관 없이 분류 구조를 바꾼다.
 
 ### 다른 앱 원장에 자동 추가한 단건을 검증·백업 후 원자적으로 되돌리기 (2026-08-11)
-- **접근법**: 1→ 원장 소유 앱 `../고등부 학생 출석부/src/components/modals/StudentModal.tsx`의 삭제 계약이 `classes` 학생·해당 `attendance` 삭제와 `trash` 복구 사본임을 확인한다. 2→ `src/features/semester/newFriend.ts`에서 새친구 ID로 계산한 결정적 `nf_` 학생 ID, 저장된 연결 ID·반, 현재 학생 이름을 검증한다. 3→ 삭제 직전 학생·출석·새친구 공개/비공개 값을 `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}/removals/{timestamp}`에 담고, `trash` 사본과 네 삭제 경로를 하나의 루트 update로 계획한다. 4→ `removeNewFriendFromRoster`에서 현재 레코드를 다시 읽어 연결 변경을 차단하고 실행 뒤 삭제 경로·백업·휴지통을 재조회한다. 5→ 화면은 통합관리자에게만 버튼을 보이고 학생 이름 재입력 전에는 최종 삭제 버튼을 비활성화하며, 실제 화면 검증에서는 확인창만 열고 취소한다.
+- **접근법**: 1→ 원장 소유 앱 `../attendance-app/src/components/modals/StudentModal.tsx`의 삭제 계약이 `classes` 학생·해당 `attendance` 삭제와 `trash` 복구 사본임을 확인한다. 2→ `src/features/semester/newFriend.ts`에서 새친구 ID로 계산한 결정적 `nf_` 학생 ID, 저장된 연결 ID·반, 현재 학생 이름을 검증한다. 3→ 삭제 직전 학생·출석·새친구 공개/비공개 값을 `semestersPrivate/{sid}/newFriendRosterBackups/{friendId}/removals/{timestamp}`에 담고, `trash` 사본과 네 삭제 경로를 하나의 루트 update로 계획한다. 4→ `removeNewFriendFromRoster`에서 현재 레코드를 다시 읽어 연결 변경을 차단하고 실행 뒤 삭제 경로·백업·휴지통을 재조회한다. 5→ 화면은 통합관리자에게만 버튼을 보이고 학생 이름 재입력 전에는 최종 삭제 버튼을 비활성화하며, 실제 화면 검증에서는 확인창만 열고 취소한다.
 - **판단 질문**: 통합 앱에 범용 학생 삭제를 열거나 `classes`만 단독 삭제하지 않는다. 전자는 학생 앱 소유권을 넘어 기존 학생까지 지울 수 있고, 후자는 출석 고아 레코드를 남긴다. 새친구 공개 기록만 먼저 지우거나 하드 삭제하지도 않는다 — 연결 근거와 복구 수단을 잃기 때문이다.
 - **재사용 규칙**: 다른 앱 소유 원장에 자동 생성한 단건을 되돌릴 때는 `생성 당시 결정적 연결 검증 → 소유 앱의 삭제 계약 복제 → 민감 사전 백업 + 원장 휴지통 → 한 번의 다중 경로 update → 재조회 검증 → 이름 입력 확인` 순서를 지킨다.
 
@@ -181,7 +181,7 @@ npm run build
 - **재사용 규칙**: 외부 원장에 반영된 업무를 취소할 때는 `원본 업무 기록 보존 여부`를 먼저 명령 경계로 삼고, 연결만 취소하는 명령은 외부 원장 복구 절차를 실행하되 원본의 연결 필드만 해제한다.
 
 ### Rules 변경 없이 기존 사용자별 노드에 독립 요청함을 격리하기 (2026-08-13)
-- **접근법**: 1→ `../고등부 학생 출석부/database.rules.json`에서 `iguardPending/{uid}`가 본인 읽기·쓰기와 통합관리자 전체 읽기·쓰기를 이미 제공함을 확인한다. 2→ `src/lib/paths.ts`에 `iguardPending/{uid}/siteRequests/{requestId}` 경로를 선언하고, `src/features/suggestions/siteRequest.ts`가 접근 승인 필드와 요청 레코드를 분리해 정규화한다. 3→ `src/features/iguard/lib/db.ts`의 접근 요청 저장을 사용자 노드 전체 `set`에서 필드 `update`로 바꾸고, 승인·거절도 `email`·`name`·`requestedAt`만 제거해 `siteRequests`를 보존한다. 4→ 첨부 이미지는 `attachment.ts`에서 JPG·PNG·WEBP만 JPEG로 재인코딩하고 최대 1600px·1.2MB로 줄인 뒤 요청에 저장한다. 5→ 통합관리자만 전체 요청을 구독하고 해결 상태를 기록하며, 작성자는 로그인 시작 시 자기 요청만 한 번 읽어 `notifiedAt` 없는 해결 건을 알림 처리한다.
+- **접근법**: 1→ `../attendance-app/database.rules.json`에서 `iguardPending/{uid}`가 본인 읽기·쓰기와 통합관리자 전체 읽기·쓰기를 이미 제공함을 확인한다. 2→ `src/lib/paths.ts`에 `iguardPending/{uid}/siteRequests/{requestId}` 경로를 선언하고, `src/features/suggestions/siteRequest.ts`가 접근 승인 필드와 요청 레코드를 분리해 정규화한다. 3→ `src/features/iguard/lib/db.ts`의 접근 요청 저장을 사용자 노드 전체 `set`에서 필드 `update`로 바꾸고, 승인·거절도 `email`·`name`·`requestedAt`만 제거해 `siteRequests`를 보존한다. 4→ 첨부 이미지는 `attachment.ts`에서 JPG·PNG·WEBP만 JPEG로 재인코딩하고 최대 1600px·1.2MB로 줄인 뒤 요청에 저장한다. 5→ 통합관리자만 전체 요청을 구독하고 해결 상태를 기록하며, 작성자는 로그인 시작 시 자기 요청만 한 번 읽어 `notifiedAt` 없는 해결 건을 알림 처리한다.
 - **판단 질문**: 학생 출석부 전용 `suggestions/{year}/{classKey}`를 재사용하지 않는다 — 담임 반 키·권한·화면 스키마와 충돌한다. 새 최상위 `siteRequests`도 만들지 않는다 — Rules에 경로가 없어 즉시 거부되고 이 작업에서는 Rules 배포가 금지다. `iguardPending/{uid}` 전체를 사이트 요청으로 덮거나 승인 시 통째로 삭제하지도 않는다 — 접근 승인과 요청함 중 하나가 다른 하나를 유실시킨다.
 - **재사용 규칙**: 새 Rules 없이 사용자별 워크플로를 추가해야 하면 `기존 노드의 읽기·쓰기 주체 일치 확인 → 의미가 다른 하위 namespace 격리 → 기존 전체 set/remove를 필드 update로 축소 → 파서에서 두 스키마 분리 → 양쪽 보존 회귀 테스트` 순서를 따른다.
 

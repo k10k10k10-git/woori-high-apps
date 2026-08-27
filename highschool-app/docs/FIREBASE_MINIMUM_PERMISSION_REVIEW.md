@@ -6,7 +6,7 @@
 
 클라이언트의 `accessPolicy.ts`는 역할을 세밀하게 구분하지만, 현재 Realtime Database Rules는 일부 경로에서 `retreatAdmins` 또는 `iguardMembers` 소속 여부만 확인합니다. 따라서 화면에서 버튼을 숨기는 것과 서버가 쓰기를 거부하는 것이 완전히 같은 수준은 아닙니다.
 
-이 저장소의 운영 계약에 따라 Rules 원본과 배포 권한은 `고등부 학생 출석부/database.rules.json`에만 있습니다. 이번 고등부 통합사이트 배포에서는 Rules를 수정하거나 배포하지 않습니다.
+이 저장소의 운영 계약에 따라 Rules 원본과 배포 권한은 `attendance-app/database.rules.json`에만 있습니다. 이번 고등부 통합사이트 배포에서는 Rules를 수정하거나 배포하지 않습니다.
 
 ## 서버에서 더 좁혀야 할 경로
 

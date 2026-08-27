@@ -11,7 +11,7 @@
 두 앱은 **하나의 Firebase 프로젝트(`woori-high`, Realtime Database)를 공유**합니다.
 사람은 같은데 쓰는 화면이 다르기 때문에, DB를 나누지 않고 앱을 나눴습니다.
 
-| | 고등부 학생 출석부 | highschool-app (통합 플랫폼) |
+| | attendance-app (학생 출석부) | highschool-app (통합 플랫폼) |
 |---|---|---|
 | **하는 일** | 주일 예배 출석 체크와 통계 | 수련회 운영, 학기 반 편성, 주일 사역 관리 |
 | **주 사용자** | 반 교사 | 교역자 · 행정팀 · 이가드팀 · 스탭 |
@@ -45,7 +45,7 @@
 
 두 가지 규칙이 특히 중요합니다.
 
-1. **Firebase 보안 규칙(Rules)의 원천은 단 하나** — `고등부 학생 출석부/database.rules.json`
+1. **Firebase 보안 규칙(Rules)의 원천은 단 하나** — `attendance-app/database.rules.json`
    입니다. 저장소 전체에서 `database.rules.json`도 `firebase.json`도 이 앱에만 있어서,
    다른 곳에서 실수로 Rules를 배포하는 일이 구조적으로 불가능합니다.
 2. **민감 정보는 `retreatsPrivate/` 아래에만** 둡니다. 환불 계좌·의료 일지 같은 것을
@@ -58,7 +58,7 @@
 Node.js 22를 권장합니다(CI가 쓰는 버전). 각 앱은 독립적으로 설치·실행합니다.
 
 ```bash
-cd highschool-app     # 또는 "고등부 학생 출석부"
+cd highschool-app     # 또는 attendance-app
 npm install
 npm run dev           # http://localhost:3000
 ```
@@ -109,7 +109,7 @@ npx firebase deploy --only hosting
 highschool-app/          통합 플랫폼 (Vercel)
   src/features/          기능 모듈 — iguard, semester, portal, sunday*
   src/lib/               공용 유틸 (경로 헬퍼, 이름 정규화, 시간 판정)
-고등부 학생 출석부/       주일 출석부 (Firebase Hosting)
+attendance-app/       주일 출석부 (Firebase Hosting)
   database.rules.json    ← Firebase 보안 규칙의 유일한 원천
 docs/                    통합 이관 기록 (2026-08 앱 통합 당시 런북)
 agent-os/                로컬 운영 대시보드
