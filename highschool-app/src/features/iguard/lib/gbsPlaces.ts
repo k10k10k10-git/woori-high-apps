@@ -1,5 +1,5 @@
 import { Group, IguardGbsPlace } from "./types";
-import { groupDisplayName, sortGroupsByDisplayNumber } from "./groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import { normalizeStaffIdentityName } from "./staffIdentity";
 
 export interface GbsPlaceGroup {

@@ -1,6 +1,6 @@
 import { Group, PartialAttendanceMap, Room, Student } from "./types";
 import { isCancelledStudent } from "./busParticipation";
-import { groupDisplayName } from "./groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 
 export interface RoomHotspot {
   roomNumber: string;

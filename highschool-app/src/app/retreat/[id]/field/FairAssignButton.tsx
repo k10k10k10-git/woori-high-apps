@@ -3,7 +3,7 @@ import { useState } from "react";
 import OverlayShell from "@/components/OverlayShell";
 import { Group, IguardMeal, IguardSeating } from "@/features/iguard/lib/types";
 import { computeFairAssignment, FairResult } from "@/features/iguard/lib/fairAssign";
-import { groupDisplayName } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 import { updateIguardMeal, updateIguardSeating } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
 

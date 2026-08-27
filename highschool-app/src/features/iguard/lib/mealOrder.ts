@@ -1,5 +1,5 @@
 import type { Group, IguardMeal } from "./types";
-import { groupDisplayName } from "./groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 
 export interface MealOrderItem {
   group: Group;

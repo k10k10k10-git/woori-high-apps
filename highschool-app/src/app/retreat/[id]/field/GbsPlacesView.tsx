@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Group, IguardGbsPlace } from "@/features/iguard/lib/types";
 import { saveIguardGbsPlace } from "@/features/iguard/lib/db";
 import { buildGbsPlaceSummaries, effectiveGbsPlace } from "@/features/iguard/lib/gbsPlaces";
-import { groupDisplayName, sortGroupsByDisplayNumber } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import { useUI } from "@/context/UIContext";
 
 interface Props {

@@ -21,7 +21,7 @@ import {
   IguardStaff, IguardBus, AssignedIguardMovement, IguardPost,
   PartialAttendanceMap, BusStudentGender,
 } from "./types";
-import { groupDisplayName } from "./groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isOwnCarTransport, isTeacherBusPassenger } from "./busParticipation";
 import { studentPartialLabel } from "./checklistMembers";
 import { normalizeStaffIdentityName } from "./staffIdentity";

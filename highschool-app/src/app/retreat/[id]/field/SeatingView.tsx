@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Group, IguardSeating, IguardSeatingZone, IguardMeal } from "@/features/iguard/lib/types";
 import { saveIguardSeating, updateIguardSeating, deleteIguardSeating } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
-import { groupDisplayName, sortGroupsByDisplayNumber } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import FairAssignButton from "./FairAssignButton";
 
 function parseLayoutPattern(value: string): number[] {

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, IguardScheduleBlock, IguardStaff, IguardPost, IguardMovement, IguardSegment } from "@/features/iguard/lib/types";
-import { groupDisplayName } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 import { postLabel, parseNames, scheduleSortValue, timeRangeLabel, ageSortValue } from "@/features/iguard/lib/cueSheet";
 import { dutyLabelsForStaff, dutyLinesForStaff, withoutStructuredDutyLabels } from "@/features/iguard/lib/personalDuty";
 import { isDefaultSegment } from "@/features/iguard/lib/defaultSegment";

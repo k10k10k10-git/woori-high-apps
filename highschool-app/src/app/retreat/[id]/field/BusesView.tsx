@@ -4,7 +4,7 @@ import OverlayShell from "@/components/OverlayShell";
 import { BusStudentGender, Group, IguardBus, IguardBusSegment, IguardScheduleBlock, Participant, PartialAttendanceMap, Student, TeacherAttendance } from "@/features/iguard/lib/types";
 import { saveIguardBus, updateIguardBus, deleteIguardBus } from "@/features/iguard/lib/db";
 import { useUI } from "@/context/UIContext";
-import { groupDisplayName } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay, isTeacherBusPassenger } from "@/features/iguard/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/features/iguard/lib/busStaff";
 import { busCapacityOf, isValidBusCapacity, DEFAULT_BUS_CAPACITY, MIN_BUS_CAPACITY, MAX_BUS_CAPACITY } from "@/features/iguard/lib/busCapacity";

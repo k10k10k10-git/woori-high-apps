@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { Group, IguardStaff, Student, TeacherAttendance, PartialAttendanceMap } from "@/features/iguard/lib/types";
 import { setIguardGroupStaff, updateIguardGroupStaffEntries } from "@/features/iguard/lib/db";
-import { groupDisplayName, sortGroupsByNumber } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
 import { useUI } from "@/context/UIContext";
 import { isCancelledStudent } from "@/features/iguard/lib/busParticipation";
 

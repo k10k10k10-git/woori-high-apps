@@ -5,7 +5,7 @@ import { clearIguardAttendance, updateIguardAttendance } from "@/features/iguard
 import { printAsPDF, escapeHtml } from "@/features/iguard/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
 import { useAuth } from "@/features/iguard/context/AuthContext";
-import { groupDisplayName } from "@/features/iguard/lib/groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/features/iguard/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/features/iguard/lib/busStaff";
 import { roleNamesForChecklist, studentPartialLabel, teacherChecklistMeta } from "@/features/iguard/lib/checklistMembers";

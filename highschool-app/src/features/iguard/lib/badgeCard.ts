@@ -6,7 +6,7 @@ import { parseBusStaffNames } from "./busStaff";
 import { normalizeStaffIdentityName } from "./staffIdentity";
 import { buildMealOrderSummaries } from "./mealOrder";
 import { effectiveGbsPlace } from "./gbsPlaces";
-import { groupDisplayName, sortGroupsByDisplayNumber } from "./groupNumber";
+import { groupDisplayName, sortGroupsByDisplayNumber } from "@/lib/groupNumber";
 import { parseAssignedAreas, roomMatchesAssignedAreas } from "./assignedArea";
 import { isCancelledStudent } from "./busParticipation";
 import { escapeHtml } from "./exportUtils";

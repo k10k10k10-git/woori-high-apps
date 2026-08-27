@@ -1,5 +1,5 @@
 import { Group, IguardMeal, IguardMealEntry, IguardSeating, IguardSeatingZone } from "./types";
-import { groupDisplayName } from "./groupNumber";
+import { groupDisplayName } from "@/lib/groupNumber";
 
 // ════════════════════════════════════════════════════════════
 // 공정 배분 알고리즘
