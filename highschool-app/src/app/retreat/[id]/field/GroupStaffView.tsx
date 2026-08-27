@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { ChalkboardTeacher, Crown, X } from "@phosphor-icons/react";
 import { Group, IguardStaff, Student, TeacherAttendance, PartialAttendanceMap } from "@/features/iguard/lib/types";
 import { setIguardGroupStaff, updateIguardGroupStaffEntries } from "@/features/iguard/lib/db";
 import { groupDisplayName, sortGroupsByNumber } from "@/lib/groupNumber";
@@ -306,30 +307,35 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
             .filter(s => studentStatus(s, partial, cellColors).status !== "불참")
             .sort((a, b) => (a.grade - b.grade) || (a.class - b.class) || ((a.num ?? 0) - (b.num ?? 0)));
           return (
-            <button
+            <article
               key={g.id}
-              type="button"
-              onClick={() => setActiveGroupId(active ? null : g.id)}
               className={`flex flex-col rounded-xl border p-2.5 text-left transition-colors ${
                 active ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300" : "border-slate-200 bg-white hover:border-slate-300"
               }`}
             >
-              <div className="flex items-center justify-between gap-1">
+              <button
+                type="button"
+                aria-pressed={active}
+                onClick={() => setActiveGroupId(active ? null : g.id)}
+                className="flex min-h-10 w-full items-center justify-between gap-1 rounded-lg text-left focus-visible:outline-offset-2"
+              >
                 <span className="text-sm font-bold text-slate-800">{groupDisplayName(g, groups)}</span>
                 <span className="text-[10px] text-slate-400">조스탭 {ids.length}</span>
-              </div>
+              </button>
               <div className="mt-1 flex flex-wrap gap-1">
                 {ids.length === 0 ? (
                   <span className="text-[11px] text-slate-300">조스탭 없음</span>
                 ) : ids.map(sid => (
-                  <span
+                  <button
                     key={sid}
+                    type="button"
                     className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700"
-                    onClick={e => { e.stopPropagation(); removeFromGroup(g.id, sid); }}
+                    onClick={() => removeFromGroup(g.id, sid)}
+                    aria-label={`${staffById.get(sid)?.name ?? "미상"} 조스탭 배정 해제`}
                   >
                     {staffById.get(sid)?.name ?? "(미상)"}
-                    <span className="text-emerald-400">✕</span>
-                  </span>
+                    <X aria-hidden="true" className="text-emerald-500" size={11} weight="bold" />
+                  </button>
                 ))}
               </div>
               {/* 조장 */}
@@ -339,7 +345,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
                   <span className="text-[11px] text-slate-300">조장 없음</span>
                 ) : (
                   <div className="space-y-0.5">
-                    {leaderNames.map(n => <div key={n} className="text-[11px] font-medium text-emerald-700">👑 {n}</div>)}
+                    {leaderNames.map(n => <div key={n} className="flex items-center gap-1 text-[11px] font-medium text-emerald-700"><Crown aria-hidden="true" size={12} weight="fill" />{n}</div>)}
                   </div>
                 )}
               </div>
@@ -356,8 +362,8 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
                         : st === "불참" ? "text-slate-300 line-through"
                         : "text-slate-700";
                       return (
-                        <div key={name} className={`text-[11px] ${cls}`}>
-                          👨‍🏫 {name}{st === "부분참" ? " (부분참)" : st === "불참" ? " (불참)" : ""}
+                        <div key={name} className={`flex items-center gap-1 text-[11px] ${cls}`}>
+                          <ChalkboardTeacher aria-hidden="true" size={12} weight="bold" />{name}{st === "부분참" ? " (부분참)" : st === "불참" ? " (불참)" : ""}
                         </div>
                       );
                     })}
@@ -392,7 +398,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
                   </div>
                 )}
               </div>
-            </button>
+            </article>
           );
         })}
       </div>

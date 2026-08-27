@@ -308,7 +308,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
                   <h3 className={`min-w-0 font-semibold text-slate-700 ${mode === "호차별" ? "text-sm sm:text-base" : ""}`}>{u.title}</h3>
                   <div className={`flex shrink-0 items-center ${mode === "호차별" ? "gap-1 sm:gap-2" : "gap-2"}`}>
                     {c > 0 && (
-                      <button onClick={() => resetUnit(u)} className={`${mode === "호차별" ? "text-[11px] sm:text-xs" : "text-xs"} min-h-8 rounded px-1 text-slate-500 underline hover:bg-slate-100 hover:text-slate-700`} aria-label={`${u.title} 체크 초기화`}>
+                      <button onClick={() => resetUnit(u)} className={`${mode === "호차별" ? "text-[11px] sm:text-xs" : "text-xs"} min-h-10 rounded px-2 text-slate-500 underline hover:bg-slate-100 hover:text-slate-700`} aria-label={`${u.title} 체크 초기화`}>
                         {mode === "호차별" ? <><span aria-hidden="true">↺</span><span className="hidden sm:inline">초기화</span></> : "초기화"}
                       </button>
                     )}

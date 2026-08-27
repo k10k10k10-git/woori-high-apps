@@ -379,7 +379,7 @@ function ScheduleSheetRow({
         <button type="button" onClick={() => { void openAdvanced(); }} className="btn-secondary min-h-10 text-xs">
           상세 설정 · {movementCount}
         </button>
-        <button type="button" onClick={onDelete} className="min-h-8 text-xs text-slate-300 hover:text-red-500">
+        <button type="button" onClick={onDelete} className="min-h-10 rounded-md px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-600">
           삭제
         </button>
       </div>

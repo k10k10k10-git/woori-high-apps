@@ -9,11 +9,37 @@
   contain-intrinsic-size: auto 156px;
 }
 
+.compact-icon-control {
+  display: inline-grid;
+  min-width: 40px;
+  min-height: 40px;
+  place-items: center;
+}
+
+.attendance-status-choice {
+  min-height: 40px;
+  border-color: var(--color-border-hover);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.attendance-status-choice:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
 @media (pointer: coarse) {
   button[aria-label],
   a[aria-label],
   .export-action,
   .pagination-control {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .compact-icon-control,
+  .attendance-status-choice {
     min-width: 44px;
     min-height: 44px;
   }

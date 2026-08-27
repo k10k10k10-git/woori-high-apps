@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MagnifyingGlass } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, searchScope } from "./accessPolicy";
@@ -113,7 +113,7 @@ export default function PortalSearch() {
                     aria-label="인물 이름"
                     className="min-h-11 flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
                   />
-                  <button type="button" onClick={close} className="rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100">ESC</button>
+                  <button type="button" onClick={close} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100">ESC</button>
                 </div>
                 <div className="min-h-52 flex-1 overflow-y-auto p-2.5">
                   {loading ? <SearchState title="고등부 인물 기록을 모으고 있습니다…" description="학적·출석, 학기 사역, 새친구, 수련회 데이터를 연결합니다." />
@@ -133,7 +133,7 @@ export default function PortalSearch() {
                             {profile.years.length > 0 ? ` · ${profile.years.join(", ")}` : ""}
                           </span>
                         </span>
-                        <span aria-hidden="true" className="mt-2 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-emerald-600">→</span>
+                        <ArrowRight aria-hidden="true" className="mt-2 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-600" size={17} weight="bold" />
                       </button>
                     )) : <SearchState title="일치하는 인물이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
                 </div>
@@ -165,7 +165,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
   return (
     <>
       <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
-        <button type="button" onClick={onBack} className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" aria-label="검색 결과로 돌아가기">←</button>
+        <button type="button" onClick={onBack} className="compact-icon-control mt-0.5 shrink-0 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" aria-label="검색 결과로 돌아가기"><ArrowLeft aria-hidden="true" size={17} weight="bold" /></button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{profile.name}</h2>
@@ -174,7 +174,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
           </div>
           <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"} · 연결된 기록 {profile.records.length}건</p>
         </div>
-        <button type="button" onClick={onClose} className="rounded-lg px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100">ESC</button>
+        <button type="button" onClick={onClose} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100">ESC</button>
       </header>
       <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
         {profile.ambiguous && (

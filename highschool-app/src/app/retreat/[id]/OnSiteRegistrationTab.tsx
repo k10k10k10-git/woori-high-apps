@@ -317,7 +317,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
           <span className={`text-2xl font-bold ${accentText}`}>{stats.registered}</span>
           <span className="text-slate-400 text-sm">/ {stats.total}명</span>
           <div className="w-28 bg-slate-100 rounded-full h-2.5 overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${accentBg}`} style={{ width: `${pct}%` }} />
+            <div className={`h-full rounded-full transition-[width,background-color] ${accentBg}`} style={{ width: `${pct}%` }} />
           </div>
           <span className="text-sm font-semibold text-slate-600">{pct}%</span>
           {stats.walkIns > 0 && (
@@ -469,7 +469,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
                         </div>
                         {/* 진행 바 */}
                         <div className="h-1 bg-slate-100">
-                          <div className={`h-full transition-all ${accentBg}`}
+                          <div className={`h-full transition-[width,background-color] ${accentBg}`}
                             style={{ width: `${total > 0 ? Math.round(regCount / total * 100) : 0}%` }} />
                         </div>
                         {/* 기존의 작은 이름 칩 밀도를 유지하고 상태만 짧은 꼬리표로 붙인다. */}

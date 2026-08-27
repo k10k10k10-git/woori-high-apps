@@ -224,7 +224,7 @@ export default function SuppliesTab({ retreat }: Props) {
         {budget > 0 ? (
           <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className={`h-full rounded-full transition-all ${used > budget ? "bg-red-400" : "bg-blue-500"}`}
+              className={`h-full rounded-full transition-[width,background-color] ${used > budget ? "bg-red-400" : "bg-blue-500"}`}
               style={{ width: `${pct}%` }}
             />
           </div>

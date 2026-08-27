@@ -4,8 +4,10 @@
 // 다른 것은 카드에서 들어가는 곳뿐이다: mode="admin" → 행정 화면, mode="field" → 현장 화면.
 // 데이터 로딩·권한 게이트는 각 라우트가 담당하고, 여기서는 화면만 그린다.
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { ArrowRight, LockKey, X } from "@phosphor-icons/react";
 import RetreatCalendarPanel from "@/app/RetreatCalendarPanel";
 import type { Retreat } from "@/lib/types";
 import { canAccessArea, canCreateRetreat, canEditArea, type MinistryRoles } from "./accessPolicy";
@@ -42,7 +44,7 @@ export default function VacationHome({
   const { isMobileView } = useViewMode();
   const canCreate = canCreateRetreat(roles);
   const entryHref = (id: string) => (mode === "admin" ? `/retreat/${id}` : `/retreat/${id}/field`);
-  const entryLabel = mode === "admin" ? "행정 화면 →" : "현장 화면 →";
+  const entryLabel = mode === "admin" ? "행정 화면" : "현장 화면";
   const selected = retreats.find((retreat) => retreat.id === selectedId);
 
   return (
@@ -151,17 +153,17 @@ export default function VacationHome({
                     </span>
                     {mode === "admin" && onDelete && (
                       <button onClick={() => onDelete(selected.id, selected.name)}
-                        className="text-lg leading-none text-slate-300 transition-colors hover:text-red-400" aria-label="삭제">×</button>
+                        className="compact-icon-control -m-2 text-slate-400 transition-colors hover:text-red-500" aria-label={`${selected.name} 삭제`}><X aria-hidden="true" size={18} weight="bold" /></button>
                     )}
                   </div>
                   <div className="font-bold leading-snug text-slate-800">{selected.name}</div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <button onClick={() => router.push(entryHref(selected.id))}
                       className="text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
-                      {entryLabel}
+                      {entryLabel} <ArrowRight aria-hidden="true" className="inline" size={13} weight="bold" />
                     </button>
                     {mode === "field" && lockedIds?.has(selected.id) && (
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">🔒 PIN</span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"><LockKey aria-hidden="true" size={12} weight="bold" />PIN</span>
                     )}
                   </div>
                 </div>
@@ -173,43 +175,46 @@ export default function VacationHome({
               {retreats.map((retreat) => {
                 const isSelected = selectedId === retreat.id;
                 return (
-                  <div
+                  <article
                     key={retreat.id}
-                    onClick={() => router.push(entryHref(retreat.id))}
-                    onMouseEnter={() => onSelect(retreat.id)}
-                    className="card group cursor-pointer p-[18px] transition-all duration-150"
+                    className="card group relative transition-[border-color,box-shadow,transform] duration-150"
                     data-hover
                     style={{
                       borderColor: isSelected ? "var(--color-primary)" : "var(--color-border)",
                       boxShadow: isSelected ? "0 4px 16px var(--color-primary-glow)" : "",
                     }}
                   >
-                    <div className="mb-1.5 flex items-start justify-between gap-2">
-                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                        style={{ background: "var(--color-primary-glow)", color: "var(--color-primary)", border: "1px solid var(--color-primary-ring)" }}>
-                        {retreat.year}년
-                      </span>
-                      <span className="flex items-center gap-1.5">
+                    <Link
+                      href={entryHref(retreat.id)}
+                      onMouseEnter={() => onSelect(retreat.id)}
+                      className="block rounded-[inherit] p-[18px] focus-visible:outline-offset-[-3px]"
+                    >
+                      <div className="mb-1.5 flex items-start justify-between gap-2 pr-8">
+                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                          style={{ background: "var(--color-primary-glow)", color: "var(--color-primary)", border: "1px solid var(--color-primary-ring)" }}>
+                          {retreat.year}년
+                        </span>
                         {mode === "field" && lockedIds?.has(retreat.id) && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">🔒 PIN</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"><LockKey aria-hidden="true" size={11} weight="bold" />PIN</span>
                         )}
-                        {mode === "admin" && onDelete && (
-                          <button
-                            onClick={(event) => { event.stopPropagation(); onDelete(retreat.id, retreat.name); }}
-                            className="text-lg leading-none text-slate-200 opacity-0 transition-colors hover:text-red-400 group-hover:opacity-100"
-                            aria-label="삭제"
-                          >×</button>
-                        )}
-                      </span>
-                    </div>
-                    <h3 className="mb-2 truncate text-sm font-bold leading-tight text-slate-800">{retreat.name}</h3>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs text-slate-400">
-                        {retreat.createdAt ? `${new Date(retreat.createdAt).toLocaleDateString("ko-KR")} 생성` : ""}
-                      </p>
-                      <span className="text-xs font-medium" style={{ color: "var(--color-primary)" }}>{entryLabel}</span>
-                    </div>
-                  </div>
+                      </div>
+                      <h3 className="mb-2 truncate text-sm font-bold leading-tight text-slate-800">{retreat.name}</h3>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-400">
+                          {retreat.createdAt ? `${new Date(retreat.createdAt).toLocaleDateString("ko-KR")} 생성` : ""}
+                        </p>
+                        <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: "var(--color-primary)" }}>{entryLabel}<ArrowRight aria-hidden="true" size={13} weight="bold" /></span>
+                      </div>
+                    </Link>
+                    {mode === "admin" && onDelete && (
+                      <button
+                        type="button"
+                        onClick={() => onDelete(retreat.id, retreat.name)}
+                        className="compact-icon-control absolute right-2 top-2 text-slate-300 opacity-0 transition-[color,opacity,background-color] hover:bg-red-50 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100"
+                        aria-label={`${retreat.name} 삭제`}
+                      ><X aria-hidden="true" size={17} weight="bold" /></button>
+                    )}
+                  </article>
                 );
               })}
             </div>

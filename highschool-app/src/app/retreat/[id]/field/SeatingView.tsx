@@ -194,7 +194,7 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
                         <label className="flex items-center gap-1 text-[11px] text-slate-400">
                           자리 점수
                           <input
-                            className="h-7 w-16 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-violet-300"
+                            className="h-10 w-20 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-600 outline-none focus:border-violet-300"
                             type="number"
                             min={0}
                             step={0.1}
@@ -205,11 +205,11 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
                         <button
                           type="button"
                           onClick={() => toggleZoneEditor(s.id, zi)}
-                          className="min-h-8 rounded-md border border-violet-200 bg-violet-50 px-2 text-xs font-semibold text-violet-700"
+                          className="min-h-10 rounded-md border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700"
                         >
                           {editingZones.has(`${s.id}:${zi}`) ? "수정 완료" : "조 수정"}
                         </button>
-                        <button onClick={() => delZone(s, zi)} className="text-xs text-slate-300 hover:text-red-400">구역 삭제</button>
+                        <button onClick={() => delZone(s, zi)} className="min-h-10 rounded-md px-2 text-xs text-slate-400 hover:bg-red-50 hover:text-red-500">구역 삭제</button>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-1.5">

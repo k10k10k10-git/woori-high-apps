@@ -5,6 +5,7 @@
 // 기록 취소는 별도 '지우기'로만.
 
 import { useEffect, useMemo, useState } from "react";
+import { Backspace } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
@@ -301,7 +302,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                     aria-label={`${m.name} ${s}`}
                     aria-pressed={entry?.s === s}
                     className={`px-2.5 py-1.5 rounded-md text-xs border font-medium ${
-                      entry?.s === s ? on : "border-slate-200 text-slate-400 hover:border-slate-300"
+                      entry?.s === s ? on : "attendance-status-choice"
                     }`}
                   >
                     {s}
@@ -311,9 +312,9 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                   <button
                     onClick={() => void clearAt(m.id, activeSessId)}
                     aria-label={`${m.name} 기록 지우기`}
-                    className="px-1.5 text-xs text-slate-300 hover:text-slate-600"
+                    className="compact-icon-control text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   >
-                    ⌫
+                    <Backspace aria-hidden="true" size={17} weight="bold" />
                   </button>
                 )}
               </div>

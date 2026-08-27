@@ -20,6 +20,7 @@ import {
   stripRosterSuffix,
 } from "./classRosterModel";
 import ExportButton from "./ExportButton";
+import { X } from "@phosphor-icons/react";
 
 type BuTab = "1부" | "2부";
 
@@ -514,6 +515,15 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
       <td key={`s-${keyPrefix}-${cls.grade}-${cls.classNum}-${rowIdx}`}
         title={titleText}
         onClick={() => { setPickerKey(prev => prev === colorKey ? null : colorKey); }}
+        onKeyDown={event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            setPickerKey(prev => prev === colorKey ? null : colorKey);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={titleText}
         className={`border px-1 py-0.5 text-center transition-colors select-none relative ${cellClass}`}>
         {student.name}
         {pickerKey === colorKey && (
@@ -534,8 +544,11 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
                   setColorDirectly(cls.buNum, student.id, student.name, cls.grade, cls.classNum, opt.color);
                   setPickerKey(null);
                 }}
-                className={`w-7 h-7 sm:w-5 sm:h-5 rounded-full ${opt.cls} hover:scale-110 transition-transform`}
-              />
+                aria-label={opt.label}
+                className="compact-icon-control rounded-full hover:bg-slate-100"
+              >
+                <span aria-hidden="true" className={`h-5 w-5 rounded-full ${opt.cls}`} />
+              </button>
             ))}
             <button
               title="색상 제거"
@@ -543,8 +556,9 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
                 setColorDirectly(cls.buNum, student.id, student.name, cls.grade, cls.classNum, null);
                 setPickerKey(null);
               }}
-              className="w-7 h-7 sm:w-5 sm:h-5 rounded-full bg-slate-200 text-slate-500 text-xs flex items-center justify-center hover:bg-slate-300"
-            >×</button>
+              aria-label="색상 제거"
+              className="compact-icon-control rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+            ><X aria-hidden="true" size={18} weight="bold" /></button>
           </div>
         )}
       </td>

@@ -185,7 +185,7 @@ export default function SiteRequestsPanel() {
                 {selected.attachment && siteRequestAttachmentUrl(selected.attachment) && (
                   <section>
                     <p className="mb-2 text-xs font-bold text-slate-500">첨부 이미지</p>
-                    <a href={siteRequestAttachmentUrl(selected.attachment)} download={selected.attachment.name} className="block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                    <a href={siteRequestAttachmentUrl(selected.attachment)} download={selected.attachment.name} className="media-outline block overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                       {/* Storage URL과 레거시 data URL 모두 전송 전에 JPEG로 재인코딩된 결과만 허용한다. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={siteRequestAttachmentUrl(selected.attachment)} alt={`${selected.title} 첨부`} className="max-h-80 w-full object-contain" />

@@ -42,7 +42,7 @@ export default function MyPageModal({ onClose, initialTab = "dashboard" }: { onC
               <h2 className="text-xl font-bold text-slate-950">{displayName || "사용자"} 마이페이지</h2>
               <p className="mt-1 text-xs text-slate-500">{describeRoles(roles)} 역할의 일정, 배정과 요청 상태를 확인합니다.</p>
             </div>
-            <button onClick={onClose} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="마이페이지 닫기"><X size={18} weight="bold" /></button>
+            <button onClick={onClose} className="compact-icon-control shrink-0 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="마이페이지 닫기"><X aria-hidden="true" size={18} weight="bold" /></button>
           </div>
           <div className="admin-mypage-tabs mt-4 flex gap-1" role="tablist" aria-label="마이페이지 메뉴">
             <TabButton selected={tab === "dashboard"} onClick={() => setTab("dashboard")}>대시보드</TabButton>

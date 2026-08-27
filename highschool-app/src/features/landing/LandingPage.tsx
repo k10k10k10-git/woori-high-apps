@@ -42,7 +42,7 @@ function LandingHeader({ signIn }: { signIn: () => Promise<void> }) {
 
 function HeroMedia() {
   return (
-    <figure className="landing-hero-media">
+    <figure className="landing-hero-media media-outline">
       <Image
         src="/landing-ministry-team.jpg"
         alt="사역 일정과 명단을 함께 확인하는 고등부 사역자들"

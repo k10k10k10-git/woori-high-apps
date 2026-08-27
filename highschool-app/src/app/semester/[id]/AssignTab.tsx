@@ -382,7 +382,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                   {collapsible ? (
                     <button
                       type="button"
-                      className="mb-1.5 flex min-h-9 items-center gap-2 rounded-lg px-1 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
+                      className="mb-1.5 flex min-h-10 items-center gap-2 rounded-lg px-1 text-xs font-semibold text-slate-500 transition hover:text-emerald-700"
                       aria-expanded={detailStaffOpen}
                       aria-controls="detail-staff-list"
                       onClick={() => setDetailStaffOpen((value) => !value)}

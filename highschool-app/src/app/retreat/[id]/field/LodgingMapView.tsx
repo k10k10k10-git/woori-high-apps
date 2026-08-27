@@ -208,7 +208,7 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
             <span>{building.label} · {page.floorLabel}</span>
             <span>배정 호실 <strong className="text-slate-700">{pageRooms.length}</strong></span>
           </div>
-          <div ref={mapScrollRef} className="overflow-x-auto overscroll-x-contain rounded-lg border border-slate-200 bg-slate-100 [-webkit-overflow-scrolling:touch]">
+          <div ref={mapScrollRef} className="media-outline overflow-x-auto overscroll-x-contain rounded-lg border border-slate-200 bg-slate-100 [-webkit-overflow-scrolling:touch]">
             <div className="relative" style={{ minWidth: `${page.minWidth}px` }}>
               {page.image ? (
                 <Image

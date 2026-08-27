@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ChalkboardTeacher, Crown, MapPin, PencilSimple, PuzzlePiece, User, X } from "@phosphor-icons/react";
 import { Group, Student, TeacherAttendance } from "@/lib/types";
 import { TEACHER_STATUS_CLS } from "@/lib/constants";
 import { resolveGroupRoleStudentId } from "@/lib/groupRoleStudent";
@@ -39,7 +40,7 @@ export function StudentChip({ id, name, tag, bu, color, onDragStart }: {
         e.dataTransfer.setData("dragId", id);
         onDragStart();
       }}
-      className={`drag-handle border rounded-lg px-2 py-1 text-xs flex items-center gap-1 hover:border-blue-300 hover:shadow-sm transition-all select-none ${chipBase}`}
+      className={`drag-handle border rounded-lg px-2 py-1 text-xs flex items-center gap-1 hover:border-blue-300 hover:shadow-sm transition-[border-color,box-shadow,background-color,color] select-none ${chipBase}`}
     >
       <span className="font-medium text-slate-700">{name}</span>
       {tag && <span className="text-slate-400">{tag}</span>}
@@ -65,13 +66,13 @@ export function TeacherChip({ teacher, onDragStart, onRemove }: {
         e.dataTransfer.setData("dragName", teacher.name);
         onDragStart();
       }}
-      className={`drag-handle border rounded-lg px-2 py-1 text-xs flex items-center gap-1 hover:shadow-sm transition-all select-none cursor-grab ${statusCls}`}
+      className={`drag-handle border rounded-lg px-2 py-1 text-xs flex items-center gap-1 hover:shadow-sm transition-[border-color,box-shadow,background-color,color] select-none cursor-grab ${statusCls}`}
     >
-      <span className="font-medium">👨‍🏫 {teacher.name}</span>
+      <span className="inline-flex items-center gap-1 font-medium"><ChalkboardTeacher aria-hidden="true" size={13} weight="bold" />{teacher.name}</span>
       {teacher.status !== "전참" && <span className="text-[10px] opacity-75">({teacher.status})</span>}
       {onRemove && (
         <button onClick={e => { e.stopPropagation(); onRemove(); }}
-          className="opacity-60 hover:opacity-100 ml-0.5" aria-label={`${teacher.name} 제거`}>×</button>
+          className="compact-icon-control -m-2 ml-0 opacity-60 hover:opacity-100" aria-label={`${teacher.name} 제거`}><X aria-hidden="true" size={12} weight="bold" /></button>
       )}
     </div>
   );
@@ -244,46 +245,42 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
         {/* 윈도우 창 컨트롤 느낌 — 평소엔 납작한 아이콘, 호버 시에만 강조(삭제는 빨강 채움) */}
         <div className="flex items-center -mr-1 -mt-0.5">
           <button onClick={toggleEditing}
-            className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="compact-icon-control rounded text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
             title="조 편집" aria-label="조 편집">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
+            <PencilSimple aria-hidden="true" size={15} weight="bold" />
           </button>
           <button onClick={onRemoveGroup}
-            className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:bg-red-500 hover:text-white transition-colors"
+            className="compact-icon-control rounded text-slate-400 transition-colors hover:bg-red-500 hover:text-white"
             title="조 삭제" aria-label="조 삭제">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M18 6 6 18" /><path d="m6 6 12 12" />
-            </svg>
+            <X aria-hidden="true" size={15} weight="bold" />
           </button>
         </div>
       </div>
 
       {editing && (
         <div className="mb-2 space-y-1.5 bg-slate-50 rounded p-2">
-          <input className="input text-xs py-1" placeholder="👨‍🏫 교사 (쉼표 구분 또는 드래그)"
+          <input className="input text-xs py-1" placeholder="교사 (쉼표 구분 또는 드래그)"
             aria-label="교사"
             value={editTeachers}
             onChange={e => setEditTeachers(e.target.value)}
             onBlur={() => onUpdate("teachers", editTeachers.split(",").map(t => t.trim()).filter(Boolean))}
             onDragOver={e => e.preventDefault()}
             onDrop={e => handleDrop("teachers", e)} />
-          <input className="input text-xs py-1" placeholder="⭐ 조장 (드래그 또는 입력)"
+          <input className="input text-xs py-1" placeholder="조장 (드래그 또는 입력)"
             aria-label="조장"
             value={editLeader}
             onChange={e => setEditLeader(e.target.value)}
             onBlur={() => onUpdate("leader", editLeader)}
             onDragOver={e => e.preventDefault()}
             onDrop={e => handleDrop("leader", e)} />
-          <input className="input text-xs py-1" placeholder="🧑‍💼 조 스탭 (드래그 또는 입력)"
+          <input className="input text-xs py-1" placeholder="조 스탭 (드래그 또는 입력)"
             aria-label="조 스탭"
             value={editStaff}
             onChange={e => setEditStaff(e.target.value)}
             onBlur={() => onUpdate("staff", editStaff)}
             onDragOver={e => e.preventDefault()}
             onDrop={e => handleDrop("staff", e)} />
-          <input className="input text-xs py-1" placeholder="📍 GBS 장소 (예: 5012호)"
+          <input className="input text-xs py-1" placeholder="GBS 장소 (예: 5012호)"
             aria-label="GBS 장소"
             value={editGbs}
             onChange={e => setEditGbs(e.target.value)}
@@ -294,7 +291,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
 
       {!editing && (
         <div className="flex flex-wrap items-center gap-1 mb-1">
-          <span className="text-xs text-slate-400">👨‍🏫 교사:</span>
+          <span className="inline-flex items-center gap-1 text-xs text-slate-400"><ChalkboardTeacher aria-hidden="true" size={13} weight="bold" />교사:</span>
           {(group.teachers || []).length === 0 && <span className="text-xs text-slate-300">-</span>}
           {(group.teachers || []).map(t => {
             const status = teacherStatusMap[t];
@@ -309,7 +306,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                 {status === "부분참" && <span className="text-[10px] opacity-75">(부분참)</span>}
                 {status === "불참" && <span className="text-[10px] opacity-75">(불참)</span>}
                 <button onClick={() => onRemoveTeacher(t)}
-                  className="opacity-0 group-hover:opacity-100 ml-0.5" aria-label={`${t} 제거`}>×</button>
+                  className="compact-icon-control -m-2 ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100" aria-label={`${t} 제거`}><X aria-hidden="true" size={11} weight="bold" /></button>
               </div>
             );
           })}
@@ -319,7 +316,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
         const names = (group.leader || "").split(",").map(n => n.trim()).filter(Boolean);
         return (
           <div className="flex flex-wrap items-center gap-1 mb-1">
-            <span className="text-xs text-slate-400">⭐ 조장:</span>
+            <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Crown aria-hidden="true" size={13} weight="fill" />조장:</span>
             {names.length === 0 && <span className="text-xs text-slate-300">-</span>}
             {names.map(name => {
               const sid = resolveGroupRoleStudentId(students, group, name);
@@ -331,7 +328,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                   <button onClick={() => {
                     onUpdate("leader", names.filter(n => n !== name).join(", "));
                     if (sid) onRemoveStudent(sid);
-                  }} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 ml-0.5" aria-label={`조장 ${name} 제거`}>×</button>
+                  }} className="compact-icon-control -m-2 ml-0 text-slate-400 opacity-0 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100" aria-label={`조장 ${name} 제거`}><X aria-hidden="true" size={11} weight="bold" /></button>
                 </div>
               );
             })}
@@ -344,7 +341,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
         const iguardOnly = iguardStaffNames.filter(n => !names.includes(n));
         return (
           <div className="flex flex-wrap items-center gap-1 mb-1">
-            <span className="text-xs text-slate-400">🧑‍💼 스탭:</span>
+            <span className="inline-flex items-center gap-1 text-xs text-slate-400"><User aria-hidden="true" size={13} weight="bold" />스탭:</span>
             {names.length === 0 && iguardOnly.length === 0 && <span className="text-xs text-slate-300">-</span>}
             {names.map(name => {
               const sid = resolveGroupRoleStudentId(students, group, name);
@@ -354,7 +351,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
                   <button onClick={() => {
                     onUpdate("staff", names.filter(n => n !== name).join(", "));
                     if (sid) onRemoveStudent(sid);
-                  }} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 ml-0.5" aria-label={`스탭 ${name} 제거`}>×</button>
+                  }} className="compact-icon-control -m-2 ml-0 text-slate-400 opacity-0 hover:text-red-500 group-hover:opacity-100 focus-visible:opacity-100" aria-label={`스탭 ${name} 제거`}><X aria-hidden="true" size={11} weight="bold" /></button>
                 </div>
               );
             })}
@@ -362,14 +359,14 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
               <span key={`ig_${name}`}
                 title="이가드 사이트의 조스탭 배정 탭에서 배정됨 — 해제도 이가드에서"
                 className="rounded bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">
-                🧩 {name}
+                <PuzzlePiece aria-hidden="true" className="mr-1 inline" size={12} weight="fill" />{name}
               </span>
             ))}
           </div>
         );
       })()}
       {!editing && (
-        <div className="text-xs text-blue-500 mb-2">📍 GBS: {group.gbs ? group.gbs : <span className="text-slate-300">-</span>}</div>
+        <div className="mb-2 flex items-center gap-1 text-xs text-blue-500"><MapPin aria-hidden="true" size={13} weight="fill" />GBS: {group.gbs ? group.gbs : <span className="text-slate-300">-</span>}</div>
       )}
 
       {(() => {
@@ -415,7 +412,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
             >
               <span className="text-slate-700">{s?.name || sid}</span>
               <button onClick={() => onRemoveStudent(sid)}
-                className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 ml-0.5" aria-label={`${s?.name || sid} 제거`}>×</button>
+                className="compact-icon-control -m-2 ml-0 text-red-400 opacity-0 hover:text-red-600 group-hover:opacity-100 focus-visible:opacity-100" aria-label={`${s?.name || sid} 제거`}><X aria-hidden="true" size={11} weight="bold" /></button>
             </div>
           );
         };

@@ -120,7 +120,7 @@ export default function AdminSuppliesTab({ retreat }: Props) {
           <span className="text-slate-500">준비 완료 <strong className="text-emerald-600">{checkedCount}</strong> / {itemsInTab.length}</span>
           {itemsInTab.length > 0 && (
             <div className="w-28 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-400 rounded-full transition-all"
+              <div className="h-full bg-emerald-400 rounded-full transition-[width]"
                 style={{ width: `${itemsInTab.length > 0 ? (checkedCount / itemsInTab.length) * 100 : 0}%` }} />
             </div>
           )}

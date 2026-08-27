@@ -165,7 +165,19 @@ body {
   color: var(--color-text-primary);
   font-size: var(--text-base);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p,
+figcaption {
+  text-wrap: pretty;
 }
 
 /* PC에서는 루트 요소를 명시적인 스크롤 컨테이너로 둔다.
@@ -214,6 +226,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .card:where([data-hover]):hover {
   transform: translateY(-2px);
   box-shadow: 0 0 0 1px rgba(8, 122, 87, 0.11), var(--shadow-md);
+}
+
+/* 사진·첨부·도면은 밝고 어두운 배경 어디서나 가장자리를 잃지 않는다. */
+.media-outline {
+  outline: 1px solid rgba(18, 28, 24, 0.12);
+  outline-offset: -1px;
+}
+[data-theme="dark"] .media-outline {
+  outline-color: rgba(238, 245, 241, 0.14);
 }
 
 /* ════════════════════════════════════════════════════
@@ -266,7 +287,7 @@ table th {
   box-shadow: var(--shadow-primary);
 }
 .btn-primary:hover  { background: var(--color-primary-hover); box-shadow: 0 6px 20px var(--color-primary-glow); }
-.btn-primary:active { background: var(--color-primary-active); transform: scale(0.97); box-shadow: none; }
+.btn-primary:active { background: var(--color-primary-active); transform: scale(0.96); box-shadow: none; }
 .btn-primary:disabled { background: var(--color-primary-disabled); color: var(--color-primary-disabled-text); cursor: not-allowed; box-shadow: none; transform: none; }
 
 .btn-secondary {
@@ -287,7 +308,7 @@ table th {
   gap: 6px;
 }
 .btn-secondary:hover  { background: #e9efec; border-color: var(--color-border-hover); }
-.btn-secondary:active { background: #dce5e0; transform: scale(0.97); }
+.btn-secondary:active { background: #dce5e0; transform: scale(0.96); }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .btn-danger {
@@ -307,7 +328,7 @@ table th {
   gap: 6px;
 }
 .btn-danger:hover  { background: #fecaca; }
-.btn-danger:active { background: #fca5a5; transform: scale(0.97); }
+.btn-danger:active { background: #fca5a5; transform: scale(0.96); }
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* flex 컨테이너 안에서 버튼이 눌려 글자가 세로로 쪼개지는 것을 막는다.
@@ -329,7 +350,7 @@ table th {
 .btn-sm {
   padding: 4px 10px !important;
   font-size: var(--text-xs) !important;
-  min-height: 32px;
+  min-height: 40px;
 }
 
 /* ════════════════════════════════════════════════════
@@ -490,7 +511,6 @@ table th {
   background: rgba(3,8,6,.58);
   backdrop-filter: blur(3px);
   overscroll-behavior: contain;
-  animation: backdropIn .15s var(--ease-out) both;
 }
 .overlay-shell__panel {
   width: min(100%, 760px);
@@ -501,7 +521,6 @@ table th {
   color: var(--color-text-primary);
   box-shadow: var(--shadow-lg);
   outline: none;
-  animation: modalIn .2s var(--ease-out) both;
 }
 .overlay-shell--bottom-sheet { align-items: flex-end; padding: 0; }
 .overlay-shell--bottom-sheet .overlay-shell__panel {
@@ -540,22 +559,9 @@ table th {
   box-sizing: border-box;
 }
 
-.modal-backdrop {
-  animation: backdropIn 0.15s var(--ease-out) both;
-}
 .modal-card {
-  animation: modalIn 0.2s var(--ease-out) both;
   border-radius: var(--radius-xl) !important;
   box-shadow: var(--shadow-lg) !important;
-}
-
-@keyframes backdropIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes modalIn {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 /* ════════════════════════════════════════════════════
@@ -852,7 +858,7 @@ table th {
   position: sticky;
   top: 0;
   z-index: 60;
-  height: 70px;
+  height: 80px;
   color: white;
   background: rgba(23,25,28,.96);
   border-bottom: 1px solid rgba(255,255,255,.07);
@@ -885,7 +891,7 @@ table th {
 .portal-nav { display: flex; min-width: 0; flex: 1; align-items: center; gap: 4px; }
 .portal-nav-link {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 40px;
   align-items: center;
   gap: 6px;
   border-radius: 10px;
@@ -914,11 +920,11 @@ table th {
   transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
 }
 .portal-action:hover { color: white; border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); }
-.portal-header-tools { margin-left: auto; display: grid; flex: 0 0 auto; gap: 4px; justify-items: stretch; }
-.portal-account-row { display: flex; min-height: 25px; align-items: center; justify-content: flex-end; gap: 7px; }
+.portal-header-tools { margin-left: auto; display: grid; flex: 0 0 auto; gap: 0; justify-items: stretch; }
+.portal-account-row { display: flex; min-height: 40px; align-items: center; justify-content: flex-end; gap: 7px; }
 .portal-compact-action {
   display: inline-flex;
-  min-height: 25px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
   gap: 5px;
@@ -933,14 +939,14 @@ table th {
 .portal-compact-action:hover { color: white; border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); }
 .view-mode-toggle {
   display: inline-flex;
-  min-height: 25px;
+  min-height: 40px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.11);
   border-radius: 8px;
 }
 .view-mode-toggle button {
   display: inline-flex;
-  min-height: 23px;
+  min-height: 40px;
   align-items: center;
   gap: 4px;
   padding: 0 8px;
@@ -1172,7 +1178,7 @@ html[data-view-preview="true"] .overlay-shell--bottom-sheet .overlay-shell__pane
 .theme-toggle {
   display: inline-flex;
   min-width: 28px;
-  min-height: 25px;
+  min-height: 40px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
@@ -1203,7 +1209,7 @@ html[data-view-preview="true"] .overlay-shell--bottom-sheet .overlay-shell__pane
 .landing-header .theme-toggle:hover { border-color: var(--color-border-hover); background: var(--color-surface-hover); color: var(--color-text-primary); }
 .portal-search-trigger {
   display: inline-flex;
-  min-height: 27px;
+  min-height: 40px;
   min-width: 154px;
   align-items: center;
   justify-content: flex-end;

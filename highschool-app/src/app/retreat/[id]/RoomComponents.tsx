@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ChalkboardTeacher, PencilSimple, X } from "@phosphor-icons/react";
 import { Room, Student, TeacherAttendance } from "@/lib/types";
 import { TEACHER_STATUS_CLS } from "@/lib/constants";
 import { roomLabel } from "@/lib/roomLabel";
@@ -113,7 +114,7 @@ function RoomStudentChip({ id, student, color, onDragStart }: {
   const chipBase = color ? CELL_COLOR_CLS[color] : "bg-white border-slate-200";
   return (
     <div draggable={canEditRetreat} onDragStart={onDragStart}
-      className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 hover:border-blue-300 transition-all select-none ${chipBase}`}>
+      className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 hover:border-blue-300 transition-[border-color,background-color,color] select-none ${chipBase}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${student?.gender === "여" ? "bg-red-400" : "bg-blue-400"}`} />
       <span className="font-medium text-slate-700">{student?.name || id}</span>
       {student && <span className="text-slate-400">{student.grade}-{student.class}</span>}
@@ -130,12 +131,12 @@ function RoomTeacherChip({ teacher, onDragStart, onRemove }: {
   const statusCls = TEACHER_STATUS_CLS[teacher.status] || "bg-slate-100 border-slate-200 text-slate-600";
   return (
     <div draggable={canEditRetreat} onDragStart={onDragStart}
-      className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 cursor-grab hover:shadow-sm transition-all select-none ${statusCls}`}>
-      <span>👨‍🏫 {teacher.name}</span>
+      className={`drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 cursor-grab hover:shadow-sm transition-[border-color,box-shadow,background-color,color] select-none ${statusCls}`}>
+      <span className="inline-flex items-center gap-1"><ChalkboardTeacher aria-hidden="true" size={13} weight="bold" />{teacher.name}</span>
       {teacher.status !== "전참" && <span className="text-[10px] opacity-75">({teacher.status})</span>}
       {onRemove && (
         <button onClick={e => { e.stopPropagation(); onRemove(); }}
-          className="opacity-60 hover:opacity-100 ml-0.5">×</button>
+          className="compact-icon-control -m-2 ml-0 opacity-60 hover:opacity-100" aria-label={`${teacher.name} 제거`}><X aria-hidden="true" size={12} weight="bold" /></button>
       )}
     </div>
   );
@@ -233,15 +234,13 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
           </span>
           <button
             onClick={() => editing ? closeEditing() : setEditing(true)}
-            className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${editing ? "bg-blue-50 text-blue-600" : "text-slate-300 hover:bg-slate-100 hover:text-slate-600"}`}
+            className={`compact-icon-control rounded transition-colors ${editing ? "bg-blue-50 text-blue-600" : "text-slate-300 hover:bg-slate-100 hover:text-slate-600"}`}
             title={editing ? "편집 닫기" : "방 편집"}
             aria-label={`${roomLabel(room)} ${editing ? "편집 닫기" : "방 편집"}`}
           >
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
+            <PencilSimple aria-hidden="true" size={15} weight="bold" />
           </button>
-          <button onClick={onRemove} aria-label={`${roomLabel(room)} 삭제`} className="text-slate-300 hover:text-red-400 ml-1">×</button>
+          <button onClick={onRemove} aria-label={`${roomLabel(room)} 삭제`} className="compact-icon-control text-slate-300 hover:text-red-400"><X aria-hidden="true" size={15} weight="bold" /></button>
         </div>
       </div>
 
@@ -251,7 +250,7 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
             <label className="shrink-0 text-[11px] font-medium text-slate-500 whitespace-nowrap" htmlFor={`room-capacity-${room.id}`}>방 정원</label>
             <input
               id={`room-capacity-${room.id}`}
-              className="input !h-7 !w-14 shrink-0 px-1 py-0 text-center text-xs"
+              className="input !h-10 !w-16 shrink-0 px-1 py-0 text-center text-xs"
               type="number"
               min={1}
               max={999}
@@ -264,7 +263,7 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
               }}
             />
             <span className="shrink-0 text-[11px] text-slate-400">명</span>
-            <button type="button" className="btn-secondary !h-7 shrink-0 whitespace-nowrap px-2 py-0 text-[11px]" onClick={() => void saveCapacity()}>변경</button>
+            <button type="button" className="btn-secondary !h-10 shrink-0 whitespace-nowrap px-3 py-0 text-[11px]" onClick={() => void saveCapacity()}>변경</button>
             <span className="ml-auto shrink-0 whitespace-nowrap text-[10px] text-slate-400">현재 {occupancy}명</span>
           </div>
           <div className="relative">
@@ -284,9 +283,9 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-400 hover:text-slate-600"
+                className="compact-icon-control absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 aria-label="검색어 지우기"
-              >×</button>
+              ><X aria-hidden="true" size={14} weight="bold" /></button>
             )}
             {normalizedQuery && (
               <div className="absolute z-30 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -298,7 +297,7 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
                     <button key={`teacher-${result.teacher.name}`} type="button"
                       onClick={() => { onAssignTeacher(result.teacher.name); setSearchQuery(""); }}
                       className="w-full px-3 py-2 text-left text-xs hover:bg-green-50 flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-700">👨‍🏫 {result.teacher.name}</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-slate-700"><ChalkboardTeacher aria-hidden="true" size={13} weight="bold" />{result.teacher.name}</span>
                       <span className="text-slate-400">교사 · {result.teacher.bu}</span>
                     </button>
                   );
@@ -324,9 +323,9 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
           {teachers.map(name => (
             <div key={name} draggable={canEditRetreat} onDragStart={() => onDragStart("teacher", name)}
               className="drag-handle border rounded px-1.5 py-0.5 text-xs flex items-center gap-1 group bg-green-50 border-green-200 text-green-700 cursor-grab">
-              <span>👨‍🏫 {name}</span>
+              <span className="inline-flex items-center gap-1"><ChalkboardTeacher aria-hidden="true" size={13} weight="bold" />{name}</span>
               <button onClick={() => onRemoveTeacher(name)}
-                className="opacity-0 group-hover:opacity-100 ml-0.5">×</button>
+                className="compact-icon-control -m-2 ml-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100" aria-label={`${name} 제거`}><X aria-hidden="true" size={11} weight="bold" /></button>
             </div>
           ))}
         </div>
@@ -345,7 +344,7 @@ export function RoomCard({ room, students, cellColors, studentCandidateIds, allT
               <span className="text-slate-700 font-medium">{s?.name || sid}</span>
               {s && <span className="text-slate-400 whitespace-nowrap">{s.bu} {s.grade}-{s.class}</span>}
               <button onClick={() => onRemoveStudent(sid)}
-                className="opacity-0 group-hover:opacity-100 text-red-400 ml-0.5">×</button>
+                className="compact-icon-control -m-2 ml-0 text-red-400 opacity-0 group-hover:opacity-100 focus-visible:opacity-100" aria-label={`${s?.name || sid} 제거`}><X aria-hidden="true" size={11} weight="bold" /></button>
             </div>
           );
         })}

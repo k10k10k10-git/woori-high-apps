@@ -442,7 +442,7 @@ export function CueCardView({
                       )}
                     </div>
                     {!timelineCompact && (b.detail || b.owner || b.notice) && (
-                      <button onClick={() => toggleOpen(b.id)} className="min-h-9 shrink-0 whitespace-nowrap rounded px-2 text-xs text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
+                      <button onClick={() => toggleOpen(b.id)} className="min-h-10 shrink-0 whitespace-nowrap rounded px-2 text-xs text-slate-500 hover:bg-emerald-50 hover:text-emerald-700">
                         {isOpen ? "접기" : "상세 ▾"}
                       </button>
                     )}

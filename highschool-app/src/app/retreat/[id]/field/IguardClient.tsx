@@ -351,7 +351,7 @@ function IguardWorkspace({ id }: { id: string }) {
           <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-1.5 font-semibold"><WarningCircle aria-hidden="true" size={17} />행정 데이터 호환성 경고</div>
-              <button onClick={() => setCompatDismissed(true)} className="min-h-9 shrink-0 rounded px-2 text-xs text-amber-600 hover:bg-amber-100 hover:text-amber-800">닫기</button>
+              <button onClick={() => setCompatDismissed(true)} className="min-h-10 shrink-0 rounded px-2 text-xs text-amber-600 hover:bg-amber-100 hover:text-amber-800">닫기</button>
             </div>
             <ul className="mt-1.5 space-y-1">
               {compatWarnings.map((w, i) => (

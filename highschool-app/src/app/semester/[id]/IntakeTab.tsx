@@ -275,7 +275,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           </h3>
           <button
             type="button"
-            className="min-h-9 shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700"
+            className="min-h-10 shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700"
             aria-expanded={!rosterCollapsed}
             aria-controls="intake-applied-list"
             onClick={() => setRosterCollapsed((value) => !value)}
@@ -301,7 +301,7 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
               <div className="mt-3 border-t border-slate-100 pt-3">
                 <button
                   type="button"
-                  className="flex min-h-9 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-slate-600 transition hover:text-emerald-700"
+                  className="flex min-h-10 items-center gap-2 rounded-lg px-1 text-sm font-semibold text-slate-600 transition hover:text-emerald-700"
                   aria-expanded={!staffCollapsed}
                   aria-controls="intake-staff-list"
                   onClick={() => setStaffCollapsed((value) => !value)}

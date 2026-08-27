@@ -4,6 +4,7 @@
 // 역할 계약은 accessPolicy, 쓰기 계획은 roleAssign(순수) → applyRole(실행)이 담당한다.
 
 import { useEffect, useMemo, useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
@@ -321,7 +322,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
             <h2 className="text-xl font-bold text-slate-900">팀원 관리</h2>
             <p className="mt-1 text-xs text-slate-500">학기 역할은 학기·주일 화면에, 방학 역할은 수련회 행정·현장 화면에 적용됩니다.</p>
           </div>
-          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-xl text-slate-500 hover:bg-slate-200" aria-label="닫기">×</button>
+          <button onClick={onClose} className="compact-icon-control rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="닫기"><X aria-hidden="true" size={18} weight="bold" /></button>
         </header>}
 
         <div className="space-y-6 p-5 sm:p-6">
