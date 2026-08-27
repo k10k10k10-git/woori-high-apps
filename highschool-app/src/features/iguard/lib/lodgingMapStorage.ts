@@ -1,5 +1,5 @@
 import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
-import { storage } from "@/features/iguard/lib/firebase";
+import { storage } from "@/lib/firebase";
 
 function safeFileName(name: string): string {
   return name.normalize("NFKC").replace(/[^0-9A-Za-z가-힣._-]+/g, "_").slice(-120);

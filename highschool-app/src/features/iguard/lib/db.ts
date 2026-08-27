@@ -1,5 +1,5 @@
 import { ref, get, set, update, push, remove, onValue, runTransaction, DataSnapshot } from "firebase/database";
-import { db } from "./firebase";
+import { db } from "@/lib/firebase";
 import { paths } from "./paths";
 import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardSegment, IguardPost, IguardMovement, IguardBus, IguardSeating,

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup } from "firebase/auth";
 import { get, ref } from "firebase/database";
-import { auth, googleProvider, db } from "@/features/iguard/lib/firebase";
+import { auth, googleProvider, db } from "@/lib/firebase";
 import { paths } from "@/features/iguard/lib/paths";
 import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";
 
