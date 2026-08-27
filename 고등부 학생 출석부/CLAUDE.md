@@ -261,7 +261,7 @@ Firebase 보안 규칙에서 `teacherClasses/{uid}` = classKey로 담당 반을 
 
 > **이 파일이 Firebase 프로젝트 `woori-high`의 유일한 배포용 보안 규칙 원천이다.**
 > `firebase deploy --only database`는 반드시 이 프로젝트(학생 앱)에서만 실행한다.
-> 다른 앱(행정, 이가드)의 rules 파일은 `DO_NOT_DEPLOY` 접두사로 보관용이며 배포에 사용하지 않는다.
+> 저장소 전체에서 `database.rules.json`과 `firebase.json`은 이 앱에만 있다 — 다른 앱에는 rules 파일 자체가 없다(2026-08-28 실측). 옛 행정·이가드 앱의 `DO_NOT_DEPLOY.*` 보관 파일은 2026-08 통합 때 그 앱들과 함께 사라졌다.
 
 주요 규칙 특이사항:
 - `admins` 노드: bootstrap 조건 제거됨 — 최초 admin은 Firebase Console에서 직접 추가해야 함

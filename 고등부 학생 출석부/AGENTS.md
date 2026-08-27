@@ -36,7 +36,7 @@ This app owns:
 
 - `database.rules.json` here is the single production source for `woori-high` Rules.
 - Run `firebase deploy --only database` only from this app, and only when explicitly requested.
-- Other apps' `DO_NOT_DEPLOY.database.rules.json` files are not deployable sources.
+- No other app has a rules file: `database.rules.json` and `firebase.json` exist only here (verified 2026-08-28). The old `DO_NOT_DEPLOY.*` copies went away with the retreat/iguard apps in the 2026-08 consolidation.
 - Keep read permissions for `retreatAdmins` and `iguardMembers` where required by retreat apps.
 
 ## Required Patterns

@@ -70,7 +70,7 @@
 2. **전체 덮어쓰기 유실** ★ — `set()`으로 노드 전체 저장 → 동시 편집·오프라인 큐가 데이터를 지움. → 규칙: 단일 경로 `update()` 우선. 전체 set이 불가피하면(배열 순서) `backupNodeBeforeOverwrite` 패턴을 반드시 동반.
 3. **"고쳤을 것" 보고** ★ — 코드만 보고 수정 완료 선언, 배포 전 사용자에게 확인 요청 → "여전히 동일해" 루프. → 규칙: 아래 품질 기준의 버그 수정 체크리스트를 전부 통과하기 전에 "고쳤다"고 말하지 않는다.
 4. **회귀 테스트 생략** ★ — 특이사항 초기화 버그가 테스트 없이 3세션/5회 재발했다. → 규칙: 순수 로직 버그는 회귀 테스트 1개를 **같은 커밋**에 포함.
-5. **Rules 오배포** — retreat/iguard 폴더에서 `firebase deploy --only database`. → 규칙: Rules는 학생 앱에서만. 다른 앱의 rules 파일명이 `DO_NOT_DEPLOY.*`인 이유다.
+5. **Rules 오배포** — 학생 앱이 아닌 곳에서 `firebase deploy --only database`. → 규칙: Rules는 학생 앱에서만. 지금은 구조가 이를 막는다 — 저장소 전체에서 `database.rules.json`도 `firebase.json`도 학생 앱에만 있어 다른 위치에서는 배포 명령이 성립하지 않는다(2026-08-28 실측). 새 앱에 `firebase.json`을 추가할 때 이 보호가 깨지므로 주의.
 6. **구독 onError 누락** ★ — 새 onValue 구독에 에러 콜백이 없으면 권한 오류 시 무한 스피너. → 규칙: 모든 구독 함수는 `onError?: (e: Error) => void`를 받고, 훅/컴포넌트는 loadError에 배선한다(iguard 패턴 16).
 7. **시간 비교 재발명** ★ — 큐싯의 `24:30~25:30`(자정 넘김) 표기를 단순 시:분 비교로 처리 → 새벽에 전부 "일정 없음". → 규칙: `highschool-app/src/features/iguard/lib/scheduleTime.ts`의 `isNowOn`/`currentBlockFor`만 사용. `scheduleTime.test.ts`가 지킨다(2026-08-09 신설).
 8. **큐싯 파싱 순서 변경** ★ — 날짜 마커 검사를 시간 검사보다 먼저 하면 "둘째날 오전 프로그램" 행이 통째로 사라진다. → 규칙: `cueSheet.ts` 수정 시 "시간 유무 → 날짜 판정" 순서 유지, `cueSheet.test.ts`가 지킨다(2026-08-09 신설 — 그전까지 이 자리에 적혀 있던 `scheduleUtils.test.ts`는 **존재한 적이 없다**).
