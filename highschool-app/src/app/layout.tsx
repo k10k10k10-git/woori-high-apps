@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import "./operations-tables.css";
 import "./theme-compat.css";
@@ -64,7 +65,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <UpdateBanner />
         <Providers>
-          <PortalViewportShell>{children}</PortalViewportShell>
+          <Suspense fallback={<div className="portal-shell-loading" aria-label="화면 준비 중" />}>
+            <PortalViewportShell>{children}</PortalViewportShell>
+          </Suspense>
         </Providers>
       </body>
     </html>

@@ -1,16 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDesktopFrameSrc,
   isMobileMode,
   resolveInitialViewMode,
-  shouldLockDesktopViewport,
+  shouldUseDesktopFrame,
   shouldUseMobilePreview,
+  stripDesktopFrameSearch,
 } from "./viewMode";
 
 describe("화면 보기 모드", () => {
   it("저장된 PC 선택은 좁은 브라우저에서도 유지한다", () => {
     expect(resolveInitialViewMode("desktop", true)).toBe("desktop");
     expect(isMobileMode("desktop")).toBe(false);
-    expect(shouldLockDesktopViewport("desktop", true)).toBe(true);
+    expect(shouldUseDesktopFrame("desktop", false)).toBe(true);
   });
 
   it("선택 기록이 없는 실제 모바일은 모바일 화면으로 시작한다", () => {
@@ -21,6 +23,14 @@ describe("화면 보기 모드", () => {
   it("넓은 PC에서 모바일 선택 시에만 모바일 미리보기를 사용한다", () => {
     expect(shouldUseMobilePreview("mobile", false)).toBe(true);
     expect(shouldUseMobilePreview("desktop", false)).toBe(false);
-    expect(shouldLockDesktopViewport("desktop", false)).toBe(false);
+    expect(shouldUseDesktopFrame("mobile", false)).toBe(false);
+  });
+
+  it("PC 프레임 표식은 내부 URL에만 붙이고 바깥 URL에서는 제거한다", () => {
+    expect(buildDesktopFrameSrc("/semester/2026-2", "tab=attendance")).toBe(
+      "/semester/2026-2?tab=attendance&__portalFrame=desktop",
+    );
+    expect(stripDesktopFrameSearch("?tab=attendance&__portalFrame=desktop")).toBe("?tab=attendance");
+    expect(stripDesktopFrameSearch("?__portalFrame=desktop")).toBe("");
   });
 });

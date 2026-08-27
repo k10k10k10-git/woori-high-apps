@@ -1011,11 +1011,16 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
 }
 .portal-desktop-lock-frame {
   display: block;
-  width: 1280px;
+  width: max(100%, 1280px);
   min-width: 1280px;
   height: 100dvh;
   min-height: 760px;
   border: 0;
+  background: var(--color-bg);
+}
+.portal-shell-loading {
+  width: 100%;
+  min-height: 100dvh;
   background: var(--color-bg);
 }
 

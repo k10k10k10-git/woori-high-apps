@@ -96,13 +96,16 @@ describe("모바일 운영 화면 계약", () => {
     expect(css).not.toContain('html[data-view-preview="true"] .home-hero');
   });
 
-  it("PC버전은 좁은 브라우저에서도 1280px 데스크톱 화면을 유지한다", () => {
+  it("PC버전은 처음부터 같은 1280px 프레임을 사용해 리사이즈 중 화면을 교체하지 않는다", () => {
     const shell = source("src/components/PortalViewportShell.tsx");
     const css = source("src/app/globals.css");
-    expect(shell).toContain("shouldLockDesktopViewport(mode, isViewportMobile)");
+    expect(shell).toContain("shouldUseDesktopFrame(mode, isEmbeddedDesktopFrame)");
     expect(shell).toContain('className="portal-desktop-lock-frame"');
+    expect(shell).toContain("name={DESKTOP_FRAME_NAME}");
+    expect(shell).toContain("const [src] = useState(initialSrc)");
     expect(shell).toContain('title="고등부 통합사이트 PC 화면"');
     expect(css).toContain(".portal-desktop-lock-frame");
+    expect(css).toContain("width: max(100%, 1280px);");
     expect(css).toContain("min-width: 1280px;");
   });
 });
