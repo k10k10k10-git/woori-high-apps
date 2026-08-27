@@ -21,3 +21,7 @@ backups/
 
 # 에이전트 OS 실행 로그 (트랜스크립트 포함)
 agent-os/runs/
+
+# graphify 산출물 — 재생성 가능하고 10MB가 넘는다. 코드가 바뀌면 그래프도 낡으므로
+# 커밋본을 두면 실제 코드와 어긋난 지도가 남는다. 필요할 때 `/graphify .`로 다시 만든다.
+graphify-out/
