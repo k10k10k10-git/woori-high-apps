@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { ArrowLeft } from "@phosphor-icons/react";
 import {
   PIN_MAX_LENGTH,
   PIN_MIN_LENGTH,
@@ -65,7 +66,7 @@ export default function RetreatPinGate({ retreatId, lock, onUnlocked, onBack }: 
           className="btn-primary mt-4 w-full justify-center py-3 disabled:opacity-40">
           {checking ? "확인 중..." : "입장"}
         </button>
-        <button type="button" onClick={onBack} className="mt-3 text-sm text-slate-400 hover:text-slate-600">← 수련회 목록으로</button>
+        <button type="button" onClick={onBack} className="mt-3 inline-flex min-h-10 items-center gap-1 text-sm text-slate-400 hover:text-slate-600"><ArrowLeft aria-hidden="true" size={15} />수련회 목록으로</button>
       </form>
     </div>
   );

@@ -193,11 +193,12 @@ export default function GlobalPortalHeader() {
             <div className="portal-preview-toolbar__controls">
               <ViewModeToggle />
               <ThemeToggle showLabel />
-              <button onClick={() => openMyPage()} className="portal-compact-action">
+              <button onClick={() => openMyPage()} className="portal-compact-action portal-compact-action--account">
+                <UserCircle aria-hidden="true" size={16} />
                 <span>마이페이지</span>
               </button>
               <span className="portal-account-name">{user.displayName || user.email}</span>
-              <button onClick={() => void signOut()} className="portal-compact-action" aria-label="로그아웃">
+              <button onClick={() => void signOut()} className="portal-compact-action portal-compact-action--quiet" aria-label="로그아웃">
                 <span>로그아웃</span>
               </button>
             </div>
@@ -282,12 +283,13 @@ export default function GlobalPortalHeader() {
             <div className="portal-account-row portal-account-row--desktop">
               <ViewModeToggle />
               <ThemeToggle showLabel />
-              <button onClick={() => openMyPage()} className="portal-compact-action">
+              <button onClick={() => openMyPage()} className="portal-compact-action portal-compact-action--account">
+                <UserCircle aria-hidden="true" size={16} />
                 <span>마이페이지</span>
               </button>
               <span className="portal-account-name hidden md:inline">{user.displayName || user.email}</span>
-              <button onClick={() => void signOut()} className="portal-compact-action" aria-label="로그아웃">
-                <span className="hidden sm:inline">로그아웃</span><span className="sm:hidden">↪</span>
+              <button onClick={() => void signOut()} className="portal-compact-action portal-compact-action--quiet" aria-label="로그아웃">
+                <SignOut aria-hidden="true" className="sm:hidden" size={16} /><span className="hidden sm:inline">로그아웃</span>
               </button>
             </div>
             <PortalSearch />

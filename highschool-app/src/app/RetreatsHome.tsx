@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { Trash } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import {
   deleteRetreat, requestRetreatAccess, subscribeToAllRetreatPeriods, subscribeToRetreats,
@@ -226,7 +227,7 @@ export default function HomePage() {
             <div className="text-center mb-5">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
                 style={{ background: "#fee2e2" }}>
-                <span className="text-xl">🗑️</span>
+                <Trash aria-hidden="true" size={22} className="text-red-500" />
               </div>
               <h3 className="font-bold text-lg text-slate-800 mb-1">수련회 삭제</h3>
               <p className="text-sm text-slate-500">

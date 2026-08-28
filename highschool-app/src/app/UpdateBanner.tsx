@@ -42,7 +42,7 @@ export default function UpdateBanner() {
       <button
         onClick={() => window.location.reload()}
         className="shrink-0 whitespace-nowrap px-3 py-1 rounded-lg font-semibold text-xs transition-colors"
-        style={{ background: "var(--color-primary)" }}
+        style={{ background: "var(--color-primary)", color: "var(--color-primary-contrast)" }}
       >
         새로고침
       </button>

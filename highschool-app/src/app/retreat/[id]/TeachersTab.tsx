@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Database } from "@phosphor-icons/react";
 import { Retreat, TeacherAttendance } from "@/lib/types";
 import { getTeachers, subscribeToTeachers, saveTeacher, updateTeacher, deleteTeacher, loadTeachersFromDB, getRetreats } from "@/lib/db";
 import { prepareTeacherUpdate } from "@/lib/teacherWrite";
@@ -367,7 +368,7 @@ async function handleSave() {
         </div>
         {/* 하단: 버튼 */}
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={openImport} className="btn-secondary text-xs sm:text-sm">📋 DB에서 불러오기</button>
+          <button onClick={openImport} className="btn-secondary text-xs sm:text-sm"><Database aria-hidden="true" size={16} />DB에서 불러오기</button>
           <div className="ml-auto flex gap-2">
             <button onClick={startAddAssistant} className="btn-secondary text-xs sm:text-sm">＋ 보조스탭</button>
             <button onClick={startAddTeacher} className="btn-primary text-xs sm:text-sm">＋ 교사 추가</button>

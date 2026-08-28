@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ArrowsClockwise, ClipboardText, Copy, Eye, EyeSlash, IdentificationCard } from "@phosphor-icons/react";
 import { Cancellation, Retreat, TeacherAttendance } from "@/lib/types";
 import { subscribeToCancellations, subscribeToTeachers, subscribeToTeacherIdNumbers, updateTeacherIdNumber } from "@/lib/db";
 import { loadXlsx, saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
@@ -195,7 +196,7 @@ export default function InsuranceTab({ retreat }: Props) {
           <ExportButton kind="xlsx" onClick={exportXLSX} disabled={allInsured.length === 0} />
           <ExportButton kind="pdf" onClick={exportPDF} disabled={allInsured.length === 0} />
           <ExportButton kind="jpg" onClick={exportJPG} disabled={allInsured.length === 0} />
-          <button onClick={() => setSheetRefreshGeneration((value) => value + 1)} className="btn-secondary text-xs">🔄 시트 새로고침</button>
+          <button onClick={() => setSheetRefreshGeneration((value) => value + 1)} className="btn-secondary text-xs"><ArrowsClockwise aria-hidden="true" size={15} />시트 새로고침</button>
         </div>
       </div>
 
@@ -223,7 +224,7 @@ export default function InsuranceTab({ retreat }: Props) {
       {(buFilter === "전체" || buFilter === "교사/스탭") && (
         <div className="card overflow-x-auto">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-semibold text-sm text-slate-700">👨‍🏫 교사/스탭 주민등록번호</span>
+            <span className="flex items-center gap-1.5 font-semibold text-sm text-slate-700"><IdentificationCard aria-hidden="true" size={17} />교사/스탭 주민등록번호</span>
             <span className="text-xs text-slate-400">교사 참석 탭 기준 · {teacherInsured.length}/{teacherRows.length}명 입력됨</span>
           </div>
           <table className="w-full text-sm">
@@ -276,16 +277,16 @@ export default function InsuranceTab({ retreat }: Props) {
       {filteredInsured.length > 0 && (
         <div className="card overflow-x-auto">
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <span className="font-semibold text-sm text-slate-700">📋 보험 등록 명단</span>
+            <span className="flex items-center gap-1.5 font-semibold text-sm text-slate-700"><ClipboardText aria-hidden="true" size={17} />보험 등록 명단</span>
             <div className="flex gap-2">
               <button onClick={() => setShowIds(s => !s)} className="btn-secondary text-xs">
-                {showIds ? "🙈 주민번호 가리기" : "👁 주민번호 보기"}
+                {showIds ? <><EyeSlash aria-hidden="true" size={15} />주민번호 가리기</> : <><Eye aria-hidden="true" size={15} />주민번호 보기</>}
               </button>
               <button onClick={() => {
                 const lines = ["구분\t이름\t부\t학년반\t주민등록번호"];
                 filteredInsured.forEach(e => lines.push(`${e.type}\t${e.name}\t${e.bu}\t${e.grade > 0 ? `${e.grade}학년 ${e.cls}반` : "-"}\t${e.idNumber}`));
                 copyToClipboard(lines.join("\n"), `${filteredInsured.length}명 복사 완료`);
-              }} className="btn-secondary text-xs">📋 복사</button>
+              }} className="btn-secondary text-xs"><Copy aria-hidden="true" size={15} />복사</button>
             </div>
           </div>
           {!showIds && (

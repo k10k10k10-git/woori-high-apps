@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { MagicWand } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { BusStudentGender, Group, IguardBus, IguardBusSegment, IguardScheduleBlock, Participant, PartialAttendanceMap, Student, TeacherAttendance } from "@/features/iguard/lib/types";
 import { saveIguardBus, updateIguardBus, deleteIguardBus } from "@/features/iguard/lib/db";
@@ -294,7 +295,7 @@ export default function BusesView({ retreatId, buses, groups, students, particip
             <option value="mixed">혼합 · 기존 조 유지</option>
             <option value="gender">남녀 분리 · 조별 성별 묶음</option>
           </select>
-          <button onClick={autoAssign} className="btn-secondary">✨ 자동배정</button>
+          <button onClick={autoAssign} className="btn-secondary"><MagicWand aria-hidden="true" size={16} />자동배정</button>
           <button onClick={openNew} className="btn-primary">＋ 호차 추가</button>
         </div>
       </div>

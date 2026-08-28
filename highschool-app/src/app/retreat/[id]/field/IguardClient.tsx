@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, DownloadSimple, DotsThreeVertical,
@@ -121,13 +121,18 @@ function IguardWorkspace({ id }: { id: string }) {
   }, []);
   const fieldAllowed = canAccessArea("retreat-field", roles);
 
-  const [view, setView] = useState<string>(() => searchParams.get("view") ?? "cue");
+  const view = searchParams.get("view") ?? "cue";
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheetSettingsOpen, setSheetSettingsOpen] = useState(false);
   const [fieldToolsOpen, setFieldToolsOpen] = useState(false);
   const [compatDismissed, setCompatDismissed] = useState(false);
   const headerRef = useRef<HTMLElement | null>(null);
   const fieldToolsRef = useRef<HTMLDivElement | null>(null);
+  const selectView = useCallback((nextView: string) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("view", nextView);
+    router.replace(`/retreat/${encodeURIComponent(id)}/field?${nextParams.toString()}`, { scroll: false });
+  }, [id, router, searchParams]);
 
   // 데이터 허브 — 모든 구독을 커스텀 훅에서 관리
   const {
@@ -257,7 +262,7 @@ function IguardWorkspace({ id }: { id: string }) {
             {!executionOnly && (
               <button
                 onClick={() => {
-                  setView("schedule");
+                  selectView("schedule");
                   setSheetSettingsOpen(true);
                 }}
                 className="hidden min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-[var(--color-on-dark-accent)] sm:flex"
@@ -284,7 +289,7 @@ function IguardWorkspace({ id }: { id: string }) {
                     <MagnifyingGlass aria-hidden="true" size={18} /> 이름·조·숙소 검색
                   </button>
                   {!executionOnly && (
-                    <button type="button" role="menuitem" onClick={() => { setFieldToolsOpen(false); setView("schedule"); setSheetSettingsOpen(true); }}>
+                    <button type="button" role="menuitem" onClick={() => { setFieldToolsOpen(false); selectView("schedule"); setSheetSettingsOpen(true); }}>
                       <DownloadSimple aria-hidden="true" size={18} /> 큐싯 가져오기
                     </button>
                   )}
@@ -296,7 +301,7 @@ function IguardWorkspace({ id }: { id: string }) {
             <div className="iguard-mobile-tabs" role="tablist" aria-label="수련회 현장 주요 업무">
               {mobileExecutionTabs.map((item) => {
                 const selected = item.key === "rooms" ? mobileInfoActive : activeView === item.key;
-                return <button key={item.key} role="tab" aria-selected={selected} onClick={() => setView(item.key)}>{item.label}</button>;
+                return <button key={item.key} role="tab" aria-selected={selected} onClick={() => selectView(item.key)}>{item.label}</button>;
               })}
             </div>
           ) : (
@@ -304,7 +309,7 @@ function IguardWorkspace({ id }: { id: string }) {
               {visibleGroups.map(g => {
                 const active = g.label === activeGroup.label;
                 return (
-                  <button key={g.label} onClick={() => setView(g.views[0].key)}
+                  <button key={g.label} onClick={() => selectView(g.views[0].key)}
                     role="tab"
                     aria-selected={active}
                     className="workspace-group-tab">
@@ -319,7 +324,7 @@ function IguardWorkspace({ id }: { id: string }) {
         {!isMobileView && <div className="workspace-tabs">
           <div className={`${shellWidth} mx-auto px-4 flex gap-0 overflow-x-auto`} role="tablist" aria-label={`${activeGroup.label} 하위 탭`}>
             {activeGroup.views.map(v => (
-              <button key={v.key} onClick={() => setView(v.key)}
+              <button key={v.key} onClick={() => selectView(v.key)}
                 role="tab"
                 aria-selected={activeView === v.key}
                 className="workspace-tab"
@@ -336,7 +341,7 @@ function IguardWorkspace({ id }: { id: string }) {
           <div className="mobile-subtabs iguard-info-tabs" role="tablist" aria-label="수련회 현장 정보">
             {([
               ["rooms", "조별 정보"], ["lodging", "숙소 안내"], ["buses", "버스"], ["seating", "자리"], ["meals", "식사"],
-            ] as const).map(([key, label]) => <button key={key} role="tab" aria-selected={activeView === key} onClick={() => setView(key)}>{label}</button>)}
+            ] as const).map(([key, label]) => <button key={key} role="tab" aria-selected={activeView === key} onClick={() => selectView(key)}>{label}</button>)}
           </div>
         )}
         {!connected && (
@@ -415,7 +420,7 @@ function IguardWorkspace({ id }: { id: string }) {
         <SearchOverlay
           data={searchData}
           onClose={() => setSearchOpen(false)}
-          onJump={nextView => { setView(nextView); setSearchOpen(false); }}
+          onJump={nextView => { selectView(nextView); setSearchOpen(false); }}
         />
       )}
 

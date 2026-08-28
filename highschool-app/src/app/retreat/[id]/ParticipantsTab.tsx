@@ -1,15 +1,18 @@
 "use client";
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { ArrowsClockwise, CloudArrowDown, Database, ShieldCheck } from "@phosphor-icons/react";
 import { Retreat, Participant, Student, SyncDuplicateGroup } from "@/lib/types";
 import { fetchSheetParticipants } from "@/lib/sheetsParser";
-import { getStudentsByYear, subscribeToStudentsByYear, saveParticipants, getParticipants, getParticipantsWithContacts, subscribeToParticipants, subscribeToParticipantsWithContacts, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch } from "@/lib/db";
+import { getStudentsByYear, subscribeToStudentsByYear, saveParticipants, getParticipants, getParticipantsWithContacts, subscribeToParticipants, subscribeToParticipantsWithContacts, backupParticipants, subscribeToCellColors, saveSyncDuplicates, getSyncDuplicates, updateParticipant, applyRematch, getParticipantsBackups, restoreParticipantsBackup } from "@/lib/db";
 import { findStudent, normalizeName, stripSuffix } from "@/lib/studentMatcher";
-import { buildExtraPreservationMaps, dedupeSheetParticipants, identityKeyOf } from "@/lib/syncParticipants";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
+import { buildRematchPlan, buildSheetSyncPlan, type ParticipantBulkPlan } from "@/lib/participantSyncPreview";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import RetreatParticipantMobileList from "./RetreatParticipantMobileList";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import DuplicateApplicationsSection from "./DuplicateApplicationsSection";
+import BackupRestoreButton from "./BackupRestoreButton";
+import ParticipantSyncDialog from "./ParticipantSyncDialog";
 
 interface Props {
   retreat: Retreat;
@@ -38,6 +41,7 @@ export default function ParticipantsTab({ retreat }: Props) {
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState<SyncDuplicateGroup[]>([]);
   const [showDuplicates, setShowDuplicates] = useState(false);
+  const [bulkPlan, setBulkPlan] = useState<ParticipantBulkPlan | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -86,65 +90,21 @@ export default function ParticipantsTab({ retreat }: Props) {
     return () => { unsubParticipants(); unsubStudents(); unsubColors(); };
   }, [isDesktop, loadData, retreat.id, retreat.year]);
 
-  async function syncFromSheet() {
+  async function prepareSheetSync() {
     if (!retreat.sheetId) {
-      setError("먼저 시트 설정을 해주세요. (우측 상단 ⚙ 아이콘)");
+      setError("먼저 우측 상단의 시트 설정에서 응답 시트를 연결해 주세요.");
       return;
     }
     setSyncing(true);
     setError("");
     try {
-      // 덮어쓰기 전 현재 상태 백업 (입금완료 표시 등 매칭이 어긋났을 때 복구용)
-      await backupParticipants(retreat.id);
-      const list = await fetchSheetParticipants(retreat.sheetId, retreat.sheetGid);
-
-      // 특이사항 보존: 시트에도 특이사항 열이 있어서 전체 재생성 시 관리자가 건강 특이사항 탭에서
-      // 수정한 내용([분류] 태그, 문구 수정, 추가 메모)이 시트 원문으로 되돌아가는 버그가 있었다.
-      // 키(p_N)는 매 동기화마다 재배열되므로 studentId(없으면 이름+부+학년+반)로 사람을 맞춰
-      // 기존 extra를 우선 유지한다. 기존 값이 없을 때만 시트의 특이사항을 새로 채운다.
-      // (로컬 state는 stale할 수 있어 DB에서 새로 읽는다.)
-      // ⚠ studentId·identity가 두 명 이상에게 겹치면(매칭 애매 등으로 DB에 일시적으로 중복 매핑된 경우)
-      // 그 키는 누구 것인지 신뢰할 수 없으므로 보존 후보에서 제외한다 — 안 그러면 엉뚱한 사람의
-      // 특이사항이 studentId를 공유하는 다른 사람에게 옮겨붙어("복사")버리고, 이후 재동기화마다
-      // 그 잘못된 값이 "기존값 우선 보존"되어 영구화된다(실제 사례: 서로 다른 6쌍/12명 오염 확인, 2026-07-08).
-      const existing = await getParticipants(retreat.id);
-      const { extraByStudentId, extraByIdentity } = buildExtraPreservationMaps(existing);
-
-      // 학생 DB 매칭 + 중복 제거 (동일 studentId는 최초 신청만 유지, 미매칭은 name+bu+grade 기준)
-      const { deduped, dupEntries } = dedupeSheetParticipants(list, students);
-
-      const sorted = [...deduped].sort((a, b) => a.p.name.localeCompare(b.p.name, "ko"));
-      const matched: Record<string, Participant> = {};
-      const dedupKeyToParticipantKey = new Map<string, string>();
-      sorted.forEach(({ p, ms, dedupKey }, idx) => {
-        const key = `p_${idx}`;
-        const preservedExtra = (ms?.id ? extraByStudentId.get(ms.id) : undefined)
-          ?? extraByIdentity.get(identityKeyOf(p));
-        // raw(시트 전체 열, 민감정보 포함 가능)는 공용 participants 경로에 절대 저장하지 않는다 — stripRaw로 제외.
-        matched[key] = {
-          ...stripRaw(p),
-          studentId: ms?.id ?? null,
-          phone: p.phone || ms?.phone || null,
-          pPhone: ms?.pPhone ?? null,
-          ...(preservedExtra ? { extra: preservedExtra } : {}),
-        };
-        dedupKeyToParticipantKey.set(dedupKey, key);
-      });
-
-      // 각 중복 그룹이 어느 participants 키에 저장됐는지 연결해둬야, 관리자가 다른 신청을 선택했을 때
-      // 정확히 그 키만 갱신할 수 있다(전체 participants 재저장 없이).
-      const dupList: SyncDuplicateGroup[] = [...dupEntries.entries()].map(([k, v]) => ({
-        ...v,
-        resolvedIndex: 0,
-        participantKey: dedupKeyToParticipantKey.get(k),
-      }));
-      setDuplicates(dupList);
-      await saveSyncDuplicates(retreat.id, dupList);
-
-      await saveParticipants(retreat.id, matched);
-      setParticipants(matched);
+      const [source, existing] = await Promise.all([
+        fetchSheetParticipants(retreat.sheetId, retreat.sheetGid),
+        getParticipantsWithContacts(retreat.id),
+      ]);
+      setBulkPlan(buildSheetSyncPlan(source, students, existing));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "오류가 발생했습니다.");
+      setError(e instanceof Error ? e.message : "동기화 계획을 만들지 못했습니다.");
     } finally {
       setSyncing(false);
     }
@@ -177,49 +137,47 @@ export default function ParticipantsTab({ retreat }: Props) {
     }
   }
 
-  async function rematch() {
+  async function prepareRematch() {
     setSyncing(true);
     setError("");
     try {
-      // 덮어쓰기 전 현재 상태 백업
-      await backupParticipants(retreat.id);
       const freshStudents = await getStudentsByYear(retreat.year);
-      let matchedCount = 0;
-      const debugMissed: string[] = [];
-
-
-      // studentId/phone/pPhone만 경로 지정 업데이트 — extra(특이사항) 등 나머지 필드는 DB에서 보존.
-      // 이전에 saveParticipants(전체 덮어쓰기)를 쓰다가 로컬 상태가 stale하면 extra가 날아가는
-      // 버그가 있었다. applyRematch는 update()로 3개 필드만 건드려 이 문제를 원천 차단한다.
-      const rematchUpdates: Record<string, { studentId: string | null; phone: string | null; pPhone: string | null }> = {};
-      Object.entries(participants).forEach(([key, p]) => {
-        const found = findStudent(p, freshStudents);
-        if (found) matchedCount++;
-        else debugMissed.push(`${p.name}(${p.grade}학년${p.class}반)`);
-        rematchUpdates[key] = {
-          studentId: found?.id ?? null,
-          phone: found?.phone ?? p.phone ?? null,
-          pPhone: found?.pPhone ?? p.pPhone ?? null,
-        };
-      });
-
-      await applyRematch(retreat.id, rematchUpdates);
-
-      // 로컬 상태: 변경된 3개 필드만 병합 (extra 등 나머지는 그대로 유지)
-      setParticipants(prev => {
-        const next = { ...prev };
-        for (const [key, upd] of Object.entries(rematchUpdates)) {
-          if (next[key]) next[key] = { ...next[key], ...upd };
-        }
-        return next;
-      });
-      setStudents(freshStudents);
-
-      const total = Object.keys(participants).length;
-      const missedSample = debugMissed.slice(0, 5).join(", ");
-      setError(`✅ 재매칭 완료: ${matchedCount}/${total}명\n미매칭 예시: ${missedSample || "없음"}`);
+      setBulkPlan(buildRematchPlan(participants, freshStudents));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "재매칭 중 오류가 발생했습니다.");
+      setError(e instanceof Error ? e.message : "재매칭 계획을 만들지 못했습니다.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function applyBulkPlan() {
+    if (!bulkPlan) return;
+    setSyncing(true);
+    setError("");
+    try {
+      // 적용 직전 공개 명단과 비공개 연락처를 같은 시점으로 백업한다.
+      await backupParticipants(retreat.id);
+      if (bulkPlan.kind === "sheet") {
+        await saveSyncDuplicates(retreat.id, bulkPlan.duplicates);
+        await saveParticipants(retreat.id, bulkPlan.participants);
+        setDuplicates(bulkPlan.duplicates);
+        setParticipants(bulkPlan.participants);
+        setError(`✅ 시트 동기화 완료: ${bulkPlan.summary.nextCount}명 · 미매칭 ${bulkPlan.summary.unmatchedCount}명`);
+      } else {
+        await applyRematch(retreat.id, bulkPlan.updates);
+        setParticipants((previous) => {
+          const next = { ...previous };
+          Object.entries(bulkPlan.updates).forEach(([key, update]) => {
+            if (next[key]) next[key] = { ...next[key], ...update };
+          });
+          return next;
+        });
+        setStudents(bulkPlan.students);
+        setError(`✅ 재매칭 완료: ${bulkPlan.summary.matchedCount}/${bulkPlan.summary.nextCount}명 · 변경 ${bulkPlan.summary.changedCount}명`);
+      }
+      setBulkPlan(null);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "명단 반영 중 오류가 발생했습니다.");
     } finally {
       setSyncing(false);
     }
@@ -380,9 +338,9 @@ export default function ParticipantsTab({ retreat }: Props) {
         ))}
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-3 mb-4">
-        <div className="flex gap-2">
+      {/* 검색과 필터는 항상 노출하고, 저빈도·고위험 명단 도구는 점진적으로 연다. */}
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 gap-2">
           <input className="input flex-1" style={{minWidth: 120}} placeholder="이름 검색..." value={search}
             onChange={e => setSearch(e.target.value)} />
           <select className="input" style={{width: 80}} value={buFilter} onChange={e => setBuFilter(e.target.value)}>
@@ -397,16 +355,43 @@ export default function ParticipantsTab({ retreat }: Props) {
             <option value="3">3학년</option>
           </select>
         </div>
-
-        <div className="flex gap-2 sm:ml-auto">
-          <button onClick={rematch} disabled={syncing || Object.keys(participants).length === 0} className="btn-secondary flex-1 sm:flex-none justify-center text-xs sm:text-sm">
-            {syncing ? "⟳ 처리 중..." : "↺ DB 재매칭"}
-          </button>
-          <button onClick={syncFromSheet} disabled={syncing} className="btn-primary flex-1 sm:flex-none justify-center text-xs sm:text-sm">
-            {syncing ? "⟳ 동기화 중..." : "↻ 구글시트 동기화"}
-          </button>
-        </div>
       </div>
+
+      <details className="mb-4 rounded-xl border border-slate-200 bg-white">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-slate-700">
+          <span className="flex items-center gap-2"><Database aria-hidden="true" size={18} weight="duotone" />명단 관리 도구</span>
+          <span className="text-xs font-normal text-slate-400">동기화·재매칭·복구</span>
+        </summary>
+        <div className="border-t border-slate-200 p-3 sm:p-4">
+          <p className="mb-3 text-xs leading-5 text-slate-500">
+            <strong className="font-semibold text-slate-600">구글시트 동기화</strong>는 신청 응답 시트를 다시 읽어 이 명단을 최신 상태로 맞춥니다.{" "}
+            <strong className="font-semibold text-slate-600">DB 재매칭</strong>은 지금 명단을 학생 출석부와 다시 대조해, 이름이나 반이 바뀌어 끊어진 연결을 이어 붙입니다.{" "}
+            둘 다 바뀔 인원을 먼저 보여주고, 승인하면 백업한 뒤 반영합니다.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <button onClick={prepareRematch} disabled={syncing || Object.keys(participants).length === 0} className="btn-secondary justify-center text-xs sm:text-sm">
+              <ArrowsClockwise className={syncing ? "animate-spin" : ""} aria-hidden="true" size={17} />
+              {syncing ? "계획 계산 중…" : "DB 재매칭 검토"}
+            </button>
+            <button onClick={prepareSheetSync} disabled={syncing} className="btn-primary justify-center text-xs sm:text-sm">
+              <CloudArrowDown aria-hidden="true" size={17} weight="duotone" />
+              {syncing ? "계획 계산 중…" : "구글시트 동기화 검토"}
+            </button>
+            <div className="sm:ml-auto">
+              <BackupRestoreButton
+                label="참가자 명단"
+                disabled={syncing}
+                loadBackups={() => getParticipantsBackups(retreat.id)}
+                restore={(key) => restoreParticipantsBackup(retreat.id, key)}
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex items-start gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
+            <ShieldCheck className="mt-0.5 shrink-0" aria-hidden="true" size={16} weight="duotone" />
+            <span>최근 5개 백업을 보관하며 공개 명단과 비공개 연락처를 같은 시점으로 복구합니다.</span>
+          </div>
+        </div>
+      </details>
 
       {error && (
         <div className={`rounded-lg p-3 text-sm mb-4 whitespace-pre-line ${error.startsWith("✅") ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
@@ -426,6 +411,15 @@ export default function ParticipantsTab({ retreat }: Props) {
         onToggle={() => setShowDuplicates(value => !value)}
         onChoose={chooseDuplicateEntry}
       />
+
+      {bulkPlan && (
+        <ParticipantSyncDialog
+          plan={bulkPlan}
+          applying={syncing}
+          onCancel={() => { if (!syncing) setBulkPlan(null); }}
+          onApply={() => void applyBulkPlan()}
+        />
+      )}
 
       {/* 불일치 / 미매칭 / 수동매칭 — 항상 표시 */}
       <div className="mb-4 border border-orange-200 rounded-lg overflow-x-auto">

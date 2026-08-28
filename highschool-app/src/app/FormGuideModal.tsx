@@ -1,6 +1,7 @@
 "use client";
 
 import OverlayShell from "@/components/OverlayShell";
+import { X } from "@phosphor-icons/react";
 
 interface Props {
   onClose: () => void;
@@ -22,7 +23,7 @@ export default function FormGuideModal({ onClose }: Props) {
             <h3 className="font-bold text-white text-base">📋 구글폼 생성 가이드라인</h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--color-on-dark-accent)" }}>앱과 정상 연동되는 폼을 만들기 위한 규칙</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none transition-colors" aria-label="닫기">×</button>
+          <button onClick={onClose} className="compact-icon-control text-slate-400 transition-colors hover:text-white" aria-label="닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
         </div>
 
         {/* 콘텐츠 */}

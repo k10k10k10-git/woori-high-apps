@@ -19,9 +19,11 @@ import {
 function DesktopPortalFrame({
   initialSrc,
   frameRef,
+  onReady,
 }: {
   initialSrc: string;
   frameRef: RefObject<HTMLIFrameElement | null>;
+  onReady: () => void;
 }) {
   // 바깥 URL은 프레임의 현재 위치를 따라가지만 이미 열린 프레임의 src는 고정한다.
   // 그래야 내부 링크 이동 때 동일 페이지를 다시 불러오지 않는다.
@@ -33,7 +35,20 @@ function DesktopPortalFrame({
       name={DESKTOP_FRAME_NAME}
       src={src}
       title="고등부 통합사이트 PC 화면"
+      onLoad={onReady}
     />
+  );
+}
+
+function ViewportFrameLoading({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={`portal-frame-loading ${compact ? "portal-frame-loading--compact" : ""}`} aria-hidden="true">
+      <div className="portal-frame-loading__bar" />
+      <div className="portal-frame-loading__hero" />
+      <div className="portal-frame-loading__grid">
+        <span /><span /><span />
+      </div>
+    </div>
   );
 }
 
@@ -47,6 +62,7 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const searchParams = useSearchParams();
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const [loadedFrameKey, setLoadedFrameKey] = useState("");
   const { mode, isViewportMobile } = useViewMode();
   const isEmbeddedDesktopFrame =
     searchParams.get(DESKTOP_FRAME_QUERY_KEY) === DESKTOP_FRAME_QUERY_VALUE ||
@@ -55,6 +71,8 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const isDesktopFrame = shouldUseDesktopFrame(mode, isEmbeddedDesktopFrame);
   const isFramedView = isMobilePreview || isDesktopFrame;
   const currentDesktopFrameSrc = buildDesktopFrameSrc(pathname, searchParams.toString());
+  const frameKey = isDesktopFrame ? "desktop" : `mobile:${pathname}`;
+  const frameReady = loadedFrameKey === frameKey;
 
   // 모바일 프레임 안에서 이동한 URL을 바깥 주소에도 반영한다. 그래야 PC버전으로
   // 돌아갈 때 방금 보고 있던 업무 화면이 그대로 열린다. 같은 출처만 읽고 쓰기는 없다.
@@ -88,8 +106,9 @@ export default function PortalViewportShell({ children }: { children: React.Reac
 
   if (isDesktopFrame) {
     return (
-      <main className="portal-desktop-lock-stage" aria-label="PC 화면 고정 보기">
-        <DesktopPortalFrame initialSrc={currentDesktopFrameSrc} frameRef={frameRef} />
+      <main className="portal-desktop-lock-stage" aria-label="PC 화면 고정 보기" data-frame-ready={frameReady ? "true" : "false"}>
+        {!frameReady && <ViewportFrameLoading />}
+        <DesktopPortalFrame initialSrc={currentDesktopFrameSrc} frameRef={frameRef} onReady={() => setLoadedFrameKey(frameKey)} />
       </main>
     );
   }
@@ -98,12 +117,14 @@ export default function PortalViewportShell({ children }: { children: React.Reac
     return (
       <>
         <GlobalPortalHeader />
-        <main className="portal-mobile-preview-stage" aria-label="모바일 화면 미리보기">
+        <main className="portal-mobile-preview-stage" aria-label="모바일 화면 미리보기" data-frame-ready={frameReady ? "true" : "false"}>
+          {!frameReady && <ViewportFrameLoading compact />}
           <iframe
             ref={frameRef}
             className="portal-mobile-preview-frame"
             src={pathname}
             title="고등부 통합사이트 모바일 화면"
+            onLoad={() => setLoadedFrameKey(frameKey)}
           />
         </main>
       </>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, X } from "@phosphor-icons/react";
+import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import LandingPage from "@/features/landing/LandingPage";
 import { useLoadErrors } from "@/lib/useLoadErrors";
@@ -162,6 +164,25 @@ export default function PortalHome() {
   const homeActions = useMemo(() => {
     return buildHomeActions(calendarItems, today);
   }, [calendarItems, today]);
+  const mobilePrimaryAction = useMemo(() => {
+    const scheduled = homeActions.find((item) => item.href);
+    if (scheduled?.href) return { href: scheduled.href, title: scheduled.title, meta: `${scheduled.dayLabel} · ${scheduled.meta}` };
+    if (fieldAllowed && currentRetreat) return {
+      href: `/retreat/${encodeURIComponent(currentRetreat.id)}/field?view=cue`,
+      title: "개인 큐카드 확인",
+      meta: `${currentRetreat.name} 현장 실행`,
+    };
+    if (semesterAllowed) return {
+      href: currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters",
+      title: "학기 중 사역 확인",
+      meta: "신청·배치·출석·커리큘럼",
+    };
+    return {
+      href: currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/retreats",
+      title: "수련회 행정 확인",
+      meta: "명단·편성·현장 준비",
+    };
+  }, [currentRetreat, currentSemester, fieldAllowed, homeActions, roles, semesterAllowed]);
 
   async function submitSchedule() {
     if (!scheduleDraft) return;
@@ -245,6 +266,15 @@ export default function PortalHome() {
           </div>
           <HomeAgendaSummary actions={homeActions} />
         </section>
+
+        <Link href={mobilePrimaryAction.href} className="mobile-home-primary mb-4 lg:hidden">
+          <span className="min-w-0">
+            <span className="block text-[11px] font-bold text-emerald-700">지금 바로 열기</span>
+            <strong className="mt-1 block truncate text-base text-slate-900">{mobilePrimaryAction.title}</strong>
+            <span className="mt-0.5 block truncate text-xs text-slate-500">{mobilePrimaryAction.meta}</span>
+          </span>
+          <ArrowRight aria-hidden="true" className="shrink-0 text-emerald-700" size={20} weight="bold" />
+        </Link>
 
         <section className="grid gap-5 lg:grid-cols-3">
           {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
@@ -365,19 +395,16 @@ export default function PortalHome() {
           </div>
         </section>
         {scheduleDraft && (
-          <div
-            className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-            onClick={() => setScheduleDraft(null)}
-            onKeyDown={(event) => event.key === "Escape" && setScheduleDraft(null)}
+          <OverlayShell
+            label={scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}
+            onClose={() => setScheduleDraft(null)}
+            panelClassName="w-full max-w-sm"
           >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}
-              className="modal-card w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <h3 className="font-bold text-slate-900">{scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}</h3>
+            <div className="modal-card w-full rounded-2xl bg-white p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="font-bold text-slate-900">{scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}</h3>
+                <button type="button" onClick={() => setScheduleDraft(null)} className="compact-icon-control -mr-1 -mt-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="공유 일정 창 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
+              </div>
               <p className="mt-1 text-xs text-slate-500">고등부 전체가 함께 보는 일정입니다. 일정이 속한 사역 영역을 선택해 주세요.</p>
               <label className="mt-4 block text-sm">
                 <span className="text-xs text-slate-500">날짜</span>
@@ -403,7 +430,7 @@ export default function PortalHome() {
               <label className="mt-3 block text-sm">
                 <span className="text-xs text-slate-500">일정 내용</span>
                 <input
-                  autoFocus
+                  data-autofocus
                   value={scheduleDraft.title}
                   onChange={(event) => setScheduleDraft({ ...scheduleDraft, title: event.target.value })}
                   onKeyDown={(event) => event.key === "Enter" && void submitSchedule()}
@@ -422,7 +449,7 @@ export default function PortalHome() {
                 </button>
               </div>
             </div>
-          </div>
+          </OverlayShell>
         )}
       </main>
     </div>

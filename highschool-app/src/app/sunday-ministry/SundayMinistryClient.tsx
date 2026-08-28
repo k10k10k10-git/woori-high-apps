@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, CaretDown } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
@@ -126,7 +127,7 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
         <header className="workspace-sticky-header workspace-header">
           <div className="mx-auto max-w-6xl px-4">
             <div className="flex min-w-0 items-center gap-2 py-3">
-              <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white">← 홈</button>
+              <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white" aria-label="통합 홈으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={13} /> 홈</button>
               <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200">주일 사역</span>
               <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white">팀 선택</h1>
             </div>
@@ -156,10 +157,10 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
         <div className="workspace-header">
           <div className="mx-auto max-w-6xl px-4">
             <div className="flex min-w-0 items-center gap-2 py-3 sm:gap-3">
-              <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="통합 홈으로 돌아가기">← 홈</button>
+              <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="통합 홈으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={13} /> 홈</button>
               <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">주일 사역</span>
               {isMobileView ? (
-                <button type="button" onClick={() => router.push("/sunday-ministry")} className="min-w-0 flex-1 truncate text-left text-sm font-bold text-white" aria-label="주일 사역 팀 변경">{teamMeta.label} ▼</button>
+                <button type="button" onClick={() => router.push("/sunday-ministry")} className="min-w-0 flex-1 truncate text-left text-sm font-bold text-white" aria-label="주일 사역 팀 변경">{teamMeta.label} <CaretDown aria-hidden="true" className="inline align-[-2px]" size={13} weight="bold" /></button>
               ) : (
                 <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
               )}

@@ -14,6 +14,7 @@ import { activeStudentIdsForGender, buildStudentGenderMap, teacherNamesForBusSeg
 import { isMemberChecked, memberCheckKeys, stableMemberId } from "@/features/iguard/lib/checklistKeys";
 import { isPresentOnDay } from "@/features/iguard/lib/partialAttendance";
 import type { RetreatDay } from "@/features/iguard/lib/partialAttendance";
+import { ArrowCounterClockwise, Bus, CheckCircle, Printer } from "@phosphor-icons/react";
 
 const groupSort = (a: Group, b: Group) => a.bu.localeCompare(b.bu, "ko") || a.name.localeCompare(b.name, "ko", { numeric: true });
 const busDayOf = (b: IguardBus): 1 | 3 => b.day === 3 ? 3 : 1;
@@ -283,8 +284,8 @@ export default function ChecklistView({ retreatId, groups, students, participant
         </div>
         <div className="text-sm"><span className="text-slate-500">체크 </span><strong className="text-emerald-700">{checkedCount}</strong><span className="text-slate-400"> / {total}명</span></div>
         <div className="flex gap-2">
-          <button onClick={resetDay} className="btn-secondary btn-sm" aria-label={`${dayLabel} 체크 전체 초기화`}>↺ 초기화</button>
-          <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄">🖨 인쇄</button>
+          <button onClick={resetDay} className="btn-secondary btn-sm" aria-label={`${dayLabel} 체크 전체 초기화`}><ArrowCounterClockwise aria-hidden="true" size={16} />초기화</button>
+          <button onClick={print} className="btn-secondary btn-sm" aria-label="체크리스트 인쇄"><Printer aria-hidden="true" size={16} />인쇄</button>
         </div>
       </div>
       <p className="text-xs text-slate-400 mb-1">이름을 누르면 출석 체크됩니다. 체크된 이름을 다시 누르면 <strong>해제 확인</strong>을 거칩니다 - 여러 명이 동시에 체크해도 실수로 풀리지 않아요.</p>
@@ -295,9 +296,9 @@ export default function ChecklistView({ retreatId, groups, students, participant
       </p>
 
       {mode === "호차별" && units.length === 0 ? (
-        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🚌</div><p>{dayLabel} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>
+        <div className="card p-8 text-center text-slate-400"><Bus aria-hidden="true" className="mx-auto mb-2" size={30} weight="duotone" /><p>{dayLabel} 버스 배정이 없습니다. <strong>기획 → 버스배정</strong>에서 먼저 등록하세요.</p></div>
       ) : units.length === 0 ? (
-        <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">✅</div><p>조편성 데이터가 없습니다.</p><p className="text-xs mt-1.5 text-slate-300">행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</p></div>
+        <div className="card p-8 text-center text-slate-400"><CheckCircle aria-hidden="true" className="mx-auto mb-2" size={30} weight="duotone" /><p>조편성 데이터가 없습니다.</p><p className="text-xs mt-1.5 text-slate-300">행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</p></div>
       ) : (
         <div className={mode === "호차별" ? "grid grid-cols-2 gap-2 sm:gap-4" : "grid gap-4 sm:grid-cols-2"}>
           {units.map(u => {
@@ -309,7 +310,7 @@ export default function ChecklistView({ retreatId, groups, students, participant
                   <div className={`flex shrink-0 items-center ${mode === "호차별" ? "gap-1 sm:gap-2" : "gap-2"}`}>
                     {c > 0 && (
                       <button onClick={() => resetUnit(u)} className={`${mode === "호차별" ? "text-[11px] sm:text-xs" : "text-xs"} min-h-10 rounded px-2 text-slate-500 underline hover:bg-slate-100 hover:text-slate-700`} aria-label={`${u.title} 체크 초기화`}>
-                        {mode === "호차별" ? <><span aria-hidden="true">↺</span><span className="hidden sm:inline">초기화</span></> : "초기화"}
+                        {mode === "호차별" ? <><ArrowCounterClockwise aria-hidden="true" size={15} /><span className="hidden sm:inline">초기화</span></> : "초기화"}
                       </button>
                     )}
                     <span className={`text-sm font-medium ${c === u.members.length && u.members.length > 0 ? "text-green-600" : "text-emerald-700"}`}>{c}/{u.members.length}</span>

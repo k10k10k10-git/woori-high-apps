@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Group, IguardLodgingMap, PartialAttendanceMap, Room, Student } from "@/features/iguard/lib/types";
@@ -299,7 +300,7 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
               <h2 className="font-bold text-slate-900">{roomLabel(selection.room.room)}</h2>
               <p className="mt-0.5 text-xs text-slate-500">{selection.room.peopleCount}/{selection.room.room.capacity}명 · {selection.room.room.type || "성별 미지정"}</p>
             </div>
-            <button type="button" onClick={closePopover} className="-mr-1 -mt-1 rounded p-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="호실 상세 닫기">✕</button>
+            <button type="button" onClick={closePopover} className="-mr-1 -mt-1 rounded p-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label="호실 상세 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
           </div>
           <div className="mt-3 space-y-2 text-sm">
             <div className="flex items-start gap-2">

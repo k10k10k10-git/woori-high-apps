@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import OverlayShell from "@/components/OverlayShell";
@@ -258,7 +259,7 @@ function NewFriendEditor({
             <p className="section-kicker">새친구</p>
             <h3 className="text-lg font-bold text-slate-900">{friend ? `${friend.name} 기록 수정` : "새친구 접수"}</h3>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-100" aria-label="닫기">✕</button>
+          <button type="button" onClick={onClose} className="compact-icon-control rounded-lg text-slate-400 hover:bg-slate-100" aria-label="닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
         </div>
 
         <div className="overlay-panel-body">

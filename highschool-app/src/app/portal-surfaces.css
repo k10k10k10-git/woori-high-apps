@@ -1,0 +1,124 @@
+/* 화면별 표면 — 포털 셸·홈·워크스페이스 내비게이션.
+   globals.css는 토큰과 기반만 담고, 특정 화면의 표면 규칙은 여기에 둔다. */
+
+/* ── 수련회 행정 워크스페이스 ───────────────────────────── */
+.retreat-more-groups__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: min(320px, calc(100vw - 24px));
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text-primary);
+}
+.retreat-more-groups__menu button {
+  display: block;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 13px;
+  text-align: left;
+}
+.retreat-more-groups__menu button + button { border-top: 1px solid var(--color-border); }
+.retreat-more-groups__menu button:hover { background: var(--color-surface-hover); }
+.retreat-more-groups__menu strong { display: block; font-size: 13px; }
+.retreat-more-groups__menu span { display: block; margin-top: 2px; color: var(--color-text-muted); font-size: 11px; line-height: 1.45; }
+
+/* ── PC·모바일 보기 프레임 로딩 ─────────────────────────── */
+.portal-frame-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--color-bg);
+  padding: 24px;
+}
+.portal-frame-loading__bar,
+.portal-frame-loading__hero,
+.portal-frame-loading__grid > span {
+  background: color-mix(in srgb, var(--color-text-primary) 7%, var(--color-surface));
+}
+.portal-frame-loading__bar { height: 68px; border-radius: 14px; }
+.portal-frame-loading__hero { height: min(320px, 38vh); margin-top: 24px; border-radius: 22px; }
+.portal-frame-loading__grid { display: grid; margin-top: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.portal-frame-loading__grid > span { min-height: 210px; border-radius: 16px; }
+.portal-frame-loading--compact {
+  width: min(430px, calc(100vw - 32px));
+  height: min(844px, calc(100dvh - 84px));
+  inset: 16px auto auto 50%;
+  transform: translateX(-50%);
+  border-radius: 24px;
+  padding: 16px;
+}
+.portal-frame-loading--compact .portal-frame-loading__bar { height: 56px; }
+.portal-frame-loading--compact .portal-frame-loading__hero { height: 250px; margin-top: 16px; border-radius: 18px; }
+.portal-frame-loading--compact .portal-frame-loading__grid { grid-template-columns: 1fr; gap: 12px; margin-top: 14px; }
+.portal-frame-loading--compact .portal-frame-loading__grid > span { min-height: 128px; }
+
+/* ── 통합 홈 ────────────────────────────────────────────── */
+.mobile-home-primary {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 14px 16px;
+}
+
+/* ── 수련회 행정 준비 요약 ───────────────────────────────── */
+.retreat-prep-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.retreat-prep-summary--muted { color: var(--color-text-muted); }
+.retreat-prep-summary__lead,
+.retreat-prep-summary__done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+}
+.retreat-prep-summary__lead { color: var(--color-warning); }
+.retreat-prep-summary__done { color: var(--color-success); }
+.retreat-prep-summary__items { display: flex; flex-wrap: wrap; gap: 8px; }
+.retreat-prep-summary__roster {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.retreat-prep-chip {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 34%, var(--color-border));
+  border-radius: 10px;
+  background: var(--color-warning-bg);
+  padding: 6px 11px;
+  color: var(--color-text-primary);
+  text-align: left;
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+}
+.retreat-prep-chip:hover { background: color-mix(in srgb, var(--color-warning) 16%, var(--color-surface)); }
+.retreat-prep-chip strong { font-size: 12px; font-weight: 750; }
+.retreat-prep-chip span { color: var(--color-text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.retreat-prep-chip svg { color: var(--color-warning); }
+@media (max-width: 640px) {
+  .retreat-prep-summary { gap: 8px 10px; }
+  .retreat-prep-summary__roster { margin-left: 0; }
+  .retreat-prep-chip { min-height: 44px; width: 100%; }
+}

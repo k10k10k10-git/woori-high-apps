@@ -937,6 +937,10 @@ table th {
   transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
 }
 .portal-compact-action:hover { color: white; border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); }
+/* 계정 진입점(마이페이지)이 보기·테마 토글과 같은 무게로 읽히지 않게 한다. */
+.portal-compact-action--account { border-color: rgba(255,255,255,.2); color: var(--color-on-dark-primary); font-weight: 700; }
+.portal-compact-action--quiet { border-color: transparent; color: var(--color-on-dark-muted); }
+.portal-compact-action--quiet:hover { border-color: rgba(255,255,255,.14); }
 .view-mode-toggle {
   display: inline-flex;
   min-height: 40px;
@@ -990,6 +994,7 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
 .portal-preview-toolbar__brand .portal-brand-mark { width: 32px; height: 32px; border-radius: 10px; }
 .portal-preview-toolbar__controls { display: flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 7px; }
 .portal-mobile-preview-stage {
+  position: relative;
   display: grid;
   height: calc(100dvh - 52px);
   overflow: auto;
@@ -997,6 +1002,8 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
   padding: 16px;
   overscroll-behavior: contain;
 }
+.portal-mobile-preview-stage[data-frame-ready="false"] .portal-mobile-preview-frame,
+.portal-desktop-lock-stage[data-frame-ready="false"] .portal-desktop-lock-frame { opacity: 0; }
 .portal-mobile-preview-frame {
   width: min(430px, calc(100vw - 32px));
   height: min(844px, calc(100dvh - 84px));
@@ -1009,6 +1016,7 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
 
 /* PC버전을 고른 뒤 창을 줄여도 iframe의 레이아웃 뷰포트는 PC 폭을 유지한다. */
 .portal-desktop-lock-stage {
+  position: relative;
   width: 100%;
   height: 100dvh;
   overflow: auto;
@@ -1242,13 +1250,10 @@ main .text-slate-500 { color: var(--color-text-muted); }
 main .text-slate-400 { color: var(--color-text-faint); }
 
 /* 도메인 홈과 업무 카드가 같은 제품의 구성요소로 읽히도록 한다. */
-.home-domain-card { position: relative; overflow: hidden; }
-.home-domain-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: var(--domain-color, var(--color-primary));
+.home-domain-card {
+  position: relative;
+  overflow: hidden;
+  border-top-color: color-mix(in srgb, var(--domain-color, var(--color-primary)) 42%, var(--color-border));
 }
 .home-domain-card--semester { --domain-color: #2563eb; }
 .home-domain-card--sunday { --domain-color: #d97706; }
@@ -1513,6 +1518,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .landing-feature-copy > span { display: block; margin-top: 16px; color: var(--color-text-muted); font-size: 14px; line-height: 1.8; }
 .landing-feature-copy ul { display: flex; margin: 27px 0 0; padding: 0; flex-wrap: wrap; gap: 7px; list-style: none; }
 .landing-feature-copy li { border-radius: 999px; background: white; padding: 8px 11px; color: var(--color-text-secondary); font-size: 11px; font-weight: 700; box-shadow: var(--shadow-xs); }
+.landing-feature-note { display: block; margin-top: 10px; color: var(--color-text-faint); font-size: 11px; }
 .landing-target-grid { display: grid; margin-top: 50px; grid-template-columns: 1fr 1fr; gap: 12px; }
 .landing-target-grid article { display: flex; min-height: 86px; align-items: center; gap: 16px; border-radius: 17px; background: white; padding: 21px 23px; box-shadow: var(--shadow-xs); }
 .landing-target-grid span { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #e5f7f0; color: var(--color-primary); font-weight: 850; }
@@ -1758,7 +1764,6 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .guide-category-tabs button[data-active="true"] { background: #17201d; color: white; }
 .guide-card-grid { display: grid; margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .guide-card { position: relative; overflow: hidden; border-radius: 19px; background: white; padding: 25px; box-shadow: 0 0 0 1px rgba(18,28,24,.04), var(--shadow-sm); }
-.guide-card::before { position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--guide-tone); content: ""; }
 .guide-tone-blue { --guide-tone: #3b82f6; --guide-soft: #eff6ff; --guide-ink: #2457b8; }
 .guide-tone-green { --guide-tone: #10a779; --guide-soft: #eaf8f3; --guide-ink: #087a57; }
 .guide-tone-violet { --guide-tone: #7c6ee6; --guide-soft: #f1efff; --guide-ink: #5a4fbd; }
@@ -2270,6 +2275,7 @@ a.mypage-row:hover { background: var(--color-surface-hover); }
   border-radius: 14px;
   background: var(--color-surface);
 }
+/* 장식용 색 띠가 아니라 "지금 진행 중"이라는 운영 상태 표시다 — 현장에서 한눈에 찾는 단서라 유지한다. */
 .cue-current-card.is-active { border-left: 3px solid var(--color-primary); background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface)); }
 .cue-collapse-button { border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: none; }
 .cue-location-block { border-top: 1px solid var(--color-border); background: var(--color-surface-hover); }

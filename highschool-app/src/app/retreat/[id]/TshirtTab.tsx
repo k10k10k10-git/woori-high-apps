@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
+import { X } from "@phosphor-icons/react";
 import { Retreat, TshirtOrder, TSHIRT_DESIGNS, TSHIRT_SIZES } from "@/lib/types";
 import {
   subscribeToTshirtOrders,
@@ -122,7 +123,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
   // ── 시트 불러오기 ──────────────────────────────────────────
   async function handleImport() {
     if (!retreat.sheetId) {
-      setImportMsg({ type: "err", text: "응답 시트가 설정되지 않았습니다. ⚙ 시트 설정에서 먼저 연결해주세요." });
+      setImportMsg({ type: "err", text: "응답 시트가 설정되지 않았습니다. 우측 상단의 시트 설정에서 먼저 연결해 주세요." });
       return;
     }
     setImporting(true);
@@ -271,7 +272,7 @@ export default function TshirtTab({ retreat }: { retreat: Retreat }) {
             : "bg-red-50 border border-red-200 text-red-700"
         }`}>
           {importMsg.type === "ok" ? "✅" : "⚠"} {importMsg.text}
-          <button onClick={() => setImportMsg(null)} className="ml-auto text-slate-400 hover:text-slate-600">×</button>
+          <button onClick={() => setImportMsg(null)} className="compact-icon-control ml-auto text-slate-400 hover:text-slate-600" aria-label="안내 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
         </div>
       )}
 

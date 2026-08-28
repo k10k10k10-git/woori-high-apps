@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { X } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { Group, IguardMeal, IguardSeating } from "@/features/iguard/lib/types";
 import { computeFairAssignment, FairResult } from "@/features/iguard/lib/fairAssign";
@@ -66,7 +67,7 @@ export default function FairAssignButton({ retreatId, groups, meals, seatings }:
           <div className="max-h-[85dvh] overflow-y-auto p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-lg">⚖️ 공정 배정 결과</h3>
-              <button onClick={() => setResult(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+              <button onClick={() => setResult(null)} className="compact-icon-control text-slate-400 hover:text-slate-600" aria-label="결과 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
             </div>
             <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
               식사 <strong>{result.counts.meals}</strong>개 · 집회 <strong>{result.counts.seatings}</strong>개 재배정 완료.

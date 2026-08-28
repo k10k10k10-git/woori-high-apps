@@ -78,7 +78,9 @@ function FeatureSection() {
           <p>{active.eyebrow}</p>
           <h3>{active.title}</h3>
           <span>{active.body}</span>
-          <ul>{active.metrics.map((metric) => <li key={metric}>{metric}</li>)}</ul>
+          {/* 아래 수치는 화면 구성을 보여주는 예시다 — 운영 성과로 읽히지 않게 명시한다. */}
+          <ul aria-describedby="landing-metric-note">{active.metrics.map((metric) => <li key={metric}>{metric}</li>)}</ul>
+          <small id="landing-metric-note" className="landing-feature-note">화면 예시입니다. 실제 운영 수치가 아닙니다.</small>
         </div>
         <div className="landing-feature-flow" aria-label={`${active.label} 업무 흐름`}>
           <p>연결되는 업무</p>

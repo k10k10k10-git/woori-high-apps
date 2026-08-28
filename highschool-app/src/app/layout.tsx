@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import "./operations-tables.css";
+import "./portal-surfaces.css";
 import "./theme-compat.css";
 import "./interaction-controls.css";
 import Providers from "./providers";

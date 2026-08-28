@@ -9,6 +9,7 @@ describe("CSS architecture", () => {
     const layout = read("src/app/layout.tsx");
     expect(layout).toContain('import "./theme-compat.css"');
     expect(layout).toContain('import "./interaction-controls.css"');
+    expect(layout).toContain('import "./portal-surfaces.css"');
     expect(read("src/app/globals.css").split("\n").length).toBeLessThan(2_350);
   });
 

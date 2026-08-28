@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
+import { X } from "@phosphor-icons/react";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
 import { clearGroups, saveGroups, subscribeToGroups, subscribeToStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
@@ -707,7 +708,7 @@ export default function GroupsTab({ retreat }: Props) {
       {saveError && (
         <div className="mb-3 flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-sm text-red-700">
           <span>⚠ 저장 실패: {saveError}</span>
-          <button onClick={() => setSaveError(null)} className="text-red-400 hover:text-red-600 ml-3 font-bold">×</button>
+          <button onClick={() => setSaveError(null)} className="compact-icon-control ml-3 text-red-400 hover:text-red-600" aria-label="저장 실패 안내 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
         </div>
       )}
       {remoteUpdated && (

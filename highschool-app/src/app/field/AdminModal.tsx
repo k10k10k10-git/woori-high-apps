@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { createRetreatAccessLock, PIN_MAX_LENGTH, PIN_MIN_LENGTH } from "@/features/iguard/lib/accessLock";
 import { deleteIguardAccessLock, saveIguardAccessLock } from "@/features/iguard/lib/db";
 import type { IguardAccessLock, Retreat } from "@/features/iguard/lib/types";
@@ -56,7 +57,7 @@ export default function AdminModal({ onClose, retreats, locks, adminId }: AdminM
             <h3 className="text-lg font-bold text-slate-800">🔐 관리자</h3>
             <p className="mt-0.5 text-xs text-slate-400">수련회별 PIN 잠금</p>
           </div>
-          <button onClick={onClose} className="text-xl leading-none text-slate-400 hover:text-slate-600" aria-label="닫기">×</button>
+          <button onClick={onClose} className="compact-icon-control text-slate-400 hover:text-slate-600" aria-label="닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
         </div>
 
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { Copy } from "@phosphor-icons/react";
 import {
   Retreat, MealSlot, MealAdjustment, MealRoleCounts, MealPersonAssignment, MealRole,
   RetreatPeriod, TeacherAttendance, Participant, PartialAttendance, Student,
@@ -555,7 +556,7 @@ export default function MealCountTab({ retreat }: Props) {
       <div className="card overflow-x-auto">
         <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <h3 className="font-semibold text-slate-700">④ 끼니별 식수 인원 <span className="text-xs font-normal text-slate-400">(수련원 통보용)</span></h3>
-          <button onClick={copySummary} disabled={mealRows.length === 0} className="btn-secondary text-xs px-3 py-1.5">📋 텍스트 복사</button>
+          <button onClick={copySummary} disabled={mealRows.length === 0} className="btn-secondary text-xs px-3 py-1.5"><Copy aria-hidden="true" size={15} />텍스트 복사</button>
         </div>
         {mealRows.length === 0 ? (
           <p className="p-8 text-center text-slate-400 text-sm">끼니 목록을 만들면 여기에 인원표가 표시됩니다.</p>

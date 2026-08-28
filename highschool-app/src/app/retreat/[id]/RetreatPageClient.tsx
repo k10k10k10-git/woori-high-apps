@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { ArrowLeft, ArrowRight, DotsThree, GearSix } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeToRetreat, updateRetreat } from "@/lib/db";
 import { Retreat } from "@/lib/types";
 import { parseSheetUrl, buildSheetUrl } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 import ParticipantsTab from "./ParticipantsTab";
+import RetreatPrepSummary from "./RetreatPrepSummary";
 import GroupsTab from "./GroupsTab";
 import RoomsTab from "./RoomsTab";
 import ClassRosterTab from "./ClassRosterTab";
@@ -167,6 +169,10 @@ export default function RetreatPageClient() {
   const activeGroupIdx = visibleGroups.findIndex(g => g.tabs.some(t => t.idx === tab));
   const safeGroupIdx = activeGroupIdx >= 0 ? activeGroupIdx : 0;
   const activeGroup  = visibleGroups[safeGroupIdx];
+  // 명단·편성·이동은 일상 흐름으로 바로 두고, 저빈도 물품·현장 분류는 필요할 때 연다.
+  // 현재 저빈도 그룹을 보고 있다면 그 그룹은 항상 1차 탭에 남겨 현재 위치를 잃지 않게 한다.
+  const primaryGroups = visibleGroups.filter((_, index) => index < 3 || index === safeGroupIdx);
+  const moreGroups = visibleGroups.filter((group) => !primaryGroups.includes(group));
   // 주소를 직접 입력해 민감 탭으로 들어오는 경로도 막는다.
   const effectiveTab = sensitiveTabs.includes(tab) ? (activeGroup?.tabs[0]?.idx ?? 0) : tab;
 
@@ -241,7 +247,7 @@ export default function RetreatPageClient() {
                 className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white sm:text-xs"
                 aria-label="수련회 목록으로 돌아가기"
               >
-                ← 목록
+                <ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={14} /> 목록
               </button>
               <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0"
                 style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>
@@ -252,14 +258,14 @@ export default function RetreatPageClient() {
                 onClick={() => router.push(`/retreat/${id}/field`)}
                 className="ml-auto shrink-0 whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.07] px-2 py-1.5 text-[11px] font-semibold text-[var(--color-on-dark-accent)] transition hover:bg-white/[0.12] sm:px-2.5 sm:text-xs"
               >
-                이가드 현장 →
+                이가드 현장 <ArrowRight aria-hidden="true" className="inline align-[-2px]" size={14} />
               </button>
               <button
                 onClick={() => setEditingSheet(true)}
                 className="hidden shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white sm:flex"
                 aria-label="시트 설정 열기"
               >
-                ⚙ 시트 설정
+                <GearSix aria-hidden="true" size={16} /> 시트 설정
               </button>
               <button
                 onClick={() => setEditingSheet(true)}
@@ -267,14 +273,14 @@ export default function RetreatPageClient() {
                 aria-label="시트 설정 열기"
                 style={{ color: "#6b7280" }}
               >
-                ⚙
+                <GearSix aria-hidden="true" size={17} />
               </button>
             </div>
 
             {/* 대그룹 탭 */}
             <div className="flex gap-0.5 sm:gap-1" role="tablist" aria-label="탭 그룹">
-              {visibleGroups.map((g, gi) => {
-                const isActive = gi === safeGroupIdx;
+              {primaryGroups.map((g) => {
+                const isActive = g.label === activeGroup.label;
                 return (
                   <button
                     key={g.label}
@@ -288,6 +294,28 @@ export default function RetreatPageClient() {
                   </button>
                 );
               })}
+              {moreGroups.length > 0 && (
+                <details className="retreat-more-groups relative shrink-0">
+                  <summary className="workspace-group-tab flex cursor-pointer list-none items-center gap-1">
+                    <DotsThree aria-hidden="true" size={17} weight="bold" /> 더보기
+                  </summary>
+                  <div className="retreat-more-groups__menu">
+                    {moreGroups.map((group) => (
+                      <button
+                        key={group.label}
+                        type="button"
+                        onClick={(event) => {
+                          setTab(group.tabs[0].idx);
+                          event.currentTarget.closest("details")?.removeAttribute("open");
+                        }}
+                      >
+                        <strong>{group.label}</strong>
+                        <span>{group.tabs.map((item) => item.label).join(" · ")}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           </div>
         </div>
@@ -390,6 +418,8 @@ export default function RetreatPageClient() {
               조회 전용입니다. 명단·편성·이동·물품을 볼 수 있고 저장은 되지 않습니다.
             </div>
           )}
+          {/* 탭 구조보다 남은 일을 먼저 읽히게 한다 — 조회 전용 역할에게도 현황은 보여준다. */}
+          <RetreatPrepSummary key={id} retreatId={id} onOpenTab={setTab} />
           {/* fieldset disabled — 내부의 button·input·select·textarea를 브라우저가 전부 잠근다.
               display:contents라 레이아웃에는 영향이 없다. 드래그처럼 폼 요소가 아닌 조작은
               각 탭이 useRetreatCanEdit()으로 따로 잠근다. */}

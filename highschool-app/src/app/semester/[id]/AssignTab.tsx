@@ -4,6 +4,7 @@
 // 저장은 신청 문서 단일 경로 update (전체 덮어쓰기 없음).
 
 import { useEffect, useMemo, useState } from "react";
+import { X } from "@phosphor-icons/react";
 import { useUI } from "@/context/UIContext";
 import {
   describeApplicant,
@@ -364,7 +365,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                     <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 지원 동기와 하고 싶은 활동을 확인할 수 있습니다.</p>
                   )}
                 </div>
-                <button onClick={() => setDetailTeamId(null)} aria-label="닫기" className="rounded-lg px-2 py-1 text-lg text-slate-400 hover:bg-slate-100">✕</button>
+                <button onClick={() => setDetailTeamId(null)} aria-label="닫기" className="compact-icon-control rounded-lg text-slate-400 hover:bg-slate-100"><X aria-hidden="true" size={17} weight="bold" /></button>
               </div>
               {/* 여기서 전원을 해제하면 명단이 빈다 — 빈 화면 대신 상태를 알린다. */}
               {members.length === 0 && (
@@ -479,7 +480,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
                   </div>
                   <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 신청 내용과 연락처를 확인할 수 있습니다.</p>
                 </div>
-                <button onClick={() => setDetailTrainingClassId(null)} aria-label="닫기" className="rounded-lg px-2 py-1 text-lg text-slate-400 hover:bg-slate-100">✕</button>
+                <button onClick={() => setDetailTrainingClassId(null)} aria-label="닫기" className="compact-icon-control rounded-lg text-slate-400 hover:bg-slate-100"><X aria-hidden="true" size={17} weight="bold" /></button>
               </div>
               {members.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-slate-200 py-8 text-center text-sm text-slate-400">배정된 인원이 없습니다.</p>

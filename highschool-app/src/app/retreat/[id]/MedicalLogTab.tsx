@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
+import { DownloadSimple, Image as ImageIcon, X } from "@phosphor-icons/react";
 import { Retreat, MedicalLog, Participant } from "@/lib/types";
 import {
   subscribeToMedicalLogs, saveMedicalLog, updateMedicalLog, deleteMedicalLog,
@@ -377,8 +378,8 @@ export default function MedicalLogTab({ retreat }: Props) {
         <div className="flex gap-2">
           {logs.length > 0 && (
             <>
-              <button onClick={handleExport} className="btn-secondary text-sm">↓ 엑셀</button>
-              <button onClick={handleExportJPG} className="btn-secondary text-sm">🖼️ JPG</button>
+              <button onClick={handleExport} className="btn-secondary text-sm"><DownloadSimple aria-hidden="true" size={16} />엑셀</button>
+              <button onClick={handleExportJPG} className="btn-secondary text-sm"><ImageIcon aria-hidden="true" size={16} />JPG</button>
             </>
           )}
           <button onClick={() => { setForm(EMPTY_FORM); setShowForm(true); }} className="btn-primary text-sm">
@@ -480,7 +481,7 @@ export default function MedicalLogTab({ retreat }: Props) {
           <div className="card p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">약 목록 편집</h3>
-              <button onClick={() => setShowPresetModal(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+              <button onClick={() => setShowPresetModal(false)} className="compact-icon-control text-slate-400 hover:text-slate-600" aria-label="닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
             </div>
             <div className="space-y-2 mb-3 max-h-60 overflow-y-auto">
               {presetDraft.map((med, i) => (

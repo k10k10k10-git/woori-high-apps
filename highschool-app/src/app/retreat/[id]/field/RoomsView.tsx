@@ -1,5 +1,6 @@
 "use client";
 import { useMemo } from "react";
+import { Printer } from "@phosphor-icons/react";
 import { Group, Room, IguardBus, IguardGbsPlace, IguardMeal, IguardStaff, PartialAttendanceMap, Student } from "@/features/iguard/lib/types";
 import { printAsPDF } from "@/features/iguard/lib/exportUtils";
 import { escapeHtml } from "@/lib/exportUtils";
@@ -143,7 +144,7 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
 
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-slate-500">조 <strong className="text-slate-800">{data.length}</strong></span>
-        <button onClick={print} className="btn-secondary btn-sm">🖨 인쇄</button>
+        <button onClick={print} className="btn-secondary btn-sm"><Printer aria-hidden="true" size={16} />인쇄</button>
       </div>
 
       {!hasRooms && (

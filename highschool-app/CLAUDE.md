@@ -165,7 +165,7 @@
 - 수련회 모바일 참가자 명단은 한 페이지 40명만 DOM에 만들고 `content-visibility:auto`를 함께 사용합니다. 검색·필터·정렬이 바뀌면 `ParticipantsTab`의 key로 1페이지로 돌아갑니다.
 - XLSX 런타임은 `loadXlsx()` 동적 import만 사용합니다. 화면 컴포넌트에 정적 XLSX import를 다시 추가하지 않습니다.
 - 대형 화면의 현재 분리 경계는 `AutoAssignNamePickers`, `classRosterModel`, `RoomComponents`, `GroupComponents`입니다. `componentBoundaries.test.ts`가 오케스트레이터 1,000줄 미만과 경계 import를 고정합니다.
-- CSS는 `globals.css`(토큰·기반), `operations-tables.css`(운영 표), `theme-compat.css`(Tailwind 다크 호환), `interaction-controls.css`(터치·키보드·가상화)로 나눕니다. `!important`는 호환 경계에만 둡니다.
+- CSS는 `globals.css`(토큰·기반), `operations-tables.css`(운영 표), `portal-surfaces.css`(화면별 표면 — 포털 셸·홈·워크스페이스 내비), `theme-compat.css`(Tailwind 다크 호환), `interaction-controls.css`(터치·키보드·가상화)로 나눕니다. `!important`는 호환 경계에만 둡니다. `globals.css`는 2,350줄 미만을 유지하며(`cssArchitecture.test.ts`가 지킵니다), 특정 화면에서만 쓰는 표면 규칙은 `portal-surfaces.css`에 둡니다. **이 가드가 깨지면 한계값을 올리지 말고 분리하세요** — 한계값을 올리면 globals가 다시 화면별 규칙의 쓰레기통이 됩니다(2026-08-29: polish가 추가한 표면 CSS 58줄을 `portal-surfaces.css`로 옮겨 2,394→2,328줄로 되돌렸습니다).
 - CI는 `.github/workflows/highschool-quality.yml`에서 lint → typecheck → coverage → build → Lighthouse → 로그인 smoke/axe 순서로 실행합니다. 인증 E2E는 GitHub Secret `E2E_STORAGE_STATE_B64`를 `.auth/user.json`으로 복원하며, 비밀값이 없으면 건너뛰지 않고 실패합니다.
 - 커버리지 하한은 줄·함수·구문 55%, 분기 45%입니다. Lighthouse 관문은 FCP 1.8초, Speed Index 3초, 접근성 0.90, Best Practices 0.85입니다.
 - 운영 의존성은 패치 범위만 우선 갱신합니다. 2026-08-27 기준 React/React DOM은 19.2.8이고, Firebase 12.15.0과 Tailwind 4.2.1은 다음 패치가 없어 minor 업데이트를 보류했습니다.

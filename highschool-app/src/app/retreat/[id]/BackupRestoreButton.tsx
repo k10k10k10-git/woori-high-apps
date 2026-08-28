@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
-import { useDialogEscape } from "@/components/useDialogEscape";
+import { ArrowCounterClockwise, X } from "@phosphor-icons/react";
 import { useUI } from "@/context/UIContext";
+import OverlayShell from "@/components/OverlayShell";
 
 /**
  * 롤링 백업 복구 버튼 — 조편성/방배정처럼 전체 덮어쓰기로 저장되는 노드의 복구 진입점.
@@ -17,8 +18,6 @@ export default function BackupRestoreButton({ label, loadBackups, restore, disab
   const [open, setOpen] = useState(false);
   const [keys, setKeys] = useState<string[] | null>(null);
   const [busy, setBusy] = useState(false);
-  useDialogEscape(open, () => { if (!busy) setOpen(false); });
-
   async function openPicker() {
     setOpen(true);
     setKeys(null);
@@ -48,13 +47,13 @@ export default function BackupRestoreButton({ label, loadBackups, restore, disab
 
   return (
     <>
-      <button onClick={openPicker} disabled={disabled} className="btn-secondary btn-sm" aria-label={`${label} 복구`}>⟲ 복구</button>
+      <button onClick={openPicker} disabled={disabled} className="btn-secondary btn-sm" aria-label={`${label} 복구`}><ArrowCounterClockwise aria-hidden="true" size={16} />복구</button>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label={`${label} 복구`} onClick={() => !busy && setOpen(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-4" onClick={e => e.stopPropagation()}>
+        <OverlayShell label={`${label} 복구`} onClose={() => { if (!busy) setOpen(false); }} closeOnBackdrop={!busy} panelClassName="w-full max-w-sm">
+          <div className="modal-card w-full rounded-2xl bg-white p-4 shadow-xl">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-800">{label} 복구</h3>
-              <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="닫기">×</button>
+              <button onClick={() => setOpen(false)} disabled={busy} className="compact-icon-control text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
             </div>
             <p className="text-xs text-slate-500 mb-3">최근 저장 시점의 자동 스냅샷입니다. 되돌릴 시점을 선택하세요.</p>
             {keys === null ? (
@@ -75,7 +74,7 @@ export default function BackupRestoreButton({ label, loadBackups, restore, disab
               </ul>
             )}
           </div>
-        </div>
+        </OverlayShell>
       )}
     </>
   );
