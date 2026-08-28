@@ -419,7 +419,7 @@ export default function RetreatPageClient() {
             </div>
           )}
           {/* 탭 구조보다 남은 일을 먼저 읽히게 한다 — 조회 전용 역할에게도 현황은 보여준다. */}
-          <RetreatPrepSummary key={id} retreatId={id} onOpenTab={setTab} />
+          <RetreatPrepSummary key={id} retreatId={id} retreatYear={retreat.year} onOpenTab={setTab} />
           {/* fieldset disabled — 내부의 button·input·select·textarea를 브라우저가 전부 잠근다.
               display:contents라 레이아웃에는 영향이 없다. 드래그처럼 폼 요소가 아닌 조작은
               각 탭이 useRetreatCanEdit()으로 따로 잠근다. */}

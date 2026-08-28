@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildRetreatPrepStatus } from "./retreatPrepStatus";
-import type { Group, Participant, Room } from "@/lib/types";
+import type { Group, Participant, Room, Student } from "@/lib/types";
 
 const participant = (name: string, studentId?: string | null): Participant => ({
   name,
@@ -18,6 +18,21 @@ const group = (studentIds: string[]): Group => ({
 
 const room = (studentIds: string[]): Room => ({
   id: "r1", roomNumber: "101", capacity: 6, type: "남", studentIds,
+});
+
+const student = (id: string): Student => ({
+  id,
+  name: `학생${id}`,
+  num: 1,
+  grade: 1,
+  class: 1,
+  buNum: 1,
+  birth: "",
+  phone: "",
+  pPhone: "",
+  addr: "",
+  photo: "",
+  school: "",
 });
 
 const stageOf = (status: ReturnType<typeof buildRetreatPrepStatus>, key: string) =>
@@ -87,5 +102,40 @@ describe("buildRetreatPrepStatus", () => {
     });
 
     expect(stageOf(status, "groups").count).toBe(1);
+  });
+
+  it("실제 편성 화면처럼 중복 신청·취소·당일참석을 반영한다", () => {
+    const status = buildRetreatPrepStatus({
+      participants: {
+        a: participant("김하늘", "s1"),
+        aDuplicate: participant("김하늘", "s1"),
+        b: participant("이바다", "s2"),
+        c: participant("박도담", "s3"),
+        d: participant("최아람", "s4"),
+      },
+      groups: [group(["s1", "s3"])],
+      rooms: [room(["s1"])],
+      students: { s1: student("s1"), s2: student("s2"), s3: student("s3"), s4: student("s4") },
+      cellColors: { s2: "red" },
+      partialAttendances: [{ id: "s3", type: "당일참석", day: 1 }],
+    });
+
+    // s1 중복 신청은 한 명으로 계산하고, 취소자 s2는 두 편성에서 제외한다.
+    expect(stageOf(status, "groups").count).toBe(1);
+    // 방배정에서는 당일참석 s3도 제외되어 실제 미배정 학생은 s4 한 명이다.
+    expect(stageOf(status, "rooms").count).toBe(1);
+  });
+
+  it("후기 신청자는 실제 편성 화면과 같이 미배정에 포함한다", () => {
+    const status = buildRetreatPrepStatus({
+      participants: { a: participant("김하늘", "s1") },
+      groups: [group(["s1"])],
+      rooms: [room(["s1"])],
+      students: { s1: student("s1"), late: student("late") },
+      cellColors: { late: "blue" },
+    });
+
+    expect(stageOf(status, "groups").count).toBe(1);
+    expect(stageOf(status, "rooms").count).toBe(1);
   });
 });

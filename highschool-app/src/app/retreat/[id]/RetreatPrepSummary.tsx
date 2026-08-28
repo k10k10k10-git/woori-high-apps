@@ -1,8 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle, WarningCircle } from "@phosphor-icons/react";
-import { subscribeToGroups, subscribeToParticipants, subscribeToRooms } from "@/lib/db";
-import type { Group, Participant, Room } from "@/lib/types";
+import {
+  subscribeToCellColors,
+  subscribeToGroups,
+  subscribeToPartialAttendances,
+  subscribeToParticipants,
+  subscribeToRooms,
+  subscribeToStudentsByYear,
+} from "@/lib/db";
+import type { Group, Participant, PartialAttendance, Room, Student } from "@/lib/types";
 import { buildRetreatPrepStatus } from "@/features/portal/retreatPrepStatus";
 
 /**
@@ -11,14 +18,19 @@ import { buildRetreatPrepStatus } from "@/features/portal/retreatPrepStatus";
  */
 export default function RetreatPrepSummary({
   retreatId,
+  retreatYear,
   onOpenTab,
 }: {
   retreatId: string;
+  retreatYear: number;
   onOpenTab: (tabIdx: number) => void;
 }) {
   const [participants, setParticipants] = useState<Record<string, Participant> | null>(null);
   const [groups, setGroups] = useState<Group[] | null>(null);
   const [rooms, setRooms] = useState<Room[] | null>(null);
+  const [students, setStudents] = useState<Record<string, Student> | null>(null);
+  const [cellColors, setCellColors] = useState<Record<string, string> | null>(null);
+  const [partialAttendances, setPartialAttendances] = useState<PartialAttendance[] | null>(null);
   const [loadError, setLoadError] = useState("");
 
   // 수련회가 바뀌면 호출 측이 key로 이 컴포넌트를 새로 마운트한다 —
@@ -30,14 +42,17 @@ export default function RetreatPrepSummary({
       subscribeToParticipants(retreatId, setParticipants, fail),
       subscribeToGroups(retreatId, setGroups, fail),
       subscribeToRooms(retreatId, setRooms, fail),
+      subscribeToStudentsByYear(retreatYear, setStudents, fail),
+      subscribeToCellColors(retreatId, setCellColors, fail),
+      subscribeToPartialAttendances(retreatId, setPartialAttendances, fail),
     ];
     return () => unsubscribers.forEach((off) => off());
-  }, [retreatId]);
+  }, [retreatId, retreatYear]);
 
   if (loadError) {
     return <p className="retreat-prep-summary retreat-prep-summary--muted" role="status">{loadError}</p>;
   }
-  if (!participants || !groups || !rooms) {
+  if (!participants || !groups || !rooms || !students || !cellColors || !partialAttendances) {
     return (
       <p className="retreat-prep-summary retreat-prep-summary--muted" role="status">
         준비 상태를 확인하는 중입니다.
@@ -45,7 +60,14 @@ export default function RetreatPrepSummary({
     );
   }
 
-  const { stages, attentionCount } = buildRetreatPrepStatus({ participants, groups, rooms });
+  const { stages, attentionCount } = buildRetreatPrepStatus({
+    participants,
+    groups,
+    rooms,
+    students,
+    cellColors,
+    partialAttendances,
+  });
   const roster = stages.find((stage) => stage.key === "roster")!;
   const pending = stages.filter((stage) => stage.tone === "attention");
 
