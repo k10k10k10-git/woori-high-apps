@@ -17,13 +17,24 @@ firebase deploy --only hosting
 - 배포 URL: https://woori-high.web.app
 
 ### 통합 고등부 플랫폼 (Vercel)
+
+**2026-08-29부터 `main` 푸시가 자동 배포한다.** Vercel 프로젝트를 `k10k10k10-git/woori-high-apps`에 연결하고 Root Directory를 `highschool-app`으로 지정했다. 평상시 배포는 푸시 하나로 끝난다.
+
 ```bash
-cd "highschool-app"
+git push origin main            # 자동 배포 트리거
+npx vercel ls                   # 새 배포가 Ready 되는지 확인 (저장소 루트에서)
+```
+
+수동 배포가 필요하면 **저장소 루트에서** 실행한다. `.vercel/` 링크는 루트에 있고 Root Directory가 `highschool-app`이므로, 앱 폴더 안에서 실행하면 경로가 어긋나 빌드가 깨진다.
+
+```bash
+cd /Users/sunghoon/Desktop/ai개발
 npx vercel --prod
 ```
+
 - 배포 URL: https://woorihigh-app.vercel.app (구 주소 `highschool-app-flame.vercel.app`도 같은 배포를 가리키게 남겨 둠 — 기존 링크·북마크 보호)
 - 주소 변경/이관: `npx vercel alias set <배포 URL> woorihigh-app.vercel.app`
-- **2026-08-21 실측: Git 저장소 미연결.** 대시보드에 `Connect Git Repository`가 표시되므로 `main` 푸시만으로는 자동 배포되지 않는다. 현재는 검증·커밋·푸시 뒤 `npx vercel --prod`를 반드시 직접 실행한다.
+- **Ignored Build Step**: `git diff --quiet HEAD^ HEAD -- .` — `highschool-app/` 밖만 바뀐 푸시(예: `attendance-app` 수정, 문서만 수정)는 빌드를 건너뛴다. 이때 `vercel ls`에 새 배포가 안 잡히는 것은 정상이며 실패가 아니다.
 - CLI가 `Not authorized`이면 `npx vercel login`의 device URL을 **이미 로그인된 Vercel 브라우저**에서 승인한 뒤 같은 배포 명령을 다시 실행한다. 새 토큰 생성이나 프로젝트 재연결은 필요 없다.
 - 배포 후 `curl -s https://woorihigh-app.vercel.app/api/version`의 `buildId`와 `git rev-parse HEAD`를 대조하고 `npx vercel ls`에서 Ready를 확인한다.
 - 독립 `retreat-app`·`iguard-app` Vercel 프로젝트와 Firebase Hosting 사이트는 2026-08-05 제거했다.

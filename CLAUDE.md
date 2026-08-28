@@ -133,7 +133,7 @@
 ## 배포
 
 - 배포·커밋·푸시·Ready 확인은 `/ship` 스킬 절차를 따른다.
-- `highschool-app`은 Vercel의 `highschool-app` 프로젝트로 배포한다. push 후 `/api/version`과 `npx vercel ls`로 Ready를 확인한다.
+- `highschool-app`은 Vercel의 `highschool-app` 프로젝트로 배포한다. **2026-08-29부터 저장소가 연결돼 `main` 푸시가 자동 배포한다** — push 후 `/api/version`의 buildId와 `npx vercel ls`로 Ready를 확인한다. 수동 배포는 **저장소 루트에서** `npx vercel --prod`(Root Directory가 `highschool-app`이라 앱 폴더 안에서 실행하면 깨진다). `highschool-app/` 밖만 바뀐 푸시는 Ignored Build Step이 빌드를 건너뛴다.
 - 학생 앱은 Firebase Hosting(`firebase deploy --only hosting`, predeploy가 SW 캐시명 갱신).
 - 배포 전 `npx tsc --noEmit` 0 errors + `npm test` 통과 필수.
 
