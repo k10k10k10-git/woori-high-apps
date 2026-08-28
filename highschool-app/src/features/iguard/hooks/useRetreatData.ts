@@ -10,6 +10,8 @@ import {
   subscribeToConnection, subscribeToParticipants, subscribeToIguardGbs,
   subscribeToIguardLodgingMaps,
 } from "@/features/iguard/lib/db";
+import { subscribeToRetreatPrograms } from "@/lib/db";
+import type { RetreatProgram } from "@/lib/types";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
   IguardSegment, IguardPost, IguardMovement, AssignedIguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
@@ -51,18 +53,19 @@ export interface RetreatData {
   groupStaff: Record<string, string[]>;
   gbs: Record<string, IguardGbsPlace>;
   lodgingMaps: IguardLodgingMap[];
+  programs: RetreatProgram[];
   connected: boolean;
 }
 
 /**
  * 수련회 데이터 허브 — 모든 Firebase 실시간 구독을 중앙 관리.
- * IguardClient에서 추출한 17개 구독 로직.
+ * IguardClient에서 추출한 22개 실시간 구독 로직.
  */
 export function useRetreatData(id: string): RetreatData {
   const [retreat, setRetreat] = useState<Retreat | null>(null);
   const [retreatLoading, setRetreatLoading] = useState(true);
   const [loadedScope, setLoadedScope] = useState<string | null>(null);
-  // 21개 구독의 실패를 경로별로 모은다 — 하나로 합치면 첫 실패만 보여 원인을 잘못 짚는다
+  // 22개 구독의 실패를 경로별로 모은다 — 하나로 합치면 첫 실패만 보여 원인을 잘못 짚는다
   // (2026-08-08 학기·홈에서 실제로 두 번 오진했다). scope가 id라 수련회를 옮기면 초기화된다.
   const { fail: failPath, ok: okPath, message: loadError } = useLoadErrors(id);
 
@@ -88,6 +91,7 @@ export function useRetreatData(id: string): RetreatData {
   const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
   const [gbs, setGbs] = useState<Record<string, IguardGbsPlace>>({});
   const [lodgingMaps, setLodgingMaps] = useState<IguardLodgingMap[]>([]);
+  const [programs, setPrograms] = useState<RetreatProgram[]>([]);
   const [connected, setConnected] = useState(true);
   const movements = useMemo(
     () => movementsForDefaultSegments(segments, movementRecords),
@@ -119,7 +123,7 @@ export function useRetreatData(id: string): RetreatData {
     let alive = true;
     const readiness = createSubscriptionReadinessGate([
       "students", "participants", "adminTeachers", "groups", "rooms", "meals", "schedule", "segments", "posts",
-      "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff", "gbs", "lodgingMaps",
+      "movements", "buses", "seating", "todos", "guide", "periods", "attendance", "partial", "cellColors", "groupStaff", "gbs", "lodgingMaps", "programs",
     ], () => { if (alive) setLoadedScope(scope); });
     // 성공하면 그 경로의 이전 실패를 지운다 — 권한이 열린 뒤 재구독하면 배너가 사라진다.
     const ready = (key: string) => {
@@ -154,6 +158,7 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }, fail("groupStaff")),
       subscribeToIguardGbs(id, value => { setGbs(value); ready("gbs"); }, fail("gbs")),
       subscribeToIguardLodgingMaps(id, value => { setLodgingMaps(value); ready("lodgingMaps"); }, fail("lodgingMaps")),
+      subscribeToRetreatPrograms(id, value => { setPrograms(value); ready("programs"); }, fail("programs")),
     ];
     return () => {
       alive = false;
@@ -165,7 +170,7 @@ export function useRetreatData(id: string): RetreatData {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, participants, adminTeachers,
     meals, schedule, segments, posts, movements, movementRecords, buses, seating,
-    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps,
+    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps, programs,
     connected,
   };
 }

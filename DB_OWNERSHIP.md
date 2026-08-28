@@ -66,6 +66,7 @@
 | `retreats/{id}/tshirtOrders` | 행정 | - | 행정만 | 없음 (단체티 신청) |
 | `retreats/{id}/groupsBackups` | 행정 | - | 행정만 | 없음 (groups 전체 덮어쓰기 직전 롤링 백업) |
 | `retreats/{id}/roomsBackups` | 행정 | - | 행정만 | 없음 (rooms 전체 덮어쓰기 직전 롤링 백업) |
+| `retreats/{id}/programs/{programId}` | 행정 | 이가드 | 행정만 | 프로그램별 기획·진행안·규칙·브리핑·대본·물품·할 일. 이가드는 `status=published`만 화면에 노출하며 별도 복제하지 않음 |
 | `retreatsPrivate/{id}/cancellations` | 행정 | - | 행정만 | 민감 취소정보; 학생키만 `cellColors/{studentKey}=red`로 원자 동기화 |
 | `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |
 | `retreatsPrivate/{id}/medicalLogs` | 행정 | - | 행정만 | 없음 (민감정보) |

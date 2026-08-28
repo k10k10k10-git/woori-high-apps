@@ -105,6 +105,7 @@ export const IGUARD_VIEW_GROUPS = [
       { key: "rooms", label: "조별 정보" },
       { key: "lodging", label: "숙소 안내" },
       { key: "check", label: "인원체크" },
+      { key: "programs", label: "프로그램" },
     ],
   },
   {
@@ -147,7 +148,9 @@ export const UNIFIED_ROUTES = [
   "/semester-admin",
   "/semester/[id]",
   "/retreats",
+  "/programs",
   "/retreat/[id]",
+  "/retreat/[id]/programs",
   "/field",
   "/retreat/[id]/field",
 ] as const;

@@ -12,3 +12,4 @@ export * from "./db/access";
 export * from "./db/retreatOps";
 export * from "./db/private";
 export * from "./db/shared";
+export * from "./db/programs";

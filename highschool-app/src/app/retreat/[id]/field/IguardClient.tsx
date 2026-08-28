@@ -20,6 +20,7 @@ import RoomsView from "./RoomsView";
 import LodgingMapView from "./LodgingMapView";
 import MealsView from "./MealsView";
 import StaffView from "./StaffView";
+import PublishedProgramsView from "./PublishedProgramsView";
 import ScheduleView from "./ScheduleView";
 import ScheduleOverviewView from "./ScheduleOverviewView";
 import PostsView from "./PostsView";
@@ -139,7 +140,7 @@ function IguardWorkspace({ id }: { id: string }) {
     retreat, retreatLoading, dataLoading, loadError,
     groups, rooms, students, participants, adminTeachers,
     meals, schedule, segments, posts, movements, movementRecords, buses, seating,
-    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps,
+    todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps, programs,
     connected,
   } = useRetreatData(id);
 
@@ -228,7 +229,7 @@ function IguardWorkspace({ id }: { id: string }) {
     </div>
   );
 
-  const mobileInfoKeys = ["rooms", "lodging", "buses", "seating", "meals"] as const;
+  const mobileInfoKeys = ["rooms", "lodging", "buses", "seating", "meals", "programs"] as const;
   const mobileInfoActive = mobileInfoKeys.some((key) => key === activeView);
   const mobileExecutionTabs = [
     { key: "cue", label: "큐카드" },
@@ -340,7 +341,7 @@ function IguardWorkspace({ id }: { id: string }) {
         {isMobileView && mobileInfoActive && (
           <div className="mobile-subtabs iguard-info-tabs" role="tablist" aria-label="수련회 현장 정보">
             {([
-              ["rooms", "조별 정보"], ["lodging", "숙소 안내"], ["buses", "버스"], ["seating", "자리"], ["meals", "식사"],
+              ["rooms", "조별 정보"], ["lodging", "숙소 안내"], ["buses", "버스"], ["seating", "자리"], ["meals", "식사"], ["programs", "프로그램"],
             ] as const).map(([key, label]) => <button key={key} role="tab" aria-selected={activeView === key} onClick={() => selectView(key)}>{label}</button>)}
           </div>
         )}
@@ -414,6 +415,7 @@ function IguardWorkspace({ id }: { id: string }) {
         {!dataLoading && activeView === "seating" && <SeatingView retreatId={id} seating={seating} groups={groups} meals={meals} />}
         {!dataLoading && activeView === "guide" && <GuideView retreatId={id} guide={guide} />}
         {!dataLoading && activeView === "todos" && <TodosView todos={todos} />}
+        {!dataLoading && activeView === "programs" && <PublishedProgramsView programs={programs} />}
       </main>
 
       {searchOpen && (

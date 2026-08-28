@@ -1,7 +1,7 @@
 "use client";
 
-// 방학 중 사역 홈 — 행정(/retreats)과 이가드(/field)가 **같은 화면**을 쓴다.
-// 다른 것은 카드에서 들어가는 곳뿐이다: mode="admin" → 행정 화면, mode="field" → 현장 화면.
+// 방학 중 사역 홈 — 행정(/retreats)·프로그램(/programs)·이가드(/field)가 **같은 화면**을 쓴다.
+// 다른 것은 카드에서 들어가는 곳뿐이다.
 // 데이터 로딩·권한 게이트는 각 라우트가 담당하고, 여기서는 화면만 그린다.
 
 import Link from "next/link";
@@ -14,7 +14,7 @@ import { canAccessArea, canCreateRetreat, canEditArea, type MinistryRoles } from
 import NewRetreatButton from "./NewRetreatButton";
 import { useViewMode } from "@/context/ViewModeContext";
 
-export type VacationMode = "admin" | "field";
+export type VacationMode = "admin" | "program" | "field";
 
 type Props = {
   mode: VacationMode;
@@ -42,9 +42,13 @@ export default function VacationHome({
 }: Props) {
   const router = useRouter();
   const { isMobileView } = useViewMode();
-  const canCreate = canCreateRetreat(roles);
-  const entryHref = (id: string) => (mode === "admin" ? `/retreat/${id}` : `/retreat/${id}/field`);
-  const entryLabel = mode === "admin" ? "행정 화면" : "현장 화면";
+  const canCreate = mode === "admin" && canCreateRetreat(roles);
+  const entryHref = (id: string) => mode === "admin"
+    ? `/retreat/${id}`
+    : mode === "program"
+      ? `/retreat/${id}/programs`
+      : `/retreat/${id}/field`;
+  const entryLabel = mode === "admin" ? "행정 화면" : mode === "program" ? "프로그램 준비" : "현장 화면";
   const selected = retreats.find((retreat) => retreat.id === selectedId);
 
   return (
@@ -79,6 +83,11 @@ export default function VacationHome({
                 <span>지금 해야 할 일은 개인 큐카드에서 바로 확인합니다.</span>
                 <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=cue`)} className="btn-primary">개인 큐카드 열기</button>
               </>
+            ) : mode === "program" ? (
+              <>
+                <span>기획·진행안·브리핑·할 일을 프로그램별로 정리합니다.</span>
+                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/programs`)} className="btn-primary">프로그램 준비 열기</button>
+              </>
             ) : (
               <>
                 <span>신청 명단과 편성, 물품, 비용을 관리합니다.</span>
@@ -104,6 +113,13 @@ export default function VacationHome({
             <button type="button" className="vacation-mobile-field-link" onClick={() => router.push(`/retreat/${selected.id}/field`)}>이가드 현장으로 이동 →</button>
           )}
 
+          {mode === "program" && (
+            <div className="vacation-mobile-cross-links">
+              <button type="button" onClick={() => router.push(`/retreat/${selected.id}`)}>행정 보기</button>
+              {canAccessArea("retreat-field", roles) && <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field`)}>이가드 보기</button>}
+            </div>
+          )}
+
           <details className="vacation-mobile-calendar">
             <summary>공유 준비 일정 보기</summary>
             <RetreatCalendarPanel retreat={selected} retreats={retreats} canEditPeriods={canEditArea("retreat-admin", roles)} />
@@ -113,7 +129,9 @@ export default function VacationHome({
         <div className="card mx-auto max-w-md p-16 text-center">
           {emptyLogo && <div className="mb-4 flex justify-center">{emptyLogo}</div>}
           <p className="font-medium text-slate-500">아직 수련회가 없습니다</p>
-          <p className="mb-5 mt-1 text-sm text-slate-400">&apos;새 수련회&apos; 버튼으로 시작하세요!</p>
+          <p className="mb-5 mt-1 text-sm text-slate-400">
+            {canCreate ? "'새 수련회' 버튼으로 시작하세요!" : "수련회 행정에서 수련회를 만든 뒤 이용할 수 있습니다."}
+          </p>
           {canCreate && <NewRetreatButton hrefAfterCreate={entryHref} onCreated={onCreated} />}
         </div>
       ) : (

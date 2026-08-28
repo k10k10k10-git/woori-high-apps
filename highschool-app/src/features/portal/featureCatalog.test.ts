@@ -65,10 +65,10 @@ describe("통합 앱 기능 카탈로그", () => {
     expect([...new Set(indices)].sort((a, b) => a - b)).toEqual(Array.from({ length: 17 }, (_, index) => index));
   });
 
-  it("이가드의 실행·기획·정보 21개 화면을 유지한다", () => {
-    expect(IGUARD_VIEW_GROUPS.map(group => group.views.length)).toEqual([5, 14, 2]);
+  it("이가드의 실행·기획·정보 22개 화면을 유지한다", () => {
+    expect(IGUARD_VIEW_GROUPS.map(group => group.views.length)).toEqual([6, 14, 2]);
     const keys = IGUARD_VIEW_GROUPS.flatMap(group => group.views.map(view => view.key));
-    expect(new Set(keys).size).toBe(21);
+    expect(new Set(keys).size).toBe(22);
   });
 
   it("통합 홈과 세 도메인의 진입 경로를 제공한다", () => {
@@ -78,6 +78,8 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(UNIFIED_ROUTES).toContain("/sunday-ministry");
     expect(UNIFIED_ROUTES).toContain("/semester-admin");
     expect(UNIFIED_ROUTES).toContain("/retreats");
+    expect(UNIFIED_ROUTES).toContain("/programs");
+    expect(UNIFIED_ROUTES).toContain("/retreat/[id]/programs");
     expect(UNIFIED_ROUTES).toContain("/field");
     expect(UNIFIED_ROUTES).toContain("/retreat/[id]/field");
   });

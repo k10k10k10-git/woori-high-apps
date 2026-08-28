@@ -118,6 +118,52 @@ export interface Retreat {
   endDate?: string;   // YYYY-MM-DD 수련회 종료일
 }
 
+export type RetreatProgramStatus = "draft" | "review" | "confirmed" | "published";
+
+export type RetreatProgramKind = "main" | "post" | "sports" | "other";
+
+export interface RetreatProgramTask {
+  id: string;
+  title: string;
+  assignee?: string;
+  dueDate?: string;
+  done: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 수련회 프로그램 준비 원본.
+ * 행정이 소유하는 retreats/{id}/programs 아래에 두고,
+ * 이가드는 published 상태만 읽어 현장에 보여준다.
+ */
+export interface RetreatProgram {
+  id: string;
+  order: number;
+  title: string;
+  kind: RetreatProgramKind;
+  status: RetreatProgramStatus;
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  place?: string;
+  lead?: string;
+  team?: string;
+  theme?: string;
+  scripture?: string;
+  objective?: string;
+  summary?: string;
+  flow?: string;
+  rules?: string;
+  briefing?: string;
+  script?: string;
+  materials?: string;
+  notes?: string;
+  tasks?: Record<string, RetreatProgramTask>;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface RetreatPeriod {
   id: string;
   startDate: string; // YYYY-MM-DD

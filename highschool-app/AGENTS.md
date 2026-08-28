@@ -324,3 +324,18 @@ npm run build
 - **접근법**: 1→ `src/features/portal/retreatPrepStatus.ts`의 요약 수치와 `GroupsTab.tsx`·`RoomsTab.tsx`의 실제 `allUnassigned` 파생식을 나란히 비교한다. 2→ 신청 레코드를 직접 세지 않고 `studentId`를 중복 제거한다. 3→ `assignmentBoard.ts`의 `findLateRegistrantIds`·`excludeAssignedStudents`·`findUnassignedStudentIds`·`findDayAttendanceIds`를 요약에서도 재사용해 취소자·후기 신청자·당일참석 규칙을 맞춘다. 4→ 요약 컴포넌트가 학생 원장·셀 색·부분참도 실시간 구독하게 한다. 5→ 중복 신청·취소·당일참석·후기 신청 조합을 `retreatPrepStatus.test.ts`로 고정한다.
 - **판단 질문**: 화면에 표시된 차이만 상수 보정하거나 참가자 레코드 수에서 임의로 빼지 않는다. 조편성은 당일참석자를 포함하고 방배정은 제외하며, 취소·후기 신청도 실시간으로 바뀌므로 임시 산술은 다음 변경에서 다시 어긋난다. 요약 전용 집계 노드도 만들지 않는다. 원본 화면과 다른 두 번째 진실이 된다.
 - **재사용 규칙**: 운영 화면의 요약·배지·대시보드 숫자는 `상세 화면의 실제 모집단 식별 → 고유 ID 중복 제거 → 같은 제외·포함 순수 함수 재사용 → 필요한 원천을 함께 구독 → 엣지 조합 회귀 테스트` 순서로 구현한다.
+
+### Firebase 중첩 목록의 push 키를 화면 ID로 복원하기 (2026-08-29)
+- **접근법**: 1→ `src/lib/db/programs.ts`처럼 `push()`한 중첩 경로에 값만 저장하면 자식 데이터 안에는 키가 없다는 점을 확인한다. 2→ 최상위 `snapToList`가 프로그램 ID만 복원하고 `program.tasks` 같은 중첩 객체의 키는 복원하지 않는지 대조한다. 3→ `src/lib/programPreparation.ts`의 `programTasks`에서 `Object.entries(tasks)`를 사용해 각 Firebase 객체 키를 런타임 `task.id`로 주입한다. 4→ 할 일 생성 순 정렬뿐 아니라 값 안에 `id`가 없는 실제 저장 형태에서도 `first`·`later` 키가 ID로 복원되는 회귀 테스트를 추가한다. 5→ 토글·삭제 함수가 복원된 ID로 정확한 `retreats/{id}/programs/{programId}/tasks/{taskId}` 한 건만 쓰는지 타입·테스트·빌드로 확인한다.
+- **판단 질문**: 생성 시 push 키를 값 안에 중복 저장하거나 기존 레코드를 일괄 이관하지 않는다. 키와 필드가 어긋나는 두 번째 진실을 만들고 운영 DB 마이그레이션까지 필요해진다. `Object.values()` 결과의 `id`가 항상 있다고 가정하지도 않는다. 타입은 통과해도 실제 Firebase 스냅샷에는 값 내부 ID가 없어 수정·삭제가 `undefined` 경로로 실패한다.
+- **재사용 규칙**: RTDB 객체형 중첩 목록을 배열로 렌더링할 때는 `Object.entries → 객체 키를 런타임 ID로 주입 → 그 ID로 쓰기 경로 구성 → 값 내부 ID 없는 fixture로 회귀 테스트` 순서를 지킨다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

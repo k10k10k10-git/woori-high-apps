@@ -26,5 +26,6 @@ describe("portal search", () => {
     expect(filterPortalSearchItems(items, "커리큘럼").map((item) => item.id)).toContain("semester-home");
     expect(filterPortalSearchItems(items, "처리 대기").map((item) => item.id)).toContain("sunday-ministry");
     expect(filterPortalSearchItems(items, "목양").map((item) => item.id)).toContain("ministry-guide");
+    expect(filterPortalSearchItems(items, "진행안").map((item) => item.id)).toContain("program-home");
   });
 });

@@ -87,6 +87,11 @@ export const paths = {
   periods: (id: string) => `retreats/${id}/periods`,
   period: (id: string, pid: string) => `retreats/${id}/periods/${pid}`,
 
+  // ── 프로그램 준비 (행정 소유, 이가드 published 읽기) ──
+  programs: (id: string) => `retreats/${id}/programs`,
+  program: (id: string, programId: string) => `retreats/${id}/programs/${programId}`,
+  programTask: (id: string, programId: string, taskId: string) => `retreats/${id}/programs/${programId}/tasks/${taskId}`,
+
   // ── 민감정보 (retreatsPrivate) ──
   retreatsPrivate: () => "retreatsPrivate",
   /** 수련회의 민감정보 루트. 수련회 삭제 시 이 노드까지 함께 지워야 한다(고아로 남으면 UI로 접근 불가). */

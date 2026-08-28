@@ -103,6 +103,14 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
       keywords: RETREAT_TAB_GROUPS.flatMap((group) => group.tabs.map((tab) => tab.label)).join(" "),
       area: "retreat",
     });
+    items.push({
+      id: "program-home",
+      label: "수련회 프로그램 준비",
+      description: "기획·진행안·규칙·브리핑·할 일 관리",
+      href: "/programs",
+      keywords: "프로그램 기획 진행안 규칙 대본 브리핑 물품 할 일 현장 공유",
+      area: "retreat",
+    });
   }
   if (fieldAllowed) {
     const visibleGroups = IGUARD_VIEW_GROUPS.filter(
@@ -123,10 +131,10 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
     items.push({
       id: `retreat-${retreat.id}`,
       label: `${retreat.year}년 ${retreat.name}`,
-      description: adminAllowed ? "수련회 행정·현장 운영" : "수련회 현장 운영",
+      description: adminAllowed ? "수련회 행정·프로그램·현장 운영" : "수련회 현장 운영",
       href,
       keywords: adminAllowed
-        ? `행정 이가드 ${RETREAT_TAB_GROUPS.flatMap((group) => group.tabs.map((tab) => tab.label)).join(" ")}`
+        ? `행정 프로그램 이가드 기획 진행안 브리핑 ${RETREAT_TAB_GROUPS.flatMap((group) => group.tabs.map((tab) => tab.label)).join(" ")}`
         : "이가드 개인 큐카드 포스트 조별 인원체크",
       area: adminAllowed ? "retreat" : "field",
     });
