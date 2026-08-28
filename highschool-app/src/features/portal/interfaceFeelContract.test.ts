@@ -13,7 +13,7 @@ describe("인터페이스 촉감·접근성 계약", () => {
     expect(css).toContain(".portal-compact-action {\n  display: inline-flex;\n  min-height: 40px;");
     expect(css).toContain(".view-mode-toggle button {\n  display: inline-flex;\n  min-height: 40px;");
     expect(css).toContain(".portal-search-trigger {\n  display: inline-flex;\n  min-height: 40px;");
-    expect(css).toContain(".portal-brand { display: inline-flex; min-width: 0; min-height: 40px;");
+    expect(css).toContain(".portal-brand { display: inline-flex; min-width: 40px; min-height: 40px;");
   });
 
   it("아이콘 버튼과 출석 상태는 키보드·터치 표적 계약을 공유한다", () => {
