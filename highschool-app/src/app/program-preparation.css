@@ -23,8 +23,17 @@
 .program-page-summary strong { margin-left: 3px; color: var(--color-text-primary); font-size: 14px; }
 .program-load-error { margin-bottom: 14px; border: 1px solid var(--color-danger-border); border-radius: 12px; background: var(--color-danger-bg); padding: 12px 14px; color: var(--color-danger); font-size: 13px; }
 
-.program-workspace { display: grid; align-items: start; grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); gap: 20px; }
-.program-list { position: sticky; top: 124px; min-width: 0; border: 1px solid var(--color-border); border-radius: 15px; background: var(--color-surface); box-shadow: var(--shadow-xs); }
+/* 목록과 상세는 화면을 나눠 쓴다 — 한 화면에 붙이면 둘 다 좁아진다. */
+.program-list-screen { width: min(100%, 760px); }
+.program-detail-screen { display: grid; gap: 14px; }
+.program-back-to-list {
+  display: inline-flex; min-height: 40px; width: fit-content; align-items: center; gap: 6px;
+  border-radius: 9px; padding: 0 10px 0 6px;
+  color: var(--color-text-muted); font-size: 13px; font-weight: 700;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+.program-back-to-list:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.program-list { min-width: 0; border: 1px solid var(--color-border); border-radius: 15px; background: var(--color-surface); box-shadow: var(--shadow-xs); }
 .program-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--color-border); padding: 15px; }
 .program-list-heading h2 { color: var(--color-text-primary); font-size: 15px; font-weight: 800; }
 .program-list-heading p { margin-top: 2px; color: var(--color-text-muted); font-size: 11px; }
@@ -150,7 +159,6 @@
   .program-page-intro { display: block; }
   .program-page-intro h2 { font-size: 21px; }
   .program-page-summary { justify-content: flex-start; margin-top: 12px; }
-  .program-workspace { grid-template-columns: 1fr; }
   .program-list { position: static; }
   .program-list-items { display: flex; gap: 5px; overflow-x: auto; padding: 7px; scroll-snap-type: x proximity; }
   .program-header-back, .program-add-button { min-width: 44px; min-height: 44px; }

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
@@ -57,6 +58,25 @@ export default function ProgramPreparationClient() {
   // 선택한 항목은 렌더 중 파생 — effect에서 setState로 맞추면 사용자의 선택을 덮는다(실수 13).
   const sectionParam = searchParams.get("section");
   const section: ProgramSectionKey = isProgramSection(sectionParam) ? sectionParam : "overview";
+  // 목록과 상세를 한 화면에 붙여 두면 둘 다 좁아진다. 선택한 프로그램을 주소에 두고
+  // 화면을 가른다 — 목록에서 고르면 상세로, 상세에서 목록으로 되돌아온다.
+  const selectedId = searchParams.get("program");
+
+  function goToProgram(programId: string, nextSection: ProgramSectionKey = section) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("program", programId);
+    params.set("section", nextSection);
+    router.push(`?${params.toString()}`, { scroll: false });
+  }
+
+  function goToList() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("program");
+    params.delete("section");
+    const query = params.toString();
+    router.push(query ? `?${query}` : `/retreat/${encodeURIComponent(retreatId)}/programs`, { scroll: false });
+  }
+
   function selectSection(next: ProgramSectionKey) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("section", next);
@@ -77,7 +97,6 @@ export default function ProgramPreparationClient() {
   const [retreatReady, setRetreatReady] = useState(false);
   const [programsReady, setProgramsReady] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RetreatProgram | null>(null);
@@ -102,7 +121,6 @@ export default function ProgramPreparationClient() {
       retreatId,
       (next) => {
         setPrograms(next);
-        setSelectedId((previous) => previous && next.some((program) => program.id === previous) ? previous : next[0]?.id ?? null);
         setProgramsReady(true);
       },
       (error) => { setLoadError(`프로그램 정보 - ${error.message}`); setProgramsReady(true); },
@@ -111,7 +129,7 @@ export default function ProgramPreparationClient() {
   }, [adminAllowed, authLoading, retreatId, router, user]);
 
   const selectedProgram = useMemo(
-    () => programs.find((program) => program.id === selectedId) ?? programs[0] ?? null,
+    () => (selectedId ? programs.find((program) => program.id === selectedId) ?? null : null),
     [programs, selectedId],
   );
 
@@ -120,7 +138,7 @@ export default function ProgramPreparationClient() {
     try {
       const nextOrder = programs.reduce((max, program) => Math.max(max, program.order), 0) + 1;
       const id = await createRetreatProgram(retreatId, createProgramDraft(nextOrder));
-      setSelectedId(id);
+      goToProgram(id, "overview");
       toast("프로그램 초안을 만들었습니다.", "success");
     } catch (error) {
       toast(error instanceof Error ? error.message : "프로그램을 만들지 못했습니다.", "error");
@@ -134,7 +152,7 @@ export default function ProgramPreparationClient() {
     setBusy(true);
     try {
       const ids = await createDefaultRetreatPrograms(retreatId);
-      setSelectedId(ids[0]);
+      goToProgram(ids[0], "overview");
       toast("프로그램 초안 2개를 만들었습니다.", "success");
     } catch (error) {
       toast(error instanceof Error ? error.message : "기본 프로그램을 만들지 못했습니다.", "error");
@@ -262,19 +280,27 @@ export default function ProgramPreparationClient() {
         {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
 
         {programs.length === 0 ? (
-          <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={setSelectedId} onAdd={() => void addProgram()} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
-        ) : (
-          <div className="program-workspace">
+          <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={(id) => goToProgram(id)} onAdd={() => void addProgram()} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
+        ) : !selectedProgram ? (
+          <div className="program-list-screen">
             <ProgramList
               programs={programs}
-              selectedId={selectedProgram?.id ?? null}
+              selectedId={null}
               canEdit={canEdit}
               busy={busy}
-              onSelect={(id) => discardGuard.requestAction("다른 프로그램으로 이동", () => setSelectedId(id))}
-              onAdd={() => discardGuard.requestAction("새 프로그램으로 이동", addProgram)}
+              onSelect={(id) => goToProgram(id)}
+              onAdd={() => void addProgram()}
               onCreateDefaults={() => void createDefaults()}
-              onMove={(id, direction) => discardGuard.requestAction("프로그램 순서를 변경", () => moveProgram(id, direction))}
+              onMove={(id, direction) => moveProgram(id, direction)}
             />
+          </div>
+        ) : (
+          <div className="program-detail-screen">
+            <button type="button" className="program-back-to-list"
+              onClick={() => discardGuard.requestAction("프로그램 목록으로 이동", goToList)}>
+              <ArrowLeft aria-hidden="true" size={15} weight="bold" />
+              프로그램 목록
+            </button>
             {selectedProgram && (
               <ProgramEditor
                 program={selectedProgram}

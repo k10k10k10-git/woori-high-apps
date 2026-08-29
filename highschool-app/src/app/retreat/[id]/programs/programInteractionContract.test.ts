@@ -13,13 +13,27 @@ describe("program preparation interaction contract", () => {
     expect(editor).toContain("onDeleteTask");
   });
 
-  it("protects dirty drafts before selection, creation, ordering, navigation, and browser exit", () => {
+  it("protects dirty drafts on every path that leaves the editor", () => {
+    // 목록과 상세를 화면으로 나눈 뒤, 편집 중인 초안을 잃을 수 있는 경로는 두 가지뿐이다.
+    // 목록 화면에는 편집기가 없어 dirty 상태가 존재하지 않으므로 선택·추가·순서 변경은 가드가 필요 없다.
+    // 섹션 탭 전환은 같은 draft를 유지하므로(effect 의존성에 section이 없음) 이탈이 아니다.
     const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
     const guard = source("src/app/retreat/[id]/programs/useProgramDiscardGuard.ts");
-    expect(client.match(/discardGuard\.requestAction/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(client).toContain('discardGuard.requestAction("프로그램 목록으로 이동"');
+    expect(client).toContain('discardGuard.requestAction("다른 화면으로 이동"');
     expect(client).toContain("resetVersion={discardGuard.resetVersion}");
     expect(guard).toContain('window.addEventListener("beforeunload"');
     expect(guard).toContain("setResetVersion((version) => version + 1)");
+  });
+
+  it("keeps the list and the editor on separate screens", () => {
+    // 한 화면에 붙여 두면 목록도 편집기도 좁아진다. 선택은 주소(?program=)가 들고 있어야
+    // 새로고침·링크 공유에서 보던 프로그램을 잃지 않는다.
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    expect(client).toContain('searchParams.get("program")');
+    expect(client).toContain("program-list-screen");
+    expect(client).toContain("program-detail-screen");
+    expect(client).not.toContain("program-workspace\"");
   });
 
   it("keeps mobile and tablet action targets at least 44px and prevents task-row overflow", () => {
