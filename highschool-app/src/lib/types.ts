@@ -180,7 +180,13 @@ export interface RetreatProgramItem {
   id: string;
   order: number;
   name: string;
-  /** 어느 게임·순서에 쓰는 물품인지 (시트의 "항목" 열) */
+  /**
+   * 이 물품을 쓰는 게임(posts의 id). 비어 있으면 프로그램 공통 물품이다.
+   * 시트에서 게임 탭 하나에 준비물이 같이 있던 구조를 되살리기 위한 연결이고,
+   * 물품·예산 탭은 이 값으로 묶어 게임별 소계를 낸다.
+   */
+  postId?: string;
+  /** postId 이전에 쓰던 자유 텍스트 항목명 — 읽기 호환용. 새 입력은 postId를 쓴다. */
   group?: string;
   status: RetreatProgramItemStatus;
   quantity?: number;
@@ -196,6 +202,8 @@ export interface RetreatProgramRole {
   id: string;
   order: number;
   role: string;
+  /** 이 역할이 붙는 게임(posts의 id). 비어 있으면 프로그램 전체 역할이다. */
+  postId?: string;
   assignee?: string;
   place?: string;
   headcount?: string;

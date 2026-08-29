@@ -3,8 +3,12 @@ import {
   PROGRAM_ITEM_STATUS_META,
   PROGRAM_KIND_META,
   PROGRAM_STATUS_META,
+  commonItems,
+  commonRoles,
   createProgramDraft,
+  groupItemsByPost,
   isProgramSection,
+  itemsOfPost,
   nextMatchRound,
   postMatchRounds,
   programBudget,
@@ -16,6 +20,7 @@ import {
   programReadiness,
   programStatusMeta,
   programTasks,
+  rolesOfPost,
   shouldSyncEditorDraft,
   sortRetreatPrograms,
 } from "./programPreparation";
@@ -55,8 +60,9 @@ describe("수련회 프로그램 준비", () => {
     expect(result.map((program) => program.id)).toEqual(["a", "c", "b"]);
   });
 
-  it("현장 준비에 필요한 6가지 핵심 항목을 점검한다", () => {
-    const readiness = programReadiness(base({
+  it("현장 준비에 필요한 8가지 핵심 항목을 점검한다", () => {
+    // 본문만 채운 상태 — 게임·역할·물품이 비어 있으면 아직 100%가 아니다.
+    const body = {
       date: "2026-08-08",
       startTime: "14:00",
       place: "본당",
@@ -65,8 +71,18 @@ describe("수련회 프로그램 준비", () => {
       flow: "오프닝\n본 활동\n마무리",
       rules: "안전 수칙을 지킨니다.",
       briefing: "교사 역할을 안내합니다.",
-    }));
-    expect(readiness).toMatchObject({ ready: 6, total: 6, percent: 100, missingLabels: [] });
+    };
+    expect(programReadiness(base(body))).toMatchObject({
+      ready: 5, total: 8, missingLabels: ["게임·포스트", "역할", "물품"],
+    });
+
+    const filled = programReadiness(base({
+      ...body,
+      posts: { g1: { order: 1, name: "물코기", createdAt: 1, updatedAt: 1 } },
+      roles: { r1: { order: 1, role: "진행", createdAt: 1, updatedAt: 1 } },
+      items: { i1: { order: 1, name: "줄자", status: "todo", createdAt: 1, updatedAt: 1 } },
+    } as never));
+    expect(filled).toMatchObject({ ready: 8, total: 8, percent: 100, missingLabels: [] });
   });
 
   it("할 일은 생성 순으로 표시한다", () => {
@@ -179,5 +195,50 @@ describe("대진표", () => {
   it("대진이 없으면 1라운드부터 시작한다", () => {
     expect(nextMatchRound(post({}))).toBe(1);
     expect(nextMatchRound(post({ a: { round: 3, order: 1, createdAt: 1, updatedAt: 1 } }))).toBe(3);
+  });
+});
+
+describe("게임 ↔ 물품·역할 연결", () => {
+  const program = {
+    posts: {
+      g1: { order: 1, name: "물코기", createdAt: 1, updatedAt: 1 },
+      g2: { order: 2, name: "김밥 코드", createdAt: 2, updatedAt: 2 },
+    },
+    items: {
+      i1: { order: 1, name: "줄자", status: "todo", postId: "g1", createdAt: 1, updatedAt: 1 },
+      i2: { order: 2, name: "종이", status: "purchased", postId: "g1", quantity: 2, unitPrice: 500, createdAt: 2, updatedAt: 2 },
+      i3: { order: 3, name: "현수막", status: "todo", createdAt: 3, updatedAt: 3 },
+      i4: { order: 4, name: "지워진 게임 물품", status: "todo", postId: "없어진게임", createdAt: 4, updatedAt: 4 },
+    },
+    roles: {
+      r1: { order: 1, role: "진행", postId: "g1", createdAt: 1, updatedAt: 1 },
+      r2: { order: 2, role: "총괄", createdAt: 2, updatedAt: 2 },
+    },
+  } as unknown as RetreatProgram;
+
+  it("게임에 묶인 물품·역할만 그 게임에서 보인다", () => {
+    expect(itemsOfPost(program, "g1").map((i) => i.name)).toEqual(["줄자", "종이"]);
+    expect(itemsOfPost(program, "g2")).toEqual([]);
+    expect(rolesOfPost(program, "g1").map((r) => r.role)).toEqual(["진행"]);
+  });
+
+  it("게임이 없거나 삭제된 게임에 묶인 항목은 공통으로 모인다", () => {
+    // postId 도입 이전 데이터와, 게임을 지운 뒤 남은 물품이 사라지지 않아야 한다.
+    expect(commonItems(program).map((i) => i.name)).toEqual(["현수막", "지워진 게임 물품"]);
+    expect(commonRoles(program).map((r) => r.role)).toEqual(["총괄"]);
+  });
+
+  it("게임 순서대로 묶고 공통을 마지막에 둔다", () => {
+    const groups = groupItemsByPost(program);
+    expect(groups.map((g) => g.label)).toEqual(["물코기", "김밥 코드", "프로그램 공통"]);
+    // 비어 있는 게임도 자리를 남겨 어디가 비었는지 보이게 한다.
+    expect(groups[1].entries).toEqual([]);
+  });
+
+  it("준비율이 게임·역할·물품도 센다", () => {
+    // 본문만 보던 시절에는 게임을 아무리 채워도 0%였다.
+    const readiness = programReadiness(program);
+    expect(readiness.readyLabels).toEqual(expect.arrayContaining(["게임·포스트", "역할", "물품"]));
+    expect(readiness.total).toBe(8);
   });
 });

@@ -264,17 +264,20 @@ export default function ProgramPreparationClient() {
         )}
       </ProgramWorkspaceHeader>
       <main className="program-preparation-main">
-        <div className="program-page-intro">
-          <div>
-            <h2>프로그램 준비</h2>
-            <p>기획에서 진행안·브리핑·현장 전달까지 프로그램별로 정리합니다.</p>
+        {/* 목록 화면용 안내와 집계다. 특정 프로그램을 편집하는 중에는 자리만 차지한다. */}
+        {!selectedProgram && (
+          <div className="program-page-intro">
+            <div>
+              <h2>프로그램 준비</h2>
+              <p>기획에서 진행안·브리핑·현장 전달까지 프로그램별로 정리합니다.</p>
+            </div>
+            <div className="program-page-summary" aria-label="프로그램 상태 요약">
+              <span>전체 <strong>{programs.length}</strong></span>
+              <span>검토·확정 <strong>{programs.filter((program) => program.status === "review" || program.status === "confirmed").length}</strong></span>
+              <span>현장 공유 <strong>{programs.filter((program) => program.status === "published").length}</strong></span>
+            </div>
           </div>
-          <div className="program-page-summary" aria-label="프로그램 상태 요약">
-            <span>전체 <strong>{programs.length}</strong></span>
-            <span>검토·확정 <strong>{programs.filter((program) => program.status === "review" || program.status === "confirmed").length}</strong></span>
-            <span>현장 공유 <strong>{programs.filter((program) => program.status === "published").length}</strong></span>
-          </div>
-        </div>
+        )}
 
         {loadError && <div className="program-load-error" role="alert">{loadError} 새로고침하면 다시 연결합니다.</div>}
         {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
@@ -320,10 +323,10 @@ export default function ProgramPreparationClient() {
                 onCreateMatch={(postId, data) => createRetreatProgramMatch(retreatId, selectedProgram.id, postId, data).then(() => undefined)}
                 onUpdateMatch={(postId, matchId, data: Partial<RetreatProgramMatch>) => updateRetreatProgramMatch(retreatId, selectedProgram.id, postId, matchId, data)}
                 onDeleteMatch={(postId, matchId) => deleteRetreatProgramMatch(retreatId, selectedProgram.id, postId, matchId)}
-                onCreateRole={(role, order) => createRetreatProgramRole(retreatId, selectedProgram.id, { role, order }).then(() => undefined)}
+                onCreateRole={(role, order, postId) => createRetreatProgramRole(retreatId, selectedProgram.id, { role, order, postId }).then(() => undefined)}
                 onUpdateRole={(roleId, data: Partial<RetreatProgramRole>) => updateRetreatProgramRole(retreatId, selectedProgram.id, roleId, data)}
                 onDeleteRole={(roleId) => deleteRetreatProgramRole(retreatId, selectedProgram.id, roleId)}
-                onCreateItem={(name, order) => createRetreatProgramItem(retreatId, selectedProgram.id, { name, order, status: "todo" }).then(() => undefined)}
+                onCreateItem={(name, order, postId) => createRetreatProgramItem(retreatId, selectedProgram.id, { name, order, status: "todo", postId }).then(() => undefined)}
                 onUpdateItem={(itemId, data: Partial<RetreatProgramItem>) => updateRetreatProgramItem(retreatId, selectedProgram.id, itemId, data)}
                 onDeleteItem={(itemId) => deleteRetreatProgramItem(retreatId, selectedProgram.id, itemId)}
               />

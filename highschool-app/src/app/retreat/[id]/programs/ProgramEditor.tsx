@@ -6,10 +6,12 @@ import { useUI } from "@/context/UIContext";
 import {
   PROGRAM_KIND_META,
   PROGRAM_STATUS_META,
-  programItems,
+  groupItemsByPost,
+  groupRolesByPost,
+  itemsOfPost,
   programPosts,
+  rolesOfPost,
   programReadiness,
-  programRoles,
   programStatusMeta,
   programTasks,
   shouldSyncEditorDraft,
@@ -47,10 +49,10 @@ type Props = {
   onCreateMatch: (postId: string, data: { round: number; order: number }) => Promise<void>;
   onUpdateMatch: (postId: string, matchId: string, data: Partial<RetreatProgramMatch>) => Promise<void>;
   onDeleteMatch: (postId: string, matchId: string) => Promise<void>;
-  onCreateRole: (role: string, order: number) => Promise<void>;
+  onCreateRole: (role: string, order: number, postId?: string) => Promise<void>;
   onUpdateRole: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
   onDeleteRole: (roleId: string) => Promise<void>;
-  onCreateItem: (name: string, order: number) => Promise<void>;
+  onCreateItem: (name: string, order: number, postId?: string) => Promise<void>;
   onUpdateItem: (itemId: string, data: Partial<RetreatProgramItem>) => Promise<void>;
   onDeleteItem: (itemId: string) => Promise<void>;
 };
@@ -137,8 +139,6 @@ export default function ProgramEditor({
   const readiness = useMemo(() => programReadiness({ ...program, ...draft }), [draft, program]);
   const tasks = useMemo(() => programTasks(program), [program]);
   const posts = useMemo(() => programPosts(program), [program]);
-  const roles = useMemo(() => programRoles(program), [program]);
-  const items = useMemo(() => programItems(program), [program]);
   const doneTasks = tasks.filter((task) => task.done).length;
 
   function setField<K extends keyof EditableProgram>(key: K, value: EditableProgram[K]) {
@@ -293,16 +293,19 @@ export default function ProgramEditor({
 
       {section === "posts" && (
         <ProgramPostsSection posts={posts} canEdit={canEdit} onCreate={onCreatePost} onUpdate={onUpdatePost} onDelete={onDeletePost}
-          onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch} />
+          onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
+          itemsOf={(postId) => itemsOfPost(program, postId)} rolesOf={(postId) => rolesOfPost(program, postId)}
+          onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
+          onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole} />
       )}
 
       {section === "roles" && (
-        <ProgramRolesSection roles={roles} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} />
+        <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} />
       )}
 
       {section === "items" && (
         <>
-          <ProgramItemsSection items={items} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} />
+          <ProgramItemsSection groups={groupItemsByPost(program)} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} />
           <fieldset disabled={!canEdit || saving} className="program-form">
             <section className="program-form-section">
               <h3>물품 메모</h3>

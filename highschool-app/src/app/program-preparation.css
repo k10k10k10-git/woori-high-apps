@@ -261,3 +261,18 @@
 .program-bracket-round .program-table-scroll { margin-top: 8px; }
 .program-bracket-round > button { margin-top: 8px; }
 .program-bracket-add-round { margin-top: 14px; }
+
+/* ── 게임 카드 안의 준비물·역할 ─────────────────────────────── */
+.program-post-subs { display: grid; margin-top: 18px; gap: 18px; border-top: 1px solid var(--color-border); padding-top: 16px; }
+.program-post-subs h5, .program-bracket h4 { color: var(--color-text-primary); font-size: 13px; font-weight: 800; }
+.program-post-subs .program-inline-form { margin-top: 10px; }
+.program-post-subs .program-inline-form .input { flex: 1 1 auto; min-width: 0; }
+.program-card-counts { flex: 0 0 auto; margin-left: auto; color: var(--color-text-faint); font-size: 11px; font-style: normal; font-variant-numeric: tabular-nums; }
+
+/* ── 집계 화면의 게임별 묶음 ────────────────────────────────── */
+.program-group { margin-top: 18px; }
+.program-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
+.program-group-heading h4 { color: var(--color-text-primary); font-size: 13px; font-weight: 800; }
+.program-group-heading span { color: var(--color-text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.program-group .program-table-scroll { margin-top: 9px; }
+.program-group .program-task-empty { margin-top: 9px; }

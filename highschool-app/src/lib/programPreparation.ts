@@ -68,12 +68,21 @@ export function sortRetreatPrograms(programs: RetreatProgram[]): RetreatProgram[
   return [...programs].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
 }
 
+/**
+ * 준비율이 보는 항목.
+ *
+ * 본문 필드만 세면 게임 11개와 물품 30줄을 다 채워도 0%에 머문다 — 실제로 한 일과
+ * 화면의 진행 표시가 어긋나 "뭘 해도 진도가 안 나가는" 화면이 된다.
+ * 그래서 게임·역할·물품도 함께 센다.
+ */
 const CHECKS: Array<{ key: string; ready: (program: RetreatProgram) => boolean }> = [
   { key: "일정·장소", ready: (program) => Boolean(program.date && program.startTime && program.place?.trim()) },
   { key: "담당", ready: (program) => Boolean(program.lead?.trim()) },
   { key: "목표", ready: (program) => Boolean(program.objective?.trim()) },
   { key: "진행안", ready: (program) => Boolean(program.flow?.trim()) },
-  { key: "규칙", ready: (program) => Boolean(program.rules?.trim()) },
+  { key: "게임·포스트", ready: (program) => programPosts(program).length > 0 },
+  { key: "역할", ready: (program) => programRoles(program).length > 0 },
+  { key: "물품", ready: (program) => programItems(program).length > 0 },
   { key: "브리핑·대본", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
 ];
 
@@ -194,4 +203,63 @@ export function postMatchRounds(post: RetreatProgramPost): Array<{ round: number
 export function nextMatchRound(post: RetreatProgramPost): number {
   const rounds = postMatchRounds(post);
   return rounds.length === 0 ? 1 : rounds[rounds.length - 1].round;
+}
+
+// ── 게임 ↔ 물품·역할 연결 ────────────────────────────────────
+// 준비 시트는 게임 탭 하나에 규칙·준비물·스탭이 함께 있었다. 프로그램 단위로 흩어 놓으면
+// 게임 하나를 준비하는 데 탭을 세 번 오가고 게임 이름을 세 번 다시 적게 된다.
+// 그래서 물품·역할은 프로그램 아래 그대로 두되 postId로 게임에 묶고,
+// 물품·예산·역할·배치 탭은 "입력하는 곳"이 아니라 게임별로 모아 보는 집계 화면이 된다.
+
+export function itemsOfPost(program: RetreatProgram, postId: string): RetreatProgramItem[] {
+  return programItems(program).filter((item) => item.postId === postId);
+}
+
+export function rolesOfPost(program: RetreatProgram, postId: string): RetreatProgramRole[] {
+  return programRoles(program).filter((role) => role.postId === postId);
+}
+
+/** 어느 게임에도 묶이지 않은 항목 — 프로그램 공통. postId 도입 이전 데이터도 여기 모인다. */
+export function commonItems(program: RetreatProgram): RetreatProgramItem[] {
+  const postIds = new Set(programPosts(program).map((post) => post.id));
+  return programItems(program).filter((item) => !item.postId || !postIds.has(item.postId));
+}
+
+export function commonRoles(program: RetreatProgram): RetreatProgramRole[] {
+  const postIds = new Set(programPosts(program).map((post) => post.id));
+  return programRoles(program).filter((role) => !role.postId || !postIds.has(role.postId));
+}
+
+export interface ProgramGroupedEntries<T> {
+  postId: string | null;
+  /** 화면에 보여줄 이름 — 게임 이름, 또는 공통 묶음 */
+  label: string;
+  entries: T[];
+}
+
+/** 게임 순서대로 묶고, 공통 묶음을 마지막에 둔다. 비어 있는 게임도 자리를 남겨 어디가 비었는지 보이게 한다. */
+export function groupItemsByPost(program: RetreatProgram): Array<ProgramGroupedEntries<RetreatProgramItem>> {
+  const groups = programPosts(program).map((post) => ({
+    postId: post.id as string | null,
+    label: post.name,
+    entries: itemsOfPost(program, post.id),
+  }));
+  const common = commonItems(program);
+  if (common.length > 0 || groups.length === 0) {
+    groups.push({ postId: null, label: "프로그램 공통", entries: common });
+  }
+  return groups;
+}
+
+export function groupRolesByPost(program: RetreatProgram): Array<ProgramGroupedEntries<RetreatProgramRole>> {
+  const groups = programPosts(program).map((post) => ({
+    postId: post.id as string | null,
+    label: post.name,
+    entries: rolesOfPost(program, post.id),
+  }));
+  const common = commonRoles(program);
+  if (common.length > 0 || groups.length === 0) {
+    groups.push({ postId: null, label: "프로그램 전체", entries: common });
+  }
+  return groups;
 }

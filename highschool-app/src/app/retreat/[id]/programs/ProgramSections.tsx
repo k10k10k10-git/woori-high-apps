@@ -10,6 +10,7 @@ import {
   programBudget,
   programItemTotal,
 } from "@/lib/programPreparation";
+import type { ProgramGroupedEntries } from "@/lib/programPreparation";
 import type {
   RetreatProgramItem,
   RetreatProgramItemStatus,
@@ -28,6 +29,12 @@ import type {
 
 const won = (value: number) => `₩${value.toLocaleString("ko-KR")}`;
 
+/** 입력칸에서 숫자만 걸러 낸다. 비어 있으면 undefined. */
+function digits(value: string): number | undefined {
+  const only = value.replace(/[^0-9]/g, "");
+  return only ? Number(only) : undefined;
+}
+
 function useRowBusy() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const { toast } = useUI();
@@ -44,6 +51,119 @@ function useRowBusy() {
   return { busyId, run };
 }
 
+
+
+// ── 게임 카드 안의 물품·역할 ──────────────────────────────────
+// 시트에서 게임 탭 하나에 준비물·스탭이 같이 있던 구조를 되살린다.
+// 여기서 넣으면 postId가 자동으로 붙어, 물품·예산·역할·배치 탭에서 게임별로 묶여 보인다.
+function PostSubEntries({
+  post, items, roles, canEdit,
+  onCreateItem, onUpdateItem, onDeleteItem,
+  onCreateRole, onUpdateRole, onDeleteRole,
+}: {
+  post: RetreatProgramPost;
+  items: RetreatProgramItem[];
+  roles: RetreatProgramRole[];
+  canEdit: boolean;
+  onCreateItem: (name: string, order: number, postId: string) => Promise<void>;
+  onUpdateItem: (itemId: string, data: Partial<RetreatProgramItem>) => Promise<void>;
+  onDeleteItem: (itemId: string) => Promise<void>;
+  onCreateRole: (role: string, order: number, postId: string) => Promise<void>;
+  onUpdateRole: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
+  onDeleteRole: (roleId: string) => Promise<void>;
+}) {
+  const { busyId, run } = useRowBusy();
+  const [itemName, setItemName] = useState("");
+  const [roleName, setRoleName] = useState("");
+  const budget = programBudget(items);
+
+  return (
+    <div className="program-post-subs">
+      <section aria-label={`${post.name} 준비물`}>
+        <div className="program-subsection-heading">
+          <h5>준비물</h5>
+          <span className="program-count">{items.length}건 · {won(budget.total)}</span>
+        </div>
+        {canEdit && (
+          <div className="program-inline-form">
+            <input className="input" value={itemName} maxLength={80} placeholder="예: 줄자"
+              onChange={(event) => setItemName(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (itemName.trim()) { void onCreateItem(itemName.trim(), items.length + 1, post.id); setItemName(""); } } }} />
+            <button type="button" className="btn-secondary btn-sm" disabled={!itemName.trim()}
+              onClick={() => { void onCreateItem(itemName.trim(), items.length + 1, post.id); setItemName(""); }}>
+              <Plus aria-hidden="true" size={15} /> 추가
+            </button>
+          </div>
+        )}
+        {items.length === 0 ? <p className="program-task-empty">아직 준비물이 없습니다.</p> : (
+          <div className="program-table-scroll">
+            <table className="program-table">
+              <thead><tr><th>상태</th><th>이름</th><th>수량</th><th>단가</th><th>금액</th>{canEdit && <th aria-label="삭제" />}</tr></thead>
+              <tbody>
+                {items.map((item) => (
+                  <tr key={item.id} aria-busy={busyId === item.id}>
+                    <td><select className="input" defaultValue={item.status} disabled={!canEdit}
+                      onChange={(event) => void run(item.id, () => onUpdateItem(item.id, { status: event.target.value as RetreatProgramItemStatus }), "상태를 바꾸지 못했습니다.")}>
+                      {Object.entries(PROGRAM_ITEM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                    </select></td>
+                    <td><input className="input" defaultValue={item.name} maxLength={80} disabled={!canEdit}
+                      onBlur={(event) => { if (event.target.value.trim() && event.target.value !== item.name) void run(item.id, () => onUpdateItem(item.id, { name: event.target.value.trim() }), "이름을 수정하지 못했습니다."); }} /></td>
+                    <td><input className="input program-number" inputMode="numeric" defaultValue={item.quantity ?? ""} disabled={!canEdit}
+                      onBlur={(event) => { const next = digits(event.target.value); if (next !== item.quantity) void run(item.id, () => onUpdateItem(item.id, { quantity: next ?? null as never }), "수량을 수정하지 못했습니다."); }} /></td>
+                    <td><input className="input program-number" inputMode="numeric" defaultValue={item.unitPrice ?? ""} disabled={!canEdit}
+                      onBlur={(event) => { const next = digits(event.target.value); if (next !== item.unitPrice) void run(item.id, () => onUpdateItem(item.id, { unitPrice: next ?? null as never }), "단가를 수정하지 못했습니다."); }} /></td>
+                    <td className="program-money">{won(programItemTotal(item))}</td>
+                    {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
+                      onClick={() => void run(item.id, () => onDeleteItem(item.id), "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section aria-label={`${post.name} 역할`}>
+        <div className="program-subsection-heading">
+          <h5>역할</h5>
+          <span className="program-count">{roles.length}명</span>
+        </div>
+        {canEdit && (
+          <div className="program-inline-form">
+            <input className="input" value={roleName} maxLength={80} placeholder="예: 진행 / 점수 기록"
+              onChange={(event) => setRoleName(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (roleName.trim()) { void onCreateRole(roleName.trim(), roles.length + 1, post.id); setRoleName(""); } } }} />
+            <button type="button" className="btn-secondary btn-sm" disabled={!roleName.trim()}
+              onClick={() => { void onCreateRole(roleName.trim(), roles.length + 1, post.id); setRoleName(""); }}>
+              <Plus aria-hidden="true" size={15} /> 추가
+            </button>
+          </div>
+        )}
+        {roles.length === 0 ? <p className="program-task-empty">아직 역할이 없습니다.</p> : (
+          <div className="program-table-scroll">
+            <table className="program-table">
+              <thead><tr><th>역할</th><th>담당</th><th>세부 내용</th>{canEdit && <th aria-label="삭제" />}</tr></thead>
+              <tbody>
+                {roles.map((entry) => (
+                  <tr key={entry.id} aria-busy={busyId === entry.id}>
+                    <td><input className="input" defaultValue={entry.role} maxLength={80} disabled={!canEdit}
+                      onBlur={(event) => { if (event.target.value.trim() && event.target.value !== entry.role) void run(entry.id, () => onUpdateRole(entry.id, { role: event.target.value.trim() }), "역할을 수정하지 못했습니다."); }} /></td>
+                    <td><input className="input" defaultValue={entry.assignee ?? ""} maxLength={120} disabled={!canEdit}
+                      onBlur={(event) => { if (event.target.value !== (entry.assignee ?? "")) void run(entry.id, () => onUpdateRole(entry.id, { assignee: event.target.value }), "담당을 수정하지 못했습니다."); }} /></td>
+                    <td><input className="input" defaultValue={entry.detail ?? ""} maxLength={400} disabled={!canEdit}
+                      onBlur={(event) => { if (event.target.value !== (entry.detail ?? "")) void run(entry.id, () => onUpdateRole(entry.id, { detail: event.target.value }), "내용을 수정하지 못했습니다."); }} /></td>
+                    {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
+                      onClick={() => void run(entry.id, () => onDeleteRole(entry.id), "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
 
 // ── 대진표 (게임 카드 안) ───────────────────────────────────────
 function ProgramBracket({
@@ -143,9 +263,18 @@ const POST_FIELDS = [
 
 export function ProgramPostsSection({
   posts, canEdit, onCreate, onUpdate, onDelete, onCreateMatch, onUpdateMatch, onDeleteMatch,
+  itemsOf, rolesOf, onCreateItem, onUpdateItem, onDeleteItem, onCreateRole, onUpdateRole, onDeleteRole,
 }: {
   posts: RetreatProgramPost[];
   canEdit: boolean;
+  itemsOf: (postId: string) => RetreatProgramItem[];
+  rolesOf: (postId: string) => RetreatProgramRole[];
+  onCreateItem: (name: string, order: number, postId: string) => Promise<void>;
+  onUpdateItem: (itemId: string, data: Partial<RetreatProgramItem>) => Promise<void>;
+  onDeleteItem: (itemId: string) => Promise<void>;
+  onCreateRole: (role: string, order: number, postId: string) => Promise<void>;
+  onUpdateRole: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
+  onDeleteRole: (roleId: string) => Promise<void>;
   onCreate: (name: string, order: number) => Promise<void>;
   onUpdate: (postId: string, data: Partial<RetreatProgramPost>) => Promise<void>;
   onDelete: (postId: string) => Promise<void>;
@@ -203,6 +332,7 @@ export function ProgramPostsSection({
                 <summary>
                   <strong>{post.name}</strong>
                   <span>{[post.place, post.duration, post.staff].filter(Boolean).join(" · ") || "장소·시간·담당 미정"}</span>
+                  <em className="program-card-counts">준비물 {itemsOf(post.id).length} · 역할 {rolesOf(post.id).length}</em>
                 </summary>
                 <fieldset disabled={!canEdit || busyId === post.id} className="program-card-body">
                   <div className="program-form-grid">
@@ -235,6 +365,11 @@ export function ProgramPostsSection({
                       </label>
                     ))}
                   </div>
+                  <PostSubEntries
+                    post={post} items={itemsOf(post.id)} roles={rolesOf(post.id)} canEdit={canEdit}
+                    onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
+                    onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
+                  />
                   <ProgramBracket post={post} canEdit={canEdit}
                     onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch} />
                   {canEdit && (
@@ -255,129 +390,108 @@ export function ProgramPostsSection({
   );
 }
 
-// ── 역할·배치 ───────────────────────────────────────────────
+// ── 역할·배치 (모아 보기) ────────────────────────────────────
+// 입력은 게임 카드 안에서 한다. 여기는 게임별로 묶어 한눈에 보고, 프로그램 전체 역할을 더하는 자리다.
 export function ProgramRolesSection({
-  roles, canEdit, onCreate, onUpdate, onDelete,
+  groups, canEdit, onCreate, onUpdate, onDelete,
 }: {
-  roles: RetreatProgramRole[];
+  groups: Array<ProgramGroupedEntries<RetreatProgramRole>>;
   canEdit: boolean;
-  onCreate: (role: string, order: number) => Promise<void>;
+  onCreate: (role: string, order: number, postId?: string) => Promise<void>;
   onUpdate: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
   onDelete: (roleId: string) => Promise<void>;
 }) {
   const [role, setRole] = useState("");
-  const [adding, setAdding] = useState(false);
   const { busyId, run } = useRowBusy();
-
-  async function add() {
-    const trimmed = role.trim();
-    if (!trimmed) return;
-    setAdding(true);
-    try {
-      await onCreate(trimmed, roles.length + 1);
-      setRole("");
-    } finally {
-      setAdding(false);
-    }
-  }
+  const total = groups.reduce((sum, group) => sum + group.entries.length, 0);
 
   return (
     <section className="program-form-section" aria-labelledby="program-roles-heading">
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-roles-heading">역할·배치</h3>
-          <p>누가 어디서 무엇을 맡는지. 교사 브리핑에 그대로 옮겨 쓸 수 있게 적어 주세요.</p>
+          <p>게임별 역할은 게임·포스트 탭의 카드 안에서 넣습니다. 여기서는 전체를 모아 보고 프로그램 공통 역할을 더합니다.</p>
         </div>
-        <span className="program-count">{roles.length}명</span>
+        <span className="program-count">{total}명</span>
       </div>
 
       {canEdit && (
         <div className="program-inline-form">
           <label className="program-field program-field--wide">
-            <span>역할</span>
-            <input className="input" value={role} maxLength={80} placeholder="예: 진행 / 소통 / 타임키퍼"
+            <span>프로그램 전체 역할</span>
+            <input className="input" value={role} maxLength={80} placeholder="예: 총괄 / 타임키퍼"
               onChange={(event) => setRole(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void add(); } }} />
+              onKeyDown={(event) => { if (event.key === "Enter" && role.trim()) { event.preventDefault(); void onCreate(role.trim(), total + 1); setRole(""); } }} />
           </label>
-          <button type="button" className="btn-secondary" disabled={adding || !role.trim()} onClick={() => void add()}>
+          <button type="button" className="btn-secondary" disabled={!role.trim()}
+            onClick={() => { void onCreate(role.trim(), total + 1); setRole(""); }}>
             <Plus aria-hidden="true" size={16} /> 추가
           </button>
         </div>
       )}
 
-      {roles.length === 0 ? (
-        <p className="program-task-empty">아직 등록된 역할이 없습니다.</p>
-      ) : (
-        <div className="program-table-scroll">
-          <table className="program-table">
-            <thead>
-              <tr><th>역할</th><th>담당</th><th>장소</th><th>인원</th><th>세부 내용</th>{canEdit && <th aria-label="삭제" />}</tr>
-            </thead>
-            <tbody>
-              {roles.map((entry) => (
-                <tr key={entry.id} aria-busy={busyId === entry.id}>
-                  <td><input className="input" defaultValue={entry.role} maxLength={80} disabled={!canEdit}
-                    onBlur={(event) => { if (event.target.value.trim() && event.target.value !== entry.role) void run(entry.id, () => onUpdate(entry.id, { role: event.target.value.trim() }), "역할을 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input" defaultValue={entry.assignee ?? ""} maxLength={120} disabled={!canEdit}
-                    onBlur={(event) => { if (event.target.value !== (entry.assignee ?? "")) void run(entry.id, () => onUpdate(entry.id, { assignee: event.target.value }), "담당을 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input" defaultValue={entry.place ?? ""} maxLength={80} disabled={!canEdit}
-                    onBlur={(event) => { if (event.target.value !== (entry.place ?? "")) void run(entry.id, () => onUpdate(entry.id, { place: event.target.value }), "장소를 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input" defaultValue={entry.headcount ?? ""} maxLength={40} disabled={!canEdit}
-                    onBlur={(event) => { if (event.target.value !== (entry.headcount ?? "")) void run(entry.id, () => onUpdate(entry.id, { headcount: event.target.value }), "인원을 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input" defaultValue={entry.detail ?? ""} maxLength={400} disabled={!canEdit}
-                    onBlur={(event) => { if (event.target.value !== (entry.detail ?? "")) void run(entry.id, () => onUpdate(entry.id, { detail: event.target.value }), "내용을 수정하지 못했습니다."); }} /></td>
-                  {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
-                    onClick={() => void run(entry.id, () => onDelete(entry.id), "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {groups.map((group) => (
+        <div key={group.postId ?? "common"} className="program-group">
+          <div className="program-group-heading">
+            <h4>{group.label}</h4>
+            <span>{group.entries.length}명</span>
+          </div>
+          {group.entries.length === 0 ? (
+            <p className="program-task-empty">{group.postId ? "이 게임에 배정된 역할이 없습니다." : "프로그램 전체 역할이 없습니다."}</p>
+          ) : (
+            <div className="program-table-scroll">
+              <table className="program-table">
+                <thead><tr><th>역할</th><th>담당</th><th>장소</th><th>인원</th><th>세부 내용</th>{canEdit && <th aria-label="삭제" />}</tr></thead>
+                <tbody>
+                  {group.entries.map((entry) => (
+                    <tr key={entry.id} aria-busy={busyId === entry.id}>
+                      <td><input className="input" defaultValue={entry.role} maxLength={80} disabled={!canEdit}
+                        onBlur={(event) => { if (event.target.value.trim() && event.target.value !== entry.role) void run(entry.id, () => onUpdate(entry.id, { role: event.target.value.trim() }), "역할을 수정하지 못했습니다."); }} /></td>
+                      <td><input className="input" defaultValue={entry.assignee ?? ""} maxLength={120} disabled={!canEdit}
+                        onBlur={(event) => { if (event.target.value !== (entry.assignee ?? "")) void run(entry.id, () => onUpdate(entry.id, { assignee: event.target.value }), "담당을 수정하지 못했습니다."); }} /></td>
+                      <td><input className="input" defaultValue={entry.place ?? ""} maxLength={80} disabled={!canEdit}
+                        onBlur={(event) => { if (event.target.value !== (entry.place ?? "")) void run(entry.id, () => onUpdate(entry.id, { place: event.target.value }), "장소를 수정하지 못했습니다."); }} /></td>
+                      <td><input className="input program-number" defaultValue={entry.headcount ?? ""} maxLength={40} disabled={!canEdit}
+                        onBlur={(event) => { if (event.target.value !== (entry.headcount ?? "")) void run(entry.id, () => onUpdate(entry.id, { headcount: event.target.value }), "인원을 수정하지 못했습니다."); }} /></td>
+                      <td><input className="input" defaultValue={entry.detail ?? ""} maxLength={400} disabled={!canEdit}
+                        onBlur={(event) => { if (event.target.value !== (entry.detail ?? "")) void run(entry.id, () => onUpdate(entry.id, { detail: event.target.value }), "내용을 수정하지 못했습니다."); }} /></td>
+                      {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
+                        onClick={() => void run(entry.id, () => onDelete(entry.id), "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
+      ))}
     </section>
   );
 }
 
-// ── 물품·예산 ───────────────────────────────────────────────
+// ── 물품·예산 (모아 보기 · 구매 체크) ──────────────────────────
 export function ProgramItemsSection({
-  items, canEdit, onCreate, onUpdate, onDelete,
+  groups, canEdit, onCreate, onUpdate, onDelete,
 }: {
-  items: RetreatProgramItem[];
+  groups: Array<ProgramGroupedEntries<RetreatProgramItem>>;
   canEdit: boolean;
-  onCreate: (name: string, order: number) => Promise<void>;
+  onCreate: (name: string, order: number, postId?: string) => Promise<void>;
   onUpdate: (itemId: string, data: Partial<RetreatProgramItem>) => Promise<void>;
   onDelete: (itemId: string) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [adding, setAdding] = useState(false);
   const { busyId, run } = useRowBusy();
-  const budget = programBudget(items);
-
-  async function add() {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setAdding(true);
-    try {
-      await onCreate(trimmed, items.length + 1);
-      setName("");
-    } finally {
-      setAdding(false);
-    }
-  }
-
-  function numberOrUndefined(value: string): number | undefined {
-    const digits = value.replace(/[^0-9]/g, "");
-    return digits ? Number(digits) : undefined;
-  }
+  const all = groups.flatMap((group) => group.entries);
+  const budget = programBudget(all);
 
   return (
     <section className="program-form-section" aria-labelledby="program-items-heading">
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-items-heading">물품·예산</h3>
-          <p>수량과 단가를 넣으면 금액과 합계가 자동으로 계산됩니다.</p>
+          <p>게임별 준비물은 게임·포스트 탭의 카드 안에서 넣습니다. 여기서는 전체를 모아 보고 구매 상태를 체크합니다.</p>
         </div>
-        <span className="program-count">{items.length}건</span>
+        <span className="program-count">{all.length}건</span>
       </div>
 
       <div className="program-budget" aria-label="예산 요약">
@@ -389,51 +503,57 @@ export function ProgramItemsSection({
       {canEdit && (
         <div className="program-inline-form">
           <label className="program-field program-field--wide">
-            <span>물품 이름</span>
-            <input className="input" value={name} maxLength={80} placeholder="예: 종이테이프"
+            <span>프로그램 공통 물품</span>
+            <input className="input" value={name} maxLength={80} placeholder="예: 현수막"
               onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void add(); } }} />
+              onKeyDown={(event) => { if (event.key === "Enter" && name.trim()) { event.preventDefault(); void onCreate(name.trim(), all.length + 1); setName(""); } }} />
           </label>
-          <button type="button" className="btn-secondary" disabled={adding || !name.trim()} onClick={() => void add()}>
+          <button type="button" className="btn-secondary" disabled={!name.trim()}
+            onClick={() => { void onCreate(name.trim(), all.length + 1); setName(""); }}>
             <Plus aria-hidden="true" size={16} /> 추가
           </button>
         </div>
       )}
 
-      {items.length === 0 ? (
-        <p className="program-task-empty">아직 등록된 물품이 없습니다.</p>
-      ) : (
-        <div className="program-table-scroll">
-          <table className="program-table">
-            <thead>
-              <tr><th>상태</th><th>항목</th><th>이름</th><th>수량</th><th>단가</th><th>금액</th>{canEdit && <th aria-label="삭제" />}</tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} aria-busy={busyId === item.id}>
-                  <td>
-                    <select className="input" defaultValue={item.status} disabled={!canEdit}
-                      onChange={(event) => void run(item.id, () => onUpdate(item.id, { status: event.target.value as RetreatProgramItemStatus }), "상태를 바꾸지 못했습니다.")}>
-                      {Object.entries(PROGRAM_ITEM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
-                    </select>
-                  </td>
-                  <td><input className="input" defaultValue={item.group ?? ""} maxLength={80} disabled={!canEdit} placeholder="게임 이름"
-                    onBlur={(event) => { if (event.target.value !== (item.group ?? "")) void run(item.id, () => onUpdate(item.id, { group: event.target.value }), "항목을 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input" defaultValue={item.name} maxLength={80} disabled={!canEdit}
-                    onBlur={(event) => { if (event.target.value.trim() && event.target.value !== item.name) void run(item.id, () => onUpdate(item.id, { name: event.target.value.trim() }), "이름을 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input program-number" inputMode="numeric" defaultValue={item.quantity ?? ""} disabled={!canEdit}
-                    onBlur={(event) => { const next = numberOrUndefined(event.target.value); if (next !== item.quantity) void run(item.id, () => onUpdate(item.id, { quantity: next ?? null as never }), "수량을 수정하지 못했습니다."); }} /></td>
-                  <td><input className="input program-number" inputMode="numeric" defaultValue={item.unitPrice ?? ""} disabled={!canEdit}
-                    onBlur={(event) => { const next = numberOrUndefined(event.target.value); if (next !== item.unitPrice) void run(item.id, () => onUpdate(item.id, { unitPrice: next ?? null as never }), "단가를 수정하지 못했습니다."); }} /></td>
-                  <td className="program-money">{won(programItemTotal(item))}</td>
-                  {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
-                    onClick={() => void run(item.id, () => onDelete(item.id), "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {groups.map((group) => {
+        const groupBudget = programBudget(group.entries);
+        return (
+          <div key={group.postId ?? "common"} className="program-group">
+            <div className="program-group-heading">
+              <h4>{group.label}</h4>
+              <span>{group.entries.length}건 · {won(groupBudget.total)}</span>
+            </div>
+            {group.entries.length === 0 ? (
+              <p className="program-task-empty">{group.postId ? "이 게임의 준비물이 없습니다." : "공통 물품이 없습니다."}</p>
+            ) : (
+              <div className="program-table-scroll">
+                <table className="program-table">
+                  <thead><tr><th>상태</th><th>이름</th><th>수량</th><th>단가</th><th>금액</th>{canEdit && <th aria-label="삭제" />}</tr></thead>
+                  <tbody>
+                    {group.entries.map((item) => (
+                      <tr key={item.id} aria-busy={busyId === item.id}>
+                        <td><select className="input" defaultValue={item.status} disabled={!canEdit}
+                          onChange={(event) => void run(item.id, () => onUpdate(item.id, { status: event.target.value as RetreatProgramItemStatus }), "상태를 바꾸지 못했습니다.")}>
+                          {Object.entries(PROGRAM_ITEM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                        </select></td>
+                        <td><input className="input" defaultValue={item.name} maxLength={80} disabled={!canEdit}
+                          onBlur={(event) => { if (event.target.value.trim() && event.target.value !== item.name) void run(item.id, () => onUpdate(item.id, { name: event.target.value.trim() }), "이름을 수정하지 못했습니다."); }} /></td>
+                        <td><input className="input program-number" inputMode="numeric" defaultValue={item.quantity ?? ""} disabled={!canEdit}
+                          onBlur={(event) => { const next = digits(event.target.value); if (next !== item.quantity) void run(item.id, () => onUpdate(item.id, { quantity: next ?? null as never }), "수량을 수정하지 못했습니다."); }} /></td>
+                        <td><input className="input program-number" inputMode="numeric" defaultValue={item.unitPrice ?? ""} disabled={!canEdit}
+                          onBlur={(event) => { const next = digits(event.target.value); if (next !== item.unitPrice) void run(item.id, () => onUpdate(item.id, { unitPrice: next ?? null as never }), "단가를 수정하지 못했습니다."); }} /></td>
+                        <td className="program-money">{won(programItemTotal(item))}</td>
+                        {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
+                          onClick={() => void run(item.id, () => onDelete(item.id), "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </section>
   );
 }
