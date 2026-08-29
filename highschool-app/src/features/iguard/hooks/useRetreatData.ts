@@ -1,16 +1,31 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import {
-  subscribeToRetreat, subscribeToStudentsByYear, subscribeToGroups, subscribeToRooms,
-  subscribeToIguardMeals, subscribeToIguardSchedule,
-  subscribeToIguardSegments, subscribeToIguardPosts, subscribeToIguardMovements, subscribeToIguardBuses,
-  subscribeToIguardSeating, subscribeToMilestones, subscribeToIguardGuide,
-  subscribeToRetreatPeriods, subscribeToIguardAttendance, subscribeToPartialAttendances,
-  subscribeToTeacherAttendances, subscribeToIguardGroupStaff, subscribeToCellColors,
-  subscribeToConnection, subscribeToParticipants, subscribeToIguardGbs,
+  subscribeToCellColors,
+  subscribeToConnection,
+  subscribeToGroups,
+  subscribeToIguardAttendance,
+  subscribeToIguardBuses,
+  subscribeToIguardGbs,
+  subscribeToIguardGroupStaff,
+  subscribeToIguardGuide,
   subscribeToIguardLodgingMaps,
+  subscribeToIguardMeals,
+  subscribeToIguardMovements,
+  subscribeToIguardPosts,
+  subscribeToIguardSchedule,
+  subscribeToIguardSeating,
+  subscribeToIguardSegments,
+  subscribeToMilestones,
+  subscribeToPartialAttendances,
+  subscribeToParticipants,
+  subscribeToRetreat,
+  subscribeToRetreatPeriods,
+  subscribeToRetreatPrograms,
+  subscribeToRooms,
+  subscribeToStudentsByYear,
+  subscribeToTeacherAttendances,
 } from "@/features/iguard/lib/db";
-import { subscribeToRetreatPrograms } from "@/lib/db";
 import type { RetreatProgram } from "@/lib/types";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,

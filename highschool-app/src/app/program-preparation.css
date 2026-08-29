@@ -62,6 +62,11 @@
 .program-readiness span { color: var(--color-text-muted); font-size: 10px; }
 .program-missing { display: flex; align-items: flex-start; gap: 7px; margin: 0 24px 18px; border-radius: 10px; background: var(--color-warning-bg); padding: 10px 12px; color: var(--color-warning); font-size: 12px; line-height: 1.55; }
 .program-missing svg { flex: 0 0 auto; margin-top: 1px; }
+/* 다른 사람이 저장했을 때 — 작성 중인 본문을 덮지 않고 선택지를 준다. */
+.program-remote-updated { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 24px 18px; border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border)); border-radius: 10px; background: var(--color-danger-bg); padding: 10px 12px; color: var(--color-danger); font-size: 12px; line-height: 1.55; }
+.program-remote-updated svg { flex: 0 0 auto; }
+.program-remote-updated span { flex: 1 1 220px; min-width: 0; }
+.program-remote-updated button { flex: 0 0 auto; }
 .program-form-section { border-top: 1px solid var(--color-border); padding: 21px 24px 24px; }
 .program-form-section h3, .program-task-heading h3 { color: var(--color-text-primary); font-size: 14px; font-weight: 800; }
 .program-form-grid { display: grid; margin-top: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
@@ -84,16 +89,25 @@
 .program-task-empty { margin-top: 14px; border-radius: 10px; background: var(--color-surface-hover); padding: 15px; color: var(--color-text-muted); font-size: 12px; text-align: center; }
 .program-task-list { margin-top: 12px; border-top: 1px solid var(--color-border); }
 .program-task-list li { display: grid; min-height: 58px; align-items: center; grid-template-columns: 36px minmax(0, 1fr) 40px; gap: 7px; border-bottom: 1px solid var(--color-border); }
+.program-task-list li > div { min-width: 0; }
 .program-task-list li > button:first-child { display: grid; width: 36px; height: 44px; place-items: center; color: var(--color-text-muted); }
 .program-task-list li > button:first-child:hover { color: var(--color-primary); }
 .program-task-list li[data-done="true"] > button:first-child { color: var(--color-success); }
 .program-task-list li strong { display: block; color: var(--color-text-primary); font-size: 13px; font-weight: 700; }
 .program-task-list li span { display: block; margin-top: 2px; color: var(--color-text-muted); font-size: 10px; }
+.program-task-list li strong, .program-task-list li span { overflow-wrap: anywhere; }
 .program-task-list li[data-done="true"] strong { color: var(--color-text-muted); text-decoration: line-through; }
 .program-task-delete { display: grid; width: 40px; height: 44px; place-items: center; border-radius: 9px; color: var(--color-text-muted); }
 .program-task-delete:hover { background: var(--color-danger-bg); color: var(--color-danger); }
 .program-editor-actions { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--color-border); padding: 15px 24px; }
 .program-dirty-state { min-width: 0; flex: 1; color: var(--color-text-muted); font-size: 11px; text-align: right; }
+
+.program-confirm-dialog__body { padding: 24px; }
+.program-confirm-dialog__body h2 { color: var(--color-text-primary); font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.program-confirm-dialog__body p { margin-top: 8px; color: var(--color-text-muted); font-size: 13px; line-height: 1.65; }
+.program-confirm-dialog__body p strong { color: var(--color-text-primary); }
+.program-confirm-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.program-confirm-dialog__actions button { min-height: 44px; }
 
 .program-access-state { display: flex; min-height: 70vh; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
 .program-access-state h1 { color: var(--color-text-primary); font-size: 22px; font-weight: 800; }
@@ -139,6 +153,8 @@
   .program-workspace { grid-template-columns: 1fr; }
   .program-list { position: static; }
   .program-list-items { display: flex; gap: 5px; overflow-x: auto; padding: 7px; scroll-snap-type: x proximity; }
+  .program-header-back, .program-add-button { min-width: 44px; min-height: 44px; }
+  .program-empty-actions button { min-height: 44px; }
   .program-list-item { min-width: min(82vw, 300px); flex: 0 0 auto; scroll-snap-align: start; }
   .program-list-item + .program-list-item { margin-top: 0; }
   .program-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -147,13 +163,17 @@
   .program-task-form { grid-template-columns: 1fr 1fr; }
   .program-task-form label:first-child { grid-column: span 2; }
   .program-task-form .btn-secondary { align-self: end; }
+  .program-order-controls button { width: 44px; height: 44px; }
+  .program-task-list li { grid-template-columns: 44px minmax(0, 1fr) 44px; }
+  .program-task-list li > button:first-child, .program-task-delete { width: 44px; height: 44px; }
+  .program-editor-actions :is(.btn-primary, .btn-danger) { min-height: 44px; }
   .published-program-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .published-program-purpose { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
   .program-workspace-title-row { min-height: 48px; gap: 6px; }
-  .program-header-back { width: 40px; padding: 0; justify-content: center; }
+  .program-header-back { width: 44px; padding: 0; justify-content: center; }
   .program-header-back span, .program-year-badge { display: none; }
   .program-workspace-title-row h1 { font-size: 13px; }
   .program-area-nav button { min-height: 44px; flex: 1 0 auto; justify-content: center; padding-inline: 10px; font-size: 12px; }
@@ -163,6 +183,7 @@
   .program-editor-heading { padding: 18px 16px 15px; }
   .program-editor-heading h2 { font-size: 18px; }
   .program-missing { margin: 0 16px 15px; }
+  .program-remote-updated { margin: 0 16px 15px; }
   .program-form-section, .program-task-section { padding: 18px 16px 20px; }
   .program-form-grid { grid-template-columns: 1fr; }
   .program-field--wide { grid-column: auto; }
@@ -176,3 +197,80 @@
   .published-program { padding: 17px 15px; }
   .published-program-sections { grid-template-columns: 1fr; }
 }
+
+/* ── 편집기 상단 내비게이션 ─────────────────────────────────── */
+.program-section-nav { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--color-border); padding: 0 24px; scrollbar-width: none; }
+.program-section-nav::-webkit-scrollbar { display: none; }
+.program-section-nav button {
+  display: inline-flex; min-height: 44px; flex: 0 0 auto; align-items: center; gap: 6px;
+  border-bottom: 2px solid transparent; padding: 0 13px;
+  color: var(--color-text-muted); font-size: 13px; font-weight: 700; white-space: nowrap;
+  transition: color var(--duration-fast), border-color var(--duration-fast);
+}
+.program-section-nav button:hover { color: var(--color-text-primary); }
+.program-section-nav button[aria-current="page"] { border-bottom-color: var(--color-primary); color: var(--color-primary); }
+.program-section-nav em {
+  display: inline-grid; min-width: 20px; place-items: center; border-radius: 999px;
+  background: var(--color-surface-hover); padding: 1px 6px;
+  color: var(--color-text-muted); font-size: 10px; font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.program-section-nav button[aria-current="page"] em { background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)); color: var(--color-primary); }
+.program-section-hint { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+
+/* ── 하위 항목 공통 ─────────────────────────────────────────── */
+.program-subsection-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.program-subsection-heading p { margin-top: 3px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.program-count { flex: 0 0 auto; border-radius: 999px; background: var(--color-surface-hover); padding: 3px 10px; color: var(--color-text-muted); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.program-inline-form { display: flex; align-items: flex-end; gap: 9px; margin-top: 14px; }
+.program-inline-form .program-field { flex: 1 1 auto; }
+.program-inline-form button { flex: 0 0 auto; }
+.program-autosave-hint { color: var(--color-text-faint); font-size: 11px; }
+
+/* ── 게임·포스트 카드 ───────────────────────────────────────── */
+.program-card-list { display: grid; margin-top: 14px; gap: 9px; list-style: none; padding: 0; }
+.program-card { border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); }
+.program-card > summary { display: flex; min-height: 52px; cursor: pointer; align-items: center; gap: 12px; list-style: none; padding: 10px 14px; }
+.program-card > summary::-webkit-details-marker { display: none; }
+.program-card > summary strong { flex: 0 0 auto; font-size: 13px; font-weight: 800; }
+.program-card > summary span { min-width: 0; overflow: hidden; color: var(--color-text-muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.program-card[open] > summary { border-bottom: 1px solid var(--color-border); }
+.program-card-body { padding: 15px 14px 16px; }
+.program-card-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+
+/* ── 표 (역할·물품) ─────────────────────────────────────────── */
+.program-table-scroll { margin-top: 14px; overflow-x: auto; border: 1px solid var(--color-border); border-radius: 12px; }
+.program-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.program-table th { border-bottom: 1px solid var(--color-border); background: var(--color-surface-hover); padding: 8px 10px; color: var(--color-text-muted); font-size: 11px; font-weight: 800; text-align: left; white-space: nowrap; }
+.program-table td { border-bottom: 1px solid var(--color-border); padding: 5px 7px; vertical-align: middle; }
+.program-table tr:last-child td { border-bottom: 0; }
+.program-table .input { min-width: 92px; }
+.program-table .program-number { max-width: 88px; text-align: right; font-variant-numeric: tabular-nums; }
+.program-money { color: var(--color-text-primary); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+/* ── 예산 요약 ──────────────────────────────────────────────── */
+.program-budget { display: grid; margin-top: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.program-budget > div { border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface); padding: 11px 13px; }
+.program-budget span { display: block; color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+.program-budget strong { display: block; margin-top: 3px; font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.program-budget--total { border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border)); }
+.program-budget--total strong { color: var(--color-primary); }
+
+@media (max-width: 720px) {
+  .program-section-nav { padding: 0 16px; }
+  .program-budget { grid-template-columns: 1fr; }
+  .program-inline-form { flex-wrap: wrap; }
+  .program-card-actions { flex-wrap: wrap; }
+}
+
+/* ── 대진표 ─────────────────────────────────────────────────── */
+.program-bracket { margin-top: 18px; border-top: 1px solid var(--color-border); padding-top: 16px; }
+.program-bracket h4 { color: var(--color-text-primary); font-size: 13px; font-weight: 800; }
+.program-bracket-round { margin-top: 14px; }
+.program-bracket-round h5 {
+  display: inline-flex; align-items: center; border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  padding: 3px 10px; color: var(--color-primary); font-size: 11px; font-weight: 800;
+}
+.program-bracket-round .program-table-scroll { margin-top: 8px; }
+.program-bracket-round > button { margin-top: 8px; }
+.program-bracket-add-round { margin-top: 14px; }

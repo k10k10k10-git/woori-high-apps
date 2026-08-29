@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import OverlayShell from "@/components/OverlayShell";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
@@ -10,25 +10,58 @@ import { useUI } from "@/context/UIContext";
 import {
   createDefaultRetreatPrograms,
   createRetreatProgram,
+  createRetreatProgramItem,
+  createRetreatProgramMatch,
+  createRetreatProgramPost,
+  createRetreatProgramRole,
+  createRetreatProgramTask,
   deleteRetreatProgram,
+  deleteRetreatProgramItem,
+  deleteRetreatProgramMatch,
+  deleteRetreatProgramPost,
+  deleteRetreatProgramRole,
+  deleteRetreatProgramTask,
   reorderRetreatPrograms,
   subscribeToRetreat,
   subscribeToRetreatPrograms,
   updateRetreatProgram,
+  updateRetreatProgramItem,
+  updateRetreatProgramMatch,
+  updateRetreatProgramPost,
+  updateRetreatProgramRole,
+  updateRetreatProgramTask,
 } from "@/lib/db";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
-import { createProgramDraft } from "@/lib/programPreparation";
-import type { Retreat, RetreatProgram } from "@/lib/types";
+import { createProgramDraft, isProgramSection, type ProgramSectionKey } from "@/lib/programPreparation";
+import type {
+  Retreat,
+  RetreatProgram,
+  RetreatProgramItem,
+  RetreatProgramMatch,
+  RetreatProgramPost,
+  RetreatProgramRole,
+} from "@/lib/types";
 import RetreatPinGate from "../field/RetreatPinGate";
+import ProgramDiscardDialog from "./ProgramDiscardDialog";
 import ProgramEditor from "./ProgramEditor";
 import ProgramList from "./ProgramList";
 import ProgramWorkspaceHeader from "./ProgramWorkspaceHeader";
+import { useProgramDiscardGuard } from "./useProgramDiscardGuard";
 
 export default function ProgramPreparationClient() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const retreatId = params.id as string;
+  // 선택한 항목은 렌더 중 파생 — effect에서 setState로 맞추면 사용자의 선택을 덮는다(실수 13).
+  const sectionParam = searchParams.get("section");
+  const section: ProgramSectionKey = isProgramSection(sectionParam) ? sectionParam : "overview";
+  function selectSection(next: ProgramSectionKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("section", next);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
   const { user, loading: authLoading, roles } = useAuth();
   const { toast } = useUI();
   const adminAllowed = canAccessArea("retreat-admin", roles);
@@ -48,6 +81,7 @@ export default function ProgramPreparationClient() {
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RetreatProgram | null>(null);
+  const discardGuard = useProgramDiscardGuard();
 
   useEffect(() => {
     if (authLoading) return;
@@ -186,7 +220,11 @@ export default function ProgramPreparationClient() {
 
   return (
     <div className="app-page program-preparation-page">
-      <ProgramWorkspaceHeader retreat={retreat} fieldAllowed={fieldAllowed} />
+      <ProgramWorkspaceHeader
+        retreat={retreat}
+        fieldAllowed={fieldAllowed}
+        onNavigate={(href) => discardGuard.requestAction("다른 화면으로 이동", () => router.push(href))}
+      />
       <main className="program-preparation-main">
         <div className="program-page-intro">
           <div>
@@ -207,24 +245,65 @@ export default function ProgramPreparationClient() {
           <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={setSelectedId} onAdd={() => void addProgram()} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
         ) : (
           <div className="program-workspace">
-            <ProgramList programs={programs} selectedId={selectedProgram?.id ?? null} canEdit={canEdit} busy={busy} onSelect={setSelectedId} onAdd={() => void addProgram()} onCreateDefaults={() => void createDefaults()} onMove={(id, direction) => void moveProgram(id, direction)} />
-            {selectedProgram && <ProgramEditor retreatId={retreatId} program={selectedProgram} canEdit={canEdit} saving={saving} onSave={saveProgram} onRequestDelete={setDeleteTarget} />}
+            <ProgramList
+              programs={programs}
+              selectedId={selectedProgram?.id ?? null}
+              canEdit={canEdit}
+              busy={busy}
+              onSelect={(id) => discardGuard.requestAction("다른 프로그램으로 이동", () => setSelectedId(id))}
+              onAdd={() => discardGuard.requestAction("새 프로그램으로 이동", addProgram)}
+              onCreateDefaults={() => void createDefaults()}
+              onMove={(id, direction) => discardGuard.requestAction("프로그램 순서를 변경", () => moveProgram(id, direction))}
+            />
+            {selectedProgram && (
+              <ProgramEditor
+                program={selectedProgram}
+                canEdit={canEdit}
+                saving={saving}
+                resetVersion={discardGuard.resetVersion}
+                onSave={saveProgram}
+                onDirtyChange={discardGuard.setDirty}
+                onRequestDelete={setDeleteTarget}
+                onCreateTask={(data) => createRetreatProgramTask(retreatId, selectedProgram.id, data).then(() => undefined)}
+                onUpdateTask={(taskId, data) => updateRetreatProgramTask(retreatId, selectedProgram.id, taskId, data)}
+                onDeleteTask={(taskId) => deleteRetreatProgramTask(retreatId, selectedProgram.id, taskId)}
+                section={section}
+                onSectionChange={selectSection}
+                onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, { name, order }).then(() => undefined)}
+                onUpdatePost={(postId, data: Partial<RetreatProgramPost>) => updateRetreatProgramPost(retreatId, selectedProgram.id, postId, data)}
+                onDeletePost={(postId) => deleteRetreatProgramPost(retreatId, selectedProgram.id, postId)}
+                onCreateMatch={(postId, data) => createRetreatProgramMatch(retreatId, selectedProgram.id, postId, data).then(() => undefined)}
+                onUpdateMatch={(postId, matchId, data: Partial<RetreatProgramMatch>) => updateRetreatProgramMatch(retreatId, selectedProgram.id, postId, matchId, data)}
+                onDeleteMatch={(postId, matchId) => deleteRetreatProgramMatch(retreatId, selectedProgram.id, postId, matchId)}
+                onCreateRole={(role, order) => createRetreatProgramRole(retreatId, selectedProgram.id, { role, order }).then(() => undefined)}
+                onUpdateRole={(roleId, data: Partial<RetreatProgramRole>) => updateRetreatProgramRole(retreatId, selectedProgram.id, roleId, data)}
+                onDeleteRole={(roleId) => deleteRetreatProgramRole(retreatId, selectedProgram.id, roleId)}
+                onCreateItem={(name, order) => createRetreatProgramItem(retreatId, selectedProgram.id, { name, order, status: "todo" }).then(() => undefined)}
+                onUpdateItem={(itemId, data: Partial<RetreatProgramItem>) => updateRetreatProgramItem(retreatId, selectedProgram.id, itemId, data)}
+                onDeleteItem={(itemId) => deleteRetreatProgramItem(retreatId, selectedProgram.id, itemId)}
+              />
+            )}
           </div>
         )}
       </main>
 
       {deleteTarget && (
-        <OverlayShell label="프로그램 삭제" onClose={() => { if (!busy) setDeleteTarget(null); }} closeOnBackdrop={!busy} panelClassName="w-full max-w-sm">
-          <div className="p-6">
-            <h2 className="text-lg font-bold text-slate-800">프로그램을 삭제할까요?</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500"><strong>{deleteTarget.title}</strong>의 진행안·대본·할 일이 함께 삭제됩니다.</p>
-            <div className="mt-5 flex justify-end gap-2">
+        <OverlayShell label="프로그램 삭제" onClose={() => { if (!busy) setDeleteTarget(null); }} closeOnBackdrop={!busy} panelClassName="program-confirm-dialog w-full max-w-sm">
+          <div className="program-confirm-dialog__body">
+            <h2>프로그램을 삭제할까요?</h2>
+            <p><strong>{deleteTarget.title}</strong>의 진행안·대본·할 일이 함께 삭제됩니다.</p>
+            <div className="program-confirm-dialog__actions">
               <button type="button" className="btn-secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>취소</button>
               <button type="button" className="btn-danger" disabled={busy} onClick={() => void confirmDelete()}>{busy ? "삭제 중…" : "삭제"}</button>
             </div>
           </div>
         </OverlayShell>
       )}
+      <ProgramDiscardDialog
+        actionLabel={discardGuard.pendingLabel}
+        onCancel={discardGuard.cancelDiscard}
+        onConfirm={discardGuard.confirmDiscard}
+      />
     </div>
   );
 }

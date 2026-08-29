@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarBlank, Clock, MapPin, UserCircle } from "@phosphor-icons/react";
-import { PROGRAM_KIND_META, programTasks } from "@/lib/programPreparation";
+import { programKindMeta, programTasks } from "@/lib/programPreparation";
 import type { RetreatProgram } from "@/lib/types";
 
 export default function PublishedProgramsView({ programs }: { programs: RetreatProgram[] }) {
@@ -28,7 +28,7 @@ export default function PublishedProgramsView({ programs }: { programs: RetreatP
           <article key={program.id} className="published-program">
             <div className="published-program-title">
               <span>{index + 1}</span>
-              <div><h3>{program.title}</h3><p>{PROGRAM_KIND_META[program.kind]}</p></div>
+              <div><h3>{program.title}</h3><p>{programKindMeta(program.kind)}</p></div>
             </div>
             <dl className="published-program-meta">
               {program.date && <div><dt><CalendarBlank aria-hidden="true" size={16} /> 날짜</dt><dd>{program.date}</dd></div>}

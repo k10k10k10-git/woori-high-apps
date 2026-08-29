@@ -133,6 +133,78 @@ export interface RetreatProgramTask {
 }
 
 /**
+ * 게임·포스트 한 칸. 기존 준비 시트가 게임마다 같은 13개 항목을 반복해 적던 것을 그대로 옮겼다.
+ * (게임 이름·컨셉·장소·러닝타임·힌트·참여 인원·진행 스탭·준비물·규칙·스탭 역할·준비/진행 주의·기타)
+ */
+export interface RetreatProgramPost {
+  id: string;
+  order: number;
+  name: string;
+  concept?: string;
+  place?: string;
+  duration?: string;
+  hint?: string;
+  headcount?: string;
+  staff?: string;
+  materials?: string;
+  rules?: string;
+  staffRoles?: string;
+  prepCautions?: string;
+  runCautions?: string;
+  extra?: string;
+  matches?: Record<string, RetreatProgramMatch>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 대진 한 경기. 시트의 "대진표"·"대진표 타임키퍼용" 두 탭을 한 줄로 합쳤다. */
+export interface RetreatProgramMatch {
+  id: string;
+  /** 몇 라운드인지 — 시트가 라운드를 열로 두던 것을 행 속성으로 옮겼다. */
+  round: number;
+  order: number;
+  teamA?: string;
+  teamB?: string;
+  time?: string;
+  place?: string;
+  result?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 물품 상태 — 시트의 "구매 여부" 열이 쓰던 값들. */
+export type RetreatProgramItemStatus = "todo" | "ordered" | "purchased" | "inChurch" | "toMake";
+
+/** 물품·예산 한 줄. 시트의 물품리스트(항목·이름·수량·가격·총액·링크)를 옮겼다. */
+export interface RetreatProgramItem {
+  id: string;
+  order: number;
+  name: string;
+  /** 어느 게임·순서에 쓰는 물품인지 (시트의 "항목" 열) */
+  group?: string;
+  status: RetreatProgramItemStatus;
+  quantity?: number;
+  unitPrice?: number;
+  link?: string;
+  note?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 역할·배치 한 줄. 시트의 "교사 가이드&역할분배"·"위치 배정"을 합친 형태. */
+export interface RetreatProgramRole {
+  id: string;
+  order: number;
+  role: string;
+  assignee?: string;
+  place?: string;
+  headcount?: string;
+  detail?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
  * 수련회 프로그램 준비 원본.
  * 행정이 소유하는 retreats/{id}/programs 아래에 두고,
  * 이가드는 published 상태만 읽어 현장에 보여준다.
@@ -159,7 +231,13 @@ export interface RetreatProgram {
   script?: string;
   materials?: string;
   notes?: string;
+  /** 아이디어·회의록 — 시트의 "아이디어/회의록", "최종 선정 프로그램 회의록"에 해당 */
+  ideas?: string;
+  decisions?: string;
   tasks?: Record<string, RetreatProgramTask>;
+  posts?: Record<string, RetreatProgramPost>;
+  items?: Record<string, RetreatProgramItem>;
+  roles?: Record<string, RetreatProgramRole>;
   createdAt: number;
   updatedAt: number;
 }

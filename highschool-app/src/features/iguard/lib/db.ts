@@ -43,6 +43,12 @@ export function subscribeToRetreats(callback: (retreats: Retreat[]) => void, onE
   return subscribeToAdminRetreats(callback, onError);
 }
 
+/**
+ * 프로그램 준비는 행정이 소유한다. 현장은 published만 화면에 노출하되 구독 자체는 여기를 거친다 —
+ * 훅이 `@/lib/db` 배럴을 직접 쓰면 삭제·수정 함수까지 사정권에 들어와 이 경계가 무의미해진다.
+ */
+export { subscribeToRetreatPrograms } from "@/lib/db/programs";
+
 export async function getRetreat(id: string): Promise<Retreat | null> {
   const snap = await get(ref(db, paths.retreat(id)));
   if (!snap.exists()) return null;

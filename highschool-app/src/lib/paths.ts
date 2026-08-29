@@ -91,6 +91,11 @@ export const paths = {
   programs: (id: string) => `retreats/${id}/programs`,
   program: (id: string, programId: string) => `retreats/${id}/programs/${programId}`,
   programTask: (id: string, programId: string, taskId: string) => `retreats/${id}/programs/${programId}/tasks/${taskId}`,
+  programPost: (id: string, programId: string, postId: string) => `retreats/${id}/programs/${programId}/posts/${postId}`,
+  programPostMatch: (id: string, programId: string, postId: string, matchId: string) =>
+    `retreats/${id}/programs/${programId}/posts/${postId}/matches/${matchId}`,
+  programItem: (id: string, programId: string, itemId: string) => `retreats/${id}/programs/${programId}/items/${itemId}`,
+  programRole: (id: string, programId: string, roleId: string) => `retreats/${id}/programs/${programId}/roles/${roleId}`,
 
   // ── 민감정보 (retreatsPrivate) ──
   retreatsPrivate: () => "retreatsPrivate",

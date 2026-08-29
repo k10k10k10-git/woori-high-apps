@@ -42,7 +42,9 @@ export default function VacationHome({
 }: Props) {
   const router = useRouter();
   const { isMobileView } = useViewMode();
-  const canCreate = mode === "admin" && canCreateRetreat(roles);
+  // 수련회 생성은 행정·현장 어느 홈에서도 가능해야 한다(앱 CLAUDE.md 공용 NewRetreatButton 계약).
+  // 프로그램 준비 홈만 목록 선택에 집중하도록 감춘다.
+  const canCreate = mode !== "program" && canCreateRetreat(roles);
   const entryHref = (id: string) => mode === "admin"
     ? `/retreat/${id}`
     : mode === "program"

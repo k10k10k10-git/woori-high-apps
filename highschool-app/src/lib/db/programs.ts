@@ -2,7 +2,14 @@ import { onValue, push, ref, remove, set, update } from "firebase/database";
 import { db } from "../firebase";
 import { paths } from "../paths";
 import { createProgramDraft, sortRetreatPrograms } from "../programPreparation";
-import type { RetreatProgram, RetreatProgramTask } from "../types";
+import type {
+  RetreatProgram,
+  RetreatProgramItem,
+  RetreatProgramMatch,
+  RetreatProgramPost,
+  RetreatProgramRole,
+  RetreatProgramTask,
+} from "../types";
 import { snapToList, stripUndefined } from "./core";
 
 export function subscribeToRetreatPrograms(
@@ -83,4 +90,125 @@ export async function updateRetreatProgramTask(
 
 export async function deleteRetreatProgramTask(retreatId: string, programId: string, taskId: string): Promise<void> {
   await remove(ref(db, paths.programTask(retreatId, programId, taskId)));
+}
+
+// ── 하위 컬렉션 (포스트·물품·역할) ──────────────────────────────
+// tasks와 같은 규약: push로 만든 키가 곧 id이고, 저장은 경로 단위 update만 쓴다.
+// 프로그램 노드 전체를 set으로 덮으면 동시 편집이 서로를 지운다(루트 실수 2).
+
+type SubCollection = "posts" | "items" | "roles";
+
+function subPath(retreatId: string, programId: string, kind: SubCollection, id?: string): string {
+  const base = `${paths.program(retreatId, programId)}/${kind}`;
+  return id ? `${base}/${id}` : base;
+}
+
+async function createSubEntry<T extends object>(
+  retreatId: string,
+  programId: string,
+  kind: SubCollection,
+  data: T,
+): Promise<string> {
+  const entryRef = push(ref(db, subPath(retreatId, programId, kind)));
+  const now = Date.now();
+  await set(entryRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  return entryRef.key!;
+}
+
+async function updateSubEntry<T extends object>(
+  retreatId: string,
+  programId: string,
+  kind: SubCollection,
+  id: string,
+  data: T,
+): Promise<void> {
+  await update(ref(db, subPath(retreatId, programId, kind, id)), stripUndefined({ ...data, updatedAt: Date.now() }));
+}
+
+async function deleteSubEntry(retreatId: string, programId: string, kind: SubCollection, id: string): Promise<void> {
+  await remove(ref(db, subPath(retreatId, programId, kind, id)));
+}
+
+export function createRetreatProgramPost(
+  retreatId: string, programId: string,
+  data: Omit<RetreatProgramPost, "id" | "createdAt" | "updatedAt">,
+): Promise<string> {
+  return createSubEntry(retreatId, programId, "posts", data);
+}
+
+export function updateRetreatProgramPost(
+  retreatId: string, programId: string, postId: string,
+  data: Partial<Omit<RetreatProgramPost, "id" | "createdAt">>,
+): Promise<void> {
+  return updateSubEntry(retreatId, programId, "posts", postId, data);
+}
+
+export function deleteRetreatProgramPost(retreatId: string, programId: string, postId: string): Promise<void> {
+  return deleteSubEntry(retreatId, programId, "posts", postId);
+}
+
+export function createRetreatProgramItem(
+  retreatId: string, programId: string,
+  data: Omit<RetreatProgramItem, "id" | "createdAt" | "updatedAt">,
+): Promise<string> {
+  return createSubEntry(retreatId, programId, "items", data);
+}
+
+export function updateRetreatProgramItem(
+  retreatId: string, programId: string, itemId: string,
+  data: Partial<Omit<RetreatProgramItem, "id" | "createdAt">>,
+): Promise<void> {
+  return updateSubEntry(retreatId, programId, "items", itemId, data);
+}
+
+export function deleteRetreatProgramItem(retreatId: string, programId: string, itemId: string): Promise<void> {
+  return deleteSubEntry(retreatId, programId, "items", itemId);
+}
+
+export function createRetreatProgramRole(
+  retreatId: string, programId: string,
+  data: Omit<RetreatProgramRole, "id" | "createdAt" | "updatedAt">,
+): Promise<string> {
+  return createSubEntry(retreatId, programId, "roles", data);
+}
+
+export function updateRetreatProgramRole(
+  retreatId: string, programId: string, roleId: string,
+  data: Partial<Omit<RetreatProgramRole, "id" | "createdAt">>,
+): Promise<void> {
+  return updateSubEntry(retreatId, programId, "roles", roleId, data);
+}
+
+export function deleteRetreatProgramRole(retreatId: string, programId: string, roleId: string): Promise<void> {
+  return deleteSubEntry(retreatId, programId, "roles", roleId);
+}
+
+// ── 대진표 (게임 카드 안) ───────────────────────────────────────
+// posts/{postId}/matches 아래에 둔다. 게임 필드 수정과 경로가 겹치지 않으므로
+// 대진을 고치는 동안 다른 사람이 규칙을 고쳐도 서로를 덮지 않는다.
+
+export async function createRetreatProgramMatch(
+  retreatId: string, programId: string, postId: string,
+  data: Omit<RetreatProgramMatch, "id" | "createdAt" | "updatedAt">,
+): Promise<string> {
+  const matchRef = push(ref(db, `${paths.program(retreatId, programId)}/posts/${postId}/matches`));
+  const now = Date.now();
+  await set(matchRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  return matchRef.key!;
+}
+
+export async function updateRetreatProgramMatch(
+  retreatId: string, programId: string, postId: string, matchId: string,
+  data: Partial<Omit<RetreatProgramMatch, "id" | "createdAt">>,
+): Promise<void> {
+  await update(
+    ref(db, paths.programPostMatch(retreatId, programId, postId, matchId)),
+    stripUndefined({ ...data, updatedAt: Date.now() }),
+  );
+}
+
+export async function deleteRetreatProgramMatch(
+  retreatId: string, programId: string, postId: string, matchId: string,
+): Promise<void> {
+  await remove(ref(db, paths.programPostMatch(retreatId, programId, postId, matchId)));
 }

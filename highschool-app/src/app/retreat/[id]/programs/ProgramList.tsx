@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Plus } from "@phosphor-icons/react";
-import { PROGRAM_KIND_META, PROGRAM_STATUS_META, programReadiness } from "@/lib/programPreparation";
+import { programKindMeta, programStatusMeta, programReadiness } from "@/lib/programPreparation";
 import type { RetreatProgram } from "@/lib/types";
 
 type Props = {
@@ -53,11 +53,11 @@ export default function ProgramList({
           const readiness = programReadiness(program);
           return (
             <article key={program.id} className="program-list-item" data-selected={selectedId === program.id ? "true" : undefined}>
-              <button type="button" className="program-list-select" onClick={() => onSelect(program.id)} aria-current={selectedId === program.id ? "true" : undefined}>
+              <button type="button" className="program-list-select" disabled={busy} onClick={() => onSelect(program.id)} aria-current={selectedId === program.id ? "true" : undefined}>
                 <span className="program-list-order">{index + 1}</span>
                 <span className="program-list-copy">
                   <strong>{program.title}</strong>
-                  <small>{PROGRAM_KIND_META[program.kind]} · {PROGRAM_STATUS_META[program.status].label}</small>
+                  <small>{programKindMeta(program.kind)} · {programStatusMeta(program.status).label}</small>
                 </span>
                 <span className="program-list-progress" aria-label={`준비 ${readiness.percent}%`}>{readiness.percent}%</span>
               </button>

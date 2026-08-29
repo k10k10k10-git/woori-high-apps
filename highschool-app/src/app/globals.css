@@ -45,6 +45,7 @@
 
   /* Semantic */
   --color-danger:          #c84655;
+  --color-danger-action:   #a92537;
   --color-danger-bg:       #fff0f2;
   --color-danger-border:   #f4b9c0;
   --color-success:         #087a57;
@@ -133,6 +134,7 @@
   --color-text-faint:       #82938a;
 
   --color-danger:           #ff8d9a;
+  --color-danger-action:    #ff9daa;
   --color-danger-bg:        #3b1c22;
   --color-danger-border:    #77313d;
   --color-success:          #55d9a7;
@@ -314,10 +316,10 @@ table th {
 .btn-danger {
   min-height: 40px;
   background: var(--color-danger-bg);
-  color: var(--color-danger);
+  color: var(--color-danger-action);
   padding: 8px 16px;
   border-radius: var(--radius-md);
-  font-weight: 500;
+  font-weight: 650;
   font-size: var(--text-base);
   cursor: pointer;
   border: 1px solid var(--color-danger-border);
