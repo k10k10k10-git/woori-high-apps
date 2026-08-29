@@ -164,7 +164,7 @@ export default function GlobalPortalHeader() {
   // 세 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고, 선택 후 업무 화면만 달라진다.
   const vacationItems: NavItem[] = [
     ...(canAccessArea("retreat-admin", roles) ? [{ href: "/retreats", label: "수련회 행정팀", hint: "신청·편성·물품" }] : []),
-    ...(canAccessArea("retreat-admin", roles) ? [{ href: "/programs", label: "프로그램 준비", hint: "기획·진행안·브리핑" }] : []),
+    ...(canAccessArea("retreat-admin", roles) ? [{ href: "/programs", label: "수련회 프로그램팀", hint: "기획·진행안·브리핑" }] : []),
     ...(canAccessArea("retreat-field", roles) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
   ];
   // 주일 사역도 같은 드롭다운 구조다. 팀 목록은 featureCatalog가 단일 원천.
