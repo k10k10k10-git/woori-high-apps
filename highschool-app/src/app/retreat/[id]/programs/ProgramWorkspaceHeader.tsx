@@ -8,9 +8,11 @@ type Props = {
   retreat: Retreat;
   fieldAllowed: boolean;
   onNavigate?: (href: string) => void;
+  /** 2단 탭 — 행정·이가드와 같이 sticky 헤더 안에서 흰 띠로 붙는다. */
+  children?: React.ReactNode;
 };
 
-export default function ProgramWorkspaceHeader({ retreat, fieldAllowed, onNavigate }: Props) {
+export default function ProgramWorkspaceHeader({ retreat, fieldAllowed, onNavigate, children }: Props) {
   const router = useRouter();
   const navigate = onNavigate ?? ((href: string) => router.push(href));
   const items = [
@@ -42,6 +44,7 @@ export default function ProgramWorkspaceHeader({ retreat, fieldAllowed, onNaviga
           })}
         </nav>
       </div>
+      {children}
     </header>
   );
 }

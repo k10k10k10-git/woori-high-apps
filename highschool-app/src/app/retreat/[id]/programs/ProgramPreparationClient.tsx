@@ -33,7 +33,7 @@ import {
 } from "@/lib/db";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
-import { createProgramDraft, isProgramSection, type ProgramSectionKey } from "@/lib/programPreparation";
+import { PROGRAM_SECTIONS, createProgramDraft, isProgramSection, type ProgramSectionKey } from "@/lib/programPreparation";
 import type {
   Retreat,
   RetreatProgram,
@@ -224,7 +224,27 @@ export default function ProgramPreparationClient() {
         retreat={retreat}
         fieldAllowed={fieldAllowed}
         onNavigate={(href) => discardGuard.requestAction("다른 화면으로 이동", () => router.push(href))}
-      />
+      >
+        {/* 2단 탭 — 행정·이가드와 같은 workspace-tabs 구조를 그대로 쓴다. */}
+        {selectedProgram && (
+          <div className="workspace-tabs">
+            <div className="mx-auto flex max-w-6xl gap-0 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label="프로그램 준비 항목">
+              {PROGRAM_SECTIONS.map((entry) => (
+                <button
+                  key={entry.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={entry.key === section}
+                  className="workspace-tab shrink-0"
+                  onClick={() => selectSection(entry.key)}
+                >
+                  {entry.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </ProgramWorkspaceHeader>
       <main className="program-preparation-main">
         <div className="program-page-intro">
           <div>
@@ -268,7 +288,6 @@ export default function ProgramPreparationClient() {
                 onUpdateTask={(taskId, data) => updateRetreatProgramTask(retreatId, selectedProgram.id, taskId, data)}
                 onDeleteTask={(taskId) => deleteRetreatProgramTask(retreatId, selectedProgram.id, taskId)}
                 section={section}
-                onSectionChange={selectSection}
                 onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, { name, order }).then(() => undefined)}
                 onUpdatePost={(postId, data: Partial<RetreatProgramPost>) => updateRetreatProgramPost(retreatId, selectedProgram.id, postId, data)}
                 onDeletePost={(postId) => deleteRetreatProgramPost(retreatId, selectedProgram.id, postId)}

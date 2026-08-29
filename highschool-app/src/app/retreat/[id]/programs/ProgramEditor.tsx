@@ -5,7 +5,6 @@ import { CheckCircle, Circle, Plus, Trash, WarningCircle } from "@phosphor-icons
 import { useUI } from "@/context/UIContext";
 import {
   PROGRAM_KIND_META,
-  PROGRAM_SECTIONS,
   PROGRAM_STATUS_META,
   programItems,
   programPosts,
@@ -42,7 +41,6 @@ type Props = {
   onUpdateTask: (taskId: string, data: Partial<Omit<RetreatProgramTask, "id" | "createdAt">>) => Promise<void>;
   onDeleteTask: (taskId: string) => Promise<void>;
   section: ProgramSectionKey;
-  onSectionChange: (section: ProgramSectionKey) => void;
   onCreatePost: (name: string, order: number) => Promise<void>;
   onUpdatePost: (postId: string, data: Partial<RetreatProgramPost>) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
@@ -87,7 +85,6 @@ export default function ProgramEditor({
   onUpdateTask,
   onDeleteTask,
   section,
-  onSectionChange,
   onCreatePost, onUpdatePost, onDeletePost,
   onCreateMatch, onUpdateMatch, onDeleteMatch,
   onCreateRole, onUpdateRole, onDeleteRole,
@@ -231,19 +228,6 @@ export default function ProgramEditor({
           <span>아직 필요해요: {readiness.missingLabels.join(" · ")}</span>
         </div>
       )}
-
-      <nav className="program-section-nav" aria-label="프로그램 준비 항목">
-        {PROGRAM_SECTIONS.map((entry) => (
-          <button key={entry.key} type="button" aria-current={entry.key === section ? "page" : undefined}
-            onClick={() => onSectionChange(entry.key)}>
-            {entry.label}
-            {entry.key === "posts" && posts.length > 0 && <em>{posts.length}</em>}
-            {entry.key === "roles" && roles.length > 0 && <em>{roles.length}</em>}
-            {entry.key === "items" && items.length > 0 && <em>{items.length}</em>}
-            {entry.key === "tasks" && tasks.length > 0 && <em>{doneTasks}/{tasks.length}</em>}
-          </button>
-        ))}
-      </nav>
 
       {section === "overview" && (
         <fieldset disabled={!canEdit || saving} className="program-form">

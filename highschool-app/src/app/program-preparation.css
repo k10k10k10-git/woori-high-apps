@@ -198,23 +198,7 @@
   .published-program-sections { grid-template-columns: 1fr; }
 }
 
-/* ── 편집기 상단 내비게이션 ─────────────────────────────────── */
-.program-section-nav { display: flex; gap: 2px; overflow-x: auto; border-bottom: 1px solid var(--color-border); padding: 0 24px; scrollbar-width: none; }
-.program-section-nav::-webkit-scrollbar { display: none; }
-.program-section-nav button {
-  display: inline-flex; min-height: 44px; flex: 0 0 auto; align-items: center; gap: 6px;
-  border-bottom: 2px solid transparent; padding: 0 13px;
-  color: var(--color-text-muted); font-size: 13px; font-weight: 700; white-space: nowrap;
-  transition: color var(--duration-fast), border-color var(--duration-fast);
-}
-.program-section-nav button:hover { color: var(--color-text-primary); }
-.program-section-nav button[aria-current="page"] { border-bottom-color: var(--color-primary); color: var(--color-primary); }
-.program-section-nav em {
-  display: inline-grid; min-width: 20px; place-items: center; border-radius: 999px;
-  background: var(--color-surface-hover); padding: 1px 6px;
-  color: var(--color-text-muted); font-size: 10px; font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums;
-}
-.program-section-nav button[aria-current="page"] em { background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface)); color: var(--color-primary); }
+/* ── 편집기 보조 문구 ───────────────────────────────────────── */
 .program-section-hint { margin-top: 4px; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
 
 /* ── 하위 항목 공통 ─────────────────────────────────────────── */
@@ -256,7 +240,6 @@
 .program-budget--total strong { color: var(--color-primary); }
 
 @media (max-width: 720px) {
-  .program-section-nav { padding: 0 16px; }
   .program-budget { grid-template-columns: 1fr; }
   .program-inline-form { flex-wrap: wrap; }
   .program-card-actions { flex-wrap: wrap; }
