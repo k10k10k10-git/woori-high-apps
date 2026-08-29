@@ -39,6 +39,7 @@ import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
 import { currentBlockFor, currentRetreatDay } from "@/features/iguard/lib/scheduleTime";
 import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
+import RetreatAreaNav from "@/features/portal/RetreatAreaNav";
 import { canAccessArea, iguardScopeOf } from "@/features/portal/accessPolicy";
 import { useViewMode } from "@/context/ViewModeContext";
 
@@ -251,11 +252,12 @@ function IguardWorkspace({ id }: { id: string }) {
             </button>
             <span className="hidden text-slate-600 sm:inline">|</span>
             <span className="hidden px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 sm:inline-flex" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>
-            <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
+            <h1 className="min-w-0 truncate text-sm font-bold text-white sm:text-base">{retreat.name}</h1>
+            <RetreatAreaNav retreatId={id} current="field" adminAllowed={canAccessArea("retreat-admin", roles)} fieldAllowed onNavigate={(href) => router.push(href)} />
             <button
               onClick={() => setSearchOpen(true)}
               disabled={dataLoading}
-              className="hidden min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40 sm:flex"
+              className="ml-auto hidden min-h-10 min-w-10 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-lg px-2 text-xs text-slate-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40 sm:flex"
               aria-label="이름·조·호실·호차 검색"
             >
               <MagnifyingGlass aria-hidden="true" size={17} weight="regular" /><span>검색</span>
@@ -272,7 +274,7 @@ function IguardWorkspace({ id }: { id: string }) {
                 <DownloadSimple aria-hidden="true" size={17} weight="regular" /><span>큐싯 가져오기</span>
               </button>
             )}
-            <div ref={fieldToolsRef} className="relative shrink-0 sm:hidden">
+            <div ref={fieldToolsRef} className="relative ml-auto shrink-0 sm:hidden sm:ml-0">
               <button
                 type="button"
                 className="field-header-more"

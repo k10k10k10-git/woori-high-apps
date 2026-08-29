@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, ArrowRight, ClipboardText, DotsThree, GearSix } from "@phosphor-icons/react";
+import { ArrowLeft, DotsThree, GearSix } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeToRetreat, updateRetreat } from "@/lib/db";
 import { Retreat } from "@/lib/types";
@@ -9,6 +9,7 @@ import { parseSheetUrl, buildSheetUrl } from "@/lib/sheetsParser";
 import { useUI } from "@/context/UIContext";
 import ParticipantsTab from "./ParticipantsTab";
 import RetreatPrepSummary from "./RetreatPrepSummary";
+import RetreatAreaNav from "@/features/portal/RetreatAreaNav";
 import GroupsTab from "./GroupsTab";
 import RoomsTab from "./RoomsTab";
 import ClassRosterTab from "./ClassRosterTab";
@@ -254,19 +255,8 @@ export default function RetreatPageClient() {
                 {retreat.year}년
               </span>
               <h1 className="font-bold text-white text-xs sm:text-base truncate min-w-0">{retreat.name}</h1>
+              <RetreatAreaNav retreatId={id} current="admin" adminAllowed fieldAllowed={canAccessArea("retreat-field", roles)} />
                <div className="ml-auto shrink-0 whitespace-nowrap flex items-center gap-1.5">
-                 <button
-                   onClick={() => router.push(`/retreat/${id}/programs`)}
-                   className="hidden shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.07] px-2 py-1.5 text-[11px] font-semibold text-[var(--color-on-dark-accent)] transition hover:bg-white/[0.12] sm:flex sm:px-2.5 sm:text-xs"
-                 >
-                   <ClipboardText aria-hidden="true" size={14} /> 프로그램 준비
-                 </button>
-                 <button
-                   onClick={() => router.push(`/retreat/${id}/field`)}
-                   className="shrink-0 whitespace-nowrap rounded-lg border border-white/10 bg-white/[0.07] px-2 py-1.5 text-[11px] font-semibold text-[var(--color-on-dark-accent)] transition hover:bg-white/[0.12] sm:px-2.5 sm:text-xs"
-                 >
-                   이가드 현장 <ArrowRight aria-hidden="true" className="inline align-[-2px]" size={14} />
-                 </button>
                  <button
                    onClick={() => setEditingSheet(true)}
                    className="hidden shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-xs text-slate-400 transition hover:bg-white/10 hover:text-white sm:flex"

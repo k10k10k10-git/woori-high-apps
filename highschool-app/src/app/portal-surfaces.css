@@ -122,3 +122,24 @@
   .retreat-prep-summary__roster { margin-left: 0; }
   .retreat-prep-chip { min-height: 44px; width: 100%; }
 }
+
+/* ── 수련회 업무 영역 전환 (행정·프로그램 준비·이가드) ─────────── */
+/* 세 화면이 같은 마크업을 쓰도록 공용 컴포넌트 RetreatAreaNav 하나만 이 규칙을 쓴다. */
+.retreat-area-nav { display: flex; min-width: 0; flex: 0 1 auto; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.retreat-area-nav::-webkit-scrollbar { display: none; }
+.retreat-area-nav button {
+  position: relative;
+  display: inline-flex; min-height: 40px; flex: 0 0 auto; align-items: center; gap: 6px;
+  border-radius: 9px; padding: 0 11px;
+  color: var(--color-on-dark-muted); font-size: 13px; font-weight: 700; white-space: nowrap;
+  transition: color var(--duration-fast), background var(--duration-fast);
+}
+.retreat-area-nav button:hover { background: rgba(255,255,255,.07); color: var(--color-on-dark-primary); }
+.retreat-area-nav button[aria-current="page"] { background: rgba(255,255,255,.1); color: var(--color-on-dark-primary); }
+.retreat-area-nav button[aria-current="page"] svg { color: var(--color-on-dark-accent); }
+
+@media (max-width: 720px) {
+  /* 제목 줄이 좁아지므로 라벨을 접고 아이콘만 남긴다 — 이름은 aria-label이 들고 있다. */
+  .retreat-area-nav button { min-width: 40px; justify-content: center; padding: 0 9px; }
+  .retreat-area-nav button span { display: none; }
+}
