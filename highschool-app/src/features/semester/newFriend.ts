@@ -73,6 +73,10 @@ export function formatClassLabel(classKey?: string): string {
   return match ? `${match[1]}부 ${match[2]}학년 ${match[3]}반` : classKey;
 }
 
+export function formatNewFriendGrade(grade?: number): string {
+  return grade && grade > 0 ? `${grade}학년` : "학년 미입력";
+}
+
 export function needsClassAssignment(friend: NewFriend): boolean {
   return Boolean(
     friend.week2Date

@@ -9,6 +9,7 @@ import {
   findNewFriendDuplicate,
   formatClassLabel,
   formatKoreanPhone,
+  formatNewFriendGrade,
   koreaDateInputValue,
   needsClassAssignment,
   NEW_FRIEND_FAITH_STEP_OPTIONS,
@@ -67,6 +68,8 @@ describe("새친구 진행 단계", () => {
     expect(formatKoreanPhone("01011112222")).toBe("010-1111-2222");
     expect(formatKoreanPhone("0311234567")).toBe("031-123-4567");
     expect(formatClassLabel("2-1-9")).toBe("2부 1학년 9반");
+    expect(formatNewFriendGrade(2)).toBe("2학년");
+    expect(formatNewFriendGrade(0)).toBe("학년 미입력");
   });
 
   it("2주차를 마치고 반이 없는 대상의 카카오톡 복사문을 만든다", () => {

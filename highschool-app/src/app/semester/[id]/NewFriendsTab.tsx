@@ -19,6 +19,7 @@ import {
   deriveNewFriendStage,
   formatClassLabel,
   formatKoreanPhone,
+  formatNewFriendGrade,
   koreaDateInputValue,
   needsClassAssignment,
   NEW_FRIEND_FAITH_STEP_OPTIONS,
@@ -459,7 +460,7 @@ export default function NewFriendsTab({
                   <div className="min-w-0 text-sm leading-6 text-slate-700">
                     <p><span className="text-slate-400">이름 :</span> <strong className="text-slate-900">{friend.name}</strong></p>
                     <p><span className="text-slate-400">부서 :</span> {friend.part}</p>
-                    <p><span className="text-slate-400">학년 :</span> {friend.grade}학년</p>
+                    <p><span className="text-slate-400">학년 :</span> {formatNewFriendGrade(friend.grade)}</p>
                     <p><span className="text-slate-400">성별 :</span> {friend.gender || "미입력"}</p>
                   </div>
                   <button type="button" className="btn-secondary shrink-0 px-2.5 py-1.5 text-[11px]" onClick={() => copyAssignment(friend)} aria-label={`${friend.name} 학생 정보 복사`}>
@@ -496,7 +497,7 @@ export default function NewFriendsTab({
                   <span className={`inline-flex shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${PROGRESS_STYLE[progress]}`}>{progress}</span>
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                  <div><dt className="text-slate-400">부서 / 학년</dt><dd className="mt-1 font-medium text-slate-700">{friend.part} / {friend.grade}학년</dd></div>
+                  <div><dt className="text-slate-400">부서 / 학년</dt><dd className="mt-1 font-medium text-slate-700">{friend.part} / {formatNewFriendGrade(friend.grade)}</dd></div>
                   <div><dt className="text-slate-400">바나바 담당</dt><dd className="mt-1 font-medium text-slate-700">{friend.owner || "미배정"}</dd></div>
                   <div><dt className="text-slate-400">1주차</dt><dd className="mt-1 tabular-nums text-slate-700">{friend.week1Date || "-"}</dd></div>
                   <div><dt className="text-slate-400">2주차</dt><dd className="mt-1 tabular-nums text-slate-700">{friend.week2Date || "-"}</dd></div>
@@ -558,7 +559,7 @@ export default function NewFriendsTab({
                   </button>
                 </td>
                 <td className="max-w-40 truncate px-3 py-3 text-slate-600">{friend.school || "-"}</td>
-                <td className="whitespace-nowrap px-3 py-3 text-slate-600">{friend.part} · {friend.grade}학년</td>
+                <td className="whitespace-nowrap px-3 py-3 text-slate-600">{friend.part} · {formatNewFriendGrade(friend.grade)}</td>
                 <td className="px-3 py-3 text-slate-600">{friend.owner || "미배정"}</td>
                 <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week1Date || "-"}</td>
                 <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{friend.week2Date || "-"}</td>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { deriveNewFriendStage, formatClassLabel } from "@/features/semester/newFriend";
+import { deriveNewFriendStage, formatClassLabel, formatNewFriendGrade } from "@/features/semester/newFriend";
 import type { NewFriendPrivate } from "@/features/semester/types";
 import { sundayFriendKey, type SundayAdminChange, type SundayNewFriend } from "./model";
 
@@ -77,7 +77,7 @@ export function PendingTab({ friends, privateValueFor, showPrivate, onOpenNewFri
               <strong className="text-slate-900">{friend.name}</strong>
               <span className="rounded-full bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-700">{stage}</span>
             </div>
-            <p className="mt-2 text-xs text-slate-500">{friend.part} · {friend.grade}학년 · 담당 {friend.owner || "미배정"}</p>
+            <p className="mt-2 text-xs text-slate-500">{friend.part} · {formatNewFriendGrade(friend.grade)} · 담당 {friend.owner || "미배정"}</p>
             {showPrivate && <p className="mt-2 text-xs text-slate-500">연락처 {priv?.phone || "-"}</p>}
             <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] text-slate-400">다음 확인: {nextAction(friend)}</p>
           </article>;
