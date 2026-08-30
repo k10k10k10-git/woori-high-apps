@@ -45,7 +45,7 @@ function mobileSectionOf(tab: TabName): MobileSection {
 const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
   신청: { title: "훈련·사역팀 신청 및 삭제", description: "이름으로 찾아 신청을 접수하거나 삭제합니다." },
   배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
-  출석: { title: "출석부", description: "주차별 출석과 점수·출석률·수료 판정, 수료증·사진 작업을 한 표에서 관리합니다." },
+  출석: { title: "출석부", description: "사역팀·훈련 출석을 따로 기록하고 두 수료 판정과 수료증·사진 작업을 한 표에서 관리합니다." },
   커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 주차별 모임 계획을 작성하고 공유합니다." },
   아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
   설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 주차와 수료 기준을 관리합니다." },

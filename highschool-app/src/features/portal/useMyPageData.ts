@@ -150,7 +150,7 @@ export function useMyPageData() {
       subscribeApplications(sid, (values) => { setApplications(values); ok("학기 신청"); }, fail("학기 신청")),
       subscribeTeams(sid, (values) => { setTeams(values); ok("사역팀"); }, fail("사역팀")),
       subscribeTrainingClasses(sid, (values) => { setTrainingClasses(values); ok("훈련 반"); }, fail("훈련 반")),
-      subscribeAllAttendance(sid, (values) => { setAttendance(values); ok("학기 출석"); }, fail("학기 출석")),
+      subscribeAllAttendance(sid, "team", (values) => { setAttendance(values); ok("학기 사역팀 출석"); }, fail("학기 사역팀 출석")),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [currentSemester, fail, ok, roles, user]);

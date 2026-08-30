@@ -4,6 +4,8 @@
 //         classes/*·attendance/*·trash/*는 학생 앱 소유. 새친구 단건 등록과 그 등록의 검증된 되돌리기만 통합관리자 예외.
 //         admins, retreatAdmins 는 읽기 전용 (다른 앱 소유).
 
+import type { SemesterAttendanceScope } from "./types";
+
 export const paths = {
   // ── 소유 노드 ──
   semesters: () => `semesters`,
@@ -19,9 +21,12 @@ export const paths = {
   session: (sid: string, sessId: string) => `semesters/${sid}/sessions/${sessId}`,
   applications: (sid: string) => `semesters/${sid}/applications`,
   application: (sid: string, appKey: string) => `semesters/${sid}/applications/${appKey}`,
-  teamAttendance: (sid: string, sessId: string) => `semesters/${sid}/attendance/team/${sessId}`,
-  teamAttendanceEntry: (sid: string, sessId: string, appKey: string) =>
-    `semesters/${sid}/attendance/team/${sessId}/${appKey}`,
+  attendanceByScope: (sid: string, scope: SemesterAttendanceScope) =>
+    `semesters/${sid}/attendance/${scope}`,
+  attendanceSession: (sid: string, scope: SemesterAttendanceScope, sessId: string) =>
+    `semesters/${sid}/attendance/${scope}/${sessId}`,
+  attendanceEntry: (sid: string, scope: SemesterAttendanceScope, sessId: string, appKey: string) =>
+    `semesters/${sid}/attendance/${scope}/${sessId}/${appKey}`,
   completion: (sid: string) => `semesters/${sid}/completion`,
   completionEntry: (sid: string, appKey: string) => `semesters/${sid}/completion/${appKey}`,
   archiveLinks: (sid: string) => `semesters/${sid}/archiveLinks`,

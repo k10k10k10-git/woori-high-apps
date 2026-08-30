@@ -23,6 +23,7 @@ import {
   NewFriend,
   NewFriendPrivate,
   Semester,
+  SemesterAttendanceScope,
   SemesterMeta,
   Session,
   SessionAttendance,
@@ -279,41 +280,50 @@ export function subscribeApplicationsPrivate(
 }
 
 // ── 출석 ──────────────────────────────────────────────────────────────
+// 사역팀(team)과 훈련(training)은 별도 원장이다. 기존 team 기록은 그대로 보존한다.
 // 멱등 명시 상태 기록 — 토글 아님 (같은 상태를 다시 눌러도 동일 결과).
 
 export function subscribeSessionAttendance(
   sid: string,
+  scope: SemesterAttendanceScope,
   sessId: string,
   cb: (att: SessionAttendance) => void,
   onError?: (e: Error) => void,
 ) {
-  return onValue(ref(db, paths.teamAttendance(sid, sessId)), (s) => cb(s.val() ?? {}), onError);
+  return onValue(ref(db, paths.attendanceSession(sid, scope, sessId)), (s) => cb(s.val() ?? {}), onError);
 }
 
 export function subscribeAllAttendance(
   sid: string,
+  scope: SemesterAttendanceScope,
   cb: (bySession: Record<string, SessionAttendance>) => void,
   onError?: (e: Error) => void,
 ) {
-  return onValue(ref(db, `${paths.semester(sid)}/attendance/team`), (s) => cb(s.val() ?? {}), onError);
+  return onValue(ref(db, paths.attendanceByScope(sid, scope)), (s) => cb(s.val() ?? {}), onError);
 }
 
 export async function setAttendance(
   sid: string,
+  scope: SemesterAttendanceScope,
   sessId: string,
   appKey: string,
   status: AttendanceStatus,
   byUid?: string,
 ): Promise<void> {
-  await update(ref(db, paths.teamAttendanceEntry(sid, sessId, appKey)), {
+  await update(ref(db, paths.attendanceEntry(sid, scope, sessId, appKey)), {
     s: status,
     by: byUid ?? null,
     at: nowISO(),
   });
 }
 
-export async function clearAttendance(sid: string, sessId: string, appKey: string): Promise<void> {
-  await remove(ref(db, paths.teamAttendanceEntry(sid, sessId, appKey)));
+export async function clearAttendance(
+  sid: string,
+  scope: SemesterAttendanceScope,
+  sessId: string,
+  appKey: string,
+): Promise<void> {
+  await remove(ref(db, paths.attendanceEntry(sid, scope, sessId, appKey)));
 }
 
 // ── 수료 체크리스트 ────────────────────────────────────────────────────

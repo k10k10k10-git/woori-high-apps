@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calcCompletion } from "./completion";
-import { Session, SessionAttendance } from "./types";
+import { calcCompletion, calcScopedCompletions } from "./completion";
+import { AttendanceByScope, Session, SessionAttendance } from "./types";
 
 const sessions: Session[] = [
   { id: "s1", date: "2026-03-14", type: "정규" },
@@ -49,5 +49,37 @@ describe("calcCompletion — 출석2/지각1/결석0, 휴강 제외", () => {
     const r = calcCompletion("a", [{ id: "x", date: "2026-01-01", type: "휴강" }], {}, 0.7);
     expect(r.rate).toBe(0);
     expect(r.completed).toBe(false);
+  });
+});
+
+describe("calcScopedCompletions — 사역팀·훈련 출석 분리", () => {
+  it("같은 신청자라도 각 출석 원장의 기록만으로 별도 판정한다", () => {
+    const attendance: AttendanceByScope = {
+      team: att({ s1: { a: "출석" }, s2: { a: "출석" }, s4: { a: "출석" } }),
+      training: att({ s1: { a: "결석" } }),
+    };
+
+    const result = calcScopedCompletions("a", sessions, attendance, 0.7, {
+      team: true,
+      training: true,
+    });
+
+    expect(result.team).toMatchObject({ score: 6, completed: true });
+    expect(result.training).toMatchObject({ score: 0, completed: false });
+  });
+
+  it("신청하지 않은 축은 출석값이 있어도 판정 대상이 아니다", () => {
+    const attendance: AttendanceByScope = {
+      team: {},
+      training: att({ s1: { a: "출석" }, s2: { a: "출석" }, s4: { a: "출석" } }),
+    };
+
+    const result = calcScopedCompletions("a", sessions, attendance, 0.7, {
+      team: true,
+      training: false,
+    });
+
+    expect(result.team?.completed).toBe(false);
+    expect(result.training).toBeNull();
   });
 });

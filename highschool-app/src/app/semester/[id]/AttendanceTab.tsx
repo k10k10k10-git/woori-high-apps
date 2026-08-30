@@ -20,10 +20,20 @@ import {
 import AttendanceGrid from "./AttendanceGrid";
 import { applicantSortKey } from "@/features/semester/applicant";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
-import { semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
+import { completionRoster, semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
 import { sessionDateLabel, sessionIncludesDate } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
-import { Application, AttendanceStatus, CompletionEntry, SemesterMeta, Session, SessionAttendance, Team, TrainingClass } from "@/features/semester/types";
+import {
+  Application,
+  AttendanceByScope,
+  AttendanceStatus,
+  CompletionEntry,
+  SemesterMeta,
+  Session,
+  SessionAttendance,
+  Team,
+  TrainingClass,
+} from "@/features/semester/types";
 import { useViewMode } from "@/context/ViewModeContext";
 
 interface Props {
@@ -42,6 +52,8 @@ const STATUS_BTN: { s: AttendanceStatus; on: string }[] = [
   { s: "결석", on: "bg-red-100 text-red-900 border-red-300" },
 ];
 
+const EMPTY_ATTENDANCE_BY_SCOPE: AttendanceByScope = { team: {}, training: {} };
+
 function todayYMD(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -56,8 +68,11 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [teamFilter, setTeamFilter] = useState<string>("");
   const [classFilter, setClassFilter] = useState<string>("");
   const [scope, setScope] = useState<SemesterRosterScope>("team");
-  const [att, setAtt] = useState<SessionAttendance>({});
-  const [attAll, setAttAll] = useState<Record<string, SessionAttendance>>({});
+  const [sessionAttendance, setSessionAttendance] = useState<{ key: string; values: SessionAttendance }>({
+    key: "",
+    values: {},
+  });
+  const [attAllByScope, setAttAllByScope] = useState<AttendanceByScope>(EMPTY_ATTENDANCE_BY_SCOPE);
   const [completion, setCompletion] = useState<Record<string, CompletionEntry>>({});
   const [pickedView, setPickedView] = useState<"grid" | "session" | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -73,18 +88,28 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     return candidate.id;
   }, [sessions]);
   const activeSessId = sessions.some((session) => session.id === sessId) ? sessId : defaultSessId;
+  const activeAttendanceKey = `${scope}/${activeSessId}`;
+  const att = sessionAttendance.key === activeAttendanceKey ? sessionAttendance.values : {};
 
   useEffect(() => {
     if (!activeSessId) return;
-    return subscribeSessionAttendance(sid, activeSessId, setAtt, (e) => setLoadError(e.message));
-  }, [sid, activeSessId]);
+    const key = `${scope}/${activeSessId}`;
+    return subscribeSessionAttendance(sid, scope, activeSessId, (values) => {
+      setSessionAttendance({ key, values });
+    }, (e) => setLoadError(e.message));
+  }, [sid, scope, activeSessId]);
 
   // 표 보기는 전 회차를 한 번에 본다 (수료 탭과 같은 경로를 재사용)
   useEffect(() => {
     if (view !== "grid") return;
     const fail = (error: Error) => setLoadError(error.message);
     const unsubs = [
-      subscribeAllAttendance(sid, setAttAll, fail),
+      subscribeAllAttendance(sid, "team", (values) => {
+        setAttAllByScope((current) => ({ ...current, team: values }));
+      }, fail),
+      subscribeAllAttendance(sid, "training", (values) => {
+        setAttAllByScope((current) => ({ ...current, training: values }));
+      }, fail),
       subscribeCompletion(sid, setCompletion, fail),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
@@ -105,11 +130,15 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         }),
     [applications, scope, teamFilter, classFilter, teamById],
   );
+  const completionEligibleByScope = useMemo(() => ({
+    team: new Set(completionRoster(applications, "team").map((application) => application.id)),
+    training: new Set(completionRoster(applications, "training").map((application) => application.id)),
+  }), [applications]);
 
   async function markAt(appKey: string, sessionId: string, status: AttendanceStatus) {
     setSaveState("saving");
     try {
-      await setAttendance(sid, sessionId, appKey, status, user?.uid);
+      await setAttendance(sid, scope, sessionId, appKey, status, user?.uid);
       setSaveState("saved");
     } catch (e) {
       setSaveState("error");
@@ -120,7 +149,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   async function clearAt(appKey: string, sessionId: string) {
     setSaveState("saving");
     try {
-      await clearAttendance(sid, sessionId, appKey);
+      await clearAttendance(sid, scope, sessionId, appKey);
       setSaveState("saved");
     } catch (error) {
       setSaveState("error");
@@ -256,7 +285,9 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         <AttendanceGrid
           members={members}
           sessions={sessions}
-          attBySession={attAll}
+          scope={scope}
+          attendanceByScope={attAllByScope}
+          completionEligibleByScope={completionEligibleByScope}
           canEdit={canEdit}
           completion={completion}
           completionMinRate={meta?.completionRule?.minRate ?? 0.7}

@@ -1,7 +1,7 @@
 import { STAFF_BU } from "./applicant";
-import type { Application } from "./types";
+import type { Application, SemesterAttendanceScope } from "./types";
 
-export type SemesterRosterScope = "team" | "training";
+export type SemesterRosterScope = SemesterAttendanceScope;
 
 /** 교사·스탭 신청인가 — 학생과 화면에서 분리하거나 수료 대상에서 빼는 판정의 단일 지점. */
 export function isStaffApplication(application: { bu: string }): boolean {

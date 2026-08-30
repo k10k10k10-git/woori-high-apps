@@ -7,17 +7,26 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { describeApplicant } from "@/features/semester/db";
-import { calcCompletion } from "@/features/semester/completion";
+import { calcScopedCompletions } from "@/features/semester/completion";
 import { isStaffApplication, splitStudentsAndStaff } from "@/features/semester/roster";
 import { sessionDateLabel, sessionDayLabel } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
-import type { Application, AttendanceStatus, CompletionEntry, Session, SessionAttendance } from "@/features/semester/types";
+import type {
+  Application,
+  AttendanceByScope,
+  AttendanceStatus,
+  CompletionEntry,
+  SemesterAttendanceScope,
+  Session,
+} from "@/features/semester/types";
 import { attendanceMenuPosition } from "./attendanceGridPosition";
 
 type Props = {
   members: Application[];
   sessions: Session[];
-  attBySession: Record<string, SessionAttendance>;
+  scope: SemesterAttendanceScope;
+  attendanceByScope: AttendanceByScope;
+  completionEligibleByScope: Record<SemesterAttendanceScope, ReadonlySet<string>>;
   canEdit: boolean;
   completion: Record<string, CompletionEntry>;
   completionMinRate: number;
@@ -57,7 +66,9 @@ function memberSections(members: Application[]): { label: string | null; rows: A
 export default function AttendanceGrid({
   members,
   sessions,
-  attBySession,
+  scope,
+  attendanceByScope,
+  completionEligibleByScope,
   canEdit,
   completion,
   completionMinRate,
@@ -72,7 +83,8 @@ export default function AttendanceGrid({
   const anchorRef = useRef<HTMLButtonElement | null>(null);
   const groups = useMemo(() => monthGroups(sessions), [sessions]);
   const sections = useMemo(() => memberSections(members), [members]);
-  const columnCount = sessions.length + 7;
+  const selectedAttendance = attendanceByScope[scope];
+  const columnCount = sessions.length + 8;
 
   function closeMenu() {
     setOpenCell(null);
@@ -145,8 +157,15 @@ export default function AttendanceGrid({
                 {group.month}월
               </th>
             ))}
-            {(["점수", "출석률", "판정", "수료증", "사진"] as const).map((label) => (
-              <th key={label} rowSpan={2} className="min-w-16 border-l px-2 py-2 text-xs font-semibold text-slate-500" style={{ borderColor: "var(--color-border)" }}>
+            {([
+              scope === "team" ? "사역팀 점수" : "훈련 점수",
+              scope === "team" ? "사역팀 출석률" : "훈련 출석률",
+              "사역팀 수료",
+              "훈련 수료",
+              "수료증",
+              "사진",
+            ] as const).map((label) => (
+              <th key={label} rowSpan={2} className="min-w-20 whitespace-nowrap border-l px-2 py-2 text-xs font-semibold text-slate-500" style={{ borderColor: "var(--color-border)" }}>
                 {label}
               </th>
             ))}
@@ -179,7 +198,13 @@ export default function AttendanceGrid({
               )}
               {section.rows.map((member, index) => {
                 const staffMember = isStaffApplication(member);
-                const result = staffMember ? null : calcCompletion(member.id, sessions, attBySession, completionMinRate);
+                const results = staffMember
+                  ? { team: null, training: null }
+                  : calcScopedCompletions(member.id, sessions, attendanceByScope, completionMinRate, {
+                      team: completionEligibleByScope.team.has(member.id),
+                      training: completionEligibleByScope.training.has(member.id),
+                    });
+                const selectedResult = results[scope];
                 const check = completion[member.id] ?? {};
                 return (
                 <tr key={member.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
@@ -189,7 +214,7 @@ export default function AttendanceGrid({
                     <span className="ml-1.5 text-[11px] text-slate-400">{describeApplicant(member)}</span>
                   </td>
                   {sessions.map((session) => {
-                    const entry = attBySession[session.id]?.[member.id];
+                    const entry = selectedAttendance[session.id]?.[member.id];
                     const holiday = session.type === "휴강";
                     const open = openCell?.appKey === member.id && openCell?.sessId === session.id;
                     return (
@@ -213,12 +238,19 @@ export default function AttendanceGrid({
                     );
                   })}
                   <td className="border-l px-2 py-1.5 text-xs tabular-nums text-slate-600" style={{ borderColor: "var(--color-border)" }}>
-                    {result ? `${result.score}/${result.maxScore}` : "-"}
+                    {selectedResult ? `${selectedResult.score}/${selectedResult.maxScore}` : "-"}
                   </td>
-                  <td className="px-2 py-1.5 text-xs tabular-nums text-slate-600">{result ? `${Math.round(result.rate * 100)}%` : "-"}</td>
-                  <td className="px-2 py-1.5">
-                    {result ? <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${result.completed ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-500"}`}>{result.completed ? "수료" : "미수료"}</span> : <span className="text-xs text-slate-400">대상 아님</span>}
-                  </td>
+                  <td className="px-2 py-1.5 text-xs tabular-nums text-slate-600">{selectedResult ? `${Math.round(selectedResult.rate * 100)}%` : "-"}</td>
+                  {(["team", "training"] as const).map((completionScope) => {
+                    const result = results[completionScope];
+                    return (
+                      <td key={completionScope} className="px-2 py-1.5">
+                        {result
+                          ? <span className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-medium ${result.completed ? "bg-emerald-100 text-emerald-900" : "bg-slate-100 text-slate-500"}`}>{result.completed ? "수료" : "미수료"}</span>
+                          : <span className="whitespace-nowrap text-xs text-slate-400">대상 아님</span>}
+                      </td>
+                    );
+                  })}
                   <td className="px-2 py-1.5">
                     {!staffMember && <input type="checkbox" aria-label={`${member.name} 수료증 제작`} disabled={!canEdit} checked={check.certPrinted ?? false} onChange={(event) => onToggleCompletion(member.id, "certPrinted", event.target.checked)} />}
                   </td>
@@ -236,7 +268,7 @@ export default function AttendanceGrid({
       {/* 메뉴는 body로 포털 — 표의 overflow에 잘리지 않는다 */}
       {openCell && menuAt && typeof document !== "undefined" && createPortal(
         (() => {
-          const entry = attBySession[openCell.sessId]?.[openCell.appKey];
+          const entry = selectedAttendance[openCell.sessId]?.[openCell.appKey];
           return (
             <div ref={menuRef} role="menu"
               style={{ left: menuAt.left, top: menuAt.top, width: 148 }}

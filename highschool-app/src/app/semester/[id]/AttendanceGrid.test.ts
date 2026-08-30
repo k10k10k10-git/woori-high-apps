@@ -44,4 +44,13 @@ describe("출석 상태 셀 밀도", () => {
     expect(css).toContain(".semester-attendance-grid .attendance-session-cell { width: 52px; min-width: 52px; max-width: 52px; }");
     expect(css).not.toContain(".semester-attendance-grid :where(th, td):nth-child(2)");
   });
+
+  it("현재 원장의 점수와 사역팀·훈련 수료 판정을 한 표에 함께 표시한다", () => {
+    const source = readFileSync(join(process.cwd(), "src/app/semester/[id]/AttendanceGrid.tsx"), "utf8");
+
+    expect(source).toContain('scope === "team" ? "사역팀 점수" : "훈련 점수"');
+    expect(source).toContain('"사역팀 수료"');
+    expect(source).toContain('"훈련 수료"');
+    expect(source).toContain("calcScopedCompletions");
+  });
 });

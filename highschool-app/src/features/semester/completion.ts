@@ -1,7 +1,13 @@
 // 수료 판정 순수 로직 — 시트의 "출석 2 / 지각 1 / 결석 0" 규칙을 그대로 계승.
 // 수료 여부는 DB에 저장하지 않고 항상 이 함수로 계산한다(이중 원장 방지).
 
-import { AttendanceStatus, Session, SessionAttendance } from "./types";
+import {
+  AttendanceByScope,
+  AttendanceStatus,
+  SemesterAttendanceScope,
+  Session,
+  SessionAttendance,
+} from "./types";
 
 export const SCORE: Record<AttendanceStatus, number> = {
   출석: 2,
@@ -43,5 +49,23 @@ export function calcCompletion(
     rate,
     completed: maxScore > 0 && rate >= minRate,
     regularSessionCount: regs.length,
+  };
+}
+
+/** 사역팀·훈련은 같은 신청자를 공유해도 서로 다른 출석 원장으로 판정한다. */
+export function calcScopedCompletions(
+  appKey: string,
+  sessions: Session[],
+  attendanceByScope: AttendanceByScope,
+  minRate: number,
+  eligible: Record<SemesterAttendanceScope, boolean>,
+): Record<SemesterAttendanceScope, CompletionResult | null> {
+  return {
+    team: eligible.team
+      ? calcCompletion(appKey, sessions, attendanceByScope.team, minRate)
+      : null,
+    training: eligible.training
+      ? calcCompletion(appKey, sessions, attendanceByScope.training, minRate)
+      : null,
   };
 }

@@ -112,6 +112,8 @@
 | `semesters/{sid}/trainingClasses/{id}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반. 삭제 시 `applications/*/trainingClassId`를 같은 루트 update로 함께 비운다(`trainingClass.ts`) |
 | `semesters/{sid}/teams/{id}/goal` | highschool-app 학기 모듈 | - | highschool-app | 팀별 이번 학기 목표 (커리큘럼 탭 상단) |
 | `semesters/{sid}/applications/{key}/trainingClassId` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반 배정. 값이 없으면 훈련 미신청 — 사역팀 지원은 고3 2학기·스탭만 가능(`intakeRule.ts`). `trainingOnly`는 파생 유지 |
+| `semesters/{sid}/attendance/team/{sessionId}` | highschool-app 학기 모듈 | - | highschool-app | 사역팀 출석 원장. 2026-08-30 이전 기록을 포함하며 훈련 출석의 대체값으로 읽지 않는다. |
+| `semesters/{sid}/attendance/training/{sessionId}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 출석 원장. 사역팀 출석과 같은 신청자 키를 써도 독립적으로 기록·판정한다. |
 | `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 | `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | - | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
 | `semestersPrivate/{sid}/newFriendsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 새친구 연락처·주소·가족·심방 메모 |

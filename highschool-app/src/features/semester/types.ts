@@ -72,6 +72,7 @@ export interface ApplicationPrivate {
 }
 
 export type AttendanceStatus = "출석" | "지각" | "결석";
+export type SemesterAttendanceScope = "team" | "training";
 
 export interface AttendanceEntry {
   s: AttendanceStatus;
@@ -81,6 +82,7 @@ export interface AttendanceEntry {
 
 // 회차별 출석 맵: appKey → entry (노드 없음 = 미기록)
 export type SessionAttendance = Record<string, AttendanceEntry>;
+export type AttendanceByScope = Record<SemesterAttendanceScope, Record<string, SessionAttendance>>;
 
 export interface CompletionEntry {
   certPrinted?: boolean;
