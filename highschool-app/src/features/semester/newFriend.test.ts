@@ -9,7 +9,11 @@ import {
   findNewFriendDuplicate,
   formatClassLabel,
   formatKoreanPhone,
+  koreaDateInputValue,
   needsClassAssignment,
+  NEW_FRIEND_FAITH_STEP_OPTIONS,
+  NEW_FRIEND_INVITER_OPTIONS,
+  newFriendRegisteredDate,
   newFriendAssignmentCopyText,
   personIdForNewFriend,
   studentIdForNewFriend,
@@ -35,8 +39,21 @@ describe("새친구 진행 단계", () => {
     expect(deriveNewFriendStage(friend({ week1Date: "2026-08-02", week2Date: "2026-08-09" }))).toBe("등록 결정");
     expect(deriveNewFriendStage(friend({ decision: "등록" }))).toBe("반배정");
     expect(deriveNewFriendStage(friend({ decision: "등록", assignedClassKey: "1-1-2" }))).toBe("출석부 반영");
-    expect(deriveNewFriendStage(friend({ rosterSync: { studentId: "nf_1", classKey: "1-1-2", syncedAt: "now" } }))).toBe("등반 확인");
+    expect(deriveNewFriendStage(friend({ rosterSync: { studentId: "nf_1", classKey: "1-1-2", syncedAt: "now" } }))).toBe("완료");
     expect(deriveNewFriendStage(friend({ giftDate: "2026-08-16" }))).toBe("완료");
+  });
+
+  it("등록일은 수정값을 우선하고 기존 기록은 생성 시각의 한국 날짜로 보완한다", () => {
+    expect(koreaDateInputValue(new Date("2026-08-29T15:30:00.000Z"))).toBe("2026-08-30");
+    expect(newFriendRegisteredDate(friend({ createdAt: "2026-08-29T15:30:00.000Z" }))).toBe("2026-08-30");
+    expect(newFriendRegisteredDate(friend({ registeredDate: "2026-08-28" }))).toBe("2026-08-28");
+  });
+
+  it("인도자와 신급 선택지는 운영 합의 순서로 고정한다", () => {
+    expect(NEW_FRIEND_INVITER_OPTIONS).toEqual(["부모", "친구", "스스로", "기타"]);
+    expect(NEW_FRIEND_FAITH_STEP_OPTIONS).toEqual([
+      "아직 안함", "학습", "세례", "유아세례", "입교", "침례", "영세", "기억안남",
+    ]);
   });
 
   it("출석부 반영을 기준으로 대기·처리중·완료를 표시한다", () => {

@@ -157,6 +157,8 @@ export interface NewFriend {
   decision: NewFriendDecision;
   week1Date?: string;
   week2Date?: string;
+  /** 운영 화면에서 수정할 수 있는 새친구 접수일(YYYY-MM-DD). createdAt 감사 시각과 분리한다. */
+  registeredDate?: string;
   inviter?: string;
   faithStep?: string;
   assignedClassKey?: string;
@@ -186,7 +188,6 @@ export type NewFriendStage =
   | "등록 결정"
   | "반배정"
   | "출석부 반영"
-  | "등반 확인"
   | "완료"
   | "보류"
   | "종료";

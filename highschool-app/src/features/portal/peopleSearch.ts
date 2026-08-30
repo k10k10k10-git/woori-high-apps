@@ -457,7 +457,7 @@ function buildSemesterEvidence(data: PeopleSearchData, output: Evidence[]) {
         field("진행 상태", friend.decision), field("부서", friend.part), field("학년", `${text(friend.grade)}학년`),
         field("학교", friend.school), field("담당 바나바", friend.owner), field("인도자", friend.inviter),
         field("1주차", friend.week1Date), field("2주차", friend.week2Date), field("신앙 단계", friend.faithStep),
-        field("배정 반", friend.assignedClassKey), field("선물 전달", friend.giftDate),
+        field("배정 반", friend.assignedClassKey),
         field("생년월일", priv.birth, true), field("학생 연락처", priv.phone, true), field("보호자 연락처", priv.parentPhone, true),
         field("주소", priv.address, true), field("교회 친구", priv.churchFriend, true), field("바나바 메모", priv.teamMemo, true),
         field("가족 사항", priv.familyNotes, true), field("목양 메모", priv.pastoralNotes, true),

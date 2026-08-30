@@ -41,6 +41,7 @@ import {
   buildNewFriendRosterRegistrationUpdates,
   buildNewFriendRosterRemovalUpdates,
   findNewFriendDuplicate,
+  newFriendRegisteredDate,
   studentIdForNewFriend,
   validateNewFriendRosterRegistration,
   validateNewFriendRosterRemoval,
@@ -485,11 +486,11 @@ export async function saveNewFriend(
   const id = friend.id ?? newId();
   const publicFields: Array<keyof Omit<NewFriend, "id">> = [
     "name", "part", "gender", "school", "grade", "owner", "decision", "week1Date",
-    "week2Date", "inviter", "faithStep", "assignedClassKey", "giftDate", "createdAt",
+    "week2Date", "registeredDate", "inviter", "faithStep", "assignedClassKey", "giftDate", "createdAt",
     "createdBy", "updatedAt", "rosterSync",
   ];
   const publicUpdates = Object.fromEntries(publicFields.map((key) => {
-    const value = friend[key];
+    const value = key === "registeredDate" ? newFriendRegisteredDate(friend) : friend[key];
     return [`${paths.newFriend(sid, id)}/${key}`, value === undefined || value === "" ? null : value];
   }));
   await update(ref(db), {

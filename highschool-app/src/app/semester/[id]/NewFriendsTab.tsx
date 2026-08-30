@@ -19,7 +19,11 @@ import {
   deriveNewFriendStage,
   formatClassLabel,
   formatKoreanPhone,
+  koreaDateInputValue,
   needsClassAssignment,
+  NEW_FRIEND_FAITH_STEP_OPTIONS,
+  NEW_FRIEND_INVITER_OPTIONS,
+  newFriendRegisteredDate,
   newFriendAssignmentCopyText,
   validateNewFriendRosterRegistration,
 } from "@/features/semester/newFriend";
@@ -50,10 +54,10 @@ type Draft = {
   decision: NewFriendDecision;
   week1Date: string;
   week2Date: string;
+  registeredDate: string;
   inviter: string;
   faithStep: string;
   assignedClassKey: string;
-  giftDate: string;
   birth: string;
   phone: string;
   parentPhone: string;
@@ -74,10 +78,10 @@ const EMPTY_DRAFT: Draft = {
   decision: "미정",
   week1Date: "",
   week2Date: "",
+  registeredDate: "",
   inviter: "",
   faithStep: "",
   assignedClassKey: "",
-  giftDate: "",
   birth: "",
   phone: "",
   parentPhone: "",
@@ -95,7 +99,7 @@ const PROGRESS_STYLE = {
 };
 
 function draftFor(friend: NewFriend | null, priv: NewFriendPrivate | undefined): Draft {
-  if (!friend) return EMPTY_DRAFT;
+  if (!friend) return { ...EMPTY_DRAFT, registeredDate: koreaDateInputValue() };
   return {
     name: friend.name,
     part: friend.part,
@@ -106,10 +110,10 @@ function draftFor(friend: NewFriend | null, priv: NewFriendPrivate | undefined):
     decision: friend.decision,
     week1Date: friend.week1Date ?? "",
     week2Date: friend.week2Date ?? "",
+    registeredDate: newFriendRegisteredDate(friend),
     inviter: friend.inviter ?? "",
     faithStep: friend.faithStep ?? "",
     assignedClassKey: friend.assignedClassKey ?? "",
-    giftDate: friend.giftDate ?? "",
     birth: priv?.birth ?? "",
     phone: priv?.phone ?? "",
     parentPhone: priv?.parentPhone ?? "",
@@ -171,10 +175,12 @@ function NewFriendEditor({
         owner: draft.owner.trim() || undefined,
         week1Date: draft.week1Date || undefined,
         week2Date: draft.week2Date || undefined,
+        registeredDate: draft.registeredDate || undefined,
         inviter: draft.inviter.trim() || undefined,
         faithStep: draft.faithStep.trim() || undefined,
         assignedClassKey: draft.assignedClassKey || undefined,
-        giftDate: draft.giftDate || undefined,
+        // 선물 전달일은 운영에서 제거했지만 기존 레코드를 수정할 때 과거 값은 보존한다.
+        giftDate: friend?.giftDate,
         updatedAt: now,
       }, {
         birth: draft.birth,
@@ -222,12 +228,12 @@ function NewFriendEditor({
   }
 
   async function handleCancelPlacement() {
-    if (!friend || (!friend.giftDate && !friend.assignedClassKey && !friend.rosterSync)) return;
+    if (!friend || (!friend.assignedClassKey && !friend.rosterSync)) return;
     if (friend.rosterSync && !canSyncRoster) return toast("출석부 연동 배정 취소는 통합관리자만 할 수 있습니다.", "error");
     const confirmed = await uiConfirm(
       friend.rosterSync
         ? `${friend.name}님의 등반과 반 배정을 취소할까요? 새친구 기록은 유지하지만 출석부 학생과 출석 기록은 백업 후 제거되며, 다시 반을 배정해야 합니다.`
-        : `${friend.name}님의 등반과 반 배정을 취소할까요? 등반 선물 전달일과 배정 반을 비웁니다.`,
+        : `${friend.name}님의 등반과 반 배정을 취소할까요? 배정 반을 비웁니다.`,
     );
     if (!confirmed) return;
     setSaving(true);
@@ -265,12 +271,13 @@ function NewFriendEditor({
         <div className="overlay-panel-body">
         {rosterLocked && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-            출석부 반영이 완료되어 이름·부서·학년·연락처·배정 반은 잠겼습니다. 학생 정보 변경은 학생 출석부에서 처리하고, 여기서는 담당·선물·목양 메모만 갱신해 주세요. 명단 삭제는 통합관리자가 새친구 기록과 출석부를 함께 정리할 수 있습니다.
+            출석부 반영이 완료되어 이름·부서·학년·연락처·배정 반은 잠겼습니다. 학생 정보 변경은 학생 출석부에서 처리하고, 여기서는 등록일·담당·목양 메모를 갱신해 주세요. 명단 삭제는 통합관리자가 새친구 기록과 출석부를 함께 정리할 수 있습니다.
           </div>
         )}
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="이름 *"><input className="input" value={draft.name} onChange={(e) => set("name", e.target.value)} disabled={rosterLocked} /></Field>
+          <Field label="새친구 등록일"><input type="date" className="input" value={draft.registeredDate} onChange={(e) => set("registeredDate", e.target.value)} /></Field>
           <Field label="부서"><select className="input" value={draft.part} onChange={(e) => { set("part", e.target.value as Draft["part"]); set("assignedClassKey", ""); }} disabled={rosterLocked}><option>1부</option><option>2부</option></select></Field>
           <Field label="학년"><select className="input" value={draft.grade} onChange={(e) => { set("grade", e.target.value); set("assignedClassKey", ""); }} disabled={rosterLocked}>{[1, 2, 3].map((grade) => <option key={grade} value={grade}>{grade}학년</option>)}</select></Field>
           <Field label="성별"><select className="input" value={draft.gender} onChange={(e) => set("gender", e.target.value as Draft["gender"])} disabled={rosterLocked}><option value="">미입력</option><option>남</option><option>여</option></select></Field>
@@ -283,10 +290,9 @@ function NewFriendEditor({
           <Field label="1주차"><input type="date" className="input" value={draft.week1Date} onChange={(e) => set("week1Date", e.target.value)} /></Field>
           <Field label="2주차"><input type="date" className="input" value={draft.week2Date} onChange={(e) => set("week2Date", e.target.value)} /></Field>
           <Field label="등록 결정"><select className="input" value={draft.decision} onChange={(e) => set("decision", e.target.value as NewFriendDecision)} disabled={rosterLocked}>{["미정", "등록", "보류", "미등록"].map((value) => <option key={value}>{value}</option>)}</select></Field>
-          <Field label="인도자"><input className="input" value={draft.inviter} onChange={(e) => set("inviter", e.target.value)} /></Field>
-          <Field label="신급"><input className="input" value={draft.faithStep} onChange={(e) => set("faithStep", e.target.value)} /></Field>
+          <Field label="인도자"><select className="input" value={draft.inviter} onChange={(e) => set("inviter", e.target.value)}><option value="">선택</option>{draft.inviter && !NEW_FRIEND_INVITER_OPTIONS.includes(draft.inviter as (typeof NEW_FRIEND_INVITER_OPTIONS)[number]) && <option value={draft.inviter}>{draft.inviter} (기존값)</option>}{NEW_FRIEND_INVITER_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
+          <Field label="신급"><select className="input" value={draft.faithStep} onChange={(e) => set("faithStep", e.target.value)}><option value="">선택</option>{draft.faithStep && !NEW_FRIEND_FAITH_STEP_OPTIONS.includes(draft.faithStep as (typeof NEW_FRIEND_FAITH_STEP_OPTIONS)[number]) && <option value={draft.faithStep}>{draft.faithStep} (기존값)</option>}{NEW_FRIEND_FAITH_STEP_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}</select></Field>
           <Field label="배정 반"><select className="input" value={draft.assignedClassKey} onChange={(e) => set("assignedClassKey", e.target.value)} disabled={rosterLocked}><option value="">미배정</option>{classOptions.map((item) => <option key={item.classKey} value={item.classKey}>{formatClassLabel(item.classKey)}{item.teacher ? ` · ${item.teacher}` : ""}</option>)}</select></Field>
-          <Field label="등반 선물 전달일"><input type="date" className="input" value={draft.giftDate} onChange={(e) => set("giftDate", e.target.value)} /></Field>
           <Field label="교회 내 지인"><input className="input" value={draft.churchFriend} onChange={(e) => set("churchFriend", e.target.value)} /></Field>
         </div>
 
@@ -331,7 +337,7 @@ function NewFriendEditor({
                 {friend.rosterSync ? "명단·출석부 삭제" : "명단 삭제"}
               </button>
             )}
-            {friend && (friend.giftDate || friend.assignedClassKey || friend.rosterSync) && (!friend.rosterSync || canSyncRoster) && !deleteConfirming && (
+            {friend && (friend.assignedClassKey || friend.rosterSync) && (!friend.rosterSync || canSyncRoster) && !deleteConfirming && (
               <button type="button" className="btn-secondary border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" onClick={handleCancelPlacement} disabled={saving}>
                 등반 및 배정 취소
               </button>
@@ -434,7 +440,7 @@ export default function NewFriendsTab({
       {!canEdit && <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500">조회 전용 역할입니다. 민감정보는 표시되지 않으며 새친구 기록을 수정할 수 없습니다.</div>}
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {["1주차", "2주차", "출석부 반영", "등반 확인"].map((stage) => <div key={stage} className="card p-3"><p className="text-xs text-slate-400">{stage}</p><p className="mt-1 text-xl font-bold text-slate-900">{stageCounts[stage] ?? 0}<span className="ml-1 text-xs font-normal text-slate-400">명</span></p></div>)}
+        {["1주차", "2주차", "출석부 반영", "완료"].map((stage) => <div key={stage} className="card p-3"><p className="text-xs text-slate-400">{stage}</p><p className="mt-1 text-xl font-bold text-slate-900">{stageCounts[stage] ?? 0}<span className="ml-1 text-xs font-normal text-slate-400">명</span></p></div>)}
       </div>
 
       {canEdit && assignmentCandidates.length > 0 && (
@@ -481,7 +487,7 @@ export default function NewFriendsTab({
               <article key={`mobile:${recordKeyFor(friend)}`} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-slate-400">No. {index + 1}</p>
+                    <p className="text-[11px] font-semibold tabular-nums text-slate-400">No. {index + 1} · 등록일 {newFriendRegisteredDate(friend)}</p>
                     <button type="button" className="mt-0.5 text-left" onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
                       <strong className="text-base text-slate-900">{friend.name}</strong>
                     </button>
@@ -518,11 +524,12 @@ export default function NewFriendsTab({
         </div>
 
         <div className="mt-4 hidden max-h-[68vh] overflow-auto rounded-xl border border-slate-200 sm:block">
-          <table className="w-full min-w-[1280px] border-collapse text-left text-xs">
-            <caption className="sr-only">새친구별 연락처, 담당자, 2주 과정, 등록 결정, 배정 반과 출석부 반영 현황</caption>
+          <table className="w-full min-w-[1390px] border-collapse text-left text-xs">
+            <caption className="sr-only">새친구별 등록일, 연락처, 담당자, 2주 과정, 등록 결정, 배정 반과 출석부 반영 현황</caption>
             <thead className="sticky top-0 z-10 bg-slate-50 text-[11px] font-semibold text-slate-500 shadow-[0_1px_0_#e2e8f0]">
               <tr>
                 <th className="w-12 px-3 py-3 text-center">No.</th>
+                <th className="min-w-28 px-3 py-3">등록일</th>
                 <th className="min-w-28 px-3 py-3">이름</th>
                 <th className="min-w-32 px-3 py-3">학교</th>
                 <th className="min-w-24 px-3 py-3">부서 / 학년</th>
@@ -544,6 +551,7 @@ export default function NewFriendsTab({
             return (
               <tr key={recordKeyFor(friend)} className="transition-colors hover:bg-slate-50/80">
                 <td className="px-3 py-3 text-center tabular-nums text-slate-400">{index + 1}</td>
+                <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{newFriendRegisteredDate(friend)}</td>
                 <td className="px-3 py-3">
                   <button type="button" className={`block text-left ${canEdit ? "hover:text-emerald-700 hover:underline" : "cursor-default"}`} onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
                     <strong className="block text-sm text-slate-900">{friend.name}</strong>
@@ -559,7 +567,10 @@ export default function NewFriendsTab({
                 {canEdit && <td className="px-3 py-3 leading-5 text-slate-600"><span className="block">본인 {formatKoreanPhone(priv?.phone) || "-"}</span><span className="block text-slate-400">보호자 {formatKoreanPhone(priv?.parentPhone) || "-"}</span></td>}
                 <td className="px-3 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${PROGRESS_STYLE[progress]}`}>{progress}</span></td>
                 <td className="px-3 py-3">
-                  {friend.rosterSync ? <div><span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">반영 완료</span><span className="mt-1 block max-w-32 truncate text-[10px] text-slate-400">{friend.rosterSync.studentId}</span></div> : syncReady ? <>
+                  {friend.rosterSync ? <div>
+                    <span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">반영 완료</span>
+                    <span className="mt-1 block max-w-32 truncate text-[10px] text-emerald-700/70">{friend.rosterSync.studentId}</span>
+                  </div> : syncReady ? <>
                     {canSyncRoster && <button type="button" className="btn-primary whitespace-nowrap px-2.5 py-1.5 text-[11px]" onClick={() => handleSync(friend)} disabled={syncingId === friend.id}>{syncingId === friend.id ? "반영 중…" : "출석부 반영"}</button>}
                     {!canSyncRoster && <span className="inline-flex rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">관리자 확인 대기</span>}
                   </> : <span className="text-[11px] text-slate-400">준비 필요</span>}
@@ -567,7 +578,7 @@ export default function NewFriendsTab({
               </tr>
             );
           })}
-          {friends.length === 0 && <tr><td colSpan={canEdit ? 12 : 11} className="py-14 text-center text-sm text-slate-400">접수된 새친구가 없습니다.</td></tr>}
+          {friends.length === 0 && <tr><td colSpan={canEdit ? 13 : 12} className="py-14 text-center text-sm text-slate-400">접수된 새친구가 없습니다.</td></tr>}
             </tbody>
           </table>
         </div>

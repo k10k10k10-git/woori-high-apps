@@ -16,6 +16,7 @@ import {
 } from "@/features/portal/featureCatalog";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import type { NewFriend, NewFriendPrivate } from "@/features/semester/types";
+import { deriveNewFriendStage } from "@/features/semester/newFriend";
 import { subscribeSundayAdminChanges, subscribeSundayNewFriends, subscribeSundayNewFriendsPrivate } from "@/features/sundayMinistry/db";
 import {
   privateValueForSundayFriend,
@@ -95,7 +96,7 @@ export default function SundayMinistryClient({ team, initialTab }: { team?: Sund
   }, [allowed, canEdit, fail, needsAdminChanges, needsFriends, ok, user]);
 
   const pendingCount = useMemo(() => friends.filter((friend) =>
-    !friend.giftDate && friend.decision !== "미등록" && friend.decision !== "보류",
+    !["완료", "종료", "보류"].includes(deriveNewFriendStage(friend)),
   ).length, [friends]);
   const storageSidFor = useCallback((friend: NewFriend) => (friend as SundayNewFriend).storageSid, []);
   const recordKeyFor = useCallback((friend: NewFriend) => {

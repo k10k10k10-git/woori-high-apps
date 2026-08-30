@@ -10,11 +10,44 @@ import { paths } from "./paths";
 const digits = (value?: string) => (value ?? "").replace(/\D/g, "");
 const normalizedName = (value?: string) => (value ?? "").replace(/\s/g, "").toLocaleLowerCase("ko");
 
+export const NEW_FRIEND_INVITER_OPTIONS = ["부모", "친구", "스스로", "기타"] as const;
+export const NEW_FRIEND_FAITH_STEP_OPTIONS = [
+  "아직 안함",
+  "학습",
+  "세례",
+  "유아세례",
+  "입교",
+  "침례",
+  "영세",
+  "기억안남",
+] as const;
+
+/** 브라우저·서버의 로컬 시간대와 관계없이 한국 기준 입력 날짜를 만든다. */
+export function koreaDateInputValue(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+/** 이전 레코드는 createdAt의 한국 날짜를 등록일로 보여 주어 별도 마이그레이션 없이 호환한다. */
+export function newFriendRegisteredDate(friend: Pick<NewFriend, "registeredDate" | "createdAt">): string {
+  if (friend.registeredDate) return friend.registeredDate;
+  const created = new Date(friend.createdAt);
+  return Number.isNaN(created.getTime()) ? friend.createdAt.slice(0, 10) : koreaDateInputValue(created);
+}
+
 export type NewFriendRosterProgress = "대기" | "처리중" | "완료";
 
 /** 새친구 진행표에서 사용하는 3단계 상태. 출석부 원장 반영을 완료 기준으로 삼는다. */
 export function deriveNewFriendRosterProgress(friend: NewFriend): NewFriendRosterProgress {
-  if (friend.rosterSync) return "완료";
+  // 과거 giftDate 기록은 마이그레이션 없이 완료 상태를 유지하고,
+  // 신규 흐름은 출석부 반영 자체를 완료 기준으로 삼는다.
+  if (friend.rosterSync || friend.giftDate) return "완료";
   if (friend.week2Date || friend.decision === "등록" || friend.assignedClassKey) return "처리중";
   return "대기";
 }
@@ -65,8 +98,7 @@ export function newFriendAssignmentCopyText(friend: NewFriend, priv: NewFriendPr
 export function deriveNewFriendStage(friend: NewFriend): NewFriendStage {
   if (friend.decision === "미등록") return "종료";
   if (friend.decision === "보류") return "보류";
-  if (friend.giftDate) return "완료";
-  if (friend.rosterSync) return "등반 확인";
+  if (friend.rosterSync || friend.giftDate) return "완료";
   if (friend.assignedClassKey) return "출석부 반영";
   if (friend.decision === "등록") return "반배정";
   if (friend.week2Date) return "등록 결정";

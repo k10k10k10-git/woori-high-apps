@@ -39,6 +39,16 @@ describe("모바일 운영 화면 계약", () => {
     expect(css).toContain("touch-action: pan-y;");
   });
 
+  it("새친구 접수는 선택형 인도자·신급과 수정 가능한 등록일을 제공하고 선물일 입력은 노출하지 않는다", () => {
+    const newFriends = source("src/app/semester/[id]/NewFriendsTab.tsx");
+    expect(newFriends).toContain('Field label="새친구 등록일"');
+    expect(newFriends).toContain("NEW_FRIEND_INVITER_OPTIONS.map");
+    expect(newFriends).toContain("NEW_FRIEND_FAITH_STEP_OPTIONS.map");
+    expect(newFriends).not.toContain('Field label="등반 선물 전달일"');
+    expect(newFriends.indexOf('>No.</th>')).toBeLessThan(newFriends.indexOf('>등록일</th>'));
+    expect(newFriends.indexOf('>등록일</th>')).toBeLessThan(newFriends.indexOf('>이름</th>'));
+  });
+
   it("새친구, 등록 현황, 행정 변동은 모바일 전용 목록과 데스크톱 표를 함께 제공한다", () => {
     expect(source("src/app/semester/[id]/NewFriendsTab.tsx")).toContain("새친구 진행 현황 모바일 목록");
     const sundayTabs = source("src/features/sundayMinistry/SundayMinistryTabs.tsx");
