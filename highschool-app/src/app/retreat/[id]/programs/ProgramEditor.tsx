@@ -10,6 +10,7 @@ import {
   groupRolesByPost,
   itemsOfPost,
   programPosts,
+  programCompetitionTeams,
   rolesOfPost,
   programReadiness,
   programStatusMeta,
@@ -18,8 +19,11 @@ import {
   type ProgramSectionKey,
 } from "@/lib/programPreparation";
 import { ProgramItemsSection, ProgramPostsSection, ProgramRolesSection } from "./ProgramSections";
+import ProgramCompetitionTeamsSection from "./ProgramCompetitionTeamsSection";
 import type {
+  Group,
   RetreatProgram,
+  RetreatProgramCompetitionTeam,
   RetreatProgramItem,
   RetreatProgramKind,
   RetreatProgramMatch,
@@ -29,7 +33,7 @@ import type {
   RetreatProgramTask,
 } from "@/lib/types";
 
-type EditableProgram = Omit<RetreatProgram, "tasks">;
+type EditableProgram = Omit<RetreatProgram, "tasks" | "posts" | "items" | "roles" | "competitionTeams">;
 
 type Props = {
   program: RetreatProgram;
@@ -59,6 +63,14 @@ type Props = {
   onCreateItem: (name: string, order: number, postId?: string) => Promise<void>;
   onUpdateItem: (itemId: string, data: Partial<RetreatProgramItem>) => Promise<void>;
   onDeleteItem: (itemId: string) => Promise<void>;
+  groups: Group[];
+  onCreateCompetitionTeam: (name: string, order: number, color: NonNullable<RetreatProgramCompetitionTeam["color"]>) => Promise<void>;
+  onCreateDefaultCompetitionTeams: () => Promise<void>;
+  onUpdateCompetitionTeam: (teamId: string, data: Partial<RetreatProgramCompetitionTeam>) => Promise<void>;
+  onDeleteCompetitionTeam: (teamId: string) => Promise<void>;
+  onRestoreCompetitionTeam: (team: RetreatProgramCompetitionTeam) => Promise<void>;
+  onAssignCompetitionGroup: (groupId: string, teamId: string | null) => Promise<void>;
+  onApplyBalancedCompetitionTeams: (assignment: Record<string, string>) => Promise<void>;
 };
 
 const OVERVIEW_FIELDS = [
@@ -96,6 +108,10 @@ export default function ProgramEditor({
   onCreateMatch, onUpdateMatch, onDeleteMatch,
   onCreateRole, onUpdateRole, onDeleteRole,
   onCreateItem, onUpdateItem, onDeleteItem,
+  groups,
+  onCreateCompetitionTeam, onCreateDefaultCompetitionTeams, onUpdateCompetitionTeam,
+  onDeleteCompetitionTeam, onRestoreCompetitionTeam, onAssignCompetitionGroup,
+  onApplyBalancedCompetitionTeams,
 }: Props) {
   const { toast } = useUI();
   const programRef = useRef(program);
@@ -144,6 +160,7 @@ export default function ProgramEditor({
   const readiness = useMemo(() => programReadiness({ ...program, ...draft }), [draft, program]);
   const tasks = useMemo(() => programTasks(program), [program]);
   const posts = useMemo(() => programPosts(program), [program]);
+  const competitionTeams = useMemo(() => programCompetitionTeams(program), [program]);
   const doneTasks = tasks.filter((task) => task.done).length;
 
   function setField<K extends keyof EditableProgram>(key: K, value: EditableProgram[K]) {
@@ -279,11 +296,12 @@ export default function ProgramEditor({
         </fieldset>
       )}
 
-      {section === "flow" && (
+      {section === "posts" && (
+        <>
         <fieldset disabled={!canEdit || saving} className="program-form">
           <section className="program-form-section">
-            <h3>진행안·대본</h3>
-            <p className="program-section-hint">시간표(큐시트)는 이가드 현장의 큐싯이 단일 원본입니다. 여기에는 이 프로그램 안에서의 순서와 멘트를 적습니다.</p>
+            <h3>전체 흐름</h3>
+            <p className="program-section-hint">프로그램의 큰 순서를 적고, 아래에서 활동마다 운영 방식과 참가 단위를 지정합니다. 이가드 큐싯은 전체 수련회 시간표의 단일 원본입니다.</p>
             <div className="program-text-fields">
               {FLOW_FIELDS.map((field) => (
                 <label key={field.key} className="program-field">
@@ -294,23 +312,30 @@ export default function ProgramEditor({
             </div>
           </section>
         </fieldset>
-      )}
-
-      {section === "posts" && (
+        <ProgramCompetitionTeamsSection
+          teams={competitionTeams}
+          groups={groups}
+          canEdit={canEdit}
+          onCreate={onCreateCompetitionTeam}
+          onCreateDefaults={onCreateDefaultCompetitionTeams}
+          onUpdate={onUpdateCompetitionTeam}
+          onDelete={onDeleteCompetitionTeam}
+          onRestore={onRestoreCompetitionTeam}
+          onAssignGroup={onAssignCompetitionGroup}
+          onApplyBalanced={onApplyBalancedCompetitionTeams}
+        />
         <ProgramPostsSection posts={posts} canEdit={canEdit} onCreate={onCreatePost} onUpdate={onUpdatePost} onDelete={onDeletePost}
           onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
           itemsOf={(postId) => itemsOfPost(program, postId)} rolesOf={(postId) => rolesOfPost(program, postId)}
           onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
           onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
           onRestore={onRestorePost} onRestoreItem={onRestoreItem} onRestoreRole={onRestoreRole} onRestoreMatch={onRestoreMatch} />
+        </>
       )}
 
       {section === "roles" && (
-        <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} onRestore={onRestoreRole} />
-      )}
-
-      {section === "items" && (
         <>
+          <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} onRestore={onRestoreRole} />
           <ProgramItemsSection groups={groupItemsByPost(program)} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} onRestore={onRestoreItem} />
           <fieldset disabled={!canEdit || saving} className="program-form">
             <section className="program-form-section">
@@ -390,5 +415,6 @@ function withoutTasks(program: RetreatProgram): EditableProgram {
   delete copy.posts;
   delete copy.items;
   delete copy.roles;
+  delete copy.competitionTeams;
   return copy as EditableProgram;
 }

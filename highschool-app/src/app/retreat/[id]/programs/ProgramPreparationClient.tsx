@@ -11,37 +11,47 @@ import { useUI } from "@/context/UIContext";
 import {
   createDefaultRetreatPrograms,
   createRetreatProgram,
+  createDefaultRetreatProgramCompetitionTeams,
+  createRetreatProgramCompetitionTeam,
   createRetreatProgramItem,
   createRetreatProgramMatch,
   createRetreatProgramPost,
   createRetreatProgramRole,
   createRetreatProgramTask,
   deleteRetreatProgram,
+  deleteRetreatProgramCompetitionTeam,
   deleteRetreatProgramItem,
   deleteRetreatProgramMatch,
   deleteRetreatProgramPost,
   deleteRetreatProgramRole,
   deleteRetreatProgramTask,
   restoreRetreatProgramItem,
+  restoreRetreatProgramCompetitionTeam,
   restoreRetreatProgramMatch,
   restoreRetreatProgramPost,
   restoreRetreatProgramRole,
   reorderRetreatPrograms,
   subscribeToRetreat,
+  subscribeToGroups,
   subscribeToRetreatPrograms,
   updateRetreatProgram,
+  updateRetreatProgramCompetitionTeam,
   updateRetreatProgramItem,
   updateRetreatProgramMatch,
   updateRetreatProgramPost,
   updateRetreatProgramRole,
   updateRetreatProgramTask,
+  assignRetreatGroupToProgramCompetitionTeam,
+  replaceRetreatProgramCompetitionAssignments,
 } from "@/lib/db";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
-import { PROGRAM_SECTIONS, createProgramDraft, isProgramSection, type ProgramSectionKey } from "@/lib/programPreparation";
+import { PROGRAM_SECTIONS, createProgramDraft, programSectionFromParam, type ProgramSectionKey } from "@/lib/programPreparation";
 import type {
+  Group,
   Retreat,
   RetreatProgram,
+  RetreatProgramCompetitionTeam,
   RetreatProgramItem,
   RetreatProgramMatch,
   RetreatProgramPost,
@@ -61,7 +71,7 @@ export default function ProgramPreparationClient() {
   const retreatId = params.id as string;
   // 선택한 항목은 렌더 중 파생 — effect에서 setState로 맞추면 사용자의 선택을 덮는다(실수 13).
   const sectionParam = searchParams.get("section");
-  const section: ProgramSectionKey = isProgramSection(sectionParam) ? sectionParam : "overview";
+  const section: ProgramSectionKey = programSectionFromParam(sectionParam);
   // 목록과 상세를 한 화면에 붙여 두면 둘 다 좁아진다. 선택한 프로그램을 주소에 두고
   // 화면을 가른다 — 목록에서 고르면 상세로, 상세에서 목록으로 되돌아온다.
   const selectedId = searchParams.get("program");
@@ -98,8 +108,10 @@ export default function ProgramPreparationClient() {
 
   const [retreat, setRetreat] = useState<Retreat | null>(null);
   const [programs, setPrograms] = useState<RetreatProgram[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [retreatReady, setRetreatReady] = useState(false);
   const [programsReady, setProgramsReady] = useState(false);
+  const [groupsReady, setGroupsReady] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -115,6 +127,7 @@ export default function ProgramPreparationClient() {
     if (!adminAllowed || !retreatId) return;
     setRetreatReady(false);
     setProgramsReady(false);
+    setGroupsReady(false);
     setLoadError("");
     const unsubscribeRetreat = subscribeToRetreat(
       retreatId,
@@ -129,7 +142,12 @@ export default function ProgramPreparationClient() {
       },
       (error) => { setLoadError(`프로그램 정보 - ${error.message}`); setProgramsReady(true); },
     );
-    return () => { unsubscribeRetreat(); unsubscribePrograms(); };
+    const unsubscribeGroups = subscribeToGroups(
+      retreatId,
+      (next) => { setGroups(next); setGroupsReady(true); },
+      (error) => { setLoadError(`조 편성 정보 - ${error.message}`); setGroupsReady(true); },
+    );
+    return () => { unsubscribeRetreat(); unsubscribePrograms(); unsubscribeGroups(); };
   }, [adminAllowed, authLoading, retreatId, router, user]);
 
   const selectedProgram = useMemo(
@@ -181,7 +199,7 @@ export default function ProgramPreparationClient() {
     }
   }
 
-  async function saveProgram(program: Omit<RetreatProgram, "tasks">) {
+  async function saveProgram(program: Omit<RetreatProgram, "tasks" | "posts" | "items" | "roles" | "competitionTeams">) {
     setSaving(true);
     try {
       const { id } = program;
@@ -226,7 +244,7 @@ export default function ProgramPreparationClient() {
     </div>
   );
 
-  if (!retreatReady || !programsReady || lock === undefined) return (
+  if (!retreatReady || !programsReady || !groupsReady || lock === undefined) return (
     <div className="min-h-screen px-4 py-8" style={{ background: "var(--color-bg)" }}>
       <div className="mx-auto max-w-6xl"><WorkspaceSkeleton label="프로그램 준비 화면을 불러오는 중입니다." rows={7} variant="page" /></div>
     </div>
@@ -321,7 +339,13 @@ export default function ProgramPreparationClient() {
                 onUpdateTask={(taskId, data) => updateRetreatProgramTask(retreatId, selectedProgram.id, taskId, data)}
                 onDeleteTask={(taskId) => deleteRetreatProgramTask(retreatId, selectedProgram.id, taskId)}
                 section={section}
-                onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, { name, order }).then(() => undefined)}
+                onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, {
+                  name,
+                  order,
+                  operationMode: "whole",
+                  participationMode: "retreatGroup",
+                  scoreEnabled: false,
+                }).then(() => undefined)}
                 onUpdatePost={(postId, data: Partial<RetreatProgramPost>) => updateRetreatProgramPost(retreatId, selectedProgram.id, postId, data)}
                 onDeletePost={(postId) => deleteRetreatProgramPost(retreatId, selectedProgram.id, postId)}
                 onRestorePost={(post) => restoreRetreatProgramPost(retreatId, selectedProgram.id, post)}
@@ -337,6 +361,25 @@ export default function ProgramPreparationClient() {
                 onCreateItem={(name, order, postId) => createRetreatProgramItem(retreatId, selectedProgram.id, { name, order, status: "todo", postId }).then(() => undefined)}
                 onUpdateItem={(itemId, data: Partial<RetreatProgramItem>) => updateRetreatProgramItem(retreatId, selectedProgram.id, itemId, data)}
                 onDeleteItem={(itemId) => deleteRetreatProgramItem(retreatId, selectedProgram.id, itemId)}
+                groups={groups}
+                onCreateCompetitionTeam={(name, order, color) => createRetreatProgramCompetitionTeam(retreatId, selectedProgram.id, { name, order, color }).then(() => undefined)}
+                onCreateDefaultCompetitionTeams={() => createDefaultRetreatProgramCompetitionTeams(retreatId, selectedProgram.id)}
+                onUpdateCompetitionTeam={(teamId, data: Partial<RetreatProgramCompetitionTeam>) => updateRetreatProgramCompetitionTeam(retreatId, selectedProgram.id, teamId, data)}
+                onDeleteCompetitionTeam={(teamId) => deleteRetreatProgramCompetitionTeam(retreatId, selectedProgram.id, teamId)}
+                onRestoreCompetitionTeam={(team) => restoreRetreatProgramCompetitionTeam(retreatId, selectedProgram.id, team)}
+                onAssignCompetitionGroup={(groupId, teamId) => assignRetreatGroupToProgramCompetitionTeam(
+                  retreatId,
+                  selectedProgram.id,
+                  Object.keys(selectedProgram.competitionTeams ?? {}),
+                  groupId,
+                  teamId,
+                )}
+                onApplyBalancedCompetitionTeams={(assignment) => replaceRetreatProgramCompetitionAssignments(
+                  retreatId,
+                  selectedProgram.id,
+                  Object.keys(selectedProgram.competitionTeams ?? {}),
+                  assignment,
+                )}
               />
             )}
           </div>

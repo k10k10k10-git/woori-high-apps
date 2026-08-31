@@ -80,4 +80,24 @@ describe("program preparation interaction contract", () => {
     expect(css).toContain(".program-task-list li > div { min-width: 0; }");
     expect(css).toContain(".program-confirm-dialog__actions button { min-height: 44px; }");
   });
+
+  it("연합팀 편성은 수련회 기본 조를 수정하지 않고 프로그램 하위 경로만 쓴다", () => {
+    const db = source("src/lib/db/programs.ts");
+    const paths = source("src/lib/paths.ts");
+    const builder = source("src/app/retreat/[id]/programs/ProgramCompetitionTeamsSection.tsx");
+    expect(paths).toContain("programCompetitionTeamGroup");
+    expect(db).toContain("assignRetreatGroupToProgramCompetitionTeam");
+    expect(db).not.toContain("paths.group(retreatId");
+    expect(builder).not.toContain('from "@/lib/db"');
+    expect(builder).toContain("균등 배치 미리보기");
+    expect(builder).toContain("이 배치 적용");
+  });
+
+  it("프로그램은 진행 방식과 참가 단위를 서로 독립적으로 편집한다", () => {
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    expect(sections).toContain("PROGRAM_OPERATION_MODE_META");
+    expect(sections).toContain("PROGRAM_PARTICIPATION_MODE_META");
+    expect(sections).toContain("operationMode");
+    expect(sections).toContain("participationMode");
+  });
 });

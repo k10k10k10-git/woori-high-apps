@@ -1,12 +1,16 @@
 import type {
+  Group,
   RetreatProgram,
   RetreatProgramItem,
   RetreatProgramItemStatus,
   RetreatProgramKind,
   RetreatProgramMatch,
+  RetreatProgramOperationMode,
+  RetreatProgramParticipationMode,
   RetreatProgramPost,
   RetreatProgramRole,
   RetreatProgramStatus,
+  RetreatProgramCompetitionTeam,
 } from "./types";
 
 export const PROGRAM_STATUS_META: Record<RetreatProgramStatus, { label: string; description: string }> = {
@@ -22,6 +26,32 @@ export const PROGRAM_KIND_META: Record<RetreatProgramKind, string> = {
   sports: "운동회·대진형",
   other: "기타",
 };
+
+export const PROGRAM_OPERATION_MODE_META: Record<RetreatProgramOperationMode, { label: string; description: string }> = {
+  whole: { label: "전체 진행", description: "MC가 앞에서 모두를 이끄는 진행" },
+  course: { label: "코스 순환", description: "조가 여러 코스를 순서대로 이동" },
+  group: { label: "조별 협력", description: "기존 조 안에서 함께 해결하는 활동" },
+  alliance: { label: "연합팀 경쟁", description: "여러 조를 큰 팀으로 묶어 경쟁" },
+  break: { label: "설명·이동·휴식", description: "게임 사이 안내와 전환 구간" },
+};
+
+export const PROGRAM_PARTICIPATION_MODE_META: Record<RetreatProgramParticipationMode, string> = {
+  individual: "개인",
+  retreatGroup: "기존 수련회 조",
+  allianceTeam: "프로그램 연합팀",
+  department: "부서별",
+  temporary: "현장 임시 편성",
+};
+
+export function programOperationMode(post: RetreatProgramPost): RetreatProgramOperationMode {
+  return post.operationMode && PROGRAM_OPERATION_MODE_META[post.operationMode] ? post.operationMode : "whole";
+}
+
+export function programParticipationMode(post: RetreatProgramPost): RetreatProgramParticipationMode {
+  return post.participationMode && PROGRAM_PARTICIPATION_MODE_META[post.participationMode]
+    ? post.participationMode
+    : "retreatGroup";
+}
 
 /**
  * 상태·종류 라벨은 DB 값을 그대로 키로 쓴다. 스키마가 늘었다 줄거나 레코드를 손으로 고치면
@@ -140,6 +170,38 @@ export function programRoles(program: RetreatProgram): RetreatProgramRole[] {
   return listOf(program.roles);
 }
 
+export function programCompetitionTeams(program: RetreatProgram): RetreatProgramCompetitionTeam[] {
+  return listOf(program.competitionTeams);
+}
+
+/**
+ * 기본 조를 쪼개지 않고 연합팀별 학생 수가 비슷해지도록 큰 조부터 차례로 배치한다.
+ * 결과는 미리보기용 순수 함수이고, 실제 저장은 사용자가 적용을 눌렀을 때만 한다.
+ */
+export function balanceGroupsAcrossCompetitionTeams(
+  groups: Group[],
+  teams: RetreatProgramCompetitionTeam[],
+): Record<string, string> {
+  if (teams.length === 0) return {};
+  const orderedTeams = [...teams].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const loads = new Map(orderedTeams.map((team) => [team.id, 0]));
+  const assignment: Record<string, string> = {};
+  const orderedGroups = [...groups].sort((a, b) =>
+    (b.studentIds?.length ?? 0) - (a.studentIds?.length ?? 0) || a.name.localeCompare(b.name, "ko"),
+  );
+
+  for (const group of orderedGroups) {
+    const target = orderedTeams.reduce((best, team) => {
+      const bestLoad = loads.get(best.id) ?? 0;
+      const teamLoad = loads.get(team.id) ?? 0;
+      return teamLoad < bestLoad ? team : best;
+    });
+    assignment[group.id] = target.id;
+    loads.set(target.id, (loads.get(target.id) ?? 0) + (group.studentIds?.length ?? 0));
+  }
+  return assignment;
+}
+
 export const PROGRAM_ITEM_STATUS_META: Record<RetreatProgramItemStatus, { label: string; counts: boolean }> = {
   todo: { label: "구매 예정", counts: true },
   ordered: { label: "주문함", counts: true },
@@ -179,18 +241,23 @@ export function programBudget(items: RetreatProgramItem[]) {
 
 /** 편집기 상단 내비게이션 — 각 탭이 서로 다른 일을 맡는다. */
 export const PROGRAM_SECTIONS = [
-  { key: "overview", label: "개요" },
-  { key: "flow", label: "진행안" },
-  { key: "posts", label: "게임·포스트" },
-  { key: "roles", label: "역할·배치" },
-  { key: "items", label: "물품·예산" },
-  { key: "tasks", label: "할 일·기록" },
+  { key: "overview", label: "준비 보드" },
+  { key: "posts", label: "프로그램 구성" },
+  { key: "roles", label: "운영 현황" },
+  { key: "tasks", label: "점검·현장 공유" },
 ] as const;
 
 export type ProgramSectionKey = (typeof PROGRAM_SECTIONS)[number]["key"];
 
 export function isProgramSection(value: string | null | undefined): value is ProgramSectionKey {
   return !!value && PROGRAM_SECTIONS.some((section) => section.key === value);
+}
+
+/** 예전 링크의 진행안·물품 탭도 새 4단계 작업 흐름으로 안전하게 연결한다. */
+export function programSectionFromParam(value: string | null | undefined): ProgramSectionKey {
+  if (value === "flow") return "posts";
+  if (value === "items") return "roles";
+  return isProgramSection(value) ? value : "overview";
 }
 
 /**

@@ -417,7 +417,7 @@ function IguardWorkspace({ id }: { id: string }) {
         {!dataLoading && activeView === "seating" && <SeatingView retreatId={id} seating={seating} groups={groups} meals={meals} />}
         {!dataLoading && activeView === "guide" && <GuideView retreatId={id} guide={guide} />}
         {!dataLoading && activeView === "todos" && <TodosView todos={todos} />}
-        {!dataLoading && activeView === "programs" && <PublishedProgramsView programs={programs} />}
+        {!dataLoading && activeView === "programs" && <PublishedProgramsView programs={programs} groups={groups} />}
       </main>
 
       {searchOpen && (

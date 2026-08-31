@@ -3,6 +3,7 @@ import {
   PROGRAM_ITEM_STATUS_META,
   PROGRAM_KIND_META,
   PROGRAM_STATUS_META,
+  balanceGroupsAcrossCompetitionTeams,
   commonItems,
   commonRoles,
   createProgramDraft,
@@ -20,6 +21,7 @@ import {
   programReadiness,
   programStatusMeta,
   programTasks,
+  programSectionFromParam,
   rolesOfPost,
   shouldSyncEditorDraft,
   sortRetreatPrograms,
@@ -180,6 +182,32 @@ describe("isProgramSection", () => {
     expect(isProgramSection("posts")).toBe(true);
     expect(isProgramSection("nope")).toBe(false);
     expect(isProgramSection(null)).toBe(false);
+  });
+
+  it("예전 진행안·물품 링크를 새 작업 흐름으로 연결한다", () => {
+    expect(programSectionFromParam("flow")).toBe("posts");
+    expect(programSectionFromParam("items")).toBe("roles");
+    expect(programSectionFromParam("unknown")).toBe("overview");
+  });
+});
+
+describe("연합팀 자동 편성", () => {
+  it("기본 조를 쪼개지 않고 학생 수가 적은 팀부터 채운다", () => {
+    const teams = [
+      { id: "blue", order: 1, name: "파랑", createdAt: 1, updatedAt: 1 },
+      { id: "red", order: 2, name: "빨강", createdAt: 1, updatedAt: 1 },
+    ];
+    const groups = [
+      { id: "g1", name: "1조", bu: "1부", teachers: [], leader: "", studentIds: ["1", "2", "3", "4"] },
+      { id: "g2", name: "2조", bu: "1부", teachers: [], leader: "", studentIds: ["5", "6", "7"] },
+      { id: "g3", name: "3조", bu: "1부", teachers: [], leader: "", studentIds: ["8", "9"] },
+    ];
+
+    expect(balanceGroupsAcrossCompetitionTeams(groups, teams)).toEqual({ g1: "blue", g2: "red", g3: "red" });
+  });
+
+  it("연합팀이 없으면 빈 배치를 반환한다", () => {
+    expect(balanceGroupsAcrossCompetitionTeams([], [])).toEqual({});
   });
 });
 

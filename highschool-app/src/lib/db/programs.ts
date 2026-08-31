@@ -4,6 +4,7 @@ import { paths } from "../paths";
 import { createProgramDraft, sortRetreatPrograms } from "../programPreparation";
 import type {
   RetreatProgram,
+  RetreatProgramCompetitionTeam,
   RetreatProgramItem,
   RetreatProgramMatch,
   RetreatProgramPost,
@@ -49,7 +50,7 @@ export async function createDefaultRetreatPrograms(retreatId: string): Promise<s
 export async function updateRetreatProgram(
   retreatId: string,
   programId: string,
-  data: Partial<Omit<RetreatProgram, "id" | "tasks" | "createdAt">>,
+  data: Partial<Omit<RetreatProgram, "id" | "tasks" | "posts" | "items" | "roles" | "competitionTeams" | "createdAt">>,
 ): Promise<void> {
   await update(ref(db, paths.program(retreatId, programId)), stripUndefined({ ...data, updatedAt: Date.now() }));
 }
@@ -105,7 +106,7 @@ export async function restoreRetreatProgramTask(
 // tasks와 같은 규약: push로 만든 키가 곧 id이고, 저장은 경로 단위 update만 쓴다.
 // 프로그램 노드 전체를 set으로 덮으면 동시 편집이 서로를 지운다(루트 실수 2).
 
-type SubCollection = "posts" | "items" | "roles";
+type SubCollection = "posts" | "items" | "roles" | "competitionTeams";
 
 function subPath(retreatId: string, programId: string, kind: SubCollection, id?: string): string {
   const base = `${paths.program(retreatId, programId)}/${kind}`;
@@ -212,6 +213,102 @@ export function deleteRetreatProgramRole(retreatId: string, programId: string, r
 
 export function restoreRetreatProgramRole(retreatId: string, programId: string, role: RetreatProgramRole): Promise<void> {
   return restoreSubEntry(retreatId, programId, "roles", role);
+}
+
+// ── 프로그램 전용 연합팀 ──────────────────────────────────────
+// 수련회 기본 groups는 읽기만 한다. 프로그램에서 조를 묶는 정보는 이 하위 노드에만 저장해
+// 숙소·인원체크·기본 조 명단이 프로그램 구성 때문에 바뀌지 않게 한다.
+
+export function createRetreatProgramCompetitionTeam(
+  retreatId: string,
+  programId: string,
+  data: Omit<RetreatProgramCompetitionTeam, "id" | "createdAt" | "updatedAt">,
+): Promise<string> {
+  return createSubEntry(retreatId, programId, "competitionTeams", data);
+}
+
+export function updateRetreatProgramCompetitionTeam(
+  retreatId: string,
+  programId: string,
+  teamId: string,
+  data: Partial<Omit<RetreatProgramCompetitionTeam, "id" | "createdAt" | "groupIds">>,
+): Promise<void> {
+  return updateSubEntry(retreatId, programId, "competitionTeams", teamId, data);
+}
+
+export function deleteRetreatProgramCompetitionTeam(
+  retreatId: string,
+  programId: string,
+  teamId: string,
+): Promise<void> {
+  return deleteSubEntry(retreatId, programId, "competitionTeams", teamId);
+}
+
+export function restoreRetreatProgramCompetitionTeam(
+  retreatId: string,
+  programId: string,
+  team: RetreatProgramCompetitionTeam,
+): Promise<void> {
+  return restoreSubEntry(retreatId, programId, "competitionTeams", team);
+}
+
+export async function createDefaultRetreatProgramCompetitionTeams(
+  retreatId: string,
+  programId: string,
+): Promise<void> {
+  const colors: RetreatProgramCompetitionTeam["color"][] = ["blue", "red", "yellow", "green"];
+  const names = ["파랑팀", "빨강팀", "노랑팀", "초록팀"];
+  const now = Date.now();
+  const payload: Record<string, unknown> = {};
+  for (let index = 0; index < names.length; index += 1) {
+    const teamRef = push(ref(db, paths.programCompetitionTeams(retreatId, programId)));
+    payload[paths.programCompetitionTeam(retreatId, programId, teamRef.key!)] = {
+      order: index + 1,
+      name: names[index],
+      color: colors[index],
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+  await update(ref(db), payload);
+}
+
+/** 조 하나를 연합팀 하나로 옮긴다. 모든 팀에서 제거하고 선택 팀에 넣는 작업을 원자 적용한다. */
+export async function assignRetreatGroupToProgramCompetitionTeam(
+  retreatId: string,
+  programId: string,
+  teamIds: string[],
+  groupId: string,
+  selectedTeamId: string | null,
+): Promise<void> {
+  const now = Date.now();
+  const payload: Record<string, unknown> = {};
+  for (const teamId of teamIds) {
+    payload[paths.programCompetitionTeamGroup(retreatId, programId, teamId, groupId)] =
+      teamId === selectedTeamId ? true : null;
+    payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/updatedAt`] = now;
+  }
+  await update(ref(db), payload);
+}
+
+/** 현재 연합팀 전체에 기본 조를 인원수 기준으로 균등 분배한 결과를 한 번에 적용한다. */
+export async function replaceRetreatProgramCompetitionAssignments(
+  retreatId: string,
+  programId: string,
+  teamIds: string[],
+  assignment: Record<string, string>,
+): Promise<void> {
+  const now = Date.now();
+  const payload: Record<string, unknown> = {};
+  for (const teamId of teamIds) {
+    payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/groupIds`] = null;
+    payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/updatedAt`] = now;
+  }
+  for (const [groupId, teamId] of Object.entries(assignment)) {
+    if (!teamIds.includes(teamId)) continue;
+    payload[paths.programCompetitionTeamGroup(retreatId, programId, teamId, groupId)] = true;
+  }
+  await update(ref(db), payload);
 }
 
 // ── 대진표 (게임 카드 안) ───────────────────────────────────────

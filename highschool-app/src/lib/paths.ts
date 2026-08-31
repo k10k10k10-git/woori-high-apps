@@ -96,6 +96,11 @@ export const paths = {
     `retreats/${id}/programs/${programId}/posts/${postId}/matches/${matchId}`,
   programItem: (id: string, programId: string, itemId: string) => `retreats/${id}/programs/${programId}/items/${itemId}`,
   programRole: (id: string, programId: string, roleId: string) => `retreats/${id}/programs/${programId}/roles/${roleId}`,
+  programCompetitionTeams: (id: string, programId: string) => `retreats/${id}/programs/${programId}/competitionTeams`,
+  programCompetitionTeam: (id: string, programId: string, teamId: string) =>
+    `retreats/${id}/programs/${programId}/competitionTeams/${teamId}`,
+  programCompetitionTeamGroup: (id: string, programId: string, teamId: string, groupId: string) =>
+    `retreats/${id}/programs/${programId}/competitionTeams/${teamId}/groupIds/${groupId}`,
 
   // ── 민감정보 (retreatsPrivate) ──
   retreatsPrivate: () => "retreatsPrivate",

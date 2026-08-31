@@ -1,11 +1,21 @@
 "use client";
 
 import { CalendarBlank, Clock, MapPin, UserCircle } from "@phosphor-icons/react";
-import { programKindMeta, programTasks } from "@/lib/programPreparation";
-import type { RetreatProgram } from "@/lib/types";
+import {
+  PROGRAM_OPERATION_MODE_META,
+  PROGRAM_PARTICIPATION_MODE_META,
+  programCompetitionTeams,
+  programKindMeta,
+  programOperationMode,
+  programParticipationMode,
+  programPosts,
+  programTasks,
+} from "@/lib/programPreparation";
+import type { Group, RetreatProgram } from "@/lib/types";
 
-export default function PublishedProgramsView({ programs }: { programs: RetreatProgram[] }) {
+export default function PublishedProgramsView({ programs, groups }: { programs: RetreatProgram[]; groups: Group[] }) {
   const published = programs.filter((program) => program.status === "published");
+  const groupNames = new Map(groups.map((group) => [group.id, group.name]));
 
   if (published.length === 0) {
     return (
@@ -24,6 +34,8 @@ export default function PublishedProgramsView({ programs }: { programs: RetreatP
       </header>
       {published.map((program, index) => {
         const tasks = programTasks(program);
+        const blocks = programPosts(program);
+        const competitionTeams = programCompetitionTeams(program);
         return (
           <article key={program.id} className="published-program">
             <div className="published-program-title">
@@ -50,6 +62,29 @@ export default function PublishedProgramsView({ programs }: { programs: RetreatP
               {program.script && <section><h4>대본</h4><p>{program.script}</p></section>}
               {program.materials && <section><h4>물품·자료</h4><p>{program.materials}</p></section>}
             </div>
+            {blocks.length > 0 && (
+              <section className="published-program-blocks">
+                <h4>진행 순서</h4>
+                <ol>
+                  {blocks.map((block) => (
+                    <li key={block.id}>
+                      <span>{block.name}</span>
+                      <small>{PROGRAM_OPERATION_MODE_META[programOperationMode(block)].label} · {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(block)]}{block.duration ? ` · ${block.duration}` : ""}</small>
+                      {(block.rules || block.runCautions) && <p>{block.rules || block.runCautions}</p>}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+            {competitionTeams.length > 0 && (
+              <section className="published-program-alliance">
+                <h4>연합팀</h4>
+                <div>{competitionTeams.map((team) => {
+                  const names = Object.keys(team.groupIds ?? {}).map((groupId) => groupNames.get(groupId) ?? "삭제된 조");
+                  return <span key={team.id} data-color={team.color ?? "blue"}>{team.name}{names.length > 0 ? ` · ${names.join("·")}` : " · 미배정"}</span>;
+                })}</div>
+              </section>
+            )}
             {tasks.length > 0 && (
               <section className="published-program-tasks">
                 <h4>할 일</h4>

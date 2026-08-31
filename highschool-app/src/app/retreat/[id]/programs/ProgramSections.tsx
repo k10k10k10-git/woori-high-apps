@@ -8,16 +8,22 @@ import ProgramUndoNotice from "./ProgramUndoNotice";
 import { useProgramUndo } from "./useProgramUndo";
 import {
   PROGRAM_ITEM_STATUS_META,
+  PROGRAM_OPERATION_MODE_META,
+  PROGRAM_PARTICIPATION_MODE_META,
   nextMatchRound,
   postMatchRounds,
   programBudget,
   programItemTotal,
+  programOperationMode,
+  programParticipationMode,
 } from "@/lib/programPreparation";
 import type { ProgramGroupedEntries } from "@/lib/programPreparation";
 import type {
   RetreatProgramItem,
   RetreatProgramItemStatus,
   RetreatProgramMatch,
+  RetreatProgramOperationMode,
+  RetreatProgramParticipationMode,
   RetreatProgramPost,
   RetreatProgramRole,
 } from "@/lib/types";
@@ -434,8 +440,8 @@ export function ProgramPostsSection({
     <section className="program-form-section" aria-labelledby="program-posts-heading">
       <div className="program-subsection-heading">
         <div>
-          <h3 id="program-posts-heading">게임·포스트</h3>
-          <p>게임 하나가 카드 하나입니다. 현장 스탭이 이 카드만 보고 진행할 수 있어야 합니다.</p>
+          <h3 id="program-posts-heading">진행 블록</h3>
+          <p>게임·설명·이동을 실제 순서대로 추가하고, 각 블록의 운영 방식과 참가 단위를 정합니다.</p>
         </div>
         <span className="program-count">{posts.length}개</span>
       </div>
@@ -443,8 +449,8 @@ export function ProgramPostsSection({
       {canEdit && (
         <div className="program-inline-form">
           <label className="program-field program-field--wide">
-            <span>게임 이름</span>
-            <input className="input" value={name} maxLength={80} placeholder="예: 물코기(이천규빗)"
+            <span>활동 이름</span>
+            <input className="input" value={name} maxLength={80} placeholder="예: 전체 오프닝 / 물코기 / 코스 이동"
               onChange={(event) => setName(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void add(); } }} />
           </label>
@@ -455,7 +461,7 @@ export function ProgramPostsSection({
       )}
 
       {posts.length === 0 ? (
-        <p className="program-task-empty">아직 등록된 게임이 없습니다. 위에서 이름부터 추가해 주세요.</p>
+        <p className="program-task-empty">아직 진행 블록이 없습니다. 실제 진행 순서대로 활동을 추가해 주세요.</p>
       ) : (
         <ul className="program-card-list">
           {posts.map((post) => (
@@ -463,7 +469,7 @@ export function ProgramPostsSection({
               <details className="program-card">
                 <summary>
                   <strong>{post.name}</strong>
-                  <span>{[post.place, post.duration, post.staff].filter(Boolean).join(" · ") || "장소·시간·담당 미정"}</span>
+                  <span>{PROGRAM_OPERATION_MODE_META[programOperationMode(post)].label} · {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(post)]}</span>
                   <em className="program-card-counts">준비물 {itemsOf(post.id).length} · 역할 {rolesOf(post.id).length}</em>
                 </summary>
                 <fieldset disabled={!canEdit || busyId === post.id} className="program-card-body">
@@ -477,6 +483,26 @@ export function ProgramPostsSection({
                         onSave={(next) => onUpdate(post.id, { name: next })}
                         errorMessage="게임을 수정하지 못했습니다."
                       /></label>
+                    <label className="program-field"><span>운영 방식</span>
+                      <select className="input" value={programOperationMode(post)}
+                        onChange={(event) => void run(post.id, () => onUpdate(post.id, {
+                          operationMode: event.target.value as RetreatProgramOperationMode,
+                          ...(event.target.value === "alliance" ? { participationMode: "allianceTeam" as const } : {}),
+                        }), "운영 방식을 바꾸지 못했습니다.")}>
+                        {Object.entries(PROGRAM_OPERATION_MODE_META).map(([value, meta]) => <option key={value} value={value}>{meta.label} — {meta.description}</option>)}
+                      </select>
+                    </label>
+                    <label className="program-field"><span>참가 단위</span>
+                      <select className="input" value={programParticipationMode(post)}
+                        onChange={(event) => void run(post.id, () => onUpdate(post.id, { participationMode: event.target.value as RetreatProgramParticipationMode }), "참가 단위를 바꾸지 못했습니다.")}>
+                        {Object.entries(PROGRAM_PARTICIPATION_MODE_META).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                      </select>
+                    </label>
+                    <label className="program-score-toggle">
+                      <input type="checkbox" checked={post.scoreEnabled ?? false}
+                        onChange={(event) => void run(post.id, () => onUpdate(post.id, { scoreEnabled: event.target.checked }), "점수 사용 설정을 바꾸지 못했습니다.")} />
+                      <span>점수·대진 사용</span>
+                    </label>
                     <label className="program-field"><span>장소</span>
                       <ProgramAutosaveField
                         value={post.place ?? ""}
@@ -546,14 +572,16 @@ export function ProgramPostsSection({
                     onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
                     onRestoreItem={onRestoreItem} onRestoreRole={onRestoreRole}
                   />
-                  <ProgramBracket post={post} canEdit={canEdit}
-                    onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
-                    onRestoreMatch={onRestoreMatch} />
+                  {(post.scoreEnabled || postMatchRounds(post).length > 0) && (
+                    <ProgramBracket post={post} canEdit={canEdit}
+                      onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
+                      onRestoreMatch={onRestoreMatch} />
+                  )}
                   {canEdit && (
                     <div className="program-card-actions">
                       <span className="program-autosave-hint">입력한 칸에서 벗어나면 바로 저장됩니다.</span>
                       <button type="button" className="btn-danger btn-sm" onClick={() => void run(post.id, async () => { await onDelete(post.id); undo.remember(post.name, () => onRestore(post)); }, "게임을 삭제하지 못했습니다.")}>
-                        <Trash aria-hidden="true" size={15} /> 이 게임 삭제
+                        <Trash aria-hidden="true" size={15} /> 이 블록 삭제
                       </button>
                     </div>
                   )}

@@ -122,6 +122,12 @@ export type RetreatProgramStatus = "draft" | "review" | "confirmed" | "published
 
 export type RetreatProgramKind = "main" | "post" | "sports" | "other";
 
+/** 프로그램 안의 한 활동이 실제로 운영되는 방식. 프로그램 전체 유형과 분리한다. */
+export type RetreatProgramOperationMode = "whole" | "course" | "group" | "alliance" | "break";
+
+/** 한 활동에 참여하는 단위. 같은 진행 방식도 참가 단위는 수련회마다 달라질 수 있다. */
+export type RetreatProgramParticipationMode = "individual" | "retreatGroup" | "allianceTeam" | "department" | "temporary";
+
 export interface RetreatProgramTask {
   id: string;
   title: string;
@@ -140,6 +146,11 @@ export interface RetreatProgramPost {
   id: string;
   order: number;
   name: string;
+  /** 전체 진행·코스 순환·조별 협력 등 이 활동의 운영 방식. 없으면 구버전 기본값(전체 진행)으로 읽는다. */
+  operationMode?: RetreatProgramOperationMode;
+  /** 개인·기존 조·연합팀 등 참가자 묶음. 없으면 구버전 기본값(기존 조)으로 읽는다. */
+  participationMode?: RetreatProgramParticipationMode;
+  scoreEnabled?: boolean;
   concept?: string;
   place?: string;
   duration?: string;
@@ -153,6 +164,20 @@ export interface RetreatProgramPost {
   runCautions?: string;
   extra?: string;
   matches?: Record<string, RetreatProgramMatch>;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 프로그램에서만 사용하는 연합팀. 수련회 기본 조(groups)는 참조할 뿐 수정하지 않는다.
+ * groupIds는 Firebase 배열 대신 ID 맵으로 저장해 조 하나만 원자적으로 옮길 수 있게 한다.
+ */
+export interface RetreatProgramCompetitionTeam {
+  id: string;
+  order: number;
+  name: string;
+  color?: "blue" | "red" | "yellow" | "green" | "purple" | "orange";
+  groupIds?: Record<string, true>;
   createdAt: number;
   updatedAt: number;
 }
@@ -246,6 +271,8 @@ export interface RetreatProgram {
   posts?: Record<string, RetreatProgramPost>;
   items?: Record<string, RetreatProgramItem>;
   roles?: Record<string, RetreatProgramRole>;
+  /** 프로그램 전용 연합팀. 수련회 기본 조 편성과는 독립이다. */
+  competitionTeams?: Record<string, RetreatProgramCompetitionTeam>;
   createdAt: number;
   updatedAt: number;
 }
