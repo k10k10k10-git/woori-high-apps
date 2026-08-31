@@ -22,6 +22,10 @@ import {
   deleteRetreatProgramPost,
   deleteRetreatProgramRole,
   deleteRetreatProgramTask,
+  restoreRetreatProgramItem,
+  restoreRetreatProgramMatch,
+  restoreRetreatProgramPost,
+  restoreRetreatProgramRole,
   reorderRetreatPrograms,
   subscribeToRetreat,
   subscribeToRetreatPrograms,
@@ -320,6 +324,10 @@ export default function ProgramPreparationClient() {
                 onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, { name, order }).then(() => undefined)}
                 onUpdatePost={(postId, data: Partial<RetreatProgramPost>) => updateRetreatProgramPost(retreatId, selectedProgram.id, postId, data)}
                 onDeletePost={(postId) => deleteRetreatProgramPost(retreatId, selectedProgram.id, postId)}
+                onRestorePost={(post) => restoreRetreatProgramPost(retreatId, selectedProgram.id, post)}
+                onRestoreItem={(item) => restoreRetreatProgramItem(retreatId, selectedProgram.id, item)}
+                onRestoreRole={(role) => restoreRetreatProgramRole(retreatId, selectedProgram.id, role)}
+                onRestoreMatch={(postId, match) => restoreRetreatProgramMatch(retreatId, selectedProgram.id, postId, match)}
                 onCreateMatch={(postId, data) => createRetreatProgramMatch(retreatId, selectedProgram.id, postId, data).then(() => undefined)}
                 onUpdateMatch={(postId, matchId, data: Partial<RetreatProgramMatch>) => updateRetreatProgramMatch(retreatId, selectedProgram.id, postId, matchId, data)}
                 onDeleteMatch={(postId, matchId) => deleteRetreatProgramMatch(retreatId, selectedProgram.id, postId, matchId)}

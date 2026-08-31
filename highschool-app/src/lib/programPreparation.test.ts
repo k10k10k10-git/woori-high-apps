@@ -78,11 +78,20 @@ describe("수련회 프로그램 준비", () => {
 
     const filled = programReadiness(base({
       ...body,
+      posts: { g1: { order: 1, name: "물코기", rules: "1. 조별 대항", createdAt: 1, updatedAt: 1 } },
+      roles: { r1: { order: 1, role: "진행", assignee: "박준규", createdAt: 1, updatedAt: 1 } },
+      items: { i1: { order: 1, name: "줄자", status: "todo", quantity: 2, createdAt: 1, updatedAt: 1 } },
+    } as never));
+    expect(filled).toMatchObject({ ready: 8, total: 8, percent: 100, missingLabels: [] });
+
+    // 이름만 있는 게임·담당 없는 역할·수량 없는 물품은 아직 준비된 것으로 세지 않는다.
+    const shallow = programReadiness(base({
+      ...body,
       posts: { g1: { order: 1, name: "물코기", createdAt: 1, updatedAt: 1 } },
       roles: { r1: { order: 1, role: "진행", createdAt: 1, updatedAt: 1 } },
       items: { i1: { order: 1, name: "줄자", status: "todo", createdAt: 1, updatedAt: 1 } },
     } as never));
-    expect(filled).toMatchObject({ ready: 8, total: 8, percent: 100, missingLabels: [] });
+    expect(shallow.missingLabels).toEqual(["게임·포스트", "역할", "물품"]);
   });
 
   it("할 일은 생성 순으로 표시한다", () => {
@@ -201,17 +210,17 @@ describe("대진표", () => {
 describe("게임 ↔ 물품·역할 연결", () => {
   const program = {
     posts: {
-      g1: { order: 1, name: "물코기", createdAt: 1, updatedAt: 1 },
+      g1: { order: 1, name: "물코기", rules: "1. 조별 대항", createdAt: 1, updatedAt: 1 },
       g2: { order: 2, name: "김밥 코드", createdAt: 2, updatedAt: 2 },
     },
     items: {
-      i1: { order: 1, name: "줄자", status: "todo", postId: "g1", createdAt: 1, updatedAt: 1 },
+      i1: { order: 1, name: "줄자", status: "todo", postId: "g1", quantity: 1, createdAt: 1, updatedAt: 1 },
       i2: { order: 2, name: "종이", status: "purchased", postId: "g1", quantity: 2, unitPrice: 500, createdAt: 2, updatedAt: 2 },
       i3: { order: 3, name: "현수막", status: "todo", createdAt: 3, updatedAt: 3 },
       i4: { order: 4, name: "지워진 게임 물품", status: "todo", postId: "없어진게임", createdAt: 4, updatedAt: 4 },
     },
     roles: {
-      r1: { order: 1, role: "진행", postId: "g1", createdAt: 1, updatedAt: 1 },
+      r1: { order: 1, role: "진행", assignee: "박준규", postId: "g1", createdAt: 1, updatedAt: 1 },
       r2: { order: 2, role: "총괄", createdAt: 2, updatedAt: 2 },
     },
   } as unknown as RetreatProgram;

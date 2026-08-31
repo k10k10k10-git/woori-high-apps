@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { Plus, Trash } from "@phosphor-icons/react";
 import { useUI } from "@/context/UIContext";
+import ProgramAutosaveField from "./ProgramAutosaveField";
+import ProgramUndoNotice from "./ProgramUndoNotice";
+import { useProgramUndo } from "./useProgramUndo";
 import {
   PROGRAM_ITEM_STATUS_META,
   nextMatchRound,
@@ -58,8 +61,8 @@ function useRowBusy() {
 // 여기서 넣으면 postId가 자동으로 붙어, 물품·예산·역할·배치 탭에서 게임별로 묶여 보인다.
 function PostSubEntries({
   post, items, roles, canEdit,
-  onCreateItem, onUpdateItem, onDeleteItem,
-  onCreateRole, onUpdateRole, onDeleteRole,
+  onCreateItem, onUpdateItem, onDeleteItem, onRestoreItem,
+  onCreateRole, onUpdateRole, onDeleteRole, onRestoreRole,
 }: {
   post: RetreatProgramPost;
   items: RetreatProgramItem[];
@@ -71,8 +74,11 @@ function PostSubEntries({
   onCreateRole: (role: string, order: number, postId: string) => Promise<void>;
   onUpdateRole: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
   onDeleteRole: (roleId: string) => Promise<void>;
+  onRestoreItem: (item: RetreatProgramItem) => Promise<void>;
+  onRestoreRole: (role: RetreatProgramRole) => Promise<void>;
 }) {
   const { busyId, run } = useRowBusy();
+  const undo = useProgramUndo();
   const [itemName, setItemName] = useState("");
   const [roleName, setRoleName] = useState("");
   const budget = programBudget(items);
@@ -102,19 +108,40 @@ function PostSubEntries({
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} aria-busy={busyId === item.id}>
-                    <td><select className="input" defaultValue={item.status} disabled={!canEdit}
+                    <td><select className="input" value={item.status} disabled={!canEdit}
                       onChange={(event) => void run(item.id, () => onUpdateItem(item.id, { status: event.target.value as RetreatProgramItemStatus }), "상태를 바꾸지 못했습니다.")}>
                       {Object.entries(PROGRAM_ITEM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
                     </select></td>
-                    <td><input className="input" defaultValue={item.name} maxLength={80} disabled={!canEdit}
-                      onBlur={(event) => { if (event.target.value.trim() && event.target.value !== item.name) void run(item.id, () => onUpdateItem(item.id, { name: event.target.value.trim() }), "이름을 수정하지 못했습니다."); }} /></td>
-                    <td><input className="input program-number" inputMode="numeric" defaultValue={item.quantity ?? ""} disabled={!canEdit}
-                      onBlur={(event) => { const next = digits(event.target.value); if (next !== item.quantity) void run(item.id, () => onUpdateItem(item.id, { quantity: next ?? null as never }), "수량을 수정하지 못했습니다."); }} /></td>
-                    <td><input className="input program-number" inputMode="numeric" defaultValue={item.unitPrice ?? ""} disabled={!canEdit}
-                      onBlur={(event) => { const next = digits(event.target.value); if (next !== item.unitPrice) void run(item.id, () => onUpdateItem(item.id, { unitPrice: next ?? null as never }), "단가를 수정하지 못했습니다."); }} /></td>
+                    <td><ProgramAutosaveField
+                        value={item.name}
+                        ariaLabel="이름"
+                        maxLength={80}
+                        allowEmpty={false}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateItem(item.id, { name: next })}
+                        errorMessage="이름을 수정하지 못했습니다."
+                      /></td>
+                    <td><ProgramAutosaveField
+                        value={item.quantity ?? ""}
+                        ariaLabel="수량"
+                        className="program-number"
+                        inputMode="numeric"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateItem(item.id, { quantity: digits(next) ?? null as never })}
+                        errorMessage="수량을 수정하지 못했습니다."
+                      /></td>
+                    <td><ProgramAutosaveField
+                        value={item.unitPrice ?? ""}
+                        ariaLabel="단가"
+                        className="program-number"
+                        inputMode="numeric"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateItem(item.id, { unitPrice: digits(next) ?? null as never })}
+                        errorMessage="단가를 수정하지 못했습니다."
+                      /></td>
                     <td className="program-money">{won(programItemTotal(item))}</td>
                     {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
-                      onClick={() => void run(item.id, () => onDeleteItem(item.id), "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                      onClick={() => void run(item.id, async () => { await onDeleteItem(item.id); undo.remember(item.name, () => onRestoreItem(item)); }, "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                   </tr>
                 ))}
               </tbody>
@@ -146,14 +173,33 @@ function PostSubEntries({
               <tbody>
                 {roles.map((entry) => (
                   <tr key={entry.id} aria-busy={busyId === entry.id}>
-                    <td><input className="input" defaultValue={entry.role} maxLength={80} disabled={!canEdit}
-                      onBlur={(event) => { if (event.target.value.trim() && event.target.value !== entry.role) void run(entry.id, () => onUpdateRole(entry.id, { role: event.target.value.trim() }), "역할을 수정하지 못했습니다."); }} /></td>
-                    <td><input className="input" defaultValue={entry.assignee ?? ""} maxLength={120} disabled={!canEdit}
-                      onBlur={(event) => { if (event.target.value !== (entry.assignee ?? "")) void run(entry.id, () => onUpdateRole(entry.id, { assignee: event.target.value }), "담당을 수정하지 못했습니다."); }} /></td>
-                    <td><input className="input" defaultValue={entry.detail ?? ""} maxLength={400} disabled={!canEdit}
-                      onBlur={(event) => { if (event.target.value !== (entry.detail ?? "")) void run(entry.id, () => onUpdateRole(entry.id, { detail: event.target.value }), "내용을 수정하지 못했습니다."); }} /></td>
+                    <td><ProgramAutosaveField
+                        value={entry.role}
+                        ariaLabel="역할"
+                        maxLength={80}
+                        allowEmpty={false}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateRole(entry.id, { role: next })}
+                        errorMessage="역할을 수정하지 못했습니다."
+                      /></td>
+                    <td><ProgramAutosaveField
+                        value={entry.assignee ?? ""}
+                        ariaLabel="담당"
+                        maxLength={120}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateRole(entry.id, { assignee: next })}
+                        errorMessage="담당을 수정하지 못했습니다."
+                      /></td>
+                    <td><ProgramAutosaveField
+                        value={entry.detail ?? ""}
+                        ariaLabel="내용"
+                        maxLength={400}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateRole(entry.id, { detail: next })}
+                        errorMessage="내용을 수정하지 못했습니다."
+                      /></td>
                     {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
-                      onClick={() => void run(entry.id, () => onDeleteRole(entry.id), "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                      onClick={() => void run(entry.id, async () => { await onDeleteRole(entry.id); undo.remember(entry.role, () => onRestoreRole(entry)); }, "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                   </tr>
                 ))}
               </tbody>
@@ -161,21 +207,27 @@ function PostSubEntries({
           </div>
         )}
       </section>
+
+      {undo.pending && (
+        <ProgramUndoNotice label={undo.pending.label} busy={undo.busy} onUndo={() => void undo.undo()} onDismiss={undo.dismiss} />
+      )}
     </div>
   );
 }
 
 // ── 대진표 (게임 카드 안) ───────────────────────────────────────
 function ProgramBracket({
-  post, canEdit, onCreateMatch, onUpdateMatch, onDeleteMatch,
+  post, canEdit, onCreateMatch, onUpdateMatch, onDeleteMatch, onRestoreMatch,
 }: {
   post: RetreatProgramPost;
   canEdit: boolean;
   onCreateMatch: (postId: string, data: { round: number; order: number }) => Promise<void>;
   onUpdateMatch: (postId: string, matchId: string, data: Partial<RetreatProgramMatch>) => Promise<void>;
   onDeleteMatch: (postId: string, matchId: string) => Promise<void>;
+  onRestoreMatch: (postId: string, match: RetreatProgramMatch) => Promise<void>;
 }) {
   const { busyId, run } = useRowBusy();
+  const undo = useProgramUndo();
   const [adding, setAdding] = useState(false);
   const rounds = postMatchRounds(post);
   const totalMatches = rounds.reduce((sum, entry) => sum + entry.matches.length, 0);
@@ -214,18 +266,53 @@ function ProgramBracket({
                 <tbody>
                   {entry.matches.map((match) => (
                     <tr key={match.id} aria-busy={busyId === match.id}>
-                      <td><input className="input program-number" defaultValue={match.time ?? ""} maxLength={20} disabled={!canEdit} placeholder="14:00"
-                        onBlur={(event) => { if (event.target.value !== (match.time ?? "")) void run(match.id, () => onUpdateMatch(post.id, match.id, { time: event.target.value }), "시간을 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={match.place ?? ""} maxLength={60} disabled={!canEdit}
-                        onBlur={(event) => { if (event.target.value !== (match.place ?? "")) void run(match.id, () => onUpdateMatch(post.id, match.id, { place: event.target.value }), "장소를 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={match.teamA ?? ""} maxLength={60} disabled={!canEdit} placeholder="1조"
-                        onBlur={(event) => { if (event.target.value !== (match.teamA ?? "")) void run(match.id, () => onUpdateMatch(post.id, match.id, { teamA: event.target.value }), "대진을 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={match.teamB ?? ""} maxLength={60} disabled={!canEdit} placeholder="2조"
-                        onBlur={(event) => { if (event.target.value !== (match.teamB ?? "")) void run(match.id, () => onUpdateMatch(post.id, match.id, { teamB: event.target.value }), "대진을 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={match.result ?? ""} maxLength={80} disabled={!canEdit} placeholder="승자·점수"
-                        onBlur={(event) => { if (event.target.value !== (match.result ?? "")) void run(match.id, () => onUpdateMatch(post.id, match.id, { result: event.target.value }), "결과를 수정하지 못했습니다."); }} /></td>
+                      <td><ProgramAutosaveField
+                        value={match.time ?? ""}
+                        ariaLabel="시간"
+                        className="program-number"
+                        maxLength={20}
+                        placeholder="14:00"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateMatch(post.id, match.id, { time: next })}
+                        errorMessage="시간을 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={match.place ?? ""}
+                        ariaLabel="장소"
+                        maxLength={60}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateMatch(post.id, match.id, { place: next })}
+                        errorMessage="장소를 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={match.teamA ?? ""}
+                        ariaLabel="대진"
+                        maxLength={60}
+                        placeholder="1조"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateMatch(post.id, match.id, { teamA: next })}
+                        errorMessage="대진을 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={match.teamB ?? ""}
+                        ariaLabel="대진"
+                        maxLength={60}
+                        placeholder="2조"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateMatch(post.id, match.id, { teamB: next })}
+                        errorMessage="대진을 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={match.result ?? ""}
+                        ariaLabel="결과"
+                        maxLength={80}
+                        placeholder="승자·점수"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdateMatch(post.id, match.id, { result: next })}
+                        errorMessage="결과를 수정하지 못했습니다."
+                      /></td>
                       {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === match.id} aria-label={`${entry.round}라운드 경기 삭제`}
-                        onClick={() => void run(match.id, () => onDeleteMatch(post.id, match.id), "경기를 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                        onClick={() => void run(match.id, async () => { await onDeleteMatch(post.id, match.id); undo.remember(`${entry.round}라운드 경기`, () => onRestoreMatch(post.id, match)); }, "경기를 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -246,6 +333,10 @@ function ProgramBracket({
           <Plus aria-hidden="true" size={15} /> {rounds.length === 0 ? "1라운드 만들기" : `${nextMatchRound(post) + 1}라운드 추가`}
         </button>
       )}
+
+      {undo.pending && (
+        <ProgramUndoNotice label={undo.pending.label} busy={undo.busy} onUndo={() => void undo.undo()} onDismiss={undo.dismiss} />
+      )}
     </section>
   );
 }
@@ -264,6 +355,7 @@ const POST_FIELDS = [
 export function ProgramPostsSection({
   posts, canEdit, onCreate, onUpdate, onDelete, onCreateMatch, onUpdateMatch, onDeleteMatch,
   itemsOf, rolesOf, onCreateItem, onUpdateItem, onDeleteItem, onCreateRole, onUpdateRole, onDeleteRole,
+  onRestore, onRestoreItem, onRestoreRole, onRestoreMatch,
 }: {
   posts: RetreatProgramPost[];
   canEdit: boolean;
@@ -281,10 +373,15 @@ export function ProgramPostsSection({
   onCreateMatch: (postId: string, data: { round: number; order: number }) => Promise<void>;
   onUpdateMatch: (postId: string, matchId: string, data: Partial<RetreatProgramMatch>) => Promise<void>;
   onDeleteMatch: (postId: string, matchId: string) => Promise<void>;
+  onRestore: (post: RetreatProgramPost) => Promise<void>;
+  onRestoreItem: (item: RetreatProgramItem) => Promise<void>;
+  onRestoreRole: (role: RetreatProgramRole) => Promise<void>;
+  onRestoreMatch: (postId: string, match: RetreatProgramMatch) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [adding, setAdding] = useState(false);
   const { busyId, run } = useRowBusy();
+  const undo = useProgramUndo();
 
   async function add() {
     const trimmed = name.trim();
@@ -337,31 +434,73 @@ export function ProgramPostsSection({
                 <fieldset disabled={!canEdit || busyId === post.id} className="program-card-body">
                   <div className="program-form-grid">
                     <label className="program-field program-field--wide"><span>게임 이름</span>
-                      <input className="input" defaultValue={post.name} maxLength={80}
-                        onBlur={(event) => { if (event.target.value.trim() && event.target.value !== post.name) void run(post.id, () => onUpdate(post.id, { name: event.target.value.trim() }), "게임을 수정하지 못했습니다."); }} /></label>
+                      <ProgramAutosaveField
+                        value={post.name}
+                        ariaLabel="게임"
+                        maxLength={80}
+                        allowEmpty={false}
+                        onSave={(next) => onUpdate(post.id, { name: next })}
+                        errorMessage="게임을 수정하지 못했습니다."
+                      /></label>
                     <label className="program-field"><span>장소</span>
-                      <input className="input" defaultValue={post.place ?? ""} maxLength={80} placeholder="B2 강당 1"
-                        onBlur={(event) => { if (event.target.value !== (post.place ?? "")) void run(post.id, () => onUpdate(post.id, { place: event.target.value }), "장소를 수정하지 못했습니다."); }} /></label>
+                      <ProgramAutosaveField
+                        value={post.place ?? ""}
+                        ariaLabel="장소"
+                        maxLength={80}
+                        placeholder="B2 강당 1"
+                        onSave={(next) => onUpdate(post.id, { place: next })}
+                        errorMessage="장소를 수정하지 못했습니다."
+                      /></label>
                     <label className="program-field"><span>러닝 타임</span>
-                      <input className="input" defaultValue={post.duration ?? ""} maxLength={40} placeholder="15m"
-                        onBlur={(event) => { if (event.target.value !== (post.duration ?? "")) void run(post.id, () => onUpdate(post.id, { duration: event.target.value }), "시간을 수정하지 못했습니다."); }} /></label>
+                      <ProgramAutosaveField
+                        value={post.duration ?? ""}
+                        ariaLabel="시간"
+                        maxLength={40}
+                        placeholder="15m"
+                        onSave={(next) => onUpdate(post.id, { duration: next })}
+                        errorMessage="시간을 수정하지 못했습니다."
+                      /></label>
                     <label className="program-field"><span>참여 인원</span>
-                      <input className="input" defaultValue={post.headcount ?? ""} maxLength={120} placeholder="라운드당 8명"
-                        onBlur={(event) => { if (event.target.value !== (post.headcount ?? "")) void run(post.id, () => onUpdate(post.id, { headcount: event.target.value }), "인원을 수정하지 못했습니다."); }} /></label>
+                      <ProgramAutosaveField
+                        value={post.headcount ?? ""}
+                        ariaLabel="인원"
+                        maxLength={120}
+                        placeholder="라운드당 8명"
+                        onSave={(next) => onUpdate(post.id, { headcount: next })}
+                        errorMessage="인원을 수정하지 못했습니다."
+                      /></label>
                     <label className="program-field"><span>진행 스탭</span>
-                      <input className="input" defaultValue={post.staff ?? ""} maxLength={120}
-                        onBlur={(event) => { if (event.target.value !== (post.staff ?? "")) void run(post.id, () => onUpdate(post.id, { staff: event.target.value }), "담당을 수정하지 못했습니다."); }} /></label>
+                      <ProgramAutosaveField
+                        value={post.staff ?? ""}
+                        ariaLabel="담당"
+                        maxLength={120}
+                        onSave={(next) => onUpdate(post.id, { staff: next })}
+                        errorMessage="담당을 수정하지 못했습니다."
+                      /></label>
                     <label className="program-field"><span>힌트</span>
-                      <input className="input" defaultValue={post.hint ?? ""} maxLength={200} placeholder="메인 힌트 1"
-                        onBlur={(event) => { if (event.target.value !== (post.hint ?? "")) void run(post.id, () => onUpdate(post.id, { hint: event.target.value }), "힌트를 수정하지 못했습니다."); }} /></label>
+                      <ProgramAutosaveField
+                        value={post.hint ?? ""}
+                        ariaLabel="힌트"
+                        maxLength={200}
+                        placeholder="메인 힌트 1"
+                        onSave={(next) => onUpdate(post.id, { hint: next })}
+                        errorMessage="힌트를 수정하지 못했습니다."
+                      /></label>
                   </div>
                   <div className="program-text-fields">
                     {POST_FIELDS.map((field) => (
                       <label key={field.key} className="program-field">
                         <span>{field.label}</span>
-                        <textarea className="input" rows={field.rows} maxLength={4000} placeholder={field.placeholder}
-                          defaultValue={(post[field.key] as string | undefined) ?? ""}
-                          onBlur={(event) => { if (event.target.value !== ((post[field.key] as string | undefined) ?? "")) void run(post.id, () => onUpdate(post.id, { [field.key]: event.target.value }), "내용을 수정하지 못했습니다."); }} />
+                        <ProgramAutosaveField
+                        value={(post[field.key] as string | undefined) ?? ""}
+                        ariaLabel={field.label}
+                        maxLength={4000}
+                        rows={field.rows}
+                        placeholder={field.placeholder}
+                        multiline
+                        onSave={(next) => onUpdate(post.id, { [field.key]: next })}
+                        errorMessage="내용을 수정하지 못했습니다."
+                      />
                       </label>
                     ))}
                   </div>
@@ -369,13 +508,15 @@ export function ProgramPostsSection({
                     post={post} items={itemsOf(post.id)} roles={rolesOf(post.id)} canEdit={canEdit}
                     onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
                     onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
+                    onRestoreItem={onRestoreItem} onRestoreRole={onRestoreRole}
                   />
                   <ProgramBracket post={post} canEdit={canEdit}
-                    onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch} />
+                    onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
+                    onRestoreMatch={onRestoreMatch} />
                   {canEdit && (
                     <div className="program-card-actions">
                       <span className="program-autosave-hint">입력한 칸에서 벗어나면 바로 저장됩니다.</span>
-                      <button type="button" className="btn-danger btn-sm" onClick={() => void run(post.id, () => onDelete(post.id), "게임을 삭제하지 못했습니다.")}>
+                      <button type="button" className="btn-danger btn-sm" onClick={() => void run(post.id, async () => { await onDelete(post.id); undo.remember(post.name, () => onRestore(post)); }, "게임을 삭제하지 못했습니다.")}>
                         <Trash aria-hidden="true" size={15} /> 이 게임 삭제
                       </button>
                     </div>
@@ -393,16 +534,18 @@ export function ProgramPostsSection({
 // ── 역할·배치 (모아 보기) ────────────────────────────────────
 // 입력은 게임 카드 안에서 한다. 여기는 게임별로 묶어 한눈에 보고, 프로그램 전체 역할을 더하는 자리다.
 export function ProgramRolesSection({
-  groups, canEdit, onCreate, onUpdate, onDelete,
+  groups, canEdit, onCreate, onUpdate, onDelete, onRestore,
 }: {
   groups: Array<ProgramGroupedEntries<RetreatProgramRole>>;
   canEdit: boolean;
   onCreate: (role: string, order: number, postId?: string) => Promise<void>;
   onUpdate: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
   onDelete: (roleId: string) => Promise<void>;
+  onRestore: (role: RetreatProgramRole) => Promise<void>;
 }) {
   const [role, setRole] = useState("");
   const { busyId, run } = useRowBusy();
+  const undo = useProgramUndo();
   const total = groups.reduce((sum, group) => sum + group.entries.length, 0);
 
   return (
@@ -445,18 +588,50 @@ export function ProgramRolesSection({
                 <tbody>
                   {group.entries.map((entry) => (
                     <tr key={entry.id} aria-busy={busyId === entry.id}>
-                      <td><input className="input" defaultValue={entry.role} maxLength={80} disabled={!canEdit}
-                        onBlur={(event) => { if (event.target.value.trim() && event.target.value !== entry.role) void run(entry.id, () => onUpdate(entry.id, { role: event.target.value.trim() }), "역할을 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={entry.assignee ?? ""} maxLength={120} disabled={!canEdit}
-                        onBlur={(event) => { if (event.target.value !== (entry.assignee ?? "")) void run(entry.id, () => onUpdate(entry.id, { assignee: event.target.value }), "담당을 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={entry.place ?? ""} maxLength={80} disabled={!canEdit}
-                        onBlur={(event) => { if (event.target.value !== (entry.place ?? "")) void run(entry.id, () => onUpdate(entry.id, { place: event.target.value }), "장소를 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input program-number" defaultValue={entry.headcount ?? ""} maxLength={40} disabled={!canEdit}
-                        onBlur={(event) => { if (event.target.value !== (entry.headcount ?? "")) void run(entry.id, () => onUpdate(entry.id, { headcount: event.target.value }), "인원을 수정하지 못했습니다."); }} /></td>
-                      <td><input className="input" defaultValue={entry.detail ?? ""} maxLength={400} disabled={!canEdit}
-                        onBlur={(event) => { if (event.target.value !== (entry.detail ?? "")) void run(entry.id, () => onUpdate(entry.id, { detail: event.target.value }), "내용을 수정하지 못했습니다."); }} /></td>
+                      <td><ProgramAutosaveField
+                        value={entry.role}
+                        ariaLabel="역할"
+                        maxLength={80}
+                        allowEmpty={false}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(entry.id, { role: next })}
+                        errorMessage="역할을 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={entry.assignee ?? ""}
+                        ariaLabel="담당"
+                        maxLength={120}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(entry.id, { assignee: next })}
+                        errorMessage="담당을 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={entry.place ?? ""}
+                        ariaLabel="장소"
+                        maxLength={80}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(entry.id, { place: next })}
+                        errorMessage="장소를 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={entry.headcount ?? ""}
+                        ariaLabel="인원"
+                        className="program-number"
+                        maxLength={40}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(entry.id, { headcount: next })}
+                        errorMessage="인원을 수정하지 못했습니다."
+                      /></td>
+                      <td><ProgramAutosaveField
+                        value={entry.detail ?? ""}
+                        ariaLabel="내용"
+                        maxLength={400}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(entry.id, { detail: next })}
+                        errorMessage="내용을 수정하지 못했습니다."
+                      /></td>
                       {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
-                        onClick={() => void run(entry.id, () => onDelete(entry.id), "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                        onClick={() => void run(entry.id, async () => { await onDelete(entry.id); undo.remember(entry.role, () => onRestore(entry)); }, "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                     </tr>
                   ))}
                 </tbody>
@@ -471,16 +646,18 @@ export function ProgramRolesSection({
 
 // ── 물품·예산 (모아 보기 · 구매 체크) ──────────────────────────
 export function ProgramItemsSection({
-  groups, canEdit, onCreate, onUpdate, onDelete,
+  groups, canEdit, onCreate, onUpdate, onDelete, onRestore,
 }: {
   groups: Array<ProgramGroupedEntries<RetreatProgramItem>>;
   canEdit: boolean;
   onCreate: (name: string, order: number, postId?: string) => Promise<void>;
   onUpdate: (itemId: string, data: Partial<RetreatProgramItem>) => Promise<void>;
   onDelete: (itemId: string) => Promise<void>;
+  onRestore: (item: RetreatProgramItem) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const { busyId, run } = useRowBusy();
+  const undo = useProgramUndo();
   const all = groups.flatMap((group) => group.entries);
   const budget = programBudget(all);
 
@@ -532,19 +709,40 @@ export function ProgramItemsSection({
                   <tbody>
                     {group.entries.map((item) => (
                       <tr key={item.id} aria-busy={busyId === item.id}>
-                        <td><select className="input" defaultValue={item.status} disabled={!canEdit}
+                        <td><select className="input" value={item.status} disabled={!canEdit}
                           onChange={(event) => void run(item.id, () => onUpdate(item.id, { status: event.target.value as RetreatProgramItemStatus }), "상태를 바꾸지 못했습니다.")}>
                           {Object.entries(PROGRAM_ITEM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
                         </select></td>
-                        <td><input className="input" defaultValue={item.name} maxLength={80} disabled={!canEdit}
-                          onBlur={(event) => { if (event.target.value.trim() && event.target.value !== item.name) void run(item.id, () => onUpdate(item.id, { name: event.target.value.trim() }), "이름을 수정하지 못했습니다."); }} /></td>
-                        <td><input className="input program-number" inputMode="numeric" defaultValue={item.quantity ?? ""} disabled={!canEdit}
-                          onBlur={(event) => { const next = digits(event.target.value); if (next !== item.quantity) void run(item.id, () => onUpdate(item.id, { quantity: next ?? null as never }), "수량을 수정하지 못했습니다."); }} /></td>
-                        <td><input className="input program-number" inputMode="numeric" defaultValue={item.unitPrice ?? ""} disabled={!canEdit}
-                          onBlur={(event) => { const next = digits(event.target.value); if (next !== item.unitPrice) void run(item.id, () => onUpdate(item.id, { unitPrice: next ?? null as never }), "단가를 수정하지 못했습니다."); }} /></td>
+                        <td><ProgramAutosaveField
+                        value={item.name}
+                        ariaLabel="이름"
+                        maxLength={80}
+                        allowEmpty={false}
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(item.id, { name: next })}
+                        errorMessage="이름을 수정하지 못했습니다."
+                      /></td>
+                        <td><ProgramAutosaveField
+                        value={item.quantity ?? ""}
+                        ariaLabel="수량"
+                        className="program-number"
+                        inputMode="numeric"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(item.id, { quantity: digits(next) ?? null as never })}
+                        errorMessage="수량을 수정하지 못했습니다."
+                      /></td>
+                        <td><ProgramAutosaveField
+                        value={item.unitPrice ?? ""}
+                        ariaLabel="단가"
+                        className="program-number"
+                        inputMode="numeric"
+                        disabled={!canEdit}
+                        onSave={(next) => onUpdate(item.id, { unitPrice: digits(next) ?? null as never })}
+                        errorMessage="단가를 수정하지 못했습니다."
+                      /></td>
                         <td className="program-money">{won(programItemTotal(item))}</td>
                         {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
-                          onClick={() => void run(item.id, () => onDelete(item.id), "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
+                          onClick={() => void run(item.id, async () => { await onDelete(item.id); undo.remember(item.name, () => onRestore(item)); }, "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                       </tr>
                     ))}
                   </tbody>

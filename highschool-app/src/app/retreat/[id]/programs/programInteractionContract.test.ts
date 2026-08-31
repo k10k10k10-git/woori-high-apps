@@ -36,6 +36,27 @@ describe("program preparation interaction contract", () => {
     expect(client).not.toContain("program-workspace\"");
   });
 
+  it("행 단위 입력이 원격 갱신을 반영하고 남의 값을 덮지 않는다", () => {
+    // uncontrolled defaultValue 입력은 구독으로 값이 바뀌어도 화면이 그대로라,
+    // 그 상태에서 저장하면 다른 사람이 방금 넣은 값을 과거 값으로 덮어쓴다.
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    const field = source("src/app/retreat/[id]/programs/ProgramAutosaveField.tsx");
+    expect(sections).not.toContain("defaultValue=");
+    expect(sections.match(/<ProgramAutosaveField/g)?.length).toBeGreaterThanOrEqual(20);
+    expect(field).toContain("setRemoteConflict(true)");
+    expect(field).toContain('data-conflict');
+  });
+
+  it("행 삭제는 되돌릴 수 있다", () => {
+    // 표를 정리하는 일이라 확인창 대신 되돌리기를 둔다 — 지운 값을 같은 id로 되살린다.
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    expect(sections.match(/undo\.remember\(/g)?.length).toBe(6);
+    for (const fn of ["restoreRetreatProgramPost", "restoreRetreatProgramItem", "restoreRetreatProgramRole", "restoreRetreatProgramMatch"]) {
+      expect(client).toContain(fn);
+    }
+  });
+
   it("keeps mobile and tablet action targets at least 44px and prevents task-row overflow", () => {
     const css = source("src/app/program-preparation.css");
     expect(css).toContain(".program-order-controls button { width: 44px; height: 44px; }");

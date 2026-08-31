@@ -92,6 +92,15 @@ export async function deleteRetreatProgramTask(retreatId: string, programId: str
   await remove(ref(db, paths.programTask(retreatId, programId, taskId)));
 }
 
+export async function restoreRetreatProgramTask(
+  retreatId: string,
+  programId: string,
+  task: RetreatProgramTask,
+): Promise<void> {
+  const { id, ...value } = task;
+  await set(ref(db, paths.programTask(retreatId, programId, id)), stripUndefined({ ...value, updatedAt: Date.now() }));
+}
+
 // ── 하위 컬렉션 (포스트·물품·역할) ──────────────────────────────
 // tasks와 같은 규약: push로 만든 키가 곧 id이고, 저장은 경로 단위 update만 쓴다.
 // 프로그램 노드 전체를 set으로 덮으면 동시 편집이 서로를 지운다(루트 실수 2).
@@ -129,6 +138,16 @@ async function deleteSubEntry(retreatId: string, programId: string, kind: SubCol
   await remove(ref(db, subPath(retreatId, programId, kind, id)));
 }
 
+async function restoreSubEntry<T extends { id: string }>(
+  retreatId: string,
+  programId: string,
+  kind: SubCollection,
+  entry: T,
+): Promise<void> {
+  const { id, ...value } = entry;
+  await set(ref(db, subPath(retreatId, programId, kind, id)), stripUndefined({ ...value, updatedAt: Date.now() }));
+}
+
 export function createRetreatProgramPost(
   retreatId: string, programId: string,
   data: Omit<RetreatProgramPost, "id" | "createdAt" | "updatedAt">,
@@ -145,6 +164,10 @@ export function updateRetreatProgramPost(
 
 export function deleteRetreatProgramPost(retreatId: string, programId: string, postId: string): Promise<void> {
   return deleteSubEntry(retreatId, programId, "posts", postId);
+}
+
+export function restoreRetreatProgramPost(retreatId: string, programId: string, post: RetreatProgramPost): Promise<void> {
+  return restoreSubEntry(retreatId, programId, "posts", post);
 }
 
 export function createRetreatProgramItem(
@@ -165,6 +188,10 @@ export function deleteRetreatProgramItem(retreatId: string, programId: string, i
   return deleteSubEntry(retreatId, programId, "items", itemId);
 }
 
+export function restoreRetreatProgramItem(retreatId: string, programId: string, item: RetreatProgramItem): Promise<void> {
+  return restoreSubEntry(retreatId, programId, "items", item);
+}
+
 export function createRetreatProgramRole(
   retreatId: string, programId: string,
   data: Omit<RetreatProgramRole, "id" | "createdAt" | "updatedAt">,
@@ -181,6 +208,10 @@ export function updateRetreatProgramRole(
 
 export function deleteRetreatProgramRole(retreatId: string, programId: string, roleId: string): Promise<void> {
   return deleteSubEntry(retreatId, programId, "roles", roleId);
+}
+
+export function restoreRetreatProgramRole(retreatId: string, programId: string, role: RetreatProgramRole): Promise<void> {
+  return restoreSubEntry(retreatId, programId, "roles", role);
 }
 
 // ── 대진표 (게임 카드 안) ───────────────────────────────────────
@@ -211,4 +242,17 @@ export async function deleteRetreatProgramMatch(
   retreatId: string, programId: string, postId: string, matchId: string,
 ): Promise<void> {
   await remove(ref(db, paths.programPostMatch(retreatId, programId, postId, matchId)));
+}
+
+export async function restoreRetreatProgramMatch(
+  retreatId: string,
+  programId: string,
+  postId: string,
+  match: RetreatProgramMatch,
+): Promise<void> {
+  const { id, ...value } = match;
+  await set(
+    ref(db, paths.programPostMatch(retreatId, programId, postId, id)),
+    stripUndefined({ ...value, updatedAt: Date.now() }),
+  );
 }

@@ -276,3 +276,28 @@
 .program-group-heading span { color: var(--color-text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .program-group .program-table-scroll { margin-top: 9px; }
 .program-group .program-task-empty { margin-top: 9px; }
+
+/* ── 행 단위 자동 저장 필드 ─────────────────────────────────── */
+/* 저장 중과 원격 충돌을 칸 자체가 말해 준다 — 저장 버튼이 없는 표에서는 이게 유일한 신호다. */
+.program-autosave-field[aria-busy="true"] { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); }
+.program-autosave-field[data-conflict="true"] {
+  border-color: var(--color-warning);
+  background: var(--color-warning-bg);
+}
+
+/* ── 삭제 되돌리기 ──────────────────────────────────────────── */
+.program-undo-notice {
+  display: flex; align-items: center; gap: 10px; margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 26%, var(--color-border));
+  border-radius: 11px; background: var(--color-surface); padding: 9px 12px;
+  color: var(--color-text-secondary); font-size: 12px;
+}
+.program-undo-notice > span { flex: 1 1 auto; min-width: 0; }
+.program-undo-notice button {
+  display: inline-flex; min-height: 40px; flex: 0 0 auto; align-items: center; gap: 5px;
+  border-radius: 9px; padding: 0 10px; color: var(--color-primary); font-size: 12px; font-weight: 750;
+  transition: background var(--duration-fast);
+}
+.program-undo-notice button:hover { background: var(--color-success-bg); }
+.program-undo-notice button:disabled { opacity: .5; }
+.program-undo-dismiss { min-width: 40px; justify-content: center; color: var(--color-text-faint); }

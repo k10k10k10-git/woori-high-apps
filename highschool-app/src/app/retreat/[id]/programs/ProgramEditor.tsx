@@ -46,6 +46,10 @@ type Props = {
   onCreatePost: (name: string, order: number) => Promise<void>;
   onUpdatePost: (postId: string, data: Partial<RetreatProgramPost>) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
+  onRestorePost: (post: RetreatProgramPost) => Promise<void>;
+  onRestoreItem: (item: RetreatProgramItem) => Promise<void>;
+  onRestoreRole: (role: RetreatProgramRole) => Promise<void>;
+  onRestoreMatch: (postId: string, match: RetreatProgramMatch) => Promise<void>;
   onCreateMatch: (postId: string, data: { round: number; order: number }) => Promise<void>;
   onUpdateMatch: (postId: string, matchId: string, data: Partial<RetreatProgramMatch>) => Promise<void>;
   onDeleteMatch: (postId: string, matchId: string) => Promise<void>;
@@ -88,6 +92,7 @@ export default function ProgramEditor({
   onDeleteTask,
   section,
   onCreatePost, onUpdatePost, onDeletePost,
+  onRestorePost, onRestoreItem, onRestoreRole, onRestoreMatch,
   onCreateMatch, onUpdateMatch, onDeleteMatch,
   onCreateRole, onUpdateRole, onDeleteRole,
   onCreateItem, onUpdateItem, onDeleteItem,
@@ -296,16 +301,17 @@ export default function ProgramEditor({
           onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
           itemsOf={(postId) => itemsOfPost(program, postId)} rolesOf={(postId) => rolesOfPost(program, postId)}
           onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
-          onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole} />
+          onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
+          onRestore={onRestorePost} onRestoreItem={onRestoreItem} onRestoreRole={onRestoreRole} onRestoreMatch={onRestoreMatch} />
       )}
 
       {section === "roles" && (
-        <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} />
+        <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} onRestore={onRestoreRole} />
       )}
 
       {section === "items" && (
         <>
-          <ProgramItemsSection groups={groupItemsByPost(program)} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} />
+          <ProgramItemsSection groups={groupItemsByPost(program)} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} onRestore={onRestoreItem} />
           <fieldset disabled={!canEdit || saving} className="program-form">
             <section className="program-form-section">
               <h3>물품 메모</h3>
