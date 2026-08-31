@@ -71,6 +71,7 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const isDesktopFrame = shouldUseDesktopFrame(mode, isEmbeddedDesktopFrame);
   const isFramedView = isMobilePreview || isDesktopFrame;
   const currentDesktopFrameSrc = buildDesktopFrameSrc(pathname, searchParams.toString());
+  const currentMobileFrameSrc = `${pathname}${stripDesktopFrameSearch(`?${searchParams.toString()}`)}`;
   const frameKey = isDesktopFrame ? "desktop" : `mobile:${pathname}`;
   const frameReady = loadedFrameKey === frameKey;
 
@@ -92,6 +93,23 @@ export default function PortalViewportShell({ children }: { children: React.Reac
     }, 350);
     return () => window.clearInterval(timer);
   }, [isFramedView, router]);
+
+  // 바깥 주소가 뒤로가기나 탭 전환으로 먼저 바뀐 경우 프레임도 같은 위치로 맞춘다.
+  // 프레임에서 시작된 이동은 현재 위치가 이미 같으므로 다시 로드하지 않는다.
+  useEffect(() => {
+    if (!isFramedView) return;
+    const frameWindow = frameRef.current?.contentWindow;
+    if (!frameWindow) return;
+    try {
+      const frameLocation = frameWindow.location;
+      if (frameLocation.origin !== window.location.origin) return;
+      const currentFrameLocation = `${frameLocation.pathname}${frameLocation.search}${frameLocation.hash}`;
+      const nextFrameLocation = isDesktopFrame ? currentDesktopFrameSrc : currentMobileFrameSrc;
+      if (currentFrameLocation !== nextFrameLocation) frameLocation.replace(nextFrameLocation);
+    } catch {
+      // 프레임이 로딩 중이면 onLoad 이후 다음 주소 변경에서 다시 맞춘다.
+    }
+  }, [currentDesktopFrameSrc, currentMobileFrameSrc, isDesktopFrame, isFramedView]);
 
   if (isEmbeddedDesktopFrame) {
     return (
@@ -122,7 +140,7 @@ export default function PortalViewportShell({ children }: { children: React.Reac
           <iframe
             ref={frameRef}
             className="portal-mobile-preview-frame"
-            src={pathname}
+            src={currentMobileFrameSrc}
             title="고등부 통합사이트 모바일 화면"
             onLoad={() => setLoadedFrameKey(frameKey)}
           />

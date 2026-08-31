@@ -105,39 +105,44 @@ export function sortRetreatPrograms(programs: RetreatProgram[]): RetreatProgram[
  * 화면의 진행 표시가 어긋나 "뭘 해도 진도가 안 나가는" 화면이 된다.
  * 그래서 게임·역할·물품도 함께 센다.
  */
-const CHECKS: Array<{ key: string; ready: (program: RetreatProgram) => boolean }> = [
-  { key: "일정·장소", ready: (program) => Boolean(program.date && program.startTime && program.place?.trim()) },
-  { key: "담당", ready: (program) => Boolean(program.lead?.trim()) },
-  { key: "목표", ready: (program) => Boolean(program.objective?.trim()) },
-  { key: "진행안", ready: (program) => Boolean(program.flow?.trim()) },
+const CHECKS: Array<{ key: string; section: ProgramSectionKey; ready: (program: RetreatProgram) => boolean }> = [
+  { key: "일정과 장소", section: "overview", ready: (program) => Boolean(program.date && program.startTime && program.place?.trim()) },
+  { key: "담당", section: "overview", ready: (program) => Boolean(program.lead?.trim()) },
+  { key: "목표", section: "overview", ready: (program) => Boolean(program.objective?.trim()) },
+  { key: "진행안", section: "posts", ready: (program) => Boolean(program.flow?.trim()) },
   // 존재 여부만 세면 이름만 적은 게임·담당 없는 역할·수량 없는 물품으로도 100%가 된다.
   // 지표가 거짓말하지 않도록 "현장에서 쓸 수 있는 최소한"이 채워졌는지까지 본다.
   {
-    key: "게임·포스트",
+    key: "게임 구성",
+    section: "posts",
     ready: (program) => programPosts(program).some((post) => Boolean(post.rules?.trim() || post.concept?.trim())),
   },
   {
     key: "역할",
+    section: "roles",
     ready: (program) => programRoles(program).some((role) => Boolean(role.assignee?.trim())),
   },
   {
     key: "물품",
+    section: "roles",
     // 사야 하는 물품은 수량이 있어야 발주가 된다. 교회 비품·제작 예정은 수량 없이도 정리된 것으로 본다.
     ready: (program) => programItems(program).some((item) =>
       item.status === "inChurch" || item.status === "toMake" || Number(item.quantity ?? 0) > 0),
   },
-  { key: "브리핑·대본", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
+  { key: "브리핑 또는 대본", section: "tasks", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
 ];
 
 export function programReadiness(program: RetreatProgram) {
-  const readyLabels = CHECKS.filter((check) => check.ready(program)).map((check) => check.key);
-  const missingLabels = CHECKS.filter((check) => !check.ready(program)).map((check) => check.key);
+  const items = CHECKS.map((check) => ({ label: check.key, section: check.section, ready: check.ready(program) }));
+  const readyLabels = items.filter((item) => item.ready).map((item) => item.label);
+  const missingLabels = items.filter((item) => !item.ready).map((item) => item.label);
   return {
     ready: readyLabels.length,
     total: CHECKS.length,
     percent: Math.round((readyLabels.length / CHECKS.length) * 100),
     readyLabels,
     missingLabels,
+    items,
   };
 }
 

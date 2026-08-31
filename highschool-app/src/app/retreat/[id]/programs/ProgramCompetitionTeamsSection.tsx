@@ -133,7 +133,7 @@ export default function ProgramCompetitionTeamsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-alliance-heading">연합팀 구성</h3>
-          <p>여러 수련회 조를 큰 팀으로 묶는 활동에서만 사용합니다. 기본 조·숙소·인원체크 명단은 바뀌지 않습니다.</p>
+          <p>여러 수련회 조를 큰 팀으로 묶는 활동에서만 사용합니다. 기본 조, 숙소와 인원체크 명단은 바뀌지 않습니다.</p>
         </div>
         <span className="program-count">{teams.length}팀</span>
       </div>
@@ -141,7 +141,7 @@ export default function ProgramCompetitionTeamsSection({
       {teams.length === 0 ? (
         <div className="program-alliance-empty">
           <UsersThree aria-hidden="true" size={24} />
-          <div><strong>연합팀 경쟁이 있을 때만 만들어 주세요.</strong><p>예: 12개 조를 파랑·빨강·노랑·초록 4개 팀으로 묶기</p></div>
+          <div><strong>연합팀 경쟁이 있을 때만 만들어 주세요.</strong><p>예: 12개 조를 파랑, 빨강, 노랑, 초록 4개 팀으로 묶기</p></div>
           {canEdit && <button type="button" className="btn-secondary" disabled={busy} onClick={() => void createDefaults()}>4개 팀으로 시작</button>}
         </div>
       ) : (
@@ -158,7 +158,7 @@ export default function ProgramCompetitionTeamsSection({
                   {canEdit && <button type="button" className="program-task-delete" aria-label={`${team.name} 삭제`} disabled={busyId === team.id}
                     onClick={() => void run(team.id, async () => { await onDelete(team.id); undo.remember(team.name, () => onRestore(team)); }, "연합팀을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button>}
                 </div>
-                <div className="program-alliance-team__meta"><strong>{people}명</strong><span>{teamGroups.map((group) => group.name).join(" · ") || "배정된 조 없음"}</span></div>
+                <div className="program-alliance-team__meta"><strong>{people}명</strong><span>{teamGroups.map((group) => group.name).join(", ") || "배정된 조 없음"}</span></div>
                 {canEdit && <label><span>표시 색</span><select className="input" value={team.color ?? "blue"}
                   onChange={(event) => void run(team.id, () => onUpdate(team.id, { color: event.target.value as TeamColor }), "팀 색을 바꾸지 못했습니다.")}>
                   {TEAM_COLORS.map((color) => <option key={color.value} value={color.value}>{color.label}</option>)}
@@ -196,7 +196,7 @@ export default function ProgramCompetitionTeamsSection({
             <div className="program-assignment-list">
               {orderedGroups.map((group) => (
                 <label key={group.id} className="program-assignment-row">
-                  <span><strong>{group.name}</strong><small>{group.bu} · 학생 {group.studentIds?.length ?? 0}명</small></span>
+                  <span><strong>{group.name}</strong><small>{group.bu} / 학생 {group.studentIds?.length ?? 0}명</small></span>
                   <select className="input" aria-label={`${group.name} 연합팀`} value={visibleAssignment[group.id] ?? ""} disabled={!canEdit || busy || preview !== null}
                     onChange={(event) => void run(group.id, () => onAssignGroup(group.id, event.target.value || null), "조 배정을 바꾸지 못했습니다.")}>
                     <option value="">미배정</option>

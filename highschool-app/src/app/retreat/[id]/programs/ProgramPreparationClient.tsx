@@ -291,18 +291,18 @@ export default function ProgramPreparationClient() {
           <div className="program-page-intro">
             <div>
               <h2>프로그램 준비</h2>
-              <p>기획에서 진행안·브리핑·현장 전달까지 프로그램별로 정리합니다.</p>
+              <p>기획, 진행안, 브리핑과 현장 전달 내용을 프로그램별로 정리합니다.</p>
             </div>
             <div className="program-page-summary" aria-label="프로그램 상태 요약">
               <span>전체 <strong>{programs.length}</strong></span>
-              <span>검토·확정 <strong>{programs.filter((program) => program.status === "review" || program.status === "confirmed").length}</strong></span>
+              <span>검토와 확정 <strong>{programs.filter((program) => program.status === "review" || program.status === "confirmed").length}</strong></span>
               <span>현장 공유 <strong>{programs.filter((program) => program.status === "published").length}</strong></span>
             </div>
           </div>
         )}
 
         {loadError && <div className="program-load-error" role="alert">{loadError} 새로고침하면 다시 연결합니다.</div>}
-        {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
+        {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀, 교역자, 통합관리자만 가능합니다." />}
 
         {programs.length === 0 ? (
           <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={(id) => goToProgram(id)} onAdd={() => void addProgram()} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
@@ -335,6 +335,7 @@ export default function ProgramPreparationClient() {
                 onSave={saveProgram}
                 onDirtyChange={discardGuard.setDirty}
                 onRequestDelete={setDeleteTarget}
+                onSelectSection={selectSection}
                 onCreateTask={(data) => createRetreatProgramTask(retreatId, selectedProgram.id, data).then(() => undefined)}
                 onUpdateTask={(taskId, data) => updateRetreatProgramTask(retreatId, selectedProgram.id, taskId, data)}
                 onDeleteTask={(taskId) => deleteRetreatProgramTask(retreatId, selectedProgram.id, taskId)}
@@ -390,7 +391,7 @@ export default function ProgramPreparationClient() {
         <OverlayShell label="프로그램 삭제" onClose={() => { if (!busy) setDeleteTarget(null); }} closeOnBackdrop={!busy} panelClassName="program-confirm-dialog w-full max-w-sm">
           <div className="program-confirm-dialog__body">
             <h2>프로그램을 삭제할까요?</h2>
-            <p><strong>{deleteTarget.title}</strong>의 진행안·대본·할 일이 함께 삭제됩니다.</p>
+            <p><strong>{deleteTarget.title}</strong>의 진행안, 대본과 할 일이 함께 삭제됩니다.</p>
             <div className="program-confirm-dialog__actions">
               <button type="button" className="btn-secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>취소</button>
               <button type="button" className="btn-danger" disabled={busy} onClick={() => void confirmDelete()}>{busy ? "삭제 중…" : "삭제"}</button>

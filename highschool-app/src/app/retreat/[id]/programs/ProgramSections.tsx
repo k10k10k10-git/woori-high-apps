@@ -94,7 +94,7 @@ function PostSubEntries({
       <section aria-label={`${post.name} 준비물`}>
         <div className="program-subsection-heading">
           <h5>준비물</h5>
-          <span className="program-count">{items.length}건 · {won(budget.total)}</span>
+          <span className="program-count">{items.length}건 / {won(budget.total)}</span>
         </div>
         {canEdit && (
           <div className="program-inline-form">
@@ -367,7 +367,7 @@ function PostLegacyText({
 
   return (
     <div className="program-legacy-note" role="status">
-      <p>예전에 자유 입력으로 적어 둔 내용입니다. {entries.map((e) => e.label).join("·")}은(는) 이제 표가 단일 원천이라, 옮긴 뒤 지워 주세요.</p>
+      <p>예전에 자유 입력으로 적어 둔 내용입니다. {entries.map((e) => e.label).join(", ")}은(는) 이제 표가 단일 원천이므로 옮긴 뒤 지워 주세요.</p>
       {entries.map((entry) => (
         <div key={entry.key}>
           <strong>{entry.label}</strong>
@@ -375,7 +375,7 @@ function PostLegacyText({
           {canEdit && (
             <button type="button" className="btn-secondary btn-sm" disabled={busyId === entry.key}
               onClick={() => void run(entry.key, () => onUpdate(post.id, { [entry.key]: "" }), `${entry.label}을(를) 지우지 못했습니다.`)}>
-              {entry.moveTo}로 옮겼습니다 · 지우기
+              {entry.moveTo}로 옮겼습니다. 지우기
             </button>
           )}
         </div>
@@ -441,7 +441,7 @@ export function ProgramPostsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-posts-heading">진행 블록</h3>
-          <p>게임·설명·이동을 실제 순서대로 추가하고, 각 블록의 운영 방식과 참가 단위를 정합니다.</p>
+          <p>게임, 설명과 이동을 실제 순서대로 추가하고 각 블록의 운영 방식과 참가 단위를 정합니다.</p>
         </div>
         <span className="program-count">{posts.length}개</span>
       </div>
@@ -469,8 +469,8 @@ export function ProgramPostsSection({
               <details className="program-card">
                 <summary>
                   <strong>{post.name}</strong>
-                  <span>{PROGRAM_OPERATION_MODE_META[programOperationMode(post)].label} · {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(post)]}</span>
-                  <em className="program-card-counts">준비물 {itemsOf(post.id).length} · 역할 {rolesOf(post.id).length}</em>
+                  <span>{PROGRAM_OPERATION_MODE_META[programOperationMode(post)].label} / {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(post)]}</span>
+                  <em className="program-card-counts">준비물 {itemsOf(post.id).length} / 역할 {rolesOf(post.id).length}</em>
                 </summary>
                 <fieldset disabled={!canEdit || busyId === post.id} className="program-card-body">
                   <div className="program-form-grid">
@@ -489,7 +489,7 @@ export function ProgramPostsSection({
                           operationMode: event.target.value as RetreatProgramOperationMode,
                           ...(event.target.value === "alliance" ? { participationMode: "allianceTeam" as const } : {}),
                         }), "운영 방식을 바꾸지 못했습니다.")}>
-                        {Object.entries(PROGRAM_OPERATION_MODE_META).map(([value, meta]) => <option key={value} value={value}>{meta.label} — {meta.description}</option>)}
+                        {Object.entries(PROGRAM_OPERATION_MODE_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}: {meta.description}</option>)}
                       </select>
                     </label>
                     <label className="program-field"><span>참가 단위</span>
@@ -621,7 +621,7 @@ export function ProgramRolesSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-roles-heading">역할·배치</h3>
-          <p>게임별 역할은 게임·포스트 탭의 카드 안에서 넣습니다. 여기서는 전체를 모아 보고 프로그램 공통 역할을 더합니다.</p>
+          <p>진행 블록별 역할은 프로그램 구성 탭의 카드 안에서 넣습니다. 여기서는 전체 역할을 확인하고 공통 역할을 추가합니다.</p>
         </div>
         <span className="program-count">{total}명</span>
       </div>
@@ -650,13 +650,13 @@ export function ProgramRolesSection({
           {group.entries.length === 0 ? (
             <p className="program-task-empty">{group.postId ? "이 게임에 배정된 역할이 없습니다." : "프로그램 전체 역할이 없습니다."}</p>
           ) : (
-            <div className="program-table-scroll">
-              <table className="program-table">
+            <div className="program-table-scroll program-table-scroll--adaptive">
+              <table className="program-table program-table--adaptive">
                 <thead><tr><th>역할</th><th>담당</th><th>장소</th><th>인원</th><th>세부 내용</th>{canEdit && <th aria-label="삭제" />}</tr></thead>
                 <tbody>
                   {group.entries.map((entry) => (
                     <tr key={entry.id} aria-busy={busyId === entry.id}>
-                      <td><ProgramAutosaveField
+                      <td data-label="역할" className="program-adaptive-cell--wide"><ProgramAutosaveField
                         value={entry.role}
                         ariaLabel="역할"
                         maxLength={80}
@@ -665,7 +665,7 @@ export function ProgramRolesSection({
                         onSave={(next) => onUpdate(entry.id, { role: next })}
                         errorMessage="역할을 수정하지 못했습니다."
                       /></td>
-                      <td><ProgramAutosaveField
+                      <td data-label="담당"><ProgramAutosaveField
                         value={entry.assignee ?? ""}
                         ariaLabel="담당"
                         maxLength={120}
@@ -673,7 +673,7 @@ export function ProgramRolesSection({
                         onSave={(next) => onUpdate(entry.id, { assignee: next })}
                         errorMessage="담당을 수정하지 못했습니다."
                       /></td>
-                      <td><ProgramAutosaveField
+                      <td data-label="장소"><ProgramAutosaveField
                         value={entry.place ?? ""}
                         ariaLabel="장소"
                         maxLength={80}
@@ -681,7 +681,7 @@ export function ProgramRolesSection({
                         onSave={(next) => onUpdate(entry.id, { place: next })}
                         errorMessage="장소를 수정하지 못했습니다."
                       /></td>
-                      <td><ProgramAutosaveField
+                      <td data-label="인원"><ProgramAutosaveField
                         value={entry.headcount ?? ""}
                         ariaLabel="인원"
                         className="program-number"
@@ -690,7 +690,7 @@ export function ProgramRolesSection({
                         onSave={(next) => onUpdate(entry.id, { headcount: next })}
                         errorMessage="인원을 수정하지 못했습니다."
                       /></td>
-                      <td><ProgramAutosaveField
+                      <td data-label="세부 내용" className="program-adaptive-cell--wide"><ProgramAutosaveField
                         value={entry.detail ?? ""}
                         ariaLabel="내용"
                         maxLength={400}
@@ -698,7 +698,7 @@ export function ProgramRolesSection({
                         onSave={(next) => onUpdate(entry.id, { detail: next })}
                         errorMessage="내용을 수정하지 못했습니다."
                       /></td>
-                      {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
+                      {canEdit && <td data-label="행 삭제" className="program-adaptive-action"><button type="button" className="program-task-delete" disabled={busyId === entry.id} aria-label={`${entry.role} 삭제`}
                         onClick={() => void run(entry.id, async () => { await onDelete(entry.id); undo.remember(entry.role, () => onRestore(entry)); }, "역할을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                     </tr>
                   ))}
@@ -738,7 +738,7 @@ export function ProgramItemsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-items-heading">물품·예산</h3>
-          <p>게임별 준비물은 게임·포스트 탭의 카드 안에서 넣습니다. 여기서는 전체를 모아 보고 구매 상태를 체크합니다.</p>
+          <p>진행 블록별 준비물은 프로그램 구성 탭의 카드 안에서 넣습니다. 여기서는 전체 물품과 구매 상태를 확인합니다.</p>
         </div>
         <span className="program-count">{all.length}건</span>
       </div>
@@ -770,22 +770,22 @@ export function ProgramItemsSection({
           <div key={group.postId ?? "common"} className="program-group">
             <div className="program-group-heading">
               <h4>{group.label}</h4>
-              <span>{group.entries.length}건 · {won(groupBudget.total)}</span>
+              <span>{group.entries.length}건 / {won(groupBudget.total)}</span>
             </div>
             {group.entries.length === 0 ? (
               <p className="program-task-empty">{group.postId ? "이 게임의 준비물이 없습니다." : "공통 물품이 없습니다."}</p>
             ) : (
-              <div className="program-table-scroll">
-                <table className="program-table">
+              <div className="program-table-scroll program-table-scroll--adaptive">
+                <table className="program-table program-table--adaptive">
                   <thead><tr><th>상태</th><th>이름</th><th>수량</th><th>단가</th><th>금액</th>{canEdit && <th aria-label="삭제" />}</tr></thead>
                   <tbody>
                     {group.entries.map((item) => (
                       <tr key={item.id} aria-busy={busyId === item.id}>
-                        <td><select className="input" value={item.status} disabled={!canEdit}
+                        <td data-label="상태"><select className="input" value={item.status} disabled={!canEdit}
                           onChange={(event) => void run(item.id, () => onUpdate(item.id, { status: event.target.value as RetreatProgramItemStatus }), "상태를 바꾸지 못했습니다.")}>
                           {Object.entries(PROGRAM_ITEM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
                         </select></td>
-                        <td><ProgramAutosaveField
+                        <td data-label="이름" className="program-adaptive-cell--wide"><ProgramAutosaveField
                         value={item.name}
                         ariaLabel="이름"
                         maxLength={80}
@@ -794,7 +794,7 @@ export function ProgramItemsSection({
                         onSave={(next) => onUpdate(item.id, { name: next })}
                         errorMessage="이름을 수정하지 못했습니다."
                       /></td>
-                        <td><ProgramAutosaveField
+                        <td data-label="수량"><ProgramAutosaveField
                         value={item.quantity ?? ""}
                         ariaLabel="수량"
                         className="program-number"
@@ -803,7 +803,7 @@ export function ProgramItemsSection({
                         onSave={(next) => onUpdate(item.id, { quantity: digits(next) ?? null as never })}
                         errorMessage="수량을 수정하지 못했습니다."
                       /></td>
-                        <td><ProgramAutosaveField
+                        <td data-label="단가"><ProgramAutosaveField
                         value={item.unitPrice ?? ""}
                         ariaLabel="단가"
                         className="program-number"
@@ -812,8 +812,8 @@ export function ProgramItemsSection({
                         onSave={(next) => onUpdate(item.id, { unitPrice: digits(next) ?? null as never })}
                         errorMessage="단가를 수정하지 못했습니다."
                       /></td>
-                        <td className="program-money">{won(programItemTotal(item))}</td>
-                        {canEdit && <td><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
+                        <td data-label="금액" className="program-money">{won(programItemTotal(item))}</td>
+                        {canEdit && <td data-label="행 삭제" className="program-adaptive-action"><button type="button" className="program-task-delete" disabled={busyId === item.id} aria-label={`${item.name} 삭제`}
                           onClick={() => void run(item.id, async () => { await onDelete(item.id); undo.remember(item.name, () => onRestore(item)); }, "물품을 삭제하지 못했습니다.")}><Trash aria-hidden="true" size={16} /></button></td>}
                       </tr>
                     ))}

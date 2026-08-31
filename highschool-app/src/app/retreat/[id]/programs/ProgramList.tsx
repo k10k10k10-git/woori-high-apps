@@ -57,7 +57,7 @@ export default function ProgramList({
                 <span className="program-list-order">{index + 1}</span>
                 <span className="program-list-copy">
                   <strong>{program.title}</strong>
-                  <small>{programKindMeta(program.kind)} · {programStatusMeta(program.status).label}</small>
+                  <small>{programKindMeta(program.kind)} / {programStatusMeta(program.status).label}</small>
                 </span>
                 <span className="program-list-progress" aria-label={`준비 ${readiness.percent}%`}>{readiness.percent}%</span>
               </button>

@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle, Circle, Plus, Trash, WarningCircle } from "@phosphor-icons/react";
+import { ArrowRight, CheckCircle, Circle, CloudCheck, FloppyDisk, Plus, Trash, WarningCircle } from "@phosphor-icons/react";
 import { useUI } from "@/context/UIContext";
 import {
   PROGRAM_KIND_META,
+  PROGRAM_SECTIONS,
   PROGRAM_STATUS_META,
   groupItemsByPost,
   groupRolesByPost,
@@ -43,6 +44,7 @@ type Props = {
   onSave: (program: EditableProgram) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   onRequestDelete: (program: RetreatProgram) => void;
+  onSelectSection: (section: ProgramSectionKey) => void;
   onCreateTask: (data: Omit<RetreatProgramTask, "id" | "createdAt" | "updatedAt">) => Promise<void>;
   onUpdateTask: (taskId: string, data: Partial<Omit<RetreatProgramTask, "id" | "createdAt">>) => Promise<void>;
   onDeleteTask: (taskId: string) => Promise<void>;
@@ -91,6 +93,13 @@ const RECORD_FIELDS = [
   { key: "notes", label: "메모", placeholder: "미정 사항, 논의가 필요한 내용", rows: 4 },
 ] as const;
 
+const SAVE_GUIDANCE: Record<ProgramSectionKey, { title: string; body: string }> = {
+  overview: { title: "저장 버튼으로 반영", body: "기본 정보와 목표는 화면 아래의 변경 사항 저장을 눌러 반영합니다." },
+  posts: { title: "두 가지 저장 방식", body: "전체 흐름은 저장 버튼으로 반영되고, 연합팀과 진행 블록은 입력한 칸에서 벗어나면 바로 저장됩니다." },
+  roles: { title: "두 가지 저장 방식", body: "역할과 물품 표는 바로 저장되고, 물품 메모는 화면 아래의 저장 버튼으로 반영됩니다." },
+  tasks: { title: "두 가지 저장 방식", body: "할 일은 바로 저장되고, 브리핑과 기록은 화면 아래의 저장 버튼으로 반영됩니다." },
+};
+
 export default function ProgramEditor({
   program,
   canEdit,
@@ -99,6 +108,7 @@ export default function ProgramEditor({
   onSave,
   onDirtyChange,
   onRequestDelete,
+  onSelectSection,
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
@@ -162,6 +172,7 @@ export default function ProgramEditor({
   const posts = useMemo(() => programPosts(program), [program]);
   const competitionTeams = useMemo(() => programCompetitionTeams(program), [program]);
   const doneTasks = tasks.filter((task) => task.done).length;
+  const saveGuidance = SAVE_GUIDANCE[section];
 
   function setField<K extends keyof EditableProgram>(key: K, value: EditableProgram[K]) {
     setDraft((previous) => ({ ...previous, [key]: value }));
@@ -244,14 +255,42 @@ export default function ProgramEditor({
         </div>
       )}
 
-      {section === "overview" && readiness.missingLabels.length > 0 && (
-        <div className="program-missing" role="status">
-          <WarningCircle aria-hidden="true" size={17} weight="fill" />
-          <span>아직 필요해요: {readiness.missingLabels.join(" · ")}</span>
+      <div className="program-save-guidance" role="status">
+        {canEdit ? <FloppyDisk aria-hidden="true" size={18} /> : <CloudCheck aria-hidden="true" size={18} />}
+        <div>
+          <strong>{canEdit ? saveGuidance.title : "읽기 전용"}</strong>
+          <span>{canEdit ? saveGuidance.body : "이 화면에서는 내용을 확인할 수 있으며 변경 사항은 저장되지 않습니다."}</span>
         </div>
+      </div>
+
+      {section === "overview" && (
+        <section className="program-readiness-checklist" aria-labelledby="program-readiness-heading">
+          <div className="program-readiness-checklist__heading">
+            <div>
+              <h3 id="program-readiness-heading">준비 체크</h3>
+              <p>항목을 누르면 필요한 내용을 입력하는 화면으로 이동합니다.</p>
+            </div>
+            <span>{readiness.ready}/{readiness.total} 완료</span>
+          </div>
+          <ul>
+            {readiness.items.map((item) => (
+              <li key={item.label} data-ready={item.ready ? "true" : "false"}>
+                <button type="button" onClick={() => onSelectSection(item.section)}>
+                  {item.ready ? <CheckCircle aria-hidden="true" size={19} weight="fill" /> : <Circle aria-hidden="true" size={19} />}
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>{PROGRAM_SECTIONS.find((entry) => entry.key === item.section)?.label}</small>
+                  </span>
+                  <ArrowRight aria-hidden="true" size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {section === "overview" && (
+        <>
         <fieldset disabled={!canEdit || saving} className="program-form">
           <section className="program-form-section">
             <h3>기본 정보</h3>
@@ -294,6 +333,18 @@ export default function ProgramEditor({
             </div>
           </section>
         </fieldset>
+        {canEdit && (
+          <section className="program-danger-zone" aria-labelledby="program-danger-heading">
+            <div>
+              <h3 id="program-danger-heading">프로그램 삭제</h3>
+              <p>프로그램과 하위 진행 블록, 역할, 물품, 할 일이 함께 삭제됩니다.</p>
+            </div>
+            <button type="button" className="btn-danger" disabled={saving} onClick={() => onRequestDelete(program)}>
+              <Trash aria-hidden="true" size={16} /> 삭제
+            </button>
+          </section>
+        )}
+        </>
       )}
 
       {section === "posts" && (
@@ -372,7 +423,7 @@ export default function ProgramEditor({
                     <button type="button" disabled={!canEdit || taskBusyId === task.id} aria-busy={taskBusyId === task.id} onClick={() => void toggleTask(task.id, !task.done)} aria-label={`${task.title} ${task.done ? "미완료로 변경" : "완료로 변경"}`}>
                       {task.done ? <CheckCircle aria-hidden="true" size={21} weight="fill" /> : <Circle aria-hidden="true" size={21} />}
                     </button>
-                    <div><strong>{task.title}</strong><span>{[task.assignee, task.dueDate].filter(Boolean).join(" · ") || "담당·기한 미정"}</span></div>
+                    <div><strong>{task.title}</strong><span>{[task.assignee, task.dueDate].filter(Boolean).join(" / ") || "담당과 기한 미정"}</span></div>
                     {canEdit && <button type="button" className="program-task-delete" disabled={taskBusyId === task.id} onClick={() => void removeTask(task.id)} aria-label={`${task.title} 삭제`}><Trash aria-hidden="true" size={16} /></button>}
                   </li>
                 ))}
@@ -396,8 +447,7 @@ export default function ProgramEditor({
       )}
 
       <div className="program-editor-actions">
-        {canEdit && <button type="button" className="btn-danger" disabled={saving} onClick={() => onRequestDelete(program)}><Trash aria-hidden="true" size={16} /> 프로그램 삭제</button>}
-        <span className="program-dirty-state" aria-live="polite">{dirty ? "저장하지 않은 변경이 있습니다." : "최신 내용이 저장되어 있습니다."}</span>
+        <span className="program-dirty-state" aria-live="polite">{dirty ? "저장 버튼을 눌러야 하는 변경이 있습니다." : "저장 버튼 대상 내용이 최신 상태입니다."}</span>
         {canEdit && <button type="button" className="btn-primary" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "저장 중…" : "변경 사항 저장"}</button>}
       </div>
     </section>

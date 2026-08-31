@@ -14,6 +14,7 @@ type ViewModeContextValue = {
 
 const STORAGE_KEY = "woori-high-view-mode";
 const MOBILE_QUERY = "(max-width: 900px)";
+const VIEW_MODE_CHANGE_EVENT = "woori-high:view-mode-change";
 
 const ViewModeContext = createContext<ViewModeContextValue | null>(null);
 
@@ -37,18 +38,31 @@ export function ViewModeProvider({ children }: { children: React.ReactNode }) {
       if (event.key !== STORAGE_KEY) return;
       setModeState(resolveInitialViewMode(event.newValue, media.matches));
     };
+    const syncCurrentTabMode = () => {
+      setModeState(resolveInitialViewMode(window.localStorage.getItem(STORAGE_KEY), media.matches));
+    };
     media.addEventListener("change", apply);
     window.addEventListener("storage", syncStoredMode);
+    window.addEventListener(VIEW_MODE_CHANGE_EVENT, syncCurrentTabMode);
     return () => {
       window.cancelAnimationFrame(frame);
       media.removeEventListener("change", apply);
       window.removeEventListener("storage", syncStoredMode);
+      window.removeEventListener(VIEW_MODE_CHANGE_EVENT, syncCurrentTabMode);
     };
   }, []);
 
   const setMode = useCallback((nextMode: ViewMode) => {
     setModeState(nextMode);
     window.localStorage.setItem(STORAGE_KEY, nextMode);
+    window.dispatchEvent(new Event(VIEW_MODE_CHANGE_EVENT));
+    if (window.parent !== window) {
+      try {
+        window.parent.dispatchEvent(new Event(VIEW_MODE_CHANGE_EVENT));
+      } catch {
+        // 같은 출처 프레임이 아니면 현재 프레임의 전환만 유지한다.
+      }
+    }
   }, []);
 
   // 한 번 선택한 화면 모드는 브라우저 폭보다 우선한다. 실제 모바일의 최초

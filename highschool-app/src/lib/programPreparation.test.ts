@@ -75,7 +75,7 @@ describe("수련회 프로그램 준비", () => {
       briefing: "교사 역할을 안내합니다.",
     };
     expect(programReadiness(base(body))).toMatchObject({
-      ready: 5, total: 8, missingLabels: ["게임·포스트", "역할", "물품"],
+      ready: 5, total: 8, missingLabels: ["게임 구성", "역할", "물품"],
     });
 
     const filled = programReadiness(base({
@@ -93,7 +93,12 @@ describe("수련회 프로그램 준비", () => {
       roles: { r1: { order: 1, role: "진행", createdAt: 1, updatedAt: 1 } },
       items: { i1: { order: 1, name: "줄자", status: "todo", createdAt: 1, updatedAt: 1 } },
     } as never));
-    expect(shallow.missingLabels).toEqual(["게임·포스트", "역할", "물품"]);
+    expect(shallow.missingLabels).toEqual(["게임 구성", "역할", "물품"]);
+    expect(shallow.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "게임 구성", section: "posts", ready: false }),
+      expect.objectContaining({ label: "역할", section: "roles", ready: false }),
+      expect.objectContaining({ label: "브리핑 또는 대본", section: "tasks", ready: true }),
+    ]));
   });
 
   it("할 일은 생성 순으로 표시한다", () => {
@@ -275,7 +280,7 @@ describe("게임 ↔ 물품·역할 연결", () => {
   it("준비율이 게임·역할·물품도 센다", () => {
     // 본문만 보던 시절에는 게임을 아무리 채워도 0%였다.
     const readiness = programReadiness(program);
-    expect(readiness.readyLabels).toEqual(expect.arrayContaining(["게임·포스트", "역할", "물품"]));
+    expect(readiness.readyLabels).toEqual(expect.arrayContaining(["게임 구성", "역할", "물품"]));
     expect(readiness.total).toBe(8);
   });
 });

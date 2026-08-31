@@ -100,4 +100,37 @@ describe("program preparation interaction contract", () => {
     expect(sections).toContain("operationMode");
     expect(sections).toContain("participationMode");
   });
+
+  it("준비 체크는 필요한 입력 탭으로 바로 이동한다", () => {
+    const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    expect(editor).toContain("program-readiness-checklist");
+    expect(editor).toContain("onSelectSection(item.section)");
+    expect(client).toContain("onSelectSection={selectSection}");
+  });
+
+  it("수동 저장과 자동 저장의 경계를 화면에서 설명한다", () => {
+    const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
+    expect(editor).toContain("const SAVE_GUIDANCE");
+    expect(editor).toContain("전체 흐름은 저장 버튼으로 반영되고");
+    expect(editor).toContain("역할과 물품 표는 바로 저장되고");
+    expect(editor).toContain("저장 버튼을 눌러야 하는 변경이 있습니다.");
+  });
+
+  it("모바일 역할과 물품 표는 가로 표 대신 같은 입력의 카드 레이아웃을 사용한다", () => {
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    const css = source("src/app/program-preparation.css");
+    expect(sections.match(/program-table--adaptive/g)?.length).toBe(2);
+    expect(sections).toContain('data-label="세부 내용"');
+    expect(sections).toContain('data-label="금액"');
+    expect(css).toContain(".program-table--adaptive tr");
+    expect(css).toContain(".program-alliance-teams { grid-template-columns: 1fr; }");
+  });
+
+  it("프로그램 삭제는 준비 보드의 위험 영역에서만 노출한다", () => {
+    const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
+    expect(editor).toContain('section === "overview"');
+    expect(editor).toContain("program-danger-zone");
+    expect(editor.match(/onRequestDelete\(program\)/g)?.length).toBe(1);
+  });
 });

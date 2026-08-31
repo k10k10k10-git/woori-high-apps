@@ -40,28 +40,29 @@ function applyTheme(theme: Theme) {
 function subscribe(onStoreChange: () => void) {
   const media = window.matchMedia("(prefers-color-scheme: dark)");
 
-  function notify() {
+  function syncCurrentTabTheme() {
+    applyTheme(resolveTheme(readSavedTheme(), systemPrefersDark()));
     onStoreChange();
   }
 
   function onStorage(event: StorageEvent) {
     if (event.key !== THEME_STORAGE_KEY) return;
     applyTheme(resolveTheme(event.newValue, systemPrefersDark()));
-    notify();
+    onStoreChange();
   }
 
   function onSystemChange() {
     if (readSavedTheme() !== null) return;
     applyTheme(resolveTheme(null, systemPrefersDark()));
-    notify();
+    onStoreChange();
   }
 
-  window.addEventListener(THEME_CHANGE_EVENT, notify);
+  window.addEventListener(THEME_CHANGE_EVENT, syncCurrentTabTheme);
   window.addEventListener("storage", onStorage);
   media.addEventListener("change", onSystemChange);
 
   return () => {
-    window.removeEventListener(THEME_CHANGE_EVENT, notify);
+    window.removeEventListener(THEME_CHANGE_EVENT, syncCurrentTabTheme);
     window.removeEventListener("storage", onStorage);
     media.removeEventListener("change", onSystemChange);
   };
@@ -78,6 +79,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
     applyTheme(nextTheme);
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+    if (window.parent !== window) {
+      try {
+        window.parent.dispatchEvent(new Event(THEME_CHANGE_EVENT));
+      } catch {
+        // 같은 출처 프레임이 아니면 현재 프레임의 테마만 유지한다.
+      }
+    }
   }, []);
 
   const toggleTheme = useCallback(() => {
