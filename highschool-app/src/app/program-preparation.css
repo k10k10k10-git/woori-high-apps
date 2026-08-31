@@ -301,3 +301,17 @@
 .program-undo-notice button:hover { background: var(--color-success-bg); }
 .program-undo-notice button:disabled { opacity: .5; }
 .program-undo-dismiss { min-width: 40px; justify-content: center; color: var(--color-text-faint); }
+
+/* ── 표로 옮기기 전 자유 입력 안내 ──────────────────────────── */
+.program-legacy-note {
+  margin-top: 16px; border: 1px solid color-mix(in srgb, var(--color-warning) 32%, var(--color-border));
+  border-radius: 11px; background: var(--color-warning-bg); padding: 12px 14px;
+}
+.program-legacy-note > p { color: var(--color-warning); font-size: 12px; font-weight: 700; line-height: 1.6; }
+.program-legacy-note > div { margin-top: 10px; }
+.program-legacy-note strong { display: block; color: var(--color-text-primary); font-size: 12px; font-weight: 800; }
+.program-legacy-note pre {
+  margin: 5px 0 8px; overflow-x: auto; border-radius: 8px; background: var(--color-surface);
+  padding: 9px 11px; color: var(--color-text-secondary);
+  font: 400 12px/1.7 inherit; white-space: pre-wrap; word-break: break-word;
+}

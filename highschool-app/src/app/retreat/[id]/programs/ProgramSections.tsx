@@ -342,11 +342,46 @@ function ProgramBracket({
 }
 
 // ── 게임·포스트 ──────────────────────────────────────────────
+
+/** 표로 옮기기 전에 자유 입력으로 적어 둔 값 — 감추면 사라진 것처럼 보이므로 옮길 때까지 보여 준다. */
+function PostLegacyText({
+  post, canEdit, onUpdate,
+}: {
+  post: RetreatProgramPost;
+  canEdit: boolean;
+  onUpdate: (postId: string, data: Partial<RetreatProgramPost>) => Promise<void>;
+}) {
+  const { busyId, run } = useRowBusy();
+  const entries = [
+    { key: "materials" as const, label: "준비물", value: post.materials?.trim(), moveTo: "아래 준비물 표" },
+    { key: "staffRoles" as const, label: "스탭 역할", value: post.staffRoles?.trim(), moveTo: "아래 역할 표" },
+  ].filter((entry) => Boolean(entry.value));
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="program-legacy-note" role="status">
+      <p>예전에 자유 입력으로 적어 둔 내용입니다. {entries.map((e) => e.label).join("·")}은(는) 이제 표가 단일 원천이라, 옮긴 뒤 지워 주세요.</p>
+      {entries.map((entry) => (
+        <div key={entry.key}>
+          <strong>{entry.label}</strong>
+          <pre>{entry.value}</pre>
+          {canEdit && (
+            <button type="button" className="btn-secondary btn-sm" disabled={busyId === entry.key}
+              onClick={() => void run(entry.key, () => onUpdate(post.id, { [entry.key]: "" }), `${entry.label}을(를) 지우지 못했습니다.`)}>
+              {entry.moveTo}로 옮겼습니다 · 지우기
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 준비물·스탭 역할은 아래 표(items·roles)가 단일 원천이다. 자유 입력으로 다시 받지 않는다.
 const POST_FIELDS = [
   { key: "concept", label: "컨셉", rows: 2, placeholder: "이 게임이 전하려는 장면·분위기" },
   { key: "rules", label: "규칙", rows: 6, placeholder: "1. 조별 대항\n2. 3라운드 진행…" },
-  { key: "materials", label: "준비물", rows: 3, placeholder: "줄자 / 종이 / 펜" },
-  { key: "staffRoles", label: "스탭 역할", rows: 3, placeholder: "진행스탭: 메인 진행, 점수 기록" },
   { key: "prepCautions", label: "준비 시 주의", rows: 3, placeholder: "물품을 미리 숨겨두기" },
   { key: "runCautions", label: "진행 시 주의", rows: 4, placeholder: "정해진 시각 이후 새 라운드 시작 금지" },
   { key: "extra", label: "기타 전달 사항", rows: 3, placeholder: "승패 보상, 컨셉 연기 요청 등" },
@@ -504,6 +539,7 @@ export function ProgramPostsSection({
                       </label>
                     ))}
                   </div>
+                  <PostLegacyText post={post} canEdit={canEdit} onUpdate={onUpdate} />
                   <PostSubEntries
                     post={post} items={itemsOf(post.id)} roles={rolesOf(post.id)} canEdit={canEdit}
                     onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}

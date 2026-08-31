@@ -57,6 +57,17 @@ describe("program preparation interaction contract", () => {
     }
   });
 
+  it("같은 사실을 표와 자유 입력으로 두 번 받지 않는다", () => {
+    // 준비물·스탭 역할은 items·roles 표가 단일 원천이다.
+    // 자유 입력 칸을 되살리면 어느 쪽이 진짜인지 알 수 없어진다.
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    const postFields = sections.slice(sections.indexOf("const POST_FIELDS = ["), sections.indexOf("] as const;", sections.indexOf("const POST_FIELDS = [")));
+    expect(postFields).not.toContain("materials");
+    expect(postFields).not.toContain("staffRoles");
+    // 이미 적어 둔 값은 감추지 않고 옮길 때까지 보여 준다.
+    expect(sections).toContain("PostLegacyText");
+  });
+
   it("keeps mobile and tablet action targets at least 44px and prevents task-row overflow", () => {
     const css = source("src/app/program-preparation.css");
     expect(css).toContain(".program-order-controls button { width: 44px; height: 44px; }");
