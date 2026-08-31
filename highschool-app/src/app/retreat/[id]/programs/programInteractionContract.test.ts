@@ -52,6 +52,11 @@ describe("program preparation interaction contract", () => {
     const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
     const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
     expect(sections.match(/undo\.remember\(/g)?.length).toBe(6);
+    // 훅만 쓰고 알림을 렌더하지 않으면 지운 사실도 되돌릴 방법도 화면에 나타나지 않는다.
+    // 실제로 집계 두 탭과 게임 카드에서 이 렌더가 빠져 있었다(2026-08-30 운영 확인).
+    expect(sections.match(/useProgramUndo\(\)/g)?.length).toBe(
+      sections.match(/<ProgramUndoNotice/g)?.length,
+    );
     for (const fn of ["restoreRetreatProgramPost", "restoreRetreatProgramItem", "restoreRetreatProgramRole", "restoreRetreatProgramMatch"]) {
       expect(client).toContain(fn);
     }

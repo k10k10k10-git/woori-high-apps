@@ -563,6 +563,10 @@ export function ProgramPostsSection({
           ))}
         </ul>
       )}
+
+      {undo.pending && (
+        <ProgramUndoNotice label={undo.pending.label} busy={undo.busy} onUndo={() => void undo.undo()} onDismiss={undo.dismiss} />
+      )}
     </section>
   );
 }
@@ -676,6 +680,10 @@ export function ProgramRolesSection({
           )}
         </div>
       ))}
+
+      {undo.pending && (
+        <ProgramUndoNotice label={undo.pending.label} busy={undo.busy} onUndo={() => void undo.undo()} onDismiss={undo.dismiss} />
+      )}
     </section>
   );
 }
@@ -788,6 +796,10 @@ export function ProgramItemsSection({
           </div>
         );
       })}
+
+      {undo.pending && (
+        <ProgramUndoNotice label={undo.pending.label} busy={undo.busy} onUndo={() => void undo.undo()} onDismiss={undo.dismiss} />
+      )}
     </section>
   );
 }
