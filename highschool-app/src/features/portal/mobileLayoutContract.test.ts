@@ -115,6 +115,8 @@ describe("모바일 운영 화면 계약", () => {
     expect(shell).toContain("const [src] = useState(initialSrc)");
     expect(shell).toContain("frameLocation.replace(nextFrameLocation)");
     expect(shell).toContain("currentMobileFrameSrc");
+    expect(shell).toContain('frameDocument.readyState !== "complete"');
+    expect(shell).toContain("setLoadedFrameKey(frameKey)");
     expect(shell).toContain('title="고등부 통합사이트 PC 화면"');
     expect(css).toContain(".portal-desktop-lock-frame");
     expect(css).toContain("width: max(100%, 1280px);");

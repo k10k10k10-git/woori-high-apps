@@ -111,6 +111,33 @@ export default function PortalViewportShell({ children }: { children: React.Reac
     }
   }, [currentDesktopFrameSrc, currentMobileFrameSrc, isDesktopFrame, isFramedView]);
 
+  // 캐시된 iframe은 React가 onLoad를 연결하기 전에 로드를 끝낼 수 있다.
+  // 실제 문서와 주소가 준비됐는지도 확인해 스켈레톤이 영구히 남지 않게 한다.
+  useEffect(() => {
+    if (!isFramedView) return;
+    const expectedLocation = isDesktopFrame ? currentDesktopFrameSrc : currentMobileFrameSrc;
+
+    function markReadyWhenLoaded() {
+      try {
+        const frameWindow = frameRef.current?.contentWindow;
+        const frameDocument = frameRef.current?.contentDocument;
+        if (!frameWindow || !frameDocument || frameDocument.readyState !== "complete") return false;
+        const frameLocation = `${frameWindow.location.pathname}${frameWindow.location.search}${frameWindow.location.hash}`;
+        if (frameLocation !== expectedLocation) return false;
+        setLoadedFrameKey(frameKey);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    if (markReadyWhenLoaded()) return;
+    const timer = window.setInterval(() => {
+      if (markReadyWhenLoaded()) window.clearInterval(timer);
+    }, 120);
+    return () => window.clearInterval(timer);
+  }, [currentDesktopFrameSrc, currentMobileFrameSrc, frameKey, isDesktopFrame, isFramedView]);
+
   if (isEmbeddedDesktopFrame) {
     return (
       <>
