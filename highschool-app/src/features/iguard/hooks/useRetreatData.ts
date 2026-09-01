@@ -87,7 +87,9 @@ type CacheWindow = Window & {
 
 function browserRetreatDataCache(): Map<string, CachedRetreatData> | null {
   if (typeof window === "undefined") return null;
-  const cacheWindow = window as CacheWindow;
+  // PC 고정 보기 iframe이 문서를 교체해도 같은 브라우저 탭의 최상위 window는
+  // 유지된다. 같은 출처 안에서만 쓰며 서버 전역이나 영구 저장소에는 남기지 않는다.
+  const cacheWindow = (window.top ?? window) as CacheWindow;
   cacheWindow[CACHE_KEY] ??= new Map<string, CachedRetreatData>();
   return cacheWindow[CACHE_KEY];
 }
