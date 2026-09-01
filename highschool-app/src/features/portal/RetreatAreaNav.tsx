@@ -2,6 +2,7 @@
 
 import { ClipboardText, ShieldCheck, UsersThree } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export type RetreatAreaKey = "admin" | "programs" | "field";
 
@@ -29,11 +30,24 @@ export default function RetreatAreaNav({
   const router = useRouter();
   const navigate = onNavigate ?? ((href: string) => router.push(href));
   const encoded = encodeURIComponent(retreatId);
+  const adminHref = `/retreat/${encoded}`;
+  const programsHref = `/retreat/${encoded}/programs`;
+  const fieldHref = `/retreat/${encoded}/field`;
+
+  // 세 영역은 사용자가 탭처럼 오간다. 보이는 동안 목적지 RSC를 준비해
+  // 클릭 뒤 전체 화면 로딩 경계가 먼저 나타나는 시간을 없앤다.
+  useEffect(() => {
+    if (adminAllowed) {
+      router.prefetch(adminHref);
+      router.prefetch(programsHref);
+    }
+    if (fieldAllowed) router.prefetch(fieldHref);
+  }, [adminAllowed, adminHref, fieldAllowed, fieldHref, programsHref, router]);
 
   const items = [
-    adminAllowed ? { key: "admin" as const, label: "행정", Icon: UsersThree, href: `/retreat/${encoded}` } : null,
-    adminAllowed ? { key: "programs" as const, label: "프로그램 준비", Icon: ClipboardText, href: `/retreat/${encoded}/programs` } : null,
-    fieldAllowed ? { key: "field" as const, label: "이가드", Icon: ShieldCheck, href: `/retreat/${encoded}/field` } : null,
+    adminAllowed ? { key: "admin" as const, label: "행정", Icon: UsersThree, href: adminHref } : null,
+    adminAllowed ? { key: "programs" as const, label: "프로그램 준비", Icon: ClipboardText, href: programsHref } : null,
+    fieldAllowed ? { key: "field" as const, label: "이가드", Icon: ShieldCheck, href: fieldHref } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   if (items.length < 2) return null;
@@ -48,6 +62,8 @@ export default function RetreatAreaNav({
             type="button"
             aria-current={isCurrent ? "page" : undefined}
             aria-label={label}
+            onPointerEnter={() => router.prefetch(href)}
+            onFocus={() => router.prefetch(href)}
             onClick={() => { if (!isCurrent) navigate(href); }}
           >
             <Icon aria-hidden="true" size={17} weight={isCurrent ? "fill" : "regular"} />

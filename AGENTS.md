@@ -46,7 +46,7 @@ Read these first for cross-app work:
 
 - Roles are expressed with **existing** DB nodes and one optional field, so no Firebase Rules change was needed. Do not invent a new roles node: new nodes have no `.read`/`.write` in the rules and are rejected immediately, and rules can only be deployed from the student app.
 - `iguardRoles` has a `.validate` that accepts only `"staff"` / `"team"`. Never write other values there.
-- Role judgement lives in one pure function, `resolveMinistryRole`, shared by both AuthContexts (`src/context/AuthContext.tsx` and `src/features/iguard/context/AuthContext.tsx`).
+- Role judgement lives in one pure function, `resolveMinistryRole`. The root `src/context/AuthContext.tsx` performs authentication and role reads once; `src/features/iguard/context/AuthContext.tsx` is a compatibility adapter over that root state.
 - Role writes go through `roleAssign.planRoleAssignment` (pure, grants before revokes) then `applyRole.applyRoleSteps` (execution). Do not call the underlying DB functions from UI code.
 - Resolved 2026-08-08: staff read of `semesters` now works — `iguardMembers` was added to the `semesters` `.read` rule and deployed from the student app. `.write` is still `admins`/`retreatAdmins` only, and `semestersPrivate` (contacts) stays admin-side only on purpose.
 
@@ -57,7 +57,7 @@ Several nodes used to be readable by **any signed-in Google account** (no role a
 - `teacherStaff`, `teacherSpecial`, `teacherExtra` → `admins` / `attendanceAdmins` / `retreatAdmins` / `iguardMembers` (the semester intake screen and retreat rosters read these).
 - `teacherAdditional`, `teacherPhones` → `admins` / `attendanceAdmins` only.
 - `userRoles` → list read is admin-only; **each record keeps a self-read rule** (`data.child('email').val() === auth.token.email`) because `loadUserRole` reads `userRoles/{emailKey}` to decide login. Remove it and every homeroom teacher is locked out.
-- `retreatAdmins`, `iguardMembers`, `iguardRoles` → list read is role holders only, and **each keeps `$uid` self-read** (`auth.uid === $uid`). Both AuthContexts read their own uid from these three; on failure the `catch` sets role `"none"`, so removing self-read locks out every non-admin.
+- `retreatAdmins`, `iguardMembers`, `iguardRoles` → list read is role holders only, and **each keeps `$uid` self-read** (`auth.uid === $uid`). The root AuthContext reads the signed-in user's uid from these three; on failure the `catch` sets role `"none"`, so removing self-read locks out every non-admin.
 - `staff_*` → removed from Rules on 2026-08-12 together with the teacher/staff app (0 records, never deployed).
 - `events` stays `auth != null` on purpose — month/day/label only, no personal data.
 

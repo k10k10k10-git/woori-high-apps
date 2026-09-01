@@ -133,8 +133,10 @@ function IguardWorkspace({ id }: { id: string }) {
   const selectView = useCallback((nextView: string) => {
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("view", nextView);
-    router.replace(`/retreat/${encodeURIComponent(id)}/field?${nextParams.toString()}`, { scroll: false });
-  }, [id, router, searchParams]);
+    // 같은 현장 작업 화면의 탭 상태다. 서버 라우트를 다시 탐색하지 않고
+    // 공유 가능한 URL만 갱신해 인증·실시간 구독·현재 화면을 유지한다.
+    window.history.replaceState(null, "", `/retreat/${encodeURIComponent(id)}/field?${nextParams.toString()}`);
+  }, [id, searchParams]);
 
   // 데이터 허브 — 모든 구독을 커스텀 훅에서 관리
   const {

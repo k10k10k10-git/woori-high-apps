@@ -29,7 +29,7 @@
 역할·영역 표와 저장 위치는 `CLAUDE.md`의 "권한" 절과 루트 `AGENTS.md`가 같은 내용을 담는다. 코드 규칙만 요약하면:
 
 - 화면 게이트는 `canAccessPortalArea` / `canEditPortalArea` / `iguardScope` / `canManageRoles`만 쓴다. `role === "staff"` 같은 직접 비교 금지.
-- 역할 판정은 `resolveMinistryRole`(순수) 하나 — 통합 `AuthContext`와 이가드 `AuthContext`가 공유한다. 두 컨텍스트는 `role`만 노출하고 예전 `accessLevel`/`iguardAccessLevel`은 없다.
+- 역할 판정은 `resolveMinistryRole`(순수) 하나 — 루트 `AuthContext`가 인증·역할을 한 번만 읽고 이가드 `AuthContext`는 그 값을 전달하는 호환 어댑터다. 두 경계는 `role`만 노출하고 예전 `accessLevel`/`iguardAccessLevel`은 없다.
 - 역할 배정 쓰기는 `planRoleAssignment`(순수, 부여→해제) → `applyRoleSteps`(실행). UI에서 `addRetreatAdmin`·`approveIguardMember`를 직접 부르지 않는다.
 - 학기 화면 편집 잠금은 `useSemesterCanEdit()`. 새 저장 컨트롤을 추가하면 이 값으로 `disabled` 또는 미렌더 처리한다.
 - 역할 배정(`canManageRolesOf`)은 통합관리자만 가능하다. 교역자의 개인정보 통합검색은 `searchScope`, 수련회 PIN 운영은 `canManageRetreatPin`으로 각각 판정해 역할 배정 권한과 결합하지 않는다.
@@ -319,6 +319,11 @@ npm run build
 - **접근법**: 1→ `ProgramPreparationClient.tsx`에서 클릭 직후 스켈레톤이 뜨는 경로를 `router.push`·`router.replace`와 Firebase 구독 의존성으로 나눠 추적한다. 2→ `program`·`section`처럼 같은 클라이언트 화면의 선택은 Next 공식 Native History API인 `window.history.pushState`·`replaceState`로 바꿔 `useSearchParams`와 공유 URL은 유지한다. 3→ `PortalViewportShell.tsx`의 iframe→바깥 주소 동기화도 History API로 바꿔 외부 서버 라우트 탐색이 프레임을 가리지 않게 한다. 4→ 계약 테스트에서 로컬 선택 구간에 Next router 호출이 없고 프레임 동기화가 `replaceState`를 쓰는지 고정한다. 5→ lint·typecheck·전체 테스트·production build 뒤 실제 프로그램 탭을 연속 전환해 구독과 스켈레톤이 유지되는지 확인한다.
 - **판단 질문**: URL 쿼리를 React 로컬 state로만 옮기지 않는다. 새로고침·링크 공유·브라우저 뒤로가기에 현재 프로그램을 보존해야 한다. Firebase 구독의 준비 상태를 억지로 캐시하지도 않는다. 이 문제에서는 구독 의존성이 `retreatId`로 안정적이었고, 같은 페이지 쿼리에 서버 탐색을 건 것이 실제 원인이었다.
 - **재사용 규칙**: 같은 App Router 화면 안의 탭·정렬·선택이 쿼리만 바꾸는데 로딩 경계가 깜빡이면 `구독 의존성 확인 → 로컬 작업 상태와 실제 경로 이동 분리 → Native History API 적용 → iframe 바깥 동기화까지 같은 원칙 적용 → URL 보존·무재탐색 계약 테스트` 순서를 따른다.
+
+### 탭처럼 오가는 형제 화면에서 인증·경로 로딩을 반복하지 않기 (2026-09-01)
+- **접근법**: 1→ 로그인된 운영 화면에서 `행정 → 이가드` 진입 시간을 재고 내부 탭 전환과 형제 경로 이동을 분리한다. 2→ `src/features/iguard/context/AuthContext.tsx`의 두 번째 `onAuthStateChanged`와 역할 DB 조회가 경로 진입마다 다시 시작되는지 확인한다. 3→ 이가드 컨텍스트를 루트 `AuthContext` 상태를 전달하는 어댑터로 바꿔 레거시 import 경계는 유지하되 인증은 한 번만 수행한다. 4→ `IguardClient.tsx`의 `view` 쿼리는 Native History API로 갱신해 22개 실시간 구독을 유지한다. 5→ `RetreatAreaNav.tsx`가 행정·프로그램·이가드 형제 경로를 마운트·포인터 진입·포커스 시 prefetch하도록 해 실제 경로 전환 전에 RSC를 준비한다. 6→ 별도 인증 조회 부재·무재탐색 탭·세 경로 prefetch를 계약 테스트로 고정하고 실제 운영 화면에서 재측정한다.
+- **판단 질문**: 행정·프로그램·이가드를 React 로컬 탭 하나로 합치거나 모든 이가드 데이터를 다른 화면에서 미리 구독하지 않는다. 세 영역은 권한·정보구조·쓰기 경계가 달라 경로를 유지해야 하고, 무조건적인 데이터 프리로드는 불필요한 개인정보 읽기와 22개 장기 리스너를 만든다. 로딩 문구만 CSS로 숨기지도 않는다. 인증과 서버 경로 탐색이 실제로 반복되는 동안 숨기면 빈 화면만 남는다.
+- **재사용 규칙**: 형제 경로가 탭처럼 보이는데 전환 때마다 전면 로딩이 뜨면 `실제 경로 이동/내부 상태 분리 → 중첩 인증 Provider 제거 또는 전역 상태 어댑트 → 내부 쿼리는 History API → 형제 경로는 권한 범위 안에서 prefetch → 인증·구독 재시작 여부를 운영 화면에서 측정` 순서를 따른다.
 
 ### 실시간 운영 화면의 로딩·대용량 UI·CI를 한 번에 품질 경계로 묶기 (2026-08-27)
 - **접근법**: 1→ `src/lib/subscriptionReadiness.ts`에서 여러 Firebase 구독의 첫 성공·오류 응답을 모두 준비 완료로 합치고 `WorkspaceSkeleton`을 준비 전 화면에 둔다. 2→ `RetreatParticipantMobileList.tsx`는 `pagination.ts`로 40명씩 자르고 `interaction-controls.css`의 `content-visibility:auto`를 더해 DOM과 페인트를 함께 제한한다. 3→ 800줄 이상 화면은 이름 선택기·순수 명단 모델·방 카드 같은 책임 단위로 분리하고 `componentBoundaries.test.ts`와 특성 테스트로 정렬·표기 계약을 고정한다. 4→ `exportUtils.loadXlsx()`의 동적 import로 무거운 XLSX 런타임을 내보내기 시점까지 미루고 빌드 manifest에서 별도 chunk 생성을 확인한다. 5→ CSS를 기반·운영표·테마 호환·상호작용 파일로 나누고 `cssArchitecture.test.ts`로 파일 크기와 `!important` 예산을 고정한다. 6→ `.github/workflows/highschool-quality.yml`에 lint·typecheck·coverage·build·Lighthouse·인증 smoke·axe를 순서대로 연결하고 인증 파일 누락은 `scripts/require-e2e-auth.mjs`가 즉시 실패하게 한다.

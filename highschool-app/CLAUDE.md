@@ -108,7 +108,7 @@
 **원칙: 화면에서 막는 것은 언제나 안전하지만, 화면에서 여는 것은 Rules가 허용할 때만 합니다.** (Rules가 막는 걸 화면에서 열면 "눌렀는데 실패"가 됩니다.)
 
 - 화면 게이트는 `canAccessArea` / `canEditArea` / `iguardScopeOf` / `canManageRolesOf`와 목적별 함수(`canDestroySemester`·`canCreateRetreat`·`canSeeSensitiveRetreat` 등)만 사용합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
-- 역할 판정은 `resolveMinistryRoles`(순수) 하나로, 통합 `AuthContext`와 이가드 `AuthContext`가 같은 결론을 냅니다.
+- 역할 판정은 `resolveMinistryRoles`(순수) 하나로 처리합니다. 이가드 `AuthContext`는 통합 `AuthContext` 값을 전달하는 호환 어댑터이며 별도 인증·역할 조회를 시작하지 않습니다.
 - 역할 배정 쓰기는 `roleAssign.planRoleAssignment`(순수·테스트) → `applyRole.applyRoleSteps`(실행) 경로만 사용합니다. 부여를 먼저, 해제를 나중에 실행합니다.
 - 학기 화면의 편집 잠금은 `features/semester/EditContext`의 `useSemesterCanEdit()`으로만 판단합니다.
 - 스탭의 학기 **조회**는 2026-08-08 Rules 보강으로 열렸습니다 — `semesters` `.read`에 `iguardMembers`가 추가됐습니다. `.write`는 계속 `admins`/`retreatAdmins`만이고, 연락처가 있는 `semestersPrivate`는 **행정 전용 그대로**입니다. 즉 스탭은 `semesters/*`(명단·팀·훈련 반·회차·출석·커리큘럼)를 읽지만 저장은 못 합니다. Rules는 학생 앱에서만 배포합니다.

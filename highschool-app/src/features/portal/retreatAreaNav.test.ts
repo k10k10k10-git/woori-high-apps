@@ -45,4 +45,13 @@ describe("수련회 영역 내비게이션 계약", () => {
     expect(source(PROGRAMS)).not.toContain("program-area-nav");
     expect(source("src/app/program-preparation.css")).not.toContain("program-area-nav");
   });
+
+  it("세 영역을 탭처럼 오갈 때 목적지를 미리 준비한다", () => {
+    const nav = source("src/features/portal/RetreatAreaNav.tsx");
+    expect(nav).toContain("router.prefetch(adminHref)");
+    expect(nav).toContain("router.prefetch(programsHref)");
+    expect(nav).toContain("router.prefetch(fieldHref)");
+    expect(nav).toContain("onPointerEnter={() => router.prefetch(href)}");
+    expect(nav).toContain("onFocus={() => router.prefetch(href)}");
+  });
 });

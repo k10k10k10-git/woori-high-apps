@@ -1,104 +1,23 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup } from "firebase/auth";
-import { get, ref } from "firebase/database";
-import { auth, googleProvider, db } from "@/lib/firebase";
-import { paths } from "@/features/iguard/lib/paths";
-import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";
+import { createContext, useContext, type ReactNode } from "react";
+import { useAuth as usePortalAuth } from "@/context/AuthContext";
 
-interface AuthContextValue {
-  user: User | null;
-  loading: boolean;
-  /** 통합 두 축 역할 — 현장 탭 범위는 accessPolicy.iguardScopeOf로만 판정한다 */
-  roles: MinistryRoles;
-  memberName: string | null;
-  signIn: () => Promise<void>;
-  signOut: () => Promise<void>;
-}
+type IguardAuthValue = ReturnType<typeof usePortalAuth>;
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+const AuthContext = createContext<IguardAuthValue | null>(null);
 
-async function canReadAsMainAdmin(uid: string): Promise<boolean> {
-  try {
-    const snap = await get(ref(db, paths.admins(uid)));
-    return snap.val() === true;
-  } catch {
-    return false;
-  }
-}
-
+/**
+ * 이가드 레거시 import 경계를 유지하는 어댑터다.
+ * 인증·역할 조회는 루트 AuthProvider가 한 번만 수행하고 현장 화면은 그 값을 재사용한다.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<MinistryRoles>(NO_ROLES);
-  const [memberName, setMemberName] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      setMemberName(null);
-      if (u) {
-        try {
-          // 역할 판정은 통합 accessPolicy가 단일 원천이다 — 행정 화면과 현장 화면이 같은 결론을 내야 한다.
-          const [retreatAdminSnap, memberSnap, roleSnap] = await Promise.all([
-            get(ref(db, paths.retreatAdmins(u.uid))),
-            get(ref(db, paths.iguardMember(u.uid))),
-            get(ref(db, paths.iguardRole(u.uid))),
-          ]);
-          const isMainAdmin = await canReadAsMainAdmin(u.uid);
-          const retreatAdmin = retreatAdminSnap.val();
-          const memberValue = memberSnap.val();
-
-          const nameSource = [retreatAdmin, memberValue].find(
-            (value) => value && typeof value === "object" && typeof value.name === "string",
-          );
-          if (nameSource) setMemberName(nameSource.name.trim() || null);
-
-          const roleSource = (retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin : null)
-            ?? (memberValue && typeof memberValue === "object" ? memberValue : null);
-
-          setRoles(resolveMinistryRoles({
-            isMainAdmin,
-            hasRetreatAdmin: retreatAdmin != null,
-            retreatAdminRole: retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin.role : undefined,
-            hasIguardMember: memberValue != null,
-            iguardRole: roleSnap.val(),
-            semesterRole: roleSource?.semesterRole,
-            retreatRole: roleSource?.retreatRole,
-          }));
-        } catch {
-          setRoles(NO_ROLES);
-          setMemberName(null);
-        }
-      } else {
-        setRoles(NO_ROLES);
-        setMemberName(null);
-      }
-      setLoading(false);
-    });
-    return unsub;
-  }, []);
-
-  async function signIn() {
-    await signInWithPopup(auth, googleProvider);
-  }
-
-  async function signOut() {
-    await firebaseSignOut(auth);
-    setRoles(NO_ROLES);
-    setMemberName(null);
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, loading, roles, memberName, signIn, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const auth = usePortalAuth();
+  return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error("useAuth must be used within Iguard AuthProvider");
+  return context;
 }
