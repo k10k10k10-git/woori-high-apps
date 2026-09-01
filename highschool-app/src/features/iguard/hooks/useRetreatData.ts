@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   subscribeToCellColors,
   subscribeToConnection,
@@ -26,7 +26,7 @@ import {
   subscribeToStudentsByYear,
   subscribeToTeacherAttendances,
 } from "@/features/iguard/lib/db";
-import type { RetreatProgram } from "@/lib/types";
+import type { Group as AdminGroup, Retreat as AdminRetreat, RetreatProgram } from "@/lib/types";
 import {
   Retreat, Group, Room, Student, IguardMeal, IguardScheduleBlock,
   IguardSegment, IguardPost, IguardMovement, AssignedIguardMovement, IguardBus, IguardSeating, Milestone, RetreatPeriod,
@@ -37,6 +37,7 @@ import {
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import { movementsForDefaultSegments } from "@/features/iguard/lib/defaultSegment";
 import { createSubscriptionReadinessGate } from "@/lib/subscriptionReadiness";
+import { mergeRetreatWorkspaceSnapshot } from "@/lib/retreatWorkspaceCache";
 
 export interface RetreatData {
   retreat: Retreat | null;
@@ -72,42 +73,61 @@ export interface RetreatData {
   connected: boolean;
 }
 
+type CachedRetreatData = Omit<RetreatData, "retreatLoading" | "dataLoading" | "loadError"> & {
+  loadedScope: string;
+  cachedAt: number;
+};
+
+const CACHE_TTL_MS = 5 * 60 * 1000;
+const retreatDataCache = new Map<string, CachedRetreatData>();
+
+function getCachedRetreatData(id: string): CachedRetreatData | null {
+  const cached = retreatDataCache.get(id);
+  if (!cached) return null;
+  if (Date.now() - cached.cachedAt > CACHE_TTL_MS) {
+    retreatDataCache.delete(id);
+    return null;
+  }
+  return cached;
+}
+
 /**
  * 수련회 데이터 허브 — 모든 Firebase 실시간 구독을 중앙 관리.
  * IguardClient에서 추출한 22개 실시간 구독 로직.
  */
 export function useRetreatData(id: string): RetreatData {
-  const [retreat, setRetreat] = useState<Retreat | null>(null);
-  const [retreatLoading, setRetreatLoading] = useState(true);
-  const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const initialCache = useRef(getCachedRetreatData(id)).current;
+  const [retreat, setRetreat] = useState<Retreat | null>(initialCache?.retreat ?? null);
+  const [retreatLoading, setRetreatLoading] = useState(!initialCache);
+  const [loadedScope, setLoadedScope] = useState<string | null>(initialCache?.loadedScope ?? null);
   // 22개 구독의 실패를 경로별로 모은다 — 하나로 합치면 첫 실패만 보여 원인을 잘못 짚는다
   // (2026-08-08 학기·홈에서 실제로 두 번 오진했다). scope가 id라 수련회를 옮기면 초기화된다.
   const { fail: failPath, ok: okPath, message: loadError } = useLoadErrors(id);
 
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [students, setStudents] = useState<Record<string, Student>>({});
-  const [participants, setParticipants] = useState<Record<string, Participant>>({});
-  const [adminTeachers, setAdminTeachers] = useState<TeacherAttendance[]>([]);
-  const [meals, setMeals] = useState<IguardMeal[]>([]);
-  const [schedule, setSchedule] = useState<IguardScheduleBlock[]>([]);
-  const [segments, setSegments] = useState<IguardSegment[]>([]);
-  const [posts, setPosts] = useState<IguardPost[]>([]);
-  const [movementRecords, setMovementRecords] = useState<IguardMovement[]>([]);
-  const [buses, setBuses] = useState<IguardBus[]>([]);
-  const [seating, setSeating] = useState<IguardSeating[]>([]);
-  const [todos, setTodos] = useState<Milestone[]>([]);
-  const [guide, setGuide] = useState<string[]>([]);
-  const [periods, setPeriods] = useState<RetreatPeriod[]>([]);
-  const [attendanceKeys, setAttendanceKeys] = useState<Set<string>>(new Set());
-  const [attendanceInfo, setAttendanceInfo] = useState<Record<string, IguardAttendanceInfo>>({});
-  const [partial, setPartial] = useState<PartialAttendanceMap>({});
-  const [cellColors, setCellColors] = useState<Record<string, string>>({});
-  const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
-  const [gbs, setGbs] = useState<Record<string, IguardGbsPlace>>({});
-  const [lodgingMaps, setLodgingMaps] = useState<IguardLodgingMap[]>([]);
-  const [programs, setPrograms] = useState<RetreatProgram[]>([]);
-  const [connected, setConnected] = useState(true);
+  const [groups, setGroups] = useState<Group[]>(initialCache?.groups ?? []);
+  const [rooms, setRooms] = useState<Room[]>(initialCache?.rooms ?? []);
+  const [students, setStudents] = useState<Record<string, Student>>(initialCache?.students ?? {});
+  const [participants, setParticipants] = useState<Record<string, Participant>>(initialCache?.participants ?? {});
+  const [adminTeachers, setAdminTeachers] = useState<TeacherAttendance[]>(initialCache?.adminTeachers ?? []);
+  const [meals, setMeals] = useState<IguardMeal[]>(initialCache?.meals ?? []);
+  const [schedule, setSchedule] = useState<IguardScheduleBlock[]>(initialCache?.schedule ?? []);
+  const [segments, setSegments] = useState<IguardSegment[]>(initialCache?.segments ?? []);
+  const [posts, setPosts] = useState<IguardPost[]>(initialCache?.posts ?? []);
+  const [movementRecords, setMovementRecords] = useState<IguardMovement[]>(initialCache?.movementRecords ?? []);
+  const [buses, setBuses] = useState<IguardBus[]>(initialCache?.buses ?? []);
+  const [seating, setSeating] = useState<IguardSeating[]>(initialCache?.seating ?? []);
+  const [todos, setTodos] = useState<Milestone[]>(initialCache?.todos ?? []);
+  const [guide, setGuide] = useState<string[]>(initialCache?.guide ?? []);
+  const [periods, setPeriods] = useState<RetreatPeriod[]>(initialCache?.periods ?? []);
+  const [attendanceKeys, setAttendanceKeys] = useState<Set<string>>(initialCache?.attendanceKeys ?? new Set());
+  const [attendanceInfo, setAttendanceInfo] = useState<Record<string, IguardAttendanceInfo>>(initialCache?.attendanceInfo ?? {});
+  const [partial, setPartial] = useState<PartialAttendanceMap>(initialCache?.partial ?? {});
+  const [cellColors, setCellColors] = useState<Record<string, string>>(initialCache?.cellColors ?? {});
+  const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>(initialCache?.groupStaff ?? {});
+  const [gbs, setGbs] = useState<Record<string, IguardGbsPlace>>(initialCache?.gbs ?? {});
+  const [lodgingMaps, setLodgingMaps] = useState<IguardLodgingMap[]>(initialCache?.lodgingMaps ?? []);
+  const [programs, setPrograms] = useState<RetreatProgram[]>(initialCache?.programs ?? []);
+  const [connected, setConnected] = useState(initialCache?.connected ?? true);
   const movements = useMemo(
     () => movementsForDefaultSegments(segments, movementRecords),
     [segments, movementRecords],
@@ -117,7 +137,12 @@ export function useRetreatData(id: string): RetreatData {
   useEffect(() => {
     if (!id) return;
     const unsub = subscribeToRetreat(id,
-      r => { setRetreat(r); okPath("수련회 정보"); setRetreatLoading(false); },
+      r => {
+        setRetreat(r);
+        mergeRetreatWorkspaceSnapshot(id, { retreat: r as AdminRetreat | null });
+        okPath("수련회 정보");
+        setRetreatLoading(false);
+      },
       e => { failPath("수련회 정보")(e); setRetreatLoading(false); });
     return unsub;
   }, [id, failPath, okPath]);
@@ -155,7 +180,11 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }, fail("students")),
       subscribeToParticipants(id, value => { setParticipants(value); ready("participants"); }, fail("participants")),
       subscribeToTeacherAttendances(id, value => { setAdminTeachers(value); ready("adminTeachers"); }, fail("adminTeachers")),
-      subscribeToGroups(id, value => { setGroups(value); ready("groups"); }, fail("groups")),
+      subscribeToGroups(id, value => {
+        setGroups(value);
+        mergeRetreatWorkspaceSnapshot(id, { groups: value as AdminGroup[] });
+        ready("groups");
+      }, fail("groups")),
       subscribeToRooms(id, value => { setRooms(value); ready("rooms"); }, fail("rooms")),
       subscribeToIguardMeals(id, value => { setMeals(value); ready("meals"); }, fail("meals")),
       subscribeToIguardSchedule(id, value => { setSchedule(value); ready("schedule"); }, fail("schedule")),
@@ -173,13 +202,58 @@ export function useRetreatData(id: string): RetreatData {
       subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }, fail("groupStaff")),
       subscribeToIguardGbs(id, value => { setGbs(value); ready("gbs"); }, fail("gbs")),
       subscribeToIguardLodgingMaps(id, value => { setLodgingMaps(value); ready("lodgingMaps"); }, fail("lodgingMaps")),
-      subscribeToRetreatPrograms(id, value => { setPrograms(value); ready("programs"); }, fail("programs")),
+      subscribeToRetreatPrograms(id, value => {
+        setPrograms(value);
+        mergeRetreatWorkspaceSnapshot(id, { programs: value });
+        ready("programs");
+      }, fail("programs")),
     ];
     return () => {
       alive = false;
       unsubs.forEach(u => u());
     };
   }, [id, retreatYear, failPath, okPath]);
+
+  // 같은 수련회 안에서 행정·프로그램·이가드를 오갈 때 마지막 정상 화면을 즉시
+  // 복원한다. 현재 구독은 계속 다시 연결되어 캐시 뒤에서 최신 값을 덮어쓴다.
+  useEffect(() => {
+    if (!retreat || retreatLoading || dataLoading || !loadedScope) return;
+    retreatDataCache.set(id, {
+      retreat,
+      groups,
+      rooms,
+      students,
+      participants,
+      adminTeachers,
+      meals,
+      schedule,
+      segments,
+      posts,
+      movements,
+      movementRecords,
+      buses,
+      seating,
+      todos,
+      guide,
+      periods,
+      attendanceKeys,
+      attendanceInfo,
+      partial,
+      cellColors,
+      groupStaff,
+      gbs,
+      lodgingMaps,
+      programs,
+      connected,
+      loadedScope,
+      cachedAt: Date.now(),
+    });
+  }, [
+    adminTeachers, attendanceInfo, attendanceKeys, buses, cellColors, connected, dataLoading,
+    gbs, groupStaff, groups, guide, id, loadedScope, lodgingMaps, meals, movementRecords,
+    movements, participants, partial, periods, posts, programs, retreat, retreatLoading,
+    rooms, schedule, seating, segments, students, todos,
+  ]);
 
   return {
     retreat, retreatLoading, dataLoading, loadError,

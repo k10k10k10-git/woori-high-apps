@@ -64,6 +64,7 @@ import ProgramEditor from "./ProgramEditor";
 import ProgramList from "./ProgramList";
 import ProgramWorkspaceHeader from "./ProgramWorkspaceHeader";
 import { useProgramDiscardGuard } from "./useProgramDiscardGuard";
+import { getRetreatWorkspaceSnapshot, mergeRetreatWorkspaceSnapshot } from "@/lib/retreatWorkspaceCache";
 
 export default function ProgramPreparationClient() {
   const params = useParams();
@@ -110,12 +111,15 @@ export default function ProgramPreparationClient() {
     roles,
   });
 
-  const [retreat, setRetreat] = useState<Retreat | null>(null);
-  const [programs, setPrograms] = useState<RetreatProgram[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [retreatReady, setRetreatReady] = useState(false);
-  const [programsReady, setProgramsReady] = useState(false);
-  const [groupsReady, setGroupsReady] = useState(false);
+  // 형제 업무 화면을 오갈 때 직전 실시간 스냅샷을 먼저 그린다. 구독은 즉시 다시
+  // 연결되므로 캐시는 로딩 깜빡임만 없애고 서버 값을 대체하지 않는다.
+  const initialSnapshot = useRef(getRetreatWorkspaceSnapshot(retreatId)).current;
+  const [retreat, setRetreat] = useState<Retreat | null>(initialSnapshot?.retreat ?? null);
+  const [programs, setPrograms] = useState<RetreatProgram[]>(initialSnapshot?.programs ?? []);
+  const [groups, setGroups] = useState<Group[]>(initialSnapshot?.groups ?? []);
+  const [retreatReady, setRetreatReady] = useState(initialSnapshot?.retreat !== undefined);
+  const [programsReady, setProgramsReady] = useState(initialSnapshot?.programs !== undefined);
+  const [groupsReady, setGroupsReady] = useState(initialSnapshot?.groups !== undefined);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,26 +147,39 @@ export default function ProgramPreparationClient() {
       return;
     }
     if (!adminAllowed || !retreatId) return;
-    setRetreatReady(false);
-    setProgramsReady(false);
-    setGroupsReady(false);
+    const cached = getRetreatWorkspaceSnapshot(retreatId);
+    setRetreat(cached?.retreat ?? null);
+    setPrograms(cached?.programs ?? []);
+    setGroups(cached?.groups ?? []);
+    setRetreatReady(cached?.retreat !== undefined);
+    setProgramsReady(cached?.programs !== undefined);
+    setGroupsReady(cached?.groups !== undefined);
     setLoadError("");
     const unsubscribeRetreat = subscribeToRetreat(
       retreatId,
-      (next) => { setRetreat(next); setRetreatReady(true); },
+      (next) => {
+        setRetreat(next);
+        mergeRetreatWorkspaceSnapshot(retreatId, { retreat: next });
+        setRetreatReady(true);
+      },
       (error) => { setLoadError(`수련회 정보 - ${error.message}`); setRetreatReady(true); },
     );
     const unsubscribePrograms = subscribeToRetreatPrograms(
       retreatId,
       (next) => {
         setPrograms(next);
+        mergeRetreatWorkspaceSnapshot(retreatId, { programs: next });
         setProgramsReady(true);
       },
       (error) => { setLoadError(`프로그램 정보 - ${error.message}`); setProgramsReady(true); },
     );
     const unsubscribeGroups = subscribeToGroups(
       retreatId,
-      (next) => { setGroups(next); setGroupsReady(true); },
+      (next) => {
+        setGroups(next);
+        mergeRetreatWorkspaceSnapshot(retreatId, { groups: next });
+        setGroupsReady(true);
+      },
       (error) => { setLoadError(`조 편성 정보 - ${error.message}`); setGroupsReady(true); },
     );
     return () => { unsubscribeRetreat(); unsubscribePrograms(); unsubscribeGroups(); };

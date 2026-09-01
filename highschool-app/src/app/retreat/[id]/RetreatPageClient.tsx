@@ -33,15 +33,7 @@ import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
-
-// 자주 사용하는 탭은 한번 마운트되면 CSS display로 보여주기/숨기기 (keep-alive).
-// 이를 통해 탭 전환 시 Firebase 재구독과 상태 초기화를 방지합니다.
-const KEEP_ALIVE_TABS = new Set([
-  0, // PARTICIPANTS
-  1, // GROUPS
-  2, // ROOMS
-  7, // ROSTER
-]);
+import { getRetreatWorkspaceSnapshot, mergeRetreatWorkspaceSnapshot } from "@/lib/retreatWorkspaceCache";
 // ── 탭 인덱스 상수 ────────────────────────────────────────────
 const TAB_IDX = {
   PARTICIPANTS: 0,
@@ -82,14 +74,16 @@ export default function RetreatPageClient() {
     roles,
   });
 
-  const [retreat, setRetreat] = useState<Retreat | null>(null);
+  const initialSnapshot = useRef(getRetreatWorkspaceSnapshot(id)).current;
+  const [retreat, setRetreat] = useState<Retreat | null>(initialSnapshot?.retreat ?? null);
   const [tab, setTab] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialSnapshot?.retreat === undefined);
   const [editingSheet, setEditingSheet] = useState(false);
   const editingSheetRef = useRef(false);
   const [sheetForm, setSheetForm] = useState({ name: "", sheetUrl: "" });
 
-  // keep-alive 탭: 한 번이라도 열린 탭은 언마운트하지 않고 CSS로 숨김
+  // 한 번이라도 연 탭은 페이지를 나갈 때까지 유지한다. 돌아올 때 Firebase 구독과
+  // 입력 상태를 다시 만들지 않아 반복 로딩·초기화를 막는다.
   const [mountedTabs, setMountedTabs] = useState<Set<number>>(new Set());
   const mountedTabsRef = useRef(mountedTabs);
 
@@ -98,7 +92,7 @@ export default function RetreatPageClient() {
   }, [editingSheet]);
 
   useEffect(() => {
-    if (KEEP_ALIVE_TABS.has(tab) && !mountedTabsRef.current.has(tab)) {
+    if (!mountedTabsRef.current.has(tab)) {
       setMountedTabs(prev => {
         const next = new Set(prev);
         next.add(tab);
@@ -119,6 +113,7 @@ export default function RetreatPageClient() {
     return subscribeToRetreat(id,
       (r) => {
         setRetreat(r);
+        mergeRetreatWorkspaceSnapshot(id, { retreat: r });
         if (r && !editingSheetRef.current) setSheetForm({
           name: r.name || "",
           sheetUrl: buildSheetUrl(r.sheetId || "", r.sheetGid || ""),
@@ -407,8 +402,7 @@ export default function RetreatPageClient() {
 
       {/* ══════════════════════════════════════════════════════
           탭 컨텐츠
-          - keep-alive 탭: 한 번 마운트되면 CSS display로 토글 (Firebase 재구독 방지)
-          - 기타 탭: 기존 conditional render 유지
+          - 방문한 탭: 한 번 마운트되면 CSS display로 토글 (Firebase 재구독 방지)
       ══════════════════════════════════════════════════════ */}
         <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6" role="tabpanel" id="tab-content-panel">
           {!canEditAdmin && (
@@ -424,7 +418,7 @@ export default function RetreatPageClient() {
           {!canEditAdmin && <ReadOnlyBanner what="수련회 행정 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
           <fieldset disabled={!canEditAdmin} className="contents">
           <RetreatEditProvider canEdit={canEditAdmin}>
-          {/* keep-alive 탭: 마운트 후 CSS display로 보여주기/숨기기 */}
+          {/* 방문한 탭은 모두 마운트 후 유지한다. 첫 방문에만 준비하고 재방문은 즉시 복귀한다. */}
           {mountedTabs.has(TAB_IDX.PARTICIPANTS) && (
             <div style={{ display: effectiveTab === TAB_IDX.PARTICIPANTS ? "block" : "none" }}>
               <ParticipantsTab retreat={retreat} />
@@ -445,21 +439,19 @@ export default function RetreatPageClient() {
               <ClassRosterTab retreat={retreat} />
             </div>
           )}
-
-          {/* 일반 탭: conditional render (사용 빈도 낮아 재마운트 허용) */}
-          {effectiveTab === TAB_IDX.NOTES       && <NotesTab              retreat={retreat} />}
-          {effectiveTab === TAB_IDX.TEACHERS    && <TeachersTab           retreat={retreat} />}
-          {effectiveTab === TAB_IDX.CARPOOL     && <CarpoolTab            retreat={retreat} />}
-          {effectiveTab === TAB_IDX.PARTIAL     && <PartialAttendanceTab  retreat={retreat} />}
-          {effectiveTab === TAB_IDX.INSURANCE   && <InsuranceTab          retreat={retreat} />}
-          {effectiveTab === TAB_IDX.CANCELLATION&& <CancellationTab       retreat={retreat} />}
-          {effectiveTab === TAB_IDX.SUPPLIES    && <SuppliesTab           retreat={retreat} />}
-          {effectiveTab === TAB_IDX.ONSITE      && <OnSiteRegistrationTab  retreat={retreat} />}
-          {effectiveTab === TAB_IDX.PAYMENTS    && <UnmatchedPaymentsTab   retreat={retreat} />}
-          {effectiveTab === TAB_IDX.TSHIRT      && <TshirtTab             retreat={retreat} />}
-          {effectiveTab === TAB_IDX.MEALCOUNT   && <MealCountTab          retreat={retreat} />}
-          {effectiveTab === TAB_IDX.ADMINSUPPLIES && <AdminSuppliesTab    retreat={retreat} />}
-          {effectiveTab === TAB_IDX.MEDICAL     && <MedicalLogTab         retreat={retreat} />}
+          {mountedTabs.has(TAB_IDX.NOTES) && <div style={{ display: effectiveTab === TAB_IDX.NOTES ? "block" : "none" }}><NotesTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.TEACHERS) && <div style={{ display: effectiveTab === TAB_IDX.TEACHERS ? "block" : "none" }}><TeachersTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.CARPOOL) && <div style={{ display: effectiveTab === TAB_IDX.CARPOOL ? "block" : "none" }}><CarpoolTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.PARTIAL) && <div style={{ display: effectiveTab === TAB_IDX.PARTIAL ? "block" : "none" }}><PartialAttendanceTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.INSURANCE) && <div style={{ display: effectiveTab === TAB_IDX.INSURANCE ? "block" : "none" }}><InsuranceTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.CANCELLATION) && <div style={{ display: effectiveTab === TAB_IDX.CANCELLATION ? "block" : "none" }}><CancellationTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.SUPPLIES) && <div style={{ display: effectiveTab === TAB_IDX.SUPPLIES ? "block" : "none" }}><SuppliesTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.ONSITE) && <div style={{ display: effectiveTab === TAB_IDX.ONSITE ? "block" : "none" }}><OnSiteRegistrationTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.PAYMENTS) && <div style={{ display: effectiveTab === TAB_IDX.PAYMENTS ? "block" : "none" }}><UnmatchedPaymentsTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.TSHIRT) && <div style={{ display: effectiveTab === TAB_IDX.TSHIRT ? "block" : "none" }}><TshirtTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.MEALCOUNT) && <div style={{ display: effectiveTab === TAB_IDX.MEALCOUNT ? "block" : "none" }}><MealCountTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.ADMINSUPPLIES) && <div style={{ display: effectiveTab === TAB_IDX.ADMINSUPPLIES ? "block" : "none" }}><AdminSuppliesTab retreat={retreat} /></div>}
+          {mountedTabs.has(TAB_IDX.MEDICAL) && <div style={{ display: effectiveTab === TAB_IDX.MEDICAL ? "block" : "none" }}><MedicalLogTab retreat={retreat} /></div>}
           </RetreatEditProvider>
           </fieldset>
         </main>
