@@ -62,6 +62,8 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const searchParams = useSearchParams();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [loadedFrameKey, setLoadedFrameKey] = useState("");
+  const routeLocation = `${pathname}${stripDesktopFrameSearch(`?${searchParams.toString()}`)}`;
+  const [framedLocation, setFramedLocation] = useState(routeLocation);
   const { mode, isViewportMobile } = useViewMode();
   const isEmbeddedDesktopFrame =
     searchParams.get(DESKTOP_FRAME_QUERY_KEY) === DESKTOP_FRAME_QUERY_VALUE ||
@@ -69,9 +71,10 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const isMobilePreview = shouldUseMobilePreview(mode, isViewportMobile);
   const isDesktopFrame = shouldUseDesktopFrame(mode, isEmbeddedDesktopFrame);
   const isFramedView = isMobilePreview || isDesktopFrame;
-  const currentDesktopFrameSrc = buildDesktopFrameSrc(pathname, searchParams.toString());
-  const currentMobileFrameSrc = `${pathname}${stripDesktopFrameSearch(`?${searchParams.toString()}`)}`;
-  const frameKey = isDesktopFrame ? "desktop" : `mobile:${pathname}`;
+  const framedUrl = new URL(framedLocation, "https://woori-high.local");
+  const currentDesktopFrameSrc = `${buildDesktopFrameSrc(framedUrl.pathname, framedUrl.search)}${framedUrl.hash}`;
+  const currentMobileFrameSrc = framedLocation;
+  const frameKey = isDesktopFrame ? "desktop" : `mobile:${framedLocation}`;
   const frameReady = loadedFrameKey === frameKey;
 
   // 모바일 프레임 안에서 이동한 URL을 바깥 주소에도 반영한다. 그래야 PC버전으로
@@ -85,9 +88,13 @@ export default function PortalViewportShell({ children }: { children: React.Reac
         const nextSearch = stripDesktopFrameSearch(frameLocation.search);
         const nextLocation = `${frameLocation.pathname}${nextSearch}${frameLocation.hash}`;
         const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        // 프레임의 작업 상태를 주소에 반영할 뿐 새 서버 화면을 요청할 필요는 없다.
-        // History API는 usePathname/useSearchParams와 동기화되면서 iframe을 유지한다.
-        if (nextLocation !== currentLocation) window.history.replaceState(null, "", nextLocation);
+        // 프레임의 작업 상태를 주소창에만 반영한다. Next가 패치한 history 메서드를
+        // 호출하면 바깥 App Router까지 다시 탐색해 고정 iframe을 숨기므로, 브라우저
+        // 원본 History 메서드로 현재 항목만 교체한다.
+        if (nextLocation !== currentLocation) {
+          History.prototype.replaceState.call(window.history, null, "", nextLocation);
+          setFramedLocation(nextLocation);
+        }
       } catch {
         // 로딩 중이거나 브라우저가 일시적으로 프레임 접근을 막아도 다음 주기에 재확인한다.
       }
@@ -104,9 +111,11 @@ export default function PortalViewportShell({ children }: { children: React.Reac
     try {
       const frameLocation = frameWindow.location;
       if (frameLocation.origin !== window.location.origin) return;
-      const currentFrameLocation = `${frameLocation.pathname}${frameLocation.search}${frameLocation.hash}`;
+      const currentFrameLocation = `${frameLocation.pathname}${stripDesktopFrameSearch(frameLocation.search)}${frameLocation.hash}`;
       const nextFrameLocation = isDesktopFrame ? currentDesktopFrameSrc : currentMobileFrameSrc;
-      if (currentFrameLocation !== nextFrameLocation) frameLocation.replace(nextFrameLocation);
+      const nextUrl = new URL(nextFrameLocation, window.location.origin);
+      const normalizedNextLocation = `${nextUrl.pathname}${stripDesktopFrameSearch(nextUrl.search)}${nextUrl.hash}`;
+      if (currentFrameLocation !== normalizedNextLocation) frameLocation.replace(nextFrameLocation);
     } catch {
       // 프레임이 로딩 중이면 onLoad 이후 다음 주소 변경에서 다시 맞춘다.
     }
@@ -116,14 +125,15 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   // 실제 문서와 주소가 준비됐는지도 확인해 스켈레톤이 영구히 남지 않게 한다.
   useEffect(() => {
     if (!isFramedView) return;
-    const expectedLocation = isDesktopFrame ? currentDesktopFrameSrc : currentMobileFrameSrc;
+    const expectedUrl = new URL(isDesktopFrame ? currentDesktopFrameSrc : currentMobileFrameSrc, window.location.origin);
+    const expectedLocation = `${expectedUrl.pathname}${stripDesktopFrameSearch(expectedUrl.search)}${expectedUrl.hash}`;
 
     function markReadyWhenLoaded() {
       try {
         const frameWindow = frameRef.current?.contentWindow;
         const frameDocument = frameRef.current?.contentDocument;
         if (!frameWindow || !frameDocument || frameDocument.readyState !== "complete") return false;
-        const frameLocation = `${frameWindow.location.pathname}${frameWindow.location.search}${frameWindow.location.hash}`;
+        const frameLocation = `${frameWindow.location.pathname}${stripDesktopFrameSearch(frameWindow.location.search)}${frameWindow.location.hash}`;
         if (frameLocation !== expectedLocation) return false;
         setLoadedFrameKey(frameKey);
         return true;
