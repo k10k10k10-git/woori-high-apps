@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
@@ -117,6 +117,20 @@ export default function ProgramPreparationClient() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RetreatProgram | null>(null);
   const discardGuard = useProgramDiscardGuard();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? PROGRAM_SECTIONS.length - 1
+        : (index + (event.key === "ArrowRight" ? 1 : -1) + PROGRAM_SECTIONS.length) % PROGRAM_SECTIONS.length;
+    const next = PROGRAM_SECTIONS[nextIndex];
+    selectSection(next.key);
+    tabRefs.current[nextIndex]?.focus();
+  }
 
   useEffect(() => {
     if (authLoading) return;
@@ -272,11 +286,16 @@ export default function ProgramPreparationClient() {
               {PROGRAM_SECTIONS.map((entry) => (
                 <button
                   key={entry.key}
+                  ref={(node) => { tabRefs.current[PROGRAM_SECTIONS.findIndex((candidate) => candidate.key === entry.key)] = node; }}
                   type="button"
                   role="tab"
+                  id={`program-tab-${entry.key}`}
+                  aria-controls={`program-panel-${entry.key}`}
                   aria-selected={entry.key === section}
+                  tabIndex={entry.key === section ? 0 : -1}
                   className="workspace-tab shrink-0"
                   onClick={() => selectSection(entry.key)}
+                  onKeyDown={(event) => handleTabKeyDown(event, PROGRAM_SECTIONS.findIndex((candidate) => candidate.key === entry.key))}
                 >
                   {entry.label}
                 </button>
@@ -320,7 +339,13 @@ export default function ProgramPreparationClient() {
             />
           </div>
         ) : (
-          <div className="program-detail-screen">
+          <div
+            className="program-detail-screen"
+            id={`program-panel-${section}`}
+            role="tabpanel"
+            aria-labelledby={`program-tab-${section}`}
+            tabIndex={0}
+          >
             <button type="button" className="program-back-to-list"
               onClick={() => discardGuard.requestAction("프로그램 목록으로 이동", goToList)}>
               <ArrowLeft aria-hidden="true" size={15} weight="bold" />

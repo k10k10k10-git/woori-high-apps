@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash } from "@phosphor-icons/react";
+import { CaretDown, Plus, Trash } from "@phosphor-icons/react";
 import { useUI } from "@/context/UIContext";
 import ProgramAutosaveField from "./ProgramAutosaveField";
+import ProgramRunOfShow from "./ProgramRunOfShow";
 import ProgramUndoNotice from "./ProgramUndoNotice";
 import { useProgramUndo } from "./useProgramUndo";
 import {
@@ -460,28 +461,36 @@ export function ProgramPostsSection({
         </div>
       )}
 
+      <ProgramRunOfShow posts={posts} itemsOf={itemsOf} rolesOf={rolesOf} />
+
       {posts.length === 0 ? (
         <p className="program-task-empty">아직 진행 블록이 없습니다. 실제 진행 순서대로 활동을 추가해 주세요.</p>
       ) : (
         <ul className="program-card-list">
-          {posts.map((post) => (
+          {posts.map((post, index) => (
             <li key={post.id}>
-              <details className="program-card">
+              <details className="program-card" id={`program-block-${post.id}`}>
                 <summary>
+                  <b className="program-card-sequence" aria-hidden="true">{String(index + 1).padStart(2, "0")}</b>
                   <strong>{post.name}</strong>
                   <span>{PROGRAM_OPERATION_MODE_META[programOperationMode(post)].label} / {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(post)]}</span>
                   <em className="program-card-counts">준비물 {itemsOf(post.id).length} / 역할 {rolesOf(post.id).length}</em>
+                  <CaretDown className="program-card-caret" aria-hidden="true" size={17} weight="bold" />
                 </summary>
                 <fieldset disabled={!canEdit || busyId === post.id} className="program-card-body">
+                  <div className="program-save-mode program-save-mode--instant" role="status">
+                    <strong>입력 즉시 저장</strong>
+                    <span>각 칸에서 벗어나면 해당 블록만 안전하게 저장됩니다.</span>
+                  </div>
                   <div className="program-form-grid">
-                    <label className="program-field program-field--wide"><span>게임 이름</span>
+                    <label className="program-field program-field--wide"><span>블록 이름</span>
                       <ProgramAutosaveField
                         value={post.name}
-                        ariaLabel="게임"
+                        ariaLabel="블록 이름"
                         maxLength={80}
                         allowEmpty={false}
                         onSave={(next) => onUpdate(post.id, { name: next })}
-                        errorMessage="게임을 수정하지 못했습니다."
+                        errorMessage="블록 이름을 수정하지 못했습니다."
                       /></label>
                     <label className="program-field"><span>운영 방식</span>
                       <select className="input" value={programOperationMode(post)}

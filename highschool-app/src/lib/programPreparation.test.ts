@@ -4,6 +4,7 @@ import {
   PROGRAM_KIND_META,
   PROGRAM_STATUS_META,
   balanceGroupsAcrossCompetitionTeams,
+  canPublishProgram,
   commonItems,
   commonRoles,
   createProgramDraft,
@@ -96,9 +97,16 @@ describe("수련회 프로그램 준비", () => {
     expect(shallow.missingLabels).toEqual(["게임 구성", "역할", "물품"]);
     expect(shallow.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: "게임 구성", section: "posts", ready: false }),
-      expect.objectContaining({ label: "역할", section: "roles", ready: false }),
+      expect.objectContaining({ label: "역할", section: "posts", action: "진행 블록에 담당 배치", ready: false }),
       expect.objectContaining({ label: "브리핑 또는 대본", section: "tasks", ready: true }),
     ]));
+    expect(canPublishProgram(base(body))).toBe(false);
+    expect(canPublishProgram(base({
+      ...body,
+      posts: { g1: { order: 1, name: "물코기", rules: "1. 조별 대항", createdAt: 1, updatedAt: 1 } },
+      roles: { r1: { order: 1, role: "진행", assignee: "박준규", createdAt: 1, updatedAt: 1 } },
+      items: { i1: { order: 1, name: "줄자", status: "todo", quantity: 2, createdAt: 1, updatedAt: 1 } },
+    } as never))).toBe(true);
   });
 
   it("할 일은 생성 순으로 표시한다", () => {

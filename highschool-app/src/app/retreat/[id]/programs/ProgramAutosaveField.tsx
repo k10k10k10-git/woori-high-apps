@@ -48,6 +48,12 @@ export default function ProgramAutosaveField({
   const [draft, setDraft] = useState(remoteValue);
   const [remoteConflict, setRemoteConflict] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const stateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (remoteValue === remoteRef.current) return;
@@ -82,10 +88,15 @@ export default function ProgramAutosaveField({
 
     setDraft(next);
     setSaving(true);
+    setSaveState("saving");
     try {
       await onSave(next);
       remoteRef.current = next;
+      setSaveState("saved");
+      if (stateTimerRef.current) clearTimeout(stateTimerRef.current);
+      stateTimerRef.current = setTimeout(() => setSaveState("idle"), 2200);
     } catch (error) {
+      setSaveState("error");
       toast(error instanceof Error ? error.message : errorMessage, "error");
     } finally {
       setSaving(false);
@@ -107,6 +118,11 @@ export default function ProgramAutosaveField({
     onBlur: () => void commit(),
   };
 
-  if (multiline) return <textarea {...shared} rows={rows} />;
-  return <input {...shared} type={type} inputMode={inputMode} />;
+  const stateLabel = saveState === "saving" ? "저장 중" : saveState === "saved" ? "저장됨" : saveState === "error" ? "저장 실패" : "";
+  return (
+    <span className="program-autosave-control" data-save-state={saveState}>
+      {multiline ? <textarea {...shared} rows={rows} /> : <input {...shared} type={type} inputMode={inputMode} />}
+      {stateLabel && <small className="program-autosave-state" aria-live="polite">{stateLabel}</small>}
+    </span>
+  );
 }

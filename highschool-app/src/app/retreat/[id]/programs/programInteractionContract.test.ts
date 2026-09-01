@@ -112,9 +112,36 @@ describe("program preparation interaction contract", () => {
   it("수동 저장과 자동 저장의 경계를 화면에서 설명한다", () => {
     const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
     expect(editor).toContain("const SAVE_GUIDANCE");
-    expect(editor).toContain("전체 흐름은 저장 버튼으로 반영되고");
-    expect(editor).toContain("역할과 물품 표는 바로 저장되고");
-    expect(editor).toContain("저장 버튼을 눌러야 하는 변경이 있습니다.");
+    expect(editor).toContain("전체 흐름은 초안 저장");
+    expect(editor).toContain("역할·물품 행은 바로 저장되고");
+    expect(editor).toContain("아직 저장하지 않은 초안 변경이 있습니다.");
+    expect(editor).toContain("program-form--manual");
+    expect(editor).toContain("초안 저장 영역");
+  });
+
+  it("현장 공유를 일반 상태 변경과 분리하고 준비 완료 뒤 확인한다", () => {
+    const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
+    const publication = source("src/app/retreat/[id]/programs/ProgramPublicationPanel.tsx");
+    expect(editor).toContain('.filter(([value]) => value !== "published"');
+    expect(editor).toContain('publicationAction === "publish" && readiness.percent !== 100');
+    expect(editor).toContain("이가드 현장에 공유할까요?");
+    expect(publication).toContain('disabled={busy || !ready}');
+  });
+
+  it("프로그램 탭은 방향키 이동과 tabpanel 연결을 제공한다", () => {
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    expect(client).toContain('aria-controls={`program-panel-${entry.key}`}');
+    expect(client).toContain('role="tabpanel"');
+    expect(client).toContain('["ArrowLeft", "ArrowRight", "Home", "End"]');
+  });
+
+  it("프로그램 구성은 폼보다 먼저 현장 진행 순서를 보여준다", () => {
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    const runSheet = source("src/app/retreat/[id]/programs/ProgramRunOfShow.tsx");
+    expect(sections).toContain("<ProgramRunOfShow");
+    expect(sections).toContain("블록 이름");
+    expect(runSheet).toContain("현장 진행 순서");
+    expect(runSheet).toContain("scrollIntoView");
   });
 
   it("모바일 역할과 물품 표는 가로 표 대신 같은 입력의 카드 레이아웃을 사용한다", () => {

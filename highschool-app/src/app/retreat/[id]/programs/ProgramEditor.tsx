@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCircle, Circle, CloudCheck, FloppyDisk, Plus, Trash, WarningCircle } from "@phosphor-icons/react";
+import OverlayShell from "@/components/OverlayShell";
 import { useUI } from "@/context/UIContext";
 import {
   PROGRAM_KIND_META,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/programPreparation";
 import { ProgramItemsSection, ProgramPostsSection, ProgramRolesSection } from "./ProgramSections";
 import ProgramCompetitionTeamsSection from "./ProgramCompetitionTeamsSection";
+import ProgramPublicationPanel from "./ProgramPublicationPanel";
 import type {
   Group,
   RetreatProgram,
@@ -94,10 +96,10 @@ const RECORD_FIELDS = [
 ] as const;
 
 const SAVE_GUIDANCE: Record<ProgramSectionKey, { title: string; body: string }> = {
-  overview: { title: "저장 버튼으로 반영", body: "기본 정보와 목표는 화면 아래의 변경 사항 저장을 눌러 반영합니다." },
-  posts: { title: "두 가지 저장 방식", body: "전체 흐름은 저장 버튼으로 반영되고, 연합팀과 진행 블록은 입력한 칸에서 벗어나면 바로 저장됩니다." },
-  roles: { title: "두 가지 저장 방식", body: "역할과 물품 표는 바로 저장되고, 물품 메모는 화면 아래의 저장 버튼으로 반영됩니다." },
-  tasks: { title: "두 가지 저장 방식", body: "할 일은 바로 저장되고, 브리핑과 기록은 화면 아래의 저장 버튼으로 반영됩니다." },
+  overview: { title: "초안 편집", body: "이 화면의 기본 정보는 아래 고정된 초안 저장 버튼으로 한 번에 반영합니다." },
+  posts: { title: "저장 영역을 구분했습니다", body: "전체 흐름은 초안 저장, 진행 블록과 연합팀은 입력 즉시 저장으로 표시됩니다." },
+  roles: { title: "운영표는 입력 즉시 저장", body: "역할·물품 행은 바로 저장되고, 물품 메모만 초안 저장 대상입니다." },
+  tasks: { title: "할 일은 즉시, 기록은 초안 저장", body: "할 일 상태는 바로 반영되고 브리핑·회의 기록은 초안 저장으로 반영합니다." },
 };
 
 export default function ProgramEditor({
@@ -140,6 +142,7 @@ export default function ProgramEditor({
   const [taskForm, setTaskForm] = useState({ title: "", assignee: "", dueDate: "" });
   const [taskBusy, setTaskBusy] = useState(false);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
+  const [publicationAction, setPublicationAction] = useState<"publish" | "unpublish" | null>(null);
 
   useEffect(() => {
     // 자식 task만 갱신될 때 작성 중인 본문을 덮지 않고, 프로그램이나 저장 버전이 바뀔 때만 동기화한다.
@@ -189,6 +192,30 @@ export default function ProgramEditor({
       setDirty(false);
     } catch {
       // 저장 함수가 사용자 안내를 담당한다. 실패 시 편집 내용과 dirty 상태를 보존한다.
+    }
+  }
+
+  async function changePublicationStatus() {
+    if (!publicationAction) return;
+    if (!draft.title.trim()) {
+      toast("프로그램 이름을 입력해주세요.", "warning");
+      setPublicationAction(null);
+      return;
+    }
+    if (publicationAction === "publish" && readiness.percent !== 100) {
+      toast("준비 항목을 모두 완료한 뒤 현장에 공유할 수 있습니다.", "warning");
+      setPublicationAction(null);
+      return;
+    }
+    const nextStatus: RetreatProgramStatus = publicationAction === "publish" ? "published" : "confirmed";
+    const next = { ...draft, title: draft.title.trim(), status: nextStatus };
+    try {
+      await onSave(next);
+      setDraft(next);
+      setDirty(false);
+      setPublicationAction(null);
+    } catch {
+      // 상위 저장 함수가 오류를 안내하며, 확인창은 다시 시도할 수 있도록 유지한다.
     }
   }
 
@@ -242,8 +269,8 @@ export default function ProgramEditor({
           <p>{programStatusMeta(draft.status).description}</p>
         </div>
         <div className="program-readiness" aria-label={`핵심 준비 ${readiness.ready}/${readiness.total}`}>
-          <strong>{readiness.percent}%</strong>
-          <span>핵심 준비 {readiness.ready}/{readiness.total}</span>
+          <strong>{readiness.ready}/{readiness.total}</strong>
+          <span>준비 완료</span>
         </div>
       </div>
 
@@ -267,18 +294,26 @@ export default function ProgramEditor({
         <section className="program-readiness-checklist" aria-labelledby="program-readiness-heading">
           <div className="program-readiness-checklist__heading">
             <div>
-              <h3 id="program-readiness-heading">준비 체크</h3>
-              <p>항목을 누르면 필요한 내용을 입력하는 화면으로 이동합니다.</p>
+              <span className="program-eyebrow">NEXT ACTION</span>
+              <h3 id="program-readiness-heading">{readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : "현장 공유 준비가 끝났습니다"}</h3>
+              <p>{readiness.missingLabels.length > 0 ? "가장 먼저 채울 항목만 보여드립니다." : "점검·현장 공유에서 최종 공개할 수 있습니다."}</p>
             </div>
-            <span>{readiness.ready}/{readiness.total} 완료</span>
+            <span>{readiness.percent}%</span>
           </div>
-          <ul>
-            {readiness.items.map((item) => (
+          {readiness.missingLabels.length === 0 ? (
+            <button type="button" className="program-readiness-complete" onClick={() => onSelectSection("tasks")}>
+              <CheckCircle aria-hidden="true" size={20} weight="fill" />
+              <span><strong>최종 점검과 현장 공유</strong><small>공유 대상을 확인한 뒤 공개합니다.</small></span>
+              <ArrowRight aria-hidden="true" size={16} />
+            </button>
+          ) : (
+          <ul className="program-next-actions">
+            {readiness.items.filter((item) => !item.ready).slice(0, 3).map((item, index) => (
               <li key={item.label} data-ready={item.ready ? "true" : "false"}>
                 <button type="button" onClick={() => onSelectSection(item.section)}>
-                  {item.ready ? <CheckCircle aria-hidden="true" size={19} weight="fill" /> : <Circle aria-hidden="true" size={19} />}
+                  <b aria-hidden="true">{index + 1}</b>
                   <span>
-                    <strong>{item.label}</strong>
+                    <strong>{item.action}</strong>
                     <small>{PROGRAM_SECTIONS.find((entry) => entry.key === item.section)?.label}</small>
                   </span>
                   <ArrowRight aria-hidden="true" size={16} />
@@ -286,12 +321,28 @@ export default function ProgramEditor({
               </li>
             ))}
           </ul>
+          )}
+          <details className="program-readiness-all">
+            <summary>전체 준비 기준 보기</summary>
+            <ul>
+              {readiness.items.map((item) => (
+                <li key={item.label} data-ready={item.ready ? "true" : "false"}>
+                  <button type="button" onClick={() => onSelectSection(item.section)}>
+                    {item.ready ? <CheckCircle aria-hidden="true" size={19} weight="fill" /> : <Circle aria-hidden="true" size={19} />}
+                    <span><strong>{item.label}</strong><small>{item.action}</small></span>
+                    <ArrowRight aria-hidden="true" size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </details>
         </section>
       )}
 
       {section === "overview" && (
         <>
-        <fieldset disabled={!canEdit || saving} className="program-form">
+        <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
+          <div className="program-save-mode program-save-mode--manual" role="status"><strong>초안 저장 영역</strong><span>아래 내용을 바꾼 뒤 화면 하단의 초안 저장을 눌러주세요.</span></div>
           <section className="program-form-section">
             <h3>기본 정보</h3>
             <div className="program-form-grid">
@@ -306,10 +357,13 @@ export default function ProgramEditor({
                 </select>
               </label>
               <label className="program-field">
-                <span>상태</span>
-                <select className="input" value={draft.status} onChange={(event) => setField("status", event.target.value as RetreatProgramStatus)}>
-                  {Object.entries(PROGRAM_STATUS_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                <span>기획 상태</span>
+                <select className="input" value={draft.status} disabled={draft.status === "published"} onChange={(event) => setField("status", event.target.value as RetreatProgramStatus)}>
+                  {Object.entries(PROGRAM_STATUS_META)
+                    .filter(([value]) => value !== "published" || draft.status === "published")
+                    .map(([value, meta]) => <option key={value} value={value} disabled={value === "published"}>{meta.label}</option>)}
                 </select>
+                <small className="program-field-help">현장 공유는 마지막 탭에서 별도로 관리합니다.</small>
               </label>
               <label className="program-field"><span>날짜</span><input type="date" className="input" value={draft.date ?? ""} onChange={(event) => setField("date", event.target.value)} /></label>
               <label className="program-field"><span>시작</span><input type="time" className="input" value={draft.startTime ?? ""} onChange={(event) => setField("startTime", event.target.value)} /></label>
@@ -349,7 +403,8 @@ export default function ProgramEditor({
 
       {section === "posts" && (
         <>
-        <fieldset disabled={!canEdit || saving} className="program-form">
+        <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
+          <div className="program-save-mode program-save-mode--manual" role="status"><strong>초안 저장 영역</strong><span>전체 진행안·규칙·대본은 화면 하단에서 한 번에 저장합니다.</span></div>
           <section className="program-form-section">
             <h3>전체 흐름</h3>
             <p className="program-section-hint">프로그램의 큰 순서를 적고, 아래에서 활동마다 운영 방식과 참가 단위를 지정합니다. 이가드 큐싯은 전체 수련회 시간표의 단일 원본입니다.</p>
@@ -388,7 +443,8 @@ export default function ProgramEditor({
         <>
           <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} onRestore={onRestoreRole} />
           <ProgramItemsSection groups={groupItemsByPost(program)} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} onRestore={onRestoreItem} />
-          <fieldset disabled={!canEdit || saving} className="program-form">
+          <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
+            <div className="program-save-mode program-save-mode--manual" role="status"><strong>초안 저장 영역</strong><span>표에 담기 어려운 메모만 아래에 적고 초안 저장을 눌러주세요.</span></div>
             <section className="program-form-section">
               <h3>물품 메모</h3>
               <label className="program-field">
@@ -402,6 +458,14 @@ export default function ProgramEditor({
 
       {section === "tasks" && (
         <>
+          <ProgramPublicationPanel
+            status={draft.status}
+            readiness={readiness}
+            canEdit={canEdit}
+            busy={saving || remoteUpdated}
+            onRequestPublish={() => setPublicationAction("publish")}
+            onRequestUnpublish={() => setPublicationAction("unpublish")}
+          />
           <section className="program-task-section" aria-labelledby="program-task-heading">
             <div className="program-task-heading">
               <div><h3 id="program-task-heading">할 일</h3><p>{doneTasks}/{tasks.length} 완료</p></div>
@@ -430,7 +494,8 @@ export default function ProgramEditor({
               </ul>
             )}
           </section>
-          <fieldset disabled={!canEdit || saving} className="program-form">
+          <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
+            <div className="program-save-mode program-save-mode--manual" role="status"><strong>초안 저장 영역</strong><span>브리핑과 회의 기록은 화면 하단의 초안 저장으로 반영합니다.</span></div>
             <section className="program-form-section">
               <h3>브리핑·기록</h3>
               <div className="program-text-fields">
@@ -447,9 +512,31 @@ export default function ProgramEditor({
       )}
 
       <div className="program-editor-actions">
-        <span className="program-dirty-state" aria-live="polite">{dirty ? "저장 버튼을 눌러야 하는 변경이 있습니다." : "저장 버튼 대상 내용이 최신 상태입니다."}</span>
-        {canEdit && <button type="button" className="btn-primary" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "저장 중…" : "변경 사항 저장"}</button>}
+        <span className="program-dirty-state" aria-live="polite">{dirty ? "아직 저장하지 않은 초안 변경이 있습니다." : "초안 저장 완료"}</span>
+        {canEdit && <button type="button" className="btn-primary" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "저장 중…" : "초안 저장"}</button>}
       </div>
+
+      {publicationAction && (
+        <OverlayShell
+          label={publicationAction === "publish" ? "현장 공유 확인" : "현장 공유 해제 확인"}
+          onClose={() => { if (!saving) setPublicationAction(null); }}
+          closeOnBackdrop={!saving}
+          panelClassName="program-confirm-dialog w-full max-w-md"
+        >
+          <div className="program-confirm-dialog__body">
+            <h2>{publicationAction === "publish" ? "이가드 현장에 공유할까요?" : "현장 공유를 해제할까요?"}</h2>
+            <p>{publicationAction === "publish"
+              ? "공유 즉시 이가드 정보 화면에 표시됩니다. 이후 수정한 내용도 같은 원본에서 바로 반영됩니다."
+              : "이가드 정보 화면 목록에서 즉시 숨겨집니다. 작성한 준비 내용은 삭제되지 않습니다."}</p>
+            <div className="program-confirm-dialog__actions">
+              <button type="button" className="btn-secondary" disabled={saving} onClick={() => setPublicationAction(null)}>취소</button>
+              <button type="button" className={publicationAction === "publish" ? "btn-primary" : "btn-danger"} disabled={saving} onClick={() => void changePublicationStatus()}>
+                {saving ? "반영 중…" : publicationAction === "publish" ? "현장에 공유" : "공유 해제"}
+              </button>
+            </div>
+          </div>
+        </OverlayShell>
+      )}
     </section>
   );
 }
