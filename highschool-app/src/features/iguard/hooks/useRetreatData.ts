@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   subscribeToCellColors,
   subscribeToConnection,
@@ -79,9 +79,22 @@ type CachedRetreatData = Omit<RetreatData, "retreatLoading" | "dataLoading" | "l
 };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const retreatDataCache = new Map<string, CachedRetreatData>();
+const CACHE_KEY = "__wooriIguardRetreatDataCache";
+
+type CacheWindow = Window & {
+  [CACHE_KEY]?: Map<string, CachedRetreatData>;
+};
+
+function browserRetreatDataCache(): Map<string, CachedRetreatData> | null {
+  if (typeof window === "undefined") return null;
+  const cacheWindow = window as CacheWindow;
+  cacheWindow[CACHE_KEY] ??= new Map<string, CachedRetreatData>();
+  return cacheWindow[CACHE_KEY];
+}
 
 function getCachedRetreatData(id: string): CachedRetreatData | null {
+  const retreatDataCache = browserRetreatDataCache();
+  if (!retreatDataCache) return null;
   const cached = retreatDataCache.get(id);
   if (!cached) return null;
   if (Date.now() - cached.cachedAt > CACHE_TTL_MS) {
@@ -96,7 +109,7 @@ function getCachedRetreatData(id: string): CachedRetreatData | null {
  * IguardClient에서 추출한 22개 실시간 구독 로직.
  */
 export function useRetreatData(id: string): RetreatData {
-  const initialCache = useRef(getCachedRetreatData(id)).current;
+  const [initialCache] = useState(() => getCachedRetreatData(id));
   const [retreat, setRetreat] = useState<Retreat | null>(initialCache?.retreat ?? null);
   const [retreatLoading, setRetreatLoading] = useState(!initialCache);
   const [loadedScope, setLoadedScope] = useState<string | null>(initialCache?.loadedScope ?? null);
@@ -218,6 +231,8 @@ export function useRetreatData(id: string): RetreatData {
   // 복원한다. 현재 구독은 계속 다시 연결되어 캐시 뒤에서 최신 값을 덮어쓴다.
   useEffect(() => {
     if (!retreat || retreatLoading || dataLoading || !loadedScope) return;
+    const retreatDataCache = browserRetreatDataCache();
+    if (!retreatDataCache) return;
     retreatDataCache.set(id, {
       retreat,
       groups,

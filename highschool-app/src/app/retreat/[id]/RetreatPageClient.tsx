@@ -74,7 +74,7 @@ export default function RetreatPageClient() {
     roles,
   });
 
-  const initialSnapshot = useRef(getRetreatWorkspaceSnapshot(id)).current;
+  const [initialSnapshot] = useState(() => getRetreatWorkspaceSnapshot(id));
   const [retreat, setRetreat] = useState<Retreat | null>(initialSnapshot?.retreat ?? null);
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(initialSnapshot?.retreat === undefined);

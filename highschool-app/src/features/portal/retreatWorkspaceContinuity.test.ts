@@ -25,6 +25,7 @@ describe("수련회 업무 화면 연속성 계약", () => {
     expect(admin).toContain("getRetreatWorkspaceSnapshot(id)");
     expect(programs).toContain("getRetreatWorkspaceSnapshot(retreatId)");
     expect(field).toContain("getCachedRetreatData(id)");
+    expect(field).toContain('if (typeof window === "undefined") return null');
     expect(field).toContain("retreatDataCache.set(id");
   });
 });

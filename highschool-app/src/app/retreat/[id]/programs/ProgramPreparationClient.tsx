@@ -113,7 +113,7 @@ export default function ProgramPreparationClient() {
 
   // 형제 업무 화면을 오갈 때 직전 실시간 스냅샷을 먼저 그린다. 구독은 즉시 다시
   // 연결되므로 캐시는 로딩 깜빡임만 없애고 서버 값을 대체하지 않는다.
-  const initialSnapshot = useRef(getRetreatWorkspaceSnapshot(retreatId)).current;
+  const [initialSnapshot] = useState(() => getRetreatWorkspaceSnapshot(retreatId));
   const [retreat, setRetreat] = useState<Retreat | null>(initialSnapshot?.retreat ?? null);
   const [programs, setPrograms] = useState<RetreatProgram[]>(initialSnapshot?.programs ?? []);
   const [groups, setGroups] = useState<Group[]>(initialSnapshot?.groups ?? []);
