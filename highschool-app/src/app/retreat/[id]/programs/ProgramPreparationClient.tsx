@@ -30,6 +30,7 @@ import {
   restoreRetreatProgramMatch,
   restoreRetreatProgramPost,
   restoreRetreatProgramRole,
+  reorderRetreatProgramPosts,
   reorderRetreatPrograms,
   subscribeToRetreat,
   subscribeToGroups,
@@ -372,6 +373,7 @@ export default function ProgramPreparationClient() {
                   participationMode: "retreatGroup",
                   scoreEnabled: false,
                 }).then(() => undefined)}
+                onReorderPosts={(orderedIds) => reorderRetreatProgramPosts(retreatId, selectedProgram.id, orderedIds)}
                 onUpdatePost={(postId, data: Partial<RetreatProgramPost>) => updateRetreatProgramPost(retreatId, selectedProgram.id, postId, data)}
                 onDeletePost={(postId) => deleteRetreatProgramPost(retreatId, selectedProgram.id, postId)}
                 onRestorePost={(post) => restoreRetreatProgramPost(retreatId, selectedProgram.id, post)}

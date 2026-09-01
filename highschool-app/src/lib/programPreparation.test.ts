@@ -11,6 +11,7 @@ import {
   groupItemsByPost,
   isProgramSection,
   itemsOfPost,
+  moveProgramPostOrder,
   nextMatchRound,
   postMatchRounds,
   programBudget,
@@ -63,6 +64,18 @@ describe("수련회 프로그램 준비", () => {
     expect(result.map((program) => program.id)).toEqual(["a", "c", "b"]);
   });
 
+  it("진행 블록을 한 칸씩 옮기고 경계에서는 순서를 유지한다", () => {
+    const posts = [
+      { id: "b", order: 2, name: "둘", createdAt: 20, updatedAt: 20 },
+      { id: "a", order: 1, name: "하나", createdAt: 10, updatedAt: 10 },
+      { id: "c", order: 3, name: "셋", createdAt: 30, updatedAt: 30 },
+    ];
+    expect(moveProgramPostOrder(posts, "b", -1)).toEqual(["b", "a", "c"]);
+    expect(moveProgramPostOrder(posts, "b", 1)).toEqual(["a", "c", "b"]);
+    expect(moveProgramPostOrder(posts, "a", -1)).toEqual(["a", "b", "c"]);
+    expect(moveProgramPostOrder(posts, "missing", 1)).toEqual(["a", "b", "c"]);
+  });
+
   it("현장 준비에 필요한 8가지 핵심 항목을 점검한다", () => {
     // 본문만 채운 상태 — 게임·역할·물품이 비어 있으면 아직 100%가 아니다.
     const body = {
@@ -96,9 +109,10 @@ describe("수련회 프로그램 준비", () => {
     } as never));
     expect(shallow.missingLabels).toEqual(["게임 구성", "역할", "물품"]);
     expect(shallow.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: "게임 구성", section: "posts", ready: false }),
-      expect.objectContaining({ label: "역할", section: "posts", action: "진행 블록에 담당 배치", ready: false }),
-      expect.objectContaining({ label: "브리핑 또는 대본", section: "tasks", ready: true }),
+      expect.objectContaining({ label: "게임 구성", section: "posts", targetId: "program-post-rules-g1", ready: false }),
+      expect.objectContaining({ label: "역할", section: "posts", targetId: "program-role-assignee-r1", action: "진행 블록에 담당 배치", ready: false }),
+      expect.objectContaining({ label: "물품", section: "posts", targetId: "program-item-quantity-i1", ready: false }),
+      expect.objectContaining({ label: "브리핑 또는 대본", section: "tasks", targetId: "program-briefing", ready: true }),
     ]));
     expect(canPublishProgram(base(body))).toBe(false);
     expect(canPublishProgram(base({

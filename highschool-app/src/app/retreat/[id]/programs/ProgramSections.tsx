@@ -11,6 +11,7 @@ import {
   PROGRAM_ITEM_STATUS_META,
   PROGRAM_OPERATION_MODE_META,
   PROGRAM_PARTICIPATION_MODE_META,
+  moveProgramPostOrder,
   nextMatchRound,
   postMatchRounds,
   programBudget,
@@ -99,7 +100,7 @@ function PostSubEntries({
         </div>
         {canEdit && (
           <div className="program-inline-form">
-            <input className="input" value={itemName} maxLength={80} placeholder="예: 줄자"
+            <input id={`program-item-add-${post.id}`} className="input" value={itemName} maxLength={80} placeholder="예: 줄자"
               onChange={(event) => setItemName(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (itemName.trim()) { void onCreateItem(itemName.trim(), items.length + 1, post.id); setItemName(""); } } }} />
             <button type="button" className="btn-secondary btn-sm" disabled={!itemName.trim()}
@@ -129,6 +130,7 @@ function PostSubEntries({
                         errorMessage="이름을 수정하지 못했습니다."
                       /></td>
                     <td><ProgramAutosaveField
+                        id={`program-item-quantity-${item.id}`}
                         value={item.quantity ?? ""}
                         ariaLabel="수량"
                         className="program-number"
@@ -164,7 +166,7 @@ function PostSubEntries({
         </div>
         {canEdit && (
           <div className="program-inline-form">
-            <input className="input" value={roleName} maxLength={80} placeholder="예: 진행 / 점수 기록"
+            <input id={`program-role-add-${post.id}`} className="input" value={roleName} maxLength={80} placeholder="예: 진행 / 점수 기록"
               onChange={(event) => setRoleName(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (roleName.trim()) { void onCreateRole(roleName.trim(), roles.length + 1, post.id); setRoleName(""); } } }} />
             <button type="button" className="btn-secondary btn-sm" disabled={!roleName.trim()}
@@ -190,6 +192,7 @@ function PostSubEntries({
                         errorMessage="역할을 수정하지 못했습니다."
                       /></td>
                     <td><ProgramAutosaveField
+                        id={`program-role-assignee-${entry.id}`}
                         value={entry.assignee ?? ""}
                         ariaLabel="담당"
                         maxLength={120}
@@ -397,7 +400,7 @@ const POST_FIELDS = [
 export function ProgramPostsSection({
   posts, canEdit, onCreate, onUpdate, onDelete, onCreateMatch, onUpdateMatch, onDeleteMatch,
   itemsOf, rolesOf, onCreateItem, onUpdateItem, onDeleteItem, onCreateRole, onUpdateRole, onDeleteRole,
-  onRestore, onRestoreItem, onRestoreRole, onRestoreMatch,
+  onRestore, onRestoreItem, onRestoreRole, onRestoreMatch, onReorder,
 }: {
   posts: RetreatProgramPost[];
   canEdit: boolean;
@@ -419,11 +422,14 @@ export function ProgramPostsSection({
   onRestoreItem: (item: RetreatProgramItem) => Promise<void>;
   onRestoreRole: (role: RetreatProgramRole) => Promise<void>;
   onRestoreMatch: (postId: string, match: RetreatProgramMatch) => Promise<void>;
+  onReorder: (orderedIds: string[]) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [adding, setAdding] = useState(false);
   const { busyId, run } = useRowBusy();
+  const { toast } = useUI();
   const undo = useProgramUndo();
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
 
   async function add() {
     const trimmed = name.trim();
@@ -434,6 +440,20 @@ export function ProgramPostsSection({
       setName("");
     } finally {
       setAdding(false);
+    }
+  }
+
+  async function move(postId: string, direction: -1 | 1) {
+    const orderedIds = moveProgramPostOrder(posts, postId, direction);
+    if (orderedIds.every((id, index) => id === posts[index]?.id)) return;
+    setReorderingId(postId);
+    try {
+      await onReorder(orderedIds);
+      toast("진행 순서를 바꿨습니다.", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "진행 순서를 바꾸지 못했습니다.", "error");
+    } finally {
+      setReorderingId(null);
     }
   }
 
@@ -451,7 +471,7 @@ export function ProgramPostsSection({
         <div className="program-inline-form">
           <label className="program-field program-field--wide">
             <span>활동 이름</span>
-            <input className="input" value={name} maxLength={80} placeholder="예: 전체 오프닝 / 물코기 / 코스 이동"
+            <input id="program-new-block-name" className="input" value={name} maxLength={80} placeholder="예: 전체 오프닝 / 물코기 / 코스 이동"
               onChange={(event) => setName(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void add(); } }} />
           </label>
@@ -461,7 +481,14 @@ export function ProgramPostsSection({
         </div>
       )}
 
-      <ProgramRunOfShow posts={posts} itemsOf={itemsOf} rolesOf={rolesOf} />
+      <ProgramRunOfShow
+        posts={posts}
+        itemsOf={itemsOf}
+        rolesOf={rolesOf}
+        canEdit={canEdit}
+        busyId={reorderingId}
+        onMove={(postId, direction) => void move(postId, direction)}
+      />
 
       {posts.length === 0 ? (
         <p className="program-task-empty">아직 진행 블록이 없습니다. 실제 진행 순서대로 활동을 추가해 주세요.</p>
@@ -562,6 +589,7 @@ export function ProgramPostsSection({
                       <label key={field.key} className="program-field">
                         <span>{field.label}</span>
                         <ProgramAutosaveField
+                        id={`program-post-${field.key}-${post.id}`}
                         value={(post[field.key] as string | undefined) ?? ""}
                         ariaLabel={field.label}
                         maxLength={4000}

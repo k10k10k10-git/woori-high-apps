@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useUI } from "@/context/UIContext";
 
 type Props = {
+  id?: string;
   value: string | number | null | undefined;
   ariaLabel: string;
   onSave: (value: string) => Promise<void>;
@@ -26,6 +27,7 @@ type Props = {
  * 다른 사용자의 변경을 과거 값으로 덮어쓰지 않는다.
  */
 export default function ProgramAutosaveField({
+  id,
   value,
   ariaLabel,
   onSave,
@@ -104,6 +106,7 @@ export default function ProgramAutosaveField({
   }
 
   const shared = {
+    id,
     className: `input program-autosave-field ${className}`.trim(),
     value: draft,
     placeholder,

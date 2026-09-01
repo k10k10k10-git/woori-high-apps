@@ -109,39 +109,70 @@ const CHECKS: Array<{
   key: string;
   section: ProgramSectionKey;
   action: string;
+  targetId: (program: RetreatProgram) => string;
   ready: (program: RetreatProgram) => boolean;
 }> = [
-  { key: "일정과 장소", section: "overview", action: "일정·장소 입력", ready: (program) => Boolean(program.date && program.startTime && program.place?.trim()) },
-  { key: "담당", section: "overview", action: "총괄 담당 지정", ready: (program) => Boolean(program.lead?.trim()) },
-  { key: "목표", section: "overview", action: "프로그램 목표 작성", ready: (program) => Boolean(program.objective?.trim()) },
-  { key: "진행안", section: "posts", action: "전체 진행안 작성", ready: (program) => Boolean(program.flow?.trim()) },
+  {
+    key: "일정과 장소",
+    section: "overview",
+    action: "일정·장소 입력",
+    targetId: (program) => !program.date ? "program-date" : !program.startTime ? "program-start-time" : "program-place",
+    ready: (program) => Boolean(program.date && program.startTime && program.place?.trim()),
+  },
+  { key: "담당", section: "overview", action: "총괄 담당 지정", targetId: () => "program-lead", ready: (program) => Boolean(program.lead?.trim()) },
+  { key: "목표", section: "overview", action: "프로그램 목표 작성", targetId: () => "program-objective", ready: (program) => Boolean(program.objective?.trim()) },
+  { key: "진행안", section: "posts", action: "전체 진행안 작성", targetId: () => "program-flow", ready: (program) => Boolean(program.flow?.trim()) },
   // 존재 여부만 세면 이름만 적은 게임·담당 없는 역할·수량 없는 물품으로도 100%가 된다.
   // 지표가 거짓말하지 않도록 "현장에서 쓸 수 있는 최소한"이 채워졌는지까지 본다.
   {
     key: "게임 구성",
     section: "posts",
     action: "진행 블록 내용 채우기",
+    targetId: (program) => {
+      const incomplete = programPosts(program).find((post) => !post.rules?.trim() && !post.concept?.trim());
+      return incomplete ? `program-post-rules-${incomplete.id}` : "program-new-block-name";
+    },
     ready: (program) => programPosts(program).some((post) => Boolean(post.rules?.trim() || post.concept?.trim())),
   },
   {
     key: "역할",
     section: "posts",
     action: "진행 블록에 담당 배치",
+    targetId: (program) => {
+      const unassigned = programRoles(program).find((role) => !role.assignee?.trim());
+      if (unassigned) return `program-role-assignee-${unassigned.id}`;
+      const firstPost = programPosts(program)[0];
+      return firstPost ? `program-role-add-${firstPost.id}` : "program-new-block-name";
+    },
     ready: (program) => programRoles(program).some((role) => Boolean(role.assignee?.trim())),
   },
   {
     key: "물품",
     section: "posts",
     action: "진행 블록에 준비물 입력",
+    targetId: (program) => {
+      const incomplete = programItems(program).find((item) =>
+        item.status !== "inChurch" && item.status !== "toMake" && Number(item.quantity ?? 0) <= 0,
+      );
+      if (incomplete) return `program-item-quantity-${incomplete.id}`;
+      const firstPost = programPosts(program)[0];
+      return firstPost ? `program-item-add-${firstPost.id}` : "program-new-block-name";
+    },
     // 사야 하는 물품은 수량이 있어야 발주가 된다. 교회 비품·제작 예정은 수량 없이도 정리된 것으로 본다.
     ready: (program) => programItems(program).some((item) =>
       item.status === "inChurch" || item.status === "toMake" || Number(item.quantity ?? 0) > 0),
   },
-  { key: "브리핑 또는 대본", section: "tasks", action: "현장 전달 내용 작성", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
+  { key: "브리핑 또는 대본", section: "tasks", action: "현장 전달 내용 작성", targetId: () => "program-briefing", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
 ];
 
 export function programReadiness(program: RetreatProgram) {
-  const items = CHECKS.map((check) => ({ label: check.key, section: check.section, action: check.action, ready: check.ready(program) }));
+  const items = CHECKS.map((check) => ({
+    label: check.key,
+    section: check.section,
+    action: check.action,
+    targetId: check.targetId(program),
+    ready: check.ready(program),
+  }));
   const readyLabels = items.filter((item) => item.ready).map((item) => item.label);
   const missingLabels = items.filter((item) => !item.ready).map((item) => item.label);
   return {
@@ -178,6 +209,20 @@ function listOf<T extends { order?: number; createdAt: number; id: string }>(
 
 export function programPosts(program: RetreatProgram): RetreatProgramPost[] {
   return listOf(program.posts);
+}
+
+/** 진행 블록 한 개를 위·아래로 옮긴 뒤 저장할 ID 순서를 반환한다. 범위를 벗어나면 원래 순서를 유지한다. */
+export function moveProgramPostOrder(
+  posts: RetreatProgramPost[],
+  postId: string,
+  direction: -1 | 1,
+): string[] {
+  const ordered = [...posts].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+  const index = ordered.findIndex((post) => post.id === postId);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= ordered.length) return ordered.map((post) => post.id);
+  [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+  return ordered.map((post) => post.id);
 }
 
 export function programItems(program: RetreatProgram): RetreatProgramItem[] {

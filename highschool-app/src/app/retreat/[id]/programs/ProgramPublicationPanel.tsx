@@ -1,7 +1,8 @@
 "use client";
 
-import { CheckCircle, Eye, LockKey, WarningCircle } from "@phosphor-icons/react";
-import type { RetreatProgramStatus } from "@/lib/types";
+import { CaretDown, CheckCircle, Eye, LockKey, WarningCircle } from "@phosphor-icons/react";
+import PublishedProgramCard from "@/components/PublishedProgramCard";
+import type { Group, RetreatProgram } from "@/lib/types";
 
 type Readiness = {
   ready: number;
@@ -11,7 +12,8 @@ type Readiness = {
 };
 
 type Props = {
-  status: RetreatProgramStatus;
+  program: RetreatProgram;
+  groups: Group[];
   readiness: Readiness;
   canEdit: boolean;
   busy: boolean;
@@ -20,14 +22,15 @@ type Props = {
 };
 
 export default function ProgramPublicationPanel({
-  status,
+  program,
+  groups,
   readiness,
   canEdit,
   busy,
   onRequestPublish,
   onRequestUnpublish,
 }: Props) {
-  const published = status === "published";
+  const published = program.status === "published";
   const ready = readiness.percent === 100;
 
   return (
@@ -59,6 +62,16 @@ export default function ProgramPublicationPanel({
           </button>
         ))}
       </div>
+      <details className="program-publication-preview">
+        <summary>
+          <Eye aria-hidden="true" size={18} />
+          <span><strong>이가드 화면 미리보기</strong><small>현재 입력된 내용이 현장에 어떻게 보이는지 확인합니다.</small></span>
+          <CaretDown aria-hidden="true" size={17} weight="bold" />
+        </summary>
+        <div className="program-publication-preview__body">
+          <PublishedProgramCard program={program} groups={groups} sequence={1} embedded />
+        </div>
+      </details>
     </section>
   );
 }

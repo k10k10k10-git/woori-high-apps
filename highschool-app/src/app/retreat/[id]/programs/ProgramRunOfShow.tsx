@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, MapPin, User } from "@phosphor-icons/react";
+import { ArrowDown, ArrowUp, Clock, MapPin, User } from "@phosphor-icons/react";
 import {
   PROGRAM_OPERATION_MODE_META,
   programOperationMode,
@@ -11,16 +11,20 @@ type Props = {
   posts: RetreatProgramPost[];
   itemsOf: (postId: string) => RetreatProgramItem[];
   rolesOf: (postId: string) => RetreatProgramRole[];
+  canEdit: boolean;
+  busyId: string | null;
+  onMove: (postId: string, direction: -1 | 1) => void;
 };
 
-export default function ProgramRunOfShow({ posts, itemsOf, rolesOf }: Props) {
+export default function ProgramRunOfShow({ posts, itemsOf, rolesOf, canEdit, busyId, onMove }: Props) {
   if (posts.length === 0) return null;
 
   function openBlock(postId: string) {
     const details = document.getElementById(`program-block-${postId}`) as HTMLDetailsElement | null;
     if (!details) return;
     details.open = true;
-    details.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    details.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
     details.querySelector<HTMLElement>("summary")?.focus({ preventScroll: true });
   }
 
@@ -38,8 +42,8 @@ export default function ProgramRunOfShow({ posts, itemsOf, rolesOf }: Props) {
           const roleCount = rolesOf(post.id).filter((role) => role.assignee?.trim()).length;
           const itemCount = itemsOf(post.id).length;
           return (
-            <li key={post.id}>
-              <button type="button" onClick={() => openBlock(post.id)} aria-label={`${index + 1}번째 ${post.name} 블록 열기`}>
+            <li key={post.id} aria-busy={busyId === post.id || undefined}>
+              <button className="program-run-sheet__open" type="button" onClick={() => openBlock(post.id)} aria-label={`${index + 1}번째 ${post.name} 블록 열기`}>
                 <span className="program-run-sheet__number">{String(index + 1).padStart(2, "0")}</span>
                 <span className="program-run-sheet__copy">
                   <strong>{post.name}</strong>
@@ -54,6 +58,16 @@ export default function ProgramRunOfShow({ posts, itemsOf, rolesOf }: Props) {
                   역할 {roleCount} · 물품 {itemCount}
                 </span>
               </button>
+              {canEdit && (
+                <div className="program-run-sheet__order" aria-label={`${post.name} 순서 변경`}>
+                  <button type="button" disabled={index === 0 || busyId !== null} onClick={() => onMove(post.id, -1)} aria-label={`${post.name} 한 칸 위로`}>
+                    <ArrowUp aria-hidden="true" size={16} weight="bold" />
+                  </button>
+                  <button type="button" disabled={index === posts.length - 1 || busyId !== null} onClick={() => onMove(post.id, 1)} aria-label={`${post.name} 한 칸 아래로`}>
+                    <ArrowDown aria-hidden="true" size={16} weight="bold" />
+                  </button>
+                </div>
+              )}
             </li>
           );
         })}

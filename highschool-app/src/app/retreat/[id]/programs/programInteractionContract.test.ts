@@ -45,6 +45,9 @@ describe("program preparation interaction contract", () => {
     expect(sections.match(/<ProgramAutosaveField/g)?.length).toBeGreaterThanOrEqual(20);
     expect(field).toContain("setRemoteConflict(true)");
     expect(field).toContain('data-conflict');
+    // 자기 저장의 RTDB 로컬 이벤트는 충돌로 오인하지 않고, 실패한 저장만 dirty를 되살린다.
+    expect(source("src/app/retreat/[id]/programs/ProgramEditor.tsx")).toContain("const restoreDirty = dirtyRef.current");
+    expect(source("src/app/retreat/[id]/programs/ProgramEditor.tsx")).toContain("setDirty(restoreDirty)");
   });
 
   it("행 삭제는 되돌릴 수 있다", () => {
@@ -101,22 +104,25 @@ describe("program preparation interaction contract", () => {
     expect(sections).toContain("participationMode");
   });
 
-  it("준비 체크는 필요한 입력 탭으로 바로 이동한다", () => {
+  it("준비 체크는 필요한 입력 탭과 정확한 필드로 바로 이동한다", () => {
     const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
     const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
     expect(editor).toContain("program-readiness-checklist");
-    expect(editor).toContain("onSelectSection(item.section)");
+    expect(editor).toContain("goToReadinessTarget(item.section, item.targetId)");
+    expect(editor).toContain("document.getElementById(pendingTarget.targetId)");
+    expect(editor).toContain('target.focus({ preventScroll: true })');
     expect(client).toContain("onSelectSection={selectSection}");
   });
 
-  it("수동 저장과 자동 저장의 경계를 화면에서 설명한다", () => {
+  it("수동 저장은 변경 중에만 상단 도크로 노출하고 행 자동 저장과 중복 안내하지 않는다", () => {
     const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
-    expect(editor).toContain("const SAVE_GUIDANCE");
-    expect(editor).toContain("전체 흐름은 초안 저장");
-    expect(editor).toContain("역할·물품 행은 바로 저장되고");
-    expect(editor).toContain("아직 저장하지 않은 초안 변경이 있습니다.");
+    const css = source("src/app/program-preparation.css");
+    expect(editor).not.toContain("const SAVE_GUIDANCE");
+    expect(editor).toContain("program-dirty-save-dock");
+    expect(editor).toContain("저장하지 않은 초안");
     expect(editor).toContain("program-form--manual");
-    expect(editor).toContain("초안 저장 영역");
+    expect(css).toContain("position: sticky; top: 8px");
+    expect(css).not.toContain(".program-save-guidance");
   });
 
   it("현장 공유를 일반 상태 변경과 분리하고 준비 완료 뒤 확인한다", () => {
@@ -126,6 +132,8 @@ describe("program preparation interaction contract", () => {
     expect(editor).toContain('publicationAction === "publish" && readiness.percent !== 100');
     expect(editor).toContain("이가드 현장에 공유할까요?");
     expect(publication).toContain('disabled={busy || !ready}');
+    expect(publication).toContain("이가드 화면 미리보기");
+    expect(publication).toContain("<PublishedProgramCard");
   });
 
   it("프로그램 탭은 방향키 이동과 tabpanel 연결을 제공한다", () => {
@@ -138,10 +146,24 @@ describe("program preparation interaction contract", () => {
   it("프로그램 구성은 폼보다 먼저 현장 진행 순서를 보여준다", () => {
     const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
     const runSheet = source("src/app/retreat/[id]/programs/ProgramRunOfShow.tsx");
+    const db = source("src/lib/db/programs.ts");
     expect(sections).toContain("<ProgramRunOfShow");
     expect(sections).toContain("블록 이름");
     expect(runSheet).toContain("현장 진행 순서");
     expect(runSheet).toContain("scrollIntoView");
+    expect(runSheet).toContain("program-run-sheet__order");
+    expect(runSheet).toContain("한 칸 위로");
+    expect(runSheet).toContain("한 칸 아래로");
+    expect(db).toContain("reorderRetreatProgramPosts");
+    expect(db).toContain("await update(ref(db), payload)");
+    expect(db).not.toContain("set(ref(db), payload)");
+  });
+
+  it("이가드 현장과 준비 화면 미리보기는 같은 읽기 전용 카드를 쓴다", () => {
+    const field = source("src/app/retreat/[id]/field/PublishedProgramsView.tsx");
+    const publication = source("src/app/retreat/[id]/programs/ProgramPublicationPanel.tsx");
+    expect(field).toContain('from "@/components/PublishedProgramCard"');
+    expect(publication).toContain('from "@/components/PublishedProgramCard"');
   });
 
   it("모바일 역할과 물품 표는 가로 표 대신 같은 입력의 카드 레이아웃을 사용한다", () => {

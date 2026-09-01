@@ -163,6 +163,23 @@ export function updateRetreatProgramPost(
   return updateSubEntry(retreatId, programId, "posts", postId, data);
 }
 
+/** 진행 블록 순서를 전체 노드 덮어쓰기 없이 order 필드만 한 번에 바꾼다. */
+export async function reorderRetreatProgramPosts(
+  retreatId: string,
+  programId: string,
+  orderedIds: string[],
+): Promise<void> {
+  const now = Date.now();
+  const payload: Record<string, unknown> = {
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  };
+  orderedIds.forEach((postId, index) => {
+    payload[`${subPath(retreatId, programId, "posts", postId)}/order`] = index + 1;
+    payload[`${subPath(retreatId, programId, "posts", postId)}/updatedAt`] = now;
+  });
+  await update(ref(db), payload);
+}
+
 export function deleteRetreatProgramPost(retreatId: string, programId: string, postId: string): Promise<void> {
   return deleteSubEntry(retreatId, programId, "posts", postId);
 }
