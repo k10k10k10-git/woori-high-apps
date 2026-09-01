@@ -81,7 +81,9 @@ export default function ProgramPreparationClient() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("program", programId);
     params.set("section", nextSection);
-    router.push(`?${params.toString()}`, { scroll: false });
+    // 프로그램·섹션은 같은 작업 화면 안의 상태다. Next 라우터 탐색을 쓰면
+    // 서버 라우트와 로딩 경계가 다시 실행되므로 URL만 갱신해 구독과 화면을 유지한다.
+    window.history.pushState(null, "", `?${params.toString()}`);
   }
 
   function goToList() {
@@ -89,13 +91,14 @@ export default function ProgramPreparationClient() {
     params.delete("program");
     params.delete("section");
     const query = params.toString();
-    router.push(query ? `?${query}` : `/retreat/${encodeURIComponent(retreatId)}/programs`, { scroll: false });
+    const pathname = `/retreat/${encodeURIComponent(retreatId)}/programs`;
+    window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
   }
 
   function selectSection(next: ProgramSectionKey) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("section", next);
-    router.replace(`?${params.toString()}`, { scroll: false });
+    window.history.replaceState(null, "", `?${params.toString()}`);
   }
   const { user, loading: authLoading, roles } = useAuth();
   const { toast } = useUI();

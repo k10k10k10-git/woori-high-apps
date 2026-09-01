@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useViewMode } from "@/context/ViewModeContext";
 import ConnectivityBanner from "@/app/ConnectivityBanner";
 import SuggestionResolutionNotifier from "@/features/suggestions/SuggestionResolutionNotifier";
@@ -60,7 +60,6 @@ function ViewportFrameLoading({ compact = false }: { compact?: boolean }) {
 export default function PortalViewportShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [loadedFrameKey, setLoadedFrameKey] = useState("");
   const { mode, isViewportMobile } = useViewMode();
@@ -86,13 +85,15 @@ export default function PortalViewportShell({ children }: { children: React.Reac
         const nextSearch = stripDesktopFrameSearch(frameLocation.search);
         const nextLocation = `${frameLocation.pathname}${nextSearch}${frameLocation.hash}`;
         const currentLocation = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        if (nextLocation !== currentLocation) router.replace(nextLocation, { scroll: false });
+        // 프레임의 작업 상태를 주소에 반영할 뿐 새 서버 화면을 요청할 필요는 없다.
+        // History API는 usePathname/useSearchParams와 동기화되면서 iframe을 유지한다.
+        if (nextLocation !== currentLocation) window.history.replaceState(null, "", nextLocation);
       } catch {
         // 로딩 중이거나 브라우저가 일시적으로 프레임 접근을 막아도 다음 주기에 재확인한다.
       }
     }, 350);
     return () => window.clearInterval(timer);
-  }, [isFramedView, router]);
+  }, [isFramedView]);
 
   // 바깥 주소가 뒤로가기나 탭 전환으로 먼저 바뀐 경우 프레임도 같은 위치로 맞춘다.
   // 프레임에서 시작된 이동은 현재 위치가 이미 같으므로 다시 로드하지 않는다.

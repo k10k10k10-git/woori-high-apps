@@ -36,6 +36,20 @@ describe("program preparation interaction contract", () => {
     expect(client).not.toContain("program-workspace\"");
   });
 
+  it("프로그램 안의 선택은 서버 라우트를 다시 탐색하지 않는다", () => {
+    // 프로그램·섹션 선택은 URL로 공유할 수 있어야 하지만 같은 Firebase 구독과
+    // 편집 화면을 유지해야 한다. router.push/replace는 로딩 경계를 다시 실행한다.
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    const localNavigation = client.slice(
+      client.indexOf("function goToProgram"),
+      client.indexOf("const { user, loading: authLoading"),
+    );
+    expect(localNavigation).toContain("window.history.pushState");
+    expect(localNavigation).toContain("window.history.replaceState");
+    expect(localNavigation).not.toContain("router.push");
+    expect(localNavigation).not.toContain("router.replace");
+  });
+
   it("행 단위 입력이 원격 갱신을 반영하고 남의 값을 덮지 않는다", () => {
     // uncontrolled defaultValue 입력은 구독으로 값이 바뀌어도 화면이 그대로라,
     // 그 상태에서 저장하면 다른 사람이 방금 넣은 값을 과거 값으로 덮어쓴다.

@@ -114,6 +114,8 @@ describe("모바일 운영 화면 계약", () => {
     expect(shell).toContain("name={DESKTOP_FRAME_NAME}");
     expect(shell).toContain("const [src] = useState(initialSrc)");
     expect(shell).toContain("frameLocation.replace(nextFrameLocation)");
+    expect(shell).toContain('window.history.replaceState(null, "", nextLocation)');
+    expect(shell).not.toContain("router.replace(nextLocation");
     expect(shell).toContain("currentMobileFrameSrc");
     expect(shell).toContain('frameDocument.readyState !== "complete"');
     expect(shell).toContain("setLoadedFrameKey(frameKey)");
