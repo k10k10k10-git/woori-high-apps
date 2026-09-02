@@ -7,7 +7,6 @@ import {
   update,
   remove,
   onValue,
-  DataSnapshot,
 } from "firebase/database";
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
@@ -47,12 +46,8 @@ import {
   validateNewFriendRosterRemoval,
 } from "./newFriend";
 
-function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
-  if (!snap.exists()) return [];
-  return Object.entries(snap.val() as Record<string, object>).map(
-    ([id, data]) => ({ id, ...data } as T),
-  );
-}
+import { snapToList } from "@/lib/db/core";
+
 
 const nowISO = () => new Date().toISOString();
 const newId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;

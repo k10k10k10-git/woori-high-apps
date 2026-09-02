@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { useAuth } from "@/features/iguard/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canManageRetreatPin } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import type { Retreat as PortalRetreat } from "@/lib/types";

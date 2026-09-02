@@ -21,6 +21,28 @@
   --color-accent:          #2563eb;
   --color-accent-soft:     #edf4ff;
 
+  /* 도메인 강조색 — 학기(파랑)·주일(주황)·수련회 행정(초록)·현장(중립).
+     홈 도메인 카드의 칩·화살표와 사역 바로가기가 같은 의미를 같은 색으로 쓴다.
+     이 토큰이 생기기 전에는 화면에서 임의값(bg-[#edf4ff])으로 박혀 있었고,
+     다크는 theme-compat.css가 !important로 덮어야 했다. */
+  --domain-semester-soft:       #edf4ff;
+  --domain-semester-soft-hover: #e4efff;
+  --domain-semester-ink:        #2457b8;
+  --domain-sunday-soft:         #fff7e8;
+  --domain-sunday-soft-hover:   #ffefd1;
+  --domain-sunday-ink:          #9a5b0b;
+  --domain-retreat-soft:        #edf7f3;
+  --domain-retreat-soft-hover:  #e3f2ec;
+  --domain-retreat-ink:         #087a57;
+  --domain-field-soft:          #f3f6f5;
+  --domain-field-soft-hover:    #eaf0ed;
+  --domain-field-ink:           #34423c;
+  --domain-vacation-soft:       #e9f6f1;
+  --domain-vacation-ink:        var(--color-primary);
+  /* 사역 바로가기(.ministry-area)는 다크에서 색면 대신 한 가지 표면을 쓴다. */
+  --domain-area-surface:        transparent;
+  --domain-area-surface-hover:  transparent;
+
   /* Layout */
   --color-header-bg:       #17191c;
   --color-screen-bg:       #101214;
@@ -119,6 +141,24 @@
   --color-primary-disabled-text: #d8e5de;
   --color-accent:           #78a7ff;
   --color-accent-soft:      #172845;
+
+  /* 도메인 강조색(다크). 칩은 색면을 유지하고, 사역 바로가기는 단일 표면 + 글자색만. */
+  --domain-semester-soft:       #172b43;
+  --domain-semester-soft-hover: #1d3452;
+  --domain-semester-ink:        #8ab7ff;
+  --domain-sunday-soft:         #3a2d16;
+  --domain-sunday-soft-hover:   #45361b;
+  --domain-sunday-ink:          #f3c16d;
+  --domain-retreat-soft:        #14372c;
+  --domain-retreat-soft-hover:  #1a4335;
+  --domain-retreat-ink:         #69dcb0;
+  --domain-field-soft:          #1b2420;
+  --domain-field-soft-hover:    #232f29;
+  --domain-field-ink:           var(--color-text-secondary);
+  --domain-vacation-soft:       #14372c;
+  --domain-vacation-ink:        #69dcb0;
+  --domain-area-surface:        #1b2420;
+  --domain-area-surface-hover:  #232f29;
 
   --color-header-bg:        #090c0b;
   --color-screen-bg:        #080a09;
@@ -1261,15 +1301,6 @@ main :where(.text-slate-700, .text-slate-600) { color: var(--color-text-secondar
 main .text-slate-500 { color: var(--color-text-muted); }
 main .text-slate-400 { color: var(--color-text-faint); }
 
-/* 도메인 홈과 업무 카드가 같은 제품의 구성요소로 읽히도록 한다. */
-.home-domain-card {
-  position: relative;
-  overflow: hidden;
-  border-top-color: color-mix(in srgb, var(--domain-color, var(--color-primary)) 42%, var(--color-border));
-}
-.home-domain-card--semester { --domain-color: #2563eb; }
-.home-domain-card--sunday { --domain-color: #d97706; }
-.home-domain-card--vacation { --domain-color: var(--color-primary); }
 .home-workspace-card {
   border-radius: 18px;
   background: #f6f8f7;
@@ -1941,8 +1972,6 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
     linear-gradient(125deg, #17191c 0%, #1c2521 60%, #14392e 100%);
 }
 .home-hero .page-title { margin-top: 0; max-width: none; font-size: clamp(27px, 3vw, 38px); }
-.home-domain-card { min-height: 198px; }
-.home-domain-card h2 { max-width: 17ch; }
 .team-member-search { width: min(100%, 280px); }
 .team-member-card { display: grid; align-items: end; grid-template-columns: minmax(220px, 1fr) minmax(360px, .8fr); gap: 16px; }
 .team-member-card .team-member-roles { margin-top: 0; }
@@ -1953,116 +1982,6 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .admin-mypage-tabs::-webkit-scrollbar { display: none; }
 .admin-mypage-tabs > button { flex: 0 0 auto; white-space: nowrap; }
 
-/* 역할별 마이페이지는 새 저장 화면이 아니라 기존 운영 데이터를 읽는 조밀한 요약 화면이다. */
-.mypage-connection {
-  display: inline-flex; align-items: center; gap: 7px; min-height: 32px; border: 1px solid var(--color-border);
-  border-radius: 999px; background: var(--color-surface); padding: 0 11px; color: var(--color-text-muted); font-size: 11px; font-weight: 750;
-}
-.mypage-connection svg { width: 15px; height: 15px; }
-.mypage-connection.is-online { border-color: #a7dfca; background: #edf9f4; color: #087a57; }
-.mypage-connection.is-offline { border-color: #efc2c2; background: #fff1f1; color: #a63e3e; }
-.mypage-metric-grid {
-  display: grid; overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px;
-  background: var(--color-surface); grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-.mypage-metric { display: flex; min-width: 0; min-height: 112px; align-items: flex-start; gap: 11px; border-right: 1px solid var(--color-border); padding: 15px; }
-.mypage-metric:last-child { border-right: 0; }
-.mypage-metric-icon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: var(--color-surface-hover); color: var(--color-primary); font-size: 20px; }
-.mypage-metric > span:last-child { display: grid; }
-.mypage-metric small { color: var(--color-text-muted); font-size: 10px; font-style: normal; font-weight: 700; }
-.mypage-metric strong { margin-top: 3px; color: var(--color-text-primary); font-size: 23px; line-height: 1.2; font-variant-numeric: tabular-nums; }
-.mypage-metric strong b { margin-left: 2px; color: var(--color-text-faint); font-size: 11px; }
-.mypage-metric em { overflow: hidden; margin-top: 5px; color: var(--color-text-faint); font-size: 10px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
-.mypage-skeleton { width: 42px; height: 27px; margin-top: 5px; border-radius: 7px; background: var(--color-surface-hover); animation: pulse 1.5s ease-in-out infinite; }
-.mypage-section { overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
-.mypage-section-header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--color-border); padding: 13px 16px; }
-.mypage-section-header h4 { color: var(--color-text-primary); font-size: 13px; font-weight: 800; }
-.mypage-section-header p { margin-top: 3px; color: var(--color-text-muted); font-size: 10px; line-height: 1.5; }
-.mypage-section-header > span { flex: 0 0 auto; border-radius: 999px; background: var(--color-surface-hover); padding: 5px 9px; color: var(--color-text-secondary); font-size: 10px; font-weight: 800; }
-.mypage-section-header > a { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; color: var(--color-primary); font-size: 10px; font-weight: 800; white-space: nowrap; }
-.mypage-section-header > a svg { width: 13px; height: 13px; }
-.mypage-row-list > :not(:last-child) { border-bottom: 1px solid var(--color-border); }
-.mypage-row { display: flex; min-height: 64px; align-items: center; gap: 12px; padding: 10px 16px; transition: background var(--duration-fast); }
-a.mypage-row:hover { background: var(--color-surface-hover); }
-.mypage-day { display: grid; width: 48px; height: 32px; flex: 0 0 auto; place-items: center; border-radius: 9px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: 10px; font-weight: 850; font-variant-numeric: tabular-nums; }
-.mypage-day--today { background: #e5f8ef; color: #087a57; }
-.mypage-day--overdue { background: #fff1e4; color: #a45a16; }
-.mypage-empty { display: grid; min-height: 180px; place-items: center; align-content: center; padding: 22px; text-align: center; }
-.mypage-empty > span, .mypage-empty > svg { color: var(--color-primary); font-size: 25px; }
-.mypage-empty > strong { margin-top: 8px; color: var(--color-text-secondary); font-size: 12px; }
-.mypage-empty > p { margin-top: 4px; color: var(--color-text-faint); font-size: 10px; line-height: 1.5; }
-.mypage-context-list { display: grid; }
-.mypage-context-list > div { min-height: 90px; border-bottom: 1px solid var(--color-border); padding: 15px 16px; }
-.mypage-context-list > div:last-child { border-bottom: 0; }
-.mypage-context-list dt { color: var(--color-text-faint); font-size: 9px; font-weight: 750; }
-.mypage-context-list dd { margin-top: 5px; color: var(--color-text-primary); font-size: 13px; font-weight: 800; }
-.mypage-context-list small { display: block; margin-top: 4px; color: var(--color-text-muted); font-size: 10px; }
-.mypage-inline-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.mypage-inline-stat { display: flex; min-height: 82px; align-items: center; justify-content: space-between; gap: 8px; border-right: 1px solid var(--color-border); padding: 13px 16px; }
-.mypage-inline-stat:last-child { border-right: 0; }
-.mypage-inline-stat > span { color: var(--color-text-muted); font-size: 10px; font-weight: 700; }
-.mypage-inline-stat > strong { color: var(--color-text-primary); font-size: 20px; font-variant-numeric: tabular-nums; }
-.mypage-inline-stat > strong small { margin-left: 2px; color: var(--color-text-faint); font-size: 9px; }
-.mypage-inline-stat.is-attention > strong { color: #a45a16; }
-.mypage-inline-stat.is-success > strong { color: #087a57; }
-.mypage-module-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.mypage-module { --module-tone: var(--color-primary); display: grid; min-height: 78px; min-width: 0; align-items: center; grid-template-columns: minmax(0, 1fr) auto 16px; gap: 10px; border-right: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); box-shadow: inset 3px 0 var(--module-tone); padding: 13px 15px 13px 17px; transition: background var(--duration-fast); }
-.mypage-module:nth-child(even) { border-right: 0; }
-.mypage-module:hover { background: var(--color-surface-hover); }
-.mypage-module strong, .mypage-module small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mypage-module strong { color: var(--color-text-primary); font-size: 12px; }
-.mypage-module small { margin-top: 4px; color: var(--color-text-muted); font-size: 9px; }
-.mypage-module > svg { color: var(--color-text-faint); }
-.mypage-module-access { border-radius: 999px; background: var(--color-surface-hover); padding: 4px 7px; color: var(--color-text-secondary); font-size: 9px; font-weight: 800; white-space: nowrap; }
-.mypage-module--semester { --module-tone: #4c8de8; }
-.mypage-module--sunday { --module-tone: #d99a2b; }
-.mypage-module--retreat { --module-tone: #2ca77b; }
-.mypage-module--field { --module-tone: #738177; }
-.mypage-module--guide { --module-tone: #8a72bd; }
-.mypage-assignment { min-height: 174px; padding: 16px; }
-.mypage-assignment-title { display: flex; align-items: center; gap: 10px; }
-.mypage-assignment-title > span, .mypage-feature-icon { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 11px; background: var(--color-surface-hover); color: var(--color-primary); font-size: 20px; }
-.mypage-assignment-title strong, .mypage-assignment-title small { display: block; }
-.mypage-assignment-title strong { color: var(--color-text-primary); font-size: 13px; }
-.mypage-assignment-title small { margin-top: 2px; color: var(--color-text-muted); font-size: 9px; }
-.mypage-assignment dl { display: grid; margin-top: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.mypage-assignment dl > div { border-radius: 10px; background: var(--color-surface-hover); padding: 9px 10px; }
-.mypage-assignment dt { color: var(--color-text-faint); font-size: 9px; }
-.mypage-assignment dd { margin-top: 3px; color: var(--color-text-primary); font-size: 11px; font-weight: 800; }
-.mypage-assignment-note { margin-top: 12px; color: var(--color-text-muted); font-size: 10px; line-height: 1.6; }
-.mypage-unmatched { display: grid; min-height: 174px; place-items: center; align-content: center; padding: 22px; color: var(--color-text-muted); text-align: center; }
-.mypage-unmatched svg { width: 25px; height: 25px; color: var(--color-text-faint); }
-.mypage-unmatched p { max-width: 44ch; margin-top: 8px; font-size: 10px; line-height: 1.6; }
-.mypage-feature-link { display: flex; min-height: 105px; align-items: center; gap: 11px; padding: 16px; }
-.mypage-feature-link:hover { background: var(--color-surface-hover); }
-.mypage-feature-link strong, .mypage-feature-link small { display: block; }
-.mypage-feature-link strong { color: var(--color-text-primary); font-size: 13px; }
-.mypage-feature-link small { margin-top: 4px; color: var(--color-text-muted); font-size: 10px; }
-.mypage-feature-link > svg { color: var(--color-text-faint); }
-.mypage-duty-list { border-left: 1px solid var(--color-border); }
-.mypage-duty-list > div { display: grid; min-height: 62px; align-items: center; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; border-bottom: 1px solid var(--color-border); padding: 9px 14px; }
-.mypage-duty-list > div:last-child { border-bottom: 0; }
-.mypage-duty-list time { color: var(--color-text-muted); font-size: 9px; font-weight: 800; }
-.mypage-duty-list strong, .mypage-duty-list small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mypage-duty-list strong { color: var(--color-text-primary); font-size: 11px; }
-.mypage-duty-list small { margin-top: 4px; color: var(--color-text-muted); font-size: 9px; }
-.mypage-request-summary { display: grid; overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.mypage-request-summary > div { display: flex; min-height: 92px; align-items: center; gap: 11px; border-right: 1px solid var(--color-border); padding: 14px 16px; }
-.mypage-request-summary > div:last-child { border-right: 0; }
-.mypage-request-summary > div > svg { width: 24px; height: 24px; color: var(--color-primary); }
-.mypage-request-summary small, .mypage-request-summary strong { display: block; }
-.mypage-request-summary small { color: var(--color-text-muted); font-size: 9px; font-weight: 700; }
-.mypage-request-summary strong { margin-top: 3px; color: var(--color-text-primary); font-size: 20px; }
-.mypage-request-summary strong b { margin-left: 2px; color: var(--color-text-faint); font-size: 9px; }
-.mypage-request-list article { display: flex; align-items: flex-start; gap: 14px; border-bottom: 1px solid var(--color-border); padding: 15px 16px; }
-.mypage-request-list article:last-child { border-bottom: 0; }
-.mypage-request-list h4 { overflow: hidden; margin-top: 7px; color: var(--color-text-primary); font-size: 12px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.mypage-request-list p { display: -webkit-box; overflow: hidden; margin-top: 4px; color: var(--color-text-muted); font-size: 10px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.mypage-request-list blockquote { margin-top: 8px; border-radius: 9px; background: #edf9f4; padding: 8px 10px; color: #087a57; font-size: 10px; line-height: 1.5; }
-.mypage-request-list time { flex: 0 0 auto; color: var(--color-text-faint); font-size: 9px; }
-.mypage-request-list article small { color: var(--color-text-faint); font-size: 9px; }
-.mypage-request-status { display: inline-flex; border-radius: 999px; background: #fff4dc; padding: 4px 7px; color: #9b6512; font-size: 9px; font-weight: 800; }
-.mypage-request-status.is-resolved { background: #e5f8ef; color: #087a57; }
 
 /* 표는 많은 정보를 읽는 도구다. 헤더와 행 구분을 조용하게 고정한다. */
 .overflow-x-auto > table thead th,
@@ -2236,7 +2155,6 @@ a.mypage-row:hover { background: var(--color-surface-hover); }
   .team-member-search { width: 100%; }
   .team-member-card { display: block; }
   .team-member-card .team-member-roles { margin-top: 12px; }
-  .home-domain-card { min-height: 172px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

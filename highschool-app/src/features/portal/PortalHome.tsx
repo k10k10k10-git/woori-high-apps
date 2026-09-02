@@ -279,8 +279,8 @@ export default function PortalHome() {
         <section className="grid gap-5 lg:grid-cols-3">
           {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--semester bg-[#edf4ff] px-3 py-1.5 text-[#2457b8]">학기 중 사역</span>
-              <span className="home-domain-arrow--semester grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#edf4ff] group-hover:text-[#2457b8]">→</span>
+              <span className="tag home-domain-chip--semester px-3 py-1.5">학기 중 사역</span>
+              <span className="home-domain-arrow--semester grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
@@ -292,8 +292,8 @@ export default function PortalHome() {
 
           {semesterAllowed && <Link href="/sunday-ministry" className="card home-domain-card home-domain-card--sunday group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag bg-amber-50 px-3 py-1.5 text-amber-700">주일 사역</span>
-              <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-amber-50 group-hover:text-amber-700">→</span>
+              <span className="tag home-domain-chip--sunday px-3 py-1.5">주일 사역</span>
+              <span className="home-domain-arrow--sunday grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">행정·바나바</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">학기 구분 없이 새친구 정착, 등록 현황과 행정 변동을 관리합니다.</p>
@@ -301,8 +301,8 @@ export default function PortalHome() {
 
           <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--vacation bg-[#e9f6f1] px-3 py-1.5 text-[var(--color-primary)]">방학 중 사역</span>
-              <span className="home-domain-arrow--vacation grid h-9 w-9 place-items-center rounded-full bg-slate-50 text-slate-400 transition group-hover:translate-x-1 group-hover:bg-[#e9f6f1] group-hover:text-[var(--color-primary)]">→</span>
+              <span className="tag home-domain-chip--vacation px-3 py-1.5">방학 중 사역</span>
+              <span className="home-domain-arrow--vacation grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
@@ -457,11 +457,6 @@ export default function PortalHome() {
 }
 
 function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "semester" | "sunday" | "retreat" | "field" }) {
-  const toneClass = {
-    semester: "bg-[#edf4ff] text-[#2457b8] hover:bg-[#e4efff]",
-    sunday: "bg-[#fff7e8] text-[#9a5b0b] hover:bg-[#ffefd1]",
-    retreat: "bg-[#edf7f3] text-[#087a57] hover:bg-[#e3f2ec]",
-    field: "bg-[#f3f6f5] text-[#34423c] hover:bg-[#eaf0ed]",
-  }[tone];
-  return <Link href={href} className={`ministry-area ministry-area--${tone} rounded-xl p-3.5 transition hover:-translate-y-0.5 ${toneClass}`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
+  // 톤별 색은 .ministry-area--{tone}(portal-surfaces.css)이 --domain-* 토큰으로 정한다.
+  return <Link href={href} className={`ministry-area ministry-area--${tone} rounded-xl p-3.5 transition hover:-translate-y-0.5`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
 }
