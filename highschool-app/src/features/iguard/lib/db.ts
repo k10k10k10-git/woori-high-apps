@@ -30,7 +30,7 @@ import {
 } from "@/lib/db/retreats";
 
 // ════════════════════════════════════════════════════════════
-// 🔒 읽기 전용 영역 — 행정 앱(retreat-app)이 소유한 노드
+// 🔒 읽기 전용 영역 — 행정 모듈이 소유한 노드 (구 retreat-app, 2026-08-05 통합)
 //    절대 set/update/remove 정의 금지. 소비(read/subscribe)만 한다.
 // ════════════════════════════════════════════════════════════
 
@@ -80,7 +80,7 @@ export function subscribeToTeacherAttendances(retreatId: string, callback: (teac
 }
 
 /** classes/{year} 원시 데이터를 uniqueKey(`${buNum}_${studentId}`)로 정규화.
- *  retreat-app/getStudentsByYear 와 동일 규칙 (단일 원천). */
+ *  src/lib/db/students.ts 의 getStudentsByYear 와 동일 규칙 (단일 원천). */
 function normalizeClasses(classesData: Record<string, ClassData> | null): Record<string, Student> {
   if (!classesData) return {};
   const result: Record<string, Student> = {};
