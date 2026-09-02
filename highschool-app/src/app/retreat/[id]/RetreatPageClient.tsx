@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ArrowLeft, DotsThree, GearSix } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeToRetreat, updateRetreat } from "@/lib/db";
@@ -10,22 +11,6 @@ import { useUI } from "@/context/UIContext";
 import ParticipantsTab from "./ParticipantsTab";
 import RetreatPrepSummary from "./RetreatPrepSummary";
 import RetreatAreaNav from "@/features/portal/RetreatAreaNav";
-import GroupsTab from "./GroupsTab";
-import RoomsTab from "./RoomsTab";
-import ClassRosterTab from "./ClassRosterTab";
-import TeachersTab from "./TeachersTab";
-import NotesTab from "./NotesTab";
-import CarpoolTab from "./CarpoolTab";
-import PartialAttendanceTab from "./PartialAttendanceTab";
-import InsuranceTab from "./InsuranceTab";
-import CancellationTab from "./CancellationTab";
-import SuppliesTab from "./SuppliesTab";
-import OnSiteRegistrationTab from "./OnSiteRegistrationTab";
-import UnmatchedPaymentsTab from "./UnmatchedPaymentsTab";
-import TshirtTab from "./TshirtTab";
-import MedicalLogTab from "./MedicalLogTab";
-import MealCountTab from "./MealCountTab";
-import AdminSuppliesTab from "./AdminSuppliesTab";
 import { canAccessArea, canEditArea, canSeeSensitiveRetreat } from "@/features/portal/accessPolicy";
 import { RetreatEditProvider } from "@/features/portal/RetreatEditContext";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
@@ -34,6 +19,37 @@ import RetreatPinGate from "./field/RetreatPinGate";
 import { RETREAT_TAB_GROUPS } from "@/features/portal/featureCatalog";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import { getRetreatWorkspaceSnapshot, mergeRetreatWorkspaceSnapshot } from "@/lib/retreatWorkspaceCache";
+
+// ── 탭 코드 분할 ──────────────────────────────────────────────
+// 행정 워크스페이스는 탭이 17개고, 큰 것은 900줄이 넘는다. 전부 정적 import면
+// "신청 접수"만 보려는 사람도 의료일지·단체티 코드까지 내려받는다 — 현장에서
+// LTE로 여는 화면이라 이 비용이 실제로 보인다.
+//
+// mountedTabs 키프얼라이브(한 번 연 탭은 display:none으로 남긴다)와 짝을 이룬다:
+// 탭을 처음 열 때만 청크를 받고, 그 뒤에는 마운트가 유지되므로 탭 전환에서
+// 다시 로딩이 뜨지 않는다. 최근에 여러 번 고친 "탭 전환 재로딩"을 되돌리지 않는
+// 것이 이 조합의 핵심이다.
+//
+// 첫 탭(ParticipantsTab)은 정적으로 둔다 — 기본 진입 화면이라 분할해도 어차피
+// 즉시 필요하고, 첫 렌더에 스켈레톤이 한 번 더 끼는 것을 피한다.
+// ssr:false는 이 화면이 이미 "use client" 전용이라 동작을 바꾸지 않는다.
+const tabFallback = () => <WorkspaceSkeleton label="탭을 불러오는 중입니다." rows={6} variant="page" />;
+const GroupsTab = dynamic(() => import("./GroupsTab"), { ssr: false, loading: tabFallback });
+const RoomsTab = dynamic(() => import("./RoomsTab"), { ssr: false, loading: tabFallback });
+const ClassRosterTab = dynamic(() => import("./ClassRosterTab"), { ssr: false, loading: tabFallback });
+const TeachersTab = dynamic(() => import("./TeachersTab"), { ssr: false, loading: tabFallback });
+const NotesTab = dynamic(() => import("./NotesTab"), { ssr: false, loading: tabFallback });
+const CarpoolTab = dynamic(() => import("./CarpoolTab"), { ssr: false, loading: tabFallback });
+const PartialAttendanceTab = dynamic(() => import("./PartialAttendanceTab"), { ssr: false, loading: tabFallback });
+const InsuranceTab = dynamic(() => import("./InsuranceTab"), { ssr: false, loading: tabFallback });
+const CancellationTab = dynamic(() => import("./CancellationTab"), { ssr: false, loading: tabFallback });
+const SuppliesTab = dynamic(() => import("./SuppliesTab"), { ssr: false, loading: tabFallback });
+const OnSiteRegistrationTab = dynamic(() => import("./OnSiteRegistrationTab"), { ssr: false, loading: tabFallback });
+const UnmatchedPaymentsTab = dynamic(() => import("./UnmatchedPaymentsTab"), { ssr: false, loading: tabFallback });
+const TshirtTab = dynamic(() => import("./TshirtTab"), { ssr: false, loading: tabFallback });
+const MedicalLogTab = dynamic(() => import("./MedicalLogTab"), { ssr: false, loading: tabFallback });
+const MealCountTab = dynamic(() => import("./MealCountTab"), { ssr: false, loading: tabFallback });
+const AdminSuppliesTab = dynamic(() => import("./AdminSuppliesTab"), { ssr: false, loading: tabFallback });
 // ── 탭 인덱스 상수 ────────────────────────────────────────────
 const TAB_IDX = {
   PARTICIPANTS: 0,
