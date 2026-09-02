@@ -126,6 +126,7 @@ scripts/verify-all.mjs   두 앱 일괄 검증
 | [`DB_OWNERSHIP.md`](DB_OWNERSHIP.md) | DB 경로를 건드리기 전 |
 | [`OPERATIONS.md`](OPERATIONS.md) | 배포하거나 장애를 복구할 때 |
 | [`LEARNINGS.md`](LEARNINGS.md) | 도구·환경이 예상과 다르게 굴 때 |
+| [`docs/HISTORY.md`](docs/HISTORY.md) | 왜 이런 구조인지, 언제 무엇이 합쳐졌는지 |
 | 각 앱의 `CLAUDE.md` | 그 앱의 코드 패턴 (해당 앱 코드 수정 시) |
 
 ## 이 코드베이스의 규칙 몇 가지

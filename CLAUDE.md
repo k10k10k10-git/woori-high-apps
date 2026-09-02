@@ -3,7 +3,9 @@
 이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 통합 플랫폼과 관련 앱을 담는다. 독립 `retreat-app`·`iguard-app`은 2026-08-05에 `highschool-app`으로 통합 후 제거했고, `교사·스탭 출석부`는 2026-08-12에 사용 중단으로 제거했다(복구 태그 `pre-staff-app-removal-2026-08-12`). `semester-app`도 같은 날 제거했다 — 학기 기능은 이미 `highschool-app` 학기 모듈로 통합돼 있었고, 옛 배포 주소 3개를 먼저 끊은 뒤 코드를 지웠다(복구 태그 `pre-semester-app-removal-2026-08-12`).
 **이 문서는 "이 저장소에서 일하는 방법" 전체를 규정한다.** 개별 앱의 코드 패턴은 각 앱의 CLAUDE.md가 원천이며, 충돌 시 이 문서의 안전 규칙이 우선한다.
 
-작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md`.
+작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md` → ⑥ "왜 이런 구조인가"가 궁금하면 `docs/HISTORY.md`.
+
+> ⚠ **이 저장소는 git 이력보다 오래됐다.** 첫 커밋(2026-07-02)에 이미 완성된 앱 4개가 들어 있다 — git만 보고 "두 달짜리 프로젝트"로 판단하지 말 것. 근거와 연대기는 `docs/HISTORY.md`.
 
 세션 시작 시 `.claude/HANDOFF.md`가 존재하면 사용자가 시키지 않아도 먼저 읽는다 — 직전 세션의 미완 작업·함정·대기 중 질문이 거기 있다.
 
