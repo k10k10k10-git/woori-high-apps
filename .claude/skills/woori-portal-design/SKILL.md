@@ -31,18 +31,28 @@ description: 고등부 통합 사역 플랫폼(highschool-app)의 디자인 시�
 실사용자에 50~60대 부장·교역자가 포함된다. 표 안이라고 `text-xs`(12px)로 낮추기 전에
 그 화면을 누가 보는지 확인한다.
 
-### 3. 다크 모드는 토큰 재정의 + 유틸리티 리매핑
+### 3. 다크 모드는 토큰 재정의 + 유틸리티 리매핑 — **임의값만 금지**
 
-`[data-theme="dark"]`에서 토큰을 다시 정의하고, **추가로** Tailwind 유틸리티를 강제 치환한다:
+`[data-theme="dark"]`에서 토큰을 다시 정의하고, **추가로** Tailwind 유틸리티를 강제 치환한다.
+리매핑은 `globals.css`가 아니라 **`theme-compat.css`** 에 있다:
 
 ```css
 [data-theme="dark"] :where(.bg-white, .bg-slate-50, …) { background-color: … !important; }
-[data-theme="dark"] :where(.text-slate-900, .text-slate-600, …) { color: … !important; }
+[data-theme="dark"] :where(.bg-amber-50, .bg-yellow-100, .bg-orange-200, …) { background-color: #3a2d16 !important; }
 ```
 
-그래서 `bg-white`·`text-slate-700` 같은 유틸리티를 써도 다크에서 자동으로 맞는다.
-**리매핑 목록에 없는 색**(예: `bg-emerald-50`, `bg-amber-50`)을 쓰면 다크에서 그대로 남아 튄다.
-새 색을 쓸 거면 globals.css 1747행 이후 목록을 확인한다.
+> ⚠ 이 문서는 한때 "`bg-emerald-50`·`bg-amber-50`을 쓰면 다크에서 튄다"고 적고 있었다.
+> **틀렸다** — `theme-compat.css`는 red·amber/yellow/orange·emerald/green/teal·blue/sky/indigo·
+> violet/purple/pink 계열을 모두 리매핑한다(2026-09-02 실측). 팔레트 유틸리티는 안전하다.
+
+**진짜 금지 대상은 임의값이다.** `bg-[#edf4ff]`처럼 hex를 화면에 직접 박으면
+리매핑 대상이 아니라서 다크가 따라오지 못하고, `theme-compat.css`가 그 유틸리티를
+이기려고 `!important`를 써야 한다(2026-09-02에 그렇게 쌓인 5개를 걷어냈다).
+
+- 색은 **CSS에서 토큰으로** 정한다 → `globals.css`의 `--domain-*`류
+- 화면은 **의미 클래스만** 붙인다 → `.home-domain-chip--semester`, `.ministry-area--retreat`
+- 컴포넌트 규칙은 `globals.css`가 아니라 **`portal-surfaces.css`** 같은 표면 파일에
+- `cssArchitecture.test.ts`의 **색 계약** 테스트가 TSX의 임의값 hex를 0건으로 강제한다
 
 ### 4. 모달은 세 가지가 한 세트다
 

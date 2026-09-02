@@ -83,20 +83,16 @@
 [data-theme="dark"] .home-workspace-card:hover,
 [data-theme="dark"] a.home-action-row:hover { background: #1d2923; }
 [data-theme="dark"] .home-action-date { background: #29352f; }
-[data-theme="dark"] .home-domain-chip--semester,
-[data-theme="dark"] .home-domain-arrow--semester { background: #172b43; color: #8ab7ff; }
-[data-theme="dark"] .home-domain-chip--vacation,
-[data-theme="dark"] .home-domain-arrow--vacation { background: #14372c; color: #69dcb0; }
 [data-theme="dark"] .form-control { background: var(--color-surface); }
 [data-theme="dark"] .calendar-grid { background: var(--color-surface); }
 [data-theme="dark"] .calendar-selected { background: #183d30; box-shadow: inset 0 0 0 2px #3b9c78; }
 [data-theme="dark"] .calendar-day:hover { background: #202a24; }
 [data-theme="dark"] .calendar-day.calendar-selected:hover { background: #183d30; }
-[data-theme="dark"] .ministry-area { background: #1b2420 !important; }
-[data-theme="dark"] .ministry-area--semester { color: #8ab7ff !important; }
-[data-theme="dark"] .ministry-area--sunday { color: #f3c16d !important; }
-[data-theme="dark"] .ministry-area--retreat { color: #69dcb0 !important; }
-[data-theme="dark"] .ministry-area--field { color: var(--color-text-secondary) !important; }
+/* 홈 도메인 칩·화살표와 사역 바로가기의 다크는 --domain-* 토큰 재정의로 따라온다
+   (globals.css). 예전에는 화면의 임의값 유틸리티를 이겨야 해서 !important 5개가
+   여기 있었다 — 2026-09-02에 임의값을 걷어내면서 함께 제거했다. */
+[data-theme="dark"] .ministry-area { background: var(--domain-area-surface); }
+[data-theme="dark"] .ministry-area:hover { background: var(--domain-area-surface-hover); }
 [data-theme="dark"] .ministry-guide-page { background: linear-gradient(180deg, #102018 0, var(--color-bg) 330px); }
 [data-theme="dark"] .mypage-connection.is-online { border-color: #28634f; background: #14372c; color: #69dcb0; }
 [data-theme="dark"] .mypage-connection.is-offline { border-color: #653a3a; background: #2d1b1b; color: #f0a6a6; }
