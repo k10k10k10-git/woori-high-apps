@@ -1,11 +1,6 @@
-import { ref, get, update, onValue, DataSnapshot } from "firebase/database";
+import { ref, get, update, onValue } from "firebase/database";
 import { db } from "../firebase";
-
-// Helper: DataSnapshot → typed list (injects id from Firebase key)
-function snapToList<T extends { id: string }>(snap: DataSnapshot): T[] {
-  if (!snap.exists()) return [];
-  return Object.entries(snap.val()).map(([id, data]) => ({ id, ...(data as object) } as T));
-}
+import { snapToList } from "./snapToList";
 
 function stripUndefined<T>(value: T): T {
   return stripUndefinedValue(value) as T;

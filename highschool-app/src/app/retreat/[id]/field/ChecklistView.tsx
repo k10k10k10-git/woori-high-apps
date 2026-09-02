@@ -5,7 +5,7 @@ import { clearIguardAttendance, updateIguardAttendance } from "@/features/iguard
 import { printAsPDF } from "@/features/iguard/lib/exportUtils";
 import { escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
-import { useAuth } from "@/features/iguard/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { isCancelledStudent, isStudentBusPassengerOnDay } from "@/features/iguard/lib/busParticipation";
 import { mergeBusStaffNames, parseBusStaff, parseBusStaffNames } from "@/features/iguard/lib/busStaff";

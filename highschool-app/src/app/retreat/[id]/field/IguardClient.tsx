@@ -5,7 +5,7 @@ import {
   ArrowLeft, DownloadSimple, DotsThreeVertical,
   MagnifyingGlass, WarningCircle, WifiSlash,
 } from "@phosphor-icons/react";
-import { useAuth } from "@/features/iguard/context/AuthContext";
+import { useAuth } from "@/context/AuthContext";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import { checkAdminCompat } from "@/features/iguard/lib/compat";
 import { useRetreatData } from "@/features/iguard/hooks/useRetreatData";

@@ -6,8 +6,7 @@ import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
   IguardAccessLock, IguardGbsPlace } from "./types";
 import type { IguardLodgingHotspot, IguardLodgingMap } from "./types";
-export { snapToList } from "./snapToList";
-import { snapToList } from "./snapToList";
+import { snapToList } from "@/lib/db/core";
 import { normalizePartialAttendanceMap } from "./partialAttendance";
 import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "./defaultSegment";
 import { buildStructureClonePayload, occupiedCloneNodes, type CloneIdFactory, type IguardStructureSource } from "./structureClone";
