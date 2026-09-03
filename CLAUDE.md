@@ -57,6 +57,11 @@
 - UI 색상은 파스텔(Tailwind `*-100` 계열, 예: `bg-blue-100`) 선호, 같은 의미의 자동/수동 표시는 같은 색.
 - 기능 완료 = 검증 + 커밋 + 푸시 + (배포 대상이면) Ready 확인까지 한 세트(/ship).
 - 모달은 포커스 트랩+ESC+`role="dialog"`, 토스트는 `aria-live`, 아이콘 버튼은 `aria-label`.
+  이 계약은 `OverlayShell.render.test.tsx`가 실제 렌더로 지킨다(2026-09-03 신설).
+- **렌더 테스트는 `*.render.test.tsx`로 두고 파일 첫 줄에 `/** @vitest-environment jsdom *​/`**를
+  적는다. 순수 로직 테스트 800여 개는 node 환경 그대로라 실행 시간이 늘지 않는다.
+  jsdom에는 레이아웃이 없어 `getClientRects()`가 항상 비어 있다 — 가시성으로 요소를 거르는
+  코드를 테스트하려면 그 스텁이 필요하다(컴포넌트 버그로 오인하지 말 것).
 
 **추가 (이 매뉴얼로 명문화하는 것):**
 - 재사용 우선: 이름 정규화는 `studentMatcher`, 버스 명단은 `busStaff`, 시간 판정은 `scheduleTime`, 큐싯은 `cueSheet`, classKey는 `classKey.ts`, 동기화 보존은 `syncParticipants`, 인앱 브라우저 탈출은 `inAppBrowser` — **같은 목적의 함수를 새로 쓰기 전에 lib를 grep**한다. (2026-08-09: `inAppBrowser`가 있는데 `FieldHomeClient`가 같은 로직을 복제해 두어 공용 모듈이 고아가 됐고, 그 사이 무한 리로드 가드가 복제본에는 빠져 있었다.)
