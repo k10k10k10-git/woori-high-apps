@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   ArrowLeft, DownloadSimple, DotsThreeVertical,
   MagnifyingGlass, WarningCircle, WifiSlash,
@@ -15,25 +16,7 @@ import {
 } from "@/features/iguard/lib/types";
 import CenterSpinner from "@/components/CenterSpinner";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
-import ChecklistView from "./ChecklistView";
-import RoomsView from "./RoomsView";
-import LodgingMapView from "./LodgingMapView";
-import MealsView from "./MealsView";
-import StaffView from "./StaffView";
-import PublishedProgramsView from "./PublishedProgramsView";
-import ScheduleView from "./ScheduleView";
-import ScheduleOverviewView from "./ScheduleOverviewView";
-import PostsView from "./PostsView";
-import MovementsView from "./MovementsView";
-import ValidationView from "./ValidationView";
-import BusesView from "./BusesView";
-import SeatingView from "./SeatingView";
 import { CueCardView, PostBoardView } from "./ExecutionViews";
-import LeaderCueManageView from "./LeaderCueManageView";
-import { GuideView, TodosView } from "./InfoViews";
-import GroupStaffView from "./GroupStaffView";
-import GbsPlacesView from "./GbsPlacesView";
-import BadgeCardsView from "./BadgeCardsView";
 import RetreatPinGate from "./RetreatPinGate";
 import SearchOverlay from "./SearchOverlay";
 import type { SearchIndexInput } from "@/features/iguard/lib/personIndex";
@@ -42,6 +25,38 @@ import { IGUARD_VIEW_GROUPS } from "@/features/portal/featureCatalog";
 import RetreatAreaNav from "@/features/portal/RetreatAreaNav";
 import { canAccessArea, iguardScopeOf } from "@/features/portal/accessPolicy";
 import { useViewMode } from "@/context/ViewModeContext";
+
+// ── 현장 뷰 코드 분할 ──────────────────────────────────────────
+// 현장 화면은 뷰가 22개고 파일 31개 6,854줄이다. 전부 정적 import면 진입 청크가
+// 264KB가 되는데, 이건 저장소에서 가장 큰 진입 청크이면서 **수련회장에서 LTE로
+// 폰으로 여는 화면**이다.
+//
+// 여기의 뷰는 행정 탭과 달리 비활성일 때 언마운트된다(activeView === k && <View/>).
+// 그래서 키프얼라이브를 맞출 필요가 없고, 청크는 모듈 캐시에 남으므로 한 번 연
+// 뷰를 다시 열 때는 추가 로딩이 없다.
+//
+// 기본 진입 뷰인 큐카드(ExecutionViews의 CueCardView·PostBoardView)만 정적으로
+// 남겨 첫 화면에 스켈레톤이 끼지 않게 한다.
+const viewFallback = () => <WorkspaceSkeleton label="화면을 불러오는 중입니다." rows={6} variant="page" />;
+const ChecklistView = dynamic(() => import("./ChecklistView"), { ssr: false, loading: viewFallback });
+const RoomsView = dynamic(() => import("./RoomsView"), { ssr: false, loading: viewFallback });
+const LodgingMapView = dynamic(() => import("./LodgingMapView"), { ssr: false, loading: viewFallback });
+const MealsView = dynamic(() => import("./MealsView"), { ssr: false, loading: viewFallback });
+const StaffView = dynamic(() => import("./StaffView"), { ssr: false, loading: viewFallback });
+const PublishedProgramsView = dynamic(() => import("./PublishedProgramsView"), { ssr: false, loading: viewFallback });
+const ScheduleView = dynamic(() => import("./ScheduleView"), { ssr: false, loading: viewFallback });
+const ScheduleOverviewView = dynamic(() => import("./ScheduleOverviewView"), { ssr: false, loading: viewFallback });
+const PostsView = dynamic(() => import("./PostsView"), { ssr: false, loading: viewFallback });
+const MovementsView = dynamic(() => import("./MovementsView"), { ssr: false, loading: viewFallback });
+const ValidationView = dynamic(() => import("./ValidationView"), { ssr: false, loading: viewFallback });
+const BusesView = dynamic(() => import("./BusesView"), { ssr: false, loading: viewFallback });
+const SeatingView = dynamic(() => import("./SeatingView"), { ssr: false, loading: viewFallback });
+const LeaderCueManageView = dynamic(() => import("./LeaderCueManageView"), { ssr: false, loading: viewFallback });
+const GroupStaffView = dynamic(() => import("./GroupStaffView"), { ssr: false, loading: viewFallback });
+const GbsPlacesView = dynamic(() => import("./GbsPlacesView"), { ssr: false, loading: viewFallback });
+const BadgeCardsView = dynamic(() => import("./BadgeCardsView"), { ssr: false, loading: viewFallback });
+const GuideView = dynamic(() => import("./InfoViews").then(m => m.GuideView), { ssr: false, loading: viewFallback });
+const TodosView = dynamic(() => import("./InfoViews").then(m => m.TodosView), { ssr: false, loading: viewFallback });
 
 function parseNames(value?: string): string[] {
   return (value || "")

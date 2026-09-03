@@ -13,6 +13,15 @@ describe("CSS architecture", () => {
     expect(read("src/app/globals.css").split("\n").length).toBeLessThan(2_350);
   });
 
+  // 리디자인마다 "20XX redesign" 섹션을 globals.css 아래에 덧붙이면, 같은 클래스가
+  // 본문과 지층 두 곳에서 정의되어 어느 규칙이 이기는지 알 수 없게 된다.
+  // 2026-09-03에 마지막 지층("2026 Preserve redesign")을 표면 파일로 접어 없앴다.
+  it("globals.css에 리디자인 지층을 쌓지 않는다", () => {
+    const css = read("src/app/globals.css");
+    expect(css, "리디자인 규칙은 globals가 아니라 해당 표면 파일(portal-surfaces.css 등)에 둘 것")
+      .not.toMatch(/redesign|리디자인 지층/i);
+  });
+
   it("limits important overrides to compatibility boundaries", () => {
     const globalCount = read("src/app/globals.css").match(/!important/g)?.length ?? 0;
     const themeCount = read("src/app/theme-compat.css").match(/!important/g)?.length ?? 0;

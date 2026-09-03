@@ -40,10 +40,6 @@ const RATCHET: Record<string, { max: number; why: string }> = {
     max: 1_120,
     why: "행정 노드 읽기 전용 영역과 이가드 쓰기 영역이 한 파일에서 주석으로 구분된다. 쪼개려면 소유권 경계를 먼저 설계해야 한다.",
   },
-  "src/app/retreat/[id]/autoAssignUtils.ts": {
-    max: 1_085,
-    why: "자동 조편성 규칙이 서로 참조하는 순수 함수 묶음. autoAssign.test.ts(697줄)가 전체를 고정하고 있어 분할 시 테스트도 함께 재배치해야 한다.",
-  },
 };
 
 function sourceFiles(dir: string): string[] {
