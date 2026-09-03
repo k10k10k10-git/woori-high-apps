@@ -1962,25 +1962,6 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .sunday-attendance-legend { padding-inline: 16px; }
 }
 
-/* ── 2026 Preserve redesign ──
-   고유 색·타이포·로고는 유지하고, 사역 정보의 순서와 밀도를 다시 조정한다. */
-.home-hero {
-  min-height: 220px;
-  align-items: center;
-  background:
-    radial-gradient(circle at 88% 10%, rgba(125,226,188,.18), transparent 23rem),
-    linear-gradient(125deg, #17191c 0%, #1c2521 60%, #14392e 100%);
-}
-.home-hero .page-title { margin-top: 0; max-width: none; font-size: clamp(27px, 3vw, 38px); }
-.team-member-search { width: min(100%, 280px); }
-.team-member-card { display: grid; align-items: end; grid-template-columns: minmax(220px, 1fr) minmax(360px, .8fr); gap: 16px; }
-.team-member-card .team-member-roles { margin-top: 0; }
-.admin-mypage-dialog { border-radius: 22px; }
-.admin-mypage-header { padding-top: 20px; }
-.admin-mypage-content > div { border: 0; border-radius: 0; box-shadow: none; }
-.admin-mypage-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
-.admin-mypage-tabs::-webkit-scrollbar { display: none; }
-.admin-mypage-tabs > button { flex: 0 0 auto; white-space: nowrap; }
 
 
 /* 표는 많은 정보를 읽는 도구다. 헤더와 행 구분을 조용하게 고정한다. */

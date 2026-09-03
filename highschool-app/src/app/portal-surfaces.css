@@ -305,3 +305,27 @@ a.mypage-row:hover { background: var(--color-surface-hover); }
 .mypage-request-list article small { color: var(--color-text-faint); font-size: 9px; }
 .mypage-request-status { display: inline-flex; border-radius: 999px; background: #fff4dc; padding: 4px 7px; color: #9b6512; font-size: 9px; font-weight: 800; }
 .mypage-request-status.is-resolved { background: #e5f8ef; color: #087a57; }
+
+/* ── 통합 홈 히어로 · 팀원 관리 · 마이페이지 대화상자 ──────
+   2026-09-03: globals.css의 "2026 Preserve redesign" 지층에 마지막까지 남아 있던
+   규칙들. 앞서 마이페이지 컴포넌트 정의를 옮길 때(2026-09-02) 함께 정리하지 못한
+   나머지이며, 전부 특정 화면의 표면 규칙이라 여기가 제 자리다.
+   이로써 globals.css에서 "지층" 섹션은 사라졌다 — 다음 리디자인도 새 지층을 쌓지 말고
+   해당 표면 파일을 고칠 것. */
+.home-hero {
+  min-height: 220px;
+  align-items: center;
+  background:
+    radial-gradient(circle at 88% 10%, rgba(125,226,188,.18), transparent 23rem),
+    linear-gradient(125deg, #17191c 0%, #1c2521 60%, #14392e 100%);
+}
+.home-hero .page-title { margin-top: 0; max-width: none; font-size: clamp(27px, 3vw, 38px); }
+.team-member-search { width: min(100%, 280px); }
+.team-member-card { display: grid; align-items: end; grid-template-columns: minmax(220px, 1fr) minmax(360px, .8fr); gap: 16px; }
+.team-member-card .team-member-roles { margin-top: 0; }
+.admin-mypage-dialog { border-radius: 22px; }
+.admin-mypage-header { padding-top: 20px; }
+.admin-mypage-content > div { border: 0; border-radius: 0; box-shadow: none; }
+.admin-mypage-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.admin-mypage-tabs::-webkit-scrollbar { display: none; }
+.admin-mypage-tabs > button { flex: 0 0 auto; white-space: nowrap; }
