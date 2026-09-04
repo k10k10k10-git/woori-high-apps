@@ -8,6 +8,17 @@
 ## 1. 배포 방법
 
 ### 학생 앱 (Firebase Hosting)
+
+> ⚠ **학생 앱은 Vercel로 배포하지 않는다.** `output: 'export'` 정적 빌드 + Firebase
+> Hosting 전용이다. 그런데 Vercel 프로젝트(`attendance-app`)가 이 저장소에 연결돼 있어
+> PR·푸시마다 빌드를 시도하고 매번 실패했다(2026-09-03 확인 — 이 실패는 어떤 변경과도
+> 무관하다). `attendance-app/vercel.json`의 `"ignoreCommand": "exit 0"`이 그 빌드를
+> 건너뛰게 한다(Vercel 규약: exit 0 = 건너뜀, exit 1 = 빌드).
+>
+> **더 깨끗한 영구 조치는 Vercel 대시보드에서 `attendance-app` 프로젝트의 Git 연결을
+> 끊는 것이다.** 그렇게 하면 이 파일은 지워도 된다. 반대로 학생 앱을 정말 Vercel로
+> 배포하게 되는 날에도 이 파일을 먼저 지워야 한다.
+
 ```bash
 cd attendance-app
 npm run build
