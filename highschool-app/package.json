@@ -14,7 +14,8 @@
     "test:e2e:a11y": "node scripts/require-e2e-auth.mjs && playwright test e2e/accessibility.e2e.ts",
     "quality:lighthouse": "lhci autorun",
     "quality:ci": "npm run lint && npm run typecheck && npm run test:coverage && npm run build",
-    "e2e:auth": "node scripts/save-e2e-auth.mjs"
+    "e2e:auth": "node scripts/save-e2e-auth.mjs",
+    "e2e:secret": "node scripts/print-e2e-secret.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
