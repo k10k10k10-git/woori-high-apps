@@ -12,14 +12,19 @@ export function useAuth() {
 
   useEffect(() => {
     dispatch({ type: 'SET_FB_READY' });
+    let active = true;
+    let request = 0;
     const unsub = onAuthStateChanged(auth, async user => {
+      const currentRequest = ++request;
+      const isCurrent = () => active && request === currentRequest
+        && (auth.currentUser?.uid ?? null) === (user?.uid ?? null);
+      if (!isCurrent()) return;
+      dispatch({ type: 'SET_USER_ROLE', payload: null });
       if (user) {
-        await loadUserRole({ uid: user.uid, email: user.email }, dispatch);
-      } else {
-        dispatch({ type: 'SET_USER_ROLE', payload: null });
+        await loadUserRole({ uid: user.uid, email: user.email }, dispatch, isCurrent);
       }
     });
-    return unsub;
+    return () => { active = false; request++; unsub(); };
   }, [dispatch]);
 }
 

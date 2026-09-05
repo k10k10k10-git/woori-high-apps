@@ -18,7 +18,7 @@ type GraduateRow = { ck: string; studentCount: number };
 
 export default function AdminTab() {
   const { state, dispatch } = useApp();
-  const { allUserRoles, curYear } = state;
+  const { allUserRoles, curYear, dataRevision } = state;
 
   // 계정 모달
   const [accountModal, setAccountModal] = useState<{ open: boolean; editKey: string | null }>({ open: false, editKey: null });
@@ -63,7 +63,7 @@ export default function AdminTab() {
 
   async function loadAllRoles() {
     const snap = await get(ref(db, 'userRoles'));
-    dispatch({ type: 'SET_ALL_USER_ROLES', payload: snap.exists() ? snap.val() : {} });
+    dispatch({ type: 'SET_ALL_USER_ROLES', revision: dataRevision, payload: snap.exists() ? snap.val() : {} });
   }
 
   async function saveAccount() {

@@ -1,10 +1,13 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useApp, useClassKey, useClassKeys, calcStats } from '@/store/AppContext';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useApp, useClassKey } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
-import { getChart } from '@/utils/chartSetup';
+import { useChartJs } from '@/hooks/useChartJs';
+import type { ChartClass } from '@/utils/chartSetup';
+import ChartLoadState from '@/components/ChartLoadState';
 import ClassTabBar from '@/components/ClassTabBar';
 import { SHOW_ATTENDANCE_RISK_SECTIONS } from '@/lib/releaseFlags';
+import { buildClassStats } from '@/utils/classStats';
 import {
   activeAndLongAbsentStudents,
   consecutiveAbsentStudentIds,
@@ -61,10 +64,13 @@ const dataLabelPlugin: any = {
     });
   },
 };
+function initializeStatChart(Chart: ChartClass) {
+  Chart.register(dataLabelPlugin);
+}
+
 export default function StatTab() {
   const { state } = useApp();
   const { curYear, months, attData, classData, events, curView } = state;
-  const classKeys = useClassKeys(state);
   const ck = useClassKey(state);
   const allStudents = useMemo(() => classData[ck]?.students ?? [], [classData, ck]);
   const { active: students, longAbsent: longAbsentStudents } = useMemo(
@@ -90,29 +96,13 @@ export default function StatTab() {
   const namesFor = (ids: string[]) => ids.slice(0, 5).map(id => studentNames.get(id)).filter(Boolean).join(', ');
 
   const [warningOpen, setWarningOpen] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chartJsRef = useRef<any>(null);
-  const [chartJsReady, setChartJsReady] = useState(false);
+  const { chartJsRef, chartJsReady, chartLoadError, retryChart } = useChartJs(initializeStatChart);
 
-  useEffect(() => {
-    getChart().then(Chart => {
-      // Register local plugin for data labels (StatTab-specific)
-      Chart.register(dataLabelPlugin);
-      chartJsRef.current = Chart;
-      setChartJsReady(true);
-    });
-  }, []);
-
-  // 주의 학생 목록 (출석률 50% 미만)
-  const warningStudents = students
-    .map(s => {
-      const { present, absent, tardy, rate } = calcStats(state, ck, s.id);
-      const recorded = present + absent + tardy;
-      const grade = rate >= 90 ? 'A' : rate >= 80 ? 'B' : rate >= 70 ? 'C' : 'D';
-      return { ...s, present, absent, tardy, recorded, rate, grade };
-    })
-    .filter(s => s.recorded > 0 && s.rate < 50)
-    .sort((a, b) => a.rate - b.rate);
+  const classStats = useMemo(
+    () => buildClassStats({ months, curView, attData, events }, ck, students),
+    [months, curView, attData, events, ck, students],
+  );
+  const { warningStudents } = classStats;
 
   const chart1Ref = useRef<HTMLCanvasElement>(null);
   const chart2Ref = useRef<HTMLCanvasElement>(null);
@@ -125,13 +115,13 @@ export default function StatTab() {
 
   // canvas에 이미 Chart 인스턴스가 있으면 파괴 후 새로 생성
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function safeChart(canvas: HTMLCanvasElement | null, config: any): any | null {
+  const safeChart = useCallback((canvas: HTMLCanvasElement | null, config: any): any | null => {
     const ChartClass = chartJsRef.current;
     if (!canvas || !ChartClass) return null;
     const existing = ChartClass.getChart(canvas);
     if (existing) existing.destroy();
     return new ChartClass(canvas, config);
-  }
+  }, [chartJsRef]);
 
   useEffect(() => {
     if (!chartJsReady) return;
@@ -189,9 +179,6 @@ export default function StatTab() {
     if (c1) chartInstances.current.push(c1);
 
     // Chart 2: 학생별 출석 현황 (스택 바) — 클릭 시 보완 데이터 표시
-    const presArr = students.map(s => calcStats(state, ck, s.id).present);
-    const absArr  = students.map(s => calcStats(state, ck, s.id).absent);
-    const tardArr = students.map(s => calcStats(state, ck, s.id).tardy);
     barClickRef.current = null; // 클래스 변경 시 초기화
     if (students.length > 0) {
       const canvas2 = chart2Ref.current;
@@ -257,9 +244,9 @@ export default function StatTab() {
         data: {
           labels: students.map(s => s.name),
           datasets: [
-            { label: '출석', data: presArr, backgroundColor: '#10b981' },
-            { label: '결석', data: absArr,  backgroundColor: '#ef4444' },
-            { label: '지각', data: tardArr, backgroundColor: '#f59e0b' },
+            { label: '출석', data: classStats.present, backgroundColor: '#10b981' },
+            { label: '결석', data: classStats.absent,  backgroundColor: '#ef4444' },
+            { label: '지각', data: classStats.tardy, backgroundColor: '#f59e0b' },
           ],
         },
         plugins: [stackedSegmentLabelPlugin, stackedClickPlugin],
@@ -285,17 +272,7 @@ export default function StatTab() {
 
     // Chart 3: 출석 등급 분포 (도넛) - A/B/C/D 등급별 인원
     // 미래 주차를 제외하고 실제 기록된 주차(O/X/T)만 분모로 사용
-    const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
-    students.forEach(s => {
-      const { present, absent, tardy } = calcStats(state, ck, s.id);
-      const recorded = present + absent + tardy;
-      if (recorded === 0) { gradeCounts.D++; return; }
-      const effectiveRate = Math.round((present / recorded) * 100);
-      if (effectiveRate >= 90) gradeCounts.A++;
-      else if (effectiveRate >= 80) gradeCounts.B++;
-      else if (effectiveRate >= 70) gradeCounts.C++;
-      else gradeCounts.D++;
-    });
+    const { gradeCounts } = classStats;
     const c3 = safeChart(chart3Ref.current, {
       type: 'doughnut',
       data: {
@@ -362,12 +339,13 @@ export default function StatTab() {
       chartInstances.current.forEach(c => { try { c.destroy(); } catch { /* ignore */ } });
       chartInstances.current = [];
     };
-  }, [ck, curView, attData, classData, months, events, students, classKeys, chartJsReady]);
+  }, [ck, curView, attData, months, events, students, classStats, chartJsReady, chartJsRef, safeChart]);
 
   return (
     <div>
       {/* 반 탭 */}
       <ClassTabBar />
+      {students.length > 0 && <ChartLoadState ready={chartJsReady} error={chartLoadError} onRetry={retryChart} />}
 
       {allStudents.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text3)', padding: 40, fontSize: 13 }}>

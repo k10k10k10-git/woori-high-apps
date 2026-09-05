@@ -1,51 +1,59 @@
-/**
- * Shared Chart.js initialization — registers components once and returns the Chart class.
- * Both StatTab and OverallTab use this to avoid duplicate registrations.
- */
+import type { Chart } from 'chart.js';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let chartClass: any = null;
-let registrationPromise: Promise<void> | null = null;
+export type ChartClass = typeof Chart;
+type ChartModule = typeof import('chart.js');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getChart(): Promise<any> {
-  if (chartClass) return chartClass;
+/** 동시 요청은 함께 기다리고, 실패한 로딩은 다음 요청에서 다시 시도한다. */
+export function createChartRegistry(loadModule: () => Promise<ChartModule>) {
+  let chartClass: ChartClass | null = null;
+  let registrationPromise: Promise<ChartClass> | null = null;
 
-  if (!registrationPromise) {
-    registrationPromise = import('chart.js').then(({
-      Chart,
-      CategoryScale, LinearScale,
-      PointElement, LineElement, LineController,
-      BarElement, BarController,
-      ArcElement, DoughnutController,
-      Tooltip, Legend, Filler,
-    }) => {
-      Chart.register(
+  return async function loadChart(): Promise<ChartClass> {
+    if (chartClass) return chartClass;
+    if (!registrationPromise) {
+      registrationPromise = Promise.resolve().then(loadModule).then(({
+        Chart,
         CategoryScale, LinearScale,
         PointElement, LineElement, LineController,
         BarElement, BarController,
         ArcElement, DoughnutController,
         Tooltip, Legend, Filler,
-      );
-      chartClass = Chart;
-    });
-  }
-
-  await registrationPromise;
-  return chartClass;
+      }) => {
+        Chart.register(
+          CategoryScale, LinearScale,
+          PointElement, LineElement, LineController,
+          BarElement, BarController,
+          ArcElement, DoughnutController,
+          Tooltip, Legend, Filler,
+        );
+        chartClass = Chart;
+        return Chart;
+      }).catch(error => {
+        registrationPromise = null;
+        throw error;
+      });
+    }
+    return registrationPromise;
+  };
 }
 
-/**
- * Hook-friendly: load Chart.js and return it via state.
- * Usage:
- *   const [Chart, ready] = useChartJs();
- */
+/** 차트 모듈과 구성 요소 등록은 화면 사이에서 한 번만 공유한다. */
+export const getChart = createChartRegistry(() => import('chart.js'));
+
+/** 화면 해제 뒤에는 로딩 결과를 전달하지 않는다. 반환 함수를 effect cleanup에 연결한다. */
 export function createChartLoader(
-  setChart: (c: unknown) => void,
-  setReady: (r: boolean) => void,
+  setChart: (chart: ChartClass) => void,
+  setReady: (ready: boolean) => void,
+  onError: (error: unknown) => void,
+  loadChart: () => Promise<ChartClass> = getChart,
 ) {
-  getChart().then(Chart => {
+  let active = true;
+  Promise.resolve().then(loadChart).then(Chart => {
+    if (!active) return;
     setChart(Chart);
     setReady(true);
+  }).catch(error => {
+    if (active) onError(error);
   });
+  return () => { active = false; };
 }

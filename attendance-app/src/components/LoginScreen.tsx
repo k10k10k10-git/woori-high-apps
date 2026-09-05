@@ -2,8 +2,7 @@
 import { useState, useEffect } from 'react';
 import { doLogin } from '@/hooks/useAuth';
 
-export default function LoginScreen({ onLogin, authError, onBackToDemo }: {
-  onLogin: () => void;
+export default function LoginScreen({ authError, onBackToDemo }: {
   authError?: string | null;
   /** 데모 모드에서만 넘어온다 — 관리자 로그인을 취소하고 반 선택 화면으로 되돌아간다. */
   onBackToDemo?: () => void;
@@ -29,7 +28,7 @@ export default function LoginScreen({ onLogin, authError, onBackToDemo }: {
     setErr(''); setLoading(true);
     try {
       await doLogin(email, pw, stayLogin, saveEmail);
-      onLogin();
+      // 화면 진입은 AppShell의 인증 구독이 사용자 역할 조회까지 마친 뒤 확정한다.
     } catch (e: unknown) {
       const msg = (e as { code?: string })?.code;
       if (msg?.includes('user-not-found') || msg?.includes('wrong-password') || msg?.includes('invalid-credential')) {

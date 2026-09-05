@@ -6,7 +6,7 @@
 
 - 루트 `../CLAUDE.md`의 안전 규칙이 우선입니다. 재개 시 `../.claude/HANDOFF.md`를 먼저 확인하고, 이 앱의 `CLAUDE.md`, 데이터 경로 작업은 `../DB_OWNERSHIP.md`, 배포·복구는 `../OPERATIONS.md`를 읽습니다.
 - 첫 응답은 루트에서 정한 DB 안전 4문답으로 시작합니다. 문서 점검에도 적용됩니다. 운영 DB 직접 쓰기는 명시 승인과 사전 스냅샷 없이는 실행하지 않으며 Rules 변경·배포는 이 앱에서 수행하지 않습니다.
-- `git status --short`로 기존 작업을 확인하고 사용자 수정 파일을 보존합니다. 코드·가이드 수정만으로 푸시·배포가 승인된 것으로 해석하지 않습니다. `main` 푸시는 Vercel 배포를 유발할 수 있습니다. 배포 변경은 루트 인수인계의 PR 검토·사용자 병합 결정을 따릅니다.
+- `git status --short`로 기존 작업을 확인하고 사용자 수정 파일을 보존합니다. 2026-09-05 상시 승인에 따라 운영 앱 구현·수정은 검증·PR 검토·에이전트 병합·운영 배포까지 진행하며 같은 범위의 승인을 다시 요청하지 않습니다. 조사·리뷰·문서만 요청한 작업이나 사용자가 배포를 보류한 작업은 제외합니다. `main` 푸시는 Vercel 배포를 유발합니다. 상세 범위와 DB·Rules·권한 예외는 루트 `AGENTS.md`·`CLAUDE.md`가 원천입니다.
 - 파일 점검은 `git ls-files`와 `rg --files --hidden`으로 범위를 나눈 뒤 수행합니다. `node_modules`, `.next`, `.auth`, `.env*`, coverage·브라우저 결과물은 앱 소스와 구분하고 인증값·개인정보를 출력하거나 커밋하지 않습니다.
 - 현재 코드와 오래된 문서가 다르면 소스와 계약 테스트로 확인한 사실을 보고합니다. 문서 불일치를 이유로 DB나 권한을 임의 변경하지 않습니다. 아래 날짜별 학습 기록은 당시의 배경이며 현재 계약은 이 앞부분과 실제 코드입니다.
 
@@ -64,6 +64,8 @@
 - 지속 표시 데이터는 구독하고 닫기·계정/대상 ID 변경 시 해제합니다. 모든 새 구독은 `onError`를 전달하고 `useLoadErrors`로 경로별 실패를 표시합니다. 첫 성공·오류 응답은 `subscriptionReadiness`에서 모두 ready 처리합니다.
 - 인증·역할 조회, 명시적 가져오기, 저장·삭제 직전 확인, 백업·복구·멱등성 검증은 일회성 `get`을 유지합니다. 구독 echo가 화면의 원천이므로 저장 후 같은 항목을 수동 append하지 않습니다.
 - 이가드 구독은 `features/iguard/hooks/useRetreatData.ts`에 모으고 `fail(key)`를 배선합니다. 행정 원본 읽기는 현장 DB 모듈의 읽기 전용 함수로 제공하며 현장 훅에서 행정 DB 배럴을 직접 가져오지 않습니다.
+- 현장 workspace의 key는 수련회 `id`만 사용합니다. `useRetreatData`는 현재 ID와 metadata ID가 일치한 뒤 연도 구독을 시작하며, 해제 후 콜백은 상태와 캐시 모두 갱신하지 않습니다. metadata 실패를 수련회 없음으로 숨기지 않고 오류로 표시합니다.
+- `PortalHome`·`useMyPageData`의 기간 구독은 순서를 보존한 수련회 ID 목록에 의존하고 마이페이지 현장 구독은 현재 수련회 ID에 의존합니다. 이름 변경 때문에 재구독하지 않으며, 같은 날짜 기간의 선택 우선순위를 바꾸는 ID 정렬을 추가하지 않습니다.
 - PIN은 `useRetreatPinGate` 하나와 `retreats/{id}/iguard/accessLock`을 사용합니다. 행정·프로그램·현장에 별도 잠금 노드를 만들지 않습니다.
 - 인원체크는 멱등 체크·트랜잭션·톰스톤을 유지합니다. 키는 `checklistKeys.stableMemberId`; 구형 읽기·해제는 `memberCheckKeys`/`isMemberChecked`를 거칩니다. 배열 인덱스 키나 단순 토글로 되돌리지 않습니다.
 - 이름·배정·시간 처리는 `studentMatcher`, `busStaff`, `scheduleTime`, `cueSheet`, `cueSelection`, `staffIdentity`, `syncParticipants`를 먼저 찾습니다. 자정 이후 시간, 동명이인, 동기화 ambiguous 보존 가드를 화면에서 재구현하지 않습니다.
@@ -107,14 +109,26 @@ npm run build
 ```
 
 - `typecheck`는 `tsc --noEmit`, build는 `next build --webpack`입니다. `npm run quality:ci`는 lint → typecheck → coverage → build를 묶습니다. Firebase 빌드 설정은 `src/lib/firebase.ts`와 CI의 `NEXT_PUBLIC_FIREBASE_*` 키를 확인하고 실제 값은 출력하지 않습니다. 환경변수 누락 실패와 소스 회귀를 구분합니다.
-- 같은 앱에서 타입 검사와 build를 병렬 실행하지 않습니다. 전체 lint가 `.auth/chrome-profile` 생성 JS 때문에 실패하면 원래 실패를 기록한 뒤 `npm run lint -- --ignore-pattern '.auth/**'` 결과를 별도로 보고합니다. 인증 프로필을 삭제하거나 애플리케이션 소스 검사를 생략하지 않습니다.
+- 같은 앱에서 타입 검사와 build를 병렬 실행하지 않습니다. ESLint 전역 ignore의 `.auth/**`를 유지해 `npm run lint` 자체가 앱 소스를 검사하게 합니다. 인증 프로필을 삭제하거나 추가 ignore 명령으로 검사 범위를 줄여 통과시키지 않습니다.
 - Vitest는 기본 node 환경이며 렌더 테스트 첫 줄에 `/** @vitest-environment jsdom */`을 둡니다. jsdom은 레이아웃 계산이 없어 필요할 때 `getClientRects` 등을 스텁합니다. 커버리지 하한은 `vitest.config.ts`, 성능·접근성 예산은 `lighthouserc.cjs`가 원천입니다.
 - `../.github/workflows/highschool-quality.yml`은 Node 22에서 검증·Lighthouse를 실행한 뒤 별도 `authenticated-e2e` job으로 **운영 URL** smoke·axe를 실행합니다. PR 코드를 검증한 것과 운영 화면을 검사한 것을 구분해 보고합니다. `quality:ci`만으로 Lighthouse·E2E까지 통과했다고 말하지 않습니다.
 - 인증 E2E는 `E2E_STORAGE_STATE`의 비어 있지 않은 세션 파일이 필요하며, CI는 `E2E_STORAGE_STATE_B64` secret을 복원합니다. `require-e2e-auth.mjs` 가드를 제거하거나 무인증 skip으로 성공 처리하지 않습니다. 실제 인증 완료와 역할·앱 프레임을 별도로 확인합니다.
 - 로그인 세션이 없으면 `npm run e2e:auth`의 실제 Chrome 창에서 사람이 OAuth를 마친 뒤 재사용합니다. `storageState({ indexedDB: true })`를 유지해야 Firebase Auth가 복원됩니다. 로그인 벽 때문에 모든 헤드리스 검증이 불가능하다고 단정하지 않습니다. `.auth`, 시크릿 출력, 추적·스크린샷에 포함될 수 있는 개인정보를 공유하지 않습니다.
 - Lighthouse는 로컬 공개 홈의 지표이며 인증된 전체 운영 화면을 보증하지 않습니다. 파괴적 화면 확인은 매칭되지 않는 더미 입력의 확인 건수까지만 보고 취소합니다. 기능 검증을 이유로 운영 DB 저장을 누르지 않습니다.
-- 배포는 사용자 요청 또는 `/ship` 절차 때만 수행합니다. 운영 주소는 `https://woorihigh-app.vercel.app`, Vercel 프로젝트는 `highschool-app`입니다. 수동 배포가 필요하면 Root Directory 설정을 확인하고 **저장소 루트**에서 실행합니다. 배포 확인은 `/api/version`의 `buildId`와 대상 커밋, Production `Ready`를 함께 대조합니다.
+- 운영 앱 구현·수정의 배포는 루트의 상시 승인과 PR 검토·에이전트 병합 절차를 따릅니다. 운영 주소는 `https://woorihigh-app.vercel.app`, Vercel 프로젝트는 `highschool-app`입니다. 수동 배포가 필요하면 Root Directory 설정을 확인하고 **저장소 루트**에서 실행합니다. 배포 확인은 `/api/version`의 `buildId`와 대상 커밋, Production `Ready`를 함께 대조합니다.
 - 사소하지 않은 해결은 루트 학습 법칙에 따라 `extract-approach`로 남깁니다. 테스트 수·번들 크기·CI 비밀값 유무·최신 배포 상태를 영구 사실처럼 이 가이드에 누적하지 않습니다.
+
+## 핵심 코드 패턴
+
+### 인증 응답 순서와 목록 갱신의 의미를 분리하기 (2026-09-05)
+- **접근법**: `src/context/AuthContext.render.test.tsx`에서 A·B 계정의 응답 순서를 뒤집고 로그아웃 뒤 응답을 재현한다 → 조회 시작 시 역할을 비우고 성공·실패에 요청 세대 검사를 둔다 → `src/features/semester/semesterSubscription.test.ts`에서 출석 100회 변경의 콜백 수를 비교해 동일한 학기 metadata 전달을 억제한다.
+- **판단 질문**: 역할 판정은 기존 `resolveMinistryRoles`와 자기조회 경로를 유지했다. 학기 루트 구독 분할은 DB 경로·소유권 설계가 필요하므로 화면 갱신 최적화와 함께 바꾸지 않았다.
+- **재사용 규칙**: 계정이 바뀌는 비동기 조회는 성공·실패 모두 최신 요청인지 검사하고, 상위 DB 갱신을 UI에 전달하기 전에 소비하는 metadata가 실제 바뀌었는지 비교한다. 콜백 감소를 DB 전송량 감소로 보고하지 않는다.
+
+### 수련회 전환과 표시 정보 갱신의 구독 경계를 분리하기 (2026-09-05)
+- **접근법**: `src/app/retreat/[id]/field/IguardClient.render.test.tsx`에서 실제 `IguardClient`와 `useRetreatData`를 사용해 A 수련회 2026년에서 B 수련회 2027년으로 전환한다 → workspace를 `key={id}`로 구분하고 현재 ID와 metadata ID가 일치할 때만 연도 구독을 시작한다 → 구독 해제 후 이전 성공·오류 응답을 전달해 상태뿐 아니라 `mergeRetreatWorkspaceSnapshot`의 캐시 갱신도 차단한다 → metadata 오류와 실제 없는 수련회의 문구를 구분한다 → `PortalHome.render.test.tsx`·`useMyPageData.render.test.tsx`에서 이름 변경, ID 목록 변경, 동일 날짜 기간의 순서를 대조하고 기간 구독 의존성을 순서 있는 ID 목록으로 좁힌다.
+- **판단 질문**: 현장 workspace key에 뷰·이름을 넣으면 같은 수련회 안의 화면 이동에도 구독과 선택을 초기화하므로 ID만 사용한다. unsubscribe만으로 이미 큐에 들어온 응답과 캐시 부작용을 취소했다고 가정하지 않는다. 수련회 객체 배열을 ID 목록으로 바꾸면서 정렬하면 같은 날짜 기간의 우선순위까지 바뀌므로 원래 순서를 유지한다. 데이터 경로·역할 정책·행정 원본 쓰기 경계는 이 수명 수정과 함께 변경하지 않는다.
+- **재사용 규칙**: 실시간 화면은 `대상 ID가 정하는 상태 수명 → 일치한 metadata로 하위 구독 → 해제 후 모든 부작용 차단 → 순서를 보존한 실제 입력 의존성`으로 나누고, 이름 변경과 대상 변경을 각각 검증한다.
 
 ## 날짜별 학습 기록 — 현재 지침과 구분
 

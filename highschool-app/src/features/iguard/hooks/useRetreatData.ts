@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   subscribeToCellColors,
   subscribeToConnection,
@@ -151,25 +151,31 @@ export function useRetreatData(id: string): RetreatData {
   // 수련회 메타 구독
   useEffect(() => {
     if (!id) return;
+    let alive = true;
     const unsub = subscribeToRetreat(id,
       r => {
+        if (!alive) return;
         setRetreat(r);
         mergeRetreatWorkspaceSnapshot(id, { retreat: r as AdminRetreat | null });
         okPath("수련회 정보");
         setRetreatLoading(false);
       },
-      e => { failPath("수련회 정보")(e); setRetreatLoading(false); });
-    return unsub;
+      e => { if (alive) { failPath("수련회 정보")(e); setRetreatLoading(false); } });
+    return () => { alive = false; unsub(); };
   }, [id, failPath, okPath]);
 
   // 연결 상태 구독 — 수련회와 무관한 앱 전역 상태라 별도 useEffect
-  useEffect(() => subscribeToConnection(
-    value => { setConnected(value); okPath("연결 상태"); },
-    failPath("연결 상태"),
-  ), [failPath, okPath]);
+  useEffect(() => {
+    let alive = true;
+    const unsub = subscribeToConnection(
+      value => { if (alive) { setConnected(value); okPath("연결 상태"); } },
+      error => { if (alive) failPath("연결 상태")(error); },
+    );
+    return () => { alive = false; unsub(); };
+  }, [failPath, okPath]);
 
   // 데이터 구독은 id·연도에만 의존 — 메타(이름/날짜) 실시간 변경 시 재구독하지 않도록
-  const retreatYear = retreat?.year;
+  const retreatYear = retreat?.id === id ? retreat.year : undefined;
   const dataScope = retreatYear == null ? null : `${id}:${retreatYear}`;
   const dataLoading = dataScope == null || loadedScope !== dataScope;
   useEffect(() => {
@@ -182,42 +188,54 @@ export function useRetreatData(id: string): RetreatData {
     ], () => { if (alive) setLoadedScope(scope); });
     // 성공하면 그 경로의 이전 실패를 지운다 — 권한이 열린 뒤 재구독하면 배너가 사라진다.
     const ready = (key: string) => {
-      if (alive) okPath(key);
+      if (!alive) return;
+      okPath(key);
       readiness.markReady(key);
+    };
+    const receive = <T,>(setter: Dispatch<SetStateAction<T>>, key: string) => (value: T) => {
+      if (!alive) return;
+      setter(value);
+      ready(key);
     };
     // 구독 에러(권한 거부·규칙 변경 등) 시: 실패한 경로를 배너에 모으고 해당 키를 ready 처리해
     // dataLoading이 영원히 true로 남는 "무한 스피너"를 방지한다.
     const fail = (key: string) => (error: Error) => {
-      if (alive) failPath(key)(error);
+      if (!alive) return;
+      failPath(key)(error);
       readiness.markReady(key);
     };
     const unsubs = [
-      subscribeToStudentsByYear(retreatYear, value => { setStudents(value); ready("students"); }, fail("students")),
-      subscribeToParticipants(id, value => { setParticipants(value); ready("participants"); }, fail("participants")),
-      subscribeToTeacherAttendances(id, value => { setAdminTeachers(value); ready("adminTeachers"); }, fail("adminTeachers")),
+      subscribeToStudentsByYear(retreatYear, receive(setStudents, "students"), fail("students")),
+      subscribeToParticipants(id, receive(setParticipants, "participants"), fail("participants")),
+      subscribeToTeacherAttendances(id, receive(setAdminTeachers, "adminTeachers"), fail("adminTeachers")),
       subscribeToGroups(id, value => {
+        if (!alive) return;
         setGroups(value);
         mergeRetreatWorkspaceSnapshot(id, { groups: value as AdminGroup[] });
         ready("groups");
       }, fail("groups")),
-      subscribeToRooms(id, value => { setRooms(value); ready("rooms"); }, fail("rooms")),
-      subscribeToIguardMeals(id, value => { setMeals(value); ready("meals"); }, fail("meals")),
-      subscribeToIguardSchedule(id, value => { setSchedule(value); ready("schedule"); }, fail("schedule")),
-      subscribeToIguardSegments(id, value => { setSegments(value); ready("segments"); }, fail("segments")),
-      subscribeToIguardPosts(id, value => { setPosts(value); ready("posts"); }, fail("posts")),
-      subscribeToIguardMovements(id, value => { setMovementRecords(value); ready("movements"); }, fail("movements")),
-      subscribeToIguardBuses(id, value => { setBuses(value); ready("buses"); }, fail("buses")),
-      subscribeToIguardSeating(id, value => { setSeating(value); ready("seating"); }, fail("seating")),
-      subscribeToMilestones(value => { setTodos(value); ready("todos"); }, fail("todos")),
-      subscribeToIguardGuide(id, value => { setGuide(value); ready("guide"); }, fail("guide")),
-      subscribeToRetreatPeriods(id, value => { setPeriods(value); ready("periods"); }, fail("periods")),
-      subscribeToIguardAttendance(id, (value, info) => { setAttendanceKeys(value); setAttendanceInfo(info); ready("attendance"); }, fail("attendance")),
-      subscribeToPartialAttendances(id, value => { setPartial(value); ready("partial"); }, fail("partial")),
-      subscribeToCellColors(id, value => { setCellColors(value); ready("cellColors"); }, fail("cellColors")),
-      subscribeToIguardGroupStaff(id, value => { setGroupStaff(value); ready("groupStaff"); }, fail("groupStaff")),
-      subscribeToIguardGbs(id, value => { setGbs(value); ready("gbs"); }, fail("gbs")),
-      subscribeToIguardLodgingMaps(id, value => { setLodgingMaps(value); ready("lodgingMaps"); }, fail("lodgingMaps")),
+      subscribeToRooms(id, receive(setRooms, "rooms"), fail("rooms")),
+      subscribeToIguardMeals(id, receive(setMeals, "meals"), fail("meals")),
+      subscribeToIguardSchedule(id, receive(setSchedule, "schedule"), fail("schedule")),
+      subscribeToIguardSegments(id, receive(setSegments, "segments"), fail("segments")),
+      subscribeToIguardPosts(id, receive(setPosts, "posts"), fail("posts")),
+      subscribeToIguardMovements(id, receive(setMovementRecords, "movements"), fail("movements")),
+      subscribeToIguardBuses(id, receive(setBuses, "buses"), fail("buses")),
+      subscribeToIguardSeating(id, receive(setSeating, "seating"), fail("seating")),
+      subscribeToMilestones(receive(setTodos, "todos"), fail("todos")),
+      subscribeToIguardGuide(id, receive(setGuide, "guide"), fail("guide")),
+      subscribeToRetreatPeriods(id, receive(setPeriods, "periods"), fail("periods")),
+      subscribeToIguardAttendance(id, (value, info) => {
+        if (!alive) return;
+        setAttendanceKeys(value); setAttendanceInfo(info); ready("attendance");
+      }, fail("attendance")),
+      subscribeToPartialAttendances(id, receive(setPartial, "partial"), fail("partial")),
+      subscribeToCellColors(id, receive(setCellColors, "cellColors"), fail("cellColors")),
+      subscribeToIguardGroupStaff(id, receive(setGroupStaff, "groupStaff"), fail("groupStaff")),
+      subscribeToIguardGbs(id, receive(setGbs, "gbs"), fail("gbs")),
+      subscribeToIguardLodgingMaps(id, receive(setLodgingMaps, "lodgingMaps"), fail("lodgingMaps")),
       subscribeToRetreatPrograms(id, value => {
+        if (!alive) return;
         setPrograms(value);
         mergeRetreatWorkspaceSnapshot(id, { programs: value });
         ready("programs");

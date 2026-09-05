@@ -11,26 +11,27 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 현재 구조와 시작점
 
 - **Next.js App Router + React + TypeScript PWA**다. `next.config.ts`의 `output: 'export'`로 `out/`를 만들고 Firebase Hosting에 배포한다. 운영 주소는 `https://woori-high.web.app`이다.
-- `src/app/layout.tsx` → `AppProvider` → `AppShell`이 공통 레이아웃이다. `/`는 `/attendance`로 이동하고, `/attendance`·`/manage`·`/stats`·`/overall`·`/admin`은 탭 컴포넌트의 래퍼다. 서버 API 라우트는 현재 없다.
+- `src/app/layout.tsx` → `AppProvider` → `AppShell`이 공통 레이아웃이다. `/`는 일반 관리자에게 `/dashboard`, 교사·데모에게 `/attendance`를 연다. `/dashboard`·`/attendance`·`/manage`·`/stats`·`/overall`·`/admin`은 화면 컴포넌트의 래퍼다. 서버 API 라우트는 현재 없다.
 - 인증은 **Firebase 이메일·비밀번호 로그인**이다. 통합 앱의 Google OAuth 설명을 이 앱에 적용하지 않는다. `AppShell`이 인증 게이트를 운영하고 `useAuth.ts`는 로그인·로그아웃 함수를 제공한다.
 - 활성 서비스는 이 앱과 `../highschool-app/`이다. 수련회·이가드·학기 기능은 통합 앱의 모듈이며, 제거된 독립 앱을 새 의존 대상으로 만들지 않는다.
 
 | 영역 | 먼저 볼 파일 | 유지할 계약 |
 |---|---|---|
 | 공유 상태·반 선택 | `src/store/AppContext.tsx`, `src/components/ClassTabBar.tsx` | reducer action과 기존 selector 사용 |
-| 인증·데이터 구독 | `src/components/AppShell.tsx`, `src/hooks/useFirebaseData.ts` | 인증 후 구독, 교사 본인 반 범위, 에러 콜백·구독 해제 |
-| 출석·통계 | `src/components/tabs/AttendanceTab.tsx`, `src/utils/attendanceWorkflow.ts`, `src/utils/dates.ts` | KST 주일·행사 제외·최근 4회·장결 분리 |
+| 인증·데이터 구독 | `src/components/AppShell.tsx`, `src/components/DataLoadGate.tsx`, `src/hooks/useFirebaseData.ts` | 현재 인증·revision의 응답만 적용, 세 원장 준비 후 페이지 표시, 지속 오류·명시 재시도, 교사 본인 반 범위 |
+| 관리자 셸·주간 현황 | `src/components/admin/`, `src/lib/adminNavigation.ts`, `src/utils/adminDashboard.ts` | 일반 관리자만 진입, 기존 구독 재사용, 입력 업무와 출석 통계의 분모 구분 |
+| 출석·통계 | `src/components/tabs/AttendanceTab.tsx`, `src/utils/attendanceEntry.ts`, `src/utils/attendanceWorkflow.ts`, `src/utils/dates.ts` | KST 주일·행사 제외·역할별 날짜 범위·장결 분리 |
 | 학생 명단 | `src/components/modals/`, `src/components/tabs/ManageTab.tsx` | 학생 단일 경로 쓰기·personId·행정 이력 |
 | 시트 동기화 | `src/lib/sheetSync.ts`, `src/components/tabs/SheetSyncSection.tsx` | 미리보기와 payload 분리, 출석·SID 보존 |
 | 계정·교사·전체 현황 | `src/components/tabs/AdminTab.tsx`, `src/components/tabs/overall/` | 출석부 권한과 플랫폼 권한 구분 |
 | 공용 처리 | `src/utils/personId.ts`, `adminChange.ts`, `export.ts`, `image.ts`, `chartSetup.ts`, `dbError.ts` | 기존 순수 함수 재사용·민감값 최소화 |
-| 스타일·PWA | `src/app/globals.css`, `public/sw.js`, `public/manifest.json` | CSS 변수·모바일 화면·캐시 제외 목록 |
+| 스타일·PWA | `src/app/globals.css`, `src/components/admin/*.css`, `public/sw.js`, `public/manifest.json` | 관리자 스타일 범위·CSS 변수·모바일 화면·캐시 제외 목록 |
 
 `src/lib/db.ts`가 DB SDK와 초기화 객체를 노출하는 진입점이다. 컴포넌트·훅은 `@/lib/db`를 사용하고 `firebase/database`를 직접 import하지 않는다. 인증용 `auth`는 `src/lib/firebase/client.ts`에서 가져온다. 현재 경로는 대부분 기존 호출부에 있으며, 이 앱에 존재하지 않는 `paths.ts`나 통합 앱의 `snapToList`를 이미 사용하는 것으로 가정하지 않는다.
 
 ## DB 소유권과 권한
 
-작업 시작 시 루트 매뉴얼의 DB 안전 4문답에 답한다. 운영 DB 직접 쓰기는 명시 승인과 사전 스냅샷이 필요하다. 문서 점검이나 코드 검증을 운영 쓰기·배포 승인으로 간주하지 않는다.
+작업 시작 시 루트 매뉴얼의 DB 안전 4문답에 답한다. 운영 DB 직접 쓰기는 명시 승인과 사전 스냅샷이 필요하다. 문서 점검이나 코드 검증을 운영 DB 쓰기 승인으로 간주하지 않는다. 운영 앱 구현·수정은 2026-09-05 상시 승인에 따라 검증·PR 검토·에이전트 병합·Hosting 운영 배포까지 진행하며 재승인을 요청하지 않는다. 조사·리뷰·문서만 요청한 작업과 사용자 배포 보류는 제외한다. DB·Rules·계정/권한 변경은 루트의 별도 승인 경계를 유지한다.
 
 | 이 앱이 관리하는 경로 | 용도·교차 앱 영향 |
 |---|---|
@@ -51,7 +52,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - 반 키는 `{part}-{grade}-{class}`, 출석 셀 키는 `evKey(mi, di)`의 `{월 인덱스}-{주일 인덱스}`다. 출석 값은 `O`/`X`/`T`이며 미입력 쓰기는 해당 셀을 `null`로 지운다. 한 번의 출석 입력은 `attendance/{year}/{ck}/{sid}/{weekKey}` 한 칸만 갱신한다.
 - 교사는 행사·휴일을 제외한 최근 정상 주일 4회만 수정한다. 저장 중·성공·실패·재시도 안내를 보존한다. 관리자의 전체 기간 편집 범위와 구분한다.
+- 대시보드에서 출석부를 열 때는 선택한 반·학기와 `/attendance?week={주일 키}`를 함께 전달한다. `buildAttendanceEntry()`는 관리자에게 선택 연도 정상 주일 전체, 교사·데모에게 최근 4회만 허용한다. 쿼리로 범위를 확대하지 않고 유효한 수동 선택이 쿼리보다 우선한다. `src/app/attendance/page.tsx`의 `Suspense`를 유지해 `useSearchParams`의 정적 빌드를 지원한다.
 - `jang === true` 학생은 원본을 유지하고 일반 출석·통계·내보내기에서 분리한다. SID의 `J`만 보고 장결자로 판단하지 않는다. 화면 정렬·번호는 `sortAndRenumber()`로 처리한다.
+- 관리자 주간 현황의 전체 출석 통계는 기존 전체 현황처럼 장결 기록을 포함한다. `attendanceRate = present / recorded`이며 `recorded`는 O·X·T 합계다. 입력 업무는 일반 학생의 `inputStudentCount`·`inputRecorded`로만 계산한다. 전원 장결 반(`no-targets`)·빈 반(`no-students`)·조회 주일 없음(`no-week`)을 입력 완료나 확인 필요 반으로 세지 않는다.
 - 학생 수정·이동·삭제는 해당 학생 경로와 관련 경로를 루트 `update()`로 묶는다. `RosterModal`의 확인 후 명단 교체, 시트 동기화, 진급에는 현재 전체 `students` 교체 경로가 있으므로 일반 수정의 본보기로 복사하지 않는다. 전체 덮어쓰기를 추가·수정할 때는 백업·복구 범위를 먼저 검토한다.
 - `personId`는 영구 연결용 선택 필드다. 기존 sid·pid·출석 참조키를 대체하지 않는다. 생성 시 `person_student_*`·`person_teacher_*`·`person_staff_*`를 구분하고, 편집·이동·진급·동기화에서는 보존한다. 학생 과거 ID 재사용은 이름·생년월일·부서·정상 진급선·연도별 유일 후보 조건을 `personId.ts`에 위임한다. 같은 연도 다른 ID와 보호자 연락처만으로 합치지 않는다.
 - 관리자 학생 변경은 원본과 `classes/{year}/{ck}/adminChanges/{changeId}`를 같은 update에 기록한다. `adminChange.ts`의 `VALUE_FIELDS`에 있는 **이름·학교만** 실제 값을 남긴다. 연락처·주소·생년월일·사진은 값 없이 필드 이름과 입력/변경/삭제만 기록한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
@@ -59,16 +62,44 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 주일 당일 동기화는 오늘 열을 건드리지 않는다. `lastElapsedSundayUTC`와 토·일·월 회귀 테스트를 유지한다. 시트 반 이동은 기존 출석 스냅샷에서 **시트 값이 없는 칸만** 이관한 후 옛 출석 경로를 삭제한다. 스냅샷이 없으면 이관·삭제하지 않는다.
 - 시트 행정 이력은 `describeSheetSyncForClass()`가 변동 없는 반에 `null`을 반환하면 남기지 않는다. `removeMissing`으로 제외되는 학생의 출석은 이관 목적지가 없어 의도적으로 보존한다. 자동 정리되지 않는 `trash/{year}/attendance`를 새로 만들지 않는다.
 - 사진은 `compressImage()`로 압축하고, 인쇄 HTML에 사용자 값을 넣을 때는 `escapeHTML()`을 거친다. 내보내기·차트는 기존 `export.ts`·`chartSetup.ts`의 동적 로딩을 재사용한다.
+- 계정 역할·연도·재조회가 바뀌면 `AppContext.resetData`가 원장·행사·계정 목록·편집 대상을 함께 비우고 `dataRevision`을 증가시킨다. 구독 성공·오류와 관리자 계정 목록 응답에는 요청 당시 revision을 붙인다. `DataLoadGate`의 세 원장 준비 조건을 우회해 이전 자료나 실패한 빈 자료로 편집 화면을 열지 않는다.
+- `watchCalendarYear`는 실제 KST 연도 변경만 알리고 최신 예약 타이머까지 종료한다. `CALENDAR_YEAR_CHANGED`는 직전 달력 연도 조회 중에만 새해로 넘기므로, 수동 과거 연도 선택을 화면 복귀 때 덮어쓰지 않는다.
 
 ## 데모·운영 화면 점검 주의
 
 - 데모는 `src/lib/demo.ts`와 빌드 시 `NEXT_PUBLIC_DEMO_*` 값으로 켜진다. 공용 Firebase 계정으로 실제 로그인하며 **운영 DB와 분리된 샘플 모드가 아니다**. `attendanceAdmins` 권한을 가진 계정의 화면만 교사처럼 제한한다.
-- 반 선택은 보안 경계가 아니다. `AppShell`의 데모 `/admin`·`/overall` 차단, `demoSelection`/`demoLastSelection` 구분, 관리자 로그인 의도 플래그를 유지한다. 데모 값을 보고서·로그에 출력하거나 자격정보를 커밋하지 않는다.
+- 반 선택은 보안 경계가 아니다. `AppShell`과 `adminNavigation.ts`의 교사·데모 `/dashboard`·`/admin`·`/overall` 차단, `demoSelection`/`demoLastSelection` 구분, 관리자 로그인 의도 플래그를 유지한다. 데모 값을 보고서·로그에 출력하거나 자격정보를 커밋하지 않는다.
+- `canUseAdminWorkspace(role, isDemo)`가 허용하는 일반 관리자만 `AdminWorkspace`를 사용한다. 관리자의 첫 기본 진입은 `/dashboard`로 안내하되 `createAdminEntryTracker()`가 저장한 방문과 날짜 직접 링크를 보존한다. 교사·공용 데모의 기존 `TopBar`·`TabNav`, 자동 로그인·반 선택·관리자 접근 흐름은 유지하고 새 인증 구독이나 데모 권한 변경을 추가하지 않는다.
 - 2026-09-05 사용자가 데모 모드 유지를 요청해 `NEXT_PUBLIC_DEMO_MODE=1`과 기존 데모 자격정보를 복구하고 Hosting을 다시 배포했다. 운영 브라우저에서 공용 계정 자동 로그인 뒤 부서·학년·반 선택 화면이 나타나는 것을 확인했다. Firebase Auth 데모 계정과 `attendanceAdmins/{demoUid}` 레코드도 의도적으로 유지한다. 이후 종료 요청 시 플래그·공개 자격정보·Auth 계정·권한 레코드를 함께 회수하되, 운영 DB 레코드 삭제는 명시 승인과 사전 스냅샷 뒤에만 수행한다.
 - `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS=false`는 임시 노출 정책이다. 문서 정리 중 임의로 켜지 않는다.
 - 관리자 로그인·연도 변경만으로 오래된 `classes`·`attendance`·`events`를 정리하지 않는다. `TrashModal`도 모든 복구본을 조회만 하며, 영구 삭제는 사용자가 항목별 `삭제` → `확인`을 누른 경우에만 실행한다. 이 계약을 화면 진입 effect의 자동 쓰기로 되돌리지 않는다.
 
 ## 핵심 코드 패턴
+
+### 관리자 입력 업무와 전체 출석 통계의 대상을 분리하기 (2026-09-05)
+- **접근법**: `src/components/tabs/AttendanceTab.tsx`의 일반 학생 입력·장결 이력 조회 대상을 확인한다 → `src/utils/adminDashboard.ts`에서 전체 `studentCount`·`recorded`와 일반 대상 `inputStudentCount`·`inputRecorded`를 따로 합산한다 → 일반 20명 전원 입력·장결 1명 미기록, 전원 장결, 장결자만 기록된 반을 `__tests__/adminDashboard.test.ts`로 검증한다 → 입력률·완료·확인 필요는 일반 대상, 출석률은 기존 장결 포함 O/(O+X+T)로 표시한다.
+- **판단 질문**: 출석 통계의 분모를 그대로 입력 완료에 쓰면 화면에서 입력할 수 없는 장결 학생 때문에 반이 영구 미완료로 남는다. 이를 해결하려고 기존 전체 출석 통계에서 장결 기록까지 제외하지 않는다. 빈 반·전원 장결·조회 주일 없음도 서로 구분한다.
+- **재사용 규칙**: 업무 완료율은 실제 편집 대상과 맞추고, 기존 통계 분모는 별도 필드와 회귀 테스트로 보존한다.
+
+### 관리자 첫 진입과 출석 날짜 직접 링크를 함께 보존하기 (2026-09-05)
+- **접근법**: `src/lib/adminNavigation.ts`에 일반 관리자·교사·데모의 셸과 경로 판정을 모은다 → `createAdminEntryTracker()`로 인증 세션 첫 기본 진입만 `/dashboard`로 안내한다 → 반·학기 선택과 `/attendance?week=…`를 함께 전달한다 → `src/utils/attendanceEntry.ts`에서 역할별 허용 주일 안에서 날짜를 파생하고 수동 선택을 우선한다 → `__tests__/adminNavigation.test.ts`·`attendanceEntry.test.ts`로 직접 링크·행사·교사 최근 4회 제한을 확인한다.
+- **판단 질문**: 로그인 때마다 대시보드로 보내면 날짜 직접 링크와 진행 중인 출석 업무를 잃는다. URL의 주일 키를 그대로 편집 범위로 쓰면 교사·데모가 최근 4회 제한을 벗어난다. `useSearchParams`를 도입할 때는 `src/app/attendance/page.tsx`의 `Suspense`도 함께 두어 정적 export를 유지한다.
+- **재사용 규칙**: 기본 첫 화면 안내·사용자가 요청한 이동·실제 편집 권한을 각각 판정하고, 화면 진입을 새 인증·운영 DB 쓰기에 연결하지 않는다.
+
+### 통계 차트가 무관한 상태 변경에도 다시 만들어질 때 (2026-09-05)
+- **접근법**: `src/components/tabs/StatTab.tsx`의 effect 의존 배열을 실제 참조와 대조한다 → 매 렌더마다 새로 만드는 미사용 `classKeys`를 제거한다 → `calcStats` 다섯 호출을 `src/utils/classStats.ts`의 한 집계로 묶고 실제 입력으로 메모한다 → `src/components/tabs/overall/OverallDashboard.tsx`의 네 차트를 입력별 effect로 나누고 각 effect가 자신의 인스턴스만 해제하게 한다 → 기존 기간별 출력·셀 접근 횟수와 부서 필터 변경 시 실제 Chart.js 생성·해제 횟수를 대조한다. 로컬 540명·52주 fixture의 차트 부서 필터 한 번 변경에서는 재생성이 네 개에서 해당 한 개로 줄었다.
+- **판단 질문**: `useClassKeys`의 다른 소비처는 렌더·클릭용이라 전역 Context 재설계로 넓히지 않았다. 차트 종류·분모·옵션은 유지해 계산 재사용의 효과만 확인했다. 네 차트를 하나의 effect에 두면 작은 필터 변경도 무관한 세 차트의 해제·생성을 유발하므로 입력별 수명을 분리했다.
+- **재사용 규칙**: 차트 최적화는 effect를 깨우는 참조·중복 집계·인스턴스 소유 범위를 함께 확인하고, 동일 출력과 실제 계산·생성 횟수로 검증한다. 부분 작업량 감소를 전체 화면 처리시간 감소로 보고하지 않는다.
+
+### 계정·연도 전환 중 이전 원장과 편집 대상을 함께 차단하기 (2026-09-05)
+- **접근법**: `__tests__/firebaseDataLifecycle.test.ts`에서 이전 계정·연도 콜백을 새 상태 뒤에 전달한다 → `src/store/AppContext.tsx`의 `resetData`로 원장·행사·계정 목록·모달을 함께 비우고 `dataRevision`을 증가시킨다 → `src/hooks/useFirebaseData.ts`의 구독 success/error 및 `src/components/tabs/AdminTab.tsx`의 계정 목록 조회에 요청 revision을 붙여 reducer에서 거부한다 → `DataLoadGate`는 세 원장의 성공 여부와 지속 오류로 편집 진입을 판정하고 명시 재시도로 새 구독을 연다 → `AppShell`과 `useAuth`의 역할 조회에 요청 번호·실제 UID·해제 여부 검사를 둔다 → `yearRollover.test.ts`로 실제 KST 연도 전환과 마지막 타이머 종료를 확인한다.
+- **판단 질문**: unsubscribe만으로는 React effect cleanup 전 이미 도착한 이전 응답을 막을 수 없어 reducer에도 세대 검사를 둔다. 오류를 빈 원장 성공으로 바꾸거나 지연만으로 편집을 열지 않는다. `SET_YEAR`에서 이전 커스텀 행사로 새해 통계 제외 조건을 만들지 않고, 달력 연도 변경과 사용자의 과거 연도 조회를 분리한다. 이 상태 초기화는 운영 DB 삭제가 아니다.
+- **재사용 규칙**: 데이터 범위가 바뀌는 화면은 `요청 취소 + 응답 적용 시 세대 확인 + 편집 대상 초기화 + 현재 원장 준비 확인`을 함께 구현하고, 실패·지연에는 복구 제어를 유지한다.
+
+### 실패한 차트 로딩을 캐시에 고정하지 않고 다시 시도하기 (2026-09-05)
+- **접근법**: `src/utils/chartSetup.ts`의 `createChartRegistry`에 모듈 로더를 주입한다 → 동시 요청과 성공 결과는 공유하되 실패한 Promise는 비운다 → `createChartLoader`가 반환하는 cleanup으로 화면 해제 뒤 성공·실패 전달을 막는다 → `src/hooks/useChartJs.ts`와 `ChartLoadState`에 오류·명시 재시도를 모은다 → `__tests__/chartSetup.test.ts`에서 실패 후 성공·동시 요청·해제·초기화 예외를 확인하고 로컬 브라우저에서 실패 안내와 키보드 재시도를 점검한다.
+- **판단 질문**: 실패한 Promise를 계속 공유하면 네트워크가 돌아와도 같은 실패만 반복하므로 성공 캐시와 분리한다. 자동 무한 재시도로 오류를 숨기거나 차트 모듈 실패 때문에 이미 계산 가능한 출석 표까지 막지 않는다. 주입한 로더 실패 검증을 실제 Firebase 단절 검증으로 설명하지 않는다.
+- **재사용 규칙**: 지연 로딩 자원은 `동시 요청 공유 → 성공 캐시 → 실패 캐시 해제 → 화면 수명 검사 → 사용자 재시도`를 한 계약으로 검증한다.
 
 ### 학생 반 이동과 화면 진입 정리를 데이터 유실 없이 다루기 (2026-09-05)
 - **접근법**: `sheetSync.ts`의 출석 이관 계약을 먼저 확인한다 → 부·학년 선택 변경 때 반 선택을 초기화한다 → 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 두 leaf 제거는 한 `onDisconnect(yearRef).update()`로 선점 전 등록하고 선점 직후 다시 등록한다 → 서버 시간 오프셋을 확인한 뒤 원본 학생·목적지 반·양쪽 출석을 다시 읽는다 → 목적지 출석 셀을 우선해 병합하고 목적지 반이 없거나 같은 SID 학생이 있으면 중단한다 → 잠금 두 개를 `pending`으로 정확히 전환하면서 `startedAt`을 서버 보정 시각으로 갱신한다 → 종료 예약 취소 완료와 pending 소유권 재확인 뒤, 학생·출석·감사기록·두 잠금 해제·불변 `studentMoveCommits` marker를 단발 루트 REST PATCH에 묶는다 → 성공 후 부·학년·반 선택을 모두 목적지에 맞춘다 → 로그인·연도 변경 및 `TrashModal` 로드 effect에서 삭제 쓰기를 제거한다.
@@ -88,9 +119,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 명령은 `attendance-app/`에서 실행한다. 현재 설치 버전과 지원 범위는 `package.json`·lockfile·로컬 Next 문서로 확인한다.
 
 ```bash
-npm test
-npx tsc --noEmit
 npm run lint
+npm run typecheck
+npm test
 npm run build
 ```
 

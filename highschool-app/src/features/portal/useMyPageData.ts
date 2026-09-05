@@ -105,7 +105,10 @@ export function useMyPageData() {
           setRetreats([...values].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
           setLoaded(true);
           ok("수련회 목록");
-        }, fail("수련회 목록")),
+        }, (error) => {
+          fail("수련회 목록")(error);
+          setLoaded(true);
+        }),
         subscribeToMilestones((values) => {
           setMilestones(values);
           ok("공유 일정");
@@ -127,13 +130,15 @@ export function useMyPageData() {
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [fail, hasPortalAccess, ok, roles, user]);
 
+  // 기간 시작일이 같으면 수련회 목록의 순서로 선택하므로 ID 순서를 보존한다.
+  const retreatIdsKey = JSON.stringify(retreats.map((retreat) => retreat.id));
   useEffect(() => {
     if (!user || !hasPortalAccess) return;
-    return subscribeToAllRetreatPeriods(retreats.map((retreat) => retreat.id), (values) => {
+    return subscribeToAllRetreatPeriods(JSON.parse(retreatIdsKey) as string[], (values) => {
       setPeriods(values);
       ok("수련회 기간");
     }, fail("수련회 기간"));
-  }, [fail, hasPortalAccess, ok, retreats, user]);
+  }, [fail, hasPortalAccess, ok, retreatIdsKey, user]);
 
   const currentSemester = useMemo(() => (
     semesters.find((semester) => {
@@ -162,9 +167,10 @@ export function useMyPageData() {
     return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
   }, [periods, retreats, today]);
 
+  const currentRetreatId = currentRetreat?.id;
   useEffect(() => {
-    if (!user || !currentRetreat || iguardScopeOf(roles) === "none") return;
-    const id = currentRetreat.id;
+    if (!user || !currentRetreatId || iguardScopeOf(roles) === "none") return;
+    const id = currentRetreatId;
     const unsubs = [
       subscribeToGroups(id, (values) => { setGroups(values); ok("조 편성"); }, fail("조 편성")),
       subscribeToTeacherAttendances(id, (values) => { setTeachers(values); ok("교사 참석"); }, fail("교사 참석")),
@@ -175,7 +181,7 @@ export function useMyPageData() {
       subscribeToIguardPosts(id, (values) => { setPosts(values); ok("현장 포스트"); }, fail("현장 포스트")),
     ];
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [currentRetreat, fail, ok, roles, user]);
+  }, [currentRetreatId, fail, ok, roles, user]);
 
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
     const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters";

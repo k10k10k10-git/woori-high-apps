@@ -15,6 +15,9 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
     classData: {},
     attData: {},
     customEventsData: {},
+    dataRevision: 0,
+    dataLoaded: { classes: false, attendance: false, events: false },
+    dataErrors: { classes: null, attendance: null, events: null },
     months: [
       { month: 1, sundays: [5, 12, 19, 26] },
       { month: 2, sundays: [2, 9, 16, 23] },

@@ -1,8 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, calcStats } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
-import { getChart } from '@/utils/chartSetup';
+import { useChartJs } from '@/hooks/useChartJs';
+import ChartLoadState from '@/components/ChartLoadState';
 
 function sortClassKeys(keys: string[]): string[] {
   return [...keys].sort((a, b) => {
@@ -14,9 +15,13 @@ function sortClassKeys(keys: string[]): string[] {
   });
 }
 
+function toPoints(rates: (number | null)[]) {
+  return rates.map(r => r === null ? NaN : r);
+}
+
 export default function OverallDashboard() {
   const { state } = useApp();
-  const { classData, attData, months, events, curYear } = state;
+  const { classData, attData, months, events } = state;
 
   const [rateTablePart, setRateTablePart] = useState<'1' | '2'>('1');
   const [weeklyGradePart, setWeeklyGradePart] = useState<'1' | '2'>('1');
@@ -26,21 +31,10 @@ export default function OverallDashboard() {
   const chartWeeklyGradeRef = useRef<HTMLCanvasElement>(null);
   const chartPartRef = useRef<HTMLCanvasElement>(null);
   const chartGradeRef = useRef<HTMLCanvasElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chartInstRef = useRef<any[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chartJsRef = useRef<any>(null);
-  const [chartJsReady, setChartJsReady] = useState(false);
+  const { chartJsRef, chartJsReady, chartLoadError, retryChart } = useChartJs();
 
-  useEffect(() => {
-    getChart().then(Chart => {
-      chartJsRef.current = Chart;
-      setChartJsReady(true);
-    });
-  }, []);
-
-  function monthlyRates(classKeys: string[]): (number | null)[] {
-    return months.map(({ month, sundays }, mi) => {
+  const monthlyRates = useCallback((classKeys: string[]): (number | null)[] => {
+    return months.map(({ sundays }, mi) => {
       const weekKeys = sundays.map((_, di) => evKey(mi, di)).filter(k => !events[k]);
       if (weekKeys.length === 0) return null;
       let total = 0, present = 0;
@@ -54,23 +48,13 @@ export default function OverallDashboard() {
       });
       return total === 0 ? null : Math.round((present / total) * 100);
     });
-  }
+  }, [months, events, classData, attData]);
 
-  useEffect(() => {
-    if (!chartJsReady) return;
-    const Chart = chartJsRef.current;
-    chartInstRef.current.forEach(c => { try { c.destroy(); } catch { /* */ } });
-    chartInstRef.current = [];
-
-    const labels = months.map(m => `${m.month}월`);
-    const allCks = Object.keys(classData);
-    const part1Cks = allCks.filter(k => k.startsWith('1-'));
-    const part2Cks = allCks.filter(k => k.startsWith('2-'));
-
-    function toPoints(rates: (number | null)[]) {
-      return rates.map(r => r === null ? NaN : r);
-    }
-
+  const allCks = useMemo(() => Object.keys(classData), [classData]);
+  const part1Cks = useMemo(() => allCks.filter(k => k.startsWith('1-')), [allCks]);
+  const part2Cks = useMemo(() => allCks.filter(k => k.startsWith('2-')), [allCks]);
+  const labels = useMemo(() => months.map(m => `${m.month}월`), [months]);
+  const { weekLabels, weekKeys } = useMemo(() => {
     const weekLabels: string[] = [];
     const weekKeys: string[] = [];
     months.forEach(({ month, sundays }, mi) => {
@@ -79,14 +63,20 @@ export default function OverallDashboard() {
         if (!events[k]) { weekKeys.push(k); weekLabels.push(`${month}/${day}`); }
       });
     });
-    function weeklyCount(cks: string[]): number[] {
-      return weekKeys.map(k =>
-        cks.reduce((sum, ck) =>
-          sum + (classData[ck]?.students ?? []).filter(s => attData[ck]?.[s.id]?.[k] === 'O').length
-        , 0)
-      );
-    }
+    return { weekLabels, weekKeys };
+  }, [months, events]);
 
+  const weeklyCount = useCallback((cks: string[]): number[] => {
+    return weekKeys.map(k =>
+      cks.reduce((sum, ck) =>
+        sum + (classData[ck]?.students ?? []).filter(s => attData[ck]?.[s.id]?.[k] === 'O').length
+      , 0)
+    );
+  }, [weekKeys, classData, attData]);
+
+  useEffect(() => {
+    if (!chartJsReady || !chartJsRef.current) return;
+    const Chart = chartJsRef.current;
     if (chartWeeklyRef.current) {
       const existing = Chart.getChart(chartWeeklyRef.current);
       if (existing) existing.destroy();
@@ -106,9 +96,13 @@ export default function OverallDashboard() {
           scales: { y: { min: 0 } },
         },
       });
-      chartInstRef.current.push(c);
+      return () => { try { c.destroy(); } catch { /* 이미 해제된 차트 */ } };
     }
+  }, [chartJsReady, chartJsRef, weekLabels, part1Cks, part2Cks, weeklyCount]);
 
+  useEffect(() => {
+    if (!chartJsReady || !chartJsRef.current) return;
+    const Chart = chartJsRef.current;
     if (chartWeeklyGradeRef.current) {
       const existing = Chart.getChart(chartWeeklyGradeRef.current);
       if (existing) existing.destroy();
@@ -133,9 +127,13 @@ export default function OverallDashboard() {
           scales: { y: { min: 0 } },
         },
       });
-      chartInstRef.current.push(c);
+      return () => { try { c.destroy(); } catch { /* 이미 해제된 차트 */ } };
     }
+  }, [chartJsReady, chartJsRef, weekLabels, allCks, weeklyGradePart, weeklyCount]);
 
+  useEffect(() => {
+    if (!chartJsReady || !chartJsRef.current) return;
+    const Chart = chartJsRef.current;
     if (chartPartRef.current) {
       const existing = Chart.getChart(chartPartRef.current);
       if (existing) existing.destroy();
@@ -155,9 +153,13 @@ export default function OverallDashboard() {
           scales: { y: { min: 0, max: 100 } },
         },
       });
-      chartInstRef.current.push(c);
+      return () => { try { c.destroy(); } catch { /* 이미 해제된 차트 */ } };
     }
+  }, [chartJsReady, chartJsRef, labels, part1Cks, part2Cks, monthlyRates]);
 
+  useEffect(() => {
+    if (!chartJsReady || !chartJsRef.current) return;
+    const Chart = chartJsRef.current;
     if (chartGradeRef.current) {
       const existing = Chart.getChart(chartGradeRef.current);
       if (existing) existing.destroy();
@@ -182,15 +184,9 @@ export default function OverallDashboard() {
           scales: { y: { min: 0, max: 100 } },
         },
       });
-      chartInstRef.current.push(c);
+      return () => { try { c.destroy(); } catch { /* 이미 해제된 차트 */ } };
     }
-
-    return () => {
-      chartInstRef.current.forEach(c => { try { c.destroy(); } catch { /* */ } });
-      chartInstRef.current = [];
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classData, attData, months, events, weeklyGradePart, gradeRatePart, chartJsReady]);
+  }, [chartJsReady, chartJsRef, labels, allCks, gradeRatePart, monthlyRates]);
 
   const allClassKeys = sortClassKeys(Object.keys(classData));
   const part1Keys = allClassKeys.filter(k => k.startsWith('1-'));
@@ -354,6 +350,8 @@ export default function OverallDashboard() {
         </div>
       </div>
 
+      <ChartLoadState ready={chartJsReady} error={chartLoadError} onRetry={retryChart} />
+
       <div className="overall-card">
         <div className="overall-card-header">
           <span className="overall-card-title">주차별 전체 출석인원</span>
@@ -366,7 +364,7 @@ export default function OverallDashboard() {
       <div className="overall-card">
         <div className="overall-card-header">
           <span className="overall-card-title">주차별 학년별 출석인원</span>
-          <div style={{ display: 'flex', gap: 4 }} role="tablist" aria-label="부서 선택">
+          <div style={{ display: 'flex', gap: 4 }} role="tablist" aria-label="주차별 학년 출석인원 부서 선택">
             {(['1', '2'] as const).map(p => (
               <button key={p} role="tab" aria-selected={weeklyGradePart === p} className={`view-btn${weeklyGradePart === p ? ' active' : ''}`}
                 style={{ padding: '3px 12px', fontSize: 12 }}
@@ -391,7 +389,7 @@ export default function OverallDashboard() {
       <div className="overall-card">
         <div className="overall-card-header">
           <span className="overall-card-title">학년별 월별 출석률</span>
-          <div style={{ display: 'flex', gap: 4 }} role="tablist" aria-label="부서 선택">
+          <div style={{ display: 'flex', gap: 4 }} role="tablist" aria-label="학년별 월별 출석률 부서 선택">
             {(['1', '2'] as const).map(p => (
               <button key={p} role="tab" aria-selected={gradeRatePart === p} className={`view-btn${gradeRatePart === p ? ' active' : ''}`}
                 style={{ padding: '3px 12px', fontSize: 12 }}

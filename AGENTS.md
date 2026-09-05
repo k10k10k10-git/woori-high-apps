@@ -30,10 +30,10 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 | `highschool-app/` | Next.js 통합 플랫폼: 학기·주일, 수련회 행정, 프로그램 준비, 이가드 현장 | `semesters/*`, `semestersPrivate/*`, `retreats/{id}/*`, `retreatsPrivate/{id}/*`, `retreatAdmins`, `iguard*`, `prepMilestones/*` |
 | `attendance-app/` | Next.js 정적 내보내기 기반 학생 출석 PWA | `classes/`, `attendance/`, `events/`, `userRoles`, `admins`, `attendanceAdmins`, `teacher*`, `trash/`, `suggestions/`; 공유 Rules 원천 |
 | `agent-os/` | 로컬 대시보드와 Claude 작업 실행기 | `AgentOS.command`, `server.js`, `skills.json`; 운영 앱이 아님 |
-| `scripts/verify-all.mjs` | 두 앱 품질 검사 실행 | 루트 `npm run verify` |
+| `scripts/verify-all.mjs` | 두 앱 품질 검사 후 Agent OS 회귀 테스트 실행 | 루트 `npm run verify` |
 | `.github/workflows/` | CI | 통합·학생 앱 품질 검사와 Agent OS 보안 회귀 테스트 |
 | `.claude/`, `.agents/` | 인수인계·로컬 스킬·설정 | `.claude/HANDOFF.md`가 인수인계의 유일한 원천; `.agents/`는 Codex용 변형이며 중복으로 삭제하지 않음 |
-| `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [이번 점검 기록](docs/PROJECT_AUDIT_2026-09-05.md) |
+| `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [속도·안정성 보강](docs/SPEED_STABILITY_REVIEW_2026-09-05.md), [최적화 점검](docs/PROJECT_OPTIMIZATION_2026-09-05.md), [앞선 감사](docs/PROJECT_AUDIT_2026-09-05.md) |
 | `outputs/`, `tmp/`, `graphify-out/` | 최종 산출물·중간물·재생성 가능한 코드 그래프 | 소스·운영 데이터 원천으로 취급하지 않음 |
 
 각 앱은 별도 `package.json`·lockfile·`node_modules`를 사용한다. 루트는 npm workspace 설치 관리자가 아니라 검증 실행기다. 스택 버전·테스트 개수는 실제 파일과 실행 결과로 확인한다.
@@ -76,7 +76,7 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 - 소통·커밋 메시지·코드 주석은 한국어, 커밋은 `영역: 요약`. 같은 목적의 함수를 추가하기 전 기존 lib를 검색한다. `snapToList`의 통합 앱 단일 원천은 `src/lib/db/snapToList.ts`다.
 - 구독에는 에러 콜백과 `loadError` 표시를 연결한다. 이가드 구독은 `useRetreatData`에 모으고 `fail(key)`를 배선한다. 출석·인원체크는 명시 선택·멱등 처리를 유지한다.
 - 순수 로직 버그는 회귀 테스트를 함께 추가한다. 렌더 테스트는 `*.render.test.tsx`와 `@vitest-environment jsdom` docblock을 사용한다. 모달 포커스·ESC·dialog, 토스트 `aria-live`, 아이콘 버튼 이름을 확인한다.
-- 앱마다 다음을 **순차** 실행한다. 루트 `npm run verify`는 두 앱에서 이 순서를 반복하며 첫 실패에서 중단한다.
+- 앱마다 다음을 **순차** 실행한다. 루트 `npm run verify`는 두 앱에서 이 순서를 반복한 뒤 Agent OS의 모든 `*.test.js`를 실행하며 첫 실패에서 중단한다.
 
 ```bash
 npm run lint
@@ -92,7 +92,10 @@ npm run build
 
 ## 배포와 변경 보존
 
-- 배포는 명시 요청 또는 승인된 `/ship` 범위에서만 한다. `.claude/HANDOFF.md`의 2026-09-02 사용자 결정에 따라 **배포 변경은 PR에서 검토 후 사용자가 병합**하는 흐름을 따른다.
+- **2026-09-05 사용자 상시 승인:** 운영 앱의 구현·수정 요청은 검증 → 변경 파일별 커밋·작업 브랜치 푸시 → PR 생성·검토 → **에이전트 병합 → 대상 앱 운영 배포·확인**까지 포함한다. 같은 범위의 병합·배포를 다시 승인받지 않는다. 2026-09-02의 ‘사용자가 PR을 병합’ 결정은 이 승인으로 대체됐다.
+- ‘배포하지 마’, ‘로컬만’, ‘PR까지만’ 같은 사용자 제한은 우선한다. 조사·리뷰·문서 점검·로컬 실험만 요청받은 작업은 운영 배포 대상이 아니다. 운영 DB 직접 쓰기·Rules·계정/권한 변경은 이 상시 승인에 포함되지 않으며 기존 별도 승인·백업 경계를 유지한다.
+- PR 검토와 실제 품질 검사를 생략하지 않는다. 실패 원인과 미검증 범위를 구분해 보고하며 인증 가드 제거·테스트 삭제로 통과시키지 않는다. 코드 회귀·실제 배포 실패는 해결하고 진행한다. 기존 인증 정보 미등록을 실제 E2E 성공으로 표시하지 않는다.
+- 이 저장소에서는 오래된 `/ship`의 직접 `main` 푸시·작업 브랜치 금지나 `/handoff`의 마무리 재확인보다 위 PR 기반 상시 승인 흐름이 우선한다. 다른 저장소에도 쓰는 전역 명령 파일은 임의 수정하지 않는다.
 - `highschool-app`은 Vercel 프로젝트 `highschool-app`으로 배포되며 `main` 푸시가 자동 배포를 유발한다. **앱 내부 `AGENTS.md` 변경도 앱 경로 변경**이므로 문서라고 무조건 배포가 생략되는 것은 아니다. 검증·문서 수정 요청만으로 푸시하지 않는다.
 - 수동 Vercel 배포는 승인된 경우 저장소 루트에서 실행한다. 운영 확인은 `/api/version`의 `buildId`와 배포 대상 커밋 SHA 대조, Production `Ready` 확인이다. CLI 인증·네트워크 제약은 세션마다 확인하며 과거 원격 환경의 실패를 현재 사실로 단정하지 않는다.
 - 통합 앱 운영 주소: `https://woorihigh-app.vercel.app`. 구 별칭 `highschool-app-flame.vercel.app`은 기존 링크 보호용이다.

@@ -67,15 +67,17 @@ export function subscribeSemesters(
   cb: (semesters: Semester[]) => void,
   onError?: (e: Error) => void,
 ): () => void {
+  let previousMetadata: string | undefined;
   return onValue(ref(db, paths.semesters()), (snap) => {
-    if (!snap.exists()) {
-      cb([]);
-      return;
-    }
-    const semesters = Object.entries(snap.val() as Record<string, { meta?: SemesterMeta }>)
+    const semesters = Object.entries((snap.val() ?? {}) as Record<string, { meta?: SemesterMeta }>)
       .filter(([, value]) => !!value.meta)
       .map(([id, value]) => ({ id, meta: value.meta! }))
       .sort((a, b) => b.id.localeCompare(a.id));
+    // 출석·신청 갱신도 루트에 도착한다. 목록에 쓰는 meta가 같으면 React 상태와
+    // 현재 학기에 연결된 하위 구독들을 다시 만들지 않는다. 첫 빈 목록은 전달한다.
+    const metadata = JSON.stringify(semesters);
+    if (metadata === previousMetadata) return;
+    previousMetadata = metadata;
     cb(semesters);
   }, onError);
 }

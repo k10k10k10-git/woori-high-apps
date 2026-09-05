@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
@@ -18,16 +19,17 @@ import TabNav from '@/components/TabNav';
 import Toast from '@/components/Toast';
 import UpdateBanner from '@/components/UpdateBanner';
 import FirebaseDataLoader from '@/components/FirebaseDataLoader';
+import DataLoadGate from '@/components/DataLoadGate';
+import { watchCalendarYear } from '@/utils/yearRollover';
+import AdminWorkspace from '@/components/admin/AdminWorkspace';
+import { canAccessAttendancePath, canUseAdminWorkspace, createAdminEntryTracker } from '@/lib/adminNavigation';
 
 type AuthState = 'loading' | 'demo-pick' | 'login' | 'app';
-
-// 데모 계정은 실제로는 전체 권한(attendanceAdmins)을 가진다. 화면에서 탭을 감추는 것만으로는
-// 주소를 직접 입력하는 접근을 막지 못하므로, 관리자 전용 라우트는 셸에서 차단한다.
-const ADMIN_ONLY_PATHS = ['/admin', '/overall'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { state, dispatch } = useApp();
   const pathname = usePathname();
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
   const [demoError, setDemoError] = useState<string | null>(null);
@@ -37,6 +39,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 데모 자동 로그인은 한 번만 시도한다 — 실패 시 재시도 루프를 막는다.
   const demoTriedRef = useRef(false);
+  const adminEntryRef = useRef<ReturnType<typeof createAdminEntryTracker> | null>(null);
+
+  useEffect(() => {
+    if (adminEntryRef.current) return;
+    let storage: Storage | undefined;
+    try { storage = window.sessionStorage; } catch { /* 제한된 브라우저에서는 메모리 기록을 사용한다. */ }
+    adminEntryRef.current = createAdminEntryTracker(storage);
+  }, []);
 
   // 고른 반을 담임 교사 역할로 적용 (데모 전용)
   const applyDemoSelection = useCallback((sel: DemoSelection): boolean => {
@@ -52,7 +62,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Firebase Auth 감지
   useEffect(() => {
     dispatch({ type: 'SET_FB_READY' });
+    let active = true;
+    let request = 0;
     const unsub = onAuthStateChanged(auth, async user => {
+      const currentRequest = ++request;
+      const isCurrent = () => active && request === currentRequest
+        && (auth.currentUser?.uid ?? null) === (user?.uid ?? null);
+      if (!isCurrent()) return;
+      dispatch({ type: 'SET_USER_ROLE', payload: null });
+      setAuthState('loading');
       if (user) {
         // 데모 계정으로 로그인된 상태 — userRoles를 읽지 않고 고른 반을 그대로 적용한다.
         if (isDemoAccount(user.email)) {
@@ -61,22 +79,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             setDemoError(null);
             setAuthState('app');
           } else {
-            dispatch({ type: 'SET_USER_ROLE', payload: null });
             setAuthState('demo-pick');
           }
           return;
         }
-        const result = await loadUserRole({ uid: user.uid, email: user.email }, dispatch);
+        const result = await loadUserRole({ uid: user.uid, email: user.email }, dispatch, isCurrent);
+        if (!isCurrent() || result === 'stale') return;
         if (result === 'unauthorized') {
-          await doLogout();
           setAuthError('권한이 부여되지 않은 계정입니다.\n관리자에게 문의해 주세요.');
           setAuthState('login');
+          try { await doLogout(); } catch { /* 권한 없는 화면은 계속 로그인 게이트에 둔다. */ }
         } else {
           setAuthError(null);
           setAuthState('app');
         }
       } else {
-        dispatch({ type: 'SET_USER_ROLE', payload: null });
+        adminEntryRef.current?.reset();
         // 데모 모드에서는 관리자 로그인을 명시적으로 누른 경우에만 로그인 화면을 띄운다.
         if (DEMO_MODE && !getAdminIntent()) {
           if (!demoConfigured) {
@@ -90,6 +108,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               await doDemoLogin(); // 성공하면 이 콜백이 다시 호출된다
               return;
             } catch (e) {
+              if (!isCurrent()) return;
               const code = (e as { code?: string })?.code ?? '';
               setDemoError(
                 '데모 계정으로 접속하지 못했습니다.\n' +
@@ -105,8 +124,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setAuthState('login');
       }
     });
-    return unsub;
+    return () => { active = false; request++; unsub(); };
   }, [dispatch, applyDemoSelection]);
+
+  // 첫 로그인만 대시보드로 안내한다. 이후 메뉴 이동·새로고침·깊은 링크는 사용자의 선택이다.
+  useEffect(() => {
+    if (authState !== 'app' || !state.userRole || !auth.currentUser) return;
+    const target = adminEntryRef.current?.take(
+      auth.currentUser.uid, `${pathname}${window.location.search}`, state.userRole, isDemoAccount(auth.currentUser.email),
+    );
+    if (target) router.replace(target);
+  }, [authState, pathname, router, state.userRole]);
 
   // 데모: 반 선택 → 그 반 담임 화면으로
   const handleDemoPick = useCallback((sel: DemoSelection) => {
@@ -191,25 +219,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // KST 자정 연도 전환
   useEffect(() => {
     if (authState !== 'app') return;
-    const checkRollover = () => {
-      const newYear = new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear();
-      if (newYear !== state.curYear) {
-        dispatch({ type: 'SET_YEAR', payload: newYear });
-      }
-    };
-    const scheduleMidnight = () => {
-      const nowKST = new Date(Date.now() + 9 * 3600 * 1000);
-      const msUntil =
-        ((23 - nowKST.getUTCHours()) * 3600 +
-          (59 - nowKST.getUTCMinutes()) * 60 +
-          (60 - nowKST.getUTCSeconds())) * 1000 + 1000;
-      return setTimeout(() => { checkRollover(); scheduleMidnight(); }, msUntil);
-    };
-    const timer = scheduleMidnight();
-    const vis = () => { if (!document.hidden) checkRollover(); };
+    const watcher = watchCalendarYear((previousYear, currentYear) => {
+      dispatch({ type: 'CALENDAR_YEAR_CHANGED', payload: { previousYear, currentYear } });
+    });
+    const vis = () => { if (!document.hidden) watcher.check(); };
     document.addEventListener('visibilitychange', vis);
-    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', vis); };
-  }, [authState, state.curYear, dispatch]);
+    return () => { watcher.stop(); document.removeEventListener('visibilitychange', vis); };
+  }, [authState, dispatch]);
 
   // 로그인 후 모바일 줌 리셋
   // iOS Safari는 input focus 시 자동 확대되는데, 화면 전환 후에도 줌이 유지됨
@@ -256,7 +272,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (authState === 'login') {
     return (
       <LoginScreen
-        onLogin={() => { setAuthError(null); setAuthState('app'); }}
         authError={authError}
         onBackToDemo={DEMO_MODE ? handleBackToDemo : undefined}
       />
@@ -264,6 +279,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const isDemoRole = DEMO_MODE && isDemoAccount(auth.currentUser?.email);
+
+  if (canUseAdminWorkspace(state.userRole, isDemoRole)) {
+    return (
+      <>
+        <Toast />
+        {showUpdate && <UpdateBanner onReload={() => window.location.reload()} />}
+        <AdminWorkspace onLogout={doLogout} isOnline={isOnline}>
+          <FirebaseDataLoader />
+          <DataLoadGate>{children}</DataLoadGate>
+        </AdminWorkspace>
+      </>
+    );
+  }
 
   return (
     <div className="app">
@@ -284,12 +312,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       />
       <div className="content-area">
         <FirebaseDataLoader />
-        {isDemoRole && ADMIN_ONLY_PATHS.includes(pathname) ? (
+        {!canAccessAttendancePath(pathname, state.userRole, isDemoRole) ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14, lineHeight: 1.7 }}>
             관리자 전용 화면입니다.<br />
-            상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.
+            {isDemoRole
+              ? <>상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.</>
+              : <>담당 반의 출석부에서 업무를 이어갈 수 있습니다.</>}
+            <div style={{ marginTop: 16 }}><Link href="/attendance" className="btn-secondary" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', padding: '10px 20px', textDecoration: 'none' }}>출석부로 돌아가기</Link></div>
           </div>
-        ) : children}
+        ) : <DataLoadGate>{children}</DataLoadGate>}
       </div>
       <TabNav />
     </div>
