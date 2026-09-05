@@ -59,7 +59,7 @@ describe('buildStudentMovePayload', () => {
     });
 
     expect(payload['attendance/2026/1-1-1/S11_01']).toBeNull();
-    expect(payload['attendance/2026/1-1-2/S11_01']).toEqual({ '0-0': 'O', '0-1': 'T' });
+    expect(payload['attendance/2026/1-1-2/S11_01']).toEqual({ '0-0': 'O', '0-1': 'O' });
   });
 
   it('목적지에 이미 있는 출석 셀은 보존하고, 없는 셀만 원본에서 채운다', () => {
@@ -75,10 +75,23 @@ describe('buildStudentMovePayload', () => {
       '0-0': 'O',
       '0-1': 'O',
       '1-0': 'X',
-      '2-0': 'T',
+      '2-0': 'O',
     });
     expect(sourceAttendance).toEqual({ '0-0': 'O', '0-1': 'T', '1-0': 'X' });
     expect(destinationAttendance).toEqual({ '0-1': 'O', '2-0': 'T' });
+  });
+
+  it('목적지에서 명시적으로 비운 셀도 원본보다 우선한다', () => {
+    const payload = buildStudentMovePayload({
+      ...base,
+      sourceAttendance: { '0-0': 'O', '0-1': 'T' },
+      destinationAttendance: { '0-0': '' },
+    });
+
+    expect(payload['attendance/2026/1-1-2/S11_01']).toEqual({
+      '0-0': '',
+      '0-1': 'O',
+    });
   });
 
   it('원본 출석이 없으면 목적지 출석을 다시 쓰거나 원본 경로를 추측 삭제하지 않는다', () => {

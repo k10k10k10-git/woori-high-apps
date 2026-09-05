@@ -2,9 +2,10 @@
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
 import type {
   UserRole, ClassDataMap, AttData, CustomEventData, EventsMap,
-  MonthEntry, HolidayRanges, ViewKey, AttEditTarget, MoveTarget,
+  MonthEntry, HolidayRanges, ViewKey, AttEditTarget, MoveTarget, AttValue,
 } from '@/types';
 import { getKSTYear, getSundaysForYear, getWindowYears, buildHolidayRanges, buildEvents } from '@/utils/dates';
+import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 
 export type DataKey = 'classes' | 'attendance' | 'events';
 
@@ -295,14 +296,14 @@ export function useCurrentStudents(state: AppState) {
 
 export function useAttVal(
   state: AppState, ck: string, sid: string, k: string
-): string {
-  return state.attData[ck]?.[sid]?.[k] ?? '';
+): AttValue {
+  return normalizeAttendanceValue(state.attData[ck]?.[sid]?.[k]);
 }
 
 // ─── 출석 통계 계산 ───────────────────────────────────────────
 export function calcStats(state: Pick<AppState, 'months' | 'curView' | 'attData' | 'events'>, ck: string, sid: string) {
   const { months, curView, attData, events } = state;
-  let total = 0, present = 0, absent = 0, tardy = 0;
+  let total = 0, present = 0, absent = 0;
 
   months.forEach(({ sundays }, mi) => {
     sundays.forEach((_, di) => {
@@ -316,16 +317,15 @@ export function calcStats(state: Pick<AppState, 'months' | 'curView' | 'attData'
       if (curView === 'second' && !inSecond) return;
 
       total++;
-      const v = attData[ck]?.[sid]?.[k] ?? '';
+      const v = normalizeAttendanceValue(attData[ck]?.[sid]?.[k]);
       if (v === 'O') present++;
       else if (v === 'X') absent++;
-      else if (v === 'T') tardy++;
     });
   });
 
-  const recorded = present + absent + tardy;
+  const recorded = present + absent;
   const rate = recorded > 0 ? Math.round((present / recorded) * 100) : 0;
-  return { total, present, absent, tardy, rate };
+  return { total, present, absent, rate };
 }
 
 export type { Action };

@@ -172,7 +172,7 @@ export default function AdminDashboard({ onShowTrends }: { onShowTrends: () => v
         <div className="ad-table-footer"><span role="status" aria-live="polite">{rows.length}개 반 표시{hasFilters && ' · 필터 적용 중'}</span>{hasFilters && <button type="button" onClick={resetFilters}>필터 초기화</button>}</div>
       </section>
 
-      <div className="ad-bottom-note"><span>입력 현황은 장결 학생을 제외합니다. 출석률은 장결을 포함한 입력 기록(O·X·T) 중 출석(O)의 비율입니다.</span><Link href="/admin">계정·행사 설정 <AdminIcon name="arrow" /></Link></div>
+      <div className="ad-bottom-note"><span>입력 현황은 장결 학생을 제외합니다. 출석률은 장결을 포함한 입력 기록(O·X) 중 출석(O)의 비율입니다.</span><Link href="/admin">계정·행사 설정 <AdminIcon name="arrow" /></Link></div>
     </div>
   );
 }

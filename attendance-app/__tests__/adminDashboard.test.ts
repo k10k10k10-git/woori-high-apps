@@ -16,13 +16,13 @@ function mixedSource(): AdminDashboardSource {
         students: [
           { id: 'o', name: '출석학생' },
           { id: 'x', name: '결석학생' },
-          { id: 't', name: '지각학생' },
+          { id: 't', name: '이전지각학생' },
           { id: 'blank', name: '미입력학생' },
           { id: 'missing', name: '장결학생', jang: true },
         ],
       },
     },
-    attData: {
+    attData: ({
       '1-1-1': {
         o: { '7-4': 'O' },
         x: { '7-4': 'X' },
@@ -30,7 +30,7 @@ function mixedSource(): AdminDashboardSource {
         blank: { '7-4': '' },
         removed: { '7-4': 'O' },
       },
-    },
+    }) as unknown as AdminDashboardSource['attData'],
   });
 }
 
@@ -88,22 +88,22 @@ describe('관리자 주간 현황의 조회 주일', () => {
 });
 
 describe('관리자 주간 현황의 집계', () => {
-  it('O·X·T만 입력으로 세고 빈 값·누락·명단에서 삭제된 학생을 구분한다', () => {
+  it('O·X와 이전 T를 입력으로 세고 빈 값·누락·명단에서 삭제된 학생을 구분한다', () => {
     const result = buildAdminDashboard(mixedSource(), { nowMs });
     expect(result.rows[0]).toMatchObject({
       classKey: '1-1-1', label: '1부 1학년 1반', teacher: '홍교사',
-      studentCount: 5, longAbsentCount: 1, recorded: 3, present: 1, absent: 1, tardy: 1,
-      inputStudentCount: 4, inputRecorded: 3, unentered: 1, attendanceRate: 33, inputRate: 75, status: 'partial',
+      studentCount: 5, longAbsentCount: 1, recorded: 3, present: 2, absent: 1,
+      inputStudentCount: 4, inputRecorded: 3, unentered: 1, attendanceRate: 67, inputRate: 75, status: 'partial',
     });
     expect(result.summary).toMatchObject({ classCount: 1, partialClassCount: 1, pendingClassCount: 1, recorded: 3, unentered: 1 });
   });
 
-  it('장결자의 명단과 입력을 전체 현황에 모두 포함하며 지각을 출석으로 합치지 않는다', () => {
+  it('장결자의 명단과 입력을 전체 현황에 모두 포함하고 이전 지각은 출석으로 합친다', () => {
     const data = mixedSource();
     data.attData['1-1-1'].missing = { '7-4': 'O' };
     const result = buildAdminDashboard(data, { nowMs });
     expect(result.summary).toMatchObject({
-      studentCount: 5, longAbsentCount: 1, recorded: 4, present: 2, tardy: 1, attendanceRate: 50,
+      studentCount: 5, longAbsentCount: 1, recorded: 4, present: 3, attendanceRate: 75,
       inputStudentCount: 4, inputRecorded: 3, unentered: 1, inputRate: 75,
     });
   });
@@ -167,7 +167,7 @@ describe('관리자 주간 현황의 집계', () => {
         '1-1-3': { students: [{ id: 'a', name: '미입력' }] },
         '1-1-4': { students: [] },
       },
-      attData: { '1-1-1': { a: { '7-4': 'X' } }, '1-1-2': { a: { '7-4': 'T' } }, '1-1-3': { a: { '7-4': '' } } },
+      attData: ({ '1-1-1': { a: { '7-4': 'X' } }, '1-1-2': { a: { '7-4': 'T' } }, '1-1-3': { a: { '7-4': '' } } }) as unknown as AdminDashboardSource['attData'],
     }), { nowMs });
     expect(result.rows.map((row) => row.status)).toEqual(['complete', 'partial', 'empty', 'no-students']);
     expect(result.rows[2]).toMatchObject({ inputRate: 0, attendanceRate: null, teacher: '' });

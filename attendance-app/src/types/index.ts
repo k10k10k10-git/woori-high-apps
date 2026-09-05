@@ -34,7 +34,7 @@ export type ClassInfo = {
 export type ClassDataMap = Record<string, ClassInfo>;
 
 // ─── 출석 값 ──────────────────────────────────────────────────
-export type AttValue = 'O' | 'X' | 'T' | '';
+export type AttValue = 'O' | 'X' | '';
 
 export type AttData = {
   [classKey: string]: {

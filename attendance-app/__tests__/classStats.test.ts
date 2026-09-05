@@ -17,7 +17,7 @@ function makeSource(curView: ViewKey = 'all'): StatsSource {
     ],
     curView,
     events: { '0-0': '행사', '2-1': '수련회' },
-    attData: {
+    attData: ({
       [classKey]: {
         perfect: { '0-0': 'X', '0-1': 'O', '1-0': 'O', '2-0': 'O' },
         mixed: { '0-1': 'O', '0-2': 'X', '1-0': 'T', '2-0': 'O', '2-1': 'X' },
@@ -25,26 +25,25 @@ function makeSource(curView: ViewKey = 'all'): StatsSource {
         empty: { '0-1': '', '1-0': '' },
         longAbsent: { '0-1': 'O', '1-0': 'O' },
       },
-    },
+    }) as unknown as AttData,
   };
 }
 
 // 기존 화면의 독립된 다섯 계산을 특성화해 데이터셋 순서와 등급·경고 기준을 보존한다.
 function legacySummary(source: StatsSource, students: Student[]) {
   const warningStudents = students.map(student => {
-    const { present, absent, tardy, rate } = calcStats(source, classKey, student.id);
-    const recorded = present + absent + tardy;
+    const { present, absent, rate } = calcStats(source, classKey, student.id);
+    const recorded = present + absent;
     const grade = rate >= 90 ? 'A' : rate >= 80 ? 'B' : rate >= 70 ? 'C' : 'D';
-    return { ...student, present, absent, tardy, recorded, rate, grade };
+    return { ...student, present, absent, recorded, rate, grade };
   }).filter(student => student.recorded > 0 && student.rate < 50)
     .sort((a, b) => a.rate - b.rate);
   const present = students.map(student => calcStats(source, classKey, student.id).present);
   const absent = students.map(student => calcStats(source, classKey, student.id).absent);
-  const tardy = students.map(student => calcStats(source, classKey, student.id).tardy);
   const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
   for (const student of students) {
     const stats = calcStats(source, classKey, student.id);
-    const recorded = stats.present + stats.absent + stats.tardy;
+    const recorded = stats.present + stats.absent;
     if (recorded === 0) { gradeCounts.D++; continue; }
     const rate = Math.round((stats.present / recorded) * 100);
     if (rate >= 90) gradeCounts.A++;
@@ -52,7 +51,7 @@ function legacySummary(source: StatsSource, students: Student[]) {
     else if (rate >= 70) gradeCounts.C++;
     else gradeCounts.D++;
   }
-  return { present, absent, tardy, gradeCounts, warningStudents };
+  return { present, absent, gradeCounts, warningStudents };
 }
 
 describe('통계 탭 학생 집계 재사용', () => {
@@ -84,12 +83,11 @@ describe('통계 탭 학생 집계 재사용', () => {
     expect(buildClassStats(source, classKey, students)).toMatchObject({
       present: [0, 0, 0, 0, 0],
       absent: [0, 0, 0, 0, 0],
-      tardy: [0, 0, 0, 0, 0],
       gradeCounts: { A: 0, B: 0, C: 0, D: 5 },
       warningStudents: [],
     });
     expect(buildClassStats(source, classKey, [])).toEqual({
-      present: [], absent: [], tardy: [],
+      present: [], absent: [],
       gradeCounts: { A: 0, B: 0, C: 0, D: 0 }, warningStudents: [],
     });
   });
@@ -113,7 +111,7 @@ describe('통계 탭 학생 집계 재사용', () => {
     ]);
   });
 
-  it('30명 × 52주 fixture에서 출석 셀 조회를 7,800회에서 1,560회로 줄인다', () => {
+  it('30명 × 52주 fixture에서 출석 셀 조회를 6,240회에서 1,560회로 줄인다', () => {
     const fixtureStudents = Array.from({ length: 30 }, (_, index) => ({ id: `s${index}`, name: `학생${index}` }));
     const months = getSundaysForYear(2026);
     const weeks = months.flatMap(({ sundays }, mi) => sundays.map((_, di) => `${mi}-${di}`));
@@ -121,7 +119,7 @@ describe('통계 탭 학생 집계 재사용', () => {
     let cellReads = 0;
     for (const [studentIndex, student] of fixtureStudents.entries()) {
       const attendance = Object.fromEntries(weeks.map((key, weekIndex) => [
-        key, (['O', 'X', 'T', ''] as AttValue[])[(studentIndex + weekIndex) % 4],
+        key, (['O', 'X', ''] as AttValue[])[(studentIndex + weekIndex) % 3],
       ]));
       classAttendance[student.id] = new Proxy(attendance, {
         get(target, key) {
@@ -137,8 +135,8 @@ describe('통계 탭 학생 집계 재사용', () => {
     buildClassStats(source, classKey, fixtureStudents);
     const after = cellReads;
     expect(weeks).toHaveLength(52);
-    expect(before).toBe(7800);
+    expect(before).toBe(6240);
     expect(after).toBe(1560);
-    expect(after / before).toBe(0.2);
+    expect(after / before).toBe(0.25);
   });
 });

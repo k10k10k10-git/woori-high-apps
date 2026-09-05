@@ -180,8 +180,8 @@ describe('반 이동 시 옛 반 출석 기록 이관·정리', () => {
   it('시트에 없는 칸은 새 반으로 옮겨 이력을 보존한다', () => {
     const plan = buildSyncPlan(movedClasses(), movedCurrent(), oldAttendance());
     const payload = buildSyncPayload(plan, 2026, movedCurrent(), false, undefined, oldAttendance());
-    // 시트에 없던 '1-0'(지각)과 '2-3'은 새 경로로 이관된다
-    expect(payload['attendance/2026/1-1-2/S12_01/1-0']).toBe('T');
+    // 시트에 없던 이전 지각 '1-0'도 출석으로 바꿔 새 경로로 이관한다.
+    expect(payload['attendance/2026/1-1-2/S12_01/1-0']).toBe('O');
     expect(payload['attendance/2026/1-1-2/S12_01/2-3']).toBe('O');
   });
 

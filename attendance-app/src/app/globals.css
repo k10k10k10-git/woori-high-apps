@@ -434,8 +434,6 @@ html, body, #root {
 .att-cell.O::after { content: '✓'; font-size: 15px; font-weight: 800; color: var(--green-text); }
 .att-cell.X { background: var(--red-bg); font-size: 0; }
 .att-cell.X::after { content: '✕'; font-size: 13px; font-weight: 800; color: var(--red-text); }
-.att-cell.T { background: var(--amber-bg); font-size: 0; }
-.att-cell.T::after { content: '△'; font-size: 13px; font-weight: 700; color: var(--amber-text); }
 .att-cell.holiday { background: #fef3c7; cursor: default; min-width: 32px; max-width: 40px; width: 36px; }
 .att-stat-cell {
   background: var(--surface2);
@@ -733,7 +731,6 @@ html, body, #root {
 }
 .att-modal-btn.O { background: var(--green-bg); color: var(--green-text); border-color: var(--green); }
 .att-modal-btn.X { background: var(--red-bg); color: var(--red-text); border-color: var(--red); }
-.att-modal-btn.T { background: var(--amber-bg); color: var(--amber-text); border-color: var(--amber); }
 .att-modal-btn.clear { background: var(--surface2); color: var(--text3); border-color: var(--border); font-size: 12px; }
 
 /* ─── Admin Tab ──────────────────────────────────────────────── */
@@ -903,7 +900,6 @@ html, body, #root {
 }
 .check-row:last-child { border-bottom: none; }
 .check-row.row-o { background: linear-gradient(to right, #dcfce7, #f0fdf4); }
-.check-row.row-t { background: linear-gradient(to right, #fef9e7, #fffdf5); }
 .check-row.row-x { background: linear-gradient(to right, #fef4f4, #fff8f8); }
 .check-student-info {
   display: flex;
@@ -958,8 +954,6 @@ html, body, #root {
 .check-btn.O.active { background: #16a34a; color: #fff; border-color: #16a34a; box-shadow: 0 2px 10px rgba(22,163,74,.35); }
 .check-btn.X { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 .check-btn.X.active { background: #dc2626; color: #fff; border-color: #dc2626; box-shadow: 0 2px 10px rgba(220,38,38,.35); }
-.check-btn.T { background: #fffbeb; color: #d97706; border-color: #fde68a; }
-.check-btn.T.active { background: #d97706; color: #fff; border-color: #d97706; box-shadow: 0 2px 10px rgba(217,119,6,.35); }
 
 /* 교사 읽기 전용 셀 */
 .att-cell.readonly { cursor: default; }
@@ -1181,9 +1175,9 @@ html, body, #root {
   /* ── 출석 테이블 ── */
   .att-table-wrap { padding: 0 6px 8px; }
   .att-cell { height: 40px; min-width: 36px; }
-  .att-cell.O, .att-cell.X, .att-cell.T { font-size: 0; }
+  .att-cell.O, .att-cell.X { font-size: 0; }
   .att-cell.O::after { font-size: 15px; }
-  .att-cell.X::after, .att-cell.T::after { font-size: 13px; }
+  .att-cell.X::after { font-size: 13px; }
   .att-cell-name { min-width: 56px; padding: 4px 6px; }
   .att-header-name { padding: 4px 6px; min-width: 56px; font-size: 11px; }
   .att-header-cell { font-size: 11px; padding: 3px 1px; }

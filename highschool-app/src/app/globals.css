@@ -1909,7 +1909,6 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .sunday-attendance-table tbody tr:hover :where(td, th) { background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface)); }
 .sunday-attendance-table .is-name small { margin-left: 5px; border-radius: 999px; background: #fff2d5; padding: 2px 4px; color: #a26f18; font-size: 8px; }
 .sunday-attendance-table td.mark-o, .sunday-attendance-legend .mark-o { background: #e4f8ef; color: #087a57; font-weight: 850; }
-.sunday-attendance-table td.mark-t, .sunday-attendance-legend .mark-t { background: #fff4d8; color: #a1690d; font-weight: 850; }
 .sunday-attendance-table td.mark-x, .sunday-attendance-legend .mark-x { background: #ffebeb; color: #b54141; font-weight: 850; }
 .sunday-attendance-table td.is-event, .sunday-attendance-legend .is-event { background: #f4f0e7; color: #8c6c31; font-weight: 800; }
 .sunday-attendance-empty { height: 150px; color: var(--color-text-faint); }

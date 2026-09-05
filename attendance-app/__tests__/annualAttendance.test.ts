@@ -62,12 +62,12 @@ describe('반별 연간 출석률', () => {
     expect(annualClassAverageRate(source, classKey, students)).toBe(50);
   });
 
-  it('행사와 미입력 주일을 제외하고 지각은 입력 건수에만 포함한다', () => {
+  it('행사와 미입력 주일을 제외하고 이전 지각은 출석으로 포함한다', () => {
     const source = makeSource();
     source.events = { '0-3': '행사' };
-    source.attData = { [classKey]: { student: { '0-0': 'O', '0-1': 'X', '0-2': 'T', '0-3': 'O', '1-0': '' } } };
+    source.attData = ({ [classKey]: { student: { '0-0': 'O', '0-1': 'X', '0-2': 'T', '0-3': 'O', '1-0': '' } } }) as unknown as AppState['attData'];
 
-    expect(annualClassAverageRate(source, classKey, [{ id: 'student', name: '학생' }])).toBe(33);
+    expect(annualClassAverageRate(source, classKey, [{ id: 'student', name: '학생' }])).toBe(67);
   });
 
   it('학생별 백분율을 먼저 반올림하는 기존 집계 순서를 유지한다', () => {

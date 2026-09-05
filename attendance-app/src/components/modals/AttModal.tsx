@@ -1,11 +1,12 @@
 'use client';
-import type { AttEditTarget } from '@/types';
+import type { AttEditTarget, AttValue } from '@/types';
 import { useApp } from '@/store/AppContext';
+import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
 
 type Props = {
   target: AttEditTarget;
-  currentVal: string;
-  onSelect: (val: string) => void;
+  currentVal: AttValue;
+  onSelect: (val: AttValue) => void;
   onClose: () => void;
 };
 
@@ -28,16 +29,16 @@ export default function AttModal({ target, currentVal, onSelect, onClose }: Prop
           {student?.name} · {month}월 {day}일
         </div>
         <div className="att-modal-btns">
-          {(['O', 'X', 'T'] as const).map(v => (
+          {ATTENDANCE_OPTIONS.map(v => (
             <button
               key={v}
               className={`att-modal-btn ${v}${currentVal === v ? ' selected' : ''}`}
               style={currentVal === v ? { outline: '3px solid currentColor' } : {}}
               onClick={() => onSelect(v)}
-              aria-label={`${student?.name} ${v === 'O' ? '출석' : v === 'X' ? '결석' : '지각'} 처리`}
+              aria-label={`${student?.name} ${v === 'O' ? '출석' : '결석'} 처리`}
               aria-pressed={currentVal === v}
             >
-              {v === 'O' ? '출석' : v === 'X' ? '결석' : '지각'}
+              {v === 'O' ? '출석' : '결석'}
             </button>
           ))}
           <button

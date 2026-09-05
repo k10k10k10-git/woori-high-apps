@@ -44,13 +44,12 @@ describe('calcStats', () => {
     expect(result.total).toBeGreaterThan(0);
     expect(result.present).toBe(0);
     expect(result.absent).toBe(0);
-    expect(result.tardy).toBe(0);
     expect(result.rate).toBe(0);
   });
 
-  it('calculates normal attendance correctly', () => {
+  it('이전 지각 값을 출석으로 합쳐 계산한다', () => {
     const state = makeState({
-      attData: {
+      attData: ({
         '1-1-1': {
           'S11_01': {
             '0-0': 'O',
@@ -59,13 +58,12 @@ describe('calcStats', () => {
             '0-3': 'T',
           },
         },
-      },
+      }) as unknown as AppState['attData'],
     });
     const result = calcStats(state, '1-1-1', 'S11_01');
-    expect(result.present).toBe(2);
+    expect(result.present).toBe(3);
     expect(result.absent).toBe(1);
-    expect(result.tardy).toBe(1);
-    expect(result.rate).toBe(50); // 2 / (2+1+1) = 50%
+    expect(result.rate).toBe(75); // 이전 T를 O로 보아 3 / 4 = 75%
   });
 
   it('excludes events from calculations', () => {
@@ -84,7 +82,6 @@ describe('calcStats', () => {
     const result = calcStats(state, '1-1-1', 'S11_01');
     expect(result.present).toBe(1);
     expect(result.absent).toBe(1);
-    expect(result.tardy).toBe(0);
     expect(result.rate).toBe(50);
   });
 
@@ -146,7 +143,6 @@ describe('calcStats', () => {
     const result = calcStats(state, '1-1-1', 'S11_01');
     expect(result.present).toBe(0);
     expect(result.absent).toBe(0);
-    expect(result.tardy).toBe(0);
     expect(result.rate).toBe(0);
   });
 
@@ -176,7 +172,6 @@ describe('calcStats', () => {
     expect(result.rate).toBe(100);
     expect(result.present).toBe(3);
     expect(result.absent).toBe(0);
-    expect(result.tardy).toBe(0);
   });
 
   it('ignores empty string values (not yet entered)', () => {
@@ -194,7 +189,6 @@ describe('calcStats', () => {
     const result = calcStats(state, '1-1-1', 'S11_01');
     expect(result.present).toBe(1);
     expect(result.absent).toBe(0);
-    expect(result.tardy).toBe(0);
     // rate should be based on recorded entries only
     expect(result.rate).toBe(100);
   });

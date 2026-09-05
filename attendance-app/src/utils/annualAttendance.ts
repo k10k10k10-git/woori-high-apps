@@ -7,8 +7,8 @@ type AnnualSource = Pick<AppState, 'months' | 'attData' | 'events'>;
 export function annualClassAverageRate(source: AnnualSource, classKey: string, students: Student[]): number | null {
   const annualSource = { ...source, curView: 'all' as const };
   const rates = students.map(student => {
-    const { present, absent, tardy, rate } = calcStats(annualSource, classKey, student.id);
-    return present + absent + tardy === 0 ? null : rate;
+    const { present, absent, rate } = calcStats(annualSource, classKey, student.id);
+    return present + absent === 0 ? null : rate;
   }).filter((rate): rate is number => rate !== null);
 
   if (rates.length === 0) return null;

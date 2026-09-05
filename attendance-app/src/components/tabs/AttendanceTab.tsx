@@ -8,10 +8,11 @@ import { showToast } from '@/utils/toast';
 import { downloadCSV, downloadXLSX, openPrintWindow } from '@/utils/export';
 import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
+import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
-import type { AttEditTarget, ViewKey } from '@/types';
+import type { AttEditTarget, AttValue, ViewKey } from '@/types';
 
 export default function AttendanceTab() {
   const { state, dispatch } = useApp();
@@ -82,7 +83,7 @@ export default function AttendanceTab() {
     sid: string;
     studentName: string;
     target: AttEditTarget;
-    value: string;
+    value: AttValue;
     savedAt?: number;
   };
   const [saveFeedback, setSaveFeedback] = useState<SaveFeedback | null>(null);
@@ -112,10 +113,10 @@ export default function AttendanceTab() {
 
   const avgRate = useMemo(() => {
     if (totalStudents === 0) return 0;
-    const statsArr = activeStudents.map(s => calcStats(state, ck, s.id)).filter(st => (st.present + st.absent + st.tardy) > 0);
+    const statsArr = activeStudents.map(s => calcStats(state, ck, s.id)).filter(st => (st.present + st.absent) > 0);
     if (statsArr.length === 0) return 0;
     const sum = statsArr.reduce((acc, st) => {
-      const rec = st.present + st.absent + st.tardy;
+      const rec = st.present + st.absent;
       return acc + Math.round((st.present / rec) * 100);
     }, 0);
     return Math.round(sum / statsArr.length);
@@ -123,27 +124,26 @@ export default function AttendanceTab() {
 
   const teacher = classData[ck]?.teacher ?? '';
 
-  // 이번 주 출석/지각/결석/미입력 카운트
+  // 이번 주 출석/결석/미입력 카운트
   const selectedWeekStats = useMemo(() => {
     if (!selectedWeekKey) {
-      return { O: 0, T: 0, X: 0, empty: displayStudents.length };
+      return { O: 0, X: 0, empty: displayStudents.length };
     }
-    let O = 0, T = 0, X = 0, empty = 0;
+    let O = 0, X = 0, empty = 0;
     displayStudents.forEach(s => {
       const val = attData[ck]?.[s.id]?.[selectedWeekKey] ?? '';
       if (val === 'O') O++;
-      else if (val === 'T') T++;
       else if (val === 'X') X++;
       else empty++;
     });
-    return { O, T, X, empty };
+    return { O, X, empty };
   }, [displayStudents, selectedWeekKey, attData, ck]);
 
   function onCellClick(sid: string, k: string) {
     dispatch({ type: 'OPEN_ATT_MODAL', payload: { ck, sid, k } });
   }
 
-  async function saveAttendance(target: AttEditTarget, value: string) {
+  async function saveAttendance(target: AttEditTarget, value: AttValue) {
     const studentName = classData[target.ck]?.students?.find(student => student.id === target.sid)?.name ?? '학생';
     setSaveFeedback({ status: 'saving', sid: target.sid, studentName, target, value });
     dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
@@ -159,14 +159,14 @@ export default function AttendanceTab() {
     }
   }
 
-  async function handleQuickCheck(sid: string, val: string) {
+  async function handleQuickCheck(sid: string, val: Exclude<AttValue, ''>) {
     if (!selectedWeekKey) return;
     const current = attData[ck]?.[sid]?.[selectedWeekKey] ?? '';
     const newVal = current === val ? '' : val;
     await saveAttendance({ ck, sid, k: selectedWeekKey }, newVal);
   }
 
-  async function handleAttChange(target: AttEditTarget, value: string) {
+  async function handleAttChange(target: AttEditTarget, value: AttValue) {
     dispatch({ type: 'CLOSE_ATT_MODAL' });
     await saveAttendance(target, value);
   }
@@ -250,15 +250,15 @@ export default function AttendanceTab() {
       const isLast = pi === pages.length - 1;
       const rows = group.map(s => {
         const stats = calcStats(state, ck, s.id);
-        const rec = stats.present + stats.absent + stats.tardy;
+        const rec = stats.present + stats.absent;
         const rate = rec > 0 ? Math.round((stats.present / rec) * 100) : 0;
         const grade = rate >= 90 ? 'A' : rate >= 80 ? 'B' : rate >= 70 ? 'C' : 'D';
         const cells = pdfWeeks.map(k => {
           const ev = events[k];
           const val = attData[ck]?.[s.id]?.[k] ?? '';
           if (ev) return `<td style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${ev}</td>`;
-          const bg = val === 'O' ? '#ecfdf5' : val === 'X' ? '#fef2f2' : val === 'T' ? '#fffbeb' : '';
-          const fg = val === 'O' ? '#059669' : val === 'X' ? '#dc2626' : val === 'T' ? '#d97706' : '';
+          const bg = val === 'O' ? '#ecfdf5' : val === 'X' ? '#fef2f2' : '';
+          const fg = val === 'O' ? '#059669' : val === 'X' ? '#dc2626' : '';
           return `<td style="background:${bg};color:${fg};font-weight:${val ? '700' : '400'};">${val}</td>`;
         }).join('');
         return `<tr class="data-row">
@@ -403,11 +403,6 @@ export default function AttendanceTab() {
                 <div className="week-summary-count">{selectedWeekStats.O}</div>
                 <div className="week-summary-label">출석</div>
               </div>
-              <div className="week-summary-card amber">
-                <div className="week-summary-icon">△</div>
-                <div className="week-summary-count">{selectedWeekStats.T}</div>
-                <div className="week-summary-label">지각</div>
-              </div>
               <div className="week-summary-card red">
                 <div className="week-summary-icon">✕</div>
                 <div className="week-summary-count">{selectedWeekStats.X}</div>
@@ -443,7 +438,7 @@ export default function AttendanceTab() {
               <div className="check-list">
                 {displayStudents.map(student => {
                   const val = selectedWeekKey ? (attData[ck]?.[student.id]?.[selectedWeekKey] ?? '') : '';
-                  const rowCls = val === 'O' ? ' row-o' : val === 'T' ? ' row-t' : val === 'X' ? ' row-x' : '';
+                  const rowCls = val === 'O' ? ' row-o' : val === 'X' ? ' row-x' : '';
                   return (
                     <div key={student.id} className={`check-row${rowCls}`}>
                       <div className="check-student-info"
@@ -461,14 +456,14 @@ export default function AttendanceTab() {
                         )}
                       </div>
                       <div className="check-btns">
-                        {(['O', 'T', 'X'] as const).map(v => (
+                        {ATTENDANCE_OPTIONS.map(v => (
                           <button
                             key={v}
                             className={`check-btn ${v}${val === v ? ' active' : ''}`}
                             onClick={() => selectedWeekKey && handleQuickCheck(student.id, v)}
                             disabled={!selectedWeekKey || saveFeedback?.status === 'saving'}
                           >
-                            {v === 'O' ? '출석' : v === 'T' ? '지각' : '결석'}
+                            {v === 'O' ? '출석' : '결석'}
                           </button>
                         ))}
                       </div>
@@ -599,7 +594,7 @@ export default function AttendanceTab() {
             <tbody>
               {displayStudents.map(student => {
                 const stats = calcStats(state, ck, student.id);
-                const recorded = stats.present + stats.absent + stats.tardy;
+                const recorded = stats.present + stats.absent;
                 const effectiveRate = recorded > 0 ? Math.round((stats.present / recorded) * 100) : 0;
                 const grade = effectiveRate >= 90 ? 'A' : effectiveRate >= 80 ? 'B' : effectiveRate >= 70 ? 'C' : 'D';
                 const gradeColor = grade === 'A' ? '#10b981' : grade === 'B' ? '#9B8DD4' : grade === 'C' ? '#f59e0b' : '#ef4444';

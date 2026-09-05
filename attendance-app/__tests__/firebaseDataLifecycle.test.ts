@@ -155,7 +155,7 @@ describe('원장 초기화와 구독 세대', () => {
     subscriptions[0].receive(snapshot({ teacher: '담임', students: { original: { name: '학생', jang: true, personId: 'person_student_fixture' } } }));
     subscriptions[1].receive(snapshot({ original: { '0-0': 'T' } }));
     expect(state.classData['2-3-4'].students[0]).toMatchObject({ id: 'original', name: '학생', jang: true, personId: 'person_student_fixture' });
-    expect(state.attData).toEqual({ '2-3-4': { original: { '0-0': 'T' } } });
+    expect(state.attData).toEqual({ '2-3-4': { original: { '0-0': 'O' } } });
     stop();
   });
 

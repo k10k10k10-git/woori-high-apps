@@ -4,7 +4,8 @@ import { db, ref, onValue, get } from '@/lib/db';
 import { useApp, type Action, type DataKey } from '@/store/AppContext';
 import { sortAndRenumber, emailToKey } from '@/utils/dates';
 import { dataLoadMessage } from '@/utils/dbError';
-import type { ClassDataMap, AttData, CustomEventData, UserRole, Student } from '@/types';
+import { normalizeAttendanceData } from '@/utils/attendanceValue';
+import type { ClassDataMap, CustomEventData, UserRole, Student } from '@/types';
 
 type FbClass = {
   teacher?: string;
@@ -65,7 +66,7 @@ export function subscribeFirebaseData(
   });
   subscribe('attendance', attendancePath, '출석', value => ({
     type: 'SET_ATT_DATA', revision,
-    payload: value ? (teacherCk ? { [teacherCk]: value } : value) as AttData : {},
+    payload: value ? normalizeAttendanceData(teacherCk ? { [teacherCk]: value } : value) : {},
   }));
   subscribe('events', `events/${curYear}`, '이벤트', value => ({
     type: 'SET_CUSTOM_EVENTS', revision, payload: (value ?? {}) as CustomEventData,

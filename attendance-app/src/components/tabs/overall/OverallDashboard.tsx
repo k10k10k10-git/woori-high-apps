@@ -5,6 +5,7 @@ import { evKey } from '@/utils/dates';
 import { useChartJs } from '@/hooks/useChartJs';
 import ChartLoadState from '@/components/ChartLoadState';
 import { annualClassAverageRate } from '@/utils/annualAttendance';
+import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 import '@/components/admin/admin-trends.css';
 
 function sortClassKeys(keys: string[]): string[] {
@@ -43,8 +44,8 @@ export default function OverallDashboard() {
       classKeys.forEach(ck => {
         (classData[ck]?.students ?? []).forEach(s => {
           weekKeys.forEach(k => {
-            const v = attData[ck]?.[s.id]?.[k];
-            if (v === 'O' || v === 'X' || v === 'T') { total++; if (v === 'O') present++; }
+            const v = normalizeAttendanceValue(attData[ck]?.[s.id]?.[k]);
+            if (v === 'O' || v === 'X') { total++; if (v === 'O') present++; }
           });
         });
       });
@@ -71,7 +72,7 @@ export default function OverallDashboard() {
   const weeklyCount = useCallback((cks: string[]): number[] => {
     return weekKeys.map(k =>
       cks.reduce((sum, ck) =>
-        sum + (classData[ck]?.students ?? []).filter(s => attData[ck]?.[s.id]?.[k] === 'O').length
+        sum + (classData[ck]?.students ?? []).filter(s => normalizeAttendanceValue(attData[ck]?.[s.id]?.[k]) === 'O').length
       , 0)
     );
   }, [weekKeys, classData, attData]);
@@ -248,7 +249,7 @@ export default function OverallDashboard() {
           <div className="at-canvas"><canvas ref={chartGradeRef} role="img" aria-label={`${gradeRatePart}부 학년별 월별 출석률 선 그래프`} /></div>
         </section>
       </div>
-      <p className="at-note">행사 주일은 집계에서 제외합니다. 출석률은 입력된 O·X·T 중 O의 비율이며, 기록이 없는 월은 빈 구간으로 표시합니다. 주차별 인원은 현재 입력된 O의 수입니다.</p>
+      <p className="at-note">행사 주일은 집계에서 제외합니다. 출석률은 입력된 O·X 중 O의 비율이며, 기록이 없는 월은 빈 구간으로 표시합니다. 주차별 인원은 현재 입력된 O의 수입니다.</p>
     </div>
   );
 }

@@ -4,13 +4,13 @@ import { createPortal } from 'react-dom';
 import { db, ref, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { getSundaysForYear, buildHolidayRanges, buildEvents, evKey, getWindowYears } from '@/utils/dates';
+import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 import type { Student } from '@/types';
 
 interface MonthStat {
   month: number;
   p: number;
   a: number;
-  t: number;
   sc: number; // non-holiday sundays count
 }
 
@@ -20,7 +20,6 @@ interface YearStat {
   ck: string | null;
   present: number;
   absent: number;
-  tardy: number;
   total: number;
   rate: number;
   monthly: MonthStat[];
@@ -41,27 +40,26 @@ function computeMonthlyStats(
   months: { month: number; sundays: number[] }[],
   events: Record<string, string>
 ) {
-  let present = 0, absent = 0, tardy = 0;
+  let present = 0, absent = 0;
   const monthly: MonthStat[] = months.map(({ month, sundays }, mi) => {
-    let p = 0, a = 0, t = 0, sc = 0;
+    let p = 0, a = 0, sc = 0;
     sundays.forEach((_, di) => {
       const k = evKey(mi, di);
       if (events[k]) return;
       sc++;
-      const v = attRecord[k] ?? '';
+      const v = normalizeAttendanceValue(attRecord[k]);
       if (v === 'O') { p++; present++; }
       else if (v === 'X') { a++; absent++; }
-      else if (v === 'T') { t++; tardy++; }
     });
-    return { month, p, a, t, sc };
+    return { month, p, a, sc };
   });
-  const checked = present + absent + tardy;
+  const checked = present + absent;
   const rate = checked > 0 ? Math.round((present / checked) * 100) : 0;
-  return { present, absent, tardy, total: checked, rate, monthly };
+  return { present, absent, total: checked, rate, monthly };
 }
 
 const EMPTY_STATS = {
-  present: 0, absent: 0, tardy: 0, total: 0, rate: 0,
+  present: 0, absent: 0, total: 0, rate: 0,
   monthly: [] as MonthStat[],
 };
 
@@ -331,7 +329,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
                           <span style={{ fontSize: 14, fontWeight: 700, color: gc }}>{r.rate}%</span>
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--text3)' }}>
-                          출석 {r.present} · 결석 {r.absent} · 지각 {r.tardy} / {r.total}주
+                          출석 {r.present} · 결석 {r.absent} / {r.total}주
                         </div>
                       </>
                     )}
