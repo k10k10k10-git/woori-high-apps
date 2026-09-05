@@ -4,6 +4,27 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
+## 2026-09-05 최신 작업 — 두 앱 운영 배포 완료
+
+- PR #8을 에이전트가 병합했다. 배포한 앱 코드 SHA는
+  `90554a682d96ebb1de15003f36eb1948c0a5a6cd`다. 관리자 대시보드, 앞선 속도·안정성 개선,
+  아래 상시 승인 정책이 포함됐다. 이 이후 루트 문서만 수정한 커밋은 앱 재배포 대상이 아니다.
+- 통합 앱 `https://woorihigh-app.vercel.app/api/version`의 `buildId`가 위 SHA와 일치하며
+  Vercel Production **Ready**, 배포 ID `dpl_79ZpPHLu2RXxTEMvqywVbFMwPVqQ`를 확인했다.
+  운영 주소와 기존 별칭 모두 이 배포에 연결돼 있다. 배포 생성 시각은 2026-09-05 22:01:33 KST다.
+- 학생 앱은 같은 SHA에서 실제 운영 설정·`NEXT_PUBLIC_DEMO_MODE=1`로 다시 빌드하고
+  `firebase deploy --only hosting --project woori-high --non-interactive`로 배포했다.
+  live version `1acb936d4b2d2b5b`, release 시각 2026-09-05 22:02:56 KST다.
+  이전 live version `4612f5c5c77b34e9`는 복구 시 참고할 배포 기록이다.
+- 학생 `/dashboard`, `/attendance?week=0-0`, `/sw.js`의 HTTP 200·no-cache 헤더를 확인했고,
+  운영 dashboard HTML과 SW가 로컬 배포 산출물과 SHA-256으로 일치했다.
+  SW 캐시 이름은 `woori-att-1788613370740`이다. 실제 운영 브라우저에서 데모 반 선택과
+  관리자 접근 버튼을 확인했다. 실제 관리자 계정 인증 후 대시보드 검증은 가상 QA와 구분한다.
+- main CI에서도 두 앱 일반 품질·Lighthouse와 Agent OS 검사를 통과했다.
+  통합 인증 E2E만 기존 로그인 secret 미등록으로 가드에서 중단됐다(미실행, 우회 없음).
+- 원본 작업 폴더는 최신 main으로 전환했고 기존 사용자 수정 파일 3개의 바이트 해시와
+  미추적 작업을 보존했다. 운영 DB 직접 쓰기·Rules 수정/배포·계정/권한 변경은 없다.
+
 ## 2026-09-05 최신 사용자 결정 — 두 앱 운영 배포와 에이전트 자동 마무리 승인
 
 - 사용자는 ‘두 앱 운영 배포까지’와 ‘앞으로 자동배포할 수 있게 AGENTS.md 수정’을 명시 요청했다.
