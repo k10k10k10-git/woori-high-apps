@@ -63,4 +63,16 @@
 - `impeccable` 기계 검사 결과 위반 0개. 원본 작업 폴더의 기존 사용자 E2E·lockfile·인증 저장 스크립트 및 앞선 지침/스킬 변경은 이 브랜치에 섞지 않았다.
 - 인증 운영 E2E는 기존 `E2E_STORAGE_STATE_B64` 미등록으로 미실행이다. 운영 로그인 시 `SuggestionResolutionNotifier`가 자동 확인 기록을 쓰므로 합성 QA와 운영 계정 QA를 구분한다.
 
-대상은 통합 앱 `highschool-app`의 Vercel 운영 배포다. PR 검토·병합과 배포 후 [운영 버전](https://woorihigh-app.vercel.app/api/version)의 `buildId`를 대상 커밋과 대조하고 Production `Ready`를 확인한 뒤 완료 시각·SHA·배포 결과를 추가한다. 이 기록을 작성하는 시점에는 해당 확인이 진행 중이며 운영 반영 완료로 표시하지 않는다.
+[PR #10](https://github.com/k10k10k10-git/woori-high-apps/pull/10)을 병합하고 통합 앱 운영 배포를 완료했다(2026-09-06 KST).
+
+| 확인 | 결과 |
+|---|---|
+| 앱 병합 SHA | `c08502df301051fffa255764356235c68ed7db4e` |
+| [운영 버전](https://woorihigh-app.vercel.app/api/version) | `buildId`가 위 SHA와 일치 |
+| Vercel Production | `Ready`, `dpl_7oqn1p8TZupLHgoLeSMQpuSuhcS7` |
+| 운영 주소 | https://woorihigh-app.vercel.app |
+| 배포 생성 / 성공 확인 | 2026-09-06 00:13:01 / 00:14:05 KST |
+| [PR 일반 품질 검사](https://github.com/k10k10k10-git/woori-high-apps/actions/runs/33973802971) | lint·typecheck·coverage·build·Lighthouse 모두 성공 |
+| 인증 E2E | 기존 빈 storage-state 가드에서 중단, 브라우저 테스트 미실행 |
+
+학생 앱 Hosting·데모 모드·Rules는 배포하지 않았다. 이후 완료 기록을 위한 루트 문서 커밋은 앱 재배포 대상이 아니므로 운영 버전과 비교할 때 위 앱 SHA를 사용한다.
