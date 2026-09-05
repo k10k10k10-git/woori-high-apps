@@ -46,9 +46,9 @@
 
 ## 배포 상태와 후속 확인
 
-작업 브랜치는 `codex/project-optimization-20260905`다. 실제 운영 설정과 데모 유지 설정으로 다시 빌드해 [Firebase Hosting 미리보기](https://woori-high--admin-dashboard-20260905-sptfuvof.web.app)에 배포했다(2026-09-12 만료). `/dashboard`·`/attendance`의 HTTP 200과 no-cache 헤더, 원격 SW와 로컬 산출물의 SHA-256 일치를 확인했다. Auth 도메인 목록은 변경하지 않았다. 운영 반영은 기존 사용자 결정인 PR 검토·사용자 병합 절차를 따른다. 운영 배포 완료로 간주할 근거는 아래 두 가지다.
+작업 브랜치는 `codex/project-optimization-20260905`다. 실제 운영 설정과 데모 유지 설정으로 다시 빌드해 [Firebase Hosting 미리보기](https://woori-high--admin-dashboard-20260905-sptfuvof.web.app)에 배포했다(2026-09-12 만료). `/dashboard`·`/attendance`의 HTTP 200과 no-cache 헤더, 원격 SW와 로컬 산출물의 SHA-256 일치를 확인했다. Auth 도메인 목록은 변경하지 않았다. 운영 반영은 2026-09-05 최신 상시 승인에 따라 PR 검토·에이전트 병합 절차를 따른다. 운영 배포 완료로 간주할 근거는 아래 두 가지다.
 
 1. 통합 앱 Vercel Production `Ready` 및 `/api/version`의 `buildId`가 병합 SHA와 일치한다.
 2. 학생 앱 운영 설정·데모 유지 빌드의 Hosting 배포 성공, `/dashboard` 캐시 헤더와 배포된 청크·SW 버전이 산출물과 일치한다.
 
-Rules 배포는 포함하지 않는다. 최종 PR·채널·운영 상태는 `.claude/HANDOFF.md`의 가장 위 날짜 기록을 따른다.
+Rules 배포는 포함하지 않는다. 이후 사용자가 두 앱 운영 배포와 에이전트의 PR 병합·자동 마무리를 명시 승인했으므로 위의 사용자 직접 병합 대기는 해제됐다. 최종 PR·채널·운영 상태는 `.claude/HANDOFF.md`의 가장 위 날짜 기록을 따른다.
