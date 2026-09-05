@@ -11,13 +11,15 @@ export default function MyMinistryPanel() {
   const data = useMyPageData();
   const modules = ministryModulesFor(data.roles);
   const sundayTeam = ownSundayTeam(data.roles);
+  const ready = data.loaded && !data.loadError;
+  const pendingDetail = data.loadError ? "배정 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." : "내 사역 배정을 확인하고 있습니다.";
 
   return (
     <div className="space-y-5">
       <div>
         <p className="text-xs font-bold text-emerald-700">{describeRoles(data.roles)}</p>
         <h3 className="mt-1 text-lg font-bold text-slate-950">내 사역</h3>
-        <p className="mt-1 text-xs leading-5 text-slate-500">현재 계정과 유일하게 연결되는 배정만 표시합니다.</p>
+        <p className="mt-1 text-xs leading-5 text-slate-500">담당 사역과 배정, 출석 기록을 확인하세요.</p>
       </div>
 
       {data.loadError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">일부 정보를 불러오지 못했습니다: {data.loadError}</div>}
@@ -28,11 +30,11 @@ export default function MyMinistryPanel() {
             <div className="mypage-section-header">
               <div>
                 <h4 id="my-semester-title">학기 배정</h4>
-                <p>{data.currentSemester?.meta.title ?? "현재 학기가 없습니다"}</p>
+                <p>{ready ? data.currentSemester?.meta.title ?? "현재 학기가 없습니다" : "학기 정보 확인"}</p>
               </div>
               <Link href={data.currentSemester ? `/semester/${encodeURIComponent(data.currentSemester.id)}` : "/semesters"}>학기 열기 <ArrowRight weight="bold" /></Link>
             </div>
-            {data.personalApplication ? (
+            {!ready ? <p className="mypage-unmatched" role={data.loadError ? undefined : "status"}>{pendingDetail}</p> : data.personalApplication ? (
               <div className="mypage-assignment">
                 <div className="mypage-assignment-title">
                   <span><UsersThree weight="duotone" /></span>
@@ -45,7 +47,7 @@ export default function MyMinistryPanel() {
                   <div><dt>출석률</dt><dd>{data.personalAttendance ? `${data.personalAttendance.rate}%` : "0%"}</dd></div>
                 </dl>
               </div>
-            ) : <UnmatchedState text="현재 계정 이름과 유일하게 연결되는 학기 신청 기록이 없습니다." />}
+            ) : <UnmatchedState text="내 학기 배정을 찾지 못했습니다. 신청 기록과 등록된 이름을 확인해 주세요." />}
           </section>
         )}
 
@@ -54,7 +56,7 @@ export default function MyMinistryPanel() {
             <div className="mypage-section-header">
               <div>
                 <h4 id="my-sunday-title">주일 사역</h4>
-                <p>역할 정책에 따라 담당 팀과 조회 영역을 표시합니다.</p>
+                <p>담당 팀의 이번 주 사역을 확인하세요.</p>
               </div>
             </div>
             {sundayTeam ? (
@@ -83,16 +85,16 @@ export default function MyMinistryPanel() {
           <div className="mypage-section-header">
             <div>
               <h4 id="my-retreat-title">수련회 현장 배정</h4>
-              <p>{data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 기준 수련회가 없습니다"}</p>
+              <p>{ready ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 기준 수련회가 없습니다" : "수련회 정보 확인"}</p>
             </div>
             <Link href={data.currentRetreat ? `/retreat/${encodeURIComponent(data.currentRetreat.id)}/field` : "/field"}>현장 열기 <ArrowRight weight="bold" /></Link>
           </div>
-          {data.personalRetreat.matchedStaffId ? (
+          {!ready ? <p className="mypage-unmatched" role={data.loadError ? undefined : "status"}>{pendingDetail}</p> : data.personalRetreat.matchedStaffId ? (
             <div className="grid gap-4 lg:grid-cols-[minmax(220px,.65fr)_minmax(0,1.35fr)]">
               <div className="mypage-assignment">
                 <div className="mypage-assignment-title">
                   <span><MapPin weight="duotone" /></span>
-                  <div><strong>{data.personalRetreat.matchedName}</strong><small>현장 스탭 연결됨</small></div>
+                  <div><strong>{data.personalRetreat.matchedName}</strong><small>현장 담당 스탭</small></div>
                 </div>
                 <dl>
                   <div><dt>담당 조</dt><dd>{data.personalRetreat.groups.length}개</dd></div>
@@ -109,12 +111,12 @@ export default function MyMinistryPanel() {
                 )) : <UnmatchedState text="현재 수련회에 배정된 개인 큐와 포스트가 없습니다." />}
               </div>
             </div>
-          ) : <UnmatchedState text="동명이거나 연결 후보가 없어 개인 현장 배정을 자동 표시하지 않았습니다." />}
+          ) : <UnmatchedState text="내 현장 배정을 확인할 수 없습니다. 현장 명단의 이름을 확인하거나 담당자에게 문의해 주세요." />}
         </section>
       )}
 
       <section className="mypage-section" aria-labelledby="my-access-title">
-        <div className="mypage-section-header"><div><h4 id="my-access-title">내 접근 영역</h4><p>저장 권한과 조회 권한을 구분해 표시합니다.</p></div></div>
+        <div className="mypage-section-header"><div><h4 id="my-access-title">내 사역 바로가기</h4><p>이용할 수 있는 사역 화면으로 바로 이동하세요.</p></div></div>
         <div className="mypage-module-grid">
           {modules.map((module) => (
             <Link key={module.id} href={module.href} className={`mypage-module mypage-module--${module.tone}`}>

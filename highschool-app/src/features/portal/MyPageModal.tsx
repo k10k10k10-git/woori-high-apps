@@ -1,80 +1,120 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "@phosphor-icons/react";
+import { lazy, Suspense, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { CaretRight, ChartBar, ChatCircleText, EnvelopeSimple, SquaresFour, UsersThree, X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
-import AdminDashboard from "./AdminDashboardPanel";
-import TeamModal from "./TeamModal";
-import SiteRequestsPanel from "./SiteRequestsPanel";
-import RoleDashboardPanel from "./RoleDashboardPanel";
-import MyMinistryPanel from "./MyMinistryPanel";
-import MyRequestsPanel from "./MyRequestsPanel";
+import { useIsDesktop } from "@/lib/useIsDesktop";
+import OverlayShell from "@/components/OverlayShell";
 import { canManageRolesOf, canManageSiteRequests, describeRoles } from "./accessPolicy";
 import { friendlyMinistryName } from "./dailyMinistryMessage";
-import OverlayShell from "@/components/OverlayShell";
+
+const AdminDashboard = lazy(() => import("./AdminDashboardPanel"));
+const RoleDashboardPanel = lazy(() => import("./RoleDashboardPanel"));
+const MyMinistryPanel = lazy(() => import("./MyMinistryPanel"));
+const MyRequestsPanel = lazy(() => import("./MyRequestsPanel"));
+const TeamModal = lazy(() => import("./TeamModal"));
+const SiteRequestsPanel = lazy(() => import("./SiteRequestsPanel"));
 
 export type MyPageTab = "dashboard" | "ministry" | "myRequests" | "team" | "requests";
+type Props = { onClose: () => void; initialTab?: MyPageTab };
 
-export default function MyPageModal({ onClose, initialTab = "dashboard" }: { onClose: () => void; initialTab?: MyPageTab }) {
+const PERSONAL_TABS = [
+  { id: "dashboard", label: "대시보드", icon: ChartBar },
+  { id: "ministry", label: "내 사역", icon: SquaresFour },
+  { id: "myRequests", label: "내 요청", icon: ChatCircleText },
+] as const;
+
+export default function MyPageModal(props: Props) {
+  const { user, roles } = useAuth();
+  // 계정이나 권한 변경 즉시 개인 데이터와 관리 화면의 상태를 모두 폐기한다.
+  return <MyPageWorkspace key={`${user?.uid ?? "anonymous"}:${roles.semester}:${roles.retreat}`} {...props} />;
+}
+
+function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
   const { user, roles, memberName } = useAuth();
   const canManageTeam = canManageRolesOf(roles);
   const canManageRequests = canManageSiteRequests(roles);
-  const [tab, setTab] = useState<MyPageTab>(() => {
-    if (initialTab === "team" && !canManageTeam) return "dashboard";
-    if (initialTab === "requests" && !canManageRequests) return "dashboard";
-    return initialTab;
-  });
-  const displayName = friendlyMinistryName(memberName || user?.displayName);
+  const tabs = [
+    ...PERSONAL_TABS,
+    ...(canManageTeam ? [{ id: "team" as const, label: "팀원 관리", icon: UsersThree }] : []),
+    ...(canManageRequests ? [{ id: "requests" as const, label: "요청사항", icon: EnvelopeSimple }] : []),
+  ];
+  const [requestedTab, setTab] = useState<MyPageTab>(initialTab);
+  const tab = tabs.find((item) => item.id === requestedTab) ?? tabs[0];
+  const displayName = friendlyMinistryName(memberName || user?.displayName) || "사용자";
+  const id = useId();
+  const desktop = useIsDesktop();
+  const tabRefs = useRef<Partial<Record<MyPageTab, HTMLButtonElement | null>>>({});
+
+  function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    let next: number;
+    if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else if (event.key === "ArrowDown" || event.key === "ArrowRight") next = (index + 1) % tabs.length;
+    else if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = (index - 1 + tabs.length) % tabs.length;
+    else return;
+    event.preventDefault();
+    setTab(tabs[next].id);
+    tabRefs.current[tabs[next].id]?.focus();
+  }
+
+  function followShortcut(event: MouseEvent<HTMLDivElement>) {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.defaultPrevented) return;
+    const link = (event.target as Element).closest<HTMLAnchorElement>("a[href]");
+    if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+    if (new URL(link.href, window.location.href).origin === window.location.origin) onClose();
+  }
 
   return (
-    <OverlayShell
-      label="마이페이지"
-      onClose={onClose}
-      variant="fullscreen-mobile"
-      panelClassName="admin-mypage-dialog flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden bg-slate-50 shadow-2xl"
-    >
-      <div
-        className="flex min-h-0 flex-1 flex-col"
-      >
-        <header className="admin-mypage-header sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 pt-4 backdrop-blur sm:px-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-slate-950">{displayName || "사용자"} 마이페이지</h2>
-              <p className="mt-1 text-xs text-slate-500">{describeRoles(roles)} 역할의 일정, 배정과 요청 상태를 확인합니다.</p>
+    <OverlayShell label="마이페이지" onClose={onClose} variant="fullscreen-mobile" panelClassName="admin-mypage-dialog mypage-workspace">
+      <aside className="mypage-workspace-sidebar" aria-label="마이페이지 탐색">
+        <div className="mypage-workspace-brand">
+          <span className="mypage-workspace-mark"><SquaresFour size={19} weight="fill" aria-hidden="true" /></span>
+          <span><strong>서현고등부</strong><small>마이페이지</small></span>
+        </div>
+        <div className="mypage-workspace-nav" role="tablist" aria-label="마이페이지 메뉴" aria-orientation={desktop ? "vertical" : "horizontal"}>
+          {tabs.map((item, index) => (
+            <div key={item.id} role="presentation" className={index === 3 ? "mypage-workspace-admin-start" : undefined}>
+              {index === 0 && <span className="mypage-workspace-group" aria-hidden="true">나의 워크스페이스</span>}
+              {index === 3 && <span className="mypage-workspace-group" aria-hidden="true">운영 관리</span>}
+              <button
+                ref={(element) => { tabRefs.current[item.id] = element; }}
+                type="button"
+                role="tab"
+                id={`${id}-tab-${item.id}`}
+                aria-controls={`${id}-panel`}
+                aria-selected={tab.id === item.id}
+                tabIndex={tab.id === item.id ? 0 : -1}
+                onClick={() => setTab(item.id)}
+                onKeyDown={(event) => moveTab(event, index)}
+                className="mypage-workspace-nav-item"
+              >
+                <item.icon size={18} weight={tab.id === item.id ? "fill" : "regular"} aria-hidden="true" />
+                <span>{item.label}</span>
+              </button>
             </div>
-            <button onClick={onClose} className="compact-icon-control shrink-0 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="마이페이지 닫기"><X aria-hidden="true" size={18} weight="bold" /></button>
-          </div>
-          <div className="admin-mypage-tabs mt-4 flex gap-1" role="tablist" aria-label="마이페이지 메뉴">
-            <TabButton selected={tab === "dashboard"} onClick={() => setTab("dashboard")}>대시보드</TabButton>
-            <TabButton selected={tab === "ministry"} onClick={() => setTab("ministry")}>내 사역</TabButton>
-            <TabButton selected={tab === "myRequests"} onClick={() => setTab("myRequests")}>내 요청</TabButton>
-            {canManageTeam && <TabButton selected={tab === "team"} onClick={() => setTab("team")}>팀원 관리</TabButton>}
-            {canManageRequests && <TabButton selected={tab === "requests"} onClick={() => setTab("requests")}>요청사항</TabButton>}
-          </div>
+          ))}
+        </div>
+        <div className="mypage-workspace-account">
+          <span className="mypage-workspace-avatar" aria-hidden="true">{Array.from(displayName)[0]}</span>
+          <div><strong title={displayName}>{displayName}</strong><small title={describeRoles(roles)}>{describeRoles(roles)}</small></div>
+        </div>
+      </aside>
+      <div className="mypage-workspace-main">
+        <header className="mypage-workspace-topbar">
+          <div className="mypage-workspace-breadcrumb"><span>마이페이지</span><CaretRight size={12} aria-hidden="true" /><h2>{tab.label}</h2></div>
+          <button type="button" onClick={onClose} className="mypage-workspace-close" aria-label="마이페이지 닫기"><span>닫기</span><X size={18} aria-hidden="true" /></button>
         </header>
-
-        <div role="tabpanel" className="admin-mypage-content min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 sm:p-5">
-          {tab === "dashboard" && (canManageRequests ? <AdminDashboard onNavigate={setTab} /> : <RoleDashboardPanel />)}
-          {tab === "ministry" && <MyMinistryPanel />}
-          {tab === "myRequests" && <MyRequestsPanel />}
-          {tab === "team" && canManageTeam && <TeamModal embedded />}
-          {tab === "requests" && canManageRequests && <SiteRequestsPanel />}
+        <div key={tab.id} id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${tab.id}`} tabIndex={0} className="mypage-workspace-content" onClickCapture={followShortcut}>
+          <Suspense fallback={<div role="status" className="mypage-workspace-loading">{tab.label}을 불러오고 있습니다…</div>}>
+            {tab.id === "dashboard" && (canManageRequests ? <AdminDashboard onNavigate={setTab} /> : <RoleDashboardPanel />)}
+            {tab.id === "ministry" && <MyMinistryPanel />}
+            {tab.id === "myRequests" && <MyRequestsPanel />}
+            {tab.id === "team" && canManageTeam && <TeamModal embedded />}
+            {tab.id === "requests" && canManageRequests && <SiteRequestsPanel />}
+          </Suspense>
         </div>
       </div>
     </OverlayShell>
-  );
-}
-
-function TabButton({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={selected}
-      onClick={onClick}
-      className={`border-b-2 px-4 py-3 text-sm font-bold ${selected ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-800"}`}
-    >
-      {children}
-    </button>
   );
 }

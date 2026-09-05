@@ -32,11 +32,29 @@ export default function SiteRequestsPanel() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [busyAction, setBusyAction] = useState<BusyAction | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
-  useEffect(() => subscribeToAdminSiteRequests(
-    (next) => { setRequests(next); setLoadError(null); },
-    (error) => setLoadError(error.message),
-  ), []);
+  useEffect(() => {
+    let active = true;
+    const unsubscribe = subscribeToAdminSiteRequests(
+      (next) => {
+        if (!active) return;
+        setRequests(next);
+        setLoadError(null);
+        setLoaded(true);
+      },
+      (error) => {
+        if (!active) return;
+        setLoadError(error.message);
+        setLoaded(true);
+      },
+    );
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [retryKey]);
 
   const counts = useMemo(() => ({
     received: requests.filter((request) => request.status === "received").length,
@@ -91,23 +109,22 @@ export default function SiteRequestsPanel() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mypage-site-requests space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-bold text-slate-900">요청사항</h3>
           <p className="mt-1 text-xs text-slate-500">사이트 건의사항이 최신순으로 쌓입니다. 해결 완료 시 작성자에게 다음 로그인 알림을 보냅니다.</p>
         </div>
-        <div className="flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="요청 상태 필터">
+        <div className="flex rounded-xl bg-slate-100 p-1" role="group" aria-label="요청 상태 필터">
           {([
-            ["received", `받은 요청 ${counts.received}`],
-            ["resolved", `해결 ${counts.resolved}`],
-            ["all", `전체 ${requests.length}`],
+            ["received", `받은 요청 ${loaded && !loadError ? counts.received : "—"}`],
+            ["resolved", `해결 ${loaded && !loadError ? counts.resolved : "—"}`],
+            ["all", `전체 ${loaded && !loadError ? requests.length : "—"}`],
           ] as const).map(([value, label]) => (
             <button
               key={value}
               type="button"
-              role="tab"
-              aria-selected={filter === value}
+              aria-pressed={filter === value}
               onClick={() => { setFilter(value); setSelectedKey(null); }}
               className={`rounded-lg px-3 py-2 text-xs font-semibold ${filter === value ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
             >
@@ -117,8 +134,18 @@ export default function SiteRequestsPanel() {
         </div>
       </div>
 
-      {loadError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 요청함을 불러오지 못했습니다: {loadError}</div>}
-
+      {loadError ? (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <p>요청함을 불러오지 못했습니다: {loadError}</p>
+          <button type="button" className="btn-secondary mt-3" onClick={() => {
+            setLoadError(null);
+            setLoaded(false);
+            setRetryKey((current) => current + 1);
+          }}>다시 불러오기</button>
+        </div>
+      ) : !loaded ? (
+        <div role="status" className="grid min-h-44 place-items-center text-sm text-slate-500">요청함을 불러오는 중…</div>
+      ) : (
       <div className="grid min-h-[520px] overflow-hidden rounded-2xl border border-slate-200 bg-white lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="border-b border-slate-200 bg-slate-50/60 lg:border-b-0 lg:border-r">
           {filtered.length === 0 ? (
@@ -245,6 +272,7 @@ export default function SiteRequestsPanel() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -101,4 +101,28 @@ describe("OverlayShell — 포커스", () => {
     pressKey("Tab", { shiftKey: true });
     expect(document.activeElement).toBe(last);
   });
+
+  it("선택 탭만 Tab 순서에 있을 때 비선택 탭을 건너뛰고 양방향으로 순환한다", () => {
+    render(
+      <OverlayShell label="마이페이지" onClose={() => {}}>
+        <div role="tablist" aria-label="메뉴">
+          <button type="button" role="tab" tabIndex={-1} aria-selected={false}>대시보드</button>
+          <button type="button" role="tab" tabIndex={0} aria-selected={true}>내 사역</button>
+          <button type="button" role="tab" tabIndex={-1} aria-selected={false}>내 요청</button>
+        </div>
+        <button type="button">닫기</button>
+        <button type="button" tabIndex={-1}>프로그램으로만 초점 이동</button>
+      </OverlayShell>,
+    );
+    const selected = screen.getByRole("tab", { name: "내 사역" });
+    const last = screen.getByRole("button", { name: "닫기" });
+
+    selected.focus();
+    pressKey("Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(last);
+
+    last.focus();
+    pressKey("Tab");
+    expect(document.activeElement).toBe(selected);
+  });
 });

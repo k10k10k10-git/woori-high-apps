@@ -14,22 +14,31 @@ function formatTimestamp(value: number) {
 
 export default function MyRequestsPanel() {
   const { user } = useAuth();
+  if (!user) return <p className="mypage-empty">로그인 후 내 요청을 확인할 수 있습니다.</p>;
+  return <MyRequestsContent key={user.uid} uid={user.uid} />;
+}
+
+function MyRequestsContent({ uid }: { uid: string }) {
   const [requests, setRequests] = useState<SiteRequest[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const summary = useMemo(() => requestSummary(requests), [requests]);
+  const ready = loaded && !error;
 
   useEffect(() => {
-    if (!user) return;
-    return subscribeToMySiteRequests(user.uid, (values) => {
+    let active = true;
+    const unsubscribe = subscribeToMySiteRequests(uid, (values) => {
+      if (!active) return;
       setRequests(values);
       setLoaded(true);
       setError(null);
     }, (reason) => {
+      if (!active) return;
       setLoaded(true);
       setError(reason.message);
     });
-  }, [user]);
+    return () => { active = false; unsubscribe(); };
+  }, [uid]);
 
   return (
     <div className="space-y-5">
@@ -44,9 +53,9 @@ export default function MyRequestsPanel() {
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">요청을 불러오지 못했습니다: {error}</div>}
 
       <section className="mypage-request-summary" aria-label="내 요청 요약">
-        <div><EnvelopeSimple weight="duotone" /><span><small>전체 요청</small><strong>{loaded ? summary.total : "-"}<b>건</b></strong></span></div>
-        <div><ClockCountdown weight="duotone" /><span><small>처리 중</small><strong>{loaded ? summary.received : "-"}<b>건</b></strong></span></div>
-        <div><CheckCircle weight="duotone" /><span><small>해결 완료</small><strong>{loaded ? summary.resolved : "-"}<b>건</b></strong></span></div>
+        <div><EnvelopeSimple weight="duotone" /><span><small>전체 요청</small><strong>{ready ? summary.total : "—"}<b>건</b></strong></span></div>
+        <div><ClockCountdown weight="duotone" /><span><small>처리 중</small><strong>{ready ? summary.received : "—"}<b>건</b></strong></span></div>
+        <div><CheckCircle weight="duotone" /><span><small>해결 완료</small><strong>{ready ? summary.resolved : "—"}<b>건</b></strong></span></div>
       </section>
 
       <section className="mypage-section" aria-labelledby="my-request-list-title">
@@ -55,7 +64,7 @@ export default function MyRequestsPanel() {
           <div className="space-y-2 p-4" aria-label="요청 내역 불러오는 중">
             {[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}
           </div>
-        ) : requests.length === 0 ? (
+        ) : error ? <div className="mypage-empty"><p>요청 내역을 확인할 수 없습니다. 잠시 후 다시 열어 주세요.</p></div> : requests.length === 0 ? (
           <div className="mypage-empty"><EnvelopeSimple weight="duotone" /><strong>전송한 요청이 없습니다</strong><p>사이트 이용 중 불편한 점이 생기면 건의사항으로 알려 주세요.</p></div>
         ) : (
           <div className="mypage-request-list">

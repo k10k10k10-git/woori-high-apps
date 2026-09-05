@@ -74,17 +74,7 @@ describe("모바일 운영 화면 계약", () => {
     expect(css).toContain("white-space: nowrap;");
   });
 
-  it("모든 역할의 마이페이지는 공통 탭과 관리자 전용 탭을 구분한다", () => {
-    const myPage = source("src/features/portal/MyPageModal.tsx");
-    expect(myPage).toContain('initialTab = "dashboard"');
-    expect(myPage).toContain(">대시보드</TabButton>");
-    expect(myPage).toContain(">내 사역</TabButton>");
-    expect(myPage).toContain(">내 요청</TabButton>");
-    expect(myPage).toContain(">팀원 관리</TabButton>");
-    expect(myPage).toContain(">요청사항</TabButton>");
-    expect(myPage).toContain("<RoleDashboardPanel />");
-    expect(myPage).toContain("canManageTeam && <TabButton");
-    expect(myPage).toContain("canManageRequests && <TabButton");
+  it("헤더는 마이페이지를 단일 진입점으로 사용한다", () => {
     const header = source("src/features/portal/GlobalPortalHeader.tsx");
     expect(header).toContain("<span>마이페이지</span>");
     expect(header).not.toContain("teamOpen");

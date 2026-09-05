@@ -1,0 +1,14 @@
+{
+  "source": "production components, synthetic service boundaries",
+  "boundaries": [
+    "context/AuthContext",
+    "features/suggestions/db",
+    "context/UIContext",
+    "lib/db",
+    "features/iguard/lib/db",
+    "features/sundayMinistry/db",
+    "features/semester/db"
+  ],
+  "rejected": [],
+  "firebaseRuntimeModules": []
+}

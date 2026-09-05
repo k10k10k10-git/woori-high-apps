@@ -48,6 +48,7 @@ import {
 import { planRoleAssignment } from "./roleAssign";
 import { applyRoleSteps } from "./applyRole";
 import OverlayShell from "@/components/OverlayShell";
+import { useLoadErrors } from "@/lib/useLoadErrors";
 
 type TeamMember = {
   uid: string;
@@ -88,7 +89,20 @@ function memberLabel(member: { name: string; email: string }) {
   return member.name || member.email || "이름 미설정";
 }
 
-export default function TeamModal({ onClose, embedded = false }: { onClose?: () => void; embedded?: boolean }) {
+type TeamModalProps = { onClose?: () => void; embedded?: boolean };
+type TeamSource = "mainAdmins" | "admins" | "adminPending" | "iguardMembers" | "iguardPending" | "iguardRoles";
+const SOURCE_LABELS: Record<TeamSource, string> = {
+  mainAdmins: "통합관리자", admins: "행정 팀원", adminPending: "사역 접근 신청",
+  iguardMembers: "현장 팀원", iguardPending: "현장 접근 신청", iguardRoles: "현장 역할",
+};
+
+export default function TeamModal(props: TeamModalProps) {
+  const { user, roles } = useAuth();
+  const [revision, setRevision] = useState(0);
+  return <TeamContent key={`${user?.uid ?? "anonymous"}:${roles.semester}:${roles.retreat}:${revision}`} {...props} onRetry={() => setRevision((value) => value + 1)} />;
+}
+
+function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { onRetry: () => void }) {
   const { user, roles: myRoles } = useAuth();
   const { toast, uiConfirm } = useUI();
   const canManage = canManageRolesOf(myRoles);
@@ -103,21 +117,38 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
   const [draftName, setDraftName] = useState("");
   const [pendingRoleChoice, setPendingRoleChoice] = useState<Record<string, MinistryRoles>>({});
   const [busyUid, setBusyUid] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<Partial<Record<TeamSource, "ready" | "error">>>({});
+  const { fail, ok, message: loadError } = useLoadErrors("team-management");
   const [memberQuery, setMemberQuery] = useState("");
 
   useEffect(() => {
-    const fail = (error: Error) => setLoadError((current) => current ?? error.message);
+    let active = true;
+    const receive = <T,>(key: TeamSource, setter: (value: T) => void) => (value: T) => {
+      if (!active) return;
+      setter(value);
+      ok(SOURCE_LABELS[key]);
+      setLoaded((current) => ({ ...current, [key]: "ready" }));
+    };
+    const reject = (key: TeamSource) => (error: Error) => {
+      if (!active) return;
+      fail(SOURCE_LABELS[key])(error);
+      setLoaded((current) => ({ ...current, [key]: "error" }));
+    };
     const unsubs = [
-      subscribeToRetreatAdmins(setAdmins, fail),
-      subscribeToPendingRequests(setAdminPending, fail),
-      subscribeToIguardMembers(setIguardMembers, fail),
-      subscribeToIguardPending(setIguardPending, fail),
-      subscribeToIguardRoles(setIguardRoles, fail),
+      subscribeToRetreatAdmins(receive("admins", setAdmins), reject("admins")),
+      subscribeToPendingRequests(receive("adminPending", setAdminPending), reject("adminPending")),
+      subscribeToIguardMembers(receive("iguardMembers", setIguardMembers), reject("iguardMembers")),
+      subscribeToIguardPending(receive("iguardPending", setIguardPending), reject("iguardPending")),
+      subscribeToIguardRoles(receive("iguardRoles", setIguardRoles), reject("iguardRoles")),
     ];
-    if (canManage) unsubs.push(subscribeToMainAdmins(setMainAdmins, fail));
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [canManage]);
+    if (canManage) unsubs.push(subscribeToMainAdmins(receive("mainAdmins", setMainAdmins), reject("mainAdmins")));
+    return () => {
+      active = false;
+      unsubs.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [canManage, fail, ok]);
+  const requiredSources = (Object.keys(SOURCE_LABELS) as TeamSource[]).filter((key) => canManage || key !== "mainAdmins");
+  const ready = requiredSources.every((key) => loaded[key] === "ready");
 
   const members = useMemo<TeamMember[]>(() => {
     const ids = new Set([...Object.keys(mainAdmins), ...Object.keys(admins), ...Object.keys(iguardMembers)]);
@@ -326,13 +357,22 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
         </header>}
 
         <div className="space-y-6 p-5 sm:p-6">
-          {loadError && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
+          {loadError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <p>팀원 정보를 확인하지 못했습니다: {loadError}</p>
+            <p className="mt-1">모든 역할 정보를 확인한 뒤 팀원 관리가 열립니다.</p>
+            <button type="button" onClick={onRetry} className="btn-secondary mt-3">다시 불러오기</button>
+          </div>}
+          {!ready && !loadError && <div role="status" className="grid min-h-44 place-items-center text-sm text-slate-500">팀원과 역할 정보를 불러오는 중…</div>}
           {!canManage && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
               역할 배정은 통합관리자만 할 수 있습니다. 지금은 조회만 가능합니다.
             </div>
           )}
 
+          {ready && <>
+          <details className="rounded-xl border border-slate-200 px-4">
+            <summary className="cursor-pointer py-3 text-sm font-semibold text-slate-800">역할 안내 <span className="ml-2 text-xs font-normal text-slate-500">학기·방학 역할별 권한과 인원</span></summary>
+            <div className="space-y-5 pb-4">
           <section>
             <h3 className="mb-2 font-bold text-slate-800">학기 역할 <span className="text-xs font-normal text-slate-400">학기 사역 · 주일 사역</span></h3>
             <div className="grid gap-1.5 sm:grid-cols-2">
@@ -358,6 +398,9 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
               ))}
             </div>
           </section>
+
+            </div>
+          </details>
 
           <section>
             <div className="mb-3 flex items-center justify-between">
@@ -532,6 +575,7 @@ export default function TeamModal({ onClose, embedded = false }: { onClose?: () 
               ))}
             </div>
           </section>
+          </>}
         </div>
     </>
   );
