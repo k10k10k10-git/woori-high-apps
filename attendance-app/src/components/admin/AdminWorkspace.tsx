@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/store/AppContext';
 import { getWindowYears, getKSTYear } from '@/utils/dates';
 import { ADMIN_NAVIGATION, adminNavigationItem, hasClassFilters } from '@/lib/adminNavigation';
@@ -14,6 +14,10 @@ export default function AdminWorkspace({ children, onLogout, isOnline }: { child
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState(false);
   const activeItem = adminNavigationItem(pathname);
+  const navigationRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navigationRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [pathname]);
   const currentYear = getKSTYear();
   const userName = state.userRole?.name?.trim() || '관리자';
 
@@ -39,11 +43,11 @@ export default function AdminWorkspace({ children, onLogout, isOnline }: { child
     <div className="admin-workspace">
       <a className="aw-skip" href="#admin-main">본문으로 이동</a>
       <aside className="aw-sidebar" aria-label="관리자 작업 공간">
-        <Link href="/dashboard" className="aw-brand" aria-label="서현고등부 출석부 대시보드">
+        <Link href="/dashboard" className="aw-brand" aria-label="서현고등부 출석부 전체 현황">
           <span className="aw-brand-mark"><AdminIcon name="book" size={19} /></span>
           <span className="aw-brand-copy"><strong>서현고등부</strong><span>출석부</span></span>
         </Link>
-        <nav className="aw-navigation" aria-label="관리자 메뉴">
+        <nav ref={navigationRef} className="aw-navigation" aria-label="관리자 메뉴">
           {ADMIN_NAVIGATION.map(item => (
             <Link key={item.path} href={item.path} className={`aw-nav-link${activeItem?.path === item.path ? ' is-active' : ''}`} aria-current={activeItem?.path === item.path ? 'page' : undefined}>
               <AdminIcon name={item.icon} size={17} /><span>{item.label}</span>

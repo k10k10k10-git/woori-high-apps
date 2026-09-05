@@ -1,9 +1,11 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useApp, calcStats } from '@/store/AppContext';
+import { useApp } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
 import { useChartJs } from '@/hooks/useChartJs';
 import ChartLoadState from '@/components/ChartLoadState';
+import { annualClassAverageRate } from '@/utils/annualAttendance';
+import '@/components/admin/admin-trends.css';
 
 function sortClassKeys(keys: string[]): string[] {
   return [...keys].sort((a, b) => {
@@ -189,218 +191,64 @@ export default function OverallDashboard() {
   }, [chartJsReady, chartJsRef, labels, allCks, gradeRatePart, monthlyRates]);
 
   const allClassKeys = sortClassKeys(Object.keys(classData));
-  const part1Keys = allClassKeys.filter(k => k.startsWith('1-'));
-  const part2Keys = allClassKeys.filter(k => k.startsWith('2-'));
-  const totalAll = allClassKeys.reduce((s, k) => s + (classData[k]?.students.length ?? 0), 0);
-
-  const thisWeekKey = (() => {
-    const kstNow = new Date(Date.now() + 9 * 3600 * 1000);
-    const kstMonth = kstNow.getUTCMonth() + 1;
-    const kstDay = kstNow.getUTCDate();
-    for (let mi = months.length - 1; mi >= 0; mi--) {
-      const { month, sundays } = months[mi];
-      if (month > kstMonth) continue;
-      for (let di = sundays.length - 1; di >= 0; di--) {
-        const day = sundays[di];
-        if (month < kstMonth || day <= kstDay) {
-          const k = evKey(mi, di);
-          if (!events[k]) return k;
-        }
-      }
-    }
-    return null;
-  })();
-
-  const thisWeekLabel = (() => {
-    if (!thisWeekKey) return null;
-    const [mi, di] = thisWeekKey.split('-').map(Number);
-    return `${months[mi]?.month}/${months[mi]?.sundays[di]}`;
-  })();
-
-  const thisWeekRate = (() => {
-    if (!thisWeekKey) return null;
-    let total = 0, present = 0;
-    allClassKeys.forEach(ck => {
-      (classData[ck]?.students ?? []).forEach(s => {
-        const v = attData[ck]?.[s.id]?.[thisWeekKey];
-        if (v === 'O' || v === 'X' || v === 'T') {
-          total++;
-          if (v === 'O') present++;
-        }
-      });
-    });
-    return total === 0 ? null : Math.round((present / total) * 100);
-  })();
-
-  const notInputtedClasses = thisWeekKey
-    ? allClassKeys.filter(ck => {
-        const students = classData[ck]?.students ?? [];
-        if (students.length === 0) return false;
-        return !students.some(s => attData[ck]?.[s.id]?.[thisWeekKey] !== undefined);
-      })
-    : [];
-
-  function classAvgRate(ck: string): number | null {
-    const students = classData[ck]?.students ?? [];
-    if (students.length === 0) return null;
-    const rates = students.map(s => {
-      const { present, absent, tardy } = calcStats(state, ck, s.id);
-      const rec = present + absent + tardy;
-      return rec === 0 ? null : Math.round((present / rec) * 100);
-    }).filter((r): r is number => r !== null);
-    if (rates.length === 0) return null;
-    return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
-  }
+  const totalAll = allClassKeys.reduce((sum, key) => sum + (classData[key]?.students.length ?? 0), 0);
+  const classRows = useMemo(() => sortClassKeys(Object.keys(classData)).map(key => ({
+    key, teacher: classData[key]?.teacher || '담임 교사 미등록',
+    count: classData[key]?.students.length ?? 0,
+    rate: annualClassAverageRate({ months, attData, events }, key, classData[key]?.students ?? []),
+  })), [classData, months, attData, events]);
 
   return (
-    <>
-      <div className="overall-card">
-        <div className="overall-card-header">
-          <span className="overall-card-title">현황 대시보드</span>
+    <div className="admin-trends">
+      <p className="at-context">{state.curYear}년 전체 기간 · {allClassKeys.length}개 반 · 학생 {totalAll.toLocaleString()}명 (장결 포함)</p>
+      <section className="at-section" aria-labelledby="at-class-title">
+        <header className="at-section-heading">
+          <div><h3 id="at-class-title">반별 누적 출석률</h3><p>입력 기록이 있는 학생의 개인별 출석률 평균입니다.</p></div>
+          <div className="at-parts" role="group" aria-label="누적 출석률 부서 선택">
+            {(['1', '2'] as const).map(p => <button type="button" key={p} aria-pressed={rateTablePart === p} onClick={() => setRateTablePart(p)}>{p}부</button>)}
+          </div>
+        </header>
+        <div className="at-table-wrap">
+          <table className="at-table">
+            <caption className="ad-sr-only">{state.curYear}년 {rateTablePart}부 반별 연간 출석률</caption>
+            <thead><tr><th scope="col">반</th><th scope="col">담임 교사</th><th scope="col">학생 수</th><th scope="col">누적 출석률</th></tr></thead>
+            <tbody>{classRows.filter(row => row.key.startsWith(`${rateTablePart}-`)).map(row => {
+              const [, grade, number] = row.key.split('-');
+              return <tr key={row.key}><th scope="row">{grade}학년 {number}반</th><td>{row.teacher}</td><td>{row.count}명</td><td>{row.rate === null ? '—' : `${row.rate}%`}</td></tr>;
+            })}</tbody>
+          </table>
         </div>
-        <div style={{ padding: '0 12px 16px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <div className="dash-stat-card">
-            <div className="dash-stat-label">전체 학생</div>
-            <div className="dash-stat-value">{totalAll}<span className="dash-stat-unit">명</span></div>
-          </div>
-          <div className="dash-stat-card">
-            <div className="dash-stat-label">전체 반</div>
-            <div className="dash-stat-value">{allClassKeys.length}<span className="dash-stat-unit">반</span></div>
-          </div>
-          <div className="dash-stat-card">
-            <div className="dash-stat-label">1부 학생</div>
-            <div className="dash-stat-value">{part1Keys.reduce((s,k)=>s+(classData[k]?.students.length??0),0)}<span className="dash-stat-unit">명</span></div>
-          </div>
-          <div className="dash-stat-card">
-            <div className="dash-stat-label">2부 학생</div>
-            <div className="dash-stat-value">{part2Keys.reduce((s,k)=>s+(classData[k]?.students.length??0),0)}<span className="dash-stat-unit">명</span></div>
-          </div>
-          <div className="dash-stat-card" style={{ borderColor: thisWeekRate !== null && thisWeekRate < 70 ? '#fca5a5' : thisWeekRate !== null && thisWeekRate >= 80 ? '#6ee7b7' : undefined }}>
-            <div className="dash-stat-label">이번 주 출석률{thisWeekLabel ? ` (${thisWeekLabel})` : ''}</div>
-            <div className="dash-stat-value" style={{ color: thisWeekRate === null ? 'var(--text3)' : thisWeekRate >= 80 ? 'var(--green-text)' : thisWeekRate >= 70 ? 'var(--amber-text)' : 'var(--red-text)' }}>
-              {thisWeekRate === null ? '-' : `${thisWeekRate}`}<span className="dash-stat-unit">{thisWeekRate === null ? '' : '%'}</span>
-            </div>
-            {thisWeekRate !== null && notInputtedClasses.length > 0 && (
-              <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>입력된 반 기준</div>
-            )}
-          </div>
-        </div>
-
-        {notInputtedClasses.length > 0 && (
-          <div style={{ margin: '0 12px 16px', padding: '12px 14px', background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#d97706', marginBottom: 8 }}>
-              미입력 반 ({notInputtedClasses.length}개)
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {notInputtedClasses.map(ck => {
-                const [p, g, c] = ck.split('-');
-                const teacher = classData[ck]?.teacher;
-                return (
-                  <span key={ck} style={{ padding: '3px 10px', background: '#fef3c7', borderRadius: 999, fontSize: 12, color: '#92400e', fontWeight: 600 }}>
-                    {p}부 {g}학년 {c}반{teacher ? ` · ${teacher}` : ''}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {thisWeekKey && notInputtedClasses.length === 0 && (
-          <div style={{ margin: '0 12px 16px', padding: '10px 14px', background: '#ecfdf5', border: '1.5px solid #6ee7b7', borderRadius: 10, fontSize: 12, color: 'var(--green-text)', fontWeight: 600 }}>
-            모든 반이 이번 주 출석을 입력했습니다.
-          </div>
-        )}
-
-        <div style={{ borderTop: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', gap: 4, padding: '10px 12px 4px' }} role="tablist" aria-label="부서 선택">
-            {(['1', '2'] as const).map(p => (
-              <button key={p} role="tab" aria-selected={rateTablePart === p} className={`view-btn${rateTablePart === p ? ' active' : ''}`}
-                onClick={() => setRateTablePart(p)}>{p}부</button>
-            ))}
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: 'var(--surface2)' }}>
-                  {['반', '교사', '학생수', '누적 출석률'].map(h => (
-                    <th key={h} style={{ padding: '7px 10px', fontWeight: 600, color: 'var(--text2)', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {allClassKeys.filter(k => k.startsWith(`${rateTablePart}-`)).map((ck, i) => {
-                  const [, g, c] = ck.split('-');
-                  const rate = classAvgRate(ck);
-                  const cnt = classData[ck]?.students.length ?? 0;
-                  const teacher = classData[ck]?.teacher ?? '-';
-                  return (
-                    <tr key={ck} style={{ background: i % 2 === 0 ? '#fff' : 'var(--surface2)' }}>
-                      <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 600 }}>{g}학년 {c}반</td>
-                      <td style={{ padding: '7px 10px', textAlign: 'center', color: 'var(--text2)' }}>{teacher}</td>
-                      <td style={{ padding: '7px 10px', textAlign: 'center' }}>{cnt}명</td>
-                      <td style={{ padding: '7px 10px', textAlign: 'center', fontWeight: 700,
-                        color: rate === null ? 'var(--text3)' : rate >= 80 ? 'var(--green-text)' : rate >= 70 ? 'var(--amber-text)' : 'var(--red-text)' }}>
-                        {rate === null ? '-' : `${rate}%`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
+        {!classRows.some(row => row.key.startsWith(`${rateTablePart}-`)) && <p className="at-empty">{rateTablePart}부에 등록된 반이 없습니다.</p>}
+      </section>
       <ChartLoadState ready={chartJsReady} error={chartLoadError} onRetry={retryChart} />
-
-      <div className="overall-card">
-        <div className="overall-card-header">
-          <span className="overall-card-title">주차별 전체 출석인원</span>
-        </div>
-        <div style={{ padding: '0 16px 16px', height: 240 }}>
-          <canvas ref={chartWeeklyRef} />
-        </div>
+      {totalAll === 0 && <p className="at-empty">학생을 등록하고 출석을 입력하면 이곳에서 변화를 확인할 수 있습니다.</p>}
+      <div className="at-chart-grid">
+        <section className="at-section" aria-labelledby="at-weekly-title">
+          <header className="at-section-heading"><div><h3 id="at-weekly-title">주차별 출석 인원</h3><p>1부와 2부의 주일 출석 흐름</p></div></header>
+          <div className="at-canvas"><canvas ref={chartWeeklyRef} role="img" aria-label="주차별 1부와 2부 출석 인원 막대 그래프" /></div>
+        </section>
+        <section className="at-section" aria-labelledby="at-weekly-grade-title">
+          <header className="at-section-heading"><div><h3 id="at-weekly-grade-title">학년별 출석 인원</h3><p>주차별 1·2·3학년 비교</p></div>
+            <div className="at-parts" role="group" aria-label="주차별 학년 출석인원 부서 선택">
+              {(['1', '2'] as const).map(p => <button type="button" key={p} aria-pressed={weeklyGradePart === p} onClick={() => setWeeklyGradePart(p)}>{p}부</button>)}
+            </div>
+          </header>
+          <div className="at-canvas"><canvas ref={chartWeeklyGradeRef} role="img" aria-label={`${weeklyGradePart}부 주차별 학년 출석 인원 막대 그래프`} /></div>
+        </section>
+        <section className="at-section" aria-labelledby="at-monthly-title">
+          <header className="at-section-heading"><div><h3 id="at-monthly-title">부서별 월별 출석률</h3><p>1부와 2부의 입력 기록 기준</p></div></header>
+          <div className="at-canvas"><canvas ref={chartPartRef} role="img" aria-label="1부와 2부 월별 출석률 선 그래프" /></div>
+        </section>
+        <section className="at-section" aria-labelledby="at-monthly-grade-title">
+          <header className="at-section-heading"><div><h3 id="at-monthly-grade-title">학년별 월별 출석률</h3><p>월별 1·2·3학년 비교</p></div>
+            <div className="at-parts" role="group" aria-label="학년별 월별 출석률 부서 선택">
+              {(['1', '2'] as const).map(p => <button type="button" key={p} aria-pressed={gradeRatePart === p} onClick={() => setGradeRatePart(p)}>{p}부</button>)}
+            </div>
+          </header>
+          <div className="at-canvas"><canvas ref={chartGradeRef} role="img" aria-label={`${gradeRatePart}부 학년별 월별 출석률 선 그래프`} /></div>
+        </section>
       </div>
-
-      <div className="overall-card">
-        <div className="overall-card-header">
-          <span className="overall-card-title">주차별 학년별 출석인원</span>
-          <div style={{ display: 'flex', gap: 4 }} role="tablist" aria-label="주차별 학년 출석인원 부서 선택">
-            {(['1', '2'] as const).map(p => (
-              <button key={p} role="tab" aria-selected={weeklyGradePart === p} className={`view-btn${weeklyGradePart === p ? ' active' : ''}`}
-                style={{ padding: '3px 12px', fontSize: 12 }}
-                onClick={() => setWeeklyGradePart(p)}>{p}부</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ padding: '0 16px 16px', height: 240 }}>
-          <canvas ref={chartWeeklyGradeRef} />
-        </div>
-      </div>
-
-      <div className="overall-card">
-        <div className="overall-card-header">
-          <span className="overall-card-title">1부 vs 2부 월별 출석률</span>
-        </div>
-        <div style={{ padding: '0 16px 16px', height: 220 }}>
-          <canvas ref={chartPartRef} />
-        </div>
-      </div>
-
-      <div className="overall-card">
-        <div className="overall-card-header">
-          <span className="overall-card-title">학년별 월별 출석률</span>
-          <div style={{ display: 'flex', gap: 4 }} role="tablist" aria-label="학년별 월별 출석률 부서 선택">
-            {(['1', '2'] as const).map(p => (
-              <button key={p} role="tab" aria-selected={gradeRatePart === p} className={`view-btn${gradeRatePart === p ? ' active' : ''}`}
-                style={{ padding: '3px 12px', fontSize: 12 }}
-                onClick={() => setGradeRatePart(p)}>{p}부</button>
-            ))}
-          </div>
-        </div>
-        <div style={{ padding: '0 16px 16px', height: 220 }}>
-          <canvas ref={chartGradeRef} />
-        </div>
-      </div>
-    </>
+      <p className="at-note">행사 주일은 집계에서 제외합니다. 출석률은 입력된 O·X·T 중 O의 비율이며, 기록이 없는 월은 빈 구간으로 표시합니다. 주차별 인원은 현재 입력된 O의 수입니다.</p>
+    </div>
   );
 }

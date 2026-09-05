@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { db, ref, get, set } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import { createPersonId, findHistoricalPersonId } from '@/utils/personId';
+import '../../admin/admin-teacher-dialog.css';
 
 interface SpecialTeacher { title: string; name: string; phone: string; birth?: string; personId?: string; }
 interface TeacherExtra   { title?: string; name?: string; phone?: string; birth?: string; personId?: string; }
@@ -26,7 +27,6 @@ function sortClassKeys(keys: string[]): string[] {
 }
 
 const tdCell: React.CSSProperties = { padding: '7px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' };
-const editBtnStyle: React.CSSProperties = { padding: '2px 8px', fontSize: 11, borderRadius: 6, border: '1px solid var(--border2)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text2)' };
 
 export default function TeacherManagement() {
   const { state } = useApp();
@@ -37,7 +37,9 @@ export default function TeacherManagement() {
   const [teacherExtra, setTeacherExtra] = useState<Record<string, TeacherExtra>>({});
   const [staffList, setStaffList] = useState<Record<string, StaffMember>>({});
   const [additionalTeachers, setAdditionalTeachers] = useState<Record<string, StaffMember>>({});
-  const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [loadingTeachers, setLoadingTeachers] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const loadRequest = useRef({ version: 0 }).current;
 
   const [editingTeacher, setEditingTeacher] = useState<
     | { kind: 'special'; idx: number }
@@ -49,14 +51,16 @@ export default function TeacherManagement() {
   const [teacherForm, setTeacherForm] = useState({ title: '', name: '', phone: '', birth: '' });
   const [deleteStaffConfirm, setDeleteStaffConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const teacherFormId = useId();
 
-  useEffect(() => { loadTeacherData(); }, [teacherPart, curYear]);
-
-  async function loadTeacherData() {
+  const loadTeacherData = useCallback(async () => {
+    const request = ++loadRequest.version;
     setLoadingTeachers(true);
+    setLoadError(false);
     try {
       if (teacherPart === 'staff') {
         const staffSnap = await get(ref(db, `teacherStaff/${curYear}`));
+        if (request !== loadRequest.version) return;
         setStaffList(staffSnap.exists() ? (staffSnap.val() as Record<string, StaffMember>) : {});
       } else {
         const [specialSnap, extraSnap, phonesSnap, addSnap] = await Promise.all([
@@ -65,6 +69,7 @@ export default function TeacherManagement() {
           get(ref(db, `teacherPhones/${curYear}/${teacherPart}`)),
           get(ref(db, `teacherAdditional/${curYear}/${teacherPart}`)),
         ]);
+        if (request !== loadRequest.version) return;
         if (specialSnap.exists()) {
           const raw = specialSnap.val() as SpecialTeacher[];
           setSpecialTeachers([
@@ -86,9 +91,11 @@ export default function TeacherManagement() {
         setTeacherExtra(extra);
         setAdditionalTeachers(addSnap.exists() ? (addSnap.val() as Record<string, StaffMember>) : {});
       }
-    } catch { /* ignore */ }
-    setLoadingTeachers(false);
-  }
+    } catch { if (request === loadRequest.version) setLoadError(true); }
+    finally { if (request === loadRequest.version) setLoadingTeachers(false); }
+  }, [curYear, teacherPart, loadRequest]);
+
+  useEffect(() => { loadTeacherData(); return () => { loadRequest.version++; }; }, [loadTeacherData, loadRequest]);
 
   function openEditSpecial(idx: number) {
     const t = specialTeachers[idx];
@@ -220,17 +227,17 @@ export default function TeacherManagement() {
     <>
       <div className="overall-card">
         <div className="overall-card-header">
-          <span className="overall-card-title">교사 명단</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }} role="tablist" aria-label="교사 부서 선택">
+          <h2 className="overall-card-title">교사 명단</h2>
+          <div className="ao-teacher-tools" role="group" aria-label="교사 부서 선택">
             {(['1', '2'] as const).map(p => (
-              <button key={p} role="tab" aria-selected={teacherPart === p} className={`view-btn${teacherPart === p ? ' active' : ''}`}
+              <button key={p} aria-pressed={teacherPart === p} className={`view-btn${teacherPart === p ? ' active' : ''}`}
                 onClick={() => setTeacherPart(p)}>{p}부</button>
             ))}
-            <button role="tab" aria-selected={teacherPart === 'staff'} className={`view-btn${teacherPart === 'staff' ? ' active' : ''}`}
+            <button aria-pressed={teacherPart === 'staff'} className={`view-btn${teacherPart === 'staff' ? ' active' : ''}`}
               onClick={() => setTeacherPart('staff')}>스탭</button>
             <button
               aria-label="교사 목록 새로고침"
-              style={{ marginLeft: 4, padding: '4px 11px', fontSize: 11, borderRadius: 999, border: '1.5px solid var(--border2)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text2)' }}
+              className="ao-quiet-button"
               onClick={loadTeacherData}
             >새로고침</button>
           </div>
@@ -238,6 +245,8 @@ export default function TeacherManagement() {
 
         {loadingTeachers ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>불러오는 중...</div>
+        ) : loadError ? (
+          <div className="ao-error" role="alert"><span>교사 명단을 불러오지 못했습니다.</span><button type="button" onClick={loadTeacherData}>다시 시도</button></div>
         ) : teacherPart === 'staff' ? (
           <div>
             <div style={{ padding: '10px 16px 6px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -263,7 +272,7 @@ export default function TeacherManagement() {
                         <td style={{ ...tdCell, color: 'var(--text2)' }}>{s.birth || '-'}</td>
                         <td style={tdCell}>{s.phone || '-'}</td>
                         <td style={tdCell}>
-                          <button onClick={() => openEditStaff(key)} style={editBtnStyle} aria-label={`${s.name} 스탭 정보 수정`}>수정</button>
+                          <button onClick={() => openEditStaff(key)} className="ao-edit-button" aria-label={`${s.name} 스탭 정보 수정`}>수정</button>
                         </td>
                       </tr>
                     ))}
@@ -291,7 +300,7 @@ export default function TeacherManagement() {
                     <td style={{ ...tdCell, color: 'var(--text2)' }}>{teacherPart}부</td>
                     <td style={tdCell}>{t.phone || '-'}</td>
                     <td style={tdCell}>
-                      <button onClick={() => openEditSpecial(i)} style={editBtnStyle} aria-label={`${t.title} ${t.name || ''} 정보 수정`}>수정</button>
+                      <button onClick={() => openEditSpecial(i)} className="ao-edit-button" aria-label={`${t.title} ${t.name || ''} 정보 수정`}>수정</button>
                     </td>
                   </tr>
                 ))}
@@ -313,7 +322,7 @@ export default function TeacherManagement() {
                       <td style={{ ...tdCell, color: 'var(--text2)' }}>{p}부</td>
                       <td style={{ ...tdCell, color: displayPhone ? 'var(--text)' : 'var(--text3)' }}>{displayPhone || '-'}</td>
                       <td style={tdCell}>
-                        <button onClick={() => openEditRegular(ck)} style={editBtnStyle} aria-label={`${displayName} 담임 정보 수정`}>수정</button>
+                        <button onClick={() => openEditRegular(ck)} className="ao-edit-button" aria-label={`${displayName} 담임 정보 수정`}>수정</button>
                       </td>
                     </tr>
                   );
@@ -328,7 +337,7 @@ export default function TeacherManagement() {
                       <td style={{ ...tdCell, color: 'var(--text2)' }}>{teacherPart}부</td>
                       <td style={{ ...tdCell, color: s.phone ? 'var(--text)' : 'var(--text3)' }}>{s.phone || '-'}</td>
                       <td style={tdCell}>
-                        <button onClick={() => openEditAdditional(key)} style={editBtnStyle} aria-label={`${s.name} 교사 정보 수정`}>수정</button>
+                        <button onClick={() => openEditAdditional(key)} className="ao-edit-button" aria-label={`${s.name} 교사 정보 수정`}>수정</button>
                       </td>
                     </tr>
                   );
@@ -344,40 +353,36 @@ export default function TeacherManagement() {
 
       {/* 교사/스탭 수정 모달 */}
       {editingTeacher && (
-        <div className="modal-overlay center-modal" role="dialog" aria-modal="true" aria-label={editTitle}
-          onClick={() => { setEditingTeacher(null); setDeleteStaffConfirm(false); }}
-          onKeyDown={e => { if (e.key === 'Escape') { setEditingTeacher(null); setDeleteStaffConfirm(false); } }}>
-          <div className="modal-dialog" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">{editTitle}</div>
+        <TeacherDialog title={editTitle} busy={saving} onClose={() => { setEditingTeacher(null); setDeleteStaffConfirm(false); }}>
             <div className="form-field">
-              <label className="form-label">직급</label>
+              <label className="form-label" htmlFor={`${teacherFormId}-title`}>직급</label>
               {editingTeacher.kind === 'special' ? (
-                <select className="form-select" value={teacherForm.title}
+                <select id={`${teacherFormId}-title`} className="form-select" value={teacherForm.title} disabled={saving}
                   onChange={e => setTeacherForm(f => ({ ...f, title: e.target.value }))}>
                   <option value="부장">부장</option>
                   <option value="회계">회계</option>
                   <option value="행정">행정</option>
                 </select>
               ) : (
-                <input className="form-input" value={teacherForm.title}
+                <input id={`${teacherFormId}-title`} className="form-input" value={teacherForm.title} disabled={saving}
                   onChange={e => setTeacherForm(f => ({ ...f, title: e.target.value }))}
                   placeholder={editingTeacher.kind === 'staff' ? '예: 반주자, 영상, 음향' : editingTeacher.kind === 'additional' ? '예: 보조교사, 실습교사' : ''} />
               )}
             </div>
             <div className="form-field">
-              <label className="form-label">이름</label>
-              <input className="form-input" value={teacherForm.name}
+              <label className="form-label" htmlFor={`${teacherFormId}-name`}>이름</label>
+              <input id={`${teacherFormId}-name`} className="form-input" value={teacherForm.name} disabled={saving} autoComplete="name"
                 onChange={e => setTeacherForm(f => ({ ...f, name: e.target.value }))} />
             </div>
             <div className="form-field">
-              <label className="form-label">년생</label>
-              <input className="form-input" value={teacherForm.birth}
+              <label className="form-label" htmlFor={`${teacherFormId}-birth`}>년생</label>
+              <input id={`${teacherFormId}-birth`} className="form-input" value={teacherForm.birth} disabled={saving} inputMode="numeric"
                 onChange={e => setTeacherForm(f => ({ ...f, birth: e.target.value }))}
                 placeholder="예: 1990" />
             </div>
             <div className="form-field">
-              <label className="form-label">전화번호</label>
-              <input className="form-input" value={teacherForm.phone} placeholder="010-0000-0000"
+              <label className="form-label" htmlFor={`${teacherFormId}-phone`}>전화번호</label>
+              <input id={`${teacherFormId}-phone`} className="form-input" value={teacherForm.phone} placeholder="010-0000-0000" disabled={saving} type="tel" autoComplete="tel"
                 onChange={e => setTeacherForm(f => ({ ...f, phone: e.target.value }))} />
             </div>
             {(editingTeacher.kind === 'staff' || editingTeacher.kind === 'additional') && editingTeacher.key && deleteStaffConfirm && (
@@ -390,7 +395,7 @@ export default function TeacherManagement() {
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button className="btn-danger" style={{ padding: '6px 14px', fontSize: 12 }} onClick={deleteStaffOrAdditional} disabled={saving}>삭제</button>
-                  <button className="btn-secondary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setDeleteStaffConfirm(false)}>취소</button>
+                  <button className="btn-secondary" style={{ padding: '6px 14px', fontSize: 12 }} onClick={() => setDeleteStaffConfirm(false)} disabled={saving}>취소</button>
                 </div>
               </div>
             )}
@@ -404,9 +409,28 @@ export default function TeacherManagement() {
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>
-          </div>
-        </div>
+        </TeacherDialog>
       )}
     </>
   );
+}
+
+function TeacherDialog({ title, busy, onClose, children }: { title: string; busy: boolean; onClose: () => void; children: ReactNode }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const element = dialog.current;
+    const opener = document.activeElement;
+    element?.showModal();
+    element?.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled)')?.focus({ preventScroll: true });
+    return () => {
+      element?.close();
+      if (opener instanceof HTMLElement && opener.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
+  return <dialog ref={dialog} className="admin-teacher-dialog" aria-modal="true" aria-labelledby={titleId}
+    onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}
+    onClick={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    <div className="atd-content"><header className="atd-header"><h2 id={titleId}>{title}</h2><button type="button" onClick={onClose} disabled={busy}>닫기</button></header><div className="atd-fields">{children}</div></div>
+  </dialog>;
 }

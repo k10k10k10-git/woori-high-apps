@@ -48,7 +48,7 @@ src/
   app/                       # Next.js App Router 라우트 (각 탭의 단순 래퍼)
     layout.tsx
     page.tsx                 # 일반 관리자 → /dashboard, 교사·데모 → /attendance
-    dashboard/page.tsx        # → AdminDashboard
+    dashboard/page.tsx        # → OverallTab (통합 전체 현황)
     attendance/page.tsx       # useSearchParams 사용 탭을 Suspense로 감쌈
     manage/page.tsx
     stats/page.tsx
@@ -86,7 +86,7 @@ src/
       ManageTab.tsx
       StatTab.tsx
       AdminTab.tsx
-      OverallTab.tsx         # 서브 페이지 라우터 (대시보드/교사·학생 명단/건의사항)
+      OverallTab.tsx         # 통합 전체 현황 (주간 출석·연간 추이/명단/건의사항)
       overall/               # OverallTab 서브 컴포넌트
         OverallDashboard.tsx   # 출석 통계 차트 + 반별 출석률 테이블
         TeacherManagement.tsx  # 교사 명단 관리 (부장/회계/행정, 담임 추가정보)

@@ -1,11 +1,10 @@
 import type { UserRole } from '@/types';
 
 export const ADMIN_NAVIGATION = [
-  { path: '/dashboard', label: '대시보드', icon: 'dashboard' },
+  { path: '/dashboard', label: '전체 현황', icon: 'dashboard' },
   { path: '/attendance', label: '출석 입력', icon: 'calendar' },
   { path: '/manage', label: '학생 관리', icon: 'users' },
   { path: '/stats', label: '반별 통계', icon: 'chart' },
-  { path: '/overall', label: '전체 현황', icon: 'layers' },
   { path: '/admin', label: '계정·설정', icon: 'settings' },
 ] as const;
 
@@ -36,7 +35,9 @@ export function homePathForRole(role: UserRole | null, isDemo: boolean): '/dashb
 }
 
 export function adminNavigationItem(pathname: string) {
-  return ADMIN_NAVIGATION.find(item => isWithinPath(pathname, item.path));
+  // 이전 전체 현황 주소도 통합 메뉴의 활성 상태를 공유한다.
+  const current = isWithinPath(pathname, '/overall') ? '/dashboard' : pathname;
+  return ADMIN_NAVIGATION.find(item => isWithinPath(current, item.path));
 }
 
 export function hasClassFilters(pathname: string): boolean {

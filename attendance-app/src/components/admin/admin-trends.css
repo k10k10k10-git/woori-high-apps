@@ -1,0 +1,29 @@
+.admin-trends { padding: 0 0 24px; color: #292a30; }
+.at-context { padding: 4px 0 24px; color: #666773; font-size: 12px; }
+.at-section { min-width: 0; }
+.at-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.at-section-heading h3 { font-size: 14px; font-weight: 600; }
+.at-section-heading p { color: #666773; margin-top: 4px; font-size: 12px; }
+.at-parts { display: flex; gap: 2px; flex-shrink: 0; }
+.at-parts button { min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: none; color: #666773; font: inherit; cursor: pointer; border-radius: 6px; }
+.at-parts button[aria-pressed="true"] { color: #584a97; background: #eeecf5; }
+.at-parts button:hover { background: #f4f2f8; }
+.at-table-wrap { overflow-x: auto; }
+.at-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.at-table :is(th, td) { padding: 12px 14px; text-align: left; border-bottom: 1px solid #e5e5e8; font-weight: 400; }
+.at-table thead { color: #666773; background: #f8f8fa; font-size: 11px; }
+.at-table tbody th { font-weight: 550; }
+.at-table :is(th, td):nth-child(n+3) { text-align: right; }
+.at-table tbody tr:hover { background: #faf9fc; }
+.at-chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; margin-top: 32px; }
+.at-chart-grid > section { border-top: 1px solid #e5e5e8; padding-top: 22px; }
+.at-canvas { position: relative; height: 240px; width: 100%; }
+.at-note { margin-top: 24px; max-width: 75ch; font-size: 11px; color: #666773; line-height: 1.8; }
+.at-empty { text-align: center; padding: 24px 12px; color: #666773; font-size: 12px; }
+@media (max-width: 1100px) { .at-chart-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) {
+  .at-table :is(th, td) { padding: 12px 8px; white-space: nowrap; }
+  .at-section-heading { flex-wrap: wrap; }
+  .at-context { max-width: 34ch; }
+  .at-canvas { height: 220px; }
+}

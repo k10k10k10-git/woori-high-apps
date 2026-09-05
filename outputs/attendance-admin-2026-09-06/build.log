@@ -1,0 +1,31 @@
+
+> woori-attendance-next@0.1.0 build
+> next build
+
+▲ Next.js 16.2.9 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.0s
+  Running TypeScript ...
+  Finished TypeScript in 7.3s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/10) ...
+  Generating static pages using 7 workers (2/10)
+  Generating static pages using 7 workers (4/10)
+  Generating static pages using 7 workers (7/10)
+✓ Generating static pages using 7 workers (10/10) in 421ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /admin
+├ ○ /attendance
+├ ○ /dashboard
+├ ○ /manage
+├ ○ /overall
+└ ○ /stats
+
+
+○  (Static)  prerendered as static content

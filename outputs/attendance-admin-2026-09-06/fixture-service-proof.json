@@ -1,0 +1,14 @@
+{
+  "source": "실제 attendance 컴포넌트 + 실제 AppProvider/구독/권한 함수 + 합성 DB/탐색",
+  "envLoaded": false,
+  "host": "127.0.0.1",
+  "port": 4178,
+  "intercepted": [
+    "next/link",
+    "next/navigation",
+    "lib/db",
+    "next/dynamic"
+  ],
+  "rejected": [],
+  "firebaseRuntimeModules": []
+}

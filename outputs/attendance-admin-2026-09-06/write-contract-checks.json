@@ -1,0 +1,81 @@
+{
+  "checks": [
+    {
+      "file": "attendance-app/src/components/tabs/AdminTab.tsx",
+      "function": "saveAccount",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/AdminTab.tsx",
+      "function": "deleteAccount",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/AdminTab.tsx",
+      "function": "addEvent",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/AdminTab.tsx",
+      "function": "deleteEvent",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/AdminTab.tsx",
+      "function": "loadPromotionPreview",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/AdminTab.tsx",
+      "function": "runPromotion",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/overall/TeacherManagement.tsx",
+      "function": "saveTeacher",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/overall/TeacherManagement.tsx",
+      "function": "deleteStaffOrAdditional",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/SheetSyncSection.tsx",
+      "function": "saveUrls",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/SheetSyncSection.tsx",
+      "function": "loadPreview",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/SheetSyncSection.tsx",
+      "function": "applySync",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/overall/StudentListSection.tsx",
+      "function": "exportRosterPDF",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/overall/StudentListSection.tsx",
+      "function": "exportRosterXLSX",
+      "bodyUnchanged": true
+    },
+    {
+      "file": "attendance-app/src/components/tabs/overall/StudentListSection.tsx",
+      "function": "exportRosterCSV",
+      "bodyUnchanged": true
+    }
+  ],
+  "protectedFilesUnchanged": [
+    "attendance-app/database.rules.json",
+    "attendance-app/src/components/AppShell.tsx",
+    "attendance-app/src/lib/db.ts",
+    "attendance-app/src/lib/demo.ts",
+    "attendance-app/src/lib/releaseFlags.ts"
+  ]
+}

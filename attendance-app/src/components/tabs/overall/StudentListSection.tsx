@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useApp } from '@/store/AppContext';
+import AdminIcon from '@/components/admin/AdminIcon';
 import { showToast } from '@/utils/toast';
 import { downloadCSV, downloadXLSX, openPrintWindow } from '@/utils/export';
 
@@ -100,63 +101,47 @@ export default function StudentListSection() {
 
   return (
     <div className="overall-card">
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span className="overall-card-title">전체 학생 명단</span>
-          <span style={{ fontSize: 11, color: 'var(--text3)', background: 'var(--surface2)', padding: '2px 8px', borderRadius: 999 }}>{totalStudents}명</span>
-        </div>
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
-          {(['1', '2'] as const).map(p => (
-            <button key={p} className={`view-btn${rosterPart === p ? ' active' : ''}`}
-              onClick={() => setRosterPart(p)}>{p}부</button>
-          ))}
-          <div style={{ width: 1, height: 16, background: 'var(--border2)', margin: '0 2px' }} />
-          <button className={`view-btn${rosterView === 'card' ? ' active' : ''}`} onClick={() => setRosterView('card')}>목록</button>
-          <button className={`view-btn${rosterView === 'table' ? ' active' : ''}`} onClick={() => setRosterView('table')}>표</button>
-          <div style={{ position: 'relative', marginLeft: 'auto' }}>
-            <button
-              aria-label="명단 내보내기 메뉴 열기"
-              style={{ padding: '5px 12px', fontSize: 12, borderRadius: 999, border: '1.5px solid var(--border2)', background: 'var(--surface)', cursor: 'pointer', color: 'var(--text2)' }}
-              onClick={() => setRosterExportOpen(o => !o)}
-            >내보내기 &#9662;</button>
-            {rosterExportOpen && (
-              <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 8, boxShadow: 'var(--shadow)', zIndex: 100, minWidth: 140 }}>
-                {[
-                  { label: 'CSV 다운로드', fn: exportRosterCSV },
-                  { label: 'Excel 다운로드', fn: exportRosterXLSX },
-                  { label: 'PDF 인쇄', fn: exportRosterPDF },
-                ].map(({ label, fn }) => (
-                  <button key={label} onClick={fn}
-                    style={{ display: 'block', width: '100%', padding: '8px 14px', fontSize: 12, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text)' }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+      <div className="ao-students-heading">
+        <h2 className="overall-card-title">전체 학생 명단</h2>
+        <span>{totalStudents}명 · 장결 포함</span>
+      </div>
+      <div className="ao-students-tools" role="group" aria-label="학생 명단 보기 선택">
+        {(['1', '2'] as const).map(p => (
+          <button type="button" key={p} aria-pressed={rosterPart === p} className={`view-btn${rosterPart === p ? ' active' : ''}`}
+            onClick={() => setRosterPart(p)}>{p}부</button>
+        ))}
+        <button type="button" aria-pressed={rosterView === 'card'} className={`view-btn${rosterView === 'card' ? ' active' : ''}`} onClick={() => setRosterView('card')}>목록</button>
+        <button type="button" aria-pressed={rosterView === 'table'} className={`view-btn${rosterView === 'table' ? ' active' : ''}`} onClick={() => setRosterView('table')}>표</button>
+        <div className="ao-export" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setRosterExportOpen(false); }}
+          onKeyDown={event => { if (event.key === 'Escape') { setRosterExportOpen(false); event.currentTarget.querySelector('button')?.focus(); } }}>
+          <button type="button" className="ao-quiet-button" aria-expanded={rosterExportOpen} aria-controls="ao-export-options"
+            onClick={() => setRosterExportOpen(o => !o)}>내보내기 <AdminIcon name="chevron" size={12} /></button>
+          {rosterExportOpen && <div id="ao-export-options" className="ao-export-menu">
+            {[
+              { label: 'CSV 다운로드', fn: exportRosterCSV },
+              { label: 'Excel 다운로드', fn: exportRosterXLSX },
+              { label: 'PDF 인쇄', fn: exportRosterPDF },
+            ].map(({ label, fn }) => <button type="button" key={label} onClick={fn}>{label}</button>)}
+          </div>}
         </div>
       </div>
+      {totalStudents === 0 && <p className="ao-loading">{rosterPart}부에 등록된 학생이 없습니다.</p>}
 
       {rosterView === 'card' ? (
-        <div style={{ padding: '14px 16px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+        <div className="ao-student-groups">
           {rosterClassKeys.map(ck => {
             const info = classData[ck];
             if (!info || info.students.length === 0) return null;
             const [, g, c] = ck.split('-');
             return (
-              <div key={ck} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', background: 'var(--surface2)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary-text)', marginBottom: 2 }}>
-                  {g}학년 {c}반 · {info.students.length}명
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 8 }}>{info.teacher || '교사 미정'}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {info.students.map(s => (
-                    <div key={s.id} style={{ fontSize: 12, padding: '2px 0', color: 'var(--text)' }}>
-                      {s.num}. {s.name}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <section key={ck} className="ao-student-group" aria-label={`${g}학년 ${c}반 학생 명단`}>
+                <h3>{g}학년 {c}반 <span>{info.students.length}명</span></h3>
+                <p>{info.teacher || '담임 교사 미등록'}</p>
+                <ul>{info.students.map(s => <li key={s.id}>
+                  <span className="ao-student-number">{s.num}</span><span>{s.name}</span>
+                  {s.jang === true && <span className="ao-jang-label">장결</span>}
+                </li>)}</ul>
+              </section>
             );
           })}
         </div>

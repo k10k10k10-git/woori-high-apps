@@ -102,7 +102,10 @@ describe('관리자 로그인 진입', () => {
 
 describe('관리자 메뉴 표시', () => {
   it('실제 경로를 한 번씩 표시하고 현재 경로와 하위 경로를 찾는다', () => {
-    expect(new Set(ADMIN_NAVIGATION.map(item => item.path)).size).toBe(6);
+    expect(new Set(ADMIN_NAVIGATION.map(item => item.path)).size).toBe(5);
+    expect(ADMIN_NAVIGATION.filter(item => item.label === '전체 현황')).toHaveLength(1);
+    expect(adminNavigationItem('/overall/')?.path).toBe('/dashboard');
+    expect(adminNavigationItem('/dashboard')?.label).toBe('전체 현황');
     expect(adminNavigationItem('/overall/')?.label).toBe('전체 현황');
     expect(adminNavigationItem('/admin/accounts')?.path).toBe('/admin');
     expect(adminNavigationItem('/administrator')).toBeUndefined();

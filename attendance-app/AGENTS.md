@@ -76,6 +76,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 핵심 코드 패턴
 
+### 관리자 현황 중복을 제거하면서 기존 통계 계약을 유지하기 (2026-09-06)
+- **접근법**: `adminNavigation.ts`의 전체 현황 메뉴를 `/dashboard` 하나로 모으고 `/overall`의 활성 메뉴도 동일하게 해석한다 → 두 경로에서 `OverallTab`을 공유한다 → 주간 `AdminDashboard`와 펼침 시 마운트하는 연간 `OverallDashboard`를 한 화면에 배치한다 → 반별 누적률을 `annualClassAverageRate`로 분리하고 다른 페이지의 `curView`와 무관한 연간 집계·기존 학생별 반올림 평균을 테스트한다.
+- **판단 질문**: 중복 주간 지표를 남기면 미입력 판정 기준이 달라 혼동을 준다. 연간 표가 이전 반별 통계 페이지의 학기 선택을 따라가면 보이지 않는 필터가 적용된다. 명단·건의사항·계정·일정·동기화·진급의 기존 경로와 명시 실행 흐름은 유지한다.
+- **재사용 규칙**: 메뉴 통합은 URL 호환·권한 가드·입력 업무와 통계의 분모·화면 밖 필터 영향을 함께 확인하며, 데이터 변경 기능의 권한 확대와 분리한다.
+
 ### 관리자 입력 업무와 전체 출석 통계의 대상을 분리하기 (2026-09-05)
 - **접근법**: `src/components/tabs/AttendanceTab.tsx`의 일반 학생 입력·장결 이력 조회 대상을 확인한다 → `src/utils/adminDashboard.ts`에서 전체 `studentCount`·`recorded`와 일반 대상 `inputStudentCount`·`inputRecorded`를 따로 합산한다 → 일반 20명 전원 입력·장결 1명 미기록, 전원 장결, 장결자만 기록된 반을 `__tests__/adminDashboard.test.ts`로 검증한다 → 입력률·완료·확인 필요는 일반 대상, 출석률은 기존 장결 포함 O/(O+X+T)로 표시한다.
 - **판단 질문**: 출석 통계의 분모를 그대로 입력 완료에 쓰면 화면에서 입력할 수 없는 장결 학생 때문에 반이 영구 미완료로 남는다. 이를 해결하려고 기존 전체 출석 통계에서 장결 기록까지 제외하지 않는다. 빈 반·전원 장결·조회 주일 없음도 서로 구분한다.
