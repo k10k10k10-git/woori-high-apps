@@ -38,6 +38,9 @@
 - 디자인 detector `[]`, `git diff --check` 성공.
 - 실제 컴포넌트 합성 QA: 1440px PC·375px 모바일, 전체 현황 5개 메뉴와 `/overall` 호환, 완료/부분/미입력·장결/빈 반, 검색·필터, 연간 차트 4개 지연 마운트, 명단·건의, 계정·일정·데이터 설정, 모달 포커스·ESC, 계정/건의 조회 실패 후 재시도 확인.
 - 저장·미리보기·내보내기 함수 14개 본문과 Auth·Rules·데모 보호 파일은 이전 소스와 동일하다. 합성 QA의 운영 쓰기·외부 네트워크 시도는 0건이다.
-- 운영 Hosting 릴리스 결과는 배포 후 `outputs/attendance-admin-2026-09-06/deployment.json`과 최신 인수인계에 기록한다. 운영 관리자 실계정 쓰기 시험과 실제 모바일 기기 검증을 합성 QA로 대체했다고 표현하지 않는다.
+- PR #12 병합 SHA `52c463e2f4942605445c5dc587c3a45db33ca1f9`, PR/main CI 성공. **2026-09-06 05:05:43 KST 운영 배포 완료**.
+- Hosting live version `b795f29e44320da5`, SW 캐시 `woori-att-1788638737868`. HTML·SW 6경로와 새 화면 JS 3청크, 총9개 운영 파일이 배포 산출물과 SHA-256 일치. HTML/SW no-cache 헤더 유지.
+- 데모 설정은 배포 산출물에서 유지됐음을 확인했다. 통합 앱 운영 버전은 기존 `c08502df301051fffa255764356235c68ed7db4e` 그대로다.
+- 상세: `outputs/attendance-admin-2026-09-06/deployment.json`. 운영 관리자 실계정 쓰기 시험과 실제 모바일 기기 검증을 합성 QA로 대체했다고 표현하지 않는다.
 
 디자인 근거: [Linear의 공식 인터페이스 개편 설명](https://linear.app/now/behind-the-latest-design-refresh). 기존 출석부의 색·서체·관리자 셸을 유지하며 정보 중복과 불필요한 시각 요소를 줄였다.

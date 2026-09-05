@@ -1,0 +1,92 @@
+{
+  "app": "attendance-app",
+  "url": "https://woori-high.web.app",
+  "sourceSha": "52c463e2f4942605445c5dc587c3a45db33ca1f9",
+  "pr": "https://github.com/k10k10k10-git/woori-high-apps/pull/12",
+  "verifiedAt": "2026-09-05T20:07:37.862Z",
+  "hostingVersion": "projects/woori-high/sites/woori-high/versions/b795f29e44320da5",
+  "hostingRelease": "projects/woori-high/sites/woori-high/channels/live/releases/1788638743579000",
+  "releasedAt": "2026-09-05T20:05:43.579Z",
+  "previousVersion": "projects/woori-high/sites/woori-high/versions/1acb936d4b2d2b5b",
+  "swCache": "woori-att-1788638737868",
+  "demoModeMaintained": true,
+  "productionDbWrites": 0,
+  "rulesDeployed": false,
+  "checks": [
+    {
+      "path": "/",
+      "status": 200,
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "localSha256": "aec737f0bbe9edcdfb035593cab6bf4a8530a1821a012835ee092c1fe1f0ebf0",
+      "liveSha256": "aec737f0bbe9edcdfb035593cab6bf4a8530a1821a012835ee092c1fe1f0ebf0",
+      "matches": true
+    },
+    {
+      "path": "/dashboard",
+      "status": 200,
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "localSha256": "6cf75dc90bcff43ba8a7869cdf58bd37cc81b244fbc3d8b55e31a92c3be92326",
+      "liveSha256": "6cf75dc90bcff43ba8a7869cdf58bd37cc81b244fbc3d8b55e31a92c3be92326",
+      "matches": true
+    },
+    {
+      "path": "/overall",
+      "status": 200,
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "localSha256": "c37727ca0bb743af1249e8636b6c90884580acbafdeeafacee965153b7cd89b6",
+      "liveSha256": "c37727ca0bb743af1249e8636b6c90884580acbafdeeafacee965153b7cd89b6",
+      "matches": true
+    },
+    {
+      "path": "/admin",
+      "status": 200,
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "localSha256": "07f5bcb40aa9c072c09b7e68073302c103b0fd6e32ef49ec4103554b251093f4",
+      "liveSha256": "07f5bcb40aa9c072c09b7e68073302c103b0fd6e32ef49ec4103554b251093f4",
+      "matches": true
+    },
+    {
+      "path": "/attendance",
+      "status": 200,
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "localSha256": "5fb820b3818e847fc474a59ce7a2c5cfdcdebadc44426fcbace7242046fa20fc",
+      "liveSha256": "5fb820b3818e847fc474a59ce7a2c5cfdcdebadc44426fcbace7242046fa20fc",
+      "matches": true
+    },
+    {
+      "path": "/sw.js",
+      "status": 200,
+      "cacheControl": "no-cache, no-store, must-revalidate",
+      "localSha256": "f6cfc3dbbc9092f57b82ee72b7f0e3c4d8384d19b51b82b56b1de1b092d134b3",
+      "liveSha256": "f6cfc3dbbc9092f57b82ee72b7f0e3c4d8384d19b51b82b56b1de1b092d134b3",
+      "matches": true
+    },
+    {
+      "path": "/_next/static/chunks/1l1hl4ultb3tl.js",
+      "status": 200,
+      "cacheControl": "max-age=3600",
+      "localSha256": "a203e26f67d4fabb773f35e0da9d9bf218fbeff8bcf6aafaa50a05c34455e2d6",
+      "liveSha256": "a203e26f67d4fabb773f35e0da9d9bf218fbeff8bcf6aafaa50a05c34455e2d6",
+      "matches": true
+    },
+    {
+      "path": "/_next/static/chunks/2ozgb5oupsbk0.js",
+      "status": 200,
+      "cacheControl": "max-age=3600",
+      "localSha256": "a55aa0107ada8d7c392697e87163b0ede8547e5a71631732de969d9ab99c8c29",
+      "liveSha256": "a55aa0107ada8d7c392697e87163b0ede8547e5a71631732de969d9ab99c8c29",
+      "matches": true
+    },
+    {
+      "path": "/_next/static/chunks/32j2yi_giemq-.js",
+      "status": 200,
+      "cacheControl": "max-age=3600",
+      "localSha256": "69742f55e4be6aa51bf9d0e1eb04d22a895c3d7576fd4376ef33b4ad5ea0f7fe",
+      "liveSha256": "69742f55e4be6aa51bf9d0e1eb04d22a895c3d7576fd4376ef33b4ad5ea0f7fe",
+      "matches": true
+    }
+  ],
+  "highschoolVersionObserved": {
+    "buildId": "c08502df301051fffa255764356235c68ed7db4e"
+  }
+}
