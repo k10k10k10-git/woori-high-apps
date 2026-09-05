@@ -17,7 +17,7 @@
     "teacherClasses": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$uid": {
-        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || auth.uid === $uid || root.child('attendanceAdmins').child(auth.uid).val() === true)"
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
       }
     },
     "userRoles": {
@@ -31,11 +31,11 @@
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {
         "$classKey": {
-          ".read": "auth != null && root.child('teacherClasses').child(auth.uid).val() === $classKey",
-          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+          ".read": "auth != null && (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey)",
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true) && (!root.child('config').child('studentMoveLocks').child($year).child($classKey).exists() || root.child('config').child('studentMoveLocks').child($year).child($classKey).child(auth.uid).exists())",
           "students": {
             "$studentId": {
-              ".write": "auth != null && root.child('retreatAdmins').child(auth.uid).child('semesterRole').val() === 'adminTeam'"
+              ".write": "auth != null && (root.child('retreatAdmins').child(auth.uid).child('semesterRole').val() === 'adminTeam' && !root.child('config').child('studentMoveLocks').child($year).child($classKey).exists())"
             }
           }
         }
@@ -45,10 +45,10 @@
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {
         "$classKey": {
-          ".read": "auth != null && root.child('teacherClasses').child(auth.uid).val() === $classKey",
-          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+          ".read": "auth != null && (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey)",
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true) && (!root.child('config').child('studentMoveLocks').child($year).child($classKey).exists() || root.child('config').child('studentMoveLocks').child($year).child($classKey).child(auth.uid).exists())",
           "$studentId": {
-            ".write": "auth != null && root.child('retreatAdmins').child(auth.uid).child('semesterRole').val() === 'adminTeam'"
+            ".write": "auth != null && ((root.child('retreatAdmins').child(auth.uid).child('semesterRole').val() === 'adminTeam' && !root.child('config').child('studentMoveLocks').child($year).child($classKey).exists()) || ((auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey) && root.child('classes').child($year).child($classKey).child('students').child($studentId).exists() && !root.child('config').child('studentMoveLocks').child($year).child($classKey).exists()))"
           }
         }
       }
@@ -71,7 +71,55 @@
     },
     "config": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
-      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
+      "sheetSync": {
+        ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
+      },
+      "studentMoveLocks": {
+        "$year": {
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+          "$classKey": {
+            "$ownerUid": {
+              "$operationId": {
+                ".validate": "newData.hasChildren(['phase', 'startedAt', 'fromCk', 'toCk', 'sid']) && (newData.child('fromCk').val() === $classKey || newData.child('toCk').val() === $classKey) && newData.child('fromCk').val() !== newData.child('toCk').val()",
+                "phase": {
+                  ".validate": "newData.val() === 'preparing' || newData.val() === 'pending'"
+                },
+                "startedAt": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0"
+                },
+                "fromCk": {
+                  ".validate": "newData.isString() && newData.val().length > 0"
+                },
+                "toCk": {
+                  ".validate": "newData.isString() && newData.val().length > 0"
+                },
+                "sid": {
+                  ".validate": "newData.isString() && newData.val().length > 0"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "studentMoveCommits": {
+        "$year": {
+          "$fromCk": {
+            "$toCk": {
+              "$sid": {
+                "$ownerUid": {
+                  "$operationId": {
+                    ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true) && auth.uid === $ownerUid && !data.exists() && newData.val() === true && $fromCk !== $toCk && (root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).hasChildren(['phase', 'startedAt', 'fromCk', 'toCk', 'sid']) && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('phase').val() === 'pending' && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('startedAt').isNumber() && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('startedAt').val() >= 0 && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('fromCk').val() === $fromCk && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('toCk').val() === $toCk && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('sid').val() === $sid) && (root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).hasChildren(['phase', 'startedAt', 'fromCk', 'toCk', 'sid']) && root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('phase').val() === 'pending' && root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('startedAt').isNumber() && root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('startedAt').val() >= 0 && root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('fromCk').val() === $fromCk && root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('toCk').val() === $toCk && root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('sid').val() === $sid) && root.child('config').child('studentMoveLocks').child($year).child($fromCk).child($ownerUid).child($operationId).child('startedAt').val() === root.child('config').child('studentMoveLocks').child($year).child($toCk).child($ownerUid).child($operationId).child('startedAt').val()",
+                    ".validate": "newData.val() === true"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "teacherSpecial": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
@@ -82,7 +130,7 @@
       "$year": {
         "$part": {
           "$classKey": {
-            ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val().replace('-','_').replace('-','_').replace('-','_') === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)"
+            ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() === $part && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '_' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '_' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey) || root.child('attendanceAdmins').child(auth.uid).val() === true)"
           }
         }
       }
@@ -107,8 +155,8 @@
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {
         "$classKey": {
-          ".read": "auth != null && root.child('teacherClasses').child(auth.uid).val() === $classKey",
-          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('teacherClasses').child(auth.uid).val() === $classKey || root.child('attendanceAdmins').child(auth.uid).val() === true)"
+          ".read": "auth != null && (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey)",
+          ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey) || root.child('attendanceAdmins').child(auth.uid).val() === true)"
         }
       }
     },

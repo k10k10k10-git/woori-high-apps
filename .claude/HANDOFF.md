@@ -4,6 +4,36 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
+## 2026-09-05 최신 작업 — 프로젝트 감사 발견 사항 보강 (PR·배포 대기)
+
+- 감사에서 확인한 네 가지 코드 문제를 수정했다. 학생 앱은 로그인·연도 변경 및 휴지통
+  조회 시 자동 삭제를 제거했고, 수동 반 이동을 원본·목적지 dual lock, 서버 보정 시각,
+  최신값 재조회, 목적지 셀 우선 출석 병합, 단발 REST PATCH, 불변 commit marker와
+  10분 stale 복구로 바꿨다. 실제 RTDB 단절 시험은 운영 DB 무쓰기 범위라 실행하지 않았다.
+- Agent OS는 IPv4 loopback, 정확한 Host·Origin·Fetch Metadata, 프로세스별 소유자 전용
+  토큰, challenge-HMAC listener 확인, fragment 전달 후 즉시 제거, 안전/위험 capability
+  분리, 서버 측 1회 승인으로 실행 경계를 보강했다. 보안 테스트는 실제 명령 대신 스텁을 쓴다.
+- 통합 앱은 `.auth/**`를 ESLint 전역 ignore에 넣고, 접근성 E2E가 로그인·권한 화면이 아닌
+  실제 라우트 프레임을 확인한 뒤 axe를 실행하게 했다. 학생 앱 품질 workflow와 Agent OS
+  보안 workflow도 추가했다.
+- 통합 앱은 lint·typecheck·107파일 846테스트·production build, 학생 앱은 lint 0 errors
+  (기존 warnings만)·typecheck·13파일 162테스트·정적 build, Agent OS는 20개 보안 테스트와
+  문법 검사를 통과했다. 인증 E2E는 운영 URL에서 자동 쓰기 가능성을 배제하지 못해 실행하지 않았다.
+- 변경 전 라이브 Rules는 읽기 전용으로 `attendance-app/tmp/rules-backup/`에 백업했고 당시 소스와
+  SHA-256이 일치했다. 사용자가 루트 안전 규칙의 예외를 확인한 뒤 `teacherClasses` 자기 쓰기를
+  제거하고 이메일이 일치하는 `userRoles`를
+  교사 권한 원천으로 쓰며, `config` 상위 쓰기를 닫고 학생 이동 lock·commit marker를 검증하는
+  계약을 실제 `attendance-app/database.rules.json`·교사 로그인 코드·38개 Rules 계약 테스트에
+  반영했고 Firebase dry-run을 통과했다. 라이브 `userRoles`는 개인정보를 출력하지 않고 집계해
+  교사 50명 전원의 이메일 키와 `part`·`grade`·`class` 문자열 형태가 새 조건과 일치함을 확인했다.
+  **운영 Rules 배포본은 아직 바꾸지 않았다.**
+- 다음 단계는 2026-09-02 사용자 결정대로 작업 브랜치 PR을 열어 사용자가
+  병합한 뒤 Rules → 학생 Hosting 순서로 진행하고, 통합 앱은 main 자동 배포를 확인한다.
+- 작업 브랜치는 `codex/fix-audit-findings`다. 기존 사용자 변경인
+  `highschool-app/e2e/authenticated-smoke.e2e.ts`, `highschool-app/package-lock.json`,
+  `highschool-app/scripts/save-e2e-auth.mjs`와 미추적 `.agents/`·`.gitattributes`·`.impeccable/`는
+  이 작업의 스테이징·커밋에서 제외한다.
+
 ## 2026-09-03 최신 작업 — 성능·테스트·화면 일관성 2차 정리
 
 평가표(도메인 9 / 코드위생 9 / 순수테스트 8 / **UI테스트 2** / 디자인 8 /

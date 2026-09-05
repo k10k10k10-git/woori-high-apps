@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>에이전트 OS — 수련회 운영</title>
+<title>에이전트 OS — 통합 플랫폼 운영</title>
+<script src="/app.js"></script>
 <style>
   :root {
     --bg:#f8fafc; --card:#ffffff; --line:#e2e8f0; --ink:#1e293b; --sub:#64748b;
@@ -84,112 +85,5 @@
 </section>
 
 </main>
-<script>
-const $ = (s) => document.querySelector(s);
-const fmt = (ts) => new Date(ts).toLocaleString("ko-KR", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" });
-const esc = (s) => (s||"").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
-const statusPill = (s) => s==="done" ? '<span class="pill ok">완료</span>' : s==="running" ? '<span class="pill run">실행 중</span>' : '<span class="pill err">오류</span>';
-
-// ── 탭 ──
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x===b));
-  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id===b.dataset.tab));
-  if (b.dataset.tab==="logs") loadLogs();
-  if (b.dataset.tab==="home") loadReport();
-});
-
-// ── 홈: 일일 보고서 ──
-async function loadReport() {
-  const r = await (await fetch("/api/report")).json();
-  if (r.dday) $("#dday").textContent = `${r.dday.label} D${r.dday.days>0?"-"+r.dday.days:r.dday.days===0?"-DAY":"+"+(-r.dday.days)}`;
-  const dep = (name) => {
-    const d = r.deployments[name];
-    if (!d) return `<div class="row"><span>${name}</span><span class="pill err">확인 불가</span></div>`;
-    const cls = d.state==="READY" ? "ok" : d.state==="ERROR" ? "err" : "run";
-    return `<div class="row"><span>${name} <span class="h">${d.sha}</span></span><span class="pill ${cls}">${d.state}</span></div>`;
-  };
-  const commits = (list) => list.length
-    ? list.map(c=>`<div class="row"><span>${esc(c.msg.slice(0,42))}</span><span class="h">${c.hash}</span></div>`).join("")
-    : '<div class="empty">커밋 없음</div>';
-  const runsRows = (list) => list.length
-    ? list.map(x=>`<div class="row"><span>${esc(x.label)}</span>${statusPill(x.status)}</div>`).join("")
-    : '<div class="empty">실행 이력 없음</div>';
-  $("#report").innerHTML = `
-    <div class="card"><h3>이번 주 커밋</h3><div class="big">${r.commitsWeek}</div><div class="sub">오늘 ${r.commitsToday.length} · 어제 ${r.commitsYesterday.length}</div></div>
-    <div class="card"><h3>이번 주 Claude 세션</h3><div class="big">${r.sessionsWeek}</div><div class="sub">최근 7일</div></div>
-    <div class="card"><h3>미해결 백로그</h3><div class="big">${r.backlog.length}</div><div class="sub">메모리 기준</div></div>
-    <div class="card"><h3>배포 상태</h3>${dep("highschool-app")}${dep("semester-app")}</div>
-    <div class="card wide"><h3>오늘의 커밋</h3>${commits(r.commitsToday)}</div>
-    <div class="card wide"><h3>어제의 커밋</h3>${commits(r.commitsYesterday)}</div>
-    <div class="card"><h3>밤새 실행된 항목</h3>${runsRows(r.overnight)}</div>
-    <div class="card"><h3>최근 실행</h3>${runsRows(r.recentRuns)}</div>
-    <div class="card wide"><h3>열려 있는 작업 (백로그)</h3>${r.backlog.map(b=>`<div class="row"><span>${esc(b)}</span></div>`).join("")||'<div class="empty">없음</div>'}</div>`;
-}
-
-// ── 스킬 버튼 ──
-let running = false;
-async function loadSkills() {
-  const cfg = await (await fetch("/api/skills")).json();
-  const byDomain = {};
-  cfg.skills.forEach(s => (byDomain[s.domain] = byDomain[s.domain]||[]).push(s));
-  $("#skillList").innerHTML = Object.entries(byDomain).map(([d, list]) => `
-    <div class="domain"><h2>${d}</h2><div class="skills">
-      ${list.map(s=>`<button class="skill" data-id="${s.id}" data-danger="${!!s.danger}">
-        ${s.danger?'<span class="tag">배포</span>':""}<b>${esc(s.label)}</b><span>${esc(s.desc)}</span></button>`).join("")}
-    </div></div>`).join("");
-  document.querySelectorAll(".skill").forEach(b => b.onclick = () => runSkill(b));
-}
-async function runSkill(btn) {
-  if (running) return alert("이미 실행 중입니다 — 완료 후 다시 시도하세요.");
-  if (btn.dataset.danger==="true" && !confirm("커밋·푸시·배포가 실행됩니다. 진행할까요?")) return;
-  running = true;
-  document.querySelectorAll(".skill").forEach(b=>b.disabled=true);
-  const con = $("#console");
-  con.style.display = "block";
-  con.innerHTML = `<div class="hdr">▶ ${btn.querySelector("b").textContent} — 실행 시작 ${new Date().toLocaleTimeString("ko-KR")}</div>`;
-  const add = (cls, text) => { const d=document.createElement("div"); d.className=cls; d.textContent=text; con.appendChild(d); con.scrollTop=con.scrollHeight; };
-  try {
-    const res = await fetch("/api/run", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ skillId: btn.dataset.id }) });
-    const reader = res.body.getReader(); const dec = new TextDecoder(); let buf = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream:true });
-      let i; while ((i = buf.indexOf("\n\n")) >= 0) {
-        const chunk = buf.slice(0, i); buf = buf.slice(i+2);
-        if (!chunk.startsWith("data: ")) continue;
-        const ev = JSON.parse(chunk.slice(6));
-        if (ev.type==="tool") add("tool", "🔧 " + ev.data);
-        else if (ev.type==="text") add("txt", ev.data);
-        else if (ev.type==="end") add("hdr", `■ ${ev.data.status==="done"?"완료":"오류"} (${Math.round((ev.data.ms||0)/1000)}초)`);
-      }
-    }
-  } catch (e) { add("hdr", "■ 연결 오류: " + e); }
-  running = false;
-  document.querySelectorAll(".skill").forEach(b=>b.disabled=false);
-  loadLogs(); loadReport();
-}
-
-// ── 로그 ──
-async function loadLogs() {
-  const runs = await (await fetch("/api/runs")).json();
-  $("#logList").innerHTML = runs.length ? runs.map(r => `
-    <div class="log" data-id="${r.id}">
-      <div class="top"><b>${esc(r.label)}</b>${statusPill(r.status)}<span class="when">${fmt(r.startedAt)}${r.endedAt?` · ${Math.round((r.endedAt-r.startedAt)/1000)}초`:""}</span></div>
-      <div class="detail"><div class="empty">불러오는 중…</div></div>
-    </div>`).join("") : '<div class="empty">아직 실행 이력이 없습니다 — 스킬 탭에서 버튼을 눌러보세요.</div>';
-  document.querySelectorAll(".log").forEach(el => el.onclick = async () => {
-    el.classList.toggle("open");
-    if (!el.classList.contains("open") || el.dataset.loaded) return;
-    el.dataset.loaded = "1";
-    const d = await (await fetch("/api/runs/"+el.dataset.id)).json();
-    el.querySelector(".detail").innerHTML =
-      `<p style="margin-bottom:8px"><b>지시:</b> ${esc(d.prompt)}</p>` +
-      `<pre>${esc((d.transcript||[]).map(t=>(t.kind==="tool"?"🔧 ":"")+t.text).join("\n\n")) || "(기록 없음)"}</pre>`;
-  });
-}
-
-loadReport(); loadSkills();
-</script>
 </body>
 </html>

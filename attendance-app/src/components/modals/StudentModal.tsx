@@ -198,7 +198,7 @@ export default function StudentModal({
               이 학생을 삭제할까요?
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-              최근 삭제 목록에 7일간 보관됩니다.
+              최근 삭제 목록에 보관되며, 확인 후 복원하거나 영구 삭제할 수 있습니다.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-danger" style={{ padding: '6px 14px', fontSize: 12 }} onClick={handleDelete} disabled={saving}>삭제</button>

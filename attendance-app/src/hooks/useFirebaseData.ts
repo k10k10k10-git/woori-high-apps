@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import { db, ref, onValue, set, get } from '@/lib/db';
+import { db, ref, onValue, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { sortAndRenumber, emailToKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
@@ -136,17 +136,9 @@ export async function loadUserRole(
     dispatch({ type: 'SET_USER_ROLE', payload: role });
 
     if (role.role === 'teacher') {
-      const ck = `${role.part ?? '1'}-${role.grade ?? '1'}-${role.class ?? '1'}`;
       dispatch({ type: 'SET_PART', payload: role.part ?? '1' });
       dispatch({ type: 'SET_GRADE', payload: role.grade ?? '1' });
       dispatch({ type: 'SET_CLASS', payload: role.class ?? '1' });
-      // 반 구독 read 규칙이 teacherClasses/{uid}===ck 를 검사하므로,
-      // 데이터 구독 전에 반드시 기록되도록 await 한다.
-      try {
-        await set(ref(db, `teacherClasses/${user.uid}`), ck);
-      } catch {
-        showToast('교사 반 정보 동기화에 실패했습니다.', 'error');
-      }
     }
     // 관리자 계정은 여기서 아무것도 쓰거나 읽지 않는다.
     //   admins/{uid}           = 플랫폼 통합관리자 (고등부 사역 플랫폼 전권 포함)
@@ -159,24 +151,5 @@ export async function loadUserRole(
     return 'ok';
   } catch {
     return 'unauthorized';
-  }
-}
-
-// 오래된 연도 정리 (관리자)
-export async function cleanupOldYears(windowYears: number[]) {
-  try {
-    const pathsToCheck = ['classes', 'attendance', 'events'];
-    for (const p of pathsToCheck) {
-      const snap = await get(ref(db, p));
-      if (!snap.exists()) continue;
-      const years = Object.keys(snap.val()).map(Number);
-      for (const y of years) {
-        if (!windowYears.includes(y)) {
-          await set(ref(db, `${p}/${y}`), null);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('연도 정리 실패:', e);
   }
 }

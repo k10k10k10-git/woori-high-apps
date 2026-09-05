@@ -9,20 +9,23 @@
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
-| `classes/{year}` | 학생 앱 | 교사·스탭, 행정, 이가드 | 학생 앱 + 통합 앱의 통합관리자 새친구 단건 등록·검증된 되돌리기만 | **전체 영향** — 교사명단, 참가자 동기화, 이가드 반별 뷰. 학생 객체의 `personId?`는 연도별 ID를 잇는 영구 식별자. 반별 선택 하위 `adminChanges/{changeId}`는 학생 앱 관리자 명단 변경 감사기록 |
-| `attendance/{year}` | 학생 앱 | 행정 | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 출석 삭제만 | 행정 출석 통계 |
-| `events/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
-| `userRoles` | 학생 앱 | - | 학생 앱만 | 학생 앱 로그인/권한 |
-| `teacherClasses` | 학생 앱 | - | 학생 앱만 | 교사별 반 매핑 |
-| `admins` | 학생 앱 | 행정, 이가드 | 학생 앱만 | **플랫폼 통합관리자** 플래그. 출석부 전권까지 포함 |
+| `classes/{year}` | 학생 앱 | 학생 앱, 통합 앱의 학기·주일·수련회·현장 모듈 | 학생 앱 + 통합 앱에서 `canWriteStudentRoster`가 허용한 새친구 단건 등록·검증된 되돌리기만 | **전체 영향** — 교사명단, 참가자 동기화, 이가드 반별 뷰. 학생 객체의 `personId?`는 연도별 ID를 잇는 영구 식별자. 반별 선택 하위 `adminChanges/{changeId}`는 학생 앱 관리자 명단 변경 감사기록 |
+| `attendance/{year}` | 학생 앱 | 학생 앱, 통합 앱의 학기·주일·수련회 모듈 | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 출석 삭제만 | 행정 출석 통계 |
+| `events/{year}` | 학생 앱 | 통합 앱 주일 출석 화면 | 학생 앱만 | 주일 출석 날짜·라벨 |
+| `userRoles` | 학생 앱 | 학생 앱 자기조회 | 학생 앱 관리자만 | 학생 앱 로그인과 교사 본인 반 권한의 원천. 이메일 키·저장 이메일·Auth 토큰 이메일 일치를 유지 |
+| `teacherClasses` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자만 | 레거시 교사별 반 매핑. 2026-09-05부터 로그인·Rules 권한 판정에 사용하지 않으며 자기 쓰기 금지 |
+| `admins` | 학생 앱 | 통합 앱 인증·역할 판정 | 학생 앱만 | **플랫폼 통합관리자** 플래그. 출석부 전권까지 포함 |
 | `attendanceAdmins` | 학생 앱 | - | 학생 앱만 | **출석부 전용 관리자**(2026-08-06 신설). 플랫폼 노드에는 효력 없음 — 출석부만 맡는 계정은 여기에 넣는다 |
-| `teacherStaff/{year}` | 학생 앱 | 행정, 학기 모듈 | 학생 앱만 | 행정 교사 목록 동기화 + 학기 접수의 스탭 명단. 레코드의 `personId?`는 연도별 스탭 ID 연결용 |
-| `teacherSpecial/{year}` | 학생 앱 | 행정 | 학생 앱만 | 행정 교사 목록 동기화. 레코드의 `personId?`는 연도별 교사 ID 연결용 |
-| `teacherExtra/{year}` | 학생 앱 | 행정 | 학생 앱만 | 행정 교사 목록 동기화. 레코드의 `personId?`는 연도별 교사 ID 연결용 |
-| `teacherAdditional/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
+| `teacherStaff/{year}` | 학생 앱 | 통합 앱 수련회·학기·통합검색 | 학생 앱만 | 수련회 교사 목록 동기화 + 학기 접수의 스탭 명단. 레코드의 `personId?`는 연도별 스탭 ID 연결용 |
+| `teacherSpecial/{year}` | 학생 앱 | 통합 앱 수련회·통합검색 | 학생 앱만 | 수련회 교사 목록 동기화. 레코드의 `personId?`는 연도별 교사 ID 연결용 |
+| `teacherExtra/{year}` | 학생 앱 | 통합 앱 수련회·통합검색 | 학생 앱만 | 수련회 교사 목록 동기화. 레코드의 `personId?`는 연도별 교사 ID 연결용 |
+| `teacherAdditional/{year}` | 학생 앱 | 통합 앱 통합검색(허용 권한만) | 학생 앱만 | 추가 교사 검색 |
 | `teacherPhones/{year}` | 학생 앱 | - | 학생 앱(읽기) | 없음 |
 | `suggestions/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
-| `trash/{year}` | 학생 앱 | - | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 복구 사본만 | 없음 |
+| `trash/{year}` | 학생 앱 | 학생 앱 + 통합 앱의 위 새친구 되돌리기 검증만 | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 복구 사본만 | 학생·반 복원과 새친구 되돌리기 검증 |
+| `config/sheetSync` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자만 | 구글 시트 주소 설정 |
+| `config/studentMoveLocks/{year}` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자만 | 수동 반 이동 중 원본·목적지 반 명단·출석 쓰기 차단. 작업별 양쪽 leaf를 함께 관리 |
+| `config/studentMoveCommits/{year}` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자 이동 PATCH만 | 지연된 이전 PATCH 재실행을 거부하는 불변 표식. 자동 삭제하지 않음 |
 
 ## 교사·스탭 도메인 (2026-08-12 전면 정리 — 남은 것 없음)
 
@@ -74,7 +77,7 @@
 | `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
 | `retreatsPrivate/{id}/participantContacts` | 행정 | - | 행정만 | 참가자 키별 본인·보호자 연락처. 공개 명단과 키를 같게 유지 |
 | `retreatsPrivate/{id}/participantContactsBackups` | 행정 | - | 행정만 | 연락처 전체 덮어쓰기 전 롤링 백업. 기존 공개 participants 백업은 이관하지 않음 |
-| `retreatAdmins` | 행정 | 이가드 | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role}` — `role`은 `pastor`/`leader`/`adminTeam`(없으면 행정팀). 다른 앱은 존재 여부(`!= null`)만 보므로 필드 추가는 호환 |
+| `retreatAdmins` | 행정 | 통합 앱 인증·역할 판정 | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role, semesterRole?, retreatRole?}` — 두 선택 필드가 없으면 `role`에서 하위호환 파생 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
 ## 이가드 도메인 (소유: highschool-app 현장 모듈)
@@ -97,8 +100,8 @@
 | `retreats/{id}/milestones` | (레거시) | - | 없음 | **미사용** — 전역 `prepMilestones`로 이관됨(코드에 쓰기 함수 없음) |
 | `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 + `sourceSite=ministry-guide*` 사역 가이드 편집 조각. 일반 일정 구독은 가이드 조각을 필터링 (유일한 공유 쓰기 노드) |
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |
-| `iguardMembers` | 이가드 | - | 이가드만 | 이가드 멤버 인증 |
-| `iguardRoles` | 이가드 | 행정(역할 판정) | 이가드만 | `staff`(스탭) / `team`(이가드팀) — Rules validate가 이 두 값만 허용 |
+| `iguardMembers` | 이가드 | 통합 앱 인증·역할 판정 | 이가드만 | 이가드 멤버 인증과 선택 필드 `semesterRole?`·`retreatRole?`. 필드가 없으면 기존 멤버 정보와 `iguardRoles`에서 하위호환 파생 |
+| `iguardRoles` | 이가드 | 통합 앱 역할 판정 | 이가드만 | `staff` / `team`만 저장 — Rules validate가 이 두 값만 허용하며 세부 화면 역할 문자열을 새로 넣지 않음 |
 | `iguardPending` | highschool-app 접근 관리 | - | highschool-app | 사용자별 접근 요청 필드 + `siteRequests/{requestId}`. 요청 첨부 본문은 Firebase Storage `site-requests/{uid}/{requestId}/attachment.jpg`에 분리하고 RTDB에는 메타데이터만 둔다. 팀원 승인·거절은 접근 필드만 지우고 사이트 요청을 보존해야 함 |
 
 ## 학기 사역 도메인 (소유: highschool-app 학기 모듈)
@@ -122,10 +125,10 @@
 | `semesters/{year}-sunday/newFriends` | highschool-app 주일 사역 | - | highschool-app | 신규 새친구의 학기 비종속 연도별 내부 작업공간. `meta`를 두지 않아 학기 목록에서 제외 |
 | `semestersPrivate/{year}-sunday/newFriendsPrivate` | highschool-app 주일 사역 | - | highschool-app | 주일 사역 신규 새친구의 연락처·주소·가족·심방 메모 |
 
-> `highschool-app` 학기 모듈은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단, highschool-app만)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 예외는 `highschool-app` 새친구 탭에서 통합관리자가 확인한 신규 학생 1명을 결정적 `nf_` ID로 추가하는 흐름과, 그 흐름으로 연결된 동일 ID·동일 이름 학생만 사전 백업 후 `classes`·해당 `attendance`에서 제거하고 `trash`에 복구 사본을 남기는 되돌리기뿐이다. 되돌리기는 새친구 기록까지 삭제하는 `명단·출석부 삭제`와 새친구 기록은 보존하고 배정 연결만 해제하는 `등반 및 배정 취소`로 제한한다. 범용 기존 학생 수정·이동·삭제와 그 밖의 출석 변경은 계속 학생 앱만 담당한다.
+> `highschool-app` 학기 모듈은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 예외는 `canWriteStudentRoster(roles)`가 허용하는 학기 역할 `superAdmin`·`adminTeam`의 새친구 흐름이다. 신규 학생 1명을 결정적 `nf_` ID로 추가하거나, 그 흐름으로 연결된 동일 ID·동일 이름 학생만 사전 백업 후 `classes`·해당 `attendance`에서 제거하고 `trash`에 복구 사본을 남길 수 있다. 되돌리기는 새친구 기록까지 삭제하는 `명단·출석부 삭제`와 새친구 기록은 보존하고 배정 연결만 해제하는 `등반 및 배정 취소`로 제한한다. 범용 기존 학생 수정·이동·삭제와 그 밖의 출석 변경은 계속 학생 앱만 담당한다.
 > **2026-08-09 권한 축소**: `teacherStaff`·`teacherSpecial`·`teacherExtra`·`teacherAdditional`·`teacherPhones`·`userRoles`의 `.read`가 `auth != null`이라 역할 없는 구글 계정도 교사 40명의 전화·생년월일과 계정 51건을 읽을 수 있었다. 읽는 주체를 grep으로 증명해 좁혔다 — 교사 명단 계열은 `admins`·`attendanceAdmins`·`retreatAdmins`·`iguardMembers`, 나머지는 관리자만, `userRoles`는 본인 레코드만 자기조회(`auth.token.email` 일치). 새 노드를 만들 때 `.read: "auth != null"`을 기본값처럼 쓰지 말 것.
 >
-> Rules는 2026-07-10 학생 앱에서 추가·배포 완료.
+> Rules는 2026-07-10 학생 앱에서 추가했다. 2026-09-05 감사 후속으로 교사 권한 원천과 학생 이동 잠금 계약을 보강했으며 실제 배포 상태는 `.claude/HANDOFF.md` 최신 항목을 확인한다.
 > **2026-08-08 보강**: `semesters` `.read`에 `iguardMembers`를 추가해 스탭의 학기 조회를 열었다(6단계 역할표의 "스탭=조회만"). `.write`는 `admins`·`retreatAdmins`만 그대로이고, `semestersPrivate`(연락처·지원 동기)는 **읽기까지 행정 전용**이다 — 새 민감 필드는 계속 `semestersPrivate` 아래에만 둘 것.
 
 ---
@@ -142,9 +145,9 @@
 - 학기 신청은 신청 이름만으로 연결하지 않고 같은 연도 공식 원장의 `studentId`가 유일하게 일치할 때 해당 학생·스탭 `personId`를 복사한다.
 
 ### 1순위: `classes/{year}`
-- 학생 앱이 소유하지만 **3개 앱이 읽음**
-- 구조(필드명, 학생 key 형식) 변경 시 교사·스탭, 행정, 이가드 전부 영향
-- 행정 앱의 `fetchClassesForYear()`와 이가드의 `fetchClasses()` 가 이 구조에 의존
+- 학생 앱이 소유하지만 **운영 앱 2개의 여러 모듈이 읽음**
+- 구조(필드명, 학생 key 형식) 변경 시 학생 출석 화면과 통합 앱의 학기·주일·수련회 행정·현장 화면에 모두 영향
+- 통합 앱의 `getClassesByYear()`·`subscribeToClassesByYear()`와 학기 모듈 `getClassesByYear()`·`subscribeClassesByYear()`가 이 구조에 의존
 
 ### 2순위: `retreats/{id}/participants`
 - 행정이 소유, 이가드가 읽음

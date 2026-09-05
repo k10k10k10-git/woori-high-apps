@@ -379,7 +379,7 @@ export async function removeArchiveLink(sid: string, linkId: string): Promise<vo
 }
 
 // ── 학생 원장 조회 (classes — 학생 출석부 앱 소유) ──
-// 쓰기는 아래 registerNewFriendInRoster의 통합관리자 단건 등록 예외만 허용한다.
+// 쓰기는 아래 registerNewFriendInRoster의 canWriteStudentRoster 허용 역할 단건 등록 예외만 허용한다.
 
 export async function getClassesByYear(year: string): Promise<ClassInfo[]> {
   const snap = await get(ref(db, paths.classesByYear(year)));
@@ -402,7 +402,7 @@ export function subscribeClassesByYear(
   }, onError);
 }
 
-// ── 읽기 전용: 공식스탭 명단 (teacherStaff — 교사·스탭 출석부 앱 소유. 쓰기 함수 추가 금지) ──
+// ── 읽기 전용: 공식스탭 명단 (teacherStaff — 학생 출석 앱 소유. 쓰기 함수 추가 금지) ──
 
 export async function getStaffByYear(year: string): Promise<StaffPerson[]> {
   const snap = await get(ref(db, paths.teacherStaffByYear(year)));
@@ -511,7 +511,7 @@ export interface CancelNewFriendPlacementResult {
 
 /**
  * 새친구 기록은 보존하고 등반·반배정·출석부 연결만 안전하게 되돌린다.
- * 출석부에 반영된 경우는 통합관리자만 호출하며, 사전 백업·휴지통·재조회 검증을 유지한다.
+ * 출석부에 반영된 경우는 canWriteStudentRoster 허용 역할만 호출하며, 사전 백업·휴지통·재조회 검증을 유지한다.
  */
 export async function cancelNewFriendPlacement(
   sid: string,
@@ -606,7 +606,7 @@ export interface RemoveNewFriendFromRosterResult {
 }
 
 /**
- * 통합관리자 전용 새친구 등록 되돌리기.
+ * canWriteStudentRoster 허용 역할 전용 새친구 등록 되돌리기.
  * 이 화면에서 만든 결정적 nf_ 학생만 대상으로 하고, 비공개 백업과 학생 앱 휴지통을 남긴 뒤
  * 학생·출석·새친구 공개·비공개 기록을 하나의 루트 update로 삭제한다.
  */
@@ -683,8 +683,8 @@ export interface RegisterNewFriendResult {
 }
 
 /**
- * 통합관리자 전용 출석부 반영.
- * Rules가 admins만 classes 쓰기를 허용하므로 다른 역할의 호출은 서버가 아니라 Rules에서 최종 거부된다.
+ * canWriteStudentRoster 허용 역할 전용 출석부 반영.
+ * 현재 학기 역할 superAdmin·adminTeam만 UI capability와 Rules 양쪽에서 학생 단건 쓰기가 허용된다.
  * 새친구 ID 기반 학생 ID를 사용하고 루트 다중 경로 update로 학생 생성+반영 이력을 원자 처리한다.
  */
 export async function registerNewFriendInRoster(

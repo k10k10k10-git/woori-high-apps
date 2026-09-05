@@ -1,84 +1,125 @@
-# highschool-app Agent Guide
+# highschool-app 에이전트 가이드
 
-고등부 학기 사역, 수련회 행정, 이가드 현장 운영을 한 도메인에서 제공하는 통합 Next.js 앱입니다.
+학기·주일 사역, 수련회 행정·프로그램 준비, 이가드 현장을 운영하는 통합 Next.js 앱입니다. 이 가이드의 현재 계약은 2026-09-05 작업 트리의 소스·설정·테스트와 대조했습니다. 검증 결과와 운영 상태는 매 작업에서 다시 확인합니다.
 
-작업 전 `../CLAUDE.md`, `../DB_OWNERSHIP.md`, `../OPERATIONS.md`, 이 디렉터리의 `CLAUDE.md`를 읽습니다.
+## 작업 시작과 적용 범위
 
-## 데이터 경계
+- 루트 `../CLAUDE.md`의 안전 규칙이 우선입니다. 재개 시 `../.claude/HANDOFF.md`를 먼저 확인하고, 이 앱의 `CLAUDE.md`, 데이터 경로 작업은 `../DB_OWNERSHIP.md`, 배포·복구는 `../OPERATIONS.md`를 읽습니다.
+- 첫 응답은 루트에서 정한 DB 안전 4문답으로 시작합니다. 문서 점검에도 적용됩니다. 운영 DB 직접 쓰기는 명시 승인과 사전 스냅샷 없이는 실행하지 않으며 Rules 변경·배포는 이 앱에서 수행하지 않습니다.
+- `git status --short`로 기존 작업을 확인하고 사용자 수정 파일을 보존합니다. 코드·가이드 수정만으로 푸시·배포가 승인된 것으로 해석하지 않습니다. `main` 푸시는 Vercel 배포를 유발할 수 있습니다. 배포 변경은 루트 인수인계의 PR 검토·사용자 병합 결정을 따릅니다.
+- 파일 점검은 `git ls-files`와 `rg --files --hidden`으로 범위를 나눈 뒤 수행합니다. `node_modules`, `.next`, `.auth`, `.env*`, coverage·브라우저 결과물은 앱 소스와 구분하고 인증값·개인정보를 출력하거나 커밋하지 않습니다.
+- 현재 코드와 오래된 문서가 다르면 소스와 계약 테스트로 확인한 사실을 보고합니다. 문서 불일치를 이유로 DB나 권한을 임의 변경하지 않습니다. 아래 날짜별 학습 기록은 당시의 배경이며 현재 계약은 이 앞부분과 실제 코드입니다.
 
-- 학기: `semesters/*`, `semestersPrivate/*`
-- 수련회 행정: `retreats/{id}/*`, `retreatsPrivate/{id}/*`
-- 이가드: `retreats/{id}/iguard/*`
-- 공통 명단 `classes/{year}`는 원칙상 읽기 전용. 예외는 통합관리자의 `registerNewFriendInRoster` 신규 학생 단건 추가와, 그 결정적 `nf_` 학생만 사전 백업·연결 검증 후 `classes`·해당 `attendance`·새친구 기록에서 원자 삭제하고 `trash`에 사본을 남기는 `removeNewFriendFromRoster`뿐이다.
-- Rules 배포 원천은 오직 `../attendance-app/database.rules.json`
+## 구조와 진입점
 
-통합 앱은 기존 경로와 스키마를 그대로 사용합니다. 도메인 간 소유 경계를 넘는 쓰기나 전체 노드 덮어쓰기를 추가하지 않습니다.
+| 경로 | 용도·주요 코드 |
+|---|---|
+| `/` | `features/portal/PortalHome`; 비로그인 소개는 `features/landing` |
+| `/semesters`, `/semester/[id]` | 학기 목록·신청·배치·출석·커리큘럼·운영; `features/semester` |
+| `/sunday-ministry`, `/sunday-ministry/[team]` | 주일 팀 업무; `features/sundayMinistry`, `features/sundayWorship` |
+| `/semester-admin` | `/sunday-ministry`로 보내는 호환 경로 |
+| `/retreats`, `/retreat/[id]` | 수련회 행정; `src/lib/db/*`, `RetreatPageClient` |
+| `/programs`, `/retreat/[id]/programs` | 수련회 프로그램 준비; `ProgramPreparationClient`, `lib/programPreparation.ts`, `lib/db/programs.ts` |
+| `/field`, `/retreat/[id]/field` | 이가드 현장; `features/iguard`, `IguardClient` |
+| `/ministry-guide`, `/suggestions` | 사역 가이드와 본인 건의사항; 각 feature의 DB 모듈 |
+| `/api/version` | 배포 버전 확인용 `buildId` |
 
-## 코드 구조
+- `src/app/providers.tsx`가 공통 Provider를 조합하고 `src/context/AuthContext.tsx`가 인증·역할 조회를 담당합니다. 도메인별 인증 Provider를 다시 만들지 않습니다. `features/iguard/context/AuthContext.tsx`와 이가드 Firebase/submit-lock 래퍼는 제거됐으므로 과거 경로를 되살리지 않습니다.
+- Firebase 경로는 행정 `src/lib/paths.ts`, 학기 `src/features/semester/paths.ts`, 현장 `src/features/iguard/lib/paths.ts`에서 가져옵니다. `src/lib/db.ts`는 행정 DB 함수의 배럴이며 구현은 `src/lib/db/`에 나뉩니다. 컴포넌트에 직접 Firebase 쓰기를 추가하지 않습니다.
+- 테스트는 순수 로직 옆의 `*.test.ts`, 렌더 `*.render.test.tsx`, 브라우저 `e2e/*.e2e.ts`, 이관 스크립트의 `scripts/*.test.ts`로 구분합니다. `.e2e.ts`를 `.spec.ts`로 바꿔 Vitest와 중복 수집하지 않습니다.
 
-- `src/app/semester/[id]`: 학기 운영 화면
-- `src/app/retreat/[id]`: 수련회 행정 화면
-- `src/app/retreat/[id]/field`: 이가드 현장 화면
-- `src/features/semester`: 학기 데이터·유틸리티 (`applicant.ts` = appKey·표기 규칙, `EditContext.tsx` = 편집 잠금)
-- `src/features/iguard`: 이가드 데이터·유틸리티·인증
-- `src/features/portal`: 통합 홈 + **권한 계약**(`accessPolicy.ts`, `roleAssign.ts`, `applyRole.ts`), 전역 헤더, 팀원 관리(`TeamModal.tsx`)
-- `src/lib/paths.ts`: 공통/행정 Firebase 경로 단일 원천
+## 권한: 학기·방학 두 축
 
-## 권한 — 6단계 역할 (2026-08-06)
+`features/portal/accessPolicy.ts`의 `MinistryRoles = { semester, retreat }`와 `accessPolicy.test.ts`가 단일 원천입니다. 예전 단일 `role`, `resolveMinistryRole`, `canAccessPortalArea` 계약을 새 코드에 사용하지 않습니다.
 
-역할·영역 표와 저장 위치는 `CLAUDE.md`의 "권한" 절과 루트 `AGENTS.md`가 같은 내용을 담는다. 코드 규칙만 요약하면:
+- 판정은 `resolveMinistryRoles`, 영역 접근·편집은 `canAccessArea`/`canEditArea`, 주일 팀은 `canAccessSundayTeam`/`canEditSundayTeam`, 현장 탭은 `iguardScopeOf`를 사용합니다.
+- 역할 배정·통합검색·출석부 반영·민감정보·삭제·PIN은 각각 `canManageRolesOf`, `searchScope`, `canWriteStudentRoster`, `canSeeSensitiveRetreat`, `canDestroySemester`/`canDestroyRetreat`, `canManageRetreatPin`으로 구분합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
+- 학기 역할은 학기·주일 화면에, 방학 역할은 행정·프로그램·현장 화면에 적용됩니다. 달력상 학기 여부로 두 축을 전환하지 않습니다.
+- 주일 사역팀은 자기 팀에 접근·편집하며, 학기 행정팀은 모든 주일 팀을 조회하고 행정팀 화면만 편집합니다. 팀·탭 목록은 `featureCatalog.ts`의 `SUNDAY_MINISTRY_TEAMS`/`SUNDAY_MINISTRY_TABS`만 사용합니다. 미구현 팀의 빈 `tabs`를 임의 기능으로 채우지 않습니다.
+- 방학 스탭팀장·이가드팀은 수련회 행정을 조회만 하며 민감 탭은 숨깁니다. `RetreatEditProvider`와 disabled fieldset을 유지하고, 드래그 같은 비폼 제어는 `useRetreatCanEdit()`으로 잠급니다. 학기 편집은 `useSemesterCanEdit()`을 사용합니다.
+- 저장은 기존 `admins`, `retreatAdmins`, `iguardMembers`/`iguardRoles` 버킷에 두 축의 합집합으로 표현합니다. `iguardRoles` 값은 `staff`/`team`뿐이며 역할 쓰기는 `planRoleAssignment` → `applyRoleSteps`의 부여 후 해제 순서를 거칩니다. `sundayWrite` 부여도 기존 승인 DB 함수를 사용합니다.
+- UI의 세부 역할 제한이 Firebase Rules의 실제 데이터 접근 범위와 같다고 가정하지 않습니다. 승인 버킷·자기 UID 읽기 규칙을 확인하고 민감정보를 UI 숨김만으로 보호하지 않습니다.
 
-- 화면 게이트는 `canAccessPortalArea` / `canEditPortalArea` / `iguardScope` / `canManageRoles`만 쓴다. `role === "staff"` 같은 직접 비교 금지.
-- 역할 판정은 `resolveMinistryRole`(순수) 하나 — 루트 `AuthContext`가 인증·역할을 한 번만 읽고 이가드 `AuthContext`는 그 값을 전달하는 호환 어댑터다. 두 경계는 `role`만 노출하고 예전 `accessLevel`/`iguardAccessLevel`은 없다.
-- 역할 배정 쓰기는 `planRoleAssignment`(순수, 부여→해제) → `applyRoleSteps`(실행). UI에서 `addRetreatAdmin`·`approveIguardMember`를 직접 부르지 않는다.
-- 학기 화면 편집 잠금은 `useSemesterCanEdit()`. 새 저장 컨트롤을 추가하면 이 값으로 `disabled` 또는 미렌더 처리한다.
-- 역할 배정(`canManageRolesOf`)은 통합관리자만 가능하다. 교역자의 개인정보 통합검색은 `searchScope`, 수련회 PIN 운영은 `canManageRetreatPin`으로 각각 판정해 역할 배정 권한과 결합하지 않는다.
+## 데이터 소유권과 변경 경계
 
-## 화면 셸 규칙
+| 경로 | 현재 쓰기 경계 |
+|---|---|
+| `semesters/*`, `semestersPrivate/*` | 학기·주일 모듈. 공개 신청·출석과 연락처·지원 동기·새친구 민감 상세를 분리 |
+| `retreats/{id}/*` (`iguard` 제외) | 행정 원본. 현장은 명단·조·숙소·프로그램을 읽기만 함 |
+| `retreatsPrivate/{id}/*` | 참가자 연락처, 취소계좌, 의료, 주민번호, 시트 raw, 준비회의 원문·결정 |
+| `retreats/{id}/iguard/*` | 현장 모듈. 행정은 `groupStaff` 등을 읽기 참조 |
+| `prepMilestones/*` | 공유 일정·사역 가이드·예배팀 편집 조각. `sourceSite`별 구분·필터 필수 |
+| `iguardPending/{uid}/siteRequests/*` | 본인 건의사항. 접근 승인 필드와 별도 보존 |
+| `classes/*`, `attendance/*`, `trash/*`, `teacher*`, `events/*` | 학생 앱 원장. 아래 새친구 단건 예외 외 읽기 전용 |
 
-- 사이트 제목·계정·로그아웃·상단 메뉴는 `GlobalPortalHeader` 하나만 담당한다. 하위 화면에 제목 줄을 다시 만들지 않는다(중복 제목 금지 — `/retreats`·`/field`에서 실제로 겹쳤다).
-- 상단 메뉴는 학기 중 사역 / 주일 사역 / 방학 중 사역 / 사역 가이드 / 사이트 건의사항 순서이며, 방학 중 사역이 수련회 행정팀·이가드팀 드롭다운으로 갈라진다. 우측 계정 영역의 학생 통합검색은 기능 메뉴가 아니라 기존 DB에서 인물 기록을 읽기 전용으로 파생한다.
-- 학생·스탭 원장 연락처를 학기 신청 화면에 기본으로 쓸 때는 `rosterContact.ts`의 `resolvedContact`/`contactOverrideValue`를 쓴다. 비공개 신청 수정값이 원장값보다 우선하며, 원장과 같은 기본값을 `semestersPrivate`에 복사 저장해 실시간 연동을 끊지 않는다. 사역팀 지망·훈련 반처럼 학기마다 달라지는 값은 이 계약에 포함하지 않는다.
-- 출석 격자·반별 명단처럼 각 셀이 직접 액션인 표에는 `cell-action-grid`를 붙여 전역 행 hover를 끈다. 읽기 중심 표의 행 hover는 유지하고, 셀 액션 표만 현재 포인터 셀에 반응하게 한다.
-- 학기 중 사역은 `훈련·사역팀`만 학기별로 관리한다. `행정·바나바`는 독립 `주일 사역` 영역이며, 새친구·등록 현황·처리 대기·행정 변동 사항을 학기 구분 없이 보여준다.
-- 통합 브랜드 색: 학기·수련회 행정·이가드 모두 `globals.css`의 미드나이트 인디고·코발트·틸 토큰을 공유한다. `.semester-scope`와 `.iguard-scope`는 배경·최소 높이만 제공하며 도메인별 원색으로 토큰을 재정의하지 않는다. 상태 의미(정상·검토·위험)에만 에메랄드·앰버·로즈를 사용한다.
-- effect 안에서 `setState`를 직접 호출하지 않는다(eslint `react-hooks/set-state-in-effect`). 탭 유효성처럼 파생 가능한 값은 렌더 중 계산한다(`SemesterClient`의 `activeTab` 참고).
+- 새 경로·데이터 형태·동기화 수정 전 양 앱의 소비자와 `../attendance-app/database.rules.json`을 읽고 영향 경로를 설명합니다. Rules 원천은 학생 앱 하나입니다.
+- 새친구 출석부 반영은 **학기 통합관리자·행정팀**에게 `canWriteStudentRoster`가 허용합니다. `registerNewFriendInRoster`와 결정적 `nf_` 학생의 `cancelNewFriendPlacement`/`removeNewFriendFromRoster`만 기존 예외입니다. ID·이름·반 연결 검증, 사전 백업, 단일 학생 경로의 원자 update, `trash` 복구 사본·재조회 계약을 보존합니다. 일반 학생 수정·이동·삭제 함수로 넓히지 않습니다.
+- 참가자 연락처의 쓰기 원천은 `retreatsPrivate/{id}/participantContacts/{participantKey}`입니다. 공개 참가자 키와 명단 필드는 유지하고 현장 구독·공개 캐시에 연락처를 합치지 않습니다.
+- 일반 일정 구독은 사역 가이드(`isMinistryGuideMilestone`)·예배팀(`isWorshipMilestone`) 조각을 걸러야 합니다. 행정 `lib/db/shared.ts`와 현장 `features/iguard/lib/db.ts`를 함께 확인합니다.
+- 건의 첨부는 Firebase Storage `site-requests/{uid}/{requestId}/attachment.jpg`에 저장하고 RTDB에는 메타데이터만 둡니다. 레거시 `dataUrl`은 읽기 호환만 유지합니다. 승인·거절은 pending 노드 전체를 지우지 않고 접근 필드만 해제하며, 건의 삭제는 Storage 파일을 먼저 정리합니다.
+- 경로 단위 `update`를 우선합니다. 전체 덮어쓰기는 기존 `backupNodeBeforeOverwrite`의 성공 검사·복구 절차를 유지합니다. 수련회·학기 삭제는 공개/비공개 짝을, 팀·훈련 반 삭제는 관련 커리큘럼·신청자 참조를 함께 처리합니다.
 
-## 학기 사역 계약 (2026-08-06)
+## 실시간 읽기와 현장 안전 계약
 
-- 접수 원칙: 훈련 신청이 사역팀 지원의 전제. 예외는 고3 2학기·스탭. 판정은 `src/features/semester/intakeRule.ts`(순수)만 사용한다.
-- `trainingOnly`는 `deriveTrainingOnly`가 파생한다. 출석·수료 명단은 `roster.ts`(훈련 명단 = 훈련 반 배정자 전원 + 레거시 `trainingOnly`).
-- 회차 유형 변환은 `sessionKind.ts`. UI 선택지는 개강·종강·휴강·직접 입력이고 신규 기본값은 직접 입력이다. 표준 일정 문구는 `훈련&사역팀 …`이며 레거시 짧은 라벨도 표시 단계에서 정규화한다. 출석 만점에서 빠지는 유형은 휴강뿐이다. 다일 회차는 기존 `date` + 선택 `endDate`로 표현하고 회차 ID·출석 집계는 하나로 유지한다(`sessionDate.ts`).
-- 훈련 반: `semesters/{sid}/trainingClasses/{id}`. 삭제는 `trainingClass.ts`의 루트 다중 경로 update(신청자 `trainingClassId`까지 정리).
-- `.input`은 레이어 밖 규칙이라 `width:100%`가 유틸리티를 이긴다 — 폭은 감싼 div로, 높이는 `h-*` 금지.
+- 지속 표시 데이터는 구독하고 닫기·계정/대상 ID 변경 시 해제합니다. 모든 새 구독은 `onError`를 전달하고 `useLoadErrors`로 경로별 실패를 표시합니다. 첫 성공·오류 응답은 `subscriptionReadiness`에서 모두 ready 처리합니다.
+- 인증·역할 조회, 명시적 가져오기, 저장·삭제 직전 확인, 백업·복구·멱등성 검증은 일회성 `get`을 유지합니다. 구독 echo가 화면의 원천이므로 저장 후 같은 항목을 수동 append하지 않습니다.
+- 이가드 구독은 `features/iguard/hooks/useRetreatData.ts`에 모으고 `fail(key)`를 배선합니다. 행정 원본 읽기는 현장 DB 모듈의 읽기 전용 함수로 제공하며 현장 훅에서 행정 DB 배럴을 직접 가져오지 않습니다.
+- PIN은 `useRetreatPinGate` 하나와 `retreats/{id}/iguard/accessLock`을 사용합니다. 행정·프로그램·현장에 별도 잠금 노드를 만들지 않습니다.
+- 인원체크는 멱등 체크·트랜잭션·톰스톤을 유지합니다. 키는 `checklistKeys.stableMemberId`; 구형 읽기·해제는 `memberCheckKeys`/`isMemberChecked`를 거칩니다. 배열 인덱스 키나 단순 토글로 되돌리지 않습니다.
+- 이름·배정·시간 처리는 `studentMatcher`, `busStaff`, `scheduleTime`, `cueSheet`, `cueSelection`, `staffIdentity`, `syncParticipants`를 먼저 찾습니다. 자정 이후 시간, 동명이인, 동기화 ambiguous 보존 가드를 화면에서 재구현하지 않습니다.
 
-## 검증
+## 학기·주일 계약
+
+- 신청 전제·예외와 `trainingOnly` 파생은 `intakeRule`, 학생·스탭 분리는 `roster`/`applicant`를 사용합니다. 스탭의 `s_` 신청 키와 학생 키를 유지합니다.
+- 사역팀·훈련 출석은 `attendance/team`·`attendance/training` 독립 원장입니다. 휴강만 만점에서 제외하고 다일 회차도 `sessionDate`의 `date`+`endDate`, 회차 ID 하나로 집계합니다.
+- 연락처 기본값·비공개 수정값은 `rosterContact.resolvedContact`/`contactOverrideValue`로 합칩니다. 원장과 같은 값을 private에 복사해 실시간 연결을 끊지 않습니다.
+- 신규 새친구는 `semesters/{year}-sunday` 작업공간에 저장하고 `meta`를 만들지 않습니다. 기존 학기별 레코드는 이동하지 않고 통합 조회합니다. 완료는 `rosterSync`이며 레거시 `giftDate` 읽기·수정 보존을 유지합니다. 접수일 `registeredDate`와 감사 시각 `createdAt`을 구분합니다.
+- 인물 통합검색은 `peopleSearch`의 유형 namespace·영구 `personId`·유일한 진급선 계약을 사용합니다. 이름만으로 다른 사람을 합치거나 기존 참조 ID를 교체하지 않습니다.
+
+## 프로그램 준비 계약
+
+- 공개 원본은 `retreats/{id}/programs/{programId}`, 회의·결정은 `retreatsPrivate/{id}/programMeetings/{programId}`입니다. private 구독은 편집 권한자에게만 열고 공개 workspace 캐시에서 회의 원문을 제거합니다.
+- `PROGRAM_SECTIONS`와 `?section=`이 내비게이션의 원천입니다. `ProgramList`의 실행 작업률과 현장 점검률을 합치지 않습니다. `tasks.status`는 `todo/doing/blocked/done`이며 기존 `done` boolean을 계속 읽습니다.
+- 본문은 명시적 초안 저장, 하위 행은 경로별 저장입니다. `ProgramEditor.withoutTasks`에서 `tasks`·`meetings`·`posts`·`items`·`roles`·`competitionTeams`를 모두 제외합니다. 편집 중 원격 변경은 `shouldSyncEditorDraft`로 판정해 초안을 보존합니다.
+- `posts`는 운영 방식·참가 단위·테스트 상태를 가진 진행 블록입니다. 물품·역할은 `postId`로 연결하고, `competitionTeams.groupIds`는 기본 `groups`를 읽기 참조합니다. 순서 변경은 각 `order` 필드만 원자 update하며 프로그램·조 전체를 덮어쓰지 않습니다.
+- 중첩 push 키는 `programTasks` 등 읽기 함수에서 런타임 ID로 복원합니다. 결정→할 일은 `convertRetreatProgramDecisionToTask`의 결정적 ID·최신값 확인·public 작업/private 링크의 다중 경로 update를 유지합니다. 링크가 있는 작업 삭제·복원도 두 경로를 함께 처리합니다.
+- `canPublishProgram`이 현장 점검 완료와 모든 실행 작업 완료를 검사하며 명시적 확인 뒤 `published`로 바꿉니다. 현장은 공개 원본에서 `published`만 목록에 보여 주고 `PublishedProgramCard`를 공용으로 사용합니다. 이 필터는 **화면 표시 조건**이며 초안의 DB 읽기를 막는 보안 규칙이 아닙니다.
+
+## 화면·성능·접근성
+
+- 사이트 제목·계정·메뉴는 `GlobalPortalHeader` 하나, 방학 목록·캘린더는 `VacationHome` 하나를 씁니다. 공통 홈 데이터나 개인 담당을 새 집계 노드에 복사하지 않습니다.
+- `PortalViewportShell`/`ViewModeContext`의 선택 모드를 유지합니다. PC 모드는 같은 출처의 최소 1280px iframe, 모바일 미리보기는 430px iframe을 사용합니다. 프레임 경로 동기화·화면 내부 쿼리 변경으로 App Router와 인증을 다시 시작하지 않습니다. 브라우저 QA는 실제 앱 프레임을 찾아 검사합니다.
+- CSS는 `globals.css` 기반·토큰, `operations-tables.css` 운영 표, `portal-surfaces.css` 공통 화면, `program-preparation.css` 프로그램, `theme-compat.css` 다크 호환, `interaction-controls.css` 상호작용으로 나눕니다. `cssArchitecture.test.ts`의 예산을 올려 실패를 숨기지 않습니다.
+- `.input`은 레이어 밖 규칙이라 Tailwind 폭·글꼴·여백 유틸리티보다 우선할 수 있습니다. 폭은 감싼 요소로, 필요한 입력 높이·글꼴은 기존 컴포넌트 패턴으로 조절하고 양 테마·작은 화면에서 확인합니다. 셀 자체가 액션인 표는 `cell-action-grid`를 씁니다.
+- 모달은 `OverlayShell`/`ModalScrollManager`를 통해 dialog 이름·포커스 트랩·ESC·스크롤 복구를 유지합니다. 토스트는 `aria-live`, 아이콘 버튼은 `aria-label`이 필요합니다. 렌더 계약은 `OverlayShell.render.test.tsx`가 검증합니다.
+- 선택 상태는 가능한 한 렌더 중 파생하고 자동 시계 갱신이 사용자 선택을 덮지 않게 합니다. effect 안 직접 `setState`를 새로 넣어 lint 계약을 우회하지 않습니다.
+- XLSX는 `loadXlsx()` 동적 import를 사용합니다. 현장의 비활성 뷰 지연 로딩, 모바일 참가자 페이지 분할, `AutoAssignNamePickers`·`classRosterModel`·`RoomComponents`·`GroupComponents`의 책임 경계를 유지합니다. 인쇄 HTML에는 `escapeHtml()`을 적용합니다.
+
+## 검증·인증·배포
+
+앱 폴더에서 현재 `package.json` 명령을 사용합니다. 이 앱에는 `npm run verify`가 없고 루트 검증 명령과 구분합니다.
 
 ```bash
-npx tsc --noEmit
+npm run lint
+npm run typecheck
 npm test
 npm run build
 ```
 
-추가 품질 관문은 `npm run test:coverage`와 `npm run quality:lighthouse`입니다. 로그인 smoke·axe는 `E2E_STORAGE_STATE=.auth/user.json`을 요구하며, CI는 GitHub Secret `E2E_STORAGE_STATE_B64`를 복원하고 누락 시 반드시 실패합니다. `.auth`, coverage, Lighthouse 결과, Playwright 결과는 커밋하지 않습니다.
+- `typecheck`는 `tsc --noEmit`, build는 `next build --webpack`입니다. `npm run quality:ci`는 lint → typecheck → coverage → build를 묶습니다. Firebase 빌드 설정은 `src/lib/firebase.ts`와 CI의 `NEXT_PUBLIC_FIREBASE_*` 키를 확인하고 실제 값은 출력하지 않습니다. 환경변수 누락 실패와 소스 회귀를 구분합니다.
+- 같은 앱에서 타입 검사와 build를 병렬 실행하지 않습니다. 전체 lint가 `.auth/chrome-profile` 생성 JS 때문에 실패하면 원래 실패를 기록한 뒤 `npm run lint -- --ignore-pattern '.auth/**'` 결과를 별도로 보고합니다. 인증 프로필을 삭제하거나 애플리케이션 소스 검사를 생략하지 않습니다.
+- Vitest는 기본 node 환경이며 렌더 테스트 첫 줄에 `/** @vitest-environment jsdom */`을 둡니다. jsdom은 레이아웃 계산이 없어 필요할 때 `getClientRects` 등을 스텁합니다. 커버리지 하한은 `vitest.config.ts`, 성능·접근성 예산은 `lighthouserc.cjs`가 원천입니다.
+- `../.github/workflows/highschool-quality.yml`은 Node 22에서 검증·Lighthouse를 실행한 뒤 별도 `authenticated-e2e` job으로 **운영 URL** smoke·axe를 실행합니다. PR 코드를 검증한 것과 운영 화면을 검사한 것을 구분해 보고합니다. `quality:ci`만으로 Lighthouse·E2E까지 통과했다고 말하지 않습니다.
+- 인증 E2E는 `E2E_STORAGE_STATE`의 비어 있지 않은 세션 파일이 필요하며, CI는 `E2E_STORAGE_STATE_B64` secret을 복원합니다. `require-e2e-auth.mjs` 가드를 제거하거나 무인증 skip으로 성공 처리하지 않습니다. 실제 인증 완료와 역할·앱 프레임을 별도로 확인합니다.
+- 로그인 세션이 없으면 `npm run e2e:auth`의 실제 Chrome 창에서 사람이 OAuth를 마친 뒤 재사용합니다. `storageState({ indexedDB: true })`를 유지해야 Firebase Auth가 복원됩니다. 로그인 벽 때문에 모든 헤드리스 검증이 불가능하다고 단정하지 않습니다. `.auth`, 시크릿 출력, 추적·스크린샷에 포함될 수 있는 개인정보를 공유하지 않습니다.
+- Lighthouse는 로컬 공개 홈의 지표이며 인증된 전체 운영 화면을 보증하지 않습니다. 파괴적 화면 확인은 매칭되지 않는 더미 입력의 확인 건수까지만 보고 취소합니다. 기능 검증을 이유로 운영 DB 저장을 누르지 않습니다.
+- 배포는 사용자 요청 또는 `/ship` 절차 때만 수행합니다. 운영 주소는 `https://woorihigh-app.vercel.app`, Vercel 프로젝트는 `highschool-app`입니다. 수동 배포가 필요하면 Root Directory 설정을 확인하고 **저장소 루트**에서 실행합니다. 배포 확인은 `/api/version`의 `buildId`와 대상 커밋, Production `Ready`를 함께 대조합니다.
+- 사소하지 않은 해결은 루트 학습 법칙에 따라 `extract-approach`로 남깁니다. 테스트 수·번들 크기·CI 비밀값 유무·최신 배포 상태를 영구 사실처럼 이 가이드에 누적하지 않습니다.
 
-대형 운영 화면은 `AutoAssignNamePickers`, `classRosterModel`, `RoomComponents`, `GroupComponents` 경계를 유지합니다. XLSX는 `loadXlsx()` 동적 import만 사용하고, 다크 호환·터치 규칙은 각각 `theme-compat.css`·`interaction-controls.css`에 둡니다.
+## 날짜별 학습 기록 — 현재 지침과 구분
 
-독립 `retreat-app`·`iguard-app`은 기능 동등성 확인과 사용자 승인 후 2026-08-05 제거했습니다. 복구 태그는 `pre-legacy-app-removal-2026-08-05`입니다.
+아래는 기존 세션의 접근법을 보존한 기록입니다. 폐기된 앱·API, 당시 역할표·환경 제약·실측 수치가 포함됩니다. 예전 `accessLevel`·단일 `role`·이가드 인증 어댑터·6역할·통합관리자만 새친구 반영 같은 문장을 현재 구현 지시로 적용하지 말고 위 계약과 현재 소스·테스트를 우선 확인합니다.
 
-## 2026-08-09에 굳힌 계약 (되돌리지 말 것)
-
-- **로드 오류 배너는 `lib/useLoadErrors.ts` 하나로만.** 실패를 경로별로 모아 전부 나열하고, `scope`(대상 id·계정 uid) 변경 시 렌더 중 파생으로 초기화한다. 단일 `loadError` 문자열로 되돌리면 동시 실패 중 마지막 하나만 보여 원인을 잘못 짚는다(실제로 두 번 오진했다). ⚠ Firebase RTDB는 **한 번 거부된 리스너를 규칙이 바뀌어도 재시도하지 않는다** — 권한을 열어도 그 탭은 새로고침 전까지 실패 상태다.
-- **수련회 PIN 잠금은 `features/portal/useRetreatPinGate.ts` 하나로만.** 잠금은 `retreats/{id}/iguard/accessLock` 한 노드라 **행정·이가드 어느 쪽에서 잠가도 양쪽이 잠긴다.** 화면마다 구독을 새로 짜면 한쪽만 잠기는 사고가 난다. PIN 우회는 통합관리자만.
-- **인원체크 키에 배열 인덱스를 넣지 않는다.** `features/iguard/lib/checklistKeys.ts`의 `stableMemberId`(`{kind}:{ownerId}:{name}`)만 쓴다. 운영 DB에 구형 인덱스 키가 남아 있으므로 판정·해제는 반드시 `memberCheckKeys`/`isMemberChecked`를 거친다(신형·구형 동시 인식, 쓰기는 신형만).
-- **스탭/학생 구분은 `features/semester/roster.ts` 한 곳.** `isStaffApplication`·`splitStudentsAndStaff`·`completionRoster`. 수료 명단에서 교사·스탭을 빼는 것은 `completionRoster`가 담당한다(출석 명단은 스탭도 포함).
-- **삭제는 짝이 되는 노드를 함께.** 수련회는 `lib/retreatRemoval.ts`(`retreats` + `retreatsPrivate`), 팀·훈련 반은 `curriculum`까지. 한쪽만 지우면 화면에서 접근 불가능한 고아가 남는다.
-- **전체 덮어쓰기 복구는 사전 백업 성공을 확인한 뒤에만** — `backupNodeBeforeOverwrite`의 반환값을 검사한다(`if (!backedUp) throw`). 스로틀된 상시 저장 백업만 예외.
-- **인앱 브라우저 탈출은 `features/iguard/lib/inAppBrowser.ts`만.** 화면에 복제하지 말 것 — 복제본에는 "이동 주소 ≠ 현재 주소" 불변식과 세션 1회 가드가 빠져 무한 리로드가 났다.
-- **`.input`은 `globals.css`의 `@layer` 밖 규칙이라 Tailwind 유틸리티를 이긴다.** `h-*`로 높이를 고정하면 글자가 잘리고, `w-*`·`text-*`·`px-*`는 무시된다. 폭은 **감싼 div**로, 글꼴은 **인라인 style**로 준다.
-- **전체 ESLint는 0 errors / 0 warnings다(2026-08-22 기준).** 이전에 "의도적 부채"로 남겨 두던 `set-state-in-effect` 9건은 전부 정리됐다 — 자동 선택은 렌더 중 파생(`cueSelection.ts`·`chooseCueCardStaffId`), 로딩은 스코프 비교(`useRetreatData`의 `loadedScope`)로 바뀌었다. **lint 실패를 새 부채로 남기지 말 것**: `npm run verify`가 lint부터 돌기 때문에 한 건이라도 남으면 저장소 전체 게이트가 상시 빨간불이 되고, 그러면 아무도 그 게이트를 믿지 않게 된다.
-
-## 핵심 코드 패턴
 
 ### 통합 포털에서도 도메인 권한과 DB 소유권을 합치지 않기 (2026-08-05)
 - **접근법**: 1→ `semester-app`, `retreat-app`, `iguard-app`의 라우트를 `highschool-app/src/app` 아래로 편입한다. 2→ 기존 `semesters/*`, `retreats/{id}/*`, `retreats/{id}/iguard/*` 경로는 그대로 둔다. 3→ 공통 `AuthContext`에서 행정 `accessLevel`과 이가드 `iguardAccessLevel`을 별도 값으로 읽는다. 4→ 통합 홈은 두 권한 중 하나가 있으면 열되, 링크와 메뉴는 각 도메인 권한으로 다시 제한한다. 5→ 타입 검사·전체 테스트·프로덕션 빌드와 비로그인 PC·375px 화면을 확인한다.

@@ -3,17 +3,22 @@
  *  - GET  /               : UI
  *  - GET  /api/report     : 일일 보고서 데이터 (git·Vercel·세션·백로그)
  *  - GET  /api/skills     : skills.json (버튼 정의)
- *  - POST /api/run        : { skillId } → claude 헤드리스 실행, SSE 스트리밍
+ *  - POST /api/run        : { skillId, dangerConfirmation? } → claude 헤드리스 실행, SSE 스트리밍
  *  - GET  /api/runs       : 실행 이력 목록 / GET /api/runs/<id> : 상세
  */
 const http = require("http");
 const https = require("https");
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { execFile, spawn } = require("child_process");
 
 const PORT = 5599;
+const HOST = "127.0.0.1";
+const PROCESS_UID = typeof process.getuid === "function" ? process.getuid() : os.userInfo().uid;
+const RUNTIME_DIR = path.join("/tmp", `agent-os-${PROCESS_UID}`);
+const TOKEN_FILE = path.join(RUNTIME_DIR, "session-token");
 const ROOT = path.resolve(__dirname, "..");            // 모노레포 루트
 const APP = __dirname;
 const RUNS_DIR = path.join(APP, "runs");
@@ -67,12 +72,11 @@ function vercelLatest(project, token) {
 // ── 일일 보고서 ────────────────────────────────────────
 async function buildReport() {
   const token = vercelToken();
-  const [cy, ct, cw, highschool, semester] = await Promise.all([
+  const [cy, ct, cw, highschool] = await Promise.all([
     sh("git", ["log", "--since=yesterday 00:00", "--until=today 00:00", "--format=%h│%s"]),
     sh("git", ["log", "--since=today 00:00", "--format=%h│%s"]),
     sh("git", ["rev-list", "--count", "--since=7 days ago", "HEAD"]),
     vercelLatest("highschool-app", token),
-    vercelLatest("semester-app", token),
   ]);
   const parse = (s) => s ? s.split("\n").map((l) => { const [h, ...m] = l.split("│"); return { hash: h, msg: m.join("│") }; }) : [];
 
@@ -111,7 +115,7 @@ async function buildReport() {
   return {
     now: Date.now(), dday,
     commitsYesterday: parse(cy), commitsToday: parse(ct), commitsWeek: Number(cw) || 0,
-    deployments: { "highschool-app": highschool, "semester-app": semester },
+    deployments: { "highschool-app": highschool },
     sessionsWeek, backlog, overnight: overnight.slice(0, 5), recentRuns: runs.slice(0, 5),
   };
 }
@@ -126,6 +130,29 @@ function listRuns() {
 }
 
 // ── 헤드리스 claude 실행 + SSE ─────────────────────────
+function claudeArgsForSkill(skill) {
+  const args = ["-p", skill.prompt, "--output-format", "stream-json", "--verbose"];
+  if (skill.danger) {
+    args.push("--dangerously-skip-permissions");
+  } else {
+    args.push(
+      "--safe-mode",
+      "--permission-mode", "plan",
+      "--disable-slash-commands",
+      "--no-session-persistence",
+      "--tools", "Read,Glob,Grep",
+    );
+  }
+  return args;
+}
+
+function confirmDangerSkill() {
+  const script = 'display dialog "Agent OS가 외부 명령·파일 수정·커밋·푸시·배포 권한을 사용할 수 있습니다." with title "Agent OS 권한 실행" buttons {"취소", "실행"} default button "실행" cancel button "취소" with icon caution';
+  return new Promise((resolve) => {
+    execFile("/usr/bin/osascript", ["-e", script], { timeout: 60_000 }, (error) => resolve(!error));
+  });
+}
+
 function runSkill(skill, res) {
   const id = `${Date.now()}-${skill.id}`;
   const run = { id, skillId: skill.id, label: skill.label, prompt: skill.prompt,
@@ -137,7 +164,7 @@ function runSkill(skill, res) {
   const send = (type, data) => res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
   send("start", { id, label: skill.label });
 
-  const child = spawn("claude", ["-p", skill.prompt, "--output-format", "stream-json", "--verbose", "--dangerously-skip-permissions"],
+  const child = spawn("claude", claudeArgsForSkill(skill),
     { cwd: ROOT, env: process.env });
 
   let buf = "";
@@ -182,41 +209,336 @@ function runSkill(skill, res) {
   });
 }
 
-// ── HTTP 서버 ─────────────────────────────────────────
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, "http://localhost");
-  const json = (obj, code = 200) => { res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" }); res.end(JSON.stringify(obj)); };
-  try {
-    if (url.pathname === "/") {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-      return res.end(fs.readFileSync(path.join(APP, "public/index.html")));
-    }
-    if (url.pathname === "/api/report") return json(await buildReport());
-    if (url.pathname === "/api/skills") return json(JSON.parse(fs.readFileSync(path.join(APP, "skills.json"), "utf8")));
-    if (url.pathname === "/api/runs") return json(listRuns());
-    if (url.pathname.startsWith("/api/runs/")) {
-      const f = path.join(RUNS_DIR, path.basename(url.pathname) + ".json");
-      if (!fs.existsSync(f)) return json({ error: "not found" }, 404);
-      return json(JSON.parse(fs.readFileSync(f, "utf8")));
-    }
-    if (url.pathname === "/api/run" && req.method === "POST") {
-      let body = "";
-      req.on("data", (c) => (body += c));
-      req.on("end", () => {
-        try {
-          const { skillId } = JSON.parse(body || "{}");
-          const cfg = JSON.parse(fs.readFileSync(path.join(APP, "skills.json"), "utf8"));
-          const skill = cfg.skills.find((s) => s.id === skillId);
-          if (!skill) return json({ error: "unknown skill" }, 400);
-          runSkill(skill, res);
-        } catch (e) { json({ error: String(e) }, 500); }
-      });
-      return;
-    }
-    json({ error: "not found" }, 404);
-  } catch (e) { json({ error: String(e) }, 500); }
-});
+// ── HTTP 서버 보안 ─────────────────────────────────────
+const LOCAL_HOSTS = new Set([HOST, "localhost"]);
 
-server.listen(PORT, () => {
-  console.log(`에이전트 OS → http://localhost:${PORT}`);
-});
+function setSecurityHeaders(res) {
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+}
+
+function isAllowedLocalUrl(value, req) {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value.includes("://") ? value : `http://${value}`);
+    return parsed.protocol === "http:"
+      && LOCAL_HOSTS.has(parsed.hostname.toLowerCase())
+      && parsed.port === String(req.socket.localPort)
+      && parsed.pathname === "/"
+      && !parsed.search
+      && !parsed.hash
+      && !parsed.username
+      && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+function isAuthorizedRunRequest(req, sessionToken) {
+  const fetchSite = req.headers["sec-fetch-site"];
+  if (fetchSite && fetchSite !== "same-origin") return false;
+  if (!isAllowedLocalUrl(req.headers.origin, req)) return false;
+
+  const supplied = req.headers["x-agent-os-token"];
+  if (typeof supplied !== "string") return false;
+  return tokensEqual(sessionToken, supplied);
+}
+
+function hasValidSessionToken(req, sessionToken) {
+  const supplied = req.headers["x-agent-os-token"];
+  return typeof supplied === "string" && tokensEqual(sessionToken, supplied);
+}
+
+function tokensEqual(expectedToken, suppliedToken) {
+  if (typeof expectedToken !== "string" || typeof suppliedToken !== "string") return false;
+  const expected = Buffer.from(expectedToken);
+  const supplied = Buffer.from(suppliedToken);
+  return expected.length === supplied.length && crypto.timingSafeEqual(expected, supplied);
+}
+
+function createHealthProof(sessionToken, challenge) {
+  if (!/^[a-f0-9]{64}$/.test(challenge)) {
+    throw new Error("잘못된 Agent OS health challenge입니다.");
+  }
+  return crypto.createHmac("sha256", sessionToken)
+    .update(`agent-os-health-v1:${challenge}`)
+    .digest("base64url");
+}
+
+function readSessionTokenFile(runtimeDir = RUNTIME_DIR) {
+  const runtimeStat = fs.lstatSync(runtimeDir);
+  if (!runtimeStat.isDirectory() || runtimeStat.isSymbolicLink()
+    || runtimeStat.uid !== PROCESS_UID || (runtimeStat.mode & 0o777) !== 0o700) {
+    throw new Error(`안전하지 않은 Agent OS 런타임 디렉터리입니다: ${runtimeDir}`);
+  }
+
+  const tokenFile = path.join(runtimeDir, "session-token");
+  const tokenStat = fs.lstatSync(tokenFile);
+  if (!tokenStat.isFile() || tokenStat.isSymbolicLink() || tokenStat.uid !== PROCESS_UID
+    || (tokenStat.mode & 0o777) !== 0o600 || tokenStat.size > 128) {
+    throw new Error(`안전하지 않은 Agent OS 토큰 파일입니다: ${tokenFile}`);
+  }
+  const sessionToken = fs.readFileSync(tokenFile, "utf8").trim();
+  if (!/^[A-Za-z0-9_-]{43}$/.test(sessionToken)) {
+    throw new Error("잘못된 Agent OS 세션 토큰입니다.");
+  }
+  return sessionToken;
+}
+
+function ensureRuntimeDirectory(runtimeDir) {
+  try { fs.mkdirSync(runtimeDir, { mode: 0o700 }); }
+  catch (error) { if (error.code !== "EEXIST") throw error; }
+
+  const stat = fs.lstatSync(runtimeDir);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || stat.uid !== PROCESS_UID) {
+    throw new Error(`안전하지 않은 Agent OS 런타임 디렉터리입니다: ${runtimeDir}`);
+  }
+  if ((stat.mode & 0o777) !== 0o700) fs.chmodSync(runtimeDir, 0o700);
+}
+
+function writeSessionTokenFile(sessionToken, runtimeDir = RUNTIME_DIR) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(sessionToken)) {
+    throw new Error("잘못된 Agent OS 세션 토큰입니다.");
+  }
+  ensureRuntimeDirectory(runtimeDir);
+
+  const tokenFile = path.join(runtimeDir, "session-token");
+  const tempFile = path.join(runtimeDir, `.session-token-${process.pid}-${crypto.randomBytes(8).toString("hex")}`);
+  let fd;
+  try {
+    const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW || 0);
+    fd = fs.openSync(tempFile, flags, 0o600);
+    fs.writeFileSync(fd, `${sessionToken}\n`, { encoding: "utf8" });
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    fs.renameSync(tempFile, tokenFile);
+
+    const stat = fs.lstatSync(tokenFile);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== PROCESS_UID) {
+      throw new Error(`안전하지 않은 Agent OS 토큰 파일입니다: ${tokenFile}`);
+    }
+    fs.chmodSync(tokenFile, 0o600);
+    return tokenFile;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+    try { fs.unlinkSync(tempFile); } catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+}
+
+function removeSessionTokenFile(sessionToken, runtimeDir = RUNTIME_DIR) {
+  const tokenFile = path.join(runtimeDir, "session-token");
+  try {
+    const stat = fs.lstatSync(tokenFile);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.uid !== PROCESS_UID || (stat.mode & 0o077) !== 0) return false;
+    const storedToken = fs.readFileSync(tokenFile, "utf8").trim();
+    if (!tokensEqual(sessionToken, storedToken)) return false;
+    fs.unlinkSync(tokenFile);
+    return true;
+  } catch (error) {
+    if (error.code === "ENOENT") return false;
+    throw error;
+  }
+}
+
+function attachSessionTokenFile(server, sessionToken, runtimeDir = RUNTIME_DIR) {
+  let written = false;
+  const persist = () => {
+    writeSessionTokenFile(sessionToken, runtimeDir);
+    written = true;
+  };
+  const cleanup = () => {
+    if (!written) return false;
+    const removed = removeSessionTokenFile(sessionToken, runtimeDir);
+    written = false;
+    return removed;
+  };
+  server.once("close", () => { try { cleanup(); } catch {} });
+  return { persist, cleanup };
+}
+
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    let tooLarge = false;
+    req.on("data", (chunk) => {
+      if (tooLarge) return;
+      body += chunk;
+      if (Buffer.byteLength(body) > 16 * 1024) {
+        tooLarge = true;
+        body = "";
+      }
+    });
+    req.on("end", () => {
+      if (tooLarge) {
+        const error = new Error("request body too large");
+        error.statusCode = 413;
+        return reject(error);
+      }
+      try { resolve(JSON.parse(body || "{}")); }
+      catch {
+        const error = new Error("invalid json");
+        error.statusCode = 400;
+        reject(error);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function createAgentOsServer(options = {}) {
+  const sessionToken = options.sessionToken || crypto.randomBytes(32).toString("base64url");
+  const runSkillImpl = options.runSkillImpl || runSkill;
+  const confirmDangerImpl = options.confirmDangerImpl || confirmDangerSkill;
+  const dangerApprovals = new Map();
+  let dangerConfirmationPending = false;
+
+  const findSkill = (skillId) => {
+    const cfg = JSON.parse(fs.readFileSync(path.join(APP, "skills.json"), "utf8"));
+    return cfg.skills.find((item) => item.id === skillId);
+  };
+  const pruneDangerApprovals = () => {
+    const now = Date.now();
+    for (const [approval, record] of dangerApprovals) {
+      if (record.expiresAt <= now) dangerApprovals.delete(approval);
+    }
+    while (dangerApprovals.size >= 32) {
+      dangerApprovals.delete(dangerApprovals.keys().next().value);
+    }
+  };
+
+  return http.createServer(async (req, res) => {
+    setSecurityHeaders(res);
+    const json = (obj, code = 200) => {
+      res.writeHead(code, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify(obj));
+    };
+
+    if (!isAllowedLocalUrl(req.headers.host, req)) {
+      return json({ error: "허용되지 않은 Host입니다." }, 403);
+    }
+
+    let url;
+    try { url = new URL(req.url, `http://${req.headers.host}`); }
+    catch { return json({ error: "잘못된 요청 주소입니다." }, 400); }
+
+    if (url.pathname.startsWith("/api/") && !hasValidSessionToken(req, sessionToken)) {
+      return json({ error: "API 요청 인증에 실패했습니다." }, 403);
+    }
+
+    try {
+      if (url.pathname === "/.well-known/agent-os-health" && req.method === "GET") {
+        const challenge = url.searchParams.get("challenge") || "";
+        let proof;
+        try { proof = createHealthProof(sessionToken, challenge); }
+        catch { return json({ error: "잘못된 health challenge입니다." }, 400); }
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        return res.end(proof);
+      }
+      if (url.pathname === "/") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        return res.end(fs.readFileSync(path.join(APP, "public/index.html")));
+      }
+      if (url.pathname === "/app.js") {
+        res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8" });
+        return res.end(fs.readFileSync(path.join(APP, "public/app.js")));
+      }
+      if (url.pathname === "/api/report") return json(await buildReport());
+      if (url.pathname === "/api/skills") return json(JSON.parse(fs.readFileSync(path.join(APP, "skills.json"), "utf8")));
+      if (url.pathname === "/api/runs") return json(listRuns());
+      if (url.pathname.startsWith("/api/runs/")) {
+        const f = path.join(RUNS_DIR, path.basename(url.pathname) + ".json");
+        if (!fs.existsSync(f)) return json({ error: "not found" }, 404);
+        return json(JSON.parse(fs.readFileSync(f, "utf8")));
+      }
+      if (url.pathname === "/api/danger-approval" && req.method === "POST") {
+        if (!isAuthorizedRunRequest(req, sessionToken)) {
+          return json({ error: "위험 작업 승인 요청 인증에 실패했습니다." }, 403);
+        }
+        const { skillId } = await readJsonBody(req);
+        const skill = findSkill(skillId);
+        if (!skill?.danger) return json({ error: "위험 스킬만 별도 승인을 요청할 수 있습니다." }, 400);
+        if (dangerConfirmationPending) return json({ error: "다른 위험 작업 승인을 확인 중입니다." }, 409);
+        dangerConfirmationPending = true;
+        let confirmed = false;
+        try { confirmed = await confirmDangerImpl(skill); }
+        finally { dangerConfirmationPending = false; }
+        if (!confirmed) return json({ error: "위험 작업 승인이 취소되었습니다." }, 409);
+        pruneDangerApprovals();
+        const approval = crypto.randomBytes(32).toString("base64url");
+        dangerApprovals.set(approval, {
+          skillId: skill.id,
+          prompt: skill.prompt,
+          expiresAt: Date.now() + 30_000,
+        });
+        return json({ approval }, 201);
+      }
+      if (url.pathname === "/api/run" && req.method === "POST") {
+        if (!isAuthorizedRunRequest(req, sessionToken)) {
+          return json({ error: "실행 요청 인증에 실패했습니다." }, 403);
+        }
+
+        const { skillId, dangerConfirmation } = await readJsonBody(req);
+        const skill = findSkill(skillId);
+        if (!skill) return json({ error: "unknown skill" }, 400);
+        if (skill.danger) {
+          const approval = typeof dangerConfirmation === "string"
+            ? dangerApprovals.get(dangerConfirmation)
+            : null;
+          if (typeof dangerConfirmation === "string") dangerApprovals.delete(dangerConfirmation);
+          if (!approval || approval.skillId !== skill.id || approval.prompt !== skill.prompt
+            || approval.expiresAt <= Date.now()) {
+            return json({ error: "위험 작업은 유효한 일회용 서버 승인이 필요합니다." }, 409);
+          }
+        }
+        return runSkillImpl(skill, res);
+      }
+      return json({ error: "not found" }, 404);
+    } catch (e) {
+      return json({ error: e.message || String(e) }, e.statusCode || 500);
+    }
+  });
+}
+
+if (require.main === module) {
+  const sessionToken = crypto.randomBytes(32).toString("base64url");
+  const server = createAgentOsServer({ sessionToken });
+  const tokenFile = attachSessionTokenFile(server, sessionToken);
+  const cleanupTokenFile = () => { try { tokenFile.cleanup(); } catch {} };
+
+  process.once("exit", cleanupTokenFile);
+  const shutdown = () => {
+    cleanupTokenFile();
+    server.close(() => process.exit(0));
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+
+  server.listen(PORT, HOST, () => {
+    try {
+      tokenFile.persist();
+      console.log(`에이전트 OS → http://${HOST}:${PORT}`);
+    } catch (error) {
+      console.error(`에이전트 OS 토큰 파일 생성 실패: ${error.message}`);
+      server.close(() => { process.exitCode = 1; });
+    }
+  });
+}
+
+module.exports = {
+  createAgentOsServer,
+  claudeArgsForSkill,
+  confirmDangerSkill,
+  writeSessionTokenFile,
+  readSessionTokenFile,
+  removeSessionTokenFile,
+  attachSessionTokenFile,
+  createHealthProof,
+  HOST,
+  PORT,
+  RUNTIME_DIR,
+  TOKEN_FILE,
+};

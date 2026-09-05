@@ -8,9 +8,9 @@
       "id": "deploy-status",
       "domain": "배포·운영",
       "label": "통합 플랫폼 배포 상태",
-      "desc": "통합 플랫폼과 학기 앱의 최신 Vercel 배포를 확인",
+      "desc": "통합 플랫폼의 최신 Vercel 배포를 확인",
       "prompt": "highschool-app의 Vercel 최신 배포 상태(Ready/Error)와 커밋을 확인하고 한국어 3~4줄로 요약해줘. 코드와 설정은 변경하지 마.",
-      "danger": false
+      "danger": true
     },
     {
       "id": "ship-highschool",
@@ -26,7 +26,7 @@
       "label": "통합 플랫폼 테스트",
       "desc": "highschool-app 타입·테스트·빌드 결과 요약",
       "prompt": "highschool-app에서 npx tsc --noEmit, npm test, npm run build를 실행하고 결과를 요약해줘. 코드는 변경하지 마.",
-      "danger": false
+      "danger": true
     },
     {
       "id": "qa-field",
@@ -34,7 +34,7 @@
       "label": "현장 운영 리허설 QA",
       "desc": "통합 플랫폼의 이가드 현장 화면 전수 점검",
       "prompt": "highschool-app의 /field와 /retreat/{id}/field 기능을 읽기 전용으로 점검하고 심각도별로 보고해줘.",
-      "danger": false
+      "danger": true
     },
     {
       "id": "audit-all",
@@ -50,7 +50,7 @@
       "label": "DB 정합성 진단",
       "desc": "공유 Firebase 경로를 읽기 전용으로 대조",
       "prompt": "DB_OWNERSHIP.md를 기준으로 통합 플랫폼의 수련회·이가드·학기 데이터 정합성을 읽기 전용으로 진단해줘. 복구나 쓰기는 하지 마.",
-      "danger": false
+      "danger": true
     },
     {
       "id": "backlog",
@@ -66,7 +66,7 @@
       "label": "일일 보고서 심층판",
       "desc": "커밋·배포·인수인계 종합 리포트",
       "prompt": "어제와 오늘의 git 커밋, highschool-app 배포 상태, .claude/HANDOFF.md를 종합해 한국어 일일 보고서를 작성해줘. 읽기 전용으로 진행해.",
-      "danger": false
+      "danger": true
     },
     {
       "id": "refactor-plan",

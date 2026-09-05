@@ -12,6 +12,25 @@ const rules = JSON.parse(
 const refers = (expr: string | undefined, node: string) =>
   !!expr && expr.includes(`root.child('${node}')`);
 
+function ruleValue(...segments: string[]): unknown {
+  let current: unknown = rules;
+  for (const segment of segments) {
+    if (current === null || typeof current !== 'object' || Array.isArray(current)) {
+      throw new Error(`Rules 경로가 객체가 아닙니다: ${segments.join('/')}`);
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+function ruleExpression(...segments: string[]): string {
+  const value = ruleValue(...segments);
+  if (typeof value !== 'string') {
+    throw new Error(`Rules 식이 문자열이 아닙니다: ${segments.join('/')}`);
+  }
+  return value;
+}
+
 describe('database.rules.json 권한 계약', () => {
   describe('semesters — 스탭은 조회만 (2026-08-08 보강)', () => {
     it('read는 admins·retreatAdmins·iguardMembers를 허용한다', () => {
@@ -109,33 +128,126 @@ describe('database.rules.json 권한 계약', () => {
     // 통합 앱의 retreatAdmins/{uid}.semesterRole === "adminTeam"만 학생 1명 경로를 쓴다.
     // 반 전체(students 통째·teacher)나 출석 전체를 열면 안 된다 — 범위가 넓어지면 여기서 깨진다.
     const ADMIN_TEAM = "root.child('retreatAdmins').child(auth.uid).child('semesterRole').val() === 'adminTeam'";
-    const classes = rules.classes as unknown as Record<string, any>;
-    const attendance = rules.attendance as unknown as Record<string, any>;
-    const trash = rules.trash as unknown as Record<string, any>;
-
-    it('classes는 학생 1명 경로에만 열린다 — 반 노드 자체는 그대로다', () => {
-      expect(classes.$year.$classKey.students.$studentId['.write']).toContain(ADMIN_TEAM);
-      expect(classes.$year.$classKey['.write']).not.toContain('semesterRole');
+    it('classes는 학생 1명 경로에만 열리고 이동 잠금 중에는 닫힌다', () => {
+      const write = ruleExpression('classes', '$year', '$classKey', 'students', '$studentId', '.write');
+      expect(write).toContain(ADMIN_TEAM);
+      expect(write).toContain("child('studentMoveLocks')");
+      expect(write).toContain('!root.');
+      expect(ruleExpression('classes', '$year', '$classKey', '.write')).not.toContain('semesterRole');
     });
 
-    it('attendance도 학생 1명 경로에만 열린다', () => {
-      expect(attendance.$year.$classKey.$studentId['.write']).toContain(ADMIN_TEAM);
-      expect(attendance.$year.$classKey['.write']).not.toContain('semesterRole');
+    it('attendance도 학생 1명 경로에만 열리고 이동 잠금 중에는 닫힌다', () => {
+      const write = ruleExpression('attendance', '$year', '$classKey', '$studentId', '.write');
+      expect(write).toContain(ADMIN_TEAM);
+      expect(write).toContain("child('studentMoveLocks')");
+      expect(ruleExpression('attendance', '$year', '$classKey', '.write')).not.toContain('semesterRole');
     });
 
     it('trash는 학생 복구본 경로에만 열린다 — 노드 전체는 관리자 전용 그대로다', () => {
-      expect(trash.$year.students.$studentId['.write']).toContain(ADMIN_TEAM);
-      expect(trash.$year.students.$studentId['.read']).toContain(ADMIN_TEAM);
-      expect(trash['.write']).not.toContain('semesterRole');
+      expect(ruleExpression('trash', '$year', 'students', '$studentId', '.write')).toContain(ADMIN_TEAM);
+      expect(ruleExpression('trash', '$year', 'students', '$studentId', '.read')).toContain(ADMIN_TEAM);
+      expect(rules.trash['.write']).not.toContain('semesterRole');
     });
 
-    it('교사의 본인 반 쓰기와 관리자 조건은 그대로 남아 있다 (회귀)', () => {
-      for (const node of [classes, attendance]) {
-        const write = node.$year.$classKey['.write'] as string;
-        expect(write).toContain("root.child('teacherClasses').child(auth.uid).val() === $classKey");
+    it('반 단위 쓰기는 관리자만 가능하고 자기 uid 이동 잠금만 허용한다', () => {
+      for (const node of ['classes', 'attendance']) {
+        const write = ruleExpression(node, '$year', '$classKey', '.write');
+        expect(write).not.toContain("root.child('teacherClasses')");
+        expect(write).not.toContain("root.child('userRoles')");
         expect(write).toContain("root.child('admins').child(auth.uid).val() === true");
         expect(write).toContain("root.child('attendanceAdmins').child(auth.uid).val() === true");
+        expect(write).toContain("child('studentMoveLocks').child($year).child($classKey)");
+        expect(write).toContain("child($classKey).child(auth.uid).exists()");
       }
+    });
+  });
+
+  describe('교사 권한은 이메일이 일치하는 userRoles 단일 원천을 사용한다', () => {
+    const directRoleExpressions = [
+      ruleExpression('classes', '$year', '$classKey', '.read'),
+      ruleExpression('attendance', '$year', '$classKey', '.read'),
+      ruleExpression('attendance', '$year', '$classKey', '$studentId', '.write'),
+      ruleExpression('teacherExtra', '$year', '$part', '$classKey', '.write'),
+      ruleExpression('suggestions', '$year', '$classKey', '.read'),
+      ruleExpression('suggestions', '$year', '$classKey', '.write'),
+    ];
+
+    it('teacherClasses 본인 쓰기를 제거해 로그인 사용자가 권한 원천을 위조할 수 없다', () => {
+      const write = ruleExpression('teacherClasses', '$uid', '.write');
+      expect(write).not.toContain('auth.uid === $uid');
+      expect(refers(write, 'admins')).toBe(true);
+      expect(refers(write, 'attendanceAdmins')).toBe(true);
+    });
+
+    it('교사 접근 경로는 토큰 이메일과 userRoles.email·role을 함께 확인한다', () => {
+      for (const expression of directRoleExpressions) {
+        expect(expression).toContain('auth.token.email != null');
+        expect(expression).toContain("child('userRoles')");
+        expect(expression).toContain("replace('.', '__dot__').replace('@', '__at__')");
+        expect(expression).toContain("child('email').val() === auth.token.email");
+        expect(expression).toContain("child('role').val() === 'teacher'");
+        expect(expression).not.toContain("child('teacherClasses')");
+      }
+    });
+
+    it('classes 명단 쓰기는 교사에게 열리지 않는다 — 관리 화면은 관리자 전용이다', () => {
+      const write = ruleExpression('classes', '$year', '$classKey', '.write');
+      expect(write).not.toContain("child('userRoles')");
+      expect(write).not.toContain("child('teacherClasses')");
+    });
+
+    it('교사 attendance 단건 쓰기는 본인 반 roster 학생이며 이동 잠금이 없을 때만 허용한다', () => {
+      const write = ruleExpression('attendance', '$year', '$classKey', '$studentId', '.write');
+      expect(write).toContain("child('classes').child($year).child($classKey).child('students').child($studentId).exists()");
+      expect(write).toContain("!root.child('config').child('studentMoveLocks').child($year).child($classKey).exists()");
+    });
+  });
+
+  describe('학생 이동 잠금과 커밋 표식 계약', () => {
+    it('config 상위 쓰기를 닫고 sheetSync와 lock year 쓰기만 관리자에게 연다', () => {
+      expect(ruleValue('config', '.write')).toBeUndefined();
+      for (const write of [
+        ruleExpression('config', 'sheetSync', '.write'),
+        ruleExpression('config', 'studentMoveLocks', '$year', '.write'),
+      ]) {
+        expect(refers(write, 'admins')).toBe(true);
+        expect(refers(write, 'attendanceAdmins')).toBe(true);
+      }
+    });
+
+    it('lock 레코드는 양쪽 반에 같은 메타데이터 형태로만 기록한다', () => {
+      const lockPath = ['config', 'studentMoveLocks', '$year', '$classKey', '$ownerUid', '$operationId'];
+      const validate = ruleExpression(...lockPath, '.validate');
+      expect(validate).toContain("hasChildren(['phase', 'startedAt', 'fromCk', 'toCk', 'sid'])");
+      expect(validate).toContain("child('fromCk').val() === $classKey");
+      expect(validate).toContain("child('toCk').val() === $classKey");
+      expect(validate).toContain("child('fromCk').val() !== newData.child('toCk').val()");
+      expect(validate).not.toContain('auth.uid');
+      expect(ruleExpression(...lockPath, 'phase', '.validate')).toContain("'preparing'");
+      expect(ruleExpression(...lockPath, 'phase', '.validate')).toContain("'pending'");
+      expect(ruleExpression(...lockPath, 'startedAt', '.validate')).toContain('newData.isNumber()');
+      expect(ruleValue(...lockPath, '$other', '.validate')).toBe(false);
+    });
+
+    it('커밋 표식은 자기 uid로 한 번만 true를 만들며 사전 양쪽 pending lock을 요구한다', () => {
+      const markerPath = [
+        'config', 'studentMoveCommits', '$year', '$fromCk', '$toCk', '$sid', '$ownerUid', '$operationId',
+      ];
+      const write = ruleExpression(...markerPath, '.write');
+      expect(refers(write, 'admins')).toBe(true);
+      expect(refers(write, 'attendanceAdmins')).toBe(true);
+      expect(write).toContain('auth.uid === $ownerUid');
+      expect(write).toContain('!data.exists()');
+      expect(write).toContain('newData.val() === true');
+      expect(write).toContain('$fromCk !== $toCk');
+      expect(write).toContain("child($fromCk).child($ownerUid).child($operationId)");
+      expect(write).toContain("child($toCk).child($ownerUid).child($operationId)");
+      expect(write.match(/child\('phase'\)\.val\(\) === 'pending'/g)).toHaveLength(2);
+      expect(write).toContain("child('fromCk').val() === $fromCk");
+      expect(write).toContain("child('toCk').val() === $toCk");
+      expect(write).toContain("child('sid').val() === $sid");
+      expect(write).toContain("child('startedAt').val() === root.child('config')");
+      expect(ruleExpression(...markerPath, '.validate')).toBe('newData.val() === true');
     });
   });
 });
