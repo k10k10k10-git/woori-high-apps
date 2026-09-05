@@ -27,6 +27,9 @@
   no-cache 헤더 및 원격 SW와 로컬 산출물의 해시 일치를 확인했다. 운영 Hosting은 아직 변경하지 않았다.
   미리보기: https://woori-high--admin-dashboard-20260905-sptfuvof.web.app
   `--no-authorized-domains`로 Auth 도메인 목록도 변경하지 않았다.
+- 검토 PR: https://github.com/k10k10k10-git/woori-high-apps/pull/8
+  기능 커밋 `e862e1d`, 앞선 최적화 `2c1f237`·`273dede` 포함. 운영 병합은 아직 하지 않았다.
+  GitHub 인증 E2E용 `E2E_STORAGE_STATE_B64` secret이 없음을 확인했으며 가드를 생략하지 않았다.
 
 ## 2026-09-05 앞선 작업 — 사용 속도·운영 안정성 보강 (로컬 검증 완료·미배포)
 
