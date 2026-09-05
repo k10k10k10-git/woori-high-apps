@@ -34,11 +34,12 @@
   캐시 `woori-att-1788599249228` 및 파일 SHA 일치를 확인했다. 통합 앱 Vercel Production은 `Ready`이고
   `/api/version`의 `buildId`가 위 병합 SHA와 같다.
 - Hosting 점검 중 9월 1일 종료 예정이던 데모 모드와 공개 자격정보가 로컬 배포 설정에 남아 있음을
-  확인했다. `NEXT_PUBLIC_DEMO_MODE=0`으로 바꾸고 데모 이메일·비밀번호 값을 비운 뒤 Hosting을 다시
-  배포했으며, 운영 첫 화면이 일반 이메일 로그인임을 실제 브라우저로 확인했다. Firebase Auth의
-  `demo@woorihigh.com` 계정과 `attendanceAdmins/{demoUid}` boolean 레코드 1건은 아직 남아 있다.
-  삭제 전 스냅샷은 `attendance-app/tmp/demo-retirement-backup/predelete.20260905-180949.json`에 0600으로
-  준비했다. 운영 DB 쓰기와 Auth 계정 삭제는 새 명시 승인을 받은 뒤 함께 진행한다.
+  확인해 한 차례 비활성화했으나, 사용자가 데모 유지와 롤백 배포를 요청했다. 기존 로컬 정적 번들의
+  유일한 데모 자격정보 상수를 값 출력 없이 복구하고 `NEXT_PUBLIC_DEMO_MODE=1`로 완전 재빌드한 뒤
+  Hosting을 다시 배포했다. 현재 라이브 서비스워커 캐시는 `woori-att-1788600007069`이며 로컬 산출물과
+  SHA가 같다. 운영 브라우저에서 공용 계정 자동 로그인 뒤 `데모 테스트` 부서·학년·반 선택 화면과
+  실제 반 목록이 표시되는 것을 확인했다. Firebase Auth 데모 계정과 `attendanceAdmins/{demoUid}` boolean
+  레코드는 의도적으로 유지한다. 삭제 준비용 임시 스냅샷은 삭제 요청이 취소되어 정리한다.
 - `npm audit` 10건 중 운영 의존성은 6건이다. 이번 PR은 패키지 파일을 바꾸지 않았고 정적 Hosting에서
   Next 서버·Sharp·PostCSS 경로는 실행되지 않으며, `xlsx`는 내보내기만 사용해 즉시 롤백 사유는 아니다.
   후속 의존성 PR에서 Next와 전이 의존성을 갱신하고 전체 검증한다. `xlsx`는 자동 수정판이 없어 별도 검토한다.

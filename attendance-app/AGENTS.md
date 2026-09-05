@@ -64,7 +64,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - 데모는 `src/lib/demo.ts`와 빌드 시 `NEXT_PUBLIC_DEMO_*` 값으로 켜진다. 공용 Firebase 계정으로 실제 로그인하며 **운영 DB와 분리된 샘플 모드가 아니다**. `attendanceAdmins` 권한을 가진 계정의 화면만 교사처럼 제한한다.
 - 반 선택은 보안 경계가 아니다. `AppShell`의 데모 `/admin`·`/overall` 차단, `demoSelection`/`demoLastSelection` 구분, 관리자 로그인 의도 플래그를 유지한다. 데모 값을 보고서·로그에 출력하거나 자격정보를 커밋하지 않는다.
-- 2026-09-05 운영 배포에서 `NEXT_PUBLIC_DEMO_MODE=0`으로 바꾸고 공개 빌드용 데모 이메일·비밀번호 값을 비운 뒤 Hosting을 다시 배포했다. 실제 운영 첫 화면도 반 선택 데모가 아닌 일반 로그인으로 확인했다. Firebase Auth의 데모 계정과 `attendanceAdmins/{demoUid}` 레코드 1건은 아직 별도 회수 대상이므로, 플래그 해제를 계정 삭제로 간주하지 않는다. 권한 레코드 삭제는 명시 승인과 사전 스냅샷 뒤에만 수행한다.
+- 2026-09-05 사용자가 데모 모드 유지를 요청해 `NEXT_PUBLIC_DEMO_MODE=1`과 기존 데모 자격정보를 복구하고 Hosting을 다시 배포했다. 운영 브라우저에서 공용 계정 자동 로그인 뒤 부서·학년·반 선택 화면이 나타나는 것을 확인했다. Firebase Auth 데모 계정과 `attendanceAdmins/{demoUid}` 레코드도 의도적으로 유지한다. 이후 종료 요청 시 플래그·공개 자격정보·Auth 계정·권한 레코드를 함께 회수하되, 운영 DB 레코드 삭제는 명시 승인과 사전 스냅샷 뒤에만 수행한다.
 - `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS=false`는 임시 노출 정책이다. 문서 정리 중 임의로 켜지 않는다.
 - 관리자 로그인·연도 변경만으로 오래된 `classes`·`attendance`·`events`를 정리하지 않는다. `TrashModal`도 모든 복구본을 조회만 하며, 영구 삭제는 사용자가 항목별 `삭제` → `확인`을 누른 경우에만 실행한다. 이 계약을 화면 진입 effect의 자동 쓰기로 되돌리지 않는다.
 
