@@ -1,11 +1,13 @@
 'use client';
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { db, ref, set, push, onValue, off } from '@/lib/db';
 import { useApp, useClassKey, calcStats } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
 import { downloadCSV, downloadXLSX, openPrintWindow } from '@/utils/export';
-import { activeAndLongAbsentStudents, recentEditableWeeks } from '@/utils/attendanceWorkflow';
+import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
+import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
@@ -14,6 +16,7 @@ import type { AttEditTarget, ViewKey } from '@/types';
 export default function AttendanceTab() {
   const { state, dispatch } = useApp();
   const { curYear, months, events, attData, classData, curView } = state;
+  const requestedWeekKey = useSearchParams().get('week');
   const ck = useClassKey(state);
   const students = useMemo(() => classData[ck]?.students ?? [], [classData, ck]);
   const { active: activeStudents, longAbsent: longAbsentStudents } = useMemo(
@@ -63,12 +66,15 @@ export default function AttendanceTab() {
   const exportRef = useRef<HTMLDivElement>(null);
   const [sortByName, setSortByName] = useState(false);
 
-  const editableWeeks = useMemo(
-    () => recentEditableWeeks(curYear, months, events, Date.now(), 4),
-    [curYear, months, events],
+  const [pickedWeek, setPickedWeek] = useState<{ year: number; requestKey: string | null; key: string } | null>(null);
+  const pickedWeekKey = pickedWeek?.year === curYear && pickedWeek.requestKey === requestedWeekKey
+    ? pickedWeek.key : null;
+  const { editableWeeks, selectedWeek } = useMemo(
+    () => buildAttendanceEntry({ curYear, months, events, userRole: state.userRole }, {
+      queryWeekKey: requestedWeekKey, pickedWeekKey,
+    }),
+    [curYear, months, events, state.userRole, requestedWeekKey, pickedWeekKey],
   );
-  const [pickedWeekKey, setPickedWeekKey] = useState('');
-  const selectedWeek = editableWeeks.find(week => week.key === pickedWeekKey) ?? editableWeeks[0] ?? null;
   const selectedWeekKey = selectedWeek?.key ?? null;
 
   type SaveFeedback = {
@@ -375,7 +381,7 @@ export default function AttendanceTab() {
             <select
               id="attendance-week"
               value={selectedWeekKey ?? ''}
-              onChange={event => setPickedWeekKey(event.target.value)}
+              onChange={event => setPickedWeek({ year: curYear, requestKey: requestedWeekKey, key: event.target.value })}
               disabled={editableWeeks.length === 0}
             >
               {editableWeeks.length === 0 ? (
@@ -384,7 +390,9 @@ export default function AttendanceTab() {
                 <option key={week.key} value={week.key}>{week.label}</option>
               ))}
             </select>
-            <span>담임 교사는 최근 4회의 출석을 확인하고 바로 수정할 수 있습니다.</span>
+            <span>{isTeacher
+              ? '담임 교사는 최근 4회의 출석을 확인하고 바로 수정할 수 있습니다.'
+              : '관리자는 선택한 연도의 모든 정상 주일 출석을 확인하고 수정할 수 있습니다.'}</span>
           </div>
 
           {/* 이번 주 요약 카드 */}

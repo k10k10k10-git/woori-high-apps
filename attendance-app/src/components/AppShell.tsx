@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
@@ -20,16 +21,15 @@ import UpdateBanner from '@/components/UpdateBanner';
 import FirebaseDataLoader from '@/components/FirebaseDataLoader';
 import DataLoadGate from '@/components/DataLoadGate';
 import { watchCalendarYear } from '@/utils/yearRollover';
+import AdminWorkspace from '@/components/admin/AdminWorkspace';
+import { canAccessAttendancePath, canUseAdminWorkspace, createAdminEntryTracker } from '@/lib/adminNavigation';
 
 type AuthState = 'loading' | 'demo-pick' | 'login' | 'app';
-
-// 데모 계정은 실제로는 전체 권한(attendanceAdmins)을 가진다. 화면에서 탭을 감추는 것만으로는
-// 주소를 직접 입력하는 접근을 막지 못하므로, 관리자 전용 라우트는 셸에서 차단한다.
-const ADMIN_ONLY_PATHS = ['/admin', '/overall'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { state, dispatch } = useApp();
   const pathname = usePathname();
+  const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
   const [demoError, setDemoError] = useState<string | null>(null);
@@ -39,6 +39,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 데모 자동 로그인은 한 번만 시도한다 — 실패 시 재시도 루프를 막는다.
   const demoTriedRef = useRef(false);
+  const adminEntryRef = useRef<ReturnType<typeof createAdminEntryTracker> | null>(null);
+
+  useEffect(() => {
+    if (adminEntryRef.current) return;
+    let storage: Storage | undefined;
+    try { storage = window.sessionStorage; } catch { /* 제한된 브라우저에서는 메모리 기록을 사용한다. */ }
+    adminEntryRef.current = createAdminEntryTracker(storage);
+  }, []);
 
   // 고른 반을 담임 교사 역할로 적용 (데모 전용)
   const applyDemoSelection = useCallback((sel: DemoSelection): boolean => {
@@ -86,6 +94,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setAuthState('app');
         }
       } else {
+        adminEntryRef.current?.reset();
         // 데모 모드에서는 관리자 로그인을 명시적으로 누른 경우에만 로그인 화면을 띄운다.
         if (DEMO_MODE && !getAdminIntent()) {
           if (!demoConfigured) {
@@ -117,6 +126,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     });
     return () => { active = false; request++; unsub(); };
   }, [dispatch, applyDemoSelection]);
+
+  // 첫 로그인만 대시보드로 안내한다. 이후 메뉴 이동·새로고침·깊은 링크는 사용자의 선택이다.
+  useEffect(() => {
+    if (authState !== 'app' || !state.userRole || !auth.currentUser) return;
+    const target = adminEntryRef.current?.take(
+      auth.currentUser.uid, `${pathname}${window.location.search}`, state.userRole, isDemoAccount(auth.currentUser.email),
+    );
+    if (target) router.replace(target);
+  }, [authState, pathname, router, state.userRole]);
 
   // 데모: 반 선택 → 그 반 담임 화면으로
   const handleDemoPick = useCallback((sel: DemoSelection) => {
@@ -262,6 +280,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const isDemoRole = DEMO_MODE && isDemoAccount(auth.currentUser?.email);
 
+  if (canUseAdminWorkspace(state.userRole, isDemoRole)) {
+    return (
+      <>
+        <Toast />
+        {showUpdate && <UpdateBanner onReload={() => window.location.reload()} />}
+        <AdminWorkspace onLogout={doLogout} isOnline={isOnline}>
+          <FirebaseDataLoader />
+          <DataLoadGate>{children}</DataLoadGate>
+        </AdminWorkspace>
+      </>
+    );
+  }
+
   return (
     <div className="app">
       <Toast />
@@ -281,10 +312,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       />
       <div className="content-area">
         <FirebaseDataLoader />
-        {isDemoRole && ADMIN_ONLY_PATHS.includes(pathname) ? (
+        {!canAccessAttendancePath(pathname, state.userRole, isDemoRole) ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14, lineHeight: 1.7 }}>
             관리자 전용 화면입니다.<br />
-            상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.
+            {isDemoRole
+              ? <>상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.</>
+              : <>담당 반의 출석부에서 업무를 이어갈 수 있습니다.</>}
+            <div style={{ marginTop: 16 }}><Link href="/attendance" className="btn-secondary" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', padding: '10px 20px', textDecoration: 'none' }}>출석부로 돌아가기</Link></div>
           </div>
         ) : <DataLoadGate>{children}</DataLoadGate>}
       </div>

@@ -33,6 +33,9 @@ Vitest 기반 단위 테스트. 설정 파일은 `vitest.config.ts`이며 `@/` a
 - `firebaseDataLifecycle.test.ts` — 계정·연도·재조회 세대 전환, 원장 준비·오류 상태, 오래된 구독·역할 응답 차단
 - `chartSetup.test.ts` — Chart.js 동시 로딩 공유, 실패 후 재시도, 화면 해제 뒤 콜백 차단
 - `yearRollover.test.ts` — KST 연도 전환과 마지막 예약 타이머 해제
+- `adminNavigation.test.ts` — 관리자 첫 진입·직접 링크 보존, 교사·공용 데모의 관리자 화면 제한
+- `adminDashboard.test.ts` — 주간 현황·검색·정렬, 장결 포함 출석 통계와 장결 제외 입력 업무의 분모 구분
+- `attendanceEntry.test.ts` — 관리자 선택 날짜 전달, 행사·잘못된 키 복구, 교사·데모의 최근 4회 제한
 
 새 유틸 함수를 추가하거나 변경할 때는 `__tests__/`에 대응하는 테스트를 작성한다.
 
@@ -44,14 +47,15 @@ Vitest 기반 단위 테스트. 설정 파일은 `vitest.config.ts`이며 `@/` a
 src/
   app/                       # Next.js App Router 라우트 (각 탭의 단순 래퍼)
     layout.tsx
-    page.tsx                 # → /attendance 로 리다이렉트
-    attendance/page.tsx
+    page.tsx                 # 일반 관리자 → /dashboard, 교사·데모 → /attendance
+    dashboard/page.tsx        # → AdminDashboard
+    attendance/page.tsx       # useSearchParams 사용 탭을 Suspense로 감쌈
     manage/page.tsx
     stats/page.tsx
     overall/page.tsx
     admin/page.tsx
   components/
-    AppShell.tsx             # 인증 게이트, TopBar, TabNav, Toast, UpdateBanner
+    AppShell.tsx             # 인증 게이트, 역할별 셸, Toast, UpdateBanner
     ClassTabBar.tsx          # 반 선택 탭 바 (공유 컴포넌트, role="tablist")
     ErrorBoundary.tsx
     FirebaseDataLoader.tsx   # onValue 구독 담당, 렌더링 없음
@@ -62,6 +66,12 @@ src/
     Toast.tsx
     TopBar.tsx
     UpdateBanner.tsx
+    admin/
+      AdminWorkspace.tsx     # 관리자 사이드바·연도·연결 상태·반 필터
+      AdminDashboard.tsx     # 주간 입력 현황·반 검색·선택 날짜로 출석부 이동
+      AdminIcon.tsx
+      admin-workspace.css    # 관리자 셸 범위 스타일
+      admin-dashboard.css    # 관리자 대시보드 범위 스타일
     modals/
       AddClassModal.tsx
       AttModal.tsx
@@ -93,6 +103,8 @@ src/
   types/
     index.ts
   utils/
+    adminDashboard.ts        # 원장 기반 주간 현황 순수 모델
+    attendanceEntry.ts       # 역할별 편집 주일과 URL·수동 날짜 선택
     chartSetup.ts            # Chart.js 공유 초기화 (중복 등록 방지)
     dates.ts                 # 날짜·주일·출석 키 계산
     yearRollover.ts          # 실제 KST 달력 연도 변경 감지·타이머 종료
@@ -100,6 +112,7 @@ src/
     image.ts                 # 학생 사진 압축 (캔버스 리사이즈, 320px·JPEG 0.72)
     toast.ts
   lib/
+    adminNavigation.ts       # 관리자 메뉴·진입·화면 접근 정책
     sheetSync.ts              # 구글 시트 → Firebase 동기화 로직 (장결자 감지 포함)
 __tests__/                   # Vitest 단위 테스트
   calcStats.test.ts
@@ -110,18 +123,28 @@ database.rules.json          # Firebase RTDB 보안 규칙 (운영 앱 2개의 �
 
 ### 라우팅 vs. 탭 구조
 
-Next.js App Router 라우트(`/attendance`, `/manage`, `/stats`, `/overall`, `/admin`)가 있지만, 각 라우트 페이지는 해당 탭 컴포넌트를 렌더링하는 단순 래퍼다. 실제 UI는 `AppShell`이 감싸는 단일 레이아웃(TopBar + TabNav + content-area) 안에서 동작한다.
+Next.js App Router 라우트(`/dashboard`, `/attendance`, `/manage`, `/stats`, `/overall`, `/admin`)는 해당 화면 컴포넌트를 렌더링하는 래퍼다. `AppShell`은 일반 관리자에게 `AdminWorkspace`를, 교사와 공용 데모에게 기존 `TopBar`·`TabNav` 셸을 보여 준다. 인증과 데이터 구독은 공통이다.
 
 ```
 layout.tsx
   └── AppProvider (전역 상태 — useReducer)
-        └── AppShell (인증 게이트, TopBar, TabNav, Toast, UpdateBanner)
+        └── AppShell (인증 게이트, 역할별 셸, Toast, UpdateBanner)
+              └── AdminWorkspace 또는 교사·데모의 TopBar / TabNav 셸
               └── FirebaseDataLoader (onValue 구독 담당, 렌더링 없음)
               └── DataLoadGate (classes·attendance·events 준비 확인)
-                    └── [page] → AttendanceTab / ManageTab / StatTab / OverallTab / AdminTab
+                    └── [page] → AdminDashboard / AttendanceTab / ManageTab / StatTab / OverallTab / AdminTab
 ```
 
 `OverallTab`은 내부에 자체 탭 UI(대시보드 / 교사·학생 명단 / 건의사항)를 가지며, 각 서브 페이지를 `overall/` 디렉토리의 독립 컴포넌트로 분리해 렌더링한다.
+
+### 관리자 작업 공간과 주간 현황
+
+- `src/lib/adminNavigation.ts`의 `canUseAdminWorkspace(role, isDemo)`는 **일반 관리자 계정만** 관리자 셸에 진입시킨다. `/dashboard`·`/overall`·`/admin`은 교사·공용 데모에게 열지 않는다. 일반 관리자의 인증 세션 첫 기본 진입은 `/dashboard`로 이동하며, 이미 선택한 작업과 `/attendance?week=…` 직접 링크는 `createAdminEntryTracker()`가 보존한다. `/admin`은 기존 계정·설정 화면이고 새 대시보드 주소는 `/dashboard`다.
+- `AdminWorkspace`는 대시보드·출석 입력·학생 관리·반별 통계·전체 현황·계정·설정 메뉴와 조회 연도·연결 상태·로그아웃을 제공한다. 반 단위 화면에만 부서·학년 필터를 표시한다. `DataLoadGate`의 원장 준비 조건과 오류 재시도는 두 셸에서 동일하게 유지한다.
+- `AdminDashboard`는 기존 `classes/{year}`·`attendance/{year}`·`events/{year}` 구독 결과만 계산하며 구독이나 저장 경로를 추가하지 않는다. `buildAdminDashboard()`의 기본 날짜는 최근 KST 경과 정상 주일이며, 과거 연도는 마지막 정상 주일, 미래 연도는 첫 정상 주일이다. 행사 주일은 제외하고 반·교사·학생 검색은 해당 반의 전체 현황을 반환한다.
+- **출석 통계와 입력 업무는 분모가 다르다.** `studentCount`·`recorded`·`present`·`attendanceRate`는 기존 전체 현황처럼 장결자를 포함하며 출석률은 `O / (O + X + T)`다. 입력률·미입력 인원·완료 상태는 실제 출석 체크 대상인 일반 학생만 사용한다(`inputStudentCount`, `inputRecorded`). 일반 20명 전원 입력·장결 1명 미기록은 입력 완료다. 전원 장결 반은 `no-targets`, 빈 반은 `no-students`, 조회할 정상 주일이 없으면 `no-week`로 구분하고 입력 대기 반에 넣지 않는다.
+- 대시보드에서 반을 열면 부서·학년·반·학기를 선택한 뒤 `/attendance?week={주일 키}`로 이동한다. `buildAttendanceEntry()`는 관리자의 해당 연도 정상 주일 전체와 교사·데모의 최근 4회 목록을 분리한다. URL 날짜는 허용 목록 안에서만 적용하고 행사·잘못된 키는 기본 날짜로 복구한다. 콤보의 유효한 수동 선택이 URL보다 우선하며, 출석 페이지의 `Suspense`는 `useSearchParams`를 사용하는 정적 export에 필요하다.
+- 공용 데모의 자동 로그인·부서·학년·반 선택·관리자 접근 버튼 흐름은 유지한다. 관리자 셸을 만들기 위해 데모 계정의 실제 권한·환경값을 바꾸거나 별도 인증 구독을 추가하지 않는다. 화면 제한을 Firebase Rules의 새로운 보안 경계로 설명하지 않는다.
 
 ### 공유 컴포넌트
 
@@ -197,7 +220,7 @@ teacherExtra/{year}/{part}/{ck}/  (담임 추가정보)
 
 ### CSS
 
-CSS 모듈 없음. `src/app/globals.css` 하나에 모든 스타일이 있다. `:root`에 CSS 변수 정의:
+CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/globals.css`에 있고, 관리자 전용 스타일은 `src/components/admin/admin-workspace.css`·`admin-dashboard.css`에서 `.admin-workspace`·`.admin-dashboard` 범위로 적용한다. 교사·데모의 기존 셸 스타일을 관리자 재설계로 덮어쓰지 않는다. `:root`에 CSS 변수 정의:
 - 색상: `--primary` (`#9B8DD4` 보라), `--green`, `--red`, `--amber` 및 각각의 `-bg`, `-text` 변형
 - 레이아웃: `--radius` (`10px`), `--radius-lg` (`16px`), `--shadow`, `--shadow-lg`
 - 모달: `.modal-overlay` + `.modal-sheet` (바텀 시트), `.modal-overlay.center-modal` (중앙 다이얼로그)
