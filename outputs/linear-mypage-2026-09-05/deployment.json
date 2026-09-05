@@ -1,0 +1,19 @@
+{
+  "app": "highschool-app",
+  "pullRequest": 10,
+  "commit": "c08502df301051fffa255764356235c68ed7db4e",
+  "url": "https://woorihigh-app.vercel.app",
+  "buildId": "c08502df301051fffa255764356235c68ed7db4e",
+  "vercelDeploymentId": "dpl_7oqn1p8TZupLHgoLeSMQpuSuhcS7",
+  "target": "production",
+  "status": "Ready",
+  "createdAtKST": "2026-09-06T00:13:01+09:00",
+  "githubProductionSuccessAtKST": "2026-09-06T00:14:05+09:00",
+  "githubDeploymentId": 6282492902,
+  "qualityRun": 33973802971,
+  "qualityVerify": "success",
+  "authenticatedE2E": "not run: missing non-empty storage state",
+  "productionDatabaseWrites": 0,
+  "rulesDeployment": false,
+  "attendanceDeployment": false
+}
