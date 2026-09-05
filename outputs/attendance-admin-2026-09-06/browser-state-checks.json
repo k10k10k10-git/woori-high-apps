@@ -1,0 +1,92 @@
+[
+  {
+    "case": "mobile-directory",
+    "mainWidth": 364,
+    "clientWidth": 364,
+    "overflow": false
+  },
+  {
+    "case": "account-read-error",
+    "error": "계정 목록을 불러오지 못했습니다\n\n연결 상태를 확인한 뒤 다시 시도해 주세요.\n\n다시 불러오기",
+    "hiddenAccounts": 0
+  },
+  {
+    "case": "account-retry",
+    "rows": 4,
+    "proof": {
+      "role": "admin",
+      "scenario": "populated",
+      "reads": [
+        {
+          "operation": "onValue",
+          "path": "classes/2026"
+        },
+        {
+          "operation": "onValue",
+          "path": "attendance/2026"
+        },
+        {
+          "operation": "onValue",
+          "path": "events/2026"
+        },
+        {
+          "operation": "get",
+          "path": "config/sheetSync"
+        },
+        {
+          "operation": "get",
+          "path": "userRoles"
+        },
+        {
+          "operation": "get",
+          "path": "userRoles"
+        }
+      ],
+      "writes": [],
+      "blockedNetwork": [],
+      "actions": [],
+      "url": "/admin?role=admin&state=error&fault=userRoles&chrome=0"
+    }
+  },
+  {
+    "case": "suggestion-read-error",
+    "error": "건의사항을 불러오지 못했습니다.\n다시 시도"
+  },
+  {
+    "case": "suggestion-retry",
+    "rows": 2,
+    "writes": []
+  },
+  {
+    "case": "empty-data",
+    "message": "등록된 반이 없습니다.\n\n학생 관리에서 반과 학생을 등록하면 출석 현황을 확인할 수 있습니다.\n\n학생 관리로 이동"
+  },
+  {
+    "case": "role-guard",
+    "text": "관리자 전용 화면에 접근할 수 없습니다.\n\n실제 canAccessAttendancePath / canUseAdminWorkspace가 teacher 역할을 차단했습니다.\n\n/dashboard\n\n교사와 데모의 출석 입력 화면은 이번 fixture 범위 밖입니다.",
+    "adminWorkspace": false,
+    "proof": {
+      "role": "teacher",
+      "scenario": "populated",
+      "reads": [],
+      "writes": [],
+      "blockedNetwork": [],
+      "actions": [],
+      "url": "/dashboard?role=teacher&state=populated&chrome=0"
+    }
+  },
+  {
+    "case": "role-guard",
+    "text": "관리자 전용 화면에 접근할 수 없습니다.\n\n실제 canAccessAttendancePath / canUseAdminWorkspace가 demo 역할을 차단했습니다.\n\n/dashboard\n\n교사와 데모의 출석 입력 화면은 이번 fixture 범위 밖입니다.",
+    "adminWorkspace": false,
+    "proof": {
+      "role": "demo",
+      "scenario": "populated",
+      "reads": [],
+      "writes": [],
+      "blockedNetwork": [],
+      "actions": [],
+      "url": "/dashboard?role=demo&state=populated&chrome=0"
+    }
+  }
+]

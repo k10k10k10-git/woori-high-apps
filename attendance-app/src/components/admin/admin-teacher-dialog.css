@@ -1,0 +1,37 @@
+.admin-teacher-dialog {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid #e5e5e8;
+  border-radius: 12px;
+  background: #fff;
+  color: #292a30;
+  box-shadow: 0 18px 64px rgb(27 24 39 / 18%);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  scrollbar-width: thin;
+}
+.admin-teacher-dialog::backdrop { background: rgb(27 25 34 / 42%); }
+.admin-teacher-dialog :is(button, input, select) { font-family: inherit; font-size: inherit; min-height: 44px; border-radius: 6px; }
+.admin-teacher-dialog :is(button, input, select):focus-visible { outline: 2px solid #6355a7; outline-offset: 3px; }
+.admin-teacher-dialog :is(button, input, select):disabled { opacity: .5; cursor: not-allowed; }
+.atd-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; border-bottom: 1px solid #e5e5e8; }
+.atd-header h2 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.4; }
+.atd-header > button { flex-shrink: 0; padding: 8px 10px; border: 0; background: transparent; color: #666773; cursor: pointer; }
+.atd-header > button:hover:not(:disabled) { color: #6355a7; background: #f3f0fa; }
+.atd-fields { padding: 20px 22px 22px; }
+.admin-teacher-dialog .form-field { margin-bottom: 16px; }
+.admin-teacher-dialog .form-label { color: #53545f; font-size: 12px; font-weight: 500; margin-bottom: 7px; }
+.admin-teacher-dialog :is(.form-input, .form-select) { box-sizing: border-box; width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #e5e5e8; background: #fff; color: #292a30; caret-color: #6355a7; }
+.admin-teacher-dialog .form-input::placeholder { color: #666773; opacity: 1; }
+.admin-teacher-dialog .btn-row { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.admin-teacher-dialog .btn-row > button { flex: 0 1 auto; padding: 10px 16px; }
+@media (max-width: 759px) {
+  .admin-teacher-dialog { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
+  .atd-header { padding: 14px 16px; }
+  .atd-fields { padding: 18px 16px; }
+  .admin-teacher-dialog :is(.form-input, .form-select) { font-size: 16px; }
+}

@@ -133,7 +133,7 @@ export default function SheetSyncSection() {
 
   return (
     <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow)', padding: '14px 16px', marginTop: 16 }}>
-      <div className="admin-section-title">🔄 구글 시트 동기화 ({curYear}년)</div>
+      <h3 className="admin-section-title">구글 시트 동기화 ({curYear}년)</h3>
       <div style={{ fontSize: 11, color: 'var(--text3)', margin: '6px 0 12px' }}>
         출석부 구글 시트의 명단·출석을 불러옵니다. <strong>1부·2부 주소를 함께 넣고 한 번에</strong> 미리보기하세요
         (한 부만 넣으면 다른 부로 이동한 학생이 “제외”로 잘못 보입니다).
@@ -141,8 +141,8 @@ export default function SheetSyncSection() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
-        <input className="form-input" placeholder="1부 출석부 시트 URL" value={bu1Url} onChange={e => setBu1Url(e.target.value)} />
-        <input className="form-input" placeholder="2부 출석부 시트 URL" value={bu2Url} onChange={e => setBu2Url(e.target.value)} />
+        <label className="as-sheet-label"><span>1부 출석부 시트 주소</span><input className="form-input" placeholder="https://docs.google.com/spreadsheets/…" value={bu1Url} onChange={e => setBu1Url(e.target.value)} /></label>
+        <label className="as-sheet-label"><span>2부 출석부 시트 주소</span><input className="form-input" placeholder="https://docs.google.com/spreadsheets/…" value={bu2Url} onChange={e => setBu2Url(e.target.value)} /></label>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={saveUrls}>주소 저장</button>
           <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12, marginLeft: 'auto' }} disabled={loading} onClick={loadPreview}>

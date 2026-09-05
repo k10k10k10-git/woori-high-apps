@@ -14,7 +14,7 @@ const STATUS_LABELS: Record<AdminDashboardStatus, string> = {
 };
 type StatusFilter = 'all' | 'pending' | 'complete';
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ onShowTrends }: { onShowTrends: () => void }) {
   const { state, dispatch } = useApp();
   const router = useRouter();
   const [pickedWeek, setPickedWeek] = useState<{ year: number; key: string } | null>(null);
@@ -68,8 +68,7 @@ export default function AdminDashboard() {
     <div className="admin-dashboard">
       <div className="ad-heading">
         <div>
-          <h1>주간 출석</h1>
-          <p>한 주의 출석을 살피고, 필요한 반부터 확인하세요.</p>
+          <h2>주간 출석</h2>
         </div>
         <div className="ad-week-control">
           <button className="ad-icon-button ad-previous" type="button" aria-label="이전 주일"
@@ -115,7 +114,7 @@ export default function AdminDashboard() {
       <section className="ad-roster" aria-labelledby="ad-roster-title">
         <div className="ad-roster-heading">
           <h2 id="ad-roster-title">반별 입력 현황 <span>{totals.classCount}</span></h2>
-          <Link className="ad-text-link" href="/overall">전체 통계 보기 <AdminIcon name="arrow" /></Link>
+          <button type="button" className="ad-text-link" onClick={onShowTrends}>연간 추이 보기 <AdminIcon name="arrow" /></button>
         </div>
         <div className="ad-toolbar">
           <div className="ad-status-tabs" role="group" aria-label="입력 상태 필터">
