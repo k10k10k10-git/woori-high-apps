@@ -583,6 +583,26 @@ export function ProgramPostsSection({
                         onSave={(next) => onUpdate(post.id, { hint: next })}
                         errorMessage="힌트를 수정하지 못했습니다."
                       /></label>
+                    <label className="program-field"><span>사전 테스트</span>
+                      <select id={`program-post-test-${post.id}`} className="input" value={post.testStatus ?? "needed"}
+                        onChange={(event) => void run(post.id, () => onUpdate(post.id, { testStatus: event.target.value as NonNullable<RetreatProgramPost["testStatus"]> }), "테스트 상태를 바꾸지 못했습니다.")}>
+                        <option value="notNeeded">테스트 불필요</option>
+                        <option value="needed">테스트 필요</option>
+                        <option value="testing">테스트 중</option>
+                        <option value="passed">테스트 완료</option>
+                      </select>
+                    </label>
+                    <label className="program-field program-field--wide"><span>막힌 준비</span>
+                      <ProgramAutosaveField
+                        id={`program-post-blocker-${post.id}`}
+                        value={post.blocker ?? ""}
+                        ariaLabel="막힌 준비"
+                        maxLength={240}
+                        placeholder="예: 장소 사용 승인 대기 · 음향 장비 수량 확인 필요"
+                        onSave={(next) => onUpdate(post.id, { blocker: next })}
+                        errorMessage="막힌 준비를 저장하지 못했습니다."
+                      />
+                    </label>
                   </div>
                   <div className="program-text-fields">
                     {POST_FIELDS.map((field) => (

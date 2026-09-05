@@ -365,6 +365,11 @@ npm run build
 - **판단 질문**: 프로그램 전체를 `MC형/코스형/조별형` 중 하나로 고정하거나 수련회 기본 `groups`를 연합팀으로 덮어쓰지 않는다. 한 프로그램 안에서도 진행 방식이 섞이고 수련회마다 참가 구성이 달라 전자는 불필요한 필드를 강제하며, 후자는 숙소·인원체크·이가드의 참조를 깨뜨린다. 자동 균등 배치도 계산 즉시 저장하지 않는다. 대량 재배치는 사람이 팀 맥락을 확인한 뒤 적용해야 한다.
 - **재사용 규칙**: 운영 시나리오가 매번 달라지는 기능은 `기존 반복 단위를 순서형 블록으로 재해석 → 행동 방식과 참가 구조를 직교 축으로 분리 → 기준 원장은 참조만 하고 기능 전용 매핑 저장 → 대량 자동화는 미리보기 후 원자 적용 → 레거시 기본값과 현장 읽기 호환 테스트` 순서로 구현한다.
 
+### 사후 문서형 화면을 실시간 준비 작업 공간으로 바꾸기 (2026-09-02)
+- **접근법**: 1→ `src/app/retreat/[id]/programs/ProgramList.tsx`에서 프로그램 수·문서 완성률 대신 기한 지남·막힘·담당 없음과 모든 프로그램의 다음 작업을 먼저 파생한다. 2→ `src/lib/programPreparation.ts`에서 기존 `done` boolean을 읽는 `programTaskStatus`와 `todo/doing/blocked/done` 기반 `programTaskProgress`를 만들고, 문서·현장 점검률과 실행 작업률을 분리한다. 3→ 새 프로그램은 `createProgramFromTemplate`이 기존 `posts` 안에 운영 방식별 시작 블록만 만들게 해 이후 혼합 구성을 제한하지 않는다. 4→ `ProgramTaskBoard.tsx`를 상세 첫 화면에 두고 담당·기한·관련 블록·막힌 이유를 행 단위 저장한다. 5→ 회의 원문은 공개 `retreats`가 아니라 `retreatsPrivate/{retreatId}/programMeetings/{programId}/{meetingId}/decisions/{decisionId}`에 두고 편집 권한자만 별도 구독하며, 공개 캐시에는 넣지 않는다. `convertRetreatProgramDecisionToTask`는 결정적 작업 ID와 최신값 사전 확인 뒤 public 작업·private 링크를 root multi-location update로 함께 반영한다. 6→ `ProgramRunOfShow.tsx`에서 블록별 `testStatus`·`blocker`를 역할·물품과 함께 보여 준다. 7→ `withoutTasks`와 `updateRetreatProgram`에서 `tasks`뿐 아니라 `meetings`·`posts`·`items`·`roles`·`competitionTeams`를 본문 payload에서 제외하고 구버전 레코드 fixture·경로 계약·전체 빌드로 호환을 검증한다.
+- **판단 질문**: 별도 칸반 앱이나 준비 현황 집계 노드를 만들지 않는다. 원본과 상태가 갈라지고 Rules까지 늘어난다. 문서 준비율 하나로 작업 진행을 대신하지도 않는다. 규칙을 다 썼어도 담당·기한이 없으면 실행되지 않으며, 반대로 작업이 끝나도 현장 공유에 필요한 입력은 별도 확인해야 한다. 기존 자유 입력 회의록과 새 구조를 동시에 새 입력으로 노출하지 않고, 값이 있는 과거 기록만 이관용 상세 문서로 남긴다. 프로그램 본문을 `set`하거나 하위 맵을 포함한 `update`로 저장하지 않는다. 실시간 협업 중 다른 사람의 행 추가를 통째로 지울 수 있다.
+- **재사용 규칙**: 사후 정리 화면을 준비 도구로 바꿀 때는 `다가오는 행동을 목록 첫 화면으로 → 실행 상태와 산출물 점검을 별도 파생 → 기존 반복 구조를 채우는 선택형 템플릿 → 담당·기한·막힘을 원본 가까이에 → 회의 결정은 원자적으로 작업 연결 → 하위 컬렉션을 본문 저장에서 완전 제외 → 레거시 읽기 호환과 전체 회귀 테스트` 순서를 따른다.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

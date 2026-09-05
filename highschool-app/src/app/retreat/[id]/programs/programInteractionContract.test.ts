@@ -11,6 +11,51 @@ describe("program preparation interaction contract", () => {
     expect(editor).toContain("onCreateTask");
     expect(editor).toContain("onUpdateTask");
     expect(editor).toContain("onDeleteTask");
+    expect(editor).toContain("onCreateMeeting");
+    expect(editor).toContain("onConvertDecision");
+  });
+
+  it("목록은 사후 문서 수가 아니라 지금 처리할 작업과 현장 점검을 분리해 보여준다", () => {
+    const list = source("src/app/retreat/[id]/programs/ProgramList.tsx");
+    expect(list).toContain("지금 처리할 것");
+    expect(list).toContain("programTaskProgress");
+    expect(list).toContain("다가오는 할 일");
+    expect(list).toContain("현장 점검");
+    expect(list).toContain("PROGRAM_TEMPLATE_META");
+  });
+
+  it("실행 할 일은 첫 화면에 있고 회의 결정은 재시도해도 기존 작업을 덮지 않는다", () => {
+    const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
+    const meeting = source("src/app/retreat/[id]/programs/ProgramMeetingMode.tsx");
+    const db = source("src/lib/db/programs.ts");
+    const paths = source("src/lib/paths.ts");
+    expect(editor.indexOf("<ProgramTaskBoard")).toBeLessThan(editor.indexOf("program-readiness-checklist"));
+    expect(meeting).toContain("결정과 실행");
+    expect(meeting).toContain("할 일로 보내기");
+    expect(db).toContain("convertRetreatProgramDecisionToTask");
+    expect(db).toContain("programDecisionTaskId");
+    expect(db).toContain("await update(ref(db), payload)");
+    expect(paths).toContain("programDecision");
+  });
+
+  it("회의 원문은 private 경로에서만 구독하고 공개 캐시에 남기지 않는다", () => {
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    const paths = source("src/lib/paths.ts");
+    expect(paths).toContain("retreatsPrivate/${id}/programMeetings");
+    expect(client).toContain("subscribeToRetreatProgramMeetings");
+    expect(client).toContain("setMeetingsByProgram({})");
+    expect(client).toContain("stripPrivateMeetings");
+    expect(client).toContain("delete publicProgram.meetings");
+    expect(client).toContain("meetingsAvailable={!meetingLoadError}");
+  });
+
+  it("진행 블록은 테스트와 막힘 상태를 현장 순서에서 바로 드러낸다", () => {
+    const sections = source("src/app/retreat/[id]/programs/ProgramSections.tsx");
+    const runSheet = source("src/app/retreat/[id]/programs/ProgramRunOfShow.tsx");
+    expect(sections).toContain("사전 테스트");
+    expect(sections).toContain("막힌 준비");
+    expect(runSheet).toContain("준비 막힘");
+    expect(runSheet).toContain("테스트 완료");
   });
 
   it("protects dirty drafts on every path that leaves the editor", () => {
@@ -143,7 +188,7 @@ describe("program preparation interaction contract", () => {
     const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
     const publication = source("src/app/retreat/[id]/programs/ProgramPublicationPanel.tsx");
     expect(editor).toContain('.filter(([value]) => value !== "published"');
-    expect(editor).toContain('publicationAction === "publish" && readiness.percent !== 100');
+    expect(editor).toContain('publicationAction === "publish" && !canPublishProgram');
     expect(editor).toContain("이가드 현장에 공유할까요?");
     expect(publication).toContain('disabled={busy || !ready}');
     expect(publication).toContain("이가드 화면 미리보기");

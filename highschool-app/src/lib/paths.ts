@@ -90,7 +90,16 @@ export const paths = {
   // ── 프로그램 준비 (행정 소유, 이가드 published 읽기) ──
   programs: (id: string) => `retreats/${id}/programs`,
   program: (id: string, programId: string) => `retreats/${id}/programs/${programId}`,
+  programTasks: (id: string, programId: string) => `retreats/${id}/programs/${programId}/tasks`,
   programTask: (id: string, programId: string, taskId: string) => `retreats/${id}/programs/${programId}/tasks/${taskId}`,
+  // 회의 안건·메모·결정은 현장 역할이 원문을 읽지 못하도록 retreatsPrivate에 둔다.
+  programMeetingsRoot: (id: string) => `retreatsPrivate/${id}/programMeetings`,
+  programMeetings: (id: string, programId: string) => `retreatsPrivate/${id}/programMeetings/${programId}`,
+  programMeeting: (id: string, programId: string, meetingId: string) => `retreatsPrivate/${id}/programMeetings/${programId}/${meetingId}`,
+  programDecisions: (id: string, programId: string, meetingId: string) =>
+    `retreatsPrivate/${id}/programMeetings/${programId}/${meetingId}/decisions`,
+  programDecision: (id: string, programId: string, meetingId: string, decisionId: string) =>
+    `retreatsPrivate/${id}/programMeetings/${programId}/${meetingId}/decisions/${decisionId}`,
   programPost: (id: string, programId: string, postId: string) => `retreats/${id}/programs/${programId}/posts/${postId}`,
   programPostMatch: (id: string, programId: string, postId: string, matchId: string) =>
     `retreats/${id}/programs/${programId}/posts/${postId}/matches/${matchId}`,

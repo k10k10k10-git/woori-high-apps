@@ -1,11 +1,13 @@
-import { onValue, push, ref, remove, set, update } from "firebase/database";
+import { get, onValue, push, ref, remove, set, update } from "firebase/database";
 import { db } from "../firebase";
 import { paths } from "../paths";
-import { createProgramDraft, sortRetreatPrograms } from "../programPreparation";
+import { createProgramDraft, programDecisionTaskId, sortRetreatPrograms } from "../programPreparation";
 import type {
   RetreatProgram,
   RetreatProgramCompetitionTeam,
   RetreatProgramItem,
+  RetreatProgramMeeting,
+  RetreatProgramDecision,
   RetreatProgramMatch,
   RetreatProgramPost,
   RetreatProgramRole,
@@ -28,12 +30,31 @@ export function subscribeToRetreatPrograms(
   );
 }
 
+/** 관리자 전용 준비회의 원문. 공개 프로그램 구독과 분리해 현장 역할에 노출하지 않는다. */
+export function subscribeToRetreatProgramMeetings(
+  retreatId: string,
+  callback: (meetings: Record<string, Record<string, RetreatProgramMeeting>>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return onValue(
+    ref(db, paths.programMeetingsRoot(retreatId)),
+    (snapshot) => callback((snapshot.val() ?? {}) as Record<string, Record<string, RetreatProgramMeeting>>),
+    (error) => {
+      console.warn("subscribeToRetreatProgramMeetings error:", error);
+      onError?.(error);
+    },
+  );
+}
+
 export async function createRetreatProgram(
   retreatId: string,
-  data: Omit<RetreatProgram, "id">,
+  data: Omit<RetreatProgram, "id" | "meetings">,
 ): Promise<string> {
   const nextRef = push(ref(db, paths.programs(retreatId)));
-  await set(nextRef, stripUndefined(data));
+  // private 회의 기록이 실수로 공개 프로그램 노드에 섞이지 않게 런타임에서도 걷어낸다.
+  const publicData: Partial<RetreatProgram> = { ...(data as Omit<RetreatProgram, "id">) };
+  delete publicData.meetings;
+  await set(nextRef, stripUndefined(publicData));
   return nextRef.key!;
 }
 
@@ -50,13 +71,16 @@ export async function createDefaultRetreatPrograms(retreatId: string): Promise<s
 export async function updateRetreatProgram(
   retreatId: string,
   programId: string,
-  data: Partial<Omit<RetreatProgram, "id" | "tasks" | "posts" | "items" | "roles" | "competitionTeams" | "createdAt">>,
+  data: Partial<Omit<RetreatProgram, "id" | "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams" | "createdAt">>,
 ): Promise<void> {
   await update(ref(db, paths.program(retreatId, programId)), stripUndefined({ ...data, updatedAt: Date.now() }));
 }
 
 export async function deleteRetreatProgram(retreatId: string, programId: string): Promise<void> {
-  await remove(ref(db, paths.program(retreatId, programId)));
+  await update(ref(db), {
+    [paths.program(retreatId, programId)]: null,
+    [paths.programMeetings(retreatId, programId)]: null,
+  });
 }
 
 export async function reorderRetreatPrograms(retreatId: string, orderedIds: string[]): Promise<void> {
@@ -74,7 +98,7 @@ export async function createRetreatProgramTask(
   programId: string,
   data: Omit<RetreatProgramTask, "id" | "createdAt" | "updatedAt">,
 ): Promise<string> {
-  const taskRef = push(ref(db, `${paths.program(retreatId, programId)}/tasks`));
+  const taskRef = push(ref(db, paths.programTasks(retreatId, programId)));
   const now = Date.now();
   await set(taskRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
   return taskRef.key!;
@@ -89,8 +113,20 @@ export async function updateRetreatProgramTask(
   await update(ref(db, paths.programTask(retreatId, programId, taskId)), stripUndefined({ ...data, updatedAt: Date.now() }));
 }
 
-export async function deleteRetreatProgramTask(retreatId: string, programId: string, taskId: string): Promise<void> {
-  await remove(ref(db, paths.programTask(retreatId, programId, taskId)));
+export async function deleteRetreatProgramTask(
+  retreatId: string,
+  programId: string,
+  taskId: string,
+  source?: { meetingId: string; decisionId: string },
+): Promise<void> {
+  if (!source) {
+    await remove(ref(db, paths.programTask(retreatId, programId, taskId)));
+    return;
+  }
+  await update(ref(db), {
+    [paths.programTask(retreatId, programId, taskId)]: null,
+    [`${paths.programDecision(retreatId, programId, source.meetingId, source.decisionId)}/taskId`]: null,
+  });
 }
 
 export async function restoreRetreatProgramTask(
@@ -99,7 +135,124 @@ export async function restoreRetreatProgramTask(
   task: RetreatProgramTask,
 ): Promise<void> {
   const { id, ...value } = task;
-  await set(ref(db, paths.programTask(retreatId, programId, id)), stripUndefined({ ...value, updatedAt: Date.now() }));
+  const now = Date.now();
+  const restored = stripUndefined({ ...value, updatedAt: now });
+  const programPath = paths.program(retreatId, programId);
+  const taskPath = paths.programTask(retreatId, programId, id);
+  const [programSnapshot, taskSnapshot] = await Promise.all([
+    get(ref(db, programPath)),
+    get(ref(db, taskPath)),
+  ]);
+  if (!programSnapshot.exists() || taskSnapshot.exists()) {
+    throw new Error("다른 변경이 먼저 반영되어 이 할 일은 되돌리지 않았습니다.");
+  }
+  const payload: Record<string, unknown> = { [taskPath]: restored };
+  if (task.sourceMeetingId && task.sourceDecisionId) {
+    const decisionPath = paths.programDecision(retreatId, programId, task.sourceMeetingId, task.sourceDecisionId);
+    const decisionSnapshot = await get(ref(db, decisionPath));
+    const currentDecision = decisionSnapshot.val() as RetreatProgramDecision | null;
+    if (currentDecision?.taskId && currentDecision.taskId !== id) {
+      throw new Error("회의 결정이 다른 할 일에 연결되어 되돌리지 않았습니다.");
+    }
+    if (currentDecision) {
+      payload[`${decisionPath}/taskId`] = id;
+      payload[`${decisionPath}/updatedAt`] = now;
+    }
+  }
+  // 공개 작업과 private 결정 링크를 함께 적용해 한쪽만 복구되는 상태를 만들지 않는다.
+  await update(ref(db), payload);
+}
+
+export async function createRetreatProgramMeeting(
+  retreatId: string,
+  programId: string,
+  data: Omit<RetreatProgramMeeting, "id" | "createdAt" | "updatedAt" | "decisions">,
+): Promise<string> {
+  const meetingRef = push(ref(db, paths.programMeetings(retreatId, programId)));
+  const now = Date.now();
+  await set(meetingRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  return meetingRef.key!;
+}
+
+export async function updateRetreatProgramMeeting(
+  retreatId: string,
+  programId: string,
+  meetingId: string,
+  data: Partial<Omit<RetreatProgramMeeting, "id" | "createdAt" | "decisions">>,
+): Promise<void> {
+  await update(ref(db, paths.programMeeting(retreatId, programId, meetingId)), stripUndefined({ ...data, updatedAt: Date.now() }));
+}
+
+export async function createRetreatProgramDecision(
+  retreatId: string,
+  programId: string,
+  meetingId: string,
+  data: Omit<RetreatProgramDecision, "id" | "createdAt" | "updatedAt" | "taskId">,
+): Promise<string> {
+  const decisionRef = push(ref(db, paths.programDecisions(retreatId, programId, meetingId)));
+  const now = Date.now();
+  await set(decisionRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  return decisionRef.key!;
+}
+
+export async function updateRetreatProgramDecision(
+  retreatId: string,
+  programId: string,
+  meetingId: string,
+  decisionId: string,
+  data: Partial<Omit<RetreatProgramDecision, "id" | "createdAt">>,
+): Promise<void> {
+  await update(ref(db, paths.programDecision(retreatId, programId, meetingId, decisionId)), stripUndefined({ ...data, updatedAt: Date.now() }));
+}
+
+/** 결정과 실행 작업을 한 번의 multi-location update로 연결한다. */
+export async function convertRetreatProgramDecisionToTask(
+  retreatId: string,
+  programId: string,
+  meetingId: string,
+  decision: RetreatProgramDecision,
+): Promise<string> {
+  // 결정 하나의 작업 ID를 고정해 재시도·동시 클릭도 같은 노드에 수렴시킨다.
+  const taskId = decision.taskId || programDecisionTaskId(meetingId, decision.id);
+  const decisionPath = paths.programDecision(retreatId, programId, meetingId, decision.id);
+  const [programSnapshot, decisionSnapshot] = await Promise.all([
+    get(ref(db, paths.program(retreatId, programId))),
+    get(ref(db, decisionPath)),
+  ]);
+  if (!programSnapshot.exists()) {
+    throw new Error("프로그램이 삭제되어 할 일로 보낼 수 없습니다.");
+  }
+  if (!decisionSnapshot.exists()) {
+    throw new Error("원본 결정이 삭제되어 할 일로 보낼 수 없습니다.");
+  }
+  const currentDecision = { ...decision, ...(decisionSnapshot.val() as RetreatProgramDecision) };
+  const resolvedTaskId = currentDecision.taskId || taskId;
+  const taskPath = paths.programTask(retreatId, programId, resolvedTaskId);
+  const taskSnapshot = await get(ref(db, taskPath));
+  const now = Date.now();
+  const payload: Record<string, unknown> = {
+    [`${decisionPath}/taskId`]: resolvedTaskId,
+    [`${decisionPath}/updatedAt`]: now,
+  };
+  // 이미 존재하는 작업은 담당자가 수정했을 수 있으므로 링크만 복구하고 절대 덮지 않는다.
+  if (!taskSnapshot.exists()) {
+    payload[taskPath] = stripUndefined({
+      title: currentDecision.title,
+      assignee: currentDecision.assignee,
+      dueDate: currentDecision.dueDate,
+      postId: currentDecision.postId,
+      sourceDecisionId: currentDecision.id,
+      sourceMeetingId: meetingId,
+      status: "todo",
+      done: false,
+      // 동시 클릭도 동일 payload로 수렴하도록 결정 시각을 작업의 초기 시각으로 쓴다.
+      createdAt: currentDecision.createdAt,
+      updatedAt: currentDecision.updatedAt,
+    });
+  }
+  // 공개 작업 생성과 private 결정 링크를 한 번의 root update로 적용해 고아 상태를 막는다.
+  await update(ref(db), payload);
+  return resolvedTaskId;
 }
 
 // ── 하위 컬렉션 (포스트·물품·역할) ──────────────────────────────

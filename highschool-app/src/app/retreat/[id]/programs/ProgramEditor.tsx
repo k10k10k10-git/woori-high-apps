@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CheckCircle, Circle, FloppyDisk, Plus, Trash, WarningCircle } from "@phosphor-icons/react";
+import { ArrowRight, CheckCircle, Circle, FloppyDisk, UsersThree, Trash, WarningCircle } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useUI } from "@/context/UIContext";
 import {
@@ -11,10 +11,12 @@ import {
   groupItemsByPost,
   groupRolesByPost,
   itemsOfPost,
+  canPublishProgram,
   programPosts,
   programCompetitionTeams,
   rolesOfPost,
   programReadiness,
+  programTaskProgress,
   programStatusMeta,
   programTasks,
   shouldSyncEditorDraft,
@@ -23,11 +25,15 @@ import {
 import { ProgramItemsSection, ProgramPostsSection, ProgramRolesSection } from "./ProgramSections";
 import ProgramCompetitionTeamsSection from "./ProgramCompetitionTeamsSection";
 import ProgramPublicationPanel from "./ProgramPublicationPanel";
+import ProgramMeetingMode from "./ProgramMeetingMode";
+import ProgramTaskBoard from "./ProgramTaskBoard";
 import type {
   Group,
   RetreatProgram,
   RetreatProgramCompetitionTeam,
   RetreatProgramItem,
+  RetreatProgramDecision,
+  RetreatProgramMeeting,
   RetreatProgramKind,
   RetreatProgramMatch,
   RetreatProgramPost,
@@ -36,11 +42,13 @@ import type {
   RetreatProgramTask,
 } from "@/lib/types";
 
-type EditableProgram = Omit<RetreatProgram, "tasks" | "posts" | "items" | "roles" | "competitionTeams">;
+type EditableProgram = Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams">;
 
 type Props = {
   program: RetreatProgram;
   canEdit: boolean;
+  meetingsAvailable: boolean;
+  meetingSessionVersion: number;
   saving: boolean;
   resetVersion?: number;
   onSave: (program: EditableProgram) => Promise<void>;
@@ -49,7 +57,13 @@ type Props = {
   onSelectSection: (section: ProgramSectionKey) => void;
   onCreateTask: (data: Omit<RetreatProgramTask, "id" | "createdAt" | "updatedAt">) => Promise<void>;
   onUpdateTask: (taskId: string, data: Partial<Omit<RetreatProgramTask, "id" | "createdAt">>) => Promise<void>;
-  onDeleteTask: (taskId: string) => Promise<void>;
+  onDeleteTask: (task: RetreatProgramTask) => Promise<RetreatProgramTask>;
+  onRestoreTask: (task: RetreatProgramTask) => Promise<void>;
+  onCreateMeeting: (data: Omit<RetreatProgramMeeting, "id" | "createdAt" | "updatedAt" | "decisions">) => Promise<string>;
+  onUpdateMeeting: (meetingId: string, data: Partial<RetreatProgramMeeting>) => Promise<void>;
+  onCreateDecision: (meetingId: string, data: Omit<RetreatProgramDecision, "id" | "createdAt" | "updatedAt" | "taskId">) => Promise<string>;
+  onUpdateDecision: (meetingId: string, decisionId: string, data: Partial<RetreatProgramDecision>) => Promise<void>;
+  onConvertDecision: (meetingId: string, decision: RetreatProgramDecision) => Promise<string>;
   section: ProgramSectionKey;
   onCreatePost: (name: string, order: number) => Promise<void>;
   onReorderPosts: (orderedIds: string[]) => Promise<void>;
@@ -92,13 +106,14 @@ const FLOW_FIELDS = [
 const RECORD_FIELDS = [
   { key: "briefing", label: "교사·스탭 브리핑", placeholder: "역할, 준비 시간, 주의할 점", rows: 5 },
   { key: "ideas", label: "아이디어", placeholder: "후보로 나왔던 안, 참고 자료", rows: 5 },
-  { key: "decisions", label: "회의록·결정 사항", placeholder: "언제 무엇을 왜 정했는지", rows: 6 },
   { key: "notes", label: "메모", placeholder: "미정 사항, 논의가 필요한 내용", rows: 4 },
 ] as const;
 
 export default function ProgramEditor({
   program,
   canEdit,
+  meetingsAvailable,
+  meetingSessionVersion,
   saving,
   resetVersion = 0,
   onSave,
@@ -108,6 +123,8 @@ export default function ProgramEditor({
   onCreateTask,
   onUpdateTask,
   onDeleteTask,
+  onRestoreTask,
+  onCreateMeeting, onUpdateMeeting, onCreateDecision, onUpdateDecision, onConvertDecision,
   section,
   onCreatePost, onReorderPosts, onUpdatePost, onDeletePost,
   onRestorePost, onRestoreItem, onRestoreRole, onRestoreMatch,
@@ -121,7 +138,6 @@ export default function ProgramEditor({
 }: Props) {
   const { toast } = useUI();
   const programRef = useRef(program);
-  programRef.current = program;
   const [draft, setDraft] = useState<EditableProgram>(() => withoutTasks(program));
   const [dirtyState, setDirtyState] = useState(false);
   const dirty = dirtyState;
@@ -133,24 +149,34 @@ export default function ProgramEditor({
   }, []);
   const syncedRef = useRef({ id: program.id, resetVersion });
   const [remoteUpdated, setRemoteUpdated] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: "", assignee: "", dueDate: "" });
-  const [taskBusy, setTaskBusy] = useState(false);
-  const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
+  const [meetingSession, setMeetingSession] = useState<{ programId: string; version: number } | null>(null);
+  const meetingOpen = meetingsAvailable
+    && meetingSession?.programId === program.id
+    && meetingSession.version === meetingSessionVersion;
   const [publicationAction, setPublicationAction] = useState<"publish" | "unpublish" | null>(null);
   const [pendingTarget, setPendingTarget] = useState<{ section: ProgramSectionKey; targetId: string } | null>(null);
+
+  useEffect(() => {
+    programRef.current = program;
+  }, [program]);
 
   useEffect(() => {
     // 자식 task만 갱신될 때 작성 중인 본문을 덮지 않고, 프로그램이나 저장 버전이 바뀔 때만 동기화한다.
     // 편집 중에 들어온 갱신은 다른 사람의 저장이므로 덮지 않고 배너로 알린다.
     const next = { id: program.id, resetVersion };
-    if (!shouldSyncEditorDraft({ dirty: dirtyRef.current, previous: syncedRef.current, next })) {
-      setRemoteUpdated(true);
-      return;
-    }
-    syncedRef.current = next;
-    setDraft(withoutTasks(programRef.current));
-    setDirty(false);
-    setRemoteUpdated(false);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      if (!shouldSyncEditorDraft({ dirty: dirtyRef.current, previous: syncedRef.current, next })) {
+        setRemoteUpdated(true);
+        return;
+      }
+      syncedRef.current = next;
+      setDraft(withoutTasks(programRef.current));
+      setDirty(false);
+      setRemoteUpdated(false);
+    });
+    return () => { cancelled = true; };
   }, [program.id, program.updatedAt, resetVersion, setDirty]);
 
   /** 배너의 "새로 불러오기" — 작성 중이던 내용을 버리고 서버 값으로 맞춘다. */
@@ -169,7 +195,7 @@ export default function ProgramEditor({
   const tasks = useMemo(() => programTasks(program), [program]);
   const posts = useMemo(() => programPosts(program), [program]);
   const competitionTeams = useMemo(() => programCompetitionTeams(program), [program]);
-  const doneTasks = tasks.filter((task) => task.done).length;
+  const taskProgress = useMemo(() => programTaskProgress(program), [program]);
 
   useEffect(() => {
     if (!pendingTarget || pendingTarget.section !== section) return;
@@ -225,7 +251,7 @@ export default function ProgramEditor({
       setPublicationAction(null);
       return;
     }
-    if (publicationAction === "publish" && readiness.percent !== 100) {
+    if (publicationAction === "publish" && !canPublishProgram({ ...program, ...draft })) {
       toast("준비 항목을 모두 완료한 뒤 현장에 공유할 수 있습니다.", "warning");
       setPublicationAction(null);
       return;
@@ -242,47 +268,6 @@ export default function ProgramEditor({
     }
   }
 
-  async function addTask() {
-    const title = taskForm.title.trim();
-    if (!title) return;
-    setTaskBusy(true);
-    try {
-      await onCreateTask({
-        title,
-        assignee: taskForm.assignee.trim() || undefined,
-        dueDate: taskForm.dueDate || undefined,
-        done: false,
-      });
-      setTaskForm({ title: "", assignee: "", dueDate: "" });
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "할 일을 추가하지 못했습니다.", "error");
-    } finally {
-      setTaskBusy(false);
-    }
-  }
-
-  async function toggleTask(taskId: string, done: boolean) {
-    setTaskBusyId(taskId);
-    try {
-      await onUpdateTask(taskId, { done });
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "할 일 상태를 바꾸지 못했습니다.", "error");
-    } finally {
-      setTaskBusyId(null);
-    }
-  }
-
-  async function removeTask(taskId: string) {
-    setTaskBusyId(taskId);
-    try {
-      await onDeleteTask(taskId);
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "할 일을 삭제하지 못했습니다.", "error");
-    } finally {
-      setTaskBusyId(null);
-    }
-  }
-
   return (
     <section className="program-editor" aria-labelledby="program-editor-title">
       <div className="program-editor-heading">
@@ -291,9 +276,12 @@ export default function ProgramEditor({
           <h2 id="program-editor-title">{draft.title || "이름 없는 프로그램"}</h2>
           <p>{programStatusMeta(draft.status).description}</p>
         </div>
-        <div className="program-readiness" aria-label={`핵심 준비 ${readiness.ready}/${readiness.total}`}>
-          <strong>{readiness.ready}/{readiness.total}</strong>
-          <span>준비 완료</span>
+        <div className="program-editor-heading__actions">
+          {canEdit && <button type="button" className="btn-primary program-meeting-launch" disabled={!meetingsAvailable} title={meetingsAvailable ? undefined : "준비회의 기록에 다시 연결한 뒤 사용할 수 있습니다."} onClick={() => setMeetingSession({ programId: program.id, version: meetingSessionVersion })}><UsersThree aria-hidden="true" size={18} /> 회의 시작</button>}
+          <div className="program-dual-progress" aria-label="프로그램 준비 상태">
+            <span><strong>{taskProgress.done}/{taskProgress.total}</strong><small>작업 완료</small></span>
+            <span><strong>{readiness.ready}/{readiness.total}</strong><small>현장 점검</small></span>
+          </div>
         </div>
       </div>
 
@@ -316,12 +304,14 @@ export default function ProgramEditor({
       )}
 
       {section === "overview" && (
+        <>
+        <ProgramTaskBoard tasks={tasks} posts={posts} canEdit={canEdit} onCreate={onCreateTask} onUpdate={onUpdateTask} onDelete={onDeleteTask} onRestore={onRestoreTask} />
         <section className="program-readiness-checklist" aria-labelledby="program-readiness-heading">
           <div className="program-readiness-checklist__heading">
             <div>
               <span className="program-eyebrow">다음 준비</span>
-              <h3 id="program-readiness-heading">{readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : "현장 공유 준비가 끝났습니다"}</h3>
-              <p>{readiness.missingLabels.length > 0 ? "가장 먼저 채울 항목만 보여드립니다." : "점검·현장 공유에서 최종 공개할 수 있습니다."}</p>
+              <h3 id="program-readiness-heading">{readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : taskProgress.done < taskProgress.total ? "현장 점검은 끝났습니다" : "현장 공유 준비가 끝났습니다"}</h3>
+              <p>{readiness.missingLabels.length > 0 ? "가장 먼저 채울 항목만 보여드립니다." : taskProgress.done < taskProgress.total ? `실행 할 일 ${taskProgress.total - taskProgress.done}건을 마치면 현장에 공유할 수 있습니다.` : "점검·현장 공유에서 최종 공개할 수 있습니다."}</p>
             </div>
             <span>{readiness.percent}%</span>
           </div>
@@ -362,6 +352,7 @@ export default function ProgramEditor({
             </ul>
           </details>
         </section>
+        </>
       )}
 
       {section === "overview" && (
@@ -412,11 +403,21 @@ export default function ProgramEditor({
             </div>
           </section>
         </fieldset>
+        <details className="program-detail-document">
+          <summary><span><strong>상세 문서</strong><small>브리핑, 아이디어와 기록은 필요할 때만 펼쳐 작성합니다.</small></span><ArrowRight aria-hidden="true" size={17} /></summary>
+          <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
+            <div className="program-save-mode program-save-mode--manual"><strong>초안 저장</strong><span>상세 문서를 수정하면 상단에 저장 버튼이 나타납니다.</span></div>
+            <div className="program-text-fields">
+              {RECORD_FIELDS.map((field) => <label key={field.key} className="program-field"><span>{field.label}</span><textarea id={`program-${field.key}`} className="input" rows={field.rows} maxLength={6000} value={(draft[field.key] as string | undefined) ?? ""} onChange={(event) => setField(field.key, event.target.value)} placeholder={field.placeholder} /></label>)}
+              {draft.decisions?.trim() && <label className="program-field"><span>기존 회의 기록</span><textarea id="program-decisions" className="input" rows={6} maxLength={6000} value={draft.decisions} onChange={(event) => setField("decisions", event.target.value)} /><small className="program-field-help">기존 자료를 보존하는 칸입니다. 새 회의는 상단의 회의 시작에서 기록해 주세요.</small></label>}
+            </div>
+          </fieldset>
+        </details>
         {canEdit && (
           <section className="program-danger-zone" aria-labelledby="program-danger-heading">
             <div>
               <h3 id="program-danger-heading">프로그램 삭제</h3>
-              <p>프로그램과 하위 진행 블록, 역할, 물품, 할 일이 함께 삭제됩니다.</p>
+              <p>프로그램과 하위 진행 블록, 역할, 물품, 할 일, 준비회의가 함께 삭제됩니다.</p>
             </div>
             <button type="button" className="btn-danger" disabled={saving} onClick={() => onRequestDelete(program)}>
               <Trash aria-hidden="true" size={16} /> 삭제
@@ -483,60 +484,10 @@ export default function ProgramEditor({
       )}
 
       {section === "tasks" && (
-        <>
-          <ProgramPublicationPanel
-            program={{ ...program, ...draft }}
-            groups={groups}
-            readiness={readiness}
-            canEdit={canEdit}
-            busy={saving || remoteUpdated}
-            onRequestPublish={() => setPublicationAction("publish")}
-            onRequestUnpublish={() => setPublicationAction("unpublish")}
-          />
-          <section className="program-task-section" aria-labelledby="program-task-heading">
-            <div className="program-task-heading">
-              <div><h3 id="program-task-heading">할 일</h3><p>{doneTasks}/{tasks.length} 완료</p></div>
-            </div>
-            {canEdit && (
-              <div className="program-task-form">
-                <label><span>할 일</span><input className="input" value={taskForm.title} maxLength={120} onChange={(event) => setTaskForm((previous) => ({ ...previous, title: event.target.value }))} placeholder="예: 교사 브리핑 초안 작성" /></label>
-                <label><span>담당</span><input className="input" value={taskForm.assignee} maxLength={60} onChange={(event) => setTaskForm((previous) => ({ ...previous, assignee: event.target.value }))} /></label>
-                <label><span>기한</span><input type="date" className="input" value={taskForm.dueDate} onChange={(event) => setTaskForm((previous) => ({ ...previous, dueDate: event.target.value }))} /></label>
-                <button type="button" className="btn-secondary" onClick={() => void addTask()} disabled={taskBusy || !taskForm.title.trim()}><Plus aria-hidden="true" size={16} /> 추가</button>
-              </div>
-            )}
-            {tasks.length === 0 ? (
-              <p className="program-task-empty">아직 등록된 할 일이 없습니다.</p>
-            ) : (
-              <ul className="program-task-list">
-                {tasks.map((task) => (
-                  <li key={task.id} data-done={task.done ? "true" : undefined}>
-                    <button type="button" disabled={!canEdit || taskBusyId === task.id} aria-busy={taskBusyId === task.id} onClick={() => void toggleTask(task.id, !task.done)} aria-label={`${task.title} ${task.done ? "미완료로 변경" : "완료로 변경"}`}>
-                      {task.done ? <CheckCircle aria-hidden="true" size={21} weight="fill" /> : <Circle aria-hidden="true" size={21} />}
-                    </button>
-                    <div><strong>{task.title}</strong><span>{[task.assignee, task.dueDate].filter(Boolean).join(" / ") || "담당과 기한 미정"}</span></div>
-                    {canEdit && <button type="button" className="program-task-delete" disabled={taskBusyId === task.id} onClick={() => void removeTask(task.id)} aria-label={`${task.title} 삭제`}><Trash aria-hidden="true" size={16} /></button>}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-          <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
-            <div className="program-save-mode program-save-mode--manual"><strong>초안 저장</strong><span>브리핑과 회의 기록을 수정하면 상단에 저장 버튼이 나타납니다.</span></div>
-            <section className="program-form-section">
-              <h3>브리핑·기록</h3>
-              <div className="program-text-fields">
-                {RECORD_FIELDS.map((field) => (
-                  <label key={field.key} className="program-field">
-                    <span>{field.label}</span>
-                    <textarea id={`program-${field.key}`} className="input" rows={field.rows} maxLength={6000} value={(draft[field.key] as string | undefined) ?? ""} onChange={(event) => setField(field.key, event.target.value)} placeholder={field.placeholder} />
-                  </label>
-                ))}
-              </div>
-            </section>
-          </fieldset>
-        </>
+        <ProgramPublicationPanel program={{ ...program, ...draft }} groups={groups} readiness={readiness} canEdit={canEdit} busy={saving || remoteUpdated} onRequestPublish={() => setPublicationAction("publish")} onRequestUnpublish={() => setPublicationAction("unpublish")} />
       )}
+
+      {meetingOpen && <ProgramMeetingMode program={program} posts={posts} canEdit={canEdit} onClose={() => setMeetingSession(null)} onCreateMeeting={onCreateMeeting} onUpdateMeeting={onUpdateMeeting} onCreateDecision={onCreateDecision} onUpdateDecision={onUpdateDecision} onConvertDecision={onConvertDecision} />}
 
       {publicationAction && (
         <OverlayShell
@@ -571,6 +522,7 @@ export default function ProgramEditor({
 function withoutTasks(program: RetreatProgram): EditableProgram {
   const copy: Partial<RetreatProgram> = { ...program };
   delete copy.tasks;
+  delete copy.meetings;
   delete copy.posts;
   delete copy.items;
   delete copy.roles;

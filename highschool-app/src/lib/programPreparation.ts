@@ -11,7 +11,11 @@ import type {
   RetreatProgramRole,
   RetreatProgramStatus,
   RetreatProgramCompetitionTeam,
+  RetreatProgramDecision,
+  RetreatProgramMeeting,
+  RetreatProgramTask,
 } from "./types";
+import { seoulDateKey } from "../features/portal/dailyMinistryMessage";
 
 export const PROGRAM_STATUS_META: Record<RetreatProgramStatus, { label: string; description: string }> = {
   draft: { label: "초안", description: "내용을 작성하는 중입니다." },
@@ -41,6 +45,13 @@ export const PROGRAM_PARTICIPATION_MODE_META: Record<RetreatProgramParticipation
   allianceTeam: "프로그램 연합팀",
   department: "부서별",
   temporary: "현장 임시 편성",
+};
+
+export const PROGRAM_TASK_STATUS_META: Record<NonNullable<RetreatProgramTask["status"]>, string> = {
+  todo: "할 일",
+  doing: "진행 중",
+  blocked: "막힘",
+  done: "완료",
 };
 
 export function programOperationMode(post: RetreatProgramPost): RetreatProgramOperationMode {
@@ -94,6 +105,160 @@ export function createProgramDraft(order: number, title = `프로그램 ${order}
   };
 }
 
+export type ProgramTemplateKey = "blank" | "host" | "course" | "group" | "alliance";
+
+export const PROGRAM_TEMPLATE_META: Record<ProgramTemplateKey, { label: string; description: string }> = {
+  blank: { label: "빈 프로그램", description: "진행 방식이 아직 정해지지 않았을 때" },
+  host: { label: "MC 전체 진행", description: "앞에서 모두를 이끄는 레크리에이션·집중 게임" },
+  course: { label: "코스 순환", description: "조가 여러 장소를 이동하는 포스트 게임" },
+  group: { label: "조별 협력", description: "각 조가 함께 해결하는 아이스브레이킹" },
+  alliance: { label: "연합팀 경쟁", description: "여러 조를 큰 팀으로 묶는 운동회·경쟁" },
+};
+
+/** 새 프로그램의 시작 비용만 줄이고 이후 편집 방식은 제한하지 않는다. */
+export function createProgramFromTemplate(order: number, template: ProgramTemplateKey): Omit<RetreatProgram, "id"> {
+  const base = createProgramDraft(order);
+  if (template === "blank") return base;
+  const now = Date.now();
+  const block = (
+    index: number,
+    name: string,
+    operationMode: RetreatProgramOperationMode,
+    participationMode: RetreatProgramParticipationMode,
+  ): RetreatProgramPost => ({
+    id: `template-${index}`,
+    order: index,
+    name,
+    operationMode,
+    participationMode,
+    scoreEnabled: operationMode === "alliance",
+    testStatus: operationMode === "break" ? "notNeeded" : "needed",
+    createdAt: now + index,
+    updatedAt: now + index,
+  });
+  const presets: Record<Exclude<ProgramTemplateKey, "blank">, {
+    title: string;
+    kind: RetreatProgramKind;
+    blocks: Array<[string, RetreatProgramOperationMode, RetreatProgramParticipationMode]>;
+  }> = {
+    host: {
+      title: "전체 진행 프로그램",
+      kind: "main",
+      blocks: [["오프닝", "break", "retreatGroup"], ["규칙 설명", "whole", "retreatGroup"], ["메인 활동", "whole", "retreatGroup"], ["결과·마무리", "break", "retreatGroup"]],
+    },
+    course: {
+      title: "코스 순환 프로그램",
+      kind: "post",
+      blocks: [["전체 브리핑", "whole", "retreatGroup"], ["코스 순환", "course", "retreatGroup"], ["복귀·점수 집계", "break", "retreatGroup"]],
+    },
+    group: {
+      title: "조별 협력 프로그램",
+      kind: "main",
+      blocks: [["아이스브레이킹", "group", "retreatGroup"], ["조별 협력 활동", "group", "retreatGroup"], ["나눔·마무리", "break", "retreatGroup"]],
+    },
+    alliance: {
+      title: "연합팀 경쟁 프로그램",
+      kind: "sports",
+      blocks: [["연합팀 편성·설명", "break", "allianceTeam"], ["연합팀 메인 경기", "alliance", "allianceTeam"], ["점수 집계·시상", "break", "allianceTeam"]],
+    },
+  };
+  const preset = presets[template];
+  const posts = Object.fromEntries(preset.blocks.map(([name, operationMode, participationMode], index) => {
+    const entry = block(index + 1, name, operationMode, participationMode);
+    return [entry.id, entry];
+  }));
+  return { ...base, title: preset.title, kind: preset.kind, posts };
+}
+
+export function programTaskStatus(task: RetreatProgramTask): NonNullable<RetreatProgramTask["status"]> {
+  if (task.status === "done" || task.done) return "done";
+  return task.status && task.status in PROGRAM_TASK_STATUS_META ? task.status : "todo";
+}
+
+export function programTaskProgress(program: RetreatProgram, today = seoulDateKey()) {
+  const tasks = programTasks(program);
+  const done = tasks.filter((task) => programTaskStatus(task) === "done").length;
+  const blocked = tasks.filter((task) => programTaskStatus(task) === "blocked").length;
+  const doing = tasks.filter((task) => programTaskStatus(task) === "doing").length;
+  const overdue = tasks.filter((task) => programTaskStatus(task) !== "done" && Boolean(task.dueDate && task.dueDate < today)).length;
+  const unassigned = tasks.filter((task) => programTaskStatus(task) !== "done" && !task.assignee?.trim()).length;
+  return {
+    total: tasks.length,
+    done,
+    doing,
+    blocked,
+    overdue,
+    unassigned,
+    percent: tasks.length === 0 ? 0 : Math.round((done / tasks.length) * 100),
+  };
+}
+
+export function programMeetings(program: RetreatProgram): RetreatProgramMeeting[] {
+  return Object.entries(program.meetings ?? {})
+    .map(([id, meeting]) => ({ ...meeting, id: meeting.id || id }))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt || a.id.localeCompare(b.id));
+}
+
+export function meetingDecisions(meeting: RetreatProgramMeeting): RetreatProgramDecision[] {
+  return Object.entries(meeting.decisions ?? {})
+    .map(([id, decision]) => ({ ...decision, id: decision.id || id }))
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+}
+
+/** 결정에서 만든 작업을 지울 때 원본 결정의 연결도 함께 해제하기 위한 역참조. */
+export function programTaskDecisionLink(
+  program: RetreatProgram,
+  task: RetreatProgramTask,
+): { meetingId: string; decisionId: string } | undefined {
+  if (task.sourceMeetingId && task.sourceDecisionId) {
+    return { meetingId: task.sourceMeetingId, decisionId: task.sourceDecisionId };
+  }
+  for (const meeting of programMeetings(program)) {
+    const decision = meetingDecisions(meeting).find((entry) => entry.taskId === task.id);
+    if (decision) return { meetingId: meeting.id, decisionId: decision.id };
+  }
+  return undefined;
+}
+
+/** 같은 회의 결정을 여러 번 변환해도 작업 하나로 수렴시키는 결정적 Firebase 키. */
+export function programDecisionTaskId(meetingId: string, decisionId: string): string {
+  return `decision-${meetingId}-${decisionId}`;
+}
+
+/** 진행 블록의 현장 실행 가능 여부를 목록·진행표·공유 게이트가 함께 사용한다. */
+export function programPostReadiness(
+  post: RetreatProgramPost,
+  items: RetreatProgramItem[],
+  roles: RetreatProgramRole[],
+) {
+  const operationMode = programOperationMode(post);
+  const roleCount = roles.filter((role) => role.assignee?.trim()).length;
+  const itemCount = items.length;
+  const contentReady = Boolean(post.rules?.trim() || post.concept?.trim());
+  const rolesReady = roles.length > 0 && roleCount === roles.length;
+  // 안내·이동·휴식 블록은 별도 준비물이 없어도 된다. 실제 활동은 준비물과 조달 가능한 수량을 요구한다.
+  const itemsReady = operationMode === "break" || (
+    itemCount > 0
+    && items.every((item) =>
+      item.status === "inChurch"
+      || item.status === "toMake"
+      || Number(item.quantity ?? 0) > 0,
+    )
+  );
+  const testReady = post.testStatus === "passed" || post.testStatus === "notNeeded";
+  const blocked = Boolean(post.blocker?.trim());
+  return {
+    contentReady,
+    rolesReady,
+    itemsReady,
+    testReady,
+    blocked,
+    roleCount,
+    itemCount,
+    ready: contentReady && rolesReady && itemsReady && testReady && !blocked,
+  };
+}
+
 export function sortRetreatPrograms(programs: RetreatProgram[]): RetreatProgram[] {
   return [...programs].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt || a.id.localeCompare(b.id));
 }
@@ -132,37 +297,77 @@ const CHECKS: Array<{
       const incomplete = programPosts(program).find((post) => !post.rules?.trim() && !post.concept?.trim());
       return incomplete ? `program-post-rules-${incomplete.id}` : "program-new-block-name";
     },
-    ready: (program) => programPosts(program).some((post) => Boolean(post.rules?.trim() || post.concept?.trim())),
+    ready: (program) => {
+      const posts = programPosts(program);
+      return posts.length > 0 && posts.every((post) => programPostReadiness(post, itemsOfPost(program, post.id), rolesOfPost(program, post.id)).contentReady);
+    },
   },
   {
     key: "역할",
     section: "posts",
     action: "진행 블록에 담당 배치",
     targetId: (program) => {
-      const unassigned = programRoles(program).find((role) => !role.assignee?.trim());
-      if (unassigned) return `program-role-assignee-${unassigned.id}`;
-      const firstPost = programPosts(program)[0];
-      return firstPost ? `program-role-add-${firstPost.id}` : "program-new-block-name";
+      for (const post of programPosts(program)) {
+        const roles = rolesOfPost(program, post.id);
+        if (roles.length > 0 && roles.every((role) => role.assignee?.trim())) continue;
+        const unassigned = roles.find((role) => !role.assignee?.trim());
+        return unassigned ? `program-role-assignee-${unassigned.id}` : `program-role-add-${post.id}`;
+      }
+      return "program-new-block-name";
     },
-    ready: (program) => programRoles(program).some((role) => Boolean(role.assignee?.trim())),
+    ready: (program) => {
+      const posts = programPosts(program);
+      return posts.length > 0 && posts.every((post) => programPostReadiness(post, itemsOfPost(program, post.id), rolesOfPost(program, post.id)).rolesReady);
+    },
   },
   {
     key: "물품",
     section: "posts",
     action: "진행 블록에 준비물 입력",
     targetId: (program) => {
-      const incomplete = programItems(program).find((item) =>
-        item.status !== "inChurch" && item.status !== "toMake" && Number(item.quantity ?? 0) <= 0,
-      );
-      if (incomplete) return `program-item-quantity-${incomplete.id}`;
-      const firstPost = programPosts(program)[0];
-      return firstPost ? `program-item-add-${firstPost.id}` : "program-new-block-name";
+      for (const post of programPosts(program)) {
+        if (programOperationMode(post) === "break") continue;
+        const items = itemsOfPost(program, post.id);
+        const incomplete = items.find((item) =>
+          item.status !== "inChurch" && item.status !== "toMake" && Number(item.quantity ?? 0) <= 0,
+        );
+        if (incomplete) return `program-item-quantity-${incomplete.id}`;
+        if (items.length === 0) return `program-item-add-${post.id}`;
+      }
+      return "program-new-block-name";
     },
     // 사야 하는 물품은 수량이 있어야 발주가 된다. 교회 비품·제작 예정은 수량 없이도 정리된 것으로 본다.
-    ready: (program) => programItems(program).some((item) =>
-      item.status === "inChurch" || item.status === "toMake" || Number(item.quantity ?? 0) > 0),
+    ready: (program) => {
+      const posts = programPosts(program);
+      return posts.length > 0 && posts.every((post) =>
+        programPostReadiness(post, itemsOfPost(program, post.id), rolesOfPost(program, post.id)).itemsReady,
+      );
+    },
   },
-  { key: "브리핑 또는 대본", section: "tasks", action: "현장 전달 내용 작성", targetId: () => "program-briefing", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
+  {
+    key: "사전 테스트",
+    section: "posts",
+    action: "진행 블록 테스트 확인",
+    targetId: (program) => {
+      const post = programPosts(program).find((entry) => !programPostReadiness(entry, itemsOfPost(program, entry.id), rolesOfPost(program, entry.id)).testReady);
+      return post ? `program-post-test-${post.id}` : "program-new-block-name";
+    },
+    ready: (program) => {
+      const posts = programPosts(program);
+      return posts.length > 0 && posts.every((post) => programPostReadiness(post, itemsOfPost(program, post.id), rolesOfPost(program, post.id)).testReady);
+    },
+  },
+  {
+    key: "막힌 준비",
+    section: "posts",
+    action: "막힌 준비 해결",
+    targetId: (program) => {
+      const post = programPosts(program).find((entry) => entry.blocker?.trim());
+      return post ? `program-post-blocker-${post.id}` : "program-new-block-name";
+    },
+    ready: (program) => programPosts(program).every((post) => !post.blocker?.trim()),
+  },
+  { key: "브리핑 또는 대본", section: "overview", action: "현장 전달 내용 작성", targetId: () => "program-briefing", ready: (program) => Boolean(program.briefing?.trim() || program.script?.trim()) },
 ];
 
 export function programReadiness(program: RetreatProgram) {
@@ -187,7 +392,8 @@ export function programReadiness(program: RetreatProgram) {
 
 /** 현장 공유는 일반 상태 변경이 아니라 준비 항목을 모두 통과한 뒤 실행하는 별도 작업이다. */
 export function canPublishProgram(program: RetreatProgram): boolean {
-  return programReadiness(program).percent === 100;
+  return programReadiness(program).percent === 100
+    && programTasks(program).every((task) => programTaskStatus(task) === "done");
 }
 
 export function programTasks(program: RetreatProgram) {
@@ -304,10 +510,10 @@ export function programBudget(items: RetreatProgramItem[]) {
 
 /** 편집기 상단 내비게이션 — 각 탭이 서로 다른 일을 맡는다. */
 export const PROGRAM_SECTIONS = [
-  { key: "overview", label: "준비 보드" },
-  { key: "posts", label: "프로그램 구성" },
-  { key: "roles", label: "운영 현황" },
-  { key: "tasks", label: "점검·현장 공유" },
+  { key: "overview", label: "전체 준비" },
+  { key: "posts", label: "프로그램 작업실" },
+  { key: "roles", label: "물품·역할" },
+  { key: "tasks", label: "현장 공유" },
 ] as const;
 
 export type ProgramSectionKey = (typeof PROGRAM_SECTIONS)[number]["key"];

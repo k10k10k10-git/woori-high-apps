@@ -11,6 +11,9 @@ import { useUI } from "@/context/UIContext";
 import {
   createDefaultRetreatPrograms,
   createRetreatProgram,
+  createRetreatProgramMeeting,
+  createRetreatProgramDecision,
+  convertRetreatProgramDecisionToTask,
   createDefaultRetreatProgramCompetitionTeams,
   createRetreatProgramCompetitionTeam,
   createRetreatProgramItem,
@@ -25,6 +28,7 @@ import {
   deleteRetreatProgramPost,
   deleteRetreatProgramRole,
   deleteRetreatProgramTask,
+  restoreRetreatProgramTask,
   restoreRetreatProgramItem,
   restoreRetreatProgramCompetitionTeam,
   restoreRetreatProgramMatch,
@@ -35,7 +39,10 @@ import {
   subscribeToRetreat,
   subscribeToGroups,
   subscribeToRetreatPrograms,
+  subscribeToRetreatProgramMeetings,
   updateRetreatProgram,
+  updateRetreatProgramMeeting,
+  updateRetreatProgramDecision,
   updateRetreatProgramCompetitionTeam,
   updateRetreatProgramItem,
   updateRetreatProgramMatch,
@@ -47,16 +54,26 @@ import {
 } from "@/lib/db";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
-import { PROGRAM_SECTIONS, createProgramDraft, programSectionFromParam, type ProgramSectionKey } from "@/lib/programPreparation";
+import {
+  PROGRAM_SECTIONS,
+  createProgramDraft,
+  createProgramFromTemplate,
+  programSectionFromParam,
+  programTaskDecisionLink,
+  type ProgramSectionKey,
+  type ProgramTemplateKey,
+} from "@/lib/programPreparation";
 import type {
   Group,
   Retreat,
   RetreatProgram,
   RetreatProgramCompetitionTeam,
+  RetreatProgramDecision,
   RetreatProgramItem,
   RetreatProgramMatch,
   RetreatProgramPost,
   RetreatProgramRole,
+  RetreatProgramMeeting,
 } from "@/lib/types";
 import RetreatPinGate from "../field/RetreatPinGate";
 import ProgramDiscardDialog from "./ProgramDiscardDialog";
@@ -65,6 +82,12 @@ import ProgramList from "./ProgramList";
 import ProgramWorkspaceHeader from "./ProgramWorkspaceHeader";
 import { useProgramDiscardGuard } from "./useProgramDiscardGuard";
 import { getRetreatWorkspaceSnapshot, mergeRetreatWorkspaceSnapshot } from "@/lib/retreatWorkspaceCache";
+
+function stripPrivateMeetings(program: RetreatProgram): RetreatProgram {
+  const publicProgram = { ...program };
+  delete publicProgram.meetings;
+  return publicProgram;
+}
 
 export default function ProgramPreparationClient() {
   const params = useParams();
@@ -115,12 +138,23 @@ export default function ProgramPreparationClient() {
   // 연결되므로 캐시는 로딩 깜빡임만 없애고 서버 값을 대체하지 않는다.
   const [initialSnapshot] = useState(() => getRetreatWorkspaceSnapshot(retreatId));
   const [retreat, setRetreat] = useState<Retreat | null>(initialSnapshot?.retreat ?? null);
-  const [programs, setPrograms] = useState<RetreatProgram[]>(initialSnapshot?.programs ?? []);
+  // 공개 프로그램과 관리자 전용 회의 원문은 별도 구독한다. private 기록은 캐시에 넣지 않는다.
+  const [publicPrograms, setPublicPrograms] = useState<RetreatProgram[]>(() =>
+    (initialSnapshot?.programs ?? []).map(stripPrivateMeetings),
+  );
+  const [meetingsByProgram, setMeetingsByProgram] = useState<Record<string, Record<string, RetreatProgramMeeting>>>({});
+  const programs = useMemo(() => publicPrograms.map((program) => {
+    const meetings = meetingsByProgram[program.id];
+    return meetings ? { ...program, meetings } : program;
+  }), [meetingsByProgram, publicPrograms]);
   const [groups, setGroups] = useState<Group[]>(initialSnapshot?.groups ?? []);
   const [retreatReady, setRetreatReady] = useState(initialSnapshot?.retreat !== undefined);
   const [programsReady, setProgramsReady] = useState(initialSnapshot?.programs !== undefined);
+  const [meetingsReady, setMeetingsReady] = useState(!canEdit);
   const [groupsReady, setGroupsReady] = useState(initialSnapshot?.groups !== undefined);
   const [loadError, setLoadError] = useState("");
+  const [meetingLoadError, setMeetingLoadError] = useState("");
+  const [meetingSessionVersion, setMeetingSessionVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RetreatProgram | null>(null);
@@ -149,12 +183,16 @@ export default function ProgramPreparationClient() {
     if (!adminAllowed || !retreatId) return;
     const cached = getRetreatWorkspaceSnapshot(retreatId);
     setRetreat(cached?.retreat ?? null);
-    setPrograms(cached?.programs ?? []);
+    const cachedPrograms = (cached?.programs ?? []).map(stripPrivateMeetings);
+    setPublicPrograms(cachedPrograms);
+    setMeetingsByProgram({});
     setGroups(cached?.groups ?? []);
     setRetreatReady(cached?.retreat !== undefined);
     setProgramsReady(cached?.programs !== undefined);
+    setMeetingsReady(!canEdit);
     setGroupsReady(cached?.groups !== undefined);
     setLoadError("");
+    setMeetingLoadError("");
     const unsubscribeRetreat = subscribeToRetreat(
       retreatId,
       (next) => {
@@ -167,8 +205,9 @@ export default function ProgramPreparationClient() {
     const unsubscribePrograms = subscribeToRetreatPrograms(
       retreatId,
       (next) => {
-        setPrograms(next);
-        mergeRetreatWorkspaceSnapshot(retreatId, { programs: next });
+        const publicOnly = next.map(stripPrivateMeetings);
+        setPublicPrograms(publicOnly);
+        mergeRetreatWorkspaceSnapshot(retreatId, { programs: publicOnly });
         setProgramsReady(true);
       },
       (error) => { setLoadError(`프로그램 정보 - ${error.message}`); setProgramsReady(true); },
@@ -182,19 +221,36 @@ export default function ProgramPreparationClient() {
       },
       (error) => { setLoadError(`조 편성 정보 - ${error.message}`); setGroupsReady(true); },
     );
-    return () => { unsubscribeRetreat(); unsubscribePrograms(); unsubscribeGroups(); };
-  }, [adminAllowed, authLoading, retreatId, router, user]);
+    const unsubscribeMeetings = canEdit
+      ? subscribeToRetreatProgramMeetings(
+          retreatId,
+          (next) => {
+            setMeetingsByProgram(next);
+            setMeetingLoadError("");
+            setMeetingsReady(true);
+          },
+          (error) => {
+            // 권한·연결이 끊긴 뒤 메모리에 남은 private 회의를 계속 편집하면 안 된다.
+            setMeetingsByProgram({});
+            setMeetingSessionVersion((version) => version + 1);
+            setMeetingLoadError(`준비회의 기록 - ${error.message}`);
+            setMeetingsReady(true);
+          },
+        )
+      : () => {};
+    return () => { unsubscribeRetreat(); unsubscribePrograms(); unsubscribeGroups(); unsubscribeMeetings(); };
+  }, [adminAllowed, authLoading, canEdit, retreatId, router, user]);
 
   const selectedProgram = useMemo(
     () => (selectedId ? programs.find((program) => program.id === selectedId) ?? null : null),
     [programs, selectedId],
   );
 
-  async function addProgram() {
+  async function addProgram(template: ProgramTemplateKey = "blank") {
     setBusy(true);
     try {
       const nextOrder = programs.reduce((max, program) => Math.max(max, program.order), 0) + 1;
-      const id = await createRetreatProgram(retreatId, createProgramDraft(nextOrder));
+      const id = await createRetreatProgram(retreatId, template === "blank" ? createProgramDraft(nextOrder) : createProgramFromTemplate(nextOrder, template));
       goToProgram(id, "overview");
       toast("프로그램 초안을 만들었습니다.", "success");
     } catch (error) {
@@ -234,7 +290,7 @@ export default function ProgramPreparationClient() {
     }
   }
 
-  async function saveProgram(program: Omit<RetreatProgram, "tasks" | "posts" | "items" | "roles" | "competitionTeams">) {
+  async function saveProgram(program: Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams">) {
     setSaving(true);
     try {
       const { id } = program;
@@ -279,7 +335,7 @@ export default function ProgramPreparationClient() {
     </div>
   );
 
-  if (!retreatReady || !programsReady || !groupsReady || lock === undefined) return (
+  if (!retreatReady || !programsReady || !groupsReady || !meetingsReady || lock === undefined) return (
     <div className="min-h-screen px-4 py-8" style={{ background: "var(--color-bg)" }}>
       <div className="mx-auto max-w-6xl"><WorkspaceSkeleton label="프로그램 준비 화면을 불러오는 중입니다." rows={7} variant="page" /></div>
     </div>
@@ -342,10 +398,11 @@ export default function ProgramPreparationClient() {
         )}
 
         {loadError && <div className="program-load-error" role="alert">{loadError} 새로고침하면 다시 연결합니다.</div>}
+        {meetingLoadError && <div className="program-load-error" role="alert">{meetingLoadError} 회의 기록만 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>}
         {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀, 교역자, 통합관리자만 가능합니다." />}
 
         {programs.length === 0 ? (
-          <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={(id) => goToProgram(id)} onAdd={() => void addProgram()} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
+          <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={(id) => goToProgram(id)} onAddTemplate={(template) => void addProgram(template)} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
         ) : !selectedProgram ? (
           <div className="program-list-screen">
             <ProgramList
@@ -354,7 +411,7 @@ export default function ProgramPreparationClient() {
               canEdit={canEdit}
               busy={busy}
               onSelect={(id) => goToProgram(id)}
-              onAdd={() => void addProgram()}
+              onAddTemplate={(template) => void addProgram(template)}
               onCreateDefaults={() => void createDefaults()}
               onMove={(id, direction) => moveProgram(id, direction)}
             />
@@ -376,6 +433,8 @@ export default function ProgramPreparationClient() {
               <ProgramEditor
                 program={selectedProgram}
                 canEdit={canEdit}
+                meetingsAvailable={!meetingLoadError}
+                meetingSessionVersion={meetingSessionVersion}
                 saving={saving}
                 resetVersion={discardGuard.resetVersion}
                 onSave={saveProgram}
@@ -384,7 +443,23 @@ export default function ProgramPreparationClient() {
                 onSelectSection={selectSection}
                 onCreateTask={(data) => createRetreatProgramTask(retreatId, selectedProgram.id, data).then(() => undefined)}
                 onUpdateTask={(taskId, data) => updateRetreatProgramTask(retreatId, selectedProgram.id, taskId, data)}
-                onDeleteTask={(taskId) => deleteRetreatProgramTask(retreatId, selectedProgram.id, taskId)}
+                onDeleteTask={async (task) => {
+                  const source = programTaskDecisionLink(selectedProgram, task);
+                  if (task.sourceDecisionId && !source && meetingLoadError) {
+                    throw new Error("준비회의 연결을 다시 불러온 뒤 이 할 일을 삭제해 주세요.");
+                  }
+                  const restorable = source
+                    ? { ...task, sourceMeetingId: source.meetingId, sourceDecisionId: source.decisionId }
+                    : task;
+                  await deleteRetreatProgramTask(retreatId, selectedProgram.id, task.id, source);
+                  return restorable;
+                }}
+                onRestoreTask={(task) => restoreRetreatProgramTask(retreatId, selectedProgram.id, task)}
+                onCreateMeeting={(data) => createRetreatProgramMeeting(retreatId, selectedProgram.id, data)}
+                onUpdateMeeting={(meetingId, data) => updateRetreatProgramMeeting(retreatId, selectedProgram.id, meetingId, data)}
+                onCreateDecision={(meetingId, data) => createRetreatProgramDecision(retreatId, selectedProgram.id, meetingId, data)}
+                onUpdateDecision={(meetingId, decisionId, data) => updateRetreatProgramDecision(retreatId, selectedProgram.id, meetingId, decisionId, data)}
+                onConvertDecision={(meetingId, decision: RetreatProgramDecision) => convertRetreatProgramDecisionToTask(retreatId, selectedProgram.id, meetingId, decision)}
                 section={section}
                 onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, {
                   name,
@@ -438,7 +513,7 @@ export default function ProgramPreparationClient() {
         <OverlayShell label="프로그램 삭제" onClose={() => { if (!busy) setDeleteTarget(null); }} closeOnBackdrop={!busy} panelClassName="program-confirm-dialog w-full max-w-sm">
           <div className="program-confirm-dialog__body">
             <h2>프로그램을 삭제할까요?</h2>
-            <p><strong>{deleteTarget.title}</strong>의 진행안, 대본과 할 일이 함께 삭제됩니다.</p>
+            <p><strong>{deleteTarget.title}</strong>의 진행안, 대본, 할 일과 준비회의가 함께 삭제됩니다.</p>
             <div className="program-confirm-dialog__actions">
               <button type="button" className="btn-secondary" disabled={busy} onClick={() => setDeleteTarget(null)}>취소</button>
               <button type="button" className="btn-danger" disabled={busy} onClick={() => void confirmDelete()}>{busy ? "삭제 중…" : "삭제"}</button>

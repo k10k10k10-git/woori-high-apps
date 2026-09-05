@@ -19,6 +19,7 @@ type Props = {
   disabled?: boolean;
   allowEmpty?: boolean;
   normalize?: (value: string) => string;
+  onSaveStateChange?: (saving: boolean) => void;
 };
 
 /**
@@ -42,6 +43,7 @@ export default function ProgramAutosaveField({
   disabled = false,
   allowEmpty = true,
   normalize = (next) => next,
+  onSaveStateChange,
 }: Props) {
   const { toast } = useUI();
   const remoteValue = value == null ? "" : String(value);
@@ -90,6 +92,7 @@ export default function ProgramAutosaveField({
 
     setDraft(next);
     setSaving(true);
+    onSaveStateChange?.(true);
     setSaveState("saving");
     try {
       await onSave(next);
@@ -102,6 +105,7 @@ export default function ProgramAutosaveField({
       toast(error instanceof Error ? error.message : errorMessage, "error");
     } finally {
       setSaving(false);
+      onSaveStateChange?.(false);
     }
   }
 

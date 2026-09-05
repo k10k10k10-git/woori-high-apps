@@ -8,6 +8,7 @@ import {
   commonItems,
   commonRoles,
   createProgramDraft,
+  createProgramFromTemplate,
   groupItemsByPost,
   isProgramSection,
   itemsOfPost,
@@ -19,15 +20,23 @@ import {
   programItemTotal,
   programItems,
   programKindMeta,
+  programMeetings,
+  programPostReadiness,
   programPosts,
   programReadiness,
   programStatusMeta,
+  programTaskProgress,
+  programTaskDecisionLink,
+  programDecisionTaskId,
+  programTaskStatus,
   programTasks,
   programSectionFromParam,
   rolesOfPost,
   shouldSyncEditorDraft,
   sortRetreatPrograms,
+  meetingDecisions,
 } from "./programPreparation";
+import { paths } from "./paths";
 import type { RetreatProgram, RetreatProgramItem } from "./types";
 
 const base = (overrides: Partial<RetreatProgram> = {}): RetreatProgram => ({
@@ -76,7 +85,7 @@ describe("수련회 프로그램 준비", () => {
     expect(moveProgramPostOrder(posts, "missing", 1)).toEqual(["a", "b", "c"]);
   });
 
-  it("현장 준비에 필요한 8가지 핵심 항목을 점검한다", () => {
+  it("현장 준비에 필요한 10가지 핵심 항목을 점검한다", () => {
     // 본문만 채운 상태 — 게임·역할·물품이 비어 있으면 아직 100%가 아니다.
     const body = {
       date: "2026-08-08",
@@ -89,37 +98,37 @@ describe("수련회 프로그램 준비", () => {
       briefing: "교사 역할을 안내합니다.",
     };
     expect(programReadiness(base(body))).toMatchObject({
-      ready: 5, total: 8, missingLabels: ["게임 구성", "역할", "물품"],
+      ready: 6, total: 10, missingLabels: ["게임 구성", "역할", "물품", "사전 테스트"],
     });
 
     const filled = programReadiness(base({
       ...body,
-      posts: { g1: { order: 1, name: "물코기", rules: "1. 조별 대항", createdAt: 1, updatedAt: 1 } },
-      roles: { r1: { order: 1, role: "진행", assignee: "박준규", createdAt: 1, updatedAt: 1 } },
-      items: { i1: { order: 1, name: "줄자", status: "todo", quantity: 2, createdAt: 1, updatedAt: 1 } },
+      posts: { g1: { order: 1, name: "물코기", rules: "1. 조별 대항", testStatus: "passed", createdAt: 1, updatedAt: 1 } },
+      roles: { r1: { order: 1, role: "진행", assignee: "박준규", postId: "g1", createdAt: 1, updatedAt: 1 } },
+      items: { i1: { order: 1, name: "줄자", status: "todo", quantity: 2, postId: "g1", createdAt: 1, updatedAt: 1 } },
     } as never));
-    expect(filled).toMatchObject({ ready: 8, total: 8, percent: 100, missingLabels: [] });
+    expect(filled).toMatchObject({ ready: 10, total: 10, percent: 100, missingLabels: [] });
 
     // 이름만 있는 게임·담당 없는 역할·수량 없는 물품은 아직 준비된 것으로 세지 않는다.
     const shallow = programReadiness(base({
       ...body,
       posts: { g1: { order: 1, name: "물코기", createdAt: 1, updatedAt: 1 } },
-      roles: { r1: { order: 1, role: "진행", createdAt: 1, updatedAt: 1 } },
-      items: { i1: { order: 1, name: "줄자", status: "todo", createdAt: 1, updatedAt: 1 } },
+      roles: { r1: { order: 1, role: "진행", postId: "g1", createdAt: 1, updatedAt: 1 } },
+      items: { i1: { order: 1, name: "줄자", status: "todo", postId: "g1", createdAt: 1, updatedAt: 1 } },
     } as never));
-    expect(shallow.missingLabels).toEqual(["게임 구성", "역할", "물품"]);
+    expect(shallow.missingLabels).toEqual(["게임 구성", "역할", "물품", "사전 테스트"]);
     expect(shallow.items).toEqual(expect.arrayContaining([
       expect.objectContaining({ label: "게임 구성", section: "posts", targetId: "program-post-rules-g1", ready: false }),
       expect.objectContaining({ label: "역할", section: "posts", targetId: "program-role-assignee-r1", action: "진행 블록에 담당 배치", ready: false }),
       expect.objectContaining({ label: "물품", section: "posts", targetId: "program-item-quantity-i1", ready: false }),
-      expect.objectContaining({ label: "브리핑 또는 대본", section: "tasks", targetId: "program-briefing", ready: true }),
+      expect.objectContaining({ label: "브리핑 또는 대본", section: "overview", targetId: "program-briefing", ready: true }),
     ]));
     expect(canPublishProgram(base(body))).toBe(false);
     expect(canPublishProgram(base({
       ...body,
-      posts: { g1: { order: 1, name: "물코기", rules: "1. 조별 대항", createdAt: 1, updatedAt: 1 } },
-      roles: { r1: { order: 1, role: "진행", assignee: "박준규", createdAt: 1, updatedAt: 1 } },
-      items: { i1: { order: 1, name: "줄자", status: "todo", quantity: 2, createdAt: 1, updatedAt: 1 } },
+      posts: { g1: { order: 1, name: "물코기", rules: "1. 조별 대항", testStatus: "passed", createdAt: 1, updatedAt: 1 } },
+      roles: { r1: { order: 1, role: "진행", assignee: "박준규", postId: "g1", createdAt: 1, updatedAt: 1 } },
+      items: { i1: { order: 1, name: "줄자", status: "todo", quantity: 2, postId: "g1", createdAt: 1, updatedAt: 1 } },
     } as never))).toBe(true);
   });
 
@@ -130,6 +139,158 @@ describe("수련회 프로그램 준비", () => {
     } as unknown as RetreatProgram["tasks"] }));
     expect(tasks.map((task) => task.title)).toEqual(["먼저", "나중"]);
     expect(tasks.map((task) => task.id)).toEqual(["first", "later"]);
+  });
+});
+
+describe("실행 중심 준비 흐름", () => {
+  it("운영 방식 템플릿은 기존 프로그램 구조 안에 시작 블록만 만든다", () => {
+    vi.spyOn(Date, "now").mockReturnValue(100);
+    const course = createProgramFromTemplate(3, "course");
+    expect(course).toMatchObject({ order: 3, title: "코스 순환 프로그램", kind: "post", status: "draft" });
+    expect(programPosts({ id: "course", ...course } as RetreatProgram).map((post) => [post.name, post.operationMode, post.participationMode])).toEqual([
+      ["전체 브리핑", "whole", "retreatGroup"],
+      ["코스 순환", "course", "retreatGroup"],
+      ["복귀·점수 집계", "break", "retreatGroup"],
+    ]);
+    expect(createProgramFromTemplate(1, "blank")).toEqual(createProgramDraft(1));
+    vi.restoreAllMocks();
+  });
+
+  it("모든 시작 템플릿은 활동 블록과 사전 테스트 기본값을 안전하게 만든다", () => {
+    vi.spyOn(Date, "now").mockReturnValue(100);
+    for (const template of ["host", "course", "group", "alliance"] as const) {
+      const draft = createProgramFromTemplate(1, template);
+      const posts = programPosts({ id: template, ...draft } as RetreatProgram);
+      expect(posts.length).toBeGreaterThan(0);
+      expect(posts.every((post) => post.testStatus === "needed" || post.testStatus === "notNeeded")).toBe(true);
+    }
+    expect(programPosts({ id: "blank", ...createProgramFromTemplate(1, "blank") } as RetreatProgram)).toEqual([]);
+    vi.restoreAllMocks();
+  });
+
+  it("예전 done 값과 새 상태를 함께 읽고 실행 지표를 분리한다", () => {
+    const program = base({
+      tasks: {
+        old: { title: "기존 완료", done: true, createdAt: 1, updatedAt: 1 },
+        doing: { title: "진행", status: "doing", assignee: "성훈", dueDate: "2026-09-04", createdAt: 2, updatedAt: 2 },
+        blocked: { title: "막힘", status: "blocked", dueDate: "2026-09-01", createdAt: 3, updatedAt: 3 },
+      },
+    } as never);
+    expect(programTaskStatus(programTasks(program)[0])).toBe("done");
+    expect(programTaskStatus({ title: "손상된 상태", status: "unknown" as never, createdAt: 0, updatedAt: 0 } as never)).toBe("todo");
+    expect(programTaskProgress(program, "2026-09-02")).toMatchObject({
+      total: 3, done: 1, doing: 1, blocked: 1, overdue: 1, unassigned: 1, percent: 33,
+    });
+  });
+
+  it("기한 초과는 브라우저 UTC가 아니라 서울 날짜를 기준으로 센다", () => {
+    vi.useFakeTimers();
+    try {
+      // UTC로는 9/4이지만 서울은 이미 9/5이다.
+      vi.setSystemTime(new Date("2026-09-04T16:30:00.000Z"));
+      const program = base({
+        tasks: {
+          dueYesterday: { title: "어제 할 일", done: false, dueDate: "2026-09-04", createdAt: 1, updatedAt: 1 },
+          dueToday: { title: "오늘 할 일", done: false, dueDate: "2026-09-05", createdAt: 2, updatedAt: 2 },
+        },
+      } as never);
+      expect(programTaskProgress(program).overdue).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("진행 블록 준비 판정은 물품 수량·테스트·막힘을 한 기준으로 계산한다", () => {
+    const post = {
+      id: "game", order: 1, name: "협력 게임", rules: "규칙", testStatus: "passed", createdAt: 1, updatedAt: 1,
+    } as const;
+    const roles = [{ id: "role", order: 1, role: "진행", assignee: "성훈", postId: "game", createdAt: 1, updatedAt: 1 }];
+    const zeroQuantity = [{ id: "item", order: 1, name: "공", status: "todo" as const, quantity: 0, postId: "game", createdAt: 1, updatedAt: 1 }];
+    expect(programPostReadiness(post, zeroQuantity, roles)).toMatchObject({ itemsReady: false, ready: false });
+    expect(programPostReadiness(post, [{ ...zeroQuantity[0], quantity: 1 }], roles)).toMatchObject({ itemsReady: true, ready: true });
+    expect(programPostReadiness(post, [{ ...zeroQuantity[0], quantity: 1 }], [
+      ...roles,
+      { id: "unassigned", order: 2, role: "안전", postId: "game", createdAt: 2, updatedAt: 2 },
+    ])).toMatchObject({ rolesReady: false, ready: false });
+    expect(programPostReadiness({ ...post, blocker: "장소 미확정" }, [{ ...zeroQuantity[0], quantity: 1 }], roles)).toMatchObject({ blocked: true, ready: false });
+
+    const breakPost = { ...post, operationMode: "break" as const, testStatus: "notNeeded" as const };
+    expect(programPostReadiness(breakPost, [], roles)).toMatchObject({ itemsReady: true, testReady: true, ready: true });
+  });
+
+  it("현장 준비율과 실행 할 일 완료를 분리하되 둘 다 끝나야 공유한다", () => {
+    const complete = base({
+      date: "2026-09-05",
+      startTime: "14:00",
+      place: "본당",
+      lead: "성훈",
+      objective: "함께 협력한다.",
+      flow: "오프닝, 활동, 마무리",
+      briefing: "교사 브리핑",
+      posts: {
+        activity: { order: 1, name: "메인 활동", rules: "활동 규칙", testStatus: "passed", createdAt: 1, updatedAt: 1 },
+        transition: { order: 2, name: "이동", operationMode: "break", concept: "다음 장소로 이동", testStatus: "notNeeded", createdAt: 2, updatedAt: 2 },
+      },
+      roles: {
+        r1: { order: 1, role: "진행", assignee: "진행자", postId: "activity", createdAt: 1, updatedAt: 1 },
+        r2: { order: 2, role: "안내", assignee: "안내자", postId: "transition", createdAt: 2, updatedAt: 2 },
+      },
+      items: {
+        i1: { order: 1, name: "공", status: "todo", quantity: 1, postId: "activity", createdAt: 1, updatedAt: 1 },
+      },
+    } as never);
+    expect(programReadiness(complete)).toMatchObject({ percent: 100, missingLabels: [] });
+    expect(canPublishProgram(complete)).toBe(true);
+
+    const withTask = base({ ...complete, tasks: {
+      task: { title: "진행표 인쇄", done: false, status: "doing", createdAt: 1, updatedAt: 1 },
+    } } as never);
+    expect(programReadiness(withTask).percent).toBe(100);
+    expect(canPublishProgram(withTask)).toBe(false);
+    expect(canPublishProgram(base({ ...complete, posts: {
+      ...complete.posts,
+      activity: { ...complete.posts?.activity, blocker: "음향 확인 필요" },
+    } } as never))).toBe(false);
+  });
+
+  it("회의와 결정은 Firebase 키를 id로 복구하고 최근 회의부터 보여준다", () => {
+    const program = base({
+      meetings: {
+        first: { title: "첫 회의", date: "2026-08-20", closed: true, createdAt: 1, updatedAt: 1 },
+        latest: {
+          title: "최근 회의", date: "2026-08-30", closed: false, createdAt: 2, updatedAt: 2,
+          decisions: {
+            d2: { title: "두 번째", status: "decided", createdAt: 4, updatedAt: 4 },
+            d1: { title: "첫 번째", status: "discussing", createdAt: 3, updatedAt: 3 },
+          },
+        },
+      },
+    } as never);
+    const meetings = programMeetings(program);
+    expect(meetings.map((meeting) => meeting.id)).toEqual(["latest", "first"]);
+    expect(meetingDecisions(meetings[0]).map((decision) => decision.id)).toEqual(["d1", "d2"]);
+  });
+
+  it("회의 결정의 할 일 연결은 재시도해도 같은 ID로 수렴하고 구버전 연결도 찾는다", () => {
+    expect(programDecisionTaskId("meeting-a", "decision-a")).toBe("decision-meeting-a-decision-a");
+    expect(programDecisionTaskId("meeting-a", "decision-a")).toBe(programDecisionTaskId("meeting-a", "decision-a"));
+
+    const directTask = { id: "direct", title: "직접 연결", done: false, sourceMeetingId: "m1", sourceDecisionId: "d1", createdAt: 1, updatedAt: 1 };
+    expect(programTaskDecisionLink(base(), directTask)).toEqual({ meetingId: "m1", decisionId: "d1" });
+
+    const legacy = base({ meetings: {
+      m2: { title: "회의", date: "2026-09-05", decisions: {
+        d2: { title: "결정", status: "decided", taskId: "legacy-task", createdAt: 1, updatedAt: 1 },
+      }, createdAt: 1, updatedAt: 1 },
+    } } as never);
+    expect(programTaskDecisionLink(legacy, { id: "legacy-task", title: "이전 연결", done: false, createdAt: 1, updatedAt: 1 })).toEqual({ meetingId: "m2", decisionId: "d2" });
+  });
+
+  it("회의 원문은 공개 프로그램이 아니라 관리자 전용 경로를 사용한다", () => {
+    expect(paths.programs("retreat-a")).toBe("retreats/retreat-a/programs");
+    expect(paths.programMeetings("retreat-a", "program-a")).toBe("retreatsPrivate/retreat-a/programMeetings/program-a");
+    expect(paths.programDecision("retreat-a", "program-a", "meeting-a", "decision-a"))
+      .toBe("retreatsPrivate/retreat-a/programMeetings/program-a/meeting-a/decisions/decision-a");
   });
 });
 
@@ -299,10 +460,9 @@ describe("게임 ↔ 물품·역할 연결", () => {
     expect(groups[1].entries).toEqual([]);
   });
 
-  it("준비율이 게임·역할·물품도 센다", () => {
-    // 본문만 보던 시절에는 게임을 아무리 채워도 0%였다.
+  it("준비율은 일부 블록만 채운 상태를 완료로 세지 않는다", () => {
     const readiness = programReadiness(program);
-    expect(readiness.readyLabels).toEqual(expect.arrayContaining(["게임 구성", "역할", "물품"]));
-    expect(readiness.total).toBe(8);
+    expect(readiness.missingLabels).toEqual(expect.arrayContaining(["게임 구성", "역할", "물품", "사전 테스트"]));
+    expect(readiness.total).toBe(10);
   });
 });

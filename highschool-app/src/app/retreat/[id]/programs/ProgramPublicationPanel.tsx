@@ -2,6 +2,7 @@
 
 import { CaretDown, CheckCircle, Eye, LockKey, WarningCircle } from "@phosphor-icons/react";
 import PublishedProgramCard from "@/components/PublishedProgramCard";
+import { canPublishProgram, programTasks, programTaskStatus } from "@/lib/programPreparation";
 import type { Group, RetreatProgram } from "@/lib/types";
 
 type Readiness = {
@@ -31,7 +32,8 @@ export default function ProgramPublicationPanel({
   onRequestUnpublish,
 }: Props) {
   const published = program.status === "published";
-  const ready = readiness.percent === 100;
+  const ready = canPublishProgram(program);
+  const incompleteTasks = programTasks(program).filter((task) => programTaskStatus(task) !== "done").length;
 
   return (
     <section className="program-publication" aria-labelledby="program-publication-heading" data-published={published ? "true" : "false"}>
@@ -46,12 +48,14 @@ export default function ProgramPublicationPanel({
             ? "이가드 정보 화면에서 이 프로그램을 볼 수 있습니다. 내용을 바꾸면 공유 화면에도 바로 반영됩니다."
             : ready
               ? "준비 항목을 모두 확인했습니다. 공유하면 이가드 정보 화면에 즉시 표시됩니다."
-              : `아직 ${readiness.missingLabels.length}개 준비가 남았습니다: ${readiness.missingLabels.join(", ")}`}
+              : readiness.missingLabels.length > 0
+                ? `아직 ${readiness.missingLabels.length}개 현장 점검이 남았습니다: ${readiness.missingLabels.join(", ")}`
+                : `현장 점검은 끝났지만 실행 할 일 ${incompleteTasks}건이 남았습니다.`}
         </p>
       </div>
       <div className="program-publication__action">
         <strong>{readiness.ready}/{readiness.total}</strong>
-        <span>준비 완료</span>
+        <span>{incompleteTasks > 0 ? `할 일 ${incompleteTasks}건 남음` : "준비 완료"}</span>
         {canEdit && (published ? (
           <button type="button" className="btn-secondary" disabled={busy} onClick={onRequestUnpublish}>
             <WarningCircle aria-hidden="true" size={16} /> 공유 해제

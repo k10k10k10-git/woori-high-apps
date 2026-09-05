@@ -132,8 +132,46 @@ export interface RetreatProgramTask {
   id: string;
   title: string;
   assignee?: string;
-  dueDate?: string;
+  dueDate?: string | null;
+  /** 기존 done만 있는 행은 todo/done으로 읽는다. */
+  status?: "todo" | "doing" | "blocked" | "done";
+  priority?: "normal" | "high";
+  /** 특정 진행 블록에서 만들어진 작업. */
+  postId?: string;
+  /** 회의 결정에서 만들어진 작업이면 원본 결정을 추적한다. */
+  sourceDecisionId?: string;
+  /** 같은 결정 ID가 다른 회의에서도 생길 수 있으므로 원본 회의도 함께 추적한다. */
+  sourceMeetingId?: string;
+  blocker?: string;
   done: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type RetreatProgramDecisionStatus = "discussing" | "decided" | "deferred";
+
+export interface RetreatProgramDecision {
+  id: string;
+  title: string;
+  status: RetreatProgramDecisionStatus;
+  assignee?: string;
+  dueDate?: string | null;
+  postId?: string;
+  taskId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 한 번의 프로그램 준비회의. 관리자 전용 retreatsPrivate에 저장하며 결정은 회의 하위에 둔다. */
+export interface RetreatProgramMeeting {
+  id: string;
+  title: string;
+  date: string;
+  agenda?: string;
+  notes?: string;
+  nextMeetingDate?: string | null;
+  closed?: boolean;
+  decisions?: Record<string, RetreatProgramDecision>;
   createdAt: number;
   updatedAt: number;
 }
@@ -151,6 +189,9 @@ export interface RetreatProgramPost {
   /** 개인·기존 조·연합팀 등 참가자 묶음. 없으면 구버전 기본값(기존 조)으로 읽는다. */
   participationMode?: RetreatProgramParticipationMode;
   scoreEnabled?: boolean;
+  /** 현장 리허설이 필요한 블록만 상태를 기록한다. */
+  testStatus?: "notNeeded" | "needed" | "testing" | "passed";
+  blocker?: string;
   concept?: string;
   place?: string;
   duration?: string;
@@ -238,9 +279,9 @@ export interface RetreatProgramRole {
 }
 
 /**
- * 수련회 프로그램 준비 원본.
- * 행정이 소유하는 retreats/{id}/programs 아래에 두고,
- * 이가드는 published 상태만 읽어 현장에 보여준다.
+ * 수련회 프로그램의 공개 준비 원본.
+ * 행정이 소유하는 retreats/{id}/programs 아래에 두고 이가드는 published 상태만 읽는다.
+ * meetings는 retreatsPrivate에서 별도 구독한 뒤 편집 화면에서만 병합하는 런타임 필드다.
  */
 export interface RetreatProgram {
   id: string;
@@ -268,6 +309,7 @@ export interface RetreatProgram {
   ideas?: string;
   decisions?: string;
   tasks?: Record<string, RetreatProgramTask>;
+  meetings?: Record<string, RetreatProgramMeeting>;
   posts?: Record<string, RetreatProgramPost>;
   items?: Record<string, RetreatProgramItem>;
   roles?: Record<string, RetreatProgramRole>;
