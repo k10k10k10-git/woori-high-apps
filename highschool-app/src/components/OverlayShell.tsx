@@ -51,7 +51,7 @@ export default function OverlayShell({
       }
       if (event.key !== "Tab" || !panelRef.current) return;
       const focusable = [...panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
-        .filter((element) => element.getClientRects().length > 0);
+        .filter((element) => element.tabIndex >= 0 && element.getClientRects().length > 0);
       if (focusable.length === 0) {
         event.preventDefault();
         panelRef.current.focus();

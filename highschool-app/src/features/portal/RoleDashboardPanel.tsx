@@ -22,6 +22,8 @@ export default function RoleDashboardPanel() {
   const assignmentCount = (data.personalApplication ? 1 : 0)
     + data.personalRetreat.groups.length
     + data.personalRetreat.duties.length;
+  const ready = data.loaded && !data.loadError;
+  const pendingDetail = data.loadError ? "정보를 불러오지 못했습니다" : "정보를 확인하고 있습니다";
 
   return (
     <div className="mypage-dashboard space-y-5">
@@ -29,7 +31,7 @@ export default function RoleDashboardPanel() {
         <div>
           <p className="text-xs font-bold text-emerald-700">{describeRoles(data.roles)}</p>
           <h3 className="mt-1 text-lg font-bold text-slate-950">{roleDashboardTitle(data.roles)}</h3>
-          <p className="mt-1 text-xs leading-5 text-slate-500">허용된 사역 영역의 일정과 배정만 실시간으로 모았습니다.</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">내 사역의 일정과 배정, 요청 상태를 한곳에서 확인하세요.</p>
         </div>
         <ConnectionBadge connected={data.connected} />
       </div>
@@ -45,29 +47,32 @@ export default function RoleDashboardPanel() {
           icon={<ClockCountdown weight="duotone" />}
           label="다가오는 일정"
           value={data.homeActions.length}
-          detail={data.homeActions[0] ? `${data.homeActions[0].dayLabel} ${data.homeActions[0].title}` : "예정된 일정 없음"}
+          detail={ready ? data.homeActions[0] ? `${data.homeActions[0].dayLabel} ${data.homeActions[0].title}` : "예정된 일정 없음" : pendingDetail}
           loading={!data.loaded}
+          unavailable={!!data.loadError}
         />
         <Metric
           icon={<EnvelopeSimple weight="duotone" />}
           label="처리 중인 내 요청"
           value={data.requestSummary.received}
-          detail={`해결 ${data.requestSummary.resolved}건`}
+          detail={ready ? `해결 ${data.requestSummary.resolved}건` : pendingDetail}
           loading={!data.loaded}
+          unavailable={!!data.loadError}
         />
         <Metric
           icon={<UserFocus weight="duotone" />}
           label="확인된 내 배정"
           value={assignmentCount}
-          detail="학기·조·현장 역할 합계"
+          detail={ready ? "학기·조·현장 역할 합계" : pendingDetail}
           loading={!data.loaded}
+          unavailable={!!data.loadError}
         />
         <Metric
           icon={<Compass weight="duotone" />}
           label="사용 가능 영역"
           value={modules.length}
           detail="현재 역할 기준"
-          loading={!data.loaded}
+          loading={false}
         />
       </section>
 
@@ -78,10 +83,10 @@ export default function RoleDashboardPanel() {
               <h4 id="mypage-actions-title">지금 확인할 일</h4>
               <p>공유 캘린더에서 가까운 일정과 미완료 준비를 날짜순으로 보여 줍니다.</p>
             </div>
-            <span>{data.homeActions.length}건</span>
+            <span>{ready ? `${data.homeActions.length}건` : "—"}</span>
           </div>
           <div className="mypage-row-list">
-            {data.homeActions.length > 0 ? data.homeActions.slice(0, 5).map((item) => {
+            {!ready ? <div className="mypage-empty" role={data.loadError ? undefined : "status"}><p>{pendingDetail}</p></div> : data.homeActions.length > 0 ? data.homeActions.slice(0, 5).map((item) => {
               const content = (
                 <>
                   <span className={`mypage-day mypage-day--${item.urgency}`}>{item.dayLabel}</span>
@@ -111,13 +116,13 @@ export default function RoleDashboardPanel() {
           <dl className="mypage-context-list">
             <div>
               <dt>학기</dt>
-              <dd>{data.currentSemester?.meta.title ?? "현재 학기 없음"}</dd>
-              <small>{data.currentSemester?.id ?? "등록된 학기를 확인해 주세요"}</small>
+              <dd>{ready ? data.currentSemester?.meta.title ?? "현재 학기 없음" : "—"}</dd>
+              <small>{ready ? data.currentSemester?.id ?? "등록된 학기를 확인해 주세요" : pendingDetail}</small>
             </div>
             <div>
               <dt>수련회</dt>
-              <dd>{data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 수련회 없음"}</dd>
-              <small>{data.currentRetreat ? "현장 배정은 이 수련회를 기준으로 표시" : "등록된 수련회를 확인해 주세요"}</small>
+              <dd>{ready ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 수련회 없음" : "—"}</dd>
+              <small>{ready ? data.currentRetreat ? "현장 배정은 이 수련회를 기준으로 표시" : "등록된 수련회를 확인해 주세요" : pendingDetail}</small>
             </div>
           </dl>
         </section>
@@ -132,13 +137,13 @@ export default function RoleDashboardPanel() {
             </div>
             <Link href="/sunday-ministry/barnabas">바나바팀 열기 <ArrowRight weight="bold" /></Link>
           </div>
-          <div className="mypage-inline-stats">
+          {ready ? <div className="mypage-inline-stats">
             <InlineStat label="전체" value={data.newFriendSummary.total} />
             <InlineStat label="진행 중" value={data.newFriendSummary.active} tone="attention" />
             <InlineStat label="반배정 대기" value={data.newFriendSummary.classPending} tone="attention" />
             <InlineStat label="출석부 반영 대기" value={data.newFriendSummary.rosterPending} tone="attention" />
             <InlineStat label="완료" value={data.newFriendSummary.completed} tone="success" />
-          </div>
+          </div> : <div className="mypage-empty"><p>{pendingDetail}</p></div>}
         </section>
       )}
 
@@ -176,19 +181,20 @@ function ConnectionBadge({ connected }: { connected: boolean | null }) {
   );
 }
 
-function Metric({ icon, label, value, detail, loading }: {
+function Metric({ icon, label, value, detail, loading, unavailable = false }: {
   icon: React.ReactNode;
   label: string;
   value: number;
   detail: string;
   loading: boolean;
+  unavailable?: boolean;
 }) {
   return (
     <div className="mypage-metric">
       <span className="mypage-metric-icon">{icon}</span>
       <span className="min-w-0">
         <small>{label}</small>
-        {loading ? <span className="mypage-skeleton" /> : <strong>{value}<b>건</b></strong>}
+        {unavailable ? <strong aria-label="확인할 수 없음">—</strong> : loading ? <span className="mypage-skeleton" aria-label="불러오는 중" /> : <strong>{value}<b>건</b></strong>}
         <em>{detail}</em>
       </span>
     </div>

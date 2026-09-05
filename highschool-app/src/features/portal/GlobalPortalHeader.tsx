@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CaretDown, DotsThree, SignOut, UserCircle } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
-import MyPageModal, { type MyPageTab } from "./MyPageModal";
+import type { MyPageTab } from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
 import ThemeToggle from "@/components/ThemeToggle";
 import ViewModeToggle from "@/components/ViewModeToggle";
@@ -14,7 +15,10 @@ import { useViewMode } from "@/context/ViewModeContext";
 import { canAccessArea, canAccessSundayTeam, canManageRolesOf, ownSundayTeam } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
+const MyPageModal = dynamic(() => import("./MyPageModal"), { ssr: false });
+
 type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
+type MyPageSession = { pathname: string; uid: string; initialTab: MyPageTab };
 
 type NavItem = { href: string; label: string; hint: string; disabled?: boolean };
 
@@ -122,20 +126,22 @@ export default function GlobalPortalHeader() {
   const pathname = usePathname();
   const { user, loading, roles, signOut } = useAuth();
   const { mode, isViewportMobile } = useViewMode();
-  const [myPageOpen, setMyPageOpen] = useState(false);
-  const [myPageInitialTab, setMyPageInitialTab] = useState<MyPageTab>("dashboard");
+  const [myPage, setMyPage] = useState<MyPageSession | null>(null);
   const [openMenu, setOpenMenu] = useState<"sunday" | "vacation" | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const currentArea = activeArea(pathname);
+  // 다른 업무로 이동하면 이전 모달을 폐기한다. 뒤로가기로 돌아와도 다시 열리지 않는다.
+  if (myPage && (myPage.pathname !== pathname || myPage.uid !== user?.uid)) {
+    setMyPage(null);
+  }
+  const openMyPage = useCallback((tab: MyPageTab = "dashboard") => {
+    if (!user) return;
+    setMyPage({ pathname, uid: user.uid, initialTab: tab });
+  }, [pathname, user]);
   const openTeam = useCallback(() => {
     if (!canManageRolesOf(roles)) return;
-    setMyPageInitialTab("team");
-    setMyPageOpen(true);
-  }, [roles]);
-  const openMyPage = useCallback((tab: MyPageTab = "dashboard") => {
-    setMyPageInitialTab(tab);
-    setMyPageOpen(true);
-  }, []);
+    openMyPage("team");
+  }, [openMyPage, roles]);
   const closeMenu = useCallback(() => setOpenMenu(null), []);
   const openSunday = useCallback(() => setOpenMenu("sunday"), []);
   const openVacation = useCallback(() => setOpenMenu("vacation"), []);
@@ -205,7 +211,7 @@ export default function GlobalPortalHeader() {
             </div>
           </div>
         </header>
-        {myPageOpen && <MyPageModal initialTab={myPageInitialTab} onClose={() => setMyPageOpen(false)} />}
+        {myPage && <MyPageModal initialTab={myPage.initialTab} onClose={() => setMyPage(null)} />}
       </>
     );
   }
@@ -340,7 +346,7 @@ export default function GlobalPortalHeader() {
             </div>
         </OverlayShell>
       )}
-      {myPageOpen && <MyPageModal initialTab={myPageInitialTab} onClose={() => setMyPageOpen(false)} />}
+      {myPage && <MyPageModal initialTab={myPage.initialTab} onClose={() => setMyPage(null)} />}
     </>
   );
 }

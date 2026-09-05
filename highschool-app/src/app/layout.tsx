@@ -6,6 +6,7 @@ import "./portal-surfaces.css";
 import "./theme-compat.css";
 import "./interaction-controls.css";
 import "./program-preparation.css";
+import "./my-page-workspace.css";
 import Providers from "./providers";
 import UpdateBanner from "./UpdateBanner";
 import PortalViewportShell from "@/components/PortalViewportShell";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   subscribeAllAttendance,
@@ -62,126 +62,175 @@ import {
   summarizeNewFriends,
 } from "./myPageDashboard";
 
-const EMPTY_ATTENDANCE: Record<string, SessionAttendance> = {};
+const EMPTY_BASE = {
+  connected: null as boolean | null,
+  semesters: [] as Semester[],
+  retreats: [] as Retreat[],
+  milestones: [] as Milestone[],
+  requests: [] as SiteRequest[],
+  newFriends: [] as SundayNewFriend[],
+};
+const BASE_LABELS = { connected: "연결 상태", semesters: "학기 목록", retreats: "수련회 목록", milestones: "공유 일정", requests: "내 요청", newFriends: "새친구" };
+const EMPTY_PERIODS = { periods: [] as RetreatPeriodWithOwner[] };
+const PERIOD_LABELS = { periods: "수련회 기간" };
+const EMPTY_SEMESTER = {
+  sessions: [] as Session[], applications: [] as Application[], teams: [] as Team[],
+  trainingClasses: [] as TrainingClass[], attendance: {} as Record<string, SessionAttendance>,
+};
+const SEMESTER_LABELS = { sessions: "학기 회차", applications: "학기 신청", teams: "사역팀", trainingClasses: "훈련 반", attendance: "학기 사역팀 출석" };
+const EMPTY_RETREAT = {
+  groups: [] as Group[], teachers: [] as TeacherAttendance[], groupStaff: {} as Record<string, string[]>,
+  schedule: [] as IguardScheduleBlock[], segments: [] as IguardSegment[],
+  movements: [] as IguardMovement[], posts: [] as IguardPost[],
+};
+const RETREAT_LABELS = { groups: "조 편성", teachers: "교사 참석", groupStaff: "조스탭", schedule: "현장 일정", segments: "현장 구간", movements: "현장 동선", posts: "현장 포스트" };
+
+/** 계정·권한·행사 전환 직후에는 이전 응답을 표시하지 않는다. */
+function useMyPageSnapshot<T extends object>(scope: string, initial: T, labels: Record<keyof T, string>) {
+  const [state, setState] = useState<{ scope: string; revision: number; values: T; settled: Partial<Record<keyof T, boolean>> }>({ scope, revision: 0, values: initial, settled: {} });
+  // 다른 계정을 거쳤다가 돌아와도 첫 계정의 스냅샷이 다시 드러나지 않게 폐기한다.
+  const revision = state.scope === scope ? state.revision : state.revision + 1;
+  if (state.scope !== scope) setState({ scope, revision, values: initial, settled: {} });
+  const { fail, ok, message } = useLoadErrors(`${scope}|${revision}`);
+  const receive = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
+    setState((previous) => {
+      const current = previous.scope === scope ? previous : { values: initial, settled: {} };
+      return { scope, revision, values: { ...current.values, [key]: value }, settled: { ...current.settled, [key]: true } };
+    });
+    ok(labels[key]);
+  }, [initial, labels, ok, revision, scope]);
+  const reject = useCallback((key: keyof T, error: Error) => {
+    setState((previous) => {
+      const current = previous.scope === scope ? previous : { values: initial, settled: {} };
+      return { scope, revision, values: { ...current.values, [key]: initial[key] }, settled: { ...current.settled, [key]: true } };
+    });
+    fail(labels[key])(error);
+  }, [fail, initial, labels, revision, scope]);
+  const settled: Partial<Record<keyof T, boolean>> = state.scope === scope ? state.settled : {};
+  return {
+    values: state.scope === scope ? state.values : initial,
+    settled,
+    receive,
+    reject,
+    loadError: message,
+  };
+}
+
+/** 해제된 구독의 늦은 성공·실패가 다음 계정/기간의 상태를 덮지 않게 한다. */
+function subscriptionGroup<T extends object>(
+  receive: <K extends keyof T>(key: K, value: T[K]) => void,
+  reject: (key: keyof T, error: Error) => void,
+) {
+  let active = true;
+  const unsubs: (() => void)[] = [];
+  return {
+    add<K extends keyof T>(key: K, connect: (success: (value: T[K]) => void, failure: (error: Error) => void) => () => void) {
+      unsubs.push(connect(
+        (value) => { if (active) receive(key, value); },
+        (error) => { if (active) reject(key, error); },
+      ));
+    },
+    close() {
+      active = false;
+      unsubs.forEach((unsubscribe) => unsubscribe());
+    },
+  };
+}
 
 export function useMyPageData() {
   const { user, roles, memberName } = useAuth();
   const [today] = useState(seoulDateKey);
-  const [connected, setConnected] = useState<boolean | null>(null);
-  const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [retreats, setRetreats] = useState<Retreat[]>([]);
-  const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [requests, setRequests] = useState<SiteRequest[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
-  const [attendance, setAttendance] = useState<Record<string, SessionAttendance>>(EMPTY_ATTENDANCE);
-  const [newFriends, setNewFriends] = useState<SundayNewFriend[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [teachers, setTeachers] = useState<TeacherAttendance[]>([]);
-  const [groupStaff, setGroupStaff] = useState<Record<string, string[]>>({});
-  const [schedule, setSchedule] = useState<IguardScheduleBlock[]>([]);
-  const [segments, setSegments] = useState<IguardSegment[]>([]);
-  const [movements, setMovements] = useState<IguardMovement[]>([]);
-  const [posts, setPosts] = useState<IguardPost[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const { fail, ok, message: loadError } = useLoadErrors(`my-page|${user?.uid ?? "signed-out"}`);
+  const uid = user?.uid;
+  const accountScope = JSON.stringify([uid ?? "signed-out", roles.semester, roles.retreat]);
   const hasPortalAccess = canAccessArea("home", roles);
+  const hasSemesterAccess = canAccessArea("semester", roles);
+  const hasNewFriendsAccess = canAccessArea("sunday", roles) && canAccessSundayTeam("barnabas", roles);
+  const hasFieldAccess = iguardScopeOf(roles) !== "none";
+  const base = useMyPageSnapshot(accountScope, EMPTY_BASE, BASE_LABELS);
+  const { connected, semesters, retreats, milestones, requests, newFriends } = base.values;
+  const { receive: receiveBase, reject: rejectBase } = base;
 
   useEffect(() => {
-    if (!user) return;
-    const unsubs = [
-      subscribeToConnection(setConnected),
-      subscribeToMySiteRequests(user.uid, (values) => {
-        setRequests(values);
-        ok("내 요청");
-      }, fail("내 요청")),
-    ];
+    if (!uid) return;
+    const subscriptions = subscriptionGroup<typeof EMPTY_BASE>(receiveBase, rejectBase);
+    subscriptions.add("connected", subscribeToConnection);
+    subscriptions.add("requests", (success, failure) => subscribeToMySiteRequests(uid, success, failure));
     if (hasPortalAccess) {
-      unsubs.push(
-        subscribeToRetreats((values) => {
-          setRetreats([...values].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
-          setLoaded(true);
-          ok("수련회 목록");
-        }, (error) => {
-          fail("수련회 목록")(error);
-          setLoaded(true);
-        }),
-        subscribeToMilestones((values) => {
-          setMilestones(values);
-          ok("공유 일정");
-        }, fail("공유 일정")),
-      );
+      subscriptions.add("retreats", (success, failure) => subscribeToRetreats(
+        (values) => success([...values].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt)), failure,
+      ));
+      subscriptions.add("milestones", subscribeToMilestones);
     }
-    if (canAccessArea("semester", roles)) {
-      unsubs.push(subscribeSemesters((values) => {
-        setSemesters(values);
-        ok("학기 목록");
-      }, fail("학기 목록")));
-    }
-    if (canAccessArea("sunday", roles) && canAccessSundayTeam("barnabas", roles)) {
-      unsubs.push(subscribeSundayNewFriends((values) => {
-        setNewFriends(values);
-        ok("새친구");
-      }, fail("새친구")));
-    }
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [fail, hasPortalAccess, ok, roles, user]);
+    if (hasSemesterAccess) subscriptions.add("semesters", subscribeSemesters);
+    if (hasNewFriendsAccess) subscriptions.add("newFriends", subscribeSundayNewFriends);
+    return subscriptions.close;
+  }, [hasNewFriendsAccess, hasPortalAccess, hasSemesterAccess, receiveBase, rejectBase, uid]);
 
   // 기간 시작일이 같으면 수련회 목록의 순서로 선택하므로 ID 순서를 보존한다.
   const retreatIdsKey = JSON.stringify(retreats.map((retreat) => retreat.id));
+  const periodData = useMyPageSnapshot(`${accountScope}|periods|${retreatIdsKey}`, EMPTY_PERIODS, PERIOD_LABELS);
+  const { periods } = periodData.values;
+  const { receive: receivePeriods, reject: rejectPeriods } = periodData;
   useEffect(() => {
-    if (!user || !hasPortalAccess) return;
-    return subscribeToAllRetreatPeriods(JSON.parse(retreatIdsKey) as string[], (values) => {
-      setPeriods(values);
-      ok("수련회 기간");
-    }, fail("수련회 기간"));
-  }, [fail, hasPortalAccess, ok, retreatIdsKey, user]);
+    if (!uid || !hasPortalAccess) return;
+    const subscriptions = subscriptionGroup<typeof EMPTY_PERIODS>(receivePeriods, rejectPeriods);
+    subscriptions.add("periods", (success, failure) => subscribeToAllRetreatPeriods(JSON.parse(retreatIdsKey) as string[], success, failure));
+    return subscriptions.close;
+  }, [hasPortalAccess, receivePeriods, rejectPeriods, retreatIdsKey, uid]);
 
-  const currentSemester = useMemo(() => (
+  const currentSemester = useMemo<Semester | null>(() => (
     semesters.find((semester) => {
       const { startDate, endDate } = semester.meta;
       return !!startDate && !!endDate && startDate <= today && today <= endDate;
     }) ?? semesters[0] ?? null
   ), [semesters, today]);
-
+  const currentSemesterId = currentSemester?.id;
+  const semesterData = useMyPageSnapshot(`${accountScope}|semester|${currentSemesterId ?? ""}`, EMPTY_SEMESTER, SEMESTER_LABELS);
+  const { sessions, applications, teams, trainingClasses, attendance } = semesterData.values;
+  const { receive: receiveSemester, reject: rejectSemester } = semesterData;
   useEffect(() => {
-    if (!user || !currentSemester || !canAccessArea("semester", roles)) return;
-    const sid = currentSemester.id;
-    const unsubs = [
-      subscribeSessions(sid, (values) => { setSessions(values); ok("학기 회차"); }, fail("학기 회차")),
-      subscribeApplications(sid, (values) => { setApplications(values); ok("학기 신청"); }, fail("학기 신청")),
-      subscribeTeams(sid, (values) => { setTeams(values); ok("사역팀"); }, fail("사역팀")),
-      subscribeTrainingClasses(sid, (values) => { setTrainingClasses(values); ok("훈련 반"); }, fail("훈련 반")),
-      subscribeAllAttendance(sid, "team", (values) => { setAttendance(values); ok("학기 사역팀 출석"); }, fail("학기 사역팀 출석")),
-    ];
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [currentSemester, fail, ok, roles, user]);
+    if (!uid || !currentSemesterId || !hasSemesterAccess) return;
+    const subscriptions = subscriptionGroup<typeof EMPTY_SEMESTER>(receiveSemester, rejectSemester);
+    subscriptions.add("sessions", (success, failure) => subscribeSessions(currentSemesterId, success, failure));
+    subscriptions.add("applications", (success, failure) => subscribeApplications(currentSemesterId, success, failure));
+    subscriptions.add("teams", (success, failure) => subscribeTeams(currentSemesterId, success, failure));
+    subscriptions.add("trainingClasses", (success, failure) => subscribeTrainingClasses(currentSemesterId, success, failure));
+    subscriptions.add("attendance", (success, failure) => subscribeAllAttendance(currentSemesterId, "team", success, failure));
+    return subscriptions.close;
+  }, [currentSemesterId, hasSemesterAccess, receiveSemester, rejectSemester, uid]);
 
-  const currentRetreat = useMemo(() => {
+  const currentRetreat = useMemo<Retreat | null>(() => {
     const active = periods.find((period) => period.startDate <= today && today <= period.endDate);
     if (active) return retreats.find((retreat) => retreat.id === active.retreatId) ?? null;
     const next = periods.find((period) => period.startDate >= today);
     return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
   }, [periods, retreats, today]);
-
   const currentRetreatId = currentRetreat?.id;
+  const retreatData = useMyPageSnapshot(`${accountScope}|retreat|${currentRetreatId ?? ""}`, EMPTY_RETREAT, RETREAT_LABELS);
+  const { groups, teachers, groupStaff, schedule, segments, movements, posts } = retreatData.values;
+  const { receive: receiveRetreat, reject: rejectRetreat } = retreatData;
   useEffect(() => {
-    if (!user || !currentRetreatId || iguardScopeOf(roles) === "none") return;
-    const id = currentRetreatId;
-    const unsubs = [
-      subscribeToGroups(id, (values) => { setGroups(values); ok("조 편성"); }, fail("조 편성")),
-      subscribeToTeacherAttendances(id, (values) => { setTeachers(values); ok("교사 참석"); }, fail("교사 참석")),
-      subscribeToIguardGroupStaff(id, (values) => { setGroupStaff(values); ok("조스탭"); }, fail("조스탭")),
-      subscribeToIguardSchedule(id, (values) => { setSchedule(values); ok("현장 일정"); }, fail("현장 일정")),
-      subscribeToIguardSegments(id, (values) => { setSegments(values); ok("현장 구간"); }, fail("현장 구간")),
-      subscribeToIguardMovements(id, (values) => { setMovements(values); ok("현장 동선"); }, fail("현장 동선")),
-      subscribeToIguardPosts(id, (values) => { setPosts(values); ok("현장 포스트"); }, fail("현장 포스트")),
-    ];
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [currentRetreatId, fail, ok, roles, user]);
+    if (!uid || !currentRetreatId || !hasFieldAccess) return;
+    const subscriptions = subscriptionGroup<typeof EMPTY_RETREAT>(receiveRetreat, rejectRetreat);
+    subscriptions.add("groups", (success, failure) => subscribeToGroups(currentRetreatId, success, failure));
+    subscriptions.add("teachers", (success, failure) => subscribeToTeacherAttendances(currentRetreatId, success, failure));
+    subscriptions.add("groupStaff", (success, failure) => subscribeToIguardGroupStaff(currentRetreatId, success, failure));
+    subscriptions.add("schedule", (success, failure) => subscribeToIguardSchedule(currentRetreatId, success, failure));
+    subscriptions.add("segments", (success, failure) => subscribeToIguardSegments(currentRetreatId, success, failure));
+    subscriptions.add("movements", (success, failure) => subscribeToIguardMovements(currentRetreatId, success, failure));
+    subscriptions.add("posts", (success, failure) => subscribeToIguardPosts(currentRetreatId, success, failure));
+    return subscriptions.close;
+  }, [currentRetreatId, hasFieldAccess, receiveRetreat, rejectRetreat, uid]);
+
+  const baseLoaded = !!base.settled.requests
+    && (!hasPortalAccess || !!base.settled.retreats && !!base.settled.milestones)
+    && (!hasSemesterAccess || !!base.settled.semesters)
+    && (!hasNewFriendsAccess || !!base.settled.newFriends);
+  const loaded = !uid || baseLoaded
+    && (!hasPortalAccess || !!periodData.settled.periods)
+    && (!currentSemesterId || !hasSemesterAccess || Object.keys(EMPTY_SEMESTER).every((key) => semesterData.settled[key as keyof typeof EMPTY_SEMESTER]))
+    && (!currentRetreatId || !hasFieldAccess || Object.keys(EMPTY_RETREAT).every((key) => retreatData.settled[key as keyof typeof EMPTY_RETREAT]));
+  const loadError = [base.loadError, periodData.loadError, semesterData.loadError, retreatData.loadError].filter(Boolean).join(" · ") || null;
 
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
     const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters";
@@ -244,7 +293,7 @@ export function useMyPageData() {
     memberName,
     today,
     connected,
-    loaded: !hasPortalAccess || loaded,
+    loaded,
     loadError,
     currentSemester,
     currentRetreat,
