@@ -4,7 +4,7 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
-## 2026-09-05 최신 작업 — 프로젝트 감사 발견 사항 보강 (PR·배포 대기)
+## 2026-09-05 최신 작업 — 프로젝트 감사 발견 사항 보강 (PR #6 병합·운영 배포 완료)
 
 - 감사에서 확인한 네 가지 코드 문제를 수정했다. 학생 앱은 로그인·연도 변경 및 휴지통
   조회 시 자동 삭제를 제거했고, 수동 반 이동을 원본·목적지 dual lock, 서버 보정 시각,
@@ -18,7 +18,8 @@
   보안 workflow도 추가했다.
 - 통합 앱은 lint·typecheck·107파일 846테스트·production build, 학생 앱은 lint 0 errors
   (기존 warnings만)·typecheck·13파일 162테스트·정적 build, Agent OS는 20개 보안 테스트와
-  문법 검사를 통과했다. 인증 E2E는 운영 URL에서 자동 쓰기 가능성을 배제하지 못해 실행하지 않았다.
+  문법 검사를 통과했다. GitHub `authenticated-e2e`는 `E2E_STORAGE_STATE_B64`가 없어 인증 상태
+  가드에서 중단됐고 실제 브라우저 테스트는 실행되지 않았다. 가드를 우회하지 않는다.
 - 변경 전 라이브 Rules는 읽기 전용으로 `attendance-app/tmp/rules-backup/`에 백업했고 당시 소스와
   SHA-256이 일치했다. 사용자가 루트 안전 규칙의 예외를 확인한 뒤 `teacherClasses` 자기 쓰기를
   제거하고 이메일이 일치하는 `userRoles`를
@@ -26,10 +27,23 @@
   계약을 실제 `attendance-app/database.rules.json`·교사 로그인 코드·38개 Rules 계약 테스트에
   반영했고 Firebase dry-run을 통과했다. 라이브 `userRoles`는 개인정보를 출력하지 않고 집계해
   교사 50명 전원의 이메일 키와 `part`·`grade`·`class` 문자열 형태가 새 조건과 일치함을 확인했다.
-  **운영 Rules 배포본은 아직 바꾸지 않았다.**
-- 다음 단계는 2026-09-02 사용자 결정대로 작업 브랜치 PR을 열어 사용자가
-  병합한 뒤 Rules → 학생 Hosting 순서로 진행하고, 통합 앱은 main 자동 배포를 확인한다.
-- 작업 브랜치는 `codex/fix-audit-findings`다. 기존 사용자 변경인
+- PR #6을 병합해 `main`은 `a20a79065e88bc2593635a3ae74e82dc431b3f95`가 됐다. 배포 직전
+  라이브 Rules를 `attendance-app/tmp/rules-backup/predeploy-rules.20260905-175455.json`에 0600으로
+  백업했고 감사 시점 운영본과 JSON 구조가 같음을 확인했다. Rules 배포 후 라이브 전문이 병합 소스와
+  일치했고, 학생 Hosting도 배포해 `/`·`/attendance` 200과 `no-cache` 헤더, 라이브·로컬 서비스워커
+  캐시 `woori-att-1788599249228` 및 파일 SHA 일치를 확인했다. 통합 앱 Vercel Production은 `Ready`이고
+  `/api/version`의 `buildId`가 위 병합 SHA와 같다.
+- Hosting 점검 중 9월 1일 종료 예정이던 데모 모드와 공개 자격정보가 로컬 배포 설정에 남아 있음을
+  확인해 한 차례 비활성화했으나, 사용자가 데모 유지와 롤백 배포를 요청했다. 기존 로컬 정적 번들의
+  유일한 데모 자격정보 상수를 값 출력 없이 복구하고 `NEXT_PUBLIC_DEMO_MODE=1`로 완전 재빌드한 뒤
+  Hosting을 다시 배포했다. 현재 라이브 서비스워커 캐시는 `woori-att-1788600007069`이며 로컬 산출물과
+  SHA가 같다. 운영 브라우저에서 공용 계정 자동 로그인 뒤 `데모 테스트` 부서·학년·반 선택 화면과
+  실제 반 목록이 표시되는 것을 확인했다. Firebase Auth 데모 계정과 `attendanceAdmins/{demoUid}` boolean
+  레코드는 의도적으로 유지한다. 삭제 준비용 임시 스냅샷은 삭제 요청이 취소되어 정리한다.
+- `npm audit` 10건 중 운영 의존성은 6건이다. 이번 PR은 패키지 파일을 바꾸지 않았고 정적 Hosting에서
+  Next 서버·Sharp·PostCSS 경로는 실행되지 않으며, `xlsx`는 내보내기만 사용해 즉시 롤백 사유는 아니다.
+  후속 의존성 PR에서 Next와 전이 의존성을 갱신하고 전체 검증한다. `xlsx`는 자동 수정판이 없어 별도 검토한다.
+- 감사 작업 브랜치는 `codex/fix-audit-findings`다. 기존 사용자 변경인
   `highschool-app/e2e/authenticated-smoke.e2e.ts`, `highschool-app/package-lock.json`,
   `highschool-app/scripts/save-e2e-auth.mjs`와 미추적 `.agents/`·`.gitattributes`·`.impeccable/`는
   이 작업의 스테이징·커밋에서 제외한다.
