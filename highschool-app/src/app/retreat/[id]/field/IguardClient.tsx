@@ -122,7 +122,8 @@ export default function IguardClient() {
   if (lock && !unlocked) return (
     <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/retreat/${id}`)} />
   );
-  return <IguardWorkspace id={id} />;
+  // 같은 현장 탭에서는 상태를 유지하고, 다른 수련회에서는 해당 ID의 캐시·구독으로 시작한다.
+  return <IguardWorkspace key={id} id={id} />;
 }
 
 function IguardWorkspace({ id }: { id: string }) {
@@ -242,7 +243,7 @@ function IguardWorkspace({ id }: { id: string }) {
   if (!user || !fieldAllowed) return null;
   if (!retreat) return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-6">
-      <p className="text-slate-500 mb-4">수련회를 찾을 수 없습니다.</p>
+      <p className="text-slate-500 mb-4" role={loadError ? "alert" : undefined}>{loadError ?? "수련회를 찾을 수 없습니다."}</p>
       <button onClick={() => router.push("/")} className="btn-secondary">홈으로</button>
     </div>
   );

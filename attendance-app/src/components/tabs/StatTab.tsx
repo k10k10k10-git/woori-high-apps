@@ -1,8 +1,10 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp, useClassKey } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
-import { getChart } from '@/utils/chartSetup';
+import { useChartJs } from '@/hooks/useChartJs';
+import type { ChartClass } from '@/utils/chartSetup';
+import ChartLoadState from '@/components/ChartLoadState';
 import ClassTabBar from '@/components/ClassTabBar';
 import { SHOW_ATTENDANCE_RISK_SECTIONS } from '@/lib/releaseFlags';
 import { buildClassStats } from '@/utils/classStats';
@@ -62,6 +64,10 @@ const dataLabelPlugin: any = {
     });
   },
 };
+function initializeStatChart(Chart: ChartClass) {
+  Chart.register(dataLabelPlugin);
+}
+
 export default function StatTab() {
   const { state } = useApp();
   const { curYear, months, attData, classData, events, curView } = state;
@@ -90,18 +96,7 @@ export default function StatTab() {
   const namesFor = (ids: string[]) => ids.slice(0, 5).map(id => studentNames.get(id)).filter(Boolean).join(', ');
 
   const [warningOpen, setWarningOpen] = useState(true);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chartJsRef = useRef<any>(null);
-  const [chartJsReady, setChartJsReady] = useState(false);
-
-  useEffect(() => {
-    getChart().then(Chart => {
-      // Register local plugin for data labels (StatTab-specific)
-      Chart.register(dataLabelPlugin);
-      chartJsRef.current = Chart;
-      setChartJsReady(true);
-    });
-  }, []);
+  const { chartJsRef, chartJsReady, chartLoadError, retryChart } = useChartJs(initializeStatChart);
 
   const classStats = useMemo(
     () => buildClassStats({ months, curView, attData, events }, ck, students),
@@ -120,13 +115,13 @@ export default function StatTab() {
 
   // canvas에 이미 Chart 인스턴스가 있으면 파괴 후 새로 생성
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function safeChart(canvas: HTMLCanvasElement | null, config: any): any | null {
+  const safeChart = useCallback((canvas: HTMLCanvasElement | null, config: any): any | null => {
     const ChartClass = chartJsRef.current;
     if (!canvas || !ChartClass) return null;
     const existing = ChartClass.getChart(canvas);
     if (existing) existing.destroy();
     return new ChartClass(canvas, config);
-  }
+  }, [chartJsRef]);
 
   useEffect(() => {
     if (!chartJsReady) return;
@@ -344,12 +339,13 @@ export default function StatTab() {
       chartInstances.current.forEach(c => { try { c.destroy(); } catch { /* ignore */ } });
       chartInstances.current = [];
     };
-  }, [ck, curView, attData, months, events, students, classStats, chartJsReady]);
+  }, [ck, curView, attData, months, events, students, classStats, chartJsReady, chartJsRef, safeChart]);
 
   return (
     <div>
       {/* 반 탭 */}
       <ClassTabBar />
+      {students.length > 0 && <ChartLoadState ready={chartJsReady} error={chartLoadError} onRetry={retryChart} />}
 
       {allStudents.length === 0 ? (
         <div style={{ textAlign: 'center', color: 'var(--text3)', padding: 40, fontSize: 13 }}>

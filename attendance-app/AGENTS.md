@@ -18,7 +18,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 영역 | 먼저 볼 파일 | 유지할 계약 |
 |---|---|---|
 | 공유 상태·반 선택 | `src/store/AppContext.tsx`, `src/components/ClassTabBar.tsx` | reducer action과 기존 selector 사용 |
-| 인증·데이터 구독 | `src/components/AppShell.tsx`, `src/hooks/useFirebaseData.ts` | 인증 후 구독, 교사 본인 반 범위, 에러 콜백·구독 해제 |
+| 인증·데이터 구독 | `src/components/AppShell.tsx`, `src/components/DataLoadGate.tsx`, `src/hooks/useFirebaseData.ts` | 현재 인증·revision의 응답만 적용, 세 원장 준비 후 페이지 표시, 지속 오류·명시 재시도, 교사 본인 반 범위 |
 | 출석·통계 | `src/components/tabs/AttendanceTab.tsx`, `src/utils/attendanceWorkflow.ts`, `src/utils/dates.ts` | KST 주일·행사 제외·최근 4회·장결 분리 |
 | 학생 명단 | `src/components/modals/`, `src/components/tabs/ManageTab.tsx` | 학생 단일 경로 쓰기·personId·행정 이력 |
 | 시트 동기화 | `src/lib/sheetSync.ts`, `src/components/tabs/SheetSyncSection.tsx` | 미리보기와 payload 분리, 출석·SID 보존 |
@@ -59,6 +59,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 주일 당일 동기화는 오늘 열을 건드리지 않는다. `lastElapsedSundayUTC`와 토·일·월 회귀 테스트를 유지한다. 시트 반 이동은 기존 출석 스냅샷에서 **시트 값이 없는 칸만** 이관한 후 옛 출석 경로를 삭제한다. 스냅샷이 없으면 이관·삭제하지 않는다.
 - 시트 행정 이력은 `describeSheetSyncForClass()`가 변동 없는 반에 `null`을 반환하면 남기지 않는다. `removeMissing`으로 제외되는 학생의 출석은 이관 목적지가 없어 의도적으로 보존한다. 자동 정리되지 않는 `trash/{year}/attendance`를 새로 만들지 않는다.
 - 사진은 `compressImage()`로 압축하고, 인쇄 HTML에 사용자 값을 넣을 때는 `escapeHTML()`을 거친다. 내보내기·차트는 기존 `export.ts`·`chartSetup.ts`의 동적 로딩을 재사용한다.
+- 계정 역할·연도·재조회가 바뀌면 `AppContext.resetData`가 원장·행사·계정 목록·편집 대상을 함께 비우고 `dataRevision`을 증가시킨다. 구독 성공·오류와 관리자 계정 목록 응답에는 요청 당시 revision을 붙인다. `DataLoadGate`의 세 원장 준비 조건을 우회해 이전 자료나 실패한 빈 자료로 편집 화면을 열지 않는다.
+- `watchCalendarYear`는 실제 KST 연도 변경만 알리고 최신 예약 타이머까지 종료한다. `CALENDAR_YEAR_CHANGED`는 직전 달력 연도 조회 중에만 새해로 넘기므로, 수동 과거 연도 선택을 화면 복귀 때 덮어쓰지 않는다.
 
 ## 데모·운영 화면 점검 주의
 
@@ -71,9 +73,19 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 핵심 코드 패턴
 
 ### 통계 차트가 무관한 상태 변경에도 다시 만들어질 때 (2026-09-05)
-- **접근법**: `src/components/tabs/StatTab.tsx`의 effect 의존 배열을 실제 참조와 대조한다 → 매 렌더마다 새로 만드는 미사용 `classKeys`를 제거한다 → `calcStats` 다섯 호출을 `src/utils/classStats.ts`의 한 집계로 묶고 실제 입력으로 메모한다 → 기존 기간별 출력과 30명·52주 fixture의 셀 접근 횟수를 대조한다.
-- **판단 질문**: `useClassKeys`의 다른 소비처는 렌더·클릭용이라 전역 Context 재설계로 넓히지 않았다. 차트 종류·분모·옵션은 유지해 계산 재사용의 효과만 확인했다.
-- **재사용 규칙**: 차트 최적화는 effect를 깨우는 참조와 중복 집계를 함께 확인하고, 동일 출력과 계산 횟수로 검증한다. 셀 조회 감소를 전체 화면 처리시간 감소로 보고하지 않는다.
+- **접근법**: `src/components/tabs/StatTab.tsx`의 effect 의존 배열을 실제 참조와 대조한다 → 매 렌더마다 새로 만드는 미사용 `classKeys`를 제거한다 → `calcStats` 다섯 호출을 `src/utils/classStats.ts`의 한 집계로 묶고 실제 입력으로 메모한다 → `src/components/tabs/overall/OverallDashboard.tsx`의 네 차트를 입력별 effect로 나누고 각 effect가 자신의 인스턴스만 해제하게 한다 → 기존 기간별 출력·셀 접근 횟수와 부서 필터 변경 시 실제 Chart.js 생성·해제 횟수를 대조한다. 로컬 540명·52주 fixture의 차트 부서 필터 한 번 변경에서는 재생성이 네 개에서 해당 한 개로 줄었다.
+- **판단 질문**: `useClassKeys`의 다른 소비처는 렌더·클릭용이라 전역 Context 재설계로 넓히지 않았다. 차트 종류·분모·옵션은 유지해 계산 재사용의 효과만 확인했다. 네 차트를 하나의 effect에 두면 작은 필터 변경도 무관한 세 차트의 해제·생성을 유발하므로 입력별 수명을 분리했다.
+- **재사용 규칙**: 차트 최적화는 effect를 깨우는 참조·중복 집계·인스턴스 소유 범위를 함께 확인하고, 동일 출력과 실제 계산·생성 횟수로 검증한다. 부분 작업량 감소를 전체 화면 처리시간 감소로 보고하지 않는다.
+
+### 계정·연도 전환 중 이전 원장과 편집 대상을 함께 차단하기 (2026-09-05)
+- **접근법**: `__tests__/firebaseDataLifecycle.test.ts`에서 이전 계정·연도 콜백을 새 상태 뒤에 전달한다 → `src/store/AppContext.tsx`의 `resetData`로 원장·행사·계정 목록·모달을 함께 비우고 `dataRevision`을 증가시킨다 → `src/hooks/useFirebaseData.ts`의 구독 success/error 및 `src/components/tabs/AdminTab.tsx`의 계정 목록 조회에 요청 revision을 붙여 reducer에서 거부한다 → `DataLoadGate`는 세 원장의 성공 여부와 지속 오류로 편집 진입을 판정하고 명시 재시도로 새 구독을 연다 → `AppShell`과 `useAuth`의 역할 조회에 요청 번호·실제 UID·해제 여부 검사를 둔다 → `yearRollover.test.ts`로 실제 KST 연도 전환과 마지막 타이머 종료를 확인한다.
+- **판단 질문**: unsubscribe만으로는 React effect cleanup 전 이미 도착한 이전 응답을 막을 수 없어 reducer에도 세대 검사를 둔다. 오류를 빈 원장 성공으로 바꾸거나 지연만으로 편집을 열지 않는다. `SET_YEAR`에서 이전 커스텀 행사로 새해 통계 제외 조건을 만들지 않고, 달력 연도 변경과 사용자의 과거 연도 조회를 분리한다. 이 상태 초기화는 운영 DB 삭제가 아니다.
+- **재사용 규칙**: 데이터 범위가 바뀌는 화면은 `요청 취소 + 응답 적용 시 세대 확인 + 편집 대상 초기화 + 현재 원장 준비 확인`을 함께 구현하고, 실패·지연에는 복구 제어를 유지한다.
+
+### 실패한 차트 로딩을 캐시에 고정하지 않고 다시 시도하기 (2026-09-05)
+- **접근법**: `src/utils/chartSetup.ts`의 `createChartRegistry`에 모듈 로더를 주입한다 → 동시 요청과 성공 결과는 공유하되 실패한 Promise는 비운다 → `createChartLoader`가 반환하는 cleanup으로 화면 해제 뒤 성공·실패 전달을 막는다 → `src/hooks/useChartJs.ts`와 `ChartLoadState`에 오류·명시 재시도를 모은다 → `__tests__/chartSetup.test.ts`에서 실패 후 성공·동시 요청·해제·초기화 예외를 확인하고 로컬 브라우저에서 실패 안내와 키보드 재시도를 점검한다.
+- **판단 질문**: 실패한 Promise를 계속 공유하면 네트워크가 돌아와도 같은 실패만 반복하므로 성공 캐시와 분리한다. 자동 무한 재시도로 오류를 숨기거나 차트 모듈 실패 때문에 이미 계산 가능한 출석 표까지 막지 않는다. 주입한 로더 실패 검증을 실제 Firebase 단절 검증으로 설명하지 않는다.
+- **재사용 규칙**: 지연 로딩 자원은 `동시 요청 공유 → 성공 캐시 → 실패 캐시 해제 → 화면 수명 검사 → 사용자 재시도`를 한 계약으로 검증한다.
 
 ### 학생 반 이동과 화면 진입 정리를 데이터 유실 없이 다루기 (2026-09-05)
 - **접근법**: `sheetSync.ts`의 출석 이관 계약을 먼저 확인한다 → 부·학년 선택 변경 때 반 선택을 초기화한다 → 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 두 leaf 제거는 한 `onDisconnect(yearRef).update()`로 선점 전 등록하고 선점 직후 다시 등록한다 → 서버 시간 오프셋을 확인한 뒤 원본 학생·목적지 반·양쪽 출석을 다시 읽는다 → 목적지 출석 셀을 우선해 병합하고 목적지 반이 없거나 같은 SID 학생이 있으면 중단한다 → 잠금 두 개를 `pending`으로 정확히 전환하면서 `startedAt`을 서버 보정 시각으로 갱신한다 → 종료 예약 취소 완료와 pending 소유권 재확인 뒤, 학생·출석·감사기록·두 잠금 해제·불변 `studentMoveCommits` marker를 단발 루트 REST PATCH에 묶는다 → 성공 후 부·학년·반 선택을 모두 목적지에 맞춘다 → 로그인·연도 변경 및 `TrashModal` 로드 effect에서 삭제 쓰기를 제거한다.
@@ -93,9 +105,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 명령은 `attendance-app/`에서 실행한다. 현재 설치 버전과 지원 범위는 `package.json`·lockfile·로컬 Next 문서로 확인한다.
 
 ```bash
-npm test
-npx tsc --noEmit
 npm run lint
+npm run typecheck
+npm test
 npm run build
 ```
 

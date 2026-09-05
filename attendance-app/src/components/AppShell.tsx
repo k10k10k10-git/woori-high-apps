@@ -18,6 +18,8 @@ import TabNav from '@/components/TabNav';
 import Toast from '@/components/Toast';
 import UpdateBanner from '@/components/UpdateBanner';
 import FirebaseDataLoader from '@/components/FirebaseDataLoader';
+import DataLoadGate from '@/components/DataLoadGate';
+import { watchCalendarYear } from '@/utils/yearRollover';
 
 type AuthState = 'loading' | 'demo-pick' | 'login' | 'app';
 
@@ -52,7 +54,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Firebase Auth 감지
   useEffect(() => {
     dispatch({ type: 'SET_FB_READY' });
+    let active = true;
+    let request = 0;
     const unsub = onAuthStateChanged(auth, async user => {
+      const currentRequest = ++request;
+      const isCurrent = () => active && request === currentRequest
+        && (auth.currentUser?.uid ?? null) === (user?.uid ?? null);
+      if (!isCurrent()) return;
+      dispatch({ type: 'SET_USER_ROLE', payload: null });
+      setAuthState('loading');
       if (user) {
         // 데모 계정으로 로그인된 상태 — userRoles를 읽지 않고 고른 반을 그대로 적용한다.
         if (isDemoAccount(user.email)) {
@@ -61,22 +71,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             setDemoError(null);
             setAuthState('app');
           } else {
-            dispatch({ type: 'SET_USER_ROLE', payload: null });
             setAuthState('demo-pick');
           }
           return;
         }
-        const result = await loadUserRole({ uid: user.uid, email: user.email }, dispatch);
+        const result = await loadUserRole({ uid: user.uid, email: user.email }, dispatch, isCurrent);
+        if (!isCurrent() || result === 'stale') return;
         if (result === 'unauthorized') {
-          await doLogout();
           setAuthError('권한이 부여되지 않은 계정입니다.\n관리자에게 문의해 주세요.');
           setAuthState('login');
+          try { await doLogout(); } catch { /* 권한 없는 화면은 계속 로그인 게이트에 둔다. */ }
         } else {
           setAuthError(null);
           setAuthState('app');
         }
       } else {
-        dispatch({ type: 'SET_USER_ROLE', payload: null });
         // 데모 모드에서는 관리자 로그인을 명시적으로 누른 경우에만 로그인 화면을 띄운다.
         if (DEMO_MODE && !getAdminIntent()) {
           if (!demoConfigured) {
@@ -90,6 +99,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               await doDemoLogin(); // 성공하면 이 콜백이 다시 호출된다
               return;
             } catch (e) {
+              if (!isCurrent()) return;
               const code = (e as { code?: string })?.code ?? '';
               setDemoError(
                 '데모 계정으로 접속하지 못했습니다.\n' +
@@ -105,7 +115,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         setAuthState('login');
       }
     });
-    return unsub;
+    return () => { active = false; request++; unsub(); };
   }, [dispatch, applyDemoSelection]);
 
   // 데모: 반 선택 → 그 반 담임 화면으로
@@ -191,25 +201,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // KST 자정 연도 전환
   useEffect(() => {
     if (authState !== 'app') return;
-    const checkRollover = () => {
-      const newYear = new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear();
-      if (newYear !== state.curYear) {
-        dispatch({ type: 'SET_YEAR', payload: newYear });
-      }
-    };
-    const scheduleMidnight = () => {
-      const nowKST = new Date(Date.now() + 9 * 3600 * 1000);
-      const msUntil =
-        ((23 - nowKST.getUTCHours()) * 3600 +
-          (59 - nowKST.getUTCMinutes()) * 60 +
-          (60 - nowKST.getUTCSeconds())) * 1000 + 1000;
-      return setTimeout(() => { checkRollover(); scheduleMidnight(); }, msUntil);
-    };
-    const timer = scheduleMidnight();
-    const vis = () => { if (!document.hidden) checkRollover(); };
+    const watcher = watchCalendarYear((previousYear, currentYear) => {
+      dispatch({ type: 'CALENDAR_YEAR_CHANGED', payload: { previousYear, currentYear } });
+    });
+    const vis = () => { if (!document.hidden) watcher.check(); };
     document.addEventListener('visibilitychange', vis);
-    return () => { clearTimeout(timer); document.removeEventListener('visibilitychange', vis); };
-  }, [authState, state.curYear, dispatch]);
+    return () => { watcher.stop(); document.removeEventListener('visibilitychange', vis); };
+  }, [authState, dispatch]);
 
   // 로그인 후 모바일 줌 리셋
   // iOS Safari는 input focus 시 자동 확대되는데, 화면 전환 후에도 줌이 유지됨
@@ -256,7 +254,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (authState === 'login') {
     return (
       <LoginScreen
-        onLogin={() => { setAuthError(null); setAuthState('app'); }}
         authError={authError}
         onBackToDemo={DEMO_MODE ? handleBackToDemo : undefined}
       />
@@ -289,7 +286,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             관리자 전용 화면입니다.<br />
             상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.
           </div>
-        ) : children}
+        ) : <DataLoadGate>{children}</DataLoadGate>}
       </div>
       <TabNav />
     </div>

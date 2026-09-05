@@ -33,7 +33,7 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 | `scripts/verify-all.mjs` | 두 앱 품질 검사 후 Agent OS 회귀 테스트 실행 | 루트 `npm run verify` |
 | `.github/workflows/` | CI | 통합·학생 앱 품질 검사와 Agent OS 보안 회귀 테스트 |
 | `.claude/`, `.agents/` | 인수인계·로컬 스킬·설정 | `.claude/HANDOFF.md`가 인수인계의 유일한 원천; `.agents/`는 Codex용 변형이며 중복으로 삭제하지 않음 |
-| `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [최적화 점검](docs/PROJECT_OPTIMIZATION_2026-09-05.md), [앞선 감사](docs/PROJECT_AUDIT_2026-09-05.md) |
+| `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [속도·안정성 보강](docs/SPEED_STABILITY_REVIEW_2026-09-05.md), [최적화 점검](docs/PROJECT_OPTIMIZATION_2026-09-05.md), [앞선 감사](docs/PROJECT_AUDIT_2026-09-05.md) |
 | `outputs/`, `tmp/`, `graphify-out/` | 최종 산출물·중간물·재생성 가능한 코드 그래프 | 소스·운영 데이터 원천으로 취급하지 않음 |
 
 각 앱은 별도 `package.json`·lockfile·`node_modules`를 사용한다. 루트는 npm workspace 설치 관리자가 아니라 검증 실행기다. 스택 버전·테스트 개수는 실제 파일과 실행 결과로 확인한다.

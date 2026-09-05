@@ -112,14 +112,16 @@ export default function PortalHome() {
 
   // 회차 구독과 같은 이유로 user 가드가 필요하다 — 로그아웃해도 retreats 상태가 남아
   // 인증이 끊긴 채 재구독하면서 엉뚱한 permission_denied 배너가 뜬다.
+  // 같은 날짜의 기간은 목록 순서가 우선순위다. 이름만 바뀌면 구독을 유지하고 ID 순서는 보존한다.
+  const retreatIdsKey = JSON.stringify(retreats.map((retreat) => retreat.id));
   useEffect(() => {
     if (!user) return;
     return subscribeToAllRetreatPeriods(
-      retreats.map((retreat) => retreat.id),
+      JSON.parse(retreatIdsKey) as string[],
       (v) => { setPeriods(v); ok("수련회 기간"); },
       fail("수련회 기간"),
     );
-  }, [user, retreats, fail, ok]);
+  }, [user, retreatIdsKey, fail, ok]);
 
   const currentRetreat = useMemo(() => {
     const active = periods.find((period) => period.startDate <= today && today <= period.endDate);

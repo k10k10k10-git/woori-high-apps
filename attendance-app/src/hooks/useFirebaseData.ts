@@ -1,9 +1,8 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { db, ref, onValue, get } from '@/lib/db';
-import { useApp } from '@/store/AppContext';
+import { useApp, type Action, type DataKey } from '@/store/AppContext';
 import { sortAndRenumber, emailToKey } from '@/utils/dates';
-import { showToast } from '@/utils/toast';
 import { dataLoadMessage } from '@/utils/dbError';
 import type { ClassDataMap, AttData, CustomEventData, UserRole, Student } from '@/types';
 
@@ -24,109 +23,86 @@ function toClassInfo(fc: FbClass): ClassDataMap[string] {
   };
 }
 
-// Firebase 실시간 구독 훅
-// 보안/프라이버시: 교사 계정은 본인 반(classes/{year}/{ck})만 구독한다.
-// 관리자만 전체 트리(classes/{year})를 구독한다. 보안 규칙도 이에 맞춰 read를 제한한다.
+// 한 구독 세대의 종료·실패 이후 응답은 적용하지 않는다. 재시도는 화면의 명시 버튼으로만 한다.
+export function subscribeFirebaseData(
+  curYear: number,
+  teacherCk: string | null,
+  revision: number,
+  dispatch: (action: Action) => void,
+): () => void {
+  let active = true;
+  const unsubs: (() => void)[] = [];
+  const subscribe = (
+    key: DataKey,
+    path: string,
+    label: string,
+    onData: (value: unknown) => Action,
+  ) => {
+    let failed = false;
+    const fail = (error: unknown) => {
+      if (!active || failed) return;
+      failed = true;
+      dispatch({ type: 'SET_DATA_ERROR', revision, payload: { key, message: dataLoadMessage(label, error) } });
+    };
+    try {
+      unsubs.push(onValue(ref(db, path), snap => {
+        if (!active || failed) return;
+        try { dispatch(onData(snap.exists() ? snap.val() : null)); }
+        catch (error) { fail(error); }
+      }, fail));
+    } catch (error) { fail(error); }
+  };
+
+  const classPath = teacherCk ? `classes/${curYear}/${teacherCk}` : `classes/${curYear}`;
+  const attendancePath = teacherCk ? `attendance/${curYear}/${teacherCk}` : `attendance/${curYear}`;
+  subscribe('classes', classPath, '학생/반', value => {
+    const payload: ClassDataMap = {};
+    if (value) {
+      if (teacherCk) payload[teacherCk] = toClassInfo(value as FbClass);
+      else Object.entries(value as Record<string, FbClass>).forEach(([ck, info]) => { payload[ck] = toClassInfo(info); });
+    }
+    return { type: 'SET_CLASS_DATA', revision, payload };
+  });
+  subscribe('attendance', attendancePath, '출석', value => ({
+    type: 'SET_ATT_DATA', revision,
+    payload: value ? (teacherCk ? { [teacherCk]: value } : value) as AttData : {},
+  }));
+  subscribe('events', `events/${curYear}`, '이벤트', value => ({
+    type: 'SET_CUSTOM_EVENTS', revision, payload: (value ?? {}) as CustomEventData,
+  }));
+
+  return () => {
+    active = false;
+    unsubs.forEach(unsubscribe => unsubscribe());
+  };
+}
+
+// 교사는 본인 반만, 관리자는 기존 연도 범위 전체를 구독한다.
 export function useFirebaseData() {
   const { state, dispatch } = useApp();
-  const { curYear, fbReady, userRole } = state;
+  const { curYear, fbReady, userRole, dataRevision } = state;
   const role = userRole?.role;
   const teacherCk = role === 'teacher'
     ? `${userRole!.part ?? '1'}-${userRole!.grade ?? '1'}-${userRole!.class ?? '1'}`
     : null;
-  const unsubRef = useRef<(() => void)[]>([]);
 
   useEffect(() => {
     if (!fbReady || !role) return;
-
-    // 기존 구독 해제
-    unsubRef.current.forEach(fn => fn());
-    unsubRef.current = [];
-
-    // 학생/반 데이터 구독 — 교사는 본인 반만, 관리자는 전체
-    if (teacherCk) {
-      const classRef = ref(db, `classes/${curYear}/${teacherCk}`);
-      const unsub1 = onValue(classRef, snap => {
-        dispatch({
-          type: 'SET_CLASS_DATA',
-          payload: snap.exists() ? { [teacherCk]: toClassInfo(snap.val() as FbClass) } : {},
-        });
-      }, err => {
-        console.error('학생/반 데이터 구독 오류:', err);
-        showToast(dataLoadMessage('학생/반', err));
-      });
-      unsubRef.current.push(unsub1);
-
-      const attRef = ref(db, `attendance/${curYear}/${teacherCk}`);
-      const unsub2 = onValue(attRef, snap => {
-        dispatch({
-          type: 'SET_ATT_DATA',
-          payload: snap.exists() ? { [teacherCk]: snap.val() } as AttData : {},
-        });
-      }, err => {
-        console.error('출석 데이터 구독 오류:', err);
-        showToast(dataLoadMessage('출석', err));
-      });
-      unsubRef.current.push(unsub2);
-    } else {
-      const classRef = ref(db, `classes/${curYear}`);
-      const unsub1 = onValue(classRef, snap => {
-        if (!snap.exists()) {
-          dispatch({ type: 'SET_CLASS_DATA', payload: {} });
-          return;
-        }
-        const fbClasses = snap.val() as Record<string, FbClass>;
-        const newData: ClassDataMap = {};
-        Object.keys(fbClasses).forEach(ck => { newData[ck] = toClassInfo(fbClasses[ck]); });
-        dispatch({ type: 'SET_CLASS_DATA', payload: newData });
-      }, err => {
-        console.error('학생/반 데이터 구독 오류:', err);
-        showToast(dataLoadMessage('학생/반', err));
-      });
-      unsubRef.current.push(unsub1);
-
-      const attRef = ref(db, `attendance/${curYear}`);
-      const unsub2 = onValue(attRef, snap => {
-        dispatch({
-          type: 'SET_ATT_DATA',
-          payload: snap.exists() ? (snap.val() as AttData) : {},
-        });
-      }, err => {
-        console.error('출석 데이터 구독 오류:', err);
-        showToast(dataLoadMessage('출석', err));
-      });
-      unsubRef.current.push(unsub2);
-    }
-
-    // 커스텀 이벤트 구독 (연휴·특별일정 — 개인정보 아님, 전체 구독)
-    const evRef = ref(db, `events/${curYear}`);
-    const unsub3 = onValue(evRef, snap => {
-      dispatch({
-        type: 'SET_CUSTOM_EVENTS',
-        payload: snap.exists() ? (snap.val() as CustomEventData) : {},
-      });
-    }, err => {
-      console.error('이벤트 데이터 구독 오류:', err);
-      showToast(dataLoadMessage('이벤트', err));
-    });
-    unsubRef.current.push(unsub3);
-
-    return () => {
-      unsubRef.current.forEach(fn => fn());
-      unsubRef.current = [];
-    };
-  }, [fbReady, curYear, role, teacherCk, dispatch]);
+    return subscribeFirebaseData(curYear, teacherCk, dataRevision, dispatch);
+  }, [fbReady, curYear, role, teacherCk, dataRevision, dispatch]);
 }
 
 // 사용자 역할 로드
 export async function loadUserRole(
   user: { uid: string; email: string | null },
-  dispatch: ReturnType<typeof useApp>['dispatch']
-): Promise<'ok' | 'unauthorized'> {
+  dispatch: ReturnType<typeof useApp>['dispatch'],
+  isCurrent: () => boolean = () => true,
+): Promise<'ok' | 'unauthorized' | 'stale'> {
   if (!user?.email) return 'unauthorized';
   const key = emailToKey(user.email);
   try {
     const snap = await get(ref(db, `userRoles/${key}`));
+    if (!isCurrent()) return 'stale';
     if (!snap.exists()) {
       // 등록되지 않은 계정 → 로그인 차단
       return 'unauthorized';
@@ -150,6 +126,6 @@ export async function loadUserRole(
     //   dataLoadMessage가 "볼 권한이 없습니다"로 정확히 안내한다.
     return 'ok';
   } catch {
-    return 'unauthorized';
+    return isCurrent() ? 'unauthorized' : 'stale';
   }
 }

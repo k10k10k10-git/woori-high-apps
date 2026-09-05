@@ -30,6 +30,9 @@ Vitest 기반 단위 테스트. 설정 파일은 `vitest.config.ts`이며 `@/` a
 테스트 파일 위치: `__tests__/`
 - `calcStats.test.ts` — `calcStats()` 출석 통계 계산 함수 테스트
 - `dates.test.ts` — `evKey()`, `getSundaysForYear()`, `buildHolidayRanges()`, `emailToKey()`, `escapeHTML()`, `sortAndRenumber()` 등 날짜/유틸 함수 테스트
+- `firebaseDataLifecycle.test.ts` — 계정·연도·재조회 세대 전환, 원장 준비·오류 상태, 오래된 구독·역할 응답 차단
+- `chartSetup.test.ts` — Chart.js 동시 로딩 공유, 실패 후 재시도, 화면 해제 뒤 콜백 차단
+- `yearRollover.test.ts` — KST 연도 전환과 마지막 예약 타이머 해제
 
 새 유틸 함수를 추가하거나 변경할 때는 `__tests__/`에 대응하는 테스트를 작성한다.
 
@@ -52,6 +55,8 @@ src/
     ClassTabBar.tsx          # 반 선택 탭 바 (공유 컴포넌트, role="tablist")
     ErrorBoundary.tsx
     FirebaseDataLoader.tsx   # onValue 구독 담당, 렌더링 없음
+    DataLoadGate.tsx         # 세 원장 준비 확인, 지속 오류·지연 안내와 재시도
+    ChartLoadState.tsx       # 차트 모듈 로딩·실패·재시도 표시
     LoginScreen.tsx
     TabNav.tsx
     Toast.tsx
@@ -80,6 +85,7 @@ src/
   hooks/
     useAuth.ts
     useFirebaseData.ts
+    useChartJs.ts            # 차트 로딩 상태·재시도·effect 해제 공용 처리
   lib/firebase/
     client.ts
   store/
@@ -89,6 +95,7 @@ src/
   utils/
     chartSetup.ts            # Chart.js 공유 초기화 (중복 등록 방지)
     dates.ts                 # 날짜·주일·출석 키 계산
+    yearRollover.ts          # 실제 KST 달력 연도 변경 감지·타이머 종료
     export.ts                # CSV/XLSX/PDF 내보내기 공유 유틸
     image.ts                 # 학생 사진 압축 (캔버스 리사이즈, 320px·JPEG 0.72)
     toast.ts
@@ -110,7 +117,8 @@ layout.tsx
   └── AppProvider (전역 상태 — useReducer)
         └── AppShell (인증 게이트, TopBar, TabNav, Toast, UpdateBanner)
               └── FirebaseDataLoader (onValue 구독 담당, 렌더링 없음)
-              └── [page] → AttendanceTab / ManageTab / StatTab / OverallTab / AdminTab
+              └── DataLoadGate (classes·attendance·events 준비 확인)
+                    └── [page] → AttendanceTab / ManageTab / StatTab / OverallTab / AdminTab
 ```
 
 `OverallTab`은 내부에 자체 탭 UI(대시보드 / 교사·학생 명단 / 건의사항)를 가지며, 각 서브 페이지를 `overall/` 디렉토리의 독립 컴포넌트로 분리해 렌더링한다.
@@ -122,17 +130,23 @@ layout.tsx
 ### 공유 유틸리티
 
 - **`src/utils/export.ts`**: `downloadCSV()`, `downloadXLSX()` (xlsx 라이브러리 dynamic import), `openPrintWindow()` — `StatTab`과 `StudentListSection`에서 사용.
-- **`src/utils/chartSetup.ts`**: `getChart()` — Chart.js를 한 번만 등록하고 캐싱 반환. `StatTab`과 `OverallDashboard`에서 공유.
+- **`src/utils/chartSetup.ts`**: `getChart()` — Chart.js의 동시 로딩과 등록 결과를 공유하고, 실패한 Promise는 비워 다음 요청에서 다시 시도한다. `createChartLoader()`의 반환 함수는 effect cleanup에 연결해 화면 해제 뒤 성공·실패 전달을 막는다. `StatTab`과 `OverallDashboard`는 `src/hooks/useChartJs.ts`와 `ChartLoadState`로 로딩·오류·명시 재시도를 공유하며, 차트 로딩 실패 중에도 원장으로 계산한 표는 사용할 수 있다.
+- **`OverallDashboard` 차트 수명**: 네 차트는 각각 자신의 입력에 의존하는 effect에서 생성·해제한다. 주차별 학년 차트의 부서 필터와 학년별 월간 출석률 차트의 부서 필터를 바꿀 때 해당 차트만 재생성한다. 반별 테이블 필터를 차트 effect에 연결하지 않는다. 출석 분모·장결 포함 기준은 기존 계산을 유지한다.
 
 ### 전역 상태 (`src/store/AppContext.tsx`)
 
 `useReducer` 기반의 단일 Context. **모달 open/close 상태도 모두 여기서 관리**한다. 컴포넌트에서 직접 `useState`로 모달을 열지 않고 `dispatch({ type: 'OPEN_*_MODAL' })` 패턴을 사용한다.
 
 주요 셀렉터 함수 (같은 파일에서 export):
+- `isDataReady(state)` → 역할이 있고 `classes`·`attendance`·`events`가 모두 성공 응답을 받았으며 오류가 없는지 판정
 - `useClassKey(state)` → 현재 선택된 반의 키 (`"1-2-3"`)
 - `useClassKeys(state)` → 현재 부/학년의 반 키 목록 (교사 계정이면 본인 반만)
 - `useCurrentStudents(state)` → 현재 반 학생 배열
 - `calcStats(state, ck, sid)` → 한 학생의 출석 통계
+
+**원장 세대와 편집 게이트**: 계정 역할·조회 연도 변경과 `RETRY_DATA_LOAD`는 `resetData()`를 통해 `dataRevision`을 증가시키고 이전 명단·출석·커스텀 행사·계정 목록·모달 편집 대상을 함께 비운다. 구독의 성공·오류 action 및 `AdminTab`의 `SET_ALL_USER_ROLES`는 요청 시점 revision을 전달하고, reducer가 현재 세대와 다른 응답을 거부한다. 연도 전환 시 행사 맵은 새 연도의 공휴일과 빈 커스텀 행사로 다시 계산해 이전 연도 행사 제외 조건을 남기지 않는다.
+
+`DataLoadGate`는 세 원장의 첫 성공 응답 전이나 어느 하나의 오류가 남아 있을 때 페이지 내용을 열지 않는다. 성공한 빈 원장은 정상 응답이며, 실패를 빈 데이터의 성공으로 바꾸지 않는다. 실패한 구독은 같은 세대의 후속 콜백도 거부하고 화면의 `다시 불러오기`로 새 세대에서 구독한다. 구독 컴포넌트와 상단의 연결 상태·로그아웃·연도 선택은 게이트 밖에 유지한다. 이 처리는 클라이언트 상태만 비우며 운영 DB를 삭제하거나 Rules 권한을 바꾸지 않는다.
 
 ### Firebase 데이터 구조
 
@@ -229,6 +243,8 @@ CSS 모듈 없음. `src/app/globals.css` 하나에 모든 스타일이 있다. `
 
 교사 권한의 단일 원천은 이메일이 일치하는 `userRoles/{emailKey}`다. Rules가 `auth.token.email`로 키를 만들고 저장된 `email`·`role=teacher`·`part-grade-class`를 함께 검사한다. `teacherClasses/{uid}`는 관리자만 쓰는 레거시 매핑이며 권한 판정과 로그인에 사용하지 않는다.
 
+`AppShell`은 인증 변경 직후 이전 역할을 비우고, 역할 조회의 성공·실패가 현재 요청 번호와 실제 `auth.currentUser` UID에 해당하는지 검사한다. `loadUserRole()`의 `isCurrent` 검사를 제거하거나 로그인 버튼의 성공 콜백만으로 앱을 열지 않는다. 로그인 성공 뒤 화면 진입은 이 인증·역할 판정의 완료를 따른다. `useAuth`의 비동기 인증 처리에도 같은 오래된 응답 차단을 유지한다.
+
 **읽기 권한도 본인 반으로 제한됨**: `classes`/`attendance`의 `.read`는 admin·retreatAdmins·iguardMembers·attendanceAdmins에 전체 범위를 주고, 교사는 위 `userRoles` 계약으로 파생한 본인 반만 허용한다. `useFirebaseData.ts`도 교사 로그인 시 `classes/{year}/{ck}`와 같은 반 출석만 구독하며 `loadUserRole`은 DB 쓰기 없이 화면 선택을 맞춘다. 교사 출석 쓰기는 본인 반 명단에 실제로 존재하는 학생 한 명에 한정하고 학생 이동 잠금 중에는 거부한다.
 
 ### 데모 모드 (`src/lib/demo.ts`) — 교사 테스트 기간 한정, 끝나면 되돌린다
@@ -299,6 +315,12 @@ await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 ### 로딩 게이트 타임아웃 (`AppShell.tsx`)
 
 Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워크 문제 등) 무한 스피너 상태가 될 수 있다. `authState === 'loading'`이 12초 넘게 지속되면 스피너 대신 "새로고침" 버튼을 보여준다.
+
+인증 후 원장 대기는 `DataLoadGate`가 별도로 담당한다. 12초 이상 응답이 없으면 지연 안내와 `다시 불러오기`를 표시하고, 명시적인 구독 실패는 즉시 지속 오류로 표시한다. 단순 네트워크 단절을 권한 거부와 동일하게 처리하지 않는다.
+
+### 달력 연도와 조회 연도 (`src/utils/yearRollover.ts`)
+
+`watchCalendarYear()`는 KST 자정 예약과 화면 복귀 시 실제 달력 연도의 변화를 확인하며, `stop()`은 마지막으로 예약한 타이머까지 해제한다. `CALENDAR_YEAR_CHANGED`는 사용자가 직전 달력 연도를 보고 있을 때만 새해로 넘긴다. 수동으로 선택한 과거 조회 연도를 화면 복귀나 자정 검사만으로 현재 연도로 되돌리지 않는다.
 
 ### PWA / 서비스 워커 (`public/sw.js`)
 

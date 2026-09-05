@@ -6,6 +6,8 @@ import type {
 } from '@/types';
 import { getKSTYear, getSundaysForYear, getWindowYears, buildHolidayRanges, buildEvents } from '@/utils/dates';
 
+export type DataKey = 'classes' | 'attendance' | 'events';
+
 // ─── State ────────────────────────────────────────────────────
 export interface AppState {
   // 인증
@@ -24,6 +26,9 @@ export interface AppState {
   classData: ClassDataMap;
   attData: AttData;
   customEventsData: CustomEventData;
+  dataRevision: number;
+  dataLoaded: Record<DataKey, boolean>;
+  dataErrors: Record<DataKey, string | null>;
 
   // 날짜 계산
   months: MonthEntry[];
@@ -49,7 +54,7 @@ const months = getSundaysForYear(kstYear);
 const windowYears = getWindowYears(kstYear);
 const holidayRanges = buildHolidayRanges(windowYears);
 
-const initialState: AppState = {
+export const initialState: AppState = {
   fbReady: false,
   userRole: null,
   allUserRoles: {},
@@ -63,6 +68,9 @@ const initialState: AppState = {
   classData: {},
   attData: {},
   customEventsData: {},
+  dataRevision: 0,
+  dataLoaded: { classes: false, attendance: false, events: false },
+  dataErrors: { classes: null, attendance: null, events: null },
 
   months,
   holidayRanges,
@@ -84,15 +92,18 @@ const initialState: AppState = {
 type Action =
   | { type: 'SET_FB_READY' }
   | { type: 'SET_USER_ROLE'; payload: UserRole | null }
-  | { type: 'SET_ALL_USER_ROLES'; payload: Record<string, UserRole & { email?: string }> }
+  | { type: 'SET_ALL_USER_ROLES'; revision: number; payload: Record<string, UserRole & { email?: string }> }
   | { type: 'SET_VIEW'; payload: ViewKey }
   | { type: 'SET_YEAR'; payload: number }
+  | { type: 'CALENDAR_YEAR_CHANGED'; payload: { previousYear: number; currentYear: number } }
   | { type: 'SET_PART'; payload: string }
   | { type: 'SET_GRADE'; payload: string }
   | { type: 'SET_CLASS'; payload: string }
-  | { type: 'SET_CLASS_DATA'; payload: ClassDataMap }
-  | { type: 'SET_ATT_DATA'; payload: AttData }
-  | { type: 'SET_CUSTOM_EVENTS'; payload: CustomEventData }
+  | { type: 'SET_CLASS_DATA'; revision: number; payload: ClassDataMap }
+  | { type: 'SET_ATT_DATA'; revision: number; payload: AttData }
+  | { type: 'SET_CUSTOM_EVENTS'; revision: number; payload: CustomEventData }
+  | { type: 'SET_DATA_ERROR'; revision: number; payload: { key: DataKey; message: string } }
+  | { type: 'RETRY_DATA_LOAD' }
   | { type: 'SET_SAVE_STATUS'; payload: AppState['saveStatus'] }
   | { type: 'OPEN_ATT_MODAL'; payload: AttEditTarget }
   | { type: 'CLOSE_ATT_MODAL' }
@@ -111,31 +122,58 @@ type Action =
   | { type: 'OPEN_HISTORY_MODAL'; payload: { sid: string; ck: string } }
   | { type: 'CLOSE_HISTORY_MODAL' };
 
-function reducer(state: AppState, action: Action): AppState {
+function closeModals(): Pick<AppState, 'attModal' | 'studentModal' | 'teacherModal' | 'accountModal' | 'rosterModal' | 'moveModal' | 'addClassModal' | 'historyModal'> {
+  return {
+    attModal: { open: false, target: null },
+    studentModal: { open: false, editId: null },
+    teacherModal: { open: false },
+    accountModal: { open: false, editKey: null },
+    rosterModal: false,
+    moveModal: { open: false, target: null },
+    addClassModal: false,
+    historyModal: { open: false, sid: null, ck: null },
+  };
+}
+
+// 이전 계정·연도·재조회 세대의 원장과 편집 대상을 함께 비운다. 운영 DB는 변경하지 않는다.
+function resetData(state: AppState): AppState {
+  return {
+    ...state,
+    ...closeModals(),
+    classData: {}, attData: {}, customEventsData: {}, allUserRoles: {},
+    events: buildEvents(state.curYear, state.months, state.holidayRanges, {}),
+    dataRevision: state.dataRevision + 1,
+    dataLoaded: { classes: false, attendance: false, events: false },
+    dataErrors: { classes: null, attendance: null, events: null },
+    saveStatus: 'idle',
+  };
+}
+
+export function reducer(state: AppState, action: Action): AppState {
+  if ('revision' in action && (action.revision !== state.dataRevision || !state.userRole)) return state;
   switch (action.type) {
     case 'SET_FB_READY':
       return { ...state, fbReady: true };
     case 'SET_USER_ROLE':
-      return { ...state, userRole: action.payload };
+      return resetData({ ...state, userRole: action.payload });
     case 'SET_ALL_USER_ROLES':
       return { ...state, allUserRoles: action.payload };
     case 'SET_VIEW':
       return { ...state, curView: action.payload };
+    case 'CALENDAR_YEAR_CHANGED':
+      return action.payload.previousYear !== action.payload.currentYear && state.curYear === action.payload.previousYear
+        ? reducer(state, { type: 'SET_YEAR', payload: action.payload.currentYear }) : state;
     case 'SET_YEAR': {
       const newYear = action.payload;
       const newMonths = getSundaysForYear(newYear);
       const newWindow = getWindowYears(newYear);
       const newRanges = buildHolidayRanges(newWindow);
-      return {
+      return resetData({
         ...state,
         curYear: newYear,
         months: newMonths,
         holidayRanges: newRanges,
-        events: buildEvents(newYear, newMonths, newRanges, state.customEventsData),
-        classData: {},
-        attData: {},
-        customEventsData: {},
-      };
+      });
     }
     case 'SET_PART':
       return { ...state, curPart: action.payload };
@@ -144,13 +182,26 @@ function reducer(state: AppState, action: Action): AppState {
     case 'SET_CLASS':
       return { ...state, curClass: action.payload };
     case 'SET_CLASS_DATA':
-      return { ...state, classData: action.payload };
+      return { ...state, classData: action.payload, dataLoaded: { ...state.dataLoaded, classes: true }, dataErrors: { ...state.dataErrors, classes: null } };
     case 'SET_ATT_DATA':
-      return { ...state, attData: action.payload };
+      return { ...state, attData: action.payload, dataLoaded: { ...state.dataLoaded, attendance: true }, dataErrors: { ...state.dataErrors, attendance: null } };
     case 'SET_CUSTOM_EVENTS': {
       const newEvents = buildEvents(state.curYear, state.months, state.holidayRanges, action.payload);
-      return { ...state, customEventsData: action.payload, events: newEvents };
+      return { ...state, customEventsData: action.payload, events: newEvents, dataLoaded: { ...state.dataLoaded, events: true }, dataErrors: { ...state.dataErrors, events: null } };
     }
+    case 'SET_DATA_ERROR': {
+      const { key, message } = action.payload;
+      const cleared = key === 'classes' ? { classData: {} } : key === 'attendance' ? { attData: {} } : {
+        customEventsData: {}, events: buildEvents(state.curYear, state.months, state.holidayRanges, {}),
+      };
+      return {
+        ...state, ...closeModals(), ...cleared,
+        dataLoaded: { ...state.dataLoaded, [key]: false },
+        dataErrors: { ...state.dataErrors, [key]: message },
+      };
+    }
+    case 'RETRY_DATA_LOAD':
+      return resetData(state);
     case 'SET_SAVE_STATUS':
       return { ...state, saveStatus: action.payload };
     case 'OPEN_ATT_MODAL':
@@ -209,6 +260,11 @@ export function useApp() {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useApp must be used within AppProvider');
   return ctx;
+}
+
+export function isDataReady(state: AppState): boolean {
+  return !!state.userRole && state.dataLoaded.classes && state.dataLoaded.attendance && state.dataLoaded.events
+    && !Object.values(state.dataErrors).some(Boolean);
 }
 
 // ─── 편의 셀렉터 ──────────────────────────────────────────────
