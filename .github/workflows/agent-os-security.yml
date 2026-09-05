@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - "agent-os/**"
+      - "scripts/verify-all.mjs"
       - ".github/workflows/agent-os-security.yml"
   push:
     branches: [main]
     paths:
       - "agent-os/**"
+      - "scripts/verify-all.mjs"
       - ".github/workflows/agent-os-security.yml"
 
 concurrency:
@@ -24,4 +26,4 @@ jobs:
         with:
           node-version: 22
       - run: node --check agent-os/server.js
-      - run: node --test agent-os/security.test.js
+      - run: node --test agent-os/*.test.js

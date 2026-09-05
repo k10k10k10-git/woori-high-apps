@@ -244,7 +244,7 @@ export function useAttVal(
 }
 
 // ─── 출석 통계 계산 ───────────────────────────────────────────
-export function calcStats(state: AppState, ck: string, sid: string) {
+export function calcStats(state: Pick<AppState, 'months' | 'curView' | 'attData' | 'events'>, ck: string, sid: string) {
   const { months, curView, attData, events } = state;
   let total = 0, present = 0, absent = 0, tardy = 0;
 

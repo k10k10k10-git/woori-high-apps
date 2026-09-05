@@ -19,4 +19,11 @@ for (const app of apps) {
   }
 }
 
-console.log("\n[verify] all applications passed");
+console.log("\n[verify] agent-os: node --test");
+const agentOs = spawnSync(process.execPath, ["--test"], {
+  cwd: new URL("../agent-os/", import.meta.url),
+  stdio: "inherit",
+});
+if (agentOs.status !== 0) process.exit(agentOs.status ?? 1);
+
+console.log("\n[verify] all applications and Agent OS passed");

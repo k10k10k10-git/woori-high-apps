@@ -105,7 +105,10 @@ export function useMyPageData() {
           setRetreats([...values].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
           setLoaded(true);
           ok("수련회 목록");
-        }, fail("수련회 목록")),
+        }, (error) => {
+          fail("수련회 목록")(error);
+          setLoaded(true);
+        }),
         subscribeToMilestones((values) => {
           setMilestones(values);
           ok("공유 일정");

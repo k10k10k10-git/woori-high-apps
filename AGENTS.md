@@ -30,10 +30,10 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 | `highschool-app/` | Next.js 통합 플랫폼: 학기·주일, 수련회 행정, 프로그램 준비, 이가드 현장 | `semesters/*`, `semestersPrivate/*`, `retreats/{id}/*`, `retreatsPrivate/{id}/*`, `retreatAdmins`, `iguard*`, `prepMilestones/*` |
 | `attendance-app/` | Next.js 정적 내보내기 기반 학생 출석 PWA | `classes/`, `attendance/`, `events/`, `userRoles`, `admins`, `attendanceAdmins`, `teacher*`, `trash/`, `suggestions/`; 공유 Rules 원천 |
 | `agent-os/` | 로컬 대시보드와 Claude 작업 실행기 | `AgentOS.command`, `server.js`, `skills.json`; 운영 앱이 아님 |
-| `scripts/verify-all.mjs` | 두 앱 품질 검사 실행 | 루트 `npm run verify` |
+| `scripts/verify-all.mjs` | 두 앱 품질 검사 후 Agent OS 회귀 테스트 실행 | 루트 `npm run verify` |
 | `.github/workflows/` | CI | 통합·학생 앱 품질 검사와 Agent OS 보안 회귀 테스트 |
 | `.claude/`, `.agents/` | 인수인계·로컬 스킬·설정 | `.claude/HANDOFF.md`가 인수인계의 유일한 원천; `.agents/`는 Codex용 변형이며 중복으로 삭제하지 않음 |
-| `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [이번 점검 기록](docs/PROJECT_AUDIT_2026-09-05.md) |
+| `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [최적화 점검](docs/PROJECT_OPTIMIZATION_2026-09-05.md), [앞선 감사](docs/PROJECT_AUDIT_2026-09-05.md) |
 | `outputs/`, `tmp/`, `graphify-out/` | 최종 산출물·중간물·재생성 가능한 코드 그래프 | 소스·운영 데이터 원천으로 취급하지 않음 |
 
 각 앱은 별도 `package.json`·lockfile·`node_modules`를 사용한다. 루트는 npm workspace 설치 관리자가 아니라 검증 실행기다. 스택 버전·테스트 개수는 실제 파일과 실행 결과로 확인한다.
@@ -76,7 +76,7 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 - 소통·커밋 메시지·코드 주석은 한국어, 커밋은 `영역: 요약`. 같은 목적의 함수를 추가하기 전 기존 lib를 검색한다. `snapToList`의 통합 앱 단일 원천은 `src/lib/db/snapToList.ts`다.
 - 구독에는 에러 콜백과 `loadError` 표시를 연결한다. 이가드 구독은 `useRetreatData`에 모으고 `fail(key)`를 배선한다. 출석·인원체크는 명시 선택·멱등 처리를 유지한다.
 - 순수 로직 버그는 회귀 테스트를 함께 추가한다. 렌더 테스트는 `*.render.test.tsx`와 `@vitest-environment jsdom` docblock을 사용한다. 모달 포커스·ESC·dialog, 토스트 `aria-live`, 아이콘 버튼 이름을 확인한다.
-- 앱마다 다음을 **순차** 실행한다. 루트 `npm run verify`는 두 앱에서 이 순서를 반복하며 첫 실패에서 중단한다.
+- 앱마다 다음을 **순차** 실행한다. 루트 `npm run verify`는 두 앱에서 이 순서를 반복한 뒤 Agent OS의 모든 `*.test.js`를 실행하며 첫 실패에서 중단한다.
 
 ```bash
 npm run lint

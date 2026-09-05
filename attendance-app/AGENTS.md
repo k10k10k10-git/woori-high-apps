@@ -70,6 +70,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 핵심 코드 패턴
 
+### 통계 차트가 무관한 상태 변경에도 다시 만들어질 때 (2026-09-05)
+- **접근법**: `src/components/tabs/StatTab.tsx`의 effect 의존 배열을 실제 참조와 대조한다 → 매 렌더마다 새로 만드는 미사용 `classKeys`를 제거한다 → `calcStats` 다섯 호출을 `src/utils/classStats.ts`의 한 집계로 묶고 실제 입력으로 메모한다 → 기존 기간별 출력과 30명·52주 fixture의 셀 접근 횟수를 대조한다.
+- **판단 질문**: `useClassKeys`의 다른 소비처는 렌더·클릭용이라 전역 Context 재설계로 넓히지 않았다. 차트 종류·분모·옵션은 유지해 계산 재사용의 효과만 확인했다.
+- **재사용 규칙**: 차트 최적화는 effect를 깨우는 참조와 중복 집계를 함께 확인하고, 동일 출력과 계산 횟수로 검증한다. 셀 조회 감소를 전체 화면 처리시간 감소로 보고하지 않는다.
+
 ### 학생 반 이동과 화면 진입 정리를 데이터 유실 없이 다루기 (2026-09-05)
 - **접근법**: `sheetSync.ts`의 출석 이관 계약을 먼저 확인한다 → 부·학년 선택 변경 때 반 선택을 초기화한다 → 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 두 leaf 제거는 한 `onDisconnect(yearRef).update()`로 선점 전 등록하고 선점 직후 다시 등록한다 → 서버 시간 오프셋을 확인한 뒤 원본 학생·목적지 반·양쪽 출석을 다시 읽는다 → 목적지 출석 셀을 우선해 병합하고 목적지 반이 없거나 같은 SID 학생이 있으면 중단한다 → 잠금 두 개를 `pending`으로 정확히 전환하면서 `startedAt`을 서버 보정 시각으로 갱신한다 → 종료 예약 취소 완료와 pending 소유권 재확인 뒤, 학생·출석·감사기록·두 잠금 해제·불변 `studentMoveCommits` marker를 단발 루트 REST PATCH에 묶는다 → 성공 후 부·학년·반 선택을 모두 목적지에 맞춘다 → 로그인·연도 변경 및 `TrashModal` 로드 effect에서 삭제 쓰기를 제거한다.
 - **단절·복구 계약**: PATCH는 30초 뒤 중단하며 자동 재시도하지 않는다. 2xx만 즉시 성공, 4xx만 명시적 거절로 보고 exact lock을 정리한다. 예외·중단·5xx는 결과 불명확 상태이므로 pending 두 잠금을 유지한다. 다음 이동에서 서버 보정 시각 기준 10분 이상 지난 pending만 살핀다. commit marker 없음·원본 있음·목적지 SID 없음이 모두 맞으면 exact lock을 조건부 정리하고 한 번만 재선점한다. marker 있음·원본 없음·목적지 있음이면 완료로 판정해 잠금만 정리하고 화면을 목적지로 바꾼다. 나머지 혼합 상태와 `preparing`은 자동 정리하지 않는다. Firebase 연결 또는 서버 시간 오프셋을 확인할 수 없을 때도 자동 복구와 pending 전환을 하지 않는다.

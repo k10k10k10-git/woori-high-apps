@@ -7,12 +7,12 @@
  *  - GET  /api/runs       : 실행 이력 목록 / GET /api/runs/<id> : 상세
  */
 const http = require("http");
-const https = require("https");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { execFile, spawn } = require("child_process");
+const { readJson } = require("./http-json");
 
 const PORT = 5599;
 const HOST = "127.0.0.1";
@@ -37,36 +37,22 @@ function sh(cmd, args, opts = {}) {
 function vercelToken() {
   try { return JSON.parse(fs.readFileSync(VERCEL_AUTH, "utf8")).token; } catch { return null; }
 }
-function vercelLatest(project, token) {
-  return new Promise((resolve) => {
-    if (!token) return resolve(null);
-    https.get(`https://api.vercel.com/v9/projects/${project}`,
-      { headers: { Authorization: `Bearer ${token}` } }, (res) => {
-        let body = "";
-        res.on("data", (c) => (body += c));
-        res.on("end", () => {
-          try {
-            const id = JSON.parse(body).id;
-            https.get(`https://api.vercel.com/v6/deployments?projectId=${id}&limit=1`,
-              { headers: { Authorization: `Bearer ${token}` } }, (r2) => {
-                let b2 = "";
-                r2.on("data", (c) => (b2 += c));
-                r2.on("end", () => {
-                  try {
-                    const d = (JSON.parse(b2).deployments || [])[0] || {};
-                    resolve({
-                      state: d.state || "-",
-                      sha: (d.meta?.githubCommitSha || "").slice(0, 7),
-                      msg: (d.meta?.githubCommitMessage || "").split("\n")[0].slice(0, 40),
-                      at: d.created || null,
-                    });
-                  } catch { resolve(null); }
-                });
-              }).on("error", () => resolve(null));
-          } catch { resolve(null); }
-        });
-      }).on("error", () => resolve(null));
-  });
+async function vercelLatest(project, token, readJsonImpl = readJson) {
+  if (!token) return null;
+  try {
+    const headers = { Authorization: `Bearer ${token}` };
+    const info = await readJsonImpl(`https://api.vercel.com/v9/projects/${project}`, { headers });
+    if (typeof info?.id !== "string") return null;
+    const result = await readJsonImpl(`https://api.vercel.com/v6/deployments?projectId=${encodeURIComponent(info.id)}&limit=1`, { headers });
+    const d = result?.deployments?.[0];
+    if (!d) return null;
+    return {
+      state: d.state || "-",
+      sha: (d.meta?.githubCommitSha || "").slice(0, 7),
+      msg: (d.meta?.githubCommitMessage || "").split("\n")[0].slice(0, 40),
+      at: d.created || null,
+    };
+  } catch { return null; }
 }
 
 // ── 일일 보고서 ────────────────────────────────────────
@@ -153,22 +139,48 @@ function confirmDangerSkill() {
   });
 }
 
-function runSkill(skill, res) {
+function runSkill(skill, res, options = {}) {
   const id = `${Date.now()}-${skill.id}`;
   const run = { id, skillId: skill.id, label: skill.label, prompt: skill.prompt,
     startedAt: Date.now(), endedAt: null, status: "running", summary: "", transcript: [] };
-  const save = () => fs.writeFileSync(path.join(RUNS_DIR, id + ".json"), JSON.stringify(run));
+  const save = () => options.saveRunImpl
+    ? options.saveRunImpl(run)
+    : fs.writeFileSync(path.join(RUNS_DIR, id + ".json"), JSON.stringify(run));
   save();
 
   res.writeHead(200, { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" });
-  const send = (type, data) => res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+  const send = (type, data) => {
+    if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify({ type, data })}\n\n`);
+  };
   send("start", { id, label: skill.label });
 
-  const child = spawn("claude", claudeArgsForSkill(skill),
-    { cwd: ROOT, env: process.env });
+  let completed = false;
+  const finish = (code, error) => {
+    if (completed) return;
+    completed = true;
+    run.endedAt = Date.now();
+    if (error) {
+      run.status = "error";
+      run.summary = String(error);
+    } else if (code !== 0) {
+      run.status = "error";
+    } else if (run.status === "running") {
+      run.status = "done";
+    }
+    save();
+    send("end", { status: run.status, summary: run.summary, ms: run.endedAt - run.startedAt });
+    if (!res.writableEnded && !res.destroyed) res.end();
+  };
+
+  let child;
+  try {
+    child = (options.spawnImpl || spawn)("claude", claudeArgsForSkill(skill),
+      { cwd: ROOT, env: process.env });
+  } catch (error) { finish(null, error); return; }
 
   let buf = "";
   child.stdout.on("data", (chunk) => {
+    if (completed) return;
     buf += chunk.toString();
     let nl;
     while ((nl = buf.indexOf("\n")) >= 0) {
@@ -195,18 +207,11 @@ function runSkill(skill, res) {
       save();
     }
   });
-  child.stderr.on("data", (c) => send("stderr", c.toString().slice(0, 300)));
-  child.on("close", (code) => {
-    run.endedAt = Date.now();
-    if (run.status === "running") run.status = code === 0 ? "done" : "error";
-    save();
-    send("end", { status: run.status, summary: run.summary, ms: run.endedAt - run.startedAt });
-    res.end();
+  child.stderr.on("data", (c) => {
+    if (!completed) send("stderr", c.toString().slice(0, 300));
   });
-  child.on("error", (e) => {
-    run.status = "error"; run.endedAt = Date.now(); run.summary = String(e); save();
-    send("end", { status: "error", summary: String(e) }); res.end();
-  });
+  child.on("close", (code) => finish(code));
+  child.on("error", (error) => finish(null, error));
 }
 
 // ── HTTP 서버 보안 ─────────────────────────────────────
@@ -530,6 +535,8 @@ if (require.main === module) {
 
 module.exports = {
   createAgentOsServer,
+  vercelLatest,
+  runSkill,
   claudeArgsForSkill,
   confirmDangerSkill,
   writeSessionTokenFile,

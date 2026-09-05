@@ -35,19 +35,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [memberName, setMemberName] = useState<string | null>(null);
 
   useEffect(() => {
+    let authRequest = 0;
     const unsub = onAuthStateChanged(auth, async (u) => {
+      const request = ++authRequest;
       setUser(u);
+      setLoading(true);
+      setRoles(NO_ROLES);
       setMemberName(null);
       if (u) {
         try {
-          const [retreatAdminSnap, iguardMemberSnap, iguardRoleSnap] = await Promise.all([
+          const [retreatAdminSnap, iguardMemberSnap, iguardRoleSnap, isMainAdmin] = await Promise.all([
             get(ref(db, paths.retreatAdmin(u.uid))),
             get(ref(db, paths.iguardMember(u.uid))),
             get(ref(db, paths.iguardRole(u.uid))),
+            canReadAsMainAdmin(u.uid),
           ]);
+          // 로그아웃·계정 전환 뒤 늦게 도착한 이전 조회가 현재 역할을 덮지 않게 한다.
+          if (request !== authRequest) return;
           const retreatAdmin = retreatAdminSnap.val();
           const iguardMember = iguardMemberSnap.val();
-          const isMainAdmin = await canReadAsMainAdmin(u.uid);
 
           const nameSource = [retreatAdmin, iguardMember].find(
             (value) => value && typeof value === "object" && typeof value.name === "string",
@@ -68,16 +74,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             retreatRole: roleSource?.retreatRole,
           }));
         } catch {
+          if (request !== authRequest) return;
           setRoles(NO_ROLES);
           setMemberName(null);
         }
-      } else {
-        setRoles(NO_ROLES);
-        setMemberName(null);
       }
       setLoading(false);
     });
-    return unsub;
+    return () => {
+      authRequest += 1;
+      unsub();
+    };
   }, []);
 
   async function signIn() {
