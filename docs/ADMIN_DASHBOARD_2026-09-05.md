@@ -46,6 +46,8 @@
 
 ## 배포 상태와 후속 확인
 
+**운영 배포 완료:** PR #8 병합 SHA `90554a682d96ebb1de15003f36eb1948c0a5a6cd`를 두 앱에 반영했다. 통합 앱은 해당 `buildId`·Production Ready를 확인했다. 학생 앱 live version은 `1acb936d4b2d2b5b`이며 운영 `/dashboard`·날짜 링크·SW의 HTTP 200과 no-cache 헤더, dashboard HTML·SW의 로컬 산출물 해시 일치를 확인했다. 실제 운영 데모 반 선택 화면도 유지된다. main CI의 일반 품질 검사는 통과했으며 인증 E2E만 기존 secret 미등록으로 미실행이다.
+
 작업 브랜치는 `codex/project-optimization-20260905`다. 실제 운영 설정과 데모 유지 설정으로 다시 빌드해 [Firebase Hosting 미리보기](https://woori-high--admin-dashboard-20260905-sptfuvof.web.app)에 배포했다(2026-09-12 만료). `/dashboard`·`/attendance`의 HTTP 200과 no-cache 헤더, 원격 SW와 로컬 산출물의 SHA-256 일치를 확인했다. Auth 도메인 목록은 변경하지 않았다. 운영 반영은 2026-09-05 최신 상시 승인에 따라 PR 검토·에이전트 병합 절차를 따른다. 운영 배포 완료로 간주할 근거는 아래 두 가지다.
 
 1. 통합 앱 Vercel Production `Ready` 및 `/api/version`의 `buildId`가 병합 SHA와 일치한다.
