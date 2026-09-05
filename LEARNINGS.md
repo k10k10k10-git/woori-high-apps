@@ -27,10 +27,11 @@
 - **판단 질문**: 첫 탭이나 화면에 보이는 셀만 읽지 않는다 — 여러 탭 사이에 큐시트·대본·역할·물품처럼 서로 다른 진실이 흩어져 있어 구조 판단이 왜곡된다. 익명 CSV URL도 사용하지 않는다 — 탭 하나만 내려오고 비공개 시트 인증이 끊길 수 있다. XLSX 내보내기는 원본을 수정하지 않으며 모든 시트 구조를 보존하므로 전수 감사에 적합하다. Gemini 요약도 원문 전수 확인 목적에는 쓰지 않는다.
 - **재사용 규칙**: 구글 시트 전수 감사는 `exportGsuite("xlsx") → worksheets 전부 열거 → 모든 비어 있지 않은 셀 집계 → 탭별 목적 분류 → 원본 문서별 탭 목록과 빈 탭까지 보고` 순서로 한다. 화면 일부 확인만 필요할 때 이름박스 점프를 쓰고, `get_page_text`·Page_Down을 구글 오피스 본문 추출 수단으로 쓰지 않는다.
 
-### Vercel 생성물이 남은 Next.js 앱의 전체 lint는 소스 오류처럼 실패한다 (2026-07-11)
+### Vercel 생성물이 남은 Next.js 앱의 전체 lint는 소스 오류처럼 실패한다 (2026-07-11, 보강 2026-09-05)
 - **접근법**: ① `npm run lint`가 수천 건을 내면 첫 오류의 경로가 `src/`인지 `.vercel/output/`인지 먼저 분리한다 → ② `npx eslint src`(테스트·스크립트가 있으면 경로 추가)로 실제 소스만 다시 검사한다 → ③ `npm run build`를 lint와 분리 실행해 빌드 가능 여부를 확인한다 → ④ `eslint.config.mjs`의 `globalIgnores`에 `.vercel/**`가 빠졌는지 대조한다.
 - **판단 질문**: 생성된 `.vercel/output`을 삭제해 검증을 통과시키지 않았다 — 사용자 산출물을 지우지 않아야 하고, 삭제는 다음 Vercel 빌드 뒤 같은 실패가 재발해 설정 결함을 가린다. 수천 건의 번들 경고도 앱 소스 결함으로 집계하지 않았다.
 - **재사용 규칙**: Vercel을 쓰는 앱의 lint가 생성물을 읽으면 소스 한정 lint로 진위를 확인하고, 근본 수정은 ESLint ignore에 `.vercel/**`를 추가하는 것으로 제안한다.
+- **2026-09-05 보강**: `highschool-app/.auth/chrome-profile`의 Google 생성 JS도 같은 실패를 만든다. 기본 `npm run lint`의 실패를 먼저 기록한 뒤 `npm run lint -- --ignore-pattern '.auth/**'`로 해당 생성물만 제외하면 앱 소스·테스트·스크립트 검사 범위를 유지할 수 있다. `.gitignore`의 `.auth/`가 ESLint 제외를 대신한다고 가정하지 말고, 인증 상태를 지우거나 원래 품질 관문까지 통과했다고 보고하지 않는다.
 
 ### artifact-tool로 가져온 PPT 도형을 이미지로 바꿀 때 위치가 좌상단으로 튀는 문제 (2026-07-13)
 - **접근법**: ① `PresentationFile.importPptx()`로 가져온 캡처 안내 도형을 찾아 `shape.position`을 이미지 `position`에 복사했더니 좌상단에 축소 삽입되는 현상을 렌더링으로 확인 → ② `Object.getOwnPropertyNames()`와 실제 값 출력으로 가져온 도형의 `position`은 비어 있고 `frame`/`pixelRect`에만 `{left, top, width, height}`가 있음을 확인 → ③ 안내 도형을 `delete()`한 뒤 `shape.frame`을 복사해 `slide.images.add({ position: frame, ... })`로 다시 삽입 → ④ LibreOffice 렌더링과 `check_template_fidelity.mjs`로 14장 전체를 확인.
@@ -151,7 +152,8 @@
 - **판단 질문**: `git filter-branch`나 `git filter-repo`로 히스토리를 재작성하지 않았다 — 2단계에서 미푸시를 확정했으므로 `reset --soft`면 충분하고, 히스토리 재작성은 협업자의 클론을 깨뜨리는 훨씬 비싼 수단이다. `git rm --cached`로 파일만 빼지도 않았다 — 그러면 커밋 자체는 남아 히스토리에 개인정보가 그대로 박힌다. 그리고 `.gitignore`에 추가하는 것만으로 끝내지 않았다 — **이미 추적 중인 파일에는 gitignore가 효력이 없으므로**, 아직 추적 전인 이 경우에만 통한다는 점을 확인하고 `add -A` 재실행으로 실증했다.
 - **재사용 규칙**: 산출물·백업 폴더는 "추적하지 않는다"가 아니라 **`.gitignore`에 명시해 차단한다** — 미추적 상태는 `git add -A` 한 번에 무너진다. 그리고 여러 파일을 옮기거나 이름을 바꾸는 작업에서는 `git add -A` 대신 대상 경로를 명시(`git add <경로>`)하고, 부득이 `-A`를 썼다면 커밋 직후 앱 폴더 밖 파일 목록을 반드시 눈으로 확인한다.
 
-### 두 앱이 하나의 Firebase를 공유하는 구조를 증거 기반 한 장으로 설명하는 법 (2026-09-02)
+### 두 앱이 하나의 Firebase를 공유하는 구조를 증거 기반 한 장으로 설명하는 법 (2026-09-02, 문서 감사 보강 2026-09-05)
 - **접근법**: ① 루트 `CLAUDE.md`·`.claude/HANDOFF.md`·`DB_OWNERSHIP.md`와 각 앱의 `CLAUDE.md`·`AGENTS.md`를 읽어 선언된 경계를 모은다. ② 기존 `graphify-out/graph.json`을 `python -m graphify query`로 조회하고, 결과가 가리킨 `highschool-app/src/features/portal/accessPolicy.ts`, `highschool-app/src/context/AuthContext.tsx`, `attendance-app/src/components/FirebaseDataLoader.tsx`, `attendance-app/src/store/AppContext.tsx`를 직접 열어 실제 인증·권한·데이터 흐름을 교차검증한다. ③ 라우트 수·소스 파일/줄 수·CI 파일·배포 URL의 HTTP 상태와 `/api/version.buildId`를 실측해 “선언됨/의도됨/관찰됨”을 구분한다. ④ “하나의 기록실(Firebase)에 출석 창구와 통합운영 창구가 있고, 각 서랍마다 쓰기 주인이 정해져 있다”는 하나의 비유로 앱·경로·권한·배포 흐름을 층별 SVG에 배치한다. ⑤ 데스크톱/모바일 SVG를 별도로 만들고 `xmllint`, 중복 ID 검사, 라이트·다크 Playwright 캡처와 육안 검수까지 완료한다.
 - **판단 질문**: 코드 파일 수만 나열하거나 README를 그대로 요약하지 않았다 — 공유 DB 구조에서 중요한 것은 앱 개수가 아니라 누가 어느 경로를 읽고 쓰는지이기 때문이다. UI 역할표를 Firebase Rules와 같은 것으로 표현하지 않았다 — `accessPolicy.ts`의 세밀한 역할과 RTDB Rules의 거친 권한 버킷은 서로 다른 계층이며, 이 차이가 최소권한 위험의 근거다. 실제 로그인 화면을 무리하게 자동화하지도 않았다 — 인증 뒤 화면의 구성은 소스와 계약 테스트로 확인하고, 운영 상태는 공개 배포 URL과 buildId로만 검증했다.
 - **재사용 규칙**: 공유 백엔드를 쓰는 멀티앱 구조를 설명할 때는 `운영 문서 → 코드 그래프 → 핵심 소스 → 런타임 실측` 순서로 증거를 모은 뒤, 앱별 화면 목록보다 `데이터 경로의 소유권·권한 판정·배포 경계`를 한 장의 흐름도로 먼저 보여준다.
+- **2026-09-05 문서 감사 보강**: ① `git ls-files -co --exclude-standard`로 파일 목록 범위를 고정하고 생성물·개인정보·기존 사용자 변경을 구분한다. ② `graphify-out/graph.json`의 `built_at_commit`을 HEAD와 비교하고 검색된 함수·파일이 현재 존재하는지 다시 확인한다. ③ `accessPolicy.ts`·Firebase Rules·계약 테스트를 따로 읽어 화면 제한을 서버 권한 보장으로 오해하지 않는다. ④ `AGENTS.md`에는 현재 계약을 앞에 두고 과거 학습 기록은 날짜를 붙여 구분한다. 앱 개수·역할 수·테스트 수를 오래된 문서에서 그대로 복사하지 않으며, 문서 우선순위는 운영 안전 규칙과 구현 사실을 나눠 적용한다. ⑤ 전체 파일 인벤토리와 모든 실행 경로의 검증을 구분해 감사 범위·미확인 사항·미수정 결함을 기록한다.
