@@ -1,7 +1,7 @@
 # 운영 절차서
 
 > Firebase 프로젝트: `woori-high`
-> 작성일: 2026-06-23
+> 작성일: 2026-06-23 · 현재 구조 대조: 2026-09-05
 
 ---
 
@@ -24,7 +24,7 @@ cd attendance-app
 npm run build
 firebase deploy --only hosting
 ```
-- predeploy 훅이 자동으로 SW 캐시 이름을 갱신함
+- `firebase.json`의 predeploy가 정적 build 뒤 `out/sw.js`에 밀리초 단위 고유 캐시 이름을 기록함
 - 배포 URL: https://woori-high.web.app
 
 ### 통합 고등부 플랫폼 (Vercel)
@@ -53,9 +53,12 @@ npx vercel --prod
 ### 교사·스탭 앱 (제거됨 — 2026-08-12)
 - 사용 중단으로 코드를 제거했다. 배포된 적이 없어 끊을 주소도 없다.
 - 복구가 필요하면 태그 `pre-staff-app-removal-2026-08-12`를 사용한다.
-- ⚠ Firebase의 `staff_*` 노드와 Rules는 **그대로 남아 있다** — 앱 제거로 자동 정리되지 않는다.
+- `staff_members`·`staff_attendance`·`staff_events`·`staff_roles`·`staff_admins`는 당시 운영 데이터가 모두 `null`임을 확인했고 Rules에서도 제거했다. 현재 학생 앱의 `teacherStaff`는 별도 운영 노드이므로 삭제하지 않는다.
 
 ### Firebase Rules 배포
+
+Rules 변경·배포는 일반 앱 배포에 포함하지 않는다. 필요성을 먼저 보고하고 사용자가 명시적으로 승인한 작업에서만, 현재 배포 Rules를 `tmp/rules-backup/`에 백업하고 계약 테스트를 통과한 뒤 아래 명령을 실행한다.
+
 ```bash
 cd attendance-app
 firebase deploy --only database
@@ -126,6 +129,8 @@ cp database.rules.json "database.rules.backup.$(date +%Y%m%d).json"
 3. 백업 파일 선택 → **주의: 기존 데이터를 덮어씁니다**
 
 ### Rules 복구
+운영 Rules 복구도 Rules 배포와 같으므로 대상 백업과 diff를 확인해 보고한 뒤 명시적으로 승인된 경우에만 실행한다.
+
 ```bash
 cd attendance-app
 # 백업 파일로 복원
@@ -145,12 +150,12 @@ firebase deploy --only database
 ### "데이터가 사라졌어요" (잘못된 덮어쓰기)
 1. 참가자 데이터 → 행정 앱 백업 복구 기능 사용
 2. 다른 데이터 → Firebase 콘솔에서 수동 백업 파일로 복구
-3. Rules가 풀렸을 수 있으므로 학생 앱에서 `firebase deploy --only database` 실행
+3. 데이터 손실과 Rules 차이를 분리해 조사한다. Rules가 의심되면 현재 배포본과 학생 앱 원천을 비교해 결과를 보고하고, 자동 재배포하지 않는다.
 
 ### "권한이 안 돼요" (Rules 문제)
 1. Firebase 콘솔 → Realtime Database → 규칙 탭에서 현재 배포된 규칙 확인
 2. 학생 앱의 `database.rules.json`과 비교
-3. 차이가 있으면 학생 앱에서 재배포: `firebase deploy --only database`
+3. 차이와 로그인 자기조회 영향을 보고한다. 승인 후 백업·계약 테스트를 거쳐 학생 앱에서만 재배포한다.
 
 ---
 
@@ -206,12 +211,12 @@ Rules를 역할별로 쪼개지 않는 것은 의도적이다 — `accessPolicy.
 - 모든 앱의 모든 기능에 접근 가능
 
 ### 행정 관리자 (retreatAdmins)
-- 통합 홈 → 팀원 관리에서 승인
-- 또는 Firebase 콘솔에서 `retreatAdmins/{uid}` 추가
+- 통합 홈 → 팀원 관리에서 학기 역할과 방학 역할을 각각 배정한다.
+- 저장은 `planRoleAssignment()` → `applyRoleSteps()` 경로를 사용하며 `retreatAdmins/{uid}`의 선택 필드 `semesterRole`·`retreatRole`과 기존 `role` 호환값을 함께 관리한다.
 
 ### 이가드 멤버 (iguardMembers)
-- 통합 플랫폼에서 접근 요청 → 통합 홈의 팀원 관리에서 admin이 승인
-- 역할: `team` (전체 편집) 또는 `staff` (실행 탭만)
+- 통합 플랫폼에서 접근 요청 → 통합 홈의 팀원 관리에서 통합관리자가 승인한다.
+- `iguardRoles/{uid}`에는 Rules validate가 허용하는 `team` 또는 `staff`만 저장한다. 실제 화면 권한은 선택 필드와 `accessPolicy.ts`의 방학 역할·capability로 판정한다.
 
 ---
 

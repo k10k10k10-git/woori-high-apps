@@ -4,14 +4,13 @@ import { usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
-import { loadUserRole, cleanupOldYears } from '@/hooks/useFirebaseData';
+import { loadUserRole } from '@/hooks/useFirebaseData';
 import { doDemoLogin, doLogout } from '@/hooks/useAuth';
 import {
   DEMO_MODE, demoConfigured, isDemoAccount, buildDemoRole,
   loadDemoSelection, saveDemoSelection, clearDemoSelection,
   getAdminIntent, setAdminIntent, type DemoSelection,
 } from '@/lib/demo';
-import { getWindowYears } from '@/utils/dates';
 import DemoClassPicker from '@/components/DemoClassPicker';
 import LoginScreen from '@/components/LoginScreen';
 import TopBar from '@/components/TopBar';
@@ -223,12 +222,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
     requestAnimationFrame(() => { meta.content = saved; });
   }, [authState]);
-
-  // 관리자 오래된 연도 정리
-  useEffect(() => {
-    if (authState !== 'app' || state.userRole?.role !== 'admin') return;
-    cleanupOldYears(getWindowYears(state.curYear)).catch(() => {});
-  }, [authState, state.userRole, state.curYear]);
 
   if (authState === 'loading') {
     if (loadTimedOut) {

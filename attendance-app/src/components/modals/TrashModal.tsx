@@ -6,8 +6,6 @@ import { showToast } from '@/utils/toast';
 import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 import type { Student } from '@/types';
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
 type TrashStudent = Student & { ck: string; deletedAt: number };
 type TrashClass = {
   ck: string;
@@ -34,39 +32,11 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
         students?: Record<string, TrashStudent>;
         classes?: Record<string, TrashClass>;
       };
-      const now = Date.now();
-      const cleanupPaths: Record<string, null> = {};
-
-      // 학생 — 7일 지난 항목 자동 삭제
-      const stuList: TrashStudent[] = [];
-      if (data.students) {
-        for (const [id, item] of Object.entries(data.students)) {
-          if (now - item.deletedAt > SEVEN_DAYS_MS) {
-            cleanupPaths[`trash/${curYear}/students/${id}`] = null;
-          } else {
-            stuList.push(item);
-          }
-        }
-      }
+      // 조회만으로 운영 데이터를 지우지 않는다. 영구 삭제는 각 항목의 확인 버튼에서만 실행한다.
+      const stuList = Object.values(data.students ?? {});
       stuList.sort((a, b) => b.deletedAt - a.deletedAt);
-
-      // 반 — 7일 지난 항목 자동 삭제
-      const clsList: TrashClass[] = [];
-      if (data.classes) {
-        for (const [key, item] of Object.entries(data.classes)) {
-          if (now - item.deletedAt > SEVEN_DAYS_MS) {
-            cleanupPaths[`trash/${curYear}/classes/${key}`] = null;
-          } else {
-            clsList.push(item);
-          }
-        }
-      }
+      const clsList = Object.values(data.classes ?? {});
       clsList.sort((a, b) => b.deletedAt - a.deletedAt);
-
-      // 만료된 항목 정리
-      if (Object.keys(cleanupPaths).length > 0) {
-        await update(ref(db), cleanupPaths).catch(() => {});
-      }
 
       setStudents(stuList);
       setClasses(clsList);
@@ -161,9 +131,10 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
     }
   }
 
-  function daysLeft(deletedAt: number) {
-    const remaining = SEVEN_DAYS_MS - (Date.now() - deletedAt);
-    return Math.max(1, Math.ceil(remaining / (24 * 60 * 60 * 1000)));
+  function deletedAtLabel(deletedAt: number) {
+    const date = new Date(deletedAt);
+    if (Number.isNaN(date.getTime())) return '삭제 시각 미상';
+    return `${date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })} 삭제`;
   }
 
   return (
@@ -172,7 +143,7 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
       <div className="modal-dialog" style={{ maxWidth: 480, width: '95vw', maxHeight: '80vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div className="modal-title">최근 삭제 목록</div>
         <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>
-          삭제 후 7일간 보관됩니다. 복원 또는 영구 삭제할 수 있습니다.
+          자동으로 정리되지 않습니다. 확인 후 복원하거나 영구 삭제할 수 있습니다.
         </div>
 
         {loading ? (
@@ -192,7 +163,7 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{item.name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                        {item.ck.replace(/-/g, ' ')}반 · {daysLeft(item.deletedAt)}일 후 자동 삭제
+                        {item.ck.replace(/-/g, ' ')}반 · {deletedAtLabel(item.deletedAt)}
                       </div>
                     </div>
                     {confirmKey === item.id ? (
@@ -223,7 +194,7 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{part}부 {grade}학년 {cls}반</div>
                         <div style={{ fontSize: 11, color: 'var(--text3)' }}>
-                          {item.teacher || '담당 교사 없음'} · 학생 {studentCount}명 · {daysLeft(item.deletedAt)}일 후 자동 삭제
+                          {item.teacher || '담당 교사 없음'} · 학생 {studentCount}명 · {deletedAtLabel(item.deletedAt)}
                         </div>
                       </div>
                       {confirmKey === item.ck ? (

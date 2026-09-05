@@ -72,10 +72,10 @@
 | 통합관리자 | 수정 | 수정 | ✅ | ✅ | ✅ |
 | 교역자 | 수정 | 수정 | ✅ | ✅ | ✕ |
 | 스탭팀장 | 수정 | 수정 | ✅ | ✕ | ✕ |
-| 행정팀 | 수정 | 수정 | ✅ | ✕ | ✅ |
-| 바나바팀 | 조회 | **수정** | ✕ | ✕ | ✕ |
-| 예배·찬양·미디어·기획디자인팀 | 조회 | 조회 | ✕ | ✕ | ✕ |
-| 사역팀(미지정) | 조회 | 조회 | ✕ | ✕ | ✕ |
+| 행정팀 | 수정 | 행정팀 수정·다른 팀 조회 | ✅ | ✕ | ✅ |
+| 바나바팀 | 조회 | **바나바팀만 수정** | ✕ | ✕ | ✕ |
+| 예배·찬양·미디어·기획디자인팀 | 조회 | **자기 팀만 수정** | ✕ | ✕ | ✕ |
+| 사역팀(미지정) | 조회 | 접근 없음 | ✕ | ✕ | ✕ |
 
 **방학 역할 (6종)** — 수련회 행정 / 현장
 
@@ -98,7 +98,7 @@
 | `retreatAdmins/{uid}` | 교역자·스탭팀장·행정팀·바나바팀(학기 쓰기 필요) | `{ role, semesterRole, retreatRole }` |
 | `iguardMembers/{uid}` + `iguardRoles/{uid}` | 이가드팀(`team`)·현장 스탭·사역팀(`staff`) | `{ semesterRole, retreatRole }` |
 
-**행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸습니다.** `retreatAdmins/{uid}.semesterRole === "adminTeam"`인 계정만 `classes/{year}/{ck}/students/{sid}`·`attendance/{year}/{ck}/{sid}`·`trash/{year}/students/{sid}` **학생 1명 경로**를 씁니다. 반 노드 전체(`students` 통째·`teacher`)와 `trash` 노드 전체는 통합관리자·담임 그대로입니다. `semesterRole`은 `retreatAdmins` 쓰기가 통합관리자 전용이라 자가 승급이 불가능합니다. 계약은 `attendance-app/__tests__/rulesContract.test.ts`가 지킵니다.
+**출석부 반영은 `canWriteStudentRoster(roles)`가 허용하는 학기 역할 `superAdmin`·`adminTeam`만 실행합니다.** 행정팀은 2026-08-12 Rules 보강으로 열렸고, `classes/{year}/{ck}/students/{sid}`·`attendance/{year}/{ck}/{sid}`·`trash/{year}/students/{sid}` **학생 1명 경로**만 씁니다. 반 노드 전체(`students` 통째·`teacher`)와 `trash` 노드 전체는 통합관리자·담임 그대로입니다. `semesterRole`은 `retreatAdmins` 쓰기가 통합관리자 전용이라 자가 승급이 불가능합니다. 계약은 `accessPolicy.test.ts`와 `attendance-app/__tests__/rulesContract.test.ts`가 지킵니다.
 
 ※ **화면 차단 ≠ 실제 차단.** Rules는 그 외에는 세 버킷만 구분합니다. 아래는 화면에서만 막히며, 실제 차단은 Rules 변경이 필요합니다.
 - 행정 화면의 **조회 전용 모드**는 `RetreatEditProvider`(`features/portal/RetreatEditContext.tsx`) + `RetreatPageClient`의 `<fieldset disabled className="contents">` 두 겹입니다. fieldset이 내부 `button`·`input`·`select`·`textarea`를 브라우저 수준에서 잠그고(클릭 이벤트도 발생하지 않음), `display:contents`라 레이아웃에는 영향이 없습니다. 드래그처럼 폼 요소가 아닌 조작은 각 컴포넌트가 `useRetreatCanEdit()`으로 따로 잠급니다(`GroupComponents`·`RoomsTab`의 `draggable`). 새 행정 탭을 만들 때 드래그·div 클릭 편집이 있으면 이 훅을 반드시 쓰세요.
@@ -108,11 +108,11 @@
 **원칙: 화면에서 막는 것은 언제나 안전하지만, 화면에서 여는 것은 Rules가 허용할 때만 합니다.** (Rules가 막는 걸 화면에서 열면 "눌렀는데 실패"가 됩니다.)
 
 - 화면 게이트는 `canAccessArea` / `canEditArea` / `iguardScopeOf` / `canManageRolesOf`와 목적별 함수(`canDestroySemester`·`canCreateRetreat`·`canSeeSensitiveRetreat` 등)만 사용합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
-- 역할 판정은 `resolveMinistryRoles`(순수) 하나로 처리합니다. 이가드 `AuthContext`는 통합 `AuthContext` 값을 전달하는 호환 어댑터이며 별도 인증·역할 조회를 시작하지 않습니다.
+- 인증과 역할 조회는 루트 `src/context/AuthContext.tsx`에서 한 번만 수행하고 역할 판정은 `resolveMinistryRoles`(순수) 하나로 처리합니다. 삭제된 `src/features/iguard/context/AuthContext.tsx` 어댑터를 다시 만들거나 별도 인증·역할 구독을 추가하지 않습니다.
 - 역할 배정 쓰기는 `roleAssign.planRoleAssignment`(순수·테스트) → `applyRole.applyRoleSteps`(실행) 경로만 사용합니다. 부여를 먼저, 해제를 나중에 실행합니다.
 - 학기 화면의 편집 잠금은 `features/semester/EditContext`의 `useSemesterCanEdit()`으로만 판단합니다.
 - 스탭의 학기 **조회**는 2026-08-08 Rules 보강으로 열렸습니다 — `semesters` `.read`에 `iguardMembers`가 추가됐습니다. `.write`는 계속 `admins`/`retreatAdmins`만이고, 연락처가 있는 `semestersPrivate`는 **행정 전용 그대로**입니다. 즉 스탭은 `semesters/*`(명단·팀·훈련 반·회차·출석·커리큘럼)를 읽지만 저장은 못 합니다. Rules는 학생 앱에서만 배포합니다.
-- 행정 권한과 이가드 권한의 **쓰기 경계**는 계속 분리합니다. 이가드팀 계정은 통합 홈과 현장 화면만 사용합니다.
+- 행정 권한과 이가드 권한의 **쓰기 경계**는 계속 분리합니다. 이가드팀은 수련회 행정 명단을 조회할 수 있지만 저장은 현장 모듈의 허용 범위에서만 합니다.
 
 ## 인물 통합검색 계약
 
@@ -148,9 +148,9 @@
 - **배치·커리큘럼은 두 축**이다: 사역팀(`teams`)과 훈련 반(`trainingClasses`). 커리큘럼은 `curriculum/{id}` 한 맵을 공유한다(두 축의 id가 겹치지 않는다). 훈련 반에는 `goal`이 없으므로 학기 목표 박스는 사역팀에서만 보인다.
 - **홈 공유 캘린더**의 "공유 일정"은 `prepMilestones`다. 추가·수정·삭제는 Rules와 같게 스탭을 제외하고 열어 둔다(`canEditPortalArea("retreat-admin") || iguardScope === "all"`).
 - **사역 가이드**의 기본값은 `features/ministryGuide/ministryGuideContent.ts`의 정적 운영 원칙이다. 권한 있는 담당자의 월별 흐름·부서 운영 가이드 수정본은 기존 공유 경로 `prepMilestones/*`에 `sourceSite=ministry-guide*`인 결정적 레코드로 나눠 저장하고, 일반 일정 구독은 이를 반드시 필터링한다. 연간 계획은 `가안`으로 표시하며 학생 실명·연락처·주소·가정·건강 특이사항과 미결 아이디어는 넣지 않는다.
-- **주일 사역의 새친구 탭**은 학기 선택 없이 모든 `semesters/*/newFriends`를 통합 조회한다. 기존 학기별 기록은 이동하지 않고, 신규 기록만 학기가 아닌 연도별 내부 작업공간 `semesters/{year}-sunday/newFriends`와 `semestersPrivate/{year}-sunday/newFriendsPrivate`에 저장한다. 이 작업공간은 `meta`를 두지 않아 학기 목록에 나타나지 않는다. 행정팀은 접수·2주 과정·등록 결정·반배정을 관리하고, `classes/{year}` 반영은 현재 Rules와 일치하게 통합관리자만 `registerNewFriendInRoster`를 호출한다. 수정 가능한 접수일은 `registeredDate`(한국 기준 `YYYY-MM-DD`)로 저장하며, 감사 시각 `createdAt`은 변경하지 않는다. 기존 레코드에 접수일이 없으면 화면에서 `createdAt`의 한국 날짜를 사용한다. 이 함수는 새친구 ID 기반 결정적 학생 ID, 중복 차단, 대상 반 확인, 비공개 사전 스냅샷, 단일 학생 경로+반영 이력의 원자 update와 재조회 검증을 유지한다. 반영된 새친구 삭제도 통합관리자만 가능하며, `removeNewFriendFromRoster`가 결정적 `nf_` ID·현재 이름·연결 반을 재검증하고 학생·해당 출석·새친구 공개/비공개 기록을 원자 삭제한다. 삭제 직전 전체 사본은 `newFriendRosterBackups/{friendId}/removals/{timestamp}`에, 학생 복구 사본은 `trash/{year}/students/{studentId}`에 남기고 결과를 재조회한다. 일반적인 `classes`·`attendance` 쓰기 함수로 넓히지 않는다.
+- **주일 사역의 새친구 탭**은 학기 선택 없이 모든 `semesters/*/newFriends`를 통합 조회한다. 기존 학기별 기록은 이동하지 않고, 신규 기록만 학기가 아닌 연도별 내부 작업공간 `semesters/{year}-sunday/newFriends`와 `semestersPrivate/{year}-sunday/newFriendsPrivate`에 저장한다. 이 작업공간은 `meta`를 두지 않아 학기 목록에 나타나지 않는다. 행정팀은 접수·2주 과정·등록 결정·반배정을 관리하고, `classes/{year}` 반영·삭제·등반 취소는 `canWriteStudentRoster(roles)`가 참인 통합관리자·행정팀만 실행한다. 수정 가능한 접수일은 `registeredDate`(한국 기준 `YYYY-MM-DD`)로 저장하며, 감사 시각 `createdAt`은 변경하지 않는다. 기존 레코드에 접수일이 없으면 화면에서 `createdAt`의 한국 날짜를 사용한다. 이 함수는 새친구 ID 기반 결정적 학생 ID, 중복 차단, 대상 반 확인, 비공개 사전 스냅샷, 단일 학생 경로+반영 이력의 원자 update와 재조회 검증을 유지한다. `removeNewFriendFromRoster`는 결정적 `nf_` ID·현재 이름·연결 반을 재검증하고 학생·해당 출석·새친구 공개/비공개 기록을 원자 삭제한다. 삭제 직전 전체 사본은 `newFriendRosterBackups/{friendId}/removals/{timestamp}`에, 학생 복구 사본은 `trash/{year}/students/{studentId}`에 남기고 결과를 재조회한다. 일반적인 `classes`·`attendance` 쓰기 함수로 넓히지 않는다.
 - **행정 변동 사항 탭**은 학생 앱 소유 `classes/{year}/{classKey}/adminChanges`를 읽기만 한다. 학생 앱이 학생 명단 수정과 같은 원자 update로 만든 감사기록이며, 통합 앱에서는 생성·수정·삭제하지 않는다. 기존 `변경 이력`은 제거하고 `학생 변동`은 `등록 현황`으로 표시한다.
-- **새친구 완료 기준은 출석부 반영(`rosterSync`)**이다. `giftDate` 입력은 운영 화면에서 제거했으며 신규 저장에 사용하지 않는다. 다만 과거 `giftDate`가 있는 레코드는 완료로 계속 읽고 일반 수정으로 값을 지우지 않아 별도 DB 마이그레이션 없이 보존한다. **등반 및 배정 취소**는 새친구 공개·비공개 기록과 등록 결정·2주차 기록을 보존하고 `assignedClassKey`·레거시 `giftDate`·`rosterSync`를 해제해 `반배정` 단계로 되돌린다. 출석부 반영 후에는 통합관리자만 실행하며, 결정적 `nf_` 학생·해당 출석을 사전 백업과 `trash`를 남긴 뒤 원자적으로 제거한다. 새친구 기록까지 지우는 `명단·출석부 삭제`와 구분한다.
+- **새친구 완료 기준은 출석부 반영(`rosterSync`)**이다. `giftDate` 입력은 운영 화면에서 제거했으며 신규 저장에 사용하지 않는다. 다만 과거 `giftDate`가 있는 레코드는 완료로 계속 읽고 일반 수정으로 값을 지우지 않아 별도 DB 마이그레이션 없이 보존한다. **등반 및 배정 취소**는 새친구 공개·비공개 기록과 등록 결정·2주차 기록을 보존하고 `assignedClassKey`·레거시 `giftDate`·`rosterSync`를 해제해 `반배정` 단계로 되돌린다. 출석부 반영 후에는 `canWriteStudentRoster(roles)` 허용 역할만 실행하며, 결정적 `nf_` 학생·해당 출석을 사전 백업과 `trash`를 남긴 뒤 원자적으로 제거한다. 새친구 기록까지 지우는 `명단·출석부 삭제`와 구분한다.
 - 큐싯 **구글 시트 연동은 2026-08-07 제거**했다(표 붙여넣기만 사용). `iguard/cueSheet` 노드와 db 함수는 남아 있지만 화면에서 쓰지 않는다 — 되살릴 때만 참고한다.
 - **인원체크 키에 배열 인덱스를 넣지 않는다** — `checklistKeys.ts`의 `stableMemberId`(`{kind}:{ownerId}:{name}`)만 쓴다. 인덱스를 넣으면 행사 중 한 명이 불참 처리될 때 뒤 사람들의 체크가 통째로 어긋난다. 운영 DB에는 구형 인덱스 키가 남아 있으므로 판정·해제는 반드시 `memberCheckKeys`/`isMemberChecked`를 거친다(신형·구형 동시 인식, 쓰기는 신형만).
 - **삭제는 짝이 되는 노드를 반드시 함께 지운다** — 수련회는 `buildRetreatRemovalUpdates`(`retreats` + `retreatsPrivate`), 팀·훈련 반은 `curriculum`까지. 한쪽만 지우면 화면에서 접근 불가능한 고아가 남는다(민감정보면 더 심각).

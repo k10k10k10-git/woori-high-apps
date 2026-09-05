@@ -1,0 +1,27 @@
+name: agent-os security gate
+
+on:
+  pull_request:
+    paths:
+      - "agent-os/**"
+      - ".github/workflows/agent-os-security.yml"
+  push:
+    branches: [main]
+    paths:
+      - "agent-os/**"
+      - ".github/workflows/agent-os-security.yml"
+
+concurrency:
+  group: agent-os-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check agent-os/server.js
+      - run: node --test agent-os/security.test.js

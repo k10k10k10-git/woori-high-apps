@@ -1,0 +1,46 @@
+name: attendance-app quality gate
+
+on:
+  pull_request:
+    paths:
+      - "attendance-app/**"
+      - ".github/workflows/attendance-quality.yml"
+  push:
+    branches: [main]
+    paths:
+      - "attendance-app/**"
+      - ".github/workflows/attendance-quality.yml"
+
+concurrency:
+  group: attendance-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      # 빌드 시 필요한 Firebase 공개 설정 형태만 제공한다.
+      # 앱을 실행하지 않으며 운영 Firebase 주소를 사용하지 않는다.
+      NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyDUMMYDUMMYDUMMYDUMMYDUMMYDUMMY1
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-project.firebaseapp.com
+      NEXT_PUBLIC_FIREBASE_DATABASE_URL: https://ci-project-default-rtdb.firebaseio.com
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-project
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-project.appspot.com
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      NEXT_PUBLIC_FIREBASE_APP_ID: 1:000000000000:web:0000000000000000000000
+      NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-0000000000
+    defaults:
+      run:
+        working-directory: attendance-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: attendance-app/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

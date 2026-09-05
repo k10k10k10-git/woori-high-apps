@@ -1,8 +1,7 @@
 'use client';
 import { useState } from 'react';
-import { db, ref, set, update } from '@/lib/db';
+import { db, ref, update } from '@/lib/db';
 import { useApp, useClassKeys, useClassKey } from '@/store/AppContext';
-import { sortAndRenumber } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
 import ClassTabBar from '@/components/ClassTabBar';
 import StudentModal from '@/components/modals/StudentModal';
@@ -135,7 +134,7 @@ export default function ManageTab() {
             {curPart}부 {curGrade}학년 {curClass}반을 삭제할까요?
           </div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-            출석 데이터도 함께 삭제됩니다. 최근 삭제 목록에 7일간 보관됩니다.
+            출석 데이터도 함께 삭제됩니다. 반 명단은 최근 삭제 목록에 보관됩니다.
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-danger" style={{ padding: '6px 14px', fontSize: 12 }} onClick={deleteClass}>삭제</button>

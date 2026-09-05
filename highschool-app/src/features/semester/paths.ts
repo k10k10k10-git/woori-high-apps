@@ -1,7 +1,8 @@
 // DB 경로 단일 원천 — 경로 문자열은 이 파일에만 존재한다 (모노레포 컨벤션).
 // 소유권: 이 모듈이 semesters/*, semestersPrivate/* 쓰기 소유.
 //         (구 semester-app이 함께 쓰던 노드였고, 그 앱은 2026-08-12 제거됐다.)
-//         classes/*·attendance/*·trash/*는 학생 앱 소유. 새친구 단건 등록과 그 등록의 검증된 되돌리기만 통합관리자 예외.
+//         classes/*·attendance/*·trash/*는 학생 앱 소유. canWriteStudentRoster가 허용하는
+//         통합관리자·행정팀의 새친구 단건 등록과 그 등록의 검증된 되돌리기만 예외.
 //         admins, retreatAdmins 는 읽기 전용 (다른 앱 소유).
 
 import type { SemesterAttendanceScope } from "./types";
@@ -57,7 +58,7 @@ export const paths = {
   studentAttendance: (year: string, classKey: string, studentId: string) =>
     `attendance/${year}/${classKey}/${studentId}`,
   trashStudent: (year: string, studentId: string) => `trash/${year}/students/${studentId}`,
-  // 공식스탭 명단 (교사·스탭 출석부 앱 소유) — 접수 대상에 스탭을 포함하기 위해 읽는다
+  // 공식스탭 명단 (학생 출석 앱 소유) — 접수 대상에 스탭을 포함하기 위해 읽는다
   teacherStaffByYear: (year: string) => `teacherStaff/${year}`,
   admins: (uid: string) => `admins/${uid}`,
   retreatAdmin: (uid: string) => `retreatAdmins/${uid}`,

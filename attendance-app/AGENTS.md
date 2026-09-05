@@ -35,14 +35,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 | 이 앱이 관리하는 경로 | 용도·교차 앱 영향 |
 |---|---|
 | `classes/{year}`, `attendance/{year}`, `events/{year}` | 학생·반·출석·행사 원장. 통합 앱의 주일 사역·학기 접수·수련회/현장 조회가 소비하므로 키와 형태 변경은 교차 앱 검토 대상 |
-| `admins`, `attendanceAdmins`, `userRoles`, `teacherClasses` | `admins`는 플랫폼 전권, `attendanceAdmins`는 출석부 전용. 로그인 역할은 `userRoles/{emailKey}`, 교사 반 매핑은 `teacherClasses/{uid}` |
+| `admins`, `attendanceAdmins`, `userRoles`, `teacherClasses` | `admins`는 플랫폼 전권, `attendanceAdmins`는 출석부 전용. 로그인과 교사 반 권한은 이메일이 일치하는 `userRoles/{emailKey}`가 원천이며 `teacherClasses/{uid}`는 관리자만 쓰는 레거시 매핑 |
 | `teacherStaff/{year}`, `teacherSpecial/{year}`, `teacherExtra/{year}` | 통합 앱도 읽는 스탭·교사 명단. 제거된 `staff_*` 노드와 다름 |
 | `teacherAdditional/{year}`, `teacherPhones/{year}` | 출석부 관리자용 교사 정보. `teacherPhones`는 현재 앱에서 읽기만 함 |
-| `suggestions/{year}`, `trash/{year}`, `config/sheetSync` | 반별 건의사항, 삭제 복구본, 시트 주소 설정. 통합 앱 사이트 요청함과 별개 |
+| `suggestions/{year}`, `trash/{year}`, `config/sheetSync`, `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}`, `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}` | 반별 건의사항, 삭제 복구본, 시트 주소 설정, 학생 이동 중 양쪽 반 쓰기를 막는 작업별 잠금과 지연 요청 재실행을 막는 불변 commit marker. 통합 앱 사이트 요청함과 별개 |
 
-- 교사는 `classes/{year}/{ck}`·`attendance/{year}/{ck}` 자기 반만, 관리자는 해당 연도 전체를 구독한다. `loadUserRole()`의 `teacherClasses/{uid}` 기록 완료를 기다린 뒤 인증 게이트를 열어야 한다. 로그인 과정에서 관리자 권한을 자동 부여하지 않는다.
-- 위 구독 범위는 현재 앱 동작이다. Rules의 `teacherClasses/{uid}` 자기 쓰기는 값 검증이 없고 이 값이 반 접근 판정에도 쓰인다. 따라서 서버에서 본인 반만 강제한다고 설명하지 않는다. [2026-09-05 점검 보고](../docs/PROJECT_AUDIT_2026-09-05.md)의 권한 문제를 참고하고 Rules는 별도 절차 없이 수정하지 않는다.
-- `database.rules.json`과 `firebase.json`은 공유 RTDB 규칙의 유일한 배포 원천이다. **이 작업의 Rules 배포 답은 항상 아니오다.** 권한 변경 필요성은 보고하고, 루트 안전 규칙과 별도 요청 없이 수정·배포하지 않는다.
+- 교사는 `classes/{year}/{ck}`·`attendance/{year}/{ck}` 자기 반만, 관리자는 해당 연도 전체를 구독한다. `loadUserRole()`은 이메일 키의 `userRoles`를 읽고 화면 선택만 맞추며 로그인 중 DB를 쓰지 않는다. Rules도 같은 레코드의 이메일·`role=teacher`·부·학년·반을 직접 검사한다.
+- `teacherClasses/{uid}` 자기 쓰기와 권한 판정은 2026-09-05 제거했다. 이 레거시 노드는 관리자만 읽고 쓸 수 있으며 교사 권한을 다시 연결하지 않는다. 교사의 명단 변경 UI는 열려 있지 않고, 출석 쓰기는 본인 반의 실제 명단에 존재하는 학생 한 명과 잠금이 없는 반에만 허용한다.
+- `database.rules.json`과 `firebase.json`은 공유 RTDB 규칙의 유일한 배포 원천이다. 일반 작업에서는 변경 필요성을 보고하고 루트 안전 규칙의 명시 예외 확인 없이 수정·배포하지 않는다. 2026-09-05 감사 후속 작업은 사용자가 그 예외를 확인했다.
 - `userRoles/{emailKey}`의 이메일 기반 자기조회, `retreatAdmins`·`iguardMembers`·`iguardRoles`의 `$uid` 자기조회를 제거하지 않는다. 제거하면 로그인·역할 판정이 막힌다.
 - 교사 개인정보 노드를 `auth != null` 전체 읽기로 넓히지 않는다. `events`의 인증 사용자 읽기는 개인정보가 없는 행사 용도로 유지한다. `iguardRoles` 저장값은 `staff`/`team`뿐이다.
 - 통합 앱의 새친구 단건 등록 및 검증된 되돌리기는 공유 쓰기 예외다. `nf_` ID·동일 학생 확인·비공개 사전 백업·원자 update를 유지한다. 되돌리기는 해당 학생의 `classes`·`attendance`와 `trash` 복구본까지 한정한다. 허용 역할은 통합 앱 `accessPolicy.ts`와 실제 Rules를 함께 확인하고, 이 예외를 범용 명단 쓰기로 확대하지 않는다.
@@ -66,7 +66,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 반 선택은 보안 경계가 아니다. `AppShell`의 데모 `/admin`·`/overall` 차단, `demoSelection`/`demoLastSelection` 구분, 관리자 로그인 의도 플래그를 유지한다. 데모 값을 보고서·로그에 출력하거나 자격정보를 커밋하지 않는다.
 - 2026-09-05 로컬 점검에서는 데모 모드와 계정 설정이 남아 있었다. 운영 종료 여부는 별도 확인 대상이다. `.claude/HANDOFF.md`의 과거 종료 예정일이 지났다는 이유만으로 계정·권한·환경을 자동 변경하지 않는다. 종료 요청 시 계정·권한 회수와 플래그 해제·Hosting 배포를 함께 검토한다.
 - `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS=false`는 임시 노출 정책이다. 문서 정리 중 임의로 켜지 않는다.
-- **관리자 로그인·연도 변경은 읽기 전용 검증이 아니다.** `AppShell`이 `cleanupOldYears()`를 호출해 선택 연도 ±5년 밖의 `classes`·`attendance`·`events` 삭제를 시도한다. `TrashModal`은 열 때 7일 지난 휴지통 항목을 삭제한다. 운영 DB 무쓰기 점검은 이 자동 쓰기 경로까지 제외한 로컬 fixture·정적 검증으로 한다.
+- 관리자 로그인·연도 변경만으로 오래된 `classes`·`attendance`·`events`를 정리하지 않는다. `TrashModal`도 모든 복구본을 조회만 하며, 영구 삭제는 사용자가 항목별 `삭제` → `확인`을 누른 경우에만 실행한다. 이 계약을 화면 진입 effect의 자동 쓰기로 되돌리지 않는다.
+
+## 핵심 코드 패턴
+
+### 학생 반 이동과 화면 진입 정리를 데이터 유실 없이 다루기 (2026-09-05)
+- **접근법**: `sheetSync.ts`의 출석 이관 계약을 먼저 확인한다 → 부·학년 선택 변경 때 반 선택을 초기화한다 → 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 두 leaf 제거는 한 `onDisconnect(yearRef).update()`로 선점 전 등록하고 선점 직후 다시 등록한다 → 서버 시간 오프셋을 확인한 뒤 원본 학생·목적지 반·양쪽 출석을 다시 읽는다 → 목적지 출석 셀을 우선해 병합하고 목적지 반이 없거나 같은 SID 학생이 있으면 중단한다 → 잠금 두 개를 `pending`으로 정확히 전환하면서 `startedAt`을 서버 보정 시각으로 갱신한다 → 종료 예약 취소 완료와 pending 소유권 재확인 뒤, 학생·출석·감사기록·두 잠금 해제·불변 `studentMoveCommits` marker를 단발 루트 REST PATCH에 묶는다 → 성공 후 부·학년·반 선택을 모두 목적지에 맞춘다 → 로그인·연도 변경 및 `TrashModal` 로드 effect에서 삭제 쓰기를 제거한다.
+- **단절·복구 계약**: PATCH는 30초 뒤 중단하며 자동 재시도하지 않는다. 2xx만 즉시 성공, 4xx만 명시적 거절로 보고 exact lock을 정리한다. 예외·중단·5xx는 결과 불명확 상태이므로 pending 두 잠금을 유지한다. 다음 이동에서 서버 보정 시각 기준 10분 이상 지난 pending만 살핀다. commit marker 없음·원본 있음·목적지 SID 없음이 모두 맞으면 exact lock을 조건부 정리하고 한 번만 재선점한다. marker 있음·원본 없음·목적지 있음이면 완료로 판정해 잠금만 정리하고 화면을 목적지로 바꾼다. 나머지 혼합 상태와 `preparing`은 자동 정리하지 않는다. Firebase 연결 또는 서버 시간 오프셋을 확인할 수 없을 때도 자동 복구와 pending 전환을 하지 않는다.
+- **지연 요청 차단**: commit marker는 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`에 한 번만 생성하고 자동 삭제하지 않는다. Rules가 marker 생성 시 기존 양쪽 pending lock의 owner·operation·metadata 일치를 요구해야, 오래된 잠금을 복구한 뒤 늦게 도착한 이전 PATCH 전체가 거절된다.
+- **판단 질문**: 목적지 SID를 새로 만들면 기존 출석·새친구 연결이 끊길 수 있어 사용하지 않았다. 출석 충돌을 원본 값으로 덮으면 목적지 기록이 사라지므로 목적지 값을 우선했고, 휴지통 일괄 자동 정리는 기존 항목별 삭제 확인 UI가 있어 유지할 이유가 없었다.
+- **재사용 규칙**: 참조 키를 유지하는 반 이동은 양쪽 최신 스냅샷과 목적지 충돌을 확인한 뒤 한 원자 payload로 처리하고, 화면 진입 effect에서는 운영 데이터 삭제를 실행하지 않는다.
+- **검증 한계**: 잠금 선점·phase 전환·exact 복구·commit marker·단발 PATCH·응답 분류는 순수 회귀 테스트로 검증한다. 실제 브라우저와 RTDB 연결을 강제로 끊는 통합 시험은 운영 DB 무쓰기 범위에서 실행하지 않았다. 잠긴 동안에는 원본·목적지 반의 전체 명단·출석 쓰기가 잠시 차단된다. 같은 UID의 다른 탭은 Rules에서 이동 owner로 보이므로, 그 탭의 일반 명단·출석 쓰기까지 막지는 못한다. 잠금 전에 이미 SDK 오프라인 큐에 들어간 관리자 쓰기는 잠금 해제 후 재생될 수 있다. 교사의 늦은 출석 쓰기는 Rules에서 원본 학생 존재를 함께 요구해 거절하되 관리자 큐까지 완전히 fencing하려면 모든 관리자 쓰기에 별도 버전 계약이 필요하다. 연결 종료 예약이 한 번 실행된 직후 SDK 트랜잭션이 재연결에서 선점되고 코드가 예약을 다시 등록하기 전 다시 끊기는 매우 짧은 구간에는 `preparing` 잠금이 남을 수 있으며, 이를 시각만으로 자동 제거하지 않는다. 연도 잠금 트랜잭션 권한을 가진 신뢰 관리자의 직접 잠금 변조도 클라이언트 프로토콜만으로 차단할 수 없다.
 
 ## 검증과 배포
 

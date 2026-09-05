@@ -21,7 +21,7 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 - 운영 DB 직접 쓰기는 **사용자의 명시 승인 + 사전 스냅샷**이 있어야 한다. 조사·문서 수정·로컬 테스트 요청은 운영 데이터 변경 승인이 아니다.
 - Rules 변경 필요성은 보고만 한다. 직접 수정·배포하지 않는다. 유일한 원천은 `attendance-app/database.rules.json`이며 `firebase.json`도 학생 앱에만 있다.
 - 코드 수정 전에 공유 Firebase 경로 영향을 확인한다. 데이터 형태·경로·동기화·임포트·배포를 다루면 먼저 영향 경로와 읽는 앱을 설명한다. 두 앱 이상이 읽는 데이터 형태 변경은 `DB_OWNERSHIP.md`의 해당 행을 근거로 사용자 확인을 받는다.
-- 화면을 여는 행위가 항상 읽기 전용은 아니다. 학생 앱 관리자 연도 정리·휴지통 조회, 통합 앱 알림 확인·요청 흐름에는 자동 쓰기가 있을 수 있다. DB 무쓰기 QA에서는 effect·구독·인증 후처리를 먼저 확인한다.
+- 화면을 여는 행위가 항상 읽기 전용은 아니다. 학생 앱의 로그인·연도 변경 자동 정리와 휴지통 조회 자동 삭제는 2026-09-05 제거했으며 다시 넣지 않는다. 통합 앱 알림 확인·요청 흐름에는 자동 쓰기가 있으므로 DB 무쓰기 QA에서는 effect·구독·인증 후처리를 먼저 확인한다.
 
 ## 프로젝트 지도
 
@@ -31,20 +31,22 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 | `attendance-app/` | Next.js 정적 내보내기 기반 학생 출석 PWA | `classes/`, `attendance/`, `events/`, `userRoles`, `admins`, `attendanceAdmins`, `teacher*`, `trash/`, `suggestions/`; 공유 Rules 원천 |
 | `agent-os/` | 로컬 대시보드와 Claude 작업 실행기 | `AgentOS.command`, `server.js`, `skills.json`; 운영 앱이 아님 |
 | `scripts/verify-all.mjs` | 두 앱 품질 검사 실행 | 루트 `npm run verify` |
-| `.github/workflows/highschool-quality.yml` | 통합 앱 CI | lint·타입·coverage·build·Lighthouse + 인증 E2E |
+| `.github/workflows/` | CI | 통합·학생 앱 품질 검사와 Agent OS 보안 회귀 테스트 |
 | `.claude/`, `.agents/` | 인수인계·로컬 스킬·설정 | `.claude/HANDOFF.md`가 인수인계의 유일한 원천; `.agents/`는 Codex용 변형이며 중복으로 삭제하지 않음 |
 | `docs/`, `LEARNINGS.md` | 이관 이력·감사·재사용할 교훈 | [이번 점검 기록](docs/PROJECT_AUDIT_2026-09-05.md) |
 | `outputs/`, `tmp/`, `graphify-out/` | 최종 산출물·중간물·재생성 가능한 코드 그래프 | 소스·운영 데이터 원천으로 취급하지 않음 |
 
 각 앱은 별도 `package.json`·lockfile·`node_modules`를 사용한다. 루트는 npm workspace 설치 관리자가 아니라 검증 실행기다. 스택 버전·테스트 개수는 실제 파일과 실행 결과로 확인한다.
 
-`agent-os`의 `/api/run`은 실제 명령을 실행한다. 점검 중 실행 버튼/API를 호출하지 않는다. 현재 `server.js`에는 서버 측 인증과 listen 호스트 제한이 없으므로 localhost 안내 문구만 보고 외부 접근이 막혔다고 판단하지 않는다. 근거는 점검 기록에 있다.
+`agent-os`의 `/api/run`은 실제 명령을 실행한다. 점검 중 실행 버튼/API를 호출하지 않는다. 서버는 IPv4 loopback에만 바인딩한다. `probe.js`가 소유자 전용 임시 파일의 프로세스별 토큰으로 HMAC 응답을 확인한 뒤, AppleScript 런처가 같은 파일을 직접 읽어 URL fragment로 브라우저에 전달한다. 정적 셸 외 모든 API는 이 토큰을 요구하며 실행 API는 Host·Origin·Fetch Metadata와 위험 작업 확인값도 검사한다. 기본 HTML·외부 스크립트·프로세스 인자·로그에 토큰을 넣거나 인라인 스크립트를 되살리지 않는다. `node --test agent-os/security.test.js`는 실제 스킬 대신 스텁으로 이 경계를 검증한다.
 
 ## 공유 DB 경계
 
 - 쓰기는 소유 앱의 DB 모듈을 통해 수행한다. 통합 앱 경로는 `src/lib/paths.ts`, `src/features/semester/paths.ts`, `src/features/iguard/lib/paths.ts`를 사용한다. 학생 앱은 `src/lib/db.ts`를 통한 기존 경로 계약을 따른다.
 - 이가드의 행정 명단(`participants`, `teachers`, `groups`, `rooms`, `programs`)은 읽기 전용이다. `iguard/groupStaff`는 행정에서도 읽으므로 역방향 영향도 확인한다. 양 모듈 공유 쓰기는 `prepMilestones/*`이며 레거시 `retreats/{id}/milestones`를 새로 사용하지 않는다.
 - `classes`, `attendance`, `trash`는 학생 앱 소유다. 통합 앱에는 **`canWriteStudentRoster(roles)`가 허용하는 새친구 단건 등록·검증된 되돌리기** 예외만 있다. 현재 학기 역할 `superAdmin`·`adminTeam`이 대상이며 `src/features/semester/newFriend.ts`의 계획·검증과 `db.ts` 실행 함수를 재사용한다. 반·연도·학생 목록 전체 쓰기로 확대하지 않는다.
+- 학생 앱 교사 권한의 Rules 원천은 `auth.token.email`과 `userRoles/{emailKey}`의 `email`이 일치하는 레코드다. `role=teacher`와 `part-grade-class`로 본인 반을 파생한다. `teacherClasses/{uid}`는 레거시 관리자 매핑이며 더 이상 권한 판정에 쓰지 않고 본인 쓰기도 허용하지 않는다.
+- 학생 수동 반 이동은 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}`의 양쪽 반 잠금과 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}`의 불변 표식을 사용한다. 잠금은 최종 원자 쓰기에서 해제하지만 commit marker는 지연 요청 재실행을 막는 기록이므로 자동 삭제하지 않는다.
 - 참가자 연락처·취소계좌·의료일지·주민번호·시트 원문은 `retreatsPrivate/{id}`에, 학기 연락처는 `semestersPrivate/{id}`에 둔다. 참가자 공개·비공개 명단은 같은 학생 키를 유지한다.
 - 프로그램 원본은 `retreats/{id}/programs/{programId}`다. 준비회의 원문·결정은 `retreatsPrivate/{id}/programMeetings/{programId}`에만 저장하고 공개 구독·캐시·본문 저장에 섞지 않는다. 현장 화면은 `status=published`만 표시하며 이는 DB 자체의 초안 접근 차단을 뜻하지 않는다.
 - 사이트 건의는 `iguardPending/{uid}/siteRequests/{requestId}`를 사용한다. 첨부 본문은 Firebase Storage `site-requests/{uid}/{requestId}/attachment.jpg`, RTDB에는 메타데이터만 둔다. 접근 승인·거절로 같은 사용자 노드의 건의사항을 지우지 않는다.
@@ -64,6 +66,7 @@ Firebase 프로젝트 `woori-high`를 공유하는 **운영 앱 2개**와 로컬
 ### 로그인에 필요한 자기조회 유지
 
 - `userRoles/{emailKey}`의 이메일 일치 자기조회와 `retreatAdmins/{uid}`·`iguardMembers/{uid}`·`iguardRoles/{uid}`의 UID 자기조회를 제거하면 로그인 역할 판정이 막힌다.
+- 교사 로그인은 `userRoles/{emailKey}` 단건을 읽고 끝나며 인증 후 `teacherClasses/{uid}`를 쓰지 않는다. Rules도 같은 `userRoles` 레코드의 이메일·역할·부·학년·반을 직접 확인하므로 로그인 쓰기 의존성을 다시 만들지 않는다.
 - `teacherStaff`, `teacherSpecial`, `teacherExtra`는 역할 보유자만 읽는다. `teacherAdditional`, `teacherPhones`는 학생 앱 관리자 측만 읽는다. 임의 Google 로그인 전체에 다시 열지 않는다.
 - `semesters`는 이가드 멤버도 읽지만 `semestersPrivate`는 관리자 측 전용이다. `events`는 날짜·라벨용 `auth != null` 읽기를 유지한다.
 - 제거된 `staff_*` 노드와 현재 학생 앱의 `teacherStaff`를 혼동하지 않는다. 계약은 `attendance-app/__tests__/rulesContract.test.ts`로 확인한다. 테스트 통과는 Rules 수정·배포 허가가 아니다.
@@ -83,7 +86,7 @@ npm run build
 ```
 
 - 같은 앱에서 `tsc`와 `next build`를 병렬 실행하지 않는다(`.next/types` 경합). 문서만 바꿀 때는 링크·경로·명령 실재 여부와 `git diff --check`가 기본이고 전체 감사에서는 위 명령의 실제 결과도 기록한다.
-- 통합 앱 전체 lint에 `.auth/chrome-profile`의 Chrome 생성 JS가 섞일 수 있다. 원래 명령의 실패를 숨기지 말고 `npm run lint -- --ignore-pattern '.auth/**'`로 생성 파일을 제외한 결과를 별도로 보고한다. 인증 파일을 삭제하거나 앱 소스 검사 범위를 줄여 통과시키지 않는다.
+- 통합 앱 ESLint 전역 ignore의 `.auth/**`를 유지해 Chrome 생성 JS가 기본 검사에 섞이지 않게 한다. `npm run lint` 자체가 앱 소스를 0 오류로 검사해야 하며 인증 파일을 삭제하거나 추가 명령으로 검사 범위를 줄여 통과시키지 않는다.
 - 최초 Google OAuth는 사람이 로그인해야 하지만 저장된 인증 상태로 Playwright 검증은 가능하다. `E2E_STORAGE_STATE`와 CI의 `E2E_STORAGE_STATE_B64`가 필요하며 인증 가드를 생략하지 않는다. 세션 파일 존재만으로 로그인 성공을 단정하지 말고 실제 앱 화면을 확인한다. E2E는 기본적으로 운영 URL을 사용하므로 실행 전 쓰기 동작을 검토한다.
 - 실제 화면·운영 상태를 확인하지 않았으면 미확인으로 표시한다. 보고서 수치는 실행 출력 근거를 남기고 범위 밖 결함은 심각도·파일 위치와 함께 “수정하지 않았음”으로 구분한다.
 
@@ -94,6 +97,7 @@ npm run build
 - 수동 Vercel 배포는 승인된 경우 저장소 루트에서 실행한다. 운영 확인은 `/api/version`의 `buildId`와 배포 대상 커밋 SHA 대조, Production `Ready` 확인이다. CLI 인증·네트워크 제약은 세션마다 확인하며 과거 원격 환경의 실패를 현재 사실로 단정하지 않는다.
 - 통합 앱 운영 주소: `https://woorihigh-app.vercel.app`. 구 별칭 `highschool-app-flame.vercel.app`은 기존 링크 보호용이다.
 - 학생 앱 운영 주소: `https://woori-high.web.app`. `attendance-app/`에서 정적 build 후 승인된 `firebase deploy --only hosting`을 사용한다. `vercel.json`의 `ignoreCommand: exit 0`은 학생 앱 Vercel 빌드를 생략한다. Hosting predeploy는 `out/sw.js` 캐시 버전을 갱신한다.
+- 2026-09-05 사용자가 확인한 예외 범위의 Rules·로그인 소스와 계약 테스트는 반영됐고 운영 Rules·Hosting은 아직 배포 전이다. PR 병합 후 `OPERATIONS.md`의 백업과 **Rules → 라이브 Rules 대조 → Hosting** 순서를 따르며, Rules 대조가 실패하면 이전 스냅샷으로 롤백하고 Hosting 배포를 중단한다.
 - 스테이징은 변경 파일을 명시한다. `git add .`·`git add -A`로 사용자 작업·미추적 파일을 섞지 않는다. `.env*`, `.auth/`, `.vercel/`, 인증 상태·토큰·운영 스냅샷은 출력·커밋하지 않는다.
 - `tmp/{작업명}-{날짜}` 중간물과 운영 DB 스냅샷은 해당 작업 후 정리한다. `tmp/rules-backup/`은 보존 예외다. 기존 다른 작업의 산출물을 임의 삭제하지 않는다. `outputs/`에는 최종 산출물·재생성 스크립트만 둔다.
 - 사소하지 않은 문제 해결 뒤 `extract-approach`를 실행한다. 워크스페이스·도구 교훈은 `LEARNINGS.md`, 앱 코드 교훈은 해당 스킬이 지정한 앱 패턴 섹션에 남긴다.
