@@ -138,5 +138,14 @@ SHA-256이 일치했다. 사용자가 루트 안전 규칙의 예외를 확인�
 `config` 상위 쓰기 제거를 실제 `attendance-app/database.rules.json`, 38개 Rules 계약 테스트,
 교사 로그인 코드에 반영했고 Firebase Rules dry-run을 통과했다. 라이브 `userRoles`는 개인정보를
 출력하지 않고 집계해 교사 50명 전원의 이메일 키와 부·학년·반 문자열 형태가 새 조건에 맞음을
-확인했다. 운영 DB 직접 쓰기와
-Rules·Hosting·Vercel 배포는 아직 수행하지 않았다.
+확인했다. PR #6은 병합 커밋 `a20a79065e88bc2593635a3ae74e82dc431b3f95`로 `main`에 반영됐다.
+배포 직전 라이브 Rules가 기존 운영본과 같은지 다시 확인한 뒤 Rules를 배포했고, 배포 후 라이브 전문이
+병합 소스와 일치했다. 학생 Hosting은 `/`·`/attendance` 200, `no-cache` 헤더, 라이브 서비스워커와
+배포 산출물 SHA 일치까지 확인했다. 통합 앱은 Vercel Production `Ready`이고 `/api/version`의
+`buildId`가 병합 SHA와 같다.
+
+Hosting 점검 중 종료 예정일이 지난 데모 모드와 공개 자격정보가 배포 설정에 남아 있음을 확인해
+데모 플래그와 값을 비우고 다시 배포했다. 운영 첫 화면은 일반 로그인으로 확인했다. Firebase Auth의
+데모 계정과 `attendanceAdmins/{demoUid}` 레코드 1건은 운영 데이터·계정 삭제 승인을 받기 전이므로
+삭제하지 않았고, 권한 레코드의 사전 스냅샷만 0600으로 준비했다. `npm audit` 10건은 PR 이전부터 있던
+의존성 경고이며 정적 Hosting의 현재 실행 경로에서는 즉시 롤백 사유가 아니지만 후속 업그레이드가 필요하다.

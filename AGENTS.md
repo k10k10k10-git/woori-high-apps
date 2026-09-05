@@ -97,7 +97,8 @@ npm run build
 - 수동 Vercel 배포는 승인된 경우 저장소 루트에서 실행한다. 운영 확인은 `/api/version`의 `buildId`와 배포 대상 커밋 SHA 대조, Production `Ready` 확인이다. CLI 인증·네트워크 제약은 세션마다 확인하며 과거 원격 환경의 실패를 현재 사실로 단정하지 않는다.
 - 통합 앱 운영 주소: `https://woorihigh-app.vercel.app`. 구 별칭 `highschool-app-flame.vercel.app`은 기존 링크 보호용이다.
 - 학생 앱 운영 주소: `https://woori-high.web.app`. `attendance-app/`에서 정적 build 후 승인된 `firebase deploy --only hosting`을 사용한다. `vercel.json`의 `ignoreCommand: exit 0`은 학생 앱 Vercel 빌드를 생략한다. Hosting predeploy는 `out/sw.js` 캐시 버전을 갱신한다.
-- 2026-09-05 사용자가 확인한 예외 범위의 Rules·로그인 소스와 계약 테스트는 반영됐고 운영 Rules·Hosting은 아직 배포 전이다. PR 병합 후 `OPERATIONS.md`의 백업과 **Rules → 라이브 Rules 대조 → Hosting** 순서를 따르며, Rules 대조가 실패하면 이전 스냅샷으로 롤백하고 Hosting 배포를 중단한다.
+- 2026-09-05 감사 보강은 PR #6 병합 커밋 `a20a790`으로 운영 반영됐다. 배포 직전 Rules를 `tmp/rules-backup/`에 다시 백업하고 기존 운영본과 일치함을 확인한 뒤 **Rules → 라이브 Rules 대조 → Hosting** 순서로 배포했으며, 라이브 Rules와 소스가 일치한다. 통합 앱도 `/api/version`의 `buildId`가 같은 병합 SHA이고 Vercel Production `Ready`임을 확인했다. 이후 Rules 변경도 같은 백업·대조·중단 절차를 반복한다.
+- 같은 배포에서 기한이 지난 학생 앱 데모 플래그와 공개 빌드용 데모 자격정보를 비우고 Hosting을 다시 배포해 운영 첫 화면이 일반 로그인임을 확인했다. 다만 Firebase Auth의 데모 계정과 `attendanceAdmins/{demoUid}` 권한 레코드 1건은 별도 회수 대상이다. 프런트 플래그 해제를 계정·권한 삭제로 간주하지 말고, 운영 DB 레코드 삭제 전에는 명시 승인과 사전 스냅샷을 받는다.
 - 스테이징은 변경 파일을 명시한다. `git add .`·`git add -A`로 사용자 작업·미추적 파일을 섞지 않는다. `.env*`, `.auth/`, `.vercel/`, 인증 상태·토큰·운영 스냅샷은 출력·커밋하지 않는다.
 - `tmp/{작업명}-{날짜}` 중간물과 운영 DB 스냅샷은 해당 작업 후 정리한다. `tmp/rules-backup/`은 보존 예외다. 기존 다른 작업의 산출물을 임의 삭제하지 않는다. `outputs/`에는 최종 산출물·재생성 스크립트만 둔다.
 - 사소하지 않은 문제 해결 뒤 `extract-approach`를 실행한다. 워크스페이스·도구 교훈은 `LEARNINGS.md`, 앱 코드 교훈은 해당 스킬이 지정한 앱 패턴 섹션에 남긴다.
