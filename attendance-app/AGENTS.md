@@ -50,11 +50,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 학생·출석·동기화 계약
 
-- 반 키는 `{part}-{grade}-{class}`, 출석 셀 키는 `evKey(mi, di)`의 `{월 인덱스}-{주일 인덱스}`다. 출석 값은 `O`/`X`/`T`이며 미입력 쓰기는 해당 셀을 `null`로 지운다. 한 번의 출석 입력은 `attendance/{year}/{ck}/{sid}/{weekKey}` 한 칸만 갱신한다.
+- 반 키는 `{part}-{grade}-{class}`, 출석 셀 키는 `evKey(mi, di)`의 `{월 인덱스}-{주일 인덱스}`다. 신규 출석 값은 `O`/`X`이며 미입력 쓰기는 해당 셀을 `null`로 지운다. 이전 저장값 `T`는 모든 읽기·이관 경로에서 `O`로 정규화한다. 한 번의 출석 입력은 `attendance/{year}/{ck}/{sid}/{weekKey}` 한 칸만 갱신한다.
 - 교사는 행사·휴일을 제외한 최근 정상 주일 4회만 수정한다. 저장 중·성공·실패·재시도 안내를 보존한다. 관리자의 전체 기간 편집 범위와 구분한다.
 - 대시보드에서 출석부를 열 때는 선택한 반·학기와 `/attendance?week={주일 키}`를 함께 전달한다. `buildAttendanceEntry()`는 관리자에게 선택 연도 정상 주일 전체, 교사·데모에게 최근 4회만 허용한다. 쿼리로 범위를 확대하지 않고 유효한 수동 선택이 쿼리보다 우선한다. `src/app/attendance/page.tsx`의 `Suspense`를 유지해 `useSearchParams`의 정적 빌드를 지원한다.
 - `jang === true` 학생은 원본을 유지하고 일반 출석·통계·내보내기에서 분리한다. SID의 `J`만 보고 장결자로 판단하지 않는다. 화면 정렬·번호는 `sortAndRenumber()`로 처리한다.
-- 관리자 주간 현황의 전체 출석 통계는 기존 전체 현황처럼 장결 기록을 포함한다. `attendanceRate = present / recorded`이며 `recorded`는 O·X·T 합계다. 입력 업무는 일반 학생의 `inputStudentCount`·`inputRecorded`로만 계산한다. 전원 장결 반(`no-targets`)·빈 반(`no-students`)·조회 주일 없음(`no-week`)을 입력 완료나 확인 필요 반으로 세지 않는다.
+- 관리자 주간 현황의 전체 출석 통계는 기존 전체 현황처럼 장결 기록을 포함한다. `attendanceRate = present / recorded`이며 `recorded`는 O·X 합계다. 이전 `T`는 O에 포함한다. 입력 업무는 일반 학생의 `inputStudentCount`·`inputRecorded`로만 계산한다. 전원 장결 반(`no-targets`)·빈 반(`no-students`)·조회 주일 없음(`no-week`)을 입력 완료나 확인 필요 반으로 세지 않는다.
 - 학생 수정·이동·삭제는 해당 학생 경로와 관련 경로를 루트 `update()`로 묶는다. `RosterModal`의 확인 후 명단 교체, 시트 동기화, 진급에는 현재 전체 `students` 교체 경로가 있으므로 일반 수정의 본보기로 복사하지 않는다. 전체 덮어쓰기를 추가·수정할 때는 백업·복구 범위를 먼저 검토한다.
 - `personId`는 영구 연결용 선택 필드다. 기존 sid·pid·출석 참조키를 대체하지 않는다. 생성 시 `person_student_*`·`person_teacher_*`·`person_staff_*`를 구분하고, 편집·이동·진급·동기화에서는 보존한다. 학생 과거 ID 재사용은 이름·생년월일·부서·정상 진급선·연도별 유일 후보 조건을 `personId.ts`에 위임한다. 같은 연도 다른 ID와 보호자 연락처만으로 합치지 않는다.
 - 관리자 학생 변경은 원본과 `classes/{year}/{ck}/adminChanges/{changeId}`를 같은 update에 기록한다. `adminChange.ts`의 `VALUE_FIELDS`에 있는 **이름·학교만** 실제 값을 남긴다. 연락처·주소·생년월일·사진은 값 없이 필드 이름과 입력/변경/삭제만 기록한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
@@ -76,13 +76,18 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 핵심 코드 패턴
 
+### 저장값 종류를 줄일 때 이전 값과 모든 쓰기 경로를 함께 정규화하기 (2026-09-06)
+- **접근법**: `src/utils/attendanceValue.ts`에 `T → O` 단일 정규화를 둔다 → Firebase 구독·통계·이력·내보내기·시트 동기화·반 이동이 이를 재사용하게 한다 → 통합 앱의 주일 출석 조회와 통합검색도 같은 의미로 맞춘다 → 새 UI는 `ATTENDANCE_OPTIONS`의 O/X만 렌더한다 → 운영 `attendance/*`의 exact T leaf는 스냅샷 뒤 ETag 조건부 갱신으로 O로 바꾸고 다시 전수 집계한다.
+- **판단 질문**: 별도 `semesters/*`의 한국어 `출석 | 지각 | 결석`은 다른 사역 출석 계약이므로 바꾸지 않는다. Rules는 값 열거를 강제하지 않지만 이 작업의 Rules 수정·배포 범위가 아니므로 앱 정규화와 운영 데이터 이관으로 경계를 지킨다.
+- **재사용 규칙**: 공유 DB 열거값을 줄일 때는 화면만 지우지 말고 직접 구독, 순수 통계, 복사·이관 쓰기, 교차 앱 소비처, 운영 잔존값을 한 목록으로 검사하며 목적지 우선 병합 의미도 회귀 테스트로 고정한다.
+
 ### 관리자 현황 중복을 제거하면서 기존 통계 계약을 유지하기 (2026-09-06)
 - **접근법**: `adminNavigation.ts`의 전체 현황 메뉴를 `/dashboard` 하나로 모으고 `/overall`의 활성 메뉴도 동일하게 해석한다 → 두 경로에서 `OverallTab`을 공유한다 → 주간 `AdminDashboard`와 펼침 시 마운트하는 연간 `OverallDashboard`를 한 화면에 배치한다 → 반별 누적률을 `annualClassAverageRate`로 분리하고 다른 페이지의 `curView`와 무관한 연간 집계·기존 학생별 반올림 평균을 테스트한다.
 - **판단 질문**: 중복 주간 지표를 남기면 미입력 판정 기준이 달라 혼동을 준다. 연간 표가 이전 반별 통계 페이지의 학기 선택을 따라가면 보이지 않는 필터가 적용된다. 명단·건의사항·계정·일정·동기화·진급의 기존 경로와 명시 실행 흐름은 유지한다.
 - **재사용 규칙**: 메뉴 통합은 URL 호환·권한 가드·입력 업무와 통계의 분모·화면 밖 필터 영향을 함께 확인하며, 데이터 변경 기능의 권한 확대와 분리한다.
 
 ### 관리자 입력 업무와 전체 출석 통계의 대상을 분리하기 (2026-09-05)
-- **접근법**: `src/components/tabs/AttendanceTab.tsx`의 일반 학생 입력·장결 이력 조회 대상을 확인한다 → `src/utils/adminDashboard.ts`에서 전체 `studentCount`·`recorded`와 일반 대상 `inputStudentCount`·`inputRecorded`를 따로 합산한다 → 일반 20명 전원 입력·장결 1명 미기록, 전원 장결, 장결자만 기록된 반을 `__tests__/adminDashboard.test.ts`로 검증한다 → 입력률·완료·확인 필요는 일반 대상, 출석률은 기존 장결 포함 O/(O+X+T)로 표시한다.
+- **접근법**: `src/components/tabs/AttendanceTab.tsx`의 일반 학생 입력·장결 이력 조회 대상을 확인한다 → `src/utils/adminDashboard.ts`에서 전체 `studentCount`·`recorded`와 일반 대상 `inputStudentCount`·`inputRecorded`를 따로 합산한다 → 일반 20명 전원 입력·장결 1명 미기록, 전원 장결, 장결자만 기록된 반을 `__tests__/adminDashboard.test.ts`로 검증한다 → 입력률·완료·확인 필요는 일반 대상, 출석률은 기존 장결 포함 O/(O+X)로 표시한다. 이전 T는 O로 정규화한다.
 - **판단 질문**: 출석 통계의 분모를 그대로 입력 완료에 쓰면 화면에서 입력할 수 없는 장결 학생 때문에 반이 영구 미완료로 남는다. 이를 해결하려고 기존 전체 출석 통계에서 장결 기록까지 제외하지 않는다. 빈 반·전원 장결·조회 주일 없음도 서로 구분한다.
 - **재사용 규칙**: 업무 완료율은 실제 편집 대상과 맞추고, 기존 통계 분모는 별도 필드와 회귀 테스트로 보존한다.
 

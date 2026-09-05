@@ -84,7 +84,7 @@ export function recentSundays(week: string, count = 3): string[] {
 
 export type ClassAttendance = Record<string, Record<string, string>>;
 
-/** 그 주일에 온 사람 수 — 출석(O)과 지각(T)을 센다. 결석·미입력은 뺀다. */
+/** 그 주일에 온 사람 수 — 출석(O)과 이전 지각 값(T)을 센다. 결석·미입력은 뺀다. */
 function presentOn(students: ClassAttendance | undefined, cellKey: string): number {
   if (!students) return 0;
   let count = 0;

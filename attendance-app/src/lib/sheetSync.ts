@@ -16,6 +16,7 @@
 // ────────────────────────────────────────────────────────────────
 import { getSundaysForYear } from '@/utils/dates';
 import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
+import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 import type { Student, AttValue } from '@/types';
 
 export interface ParsedStudent {
@@ -67,19 +68,20 @@ export interface AttendanceMove {
 }
 
 /** attendance/{year} 하위 구조 — ck → sid → cellKey → 출석값 */
-export type AttendanceYear = Record<string, Record<string, Record<string, AttValue>>>;
+export type AttendanceYear = Record<string, Record<string, Record<string, unknown>>>;
 
 /**
  * 반이 바뀐 학생의 옛 출석 기록을 훑어 이관·대체 칸을 가른다.
  * 시트가 원본이므로 **시트에 값이 있는 칸은 건드리지 않고**, 비어 있는 칸만 옛 기록으로 채운다.
  */
 function splitOldAttendance(
-  oldMarks: Record<string, AttValue> | undefined,
+  oldMarks: Record<string, unknown> | undefined,
   sheetMarks: Record<string, AttValue>,
 ): { carry: [string, AttValue][]; superseded: number } {
   const carry: [string, AttValue][] = [];
   let superseded = 0;
-  for (const [cellKey, mark] of Object.entries(oldMarks ?? {})) {
+  for (const [cellKey, rawMark] of Object.entries(oldMarks ?? {})) {
+    const mark = normalizeAttendanceValue(rawMark);
     if (!mark) continue;
     if (cellKey in sheetMarks) superseded++;
     else carry.push([cellKey, mark]);

@@ -271,9 +271,10 @@ function evidence(input: {
 }
 
 function attendanceCounts(value: unknown) {
-  const counts = { O: 0, T: 0, X: 0 };
+  const counts = { O: 0, X: 0 };
   function walk(current: unknown) {
-    if (typeof current === "string" && current in counts) counts[current as keyof typeof counts] += 1;
+    if (current === "O" || current === "T") counts.O += 1;
+    else if (current === "X") counts.X += 1;
     else if (current && typeof current === "object") Object.values(current).forEach(walk);
   }
   walk(value);
@@ -341,7 +342,7 @@ function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
           field("생년월일", student.birth, true), field("학생 연락처", student.phone, true),
           field("보호자 연락처", student.pphone, true), field("주소", student.addr, true),
           field("장기결석", student.jang === true ? "예" : student.jang === false ? "아니오" : ""),
-          field("주일 출석", counts.O + counts.T + counts.X > 0 ? `출석 ${counts.O} · 지각 ${counts.T} · 결석 ${counts.X}` : "기록 없음"),
+          field("주일 출석", counts.O + counts.X > 0 ? `출석 ${counts.O} · 결석 ${counts.X}` : "기록 없음"),
         );
         const item = evidence({
           name, personId: student.personId, sourceId: sourceIdFor("student", year, studentId, parsed?.buNum), birth: student.birth,

@@ -1,7 +1,7 @@
 import { parseClassKey } from "@/lib/classKey";
 import type { AttendanceEventRecord } from "@/lib/db/students";
 
-export type AttendanceMark = "O" | "X" | "T" | "";
+export type AttendanceMark = "O" | "X" | "";
 export type AttendanceSemester = "first" | "second" | "all";
 
 export type AttendanceWeek = {
@@ -65,19 +65,24 @@ export function sortedRoster<T extends { name: string; num?: number }>(students?
   });
 }
 
+/** 학생 출석부의 이전 지각 값(T)은 출석(O)으로 표시하고 집계한다. */
+export function normalizeAttendanceMark(value: unknown): AttendanceMark {
+  if (value === "O" || value === "T") return "O";
+  if (value === "X") return "X";
+  return "";
+}
+
 export function attendanceSummary(record: Record<string, string> | undefined, weeks: AttendanceWeek[]) {
   let present = 0;
-  let tardy = 0;
   let absent = 0;
   weeks.forEach((week) => {
     if (week.label) return;
-    const mark = record?.[week.cellKey];
+    const mark = normalizeAttendanceMark(record?.[week.cellKey]);
     if (mark === "O") present += 1;
-    if (mark === "T") tardy += 1;
     if (mark === "X") absent += 1;
   });
-  const recorded = present + tardy + absent;
-  return { present, tardy, absent, recorded, rate: recorded === 0 ? null : Math.round((present / recorded) * 100) };
+  const recorded = present + absent;
+  return { present, absent, recorded, rate: recorded === 0 ? null : Math.round((present / recorded) * 100) };
 }
 
 export function classLabel(classKey: string): string {

@@ -136,8 +136,6 @@
 [data-theme="dark"] .sunday-attendance-error { border-color: #653a3a; background: #2d1b1b; color: #f0a6a6; }
 [data-theme="dark"] .sunday-attendance-table td.mark-o,
 [data-theme="dark"] .sunday-attendance-legend .mark-o { background: #15352a; color: #7fe0b8; }
-[data-theme="dark"] .sunday-attendance-table td.mark-t,
-[data-theme="dark"] .sunday-attendance-legend .mark-t { background: #382d18; color: #edc56e; }
 [data-theme="dark"] .sunday-attendance-table td.mark-x,
 [data-theme="dark"] .sunday-attendance-legend .mark-x { background: #382020; color: #f0a0a0; }
 [data-theme="dark"] .sunday-attendance-table td.is-event,
@@ -183,4 +181,3 @@
   .landing-header .theme-toggle__label { display: none; }
   [data-theme="dark"] .landing-proof span + span { border-color: var(--color-border); }
 }
-

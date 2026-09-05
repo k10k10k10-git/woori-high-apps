@@ -1,7 +1,23 @@
 import type { AdminChangeEntry } from '@/utils/adminChange';
 import type { AttValue, Student } from '@/types';
+import { normalizeAttendanceRecord } from '@/utils/attendanceValue';
 
-export type AttendanceRecord = Record<string, AttValue>;
+/** Firebase에서 직접 읽은 이전 T 값까지 받을 수 있는 원시 출석 레코드다. */
+export type AttendanceRecord = Record<string, unknown>;
+type NormalizedAttendanceRecord = Record<string, AttValue>;
+
+function normalizeMoveRecord(value: AttendanceRecord | undefined): NormalizedAttendanceRecord {
+  if (!value || Array.isArray(value)) return {};
+  const normalized: NormalizedAttendanceRecord = {};
+  for (const [cellKey, mark] of Object.entries(value)) {
+    if (mark === '') normalized[cellKey] = '';
+    else {
+      const next = normalizeAttendanceRecord({ [cellKey]: mark });
+      if (cellKey in next) normalized[cellKey] = next[cellKey];
+    }
+  }
+  return normalized;
+}
 
 export function isValidStudentMoveDestination(
   classKeys: readonly string[],
@@ -41,10 +57,10 @@ export function buildStudentMovePayload({
   commitPath,
   adminChangePath,
   adminChange,
-}: StudentMovePayloadInput): Record<string, Student | AttendanceRecord | AdminChangeEntry | boolean | null> {
+}: StudentMovePayloadInput): Record<string, Student | NormalizedAttendanceRecord | AdminChangeEntry | boolean | null> {
   if (fromCk === toCk) throw new Error('학생 이동의 원본 반과 목적지 반이 같습니다.');
 
-  const payload: Record<string, Student | AttendanceRecord | AdminChangeEntry | boolean | null> = {
+  const payload: Record<string, Student | NormalizedAttendanceRecord | AdminChangeEntry | boolean | null> = {
     [`classes/${year}/${fromCk}/students/${student.id}`]: null,
     [`classes/${year}/${toCk}/students/${student.id}`]: { ...student },
     [lockPaths[0]]: null,
@@ -53,11 +69,13 @@ export function buildStudentMovePayload({
     [adminChangePath]: adminChange,
   };
 
-  if (sourceAttendance && Object.keys(sourceAttendance).length > 0) {
+  const normalizedSource = normalizeMoveRecord(sourceAttendance);
+  const normalizedDestination = normalizeMoveRecord(destinationAttendance);
+  if (Object.keys(normalizedSource).length > 0) {
     payload[`attendance/${year}/${fromCk}/${student.id}`] = null;
     payload[`attendance/${year}/${toCk}/${student.id}`] = {
-      ...sourceAttendance,
-      ...(destinationAttendance ?? {}),
+      ...normalizedSource,
+      ...normalizedDestination,
     };
   }
 

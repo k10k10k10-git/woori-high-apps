@@ -142,7 +142,7 @@ layout.tsx
 - `src/lib/adminNavigation.ts`의 `canUseAdminWorkspace(role, isDemo)`는 **일반 관리자 계정만** 관리자 셸에 진입시킨다. `/dashboard`·`/overall`·`/admin`은 교사·공용 데모에게 열지 않는다. 일반 관리자의 인증 세션 첫 기본 진입은 `/dashboard`로 이동하며, 이미 선택한 작업과 `/attendance?week=…` 직접 링크는 `createAdminEntryTracker()`가 보존한다. `/admin`은 기존 계정·설정 화면이고 새 대시보드 주소는 `/dashboard`다.
 - `AdminWorkspace`는 대시보드·출석 입력·학생 관리·반별 통계·전체 현황·계정·설정 메뉴와 조회 연도·연결 상태·로그아웃을 제공한다. 반 단위 화면에만 부서·학년 필터를 표시한다. `DataLoadGate`의 원장 준비 조건과 오류 재시도는 두 셸에서 동일하게 유지한다.
 - `AdminDashboard`는 기존 `classes/{year}`·`attendance/{year}`·`events/{year}` 구독 결과만 계산하며 구독이나 저장 경로를 추가하지 않는다. `buildAdminDashboard()`의 기본 날짜는 최근 KST 경과 정상 주일이며, 과거 연도는 마지막 정상 주일, 미래 연도는 첫 정상 주일이다. 행사 주일은 제외하고 반·교사·학생 검색은 해당 반의 전체 현황을 반환한다.
-- **출석 통계와 입력 업무는 분모가 다르다.** `studentCount`·`recorded`·`present`·`attendanceRate`는 기존 전체 현황처럼 장결자를 포함하며 출석률은 `O / (O + X + T)`다. 입력률·미입력 인원·완료 상태는 실제 출석 체크 대상인 일반 학생만 사용한다(`inputStudentCount`, `inputRecorded`). 일반 20명 전원 입력·장결 1명 미기록은 입력 완료다. 전원 장결 반은 `no-targets`, 빈 반은 `no-students`, 조회할 정상 주일이 없으면 `no-week`로 구분하고 입력 대기 반에 넣지 않는다.
+- **출석 통계와 입력 업무는 분모가 다르다.** `studentCount`·`recorded`·`present`·`attendanceRate`는 기존 전체 현황처럼 장결자를 포함하며 출석률은 `O / (O + X)`다. 이전 `T`는 `O`로 먼저 정규화한다. 입력률·미입력 인원·완료 상태는 실제 출석 체크 대상인 일반 학생만 사용한다(`inputStudentCount`, `inputRecorded`). 일반 20명 전원 입력·장결 1명 미기록은 입력 완료다. 전원 장결 반은 `no-targets`, 빈 반은 `no-students`, 조회할 정상 주일이 없으면 `no-week`로 구분하고 입력 대기 반에 넣지 않는다.
 - 대시보드에서 반을 열면 부서·학년·반·학기를 선택한 뒤 `/attendance?week={주일 키}`로 이동한다. `buildAttendanceEntry()`는 관리자의 해당 연도 정상 주일 전체와 교사·데모의 최근 4회 목록을 분리한다. URL 날짜는 허용 목록 안에서만 적용하고 행사·잘못된 키는 기본 날짜로 복구한다. 콤보의 유효한 수동 선택이 URL보다 우선하며, 출석 페이지의 `Suspense`는 `useSearchParams`를 사용하는 정적 export에 필요하다.
 - 공용 데모의 자동 로그인·부서·학년·반 선택·관리자 접근 버튼 흐름은 유지한다. 관리자 셸을 만들기 위해 데모 계정의 실제 권한·환경값을 바꾸거나 별도 인증 구독을 추가하지 않는다. 화면 제한을 Firebase Rules의 새로운 보안 경계로 설명하지 않는다.
 
@@ -183,7 +183,7 @@ layout.tsx
 
 **출석 셀 키**: `evKey(mi, di)` = `"{monthIndex}-{sundayIndex}"` (예: `"0-0"` = 1월 첫 번째 주일, `"4-1"` = 5월 두 번째 주일). `mi`는 0부터 시작하는 월 인덱스, `di`는 해당 월의 주일 순번.
 
-**출석 값 (AttValue)**: `"O"` (출석) / `"X"` (결석) / `"T"` (지각) / `""` (미입력)
+**출석 값 (AttValue)**: `"O"` (출석) / `"X"` (결석) / `""` (미입력). 이전 저장값 `"T"`는 읽기·이관 시 `"O"`로 정규화한다.
 
 **Firebase DB 경로**:
 ```
@@ -194,7 +194,7 @@ classes/{year}/{ck}/
                    # jang: true = 장결자(장기결석) — 구글 시트 동기화 시 자동 표시(아래 참조)
   adminChanges/{changeId}/ { changedAt, classKey, teacher, studentName, action, changeSummary, result, actor }
 
-attendance/{year}/{ck}/{sid}/{cellKey}  → "O" | "X" | "T"
+attendance/{year}/{ck}/{sid}/{cellKey}  → "O" | "X"  # 이전 "T"는 "O"로 정규화
 
 events/{year}/{key}/   { month, day, label }   (관리자 등록 커스텀 이벤트)
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attendanceSummary, attendanceWeeks, classKeysForPart, classLabel, sortedRoster } from "./attendanceBook";
+import { attendanceSummary, attendanceWeeks, classKeysForPart, classLabel, normalizeAttendanceMark, sortedRoster } from "./attendanceBook";
 
 describe("주일 사역 출석부 조회 모델", () => {
   it("출석부 원본과 같은 0기반 월·주차 키를 만든다", () => {
@@ -26,7 +26,7 @@ describe("주일 사역 출석부 조회 모델", () => {
     expect(sortedRoster({ a: { name: "가", num: 2 }, b: { name: "나", num: 1 } }).map(([id]) => id)).toEqual(["b", "a"]);
   });
 
-  it("행사 주차를 제외하고 출석·지각·결석과 출석률을 집계한다", () => {
+  it("행사 주차를 제외하고 출석·결석과 출석률을 집계하며 이전 T는 출석으로 센다", () => {
     const weeks = [
       { cellKey: "0-0", month: 1, day: 4 },
       { cellKey: "0-1", month: 1, day: 11 },
@@ -34,11 +34,11 @@ describe("주일 사역 출석부 조회 모델", () => {
       { cellKey: "0-3", month: 1, day: 25, label: "휴강" },
     ];
     expect(attendanceSummary({ "0-0": "O", "0-1": "T", "0-2": "X", "0-3": "O" }, weeks)).toEqual({
-      present: 1,
-      tardy: 1,
+      present: 2,
       absent: 1,
       recorded: 3,
-      rate: 33,
+      rate: 67,
     });
+    expect(normalizeAttendanceMark("T")).toBe("O");
   });
 });

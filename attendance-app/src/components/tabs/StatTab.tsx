@@ -246,7 +246,6 @@ export default function StatTab() {
           datasets: [
             { label: '출석', data: classStats.present, backgroundColor: '#10b981' },
             { label: '결석', data: classStats.absent,  backgroundColor: '#ef4444' },
-            { label: '지각', data: classStats.tardy, backgroundColor: '#f59e0b' },
           ],
         },
         plugins: [stackedSegmentLabelPlugin, stackedClickPlugin],
@@ -271,7 +270,7 @@ export default function StatTab() {
     }
 
     // Chart 3: 출석 등급 분포 (도넛) - A/B/C/D 등급별 인원
-    // 미래 주차를 제외하고 실제 기록된 주차(O/X/T)만 분모로 사용
+    // 미래 주차를 제외하고 실제 기록된 주차(O/X)만 분모로 사용
     const { gradeCounts } = classStats;
     const c3 = safeChart(chart3Ref.current, {
       type: 'doughnut',
@@ -424,7 +423,7 @@ export default function StatTab() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface2)' }}>
-                      {['이름', '출석률', '등급', '결석', '지각'].map(h => (
+                      {['이름', '출석률', '등급', '결석'].map(h => (
                         <th key={h} style={{ padding: '7px 12px', fontWeight: 600, color: 'var(--text2)', textAlign: 'center', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', fontSize: 12 }}>{h}</th>
                       ))}
                     </tr>
@@ -442,7 +441,6 @@ export default function StatTab() {
                           }}>{s.grade}</span>
                         </td>
                         <td style={{ padding: '8px 12px', textAlign: 'center', color: '#ef4444' }}>{s.absent}</td>
-                        <td style={{ padding: '8px 12px', textAlign: 'center', color: '#f59e0b' }}>{s.tardy}</td>
                       </tr>
                     ))}
                   </tbody>

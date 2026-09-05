@@ -1,6 +1,7 @@
 import type { AppState } from '@/store/AppContext';
 import { recentEditableWeeks, type EditableWeek } from './attendanceWorkflow';
 import { evKey } from './dates';
+import { normalizeAttendanceValue } from './attendanceValue';
 
 export type AdminDashboardSource = Pick<AppState, 'classData' | 'attData' | 'months' | 'events' | 'curYear'>;
 
@@ -19,14 +20,13 @@ export type AdminDashboardCounts = {
   longAbsentCount: number;
   /** 출석 체크 화면에서 입력하는 일반 학생 수. 장결자는 제외한다. */
   inputStudentCount: number;
-  /** 일반 학생 중 O·X·T가 입력된 인원. */
+  /** 일반 학생 중 O·X가 입력된 인원. */
   inputRecorded: number;
   recorded: number;
   present: number;
   absent: number;
-  tardy: number;
   unentered: number;
-  /** O ÷ (O + X + T). 입력된 기록이 없으면 null이다. */
+  /** O ÷ (O + X). 입력된 기록이 없으면 null이다. */
   attendanceRate: number | null;
   /** 일반 학생의 입력 인원 ÷ 일반 학생 수. 주일이나 입력 대상이 없으면 null이다. */
   inputRate: number | null;
@@ -67,7 +67,6 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
     recorded: 0,
     present: 0,
     absent: 0,
-    tardy: 0,
     unentered: 0,
     attendanceRate: null,
     inputRate: null,
@@ -87,7 +86,6 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
     summary.recorded += row.recorded;
     summary.present += row.present;
     summary.absent += row.absent;
-    summary.tardy += row.tardy;
     summary.unentered += row.unentered;
     if (row.status === 'complete') summary.completeClassCount++;
     if (row.status === 'partial') summary.partialClassCount++;
@@ -128,20 +126,18 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
     const students = info.students ?? [];
     let present = 0;
     let absent = 0;
-    let tardy = 0;
     let longAbsentCount = 0;
     let inputRecorded = 0;
     for (const student of students) {
       if (student.jang === true) longAbsentCount++;
-      const value = selectedWeek ? attData[classKey]?.[student.id]?.[selectedWeek.key] : undefined;
+      const value = normalizeAttendanceValue(selectedWeek ? attData[classKey]?.[student.id]?.[selectedWeek.key] : undefined);
       if (value === 'O') present++;
       else if (value === 'X') absent++;
-      else if (value === 'T') tardy++;
-      if (student.jang !== true && (value === 'O' || value === 'X' || value === 'T')) inputRecorded++;
+      if (student.jang !== true && (value === 'O' || value === 'X')) inputRecorded++;
     }
 
     const studentCount = students.length;
-    const recorded = present + absent + tardy;
+    const recorded = present + absent;
     const inputStudentCount = studentCount - longAbsentCount;
     const status: AdminDashboardStatus = studentCount === 0 ? 'no-students'
       : !selectedWeek ? 'no-week'
@@ -163,7 +159,6 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
       recorded,
       present,
       absent,
-      tardy,
       unentered: selectedWeek ? inputStudentCount - inputRecorded : 0,
       attendanceRate: percentage(present, recorded),
       inputRate: selectedWeek ? percentage(inputRecorded, inputStudentCount) : null,

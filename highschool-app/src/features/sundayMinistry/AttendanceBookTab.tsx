@@ -13,6 +13,7 @@ import {
   attendanceWeeks,
   classKeysForPart,
   classLabel,
+  normalizeAttendanceMark,
   sortedRoster,
   type AttendanceSemester,
 } from "./attendanceBook";
@@ -23,7 +24,7 @@ type ClassesYear = Record<string, {
 }>;
 type AttendanceYear = Record<string, Record<string, Record<string, string>>>;
 
-const MARK_LABEL: Record<string, string> = { O: "출", T: "지", X: "결" };
+const MARK_LABEL: Record<string, string> = { O: "출", X: "결" };
 
 export default function AttendanceBookTab() {
   const today = new Date();
@@ -127,7 +128,7 @@ export default function AttendanceBookTab() {
                       <td className="is-sticky is-number">{student.num ?? index + 1}</td>
                       <th scope="row" className="is-sticky is-name">{student.name}{student.jang && <small>장결</small>}</th>
                       {weeks.map((week) => {
-                        const mark = record?.[week.cellKey] ?? "";
+                        const mark = normalizeAttendanceMark(record?.[week.cellKey]);
                         return <td key={week.cellKey} className={week.label ? "is-event" : (mark ? `mark-${mark.toLowerCase()}` : "")}>{week.label ? "휴" : (MARK_LABEL[mark] ?? "·")}</td>;
                       })}
                       <td>{summary.present}/{summary.recorded}</td>
@@ -139,7 +140,7 @@ export default function AttendanceBookTab() {
               </tbody>
             </table>
           </div>
-          <div className="sunday-attendance-legend" aria-label="출석 표시 안내"><span className="mark-o">출 · 출석</span><span className="mark-t">지 · 지각</span><span className="mark-x">결 · 결석</span><span className="is-event">휴 · 행사·휴일</span></div>
+          <div className="sunday-attendance-legend" aria-label="출석 표시 안내"><span className="mark-o">출 · 출석</span><span className="mark-x">결 · 결석</span><span className="is-event">휴 · 행사·휴일</span></div>
         </>
       ) : (
         <div className="sunday-attendance-empty-state">{year}년 {part}부 반 명단이 없습니다.</div>

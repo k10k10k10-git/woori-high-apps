@@ -19,7 +19,7 @@ function fixture(): PeopleSearchData {
         teams: { media: { name: "미디어팀" } },
         trainingClasses: { basic: { name: "기초훈련" } },
         applications: { "1_minchae": { name: "강민채", studentId: "minchae", bu: "1부", grade: 2, class: 3, status: "배치", teamId: "media", trainingClassId: "basic" } },
-        attendance: { team: { s1: { "1_minchae": { s: "출석" } } } },
+        attendance: { team: { s1: { "1_minchae": { s: "출석" } }, s2: { "1_minchae": { s: "지각" } } } },
       },
     },
     semestersPrivate: {
@@ -45,7 +45,8 @@ describe("인물 통합검색", () => {
     const profiles = buildPeopleProfiles(fixture());
     const target = profiles.find((profile) => profile.records.some((record) => record.title.includes("기초훈련")));
     expect(target?.records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 중 사역", "수련회"]));
-    expect(target?.records.some((record) => record.fields.some((item) => item.value.includes("출석 1 · 지각 1 · 결석 1")))).toBe(true);
+    expect(target?.records.some((record) => record.fields.some((item) => item.value.includes("출석 2 · 결석 1")))).toBe(true);
+    expect(target?.records.some((record) => record.fields.some((item) => item.value.includes("출석 1 · 지각 1 · 결석 0")))).toBe(true);
     expect(target?.records.some((record) => record.title === "단체티")).toBe(true);
     expect(target?.records.some((record) => record.title === "현장 등록")).toBe(false);
   });
