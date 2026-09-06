@@ -1,0 +1,46 @@
+{
+  "verifiedAt": "2026-09-06T03:00:37.844409+00:00",
+  "pr": "https://github.com/k10k10k10-git/woori-high-apps/pull/18",
+  "mergeCommit": "68f7bef3c2b2c8adb16ca5455cbf57f1d1442426",
+  "integrated": {
+    "url": "https://woorihigh-app.vercel.app",
+    "deploymentId": "dpl_5sULoRu96FQZGrWpMoLsLFDu9Fzd",
+    "deploymentUrl": "https://highschool-n0ne4jk96-smilegate1108-9038s-projects.vercel.app",
+    "target": "production",
+    "status": "Ready",
+    "buildId": "68f7bef3c2b2c8adb16ca5455cbf57f1d1442426",
+    "createdAtKst": "2026-09-06T11:56:22+09:00",
+    "httpVersionVerified": true,
+    "browserVersionVerified": true,
+    "anonymousLandingVerified": true
+  },
+  "rules": {
+    "project": "woori-high",
+    "sha256": "b8a096938a0402b51eb992f48d64b3b6b07cf94126eb2a141574afd900120fe0",
+    "liveMatchesSource": true,
+    "addedBranch": "activityLogs"
+  },
+  "readOnlySmoke": {
+    "adminSelfLookupHttp": 200,
+    "isAdmin": true,
+    "activityLogHttp": 200,
+    "activityLogRecords": 0,
+    "anonymousActivityLogHttp": 401,
+    "operationalDataWrites": 0,
+    "authenticatedUiExercised": false
+  },
+  "studentApp": {
+    "hostingRedeployed": false,
+    "serviceWorkerCache": "woori-att-1788642541931",
+    "demoUnchanged": true
+  },
+  "validation": {
+    "integratedTests": 1201,
+    "attendanceTests": 277,
+    "agentOsTests": 35,
+    "rulesScenarios": 12,
+    "generalCi": "passed",
+    "authenticatedE2e": "not_run_empty_E2E_STORAGE_STATE",
+    "prHead": "cb4bd7a53286ee508023df70351bb568ac114d5b"
+  }
+}
