@@ -252,6 +252,11 @@ export function canManageSiteRequests(roles: MinistryRoles): boolean {
   return roles.semester === "superAdmin" || roles.retreat === "superAdmin";
 }
 
+/** 타 사용자의 변경 이력은 통합관리자만 조회한다. 실제 읽기는 Rules도 검사한다. */
+export function canViewActivityLogs(roles: MinistryRoles): boolean {
+  return roles.semester === "superAdmin" || roles.retreat === "superAdmin";
+}
+
 /** classes/{year} Rules와 일치하는 새친구 원장 반영·등반 취소 권한. */
 export function canWriteStudentRoster(roles: MinistryRoles): boolean {
   return SEMESTER_CAPS[roles.semester].rosterWrite;

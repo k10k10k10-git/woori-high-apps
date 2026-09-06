@@ -1,4 +1,5 @@
-import { get, onValue, push, ref, remove, set, update } from "firebase/database";
+import { get, onValue, push, ref } from "firebase/database";
+import { auditedRemove as remove, auditedSet as set, auditedUpdate as update } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { paths } from "../paths";
 import { createProgramDraft, programDecisionTaskId, sortRetreatPrograms } from "../programPreparation";

@@ -13,6 +13,7 @@ vi.mock("./MyMinistryPanel", () => ({ default: () => <div><p>나의 사역 내�
 vi.mock("./MyRequestsPanel", () => ({ default: () => <input aria-label="내 요청 검색" /> }));
 vi.mock("./TeamModal", () => ({ default: () => <p>팀원 관리 내용</p> }));
 vi.mock("./SiteRequestsPanel", () => ({ default: () => <p>관리 요청 내용</p> }));
+vi.mock("./ActivityLogPanel", () => ({ default: () => <p>활동 로그 내용</p> }));
 
 beforeEach(() => {
   auth.user = { uid: "admin", displayName: "테스트 이름" };
@@ -24,9 +25,9 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 function menu() { return within(screen.getByRole("tablist", { name: "마이페이지 메뉴" })); }
 
 describe("마이페이지 작업 화면", () => {
-  it("관리자는 다섯 메뉴와 연결된 대시보드를 본다", async () => {
+  it("관리자는 여섯 메뉴와 연결된 대시보드를 본다", async () => {
     render(<MyPageModal onClose={vi.fn()} />);
-    expect(menu().getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["대시보드", "내 사역", "내 요청", "팀원 관리", "요청사항"]);
+    expect(menu().getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["대시보드", "내 사역", "내 요청", "팀원 관리", "요청사항", "활동 로그"]);
     expect(await screen.findByText("운영 요약 내용")).toBeInTheDocument();
     const selected = menu().getByRole("tab", { selected: true });
     const panel = screen.getByRole("tabpanel", { name: "대시보드" });
@@ -34,13 +35,14 @@ describe("마이페이지 작업 화면", () => {
     expect(panel).toHaveAttribute("aria-labelledby", selected.id);
   });
 
-  it.each(["team", "requests"] as const)("일반 사용자의 금지 초기 메뉴 %s는 개인 대시보드로 돌아간다", async (initialTab) => {
+  it.each(["team", "requests", "activity"] as const)("일반 사용자의 금지 초기 메뉴 %s는 개인 대시보드로 돌아간다", async (initialTab) => {
     auth.roles = { semester: "staff", retreat: "fieldStaff" };
     render(<MyPageModal onClose={vi.fn()} initialTab={initialTab} />);
     expect(menu().getAllByRole("tab")).toHaveLength(3);
     expect(await screen.findByText("개인 요약 내용")).toBeInTheDocument();
     expect(screen.queryByText("팀원 관리 내용")).not.toBeInTheDocument();
     expect(screen.queryByText("관리 요청 내용")).not.toBeInTheDocument();
+    expect(screen.queryByText("활동 로그 내용")).not.toBeInTheDocument();
   });
 
   it("방향키와 Home/End로 메뉴·포커스가 함께 이동한다", async () => {
@@ -51,12 +53,12 @@ describe("마이페이지 작업 화면", () => {
     expect(menu().getByRole("tab", { name: "내 사역" })).toHaveFocus();
     expect(await screen.findByText("나의 사역 내용")).toBeInTheDocument();
     fireEvent.keyDown(document.activeElement!, { key: "End" });
-    expect(menu().getByRole("tab", { name: "요청사항" })).toHaveFocus();
-    expect(await screen.findByText("관리 요청 내용")).toBeInTheDocument();
+    expect(menu().getByRole("tab", { name: "활동 로그" })).toHaveFocus();
+    expect(await screen.findByText("활동 로그 내용")).toBeInTheDocument();
     fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
     expect(first).toHaveFocus();
     fireEvent.keyDown(first, { key: "ArrowLeft" });
-    expect(menu().getByRole("tab", { name: "요청사항" })).toHaveFocus();
+    expect(menu().getByRole("tab", { name: "활동 로그" })).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: "Home" });
     expect(first).toHaveFocus();
     expect(menu().getAllByRole("tab").filter((item) => item.tabIndex === 0)).toEqual([first]);
@@ -78,6 +80,31 @@ describe("마이페이지 작업 화면", () => {
     auth.user = { uid: "another", displayName: "다른 이름" };
     rerender(<MyPageModal onClose={vi.fn()} initialTab="myRequests" />);
     expect(await screen.findByLabelText("내 요청 검색")).toHaveValue("");
+  });
+
+  it("활동 로그를 연 뒤 통합관리자 권한이 사라지면 내용을 즉시 폐기한다", async () => {
+    const { rerender } = render(<MyPageModal onClose={vi.fn()} initialTab="activity" />);
+    expect(await screen.findByText("활동 로그 내용")).toBeInTheDocument();
+    auth.roles = { semester: "pastor", retreat: "pastor" };
+    rerender(<MyPageModal onClose={vi.fn()} initialTab="activity" />);
+    expect(screen.queryByText("활동 로그 내용")).not.toBeInTheDocument();
+    expect(menu().queryByRole("tab", { name: "활동 로그" })).not.toBeInTheDocument();
+    expect(await screen.findByText("개인 요약 내용")).toBeInTheDocument();
+  });
+
+  it("모바일의 마지막 초기 탭을 수평 메뉴 안으로 드러낸다", async () => {
+    const original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+    try {
+      render(<MyPageModal onClose={vi.fn()} initialTab="activity" />);
+      expect(await screen.findByText("활동 로그 내용")).toBeInTheDocument();
+      expect(scroll).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
+      expect(scroll.mock.instances).toContain(menu().getByRole("tab", { name: "활동 로그" }));
+    } finally {
+      if (original) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", original);
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
   });
 
   it("동일 경로 바로가기도 닫지만 새 탭·첨부 다운로드는 유지한다", async () => {

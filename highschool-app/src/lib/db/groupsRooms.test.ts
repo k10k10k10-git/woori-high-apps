@@ -17,6 +17,11 @@ vi.mock("firebase/database", () => ({
   remove: mocks.remove,
   onValue: vi.fn(),
 }));
+vi.mock("@/features/activityLog/write", () => ({
+  auditedSet: mocks.set,
+  auditedUpdate: vi.fn(),
+  auditedRemove: mocks.remove,
+}));
 
 vi.mock("../firebase", () => ({ db: {} }));
 vi.mock("./core", () => ({

@@ -1,13 +1,8 @@
 // Firebase 접근 단일 지점 — 컴포넌트에서 firebase 직접 import 금지 (모노레포 컨벤션).
 // 쓰기는 전부 경로 지정 update/set(단일 문서) — 노드 전체 덮어쓰기 함수를 만들지 말 것.
 
-import {
-  ref,
-  get,
-  update,
-  remove,
-  onValue,
-} from "firebase/database";
+import { ref, get, onValue } from "firebase/database";
+import { auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
 import {
@@ -307,12 +302,13 @@ export async function setAttendance(
   appKey: string,
   status: AttendanceStatus,
   byUid?: string,
+  activityContext?: { subjectName?: string; date?: string },
 ): Promise<void> {
   await update(ref(db, paths.attendanceEntry(sid, scope, sessId, appKey)), {
     s: status,
     by: byUid ?? null,
     at: nowISO(),
-  });
+  }, activityContext);
 }
 
 export async function clearAttendance(
@@ -320,8 +316,9 @@ export async function clearAttendance(
   scope: SemesterAttendanceScope,
   sessId: string,
   appKey: string,
+  activityContext?: { subjectName?: string; date?: string },
 ): Promise<void> {
-  await remove(ref(db, paths.attendanceEntry(sid, scope, sessId, appKey)));
+  await remove(ref(db, paths.attendanceEntry(sid, scope, sessId, appKey)), activityContext);
 }
 
 // ── 수료 체크리스트 ────────────────────────────────────────────────────

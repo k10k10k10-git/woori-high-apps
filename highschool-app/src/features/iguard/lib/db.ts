@@ -1,11 +1,11 @@
-import { ref, get, set, update, push, remove, onValue, runTransaction, DataSnapshot } from "firebase/database";
+import { ref, get, push, onValue, DataSnapshot } from "firebase/database";
+import { auditedSet as set, auditedUpdate as update, auditedRemove as remove, auditedRunTransaction as runTransaction } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
-import { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
+import type { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
   IguardScheduleBlock, IguardSegment, IguardPost, IguardMovement, IguardBus, IguardSeating,
   RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
-  IguardAccessLock, IguardGbsPlace } from "./types";
-import type { IguardLodgingHotspot, IguardLodgingMap } from "./types";
+  IguardAccessLock, IguardGbsPlace, IguardLodgingHotspot, IguardLodgingMap } from "./types";
 import { snapToList } from "@/lib/db/core";
 import { normalizePartialAttendanceMap } from "./partialAttendance";
 import { DEFAULT_SEGMENT_LABEL, isDefaultSegment } from "./defaultSegment";

@@ -1,4 +1,5 @@
-import { ref, get, set, update, push, remove, onValue, runTransaction } from "firebase/database";
+import { ref, get, push, onValue } from "firebase/database";
+import { auditedSet as set, auditedUpdate as update, auditedRemove as remove, auditedRunTransaction as runTransaction } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { CarPool, PartialAttendance, SupplyItem, SnackItem, AdminSupplyItem, SuppliesBudget, MealCountData, OnSiteEntry, TshirtOrder } from "../types";
 import { paths } from "../paths";

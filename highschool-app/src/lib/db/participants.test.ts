@@ -16,6 +16,12 @@ vi.mock("firebase/database", () => ({
   remove: vi.fn(),
   onValue: vi.fn(),
 }));
+// 업무 모듈의 원자 쓰기·백업 계약을 검사한다. 로그 원자성은 write.test.ts에서 별도 검증한다.
+vi.mock("@/features/activityLog/write", () => ({
+  auditedSet: mocks.set,
+  auditedUpdate: mocks.update,
+  auditedRemove: vi.fn(),
+}));
 
 vi.mock("../firebase", () => ({ db: {} }));
 vi.mock("./core", () => ({

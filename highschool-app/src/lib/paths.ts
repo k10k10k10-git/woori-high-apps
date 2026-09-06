@@ -2,6 +2,8 @@
  *  컴포넌트·db 함수에서 경로 문자열을 직접 쓰지 말고 이 함수를 사용한다. */
 
 export const paths = {
+  // ── 앱 저장 활동 이력 (추가 전용, 통합관리자 조회) ──
+  activityLogEvents: () => "activityLogs/events",
   // ── 수련회 ──
   retreats: () => "retreats",
   retreat: (id: string) => `retreats/${id}`,

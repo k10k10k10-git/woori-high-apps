@@ -1,11 +1,11 @@
 "use client";
 
-import { lazy, Suspense, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
-import { CaretRight, ChartBar, ChatCircleText, EnvelopeSimple, SquaresFour, UsersThree, X } from "@phosphor-icons/react";
+import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { CaretRight, ChartBar, ChatCircleText, ClockCounterClockwise, EnvelopeSimple, SquaresFour, UsersThree, X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import OverlayShell from "@/components/OverlayShell";
-import { canManageRolesOf, canManageSiteRequests, describeRoles } from "./accessPolicy";
+import { canManageRolesOf, canManageSiteRequests, canViewActivityLogs, describeRoles } from "./accessPolicy";
 import { friendlyMinistryName } from "./dailyMinistryMessage";
 
 const AdminDashboard = lazy(() => import("./AdminDashboardPanel"));
@@ -14,8 +14,9 @@ const MyMinistryPanel = lazy(() => import("./MyMinistryPanel"));
 const MyRequestsPanel = lazy(() => import("./MyRequestsPanel"));
 const TeamModal = lazy(() => import("./TeamModal"));
 const SiteRequestsPanel = lazy(() => import("./SiteRequestsPanel"));
+const ActivityLogPanel = lazy(() => import("./ActivityLogPanel"));
 
-export type MyPageTab = "dashboard" | "ministry" | "myRequests" | "team" | "requests";
+export type MyPageTab = "dashboard" | "ministry" | "myRequests" | "team" | "requests" | "activity";
 type Props = { onClose: () => void; initialTab?: MyPageTab };
 
 const PERSONAL_TABS = [
@@ -34,10 +35,12 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
   const { user, roles, memberName } = useAuth();
   const canManageTeam = canManageRolesOf(roles);
   const canManageRequests = canManageSiteRequests(roles);
+  const canViewActivity = canViewActivityLogs(roles);
   const tabs = [
     ...PERSONAL_TABS,
     ...(canManageTeam ? [{ id: "team" as const, label: "팀원 관리", icon: UsersThree }] : []),
     ...(canManageRequests ? [{ id: "requests" as const, label: "요청사항", icon: EnvelopeSimple }] : []),
+    ...(canViewActivity ? [{ id: "activity" as const, label: "활동 로그", icon: ClockCounterClockwise }] : []),
   ];
   const [requestedTab, setTab] = useState<MyPageTab>(initialTab);
   const tab = tabs.find((item) => item.id === requestedTab) ?? tabs[0];
@@ -45,6 +48,10 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
   const id = useId();
   const desktop = useIsDesktop();
   const tabRefs = useRef<Partial<Record<MyPageTab, HTMLButtonElement | null>>>({});
+
+  useEffect(() => {
+    if (!desktop) tabRefs.current[tab.id]?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [desktop, tab.id]);
 
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     let next: number;
@@ -112,6 +119,7 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
             {tab.id === "myRequests" && <MyRequestsPanel />}
             {tab.id === "team" && canManageTeam && <TeamModal embedded />}
             {tab.id === "requests" && canManageRequests && <SiteRequestsPanel />}
+            {tab.id === "activity" && canViewActivity && <ActivityLogPanel />}
           </Suspense>
         </div>
       </div>

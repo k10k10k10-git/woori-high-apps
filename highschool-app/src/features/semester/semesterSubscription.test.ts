@@ -7,6 +7,9 @@ vi.mock("firebase/database", () => ({
   onValue: mocks.onValue,
   get: vi.fn(), update: vi.fn(), remove: vi.fn(),
 }));
+vi.mock("@/features/activityLog/write", () => ({
+  auditedUpdate: vi.fn(), auditedRemove: vi.fn(),
+}));
 vi.mock("@/lib/firebase", () => ({ db: {} }));
 
 import { subscribeSemesters } from "./db";

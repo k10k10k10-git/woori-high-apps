@@ -188,3 +188,10 @@
 4. 레거시 코드 복구가 필요하면 `pre-legacy-app-removal-2026-08-05` 태그를 사용합니다.
 
 상세 계획은 `../docs/UNIFIED_HIGHSCHOOL_MIGRATION.md`를 참고합니다.
+
+## 활동 로그 저장 경계 — 2026-09-06 (운영 활성화 승인 대기)
+
+- 업무 DB 쓰기는 `features/activityLog/write.ts`의 set/update/remove/transaction 도우미를 재사용한다. 일반 쓰기는 기존 원장 patch와 추가 전용 로그 한 건을 루트 update로 묶으며, 직접 Firebase 쓰기를 새로 추가하지 않는다. `activityLogWriteContract.test.ts`가 이 경계를 검사한다.
+- `canViewActivityLogs`는 마이페이지의 UI 가드다. 실제 조회는 `admins/{uid}` 플래그와 로그 Rules가 보호한다. 읽기 오류·계정 전환·늦은 응답은 이전 기록을 폐기한다.
+- 로그의 인증 UID와 서버 시각을 사람의 직접 조작 증거로 설명하지 않는다. 이전 값·과거 변경을 추측해 생성하지 않으며, 구버전/직접 DB 변경과 트랜잭션 후 별도 로그의 누락 한계를 표시한다.
+- 코드와 새 Rules는 함께 활성화한다. 현재는 제안만 준비했으며 실제 규칙 변경·배포에는 별도 승인이 필요하다. [운영·복구 계획](../docs/ACTIVITY_LOG_2026-09-06.md)을 따른다.

@@ -1,0 +1,39 @@
+name: activity-log Rules contract
+
+on:
+  pull_request:
+    paths:
+      - "attendance-app/database.rules.json"
+      - "highschool-app/src/features/activityLog/**"
+      - "scripts/*activity-log-rules*"
+      - ".github/workflows/activity-log-rules.yml"
+  push:
+    branches: [main]
+    paths:
+      - "attendance-app/database.rules.json"
+      - "highschool-app/src/features/activityLog/**"
+      - "scripts/*activity-log-rules*"
+      - ".github/workflows/activity-log-rules.yml"
+
+concurrency:
+  group: activity-log-rules-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: highschool-app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+        working-directory: highschool-app
+      - run: npm install --global firebase-tools@15.10.0
+      - run: node scripts/run-activity-log-rules.mjs
