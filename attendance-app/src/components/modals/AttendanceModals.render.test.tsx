@@ -29,6 +29,7 @@ import HistoryModal from './HistoryModal';
 function fixtureState(): AppState {
   return {
     ...initialState,
+    userRole: { role: 'teacher', part: '1', grade: '1', class: '1', name: '김교사' },
     curYear: 2026,
     months: [{ month: 9, sundays: [6] }],
     classData: {
@@ -70,6 +71,9 @@ describe('출석 모달 키보드 접근', () => {
       />,
     );
 
+    const dialog = screen.getByRole('dialog', { name: '홍길동 9월 6일 출석 입력' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.classList.contains('teacher-attendance-modal')).toBe(true);
     const currentOption = screen.getByRole('button', { name: '홍길동 결석 처리' });
     const closeButton = screen.getByRole('button', { name: '닫기' });
     const clearButton = screen.getByRole('button', { name: '출석 상태 초기화' });
@@ -102,6 +106,9 @@ describe('출석 모달 키보드 접근', () => {
       <HistoryModal sid="student-1" curCk="1-1-1" onClose={onClose} />,
     );
 
+    const dialog = screen.getByRole('dialog', { name: '홍길동 출석 이력' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.classList.contains('teacher-attendance-modal')).toBe(true);
     const closeButton = screen.getByRole('button', { name: '닫기' });
     expect(document.activeElement).toBe(closeButton);
 

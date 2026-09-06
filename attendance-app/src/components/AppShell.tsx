@@ -294,7 +294,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="app">
+    <div className={`app${state.userRole?.role === 'teacher' ? ' teacher-workspace' : ''}`}>
+      {state.userRole?.role === 'teacher' && (
+        <a className="teacher-skip" href="#teacher-main">본문으로 이동</a>
+      )}
       <Toast />
       {!isOnline && (
         <div className="offline-banner">
@@ -310,7 +313,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           ? { onChangeClass: handleDemoChangeClass, onAdminLogin: () => void handleAdminLogin() }
           : undefined}
       />
-      <div className="content-area">
+      <main id="teacher-main" className="content-area" tabIndex={-1}>
         <FirebaseDataLoader />
         {!canAccessAttendancePath(pathname, state.userRole, isDemoRole) ? (
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14, lineHeight: 1.7 }}>
@@ -321,7 +324,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div style={{ marginTop: 16 }}><Link href="/attendance" className="btn-secondary" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', padding: '10px 20px', textDecoration: 'none' }}>출석부로 돌아가기</Link></div>
           </div>
         ) : <DataLoadGate>{children}</DataLoadGate>}
-      </div>
+      </main>
       <TabNav />
     </div>
   );

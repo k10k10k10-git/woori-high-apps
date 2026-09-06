@@ -17,6 +17,14 @@ import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
 import type { AttEditTarget, AttValue, ViewKey } from '@/types';
 
+const ATTENDANCE_SUBVIEWS = [
+  { key: 'check', label: '출석 체크' },
+  { key: 'table', label: '출석부' },
+  { key: 'suggest', label: '건의사항' },
+] as const;
+
+type AttendanceSubView = typeof ATTENDANCE_SUBVIEWS[number]['key'];
+
 export default function AttendanceTab() {
   const { state, dispatch } = useApp();
   const { curYear, months, events, attData, classData, curView } = state;
@@ -28,26 +36,32 @@ export default function AttendanceTab() {
     [students],
   );
   const isTeacher = state.userRole?.role === 'teacher';
-  const [attSubView, setAttSubView] = useState<'check' | 'table' | 'suggest'>('check');
+  const [attSubView, setAttSubView] = useState<AttendanceSubView>('check');
 
   // ── 건의사항 ──
   type Suggestion = { id: string; text: string; createdAt: number; author: string };
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestText, setSuggestText] = useState('');
   const [suggestSaving, setSuggestSaving] = useState(false);
+  const [suggestLoadError, setSuggestLoadError] = useState(false);
 
   useEffect(() => {
-    if (attSubView !== 'suggest') return;
+    if (attSubView !== 'suggest' || isTeacher) return;
     const sugRef = ref(db, `suggestions/${curYear}/${ck}`);
+    setSuggestLoadError(false);
     onValue(sugRef, snap => {
+      setSuggestLoadError(false);
       if (!snap.exists()) { setSuggestions([]); return; }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const list = Object.entries(snap.val() as Record<string, any>).map(([id, v]: [string, any]) => ({ id, ...v } as Suggestion));
       list.sort((a, b) => b.createdAt - a.createdAt);
       setSuggestions(list);
+    }, () => {
+      setSuggestions([]);
+      setSuggestLoadError(true);
     });
     return () => off(sugRef);
-  }, [attSubView, curYear, ck]);
+  }, [attSubView, curYear, ck, isTeacher]);
 
   async function handleSuggestSubmit() {
     if (!suggestText.trim()) return;
@@ -68,7 +82,28 @@ export default function AttendanceTab() {
   }
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
   const [sortByName, setSortByName] = useState(false);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (!exportRef.current?.contains(event.target as Node)) setExportOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setExportOpen(false);
+      exportButtonRef.current?.focus();
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [exportOpen]);
 
   const [pickedWeek, setPickedWeek] = useState<{ year: number; requestKey: string | null; key: string } | null>(null);
   const pickedWeekKey = pickedWeek?.year === curYear && pickedWeek.requestKey === requestedWeekKey
@@ -313,7 +348,7 @@ export default function AttendanceTab() {
     });
     if (visibleSundays.length === 0) return;
     headerCols.push(
-      <th key={`m-${mi}`} colSpan={visibleSundays.length} className="att-header-month">
+      <th key={`m-${mi}`} scope="colgroup" colSpan={visibleSundays.length} className="att-header-month">
         {month}월
       </th>
     );
@@ -328,7 +363,7 @@ export default function AttendanceTab() {
       const k = evKey(mi, di);
       const ev = events[k];
       headerDays.push(
-        <th key={k} className={ev ? 'att-header-holiday' : 'att-header-cell'}>
+        <th key={k} scope="col" className={ev ? 'att-header-holiday' : 'att-header-cell'}>
           {day}
         </th>
       );
@@ -338,80 +373,139 @@ export default function AttendanceTab() {
   return (
     <div className={isTeacher ? 'teacher-attendance' : undefined}>
       {/* 반 탭 */}
-      <ClassTabBar />
+      {isTeacher ? (
+        <div className="attendance-class-context">
+          <ClassTabBar />
+          <p className="attendance-class-count">
+            <span>출석 대상</span>
+            <strong>{totalStudents}</strong>
+            <span>명</span>
+          </p>
+        </div>
+      ) : <ClassTabBar />}
 
       {/* 출석 체크 / 출석부 / 건의사항 서브탭 */}
       <div className="view-btn-row attendance-subtabs" role="tablist" aria-label="출석 서브 탭">
-        <button type="button" role="tab" aria-selected={attSubView === 'check'} className={`view-btn${attSubView === 'check' ? ' active' : ''}`} onClick={() => setAttSubView('check')}>출석 체크</button>
-        <button type="button" role="tab" aria-selected={attSubView === 'table'} className={`view-btn${attSubView === 'table' ? ' active' : ''}`} onClick={() => setAttSubView('table')}>출석부</button>
-        <button type="button" role="tab" aria-selected={attSubView === 'suggest'} className={`view-btn${attSubView === 'suggest' ? ' active' : ''}`} onClick={() => setAttSubView('suggest')}>건의사항</button>
+        {ATTENDANCE_SUBVIEWS.map((view, index) => (
+          <button
+            key={view.key}
+            id={`attendance-tab-${view.key}`}
+            type="button"
+            role="tab"
+            aria-selected={attSubView === view.key}
+            aria-controls={attSubView === view.key ? `attendance-panel-${view.key}` : undefined}
+            tabIndex={attSubView === view.key ? 0 : -1}
+            className={`view-btn${attSubView === view.key ? ' active' : ''}`}
+            onClick={() => setAttSubView(view.key)}
+            onKeyDown={event => {
+              let nextIndex = index;
+              if (event.key === 'ArrowRight') nextIndex = (index + 1) % ATTENDANCE_SUBVIEWS.length;
+              else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + ATTENDANCE_SUBVIEWS.length) % ATTENDANCE_SUBVIEWS.length;
+              else if (event.key === 'Home') nextIndex = 0;
+              else if (event.key === 'End') nextIndex = ATTENDANCE_SUBVIEWS.length - 1;
+              else return;
+
+              event.preventDefault();
+              const nextView = ATTENDANCE_SUBVIEWS[nextIndex];
+              setAttSubView(nextView.key);
+              requestAnimationFrame(() => document.getElementById(`attendance-tab-${nextView.key}`)?.focus());
+            }}
+          >
+            {view.label}
+          </button>
+        ))}
       </div>
 
       {/* 통계 카드 */}
-      <div className="stat-row">
-        <div className="stat-card">
-          <div className="stat-card-label">일반 출석 학생</div>
-          <div className="stat-card-value">{totalStudents}명</div>
-        </div>
-        {state.userRole?.role !== 'teacher' && (
+      {!isTeacher && (
+        <div className="stat-row">
+          <div className="stat-card">
+            <div className="stat-card-label">일반 출석 학생</div>
+            <div className="stat-card-value">{totalStudents}명</div>
+          </div>
           <div className="stat-card">
             <div className="stat-card-label">주차</div>
             <div className="stat-card-value">{viewWeeks.length}주</div>
           </div>
-        )}
-        {state.userRole?.role !== 'teacher' && (
           <div className="stat-card">
             <div className="stat-card-label">평균 출석률</div>
             <div className="stat-card-value">{avgRate}%</div>
           </div>
-        )}
-        <div className="stat-card">
-          <div className="stat-card-label">담당 교사</div>
-          <div className="stat-card-value" style={{ fontSize: 13 }}>{teacher || '-'}</div>
+          <div className="stat-card">
+            <div className="stat-card-label">담당 교사</div>
+            <div className="stat-card-value" style={{ fontSize: 13 }}>{teacher || '-'}</div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── 출석 체크 뷰 ── */}
       {attSubView === 'check' && (
-        <>
+        <section
+          id="attendance-panel-check"
+          role="tabpanel"
+          aria-labelledby="attendance-tab-check"
+          className="attendance-tab-panel attendance-check-panel"
+        >
           <div className="attendance-week-picker">
-            <label htmlFor="attendance-week">출석 날짜</label>
-            <select
-              id="attendance-week"
-              value={selectedWeekKey ?? ''}
-              onChange={event => setPickedWeek({ year: curYear, requestKey: requestedWeekKey, key: event.target.value })}
-              disabled={editableWeeks.length === 0}
-            >
-              {editableWeeks.length === 0 ? (
-                <option value="">입력 가능한 주일이 없습니다</option>
-              ) : editableWeeks.map(week => (
-                <option key={week.key} value={week.key}>{week.label}</option>
-              ))}
-            </select>
-            <span>{isTeacher
-              ? '담임 교사는 최근 4회의 출석을 확인하고 바로 수정할 수 있습니다.'
-              : '관리자는 선택한 연도의 모든 정상 주일 출석을 확인하고 수정할 수 있습니다.'}</span>
+            {isTeacher && (
+              <span className="attendance-week-icon" aria-hidden="true">
+                <AdminIcon name="calendar" size={17} />
+              </span>
+            )}
+            {isTeacher ? (
+              <span className="attendance-week-field">
+                <label htmlFor="attendance-week">출석 날짜</label>
+                <select
+                  id="attendance-week"
+                  value={selectedWeekKey ?? ''}
+                  onChange={event => setPickedWeek({ year: curYear, requestKey: requestedWeekKey, key: event.target.value })}
+                  disabled={editableWeeks.length === 0}
+                >
+                  {editableWeeks.length === 0 ? (
+                    <option value="">입력 가능한 주일이 없습니다</option>
+                  ) : editableWeeks.map(week => (
+                    <option key={week.key} value={week.key}>{week.label}</option>
+                  ))}
+                </select>
+              </span>
+            ) : (
+              <>
+                <label htmlFor="attendance-week">출석 날짜</label>
+                <select
+                  id="attendance-week"
+                  value={selectedWeekKey ?? ''}
+                  onChange={event => setPickedWeek({ year: curYear, requestKey: requestedWeekKey, key: event.target.value })}
+                  disabled={editableWeeks.length === 0}
+                >
+                  {editableWeeks.length === 0 ? (
+                    <option value="">입력 가능한 주일이 없습니다</option>
+                  ) : editableWeeks.map(week => (
+                    <option key={week.key} value={week.key}>{week.label}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            <span className={isTeacher ? 'attendance-week-hint' : undefined}>{isTeacher
+              ? '최근 4회 출석을 수정할 수 있습니다.'
+              : '선택한 연도의 모든 정상 주일을 수정할 수 있습니다.'}</span>
           </div>
 
-          {/* 이번 주 요약 카드 */}
+          {/* 이번 주 입력 요약 */}
           {selectedWeekKey && activeStudents.length > 0 && (
-            <div className="week-summary-row">
+            <dl className="week-summary-row" aria-label={`${selectedWeek?.label ?? ''} 출석 입력 현황`}>
               <div className="week-summary-card green">
-                <div className="week-summary-icon">✓</div>
-                <div className="week-summary-count">{selectedWeekStats.O}</div>
-                <div className="week-summary-label">출석</div>
+                <dt className="week-summary-label">출석</dt>
+                <dd className="week-summary-count">{selectedWeekStats.O}<span>명</span></dd>
               </div>
               <div className="week-summary-card red">
-                <div className="week-summary-icon">✕</div>
-                <div className="week-summary-count">{selectedWeekStats.X}</div>
-                <div className="week-summary-label">결석</div>
+                <dt className="week-summary-label">결석</dt>
+                <dd className="week-summary-count">{selectedWeekStats.X}<span>명</span></dd>
               </div>
               <div className="week-summary-card gray">
-                <div className="week-summary-icon">○</div>
-                <div className="week-summary-count">{selectedWeekStats.empty}</div>
-                <div className="week-summary-label">미입력</div>
+                <dt className="week-summary-label">미입력</dt>
+                <dd className="week-summary-count">{selectedWeekStats.empty}<span>명</span></dd>
               </div>
-            </div>
+            </dl>
           )}
 
           {/* 출석 체크 리스트 */}
@@ -419,8 +513,8 @@ export default function AttendanceTab() {
             <div className="check-list-header">
               {selectedWeekKey ? (
                 <>
-                  <span className="check-week-label">{selectedWeek?.label}</span>
-                  <span className="check-progress">{checkedCount} / {displayStudents.length}명 완료</span>
+                  <span className="check-week-label">학생 명단</span>
+                  <span className="check-progress"><strong>{checkedCount}</strong> / {displayStudents.length}명 입력</span>
                 </>
               ) : (
                 <span className="check-week-label" style={{ color: 'var(--text3)' }}>
@@ -480,23 +574,38 @@ export default function AttendanceTab() {
             )}
           </div>
 
-        </>
+        </section>
       )}
 
       {/* ── 건의사항 뷰 ── */}
       {attSubView === 'suggest' && (
-        <div style={{ padding: '12px' }}>
+        <section
+          id="attendance-panel-suggest"
+          role="tabpanel"
+          aria-labelledby="attendance-tab-suggest"
+          className="attendance-tab-panel attendance-suggest-panel"
+        >
+          {suggestLoadError && (
+            <div className="suggest-load-error" role="alert">
+              건의사항을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.
+            </div>
+          )}
           {isTeacher && (
             <div className="suggest-form-card">
-              <div className="suggest-form-title">건의사항 작성</div>
+              <h2 className="suggest-form-title">건의사항 작성</h2>
+              <p id="suggest-help" className="suggest-form-help">교역자 또는 부서에 전달할 내용을 남겨 주세요.</p>
+              <label className="suggest-label" htmlFor="teacher-suggestion">전달할 내용</label>
               <textarea
+                id="teacher-suggestion"
                 className="suggest-textarea"
                 value={suggestText}
                 onChange={e => setSuggestText(e.target.value)}
-                placeholder="교역자 또는 부서에 전달할 내용을 작성해주세요..."
+                aria-describedby="suggest-help"
+                placeholder="내용을 입력해 주세요"
                 rows={4}
               />
               <button
+                type="button"
                 className="suggest-submit-btn"
                 onClick={handleSuggestSubmit}
                 disabled={!suggestText.trim() || suggestSaving}
@@ -506,7 +615,7 @@ export default function AttendanceTab() {
             </div>
           )}
           {/* 관리자만 목록 표시 */}
-          {!isTeacher && (
+          {!isTeacher && !suggestLoadError && (
             <>
               <div className="suggest-list-header">
                 {classData[ck]?.teacher || ''} 교사 건의사항
@@ -534,38 +643,56 @@ export default function AttendanceTab() {
               )}
             </>
           )}
-        </div>
+        </section>
       )}
 
       {/* ── 출석부 테이블 뷰 ── */}
-      {attSubView === 'table' && <>
+      {attSubView === 'table' && (
+      <section
+        id="attendance-panel-table"
+        role="tabpanel"
+        aria-labelledby="attendance-tab-table"
+        className="attendance-tab-panel attendance-table-panel"
+      >
       {/* 뷰 + 정렬 + 내보내기 */}
-      <div className="view-btn-row">
+      <div className="view-btn-row attendance-table-toolbar" aria-label="출석부 보기 설정">
         {(['first', 'second', 'all'] as ViewKey[]).map(v => (
           <button
+            type="button"
             key={v}
             className={`view-btn${curView === v ? ' active' : ''}`}
+            aria-pressed={curView === v}
             onClick={() => dispatch({ type: 'SET_VIEW', payload: v })}
           >
             {v === 'first' ? '1학기' : v === 'second' ? '2학기' : '전체'}
           </button>
         ))}
         <button
+          type="button"
           className={`view-btn${sortByName ? ' active' : ''}`}
+          aria-pressed={sortByName}
           onClick={() => setSortByName(s => !s)}
           title="이름 가나다 순으로 정렬"
         >
           가나다순
         </button>
         <div className="export-wrap" ref={exportRef}>
-          <button className="export-btn" onClick={() => setExportOpen(o => !o)} aria-label="출석부 내보내기 메뉴 열기">
+          <button
+            ref={exportButtonRef}
+            type="button"
+            className="export-btn"
+            onClick={() => setExportOpen(o => !o)}
+            aria-label="출석부 내보내기 메뉴 열기"
+            aria-expanded={exportOpen}
+            aria-controls="attendance-export-menu"
+          >
             내보내기 &#9662;
           </button>
           {exportOpen && (
-            <div className="export-menu">
-              <button onClick={exportCSV}>CSV 다운로드</button>
-              <button onClick={exportXLSX}>Excel 다운로드</button>
-              <button onClick={exportPDF}>PDF 인쇄</button>
+            <div id="attendance-export-menu" className="export-menu">
+              <button type="button" onClick={exportCSV}>CSV 다운로드</button>
+              <button type="button" onClick={exportXLSX}>Excel 다운로드</button>
+              <button type="button" onClick={exportPDF}>PDF 인쇄</button>
             </div>
           )}
         </div>
@@ -581,20 +708,15 @@ export default function AttendanceTab() {
           <table className="att-table">
             <thead>
               <tr>
-                <th className="att-header-cell" style={{ minWidth: 28 }}>순</th>
-                <th className="att-header-name" style={{ textAlign: 'center', minWidth: 72 }}>사진/이름</th>
+                <th scope="col" rowSpan={2} className="att-header-cell att-sticky-number" style={{ minWidth: 36 }}>순</th>
+                <th scope="col" rowSpan={2} className="att-header-name" style={{ textAlign: 'center', minWidth: 72 }}>사진/이름</th>
                 {headerCols}
-                <th className="att-header-cell" style={{ background: 'var(--surface2)' }}>출석/주차</th>
-                <th className="att-header-cell" style={{ background: 'var(--surface2)' }}>출석률</th>
-                <th className="att-header-cell" style={{ background: 'var(--surface2)' }}>등급</th>
+                <th scope="col" rowSpan={2} className="att-header-cell" style={{ background: 'var(--surface2)' }}>출석/주차</th>
+                <th scope="col" rowSpan={2} className="att-header-cell" style={{ background: 'var(--surface2)' }}>출석률</th>
+                <th scope="col" rowSpan={2} className="att-header-cell" style={{ background: 'var(--surface2)' }}>등급</th>
               </tr>
               <tr>
-                <th className="att-header-cell"></th>
-                <th className="att-header-name"></th>
                 {headerDays}
-                <th className="att-header-cell"></th>
-                <th className="att-header-cell"></th>
-                <th className="att-header-cell"></th>
               </tr>
             </thead>
             <tbody>
@@ -603,14 +725,14 @@ export default function AttendanceTab() {
                 const recorded = stats.present + stats.absent;
                 const effectiveRate = recorded > 0 ? Math.round((stats.present / recorded) * 100) : 0;
                 const grade = effectiveRate >= 90 ? 'A' : effectiveRate >= 80 ? 'B' : effectiveRate >= 70 ? 'C' : 'D';
-                const gradeColor = grade === 'A' ? '#10b981' : grade === 'B' ? '#9B8DD4' : grade === 'C' ? '#f59e0b' : '#ef4444';
+                const gradeColor = grade === 'A' ? '#397052' : grade === 'B' ? '#6355a7' : grade === 'C' ? '#795a1c' : '#a53f3f';
                 const rateClass = effectiveRate >= 90 ? 'att-rate-good' : effectiveRate >= 80 ? '' : effectiveRate >= 60 ? 'att-rate-warn' : recorded > 0 ? 'att-rate-bad' : '';
                 return (
                   <tr key={student.id}>
-                    <td className="att-stat-cell" style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
+                    <td className="att-stat-cell att-sticky-number" style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
                       {student.num}
                     </td>
-                    <td className="att-cell-name">
+                    <th scope="row" className="att-cell-name">
                       <button
                         type="button"
                         className="att-student-history-button"
@@ -626,7 +748,7 @@ export default function AttendanceTab() {
                         )}
                         <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{student.name}</span>
                       </button>
-                    </td>
+                    </th>
                     {months.map(({ month, sundays }, mi) =>
                       sundays.map((day, di) => {
                         const monthNum = months[mi].month;
@@ -687,7 +809,8 @@ export default function AttendanceTab() {
           </table>
         )}
       </div>
-      </> }
+      </section>
+      )}
 
       {attSubView !== 'suggest' && longAbsentStudents.length > 0 && (
         <details className="long-absent-panel">

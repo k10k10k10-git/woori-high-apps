@@ -7,7 +7,7 @@ export default function ClassTabBar() {
   const classKeys = useClassKeys(state);
 
   return (
-    <div className="class-tabs-wrap" role="tablist" aria-label="반 선택">
+    <div className="class-tabs-wrap" role="group" aria-label="반 선택">
       {classKeys.map(k => {
         const classNum = k.split('-')[2];
         const teacherName = classData[k]?.teacher;
@@ -15,8 +15,8 @@ export default function ClassTabBar() {
         return (
           <button
             key={k}
-            role="tab"
-            aria-selected={isActive}
+            type="button"
+            aria-pressed={isActive}
             className={`class-tab${isActive ? ' active' : ''}`}
             onClick={() => dispatch({ type: 'SET_CLASS', payload: classNum })}
           >

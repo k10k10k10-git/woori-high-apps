@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   ref: vi.fn((_db: unknown, path: string) => ({ path })),
   set: vi.fn(),
+  onValue: vi.fn(),
   state: { current: null as unknown },
 }));
 
@@ -19,7 +20,7 @@ vi.mock('@/lib/db', () => ({
   ref: mocks.ref,
   set: mocks.set,
   push: vi.fn(),
-  onValue: vi.fn(),
+  onValue: mocks.onValue,
   off: vi.fn(),
 }));
 
@@ -33,10 +34,15 @@ vi.mock('@/store/AppContext', async importOriginal => {
 });
 
 vi.mock('@/utils/attendanceEntry', () => ({
-  buildAttendanceEntry: () => ({
-    editableWeeks: [{ key: '8-0', label: '9월 6일' }],
-    selectedWeek: { key: '8-0', label: '9월 6일' },
-  }),
+  buildAttendanceEntry: ({ userRole }: { userRole?: { role?: string } }) => {
+    const currentWeek = { key: '8-0', label: '9월 6일' };
+    return {
+      editableWeeks: userRole?.role === 'admin'
+        ? [{ key: '7-0', label: '8월 30일' }, currentWeek]
+        : [currentWeek],
+      selectedWeek: currentWeek,
+    };
+  },
 }));
 
 import { initialState } from '@/store/AppContext';
@@ -78,6 +84,7 @@ describe('AttendanceTab 교사 출석 입력', () => {
     mocks.ref.mockClear();
     mocks.set.mockReset();
     mocks.set.mockResolvedValue(undefined);
+    mocks.onValue.mockReset();
   });
 
   afterEach(() => cleanup());
@@ -153,6 +160,8 @@ describe('AttendanceTab 교사 출석 입력', () => {
   it('교사 역할에만 개편 스타일 범위를 붙인다', () => {
     const { container, unmount } = render(<AttendanceTab />);
     expect(container.querySelector('.teacher-attendance')).not.toBeNull();
+    expect(container.querySelector('.attendance-week-icon')).not.toBeNull();
+    expect(container.querySelector('.attendance-week-field')).not.toBeNull();
     unmount();
 
     mocks.state.current = {
@@ -161,5 +170,88 @@ describe('AttendanceTab 교사 출석 입력', () => {
     };
     const adminRender = render(<AttendanceTab />);
     expect(adminRender.container.querySelector('.teacher-attendance')).toBeNull();
+    expect(adminRender.container.querySelector('.attendance-week-icon')).toBeNull();
+    expect(adminRender.container.querySelector('.attendance-week-field')).toBeNull();
+    expect(screen.getByLabelText('출석 날짜')).not.toBeNull();
+  });
+
+  it('서브탭과 활성 패널을 연결하고 화살표 키로 다음 패널에 초점을 옮긴다', async () => {
+    render(<AttendanceTab />);
+
+    const checkTab = screen.getByRole('tab', { name: '출석 체크' });
+    const tableTab = screen.getByRole('tab', { name: '출석부' });
+    expect(checkTab.getAttribute('aria-controls')).toBe('attendance-panel-check');
+    expect(tableTab.hasAttribute('aria-controls')).toBe(false);
+    expect(screen.getByRole('tabpanel', { name: '출석 체크' }).id).toBe('attendance-panel-check');
+
+    fireEvent.keyDown(checkTab, { key: 'ArrowRight' });
+    expect(tableTab.getAttribute('aria-selected')).toBe('true');
+    expect(tableTab.getAttribute('aria-controls')).toBe('attendance-panel-table');
+    expect(screen.getByRole('tabpanel', { name: '출석부' }).id).toBe('attendance-panel-table');
+    await waitFor(() => expect(document.activeElement).toBe(tableTab));
+  });
+
+  it('건의 내용의 레이블과 등록 가능 상태를 제공한다', () => {
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '건의사항' }));
+
+    const textbox = screen.getByRole('textbox', { name: '전달할 내용' });
+    const submit = screen.getByRole('button', { name: '등록하기' });
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.change(textbox, { target: { value: '화면 제안' } });
+    expect((submit as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('출석표의 행과 열 헤더 관계를 제공한다', () => {
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '출석부' }));
+
+    expect(screen.getByRole('columnheader', { name: '순' }).getAttribute('scope')).toBe('col');
+    expect(screen.getByRole('columnheader', { name: '9월' }).getAttribute('scope')).toBe('colgroup');
+    expect(screen.getByRole('rowheader', { name: '홍길동' }).getAttribute('scope')).toBe('row');
+  });
+
+  it('내보내기 메뉴의 열림 상태를 알리고 ESC로 닫아 초점을 복귀한다', () => {
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '출석부' }));
+
+    const exportButton = screen.getByRole('button', { name: '출석부 내보내기 메뉴 열기' });
+    expect(exportButton.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(exportButton);
+    expect(exportButton.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'CSV 다운로드' })).not.toBeNull();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(exportButton.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(exportButton);
+  });
+
+  it('관리자 건의사항 구독 실패를 빈 목록과 구분한다', async () => {
+    mocks.state.current = {
+      ...teacherState(),
+      userRole: { role: 'admin', name: '관리자' },
+    };
+    mocks.onValue.mockImplementation((_query, _next, onError) => onError?.(new Error('권한 없음')));
+
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '건의사항' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('건의사항을 불러오지 못했습니다');
+    expect(screen.queryByText('등록된 건의사항이 없습니다.')).toBeNull();
+  });
+
+  it('관리자는 최근 범위 밖 날짜도 기존처럼 수정할 수 있다', () => {
+    mocks.state.current = {
+      ...teacherState(),
+      userRole: { role: 'admin', name: '관리자' },
+    };
+
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '출석부' }));
+
+    expect(screen.getByRole('button', {
+      name: '홍길동 8월 30일 출석 수정, 현재 결석',
+    })).not.toBeNull();
   });
 });
