@@ -435,6 +435,11 @@ npm run build
 - **판단 질문**: 모든 leaf에 서버 트리거를 붙이면 대량 명단 교체·학기 삭제의 이벤트 한도에 영향을 준다. 편의상 원자 쓰기를 분할하거나 트랜잭션 callback 안에 로그 부수효과를 넣지 않는다. 클라이언트가 제출한 업무 설명을 독립 서버 감사 증거라고 설명하지 않는다.
 - **재사용 규칙**: 새 저장 API는 동일 도우미와 `activityLogWriteContract.test.ts` 경계를 따르고, 원장·이력의 함께 성공/실패와 따로 성공할 수 있는 경로를 구분해 검증한다. 새 Rules 승인·배포가 먼저 완료되기 전 로그 쓰기 코드를 운영에 활성화하지 않는다.
 
+### 로그 키는 Rules와 SDK 조회 형식을 함께 검증한다 (2026-09-06)
+- **접근법**: `features/activityLog/model.ts`의 ID 파서와 `scripts/activity-log-rules-proposal.mjs`를 대조하고, Firebase SDK의 `ChildrenNode.val()`·`snapToList` 변환을 추적한다. 공백·한글·숫자 전용·`__proto__`·초과 길이 키를 로컬 Rules 에뮬레이터에서 거부하는지 검사한다.
+- **판단 질문**: Firebase에서 유효한 키라고 앱에서도 안전한 것은 아니다. 숫자 키는 컬렉션을 배열로 반환할 수 있고 `__proto__`는 일반 객체로 변환할 때 목록에서 빠진다. 추가 전용 로그에 조회 불가 기록을 허용하면 최신 기록 하나가 전체 목록을 막는다.
+- **재사용 규칙**: 저장 권한 테스트는 정상 기록뿐 아니라 `Rules 허용 → SDK 스냅샷 → 앱 파서`가 일치하는지 검사하며, 기존 업무 규칙의 구조 불변도 별도로 대조한다.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

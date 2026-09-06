@@ -10,7 +10,8 @@ export const activityLogRulesProposal = {
     "$eventId": {
       ".write": `auth != null && !data.exists() && newData.exists() && (${approved} || (${ownRequest}))`,
       ".validate": "newData.hasChildren(['id', 'schemaVersion', 'occurredAt', 'recordedAt', 'actor', 'area', 'action', 'target', 'changedCount'])",
-      id: { ".validate": "newData.val() === $eventId && newData.isString() && newData.val().length <= 160" },
+      // 조회기의 ID 계약과 RTDB 스냅샷의 객체·배열 변환에 안전한 키만 허용한다.
+      id: { ".validate": "newData.val() === $eventId && newData.isString() && newData.val().matches(/^[A-Za-z0-9_-]{1,160}$/) && !newData.val().matches(/^[0-9]+$/) && newData.val() !== '__proto__'" },
       schemaVersion: { ".validate": "newData.val() === 1" },
       occurredAt: { ".validate": "newData.isNumber() && newData.val() === now" },
       recordedAt: { ".validate": "newData.isNumber() && newData.val() === now" },

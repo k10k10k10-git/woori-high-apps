@@ -112,6 +112,14 @@ try {
     await set(ref(stranger, "activityLogs/events/request"), own);
     await denied(set(ref(stranger, "activityLogs/events/other-request"), { ...own, id: "other-request", target: { ...own.target, path: "iguardPending/admin/siteRequests/example" } }));
   });
+  await check("자기 요청도 조회 불가 ID·숫자 배열·예약 키는 생성 불가", async () => {
+    // 공백·한글은 ID 검증에 실패하며 0과 __proto__는 RTDB 스냅샷의 객체 변환을 깨뜨린다.
+    // 추가 전용 기록이므로 거부하지 않으면 새 계정 하나로 최신 로그 조회를 계속 막을 수 있다.
+    for (const id of ["bad key", "한글", "0", "123", "__proto__", "a".repeat(161)]) {
+      const own = { ...record(id, "stranger"), area: "requests", target: { path: "iguardPending/stranger/siteRequests/example", label: "본인 요청" } };
+      await denied(set(ref(stranger, `activityLogs/events/${id}`), own));
+    }
+  });
   await check("이가드 계정 기록·원문 생략·1001행 일괄 저장", async () => {
     await set(ref(field, "activityLogs/events/field"), { ...record("field", "field"), area: "field", changes: [{ field: "특이사항", redacted: true }] });
     const values = Object.fromEntries(Array.from({ length: 1001 }, (_, i) => [`student-${i}`, { s: "출석" }]));
