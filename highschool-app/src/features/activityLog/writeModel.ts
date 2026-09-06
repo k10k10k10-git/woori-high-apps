@@ -142,9 +142,8 @@ export async function summarizeWrite(
   const bulk = targets.size > 1;
   const changes: ActivityChange[] = [];
   if (bulk) {
-    for (const { target, parts } of safeTargets) {
-      const suffix = parts.at(-1) ?? "";
-      const label = `${target.label} ${suffix}`;
+    for (const { target } of safeTargets) {
+      const label = target.label;
       if (target.savedStatus) changes.push({ field: `${label} · 저장된 출석 상태`.slice(0, 160), after: target.savedStatus });
       else changes.push({ field: `${label} · ${[...target.fieldNames].slice(0, 3).join("·") || "기록"}`.slice(0, 160), redacted: true });
     }

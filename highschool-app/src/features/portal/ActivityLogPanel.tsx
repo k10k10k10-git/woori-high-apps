@@ -5,11 +5,11 @@ import { ArrowClockwise, CaretDown, ClockCounterClockwise, MagnifyingGlass, Warn
 import { useAuth } from "@/context/AuthContext";
 import { loadActivityLogPage, subscribeActivityLogStatus } from "@/features/activityLog/db";
 import { activityRangeBounds, defaultActivityLogRange } from "@/features/activityLog/model";
+import { presentActivityLog, type ActivityChangePresentation } from "@/features/activityLog/presentation";
 import {
   ACTIVITY_AREAS,
   type ActivityAction,
   type ActivityArea,
-  type ActivityChange,
   type ActivityLogCursor,
   type ActivityLogRange,
   type ActivityLogRecord,
@@ -61,7 +61,7 @@ function ActivityLogWorkspace() {
 
   return <div className="activity-log-panel">
     <header className="activity-log-header">
-      <div><h3>활동 로그</h3><p>기능 적용 이후 통합 사이트에서 저장한 활동을 확인합니다. 민감한 원문은 생략됩니다.</p></div>
+      <div><h3>활동 로그</h3><p>누가 어떤 업무와 항목을 저장했는지 한국어로 확인합니다. 민감한 원문은 기록하지 않습니다.</p></div>
       <button type="button" className="activity-log-refresh" onClick={() => setRevision(value => value + 1)}><ArrowClockwise size={16} aria-hidden="true" />새로고침</button>
     </header>
     <form className="activity-log-range" onSubmit={applyRange}>
@@ -150,7 +150,7 @@ function ActivityLogResults({ range, onRetry }: { range: ActivityLogRange; onRet
     const tokens = query.trim().toLocaleLowerCase("ko").split(/\s+/).filter(Boolean);
     return page.records.filter(record => {
       if (area !== "all" && record.area !== area || action !== "all" && record.action !== action) return false;
-      const text = [actorLabel(record), record.actor.uid, record.target.label, record.target.context, ACTIVITY_AREAS[record.area], ACTION_LABELS[record.action]].filter(Boolean).join(" ").toLocaleLowerCase("ko");
+      const text = [actorLabel(record), presentActivityLog(record).searchText].join(" ").toLocaleLowerCase("ko");
       return tokens.every(token => text.includes(token));
     });
   }, [action, area, page.records, query]);
@@ -169,7 +169,7 @@ function ActivityLogResults({ range, onRetry }: { range: ActivityLogRange; onRet
       <div className="activity-log-search">
         <label className="sr-only" htmlFor={`${id}-query`}>활동 로그 검색</label>
         <MagnifyingGlass size={17} aria-hidden="true" />
-        <input id={`${id}-query`} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름, UID, 대상 검색" autoComplete="off" aria-describedby={`${id}-result-count`} />
+        <input id={`${id}-query`} type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름, 업무, 변경 항목 검색" autoComplete="off" aria-describedby={`${id}-result-count`} />
         {query && <button type="button" onClick={() => setQuery("")} aria-label="활동 로그 검색 초기화"><X size={15} aria-hidden="true" /></button>}
       </div>
       <label className="activity-log-select"><span className="sr-only">활동 영역</span><select value={area} onChange={event => setArea(event.target.value as ActivityArea | "all")}><option value="all">모든 영역</option>{Object.entries(ACTIVITY_AREAS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -191,24 +191,25 @@ function uniqueRecords(records: ActivityLogRecord[]): ActivityLogRecord[] {
 }
 
 function ActivityLogRow({ record }: { record: ActivityLogRecord }) {
+  const presentation = presentActivityLog(record);
   return <li className="activity-log-item"><details>
     <summary className="activity-log-row">
       <time dateTime={new Date(record.occurredAt).toISOString()}>{formatDate(record.occurredAt)}</time>
-      <span className="activity-log-subject"><strong>{record.target.label}</strong><span>{ACTIVITY_AREAS[record.area]}{record.target.context ? ` · ${record.target.context}` : ""}</span></span>
+      <span className="activity-log-subject"><strong>{presentation.targetLabel}</strong><span>{presentation.areaLabel}{presentation.contextLabel ? ` · ${presentation.contextLabel}` : ""}</span><span className="activity-log-change-summary">{presentation.summary}</span></span>
       <span className="activity-log-actor"><strong>{actorLabel(record)}</strong><span>{record.actor.kind === "user" ? "인증 계정" : record.actor.kind === "system" ? "시스템 작업" : "인증 정보 없음"}</span></span>
       <span className={`activity-log-action is-${record.action}`}>{ACTION_LABELS[record.action]}</span>
-      <CaretDown size={15} aria-hidden="true" /><span className="sr-only">저장 상세</span>
+      <CaretDown size={15} aria-hidden="true" /><span className="sr-only">상세 보기</span>
     </summary>
     <div className="activity-log-detail">
-      <dl className="activity-log-metadata"><div><dt>기록 시각</dt><dd>{formatDate(record.recordedAt)}</dd></div>{record.actor.uid && <div><dt>계정 UID</dt><dd>{record.actor.uid}</dd></div>}<div><dt>대상 경로</dt><dd>{record.target.path}</dd></div></dl>
-      <h4>변경 내용 <span>{record.changedCount}개 항목</span></h4>
-      {record.changes.length === 0 ? <p className="activity-log-detail-empty">항목별 원문은 기록되지 않았습니다.</p> : <div className="activity-log-changes">{record.changes.map((change, index) => <ChangeRow key={`${change.field}:${index}`} change={change} />)}</div>}
-      {record.changedCount > record.changes.length && <p className="activity-log-detail-empty">전체 {record.changedCount}개 중 기록된 {record.changes.length}개 항목만 표시합니다.</p>}
+      <dl className="activity-log-metadata"><div><dt>기록 시각</dt><dd>{formatDate(record.recordedAt)}</dd></div><div><dt>작업 계정</dt><dd>{actorLabel(record)}</dd></div><div><dt>업무 영역</dt><dd>{presentation.areaLabel}</dd></div><div><dt>변경 대상</dt><dd>{presentation.targetLabel}{presentation.contextLabel ? ` · ${presentation.contextLabel}` : ""}</dd></div></dl>
+      <h4>기록된 내용 <span>{presentation.countLabel}</span></h4>
+      {presentation.changes.length === 0 ? <p className="activity-log-detail-empty">항목별 내용은 기록되지 않았습니다.</p> : <div className="activity-log-changes">{presentation.changes.map((change, index) => <ChangeRow key={`${change.title}:${index}`} change={change} />)}</div>}
+      {record.changedCount > record.changes.length && <p className="activity-log-detail-empty">전체 저장 내용 중 일부만 요약해 표시합니다.</p>}
     </div>
   </details></li>;
 }
 
-function ChangeRow({ change }: { change: ActivityChange }) {
+function ChangeRow({ change }: { change: ActivityChangePresentation }) {
   const displayValue = (value: string | null | undefined) => value === undefined ? "기록하지 않음" : value === null ? "값 없음" : value === "" ? "빈 값" : value;
-  return <div className="activity-log-change"><strong>{change.field}</strong>{change.redacted ? <p className="activity-log-redacted">변경됨 · 원문 생략</p> : <div className="activity-log-values"><div><span>변경 전</span><p>{displayValue(change.before)}</p></div><div><span>{change.before === undefined ? "저장값" : "변경 후"}</span><p>{displayValue(change.after)}</p></div></div>}</div>;
+  return <div className="activity-log-change"><strong>{change.title}</strong>{change.redacted ? <div className="activity-log-redacted">{change.fields.length > 0 && <p className="activity-log-change-fields">{change.fields.join(" · ")}</p>}<p>{change.description}</p></div> : <div className="activity-log-values"><div><span>변경 전</span><p>{displayValue(change.before)}</p></div><div><span>{change.before === undefined ? "저장값" : "변경 후"}</span><p>{displayValue(change.after)}</p></div></div>}</div>;
 }
