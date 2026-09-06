@@ -76,6 +76,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 핵심 코드 패턴
 
+### 역할 판정 전 진입 UI와 계층형 선택값을 함께 안정화하기 (2026-09-06)
+- **접근법**: `src/components/DemoClassPicker.tsx`와 `LoginScreen.tsx`를 한 진입 흐름으로 대조한다 → 역할별 셸을 재사용하지 않고 `src/app/globals.css`의 `.attendance-entry`에 헤더·패널·입력·오류·모바일 스크롤을 격리한다 → 데모의 `part → grade → class`를 현재 옵션 안의 `effectivePart → effectiveGrade → effectiveCls` 순서로 렌더 중 파생한다 → 명시적 로그인 레이블과 `status`·`alert`를 연결한다 → 두 `*.render.test.tsx`에서 선택 payload·로그인 인자·상태를 고정하고 320/390/768/1280px 및 320px·200% 텍스트 확대 브라우저에서 가로 넘침과 44px 조작 영역을 확인한다.
+- **판단 질문**: 인증 전에는 역할이 확정되지 않으므로 `.teacher-workspace`나 `.admin-workspace`를 상속하지 않았다. 고정 초기값 `1`을 실제 옵션에 맞추려고 effect에서 상태를 덮으면 사용자 선택과 경합할 수 있어 파생값을 사용했고, 진입 화면 검증에서는 반 선택 확정·로그인 제출·출석 O/X처럼 인증 상태나 운영 데이터를 바꾸는 동작을 실행하지 않았다.
+- **재사용 규칙**: 계층형 선택 진입 화면은 `현재 옵션에서 상위부터 유효값 파생 → 제출 payload 회귀 테스트 → 역할 셸과 분리된 CSS 범위 → 짧은 모바일 세로 스크롤·터치 크기 실화면 확인` 순서로 고친다.
+
 ### 교사 출석 화면을 관리자와 분리해 모바일 밀도와 키보드 경로를 정돈하기 (2026-09-06)
 - **접근법**: `AppShell.tsx`와 `AttendanceTab.tsx`에 교사·데모 전용 `.teacher-workspace`·`.teacher-attendance` 범위를 붙인다 → 관리자 화면의 평면 배경·얇은 구분선·밑줄 탭·절제한 보라색 토큰만 가져오고 정보 구조와 저장 함수를 유지한다 → `globals.css`의 교사 기본 규칙 뒤에 모바일 규칙을 둔다 → 공유 `HistoryModal`은 역할 중립 기본 레이아웃 뒤에 교사 override를 적용하고, 날짜 선택 DOM은 관리자에게 기존 label/select/hint 구조를 보존한다 → 학생 이력·출석 셀·내보내기 메뉴의 키보드 경로를 연결한다 → jsdom에서 교사/관리자 DOM 계약과 저장 상태를 검사하고 320/375/390/768/1280px 화면·가로 넘침·44px 터치 영역·콘솔 오류를 읽기 전용 브라우저로 확인한다.
 - **판단 질문**: 관리자 `AdminWorkspace`·검색·다중 필터를 교사 셸로 옮기지 않고, 같은 상태 재선택 시 미입력(`null`)과 단일 저장 잠금도 유지했다. 공유 컴포넌트의 markup만 바꾸고 교사 prefix CSS만 추가하면 관리자 이력 모달·날짜 grid가 깨지므로, 공통 레이아웃은 역할 중립으로 두거나 역할별 DOM을 명시적으로 분기한다. 뒤쪽 전역 모바일 CSS가 교사 규칙을 덮는지도 선언 순서로 확인한다.

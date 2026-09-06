@@ -10,6 +10,7 @@ import {
   type DemoOption, type DemoSelection,
 } from '@/lib/demo';
 import type { UserRole } from '@/types';
+import AdminIcon from '@/components/admin/AdminIcon';
 
 export default function DemoClassPicker({
   onPick,
@@ -68,14 +69,16 @@ export default function DemoClassPicker({
   const parts = useMemo(
     () => [...new Set((options ?? []).map(o => o.part))].sort(),
     [options]);
+  const effectivePart = parts.includes(part) ? part : (parts[0] ?? part);
   const grades = useMemo(
-    () => [...new Set((options ?? []).filter(o => o.part === part).map(o => o.grade))].sort(),
-    [options, part]);
+    () => [...new Set((options ?? []).filter(o => o.part === effectivePart).map(o => o.grade))].sort(),
+    [options, effectivePart]);
+  const effectiveGrade = grades.includes(grade) ? grade : (grades[0] ?? grade);
   const classesInGrade = useMemo(
-    () => (options ?? []).filter(o => o.part === part && o.grade === grade),
-    [options, part, grade]);
+    () => (options ?? []).filter(o => o.part === effectivePart && o.grade === effectiveGrade),
+    [options, effectivePart, effectiveGrade]);
 
-  // 부서·학년을 바꾸면 그 안에 없는 반이 선택된 채로 남는다.
+  // 기본값(1부·1학년)이 실제 목록에 없거나 상위 선택을 바꿔도 유효한 하위 값을 보여야 한다.
   // effect에서 setState로 고치지 않고 렌더 중에 파생한다(선택 상태를 effect가 덮는 사고 방지).
   const effectiveCls = classesInGrade.some(o => o.cls === cls)
     ? cls
@@ -83,116 +86,139 @@ export default function DemoClassPicker({
   const selected = classesInGrade.find(o => o.cls === effectiveCls) ?? null;
 
   return (
-    <div className="login-screen" style={{ alignItems: 'flex-start', overflowY: 'auto' }}>
-      <div className="demo-wrap">
-        <div className="demo-topbar">
-          <span className="demo-badge">데모 테스트</span>
-          <button type="button" className="demo-admin-btn" onClick={onAdminLogin}>
-            관리자 계정으로 접근
-          </button>
+    <div className="attendance-entry attendance-entry--demo">
+      <a className="entry-skip" href="#entry-main">본문으로 이동</a>
+      <header className="entry-header">
+        <div className="entry-header-inner">
+          <div className="entry-brand">
+            <span className="entry-brand-mark"><AdminIcon name="book" size={18} /></span>
+            <span>출석부</span>
+          </div>
+          <div className="entry-header-actions">
+            <span className="entry-mode">데모 테스트</span>
+            <button type="button" className="entry-secondary-action" onClick={onAdminLogin}>
+              <span>관리자 계정으로 접근</span>
+              <AdminIcon name="arrow" size={14} />
+            </button>
+          </div>
         </div>
+      </header>
 
-        <div className="login-card" style={{ maxWidth: 420 }}>
-          <div className="login-logo">
-            <div className="login-logo-icon">📋</div>
-            <div className="login-title">고등부 출석부</div>
-            <div className="login-sub">담당하시는 반을 선택해 주세요</div>
+      <main id="entry-main" className="entry-main" tabIndex={-1}>
+        <section className="entry-panel" aria-labelledby="demo-picker-title">
+          <div className="entry-intro">
+            <h1 id="demo-picker-title">고등부 출석부</h1>
+            <p>담당하시는 반을 선택해 주세요</p>
+          </div>
+
+          <div className="entry-notice" id="demo-data-notice">
+            <strong>실제 자료 안내</strong>
+            <span>테스트용 화면입니다. 선택한 반의 실제 출석 자료가 보이고, 입력한 내용은 실제로 저장됩니다.</span>
           </div>
 
           {signInError ? (
-            <div
-              className="login-err"
-              // 환경변수 이름이 길어 375px에서 가로로 삐져나온다 — 어디서든 줄바꿈되게 둔다
-              style={{ whiteSpace: 'pre-line', lineHeight: 1.6, overflowWrap: 'anywhere' }}
-            >{signInError}</div>
+            <div className="entry-error" role="alert">{signInError}</div>
           ) : options === null ? (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div className="spinner" style={{ margin: '0 auto' }} />
+            <div className="entry-loading" role="status" aria-live="polite">
+              <div className="spinner" />
+              <span>반 목록을 불러오는 중입니다</span>
             </div>
           ) : (
             <>
               {lastSelection && (
                 <button
                   type="button"
-                  className="demo-recent-btn"
+                  className="entry-recent"
                   onClick={() => onPick(lastSelection)}
                 >
-                  <span>
+                  <AdminIcon name="clock" size={17} />
+                  <span className="entry-recent-copy">
                     <strong>최근 선택한 반</strong>
                     <small>{lastSelection.ck.split('-').map((v, i) => `${v}${i === 0 ? '부' : i === 1 ? '학년' : '반'}`).join(' ')}</small>
                   </span>
-                  <span aria-hidden="true">바로 들어가기 →</span>
+                  <span className="entry-recent-action">
+                    바로 들어가기
+                    <AdminIcon name="arrow" size={14} />
+                  </span>
                 </button>
               )}
 
-              <div className="demo-field">
-                <label className="demo-label" htmlFor="demo-part">부서</label>
-                <select id="demo-part" className="login-input demo-select" value={part} onChange={e => setPart(e.target.value)}>
-                  {(parts.length > 0 ? parts : ['1', '2']).map(p => (
-                    <option key={p} value={p}>{p}부</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="demo-field">
-                <label className="demo-label" htmlFor="demo-grade">학년</label>
-                <select id="demo-grade" className="login-input demo-select" value={grade} onChange={e => setGrade(e.target.value)}>
-                  {(grades.length > 0 ? grades : ['1', '2', '3']).map(g => (
-                    <option key={g} value={g}>{g}학년</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="demo-field">
-                <label className="demo-label" htmlFor="demo-class">반</label>
-                <select
-                  id="demo-class"
-                  className="login-input demo-select"
-                  value={effectiveCls}
-                  onChange={e => setCls(e.target.value)}
-                  disabled={classesInGrade.length === 0}
-                >
-                  {classesInGrade.length === 0 ? (
-                    <option value="">선택할 반이 없습니다</option>
-                  ) : (
-                    classesInGrade.map(o => (
-                      <option key={o.ck} value={o.cls}>
-                        {o.cls}반{o.teacherName ? ` · ${o.teacherName} 선생님` : ''}
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <button
-                className="login-btn"
-                type="button"
-                disabled={!selected}
-                style={!selected ? { opacity: .5 } : undefined}
-                onClick={() => selected && onPick({ ck: selected.ck, teacherName: selected.teacherName })}
+              <form
+                className="entry-form"
+                aria-describedby="demo-data-notice"
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (selected) onPick({ ck: selected.ck, teacherName: selected.teacherName });
+                }}
               >
-                이 반으로 들어가기
-              </button>
+                <fieldset>
+                  <legend className="entry-sr-only">담당 반 선택</legend>
+                  <div className="entry-field">
+                    <label htmlFor="demo-part">부서</label>
+                    <select id="demo-part" className="entry-input" value={effectivePart} onChange={e => setPart(e.target.value)}>
+                      {(parts.length > 0 ? parts : ['1', '2']).map(p => (
+                        <option key={p} value={p}>{p}부</option>
+                      ))}
+                    </select>
+                  </div>
 
-              {selected && (
-                <div className="demo-selection-summary" aria-live="polite">
-                  선택: <strong>{selected.part}부 {selected.grade}학년 {selected.cls}반</strong>
-                  {selected.teacherName ? ` · ${selected.teacherName} 선생님` : ''}
-                </div>
+                  <div className="entry-field">
+                    <label htmlFor="demo-grade">학년</label>
+                    <select id="demo-grade" className="entry-input" value={effectiveGrade} onChange={e => setGrade(e.target.value)}>
+                      {(grades.length > 0 ? grades : ['1', '2', '3']).map(g => (
+                        <option key={g} value={g}>{g}학년</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="entry-field">
+                    <label htmlFor="demo-class">반</label>
+                    <select
+                      id="demo-class"
+                      className="entry-input"
+                      value={effectiveCls}
+                      onChange={e => setCls(e.target.value)}
+                      disabled={classesInGrade.length === 0}
+                    >
+                      {classesInGrade.length === 0 ? (
+                        <option value="">선택할 반이 없습니다</option>
+                      ) : (
+                        classesInGrade.map(o => (
+                          <option key={o.ck} value={o.cls}>
+                            {o.cls}반{o.teacherName ? ` · ${o.teacherName} 선생님` : ''}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                </fieldset>
+
+                {selected && (
+                  <div className="entry-selection-summary" aria-live="polite">
+                    <span>현재 선택</span>
+                    <strong>{selected.part}부 {selected.grade}학년 {selected.cls}반</strong>
+                    {selected.teacherName ? <small>{selected.teacherName} 선생님</small> : null}
+                  </div>
+                )}
+
+                <button className="entry-primary-action" type="submit" disabled={!selected}>
+                  이 반으로 들어가기
+                  <AdminIcon name="arrow" size={15} />
+                </button>
+              </form>
+
+              {loadError && (
+                <div className="entry-error" role="alert">반 목록을 불러오지 못했습니다: {loadError}</div>
               )}
-
-              {loadError && <div className="login-err">반 목록을 불러오지 못했습니다: {loadError}</div>}
               {!loadError && options.length === 0 && (
-                <div className="login-err">등록된 반이 없습니다. 관리자 계정으로 접속해 확인해 주세요.</div>
+                <div className="entry-error" role="alert">
+                  등록된 반이 없습니다. 관리자 계정으로 접속해 확인해 주세요.
+                </div>
               )}
             </>
           )}
-        </div>
-
-        <p className="demo-note">
-          테스트용 화면입니다. 선택한 반의 실제 출석 자료가 보이고, 입력한 내용은 실제로 저장됩니다.
-        </p>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }

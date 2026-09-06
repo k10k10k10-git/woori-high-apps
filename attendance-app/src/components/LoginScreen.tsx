@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { doLogin } from '@/hooks/useAuth';
+import AdminIcon from '@/components/admin/AdminIcon';
 
 export default function LoginScreen({ authError, onBackToDemo }: {
   authError?: string | null;
@@ -42,54 +43,78 @@ export default function LoginScreen({ authError, onBackToDemo }: {
   };
 
   return (
-    <div className="login-screen">
-      <div className="login-card">
-        <div className="login-logo">
-          <div className="login-logo-icon">📋</div>
-          <div className="login-title">고등부 출석부</div>
-          <div className="login-sub">우리교회 고등부 온라인 출석 관리</div>
-        </div>
-        <form onSubmit={handleLogin}>
-          <input
-            className="login-input"
-            type="email"
-            placeholder="이메일"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <input
-            className="login-input"
-            type="password"
-            placeholder="비밀번호"
-            value={pw}
-            onChange={e => setPw(e.target.value)}
-            autoComplete="current-password"
-          />
-          <div className="login-check-row">
-            <label>
-              <input type="checkbox" checked={saveEmail} onChange={e => setSaveEmail(e.target.checked)} />
-              이메일 저장
-            </label>
-            <label>
-              <input type="checkbox" checked={stayLogin} onChange={e => setStayLogin(e.target.checked)} />
-              로그인 유지
-            </label>
+    <div className="attendance-entry attendance-entry--login">
+      <a className="entry-skip" href="#entry-main">본문으로 이동</a>
+      <header className="entry-header">
+        <div className="entry-header-inner">
+          <div className="entry-brand">
+            <span className="entry-brand-mark"><AdminIcon name="book" size={18} /></span>
+            <span>출석부</span>
           </div>
-          <button className="login-btn" type="submit" disabled={loading}>
-            {loading ? '로그인 중...' : '로그인'}
-          </button>
-          {authError && (
-            <div className="login-err" style={{ whiteSpace: 'pre-line', textAlign: 'center' }}>{authError}</div>
+          <span className="entry-mode">관리자</span>
+        </div>
+      </header>
+
+      <main id="entry-main" className="entry-main" tabIndex={-1}>
+        <section className="entry-panel" aria-labelledby="admin-login-title">
+          <div className="entry-intro">
+            <h1 id="admin-login-title">관리자 로그인</h1>
+            <p>우리교회 고등부 온라인 출석 관리</p>
+          </div>
+
+          <form className="entry-form" onSubmit={handleLogin} aria-busy={loading}>
+            <div className="entry-field">
+              <label htmlFor="admin-email">이메일</label>
+              <input
+                id="admin-email"
+                className="entry-input"
+                type="email"
+                placeholder="이메일"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div className="entry-field">
+              <label htmlFor="admin-password">비밀번호</label>
+              <input
+                id="admin-password"
+                className="entry-input"
+                type="password"
+                placeholder="비밀번호"
+                value={pw}
+                onChange={e => setPw(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="entry-check-row">
+              <label>
+                <input type="checkbox" checked={saveEmail} onChange={e => setSaveEmail(e.target.checked)} />
+                이메일 저장
+              </label>
+              <label>
+                <input type="checkbox" checked={stayLogin} onChange={e => setStayLogin(e.target.checked)} />
+                로그인 유지
+              </label>
+            </div>
+            <button className="entry-primary-action" type="submit" disabled={loading}>
+              {loading ? '로그인 중...' : '로그인'}
+              {!loading && <AdminIcon name="arrow" size={15} />}
+            </button>
+            <span className="entry-sr-only" role="status" aria-live="polite">
+              {loading ? '로그인 정보를 확인하는 중입니다' : ''}
+            </span>
+            {authError && <div className="entry-error" role="alert">{authError}</div>}
+            {!authError && err && <div className="entry-error" role="alert">{err}</div>}
+          </form>
+          {onBackToDemo && (
+            <button type="button" className="entry-back-action" onClick={onBackToDemo}>
+              <AdminIcon name="arrow" size={14} />
+              반 선택 화면으로 돌아가기
+            </button>
           )}
-          {!authError && err && <div className="login-err">{err}</div>}
-        </form>
-        {onBackToDemo && (
-          <button type="button" className="demo-back-btn" onClick={onBackToDemo}>
-            ← 반 선택 화면으로 돌아가기
-          </button>
-        )}
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
