@@ -1,6 +1,7 @@
 'use client';
-import { useApp, useClassKey } from '@/store/AppContext';
+import { useApp } from '@/store/AppContext';
 import { getWindowYears, getKSTYear } from '@/utils/dates';
+import AdminIcon from '@/components/admin/AdminIcon';
 
 type DemoActions = { onChangeClass: () => void; onAdminLogin: () => void };
 
@@ -10,28 +11,30 @@ export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?
   const isAdmin = !userRole || userRole.role === 'admin';
   const isTeacher = userRole?.role === 'teacher';
 
-  const ck = useClassKey(state);
-  const classInfo = state.classData[ck];
-  const teacherName = classInfo?.teacher ?? '';
-
   const windowYears = getWindowYears(state.curYear);
   const kstYear = getKSTYear();
 
   return (
-    <div className="topbar">
+    <header className="topbar">
       {/* 1행: 타이틀 + 저장상태 + 로그아웃 */}
       <div className="topbar-main">
-        <div className="topbar-title">📋 출석부</div>
-        {isTeacher && teacherName && (
-          <span className="topbar-teacher-badge">{teacherName}</span>
-        )}
+        <div className="topbar-title">
+          <span className="topbar-title-mark" aria-hidden="true">
+            <AdminIcon name="book" size={17} />
+          </span>
+          <span>출석부</span>
+        </div>
         <div className="topbar-actions">
-          <div className={`save-dot${saveStatus === 'saving' ? ' saving' : saveStatus === 'saved' ? ' saved' : ''}`} />
-          {saveStatus !== 'idle' && (
-            <span className="save-label">
-              {saveStatus === 'saving' ? '저장 중' : '저장됨'}
-            </span>
-          )}
+          <div className="topbar-save-status" role="status" aria-live="polite" aria-atomic="true">
+            {saveStatus !== 'idle' && (
+              <>
+                <span className={`save-dot${saveStatus === 'saving' ? ' saving' : ' saved'}`} aria-hidden="true" />
+                <span className="save-label">
+                  {saveStatus === 'saving' ? '저장 중' : '저장됨'}
+                </span>
+              </>
+            )}
+          </div>
           {demo ? (
             <>
               <button className="logout-btn" onClick={demo.onChangeClass} aria-label="반 바꾸기">반 바꾸기</button>
@@ -86,6 +89,6 @@ export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?
           </select>
         </div>
       )}
-    </div>
+    </header>
   );
 }

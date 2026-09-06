@@ -67,6 +67,7 @@ const EMPTY_STATS = {
 export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: string; curCk?: string; onClose: () => void }) {
   const { state } = useApp();
   const { curYear, classData, attData } = state;
+  const isTeacher = state.userRole?.role === 'teacher';
 
   const student =
     (propCk ? classData[propCk]?.students.find(s => s.id === sid) : null)
@@ -264,16 +265,16 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
   }
 
   const gradeColor = (rate: number) =>
-    rate >= 90 ? '#10b981' : rate >= 80 ? '#9B8DD4' : rate >= 70 ? '#f59e0b' : '#ef4444';
+    rate >= 90 ? '#397052' : rate >= 80 ? '#6355a7' : rate >= 70 ? '#795a1c' : '#a53f3f';
 
   void mountedCkRef;
 
   return createPortal(
-    <div className="modal-overlay" onClick={dismiss}
+    <div className={`modal-overlay${isTeacher ? ' teacher-attendance-modal' : ''}`} onClick={dismiss}
       role="dialog" aria-modal="true" aria-label={`${student?.name ?? ''} 출석 이력`}>
       <div
         ref={sheetRef}
-        className="modal-sheet"
+        className="modal-sheet history-modal-sheet"
         onClick={e => e.stopPropagation()}
         tabIndex={-1}
         style={{ maxWidth: 620 }}
@@ -283,17 +284,17 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
           <div className="modal-handle" />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <div className="history-modal-header">
           {student?.photo ? (
-            <img src={student.photo} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            <img src={student.photo} alt="" className="history-modal-avatar-img" />
           ) : (
-            <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18, color: 'var(--primary-text)', flexShrink: 0 }}>
+            <div className="history-modal-avatar" aria-hidden="true">
               {student?.name?.charAt(0) ?? '?'}
             </div>
           )}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15 }}>{student?.name ?? '알 수 없음'}</div>
-            <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>출석 이력 (3년)</div>
+          <div className="history-modal-copy">
+            <div className="history-modal-name">{student?.name ?? '알 수 없음'}</div>
+            <div className="history-modal-subtitle">출석 이력 (3년)</div>
           </div>
           <button
             ref={closeButtonRef}
@@ -306,9 +307,9 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', color: 'var(--text3)', padding: 24 }}>불러오는 중...</div>
+          <div className="history-modal-loading">불러오는 중...</div>
         ) : (
-          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+          <div className="history-year-list">
             {results.map(r => {
               const isCur = r.year === mountedYearRef.current;
               const ckParts = r.ck ? r.ck.split('-') : null;
@@ -316,39 +317,31 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
               const gc = gradeColor(r.rate);
               const gradeLabel = r.rate >= 90 ? 'A' : r.rate >= 80 ? 'B' : r.rate >= 70 ? 'C' : 'D';
               return (
-                <div key={r.year} style={{
-                  flex: '1 0 140px', minWidth: 140, maxWidth: 200,
-                  border: `1.5px solid ${isCur ? 'var(--primary)' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-                }}>
-                  <div style={{
-                    background: isCur ? 'var(--primary)' : 'var(--surface2)',
-                    padding: '7px 10px', fontWeight: 700, fontSize: 13,
-                    color: isCur ? '#fff' : 'var(--text)',
-                  }}>
+                <article key={r.year} className={`history-year-card${isCur ? ' is-current' : ''}`}>
+                  <header className="history-year-heading">
                     {r.year}년{isCur && <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 4, opacity: .85 }}>(현재)</span>}
-                  </div>
+                  </header>
 
-                  <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text2)', marginBottom: 6 }}>{classLabel}</div>
+                  <div className="history-year-summary">
+                    <div className="history-year-class">{classLabel}</div>
                     {r.ck === null ? (
-                      <div style={{ fontSize: 11, color: 'var(--text3)' }}>데이터 없음</div>
+                      <div className="history-year-empty">데이터 없음</div>
                     ) : (
                       <>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <div className="history-year-grade">
                           <span style={{ padding: '2px 7px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: gc + '22', color: gc }}>
                             {gradeLabel}
                           </span>
                           <span style={{ fontSize: 14, fontWeight: 700, color: gc }}>{r.rate}%</span>
                         </div>
-                        <div style={{ fontSize: 10, color: 'var(--text3)' }}>
+                        <div className="history-year-totals">
                           출석 {r.present} · 결석 {r.absent} / {r.total}주
                         </div>
                       </>
                     )}
                   </div>
 
-                  <div style={{ padding: '8px 10px', display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  <div className="history-month-list">
                     {r.monthly.filter(m => m.sc > 0).map(m => {
                       const color = r.ck === null || m.sc === 0
                         ? 'var(--text3)'
@@ -361,7 +354,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
                       );
                     })}
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>

@@ -15,6 +15,7 @@ type Props = {
 export default function AttModal({ target, currentVal, onSelect, onClose }: Props) {
   const { state } = useApp();
   const { months, classData } = state;
+  const isTeacher = state.userRole?.role === 'teacher';
   const sheetRef = useRef<HTMLDivElement>(null);
   const initialOptionRef = useRef<HTMLButtonElement>(null);
 
@@ -27,10 +28,10 @@ export default function AttModal({ target, currentVal, onSelect, onClose }: Prop
   useModalFocus({ containerRef: sheetRef, initialFocusRef: initialOptionRef, onDismiss: onClose });
 
   return (
-    <div className="modal-overlay" onClick={onClose}
+    <div className={`modal-overlay${isTeacher ? ' teacher-attendance-modal' : ''}`} onClick={onClose}
       role="dialog" aria-modal="true" aria-label={`${student?.name} ${month}월 ${day}일 출석 입력`}>
       <div ref={sheetRef} className="modal-sheet" onClick={e => e.stopPropagation()} tabIndex={-1}>
-        <div className="modal-handle" />
+        <div className="modal-handle-area" aria-hidden="true"><div className="modal-handle" /></div>
         <div className="att-modal-header">
           <div className="modal-title">
             {student?.name} · {month}월 {day}일
