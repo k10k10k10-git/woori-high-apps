@@ -1,0 +1,38 @@
+name: 찬양팀 저장 계약
+on:
+  pull_request:
+    paths:
+      - "highschool-app/src/features/praise/**"
+      - "highschool-app/src/app/api/praise/**"
+      - "highschool-app/package*.json"
+      - "attendance-app/database.rules.json"
+      - "scripts/run-praise-contracts.mjs"
+      - ".github/workflows/praise-contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "highschool-app/src/features/praise/**"
+      - "highschool-app/src/app/api/praise/**"
+      - "highschool-app/package*.json"
+      - "attendance-app/database.rules.json"
+      - "scripts/run-praise-contracts.mjs"
+      - ".github/workflows/praise-contracts.yml"
+permissions:
+  contents: read
+jobs:
+  praise-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: highschool-app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --prefix highschool-app
+      - run: npm install --global firebase-tools@15.10.0
+      - run: node scripts/run-praise-contracts.mjs

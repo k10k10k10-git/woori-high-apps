@@ -120,6 +120,11 @@ npm run build
 
 ## 핵심 코드 패턴
 
+### 찬양팀의 원본 보호·버전·감사를 서버에서 함께 검증하기 (2026-09-06)
+- **접근법**: `src/features/praise/server/httpAuth.ts`에서 폐기 여부를 검증한 Firebase 토큰과 현재 역할 원장을 읽는다 → `commands.ts`의 순수 명령을 `repository.ts`의 단일 workspace transaction 안에서 재검증한다 → `node scripts/run-praise-contracts.mjs`로 cold cache, 빈 배열·null 복원, 다른 셀 동시 저장·같은 셀 충돌·중복 재시도를 실제 합성 RTDB에서 확인한다.
+- **판단 질문**: transaction 최초 null을 원장 부재로 즉시 처리하면 아직 읽지 않은 캐시를 실제 부재로 오인하므로 최초 서버 snapshot 구독을 유지한 뒤 시작한다. 광범위하게 읽히는 `semesters` 아래에 조별 출결을 넣지 않고, `praiseOps/{workspaceId}`를 서버 API에서 필요한 범위만 투영한다. 현행 default-deny Rules의 직접 접근 차단을 검사하며 새 클라이언트 허용을 추가하지 않는다.
+- **재사용 규칙**: 업무·감사·operationId를 한 원자 저장으로 유지하고 동일 내용 재시도는 같은 operationId를 쓴다. 통합 로그 투영은 고정 ID와 내용 일치를 검증한 뒤 완료 표시하며, 외부 historical 감사와 원장 시각을 오늘 사용자 행위로 바꾸지 않는다.
+
 ### 인증 응답 순서와 목록 갱신의 의미를 분리하기 (2026-09-05)
 - **접근법**: `src/context/AuthContext.render.test.tsx`에서 A·B 계정의 응답 순서를 뒤집고 로그아웃 뒤 응답을 재현한다 → 조회 시작 시 역할을 비우고 성공·실패에 요청 세대 검사를 둔다 → `src/features/semester/semesterSubscription.test.ts`에서 출석 100회 변경의 콜백 수를 비교해 동일한 학기 metadata 전달을 억제한다.
 - **판단 질문**: 역할 판정은 기존 `resolveMinistryRoles`와 자기조회 경로를 유지했다. 학기 루트 구독 분할은 DB 경로·소유권 설계가 필요하므로 화면 갱신 최적화와 함께 바꾸지 않았다.

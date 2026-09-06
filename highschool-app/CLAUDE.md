@@ -195,3 +195,15 @@
 - `canViewActivityLogs`는 마이페이지의 UI 가드다. 실제 조회는 `admins/{uid}` 플래그와 로그 Rules가 보호한다. 읽기 오류·계정 전환·늦은 응답은 이전 기록을 폐기한다.
 - 로그의 인증 UID와 서버 시각을 사람의 직접 조작 증거로 설명하지 않는다. 이전 값·과거 변경을 추측해 생성하지 않으며, 구버전/직접 DB 변경과 트랜잭션 후 별도 로그의 누락 한계를 표시한다.
 - 2026-09-06 사용자가 로그 Rules 추가와 운영 배포를 명시 승인했다. 원천 규칙을 검증·배포하고 라이브와 대조한 뒤 앱을 활성화한다. [운영·복구 계획](../docs/ACTIVITY_LOG_2026-09-06.md)을 따른다.
+
+
+## 찬양팀 서버 업무 경계 — 2026-09-06
+
+`/sunday-ministry/praise`는 `src/features/praise`의 다섯 업무 탭을 사용한다. `src/app/api/praise`의 Node 서버가 Firebase ID 토큰의 폐기 여부와 현재 두 축 역할을 확인하고, 조 담당 권한·revision·작업 ID를 검사한 뒤 `praiseOps/{workspaceId}`를 원자 갱신한다. 새 별도 Firebase 로그인 구독을 만들지 않는다.
+
+- `server/firebaseAdmin.ts`는 명시된 서버 전용 `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`만 받는다. 공개 환경변수·브라우저 번들·원본 export 도구에 키를 넣지 않는다. 서버 자격정보가 없으면 503으로 닫으며 권한 우회 fallback을 만들지 않는다.
+- 출결은 PRESENT/ABSENT이며 미입력은 null tombstone이다. 일반 담당자는 원본 출결을 담당 조 범위에서만 읽고 쓴다. `import-unresolved` 등 과거 조가 검증되지 않은 기록은 운영자만 확인한다. 등단 판정은 서버가 원장으로 수행한다.
+- 확정 조·등단은 새로운 불변 버전이다. 초안의 수정은 새 버전으로 저장하며, 같은 주일의 최신 확정본만 이후 등단 빈도 계산에 사용한다. 회차 날짜가 바뀌어도 과거 버전의 `worshipDate`를 다시 계산하지 않는다.
+- `server/roster.ts`는 기존 학기 배치·훈련 예외 계약을 재사용하고 신청키로 인물을 명시 연결한다. 원장 연락처·메모를 API에 복제하지 않는다. 기존 학생·스탭 원장에는 쓰지 않는다.
+- `node scripts/run-praise-contracts.mjs`는 저장소 루트에서 실행한다. 실제 운영 자격정보를 사용하지 않는 demo-praise RTDB 에뮬레이터 계약 검사이며 Java 21이 필요하다.
+- 실제 원본 이관·공통 출석 회차 전환은 [전달 절차](../docs/PRAISE_DATA_HANDOFF.md)에 따른다. 합성 테스트 통과를 실제 기록의 대조 완료로 표시하지 않는다.

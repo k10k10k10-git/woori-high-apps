@@ -195,3 +195,11 @@
 6. 삭제 시 같이 정리해야 할 데이터는 무엇인가?
 7. 민감정보인가? (`retreatsPrivate` 하위여야 하는가?)
 8. 이가드/행정/학생 앱 중 깨질 수 있는 화면은 어디인가?
+
+
+## 찬양팀 전용 원장 (2026-09-06 구현)
+
+- `praiseOps/{workspaceId}`는 통합 앱 찬양팀 서버 모듈만 쓴다. 앱 브라우저의 RTDB 직접 읽기·쓰기는 현행 default-deny Rules가 차단하며, Firebase Admin 서버 자격정보 설정 후 ID 토큰/현재 플랫폼 역할/찬양팀 담당 권한을 검증하는 API로만 이용한다.
+- 업무 원장·버전·작업 영수증·업무 감사는 같은 workspace transaction으로 저장한다. `activityLogs/events`는 고정 ID의 별도 투영이며 실패하면 원본 감사와 미반영 표시를 유지한다. GET·페이지 방문에서 재시도 쓰기를 하지 않는다.
+- `semesters/{id}/meta`, `teams`, `applications`는 연결 후보 조회에만 사용한다. 학생 `classes`·`attendance`·공식 스탭 원장은 수정하지 않는다. 학기 신청키·personId를 명시 선택하며 이름으로 병합하지 않는다. 기존 학기 출석과 동일 행사인지는 원본 이관 대조 후 확정할 사항이며 자동 동기화를 하지 않는다.
+- 원본 Supabase 보관본·민감 메모·파일·계정 대응표는 공개 API와 Git에 포함하지 않는다. 실제 운영 이관과 shadow→live 전환은 [데이터 전달 절차](docs/PRAISE_DATA_HANDOFF.md)의 백업·대조·승인 조건을 따른다.

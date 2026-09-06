@@ -1,0 +1,35 @@
+.body { padding: 0 0 16px; min-width: 0; }
+.filters { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 18px 0; }
+.filters > label:first-child { flex: 1 1 230px; }
+.filters > label { flex: 0 1 172px; }
+.count { margin: 12px 0; font-size: 13px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.scroll { width: 100%; overflow: auto; max-height: 560px; border-block: 1px solid var(--color-border); scrollbar-width: thin; scrollbar-color: var(--color-border-hover) transparent; }
+.scroll:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+.table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-size: 13px; }
+.table :is(th, td) { min-width: 152px; max-width: 240px; padding: 12px; border-bottom: 1px solid var(--color-border); vertical-align: top; overflow-wrap: anywhere; }
+.table thead th { position: sticky; top: 0; z-index: 1; background: var(--color-surface-hover); color: var(--color-text-secondary); font-weight: 600; }
+.table :is(th, td):first-child { position: sticky; left: 0; z-index: 1; min-width: 140px; background: var(--color-surface); }
+.table thead th:first-child { z-index: 2; background: var(--color-surface-hover); }
+.table :is(th, td):nth-child(2) { min-width: 82px; }
+.table small { display: block; font-size: 11px; color: var(--color-text-muted); font-weight: 400; margin-top: 5px; line-height: 1.5; }
+.table time, .total { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.staged { font-weight: 600; color: var(--color-text-primary); }
+.record { color: var(--color-text-secondary); }
+@media (max-width: 640px) {
+  .filters > label:first-child { flex-basis: 100%; }
+  .filters > label { flex: 1 1 120px; }
+  .filters > button { width: 100%; }
+  .scroll { max-height: 460px; }
+  .table :is(th, td) { min-width: 136px; padding: 10px; }
+  .table :is(th, td):first-child { min-width: 110px; max-width: 130px; }
+}
+:global([data-view-mode="mobile"]) .filters > label:first-child { flex-basis: 100%; }
+:global([data-view-mode="mobile"]) .filters > label { flex: 1 1 120px; }
+:global([data-view-mode="mobile"]) .filters > button { width: 100%; }
+.mobileServiceChoice.mobileServiceChoice { display: none; }
+:global([data-view-mode="mobile"]) .mobileServiceChoice { display: flex; }
+:global([data-view-mode="mobile"]) .inactiveService { display: none; }
+@media (max-width: 640px) {
+  :global(html:not([data-view-mode="desktop"])) .mobileServiceChoice { display: flex; }
+  :global(html:not([data-view-mode="desktop"])) .inactiveService { display: none; }
+}
