@@ -11,6 +11,7 @@ import {
   formatKoreanPhone,
   formatNewFriendGrade,
   koreaDateInputValue,
+  matchesNewFriendSearch,
   needsClassAssignment,
   NEW_FRIEND_FAITH_STEP_OPTIONS,
   NEW_FRIEND_INVITER_OPTIONS,
@@ -280,5 +281,42 @@ describe("출석부 반영 새친구 삭제 계획", () => {
         newFriendPrivate: { phone: "010-1111-2222" },
         createdBy: "통합관리자",
       });
+  });
+});
+
+describe("새친구 목록 검색", () => {
+  const target = friend({ name: "김 하늘", school: "우리High학교", owner: "이교사", part: "2부", grade: 2 });
+
+  it("이름 일부와 공백·영문 대소문자를 무시하고 검색한다", () => {
+    expect(matchesNewFriendSearch(target, " 김하늘 ")).toBe(true);
+    expect(matchesNewFriendSearch(target, "하늘")).toBe(true);
+    expect(matchesNewFriendSearch(target, "high")).toBe(true);
+    expect(matchesNewFriendSearch(target, "없는학생")).toBe(false);
+    expect(matchesNewFriendSearch(target, "   ")).toBe(true);
+  });
+
+  it("여러 조건은 같은 학생의 서로 다른 필드에서도 모두 일치해야 한다", () => {
+    expect(matchesNewFriendSearch(target, "2부 2학년 이교사")).toBe(true);
+    expect(matchesNewFriendSearch(target, "2부 1학년")).toBe(false);
+    expect(matchesNewFriendSearch(target, "하늘 다른학교")).toBe(false);
+  });
+
+  it("전달된 본인·보호자 연락처를 하이픈 유무와 무관하게 검색한다", () => {
+    const priv = { phone: "010-0000-1234", parentPhone: "01000005678" };
+    expect(matchesNewFriendSearch(target, "01000001234", priv)).toBe(true);
+    expect(matchesNewFriendSearch(target, "010-0000-5678", priv)).toBe(true);
+    expect(matchesNewFriendSearch(target, "하늘 5678", priv)).toBe(true);
+    expect(matchesNewFriendSearch(target, "5678")).toBe(false);
+  });
+
+  it("목록에 표시하지 않는 심방·가족 메모와 주소는 검색에 포함하지 않는다", () => {
+    expect(matchesNewFriendSearch(target, "민감내용", {
+      pastoralNotes: "민감내용", familyNotes: "민감내용", teamMemo: "민감내용", address: "민감내용",
+    })).toBe(false);
+  });
+
+  it("같은 ID의 다른 학생도 각각의 원본 정보로 검색한다", () => {
+    const other = friend({ name: "박바다", school: "새학교" });
+    expect([target, other].filter((item) => matchesNewFriendSearch(item, "바다"))).toEqual([other]);
   });
 });

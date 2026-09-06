@@ -77,6 +77,20 @@ export function formatNewFriendGrade(grade?: number): string {
   return grade && grade > 0 ? `${grade}학년` : "학년 미입력";
 }
 
+/** 목록에 보이는 정보만 검색한다. 연락처는 조회 권한이 있을 때만 호출자가 전달한다. */
+export function matchesNewFriendSearch(friend: NewFriend, query: string, priv?: NewFriendPrivate): boolean {
+  const normalize = (value?: string) => normalizedName((value ?? "").normalize("NFKC").replace(/[()-]/g, ""));
+  const terms = query.trim().split(/\s+/).map(normalize).filter(Boolean);
+  if (terms.length === 0) return true;
+  const fields = [
+    friend.name, friend.school, friend.owner, friend.part, formatNewFriendGrade(friend.grade),
+    friend.decision, formatClassLabel(friend.assignedClassKey), deriveNewFriendRosterProgress(friend),
+    newFriendRegisteredDate(friend), friend.week1Date, friend.week2Date,
+    priv?.phone, priv?.parentPhone,
+  ].map(normalize);
+  return terms.every((term) => fields.some((field) => field.includes(term)));
+}
+
 export function needsClassAssignment(friend: NewFriend): boolean {
   return Boolean(
     friend.week2Date
