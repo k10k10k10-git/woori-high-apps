@@ -11,6 +11,7 @@ import { useUI } from "@/context/UIContext";
 import { groupDisplayName } from "@/lib/groupNumber";
 import { parseClassKey } from "@/lib/classKey";
 import { buildOnSiteRoster, willUnregisterOnSite, OnSiteRosterPerson } from "@/lib/onSiteRoster";
+import { ActivityLogAfterCommitError } from "@/features/activityLog/write";
 
 type BuTab = "1부" | "2부";
 
@@ -197,8 +198,11 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
     setPendingKeys(prev => new Set(prev).add(onSiteKey));
     try {
       await toggleOnSiteCheckIn(retreat.id, onSiteKey, build);
-    } catch {
-      toast(`등록 처리 중 오류가 발생했습니다. 다시 시도해주세요.`, "error");
+    } catch (error) {
+      // 토글이 이미 적용된 뒤 로그만 실패했으면 재시도를 권해 등록을 다시 뒤집지 않는다.
+      toast(error instanceof ActivityLogAfterCommitError
+        ? error.message
+        : "등록 처리 중 오류가 발생했습니다. 다시 시도해주세요.", "error");
     } finally {
       setPendingKeys(prev => { const n = new Set(prev); n.delete(onSiteKey); return n; });
     }

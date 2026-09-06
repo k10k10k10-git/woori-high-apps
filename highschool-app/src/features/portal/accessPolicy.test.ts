@@ -12,6 +12,7 @@ import {
   canManageRolesOf,
   canManageRetreatPin,
   canManageSiteRequests,
+  canViewActivityLogs,
   canSeeSensitiveRetreat,
   hasAnyMinistryRole,
   isRetreatDowngrade,
@@ -34,6 +35,18 @@ import { SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 function roles(semester: SemesterRole, retreat: RetreatRole): MinistryRoles {
   return { semester, retreat };
 }
+
+describe("활동 로그 조회 권한", () => {
+  it("두 축 중 통합관리자 역할만 다른 계정의 기록을 열 수 있다", () => {
+    expect(canViewActivityLogs(roles("superAdmin", "none"))).toBe(true);
+    expect(canViewActivityLogs(roles("none", "superAdmin"))).toBe(true);
+    for (const semester of ASSIGNABLE_SEMESTER_ROLES.filter((role) => role !== "superAdmin")) {
+      for (const retreat of ASSIGNABLE_RETREAT_ROLES.filter((role) => role !== "superAdmin")) {
+        expect(canViewActivityLogs(roles(semester, retreat))).toBe(false);
+      }
+    }
+  });
+});
 
 // ─── 학기 축 ──────────────────────────────────────────────────
 // 합의한 권한표를 그대로 옮긴 것 — 이 표가 계약이다.

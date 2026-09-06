@@ -2,6 +2,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { Group, Student, IguardBus, IguardScheduleBlock, IguardAttendanceInfo, Participant, PartialAttendanceMap, TeacherAttendance } from "@/features/iguard/lib/types";
 import { clearIguardAttendance, updateIguardAttendance } from "@/features/iguard/lib/db";
+import { ActivityLogAfterCommitError } from "@/features/activityLog/write";
 import { printAsPDF } from "@/features/iguard/lib/exportUtils";
 import { escapeHtml } from "@/lib/exportUtils";
 import { useUI } from "@/context/UIContext";
@@ -182,7 +183,9 @@ export default function ChecklistView({ retreatId, groups, students, participant
     try {
       await updateIguardAttendance(retreatId, k, true, byName);
     } catch (e) {
-      toast(`체크 저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
+      toast(e instanceof ActivityLogAfterCommitError
+        ? e.message
+        : `체크 저장 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 

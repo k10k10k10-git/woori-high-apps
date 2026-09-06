@@ -1,4 +1,5 @@
-import { ref, get, set, update, push, onChildAdded, onChildRemoved, onValue } from "firebase/database";
+import { ref, get, push, onChildAdded, onChildRemoved, onValue } from "firebase/database";
+import { auditedSet as set, auditedUpdate as update } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { Retreat } from "../types";
 import { paths } from "../paths";

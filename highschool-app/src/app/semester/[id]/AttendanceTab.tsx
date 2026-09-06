@@ -138,7 +138,10 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   async function markAt(appKey: string, sessionId: string, status: AttendanceStatus) {
     setSaveState("saving");
     try {
-      await setAttendance(sid, scope, sessionId, appKey, status, user?.uid);
+      await setAttendance(sid, scope, sessionId, appKey, status, user?.uid, {
+        subjectName: applications.find((application) => application.id === appKey)?.name,
+        date: sessions.find((item) => item.id === sessionId)?.date,
+      });
       setSaveState("saved");
     } catch (e) {
       setSaveState("error");
@@ -149,7 +152,10 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   async function clearAt(appKey: string, sessionId: string) {
     setSaveState("saving");
     try {
-      await clearAttendance(sid, scope, sessionId, appKey);
+      await clearAttendance(sid, scope, sessionId, appKey, {
+        subjectName: applications.find((application) => application.id === appKey)?.name,
+        date: sessions.find((item) => item.id === sessionId)?.date,
+      });
       setSaveState("saved");
     } catch (error) {
       setSaveState("error");
