@@ -45,6 +45,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:coverage
       - run: npm run build
+      - run: node scripts/check-praise-runtime.mjs
       - run: npm run quality:lighthouse
       - uses: actions/upload-artifact@v4
         if: always()

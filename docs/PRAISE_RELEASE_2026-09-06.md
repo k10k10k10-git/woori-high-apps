@@ -42,10 +42,22 @@
 
 ## 배포 상태
 
-검증·PR 검토 진행 중. 아직 운영 배포, 운영 DB 쓰기, Rules 배포, 서비스 계정/IAM 변경, 원본 입력 중지, 실제 기록 이관을 실행하지 않았다. 배포 완료 시 Production Ready와 `/api/version`의 커밋 SHA를 확인해 이 항목을 갱신한다.
+[PR #20](https://github.com/k10k10k10-git/woori-high-apps/pull/20)을 Draft로 만들었다. 첫 코드 `61c27e4`의 일반 CI(lint/typecheck/coverage/build/Lighthouse)와 실제 RTDB 계약 CI는 통과했다. 인증 E2E는 기존 비어 있는 Playwright storage-state를 검사하는 가드에서 중단되어 미실행이며 가드를 바꾸지 않았다. 최초 Preview는 Ready와 buildId 일치를 확인했지만 실제 API에서 아래 런타임 호환 문제를 발견해 SDK 보완 미리보기를 다시 확인한다.
+
+운영에 필요한 서버 자격이 없어 병합·운영 활성화는 대기한다. 운영 DB 쓰기, Rules 배포, 서비스 계정/IAM 변경, 원본 입력 중지, 실제 기록 이관을 실행하지 않았다. 운영 `/api/version`은 기존 `68f7bef3c2b2c8adb16ca5455cbf57f1d1442426`을 유지했다. 후속 미리보기·CI 영수증은 로컬 `outputs/praise-integration-2026-09-06/`에 보존한다.
 
 
-## 부록: Firebase Admin 선택 의존성 UUID 보강 (2026-09-06)
+## Vercel 런타임 호환성 보완
+
+첫 미리보기 `61c27e4`는 build/Ready와 버전 조회는 성공했지만, `/api/praise`의 실제 비로그인 GET이 500으로 실패했다. Vercel 런타임 로그는 `jwks-rsa`가 ESM 전용 `jose`를 CommonJS require로 로드하다 `ERR_REQUIRE_ESM`으로 중단됐음을 보여줬다. 로컬 Node24는 require(ESM)을 지원해 기존 유닛 테스트와 로컬 서버에서는 드러나지 않았다.
+
+현재 의존성은 Firebase Admin **13.10.0**으로 정확히 고정했다. 공식 npm의 최신 13계열이며 실제 `jwks-rsa 3.2.2 / jose 4.15.9`로 CommonJS 로딩을 지원한다. 인증/역할 검사를 우회하거나 서버 키를 넣어 가리지 않았다. `node --no-experimental-require-module` 조건에서 실제 Admin/Auth/Database 로딩·초기화와 합성 RSA JWKS 공개키 변환을 확인했다. production 빌드를 시작해 비로그인 `/api/praise`가 JSON 401을 반환하는 `scripts/check-praise-runtime.mjs`를 CI에 추가했다. 이 검사는 인증정보를 보내거나 운영 DB에 쓰지 않는다.
+
+13계열의 선택 Firestore 의존성에서 추가된 `google-gax@4 → uuid 11.1.1` 범위 한정 override도 적용했다. 실제 makeUUID 호출 확인, 인증/저장소 회귀 54개 통과, 운영 의존성 audit 0건이다. 개발 의존성 포함 15건은 그대로 남아 있다. 아래 UUID 최초 검토는 14.3.0을 평가했던 과정의 기록이며 현재 사용하는 SDK 버전이 아니다.
+
+## 부록: 최초 Firebase Admin 14.3.0 선택 의존성 UUID 검토 (2026-09-06)
+
+다음 내용은 SDK 호환성 보완 이전의 조사 기록이다.
 
 찬양팀 서버는 firebase-admin 14.3.0의 app/auth/database 진입점만 사용한다. 이 세 진입점을 실제 Node 프로세스에서 로드한 모듈 그래프에 선택 의존성인 @google-cloud/storage·@google-cloud/firestore·uuid는 없었고, 인증 경로는 gaxios 7.3.1을 로드했다. 이는 현재 코드의 도달 경로 확인이며, 선택 패키지가 배포 산출물에 전혀 포함되지 않는다는 보장은 아니다.
 

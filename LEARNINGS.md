@@ -2,6 +2,10 @@
 
 > `extract-approach` 스킬이 채우는 파일. 앱 코드 패턴 교훈은 각 앱 CLAUDE.md에, 여기는 워크스페이스·도구·환경 교훈만.
 
+### Vercel Ready 뒤에도 신규 API의 실제 런타임을 확인한다 (2026-09-06)
+- **접근법**: Firebase Admin 14.3.0은 로컬 Node24와 Next build에서 통과했지만 Vercel의 CommonJS 로더가 jwks-rsa → ESM jose를 require하지 못해 API가 500을 반환했다. 실제 Preview GET과 런타임 로그로 원인을 찾고, `--no-experimental-require-module`로 같은 오류를 로컬 재현했다. CommonJS 호환 Admin 13.10.0으로 고정하고 관련 선택 의존성 audit와 실제 JWKS 공개키 변환을 검증했다.
+- **재사용 규칙**: 배포 Ready와 버전 조회만으로 신규 서버 기능의 성공을 판단하지 않는다. 운영 DB에 쓰지 않는 최소 API 요청으로 실제 응답을 확인하고, 발견한 런타임 조건을 production 서버 회귀 검사에 남긴다. `highschool-app/scripts/check-praise-runtime.mjs`가 해당 조건에서 실제 비로그인 401을 검사한다.
+
 ### 별도 작업 트리의 Next 빌드는 의존성 외부 연결을 거부할 수 있다 (2026-09-06)
 - **접근법**: 두 앱 검증에서 학생 앱 lint·typecheck·277개 테스트는 통과했지만 Turbopack이 `node_modules`의 외부 작업 트리 심볼릭 링크를 거부했다. 현재 작업에서 만든 링크인지 확인해 링크만 제거하고, 학생 앱 lockfile로 `npm ci`한 뒤 실패했던 build를 다시 실행해 통과했다.
 - **재사용 규칙**: 작업 트리 격리 시 각 앱의 의존성도 그 작업 트리 안에 설치한다. 기존 설치 대상이나 lockfile을 바꾸지 않으며, 환경 설치 문제를 앱 코드 실패로 보고하거나 빌드 경계를 넓혀 우회하지 않는다.
