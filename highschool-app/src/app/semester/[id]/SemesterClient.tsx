@@ -1,7 +1,7 @@
 "use client";
 
 // 훈련·사역팀 탭 라우터 + 공용 구독 단일 지점.
-// 주일 사역(행정·바나바)은 학기와 독립된 /sunday-ministry에서 관리한다.
+// 팀·주일 운영은 공통 학기 명단을 사용하되 /sunday-ministry에서 팀별 업무를 관리한다.
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "@phosphor-icons/react";
@@ -55,11 +55,31 @@ function tabLabel(tab: TabName): string {
   return tab === "신청" ? "신청 및 삭제" : tab;
 }
 
-function validInitialTab(value?: string): TabName {
+export function validInitialTab(value?: string): TabName {
   if (value === "수료") return "출석";
   return value && (SEMESTER_TRAINING_TABS as readonly string[]).includes(value)
     ? value as TabName
     : SEMESTER_TRAINING_TABS[0];
+}
+
+export function initialSemesterTab(value: string | undefined, isMobileView: boolean): TabName {
+  if (value === "수료" || (value && (SEMESTER_TRAINING_TABS as readonly string[]).includes(value))) {
+    return validInitialTab(value);
+  }
+  return value === undefined && isMobileView ? "출석" : SEMESTER_TRAINING_TABS[0];
+}
+
+/** 현재 주소의 다른 쿼리와 해시는 보존하고 선택한 학기 탭만 갱신한다. */
+export function semesterTabHref(tab: TabName, currentHref: string): string {
+  const url = new URL(currentHref, "https://example.invalid");
+  url.searchParams.set("tab", tab);
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** 뒤로가기·앞으로가기로 복원된 주소를 화면 탭 계약으로 해석한다. */
+export function semesterTabFromHref(currentHref: string, isMobileView: boolean): TabName {
+  const url = new URL(currentHref, "https://example.invalid");
+  return initialSemesterTab(url.searchParams.get("tab") ?? undefined, isMobileView);
 }
 
 export default function SemesterClient({ semesterId, initialTab }: { semesterId: string; initialTab?: string }) {
@@ -68,7 +88,9 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
   const { isMobileView } = useViewMode();
   const allowed = canAccessArea("semester", roles);
   const canEdit = canEditArea("semester", roles);
-  const [pickedTab, setPickedTab] = useState<TabName | null>(null);
+  const tabSource = `${semesterId}\u0000${initialTab ?? ""}`;
+  const [tabSelection, setTabSelection] = useState<{ source: string; tab: TabName | null }>(() => ({ source: tabSource, tab: null }));
+  const pickedTab = tabSelection.source === tabSource ? tabSelection.tab : null;
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
@@ -104,23 +126,39 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
     () => canEdit ? SEMESTER_TRAINING_TABS : SEMESTER_TRAINING_TABS.filter((name) => name !== "설정"),
     [canEdit],
   );
-  const defaultTab = isMobileView ? "출석" : validInitialTab(initialTab);
+  const defaultTab = initialSemesterTab(initialTab, isMobileView);
   const activeTab = pickedTab && visibleTabs.includes(pickedTab)
     ? pickedTab
     : visibleTabs.includes(defaultTab) ? defaultTab : visibleTabs[0];
   const mobileSection = mobileSectionOf(activeTab);
 
+  function selectTab(tab: TabName) {
+    setTabSelection({ source: tabSource, tab });
+    if (typeof window === "undefined") return;
+    const href = semesterTabHref(tab, window.location.href);
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (href !== current) window.history.pushState(null, "", href);
+  }
+
+  useEffect(() => {
+    const restoreTab = () => {
+      setTabSelection({ source: tabSource, tab: semesterTabFromHref(window.location.href, isMobileView) });
+    };
+    window.addEventListener("popstate", restoreTab);
+    return () => window.removeEventListener("popstate", restoreTab);
+  }, [isMobileView, tabSource]);
+
   function selectMobileSection(section: MobileSection) {
     if (section === "신청·배치") {
-      setPickedTab(activeTab === "신청" || activeTab === "배치" ? activeTab : "신청");
+      selectTab(activeTab === "신청" || activeTab === "배치" ? activeTab : "신청");
       return;
     }
     if (section === "운영") {
       const operatingTab = activeTab === "아카이브" || activeTab === "설정" ? activeTab : "아카이브";
-      setPickedTab(operatingTab === "설정" && !canEdit ? "아카이브" : operatingTab);
+      selectTab(operatingTab === "설정" && !canEdit ? "아카이브" : operatingTab);
       return;
     }
-    setPickedTab(section);
+    selectTab(section);
   }
 
   if (authLoading) return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
@@ -137,7 +175,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
             <div className="flex min-w-0 items-center gap-1.5 py-3 sm:gap-3">
               <button onClick={() => router.push("/semesters")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="학기 목록으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={14} /> 목록</button>
               <button onClick={() => router.push("/semesters")} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }} aria-label="학기 선택">{semesterId}</button>
-              <h1 className="min-w-0 flex-1 truncate text-xs font-bold text-white sm:text-base">{meta?.title ?? "학기 중 사역"}</h1>
+              <h1 className="min-w-0 flex-1 truncate text-xs font-bold text-white sm:text-base">{meta?.title ?? "학기 운영"}</h1>
               {!canEdit && <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">조회 전용</span>}
             </div>
           </div>
@@ -145,12 +183,12 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
         <div className="workspace-tabs">
           <div className="mx-auto max-w-6xl px-0 sm:px-4">
             {isMobileView ? (
-              <div className="mobile-workspace-tabs" role="tablist" aria-label="학기 중 사역 주요 업무">
+              <div className="mobile-workspace-tabs" role="tablist" aria-label="학기 운영 주요 업무">
                 {MOBILE_SECTIONS.map((section) => <button key={section} role="tab" aria-selected={mobileSection === section} aria-controls="tab-content-panel" onClick={() => selectMobileSection(section)}>{section}</button>)}
               </div>
             ) : (
               <div className="tab-scroll-container flex gap-0 overflow-x-auto scrollbar-hide" role="tablist" aria-label="훈련·사역팀 탭">
-                {visibleTabs.map((name) => <button key={name} role="tab" aria-selected={activeTab === name} aria-controls="tab-content-panel" onClick={() => setPickedTab(name)} className="workspace-tab">{tabLabel(name)}</button>)}
+                {visibleTabs.map((name) => <button key={name} role="tab" aria-selected={activeTab === name} aria-controls="tab-content-panel" onClick={() => selectTab(name)} className="workspace-tab">{tabLabel(name)}</button>)}
               </div>
             )}
           </div>
@@ -165,13 +203,13 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
           <>
         {isMobileView && mobileSection === "신청·배치" && (
           <div className="mobile-subtabs" role="tablist" aria-label="신청과 배치">
-            {(["신청", "배치"] as const).map((name) => <button key={name} role="tab" aria-selected={activeTab === name} onClick={() => setPickedTab(name)}>{name === "신청" ? "신청 및 삭제" : name}</button>)}
+            {(["신청", "배치"] as const).map((name) => <button key={name} role="tab" aria-selected={activeTab === name} onClick={() => selectTab(name)}>{name === "신청" ? "신청 및 삭제" : name}</button>)}
           </div>
         )}
         {isMobileView && mobileSection === "운영" && (
           <div className="mobile-subtabs" role="tablist" aria-label="학기 운영">
-            <button role="tab" aria-selected={activeTab === "아카이브"} onClick={() => setPickedTab("아카이브")}>자료 보관</button>
-            {canEdit && <button role="tab" aria-selected={activeTab === "설정"} onClick={() => setPickedTab("설정")}>학기 설정</button>}
+            <button role="tab" aria-selected={activeTab === "아카이브"} onClick={() => selectTab("아카이브")}>자료 보관</button>
+            {canEdit && <button role="tab" aria-selected={activeTab === "설정"} onClick={() => selectTab("설정")}>학기 설정</button>}
           </div>
         )}
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

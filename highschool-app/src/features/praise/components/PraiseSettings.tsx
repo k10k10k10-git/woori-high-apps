@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { listPraiseAccounts, listPraiseReferences } from "../api";
+import { personName, stampTime } from "./shared";
 import GuideContent from "../content/GuideContent";
 import { createFirstMeetingGuide } from "../content/templates";
 import type { PraiseGuideRole, PraiseGuideStep, PraiseMeetingGuide } from "../content/types";
-import { PRAISE_ROLE_LABELS, PRAISE_ROLE_OPTIONS, type PraiseCommand, type PraiseMeetingInput, type PraiseView } from "../types";
+import { PRAISE_ROLE_LABELS, PRAISE_ROLE_OPTIONS, type PraiseCommand, type PraiseMeetingInput, type PraisePendingAttendanceReview, type PraiseView } from "../types";
 
 type CommandOf<T extends PraiseCommand["type"]> = Extract<PraiseCommand, { type: T }>;
 type Draft<T> = { value: T; revision: number };
@@ -77,6 +78,43 @@ function GuideEditor({ content, change }: { content: PraiseMeetingGuide; change:
   </>;
 }
 
+function SharedAttendanceReviewRow({ review, view, disabled, resolve }: {
+  review: PraisePendingAttendanceReview;
+  view: PraiseView;
+  disabled: boolean;
+  resolve: (command: CommandOf<"attendance.resolve">) => Promise<void>;
+}) {
+  const [acknowledged, setAcknowledged] = useState(false);
+  const headingId = useId(), explanationId = useId();
+  const meeting = view.meetings.find((item) => item.id === review.meetingId);
+  const person = personName(view, review.personId);
+  const heading = `${meeting?.date ?? "모임일 확인 필요"} · ${meeting?.title ?? "연결된 모임 확인 필요"} · ${person}`;
+  const status = (value: PraisePendingAttendanceReview["status"]) => value === "PRESENT" ? "출석" : value === "ABSENT" ? "결석" : "미입력";
+  const action = review.canFinalize ? "감사 기록 완료" : "원장 변경 없이 요청 종료";
+  return <form className="praise-disclosure" aria-labelledby={headingId} aria-describedby={explanationId} onSubmit={(event) => {
+    event.preventDefault();
+    if (!acknowledged || disabled) return;
+    void resolve({ type: "attendance.resolve", pendingOperationId: review.operationId,
+      resolution: review.canFinalize ? "finalize" : "close", expectedSourceRevision: review.sourceRevision, acknowledge: true });
+  }}>
+    <h4 id={headingId} className="break-words">{heading}</h4>
+    <p className="praise-note">요청 시각: {Number.isFinite(review.requestedAt) && review.requestedAt > 0 ? stampTime(review.requestedAt) : "확인 필요"} (한국 시간)</p>
+    <div className="praise-toolbar">
+      <p><span className="praise-note">요청한 출석</span> <strong>{status(review.status)}</strong></p>
+      <p><span className="praise-note">현재 출석</span> <strong>{status(review.currentStatus)}</strong></p>
+      <p><span className="praise-note">저장 증거</span> <strong>{review.canFinalize ? "확인됨" : "확인되지 않음"}</strong></p>
+    </div>
+    <p className="praise-note" id={explanationId}>{review.canFinalize
+      ? "해당 요청이 저장된 증거가 있습니다. 현재 출석은 유지하고 원래 요청의 감사 기록을 완료합니다."
+      : "저장 성공을 확정할 증거가 없습니다. 현재 출석을 유지한 채 요청을 종료합니다. 출석 변경이 필요하면 종료 후 출석 화면에서 다시 입력해 주세요."}</p>
+    <div className="praise-save-bar">
+      <label className="praise-check min-h-11"><input type="checkbox" checked={acknowledged} disabled={disabled}
+        onChange={(event) => setAcknowledged(event.target.checked)} />현재 출석과 요청 내용을 확인했습니다.</label>
+      <button type="submit" className={review.canFinalize ? primaryClass : buttonClass} disabled={disabled || !acknowledged}>{action}</button>
+    </div>
+  </form>;
+}
+
 function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
   const [metaDraft, setMetaDraft] = useState<Draft<CommandOf<"meta.save">["meta"]> | null>(null);
   const [meetingDraft, setMeetingDraft] = useState<Draft<PraiseMeetingInput> | null>(null);
@@ -85,6 +123,8 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
   const [guideDraft, setGuideDraft] = useState<Draft<CommandOf<"guide.save">["guide"]> | null>(null);
   const [meetingSelection, setMeetingSelection] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingLock = useRef(false);
+  const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<AccountOption[]>([]);
@@ -133,7 +173,7 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
 
   async function save(event: FormEvent, command: PraiseCommand, done: () => void) {
     event.preventDefault();
-    if (!view.permissions.manage || disabled || (command.type !== "meta.save" && dataLocked)) return;
+    if (!view.permissions.manage || disabled || savingLock.current || (command.type !== "meta.save" && dataLocked)) return;
     if (command.type === "guide.save" && command.guide.published && (!command.guide.content.title || !command.guide.content.location || !command.guide.content.steps.length)) {
       setError("게시 전에 가이드 제목·나눔 장소·진행 순서를 입력해 주세요."); return;
     }
@@ -143,12 +183,31 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
     if (command.type === "access.save" && command.access.active && view.access.some((access) => access.active && access.staffId === command.access.staffId && access.uid !== command.access.uid)) {
       setError("이 스탭에는 다른 담당 계정이 연결되어 있습니다. 기존 연결을 먼저 확인해 주세요."); return;
     }
-    setSaving(true); setError(null); setNotice(null);
+    savingLock.current = true; setSaving(true); setError(null); setNotice(null);
     try {
       if (await execute(command)) { done(); setNotice("설정을 저장했습니다."); }
       else setError("저장하지 못했습니다. 입력 내용은 유지됩니다. 오류 내용을 확인한 뒤 다시 시도해 주세요.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : "저장하지 못했습니다. 다시 시도해 주세요."); }
-    finally { setSaving(false); }
+    finally { savingLock.current = false; setSaving(false); }
+  }
+  async function resolveAttendance(command: CommandOf<"attendance.resolve">) {
+    if (!view.permissions.manage || disabled || savingLock.current) return;
+    const current = view.pendingAttendance?.find((review) => review.operationId === command.pendingOperationId);
+    if (!current || current.sourceRevision !== command.expectedSourceRevision || current.canFinalize !== (command.resolution === "finalize")) {
+      setError("검토할 출석 상태가 변경됐습니다. 현재 내용을 다시 확인해 주세요."); return;
+    }
+    savingLock.current = true; setSaving(true); setError(null); setNotice(null);
+    try {
+      if (await execute(command)) {
+        setNotice(command.resolution === "finalize"
+          ? "저장 증거를 확인하고 원래 요청의 감사 기록을 완료했습니다. 현재 출석은 유지됩니다."
+          : "현재 출석을 변경하지 않고 요청을 종료했습니다.");
+        reviewHeadingRef.current?.focus();
+      }
+      else setError("검토 처리를 완료하지 못했습니다. 오류 안내와 현재 출석을 확인한 뒤 다시 시도해 주세요.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "검토 처리를 완료하지 못했습니다. 현재 출석을 확인한 뒤 다시 시도해 주세요.");
+    } finally { savingLock.current = false; setSaving(false); }
   }
   const clearMessage = () => { setError(null); setNotice(null); };
   function editGuide(template: boolean) {
@@ -162,11 +221,20 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
   return <div>
     {error && <p className="praise-note" role="alert">{error}</p>}
     {notice && <p className="praise-note" role="status">{notice}</p>}
-    <section className="praise-section" aria-label="학기 운영 설정">
-      <div className="praise-toolbar"><h3>학기 운영 설정</h3>{!metaDraft && <button type="button" className={buttonClass} disabled={disabled} onClick={() => { clearMessage(); const { name, startDate, endDate, status, mode, semesterId, teamId } = view.meta; setMetaDraft({ revision: view.meta.revision, value: { name, startDate, endDate, status, mode, semesterId: semesterId ?? "", teamId: teamId ?? "" } }); }}>학기 설정 편집</button>}</div>
+    <section className="praise-section" aria-label="공통 출석 저장 검토" aria-busy={saving}>
+      <div className="praise-section-heading"><div><h3 ref={reviewHeadingRef} tabIndex={-1}>공통 출석 저장 검토</h3><p>저장 결과가 불확실한 요청을 확인하고, 현재 출석을 유지하면서 처리합니다.</p></div><span className="praise-count">{view.pendingAttendance?.length ?? 0}건</span></div>
+      {!view.pendingAttendance?.length ? <p className="praise-note">검토 대기 중인 공통 출석 요청이 없습니다.</p> : <>
+        {view.pendingAttendance.length >= 50 && <p className="praise-note">먼저 접수된 요청부터 최대 50건을 표시합니다.</p>}
+        {view.pendingAttendance.map((review) => <SharedAttendanceReviewRow
+          key={`${review.operationId}:${review.sourceRevision}:${review.canFinalize}:${review.phase}:${review.status}:${review.currentStatus}`}
+          review={review} view={view} disabled={disabled} resolve={resolveAttendance} />)}
+      </>}
+    </section>
+    <section className="praise-section" aria-label="팀 운영 기간 설정">
+      <div className="praise-toolbar"><h3>팀 운영 기간 설정</h3>{!metaDraft && <button type="button" className={buttonClass} disabled={disabled} onClick={() => { clearMessage(); const { name, startDate, endDate, status, mode, semesterId, teamId } = view.meta; setMetaDraft({ revision: view.meta.revision, value: { name, startDate, endDate, status, mode, semesterId: semesterId ?? "", teamId: teamId ?? "" } }); }}>운영 기간 편집</button>}</div>
       {!metaDraft ? <p className="praise-note">{view.meta.name} · {view.meta.startDate} ~ {view.meta.endDate} · {view.meta.status === "active" ? "활성" : "보관"} · {{ setup: "준비", shadow: "비교 운영", live: "실운영" }[view.meta.mode]}</p> : <form onSubmit={(event) => save(event, { type: "meta.save", expectedRevision: metaDraft.revision, meta: { ...metaDraft.value, name: metaDraft.value.name.trim(), semesterId: metaDraft.value.semesterId?.trim() ?? "", teamId: metaDraft.value.teamId?.trim() ?? "" } }, () => setMetaDraft(null))}><fieldset disabled={disabled}>
         <div className="praise-form-grid">
-          <Field label="학기명"><input required value={metaDraft.value.name} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, name: event.target.value } })} /></Field>
+          <Field label="운영 이름"><input required value={metaDraft.value.name} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, name: event.target.value } })} /></Field>
           <Field label="시작일"><input type="date" required value={metaDraft.value.startDate} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, startDate: event.target.value } })} /></Field>
           <Field label="종료일"><input type="date" required min={metaDraft.value.startDate} value={metaDraft.value.endDate} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, endDate: event.target.value } })} /></Field>
           <Field label="연결 학기"><select disabled={hasLinkedMeetings || referencesLoading || !!referencesError} value={metaDraft.value.semesterId ?? ""} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, semesterId: event.target.value, teamId: "" } })}><option value="">{referencesLoading ? "학기를 불러오는 중…" : "학기 연결 안 함"}</option>{metaDraft.value.semesterId && !selectedSemester && <option value={metaDraft.value.semesterId}>기존 연결 학기</option>}{semesters.map((semester) => <option key={semester.id} value={semester.id}>{semester.title}{semester.startDate ? ` · ${semester.startDate}` : ""}</option>)}</select></Field>
@@ -174,15 +242,15 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
           <Field label="운영 모드"><select disabled={importModeLocked} value={metaDraft.value.mode} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, mode: event.target.value as typeof metaDraft.value.mode } })}><option value="setup">준비</option><option value="shadow">비교 운영</option><option value="live">실운영</option></select></Field>
         </div>
         {importModeLocked && <p className="praise-note">가져온 기록의 대조가 끝날 때까지 읽기 전용으로 유지됩니다.</p>}
-        <Check label="학기 활성" value={metaDraft.value.status === "active"} change={(active) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, status: active ? "active" : "archived" } })} />
+        <Check label="운영 기간 활성" value={metaDraft.value.status === "active"} change={(active) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, status: active ? "active" : "archived" } })} />
         <p className="praise-note">{hasLinkedMeetings ? "공통 출석에 연결된 회차가 있어 학기·사역팀 연결은 읽기 전용입니다." : "기존 학기와 사역팀을 선택해 연결합니다. 연결을 바꿔도 기존 명단이나 출석은 자동 변경되지 않습니다."}</p>
         {referencesError && <div className="praise-toolbar"><p className="praise-note" role="alert">{referencesError}</p><button type="button" className={buttonClass} onClick={() => setReferencesRetry((value) => value + 1)}>학기·사역팀 다시 불러오기</button></div>}
         {!referencesLoading && !referencesError && !semesters.length && <p className="praise-note">연결할 학기가 없습니다. 학기 사역에서 운영 학기를 먼저 등록해 주세요.</p>}
-        <Actions cancel={() => setMetaDraft(null)} saveLabel="학기 설정 저장" />
+        <Actions cancel={() => setMetaDraft(null)} saveLabel="운영 기간 저장" />
       </fieldset></form>}
     </section>
 
-    {dataLocked && <p className="praise-note" role="status">{view.meta.status === "archived" ? "보관된 학기입니다. 학기를 활성화한 뒤 아래 설정을 변경할 수 있습니다." : "비교 운영 중에는 아래 설정이 읽기 전용입니다. 학기 운영 모드를 전환한 뒤 변경할 수 있습니다."}</p>}
+    {dataLocked && <p className="praise-note" role="status">{view.meta.status === "archived" ? "보관된 운영 기간입니다. 운영 기간을 활성화한 뒤 아래 설정을 변경할 수 있습니다." : "비교 운영 중에는 아래 설정이 읽기 전용입니다. 팀 운영 모드를 전환한 뒤 변경할 수 있습니다."}</p>}
     <fieldset disabled={disabled || dataLocked}>
     <section className="praise-section" aria-label="회차 관리">
       <div className="praise-toolbar"><h3>회차 관리</h3><button type="button" className={buttonClass} disabled={disabled || !!meetingDraft} onClick={() => { clearMessage(); setMeetingDraft({ revision: 0, value: { id: newId("meeting"), date: view.meta.startDate, worshipDate: view.meta.startDate, sequence: Math.max(0, ...view.meetings.map((meeting) => meeting.sequence)) + 1, title: "", cancelled: false, temporary: false } }); }}>회차 추가</button></div>

@@ -14,7 +14,7 @@ export const PERSON_KIND_LABEL: Record<PersonKind, string> = {
 
 export type PersonRecord = {
   id: string;
-  category: "학적·출석" | "학기 중 사역" | "새친구" | "수련회";
+  category: "학적·출석" | "학기 운영" | "새친구" | "수련회";
   period: string;
   title: string;
   fields: PersonField[];
@@ -444,7 +444,7 @@ function buildSemesterEvidence(data: PeopleSearchData, output: Evidence[]) {
       const item = evidence({
         name: app.name, personId: app.personId, sourceId: sourceIdFor(kind, year, app.studentId, app.bu), phone: priv.phone, parentPhone: priv.parentPhone,
         kind, year, contextKey: `semester:${sid}`, anchor: true,
-        record: { id: `semester:${sid}:${appKey}`, category: "학기 중 사역", period: text(meta.title) || sid,
+        record: { id: `semester:${sid}:${appKey}`, category: "학기 운영", period: text(meta.title) || sid,
           title: [trainingName, teamName].filter(Boolean).join(" · ") || "사역 신청", fields: recordFields, sortKey: `${sid}-3`, private: Object.keys(priv).length > 0 },
       });
       if (item) output.push(item);

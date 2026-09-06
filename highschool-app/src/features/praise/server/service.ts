@@ -15,13 +15,30 @@ import {
   listWorkspaceIds,
   readWorkspace,
   transactWorkspace,
+  transactWorkspaceChecked,
 } from "./repository";
-import { praiseAccounts, validateSemesterLink } from "./references";
+import { praiseAccounts, praiseReferences, validateSemesterLink } from "./references";
 import { validatePraiseRosterLink } from "./roster";
 import { fingerprint } from "./stageModel";
 import { projectPraiseAudit } from "./projection";
 import { requireValue } from "./validation";
 import { praiseView } from "./view";
+import { assertSharedAttendanceCurrent, initialSharedSessions, loadSharedAttendance, overlaySharedAttendance } from "./sharedAttendance";
+import { executeSharedAttendance, pendingSharedAttendance, resolveSharedAttendance } from "./sharedAttendanceWrite";
+
+export async function createPraiseReferences(actor: PraiseActor) {
+  requireValue(canAdministerPraise(actor.roles), "찬양팀 운영 공간 개설 권한이 없습니다.", "forbidden", 403);
+  return { semesters: await praiseReferences() };
+}
+export async function readPraiseView(actor: PraiseActor, workspaceId: string) {
+  const state = await requireWorkspace(actor, workspaceId);
+  return resolvedPraiseView(state, actor);
+}
+
+async function resolvedPraiseView(state: PraiseState, actor: PraiseActor) {
+  const [shared, pending] = await Promise.all([loadSharedAttendance(state), pendingSharedAttendance(state, actor)]);
+  return praiseView(overlaySharedAttendance(state, shared), actor, shared.sources, pending);
+}
 
 export function requirePraiseAccess(actor: PraiseActor) {
   requireValue(
@@ -86,9 +103,14 @@ export async function createPraise(
     request.workspace.semesterId,
     request.workspace.teamId,
   );
+  const initialSessions = await initialSharedSessions(request.workspace.semesterId);
   const at = Date.now();
   const result = await transactWorkspace(request.workspace.id, (current) => {
-    if (!current) return createPraiseState(request, actor, at);
+    if (!current) {
+      const state = createPraiseState(request, actor, at);
+      for (const meeting of Object.values(state.meetings)) if (initialSessions[meeting.date]) meeting.linkedSessionId = initialSessions[meeting.date];
+      return state;
+    }
     const operation = current.operations[request.operationId];
     requireValue(
       operation?.actorUid === actor.uid &&
@@ -115,6 +137,17 @@ export async function executePraise(
 ) {
   const before = await requireWorkspace(actor, workspaceId);
   const { command } = request;
+  if (command.type === "attendance.resolve") {
+    const result = await resolveSharedAttendance(actor, before, command, request.operationId);
+    const logPending = await projectPraiseAudit(result);
+    return { view: await resolvedPraiseView(result, actor), logPending };
+  }
+  if (command.type === "attendance.set" && (before.meetings[command.meetingId]?.linkedSessionId || before.operations[request.operationId]?.sharedAttendance)) {
+    const shared = await loadSharedAttendance(before);
+    const result = await executeSharedAttendance(actor, before, command, request.operationId, shared);
+    const logPending = await projectPraiseAudit(result);
+    return { view: await resolvedPraiseView(result, actor), logPending };
+  }
   if (command.type === "person.save") {
     requireValue(
       praisePermissions(actor, before).manage,
@@ -153,16 +186,24 @@ export async function executePraise(
       );
     }
   }
+  const stageShared = command.type.startsWith("stage.") ? await loadSharedAttendance(before) : null;
   const at = Date.now();
-  const result = await transactWorkspace(workspaceId, (current) => {
+  const updateWorkspace = (current: PraiseState | null) => {
     requireValue(
       current,
       "운영 공간이 삭제되었습니다. 목록을 새로고침해 주세요.",
       "not_found",
       404,
     );
-    return applyPraiseCommand(current, command, actor, at, request.operationId);
-  });
+    const stageAttendance = stageShared ? overlaySharedAttendance(current, stageShared).attendance : undefined;
+    return applyPraiseCommand(current, command, actor, at, request.operationId, { stageAttendance });
+  };
+  const result = stageShared && (command.type === "stage.generate" || command.type === "stage.save" || command.type === "stage.confirm")
+    ? await transactWorkspaceChecked(workspaceId, updateWorkspace, async (current) => {
+        requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
+        await assertSharedAttendanceCurrent(current, stageShared, command.meetingId);
+      })
+    : await transactWorkspace(workspaceId, updateWorkspace);
   requireValue(
     result,
     "저장 결과를 확인하지 못했습니다. 같은 작업을 다시 시도해 주세요.",
@@ -170,5 +211,5 @@ export async function executePraise(
     503,
   );
   const logPending = await projectPraiseAudit(result);
-  return { view: praiseView(result, actor), logPending };
+  return { view: await resolvedPraiseView(result, actor), logPending };
 }

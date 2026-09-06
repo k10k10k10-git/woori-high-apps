@@ -381,9 +381,17 @@ export function parseCommand(value: unknown): {
         acknowledgeWarnings: bool(p.acknowledgeWarnings, "경고 확인"),
       };
       break;
+    case "attendance.resolve":
+      requireValue(p.acknowledge === true, "현재 공통 출석을 검토한 뒤 확인해 주세요.");
+      requireValue(typeof p.expectedSourceRevision === "string" && /^[a-f0-9]{64}$/.test(p.expectedSourceRevision), "공통 출석 버전을 확인해 주세요.");
+      command = { type, pendingOperationId: operationKey(p.pendingOperationId), resolution: choice(p.resolution, ["finalize", "close"] as const, "검토 처리"), expectedSourceRevision: p.expectedSourceRevision, acknowledge: true };
+      break;
     case "attendance.set":
+      if (p.expectedSourceRevision !== undefined)
+        requireValue(typeof p.expectedSourceRevision === "string" && /^[a-f0-9]{64}$/.test(p.expectedSourceRevision), "공통 출석 버전을 확인해 주세요.");
       command = {
         type,
+        ...(p.expectedSourceRevision !== undefined ? { expectedSourceRevision: p.expectedSourceRevision as string } : {}),
         meetingId: meetingId(),
         personId: id(p.personId),
         status:

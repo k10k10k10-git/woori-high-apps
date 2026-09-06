@@ -2,11 +2,13 @@ import type { Semester } from "@/features/semester/types";
 import type { Retreat } from "@/lib/types";
 import {
   canAccessArea,
+  canAccessSundayTeam,
+  ownSundayTeam,
   iguardScopeOf,
   retreatEntryHref,
   type MinistryRoles,
 } from "./accessPolicy";
-import { IGUARD_VIEW_GROUPS, RETREAT_TAB_GROUPS, SEMESTER_TABS, SUNDAY_MINISTRY_TABS } from "./featureCatalog";
+import { IGUARD_VIEW_GROUPS, MINISTRY_AREA_LABELS, RETREAT_TAB_GROUPS, SEMESTER_TABS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 export type PortalSearchItem = {
   id: string;
@@ -66,7 +68,7 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
   if (canAccessArea("semester", roles)) {
     items.push({
       id: "semester-home",
-      label: "학기 중 사역",
+      label: MINISTRY_AREA_LABELS.semester,
       description: "훈련·사역팀 운영",
       href: "/semesters",
       keywords: SEMESTER_TABS.join(" "),
@@ -82,14 +84,11 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
         area: "semester",
       });
     }
-    items.push({
-      id: "sunday-ministry",
-      label: "주일 사역",
-      description: "행정·바나바 · 새친구와 등록·행정 변동 관리",
-      href: "/sunday-ministry",
-      keywords: SUNDAY_MINISTRY_TABS.join(" "),
-      area: "sunday",
-    });
+  }
+  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, roles));
+  if (sundayTeams.length > 0) {
+    const ownTeam = ownSundayTeam(roles);
+    items.push({ id: "sunday-ministry", label: MINISTRY_AREA_LABELS.sunday, description: sundayTeams.map((team) => team.label).join(" · "), href: ownTeam ? sundayTeamHref(ownTeam) : "/sunday-ministry", keywords: `주일 사역 ${sundayTeams.flatMap((team) => team.tabs).join(" ")}`, area: "sunday" });
   }
 
   const adminAllowed = canAccessArea("retreat-admin", roles);

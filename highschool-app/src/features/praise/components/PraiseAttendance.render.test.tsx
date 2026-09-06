@@ -50,6 +50,30 @@ describe("찬양팀 출결 권한과 명시 입력", () => {
     fireEvent.click(within(group).getByRole("button", { name: "출석" }));
     expect(execute).toHaveBeenCalledWith({ type: "attendance.set", meetingId: "meeting-1", personId: "student-1", status: "PRESENT", expectedRevision: 0 });
   });
+  it("연결된 모임은 공통 학기 원장을 같은 화면에서 수정하고 연결이 깨진 학생은 잠근다", () => {
+    const view = praiseFixture();
+    const sourceRevision = "a".repeat(64);
+    view.meetings[0].linkedSessionId = "semester-session";
+    view.attendance = { "meeting-1": { "student-1": { revision: 7, updatedAt: 1000, updatedBy: "actor", groupVersionId: "groups-1", status: "PRESENT", originalStatus: "LATE" } } };
+    view.attendanceSources = { "meeting-1": {
+      "student-1": { source: "semester", mapping: "linked", writable: true, revision: sourceRevision, originalStatus: "지각" },
+      "student-2": { source: "praise", mapping: "invalid", writable: false },
+    } };
+    const execute = vi.fn();
+    render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+    expect(screen.getByText(/학기 운영과 이 화면에서 같은 기록/)).toBeInTheDocument();
+    expect(screen.getByText("공통 학기 원장")).toBeInTheDocument();
+    expect(screen.getByText("기존 지각 기록 · 출석으로 표시")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("group", { name: "합성학생가 출결" })).getByRole("button", { name: "결석" }));
+    expect(execute).toHaveBeenCalledWith({ type: "attendance.set", meetingId: "meeting-1", personId: "student-1", status: "ABSENT", expectedRevision: 7, expectedSourceRevision: sourceRevision });
+    const invalidRow = screen.getByText("학기 연결 확인 필요").closest("article");
+    expect(invalidRow).not.toBeNull();
+    expect(within(invalidRow!).getByText(/학기·회차·명단 연결을 확인해 주세요/)).toBeInTheDocument();
+    expect(within(invalidRow!).queryByText("아직 입력하지 않았습니다")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "합성학생나 출결" })).getByRole("button", { name: "출석" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "스탭" }));
+    expect(screen.queryByText(/학기 운영과 이 화면에서 같은 기록/)).not.toBeInTheDocument();
+  });
   it("조 담당자와 등단 담당자는 자신의 조 출결만 보고 수정한다", () => {
     const view = praiseFixture(); view.permissions = { ...view.permissions, manage: false, stageEdit: false, attendanceAll: false, role: "groupStaff" };
     const execute = vi.fn(); const { rerender } = render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
@@ -77,6 +101,41 @@ describe("찬양팀 출결 권한과 명시 입력", () => {
     rerender(<PraiseAttendance view={view} meeting={{ ...view.meetings[0], cancelled: true }} execute={execute} busy={false} />);
     expect(within(screen.getByRole("group", { name: "합성스탭나 출결" })).getByRole("button", { name: "출석" })).not.toBeDisabled();
   });
+});
+
+it("shadow의 연결 표식은 공통 원장을 실시간으로 쓰는 안내 대신 원본 대조로 표시한다", () => {
+  const view = praiseFixture(); view.meta.mode = "shadow"; view.meetings[0].linkedSessionId = "shared-session";
+  view.attendanceSources = { "meeting-1": { "student-1": { source: "praise", mapping: "shadow", writable: false } } };
+  view.attendance = { "meeting-1": { "student-1": { status: "PRESENT", groupVersionId: "groups-1", revision: 1, updatedAt: 1000, updatedBy: "supabase:synthetic-source" } } };
+  const execute = vi.fn();
+  render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+  expect(screen.getByText(/원본 대조용 출결입니다/)).toBeInTheDocument();
+  expect(screen.queryByText(/학기 운영과 이 화면에서 같은 기록/)).not.toBeInTheDocument();
+  expect(screen.queryByText("공통 학기 원장")).not.toBeInTheDocument();
+  const row = screen.getByRole("group", { name: "합성학생가 출결" });
+  expect(within(row).getByRole("button", { name: "출석" })).toHaveAttribute("aria-pressed", "true");
+  expect(within(row).getByRole("button", { name: "결석" })).toBeDisabled();
+  expect(screen.getByText(/외부 사이트 기록/)).toBeInTheDocument();
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it("휴강·취소 등으로 무효인 공통 연결은 모임과 전체 표 모두 미입력에서 제외한다", () => {
+  const view = praiseFixture(); view.meetings[0].linkedSessionId = "shared-session";
+  view.attendance = { "meeting-1": { "student-1": { status: null, groupVersionId: "groups-1", revision: 0, updatedAt: 0, updatedBy: "" } } };
+  view.attendanceSources = { "meeting-1": { "student-1": { source: "praise", mapping: "invalid", writable: false }, "student-2": { source: "semester", mapping: "linked", writable: true } } };
+  const execute = vi.fn(); render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+  expect(screen.getByRole("button", { name: "합성학생가 학기 연결 확인 필요" })).toBeDisabled();
+  fireEvent.click(screen.getByLabelText("미입력만 보기"));
+  expect(screen.queryByRole("group", { name: "합성학생가 출결" })).not.toBeInTheDocument();
+  expect(screen.getByRole("group", { name: "합성학생나 출결" })).toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("미입력만 보기"));
+  fireEvent.click(screen.getByRole("button", { name: "학기 전체 표" }));
+  const row = screen.getByRole("row", { name: /합성학생가/ });
+  expect(within(row).getByText("연결 확인 필요")).toBeInTheDocument();
+  expect(within(row).queryByText("미입력")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText("미입력만 보기"));
+  expect(screen.queryByRole("row", { name: /합성학생가/ })).not.toBeInTheDocument();
+  expect(execute).not.toHaveBeenCalled();
 });
 
 function semesterFixture() {

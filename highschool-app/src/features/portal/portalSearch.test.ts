@@ -10,7 +10,7 @@ describe("portal search", () => {
     expect(items.some((item) => item.id === "retreat-home")).toBe(false);
     expect(items.some((item) => item.id === "field-home")).toBe(true);
     expect(items.some((item) => item.id === "semester-home")).toBe(true);
-    expect(items.some((item) => item.id === "sunday-ministry")).toBe(true);
+    expect(items.some((item) => item.id === "sunday-ministry")).toBe(false);
   });
 
   it("이가드팀에게 학기 항목은 감추고 행정은 조회용으로 남긴다", () => {
@@ -28,4 +28,12 @@ describe("portal search", () => {
     expect(filterPortalSearchItems(items, "목양").map((item) => item.id)).toContain("ministry-guide");
     expect(filterPortalSearchItems(items, "진행안").map((item) => item.id)).toContain("program-home");
   });
+});
+
+it("찬양팀 검색은 자기 팀으로 이동하고 다른 팀의 업무를 검색어로 노출하지 않는다", () => {
+  const items = buildPortalSearchItems({ roles: { semester: "praise", retreat: "none" }, semesters, retreats });
+  const sunday = items.find((item) => item.id === "sunday-ministry");
+  expect(sunday).toMatchObject({ label: "팀·주일 운영", href: "/sunday-ministry/praise" });
+  expect(sunday?.keywords).toContain("등단");
+  expect(sunday?.keywords).not.toContain("새친구");
 });

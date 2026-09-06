@@ -44,7 +44,7 @@ describe("인물 통합검색", () => {
   it("같은 식별자의 연도별 학적·사역·수련회 기록을 한 사람으로 연결한다", () => {
     const profiles = buildPeopleProfiles(fixture());
     const target = profiles.find((profile) => profile.records.some((record) => record.title.includes("기초훈련")));
-    expect(target?.records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 중 사역", "수련회"]));
+    expect(target?.records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 운영", "수련회"]));
     expect(target?.records.some((record) => record.fields.some((item) => item.value.includes("출석 2 · 결석 1")))).toBe(true);
     expect(target?.records.some((record) => record.fields.some((item) => item.value.includes("출석 1 · 지각 1 · 결석 0")))).toBe(true);
     expect(target?.records.some((record) => record.title === "단체티")).toBe(true);
@@ -56,7 +56,7 @@ describe("인물 통합검색", () => {
     const groups = groupPersonRecordsByYear(target?.records ?? []);
 
     expect(groups.map((group) => group.label)).toEqual(["2026년", "2025년"]);
-    expect(groups[0].records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 중 사역", "수련회"]));
+    expect(groups[0].records.map((record) => record.category)).toEqual(expect.arrayContaining(["학적·출석", "학기 운영", "수련회"]));
     expect(groups[1].records.every((record) => record.period.includes("2025"))).toBe(true);
   });
 

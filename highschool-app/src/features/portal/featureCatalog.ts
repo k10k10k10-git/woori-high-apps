@@ -1,3 +1,5 @@
+export const MINISTRY_AREA_LABELS = { semester: "학기 운영", sunday: "팀·주일 운영" } as const;
+
 export const SEMESTER_TRAINING_TABS = [
   "신청",
   "배치",

@@ -85,7 +85,7 @@ export default function SemestersPage() {
   if (!user) {
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
-        <h1 className="text-2xl font-bold">학기 중 사역</h1>
+        <h1 className="text-2xl font-bold">학기 운영</h1>
         <p className="text-sm text-slate-500">분당우리교회 고등부 · 훈련·사역팀 관리</p>
         <LoginButton signIn={signIn} />
       </main>

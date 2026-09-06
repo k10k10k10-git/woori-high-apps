@@ -117,3 +117,17 @@ describe("전역 헤더 마이페이지 진입", () => {
     expect(await openMyPage()).toHaveTextContent("dashboard");
   });
 });
+
+it("학기와 팀 운영을 구분하고 팀 접근 권한이 없는 스탭에게 빈 메뉴를 숨긴다", () => {
+  state.auth.roles = { semester: "staff", retreat: "none" };
+  render(<GlobalPortalHeader />);
+  expect(screen.getByRole("link", { name: "학기 운영" })).toHaveAttribute("href", "/semesters");
+  expect(screen.queryByRole("button", { name: "팀·주일 운영" })).not.toBeInTheDocument();
+});
+it("찬양팀 사용자는 팀 운영 메뉴에서 자기 팀에만 진입한다", () => {
+  state.auth.roles = { semester: "praise", retreat: "none" };
+  render(<GlobalPortalHeader />);
+  fireEvent.click(screen.getByRole("button", { name: "팀·주일 운영" }));
+  expect(screen.getByRole("link", { name: /찬양팀 모임/ })).toHaveAttribute("href", "/sunday-ministry/praise");
+  expect(screen.queryByRole("link", { name: /바나바팀/ })).not.toBeInTheDocument();
+});

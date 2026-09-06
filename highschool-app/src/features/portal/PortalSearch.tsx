@@ -10,7 +10,7 @@ import { subscribePeopleSearchData } from "./peopleSearchDb";
 
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
   "학적·출석": "bg-blue-50 text-blue-700",
-  "학기 중 사역": "bg-emerald-50 text-emerald-700",
+  "학기 운영": "bg-emerald-50 text-emerald-700",
   "새친구": "bg-amber-50 text-amber-700",
   "수련회": "bg-violet-50 text-violet-700",
 };

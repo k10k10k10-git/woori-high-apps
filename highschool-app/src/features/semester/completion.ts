@@ -1,4 +1,4 @@
-// 수료 판정 순수 로직 — 시트의 "출석 2 / 지각 1 / 결석 0" 규칙을 그대로 계승.
+// 수료 판정 순수 로직 — 현재 입력은 출석/결석만 허용하고, 남아 있는 지각은 출석으로 본다.
 // 수료 여부는 DB에 저장하지 않고 항상 이 함수로 계산한다(이중 원장 방지).
 
 import {
@@ -11,9 +11,19 @@ import {
 
 export const SCORE: Record<AttendanceStatus, number> = {
   출석: 2,
-  지각: 1,
+  지각: 2,
   결석: 0,
 };
+
+export type EditableAttendanceStatus = Exclude<AttendanceStatus, "지각">;
+
+/** 새 기록에서 선택할 수 있는 상태. `지각`은 레거시 조회 호환에만 남긴다. */
+export const EDITABLE_ATTENDANCE_STATUSES = ["출석", "결석"] as const satisfies readonly EditableAttendanceStatus[];
+
+/** 기존 지각 레코드를 현재의 출석/결석 계약으로 표시하고 계산한다. */
+export function normalizeAttendanceStatus(status: AttendanceStatus): EditableAttendanceStatus {
+  return status === "지각" ? "출석" : status;
+}
 
 export interface CompletionResult {
   score: number; // 획득 점수
@@ -39,8 +49,8 @@ export function calcCompletion(
   let score = 0;
   for (const sess of regs) {
     const entry = attendanceBySession[sess.id]?.[appKey];
-    if (entry) score += SCORE[entry.s] ?? 0;
-    // 미기록 = 0점 (시트의 "결석 미표시"와 동일 취급)
+    if (entry) score += SCORE[normalizeAttendanceStatus(entry.s)];
+    // 미기록과 결석은 모두 0점이지만 원장 상태와 화면 표시는 서로 구분한다.
   }
   const rate = maxScore > 0 ? score / maxScore : 0;
   return {
