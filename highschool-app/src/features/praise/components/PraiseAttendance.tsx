@@ -5,9 +5,12 @@ import { canEditViewAttendance, canReadPraiseStudentAttendance } from "../permis
 import { PraiseAuditList } from "./PraiseAuditList";
 import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseDataWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
 
-type AttendanceProps = PraiseMeetingProps & { onSelectMeeting?: (meetingId: string) => void };
+type AttendanceProps = PraiseMeetingProps & {
+  onSelectMeeting?: (meetingId: string) => void;
+  onEditPerson?: (personId: string) => void;
+};
 
-export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting }: AttendanceProps) {
+export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting, onEditPerson }: AttendanceProps) {
   const [display, setDisplay] = useState<"meeting" | "semester">("meeting");
   const [query, setQuery] = useState("");
   const [groupId, setGroupId] = useState("");
@@ -76,7 +79,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
         ? execute({ type: "attendance.set", meetingId: meeting.id, personId: person.id, status: next, expectedRevision: record?.revision ?? 0, ...(source?.mapping === "linked" && source.revision ? { expectedSourceRevision: source.revision } : {}) })
         : execute({ type: "availability.set", meetingId: meeting.id, personId: person.id, present: next === null ? null : next === "PRESENT", role: available?.role ?? (person.singerCapable ? "SINGER" : "SESSION"), expectedRevision: available?.revision ?? 0 });
       return <article className="praise-attendance-row" key={person.id}>
-        <div className="praise-person-heading"><strong>{person.name}</strong><span>{kind === "STUDENT" ? `${person.grade}학년 · ${person.team === "SINGER" ? "싱어" : "세션"}` : "스탭"}{group ? ` · ${group.name}` : unresolvedGroup ? " · 과거 조 확인 필요" : " · 조 미배정"}</span>{record?.originalStatus === "LATE" && <small>기존 지각 기록 · 출석으로 표시</small>}{kind === "STUDENT" && meeting.linkedSessionId && <small>{view.meta.mode === "shadow" || source?.mapping === "shadow" ? "원본 대조용 기록" : source?.mapping === "linked" ? "공통 학기 원장" : invalidShared ? "학기 연결 확인 필요" : "학기 명단 연결 필요"}</small>}</div>
+        <div className="praise-person-heading"><div className="praise-person-title"><strong>{person.name}</strong>{view.permissions.manage && onEditPerson && <button type="button" className="praise-text-button praise-person-edit" disabled={busy} aria-label={`${person.name} 세부 정보 수정`} onClick={() => onEditPerson(person.id)}>정보 수정</button>}</div><span>{kind === "STUDENT" ? `${person.grade}학년 · ${person.team === "SINGER" ? "싱어" : "세션"}` : "스탭"}{group ? ` · ${group.name}` : unresolvedGroup ? " · 과거 조 확인 필요" : " · 조 미배정"}</span>{record?.originalStatus === "LATE" && <small>기존 지각 기록 · 출석으로 표시</small>}{kind === "STUDENT" && meeting.linkedSessionId && <small>{view.meta.mode === "shadow" || source?.mapping === "shadow" ? "원본 대조용 기록" : source?.mapping === "linked" ? "공통 학기 원장" : invalidShared ? "학기 연결 확인 필요" : "학기 명단 연결 필요"}</small>}</div>
         <div className="praise-row-actions"><div className="praise-status-buttons" role="group" aria-label={`${person.name} 출결`}>
           <button type="button" aria-pressed={status === "PRESENT"} disabled={busy || !canEdit || status === "PRESENT"} onClick={() => { void setStatus("PRESENT"); }}>출석</button>
           <button type="button" aria-pressed={status === "ABSENT"} disabled={busy || !canEdit || status === "ABSENT"} onClick={() => { void setStatus("ABSENT"); }}>결석</button>

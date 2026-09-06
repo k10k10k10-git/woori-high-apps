@@ -37,7 +37,7 @@ export function praiseActivityRecord(
           ? { after: String(change.after).slice(0, 160) }
           : {}),
       })),
-    changedCount: event.changes.length,
+    changedCount: Math.max(event.changes.length, event.changedCount ?? 0),
   });
 }
 

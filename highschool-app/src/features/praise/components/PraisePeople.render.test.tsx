@@ -11,9 +11,9 @@ const loadRoster = vi.mocked(listPraiseRoster);
 type RosterResult = Awaited<ReturnType<typeof listPraiseRoster>>;
 function sourceRoster(): RosterResult {
   return { semesterHref: "/semester/2026-autumn?tab=%EB%B0%B0%EC%B9%98", people: [
-    { applicationKey: "second-student", kind: "STUDENT", name: "합성연결학생", grade: 2, department: "SECOND", rosterLink: { applicationKey: "second-student", personId: "person-source-a", studentId: "source-a", year: "2026", classKey: "2-2-1" } },
-    { applicationKey: "first-student", kind: "STUDENT", name: "합성연결학생", grade: 1, department: "FIRST", rosterLink: { applicationKey: "first-student", studentId: "source-b", year: "2026", classKey: "1-1-1" } },
-    { applicationKey: "staff-source", kind: "STAFF", name: "합성연결스탭", grade: 0, department: "FIRST", rosterLink: { applicationKey: "staff-source", staffId: "source-staff", year: "2026" } },
+    { applicationKey: "second-student", kind: "STUDENT", name: "합성연결학생", grade: 2, department: "SECOND", rosterLink: { applicationKey: "second-student", personId: "person_student_source_a", studentId: "source-a", year: "2026", classKey: "2-2-1" } },
+    { applicationKey: "first-student", kind: "STUDENT", name: "합성연결학생", grade: 1, department: "FIRST", rosterLink: { applicationKey: "first-student", personId: "person_student_source_b", studentId: "source-b", year: "2026", classKey: "1-1-1" } },
+    { applicationKey: "staff-source", kind: "STAFF", name: "합성연결스탭", grade: 0, department: "FIRST", rosterLink: { applicationKey: "staff-source", personId: "person_staff_source", staffId: "source-staff", year: "2026" } },
   ] };
 }
 function setup(view: PraiseView = praiseFixture(), execute = vi.fn().mockResolvedValue(true), busy = false) {
@@ -166,6 +166,7 @@ describe("찬양팀 기존 학기 명단 연결", () => {
   it("저장 중에는 입력·닫기·팀원 전환·중복 저장을 모두 잠근다", async () => {
     const request = deferred<boolean>(); const execute = vi.fn().mockReturnValue(request.promise);
     setup(praiseFixture(), execute); fireEvent.click(screen.getByRole("button", { name: "합성학생가" })); await loaded();
+    fireEvent.change(screen.getByLabelText("파트", { exact: true }), { target: { value: "SESSION" } });
     fireEvent.click(screen.getByRole("button", { name: "팀원 저장" }));
     expect(screen.getByLabelText("이름", { exact: true })).toBeDisabled();
     expect(screen.getByLabelText("파트", { exact: true })).toBeDisabled();
@@ -177,6 +178,19 @@ describe("찬양팀 기존 학기 명단 연결", () => {
     await act(async () => request.resolve(false));
     expect(screen.getByLabelText("이름", { exact: true })).toBeEnabled();
     expect(screen.getByLabelText("이름", { exact: true })).toHaveValue("합성학생가");
+  });
+  it("기존 팀원은 실제 변경이 생긴 뒤에만 저장할 수 있다", async () => {
+    const { execute } = setup(); fireEvent.click(screen.getByRole("button", { name: "합성학생가" })); await loaded();
+    const save = screen.getByRole("button", { name: "팀원 저장" });
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("파트", { exact: true }), { target: { value: "SESSION" } });
+    expect(save).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("파트", { exact: true }), { target: { value: "SINGER" } });
+    expect(save).toBeDisabled();
+    expect(execute).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("파트", { exact: true }), { target: { value: "SESSION" } });
+    fireEvent.click(save);
+    await waitFor(() => expect(execute).toHaveBeenCalledOnce());
   });
   it("외부 busy도 모든 편집 컨트롤을 잠그고 저장 실패는 초안을 유지한다", async () => {
     const execute = vi.fn().mockRejectedValue(new Error("synthetic failure"));
@@ -205,6 +219,47 @@ describe("찬양팀 기존 학기 명단 연결", () => {
     const table = screen.getByRole("table");
     expect(within(table).getByText("학기 명단 연결")).toBeInTheDocument();
     expect(within(table).getAllByText("학기 명단 미연결")).toHaveLength(3);
+  });
+  it("출결에서 요청한 팀원을 바로 열고 통합 명단과 찬양팀 수정 범위를 구분한다", async () => {
+    const view = praiseFixture(); view.people[0].rosterLink = sourceRoster().people[0].rosterLink;
+    const close = vi.fn();
+    render(<PraisePeople view={view} execute={vi.fn()} busy={false} requestedPersonId="student-1" onRequestedPersonClose={close} />);
+    expect(await screen.findByRole("heading", { name: "합성학생가 수정" })).toHaveFocus();
+    await loaded();
+    expect(screen.getByText("통합 명단 기본 정보")).toBeInTheDocument();
+    expect(screen.getByText(/학생의 이름·구분·학년·예배 부서와 스탭의 이름·구분/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "찬양팀 세부 설정" })).toBeInTheDocument();
+    expect(screen.getByLabelText("이름", { exact: true })).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("파트", { exact: true })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    expect(close).toHaveBeenCalledOnce();
+  });
+  it("원본 대조 중에는 기존 팀원 세부 설정과 최초 연결만 저장하고 등록·가져오기는 잠근다", async () => {
+    const view = praiseFixture(); view.meta.mode = "shadow";
+    const execute = vi.fn().mockResolvedValue(false);
+    setup(view, execute);
+    expect(screen.getByRole("button", { name: "팀원 등록" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "명단 가져오기" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "합성학생가" })); await loaded();
+    expect(screen.getByRole("heading", { name: "합성학생가 수정" })).toBeInTheDocument();
+    expect(screen.getByLabelText("파트", { exact: true })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("연결할 학기 팀원"), { target: { value: "second-student" } });
+    fireEvent.change(screen.getByLabelText("파트", { exact: true }), { target: { value: "SESSION" } });
+    fireEvent.click(screen.getByRole("button", { name: "팀원 저장" }));
+    await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({ type: "person.reconcile", expectedRevision: 1, person: expect.objectContaining({ id: "student-1", team: "SESSION", rosterLink: sourceRoster().people[0].rosterLink }) })));
+  });
+  it("연결된 스탭은 찬양팀 예배 부서와 선호 예배를 계속 수정한다", async () => {
+    const view = praiseFixture(); view.people[2].rosterLink = sourceRoster().people[2].rosterLink;
+    setup(view); fireEvent.click(screen.getByRole("button", { name: "합성스탭가" })); await loaded();
+    expect(screen.getByLabelText("예배 부서", { exact: true })).toBeEnabled();
+    expect(screen.getByLabelText("선호 예배", { exact: true })).toBeEnabled();
+  });
+  it("존재하지 않는 바로가기 대상은 빈 편집기를 만들지 않고 요청을 정리한다", async () => {
+    const close = vi.fn();
+    render(<PraisePeople view={praiseFixture()} execute={vi.fn()} busy={false} requestedPersonId="missing-person" onRequestedPersonClose={close} />);
+    await waitFor(() => expect(close).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("form", { name: "찬양팀 팀원 편집" })).not.toBeInTheDocument();
+    expect(loadRoster).not.toHaveBeenCalled();
   });
   it("부서·파트·구분·비활성 필터를 이름 검색과 함께 적용하고 닫은 뒤 유지한다", async () => {
     const view = praiseFixture(); view.people[1].department = "SECOND"; view.people[1].team = "SESSION"; view.people[1].active = false;

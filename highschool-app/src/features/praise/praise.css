@@ -20,4 +20,169 @@
 .praise-people-editor.praise-editor{margin:0}
 .praise-people-list .praise-table,.praise-people-list .praise-table-wrap{margin-top:0}
 .praise-people-list tr[aria-selected=true]{background:var(--color-primary-light)}
+.praise-person-title{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.praise-person-edit{font-size:12px;min-height:32px;padding:5px 0}.praise-source-note{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;padding:13px 14px;border:1px solid var(--praise-line);border-radius:8px;background:var(--color-surface);margin:12px 0 18px}.praise-source-note strong{font-size:14px}.praise-source-note p{margin:4px 0 0;font-size:13px;line-height:1.65;color:var(--color-text-muted)}.praise-subsection-heading{margin:20px 0 4px}.praise-subsection-heading h4{margin:0;font-size:15px}.praise-subsection-heading p{margin:4px 0 0;color:var(--color-text-muted);font-size:13px}
 @media(max-width:1050px){.praise-people-layout.is-editing{grid-template-columns:minmax(0,1fr)}.praise-people-editor{grid-row:1}}
+@media(max-width:760px){.praise-person-edit{min-height:44px;padding:8px 0}}
+@media(max-width:420px){.praise-source-note{align-items:flex-start}}
+
+/* 기존 찬양팀 사이트의 `현재 맥락 → 핵심 수치 → 다음 업무` 흐름을 통합 셸 안에서 재구성한다. */
+.praise-workspace{
+  max-width:1184px;
+  padding:34px 32px 72px;
+}
+.praise-header{
+  align-items:flex-end;
+  gap:32px;
+  padding:10px 0 30px;
+}
+.praise-header-copy{max-width:690px;min-width:0}
+.praise-header-copy>.praise-back{margin-bottom:18px}
+.praise-eyebrow{
+  display:block;
+  color:var(--color-primary);
+  font-size:11px;
+  font-weight:750;
+  letter-spacing:.16em;
+  line-height:1.3;
+  text-transform:uppercase;
+}
+.praise-workspace .praise-page-title{
+  margin:9px 0 10px;
+  color:var(--color-text-primary);
+  font-size:clamp(34px,4vw,48px);
+  font-weight:680;
+  letter-spacing:-.045em;
+  line-height:1.08;
+}
+.praise-header-copy>p{color:var(--color-text-muted);font-size:14px;line-height:1.7}
+.praise-header-actions{
+  flex-wrap:nowrap;
+  align-items:flex-end;
+  padding:11px;
+  border:1px solid var(--praise-line);
+  border-radius:13px;
+  background:var(--color-surface);
+  box-shadow:var(--shadow-xs);
+}
+.praise-period-field{min-width:245px}
+.praise-overview{
+  overflow:hidden;
+  border:1px solid var(--praise-line);
+  border-radius:16px;
+  background:var(--color-surface);
+  box-shadow:var(--shadow-xs);
+}
+.praise-context{
+  align-items:flex-end;
+  padding:22px 24px;
+  border-top:0;
+}
+.praise-context-copy{min-width:0;flex:1}
+.praise-context-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+.praise-context-title>strong{font-size:21px;font-weight:680;letter-spacing:-.025em}
+.praise-context-copy>p{margin:5px 0 11px;color:var(--color-text-muted);font-size:13px}
+.praise-context-meta{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.praise-context-link{color:var(--color-primary);font-size:13px;font-weight:650;text-decoration:none}
+.praise-context-link:hover{text-decoration:underline;text-underline-offset:3px}
+.praise-context-controls{display:flex;align-items:flex-end;gap:8px;flex:none}
+.praise-context-controls .praise-field{min-width:260px}
+.praise-badge--live{border-color:color-mix(in srgb,var(--color-primary) 24%,var(--praise-line));background:var(--color-success-bg);color:var(--color-success)}
+.praise-badge--warning{border-color:color-mix(in srgb,var(--color-warning) 35%,var(--praise-line));background:var(--color-warning-bg);color:#755015}
+.praise-badge--muted{background:var(--praise-soft)}
+.praise-metrics{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  margin:0;
+  border-top:1px solid var(--praise-line);
+}
+.praise-metrics>div{display:flex;min-width:0;flex-direction:column;padding:16px 20px;border-right:1px solid var(--praise-line)}
+.praise-metrics>div:last-child{border-right:0}
+.praise-metrics dd{order:-1;margin:0;color:var(--color-text-primary);font-size:24px;font-weight:680;font-variant-numeric:tabular-nums;letter-spacing:-.035em;line-height:1.15}
+.praise-metrics dd small{color:var(--color-text-muted);font-size:13px;font-weight:550;letter-spacing:0}
+.praise-metrics dt{margin-top:5px;color:var(--color-text-muted);font-size:12px;font-weight:550}
+.praise-overview+.praise-tabs{margin-top:18px}
+.praise-tabs{gap:6px;padding:4px;border:1px solid var(--praise-line);border-radius:11px;background:var(--color-surface);box-shadow:var(--shadow-xs)}
+.praise-tabs button{min-height:42px;padding:8px 14px 9px;border-bottom:0;border-radius:7px}
+.praise-tabs button[aria-selected=true]{border-bottom-color:transparent;background:var(--praise-soft);color:var(--color-primary)}
+.praise-workspace [role=tabpanel]{padding-top:14px}
+.praise-section{border-radius:16px;padding:26px;box-shadow:var(--shadow-xs)}
+.praise-section-heading{margin-bottom:18px}
+.praise-section-kicker{display:block;margin-bottom:5px;color:var(--color-primary);font-size:10px;font-weight:750;letter-spacing:.15em}
+.praise-work-list{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  counter-reset:praise-work;
+}
+.praise-work-list>div{
+  counter-increment:praise-work;
+  display:grid;
+  min-height:166px;
+  align-content:start;
+  gap:8px;
+  padding:17px;
+  border:1px solid var(--praise-line);
+  border-radius:12px;
+  background:var(--color-surface);
+}
+.praise-work-list>div::before{
+  content:counter(praise-work,decimal-leading-zero);
+  display:grid;
+  width:29px;
+  height:29px;
+  place-items:center;
+  border-radius:50%;
+  background:var(--color-primary-light);
+  color:var(--color-primary-active);
+  font-size:11px;
+  font-weight:750;
+  font-variant-numeric:tabular-nums;
+}
+.praise-work-list>div>strong{width:auto;font-size:15px}
+.praise-work-list>div>span{min-width:0;color:var(--color-text-muted);font-size:13px;line-height:1.55}
+.praise-work-list>div>.praise-text-button{align-self:end;justify-self:start;margin-top:auto;padding-top:9px;font-weight:650;text-decoration-color:currentColor}
+.praise-attendance-row{transition:background-color .16s ease}
+.praise-attendance-row:hover{background:var(--praise-soft)}
+.praise-people-editor{background:var(--color-surface)}
+
+@media(max-width:980px){
+  .praise-header{align-items:flex-start}
+  .praise-header-actions{flex-wrap:wrap}
+  .praise-context{align-items:flex-start}
+  .praise-context-controls{width:100%}
+  .praise-context-controls .praise-field{flex:1}
+  .praise-work-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .praise-workspace{padding:24px 16px 48px}
+  .praise-header{display:grid;gap:20px;padding:4px 0 24px}
+  .praise-workspace .praise-page-title{font-size:34px}
+  .praise-header-actions{width:100%;margin-top:0;align-items:flex-end}
+  .praise-period-field{min-width:0;flex:1}
+  .praise-context{display:grid;padding:18px}
+  .praise-context-controls{margin:0}
+  .praise-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .praise-metrics>div:nth-child(2n){border-right:0}
+  .praise-metrics>div:nth-child(n+3){border-top:1px solid var(--praise-line)}
+  .praise-tabs{gap:3px;scroll-padding-inline:4px}
+  .praise-tabs::after{content:"";flex:0 0 18px}
+  .praise-tabs button{min-height:44px;padding-inline:12px}
+  .praise-segment button,.praise-status-buttons button,.praise-stage-controls button,.praise-stage-controls select{min-height:44px}
+  .praise-work-list{grid-template-columns:1fr 1fr}
+  .praise-work-list>div{min-height:156px}
+  .praise-work-list .praise-text-button{min-height:44px;margin-left:0}
+  .praise-table-wrap .praise-table :is(th,td):first-child,div.praise-table table :is(th,td):first-child{position:sticky;left:0;z-index:1;background:var(--color-surface);box-shadow:1px 0 0 var(--praise-line)}
+  .praise-table-wrap .praise-table thead th:first-child,div.praise-table table thead th:first-child{z-index:2;background:var(--praise-soft)}
+}
+@media(max-width:420px){
+  .praise-header-actions{display:grid;grid-template-columns:1fr}
+  .praise-context-controls{display:grid;grid-template-columns:1fr auto}
+  .praise-context-controls .praise-field{min-width:0;width:100%}
+  .praise-context-title>strong{font-size:19px}
+  .praise-metrics>div{padding:14px 16px}
+  .praise-metrics dd{font-size:21px}
+  .praise-work-list{grid-template-columns:1fr}
+  .praise-work-list>div{min-height:0}
+  .praise-stage-sides{grid-template-columns:1fr}
+}
+[data-theme="dark"] .praise-badge--warning{color:#f3c16d}

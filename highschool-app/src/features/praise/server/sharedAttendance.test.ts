@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PraiseActor, PraiseCommand, PraiseState } from "../types";
 vi.mock("server-only", () => ({}));
-const memory = vi.hoisted(() => ({ rows: new Map<string, unknown>(), state: null as PraiseState | null, reads: [] as string[], writes: 0, writePaths: [] as string[], failFinalize: false, failResolutionFinalize: false, failEntryAfterCommit: false, concurrentEntry: undefined as unknown, failBeforeCommit: false, mutateBeforeTransaction: undefined as (() => void) | undefined, replayWith: undefined as unknown, beforeStageVerify: undefined as (() => void) | undefined, beforeWorkspaceTransaction: undefined as (() => void) | undefined, afterWorkspaceTransaction: undefined as (() => void) | undefined }));
+const memory = vi.hoisted(() => ({ rows: new Map<string, unknown>(), state: null as PraiseState | null, reads: [] as string[], writes: 0, writePaths: [] as string[], failFinalize: false, failResolutionFinalize: false, failEntryAfterCommit: false, concurrentEntry: undefined as unknown, failBeforeCommit: false, mutateBeforeTransaction: undefined as (() => void) | undefined, replayWith: undefined as unknown, beforeStageVerify: undefined as (() => void) | undefined, beforeCheckedRetry: undefined as (() => void) | undefined, beforeWorkspaceTransaction: undefined as (() => void) | undefined, afterWorkspaceTransaction: undefined as (() => void) | undefined }));
 const store = vi.hoisted(() => {
   const object = (value: unknown): Record<string, unknown> => value && typeof value === "object" ? value as Record<string, unknown> : {};
   const get = (path: string): unknown => {
@@ -48,10 +48,17 @@ vi.mock("./firebaseAdmin", () => ({
   } } }),
 }));
 vi.mock("./repository", () => ({ transactWorkspaceChecked: async (_id: string, update: (current: PraiseState | null) => PraiseState | undefined, verify: (current: PraiseState | null) => Promise<void>) => {
-  const current = structuredClone(memory.state), next = update(current);
+  let current = structuredClone(memory.state), next = update(current);
   if (next === current || next === undefined) return current;
   memory.beforeStageVerify?.(); memory.beforeStageVerify = undefined;
-  await verify(current); memory.state = next; return structuredClone(next);
+  await verify(current);
+  if (memory.beforeCheckedRetry) {
+    const retry = memory.beforeCheckedRetry; memory.beforeCheckedRetry = undefined; retry();
+    current = structuredClone(memory.state); next = update(current);
+    if (next === current || next === undefined) return current;
+    await verify(current);
+  }
+  memory.state = next; return structuredClone(next);
 }, readWorkspace: async () => structuredClone(memory.state), listWorkspaceIds: async () => [], transactWorkspace: async (_id: string, update: (current: PraiseState | null) => PraiseState | undefined) => {
   const before = memory.beforeWorkspaceTransaction; memory.beforeWorkspaceTransaction = undefined; before?.();
   const next = update(structuredClone(memory.state));
@@ -78,7 +85,7 @@ function fixture(): PraiseState {
   const s = createPraiseState({ operationId: "create", workspace: { id: "synthetic", name: "합성 학기", startDate: "2026-09-05", endDate: "2026-09-05", semesterId: "2026-2", teamId: "praise" } }, actor, 1000);
   s.meta.mode = "live"; s.meta.activeGroupVersionId = "group";
   s.meetings.m_20260905.linkedSessionId = "session";
-  for (const id of ["student", "other"]) s.people[id] = { id, kind: "STUDENT", name: "합성 학생", grade: 1, gender: "FEMALE", department: "FIRST", team: "SINGER", active: true, isStudentLeader: false, singerCapable: true, groupStaffCapable: false, preferredService: "BOTH", excludeFromAutoSinger: false, revision: 1, updatedAt: 1000, updatedBy: actor.uid, rosterLink: { applicationKey: `1_${id}`, studentId: id } };
+  for (const id of ["student", "other"]) s.people[id] = { id, kind: "STUDENT", name: "합성 학생", grade: 1, gender: "FEMALE", department: "FIRST", team: "SINGER", active: true, isStudentLeader: false, singerCapable: true, groupStaffCapable: false, preferredService: "BOTH", excludeFromAutoSinger: false, revision: 1, updatedAt: 1000, updatedBy: actor.uid, rosterLink: { applicationKey: `1_${id}`, personId: `person_student_${id}`, year: "2026", classKey: "1-1-1", studentId: id } };
   s.people.staff = { ...s.people.student, id: "staff", kind: "STAFF", name: "합성 스탭", rosterLink: undefined, groupStaffCapable: true };
   s.groupVersions.group = { id: "group", number: 1, kind: "CONFIRMED", createdAt: 1000, createdBy: actor.uid, seed: 1, settings: s.policy.grouping, rules: [], groups: [{ id: "g", name: "합성 조", studentIds: ["student"], staffIds: ["staff"] }, { id: "g2", name: "합성 2조", studentIds: ["other"], staffIds: [] }], warnings: [], acknowledgedWarnings: true };
   s.attendance.m_20260905 = { student: { status: "ABSENT", groupVersionId: "group", revision: 3, updatedAt: 1000, updatedBy: actor.uid } };
@@ -87,11 +94,11 @@ function fixture(): PraiseState {
   return s;
 }
 function seed() {
-  memory.state = fixture(); memory.rows.clear(); memory.reads = []; memory.writes = 0; memory.writePaths = []; memory.mutateBeforeTransaction = undefined; memory.replayWith = undefined; memory.beforeStageVerify = undefined; memory.beforeWorkspaceTransaction = undefined; memory.afterWorkspaceTransaction = undefined; memory.failFinalize = false; memory.failResolutionFinalize = false; memory.failEntryAfterCommit = false; memory.concurrentEntry = undefined; memory.failBeforeCommit = false;
+  memory.state = fixture(); memory.rows.clear(); memory.reads = []; memory.writes = 0; memory.writePaths = []; memory.mutateBeforeTransaction = undefined; memory.replayWith = undefined; memory.beforeStageVerify = undefined; memory.beforeCheckedRetry = undefined; memory.beforeWorkspaceTransaction = undefined; memory.afterWorkspaceTransaction = undefined; memory.failFinalize = false; memory.failResolutionFinalize = false; memory.failEntryAfterCommit = false; memory.concurrentEntry = undefined; memory.failBeforeCommit = false;
   memory.rows.set("semesters/2026-2/meta", { title: "합성 학기" });
   memory.rows.set("semesters/2026-2/teams/praise", { name: "합성 찬양" });
   memory.rows.set("semesters/2026-2/sessions", { session: { date: "2026-09-05" } });
-  memory.rows.set("semesters/2026-2/applications", Object.fromEntries(["student", "other"].map(id => [`1_${id}`, { id: `1_${id}`, studentId: id, bu: "1부", name: "합성 학생", grade: 1, class: 1, trainingClassId: "class", choice1: "praise", teamId: "praise", status: "배치", createdAt: "2026-09-01" }])));
+  memory.rows.set("semesters/2026-2/applications", Object.fromEntries(["student", "other"].map(id => [`1_${id}`, { id: `1_${id}`, studentId: id, personId: `person_student_${id}`, bu: "1부", name: "합성 학생", grade: 1, class: 1, trainingClassId: "class", choice1: "praise", teamId: "praise", status: "배치", createdAt: "2026-09-01" }])));
 }
 async function snapshot() { return loadSharedAttendance(memory.state!); }
 async function command(status: "PRESENT" | "ABSENT" | null = "PRESENT", personId = "student"): Promise<Extract<PraiseCommand, { type: "attendance.set" }>> {
@@ -130,6 +137,18 @@ describe("학기 공통 출석의 조회·미입력·매핑·권한", () => {
       if (reason === "date") memory.rows.set("semesters/2026-2/sessions", { session: { date: "2026-09-12" } });
       if (reason === "duplicate") memory.state!.meetings.duplicate = { ...memory.state!.meetings.m_20260905, id: "duplicate" };
       const shared = await snapshot(); expect(shared.sources.m_20260905.student.mapping).toBe("invalid"); expect(overlaySharedAttendance(memory.state!, shared).attendance.m_20260905.student.status).toBeNull();
+    }
+  });
+  it("신청의 안정 인물키·반 경로가 저장된 연결과 달라지면 공통 출석을 읽거나 쓰지 않는다", async () => {
+    for (const reason of ["person", "class"] as const) {
+      seed();
+      if (reason === "person") store.set("semesters/2026-2/applications/1_student/personId", "person_student_changed");
+      else store.set("semesters/2026-2/applications/1_student/class", 2);
+      const shared = await snapshot();
+      expect(shared.sources.m_20260905.student).toMatchObject({ mapping: "invalid", writable: false });
+      expect(shared.targets.m_20260905?.student).toBeUndefined();
+      await expect(execute({ type: "attendance.set", meetingId: "m_20260905", personId: "student", status: "PRESENT", expectedRevision: 0 })).rejects.toMatchObject({ code: "attendance_mapping_required" });
+      expect(memory.writes).toBe(0);
     }
   });
   it("담당 조만 출결과 출처를 받고 신청키·영수증·다른 조 fingerprint는 노출하지 않는다", async () => {
@@ -431,5 +450,58 @@ describe("등단 커밋 직전 공통 출석 대조", () => {
     memory.beforeStageVerify = () => store.set(entryPath, { s: "결석" });
     await expect(executePraise(actor, "synthetic", { operationId: "stale_stage", command: { type: "stage.generate", meetingId: "m_20260905", config, overrides: [], inputRevision: view.inputRevisions.m_20260905 } })).rejects.toMatchObject({ code: "input_conflict" });
     expect(memory.state!.stageVersions).toEqual({}); expect(memory.state!.audit.stale_stage).toBeUndefined();
+  });
+});
+
+describe("찬양팀 명단의 공식 원장 일괄 대조", () => {
+  function batchRequest() {
+    const current = memory.state!.people.student;
+    const { revision, updatedAt: _updatedAt, updatedBy: _updatedBy, ...person } = current;
+    void _updatedAt; void _updatedBy;
+    return {
+      operationId: "batch-roster-link",
+      command: {
+        type: "people.reconcile" as const,
+        people: [{ expectedRevision: revision, person: { ...person, rosterLink: { applicationKey: "1_student", personId: "person_student_student", year: "2026", classKey: "1-1-1", studentId: "student" } } }],
+      },
+    };
+  }
+  function seedMainRoster() {
+    memory.state!.meta.mode = "shadow";
+    delete memory.state!.people.student.rosterLink;
+    memory.rows.set("semesters/2026-2/applications", { "1_student": { id: "1_student", studentId: "student", personId: "person_student_student", bu: "1부", name: "합성 학생", grade: 1, class: 1, trainingClassId: "class", choice1: "praise", teamId: "praise", status: "배치", createdAt: "2026-09-01" } });
+    memory.rows.set("classes/2026", { "1-1-1": { students: { student: { name: "합성 학생", personId: "person_student_student" } } } });
+    memory.rows.set("teacherStaff/2026", {});
+  }
+  it("API는 공식 신청·학생 원장을 재확인하고 workspace 한 번에 연결한다", async () => {
+    seedMainRoster();
+    const result = await executePraise(actor, "synthetic", batchRequest());
+    expect(memory.state!.people.student.rosterLink).toMatchObject({ applicationKey: "1_student", personId: "person_student_student", classKey: "1-1-1" });
+    expect(memory.state!.audit["batch-roster-link"]).toMatchObject({ label: "찬양팀 통합 명단 1명 연결" });
+    expect(result.view.people.find((person) => person.id === "student")?.rosterLink?.personId).toBe("person_student_student");
+    expect(memory.reads).not.toContain("classes/2026"); expect(memory.reads).not.toContain("teacherStaff/2026");
+    expect(memory.reads.filter((path) => path === "classes/2026/1-1-1/students/student")).toHaveLength(2);
+  });
+  it("계산 후 공식 인물키가 바뀌면 커밋 직전 재검증으로 전체 연결을 취소한다", async () => {
+    seedMainRoster(); const before = structuredClone(memory.state);
+    memory.beforeStageVerify = () => store.set("classes/2026/1-1-1/students/student/personId", "person_student_changed");
+    await expect(executePraise(actor, "synthetic", batchRequest())).rejects.toMatchObject({ code: "roster_changed", status: 409 });
+    expect(memory.state).toEqual(before); expect(memory.state!.audit["batch-roster-link"]).toBeUndefined();
+  });
+  it("ETag 충돌 뒤 최신 mode와 중복 연결을 다시 검사해 오래된 일괄 대조를 거절한다", async () => {
+    for (const scenario of ["mode", "duplicate"] as const) {
+      seed(); seedMainRoster();
+      memory.beforeCheckedRetry = () => {
+        if (scenario === "mode") memory.state!.meta.mode = "live";
+        else memory.state!.people.other.rosterLink = { applicationKey: "1_student", personId: "person_student_student", year: "2026", classKey: "1-1-1", studentId: "student" };
+      };
+      await expect(executePraise(actor, "synthetic", batchRequest())).rejects.toMatchObject({
+        code: scenario === "mode" ? "read_only" : "duplicate_person",
+        status: 409,
+      });
+      expect(memory.state!.people.student.rosterLink).toBeUndefined();
+      expect(memory.state!.audit["batch-roster-link"]).toBeUndefined();
+      expect(memory.reads.filter((path) => path === "classes/2026/1-1-1/students/student")).toHaveLength(2);
+    }
   });
 });

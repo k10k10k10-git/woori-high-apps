@@ -349,10 +349,23 @@ export function parseCommand(value: unknown): {
       break;
     }
     case "person.save":
+    case "person.reconcile":
       command = {
         type,
         expectedRevision: expected(),
         person: parsePerson(p.person),
+      };
+      break;
+    case "people.reconcile":
+      command = {
+        type,
+        people: list(p.people, 100, (value) => {
+          const entry = object(value);
+          return {
+            expectedRevision: integer(entry.expectedRevision, 0, Number.MAX_SAFE_INTEGER, "기록 버전"),
+            person: parsePerson(entry.person),
+          };
+        }, "대조할 팀원"),
       };
       break;
     case "meeting.save":

@@ -105,7 +105,7 @@ export async function loadSharedAttendance(state: PraiseState): Promise<SharedAt
       const candidate = applications[key] ? rosterCandidate(key, applications[key] as Application, sid, teamId) : null;
       const raw = rows[key] ?? null, record = asRecord(raw), status = sharedStatus(raw);
       const valid = Boolean((raw === null || ["출석", "지각", "결석"].includes(String(record.s))) && meta && asRecord(meta).active !== false && asRecord(meta).status !== "archived" && team && asRecord(team).active !== false && asRecord(team).disabled !== true && open && session.date === m.date && uniqueSession && candidate?.kind === "STUDENT" &&
-        candidate.rosterLink.studentId === p.rosterLink?.studentId &&
+        fingerprint(candidate.rosterLink) === fingerprint(p.rosterLink) &&
         applicationCounts.get(key) === 1);
       const groupId = groupVersionForMeeting(state, m)?.id ?? "import-unresolved";
       const source = valid ? { source: "semester" as const, mapping: "linked" as const, writable: true, revision: sharedRevision(raw),

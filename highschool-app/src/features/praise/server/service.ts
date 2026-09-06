@@ -18,7 +18,7 @@ import {
   transactWorkspaceChecked,
 } from "./repository";
 import { praiseAccounts, praiseReferences, validateSemesterLink } from "./references";
-import { validatePraiseRosterLink } from "./roster";
+import { validatePraiseRosterLink, validatePraiseRosterLinks } from "./roster";
 import { fingerprint } from "./stageModel";
 import { projectPraiseAudit } from "./projection";
 import { requireValue } from "./validation";
@@ -148,7 +148,7 @@ export async function executePraise(
     const logPending = await projectPraiseAudit(result);
     return { view: await resolvedPraiseView(result, actor), logPending };
   }
-  if (command.type === "person.save") {
+  if (command.type === "person.save" || command.type === "person.reconcile") {
     requireValue(
       praisePermissions(actor, before).manage,
       "팀원 연결 권한이 없습니다.",
@@ -156,6 +156,15 @@ export async function executePraise(
       403,
     );
     await validatePraiseRosterLink(before, command.person);
+  }
+  if (command.type === "people.reconcile") {
+    requireValue(
+      praisePermissions(actor, before).manage,
+      "팀원 연결 권한이 없습니다.",
+      "forbidden",
+      403,
+    );
+    await validatePraiseRosterLinks(before, command.people.map((entry) => entry.person));
   }
   if (command.type === "people.import")
     requireValue(
@@ -203,6 +212,16 @@ export async function executePraise(
         requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
         await assertSharedAttendanceCurrent(current, stageShared, command.meetingId);
       })
+    : command.type === "person.save" || command.type === "person.reconcile"
+      ? await transactWorkspaceChecked(workspaceId, updateWorkspace, async (current) => {
+          requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
+          await validatePraiseRosterLink(current, command.person);
+        })
+    : command.type === "people.reconcile"
+      ? await transactWorkspaceChecked(workspaceId, updateWorkspace, async (current) => {
+          requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
+          await validatePraiseRosterLinks(current, command.people.map((entry) => entry.person));
+        })
     : await transactWorkspace(workspaceId, updateWorkspace);
   requireValue(
     result,

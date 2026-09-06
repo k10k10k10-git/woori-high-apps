@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowClockwise, CaretLeft } from "@phosphor-icons/react";
 import { createPraiseWorkspace, listPraiseCreateReferences, listPraiseWorkspaces, praiseOperationId } from "./api";
 import { canOpenPraiseAttendance } from "./permissions";
@@ -13,7 +13,7 @@ import { PraiseStage } from "./components/PraiseStage";
 import { PraisePeople } from "./components/PraisePeople";
 import PraiseSettings from "./components/PraiseSettings";
 import { PraiseWeek } from "./components/PraiseWeek";
-import { praiseDataWriteLocked } from "./components/shared";
+import { praiseDataWriteLocked, praisePersonWriteLocked } from "./components/shared";
 import { PraiseResourceLibrary } from "./content/GuideContent";
 import "./praise.css";
 
@@ -22,7 +22,9 @@ export default function PraiseWorkspace({ workspaceId, initialTab, embedded = fa
   const requestedWorkspace = query.get("workspace") ?? workspaceId ?? "";
   const requestedTab = query.get("tab") ?? initialTab;
   const requestedMeeting = query.get("meeting") ?? "";
+  const requestedPerson = query.get("person") ?? "";
   const [workspaces, setWorkspaces] = useState<PraiseMeta[]>([]);
+  const [workspaceMeta, setWorkspaceMeta] = useState<Record<string, PraiseMeta>>({});
   const [canCreate, setCanCreate] = useState(false);
   const [selected, setSelected] = useState(requestedWorkspace);
   const [workspaceSource, setWorkspaceSource] = useState(requestedWorkspace);
@@ -34,34 +36,42 @@ export default function PraiseWorkspace({ workspaceId, initialTab, embedded = fa
   const [retry, setRetry] = useState(0);
   const [creating, setCreating] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
+  const selectedWorkspace = workspaceMeta[selected] ?? workspaces.find((workspace) => workspace.id === selected);
+  const syncWorkspaceMeta = useCallback((meta: PraiseMeta) => {
+    setWorkspaceMeta((current) => current[meta.id] === meta ? current : { ...current, [meta.id]: meta });
+  }, []);
   const reloadList = () => { setLoading(true); setError(""); setErrorCode(""); setRetry((value) => value + 1); };
   useEffect(() => {
     const controller = new AbortController();
     void listPraiseWorkspaces(controller.signal).then((result) => { if (controller.signal.aborted) return; setWorkspaces(result.workspaces); setCanCreate(result.canCreate); setSelected((current) => current || result.workspaces.find((item) => item.status === "active")?.id || result.workspaces[0]?.id || ""); }).catch((failure) => { if (!controller.signal.aborted) { setError(failure instanceof Error ? failure.message : "운영 공간을 불러오지 못했습니다."); setErrorCode(failure instanceof Error && "code" in failure && typeof failure.code === "string" ? failure.code : ""); } }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
   }, [retry]);
-  return <main className="praise-workspace">
-    <header className="praise-header"><div>{!embedded && <><Link className="praise-back" href="/"><CaretLeft size={14} aria-hidden="true" />통합 사이트</Link><h1>찬양팀</h1></>}<p>공통 학기의 팀 배정을 바탕으로 모임 출결과 주일 등단을 준비합니다.</p></div><div className="praise-header-actions" hidden={errorCode === "server_not_configured"}><label className="praise-field"><span>운영 기간</span><select value={selected} onChange={(event) => selectWorkspace(event.target.value)} disabled={loading || creating}><option value="">운영 기간 선택</option>{workspaces.map((workspace) => <option value={workspace.id} key={workspace.id}>{workspace.name}{workspace.semesterId ? " · 학기 참조" : " · 별도 기간"}{workspace.status === "archived" ? " · 보관됨" : ""}</option>)}</select></label>{canCreate && <button className="praise-button" type="button" disabled={creating} onClick={() => setShowCreate((value) => !value)}>{showCreate ? "개설 닫기" : "팀 운영 개설"}</button>}</div></header>
+  return <main className={`praise-workspace${embedded ? " praise-workspace--embedded" : ""}`}>
+    <header className="praise-header"><div className="praise-header-copy">{!embedded && <Link className="praise-back" href="/"><CaretLeft size={14} aria-hidden="true" />통합 사이트</Link>}<span className="praise-eyebrow">찬양팀 · 주일 운영</span>{embedded ? <h2 className="praise-page-title">{selectedWorkspace?.name ?? "찬양팀 주일 운영"}</h2> : <h1 className="praise-page-title">{selectedWorkspace?.name ?? "찬양팀 운영"}</h1>}<p>{selectedWorkspace ? `${selectedWorkspace.startDate} — ${selectedWorkspace.endDate} · ${selectedWorkspace.semesterId ? "공통 학기 팀 배정과 연결된 운영 공간" : "공통 학기와 분리된 독립 운영 기간"}` : "공통 학기의 팀 배정을 바탕으로 토요 모임 출결과 주일 등단을 한 흐름에서 준비합니다."}</p></div><div className="praise-header-actions" hidden={errorCode === "server_not_configured"}><label className="praise-field praise-period-field"><span>운영 기간</span><select value={selected} onChange={(event) => selectWorkspace(event.target.value)} disabled={loading || creating}><option value="">운영 기간 선택</option>{workspaces.map((workspace) => { const current = workspaceMeta[workspace.id] ?? workspace; return <option value={current.id} key={current.id}>{current.name}{current.semesterId ? " · 학기 참조" : " · 별도 기간"}{current.status === "archived" ? " · 보관됨" : ""}</option>; })}</select></label>{canCreate && <button className="praise-button" type="button" disabled={creating} onClick={() => setShowCreate((value) => !value)}>{showCreate ? "개설 닫기" : "팀 운영 개설"}</button>}</div></header>
     {error && errorCode !== "server_not_configured" && <div className="praise-error" role="alert">{error}<button className="praise-text-button" onClick={reloadList}>다시 불러오기</button></div>}
     {errorCode === "server_not_configured" && <ConnectionPreparing />}
     {showCreate && canCreate && errorCode !== "server_not_configured" && <CreateWorkspace creating={creating} onCreating={setCreating} onCreated={(id) => { selectWorkspace(id); setShowCreate(false); reloadList(); }} onError={(message) => setError(message)} /> }
     {loading && !selected && <p className="praise-loading" role="status">찬양팀 운영 공간을 불러오고 있습니다…</p>}
     {!loading && !selected && !error && <section className="praise-section praise-welcome"><h2>찬양팀 운영을 시작해 주세요</h2><p>{canCreate ? "공통 학기와 사역팀을 연결하면 팀원 명단, 출결, 조편성, 주일 등단표를 함께 관리할 수 있습니다." : "아직 접근할 수 있는 운영 기간이 없습니다. 담당자에게 운영 공간과 권한을 확인해 주세요."}</p>{canCreate && <button className="praise-button praise-button--primary" onClick={() => setShowCreate(true)}>팀 운영 개설하기</button>}</section>}
-    {selected && errorCode !== "server_not_configured" && <WorkspaceBody key={selected} workspaceId={selected} initialTab={requestedTab} initialMeetingId={requestedMeeting} />}
+    {selected && errorCode !== "server_not_configured" && <WorkspaceBody key={selected} workspaceId={selected} initialTab={requestedTab} initialMeetingId={requestedMeeting} initialPersonId={requestedPerson} onWorkspaceMeta={syncWorkspaceMeta} />}
   </main>;
 }
 
-function WorkspaceBody({ workspaceId, initialTab, initialMeetingId }: { workspaceId: string; initialTab?: string; initialMeetingId: string }) {
+function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPersonId, onWorkspaceMeta }: { workspaceId: string; initialTab?: string; initialMeetingId: string; initialPersonId: string; onWorkspaceMeta: (meta: PraiseMeta) => void }) {
   const { view, busy, error, errorCode, notice, execute, refresh } = usePraiseData(workspaceId);
+  useEffect(() => { if (view) onWorkspaceMeta(view.meta); }, [onWorkspaceMeta, view]);
   const [tab, setTab] = useState(() => praiseTab(initialTab));
   const [visited, setVisited] = useState(() => new Set(["week", praiseTab(initialTab)]));
   const [tabSource, setTabSource] = useState(initialTab);
   if (tabSource !== initialTab) { setTabSource(initialTab); setTab(praiseTab(initialTab)); setVisited((current) => new Set([...current, praiseTab(initialTab)])); }
-  const selectTab = (value: string) => { setTab(value); setVisited((current) => new Set([...current, value])); updatePraiseLocation({ workspace: workspaceId, tab: value, meeting: meeting?.id ?? null }); };
+  const [personId, setPersonId] = useState(initialPersonId);
+  const [personSource, setPersonSource] = useState(initialPersonId);
+  if (personSource !== initialPersonId) { setPersonSource(initialPersonId); setPersonId(initialPersonId); }
+  const selectTab = (value: string) => { const nextPerson = value === "people" ? personId : ""; setPersonId(nextPerson); setTab(value); setVisited((current) => new Set([...current, value])); updatePraiseLocation({ workspace: workspaceId, tab: value, meeting: meeting?.id ?? null, person: nextPerson || null }); };
   const [meetingId, setMeetingId] = useState(initialMeetingId);
   const [meetingSource, setMeetingSource] = useState(initialMeetingId);
   if (meetingSource !== initialMeetingId) { setMeetingSource(initialMeetingId); setMeetingId(initialMeetingId); }
-  const selectMeeting = (id: string) => { setMeetingId(id); updatePraiseLocation({ workspace: workspaceId, tab: activeTab, meeting: id }); };
+  const selectMeeting = (id: string) => { setMeetingId(id); updatePraiseLocation({ workspace: workspaceId, tab: activeTab, meeting: id, person: activeTab === "people" ? personId || null : null }); };
   const tabsRef = useRef<HTMLDivElement>(null);
   if (errorCode === "server_not_configured") return <ConnectionPreparing />;
   if (!view) return <div className="praise-section">{error ? <div className="praise-error" role="alert">{error}<button className="praise-button" onClick={() => { void refresh(); }}>다시 불러오기</button></div> : <p role="status">모임 기록을 불러오고 있습니다…</p>}</div>;
@@ -75,28 +85,42 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId }: { workspac
   const activeTab = tabs.some((item) => item.id === tab) ? tab : "week";
   const locked = praiseDataWriteLocked(view);
   const linkedMeetingCount = view.meetings.filter((item) => item.linkedSessionId).length;
-  const studentPeople = view.people.filter((item) => item.kind === "STUDENT");
-  const linkedPersonCount = studentPeople.filter((item) => item.rosterLink?.applicationKey).length;
+  const linkedPersonCount = view.people.filter((item) => item.rosterLink?.applicationKey).length;
+  const activeStudentCount = view.people.filter((item) => item.active && item.kind === "STUDENT").length;
+  const activeStaffCount = view.people.filter((item) => item.active && item.kind === "STAFF").length;
+  const fullPeopleScope = view.permissions.manage || view.permissions.stageEdit;
+  const statusLabel = view.meta.status === "archived" ? "보관됨" : view.meta.mode === "live" ? "운영 중" : view.meta.mode === "shadow" ? "원본 대조 중" : "운영 준비";
+  const statusTone = view.meta.status === "archived" || view.meta.mode === "setup" ? "muted" : view.meta.mode === "shadow" ? "warning" : "live";
   const props = { view, execute: locked ? async () => false : execute, busy };
+  const peopleProps = { view, execute: praisePersonWriteLocked(view) ? async () => false : execute, busy };
+  const editPerson = (id: string) => { setPersonId(id); setTab("people"); setVisited((current) => new Set([...current, "people"])); updatePraiseLocation({ workspace: workspaceId, tab: "people", meeting: meeting?.id ?? null, person: id }); };
+  const closeRequestedPerson = () => { setPersonId(""); updatePraiseLocation({ workspace: workspaceId, tab: "people", meeting: meeting?.id ?? null, person: null }); };
   return <>
-    <div className="praise-context"><div><strong>{view.meta.name}</strong>{view.meta.semesterId ? <><Link className="praise-back" href={`/semester/${encodeURIComponent(view.meta.semesterId)}?tab=${encodeURIComponent("배치")}`}>공통 학기 참조 · 팀 배정 보기</Link><span className="praise-badge">회차 {linkedMeetingCount}/{view.meetings.length} 연결</span>{view.permissions.manage && <span className="praise-badge">학생 {linkedPersonCount}/{studentPeople.length} 연결</span>}</> : <span className="praise-badge">별도 운영 기간</span>}<span className="praise-badge">{view.meta.status === "archived" ? "보관됨" : view.meta.mode === "live" ? "운영 중" : view.meta.mode === "shadow" ? "원본 대조 중" : "운영 준비"}</span>{Boolean(view.meta.importBlockers?.length) && <span className="praise-badge">전환 확인 {view.meta.importBlockers!.length}건</span>}</div><div className="praise-toolbar"><label className="praise-field"><span className="sr-only">모임 회차</span><select value={meeting?.id ?? ""} disabled={busy || meetings.length === 0} onChange={(event) => selectMeeting(event.target.value)}>{meetings.length === 0 && <option value="">등록된 회차 없음</option>}{meetings.map((item) => <option value={item.id} key={item.id}>{item.date} · {item.title}{item.cancelled ? " · 휴강" : ""}</option>)}</select></label><button className="praise-icon-button" disabled={busy} onClick={() => { void refresh(); }} aria-label="찬양팀 최신 기록 불러오기"><ArrowClockwise size={18} aria-hidden="true" /></button></div></div>
+    <section className="praise-overview" aria-label="찬양팀 운영 현황">
+      <div className="praise-context">
+        <div className="praise-context-copy"><span className="praise-eyebrow">OPERATIONS OVERVIEW</span><div className="praise-context-title"><strong>운영 현황</strong><span className={`praise-badge praise-badge--${statusTone}`}>{statusLabel}</span></div><p>{fullPeopleScope ? "팀원 원장과 모임 회차의 연결 상태를 확인하고 이번 업무로 이동합니다." : "현재 계정에 허용된 회차와 인원 범위에서 이번 업무로 이동합니다."}</p><div className="praise-context-meta">{view.meta.semesterId ? <><Link className="praise-context-link" href={`/semester/${encodeURIComponent(view.meta.semesterId)}?tab=${encodeURIComponent("배치")}`}>공통 학기 배정 열기 →</Link><span className="praise-badge">회차 {linkedMeetingCount}/{view.meetings.length} 연결</span>{view.permissions.manage && <span className="praise-badge">팀원 {linkedPersonCount}/{view.people.length} 연결</span>}</> : <span className="praise-badge">별도 운영 기간</span>}{Boolean(view.meta.importBlockers?.length) && <span className="praise-badge praise-badge--warning">전환 확인 {view.meta.importBlockers!.length}건</span>}</div></div>
+        <div className="praise-context-controls"><label className="praise-field"><span>현재 회차</span><select aria-label="모임 회차" value={meeting?.id ?? ""} disabled={busy || meetings.length === 0} onChange={(event) => selectMeeting(event.target.value)}>{meetings.length === 0 && <option value="">등록된 회차 없음</option>}{meetings.map((item) => <option value={item.id} key={item.id}>{item.date} · {item.title}{item.cancelled ? " · 휴강" : ""}</option>)}</select></label><button className="praise-icon-button" disabled={busy} onClick={() => { void refresh(); }} aria-label="찬양팀 최신 기록 불러오기"><ArrowClockwise size={18} aria-hidden="true" /></button></div>
+      </div>
+      <dl className="praise-metrics"><div><dt>모임</dt><dd>{view.meetings.length}</dd></div><div><dt>{fullPeopleScope ? "학생" : "표시 학생"}</dt><dd>{activeStudentCount}</dd></div><div><dt>{fullPeopleScope ? "활동 스탭" : "표시 스탭"}</dt><dd>{activeStaffCount}</dd></div>{view.permissions.manage && <div><dt>통합 명단 연결</dt><dd>{linkedPersonCount}<small> / {view.people.length}</small></dd></div>}</dl>
+    </section>
     <div className="praise-tabs" ref={tabsRef} role="tablist" aria-label="찬양팀 업무" onKeyDown={(event) => { const index = tabs.findIndex((item) => item.id === activeTab); const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1; if (next >= 0) { event.preventDefault(); selectTab(tabs[next].id); tabsRef.current?.querySelectorAll<HTMLButtonElement>("[role=tab]")[next]?.focus(); } }}>{tabs.map((item) => <button role="tab" type="button" id={`praise-tab-${item.id}`} aria-controls={`praise-panel-${item.id}`} aria-selected={activeTab === item.id} tabIndex={activeTab === item.id ? 0 : -1} key={item.id} onClick={() => selectTab(item.id)}>{item.label}</button>)}</div>
     <div className="praise-feedback" aria-live="polite" aria-atomic="true">{busy ? <p role="status">저장하고 있습니다…</p> : error ? <p role="alert" className="praise-error">{error} <button className="praise-text-button" onClick={() => { void refresh(); }}>최신 기록 불러오기</button></p> : notice ? <p className="praise-success">{notice}</p> : null}</div>
-    {locked && <p className="praise-note">{view.meta.status === "archived" ? "보관된 운영 기간입니다. 운영 설정에서 다시 열기 전까지 읽기 전용입니다." : view.meta.mode === "shadow" ? "기존 운영 기록을 대조 중입니다. 검증을 마치고 운영 모드로 전환한 뒤 입력할 수 있습니다." : "운영 책임자가 준비를 마치면 출결과 등단 편성이 열립니다."}</p>}
+    {locked && <p className="praise-note">{view.meta.status === "archived" ? "보관된 운영 기간입니다. 운영 설정에서 다시 열기 전까지 읽기 전용입니다." : view.meta.mode === "shadow" ? "기존 출결·등단·조 기록은 대조가 끝날 때까지 읽기 전용입니다. 관리자는 팀원 정보와 통합 명단 연결을 정리할 수 있습니다." : "운영 책임자가 준비를 마치면 출결과 등단 편성이 열립니다."}</p>}
     <div role="tabpanel" id="praise-panel-week" aria-labelledby="praise-tab-week" hidden={activeTab !== "week"}><PraiseWeek view={view} meeting={meeting} onTab={selectTab} /></div>
-    {canAttend && visited.has("attendance") && <div role="tabpanel" id="praise-panel-attendance" aria-labelledby="praise-tab-attendance" hidden={activeTab !== "attendance"}><PraiseAttendance {...props} meeting={meeting} onSelectMeeting={selectMeeting} /></div>}
+    {canAttend && visited.has("attendance") && <div role="tabpanel" id="praise-panel-attendance" aria-labelledby="praise-tab-attendance" hidden={activeTab !== "attendance"}><PraiseAttendance {...props} meeting={meeting} onSelectMeeting={selectMeeting} onEditPerson={view.permissions.manage ? editPerson : undefined} /></div>}
     {visited.has("stage") && <div role="tabpanel" id="praise-panel-stage" aria-labelledby="praise-tab-stage" hidden={activeTab !== "stage"}><PraiseStage key={meeting?.id ?? "no-meeting"} {...props} meeting={meeting} /></div>}
-    {(view.permissions.manage || view.permissions.stageEdit) && visited.has("people") && <div role="tabpanel" id="praise-panel-people" aria-labelledby="praise-tab-people" hidden={activeTab !== "people"}><PraisePeople {...props} /></div>}
+    {(view.permissions.manage || view.permissions.stageEdit) && visited.has("people") && <div role="tabpanel" id="praise-panel-people" aria-labelledby="praise-tab-people" hidden={activeTab !== "people"}><PraisePeople {...peopleProps} requestedPersonId={personId || undefined} onRequestedPersonClose={closeRequestedPerson} /></div>}
     {view.permissions.manage && visited.has("settings") && <div role="tabpanel" id="praise-panel-settings" aria-labelledby="praise-tab-settings" hidden={activeTab !== "settings"}><PraiseSettings view={view} execute={execute} busy={busy} /></div>}
   </>;
 }
 
 /** 선택한 운영 기간·탭·회차를 함께 기록해 새로고침과 뒤로가기에 같은 화면을 연다. */
-function updatePraiseLocation(values: { workspace: string; tab: string; meeting: string | null }) {
+function updatePraiseLocation(values: { workspace: string; tab: string; meeting: string | null; person?: string | null }) {
   const url = new URL(window.location.href);
   url.searchParams.set("workspace", values.workspace);
   url.searchParams.set("tab", values.tab);
   if (values.meeting) url.searchParams.set("meeting", values.meeting); else url.searchParams.delete("meeting");
+  if (values.person) url.searchParams.set("person", values.person); else url.searchParams.delete("person");
   if (url.href !== window.location.href) window.history.pushState(null, "", `${url.pathname}${url.search}${url.hash}`);
 }
 

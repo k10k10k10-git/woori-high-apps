@@ -48,6 +48,7 @@ function audit(
   label: string,
   targetId?: string,
   changes: PraiseAuditEvent["changes"] = [],
+  changedCount = changes.length,
 ) {
   state.audit[operationId] = {
     id: operationId,
@@ -57,7 +58,52 @@ function audit(
     label,
     ...(targetId ? { targetId } : {}),
     changes,
+    ...(changedCount !== changes.length ? { changedCount } : {}),
   };
+}
+const personKindLabel = (value: string) =>
+  value === "STUDENT" ? "학생" : "스탭";
+const genderLabel = (value: string) =>
+  value === "FEMALE" ? "여" : value === "MALE" ? "남" : "미입력";
+const departmentLabel = (value: string) =>
+  value === "SECOND" ? "2부" : "1부";
+const teamLabel = (value: string) =>
+  value === "SESSION" ? "세션" : "싱어";
+const preferredServiceLabel = (value: string) =>
+  value === "BOTH" ? "1·2부 모두" : departmentLabel(value);
+const activeLabel = (value: boolean) => (value ? "사용" : "사용 안 함");
+function personChanges(
+  before: PraiseState["people"][string] | undefined,
+  after: PraiseState["people"][string],
+): PraiseAuditEvent["changes"] {
+  const changes: PraiseAuditEvent["changes"] = [];
+  const add = (field: string, previous: string, next: string) => {
+    if (previous !== next) changes.push({ field, before: previous, after: next });
+  };
+  add("이름", before?.name ?? "등록 전", after.name);
+  add("구분", before ? personKindLabel(before.kind) : "등록 전", personKindLabel(after.kind));
+  add("학년", before?.kind === "STUDENT" ? `${before.grade}학년` : "해당 없음", after.kind === "STUDENT" ? `${after.grade}학년` : "해당 없음");
+  add("성별", before ? genderLabel(before.gender) : "등록 전", genderLabel(after.gender));
+  add("예배 부서", before ? departmentLabel(before.department) : "등록 전", departmentLabel(after.department));
+  add("파트", before ? teamLabel(before.team) : "등록 전", teamLabel(after.team));
+  add("활동 상태", before?.active ? "활동 중" : before ? "비활성" : "등록 전", after.active ? "활동 중" : "비활성");
+  add("통합 명단 연결", before?.rosterLink?.applicationKey ? "연결됨" : "미연결", after.rosterLink?.applicationKey ? "연결됨" : "미연결");
+  add("학생 인도자", before ? activeLabel(before.isStudentLeader) : "등록 전", activeLabel(after.isStudentLeader));
+  add("싱어 가능", before ? activeLabel(before.singerCapable) : "등록 전", activeLabel(after.singerCapable));
+  add("조 담당 가능", before ? activeLabel(before.groupStaffCapable) : "등록 전", activeLabel(after.groupStaffCapable));
+  add("선호 예배", before ? preferredServiceLabel(before.preferredService) : "등록 전", preferredServiceLabel(after.preferredService));
+  add("자동 싱어 배정 제외", before ? activeLabel(before.excludeFromAutoSinger) : "등록 전", activeLabel(after.excludeFromAutoSinger));
+  return changes;
+}
+function sameExistingRosterIdentity(
+  before: PraiseState["people"][string]["rosterLink"],
+  after: PraiseState["people"][string]["rosterLink"],
+) {
+  if (!before) return true;
+  if (!after || before.applicationKey !== after.applicationKey) return false;
+  return (["studentId", "staffId", "personId"] as const).every(
+    (field) => !before[field] || before[field] === after[field],
+  );
 }
 export function createPraiseState(
   request: PraiseCreateRequest,
@@ -256,7 +302,8 @@ export function applyPraiseCommand(
   }
   const pending = Object.values(previous.operations).flatMap(op => op.sharedAttendance && ["prepared", "attempting"].includes(op.sharedAttendance.phase) ? [op.sharedAttendance] : []);
   const changesAttendanceMapping =
-    (command.type === "person.save" && pending.some(receipt => receipt.personId === command.person.id)) ||
+    ((command.type === "person.save" || command.type === "person.reconcile") && pending.some(receipt => receipt.personId === command.person.id)) ||
+    (command.type === "people.reconcile" && command.people.some((entry) => pending.some((receipt) => receipt.personId === entry.person.id))) ||
     (command.type === "meeting.save" && pending.some(receipt => receipt.meetingId === command.meeting.id)) ||
     (command.type.startsWith("groups.") && pending.length > 0) ||
     (command.type === "meta.save" && pending.length > 0 && (command.meta.semesterId !== previous.meta.semesterId || command.meta.teamId !== previous.meta.teamId || command.meta.mode !== previous.meta.mode || command.meta.status !== previous.meta.status));
@@ -278,6 +325,7 @@ export function applyPraiseCommand(
       403,
     );
   if (command.type !== "meta.save") {
+    const shadowPersonReconcile = (command.type === "person.reconcile" || command.type === "people.reconcile") && previous.meta.mode === "shadow";
     requireValue(
       previous.meta.status !== "archived",
       "보관된 운영 기간은 수정할 수 없습니다. 운영 설정에서 먼저 다시 열어 주세요.",
@@ -285,8 +333,8 @@ export function applyPraiseCommand(
       409,
     );
     requireValue(
-      previous.meta.mode !== "shadow",
-      "원본 대조 중인 기록은 읽기 전용입니다. 입력 창구 전환 후 수정할 수 있습니다.",
+      previous.meta.mode !== "shadow" || shadowPersonReconcile,
+      "원본 대조 중에는 기존 팀원 연결·세부 정보만 수정할 수 있습니다.",
       "read_only",
       409,
     );
@@ -301,6 +349,7 @@ export function applyPraiseCommand(
   let label = "찬양팀 기록 수정",
     targetId: string | undefined;
   let changes: PraiseAuditEvent["changes"] = [];
+  let changedCount: number | undefined;
   switch (command.type) {
     case "attendance.resolve":
       requireValue(false, "공통 출석 검토 서비스에서 처리해 주세요.", "invalid_request", 400);
@@ -338,15 +387,38 @@ export function applyPraiseCommand(
       targetId = state.meta.id;
       break;
     }
-    case "person.save": {
+    case "person.save":
+    case "person.reconcile": {
       manage();
       const p = command.person;
-      revision(state.people[p.id]?.revision, command.expectedRevision);
-      if (state.people[p.id])
+      const previousPerson = state.people[p.id];
+      revision(previousPerson?.revision, command.expectedRevision);
+      requireValue(
+        command.type !== "person.reconcile" || (previous.meta.mode === "shadow" && previousPerson),
+        "원본 대조 중에는 기존 팀원만 수정할 수 있습니다.",
+        "read_only",
+        409,
+      );
+      if (previousPerson) {
         requireValue(
-          state.people[p.id].kind === p.kind,
+          previousPerson.kind === p.kind,
           "기록이 있는 학생·스탭 구분은 바꿀 수 없습니다.",
         );
+        requireValue(
+          previousPerson.sourceId === p.sourceId,
+          "가져온 기록의 원본 식별자는 바꿀 수 없습니다.",
+          "immutable_source",
+          409,
+        );
+        requireValue(
+          sameExistingRosterIdentity(previousPerson.rosterLink, p.rosterLink),
+          "기존 통합 명단 연결은 이 화면에서 해제하거나 다른 인물로 바꿀 수 없습니다.",
+          "immutable_roster_link",
+          409,
+        );
+      } else {
+        requireValue(!p.sourceId, "직접 등록한 팀원에는 원본 식별자를 지정할 수 없습니다.");
+      }
       if (p.rosterLink?.applicationKey)
         requireValue(
           !Object.values(state.people).some(
@@ -374,11 +446,65 @@ export function applyPraiseCommand(
           Object.keys(state.people).length < 2000,
           "현재 학기 명단의 등록 한도를 초과했습니다.",
         );
+      if (previousPerson) {
+        const { revision: _revision, updatedAt: _updatedAt, updatedBy: _updatedBy, ...previousInput } = previousPerson;
+        void _revision; void _updatedAt; void _updatedBy;
+        requireValue(
+          fingerprint(previousInput) !== fingerprint(p),
+          "변경된 팀원 정보가 없습니다.",
+          "no_changes",
+          409,
+        );
+      }
       state.people[p.id] = { ...p, ...stamp(state.people[p.id], actor, at) };
-      label = command.expectedRevision
-        ? "찬양팀 팀원 정보 수정"
-        : "찬양팀 팀원 등록";
+      changes = personChanges(previousPerson, state.people[p.id]);
+      label = command.type === "person.reconcile"
+        ? "찬양팀 팀원 정보 대조"
+        : command.expectedRevision
+          ? "찬양팀 팀원 정보 수정"
+          : "찬양팀 팀원 등록";
       targetId = p.id;
+      break;
+    }
+    case "people.reconcile": {
+      manage();
+      requireValue(previous.meta.mode === "shadow", "일괄 명단 대조는 원본 대조 중에만 실행할 수 있습니다.", "read_only", 409);
+      requireValue(command.people.length > 0, "대조할 팀원을 선택해 주세요.");
+      const personIds = new Set<string>();
+      const applicationKeys = new Set(Object.values(state.people).flatMap((person) => person.rosterLink?.applicationKey ? [person.rosterLink.applicationKey] : []));
+      const rosterPersonIds = new Set(Object.values(state.people).flatMap((person) => person.rosterLink?.personId ? [person.rosterLink.personId] : []));
+      for (const entry of command.people) {
+        const p = entry.person, previousPerson = state.people[p.id];
+        requireValue(previousPerson, "대조할 기존 팀원을 찾을 수 없습니다.", "not_found", 404);
+        requireValue(!personIds.has(p.id), "같은 팀원이 대조 목록에 두 번 포함되어 있습니다.", "duplicate_person", 409);
+        personIds.add(p.id);
+        revision(previousPerson.revision, entry.expectedRevision);
+        requireValue(previousPerson.kind === p.kind, "기록이 있는 학생·스탭 구분은 바꿀 수 없습니다.");
+        requireValue(previousPerson.sourceId === p.sourceId, "가져온 기록의 원본 식별자는 바꿀 수 없습니다.", "immutable_source", 409);
+        const { revision: _revision, updatedAt: _updatedAt, updatedBy: _updatedBy, rosterLink: _oldLink, ...previousInput } = previousPerson;
+        const { rosterLink: nextLink, ...requestedInput } = p;
+        void _revision; void _updatedAt; void _updatedBy; void _oldLink;
+        requireValue(
+          fingerprint(previousInput) === fingerprint(requestedInput),
+          "일괄 명단 대조에서는 기존 팀원 정보를 함께 바꿀 수 없습니다. 세부 정보는 팀원 편집에서 따로 저장해 주세요.",
+          "reconcile_scope",
+          409,
+        );
+        requireValue(!previousPerson.rosterLink || !Object.keys(previousPerson.rosterLink).length, "이미 연결된 팀원이 포함되어 있습니다.", "immutable_roster_link", 409);
+        requireValue(nextLink?.applicationKey && nextLink.personId, "검증된 학기 배치와 원장 인물을 모두 선택해 주세요.");
+        requireValue(!applicationKeys.has(nextLink.applicationKey) && !rosterPersonIds.has(nextLink.personId), "같은 학기 또는 원장 인물이 이미 연결되어 있습니다.", "duplicate_person", 409);
+        applicationKeys.add(nextLink.applicationKey); rosterPersonIds.add(nextLink.personId);
+        state.people[p.id] = { ...previousPerson, rosterLink: nextLink, ...stamp(previousPerson, actor, at) };
+      }
+      label = `찬양팀 통합 명단 ${command.people.length}명 연결`;
+      const names = command.people.map((entry) => state.people[entry.person.id].name);
+      const visibleNames = names.slice(0, 8).join(", ");
+      changes = [{
+        field: "연결된 팀원",
+        before: `미연결 ${command.people.length}명`,
+        after: `${visibleNames}${names.length > 8 ? ` 외 ${names.length - 8}명` : ""}`,
+      }];
+      changedCount = command.people.length;
       break;
     }
     case "meeting.save": {
@@ -791,6 +917,6 @@ export function applyPraiseCommand(
     actorUid: actor.uid,
     fingerprint: signature,
   };
-  audit(state, actor, at, operationId, command.type, label, targetId, changes);
+  audit(state, actor, at, operationId, command.type, label, targetId, changes, changedCount);
   return state;
 }
