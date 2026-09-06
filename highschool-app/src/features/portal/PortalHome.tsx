@@ -472,5 +472,5 @@ export default function PortalHome() {
 
 function MinistryArea({ href, label, description, tone }: { href: string; label: string; description: string; tone: "semester" | "sunday" | "retreat" | "field" }) {
   // 톤별 색은 .ministry-area--{tone}(portal-surfaces.css)이 --domain-* 토큰으로 정한다.
-  return <Link href={href} className={`ministry-area ministry-area--${tone} rounded-xl p-3.5 transition hover:-translate-y-0.5`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs opacity-70">{description}</p></Link>;
+  return <Link href={href} className={`ministry-area ministry-area--${tone} rounded-xl p-3.5 transition hover:-translate-y-0.5`}><strong className="text-sm">{label}</strong><p className="mt-1 text-xs">{description}</p></Link>;
 }

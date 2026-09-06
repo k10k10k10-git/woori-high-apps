@@ -205,6 +205,8 @@ export interface PraiseAuditEvent {
   label: string;
   targetId?: string;
   changes: Array<{ field: string; before?: string; after?: string }>;
+  /** 일괄 작업에서 상세 표시는 제한하되 실제 반영 대상을 보존한다. */
+  changedCount?: number;
   projectedAt?: number;
   historical?: boolean;
   sourceActorId?: string;
@@ -285,7 +287,15 @@ export type PraiseCommand =
       > &
         Partial<Pick<PraiseMeta, "semesterId" | "teamId">>;
     }
-  | { type: "person.save"; expectedRevision: number; person: PraisePersonInput }
+  | {
+      type: "person.save" | "person.reconcile";
+      expectedRevision: number;
+      person: PraisePersonInput;
+    }
+  | {
+      type: "people.reconcile";
+      people: { expectedRevision: number; person: PraisePersonInput }[];
+    }
   | {
       type: "meeting.save";
       expectedRevision: number;

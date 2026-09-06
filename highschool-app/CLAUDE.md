@@ -203,14 +203,16 @@
 `/sunday-ministry/praise`는 `src/features/praise`의 다섯 업무 탭을 사용한다. `src/app/api/praise`의 Node 서버가 Firebase ID 토큰의 폐기 여부와 현재 두 축 역할을 확인하고, 조 담당 권한·revision·작업 ID를 검사한 뒤 `praiseOps/{workspaceId}`를 갱신한다. 새 별도 Firebase 로그인 구독을 만들지 않는다. 운영 기간·탭·회차는 `workspace`·`tab`·`meeting` 쿼리로 보존한다.
 
 - `server/firebaseAdmin.ts`는 명시된 서버 전용 `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`만 받는다. 공개 환경변수·브라우저 번들·원본 export 도구에 키를 넣지 않는다. 서버 자격정보가 없으면 503으로 닫으며 권한 우회 fallback을 만들지 않는다.
-- 찬양 운영 개설은 공통 학기·사역팀 선택을 기본으로 하고 학기에 속하지 않는 별도 기간만 명시 예외로 둔다. 새 운영 공간의 토요 모임은 날짜가 정확히 같고 유일한 학기 회차만 자동 연결한다. 사람은 `rosterLink.applicationKey`를 명시 선택해야 하며 이름·날짜 유사도로 기존 이관본을 자동 연결하지 않는다.
+- 찬양 운영 개설은 공통 학기·사역팀 선택을 기본으로 하고 학기에 속하지 않는 별도 기간만 명시 예외로 둔다. 새 운영 공간의 토요 모임은 날짜가 정확히 같고 유일한 학기 회차만 자동 연결한다. 사람은 `rosterLink.applicationKey`를 명시 선택해야 하며 이름·날짜 유사도로 기존 이관본을 자동 연결하지 않는다. 찬양 인물의 기존 `id`·`sourceId`·`kind`는 과거 출결·조·등단 참조이므로 유지한다.
+- `rosterLink`는 배치된 학기 신청과 공식 `classes/{year}` 또는 `teacherStaff/{year}`의 같은 `personId`가 확인된 경우만 저장한다. 이 대조에서 `semesters/{sid}/applications`·`classes`·`teacherStaff`는 읽기 전용이며, 찬양 화면이 명단을 맞추기 위해 해당 원장을 생성·수정하지 않는다. 기존 연결은 해제·교체하지 않고 누락된 동일인 필드만 보완한다.
+- 차단 항목이 남은 `shadow`에서는 관리자의 기존 팀원 `person.reconcile`만 허용한다. 출결·등단·조편성·가져오기·새 팀원 등록과 차단 항목/모드 변경은 계속 잠그며, 일반 `person.save`로 우회하지 못하게 서버가 기존 인물·shadow 상태를 재검증한다. 여러 확정 연결은 한 workspace transaction으로 인물 revision·작업 영수증·한국어 감사를 함께 저장한다.
 - 출결은 PRESENT/ABSENT이며 미입력은 null이다. 연결된 회차와 신청자는 `semesters/{sid}/attendance/team/{sessionId}/{applicationKey}`를 공통 원장으로 조회·수정하고 찬양 출결 화면과 등단 계산이 같은 값을 사용한다. `지각` 레거시는 PRESENT로 읽되 새 저장은 `출석` 또는 `결석`만 쓴다. 연결되지 않은 기존 이관 기록은 `praiseOps`의 조회용 fallback으로 보존한다.
 - 공통 출결 저장은 workspace에 작업을 먼저 예약하고 `semesters/{sid}` transaction 안에서 최신 학기·팀·회차·신청 배치를 다시 검증한 뒤 출석 셀과 `praiseOperationReceipts/{receiptHash}`의 `applied` 표식을 함께 저장한다. 표식에는 phase·요청 지문·처리 시각만 두고 UID·이름·회차/신청키·경로를 넣지 않으며 덮어쓰기·자동 삭제하지 않는다. 서로 다른 workspace와 학기 원장을 단일 원자 커밋으로 설명하지 않는다.
 - 저장 응답이 불확실한 요청은 일반 재시도로 출석을 다시 적용하지 않는다. 관리자 검토도 외부 표식보다 먼저 private workspace에 최신 권한·원본 요청·작업 번호를 `prepared`로 예약한다. 영구 `applied` 표식이 확인될 때만 원래 감사를 완료하고, 표식이 없고 현재 출석 revision을 직접 확인한 경우에만 원장 변경 없이 `closed`로 종료한다. 외부 증거 뒤에는 예약을 `verified`로 바꾸고 감사 완료까지 재시도하며 다른 관리자가 먼저 완료한 예약은 `superseded`로 닫는다. 늦게 도착한 저장은 두 표식 모두에서 중단한다.
 - 일반 담당자는 원본 출결을 담당 조 범위에서만 읽고 쓴다. `import-unresolved` 등 과거 조가 검증되지 않은 기록은 운영자만 확인한다. 학기 신청키·Firebase 경로·다른 조의 출결은 API 응답에 노출하지 않는다.
 - 확정 조·등단은 새로운 불변 버전이다. 초안의 수정은 새 버전으로 저장하며, 같은 주일의 최신 확정본만 이후 등단 빈도 계산에 사용한다. 회차 날짜가 바뀌어도 과거 버전의 `worshipDate`를 다시 계산하지 않는다.
 - 공통 출석을 쓰는 회차의 등단 생성·저장·확정은 workspace ETag를 읽어 계산하고, 저장 직전에 같은 회차의 출석·연결 근거를 다시 읽은 뒤 `If-Match`로 저장한다. 412 충돌은 최신 workspace로 계산과 외부 검증을 모두 반복한다. 마지막 외부 검증과 workspace PUT 사이의 학기 원장 변경까지 묶는 분산 원자성은 없으므로 다음 조회에서 최신값을 다시 반영한다.
-- `server/roster.ts`는 기존 학기 배치·훈련 예외 계약을 재사용하고 신청키로 인물을 명시 연결한다. 원장 연락처·메모를 API에 복제하지 않는다. 공통 학기 사역팀 출석 셀 외의 기존 학생·스탭 원장에는 쓰지 않는다.
+- `server/roster.ts`는 기존 학기 배치·훈련 예외 계약을 재사용하고 신청키로 인물을 명시 연결한다. 신청과 공식 학생·스탭 레코드의 이름·유형·`personId`를 함께 검증하고 원장 연락처·메모를 API에 복제하지 않는다. 공통 학기 사역팀 출석 셀 외의 기존 학생·스탭 원장에는 쓰지 않는다. 동일인 근거가 부족하거나 학기 배치가 없는 인물은 자동 연결하지 않고 관리자 확인 대상으로 남긴다.
 - `node scripts/run-praise-contracts.mjs`는 저장소 루트에서 실행한다. 실제 운영 자격정보를 사용하지 않는 demo-praise RTDB 에뮬레이터 계약 검사이며 Java 21이 필요하다.
 - 실제 원본 이관과 기존 shadow 운영본의 회차·인물 연결 및 live 전환은 [전달 절차](../docs/PRAISE_DATA_HANDOFF.md)에 따른다. 어댑터의 합성 테스트 통과를 실제 기록의 대조 완료로 표시하지 않는다.
 

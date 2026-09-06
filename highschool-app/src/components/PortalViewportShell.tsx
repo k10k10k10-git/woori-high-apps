@@ -162,7 +162,7 @@ export default function PortalViewportShell({ children }: { children: React.Reac
 
   if (isDesktopFrame) {
     return (
-      <main className="portal-desktop-lock-stage" aria-label="PC 화면 고정 보기" data-frame-ready={frameReady ? "true" : "false"}>
+      <main className="portal-desktop-lock-stage" aria-label="PC 화면 고정 보기" data-frame-ready={frameReady ? "true" : "false"} tabIndex={0}>
         {!frameReady && <ViewportFrameLoading />}
         <DesktopPortalFrame initialSrc={currentDesktopFrameSrc} frameRef={frameRef} onReady={() => setLoadedFrameKey(frameKey)} />
       </main>

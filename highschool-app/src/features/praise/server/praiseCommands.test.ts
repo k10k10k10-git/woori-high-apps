@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { defaultPraisePolicy } from "../defaults";
 import { createFirstMeetingGuide } from "../content/templates";
 import { canEditViewAttendance, canWritePraiseAttendance, praisePermissions } from "../permissions";
-import type { PraiseActor, PraiseCommand, PraiseGroupInput, PraiseMeetingInput, PraisePerson, PraiseStageConfig, PraiseStageInput, PraiseStageVersion, PraiseState } from "../types";
+import type { PraiseActor, PraiseCommand, PraiseGroupInput, PraiseMeetingInput, PraisePerson, PraisePersonInput, PraiseStageConfig, PraiseStageInput, PraiseStageVersion, PraiseState } from "../types";
 import type { StageAssignment } from "../domain/stage";
 import { applyPraiseCommand, createPraiseState } from "./commands";
 import { parseCommand, parseCreate } from "./parsers";
@@ -52,6 +52,7 @@ function stageVersion(id: string, patch: Partial<PraiseStageVersion> = {}): Prai
 }
 function groupDraft(state: PraiseState): PraiseGroupInput { const group = state.groupVersions["confirmed-group"]; return structuredClone({ settings: group.settings, rules: group.rules, seed: group.seed, groups: group.groups }); }
 function meetingInput(state: PraiseState): PraiseMeetingInput { const { revision: _revision, updatedBy: _by, updatedAt: _at, ...value } = state.meetings.meeting; void _revision; void _by; void _at; return value; }
+function personInput(value: PraisePerson): PraisePersonInput { const { revision: _revision, updatedBy: _by, updatedAt: _at, ...person } = value; void _revision; void _by; void _at; return person; }
 function expectError(run: () => unknown, code: string, status: number) { expect(run).toThrowError(expect.objectContaining({ code, status })); }
 const setAttendance = (personId = "student-1", status: "PRESENT" | "ABSENT" | null = "ABSENT", expectedRevision = 1): PraiseCommand => ({ type: "attendance.set", meetingId: "meeting", personId, status, expectedRevision });
 
@@ -184,6 +185,107 @@ describe("운영 상태와 이관 경계", () => {
     const command: PraiseCommand = { type: "meta.save", expectedRevision: 1, meta: { name: state.meta.name, startDate: state.meta.startDate, endDate: state.meta.endDate, status: "active", mode: "live" } };
     const next = apply(state, command); expect(next.meta).not.toHaveProperty("semesterId"); expect(next.meta).not.toHaveProperty("teamId");
     state.meetings.meeting.linkedSessionId = "linked"; expectError(() => apply(state, command), "invalid_request", 400);
+  });
+});
+
+describe("팀원 정보 대조와 통합 명단 연결 불변성", () => {
+  it("shadow 관리자는 기존 팀원의 최초 연결과 찬양 설정만 저장하며 원본 기록을 보존한다", () => {
+    const state = fixture(); state.meta.mode = "shadow"; state.meta.importBlockers = ["historical_group_unresolved"];
+    state.people["student-1"].sourceId = "source-student-1";
+    const beforeAttendance = structuredClone(state.attendance), beforeStages = structuredClone(state.stageVersions), beforeGroups = structuredClone(state.groupVersions);
+    const person = { ...personInput(state.people["student-1"]), team: "SESSION" as const, rosterLink: { applicationKey: "1_student-1", personId: "person_student_1", year: "2026", classKey: "1-1-1", studentId: "student-1" } };
+    const next = apply(state, { type: "person.reconcile", expectedRevision: 1, person }, manager, "reconcile-person");
+    expect(next.people["student-1"]).toMatchObject({ team: "SESSION", rosterLink: person.rosterLink, sourceId: "source-student-1", revision: 2 });
+    expect(next.attendance).toEqual(beforeAttendance); expect(next.stageVersions).toEqual(beforeStages); expect(next.groupVersions).toEqual(beforeGroups);
+    expect(next.meta.importBlockers).toEqual(state.meta.importBlockers);
+    expect(next.audit["reconcile-person"]).toMatchObject({ label: "찬양팀 팀원 정보 대조", targetId: "student-1" });
+    expect(next.audit["reconcile-person"].changes).toEqual(expect.arrayContaining([
+      { field: "파트", before: "싱어", after: "세션" },
+      { field: "통합 명단 연결", before: "미연결", after: "연결됨" },
+    ]));
+    expect(JSON.stringify(next.audit["reconcile-person"])).not.toContain("person_student_1");
+    expect(JSON.stringify(next.audit["reconcile-person"])).not.toContain("1_student-1");
+  });
+
+  it("shadow의 일반 저장·신규 대조와 live의 대조 전용 명령을 거절한다", () => {
+    const state = fixture(); state.meta.mode = "shadow";
+    const existing = personInput(state.people["student-1"]);
+    expectError(() => apply(state, { type: "person.save", expectedRevision: 1, person: existing }), "read_only", 409);
+    expectError(() => apply(state, { type: "person.reconcile", expectedRevision: 0, person: personInput(person("new-student", "STUDENT")) }), "read_only", 409);
+    state.meta.mode = "live";
+    expectError(() => apply(state, { type: "person.reconcile", expectedRevision: 1, person: existing }), "read_only", 409);
+  });
+
+  it("실제 변경이 없는 팀원 저장은 revision과 감사 로그를 만들지 않는다", () => {
+    const live = fixture();
+    const liveBefore = structuredClone(live);
+    expectError(() => apply(live, { type: "person.save", expectedRevision: 1, person: personInput(live.people["student-1"]) }), "no_changes", 409);
+    expect(live).toEqual(liveBefore);
+
+    const shadow = fixture(); shadow.meta.mode = "shadow";
+    const shadowBefore = structuredClone(shadow);
+    expectError(() => apply(shadow, { type: "person.reconcile", expectedRevision: 1, person: personInput(shadow.people["student-1"]) }), "no_changes", 409);
+    expect(shadow).toEqual(shadowBefore);
+  });
+
+  it("기존 원장 연결과 이관 원본 ID는 화면 명령으로 해제·교체할 수 없다", () => {
+    const state = fixture(); state.people["student-1"].sourceId = "source-student-1";
+    state.people["student-1"].rosterLink = { applicationKey: "1_student-1", personId: "person_student_1", year: "2026", classKey: "1-1-1", studentId: "student-1" };
+    const base = personInput(state.people["student-1"]);
+    const withoutLink = { ...base }; delete withoutLink.rosterLink;
+    expectError(() => apply(state, { type: "person.save", expectedRevision: 1, person: withoutLink }), "immutable_roster_link", 409);
+    expectError(() => apply(state, { type: "person.save", expectedRevision: 1, person: { ...base, rosterLink: { ...base.rosterLink, applicationKey: "1_other", personId: "person_student_other", studentId: "other" } } }), "immutable_roster_link", 409);
+    expectError(() => apply(state, { type: "person.save", expectedRevision: 1, person: { ...base, sourceId: "other-source" } }), "immutable_source", 409);
+  });
+
+  it("대조 명령 파서는 알려진 필드만 유지한다", () => {
+    const state = fixture();
+    const result = parseCommand({ operationId: "reconcile-parse", command: { type: "person.reconcile", expectedRevision: 1, person: { ...personInput(state.people["student-1"]), arbitraryPath: "classes" }, admin: true } });
+    expect(result.command).toMatchObject({ type: "person.reconcile", expectedRevision: 1, person: { id: "student-1" } });
+    expect(JSON.stringify(result.command)).not.toContain("arbitraryPath");
+  });
+
+  it("여러 팀원을 한 작업·감사 기록으로 연결하고 중간 실패 시 원본을 유지한다", () => {
+    const state = fixture(); state.meta.mode = "shadow";
+    const entries = ["student-1", "student-2"].map((id, index) => ({
+      expectedRevision: 1,
+      person: {
+        ...personInput(state.people[id]),
+        rosterLink: { applicationKey: `1_${id}`, personId: `person_student_${index + 1}`, year: "2026", classKey: `1-1-${index + 1}`, studentId: id },
+      },
+    }));
+    const next = apply(state, { type: "people.reconcile", people: entries }, manager, "batch-reconcile");
+    expect(next.people["student-1"].rosterLink).toEqual(entries[0].person.rosterLink);
+    expect(next.people["student-2"].rosterLink).toEqual(entries[1].person.rosterLink);
+    expect(next.people["student-1"].revision).toBe(2); expect(next.people["student-2"].revision).toBe(2);
+    expect(next.meta.revision).toBe(state.meta.revision + 1);
+    expect(Object.keys(next.operations).filter((id) => id === "batch-reconcile")).toHaveLength(1);
+    expect(next.audit["batch-reconcile"]).toMatchObject({ label: "찬양팀 통합 명단 2명 연결", changedCount: 2, changes: [{ field: "연결된 팀원", before: "미연결 2명", after: "합성 student-1, 합성 student-2" }] });
+    expect(JSON.stringify(next.audit["batch-reconcile"])).not.toContain("person_student_");
+    const before = structuredClone(state);
+    expectError(() => apply(state, { type: "people.reconcile", people: [{ ...entries[0], expectedRevision: 0 }, entries[1]] }, manager, "bad-batch"), "revision_conflict", 409);
+    expect(state).toEqual(before);
+  });
+
+  it("일괄 대조는 중복·기존 연결·출석 저장 대기 중인 팀원을 거절한다", () => {
+    const state = fixture(); state.meta.mode = "shadow";
+    const entry = { expectedRevision: 1, person: { ...personInput(state.people["student-1"]), rosterLink: { applicationKey: "1_student-1", personId: "person_student_1", year: "2026", classKey: "1-1-1", studentId: "student-1" } } };
+    expectError(() => apply(state, { type: "people.reconcile", people: [entry, entry] }, manager, "duplicate-batch"), "duplicate_person", 409);
+    state.people["student-1"].rosterLink = entry.person.rosterLink;
+    expectError(() => apply(state, { type: "people.reconcile", people: [{ ...entry, expectedRevision: 1 }] }, manager, "linked-batch"), "immutable_roster_link", 409);
+    delete state.people["student-1"].rosterLink;
+    state.operations.pending = { at: 1000, actorUid: manager.uid, fingerprint: "pending", sharedAttendance: { phase: "prepared", meetingId: "meeting", personId: "student-1", semesterId: "2026-2", sessionId: "session", applicationKey: "1_student-1", groupVersionId: "confirmed-group", status: "PRESENT", beforeStatus: "ABSENT", expectedSourceRevision: "a".repeat(64) } };
+    expectError(() => apply(state, { type: "people.reconcile", people: [entry] }, manager, "pending-batch"), "shared_write_pending", 409);
+  });
+
+  it("일괄 대조 요청으로 기존 이름·학년·파트·상태를 함께 덮어쓰지 못한다", () => {
+    const state = fixture(); state.meta.mode = "shadow"; const before = structuredClone(state);
+    const base = personInput(state.people["student-1"]);
+    const rosterLink = { applicationKey: "1_student-1", personId: "person_student_1", year: "2026", classKey: "1-1-1", studentId: "student-1" };
+    for (const patch of [{ name: "다른 이름" }, { grade: 3 }, { team: "SESSION" as const }, { active: false }]) {
+      expectError(() => apply(state, { type: "people.reconcile", people: [{ expectedRevision: 1, person: { ...base, ...patch, rosterLink } }] }, manager, `scope-${Object.keys(patch)[0]}`), "reconcile_scope", 409);
+      expect(state).toEqual(before);
+    }
   });
 });
 
@@ -325,6 +427,14 @@ describe("명령 파서와 개설 기본값", () => {
   it("미입력 null은 파싱하며 알 수 없는 원장 필드를 저장 명령에 섞지 않는다", () => {
     const result = parseCommand({ operationId: "test", command: { ...setAttendance("student-1", null), admin: true, arbitraryPath: "classes" } });
     expect(result.command).toEqual(setAttendance("student-1", null));
+  });
+
+  it("일괄 대조 목록은 100명으로 제한하고 각 팀원의 알려진 필드만 파싱한다", () => {
+    const state = fixture(), entry = { expectedRevision: 1, person: { ...personInput(state.people["student-1"]), arbitraryPath: "classes" } };
+    const parsed = parseCommand({ operationId: "batch-parse", command: { type: "people.reconcile", people: [entry], arbitraryPath: "semesters" } });
+    expect(parsed.command).toMatchObject({ type: "people.reconcile", people: [{ expectedRevision: 1, person: { id: "student-1" } }] });
+    expect(JSON.stringify(parsed.command)).not.toContain("arbitraryPath");
+    expectError(() => parseCommand({ operationId: "too-many", command: { type: "people.reconcile", people: Array.from({ length: 101 }, () => entry) } }), "invalid_request", 400);
   });
 });
 

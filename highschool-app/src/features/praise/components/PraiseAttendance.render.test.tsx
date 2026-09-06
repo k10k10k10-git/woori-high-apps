@@ -5,6 +5,17 @@ import { PraiseAttendance } from "./PraiseAttendance";
 import { praiseFixture } from "./praiseTestFixtures";
 afterEach(cleanup);
 describe("찬양팀 출결 권한과 명시 입력", () => {
+  it("관리자는 출결 행에서 팀원 세부 편집을 열고 저장 중에는 중복 이동을 막는다", () => {
+    const view = praiseFixture(); const edit = vi.fn();
+    const { rerender } = render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={vi.fn()} busy={false} onEditPerson={edit} />);
+    fireEvent.click(screen.getByRole("button", { name: "합성학생가 세부 정보 수정" }));
+    expect(edit).toHaveBeenCalledWith("student-1");
+    rerender(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={vi.fn()} busy onEditPerson={edit} />);
+    expect(screen.getByRole("button", { name: "합성학생가 세부 정보 수정" })).toBeDisabled();
+    view.permissions = { ...view.permissions, manage: false, stageEdit: false, attendanceAll: false, role: "groupStaff" };
+    rerender(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={vi.fn()} busy={false} onEditPerson={edit} />);
+    expect(screen.queryByRole("button", { name: /세부 정보 수정/ })).not.toBeInTheDocument();
+  });
   it("과거 조 미연결 이관 출석은 현재 조로 표시하거나 현재 로그인 작성자로 해석하지 않는다", () => {
     const view = praiseFixture(); view.meta.sourceAsOf = "2026-09-06T07:15:04.000Z";
     view.meetings[0].updatedBy = "supabase:synthetic-original-actor";

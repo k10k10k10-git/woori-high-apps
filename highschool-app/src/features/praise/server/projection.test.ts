@@ -3,6 +3,10 @@ vi.mock("server-only", () => ({}));
 import { praiseActivityRecord } from "./projection";
 import type { PraiseAuditEvent } from "../types";
 const event: PraiseAuditEvent = {id:"op_1",at:1_800_000_000_000,actor:{uid:"synthetic_user",name:"합성 사용자"},action:"attendance.set",label:"출결 변경",changes:[{field:"출결",before:"미입력",after:"출석"}]};
+
+it("일괄 작업의 실제 대상 수를 상세 표시 제한과 별도로 보존한다",()=>{
+  expect(praiseActivityRecord("synthetic-workspace", { ...event, changedCount: 41 })?.changedCount).toBe(41);
+});
 describe("찬양팀 감사 투영",()=>{
  it("작업별 고정 ID로 재전송 중복을 막고 기존 통합 로그 계약을 만족한다",()=>{
   const first=praiseActivityRecord("test_workspace",event);expect(first).not.toBeNull();expect(first?.id).toBe(praiseActivityRecord("test_workspace",event)?.id);

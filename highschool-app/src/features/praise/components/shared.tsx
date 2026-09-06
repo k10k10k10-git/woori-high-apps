@@ -4,6 +4,10 @@ export type PraiseMeetingProps = PraiseEditorProps & { meeting: PraiseMeeting | 
 export function praiseDataWriteLocked(view: PraiseView): boolean {
   return view.meta.status === "archived" || view.meta.mode === "shadow" || (view.meta.mode === "setup" && !view.permissions.manage);
 }
+/** 원본 대조 중에도 관리자는 기존 팀원의 최초 원장 연결과 찬양팀 전용 설정을 정리할 수 있다. */
+export function praisePersonWriteLocked(view: PraiseView): boolean {
+  return view.meta.status === "archived" || !view.permissions.manage;
+}
 export function hasUnresolvedImportedGroup(view: PraiseView, meeting?: PraiseMeeting | null): boolean {
   if (!meeting) return false;
   if (meeting.groupVersionId) return meeting.groupVersionId === "import-unresolved";
