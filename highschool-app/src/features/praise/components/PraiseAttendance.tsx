@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { PraiseMeeting, PraisePerson, PraiseStatus, PraiseView } from "../types";
 import { canEditViewAttendance, canReadPraiseStudentAttendance } from "../permissions";
 import { PraiseAuditList } from "./PraiseAuditList";
-import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, stampTime, type PraiseMeetingProps } from "./shared";
+import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseDataWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
 
 type AttendanceProps = PraiseMeetingProps & { onSelectMeeting?: (meetingId: string) => void };
 
@@ -57,7 +57,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
         <tbody>{semesterRows.map(({ person, cells }) => <tr key={person.id}><th scope="row">{person.name}{!person.active && <small> · 비활성</small>}</th>{cells.map((cell, index) => <td key={meetings[index].id}>{cell.visible && cell.canOpen && person.active && onSelectMeeting ? <button className="praise-text-button" type="button" disabled={busy} title={cell.detail} aria-label={`${person.name} ${kind === "STUDENT" ? meetings[index].date : meetings[index].worshipDate} ${cell.label} · 모임별 입력 열기`} onClick={() => openMeeting(meetings[index].id, person.id)}>{cell.label}</button> : <span title={cell.detail}>{cell.label}</span>}{cell.groupName && <small className="praise-note"><br />{cell.groupName}</small>}</td>)}</tr>)}</tbody>
       </table></div>}
     </> : rows.length === 0 ? <Empty>{query ? "검색 결과가 없습니다. 이름이나 조를 바꿔 주세요." : "표시할 담당 팀원이 없습니다."}</Empty> : <div className="praise-attendance-list">{rows.map((person) => {
-      const canEdit = (kind === "STUDENT" ? !meeting.cancelled && !meeting.linkedSessionId && Boolean(groupVersion?.groups.some((group) => group.studentIds.includes(person.id))) && canEditViewAttendance(view, meeting.id, person.id) : view.permissions.stageEdit || person.id === view.permissions.staffId);
+      const canEdit = !praiseDataWriteLocked(view) && (kind === "STUDENT" ? !meeting.cancelled && !meeting.linkedSessionId && Boolean(groupVersion?.groups.some((group) => group.studentIds.includes(person.id))) && canEditViewAttendance(view, meeting.id, person.id) : view.permissions.stageEdit || person.id === view.permissions.staffId);
       const record = records[person.id]; const available = staffRecords[person.id];
       const restricted = kind === "STUDENT" && !record && !view.permissions.attendanceAll;
       const status = kind === "STUDENT" ? record?.status ?? null : available?.present != null ? available.present ? "PRESENT" : "ABSENT" : null;

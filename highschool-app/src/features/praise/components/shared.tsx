@@ -1,6 +1,9 @@
 import type { PraiseCommand, PraiseGroupVersion, PraiseMeeting, PraiseView } from "../types";
 export type PraiseEditorProps = { view: PraiseView; execute: (command: PraiseCommand) => Promise<boolean>; busy: boolean };
 export type PraiseMeetingProps = PraiseEditorProps & { meeting: PraiseMeeting | null };
+export function praiseDataWriteLocked(view: PraiseView): boolean {
+  return view.meta.status === "archived" || view.meta.mode === "shadow" || (view.meta.mode === "setup" && !view.permissions.manage);
+}
 export function hasUnresolvedImportedGroup(view: PraiseView, meeting?: PraiseMeeting | null): boolean {
   if (!meeting) return false;
   if (meeting.groupVersionId) return meeting.groupVersionId === "import-unresolved";

@@ -6,7 +6,7 @@ import { reorderStage } from "../domain/stage";
 import { toSeoulDate } from "../domain/terms";
 import { comparePraiseStageVersions, preferredPraiseStageVersion } from "../stageHistoryModel";
 import type { PraiseStageConfig, PraiseStageService, PraiseStageVersion } from "../types";
-import { Empty, WarningList, sourceTime, stampTime, type PraiseMeetingProps } from "./shared";
+import { Empty, WarningList, praiseDataWriteLocked, sourceTime, stampTime, type PraiseMeetingProps } from "./shared";
 import { PraiseStageHistory } from "./PraiseStageHistory";
 import styles from "./PraiseStageHistory.module.css";
 
@@ -38,18 +38,20 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
   const [dirty, setDirty] = useState(false);
   const [selectedService, setSelectedService] = useState(() => version?.services[0]?.department ?? "FIRST");
   if (!meeting) return null;
-  const canEdit = view.permissions.stageEdit;
+  const canEdit = view.permissions.stageEdit && !praiseDataWriteLocked(view);
   const stale = Boolean(version && latestId !== version.id);
   const inputStale = inputRevision !== view.inputRevisions[meeting.id];
-  const setSetting = (patch: Partial<PraiseStageConfig>) => { setConfig((value) => ({ ...value, ...patch })); setDirty(true); };
+  const setSetting = (patch: Partial<PraiseStageConfig>) => { if (busy || !canEdit) return; setConfig((value) => ({ ...value, ...patch })); setDirty(true); };
   const save = async (confirm: boolean) => {
-    if (!version) return;
+    if (!version || busy || !canEdit) return;
     if (await execute({ type: confirm ? "stage.confirm" : "stage.save", meetingId: meeting.id, sourceVersionId: version.id, inputRevision, draft: { config, services, overrides }, acknowledgeWarnings: acknowledge })) { setDirty(false); onSaved(); }
   };
   const generate = async () => {
+    if (busy || !canEdit) return;
     if (await execute({ type: "stage.generate", meetingId: meeting.id, inputRevision: view.inputRevisions[meeting.id], config, overrides })) { setDirty(false); onSaved(); }
   };
   const move = (department: "FIRST" | "SECOND", assignment: StageAssignment, role: "SINGER" | "CHOIR", side: "LEFT" | "RIGHT", index: number) => {
+    if (busy || !canEdit) return;
     setServices((current) => current.map((service) => service.department === department ? { ...service, assignments: reorderStage(service.assignments, `${assignment.personType}:${assignment.personId}`, role, side, index) } : service)); setDirty(true);
   };
   const exportVersion = () => version ? { ...version, config, services, overrides } : null;
