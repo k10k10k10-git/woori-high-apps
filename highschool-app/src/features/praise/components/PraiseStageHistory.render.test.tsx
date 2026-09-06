@@ -21,6 +21,23 @@ function openHistory() {
 function historyTable() { return screen.getByRole("table", { name: /학생별 최신 확정 등단 기록/ }); }
 
 describe("학생별 과거 등단 이력표", () => {
+  it("이관 등단표는 생성 후 데이터가 바뀌었다고 추정하지 않고 원본 조건 대조 한계를 표시한다", () => {
+    const view = sourceView(); const version = view.stages[0];
+    version.imported = true; version.inputRevision = "import:synthetic-source-checksum";
+    view.stages = [version]; const execute = vi.fn();
+    render(<PraiseStage view={view} meeting={view.meetings[0]} execute={execute} busy={true} />);
+    expect(screen.getByText(/이관본의 생성 당시 조건은 현재 기록과 자동 대조할 수 없습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/출결·팀원·설정이 초안 생성 이후 바뀌었습니다/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "수정 초안 저장" })).toBeDisabled();
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("현재 사이트에서 생성한 초안의 조건 변경 경고는 유지한다", () => {
+    const view = sourceView(); view.stages = [{ ...view.stages[0], inputRevision: "previous-native-revision" }];
+    render(<PraiseStage view={view} meeting={view.meetings[0]} execute={vi.fn()} busy={false} />);
+    expect(screen.getByText(/출결·팀원·설정이 초안 생성 이후 바뀌었습니다/)).toBeInTheDocument();
+    expect(screen.queryByText(/이관본의 생성 당시 조건/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "수정 초안 저장" })).toBeDisabled();
+  });
   it("확정 예배가 많으면 8주씩 렌더하고 조건 변경 시 첫 페이지로 이동한다", () => {
     const view = sourceView(); view.stages = Array.from({ length: 9 }, (_, index) => ({ ...view.stages[0], id: `version-${index}`, worshipDate: new Date(Date.UTC(2026, 8, 6 + 7 * index)).toISOString().slice(0, 10) }));
     render(<PraiseStageHistory view={view} />); openHistory();

@@ -185,3 +185,8 @@
 - **접근법**: 현재 IAM 정책과 etag를 보호된 파일에 백업한다 → 승인된 계정·역할만 추가하고 기존 바인딩 보존을 대조한다 → Admin SDK 인증서로 Auth 조회와 RTDB 조회를 따로 실행한다 → Auth는 성공하고 RTDB만 401이면 역할·프로젝트·SDK scope를 확인한 뒤 전파 시간을 둔다. 이번에는 약 2분 뒤 같은 권한·키로 SDK와 REST 조회가 모두 성공했다.
 - **판단 질문**: 즉시 Owner/Editor를 추가하거나 Rules를 열지 않았다. Admin 13의 cert는 RTDB에 필요한 scope를 포함했고, 승인된 역할은 이미 라이브 정책에 존재했다. 키 재발급과 데이터 쓰기도 연결 확인에 필요하지 않았다. [공식 IAM 전파 안내](https://docs.cloud.google.com/iam/docs/access-change-propagation)와 결과가 부합한다.
 - **재사용 규칙**: 새 권한은 정책 대조와 실제 읽기 성공을 각각 확인한다. 키는 출력·argv 없이 `vercel env add FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON production --sensitive --yes`의 stdin으로 전달하고 Preview 미등록을 확인한다. 완료 후 로컬 키와 민감한 정책 스냅샷은 삭제하고 값 없는 영수증만 보존한다.
+
+### Firebase CLI 인증을 승인된 일회성 이관에서 재사용할 때 (2026-09-06)
+- **접근법**: 설치된 firebase-tools 15.10의 `lib/apiv2.js`와 `lib/auth.js`를 확인한다 → CLI와 같은 기존 프로젝트 계정의 `getAccessToken(refreshToken, [])`를 사용한다 → 만료 시각과 access token이 refresh token과 다른지 검사한다 → 값을 출력하지 않고 Admin SDK credential 인터페이스로 전달해 대상 노드를 먼저 읽는다. 실제 REST 200과 SDK 읽기 성공을 확인했다.
+- **판단 질문**: 별도 scope를 임의 요청하거나 서버 키를 다시 만들지 않았다. 다른 scope로 요청하면 기존 OAuth grant와 맞지 않아 실패했고, CLI의 실패 fallback이 refresh token을 access token 필드로 반환할 수도 있었다. 키 재발급·권한 확대는 승인된 데이터 이관의 인증 확인에 필요하지 않았다.
+- **재사용 규칙**: 사용자 승인 일회성 작업은 동작하는 CLI의 실제 인증 계약과 토큰 유효성을 먼저 확인한다. 토큰은 메모리에서만 사용하고, 앱 서버의 명시 서비스 계정 계약에 로컬 사용자 인증 fallback을 추가하지 않는다.

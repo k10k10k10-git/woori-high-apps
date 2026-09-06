@@ -1,6 +1,6 @@
 # 찬양팀 원본 데이터 전달·검증·이관 절차
 
-2026-09-06 작성. 대상은 `high-school-worship-team`의 `worship-admin-v2` Supabase 스키마(소스 `982dc53`, 202609050007까지)다. 실제 원본 기록이 존재함은 사용자 확인 사항이다. 현재 통합사이트 작업자는 원본 Supabase 자격정보와 원본 Vercel 배포 권한이 없어 **이 문서의 운영 명령을 실행하지 않았다**. 소스 파일 검토와 합성 데이터 테스트만 수행했다.
+2026-09-06 작성. 대상은 `high-school-worship-team`의 `worship-admin-v2` Supabase 스키마(소스 `982dc53`, 202609050007까지)다. 같은 날 사용자가 실제 운영 백업 CSV를 제공하고 현재 사이트 적용을 요청했다. 원본 Supabase·Vercel 관리 접근은 없으며 제공 파일의 조회용 이관과 원본 입력 중단을 수반하는 서비스 전환을 구분한다. 이번 파일 대조·적용 상태는 [CSV 이관 기록](PRAISE_DB_IMPORT_2026-09-06.md)을 따른다.
 
 ## 담당자와 승인 범위
 
@@ -9,7 +9,7 @@
 | 원본 내보내기 | 원본 운영자가 Supabase 서비스 역할 자격을 보유 | public 업무 테이블과 imports Storage 조회만 수행 |
 | 원본 입력 동결 | 원본 운영자가 UI·직접 테이블 API·RPC·동기화 작업을 모두 통제 | 원본 쓰기 경로의 운영 변경이므로 운영자 승인·복구 계획 필요 |
 | 로컬 dry-run | 전달받은 보관본과 Node 22.18 이상 | DB·인증·네트워크 접근 없음 |
-| 신규 shadow 원장 적용 | 사용자 명시 DB 쓰기 승인, 검증된 동결 보관본, 백업 위치, 대상 Firebase Admin 자격정보 | `praiseOps/{신규workspaceId}` 단 한 노드를 원자 생성 |
+| 신규 shadow 원장 적용 | 사용자 명시 DB 쓰기 승인, 대조한 원본, 백업 위치, 승인된 Firebase 인증. 최종 동결 export와 아래 CSV 조회용 스냅샷 경로를 구분 | `praiseOps/{신규workspaceId}` 단 한 노드를 원자 생성 |
 | 접근 계정 매핑 | Firebase UID와 원본 프로필/스탭 UUID를 직접 대조하고 권한 부여 승인 | 명시된 workspace 접근 권한만 생성, Firebase 계정은 생성하지 않음 |
 | 실제 서비스 전환 | 원본 동결·대조·교육·운영 검수 후 별도 결정 | 앱의 shadow→live 전환과 원본 운영 중지 |
 | Firebase Rules·IAM·서비스 계정/키 생성 | 각각 별도 명시 승인 및 기존 운영 절차 | 앱 배포 승인으로 대신하지 않음 |
@@ -78,6 +78,22 @@ node scripts/praise-import.mjs --input /보호된/최종-보관본 --term 원본
 
 ## 3. 선택 ID 매핑
 
+### 제공된 단일 CSV 백업
+
+`woori-operational-backup-v1`은 `backup` 열의 단일 JSON 행에 24개 테이블과 스키마·계정 연결 메타데이터를 담는다. 다음 명시 옵션으로 읽는다.
+
+```bash
+node scripts/praise-import.mjs --snapshot-csv --input /보호된/백업.csv --term 원본-학기-UUID --workspace 새-workspace-ID --out /보호된/새-변환결과 --map /보호된/매핑.json
+```
+
+엄격한 CSV 인용·UTF-8·크기·스키마 검사 뒤 기존 변환과 관계 검사를 사용한다. SQL 함수·정책은 데이터로 보관하며 실행하지 않는다. `account_links`, `admin_allowlist`로 계정을 자동 생성하거나 권한을 부여하지 않는다.
+
+CSV의 내보내기 시각은 수집 기준일일 뿐 원본 동결 증거가 아니다. 이 경로는 `source_snapshot_unverified`와 `source_storage_incomplete`를 유지하며 `--source-frozen`을 추가해도 검증 완료로 바꾸지 않는다. 과거 조 매핑이 없으면 `historical_group_unresolved`도 남는다. 원본 CSV·테이블·메타데이터를 보호된 결과 디렉터리에 함께 보존한다.
+
+사용자가 제공 파일 적용을 승인한 경우 `--apply --backup-dir /보호된/새-백업`과 승인된 인증으로 **새 shadow 스냅샷만** 추가할 수 있다. 원본 동결 확인은 조회용 복사의 선행 조건이 아니며, live 전환에는 여전히 필요하다. 일반 export 디렉터리의 적용 경로는 기존 동결 선언·검증 영수증 조건을 유지한다. 차단 항목이 남은 shadow는 서버에서도 setup·live 변경을 거부하여 설정 화면을 통한 업무 편집 우회를 막는다.
+
+### 명시 매핑 파일
+
 `--map /보호된/매핑.json`은 소유자만 읽을 수 있는 `0600` JSON 파일이다. 원본 UUID와 확인한 현행 ID만 넣는다. 개인정보 검색이나 이름 기반 자동 후보 선택은 제공하지 않는다.
 
 ```json
@@ -121,7 +137,7 @@ node scripts/praise-import.mjs --input /보호된/최종-보관본 --term 원본
 
 ## 5. 승인 후 신규 shadow 원장 적용
 
-운영 적용 전에는 원본 책임자의 동결 확인, `comparison-report.json` 검토, 운영 DB 쓰기와 별도 계정 매핑 승인, 대상 신규 ID 확인이 먼저다. Firebase Admin SDK 의존성은 해당 앱 lockfile로 설치한다. `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_DATABASE_URL`을 승인된 자격정보 관리 도구로 프로세스 환경에 주입한다.
+일반 최종 export 적용 전에는 원본 책임자의 동결 확인, `comparison-report.json` 검토, 운영 DB 쓰기 승인, 대상 신규 ID 확인이 먼저다. 계정 매핑이 있는 경우 권한 부여 승인도 필요하다. 위 CSV 조회용 스냅샷은 명시된 별도 조건을 따른다. Firebase Admin SDK 의존성은 해당 앱 lockfile로 설치한다. `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_DATABASE_URL`을 승인된 자격정보 관리 도구로 프로세스 환경에 주입한다.
 
 ```bash
 node scripts/praise-import.mjs --input /보호된/최종-보관본 --term 원본-학기-UUID --workspace 새-workspace-ID --out /보호된/새-적용결과 --map /보호된/매핑.json --late-as-present --apply --source-frozen --backup-dir /보호된/새-백업디렉터리
