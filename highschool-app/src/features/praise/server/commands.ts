@@ -301,6 +301,14 @@ export function applyPraiseCommand(
         "migration_incomplete",
         409,
       );
+      requireValue(
+        state.meta.mode !== "shadow" ||
+          !state.meta.importBlockers?.length ||
+          command.meta.mode === "shadow",
+        "가져온 기록의 대조가 끝날 때까지 읽기 전용으로 유지됩니다.",
+        "migration_incomplete",
+        409,
+      );
       const linkedAttendance = Object.values(state.meetings).some(
         (m) => m.linkedSessionId,
       );

@@ -8,6 +8,7 @@ import { applyNewWorkspace, main as importMain } from "../../../../scripts/prais
 import { exportTable, listImportObjects, sourceConfiguration } from "../../../../scripts/praise-export-supabase.mjs";
 import { checksum, jsonChecksum, privateDirectory, readVerifiedExport, writeJson } from "./io.mjs";
 import { SOURCE_TABLE_KEYS, transformSupabaseSnapshot } from "./transform";
+import { OPERATIONAL_BACKUP_FORMAT, OPERATIONAL_BACKUP_SCOPE } from "./operationalBackup.mjs";
 import { fixtureOptions, fixtureTime, sourceFixture, sourceId } from "./fixtures";
 
 let directory: string;
@@ -20,6 +21,13 @@ async function exported(frozen = false) {
   const manifest = { schemaVersion: 1, schemaContract: "woori-praise-v2-20260905", completedAt: fixtureTime, sourceFrozen: frozen, tablesChecksum, tables: Object.fromEntries(Object.entries(tables).map(([table, rows]) => [table, { count: rows.length, checksum: jsonChecksum(rows) }])), storage: { downloaded: false, complete: false } };
   const manifestChecksum = await writeJson(path, "manifest.json", manifest);
   if (frozen) await writeJson(path, "verification-receipt.json", { sourceFrozen: true, repeatReadMatched: true, manifestChecksum, tablesChecksum });
+  return path;
+}
+
+async function snapshotCsv() {
+  const path = join(directory, "snapshot.csv");
+  const value = { format: OPERATIONAL_BACKUP_FORMAT, scope: OPERATIONAL_BACKUP_SCOPE, exported_at: fixtureTime, project_ref: "synthetic-project", tables: sourceFixture(), enums: [], columns: [], indexes: [], policies: [], functions: [], constraints: [], account_links: [{ id: sourceId(4), email: "PRIVATE_ACCOUNT_SENTINEL", raw_user_meta_data: { role: "ADMIN" } }] };
+  await writeFile(path, `backup\n"${JSON.stringify(value).replaceAll('"', '""')}"\n`, { mode: 0o600 });
   return path;
 }
 
@@ -88,6 +96,49 @@ describe("소유자 전용 산출물 및 dry-run", () => {
     const result = await promisify(execFile)(process.execPath, [join(process.cwd(), "scripts/praise-import.mjs"), "--input", input, "--term", sourceId(1), "--workspace", "node-test", "--out", output, "--late-as-present"], { env: { PATH: process.env.PATH, NODE_ENV: "test" } });
     expect(JSON.parse(result.stdout).mode).toBe("dry-run");
     expect(JSON.parse(await readFile(join(output, "converted-state.json"), "utf8")).meta.id).toBe("node-test");
+  });
+});
+
+describe("사용자가 제공한 CSV 스냅샷 적용 경계", () => {
+  it("dry-run은 계정 권한·네트워크 부수효과 없이 원본과 대조 산출물을 보호한다", async () => {
+    const input = await snapshotCsv(); const output = join(directory, "snapshot-output");
+    const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher); const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const result = await importMain(["--snapshot-csv", "--input", input, "--term", sourceId(1), "--workspace", "snapshot-test", "--out", output, "--late-as-present"]);
+    expect(result).toMatchObject({ mode: "dry-run", liveBlocked: true, targetCounts: { access: 0 } }); expect(fetcher).not.toHaveBeenCalled();
+    const state = JSON.parse(await readFile(join(output, "converted-state.json"), "utf8"));
+    expect(state.meta.mode).toBe("shadow"); expect(state.access).toEqual({});
+    expect(state.meta.importBlockers).toEqual(expect.arrayContaining(["source_snapshot_unverified", "source_storage_incomplete", "historical_group_unresolved"]));
+    expect(JSON.stringify(state)).not.toContain("PRIVATE_ACCOUNT_SENTINEL"); expect(JSON.stringify(log.mock.calls)).not.toContain("PRIVATE_ACCOUNT_SENTINEL");
+    expect(await readFile(join(output, "source-operational-backup.csv"))).toEqual(await readFile(input));
+    expect(JSON.parse(await readFile(join(output, "source-operational-backup-metadata.json"), "utf8")).account_links).toHaveLength(1);
+    expect((await stat(output)).mode & 0o777).toBe(0o700);
+    for (const name of ["source-operational-backup.csv", "source-operational-backup-metadata.json", "converted-state.json"]) expect((await stat(join(output, name))).mode & 0o777).toBe(0o600);
+  });
+
+  it("source-frozen 플래그를 붙여도 CSV의 실제 동결 여부는 미확인으로 남는다", async () => {
+    const input = await snapshotCsv(); const output = join(directory, "snapshot-output"); vi.spyOn(console, "log").mockImplementation(() => {});
+    await importMain(["--snapshot-csv", "--input", input, "--term", sourceId(1), "--workspace", "snapshot-test", "--out", output, "--late-as-present", "--source-frozen"]);
+    const report = JSON.parse(await readFile(join(output, "comparison-report.json"), "utf8"));
+    expect(report.snapshotVerifiedFrozen).toBe(false); expect(report.storageVerified).toBe(false);
+    expect(report.importBlockers).toContain("source_snapshot_unverified");
+    expect(JSON.parse(await readFile(join(output, "source-manifest.json"), "utf8")).sourceFrozen).toBe(false);
+  });
+
+  it("CSV 적용도 백업 경로 없이는 쓰지 않는다", async () => {
+    const input = await snapshotCsv(); const output = join(directory, "snapshot-output");
+    await expect(importMain(["--snapshot-csv", "--input", input, "--term", sourceId(1), "--workspace", "snapshot-test", "--out", output, "--late-as-present", "--apply"])).rejects.toThrow("apply_backup_required");
+    expect(JSON.parse(await readFile(join(output, "converted-state.json"), "utf8")).meta.mode).toBe("shadow");
+  });
+
+  it("CSV의 shadow 적용은 동결을 사칭하지 않고 명시 Admin 설정을 요구한다", async () => {
+    const input = await snapshotCsv(); const output = join(directory, "snapshot-output"); const fetcher = vi.fn(); vi.stubGlobal("fetch", fetcher);
+    await expect(importMain(["--snapshot-csv", "--input", input, "--term", sourceId(1), "--workspace", "snapshot-test", "--out", output, "--late-as-present", "--apply", "--backup-dir", join(directory, "backup")])).rejects.toThrow("firebase_admin_configuration_required");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("명시 snapshot 옵션 없이 CSV를 일반 검증 export처럼 취급하지 않는다", async () => {
+    const input = await snapshotCsv();
+    await expect(importMain(["--input", input, "--term", sourceId(1), "--workspace", "snapshot-test", "--out", join(directory, "output"), "--late-as-present"])).rejects.toThrow();
   });
 });
 

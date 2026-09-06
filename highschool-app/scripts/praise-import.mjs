@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { canonical, checksum, migrationFailure, parseArguments, privateDirectory, privateFile, readPrivateFile, readVerifiedExport, safeFailureCode, writeJson } from "../src/features/praise/migration/io.mjs";
+import { readOperationalBackup } from "../src/features/praise/migration/operationalBackup.mjs";
 
 /** RTDB의 빈 노드 삭제 및 배열/숫자 키 표현 차이를 반영한 저장값 대조. */
 export function rtdbCanonical(value) {
@@ -48,11 +49,14 @@ function adminConfiguration(environment = process.env) {
 }
 
 export async function main(args = process.argv.slice(2)) {
-  const options = parseArguments(args, ["input", "term", "workspace", "out", "map", "backup-dir"], ["help", "late-as-present", "apply", "source-frozen", "apply-access-map"]);
-  if (options.help) { console.log("Node 22.18+ 필요. 기본 dry-run: --input <export 디렉터리> --term <원본 UUID> --workspace <신규 ID> --out <새 디렉터리> [--map <0600 JSON>] [--late-as-present]. 운영 적용은 --apply --backup-dir <새 디렉터리> --source-frozen 및 Admin 환경변수가 모두 필요. 계정 매핑이 있으면 --apply-access-map 추가."); return; }
+  const options = parseArguments(args, ["input", "term", "workspace", "out", "map", "backup-dir"], ["help", "late-as-present", "apply", "source-frozen", "apply-access-map", "snapshot-csv"]);
+  if (options.help) { console.log("Node 22.18+ 필요. 기본 dry-run: --input <export 디렉터리> --term <원본 UUID> --workspace <신규 ID> --out <새 디렉터리> [--map <0600 JSON>] [--late-as-present]. 제공된 백업은 --snapshot-csv --input <0600 CSV>로 읽으며 원본 동결·Storage 검증은 미확인으로 유지합니다. 운영 적용은 --apply --backup-dir <새 디렉터리> 및 Admin 환경변수가 필요하며, 일반 export는 --source-frozen과 검증 영수증도 필수입니다. 계정 매핑이 있으면 --apply-access-map 추가."); return; }
   if (!options.input || !options.term || !options.workspace || !options.out) throw migrationFailure("required_arguments_missing");
   const { SOURCE_TABLE_KEYS, transformSupabaseSnapshot } = await import(new URL("../src/features/praise/migration/transform.ts", import.meta.url));
-  const exported = await readVerifiedExport(resolve(options.input), Object.keys(SOURCE_TABLE_KEYS));
+  const snapshot = options["snapshot-csv"] === true;
+  const exported = snapshot
+    ? await readOperationalBackup(resolve(options.input), Object.keys(SOURCE_TABLE_KEYS))
+    : await readVerifiedExport(resolve(options.input), Object.keys(SOURCE_TABLE_KEYS));
   const mapping = options.map ? JSON.parse((await readPrivateFile(resolve(options.map))).toString("utf8")) : undefined;
   const converted = transformSupabaseSnapshot(exported.tables, { termId: options.term, workspaceId: options.workspace, sourceAsOf: exported.manifest.completedAt, checksum: exported.manifest.tablesChecksum, lateAsPresent: options["late-as-present"] === true, map: mapping });
   const blockers = [...(converted.state.meta.importBlockers ?? [])];
@@ -63,16 +67,25 @@ export async function main(args = process.argv.slice(2)) {
   // 변환 산출물도 개인정보다. 원본을 덮어쓰지 않고 소유자 전용 사본을 함께 보존한다.
   await privateFile(join(directory, "source-tables.json"), exported.tablesBytes);
   await privateFile(join(directory, "source-manifest.json"), exported.manifestBytes);
+  if (snapshot) {
+    await privateFile(join(directory, "source-operational-backup.csv"), exported.snapshotBytes);
+    await privateFile(join(directory, "source-operational-backup-metadata.json"), exported.metadataBytes);
+  }
   if (exported.receipt) await writeJson(directory, "source-verification-receipt.json", exported.receipt);
   const stateChecksum = await writeJson(directory, "converted-state.json", converted.state);
   await writeJson(directory, "comparison-report.json", { ...converted.report, importBlockers: blockers, snapshotVerifiedFrozen: exported.verifiedFrozen, storageVerified: exported.storageVerified, stateChecksum, sourceTablesChecksum: exported.manifest.tablesChecksum });
   const summary = { mode: "dry-run", sourceRows: Object.values(converted.report.sourceCounts).reduce((sum, count) => sum + count, 0), targetCounts: converted.report.targetCounts, lateConverted: converted.report.lateConverted, liveBlocked: blockers.length > 0 };
   if (!options.apply) { console.log(JSON.stringify(summary)); return summary; }
-  if (!options["backup-dir"] || options["source-frozen"] !== true) throw migrationFailure("apply_backup_and_freeze_required");
-  if (!exported.verifiedFrozen) throw migrationFailure("verified_frozen_export_required");
+  if (!options["backup-dir"]) throw migrationFailure(snapshot ? "apply_backup_required" : "apply_backup_and_freeze_required");
+  if (!snapshot && options["source-frozen"] !== true) throw migrationFailure("apply_backup_and_freeze_required");
+  if (!snapshot && !exported.verifiedFrozen) throw migrationFailure("verified_frozen_export_required");
   if (Object.keys(converted.state.access).length > 0 && options["apply-access-map"] !== true) throw migrationFailure("explicit_access_map_apply_required");
   const config = adminConfiguration(); const backupDirectory = await privateDirectory(options["backup-dir"]);
   await privateFile(join(backupDirectory, "source-manifest.json"), exported.manifestBytes);
+  if (snapshot) {
+    await privateFile(join(backupDirectory, "source-operational-backup.csv"), exported.snapshotBytes);
+    await privateFile(join(backupDirectory, "source-operational-backup-metadata.json"), exported.metadataBytes);
+  }
   await writeJson(backupDirectory, "intended-state.json", converted.state);
   const { cert, initializeApp, deleteApp } = await import("firebase-admin/app");
   const { getDatabase } = await import("firebase-admin/database");

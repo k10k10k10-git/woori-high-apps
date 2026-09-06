@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { PraiseMeeting, PraisePerson, PraiseStatus, PraiseView } from "../types";
 import { canEditViewAttendance, canReadPraiseStudentAttendance } from "../permissions";
 import { PraiseAuditList } from "./PraiseAuditList";
-import { Empty, authorName, latestGroups, stampTime, type PraiseMeetingProps } from "./shared";
+import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseDataWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
 
 type AttendanceProps = PraiseMeetingProps & { onSelectMeeting?: (meetingId: string) => void };
 
@@ -16,6 +16,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
   const canReadStudents = canReadPraiseStudentAttendance(view.permissions);
   const kind = canReadStudents ? selectedKind : "STAFF";
   const groupVersion = latestGroups(view, meeting);
+  const unresolvedGroup = hasUnresolvedImportedGroup(view, meeting);
   if (!meeting) return <Empty>운영 설정에서 모임 회차를 추가하면 출결을 기록할 수 있습니다.</Empty>;
   const records = view.attendance[meeting.id] ?? {};
   const staffRecords = view.availability[meeting.id] ?? {};
@@ -39,7 +40,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
     <div className="praise-segment" aria-label="출결 보기"><button type="button" aria-pressed={display === "meeting"} onClick={() => setDisplay("meeting")}>모임별 입력</button><button type="button" aria-pressed={display === "semester"} onClick={() => setDisplay("semester")}>학기 전체 표</button></div>
     {display === "meeting" && meeting.cancelled && <p className="praise-warning">학생 모임 휴강 회차입니다. 학생 출결은 잠겨 있으며 주일 스탭 참석은 기록할 수 있습니다.</p>}
     {display === "meeting" && meeting.linkedSessionId && <p className="praise-note">공통 출석 원장과 연결된 모임입니다. 학기 사역팀 출석 화면에서 기록해 주세요.</p>}
-    {display === "meeting" && !groupVersion && <p className="praise-note">확정된 조편성이 없습니다. 조 담당 스탭은 조가 확정된 뒤 담당 학생의 출결을 기록할 수 있습니다.</p>}
+    {display === "meeting" && !groupVersion && <p className="praise-note">{unresolvedGroup ? "원본에 출석 당시 조편성이 연결되어 있지 않습니다. 출결은 원본대로 표시하며 과거 조는 확인이 필요합니다." : "확정된 조편성이 없습니다. 조 담당 스탭은 조가 확정된 뒤 담당 학생의 출결을 기록할 수 있습니다."}</p>}
     <div className="praise-toolbar">
       <label className="praise-search"><span className="sr-only">출결 이름 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름으로 검색" /></label>
       <label className="praise-field"><span className="sr-only">출결 조 선택</span><select value={groupId} onChange={(event) => setGroupId(event.target.value)}><option value="">전체 조</option>{(display === "semester" ? semesterGroups : groupVersion?.groups)?.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
@@ -56,7 +57,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
         <tbody>{semesterRows.map(({ person, cells }) => <tr key={person.id}><th scope="row">{person.name}{!person.active && <small> · 비활성</small>}</th>{cells.map((cell, index) => <td key={meetings[index].id}>{cell.visible && cell.canOpen && person.active && onSelectMeeting ? <button className="praise-text-button" type="button" disabled={busy} title={cell.detail} aria-label={`${person.name} ${kind === "STUDENT" ? meetings[index].date : meetings[index].worshipDate} ${cell.label} · 모임별 입력 열기`} onClick={() => openMeeting(meetings[index].id, person.id)}>{cell.label}</button> : <span title={cell.detail}>{cell.label}</span>}{cell.groupName && <small className="praise-note"><br />{cell.groupName}</small>}</td>)}</tr>)}</tbody>
       </table></div>}
     </> : rows.length === 0 ? <Empty>{query ? "검색 결과가 없습니다. 이름이나 조를 바꿔 주세요." : "표시할 담당 팀원이 없습니다."}</Empty> : <div className="praise-attendance-list">{rows.map((person) => {
-      const canEdit = (kind === "STUDENT" ? !meeting.cancelled && !meeting.linkedSessionId && Boolean(groupVersion?.groups.some((group) => group.studentIds.includes(person.id))) && canEditViewAttendance(view, meeting.id, person.id) : view.permissions.stageEdit || person.id === view.permissions.staffId);
+      const canEdit = !praiseDataWriteLocked(view) && (kind === "STUDENT" ? !meeting.cancelled && !meeting.linkedSessionId && Boolean(groupVersion?.groups.some((group) => group.studentIds.includes(person.id))) && canEditViewAttendance(view, meeting.id, person.id) : view.permissions.stageEdit || person.id === view.permissions.staffId);
       const record = records[person.id]; const available = staffRecords[person.id];
       const restricted = kind === "STUDENT" && !record && !view.permissions.attendanceAll;
       const status = kind === "STUDENT" ? record?.status ?? null : available?.present != null ? available.present ? "PRESENT" : "ABSENT" : null;
@@ -66,7 +67,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
         ? execute({ type: "attendance.set", meetingId: meeting.id, personId: person.id, status: next, expectedRevision: record?.revision ?? 0 })
         : execute({ type: "availability.set", meetingId: meeting.id, personId: person.id, present: next === null ? null : next === "PRESENT", role: available?.role ?? (person.singerCapable ? "SINGER" : "SESSION"), expectedRevision: available?.revision ?? 0 });
       return <article className="praise-attendance-row" key={person.id}>
-        <div className="praise-person-heading"><strong>{person.name}</strong><span>{kind === "STUDENT" ? `${person.grade}학년 · ${person.team === "SINGER" ? "싱어" : "세션"}` : "스탭"}{group ? ` · ${group.name}` : " · 조 미배정"}</span>{record?.originalStatus === "LATE" && <small>기존 지각 기록 이관</small>}</div>
+        <div className="praise-person-heading"><strong>{person.name}</strong><span>{kind === "STUDENT" ? `${person.grade}학년 · ${person.team === "SINGER" ? "싱어" : "세션"}` : "스탭"}{group ? ` · ${group.name}` : unresolvedGroup ? " · 과거 조 확인 필요" : " · 조 미배정"}</span>{record?.originalStatus === "LATE" && <small>기존 지각 기록 이관</small>}</div>
         <div className="praise-row-actions"><div className="praise-status-buttons" role="group" aria-label={`${person.name} 출결`}>
           <button type="button" aria-pressed={status === "PRESENT"} disabled={busy || !canEdit || status === "PRESENT"} onClick={() => { void setStatus("PRESENT"); }}>출석</button>
           <button type="button" aria-pressed={status === "ABSENT"} disabled={busy || !canEdit || status === "ABSENT"} onClick={() => { void setStatus("ABSENT"); }}>결석</button>

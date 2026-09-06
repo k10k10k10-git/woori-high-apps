@@ -38,6 +38,15 @@ function setup(view = fixture(), execute = vi.fn<(command: PraiseCommand) => Pro
 const click = (name: string) => fireEvent.click(screen.getByRole("button", { name }));
 
 describe("찬양 운영 설정", () => {
+  it("대조가 끝나지 않은 가져온 기록은 운영 모드 변경을 잠근다", () => {
+    const view = fixture(); view.meta.mode = "shadow"; view.meta.importBlockers = ["source_snapshot_unverified"];
+    const { execute } = setup(view); click("학기 설정 편집");
+    expect(screen.getByLabelText("운영 모드")).toBeDisabled();
+    expect(screen.getByLabelText("운영 모드")).toHaveValue("shadow");
+    expect(screen.getByText("가져온 기록의 대조가 끝날 때까지 읽기 전용으로 유지됩니다.")).toBeInTheDocument();
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("운영 책임자만 편집할 수 있다", () => {
     const view = fixture(); view.permissions.manage = false; view.permissions.role = "editor";
     const { execute } = setup(view);

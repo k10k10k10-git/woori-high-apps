@@ -1,14 +1,62 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), data: vi.fn(), execute: vi.fn(), refresh: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), data: vi.fn(), execute: vi.fn(), refresh: vi.fn(), png: vi.fn(), pdf: vi.fn() }));
 vi.mock("./api", () => ({ listPraiseWorkspaces: mocks.list, createPraiseWorkspace: mocks.create, praiseOperationId: () => "operation-test", listPraiseAccounts: async () => ({ accounts: [] }), listPraiseReferences: async () => ({ semesters: [] }), listPraiseRoster: async () => ({ people: [], semesterHref: null }) }));
 vi.mock("./usePraiseData", () => ({ usePraiseData: mocks.data }));
+vi.mock("./components/stageExport", () => ({ exportStagePNG: mocks.png, printStagePDF: mocks.pdf }));
 import PraiseWorkspace from "./PraiseWorkspace";
 import { praiseFixture } from "./components/praiseTestFixtures";
+import type { PraiseStageVersion } from "./types";
 beforeEach(() => { vi.clearAllMocks(); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
 afterEach(cleanup);
 describe("찬양팀 작업공간", () => {
+  for (const mode of ["shadow", "archived"] as const) it(`${mode}에서도 등단 버전·예배부·내보내기는 열고 생성·편집은 잠근다`, async () => {
+    const view = praiseFixture(); if (mode === "shadow") view.meta.mode = "shadow"; else view.meta.status = "archived";
+    const version: PraiseStageVersion = { id: "version-1", meetingId: "meeting-1", number: 1, kind: "CONFIRMED", createdAt: 1, createdBy: "actor", inputRevision: "revision-1", worshipDate: view.meetings[0].worshipDate, config: { ...view.policy!.stage, leaderType: "STAFF", leaderId: "staff-1", staffOnly: false }, leaderName: "합성스탭가", services: [{ department: "FIRST", assignments: [] }, { department: "SECOND", assignments: [] }], candidates: [], overrides: [], warnings: [], acknowledgedWarnings: true };
+    view.stages = [version, { ...version, id: "version-2", number: 2, createdAt: 2 }];
+    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="등단" />);
+    await waitFor(() => expect(mocks.list).toHaveBeenCalled());
+    const select = screen.getByLabelText("저장된 등단표"); expect(select).not.toBeDisabled();
+    fireEvent.change(select, { target: { value: "version-1" } }); expect(select).toHaveValue("version-1");
+    fireEvent.click(screen.getByRole("button", { name: "2부 예배" }));
+    expect(screen.getByRole("button", { name: "2부 예배" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "PNG 저장" })).not.toBeDisabled(); expect(screen.getByRole("button", { name: "인쇄 · PDF" })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "PNG 저장" }));
+    await waitFor(() => expect(mocks.png).toHaveBeenCalledWith(expect.objectContaining({ id: "version-1" })));
+    mocks.pdf.mockReturnValue(true); fireEvent.click(screen.getByRole("button", { name: "인쇄 · PDF" }));
+    await waitFor(() => expect(mocks.pdf).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("button", { name: "최신본 불러오기" })); expect(select).toHaveValue("version-2");
+    expect(screen.queryByRole("button", { name: "현재 조건으로 자동 편성" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "등단표 확정" })).not.toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it("shadow에서 조 버전과 팀원 상세를 읽고 출석 회차로 이동하되 저장하지 않는다", async () => {
+    const view = praiseFixture(); view.meta.mode = "shadow";
+    view.groups.push({ ...structuredClone(view.groups[0]), id: "groups-2", number: 2 });
+    view.meetings.push({ ...view.meetings[0], id: "meeting-2", date: "2026-09-12", worshipDate: "2026-09-13", sequence: 2, title: "두 번째 모임" });
+    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="팀원·조" />);
+    await waitFor(() => expect(mocks.list).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "팀원 등록" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "합성학생가" }));
+    expect(await screen.findByRole("heading", { name: "합성학생가 정보" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "팀원 저장" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "닫기" })).not.toBeDisabled(); fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    fireEvent.click(screen.getByRole("button", { name: "조편성" }));
+    const groups = screen.getByLabelText("편성 기록"); expect(groups).not.toBeDisabled();
+    fireEvent.change(groups, { target: { value: "groups-1" } }); expect(groups).toHaveValue("groups-1");
+    expect(screen.getByRole("button", { name: "자동 조편성 생성" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "조편성 확정" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "최신 편성 불러오기" })); expect(groups).toHaveValue("groups-2");
+    fireEvent.click(screen.getByRole("tab", { name: "출결" }));
+    fireEvent.click(screen.getByRole("button", { name: "학기 전체 표" }));
+    const meeting = screen.getByRole("button", { name: "2026-09-12 두 번째 모임 모임별 입력 열기" }); expect(meeting).not.toBeDisabled();
+    fireEvent.click(meeting); expect(screen.getByLabelText("모임 회차")).toHaveValue("meeting-2");
+    expect(screen.getAllByRole("button", { name: "출석" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
   it("관리자 다섯 탭과 한국어 초기탭을 연결하고 조회로 저장하지 않는다", async () => {
     render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="출결" />);
     await waitFor(() => expect(mocks.list).toHaveBeenCalled());

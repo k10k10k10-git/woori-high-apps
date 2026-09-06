@@ -12,6 +12,7 @@ import { PraiseStage } from "./components/PraiseStage";
 import { PraisePeople } from "./components/PraisePeople";
 import PraiseSettings from "./components/PraiseSettings";
 import { PraiseWeek } from "./components/PraiseWeek";
+import { praiseDataWriteLocked } from "./components/shared";
 import { PraiseResourceLibrary } from "./content/GuideContent";
 import "./praise.css";
 
@@ -64,8 +65,8 @@ function WorkspaceBody({ workspaceId, initialTab }: { workspaceId: string; initi
   const canAttend = canOpenPraiseAttendance(view.permissions);
   const tabs = [{ id: "week", label: "이번 주" }, ...(canAttend ? [{ id: "attendance", label: "출결" }] : []), { id: "stage", label: "등단" }, ...(view.permissions.manage || view.permissions.stageEdit ? [{ id: "people", label: "팀원·조" }] : []), ...(view.permissions.manage ? [{ id: "settings", label: "운영 설정" }] : [])];
   const activeTab = tabs.some((item) => item.id === tab) ? tab : "week";
-  const locked = view.meta.status === "archived" || view.meta.mode === "shadow" || (view.meta.mode === "setup" && !view.permissions.manage);
-  const props = { view, execute, busy: busy || locked };
+  const locked = praiseDataWriteLocked(view);
+  const props = { view, execute: locked ? async () => false : execute, busy };
   return <>
     <div className="praise-context"><div><strong>{view.meta.name}</strong><span className="praise-badge">{view.meta.status === "archived" ? "보관됨" : view.meta.mode === "live" ? "운영 중" : view.meta.mode === "shadow" ? "원본 대조 중" : "운영 준비"}</span></div><div className="praise-toolbar"><label className="praise-field"><span className="sr-only">모임 회차</span><select value={meeting?.id ?? ""} disabled={busy || meetings.length === 0} onChange={(event) => setMeetingId(event.target.value)}>{meetings.length === 0 && <option value="">등록된 회차 없음</option>}{meetings.map((item) => <option value={item.id} key={item.id}>{item.date} · {item.title}{item.cancelled ? " · 휴강" : ""}</option>)}</select></label><button className="praise-icon-button" disabled={busy} onClick={() => { void refresh(); }} aria-label="찬양팀 최신 기록 불러오기"><ArrowClockwise size={18} aria-hidden="true" /></button></div></div>
     <div className="praise-tabs" ref={tabsRef} role="tablist" aria-label="찬양팀 업무" onKeyDown={(event) => { const index = tabs.findIndex((item) => item.id === activeTab); const next = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index - 1 + tabs.length) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1; if (next >= 0) { event.preventDefault(); selectTab(tabs[next].id); tabsRef.current?.querySelectorAll<HTMLButtonElement>("[role=tab]")[next]?.focus(); } }}>{tabs.map((item) => <button role="tab" type="button" id={`praise-tab-${item.id}`} aria-controls={`praise-panel-${item.id}`} aria-selected={activeTab === item.id} tabIndex={activeTab === item.id ? 0 : -1} key={item.id} onClick={() => selectTab(item.id)}>{item.label}</button>)}</div>

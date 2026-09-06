@@ -4,7 +4,7 @@ import { listPraiseRoster } from "../api";
 import type { PraisePersonInput, PraiseRosterLink } from "../types";
 import { PraiseGroups } from "./PraiseGroups";
 import { PraiseImport } from "./PraiseImport";
-import { Empty, type PraiseEditorProps } from "./shared";
+import { Empty, praiseDataWriteLocked, type PraiseEditorProps } from "./shared";
 
 type RosterResult = Awaited<ReturnType<typeof listPraiseRoster>>;
 type RosterPerson = RosterResult["people"][number];
@@ -44,6 +44,7 @@ function PraisePeopleBody(props: PraiseEditorProps) {
   const focusedPerson = useRef<string | null>(null);
   const restoreFocus = useRef(false);
   const locked = busy || saving;
+  const writeLocked = praiseDataWriteLocked(view);
   const editorOpen = Boolean(draft) && view.permissions.manage;
   const editorPersonId = editorOpen ? draft?.id : null;
   useEffect(() => {
@@ -79,7 +80,7 @@ function PraisePeopleBody(props: PraiseEditorProps) {
     setSection(value); setVisited((current) => new Set([...current, value]));
   };
   const choose = (opener: HTMLButtonElement, person?: typeof view.people[number]) => {
-    if (locked || savingRef.current) return;
+    if (locked || savingRef.current || (!person && writeLocked)) return;
     if (dirty && !window.confirm("저장하지 않은 팀원 변경을 닫고 다른 팀원을 열까요?")) return;
     editorOpener.current = opener;
     focusedPerson.current = null;
@@ -94,12 +95,12 @@ function PraisePeopleBody(props: PraiseEditorProps) {
     if (!dirty || window.confirm("저장하지 않은 팀원 변경을 닫을까요?")) { restoreFocus.current = true; setDraft(null); setDirty(false); }
   };
   const change = (patch: Partial<PraisePersonInput>) => {
-    if (locked || savingRef.current) return;
+    if (locked || writeLocked || savingRef.current) return;
     setDraft((value) => value ? { ...value, ...patch } : null); setDirty(true); setSaveError("");
   };
   const usedApplicationKeys = new Set(view.people.filter((person) => person.id !== draft?.id).flatMap((person) => person.rosterLink?.applicationKey ? [person.rosterLink.applicationKey] : []));
   const selectRosterPerson = (applicationKey: string) => {
-    if (!draft || savedLink || locked || savingRef.current) return;
+    if (!draft || savedLink || locked || writeLocked || savingRef.current) return;
     if (!applicationKey) {
       const next = { ...draft }; delete next.rosterLink; setDraft(next); setDirty(true); return;
     }
@@ -120,10 +121,10 @@ function PraisePeopleBody(props: PraiseEditorProps) {
     <div className="praise-segment" aria-label="팀원과 조 메뉴">
       <button disabled={locked} aria-pressed={section === "people"} onClick={() => selectSection("people")}>팀원</button>
       <button disabled={locked} aria-pressed={section === "groups"} onClick={() => selectSection("groups")}>조편성</button>
-      {view.permissions.manage && <button disabled={locked} aria-pressed={section === "import"} onClick={() => selectSection("import")}>명단 가져오기</button>}
+      {view.permissions.manage && <button disabled={locked || writeLocked} aria-pressed={section === "import"} onClick={() => selectSection("import")}>명단 가져오기</button>}
     </div>
     <section hidden={section !== "people"} className="praise-section" onKeyDown={(event) => { if (editorOpen && event.key === "Escape" && !event.defaultPrevented && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); close(); } }}>
-      <div className="praise-section-heading"><div><h2>찬양팀 팀원</h2><p>학생과 스탭을 검색하고 현재 활동 상태를 관리합니다.</p></div>{view.permissions.manage && <button className="praise-button praise-button--primary" disabled={locked} onClick={(event) => choose(event.currentTarget)}>팀원 등록</button>}</div>
+      <div className="praise-section-heading"><div><h2>찬양팀 팀원</h2><p>학생과 스탭을 검색하고 현재 활동 상태를 관리합니다.</p></div>{view.permissions.manage && <button className="praise-button praise-button--primary" disabled={locked || writeLocked} onClick={(event) => choose(event.currentTarget)}>팀원 등록</button>}</div>
       <div className="praise-toolbar">
         <label className="praise-search"><span className="sr-only">팀원 이름 검색</span><input ref={listSearch} type="search" placeholder="이름 검색" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
         <label className="praise-field"><span className="sr-only">팀원 구분</span><select value={kind} onChange={(event) => setKind(event.target.value)}><option value="">학생과 스탭</option><option value="STUDENT">학생</option><option value="STAFF">스탭</option></select></label>
@@ -137,15 +138,15 @@ function PraisePeopleBody(props: PraiseEditorProps) {
       </div>
       {draft && view.permissions.manage && <form id={editorId} className="praise-editor praise-people-editor" aria-label="찬양팀 팀원 편집" onSubmit={async (event) => {
         event.preventDefault();
-        if (locked || savingRef.current || !draft.name.trim() || unresolvedNewLink) return;
+        if (locked || writeLocked || savingRef.current || !draft.name.trim() || unresolvedNewLink) return;
         savingRef.current = true; setSaving(true); setSaveError("");
         try {
           if (await execute({ type: "person.save", expectedRevision: revision, person: draft })) { restoreFocus.current = true; setDraft(null); setDirty(false); }
         } catch { setSaveError("팀원을 저장하지 못했습니다. 입력 내용을 확인한 뒤 다시 시도해 주세요."); }
         finally { savingRef.current = false; setSaving(false); }
       }}>
-        <fieldset disabled={locked} className="praise-edit-fieldset">
-          <div className="praise-section-heading"><h3 ref={editorHeading} tabIndex={-1}>{revision ? `${draft.name || "팀원"} 수정` : "새 팀원 등록"}</h3><button type="button" className="praise-text-button" onClick={close}>닫기</button></div>
+        <div className="praise-section-heading"><h3 ref={editorHeading} tabIndex={-1}>{revision ? `${draft.name || "팀원"} ${writeLocked ? "정보" : "수정"}` : "새 팀원 등록"}</h3><button type="button" className="praise-text-button" disabled={locked} onClick={close}>닫기</button></div>
+        <fieldset disabled={locked || writeLocked} className="praise-edit-fieldset">
           {revision > 0 && view.people.find((person) => person.id === draft.id)?.revision !== revision && <p className="praise-warning">다른 사람이 이 팀원을 수정했습니다. 현재 입력은 유지되었습니다. 닫은 뒤 팀원을 다시 열어 최신 기록과 비교해 주세요.</p>}
           <div className="praise-section-heading"><div><h4>학기 명단 연결</h4><p>배치가 완료된 팀원을 선택하면 이름·학년·부서를 가져옵니다. 이름이 같아도 자동으로 연결하지 않습니다.</p></div><div className="praise-toolbar"><button type="button" className="praise-text-button" disabled={rosterLoading} onClick={() => setRosterAttempt((attempt) => attempt + 1)}>학기 명단 새로고침</button>{semesterHref && <a className="praise-text-button" href={semesterHref} target="_blank" rel="noopener noreferrer">학기 배치 명단 관리 (새 탭)</a>}</div></div>
           {rosterLoading && <p className="praise-note" role="status">학기 명단을 불러오는 중입니다.</p>}
@@ -182,6 +183,6 @@ function PraisePeopleBody(props: PraiseEditorProps) {
       </div>
     </section>
     {visited.has("groups") && <div hidden={section !== "groups"}><PraiseGroups {...props} /></div>}
-    {view.permissions.manage && visited.has("import") && <div hidden={section !== "import"}><PraiseImport {...props} /></div>}
+    {view.permissions.manage && visited.has("import") && <div hidden={section !== "import"}><PraiseImport {...props} busy={busy || writeLocked} /></div>}
   </div>;
 }

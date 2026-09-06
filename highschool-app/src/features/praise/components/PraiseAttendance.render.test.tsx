@@ -5,6 +5,34 @@ import { PraiseAttendance } from "./PraiseAttendance";
 import { praiseFixture } from "./praiseTestFixtures";
 afterEach(cleanup);
 describe("찬양팀 출결 권한과 명시 입력", () => {
+  it("과거 조 미연결 이관 출석은 현재 조로 표시하거나 현재 로그인 작성자로 해석하지 않는다", () => {
+    const view = praiseFixture(); view.meta.sourceAsOf = "2026-09-06T07:15:04.000Z";
+    view.meetings[0].updatedBy = "supabase:synthetic-original-actor";
+    view.attendance = { "meeting-1": { "student-1": { revision: 1, updatedAt: 1000, updatedBy: "supabase:synthetic-original-actor", groupVersionId: "import-unresolved", status: "PRESENT" } } };
+    const execute = vi.fn(); render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={true} />);
+    expect(screen.getByText(/원본에 출석 당시 조편성이 연결되어 있지 않습니다/)).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "합성가조" })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/과거 조 확인 필요/)).toHaveLength(2);
+    expect(screen.getByText(/외부 사이트 기록/)).toBeInTheDocument(); expect(screen.queryByText(/계정 supaba/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "합성학생가 출결" })).getByRole("button", { name: "출석" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "학기 전체 표" }));
+    expect(within(screen.getByRole("table")).getByText("출석")).toBeInTheDocument();
+    expect(execute).not.toHaveBeenCalled();
+  });
+  it("이관 후 새로 만든 회차는 현재 확정 조로 준비할 수 있다", () => {
+    const view = praiseFixture(); view.meta.sourceAsOf = "2026-09-06T07:15:04.000Z";
+    render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={vi.fn()} busy={false} />);
+    expect(screen.getByRole("option", { name: "합성가조" })).toBeInTheDocument();
+    expect(screen.queryByText(/과거 조 확인 필요/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "합성학생가 출결" })).getByRole("button", { name: "출석" })).not.toBeDisabled();
+  });
+  it("원본 회차에 검증한 조 버전이 연결되면 해당 조를 표시한다", () => {
+    const view = praiseFixture(); view.meta.sourceAsOf = "2026-09-06T07:15:04.000Z";
+    view.meetings[0].updatedBy = "supabase:synthetic-original-actor"; view.meetings[0].groupVersionId = "groups-1";
+    render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={vi.fn()} busy={true} />);
+    expect(screen.getByRole("option", { name: "합성가조" })).toBeInTheDocument();
+    expect(screen.queryByText(/과거 조 확인 필요/)).not.toBeInTheDocument();
+  });
   it("일반 스탭도 본인 참석만 기록하고 미입력 행만 찾을 수 있다", () => {
     const view = praiseFixture(); view.permissions = { ...view.permissions, manage: false, stageEdit: false, attendanceAll: false, role: "member" };
     const execute = vi.fn(); const { rerender } = render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);

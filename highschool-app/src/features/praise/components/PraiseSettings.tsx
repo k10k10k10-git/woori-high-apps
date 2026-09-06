@@ -97,6 +97,7 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
   const [referencesRetry, setReferencesRetry] = useState(0);
   const disabled = busy || saving;
   const dataLocked = view.meta.status === "archived" || view.meta.mode === "shadow";
+  const importModeLocked = view.meta.mode === "shadow" && Boolean(view.meta.importBlockers?.length);
   const hasLinkedMeetings = view.meetings.some((meeting) => meeting.linkedSessionId);
   const selectedMeetingId = meetingSelection || view.meetings[0]?.id || "";
   const selectedGuide = view.guides.find((guide) => guide.meetingId === selectedMeetingId);
@@ -170,8 +171,9 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
           <Field label="종료일"><input type="date" required min={metaDraft.value.startDate} value={metaDraft.value.endDate} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, endDate: event.target.value } })} /></Field>
           <Field label="연결 학기"><select disabled={hasLinkedMeetings || referencesLoading || !!referencesError} value={metaDraft.value.semesterId ?? ""} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, semesterId: event.target.value, teamId: "" } })}><option value="">{referencesLoading ? "학기를 불러오는 중…" : "학기 연결 안 함"}</option>{metaDraft.value.semesterId && !selectedSemester && <option value={metaDraft.value.semesterId}>기존 연결 학기</option>}{semesters.map((semester) => <option key={semester.id} value={semester.id}>{semester.title}{semester.startDate ? ` · ${semester.startDate}` : ""}</option>)}</select></Field>
           <Field label="연결 사역팀"><select disabled={hasLinkedMeetings || referencesLoading || !!referencesError || !selectedSemester} value={metaDraft.value.teamId ?? ""} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, teamId: event.target.value } })}><option value="">사역팀 연결 안 함</option>{metaDraft.value.teamId && !teams.some((team) => team.id === metaDraft.value.teamId) && <option value={metaDraft.value.teamId}>기존 연결 사역팀</option>}{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></Field>
-          <Field label="운영 모드"><select value={metaDraft.value.mode} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, mode: event.target.value as typeof metaDraft.value.mode } })}><option value="setup">준비</option><option value="shadow">비교 운영</option><option value="live">실운영</option></select></Field>
+          <Field label="운영 모드"><select disabled={importModeLocked} value={metaDraft.value.mode} onChange={(event) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, mode: event.target.value as typeof metaDraft.value.mode } })}><option value="setup">준비</option><option value="shadow">비교 운영</option><option value="live">실운영</option></select></Field>
         </div>
+        {importModeLocked && <p className="praise-note">가져온 기록의 대조가 끝날 때까지 읽기 전용으로 유지됩니다.</p>}
         <Check label="학기 활성" value={metaDraft.value.status === "active"} change={(active) => setMetaDraft({ ...metaDraft, value: { ...metaDraft.value, status: active ? "active" : "archived" } })} />
         <p className="praise-note">{hasLinkedMeetings ? "공통 출석에 연결된 회차가 있어 학기·사역팀 연결은 읽기 전용입니다." : "기존 학기와 사역팀을 선택해 연결합니다. 연결을 바꿔도 기존 명단이나 출석은 자동 변경되지 않습니다."}</p>
         {referencesError && <div className="praise-toolbar"><p className="praise-note" role="alert">{referencesError}</p><button type="button" className={buttonClass} onClick={() => setReferencesRetry((value) => value + 1)}>학기·사역팀 다시 불러오기</button></div>}

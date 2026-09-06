@@ -207,3 +207,5 @@
 - `server/roster.ts`는 기존 학기 배치·훈련 예외 계약을 재사용하고 신청키로 인물을 명시 연결한다. 원장 연락처·메모를 API에 복제하지 않는다. 기존 학생·스탭 원장에는 쓰지 않는다.
 - `node scripts/run-praise-contracts.mjs`는 저장소 루트에서 실행한다. 실제 운영 자격정보를 사용하지 않는 demo-praise RTDB 에뮬레이터 계약 검사이며 Java 21이 필요하다.
 - 실제 원본 이관·공통 출석 회차 전환은 [전달 절차](../docs/PRAISE_DATA_HANDOFF.md)에 따른다. 합성 테스트 통과를 실제 기록의 대조 완료로 표시하지 않는다.
+
+- 제공된 운영 CSV는 `praise-import.mjs --snapshot-csv`로 엄격히 읽고 새 shadow 원장에만 넣는다. 동결·Storage·과거 조가 미확인이면 차단 항목을 유지한다. `meta.save`는 차단 항목이 남은 shadow의 setup/live 변경을 모두 거부한다. 스키마 SQL과 계정 메타는 실행·권한 부여 입력이 아니다.

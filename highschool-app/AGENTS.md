@@ -454,3 +454,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+### 조회용 이관 모드의 우회 편집 방지 (2026-09-06)
+- **접근법**: 실제 백업의 누락 근거를 차단 항목으로 남긴다 → 명령 전체의 모드 전이를 확인한다 → `meta.save`에서 미대조 shadow의 setup/live 이동을 모두 거부한다 → 설정 UI와 서버 회귀 테스트로 같은 계약을 검증한다.
+- **판단 질문**: live 전환만 막지 않았다. setup도 업무 저장을 허용하므로 shadow→setup은 과거 기록을 변경하는 우회 경로였다. 파일 내 SQL·계정 연결은 업무 테이블 데이터와 구분해 실행·자동 권한 부여하지 않았다.
+- **재사용 규칙**: 읽기 전용 이관본은 모든 편집 가능 모드로의 전이를 서버에서 검사하고, 파일 수신과 최종 운영 전환의 검증 상태를 구분한다. 요청 중 busy와 데이터 쓰기 잠금을 합치지 않는다. praiseDataWriteLocked로 쓰기만 막고 과거 버전 선택·회차 이동·내보내기는 조회 동작으로 유지한다.

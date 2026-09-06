@@ -150,9 +150,21 @@ describe("운영 상태와 이관 경계", () => {
     expect(apply(state, setAttendance()).attendance.meeting["student-1"].status).toBe("ABSENT");
   });
 
-  it("이관 미해결 항목이 있으면 실운영 전환을 막는다", () => {
-    const state = fixture(); state.meta.mode = "shadow"; state.meta.importBlockers = ["합성 미해결 항목"];
-    expectError(() => apply(state, { type: "meta.save", expectedRevision: 1, meta: { name: state.meta.name, startDate: state.meta.startDate, endDate: state.meta.endDate, status: "active", mode: "live" } }), "migration_incomplete", 409);
+  for (const mode of ["setup", "live"] as const) {
+    it(`이관 미해결 기록을 ${mode}로 바꿔 읽기 전용을 해제하지 못한다`, () => {
+      const state = fixture(); state.meta.mode = "shadow"; state.meta.importBlockers = ["source_snapshot_unverified"];
+      const before = structuredClone(state);
+      expectError(() => apply(state, { type: "meta.save", expectedRevision: 1, meta: { name: state.meta.name, startDate: state.meta.startDate, endDate: state.meta.endDate, status: "active", mode } }), "migration_incomplete", 409);
+      expect(state).toEqual(before);
+      expectError(() => apply(state, setAttendance()), "read_only", 409);
+    });
+  }
+
+  it("대조 중인 기록의 표시 이름을 바꿔도 차단 항목과 원본 출석은 보존한다", () => {
+    const state = fixture(); state.meta.mode = "shadow"; state.meta.importBlockers = ["source_snapshot_unverified"];
+    const next = apply(state, { type: "meta.save", expectedRevision: 1, meta: { name: "검토용 보관본", startDate: state.meta.startDate, endDate: state.meta.endDate, status: "active", mode: "shadow" } });
+    expect(next.meta).toMatchObject({ mode: "shadow", importBlockers: state.meta.importBlockers, name: "검토용 보관본" });
+    expect(next.attendance).toEqual(state.attendance);
   });
 
   it("공통 출석 연결은 일반 회차 명령으로 만들 수 없고 연결 회차의 출결은 별도로 쓰지 않는다", () => {

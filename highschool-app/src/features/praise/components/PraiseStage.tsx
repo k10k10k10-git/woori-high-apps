@@ -6,7 +6,7 @@ import { reorderStage } from "../domain/stage";
 import { toSeoulDate } from "../domain/terms";
 import { comparePraiseStageVersions, preferredPraiseStageVersion } from "../stageHistoryModel";
 import type { PraiseStageConfig, PraiseStageService, PraiseStageVersion } from "../types";
-import { Empty, WarningList, sourceTime, stampTime, type PraiseMeetingProps } from "./shared";
+import { Empty, WarningList, praiseDataWriteLocked, sourceTime, stampTime, type PraiseMeetingProps } from "./shared";
 import { PraiseStageHistory } from "./PraiseStageHistory";
 import styles from "./PraiseStageHistory.module.css";
 
@@ -38,18 +38,20 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
   const [dirty, setDirty] = useState(false);
   const [selectedService, setSelectedService] = useState(() => version?.services[0]?.department ?? "FIRST");
   if (!meeting) return null;
-  const canEdit = view.permissions.stageEdit;
+  const canEdit = view.permissions.stageEdit && !praiseDataWriteLocked(view);
   const stale = Boolean(version && latestId !== version.id);
   const inputStale = inputRevision !== view.inputRevisions[meeting.id];
-  const setSetting = (patch: Partial<PraiseStageConfig>) => { setConfig((value) => ({ ...value, ...patch })); setDirty(true); };
+  const setSetting = (patch: Partial<PraiseStageConfig>) => { if (busy || !canEdit) return; setConfig((value) => ({ ...value, ...patch })); setDirty(true); };
   const save = async (confirm: boolean) => {
-    if (!version) return;
+    if (!version || busy || !canEdit) return;
     if (await execute({ type: confirm ? "stage.confirm" : "stage.save", meetingId: meeting.id, sourceVersionId: version.id, inputRevision, draft: { config, services, overrides }, acknowledgeWarnings: acknowledge })) { setDirty(false); onSaved(); }
   };
   const generate = async () => {
+    if (busy || !canEdit) return;
     if (await execute({ type: "stage.generate", meetingId: meeting.id, inputRevision: view.inputRevisions[meeting.id], config, overrides })) { setDirty(false); onSaved(); }
   };
   const move = (department: "FIRST" | "SECOND", assignment: StageAssignment, role: "SINGER" | "CHOIR", side: "LEFT" | "RIGHT", index: number) => {
+    if (busy || !canEdit) return;
     setServices((current) => current.map((service) => service.department === department ? { ...service, assignments: reorderStage(service.assignments, `${assignment.personType}:${assignment.personId}`, role, side, index) } : service)); setDirty(true);
   };
   const exportVersion = () => version ? { ...version, config, services, overrides } : null;
@@ -67,7 +69,9 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
   };
   return <fieldset disabled={busy} className="praise-edit-fieldset"><div className="praise-stack">
     {stale && <p className="praise-warning">최신 등단표가 따로 있습니다. 입력 중인 내용은 유지했습니다. 상단에서 최신본을 불러온 뒤 편집해 주세요.</p>}
-    {version && inputStale && <p className="praise-warning">출결·팀원·설정이 초안 생성 이후 바뀌었습니다. 현재 조건으로 다시 생성한 뒤 확인해 주세요.</p>}
+    {version && inputStale && (version.imported
+      ? <p className="praise-note">이관본의 생성 당시 조건은 현재 기록과 자동 대조할 수 없습니다.{canEdit && " 새 편성이 필요하면 현재 조건으로 생성해 주세요."}</p>
+      : <p className="praise-warning">출결·팀원·설정이 초안 생성 이후 바뀌었습니다. 현재 조건으로 다시 생성한 뒤 확인해 주세요.</p>)}
     {meeting.cancelled && <p className="praise-note">토요 학생 모임은 휴강입니다. 학생 후보는 0명이며, 주일 스탭 참석을 기록해 스탭 등단을 편성할 수 있습니다.</p>}
     {canEdit && <details className="praise-disclosure" open={!version}><summary>등단 조건과 후보 예외</summary><div className="praise-form-grid">
       <label className="praise-field"><span>인도자 구분</span><select value={config.leaderType} onChange={(event) => setSetting({ leaderType: event.target.value as "STAFF" | "STUDENT", leaderId: "" })}><option value="STAFF">스탭</option><option value="STUDENT">학생</option></select></label>
