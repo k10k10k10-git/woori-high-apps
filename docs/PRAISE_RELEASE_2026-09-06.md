@@ -42,6 +42,10 @@
 
 ## 배포 상태
 
+2026-09-06 15:33 KST 서버 연결 확인: 기존 Firebase `woori-high`에 전용 서비스 계정 `woori-praise-server`와 사용자 관리 키 1개를 생성했다. IAM 정책의 etag·기존 바인딩을 백업/보존하고 승인된 `roles/firebaseauth.viewer`, `roles/firebasedatabase.admin`만 추가했으며 라이브 대조도 일치했다. 키는 stdin을 통해 Vercel `highschool-app`의 **Production Secret** `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`에 등록했다. Preview에는 등록하지 않았다. 새 계정으로 기존 관리자 레코드 SDK 조회·Auth getUser·찬양팀 경로 REST 조회가 성공했고 찬양 workspace는 0개다. 생성 직후 RTDB 인증 오류는 약 2분 뒤 권한·키 변경 없이 해소됐다. DB/Auth 데이터 쓰기와 Rules 배포는 모두 0건이다.
+
+승인 문서 HEAD `179b08d`의 일반 품질 CI와 찬양팀 저장 계약도 성공했다. 인증 E2E는 동일한 기존 storage-state 가드에서 중단됐으며 전체 CI 성공으로 보고하지 않는다. 후속 문서 정리는 앱 코드·의존성·워크플로를 바꾸지 않는다.
+
 [PR #20](https://github.com/k10k10k10-git/woori-high-apps/pull/20)을 Draft로 만들었다. 첫 코드 `61c27e4`의 일반 CI(lint/typecheck/coverage/build/Lighthouse)와 실제 RTDB 계약 CI는 통과했다. 인증 E2E는 기존 비어 있는 Playwright storage-state를 검사하는 가드에서 중단되어 미실행이며 가드를 바꾸지 않았다. 최초 Preview는 Ready와 buildId 일치를 확인했지만 실제 API에서 아래 런타임 호환 문제를 발견해 SDK 보완 미리보기를 다시 확인한다.
 
 SDK 보완 코드 `35fe9892c9499c4287cd5b2d6ac9c9956902bbe2`의 일반 CI와 실제 RTDB 계약 CI가 통과했다. Vercel Preview `dpl_GtD8FteqxEXANNX7vfuGBtS6j3gU`는 Ready와 buildId가 일치하고, 실제 비로그인 API도 JSON 401로 복구됐다. 서버 비밀 설정 전의 합성 Bearer 요청은 `server_not_configured` 503을 반환했으며 운영 인증 검증으로 간주하지 않는다.

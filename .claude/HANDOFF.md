@@ -11,6 +11,7 @@
 - 새 `praiseOps/{workspaceId}`는 Firebase Admin 서버 전용이다. 폐기 토큰·현재 역할·담당 조 검증, 원자 업무/감사/멱등 영수증, 글로벌 감사 투영 실패 재시도를 구현했다. 현행 운영 Rules와 소스가 일치하고 이 경로의 직접 클라이언트 접근은 기본 거절임을 확인했다. Rules 수정·배포는 없다.
 - 24개 Supabase 테이블·Storage 내보내기와 신규 shadow 원장 이관 도구는 합성 자료로 검증했다. 실제 건수·과거 LATE 정책·계정 UID 매핑·백업을 대조해 별도 운영 DB 승인을 받기 전에는 적용하지 않는다. 이름·날짜만으로 인물이나 동일 행사를 자동 연결하지 않는다.
 - **최신 승인**: 사용자 “서버 계정·권한·키 설정 승인”을 받았다. 기존 Firebase `woori-high` DB에 연결하는 전용 서비스 계정 1개·Auth 조회/RTDB 읽기쓰기 권한·서버 키의 Vercel Production 등록 범위다. 새 DB를 만들거나 운영 데이터를 이관하는 승인이 아니다. 이후 기존 DB에 연결할 수 있는지 질문에 같은 DB를 사용한다고 설명했다.
+- **서버 설정 완료 (15:33 KST)**: `woori-praise-server` 계정/키 1개와 승인된 두 역할을 기존 IAM 바인딩/etag 보존 후 설정했다. Vercel Production Secret 등록과 Preview 미등록을 확인했다. 새 키로 기존 관리자 SDK 조회·Auth getUser·찬양 경로 REST 조회가 성공했다. 찬양 workspace 0개, DB/Auth 데이터 쓰기·Rules 배포 0건이다. 초기 RTDB 인증 오류는 약 2분 뒤 같은 권한·키로 해소됐으며 권한을 확대하지 않았다.
 - **실제 이관 전 필요**: 기존 담당자의 보호된 원본 보관본. 공통 사역 출석 어댑터·이전 입력 차단과 서버의 과거 기록 페이지 조회는 실제 대조/규모 확인 후 남은 범위다. 이관본의 `importBlockers`를 삭제하거나 live로 우회하지 않는다.
 - PR #20을 Draft로 만들었다. 통합 1,513·학생 277·Agent OS 35테스트, 두 앱 build와 실제 RTDB 계약 3개 통과. 최초 Preview의 실제 API에서 SDK14의 Vercel CommonJS/ESM 호환 문제를 발견해 Admin13.10.0 정확핀과 production API 회귀 검사를 추가했다. 일반 CI와 인증 저장 상태 미설정으로 미실행된 E2E를 구분한다.
 - SDK 보완 `35fe989`의 일반 CI/실제 RTDB 계약과 Preview Ready·buildId·실제 API 비로그인 401을 확인했다. 승인된 서버 설정·PR 병합·운영 배포를 진행하며 최종 상태는 `docs/PRAISE_RELEASE_2026-09-06.md`와 로컬 `outputs/praise-integration-2026-09-06/`를 확인한다. 운영 DB 직접 쓰기·Rules 변경·원본 입력 중지·실제 이관은 범위에 없다. 앱 배포와 실제 기록 이관 완료를 구분한다.

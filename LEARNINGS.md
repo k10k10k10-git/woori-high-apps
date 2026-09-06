@@ -180,3 +180,8 @@
 - **접근법**: `agent-os/http-json.test.js`의 loopback 스텁으로 무응답을 재현한다 → 소켓 idle timeout과 전체 요청 기한을 구분한다 → `agent-os/http-json.js`에서 전체 기한·본문 바이트 상한·중간 단절·오류 상태를 제한한다 → 느린 스트림과 초과 응답에서도 연결이 닫히는지 검증한다.
 - **판단 질문**: 운영 Vercel과 실제 실행 API 대신 로컬 스텁을 써 인증·운영 부작용을 배제했다. 소켓 timeout만 추가하면 조금씩 도착하는 응답에 기한이 연장되므로 전체 타이머를 사용했다.
 - **재사용 규칙**: 선택적 외부 조회는 전체 기한과 응답 바이트 상한을 적용하고, 네트워크·파싱·형태 오류 모두 해당 필드 없음으로 끝내어 나머지 보고서가 열리게 한다. 자식 프로세스는 `error` 뒤 `close`가 올 수 있으므로 완료 처리를 한 함수로 합치고, `agent-os/runtime.test.js`처럼 두 이벤트의 순서를 스텁으로 재현해 저장과 SSE 종료가 한 번인지 확인한다.
+
+### Firebase 서버 계정 생성 직후 DB 인증 실패를 확인하는 순서 (2026-09-06)
+- **접근법**: 현재 IAM 정책과 etag를 보호된 파일에 백업한다 → 승인된 계정·역할만 추가하고 기존 바인딩 보존을 대조한다 → Admin SDK 인증서로 Auth 조회와 RTDB 조회를 따로 실행한다 → Auth는 성공하고 RTDB만 401이면 역할·프로젝트·SDK scope를 확인한 뒤 전파 시간을 둔다. 이번에는 약 2분 뒤 같은 권한·키로 SDK와 REST 조회가 모두 성공했다.
+- **판단 질문**: 즉시 Owner/Editor를 추가하거나 Rules를 열지 않았다. Admin 13의 cert는 RTDB에 필요한 scope를 포함했고, 승인된 역할은 이미 라이브 정책에 존재했다. 키 재발급과 데이터 쓰기도 연결 확인에 필요하지 않았다. [공식 IAM 전파 안내](https://docs.cloud.google.com/iam/docs/access-change-propagation)와 결과가 부합한다.
+- **재사용 규칙**: 새 권한은 정책 대조와 실제 읽기 성공을 각각 확인한다. 키는 출력·argv 없이 `vercel env add FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON production --sensitive --yes`의 stdin으로 전달하고 Preview 미등록을 확인한다. 완료 후 로컬 키와 민감한 정책 스냅샷은 삭제하고 값 없는 영수증만 보존한다.
