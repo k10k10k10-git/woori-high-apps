@@ -33,7 +33,7 @@
 
 ## 현재 운영 전환에 필요한 사항
 
-1. **통합 사이트 서버 연결**: Vercel `highschool-app`의 Production에 `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`이 필요하다. 현재 등록하지 않았다. 전용 서비스 계정 `woori-praise-server` 1개와 서버 키 1개, Firebase Auth 조회 및 RTDB 읽기/쓰기 권한을 준비해야 한다. 서비스 계정·IAM·키 변경은 루트 지침의 별도 명시 승인 대상이다. 앱 사용자의 통합관리자 권한이나 원본 외부 계정을 자동 변경하지 않는다.
+1. **통합 사이트 서버 연결**: 사용자가 2026-09-06 “서버 계정·권한·키 설정 승인”으로 전용 서비스 계정 `woori-praise-server` 1개·서버 키 1개·Firebase Auth 조회 및 RTDB 읽기/쓰기 권한과 Vercel Production 등록을 명시 승인했다. 기존 Firebase 프로젝트/DB `woori-high`에 연결하며 새 DB를 만들지 않는다. 실제 운영 데이터 변경·이관은 이 승인에 포함되지 않는다. 서버 설정과 배포의 실제 완료 여부는 후속 영수증으로 확인한다.
 2. **원본 기록 확보**: 사용자 답변에 따라 외부 Supabase와 Vercel은 다른 개발자·담당자가 운영 중이다. 실제 원본 건수·기록·파일과 쓰기 동결 권한을 확보하지 못했다. 원본 담당자가 전달 절차에 따라 검토용 보관본을 내보내야 실제 대조를 진행할 수 있다.
 3. **공통 행사 출석 전환**: 같은 회차 여부를 날짜·이름으로 추정하지 않는다. 공통 회차로 연결된 이관본은 `shared_attendance_cutover_pending`으로 live 전환을 차단한다. 최종 원장 선택, 학기/찬양 출석 조회·저장·집계 어댑터, 이전 쓰기 경로의 권한/Rules 검증은 실제 대조 후 남아 있다. 이 기능까지 구현·전환 완료했다고 보고하지 않는다.
 4. **실제 이관 승인**: 과거 LATE 변환 건수와 정책, Firebase UID 연결, 대상 경로·건수·사전 백업을 대조 보고서로 준비한 뒤 운영 DB 적용 승인을 받는다. 합성 검증 통과는 실제 기록 대조나 사용자 승인이 아니다.
@@ -44,7 +44,9 @@
 
 [PR #20](https://github.com/k10k10k10-git/woori-high-apps/pull/20)을 Draft로 만들었다. 첫 코드 `61c27e4`의 일반 CI(lint/typecheck/coverage/build/Lighthouse)와 실제 RTDB 계약 CI는 통과했다. 인증 E2E는 기존 비어 있는 Playwright storage-state를 검사하는 가드에서 중단되어 미실행이며 가드를 바꾸지 않았다. 최초 Preview는 Ready와 buildId 일치를 확인했지만 실제 API에서 아래 런타임 호환 문제를 발견해 SDK 보완 미리보기를 다시 확인한다.
 
-운영에 필요한 서버 자격이 없어 병합·운영 활성화는 대기한다. 운영 DB 쓰기, Rules 배포, 서비스 계정/IAM 변경, 원본 입력 중지, 실제 기록 이관을 실행하지 않았다. 운영 `/api/version`은 기존 `68f7bef3c2b2c8adb16ca5455cbf57f1d1442426`을 유지했다. 후속 미리보기·CI 영수증은 로컬 `outputs/praise-integration-2026-09-06/`에 보존한다.
+SDK 보완 코드 `35fe9892c9499c4287cd5b2d6ac9c9956902bbe2`의 일반 CI와 실제 RTDB 계약 CI가 통과했다. Vercel Preview `dpl_GtD8FteqxEXANNX7vfuGBtS6j3gU`는 Ready와 buildId가 일치하고, 실제 비로그인 API도 JSON 401로 복구됐다. 서버 비밀 설정 전의 합성 Bearer 요청은 `server_not_configured` 503을 반환했으며 운영 인증 검증으로 간주하지 않는다.
+
+사용자가 서버 설정을 승인했으므로 기존 DB에 서버 계정 연결 → PR 병합 → 통합 앱 운영 배포·버전 확인을 진행한다. 운영 DB 직접 쓰기, Rules 배포, 원본 입력 중지, 실제 기록 이관은 실행하지 않는다. 서버 설정 전 확인한 운영 `/api/version`은 `68f7bef3c2b2c8adb16ca5455cbf57f1d1442426`이었다. 후속 미리보기·CI·서버 설정·운영 배포 영수증은 로컬 `outputs/praise-integration-2026-09-06/`에 보존한다.
 
 
 ## Vercel 런타임 호환성 보완
