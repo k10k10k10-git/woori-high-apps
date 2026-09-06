@@ -416,24 +416,57 @@ html, body, #root {
 .att-cell-name {
   background: var(--surface);
   text-align: left;
-  padding: 6px 8px;
+  padding: 0;
   position: sticky; left: 0; z-index: 1;
-  cursor: pointer;
+  cursor: default;
   white-space: nowrap;
 }
 .att-cell-name:hover { background: var(--primary-bg); }
+.att-student-history-button {
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
 .att-cell {
   min-width: 32px; max-width: 40px; height: 30px;
-  cursor: pointer;
+  cursor: default;
   position: relative;
   transition: background .1s;
   user-select: none;
 }
-.att-cell:hover { filter: brightness(.93); }
+.att-cell.editable { cursor: pointer; }
+.att-cell.editable:hover { filter: brightness(.93); }
 .att-cell.O { background: var(--green-bg); font-size: 0; }
-.att-cell.O::after { content: '✓'; font-size: 15px; font-weight: 800; color: var(--green-text); }
+.att-cell.O::after {
+  content: '✓';
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 15px; font-weight: 800; color: var(--green-text);
+  pointer-events: none;
+}
 .att-cell.X { background: var(--red-bg); font-size: 0; }
-.att-cell.X::after { content: '✕'; font-size: 13px; font-weight: 800; color: var(--red-text); }
+.att-cell.X::after {
+  content: '✕';
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 800; color: var(--red-text);
+  pointer-events: none;
+}
+.att-cell-edit-button {
+  width: 100%; height: 100%; min-height: 30px;
+  border: 0; background: transparent; color: inherit;
+  font: inherit; cursor: pointer;
+}
+.att-student-history-button:focus-visible,
+.att-cell-edit-button:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: -3px;
+}
 .att-cell.holiday { background: #fef3c7; cursor: default; min-width: 32px; max-width: 40px; width: 36px; }
 .att-stat-cell {
   background: var(--surface2);
@@ -497,6 +530,22 @@ html, body, #root {
 .long-absent-list button:last-child { border-bottom: 0; }
 .long-absent-list button span { color: var(--text3); font-size: 11px; }
 
+.history-modal-close,
+.att-modal-close {
+  min-width: 44px; min-height: 40px;
+  margin-left: auto; padding: 7px 10px;
+  border: 1px solid var(--border2); border-radius: 8px;
+  background: var(--surface); color: var(--text2);
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.history-modal-close:hover,
+.att-modal-close:hover { background: var(--surface2); }
+.history-modal-close:focus-visible,
+.att-modal-close:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 2px;
+}
+
 .attendance-action-section { margin: 10px; }
 .attendance-action-heading {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 8px;
@@ -520,6 +569,7 @@ html, body, #root {
   display: flex; gap: 6px; padding: 8px 10px 4px;
   align-items: center;
 }
+.attendance-subtabs { padding-bottom: 0; }
 .view-btn {
   padding: 7px 15px;
   border: 1.5px solid var(--border2);
@@ -717,6 +767,16 @@ html, body, #root {
 }
 
 /* ─── Att Modal ──────────────────────────────────────────────── */
+.att-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+}
+.att-modal-header .modal-title {
+  margin: 0;
+  font-size: 14px;
+}
 .att-modal-btns {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 8px; margin-bottom: 16px;
@@ -907,7 +967,18 @@ html, body, #root {
   gap: 10px;
   flex: 1;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+}
+.check-student-info:focus-visible {
+  outline: 2px solid var(--primary-text);
+  outline-offset: 3px;
+  border-radius: 8px;
 }
 .check-avatar {
   width: 40px;
@@ -948,7 +1019,12 @@ html, body, #root {
   cursor: pointer;
   transition: all 0.12s;
   letter-spacing: -0.3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 }
+.check-btn-selected-icon { flex: 0 0 auto; }
 .check-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .check-btn.O { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
 .check-btn.O.active { background: #16a34a; color: #fff; border-color: #16a34a; box-shadow: 0 2px 10px rgba(22,163,74,.35); }
@@ -1089,6 +1165,204 @@ html, body, #root {
   text-overflow: ellipsis;
   border-top: 1px solid var(--border);
   padding-top: 10px;
+}
+
+/* ─── 이번 주 요약 카드 ──────────────────────────────────────── */
+.week-summary-row {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 4px;
+}
+.week-summary-card {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--radius);
+  padding: 12px 6px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border: 1.5px solid transparent;
+}
+.week-summary-card.green  { background: var(--green-bg);  border-color: #bbf7d0; }
+.week-summary-card.amber  { background: var(--amber-bg);  border-color: #fde68a; }
+.week-summary-card.red    { background: var(--red-bg);    border-color: #fecaca; }
+.week-summary-card.gray   { background: var(--surface2);  border-color: var(--border); }
+.week-summary-icon {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+.week-summary-card.green .week-summary-icon { color: var(--green-text); }
+.week-summary-card.amber .week-summary-icon { color: var(--amber-text); }
+.week-summary-card.red   .week-summary-icon { color: var(--red-text); }
+.week-summary-card.gray  .week-summary-icon { color: var(--text3); }
+.week-summary-count {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.week-summary-card.green .week-summary-count { color: var(--green-text); }
+.week-summary-card.amber .week-summary-count { color: var(--amber-text); }
+.week-summary-card.red   .week-summary-count { color: var(--red-text); }
+.week-summary-card.gray  .week-summary-count { color: var(--text2); }
+.week-summary-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text3);
+}
+
+/* ─── 교사 출석 화면 1차 정돈 ───────────────────────────────── */
+.teacher-attendance {
+  --teacher-accent: #6355a7;
+  --teacher-secondary: #666773;
+  --teacher-green: #15803d;
+  --teacher-red: #b91c1c;
+}
+.teacher-attendance .class-tabs-wrap { padding: 8px 10px 0; gap: 6px; }
+.teacher-attendance .class-tab {
+  min-height: 40px;
+  padding: 7px 14px;
+  border-width: 1px;
+  border-color: #dedee4;
+  border-radius: 10px;
+  color: var(--teacher-secondary);
+  box-shadow: none;
+  transition: background-color .15s, border-color .15s, color .15s;
+}
+.teacher-attendance .class-tab.active {
+  background: var(--teacher-accent);
+  border-color: var(--teacher-accent);
+  color: #fff;
+  box-shadow: none;
+}
+.teacher-attendance .attendance-subtabs {
+  margin: 6px 10px 0;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid #e5e5e8;
+  border-radius: 10px;
+  background: #f7f7f8;
+}
+.teacher-attendance .attendance-subtabs .view-btn {
+  flex: 1;
+  min-height: 40px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--teacher-secondary);
+  box-shadow: none;
+  transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.teacher-attendance .attendance-subtabs .view-btn.active {
+  background: var(--surface);
+  color: var(--teacher-accent);
+  box-shadow: 0 1px 2px rgba(41, 42, 48, .08);
+}
+.teacher-attendance .stat-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 6px 10px 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e5e5e8;
+  border-radius: 10px;
+  background: var(--surface);
+}
+.teacher-attendance .stat-card {
+  min-width: 0;
+  min-height: 50px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.teacher-attendance .stat-card + .stat-card { border-left: 1px solid #e5e5e8; }
+.teacher-attendance .stat-card-label { color: var(--teacher-secondary); }
+.teacher-attendance .stat-card-value {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.teacher-attendance .attendance-week-picker {
+  margin: 6px 10px 0;
+  border-color: #e5e5e8;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.teacher-attendance .attendance-week-picker > span { color: var(--teacher-secondary); }
+.teacher-attendance .attendance-week-picker select:focus-visible {
+  outline: 2px solid var(--teacher-accent);
+  outline-offset: 2px;
+  border-color: var(--teacher-accent);
+}
+.teacher-attendance .week-summary-row { padding: 8px 10px 2px; }
+.teacher-attendance .week-summary-card {
+  min-height: 56px;
+  padding: 8px 10px;
+  border-width: 1px;
+  flex-direction: row;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: none;
+}
+.teacher-attendance .week-summary-icon { font-size: 14px; }
+.teacher-attendance .week-summary-count { font-size: 21px; }
+.teacher-attendance .week-summary-card.green .week-summary-icon,
+.teacher-attendance .week-summary-card.green .week-summary-count { color: var(--teacher-green); }
+.teacher-attendance .week-summary-card.red .week-summary-icon,
+.teacher-attendance .week-summary-card.red .week-summary-count { color: var(--teacher-red); }
+.teacher-attendance .week-summary-card.gray .week-summary-icon,
+.teacher-attendance .week-summary-label { color: var(--teacher-secondary); }
+.teacher-attendance .check-list-wrap {
+  margin: 8px 10px 10px;
+  border-color: #e5e5e8;
+  border-radius: 12px;
+}
+.teacher-attendance .check-list-header {
+  background: #f7f7f8;
+  border-bottom-color: #e5e5e8;
+}
+.teacher-attendance .check-week-label { color: var(--teacher-accent); }
+.teacher-attendance .check-progress { color: var(--teacher-secondary); }
+.teacher-attendance .check-row.row-o {
+  background: #f8fdf9;
+  box-shadow: inset 1px 0 var(--teacher-green);
+}
+.teacher-attendance .check-row.row-x {
+  background: #fffafa;
+  box-shadow: inset 1px 0 var(--teacher-red);
+}
+.teacher-attendance .check-btn {
+  border-width: 1px;
+  box-shadow: none;
+  transition: background-color .12s, border-color .12s, color .12s;
+}
+.teacher-attendance .check-btn.O { color: var(--teacher-green); }
+.teacher-attendance .check-btn.O.active {
+  background: var(--teacher-green);
+  border-color: var(--teacher-green);
+  color: #fff;
+  box-shadow: none;
+}
+.teacher-attendance .check-btn.X { color: var(--teacher-red); }
+.teacher-attendance .check-btn.X.active {
+  background: var(--teacher-red);
+  border-color: var(--teacher-red);
+  color: #fff;
+  box-shadow: none;
+}
+.teacher-attendance .class-tab:focus-visible,
+.teacher-attendance .attendance-subtabs .view-btn:focus-visible,
+.teacher-attendance .check-student-info:focus-visible,
+.teacher-attendance .check-btn:focus-visible {
+  outline: 2px solid var(--teacher-accent);
+  outline-offset: 2px;
 }
 
 /* ─── Mobile Responsive ────────────────────────────────────── */
@@ -1381,47 +1655,58 @@ html, body, #root {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ─── 이번 주 요약 카드 ──────────────────────────────────────── */
-.week-summary-row {
-  display: flex;
-  gap: 8px;
-  padding: 10px 12px 4px;
+/* 교사 출석 화면은 전역 모바일 규칙 뒤에서 역할 범위를 다시 고정한다. */
+@media (max-width: 640px) {
+  .teacher-attendance .class-tabs-wrap { padding: 8px 8px 0; }
+  .teacher-attendance .class-tab { min-height: 44px; padding: 7px 12px; }
+  .teacher-attendance .attendance-subtabs { margin: 6px 8px 0; }
+  .teacher-attendance .attendance-subtabs .view-btn {
+    min-height: 44px;
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+  .teacher-attendance .stat-row { margin: 6px 8px 0; }
+  .teacher-attendance .stat-card { min-height: 48px; padding: 6px 10px; }
+  .teacher-attendance .stat-card-label { font-size: 11px; margin-bottom: 2px; }
+  .teacher-attendance .stat-card-value { font-size: 16px; }
+  .teacher-attendance .attendance-week-picker {
+    margin: 6px 8px 0;
+    padding: 7px 9px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 8px;
+  }
+  .teacher-attendance .attendance-week-picker select { width: 100%; }
+  .teacher-attendance .attendance-week-picker > span {
+    grid-column: 1 / -1;
+    line-height: 1.4;
+  }
+  .teacher-attendance .week-summary-row { padding: 6px 8px 2px; gap: 6px; }
+  .teacher-attendance .week-summary-card {
+    min-height: 48px;
+    padding: 6px 5px;
+    flex-direction: row;
+    justify-content: center;
+    gap: 4px;
+  }
+  .teacher-attendance .week-summary-icon { font-size: 14px; }
+  .teacher-attendance .week-summary-count { font-size: 20px; }
+  .teacher-attendance .week-summary-label { font-size: 10px; }
+  .teacher-attendance .check-list-wrap { margin: 6px 8px 8px; }
+  .teacher-attendance .check-list-header { padding: 9px 10px; }
+  .teacher-attendance .check-row { min-height: 60px; padding: 8px 10px; }
+  .teacher-attendance .check-btn { min-width: 56px; }
 }
-.week-summary-card {
-  flex: 1;
-  min-width: 0;
-  border-radius: var(--radius);
-  padding: 12px 6px 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  border: 1.5px solid transparent;
+
+@media (max-width: 380px) {
+  .teacher-attendance .class-tab,
+  .teacher-attendance .attendance-subtabs .view-btn { min-height: 44px; }
+  .teacher-attendance .week-summary-count { font-size: 18px; }
+  .teacher-attendance .check-btn { min-width: 50px; }
 }
-.week-summary-card.green  { background: var(--green-bg);  border-color: #bbf7d0; }
-.week-summary-card.amber  { background: var(--amber-bg);  border-color: #fde68a; }
-.week-summary-card.red    { background: var(--red-bg);    border-color: #fecaca; }
-.week-summary-card.gray   { background: var(--surface2);  border-color: var(--border); }
-.week-summary-icon {
-  font-size: 16px;
-  font-weight: 800;
-  line-height: 1;
-}
-.week-summary-card.green .week-summary-icon { color: var(--green-text); }
-.week-summary-card.amber .week-summary-icon { color: var(--amber-text); }
-.week-summary-card.red   .week-summary-icon { color: var(--red-text); }
-.week-summary-card.gray  .week-summary-icon { color: var(--text3); }
-.week-summary-count {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-.week-summary-card.green .week-summary-count { color: var(--green-text); }
-.week-summary-card.amber .week-summary-count { color: var(--amber-text); }
-.week-summary-card.red   .week-summary-count { color: var(--red-text); }
-.week-summary-card.gray  .week-summary-count { color: var(--text2); }
-.week-summary-label {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text3);
+
+@media (prefers-reduced-motion: reduce) {
+  .teacher-attendance .class-tab,
+  .teacher-attendance .attendance-subtabs .view-btn,
+  .teacher-attendance .check-row,
+  .teacher-attendance .check-btn { transition: none; }
 }

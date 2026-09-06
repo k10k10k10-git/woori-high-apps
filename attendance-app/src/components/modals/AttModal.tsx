@@ -1,7 +1,9 @@
 'use client';
+import { useRef } from 'react';
 import type { AttEditTarget, AttValue } from '@/types';
 import { useApp } from '@/store/AppContext';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
+import { useModalFocus } from '@/hooks/useModalFocus';
 
 type Props = {
   target: AttEditTarget;
@@ -13,6 +15,8 @@ type Props = {
 export default function AttModal({ target, currentVal, onSelect, onClose }: Props) {
   const { state } = useApp();
   const { months, classData } = state;
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const initialOptionRef = useRef<HTMLButtonElement>(null);
 
   const ck = target.ck;
   const [mi, di] = target.k.split('-').map(Number);
@@ -20,17 +24,23 @@ export default function AttModal({ target, currentVal, onSelect, onClose }: Prop
   const day = months[mi]?.sundays[di] ?? '';
   const student = classData[ck]?.students.find(s => s.id === target.sid);
 
+  useModalFocus({ containerRef: sheetRef, initialFocusRef: initialOptionRef, onDismiss: onClose });
+
   return (
-    <div className="modal-overlay" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
+    <div className="modal-overlay" onClick={onClose}
       role="dialog" aria-modal="true" aria-label={`${student?.name} ${month}월 ${day}일 출석 입력`}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+      <div ref={sheetRef} className="modal-sheet" onClick={e => e.stopPropagation()} tabIndex={-1}>
         <div className="modal-handle" />
-        <div className="modal-title" style={{ fontSize: 14, marginBottom: 8 }}>
-          {student?.name} · {month}월 {day}일
+        <div className="att-modal-header">
+          <div className="modal-title">
+            {student?.name} · {month}월 {day}일
+          </div>
+          <button type="button" className="att-modal-close" onClick={onClose}>닫기</button>
         </div>
         <div className="att-modal-btns">
           {ATTENDANCE_OPTIONS.map(v => (
             <button
+              ref={v === (currentVal || ATTENDANCE_OPTIONS[0]) ? initialOptionRef : undefined}
               key={v}
               className={`att-modal-btn ${v}${currentVal === v ? ' selected' : ''}`}
               style={currentVal === v ? { outline: '3px solid currentColor' } : {}}

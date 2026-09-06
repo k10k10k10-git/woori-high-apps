@@ -12,6 +12,7 @@ import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttendanceSaveBanner from '@/components/AttendanceSaveBanner';
 import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
+import AdminIcon from '@/components/admin/AdminIcon';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
 import type { AttEditTarget, AttValue, ViewKey } from '@/types';
@@ -335,15 +336,15 @@ export default function AttendanceTab() {
   });
 
   return (
-    <div>
+    <div className={isTeacher ? 'teacher-attendance' : undefined}>
       {/* 반 탭 */}
       <ClassTabBar />
 
       {/* 출석 체크 / 출석부 / 건의사항 서브탭 */}
-      <div className="view-btn-row" style={{ paddingBottom: 0 }} role="tablist" aria-label="출석 서브 탭">
-        <button role="tab" aria-selected={attSubView === 'check'} className={`view-btn${attSubView === 'check' ? ' active' : ''}`} onClick={() => setAttSubView('check')}>출석 체크</button>
-        <button role="tab" aria-selected={attSubView === 'table'} className={`view-btn${attSubView === 'table' ? ' active' : ''}`} onClick={() => setAttSubView('table')}>출석부</button>
-        <button role="tab" aria-selected={attSubView === 'suggest'} className={`view-btn${attSubView === 'suggest' ? ' active' : ''}`} onClick={() => setAttSubView('suggest')}>건의사항</button>
+      <div className="view-btn-row attendance-subtabs" role="tablist" aria-label="출석 서브 탭">
+        <button type="button" role="tab" aria-selected={attSubView === 'check'} className={`view-btn${attSubView === 'check' ? ' active' : ''}`} onClick={() => setAttSubView('check')}>출석 체크</button>
+        <button type="button" role="tab" aria-selected={attSubView === 'table'} className={`view-btn${attSubView === 'table' ? ' active' : ''}`} onClick={() => setAttSubView('table')}>출석부</button>
+        <button type="button" role="tab" aria-selected={attSubView === 'suggest'} className={`view-btn${attSubView === 'suggest' ? ' active' : ''}`} onClick={() => setAttSubView('suggest')}>건의사항</button>
       </div>
 
       {/* 통계 카드 */}
@@ -438,12 +439,16 @@ export default function AttendanceTab() {
                   const rowCls = val === 'O' ? ' row-o' : val === 'X' ? ' row-x' : '';
                   return (
                     <div key={student.id} className={`check-row${rowCls}`}>
-                      <div className="check-student-info"
-                        onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: student.id, ck } })}>
+                      <button
+                        type="button"
+                        className="check-student-info"
+                        aria-label={`${student.name} 출석 이력 보기`}
+                        onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: student.id, ck } })}
+                      >
                         {student.photo ? (
-                          <img src={student.photo} alt={student.name} className="check-avatar-img" />
+                          <img src={student.photo} alt="" className="check-avatar-img" />
                         ) : (
-                          <div className="check-avatar">{student.name.charAt(0)}</div>
+                          <span className="check-avatar" aria-hidden="true">{student.name.charAt(0)}</span>
                         )}
                         <span className="check-name">{student.name}</span>
                         {saveFeedback?.sid === student.id && (
@@ -451,15 +456,19 @@ export default function AttendanceTab() {
                             {saveFeedback.status === 'saving' ? '저장 중' : saveFeedback.status === 'saved' ? '저장됨' : '저장 실패'}
                           </span>
                         )}
-                      </div>
+                      </button>
                       <div className="check-btns">
                         {ATTENDANCE_OPTIONS.map(v => (
                           <button
+                            type="button"
                             key={v}
                             className={`check-btn ${v}${val === v ? ' active' : ''}`}
+                            aria-label={`${student.name} ${v === 'O' ? '출석' : '결석'}${val === v ? ' 현재 선택됨, 다시 누르면 미입력으로 변경' : '으로 기록'}`}
+                            aria-pressed={val === v}
                             onClick={() => selectedWeekKey && handleQuickCheck(student.id, v)}
                             disabled={!selectedWeekKey || saveFeedback?.status === 'saving'}
                           >
+                            {val === v && <AdminIcon name="check" size={12} className="check-btn-selected-icon" />}
                             {v === 'O' ? '출석' : '결석'}
                           </button>
                         ))}
@@ -601,22 +610,25 @@ export default function AttendanceTab() {
                     <td className="att-stat-cell" style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center' }}>
                       {student.num}
                     </td>
-                    <td
-                      className="att-cell-name"
-                      style={{ textAlign: 'center', padding: '6px 8px', verticalAlign: 'middle' }}
-                      onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: student.id, ck } })}
-                    >
-                      {student.photo ? (
-                        <img src={student.photo} alt={student.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', display: 'block', margin: '0 auto 3px' }} />
-                      ) : (
-                        <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: 'var(--primary)', margin: '0 auto 3px' }}>
-                          {student.name.charAt(0)}
-                        </div>
-                      )}
-                      <div style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{student.name}</div>
+                    <td className="att-cell-name">
+                      <button
+                        type="button"
+                        className="att-student-history-button"
+                        aria-label={`${student.name} 출석 이력 보기`}
+                        onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: student.id, ck } })}
+                      >
+                        {student.photo ? (
+                          <img src={student.photo} alt="" style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', display: 'block', margin: '0 auto 3px' }} />
+                        ) : (
+                          <span aria-hidden="true" style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 700, color: 'var(--primary-text)', margin: '0 auto 3px' }}>
+                            {student.name.charAt(0)}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>{student.name}</span>
+                      </button>
                     </td>
                     {months.map(({ month, sundays }, mi) =>
-                      sundays.map((_, di) => {
+                      sundays.map((day, di) => {
                         const monthNum = months[mi].month;
                         if (curView === 'first' && !(monthNum >= 1 && monthNum <= 6)) return null;
                         if (curView === 'second' && !(monthNum >= 7 && monthNum <= 12)) return null;
@@ -634,14 +646,23 @@ export default function AttendanceTab() {
                         }
                         const teacherCanEdit = editableWeeks.some(week => week.key === k);
                         const canEdit = !isTeacher || teacherCanEdit;
+                        const statusLabel = val === 'O' ? '출석' : val === 'X' ? '결석' : '미입력';
                         return (
                           <td
                             key={k}
-                            className={`att-cell${val ? ' ' + val : ''}${canEdit ? '' : ' readonly'}`}
-                            onClick={canEdit ? () => onCellClick(student.id, k) : undefined}
+                            className={`att-cell${val ? ' ' + val : ''}${canEdit ? ' editable' : ' readonly'}`}
                             title={isTeacher && !teacherCanEdit ? '최근 4회 출석만 수정할 수 있습니다' : undefined}
                           >
-                            {val}
+                            {canEdit ? (
+                              <button
+                                type="button"
+                                className="att-cell-edit-button"
+                                aria-label={`${student.name} ${month}월 ${day}일 출석 수정, 현재 ${statusLabel}`}
+                                onClick={() => onCellClick(student.id, k)}
+                              >
+                                <span aria-hidden="true">{val}</span>
+                              </button>
+                            ) : val}
                           </td>
                         );
                       })
