@@ -33,7 +33,7 @@
 
 ## 현재 운영 전환에 필요한 사항
 
-1. **통합 사이트 서버 연결**: 사용자가 2026-09-06 “서버 계정·권한·키 설정 승인”으로 전용 서비스 계정 `woori-praise-server` 1개·서버 키 1개·Firebase Auth 조회 및 RTDB 읽기/쓰기 권한과 Vercel Production 등록을 명시 승인했다. 기존 Firebase 프로젝트/DB `woori-high`에 연결하며 새 DB를 만들지 않는다. 실제 운영 데이터 변경·이관은 이 승인에 포함되지 않는다. 서버 설정과 배포의 실제 완료 여부는 후속 영수증으로 확인한다.
+1. **통합 사이트 서버 연결 완료**: 사용자 승인 후 전용 서비스 계정 `woori-praise-server` 1개·서버 키 1개·Firebase Auth 조회 및 RTDB 읽기/쓰기 권한과 Vercel Production 등록을 완료했다. 기존 Firebase 프로젝트/DB `woori-high`에 연결했으며 새 DB를 만들지 않았다. 실제 운영 데이터 변경·이관은 이 승인에 포함되지 않는다. 읽기·배포 확인 결과는 아래와 로컬 영수증에 기록했다.
 2. **원본 기록 확보**: 사용자 답변에 따라 외부 Supabase와 Vercel은 다른 개발자·담당자가 운영 중이다. 실제 원본 건수·기록·파일과 쓰기 동결 권한을 확보하지 못했다. 원본 담당자가 전달 절차에 따라 검토용 보관본을 내보내야 실제 대조를 진행할 수 있다.
 3. **공통 행사 출석 전환**: 같은 회차 여부를 날짜·이름으로 추정하지 않는다. 공통 회차로 연결된 이관본은 `shared_attendance_cutover_pending`으로 live 전환을 차단한다. 최종 원장 선택, 학기/찬양 출석 조회·저장·집계 어댑터, 이전 쓰기 경로의 권한/Rules 검증은 실제 대조 후 남아 있다. 이 기능까지 구현·전환 완료했다고 보고하지 않는다.
 4. **실제 이관 승인**: 과거 LATE 변환 건수와 정책, Firebase UID 연결, 대상 경로·건수·사전 백업을 대조 보고서로 준비한 뒤 운영 DB 적용 승인을 받는다. 합성 검증 통과는 실제 기록 대조나 사용자 승인이 아니다.
@@ -41,6 +41,10 @@
 서버 계정의 `roles/firebaseauth.viewer`는 사용자 정보 조회에, `roles/firebasedatabase.admin`은 RTDB 읽기/쓰기에 해당한다. RTDB IAM 권한은 프로젝트 범위이며 업무 경로 제한은 이 서버 코드가 담당한다. Owner/Editor, Firebase Auth 관리자 또는 Firestore 관리자 권한은 요구하지 않는다. [Firebase 공식 IAM 역할 문서](https://firebase.google.com/docs/projects/iam/roles-predefined-product)
 
 ## 배포 상태
+
+**운영 배포 완료 (2026-09-06 15:44 KST)**: PR #20 병합 커밋은 `f4187521e32cb1a5949110a1e776f925ff3a4973`이다. Vercel `dpl_6tChBGwiiVqVwm7xa3FxQTimBCNY`의 Production Ready와 [운영 버전 API](https://woorihigh-app.vercel.app/api/version)의 같은 buildId를 확인했다. [찬양팀](https://woorihigh-app.vercel.app/sunday-ministry/praise) HTTP 200, 비로그인·합성 무효 Bearer·workspace 비로그인 요청은 모두 JSON 401/`unauthorized`와 `private, no-store`를 반환했다. 실제 인증 화면·원장 저장 E2E를 실행한 것은 아니다.
+
+최종 PR HEAD `a3f9949`의 일반 품질 [CI 34016897528](https://github.com/k10k10k10-git/woori-high-apps/actions/runs/34016897528/job/101442143915)와 실제 RTDB [계약 CI 34016897530](https://github.com/k10k10k10-git/woori-high-apps/actions/runs/34016897530)이 통과했다. 인증 E2E는 비어 있는 storage-state 가드에서 중단됐음을 실패 로그로 확인했다. 로컬 키 사본과 민감 IAM 스냅샷은 운영 확인 후 삭제했다. 값 없는 `server-configuration.json`, `deployment.json`, 두 CI 결과와 QA 기록은 로컬 `outputs/praise-integration-2026-09-06/`에 보존했다.
 
 2026-09-06 15:33 KST 서버 연결 확인: 기존 Firebase `woori-high`에 전용 서비스 계정 `woori-praise-server`와 사용자 관리 키 1개를 생성했다. IAM 정책의 etag·기존 바인딩을 백업/보존하고 승인된 `roles/firebaseauth.viewer`, `roles/firebasedatabase.admin`만 추가했으며 라이브 대조도 일치했다. 키는 stdin을 통해 Vercel `highschool-app`의 **Production Secret** `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`에 등록했다. Preview에는 등록하지 않았다. 새 계정으로 기존 관리자 레코드 SDK 조회·Auth getUser·찬양팀 경로 REST 조회가 성공했고 찬양 workspace는 0개다. 생성 직후 RTDB 인증 오류는 약 2분 뒤 권한·키 변경 없이 해소됐다. DB/Auth 데이터 쓰기와 Rules 배포는 모두 0건이다.
 
@@ -50,7 +54,7 @@
 
 SDK 보완 코드 `35fe9892c9499c4287cd5b2d6ac9c9956902bbe2`의 일반 CI와 실제 RTDB 계약 CI가 통과했다. Vercel Preview `dpl_GtD8FteqxEXANNX7vfuGBtS6j3gU`는 Ready와 buildId가 일치하고, 실제 비로그인 API도 JSON 401로 복구됐다. 서버 비밀 설정 전의 합성 Bearer 요청은 `server_not_configured` 503을 반환했으며 운영 인증 검증으로 간주하지 않는다.
 
-사용자가 서버 설정을 승인했으므로 기존 DB에 서버 계정 연결 → PR 병합 → 통합 앱 운영 배포·버전 확인을 진행한다. 운영 DB 직접 쓰기, Rules 배포, 원본 입력 중지, 실제 기록 이관은 실행하지 않는다. 서버 설정 전 확인한 운영 `/api/version`은 `68f7bef3c2b2c8adb16ca5455cbf57f1d1442426`이었다. 후속 미리보기·CI·서버 설정·운영 배포 영수증은 로컬 `outputs/praise-integration-2026-09-06/`에 보존한다.
+기존 DB에 서버 계정 연결 → PR 병합 → 통합 앱 운영 배포·버전 확인을 완료했다. 운영 DB/Auth 데이터 쓰기, Rules 배포, 학생 Hosting 배포, 원본 입력 중지, 실제 기록 이관은 실행하지 않았다. 배포 전 운영 `/api/version`은 `68f7bef3c2b2c8adb16ca5455cbf57f1d1442426`이었으며 현재 배포 SHA는 위 완료 기록을 따른다. 앱 배포와 실제 원본 기록 전환 완료는 구분한다.
 
 
 ## Vercel 런타임 호환성 보완

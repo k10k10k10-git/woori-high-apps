@@ -4,7 +4,15 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
-## 2026-09-06 최신 작업 — 찬양팀 통합 구현·원본 이관 준비
+## 2026-09-06 15:44 KST 최신 완료 — 찬양팀 앱 배포·기존 Firebase 연결
+
+- PR #20을 병합했다. 앱 운영 코드 SHA `f4187521e32cb1a5949110a1e776f925ff3a4973`, Vercel Production 배포 `dpl_6tChBGwiiVqVwm7xa3FxQTimBCNY`의 Ready와 운영 `/api/version`의 같은 buildId를 확인했다. 찬양 페이지 HTTP 200, 비로그인·합성 무효 Bearer·workspace API 요청은 JSON 401/`private, no-store`다.
+- 기존 Firebase `woori-high`를 사용한다. 승인된 서버 계정/키 1개·Auth 조회/RTDB 읽기쓰기 역할 2개와 Vercel Production Secret 설정을 완료했고 실제 SDK/Auth/REST 읽기가 성공했다. Preview/Development에는 키를 등록하지 않았다. 로컬 키 사본·민감 IAM 스냅샷은 삭제했고 값 없는 설정/배포 영수증은 `outputs/praise-integration-2026-09-06/`에 남겼다.
+- 최종 PR HEAD `a3f9949`의 일반 CI와 실제 RTDB 계약은 통과했다. 인증 E2E는 기존 비어 있는 storage-state 가드에서 미실행이며 실제 로그인 후 원장 저장 E2E 성공으로 보고하지 않는다. 이전 합성 브라우저·로컬 검사 범위는 릴리스 문서에 기록했다.
+- **실제 기록 이관은 미완료**: 외부 담당자의 Supabase/Storage 보관본과 쓰기 동결 협의가 필요하다. 운영 DB/Auth 데이터 쓰기 0건, Rules 배포/학생 Hosting 배포 0회, 원본 사이트 변경 없음. 공통 행사 출석 어댑터·이전 경로 차단과 서버 과거 페이지 조회도 후속 범위다. 앱 배포를 전체 데이터 전환 완료로 설명하지 않는다.
+- 완료 기록은 루트 문서만 바꾸므로 앱 재배포 대상이 아니다. 원본 `/Users/sunghoon/Desktop/ai개발`의 사용자 변경은 보존했다.
+
+## 2026-09-06 이전 준비 — 찬양팀 통합 구현·원본 이관 준비
 
 - 사용자가 외부 `andew423-source/high-school-worship-team`을 기획안대로 통합해 배포하도록 요청했다. 실제 기록이 쌓여 있으며 Supabase·Vercel은 **다른 개발자·담당자가 관리**한다는 답변을 받았다. 외부 실제 원본과 입력 동결 접근은 아직 없다.
 - 별도 작업 트리 `woori-praise-integration-20260906`, 브랜치 `codex/praise-integration-20260906`에서 주일 사역 찬양팀의 주간 업무·모임/학기 출결·조 편성·등단/학생별 이력·명단 연결·권한/일정/가이드·자료실을 구현했다. 학생 출석부·기존 예배팀·데모·운영 데이터는 유지했다.
