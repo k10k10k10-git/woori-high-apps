@@ -2,6 +2,18 @@
 
 > `extract-approach` 스킬이 채우는 파일. 앱 코드 패턴 교훈은 각 앱 CLAUDE.md에, 여기는 워크스페이스·도구·환경 교훈만.
 
+### Vercel Ready 뒤에도 신규 API의 실제 런타임을 확인한다 (2026-09-06)
+- **접근법**: Firebase Admin 14.3.0은 로컬 Node24와 Next build에서 통과했지만 Vercel의 CommonJS 로더가 jwks-rsa → ESM jose를 require하지 못해 API가 500을 반환했다. 실제 Preview GET과 런타임 로그로 원인을 찾고, `--no-experimental-require-module`로 같은 오류를 로컬 재현했다. CommonJS 호환 Admin 13.10.0으로 고정하고 관련 선택 의존성 audit와 실제 JWKS 공개키 변환을 검증했다.
+- **재사용 규칙**: 배포 Ready와 버전 조회만으로 신규 서버 기능의 성공을 판단하지 않는다. 운영 DB에 쓰지 않는 최소 API 요청으로 실제 응답을 확인하고, 발견한 런타임 조건을 production 서버 회귀 검사에 남긴다. `highschool-app/scripts/check-praise-runtime.mjs`가 해당 조건에서 실제 비로그인 401을 검사한다.
+
+### 별도 작업 트리의 Next 빌드는 의존성 외부 연결을 거부할 수 있다 (2026-09-06)
+- **접근법**: 두 앱 검증에서 학생 앱 lint·typecheck·277개 테스트는 통과했지만 Turbopack이 `node_modules`의 외부 작업 트리 심볼릭 링크를 거부했다. 현재 작업에서 만든 링크인지 확인해 링크만 제거하고, 학생 앱 lockfile로 `npm ci`한 뒤 실패했던 build를 다시 실행해 통과했다.
+- **재사용 규칙**: 작업 트리 격리 시 각 앱의 의존성도 그 작업 트리 안에 설치한다. 기존 설치 대상이나 lockfile을 바꾸지 않으며, 환경 설치 문제를 앱 코드 실패로 보고하거나 빌드 경계를 넓혀 우회하지 않는다.
+
+### 소스 전수 감사는 import 스캔 후 필요한 AST만 만든다 (2026-09-06)
+- **접근법**: 찬양팀 소스 추가 후 기존 Firebase 쓰기 감사 테스트가 전체 파일 AST 생성으로 5초 제한을 넘었다. 전체 파일 열거는 유지하고 TypeScript `preProcessFile`로 import를 먼저 읽어 Firebase Database를 참조하는 파일만 기존 AST 검사에 전달했다. 좁은 검사 실행은 531ms로 통과했다.
+- **재사용 규칙**: 감사 테스트 속도를 위해 검사 대상이나 시간 제한부터 완화하지 않는다. 문자열 검색과 달리 이스케이프된 모듈 이름도 해석하는 파서를 사용하고, 실제 쓰기 호출·namespace·push 판정은 그대로 유지한다.
+
 ### shallow clone은 프로젝트 나이를 조용히 속인다 (2026-09-02)
 - **접근법**: 저장소 이력을 근거로 "이 시스템은 2개월 됐다"고 보고했다가 사용자에게 정정당했다. 원인은 원격 세션의 클론이 shallow(`.git/shallow` 존재, 커밋 50개)여서 `git log --reverse`의 첫 커밋이 **진짜 첫 커밋이 아니었던** 것. ① `git log --oneline | wc -l`과 `ls .git/shallow`로 깊이를 먼저 확인한다 → ② `git fetch --unshallow`로 전체(534커밋)와 태그를 받는다 → ③ 그래도 저장소보다 앞선 시대가 있으면 코드 안의 화석으로 복원한다: 첫 커밋의 `package.json` 세대 차이(한 앱만 firebase ^10.8/Next 15/React 18 = 나머지와 다른 세대), 패키지명 접미어(`-next`), 문서에 적힌 의존 방향("A가 관리하는 데이터를 B가 읽기 전용으로 소비" → A가 먼저), 첫 커밋에 함께 들어온 메모 폴더(`.context/`)의 세션 날짜.
 - **판단 질문**: 커밋 날짜만으로 파일 생성 시점을 단정하지 않았다 — shallow에서는 모든 파일이 "가장 오래된 보이는 커밋"에 생긴 것처럼 보인다(실제로 이 착각으로 통합 당일 생성된 파일과 그 이전 파일을 구분하지 못했다). npm 버전으로 절대 날짜를 추정하지도 않았다 — 상대 순서만 신뢰하고 절대 시점은 "추정"으로 표기했다.
@@ -168,3 +180,8 @@
 - **접근법**: `agent-os/http-json.test.js`의 loopback 스텁으로 무응답을 재현한다 → 소켓 idle timeout과 전체 요청 기한을 구분한다 → `agent-os/http-json.js`에서 전체 기한·본문 바이트 상한·중간 단절·오류 상태를 제한한다 → 느린 스트림과 초과 응답에서도 연결이 닫히는지 검증한다.
 - **판단 질문**: 운영 Vercel과 실제 실행 API 대신 로컬 스텁을 써 인증·운영 부작용을 배제했다. 소켓 timeout만 추가하면 조금씩 도착하는 응답에 기한이 연장되므로 전체 타이머를 사용했다.
 - **재사용 규칙**: 선택적 외부 조회는 전체 기한과 응답 바이트 상한을 적용하고, 네트워크·파싱·형태 오류 모두 해당 필드 없음으로 끝내어 나머지 보고서가 열리게 한다. 자식 프로세스는 `error` 뒤 `close`가 올 수 있으므로 완료 처리를 한 함수로 합치고, `agent-os/runtime.test.js`처럼 두 이벤트의 순서를 스텁으로 재현해 저장과 SSE 종료가 한 번인지 확인한다.
+
+### Firebase 서버 계정 생성 직후 DB 인증 실패를 확인하는 순서 (2026-09-06)
+- **접근법**: 현재 IAM 정책과 etag를 보호된 파일에 백업한다 → 승인된 계정·역할만 추가하고 기존 바인딩 보존을 대조한다 → Admin SDK 인증서로 Auth 조회와 RTDB 조회를 따로 실행한다 → Auth는 성공하고 RTDB만 401이면 역할·프로젝트·SDK scope를 확인한 뒤 전파 시간을 둔다. 이번에는 약 2분 뒤 같은 권한·키로 SDK와 REST 조회가 모두 성공했다.
+- **판단 질문**: 즉시 Owner/Editor를 추가하거나 Rules를 열지 않았다. Admin 13의 cert는 RTDB에 필요한 scope를 포함했고, 승인된 역할은 이미 라이브 정책에 존재했다. 키 재발급과 데이터 쓰기도 연결 확인에 필요하지 않았다. [공식 IAM 전파 안내](https://docs.cloud.google.com/iam/docs/access-change-propagation)와 결과가 부합한다.
+- **재사용 규칙**: 새 권한은 정책 대조와 실제 읽기 성공을 각각 확인한다. 키는 출력·argv 없이 `vercel env add FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON production --sensitive --yes`의 stdin으로 전달하고 Preview 미등록을 확인한다. 완료 후 로컬 키와 민감한 정책 스냅샷은 삭제하고 값 없는 영수증만 보존한다.

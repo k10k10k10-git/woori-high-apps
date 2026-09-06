@@ -20,7 +20,11 @@ describe("통합 앱 활동 로그 쓰기 경계", () => {
     for (const filename of sourceFiles(sourceRoot)) {
       const relative = path.relative(sourceRoot, filename).replaceAll(path.sep, "/");
       if (relative === "features/activityLog/write.ts") continue;
-      const source = ts.createSourceFile(filename, readFileSync(filename, "utf8"), ts.ScriptTarget.Latest, true);
+      const text = readFileSync(filename, "utf8");
+      // 모든 파일의 import를 먼저 스캔하고 Firebase DB import가 있는 파일만 AST로 검사한다.
+      // preProcessFile은 이스케이프된 모듈 이름도 해석하므로 단순 문자열 검색으로 경계를 줄이지 않는다.
+      if (!ts.preProcessFile(text, true).importedFiles.some(file => file.fileName.startsWith("firebase/database"))) continue;
+      const source = ts.createSourceFile(filename, text, ts.ScriptTarget.Latest, true);
       const pushNames = new Set<string>();
       for (const statement of source.statements) {
         if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)

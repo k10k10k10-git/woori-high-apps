@@ -7,6 +7,8 @@ export const SEMESTER_TRAINING_TABS = [
   "설정",
 ] as const;
 
+export const PRAISE_TABS = ["이번 주", "출결", "등단", "팀원·조", "운영 설정"] as const;
+
 export const SUNDAY_MINISTRY_TABS = [
   "새친구",
   "등록 현황",
@@ -16,15 +18,16 @@ export const SUNDAY_MINISTRY_TABS = [
   "자리 배치",
   "예배 담당표",
   "예배 자료",
+  ...PRAISE_TABS,
 ] as const;
 
 /**
  * 주일 사역은 방학 중 사역과 같은 드롭다운 구조다 — 팀마다 자기 탭만 본다.
  * `tabs`의 합집합은 반드시 `SUNDAY_MINISTRY_TABS`와 같아야 한다(탭 유실 방지, featureCatalog.test.ts가 지킨다).
- * 예배·찬양·미디어·기획디자인팀은 기능 확정 전까지 빈 화면이므로 `tabs`가 비어 있다.
+ * 미디어·기획디자인팀은 기능 확정 전까지 빈 화면이므로 `tabs`가 비어 있다.
  * `status`는 메뉴에서 완성된 기능과 기획 중인 영역을 구분하는 표시 계약이다.
  *
- * ⚠ `status: "planned"`인 세 팀을 **카탈로그에서 빼지 말 것**(2026-09-02 사용자 결정).
+ * ⚠ `status: "planned"`인 두 팀을 **카탈로그에서 빼지 말 것**(2026-09-02 사용자 결정).
  * "6개 메뉴 중 3개가 비어 있으니 지우자"는 제안이 나왔으나, 기획 중인 영역을 계속
  * 보이게 두는 것이 운영 의도다. 지우려면 사용자에게 다시 확인한다.
  */
@@ -32,7 +35,7 @@ export const SUNDAY_MINISTRY_TEAMS = [
   { key: "admin", label: "행정팀", hint: "출석부·행정 변동", status: "ready", tabs: ["출석부", "행정 변동 사항"] },
   { key: "barnabas", label: "바나바팀", hint: "새친구·등록·처리", status: "ready", tabs: ["새친구", "등록 현황", "처리 대기"] },
   { key: "worship", label: "예배팀", hint: "자리 배치·담당표", status: "ready", tabs: ["자리 배치", "예배 담당표", "예배 자료"] },
-  { key: "praise", label: "찬양팀", hint: "기능 기획 중", status: "planned", tabs: [] },
+  { key: "praise", label: "찬양팀", hint: "모임 출결·조 편성·등단", status: "ready", tabs: PRAISE_TABS },
   { key: "media", label: "미디어팀", hint: "기능 기획 중", status: "planned", tabs: [] },
   { key: "design", label: "기획디자인팀", hint: "기능 기획 중", status: "planned", tabs: [] },
 ] as const;

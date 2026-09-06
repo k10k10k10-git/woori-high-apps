@@ -93,7 +93,7 @@ export const SEMESTER_ROLE_HINTS: Record<SemesterRole, string> = {
   adminTeam: "학기·주일 행정팀 수정, 다른 주일팀 조회",
   barnabas: "주일 바나바팀 수정, 학기는 조회",
   worship: "주일 예배팀 수정, 학기는 조회",
-  praise: "주일 찬양팀 수정(기능 준비 중), 학기는 조회",
+  praise: "찬양팀 출결·등단은 담당 권한에 따라 이용, 학기는 조회",
   media: "주일 미디어팀 수정(기능 준비 중), 학기는 조회",
   design: "주일 기획디자인팀 수정(기능 준비 중), 학기는 조회",
   staff: "학기 조회만 · 주일 팀 미배정",

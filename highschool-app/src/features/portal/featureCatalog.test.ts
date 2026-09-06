@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  PRAISE_TABS,
   IGUARD_VIEW_GROUPS,
   RETREAT_TAB_GROUPS,
   SEMESTER_TABS,
@@ -15,7 +16,7 @@ import {
 describe("통합 앱 기능 카탈로그", () => {
   it("학기 중 사역과 주일 사역의 탭을 분리한다", () => {
     expect(SEMESTER_TRAINING_TABS).toEqual(["신청", "배치", "출석", "커리큘럼", "아카이브", "설정"]);
-    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "등록 현황", "처리 대기", "출석부", "행정 변동 사항", "자리 배치", "예배 담당표", "예배 자료"]);
+    expect(SUNDAY_MINISTRY_TABS).toEqual(["새친구", "등록 현황", "처리 대기", "출석부", "행정 변동 사항", "자리 배치", "예배 담당표", "예배 자료", ...PRAISE_TABS]);
     expect(SEMESTER_TABS).toEqual(SEMESTER_TRAINING_TABS);
   });
 
@@ -39,12 +40,12 @@ describe("통합 앱 기능 카탈로그", () => {
     expect(sundayTeamOf("worship")?.tabs).toEqual(["자리 배치", "예배 담당표", "예배 자료"]);
   });
 
-  it("찬양·미디어·기획디자인팀은 기능 확정 전까지 빈 화면이다", () => {
-    expect(sundayTeamOf("praise")?.tabs).toEqual([]);
+  it("찬양팀은 운영 화면을 제공하고 미디어·기획디자인팀의 기획 메뉴를 보존한다", () => {
+    expect(sundayTeamOf("praise")?.tabs).toEqual(["이번 주", "출결", "등단", "팀원·조", "운영 설정"]);
     expect(sundayTeamOf("media")?.tabs).toEqual([]);
     expect(sundayTeamOf("design")?.tabs).toEqual([]);
-    expect(SUNDAY_MINISTRY_TEAMS.filter((team) => team.status === "planned").map((team) => team.key)).toEqual(["praise", "media", "design"]);
-    expect(SUNDAY_MINISTRY_TEAMS.filter((team) => team.status === "ready").map((team) => team.key)).toEqual(["admin", "barnabas", "worship"]);
+    expect(SUNDAY_MINISTRY_TEAMS.filter((team) => team.status === "planned").map((team) => team.key)).toEqual(["media", "design"]);
+    expect(SUNDAY_MINISTRY_TEAMS.filter((team) => team.status === "ready").map((team) => team.key)).toEqual(["admin", "barnabas", "worship", "praise"]);
   });
 
   it("팀 없는 기존 주소는 바나바팀으로 유지해 첫 화면이 새친구 그대로다", () => {

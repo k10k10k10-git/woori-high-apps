@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, CalendarBlank, CheckCircle, MapPin, UsersThree } from "@phosphor-icons/react";
-import { canAccessArea, describeRoles, iguardScopeOf, ownSundayTeam } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, describeRoles, iguardScopeOf, ownSundayTeam } from "./accessPolicy";
 import { ministryModulesFor } from "./myPageDashboard";
 import { sundayTeamHref, sundayTeamOf } from "./featureCatalog";
 import { useMyPageData } from "./useMyPageData";
@@ -79,6 +79,14 @@ export default function MyMinistryPanel() {
           </section>
         )}
       </div>
+
+      {canAccessSundayTeam("praise", data.roles) && <section className="mypage-section" aria-labelledby="my-praise-title">
+        <div className="mypage-section-header"><div><h4 id="my-praise-title">찬양팀 준비</h4><p>담당 조의 모임 출결과 주일 등단표를 확인하세요.</p></div></div>
+        <div className="mypage-module-grid is-compact">
+          <Link className="mypage-feature-link" href="/sunday-ministry/praise"><span className="mypage-feature-icon"><CheckCircle /></span><span className="min-w-0 flex-1"><strong>찬양팀 이번 주</strong><small>담당 조·모임·예배 준비 확인</small></span><ArrowRight /></Link>
+          <Link className="mypage-feature-link" href="/sunday-ministry/praise?tab=praiseStage"><span className="mypage-feature-icon"><UsersThree /></span><span className="min-w-0 flex-1"><strong>주일 등단표</strong><small>확정 편성과 버전 이력 확인</small></span><ArrowRight /></Link>
+        </div>
+      </section>}
 
       {iguardScopeOf(data.roles) !== "none" && (
         <section className="mypage-section" aria-labelledby="my-retreat-title">
