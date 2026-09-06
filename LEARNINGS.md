@@ -190,3 +190,8 @@
 - **접근법**: 설치된 firebase-tools 15.10의 `lib/apiv2.js`와 `lib/auth.js`를 확인한다 → CLI와 같은 기존 프로젝트 계정의 `getAccessToken(refreshToken, [])`를 사용한다 → 만료 시각과 access token이 refresh token과 다른지 검사한다 → 값을 출력하지 않고 Admin SDK credential 인터페이스로 전달해 대상 노드를 먼저 읽는다. 실제 REST 200과 SDK 읽기 성공을 확인했다.
 - **판단 질문**: 별도 scope를 임의 요청하거나 서버 키를 다시 만들지 않았다. 다른 scope로 요청하면 기존 OAuth grant와 맞지 않아 실패했고, CLI의 실패 fallback이 refresh token을 access token 필드로 반환할 수도 있었다. 키 재발급·권한 확대는 승인된 데이터 이관의 인증 확인에 필요하지 않았다.
 - **재사용 규칙**: 사용자 승인 일회성 작업은 동작하는 CLI의 실제 인증 계약과 토큰 유효성을 먼저 확인한다. 토큰은 메모리에서만 사용하고, 앱 서버의 명시 서비스 계정 계약에 로컬 사용자 인증 fallback을 추가하지 않는다.
+
+### 통합 앱의 보기 모드 프레임에서 운영 UI를 검증하는 법 (2026-09-06)
+- **접근법**: 접근성 snapshot에는 업무 탭이 있는데 루트 CSS 조회가 비면 iframe 존재를 확인한다 → ego-browser의 최신 @ref로 탭을 누르거나 같은 출처 iframe.contentDocument에서 요소를 조회한다 → 외부 창 폭과 실제 앱 프레임의 innerWidth를 각각 측정한다.
+- **판단 질문**: 바깥 창을 375px로 바꿨다는 이유로 모바일 검증 완료라고 하지 않았다. 저장된 PC 보기 때문에 실제 앱은 1280px 프레임이었고, ViewModeContext의 보기 설정을 임시 모바일로 전환한 뒤에야 실제 375px 화면을 검증할 수 있었다.
+- **재사용 규칙**: 프레임/축소 보기 앱은 실제 콘텐츠 viewport를 기준으로 QA한다. 보기 설정을 복원하고 운영 쓰기 없이 필요한 건수·상태만 출력한다.
