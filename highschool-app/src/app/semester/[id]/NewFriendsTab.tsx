@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
@@ -21,6 +21,7 @@ import {
   formatKoreanPhone,
   formatNewFriendGrade,
   koreaDateInputValue,
+  matchesNewFriendSearch,
   needsClassAssignment,
   NEW_FRIEND_FAITH_STEP_OPTIONS,
   NEW_FRIEND_INVITER_OPTIONS,
@@ -372,6 +373,9 @@ export default function NewFriendsTab({
   const { user } = useAuth();
   const { toast, uiConfirm } = useUI();
   const canEdit = useSemesterCanEdit();
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchHelpId = useId();
   const [editing, setEditing] = useState<NewFriend | "new" | null>(null);
   const [classesByYear, setClassesByYear] = useState<Record<string, ClassInfo[]>>({});
   const [classError, setClassError] = useState<string | null>(null);
@@ -401,6 +405,17 @@ export default function NewFriendsTab({
     () => friends.filter(needsClassAssignment),
     [friends],
   );
+  const filteredRows = useMemo(() => friends
+    .map((friend, index) => ({ friend, number: index + 1 }))
+    .filter(({ friend }) => matchesNewFriendSearch(friend, searchQuery, canEdit
+      ? (getPrivateValue?.(friend) ?? privateMap[friend.id])
+      : undefined)), [friends, searchQuery, canEdit, getPrivateValue, privateMap]);
+  const isSearching = searchQuery.trim().length > 0;
+
+  function clearSearch() {
+    setSearchQuery("");
+    searchInputRef.current?.focus();
+  }
 
   async function copyAssignment(friend: NewFriend) {
     try {
@@ -475,12 +490,44 @@ export default function NewFriendsTab({
 
       <div className="card card-body">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><h3 className="font-semibold text-slate-900">새친구 진행 현황</h3><p className="mt-1 text-xs text-slate-400">한 명씩 행으로 확인하고, 학생 이름을 누르면 상세 기록을 수정할 수 있습니다.</p></div>
+          <div><h3 className="font-semibold text-slate-900">새친구 진행 현황</h3><p className="mt-1 text-xs text-slate-400">{canEdit ? "학생을 검색한 뒤 이름을 누르면 상세 기록을 수정할 수 있습니다." : "학생을 검색해 진행 현황을 확인할 수 있습니다."}</p></div>
           {canEdit && <button type="button" className="btn-primary" onClick={() => setEditing("new")}>+ 새친구 접수</button>}
         </div>
 
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="w-full sm:max-w-xl">
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor={searchHelpId + "-input"}>새친구 검색</label>
+            <div className="flex items-center gap-2">
+              <input
+                ref={searchInputRef}
+                id={searchHelpId + "-input"}
+                type="search"
+                className="input min-w-0"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={canEdit ? "이름, 학교, 바나바 담당, 연락처" : "이름, 학교, 바나바 담당"}
+                aria-describedby={searchHelpId}
+                autoComplete="off"
+              />
+              {searchQuery && <button type="button" className="btn-secondary shrink-0" onClick={clearSearch} aria-label="새친구 검색 초기화">초기화</button>}
+            </div>
+            <p id={searchHelpId} className="mt-1.5 text-xs leading-5 text-slate-400">이 목록에서 검색합니다. 띄어쓰기로 조건을 함께 찾을 수 있어요. 예: 2부 1학년</p>
+          </div>
+          <p role="status" className="shrink-0 text-xs tabular-nums text-slate-500">
+            {isSearching ? <>검색 결과 <strong className="text-slate-900">{filteredRows.length}명</strong> / 전체 {friends.length}명</> : <>전체 <strong className="text-slate-900">{friends.length}명</strong></>}
+          </p>
+        </div>
+        {isSearching && filteredRows.length === 0 && (
+          <div className="mt-4 rounded-xl border border-dashed border-slate-200 px-4 py-10 text-center">
+            <p className="text-sm font-semibold text-slate-700">검색 결과가 없습니다.</p>
+            <p className="mt-1 text-xs text-slate-500">이름이나 검색 조건을 바꾸거나 전체 목록을 확인해 주세요.</p>
+            <button type="button" className="btn-secondary mt-4" onClick={clearSearch}>전체 목록 보기</button>
+          </div>
+        )}
+
+        {(!isSearching || filteredRows.length > 0) && <>
         <div className="mt-4 space-y-3 sm:hidden" aria-label="새친구 진행 현황 모바일 목록">
-          {friends.map((friend, index) => {
+          {filteredRows.map(({ friend, number }) => {
             const progress = deriveNewFriendRosterProgress(friend);
             const priv = privateValueFor(friend);
             const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
@@ -488,7 +535,7 @@ export default function NewFriendsTab({
               <article key={`mobile:${recordKeyFor(friend)}`} className="rounded-xl border border-slate-200 bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold tabular-nums text-slate-400">No. {index + 1} · 등록일 {newFriendRegisteredDate(friend)}</p>
+                    <p className="text-[11px] font-semibold tabular-nums text-slate-400">No. {number} · 등록일 {newFriendRegisteredDate(friend)}</p>
                     <button type="button" className="mt-0.5 text-left" onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
                       <strong className="text-base text-slate-900">{friend.name}</strong>
                     </button>
@@ -545,13 +592,13 @@ export default function NewFriendsTab({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-          {friends.map((friend, index) => {
+          {filteredRows.map(({ friend, number }) => {
             const progress = deriveNewFriendRosterProgress(friend);
             const priv = privateValueFor(friend);
             const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
             return (
               <tr key={recordKeyFor(friend)} className="transition-colors hover:bg-slate-50/80">
-                <td className="px-3 py-3 text-center tabular-nums text-slate-400">{index + 1}</td>
+                <td className="px-3 py-3 text-center tabular-nums text-slate-400">{number}</td>
                 <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-600">{newFriendRegisteredDate(friend)}</td>
                 <td className="px-3 py-3">
                   <button type="button" className={`block text-left ${canEdit ? "hover:text-emerald-700 hover:underline" : "cursor-default"}`} onClick={() => canEdit && setEditing(friend)} disabled={!canEdit}>
@@ -583,6 +630,7 @@ export default function NewFriendsTab({
             </tbody>
           </table>
         </div>
+        </>}
       </div>
 
       {editing && (() => {
