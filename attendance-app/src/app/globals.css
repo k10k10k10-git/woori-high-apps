@@ -1154,7 +1154,7 @@ html, body, #root {
   .attendance-week-picker > span { line-height: 1.5; }
   .attendance-row-save { display: none; }
   .attendance-save-banner {
-    bottom: calc(68px + env(safe-area-inset-bottom, 0px)); margin: 8px; font-size: 12px;
+    bottom: 8px; margin: 8px; font-size: 12px;
   }
   .long-absent-panel { margin: 8px; }
   .long-absent-panel summary { align-items: flex-start; flex-direction: column; }

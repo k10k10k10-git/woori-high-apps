@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { db, ref, set, push, onValue, off } from '@/lib/db';
 import { useApp, useClassKey, calcStats } from '@/store/AppContext';
@@ -10,6 +10,8 @@ import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
 import ClassTabBar from '@/components/ClassTabBar';
+import AttendanceSaveBanner from '@/components/AttendanceSaveBanner';
+import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
 import type { AttEditTarget, AttValue, ViewKey } from '@/types';
@@ -78,15 +80,10 @@ export default function AttendanceTab() {
   );
   const selectedWeekKey = selectedWeek?.key ?? null;
 
-  type SaveFeedback = {
-    status: 'saving' | 'saved' | 'error';
-    sid: string;
-    studentName: string;
-    target: AttEditTarget;
-    value: AttValue;
-    savedAt?: number;
-  };
-  const [saveFeedback, setSaveFeedback] = useState<SaveFeedback | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<AttendanceSaveFeedback | null>(null);
+  const dismissSavedFeedback = useCallback((savedAt: number) => {
+    setSaveFeedback(current => current?.status === 'saved' && current.savedAt === savedAt ? null : current);
+  }, []);
 
   const displayStudents = sortByName
     ? [...activeStudents].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
@@ -692,18 +689,12 @@ export default function AttendanceTab() {
         </details>
       )}
 
-      {saveFeedback && attSubView !== 'suggest' && (
-        <div className={`attendance-save-banner ${saveFeedback.status}`} role="status" aria-live="polite">
-          <span>
-            {saveFeedback.status === 'saving' && `${saveFeedback.studentName} 출석을 저장하고 있습니다.`}
-            {saveFeedback.status === 'saved' && `${saveFeedback.studentName} 출석이 저장되었습니다.`}
-            {saveFeedback.status === 'error' && `${saveFeedback.studentName} 출석을 저장하지 못했습니다.`}
-          </span>
-          {saveFeedback.status === 'error' && (
-            <button type="button" onClick={() => saveAttendance(saveFeedback.target, saveFeedback.value)}>재시도</button>
-          )}
-        </div>
-      )}
+      <AttendanceSaveBanner
+        feedback={saveFeedback}
+        visible={attSubView !== 'suggest'}
+        onDismissSaved={dismissSavedFeedback}
+        onRetry={feedback => saveAttendance(feedback.target, feedback.value)}
+      />
 
       {/* 출석 모달 */}
       {state.attModal.open && state.attModal.target && (
