@@ -66,3 +66,12 @@ Rules의 `now`, `auth`, 추가 전용 검증 및 문자열 연산은 [Firebase S
 - PR head `cb4bd7a`의 두 앱 일반 CI·Lighthouse·Rules CI 통과. 인증 E2E는 기존 빈 `E2E_STORAGE_STATE` 사전 검사로 미실행이며 가드를 우회하지 않았다. 전역 알림의 자동 쓰기가 있어 실제 관리자 UI 로그인 저장 시험도 수행하지 않았다.
 - 학생 앱 Hosting과 데모는 유지했다. 운영 SW는 `woori-att-1788642541931` 그대로다. 운영 데이터 직접 변경·계정/권한 버킷 수정·Cloud Functions·요금제 변경은 없다.
 - 구조화한 영수증: `outputs/activity-log-2026-09-06/deployment.json`, `rules-deployment.json`. 이 배포 기록의 후속 루트 문서 커밋은 앱 재배포 대상이 아니다.
+
+## 한국어 상세 표시 보완 — 2026-09-06 20:34 KST
+
+- PR #27 병합 SHA `9330d7603dcd6348de5594ac2f18dd50251c21bc`를 Vercel Production `dpl_9BAGLZBQTiNcLVBmATmzryV8Y98z`에 반영했다. 배포는 **Ready**이고 운영 `/api/version`의 `buildId`가 병합 SHA와 일치하며 홈은 HTTP 200이다.
+- 저장 계약은 유지하고 `presentation.ts`의 읽기 전용 표시 모델을 추가했다. 목록과 상세에서 UID·DB 경로·해시형 식별자를 제거하고, 학기·업무·대상·필드를 한국어 문장으로 바꿨다. 안전하게 저장된 상태값과 찬양팀 감사값은 이전/저장 후 값을 표시한다.
+- 과거 복수 대상 로그의 `id_*`·짧은 레거시 키는 사람용 대상명 뒤에서 제거한다. 새 로그의 복수 대상 필드도 내부 식별자 없이 저장한다. 개인정보 원문을 보존하지 않은 `redacted` 기록은 항목명만 보여주며, 기록되지 않은 값을 복원하거나 추정하지 않는다.
+- 루트 `npm run verify`에서 통합 앱 171파일 통과/1파일 skip·1,674테스트 통과/3개 skip·build, 학생 앱 24파일/280테스트·build, Agent OS 35테스트가 통과했다. PR 일반 verify·Rules·Vercel Preview도 통과했다. 인증 E2E는 비어 있는 `E2E_STORAGE_STATE` 사전 검사에서 중단돼 실제 테스트가 실행되지 않았다.
+- 저장된 관리자 세션으로 운영 로그 5건을 조회했다. PC와 실제 430px 모바일에서 한국어 요약·항목 그룹·상세 펼치기, 패널/문서 가로 넘침 0px, UID·원시 경로·해시형 대상 미표시를 확인했다. 운영 DB 쓰기·Rules·계정/권한·학생 앱 Hosting 변경은 없다.
+- 이번 보완의 비식별 배포·브라우저 QA 영수증은 `outputs/activity-log-2026-09-06/korean-details-deployment.json`에 분리했다. 기존 `deployment.json`은 PR #18의 최초 활동 로그 배포 기록이다.

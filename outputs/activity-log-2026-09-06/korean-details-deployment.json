@@ -1,0 +1,59 @@
+{
+  "verifiedAt": "2026-09-06T20:34:29+09:00",
+  "pr": "https://github.com/k10k10k10-git/woori-high-apps/pull/27",
+  "mergeCommit": "9330d7603dcd6348de5594ac2f18dd50251c21bc",
+  "integrated": {
+    "url": "https://woorihigh-app.vercel.app",
+    "deploymentId": "dpl_9BAGLZBQTiNcLVBmATmzryV8Y98z",
+    "target": "production",
+    "status": "Ready",
+    "buildId": "9330d7603dcd6348de5594ac2f18dd50251c21bc",
+    "createdAtKst": "2026-09-06T20:28:27+09:00",
+    "homeHttpStatus": 200,
+    "versionMatchesMergeCommit": true
+  },
+  "readOnlyBrowserQa": {
+    "authenticatedAdminSession": true,
+    "activityLogRecordsObserved": 5,
+    "desktop": {
+      "firstRecordExpanded": true,
+      "koreanSummaryVisible": true,
+      "koreanFieldGroupsVisible": true,
+      "panelHorizontalOverflowPx": 0
+    },
+    "mobile": {
+      "viewportWidthPx": 430,
+      "dialogWidthPx": 430,
+      "panelWidthPx": 392,
+      "firstRecordExpanded": true,
+      "koreanSummaryVisible": true,
+      "koreanFieldGroupsVisible": true,
+      "panelHorizontalOverflowPx": 0,
+      "documentHorizontalOverflowPx": 0
+    },
+    "uidLabelVisible": false,
+    "rawPathLabelVisible": false,
+    "hashLikeTargetVisible": false,
+    "operationalDataWrites": 0
+  },
+  "validation": {
+    "rootVerify": "passed",
+    "integratedTestFilesPassed": 171,
+    "integratedTestFilesSkipped": 1,
+    "integratedTestsPassed": 1674,
+    "integratedTestsSkipped": 3,
+    "attendanceTestFilesPassed": 24,
+    "attendanceTestsPassed": 280,
+    "agentOsTestsPassed": 35,
+    "pullRequestVerify": "passed",
+    "pullRequestRules": "passed",
+    "vercelPreview": "passed",
+    "authenticatedE2e": "not_run_empty_E2E_STORAGE_STATE"
+  },
+  "unchanged": {
+    "firebaseRules": true,
+    "accountsAndRoles": true,
+    "attendanceHosting": true,
+    "attendanceDemoMode": true
+  }
+}
