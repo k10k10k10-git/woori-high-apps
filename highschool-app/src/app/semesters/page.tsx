@@ -154,7 +154,7 @@ export default function SemestersPage() {
               {canDestroy && (
                 <button
                   onClick={() => { setDeleteTarget(s); setDeleteInput(""); }}
-                  className="self-end text-xs text-slate-300 transition-colors hover:text-red-500"
+                  className="self-end text-xs text-slate-500 transition-colors hover:text-red-500"
                 >
                   학기 삭제
                 </button>
