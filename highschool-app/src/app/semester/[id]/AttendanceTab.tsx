@@ -1,6 +1,6 @@
 "use client";
 
-// 출석 체크 — 모바일 최우선(375px). 학생별 [출석/지각/결석] 3버튼.
+// 출석 체크 — 모바일 최우선(375px). 학생별 [출석/결석] 2버튼.
 // ⚠ 토글 아님: 멱등 명시 상태 기록 (같은 버튼 재탭 = 동일 상태 유지, 실수 규칙 11).
 // 기록 취소는 별도 '지우기'로만.
 
@@ -19,6 +19,11 @@ import {
 } from "@/features/semester/db";
 import AttendanceGrid from "./AttendanceGrid";
 import { applicantSortKey } from "@/features/semester/applicant";
+import {
+  EDITABLE_ATTENDANCE_STATUSES,
+  normalizeAttendanceStatus,
+  type EditableAttendanceStatus,
+} from "@/features/semester/completion";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { completionRoster, semesterRoster, type SemesterRosterScope } from "@/features/semester/roster";
 import { sessionDateLabel, sessionIncludesDate } from "@/features/semester/sessionDate";
@@ -26,7 +31,6 @@ import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import {
   Application,
   AttendanceByScope,
-  AttendanceStatus,
   CompletionEntry,
   SemesterMeta,
   Session,
@@ -46,11 +50,12 @@ interface Props {
   meta: SemesterMeta | null;
 }
 
-const STATUS_BTN: { s: AttendanceStatus; on: string }[] = [
-  { s: "출석", on: "bg-green-100 text-green-900 border-green-300" },
-  { s: "지각", on: "bg-yellow-100 text-yellow-900 border-yellow-300" },
-  { s: "결석", on: "bg-red-100 text-red-900 border-red-300" },
-];
+const STATUS_STYLE: Record<EditableAttendanceStatus, string> = {
+  출석: "bg-green-100 text-green-900 border-green-300",
+  결석: "bg-red-100 text-red-900 border-red-300",
+};
+
+const STATUS_BTN = EDITABLE_ATTENDANCE_STATUSES.map((s) => ({ s, on: STATUS_STYLE[s] }));
 
 const EMPTY_ATTENDANCE_BY_SCOPE: AttendanceByScope = { team: {}, training: {} };
 
@@ -135,7 +140,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     training: new Set(completionRoster(applications, "training").map((application) => application.id)),
   }), [applications]);
 
-  async function markAt(appKey: string, sessionId: string, status: AttendanceStatus) {
+  async function markAt(appKey: string, sessionId: string, status: EditableAttendanceStatus) {
     setSaveState("saving");
     try {
       await setAttendance(sid, scope, sessionId, appKey, status, user?.uid, {
@@ -163,7 +168,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     }
   }
 
-  const mark = (appKey: string, status: AttendanceStatus) => markAt(appKey, activeSessId, status);
+  const mark = (appKey: string, status: EditableAttendanceStatus) => markAt(appKey, activeSessId, status);
 
   async function toggleCompletion(appKey: string, field: "certPrinted" | "photoChecked", value: boolean) {
     try {
@@ -177,10 +182,10 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
   }
 
-  const counts = { 출석: 0, 지각: 0, 결석: 0, 미기록: 0 };
+  const counts = { 출석: 0, 결석: 0, 미기록: 0 };
   for (const m of members) {
     const e = att[m.id];
-    if (e) counts[e.s]++;
+    if (e) counts[normalizeAttendanceStatus(e.s)]++;
     else counts.미기록++;
   }
 
@@ -284,7 +289,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             </button>
           ))}
         </div>
-        {view === "grid" && <span className="text-xs text-slate-400">칸을 눌러 출석·지각·결석을 고릅니다.</span>}
+        {view === "grid" && <span className="text-xs text-slate-400">칸을 눌러 출석·결석을 고릅니다.</span>}
       </div>
 
       {view === "grid" ? (
@@ -305,7 +310,6 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
       <>
       <div className="flex gap-3 text-xs text-slate-500 mb-3">
         <span>출석 {counts.출석}</span>
-        <span>지각 {counts.지각}</span>
         <span>결석 {counts.결석}</span>
         <span>미기록 {counts.미기록}</span>
         <span className="ml-auto">{members.length}명</span>
@@ -337,9 +341,9 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                     onClick={() => void mark(m.id, s)}
                     disabled={!canEdit}
                     aria-label={`${m.name} ${s}`}
-                    aria-pressed={entry?.s === s}
+                    aria-pressed={entry ? normalizeAttendanceStatus(entry.s) === s : false}
                     className={`px-2.5 py-1.5 rounded-md text-xs border font-medium ${
-                      entry?.s === s ? on : "attendance-status-choice"
+                      entry && normalizeAttendanceStatus(entry.s) === s ? on : "attendance-status-choice"
                     }`}
                   >
                     {s}

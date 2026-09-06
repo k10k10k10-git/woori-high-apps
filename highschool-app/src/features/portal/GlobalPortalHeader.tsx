@@ -13,7 +13,7 @@ import ViewModeToggle from "@/components/ViewModeToggle";
 import OverlayShell from "@/components/OverlayShell";
 import { useViewMode } from "@/context/ViewModeContext";
 import { canAccessArea, canAccessSundayTeam, canManageRolesOf, ownSundayTeam } from "./accessPolicy";
-import { SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
+import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 const MyPageModal = dynamic(() => import("./MyPageModal"), { ssr: false });
 
@@ -115,8 +115,8 @@ function activeArea(pathname: string): GlobalArea {
 
 const AREA_LABEL: Record<GlobalArea, string> = {
   home: "통합 홈",
-  semester: "학기 중 사역",
-  sunday: "주일 사역",
+  semester: MINISTRY_AREA_LABELS.semester,
+  sunday: MINISTRY_AREA_LABELS.sunday,
   vacation: "방학 중 사역",
   guide: "사역 가이드",
   suggestions: "사이트 건의사항",
@@ -243,13 +243,13 @@ export default function GlobalPortalHeader() {
                 className="portal-nav-link"
                 aria-current={currentArea === "semester" ? "page" : undefined}
               >
-                학기 중 사역
+                {MINISTRY_AREA_LABELS.semester}
               </Link>
             )}
 
-            {semesterAllowed && (
+            {sundayItems.length > 0 && (
               <NavDropdown
-                label="주일 사역"
+                label={MINISTRY_AREA_LABELS.sunday}
                 items={sundayItems}
                 active={currentArea === "sunday"}
                 open={openMenu === "sunday"}
@@ -324,8 +324,8 @@ export default function GlobalPortalHeader() {
             <p className="portal-mobile-sheet-title">사역 메뉴</p>
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
               <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>통합 홈</Link>
-              {semesterAllowed && <Link href="/semesters" aria-current={currentArea === "semester" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>학기 중 사역</Link>}
-              {semesterAllowed && sundayItems.length > 0 && <Link href="/sunday-ministry" aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>주일 사역</Link>}
+              {semesterAllowed && <Link href="/semesters" aria-current={currentArea === "semester" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>{MINISTRY_AREA_LABELS.semester}</Link>}
+              {sundayItems.length > 0 && <Link href="/sunday-ministry" aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>{MINISTRY_AREA_LABELS.sunday}</Link>}
               {vacationItems.length > 0 && <Link href={(vacationItems.find((item) => item.href === "/field") ?? vacationItems[0]).href} aria-current={currentArea === "vacation" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>방학 중 사역</Link>}
               <Link href="/ministry-guide" aria-current={currentArea === "guide" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사역 가이드</Link>
               <Link href="/suggestions" aria-current={currentArea === "suggestions" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사이트 건의사항</Link>

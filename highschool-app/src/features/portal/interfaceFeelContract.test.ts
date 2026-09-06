@@ -22,7 +22,7 @@ describe("인터페이스 촉감·접근성 계약", () => {
     expect(controls).toContain(".compact-icon-control");
     expect(controls).toContain(".attendance-status-choice");
     expect(controls).toContain("min-width: 44px;");
-    expect(attendance).toContain('entry?.s === s ? on : "attendance-status-choice"');
+    expect(attendance).toContain('normalizeAttendanceStatus(entry.s) === s ? on : "attendance-status-choice"');
     expect(attendance).toContain("<Backspace");
     expect(attendance).not.toContain("⌫");
   });

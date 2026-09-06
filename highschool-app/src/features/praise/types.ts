@@ -95,6 +95,50 @@ export interface PraiseAttendance extends PraiseStamp {
   importedActorId?: string;
   importedAt?: string;
 }
+/** API 전용 원장 출처. 원본 신청키와 Firebase 경로는 응답하지 않는다. */
+export interface PraiseAttendanceSource {
+  source: "semester" | "praise";
+  mapping: "linked" | "unlinked" | "shadow" | "invalid";
+  writable: boolean;
+  revision?: string;
+  originalStatus?: "출석" | "지각" | "결석";
+}
+export type PraiseAttendanceSources = Record<string, Record<string, PraiseAttendanceSource>>;
+/** 서버 전용. 공통 원장 시도 이전에 영수증을 확보하여 지연 재시도의 덮어쓰기를 막는다. */
+export interface PraiseSharedAttendanceOperation {
+  phase: "prepared" | "attempting" | "complete" | "failed" | "closed";
+  meetingId: string;
+  personId: string;
+  semesterId: string;
+  sessionId: string;
+  applicationKey: string;
+  groupVersionId: string;
+  expectedSourceRevision: string;
+  mappingProof?: string;
+  teamId?: string;
+  studentId?: string;
+  meetingDate?: string;
+  status: PraiseStatus | null;
+  beforeStatus: PraiseStatus | null;
+}
+export interface PraiseSharedAttendanceResolution {
+  phase: "prepared" | "verified" | "complete" | "superseded";
+  pendingOperationId: string;
+  resolution: "finalize" | "close";
+  expectedSourceRevision: string;
+  originalFingerprint: string;
+}
+export interface PraisePendingAttendanceReview {
+  operationId: string;
+  meetingId: string;
+  personId: string;
+  requestedAt: number;
+  status: PraiseStatus | null;
+  phase: "prepared" | "attempting";
+  currentStatus: PraiseStatus | null;
+  sourceRevision: string;
+  canFinalize: boolean;
+}
 export interface PraiseStaffAvailability extends PraiseStamp {
   present: boolean | null;
   role: "SINGER" | "SESSION";
@@ -189,7 +233,7 @@ export interface PraiseState {
   audit: Record<string, PraiseAuditEvent>;
   operations: Record<
     string,
-    { at: number; actorUid: string; fingerprint: string }
+    { at: number; actorUid: string; fingerprint: string; sharedAttendance?: PraiseSharedAttendanceOperation; sharedAttendanceResolution?: PraiseSharedAttendanceResolution }
   >;
   imports: Record<string, PraiseImportBatch>;
 }
@@ -209,6 +253,8 @@ export interface PraiseView {
   meetings: PraiseMeeting[];
   groups: PraiseGroupVersion[];
   attendance: PraiseState["attendance"];
+  attendanceSources?: PraiseAttendanceSources;
+  pendingAttendance?: PraisePendingAttendanceReview[];
   availability: PraiseState["availability"];
   stages: PraiseStageVersion[];
   access: PraiseAccess[];
@@ -229,6 +275,7 @@ export type PraiseStageInput = Pick<
   "config" | "services" | "overrides"
 >;
 export type PraiseCommand =
+  | { type: "attendance.resolve"; pendingOperationId: string; resolution: "finalize" | "close"; expectedSourceRevision: string; acknowledge: true }
   | {
       type: "meta.save";
       expectedRevision: number;
@@ -260,6 +307,7 @@ export type PraiseCommand =
     }
   | {
       type: "attendance.set";
+      expectedSourceRevision?: string;
       meetingId: string;
       personId: string;
       status: PraiseStatus | null;

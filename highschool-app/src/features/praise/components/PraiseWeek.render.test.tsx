@@ -42,4 +42,15 @@ describe("이번 주 출결 집계의 확인 범위", () => {
     render(<PraiseWeek view={view} meeting={view.meetings[0]} onTab={vi.fn()} />);
     expect(screen.getByText("출석 0명 · 미입력 1명")).toBeTruthy();
   });
+  it("공통 연결 확인이 필요한 기록은 미입력과 별도로 집계한다", () => {
+    const view = praiseFixture(); view.meetings[0].linkedSessionId = "shared-session";
+    view.attendance = { "meeting-1": { "student-1": { status: null, groupVersionId: "groups-1", revision: 0, updatedAt: 0, updatedBy: "" } } };
+    view.attendanceSources = { "meeting-1": { "student-1": { source: "praise", mapping: "invalid", writable: false } } };
+    render(<PraiseWeek view={view} meeting={view.meetings[0]} onTab={vi.fn()} />);
+    expect(screen.getByText("출석 0명 · 미입력 1명 · 연결 확인 필요 1명")).toBeInTheDocument();
+    cleanup();
+    view.permissions = { ...view.permissions, manage: false, attendanceAll: false, stageEdit: false, role: "groupStaff" };
+    render(<PraiseWeek view={view} meeting={view.meetings[0]} onTab={vi.fn()} />);
+    expect(screen.getByText("출석 0명 · 미입력 0명 · 연결 확인 필요 1명")).toBeInTheDocument();
+  });
 });

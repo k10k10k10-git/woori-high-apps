@@ -4,13 +4,14 @@ import Link from "next/link";
 import { ArrowRight, CalendarBlank, CheckCircle, MapPin, UsersThree } from "@phosphor-icons/react";
 import { canAccessArea, canAccessSundayTeam, describeRoles, iguardScopeOf, ownSundayTeam } from "./accessPolicy";
 import { ministryModulesFor } from "./myPageDashboard";
-import { sundayTeamHref, sundayTeamOf } from "./featureCatalog";
+import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 import { useMyPageData } from "./useMyPageData";
 
 export default function MyMinistryPanel() {
   const data = useMyPageData();
   const modules = ministryModulesFor(data.roles);
   const sundayTeam = ownSundayTeam(data.roles);
+  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, data.roles) && (!sundayTeam || team.key === sundayTeam));
   const ready = data.loaded && !data.loadError;
   const pendingDetail = data.loadError ? "배정 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." : "내 사역 배정을 확인하고 있습니다.";
 
@@ -43,50 +44,34 @@ export default function MyMinistryPanel() {
                 <dl>
                   <div><dt>사역팀</dt><dd>{data.personalApplication.team?.name ?? "미배정"}</dd></div>
                   <div><dt>훈련 반</dt><dd>{data.personalApplication.trainingClass?.name ?? "미배정"}</dd></div>
-                  <div><dt>출석</dt><dd>{data.personalAttendance ? `${data.personalAttendance.recorded}/${data.personalAttendance.total}회` : "기록 없음"}</dd></div>
-                  <div><dt>출석률</dt><dd>{data.personalAttendance ? `${data.personalAttendance.rate}%` : "0%"}</dd></div>
+                  <div><dt>사역팀 출석</dt><dd>{data.personalAttendance ? `${data.personalAttendance.actualAttended}/${data.personalAttendance.total}회` : "기록 없음"}</dd></div>
+                  <div><dt>사역팀 입력 현황</dt><dd>{data.personalAttendance ? `${data.personalAttendance.recorded}/${data.personalAttendance.total}회 · 미입력 ${data.personalAttendance.unrecorded}회` : "기록 없음"}</dd></div>
+                  <div><dt>사역팀 출석률</dt><dd>{data.personalAttendance ? `${data.personalAttendance.rate}%` : "0%"}</dd></div>
                 </dl>
+                <p className="mypage-assignment-note">휴강을 제외한 정규·행사 회차 기준입니다. 수료 판정은 학기 출석부에서 정규 회차만 계산합니다.</p>
               </div>
             ) : <UnmatchedState text="내 학기 배정을 찾지 못했습니다. 신청 기록과 등록된 이름을 확인해 주세요." />}
           </section>
         )}
 
-        {canAccessArea("sunday", data.roles) && (
+        {sundayTeams.length > 0 && (
           <section className="mypage-section" aria-labelledby="my-sunday-title">
-            <div className="mypage-section-header">
-              <div>
-                <h4 id="my-sunday-title">주일 사역</h4>
-                <p>담당 팀의 이번 주 사역을 확인하세요.</p>
-              </div>
+            <div className="mypage-section-header"><div><h4 id="my-sunday-title">{MINISTRY_AREA_LABELS.sunday}</h4><p>담당 팀의 운영과 이번 주 준비를 확인하세요.</p></div></div>
+            <div className="mypage-module-grid is-compact">
+              {sundayTeams.map((team) => <div key={team.key}>
+                {team.status === "planned" && sundayTeam !== team.key ? <div className="mypage-feature-link" aria-disabled="true"><span className="min-w-0 flex-1"><strong>{team.label}</strong><small>기능 기획 중</small></span></div> : <Link href={sundayTeamHref(team.key)} className="mypage-feature-link">
+                  <span className="mypage-feature-icon"><CalendarBlank weight="duotone" /></span>
+                  <span className="min-w-0 flex-1"><strong>{team.label}</strong><small>{team.hint}</small></span><ArrowRight weight="bold" />
+                </Link>}
+                {team.key === "praise" && <div className="flex flex-wrap gap-3 px-4 pb-3 text-xs font-semibold text-emerald-700" aria-label="찬양팀 바로가기">
+                  <Link href="/sunday-ministry/praise?tab=week">이번 주 준비</Link>
+                  <Link href="/sunday-ministry/praise?tab=stage">주일 등단표</Link>
+                </div>}
+              </div>)}
             </div>
-            {sundayTeam ? (
-              <Link href={sundayTeamHref(sundayTeam)} className="mypage-feature-link">
-                <span className="mypage-feature-icon"><CalendarBlank weight="duotone" /></span>
-                <span className="min-w-0 flex-1"><strong>{sundayTeamOf(sundayTeam)?.label}</strong><small>{sundayTeamOf(sundayTeam)?.tabs.join(" · ") || "팀 기능 준비 중"}</small></span>
-                <ArrowRight weight="bold" />
-              </Link>
-            ) : (
-              <div className="mypage-module-grid is-compact">
-                {modules.filter((module) => module.tone === "sunday").map((module) => (
-                  <Link key={module.id} href={module.href} className="mypage-feature-link">
-                    <span className="mypage-feature-icon"><CalendarBlank weight="duotone" /></span>
-                    <span className="min-w-0 flex-1"><strong>{module.title}</strong><small>{module.description}</small></span>
-                    <ArrowRight weight="bold" />
-                  </Link>
-                ))}
-              </div>
-            )}
           </section>
         )}
       </div>
-
-      {canAccessSundayTeam("praise", data.roles) && <section className="mypage-section" aria-labelledby="my-praise-title">
-        <div className="mypage-section-header"><div><h4 id="my-praise-title">찬양팀 준비</h4><p>담당 조의 모임 출결과 주일 등단표를 확인하세요.</p></div></div>
-        <div className="mypage-module-grid is-compact">
-          <Link className="mypage-feature-link" href="/sunday-ministry/praise"><span className="mypage-feature-icon"><CheckCircle /></span><span className="min-w-0 flex-1"><strong>찬양팀 이번 주</strong><small>담당 조·모임·예배 준비 확인</small></span><ArrowRight /></Link>
-          <Link className="mypage-feature-link" href="/sunday-ministry/praise?tab=praiseStage"><span className="mypage-feature-icon"><UsersThree /></span><span className="min-w-0 flex-1"><strong>주일 등단표</strong><small>확정 편성과 버전 이력 확인</small></span><ArrowRight /></Link>
-        </div>
-      </section>}
 
       {iguardScopeOf(data.roles) !== "none" && (
         <section className="mypage-section" aria-labelledby="my-retreat-title">
@@ -126,7 +111,7 @@ export default function MyMinistryPanel() {
       <section className="mypage-section" aria-labelledby="my-access-title">
         <div className="mypage-section-header"><div><h4 id="my-access-title">내 사역 바로가기</h4><p>이용할 수 있는 사역 화면으로 바로 이동하세요.</p></div></div>
         <div className="mypage-module-grid">
-          {modules.map((module) => (
+          {modules.filter((module) => module.tone !== "sunday").map((module) => (
             <Link key={module.id} href={module.href} className={`mypage-module mypage-module--${module.tone}`}>
               <span className="min-w-0"><strong>{module.title}</strong><small>{module.description}</small></span>
               <span className="mypage-module-access">{module.accessLabel}</span><ArrowRight weight="bold" />

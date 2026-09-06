@@ -119,12 +119,13 @@
 
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
-| `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | - | highschool-app | - |
+| `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·praiseOperationReceipts·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | - | highschool-app | - |
 | `semesters/{sid}/sessions/{sessionId}/endDate` | highschool-app 학기 모듈 | - | highschool-app | 선택 종료일. 없으면 기존 단일 날짜 회차, 있으면 `date`~`endDate` 다일 회차이며 출석은 sessionId 하나로 집계 |
 | `semesters/{sid}/trainingClasses/{id}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반. 삭제 시 `applications/*/trainingClassId`를 같은 루트 update로 함께 비운다(`trainingClass.ts`) |
 | `semesters/{sid}/teams/{id}/goal` | highschool-app 학기 모듈 | - | highschool-app | 팀별 이번 학기 목표 (커리큘럼 탭 상단) |
 | `semesters/{sid}/applications/{key}/trainingClassId` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반 배정. 값이 없으면 훈련 미신청 — 사역팀 지원은 고3 2학기·스탭만 가능(`intakeRule.ts`). `trainingOnly`는 파생 유지 |
-| `semesters/{sid}/attendance/team/{sessionId}` | highschool-app 학기 모듈 | - | highschool-app | 사역팀 출석 원장. 2026-08-30 이전 기록을 포함하며 훈련 출석의 대체값으로 읽지 않는다. |
+| `semesters/{sid}/attendance/team/{sessionId}` | highschool-app 학기 모듈 + 찬양팀 서버 | - | highschool-app | 사역팀 공통 출석 원장. 명시 연결된 찬양 회차·신청자는 같은 셀을 조회·수정하고 등단 계산도 이 값을 사용한다. 훈련 출석의 대체값으로 읽지 않는다. |
+| `semesters/{sid}/praiseOperationReceipts/{receiptHash}` | highschool-app 찬양팀 서버 | - | highschool-app | 공통 출석 요청의 적용 또는 안전 종료를 증명하는 영구 비식별 표식. 값은 `phase`·요청 지문·서버 처리 시각만 두며 UID·이름·회차/신청키·경로를 넣지 않는다. 출석 셀과 같은 학기 transaction으로 `applied`를 쓰고 기존 표식을 덮어쓰거나 자동 삭제하지 않는다. |
 | `semesters/{sid}/attendance/training/{sessionId}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 출석 원장. 사역팀 출석과 같은 신청자 키를 써도 독립적으로 기록·판정한다. |
 | `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
 | `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | - | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
@@ -201,5 +202,7 @@
 
 - `praiseOps/{workspaceId}`는 통합 앱 찬양팀 서버 모듈만 쓴다. 앱 브라우저의 RTDB 직접 읽기·쓰기는 현행 default-deny Rules가 차단하며, Firebase Admin 서버 자격정보 설정 후 ID 토큰/현재 플랫폼 역할/찬양팀 담당 권한을 검증하는 API로만 이용한다.
 - 업무 원장·버전·작업 영수증·업무 감사는 같은 workspace transaction으로 저장한다. `activityLogs/events`는 고정 ID의 별도 투영이며 실패하면 원본 감사와 미반영 표시를 유지한다. GET·페이지 방문에서 재시도 쓰기를 하지 않는다.
-- `semesters/{id}/meta`, `teams`, `applications`는 연결 후보 조회에만 사용한다. 학생 `classes`·`attendance`·공식 스탭 원장은 수정하지 않는다. 학기 신청키·personId를 명시 선택하며 이름으로 병합하지 않는다. 기존 학기 출석과 동일 행사인지는 원본 이관 대조 후 확정할 사항이며 자동 동기화를 하지 않는다.
+- `semesters/{id}/meta`, `teams`, `sessions`, `applications`는 연결 후보와 연결 유효성 확인에 사용한다. 사용자가 찬양 모임과 학기 사역팀 모임이 같은 행사라고 확인했으며, 회차의 `linkedSessionId`와 사람의 `rosterLink.applicationKey`가 모두 검증된 경우에만 `semesters/{id}/attendance/team/{sessionId}/{applicationKey}`를 공통 원장으로 읽고 쓴다. 새 공간은 정확히 같은 날짜의 유일한 회차만 자동 연결하고, 기존 기록은 이름·날짜로 추정하지 않는다.
+- 공통 출석은 찬양 workspace 작업 예약 → `semesters/{sid}` transaction 안의 최신 학기·팀·회차·신청 배치 검증과 출석 셀+`applied` 표식 동시 저장 → 찬양 감사 완료의 세 단계다. 응답이 끊긴 요청은 운영자가 영구 표식을 확인해 감사를 완료하거나, 출석 현재값을 확인한 뒤 원장 변경 없이 `closed` 표식으로 종료한다. 늦게 도착한 요청은 기존 `applied/closed` 표식에서 중단한다. 찬양 workspace와 학기 원장은 하나의 분산 transaction이 아니며, 영구 표식은 자동 삭제하지 않는다. 학생 `classes`·학생 주일 `attendance`·공식 스탭 원장은 수정하지 않는다.
+- `semesters/{sid}` 전체 transaction은 다른 학기 쓰기와 충돌하면 재시도되고 영구 표식 수만큼 학기 노드가 커진다. 현재 규모에서는 정확성을 우선하되 지연·재시도율과 학기별 표식 증가량을 관찰한다. 학기 보관 정책을 정하기 전에는 표식을 정리하지 않는다.
 - 원본 Supabase 보관본·민감 메모·파일·계정 대응표는 공개 API와 Git에 포함하지 않는다. 실제 운영 이관과 shadow→live 전환은 [데이터 전달 절차](docs/PRAISE_DATA_HANDOFF.md)의 백업·대조·승인 조건을 따른다.

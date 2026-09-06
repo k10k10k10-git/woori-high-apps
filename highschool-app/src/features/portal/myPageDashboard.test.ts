@@ -54,7 +54,7 @@ describe("역할별 마이페이지 읽기 모델", () => {
     expect(findUniqueApplicationAssignment([base, { ...base, id: "1_staff-b", studentId: "staff-b" }], [], [], ["김성훈"])).toBeNull();
   });
 
-  it("휴강을 분모에서 제외해 개인 출석 요약을 계산한다", () => {
+  it("휴강을 분모에서 제외하고 남은 지각 기록은 출석으로 계산한다", () => {
     const sessions: Session[] = [
       { id: "a", date: "2026-08-01", type: "정규" },
       { id: "b", date: "2026-08-08", type: "정규" },
@@ -62,7 +62,19 @@ describe("역할별 마이페이지 읽기 모델", () => {
     ];
     expect(applicationAttendanceSummary("app", sessions, {
       a: { app: { s: "출석" } }, b: { app: { s: "지각" } }, c: { app: { s: "결석" } },
-    })).toEqual({ attended: 1, late: 1, absent: 0, recorded: 2, total: 2, rate: 75 });
+    })).toEqual({ actualAttended: 2, attended: 1, late: 1, absent: 0, recorded: 2, unrecorded: 0, total: 2, rate: 100 });
+  });
+
+  it("실제 출석, 결석을 포함한 입력 완료, 미입력을 서로 구분한다", () => {
+    const sessions: Session[] = [
+      { id: "present", date: "2026-08-01", type: "정규" },
+      { id: "absent", date: "2026-08-08", type: "정규" },
+      { id: "unrecorded", date: "2026-08-15", type: "정규" },
+    ];
+    expect(applicationAttendanceSummary("app", sessions, {
+      present: { app: { s: "출석" } },
+      absent: { app: { s: "결석" } },
+    })).toMatchObject({ actualAttended: 1, attended: 1, absent: 1, recorded: 2, unrecorded: 1, total: 3, rate: 33 });
   });
 
   it("현재 연도 새친구의 처리 단계를 집계한다", () => {

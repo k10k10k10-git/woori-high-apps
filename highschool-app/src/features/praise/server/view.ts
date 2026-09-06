@@ -1,6 +1,8 @@
-import { canWritePraiseAttendance, praisePermissions } from "../permissions";
+import { canWritePraiseAttendance, groupVersionForMeeting, praisePermissions } from "../permissions";
 import type {
   PraiseActor,
+  PraiseAttendanceSources,
+  PraisePendingAttendanceReview,
   PraiseGroupVersion,
   PraiseState,
   PraiseView,
@@ -9,7 +11,7 @@ import { stageInputRevision } from "./stageModel";
 import { requireValue } from "./validation";
 
 /** 조 담당자의 원본 출결 범위는 서버에서 제한한다. UI 필터는 보안 경계가 아니다. */
-export function praiseView(state: PraiseState, actor: PraiseActor): PraiseView {
+export function praiseView(state: PraiseState, actor: PraiseActor, sources?: PraiseAttendanceSources, pendingAttendance?: PraisePendingAttendanceReview[]): PraiseView {
   const permissions = praisePermissions(actor, state);
   requireValue(
     permissions.read,
@@ -97,6 +99,16 @@ export function praiseView(state: PraiseState, actor: PraiseActor): PraiseView {
     ),
     groups: groups.sort((a, b) => b.number - a.number),
     attendance,
+    ...(sources ? { attendanceSources: Object.fromEntries(Object.entries(sources).map(([meetingId, rows]) => [meetingId,
+      Object.fromEntries(Object.entries(rows).filter(([personId]) => people.some(p => p.id === personId) &&
+        (permissions.manage || Boolean(attendance[meetingId]?.[personId]))).map(([personId, source]) => [personId, { ...source,
+          writable: source.writable && state.meta.status !== "archived" && state.meta.mode !== "shadow" &&
+            (state.meta.mode === "live" || permissions.manage) && state.people[personId]?.active &&
+            !state.meetings[meetingId]?.cancelled && Boolean(groupVersionForMeeting(state, state.meetings[meetingId])?.groups.some(g => g.studentIds.includes(personId))) &&
+            canWritePraiseAttendance(actor, state, state.meetings[meetingId], personId),
+        }]))
+    ])) } : {}),
+    ...(pendingAttendance && permissions.manage ? { pendingAttendance } : {}),
     availability,
     stages: stages.sort(
       (a, b) =>

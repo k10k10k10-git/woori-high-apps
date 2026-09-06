@@ -1,20 +1,24 @@
 "use client";
 
 // 출석 표 — 학생 출석부와 같은 인원×회차 격자.
-// ⚠ 셀은 토글이 아니다. 셀을 누르면 출석/지각/결석/지우기를 명시적으로 고른다
+// ⚠ 셀은 토글이 아니다. 셀을 누르면 출석/결석/지우기를 명시적으로 고른다.
 //   (같은 값을 다시 골라도 결과가 같은 멱등 기록 — 모노레포 실수 규칙 11).
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { describeApplicant } from "@/features/semester/db";
-import { calcScopedCompletions } from "@/features/semester/completion";
+import {
+  calcScopedCompletions,
+  EDITABLE_ATTENDANCE_STATUSES,
+  normalizeAttendanceStatus,
+  type EditableAttendanceStatus,
+} from "@/features/semester/completion";
 import { isStaffApplication, splitStudentsAndStaff } from "@/features/semester/roster";
 import { sessionDateLabel, sessionDayLabel } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type {
   Application,
   AttendanceByScope,
-  AttendanceStatus,
   CompletionEntry,
   SemesterAttendanceScope,
   Session,
@@ -30,14 +34,13 @@ type Props = {
   canEdit: boolean;
   completion: Record<string, CompletionEntry>;
   completionMinRate: number;
-  onMark: (appKey: string, sessId: string, status: AttendanceStatus) => void;
+  onMark: (appKey: string, sessId: string, status: EditableAttendanceStatus) => void;
   onClear: (appKey: string, sessId: string) => void;
   onToggleCompletion: (appKey: string, field: "certPrinted" | "photoChecked", value: boolean) => void;
 };
 
-const MARK: Record<AttendanceStatus, { text: string; cell: string }> = {
+const MARK: Record<EditableAttendanceStatus, { text: string; cell: string }> = {
   출석: { text: "✓", cell: "bg-emerald-50 text-emerald-600" },
-  지각: { text: "△", cell: "bg-amber-50 text-amber-600" },
   결석: { text: "✕", cell: "bg-red-50 text-red-500" },
 };
 
@@ -215,24 +218,25 @@ export default function AttendanceGrid({
                   </td>
                   {sessions.map((session) => {
                     const entry = selectedAttendance[session.id]?.[member.id];
+                    const displayStatus = entry ? normalizeAttendanceStatus(entry.s) : null;
                     const holiday = session.type === "휴강";
                     const open = openCell?.appKey === member.id && openCell?.sessId === session.id;
                     return (
                       <td key={session.id} className={`attendance-session-cell attendance-status-cell p-0 ${
-                        holiday ? "bg-amber-50/60" : entry ? MARK[entry.s].cell : ""
+                        holiday ? "bg-amber-50/60" : displayStatus ? MARK[displayStatus].cell : ""
                       }`}>
                         <button
                           ref={open ? anchorRef : undefined}
                           disabled={!canEdit || holiday}
                           onClick={(event) => openMenu(event, member.id, session.id, open)}
-                          aria-label={`${member.name} ${sessionDateLabel(session)} 출석 상태${entry ? ` (현재 ${entry.s})` : ""}`}
+                          aria-label={`${member.name} ${sessionDateLabel(session)} 출석 상태${displayStatus ? ` (현재 ${displayStatus})` : ""}`}
                           aria-expanded={open}
                           className={`attendance-status-button w-full text-sm font-semibold transition-colors disabled:cursor-default ${
                             entry ? "" : "text-slate-200 hover:bg-slate-50"
                           }`}
                           style={open ? { boxShadow: "inset 0 0 0 2px var(--color-primary)" } : undefined}
                         >
-                          {holiday ? <span className="text-[10px] text-amber-600">휴강</span> : entry ? MARK[entry.s].text : "·"}
+                          {holiday ? <span className="text-[10px] text-amber-600">휴강</span> : displayStatus ? MARK[displayStatus].text : "·"}
                         </button>
                       </td>
                     );
@@ -269,15 +273,16 @@ export default function AttendanceGrid({
       {openCell && menuAt && typeof document !== "undefined" && createPortal(
         (() => {
           const entry = selectedAttendance[openCell.sessId]?.[openCell.appKey];
+          const displayStatus = entry ? normalizeAttendanceStatus(entry.s) : null;
           return (
             <div ref={menuRef} role="menu"
               style={{ left: menuAt.left, top: menuAt.top, width: 148 }}
               className="fixed z-50 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
-              {(Object.keys(MARK) as AttendanceStatus[]).map((status) => (
+              {EDITABLE_ATTENDANCE_STATUSES.map((status) => (
                 <button key={status} role="menuitem"
                   onClick={() => { onMark(openCell.appKey, openCell.sessId, status); closeMenu(); }}
-                  className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:bg-slate-50 ${entry?.s === status ? MARK[status].cell : "text-slate-500"}`}>
-                  {MARK[status].text} {status}{entry?.s === status ? " (현재)" : ""}
+                  className={`block w-full rounded-lg px-2 py-1.5 text-left text-xs font-medium hover:bg-slate-50 ${displayStatus === status ? MARK[status].cell : "text-slate-500"}`}>
+                  {MARK[status].text} {status}{displayStatus === status ? " (현재)" : ""}
                 </button>
               ))}
               {entry && (

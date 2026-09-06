@@ -1,14 +1,15 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), data: vi.fn(), execute: vi.fn(), refresh: vi.fn(), png: vi.fn(), pdf: vi.fn() }));
-vi.mock("./api", () => ({ listPraiseWorkspaces: mocks.list, createPraiseWorkspace: mocks.create, praiseOperationId: () => "operation-test", listPraiseAccounts: async () => ({ accounts: [] }), listPraiseReferences: async () => ({ semesters: [] }), listPraiseRoster: async () => ({ people: [], semesterHref: null }) }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), references: vi.fn(), create: vi.fn(), data: vi.fn(), execute: vi.fn(), refresh: vi.fn(), png: vi.fn(), pdf: vi.fn() }));
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(window.location.search) }));
+vi.mock("./api", () => ({ listPraiseCreateReferences: mocks.references, listPraiseWorkspaces: mocks.list, createPraiseWorkspace: mocks.create, praiseOperationId: () => "operation-test", listPraiseAccounts: async () => ({ accounts: [] }), listPraiseReferences: async () => ({ semesters: [] }), listPraiseRoster: async () => ({ people: [], semesterHref: null }) }));
 vi.mock("./usePraiseData", () => ({ usePraiseData: mocks.data }));
 vi.mock("./components/stageExport", () => ({ exportStagePNG: mocks.png, printStagePDF: mocks.pdf }));
 import PraiseWorkspace from "./PraiseWorkspace";
 import { praiseFixture } from "./components/praiseTestFixtures";
 import type { PraiseStageVersion } from "./types";
-beforeEach(() => { vi.clearAllMocks(); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
+beforeEach(() => { vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry/praise"); mocks.references.mockResolvedValue({ semesters: [] }); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
 afterEach(cleanup);
 describe("찬양팀 작업공간", () => {
   for (const mode of ["shadow", "archived"] as const) it(`${mode}에서도 등단 버전·예배부·내보내기는 열고 생성·편집은 잠근다`, async () => {
@@ -68,6 +69,23 @@ describe("찬양팀 작업공간", () => {
     expect(screen.getByRole("tab", { name: "등단" })).toHaveFocus();
     expect(screen.getByRole("tab", { name: "등단" })).toHaveAttribute("aria-selected", "true");
   });
+  it("학기 참조와 실제 회차·학생 연결 진행률을 구분해 표시한다", async () => {
+    const view = praiseFixture();
+    view.meta.semesterId = "2026-2";
+    view.meta.teamId = "praise-team";
+    view.meta.mode = "shadow";
+    view.meta.importBlockers = ["shared_attendance_cutover_pending"];
+    view.meetings[0].linkedSessionId = "session-1";
+    view.people[0].rosterLink = { applicationKey: "student-application", studentId: "student-source" };
+    mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true });
+    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    render(<PraiseWorkspace workspaceId="synthetic-workspace" />);
+    expect(await screen.findByRole("link", { name: /공통 학기 참조/ })).toBeInTheDocument();
+    expect(screen.getByText("회차 1/1 연결")).toBeInTheDocument();
+    expect(screen.getByText("학생 1/2 연결")).toBeInTheDocument();
+    expect(screen.getByText("전환 확인 1건")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /학기 참조/ })).toBeInTheDocument();
+  });
   it("멤버는 본인 참석·확정본·가이드만 보며 관리자 query로 편집탭을 열 수 없다", () => {
     const view = praiseFixture(); view.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "member", staffId: "staff-1" };
     mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
@@ -76,11 +94,20 @@ describe("찬양팀 작업공간", () => {
     expect(screen.queryByRole("button", { name: "팀원 등록" })).not.toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "이번 주" })).toHaveAttribute("aria-selected", "true");
   });
+  it("학생 연결 정보가 비공개인 비관리자에게 연결수를 0명으로 표시하지 않는다", () => {
+    const view = praiseFixture(); view.meta.semesterId = "semester-fixture";
+    view.permissions = { ...view.permissions, manage: false, attendanceAll: false, role: "editor" };
+    for (const person of view.people) delete person.rosterLink;
+    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    render(<PraiseWorkspace workspaceId="synthetic-workspace" />);
+    expect(screen.getByRole("link", { name: /공통 학기 참조/ })).toBeInTheDocument();
+    expect(screen.queryByText(/학생 \d+\/\d+ 연결/)).not.toBeInTheDocument();
+  });
   it("학기가 없을 때 준비 상태 개설과 운영 이관 안내를 제공한다", async () => {
     mocks.list.mockResolvedValue({ workspaces: [], canCreate: true });
     render(<PraiseWorkspace />);
     expect(await screen.findByRole("heading", { name: "찬양팀 운영을 시작해 주세요" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "운영 학기 개설하기" }));
+    fireEvent.click(screen.getByRole("button", { name: "팀 운영 개설하기" }));
     expect(screen.getByText(/기존 운영 기록은 별도 이관 절차/)).toBeInTheDocument();
     expect(mocks.create).not.toHaveBeenCalled();
   });
@@ -100,13 +127,48 @@ it("개설 응답을 기다리는 동안 기간·이름·닫기를 잠근다", a
   mocks.list.mockResolvedValue({ workspaces: [], canCreate: true });
   mocks.create.mockImplementation(() => new Promise((done) => { resolve = done; }));
   render(<PraiseWorkspace />);
-  fireEvent.click(await screen.findByRole("button", { name: "운영 학기 개설하기" }));
-  fireEvent.change(screen.getByLabelText("운영 학기 이름"), { target: { value: "새 학기" } });
+  fireEvent.click(await screen.findByRole("button", { name: "팀 운영 개설하기" }));
+  fireEvent.change(screen.getByLabelText("운영 기준"), { target: { value: "independent" } });
+  fireEvent.change(screen.getByLabelText("운영 이름"), { target: { value: "새 학기" } });
   fireEvent.change(screen.getByLabelText("종료일"), { target: { value: "2026-12-31" } });
   fireEvent.click(screen.getByRole("button", { name: "준비 상태로 개설" }));
-  expect(screen.getByLabelText("운영 학기 이름")).toBeDisabled();
+  expect(screen.getByLabelText("운영 이름")).toBeDisabled();
   expect(screen.getByLabelText("시작일")).toBeDisabled();
   expect(screen.getByLabelText("종료일")).toBeDisabled();
   expect(screen.getByRole("button", { name: "개설 닫기" })).toBeDisabled();
   await act(async () => resolve({ workspaceId: "synthetic-workspace" }));
+});
+
+it("개설은 공통 학기·팀을 먼저 요구하고 선택한 연결을 함께 저장한다", async () => {
+  mocks.list.mockResolvedValue({ workspaces: [], canCreate: true });
+  mocks.references.mockResolvedValue({ semesters: [{ id: "semester-fixture", title: "합성 학기", startDate: "2026-09-01", endDate: "2026-12-31", teams: [{ id: "praise-team", name: "합성 찬양팀" }] }] });
+  mocks.create.mockResolvedValue({ workspaceId: "created-workspace" });
+  render(<PraiseWorkspace />);
+  fireEvent.click(await screen.findByRole("button", { name: "팀 운영 개설하기" }));
+  expect(screen.getByLabelText("운영 기준")).toHaveValue("semester");
+  expect(screen.getByRole("button", { name: "준비 상태로 개설" })).toBeDisabled();
+  await waitFor(() => expect(screen.getByLabelText("공통 학기")).not.toBeDisabled());
+  fireEvent.change(screen.getByLabelText("공통 학기"), { target: { value: "semester-fixture" } });
+  expect(screen.getByLabelText("시작일")).toHaveValue("2026-09-01");
+  expect(screen.getByRole("button", { name: "준비 상태로 개설" })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("학기 사역팀"), { target: { value: "praise-team" } });
+  fireEvent.click(screen.getByRole("button", { name: "준비 상태로 개설" }));
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({ semesterId: "semester-fixture", teamId: "praise-team", startDate: "2026-09-01", endDate: "2026-12-31" }), "operation-test"));
+});
+it("선택한 운영 기간·탭·모임을 URL에 함께 남기고 재진입 때 복원한다", async () => {
+  const view = praiseFixture();
+  view.meetings.push({ ...view.meetings[0], id: "meeting-2", date: "2026-09-12", worshipDate: "2026-09-13", sequence: 2, title: "다음 모임" });
+  mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+  window.history.replaceState(null, "", "/sunday-ministry/praise?workspace=synthetic-workspace&tab=attendance&meeting=meeting-1&origin=team");
+  const first = render(<PraiseWorkspace />);
+  expect(screen.getByLabelText("모임 회차")).toHaveValue("meeting-1");
+  fireEvent.change(screen.getByLabelText("모임 회차"), { target: { value: "meeting-2" } });
+  fireEvent.click(screen.getByRole("tab", { name: "등단" }));
+  const query = new URLSearchParams(window.location.search);
+  expect(Object.fromEntries(query)).toEqual({ workspace: "synthetic-workspace", tab: "stage", meeting: "meeting-2", origin: "team" });
+  first.unmount();
+  render(<PraiseWorkspace />);
+  expect(screen.getByLabelText("모임 회차")).toHaveValue("meeting-2");
+  expect(screen.getByRole("tab", { name: "등단" })).toHaveAttribute("aria-selected", "true");
+  expect(mocks.execute).not.toHaveBeenCalled();
 });

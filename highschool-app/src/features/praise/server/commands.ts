@@ -233,6 +233,7 @@ export function applyPraiseCommand(
   actor: PraiseActor,
   at: number,
   operationId: string,
+  serverContext: { sharedWrite?: boolean; stageAttendance?: PraiseState["attendance"] } = {},
 ): PraiseState {
   const permissions = praisePermissions(actor, previous);
   requireValue(
@@ -250,8 +251,17 @@ export function applyPraiseCommand(
       "operation_conflict",
       409,
     );
+    requireValue(!known.sharedAttendance || known.sharedAttendance.phase === "complete", "공통 출석 저장 결과를 확인 중입니다. 같은 작업으로 다시 확인해 주세요.", "shared_write_pending", 409);
     return previous;
   }
+  const pending = Object.values(previous.operations).flatMap(op => op.sharedAttendance && ["prepared", "attempting"].includes(op.sharedAttendance.phase) ? [op.sharedAttendance] : []);
+  const changesAttendanceMapping =
+    (command.type === "person.save" && pending.some(receipt => receipt.personId === command.person.id)) ||
+    (command.type === "meeting.save" && pending.some(receipt => receipt.meetingId === command.meeting.id)) ||
+    (command.type.startsWith("groups.") && pending.length > 0) ||
+    (command.type === "meta.save" && pending.length > 0 && (command.meta.semesterId !== previous.meta.semesterId || command.meta.teamId !== previous.meta.teamId || command.meta.mode !== previous.meta.mode || command.meta.status !== previous.meta.status));
+  requireValue(!changesAttendanceMapping,
+    "해당 출석 요청의 저장 결과를 먼저 확인해 주세요. 관리자가 요청을 검토·종료하면 연결을 바꿀 수 있습니다.", "shared_write_pending", 409);
   requireValue(
     !previous.audit[operationId] &&
       !previous.groupVersions[entryId(operationId)] &&
@@ -270,7 +280,7 @@ export function applyPraiseCommand(
   if (command.type !== "meta.save") {
     requireValue(
       previous.meta.status !== "archived",
-      "보관된 학기는 수정할 수 없습니다. 운영 설정에서 먼저 다시 열어 주세요.",
+      "보관된 운영 기간은 수정할 수 없습니다. 운영 설정에서 먼저 다시 열어 주세요.",
       "read_only",
       409,
     );
@@ -292,6 +302,9 @@ export function applyPraiseCommand(
     targetId: string | undefined;
   let changes: PraiseAuditEvent["changes"] = [];
   switch (command.type) {
+    case "attendance.resolve":
+      requireValue(false, "공통 출석 검토 서비스에서 처리해 주세요.", "invalid_request", 400);
+      break;
     case "meta.save": {
       manage();
       revision(state.meta.revision, command.expectedRevision);
@@ -502,7 +515,7 @@ export function applyPraiseCommand(
       );
       requireValue(!m.cancelled, "휴강 모임에는 출결을 입력할 수 없습니다.");
       requireValue(
-        !m.linkedSessionId,
+        !m.linkedSessionId || serverContext.sharedWrite,
         "이 모임은 학기 출석 원장과 연결되어 있습니다. 공통 출석 화면에서 입력해 주세요.",
         "linked_attendance",
         409,
@@ -588,8 +601,9 @@ export function applyPraiseCommand(
         403,
       );
       const m = meetingOf(state, command.meetingId);
+      const stageState = serverContext.stageAttendance ? { ...state, attendance: serverContext.stageAttendance } : state;
       requireValue(
-        stageInputRevision(state, m) === command.inputRevision,
+        stageInputRevision(stageState, m) === command.inputRevision,
         "출결·명단·등단 이력 또는 정책이 변경되었습니다. 최신 기준으로 다시 검토해 주세요.",
         "input_conflict",
         409,
@@ -614,8 +628,8 @@ export function applyPraiseCommand(
             : command.draft.overrides;
       const result =
         command.type === "stage.generate"
-          ? generatePraiseStage(state, m, config, overrides)
-          : validateManualStage(state, m, command.draft);
+          ? generatePraiseStage(stageState, m, config, overrides)
+          : validateManualStage(stageState, m, command.draft);
       const acknowledged =
         command.type !== "stage.generate" && command.acknowledgeWarnings;
       requireValue(

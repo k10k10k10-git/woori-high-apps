@@ -1,13 +1,13 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { MinistryRoles } from "./accessPolicy";
 import type { SharedCalendarItem } from "./SharedMinistryCalendar";
 
-const mocks = vi.hoisted(() => ({ retreats: vi.fn(), periods: vi.fn(), unsubscribe: vi.fn() }));
+const mocks = vi.hoisted(() => ({ retreats: vi.fn(), periods: vi.fn(), unsubscribe: vi.fn(), roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles }));
 vi.mock("@/context/AuthContext", () => {
   const user = { uid: "home-user" };
-  const roles = { semester: "superAdmin", retreat: "superAdmin" };
-  return { useAuth: () => ({ user, roles, loading: false, memberName: "테스트" }) };
+  return { useAuth: () => ({ user, roles: mocks.roles, loading: false, memberName: "테스트" }) };
 });
 vi.mock("@/features/landing/LandingPage", () => ({ default: () => null }));
 vi.mock("@/features/semester/db", () => ({
@@ -27,6 +27,7 @@ import PortalHome from "./PortalHome";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.roles = { semester: "superAdmin", retreat: "superAdmin" };
   mocks.retreats.mockReturnValue(mocks.unsubscribe);
   mocks.periods.mockReturnValue(() => {});
 });
@@ -57,4 +58,17 @@ describe("PortalHome — 기간 구독과 표시 metadata 분리", () => {
     act(() => mocks.retreats.mock.calls[0][0]([second]));
     expect(mocks.periods.mock.calls.map(([ids]) => ids)).toEqual([[], ["a"], ["b", "a"], ["b"]]);
   });
+});
+
+it("학기만 조회하는 스탭의 홈에는 접근할 수 없는 팀 운영 링크를 표시하지 않는다", () => {
+  mocks.roles = { semester: "staff", retreat: "fieldStaff" };
+  render(<PortalHome />);
+  expect(screen.queryAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/sunday-ministry"))).toHaveLength(0);
+});
+it("찬양팀 홈은 맡은 팀의 업무와 직접 진입 경로를 안내한다", () => {
+  mocks.roles = { semester: "praise", retreat: "none" };
+  render(<PortalHome />);
+  expect(screen.getByRole("heading", { name: "찬양팀" })).toBeInTheDocument();
+  expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/sunday-ministry")).every((link) => link.getAttribute("href") === "/sunday-ministry/praise")).toBe(true);
+  expect(screen.queryByRole("heading", { name: "행정·바나바" })).not.toBeInTheDocument();
 });

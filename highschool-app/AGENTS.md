@@ -125,6 +125,11 @@ npm run build
 - **판단 질문**: transaction 최초 null을 원장 부재로 즉시 처리하면 아직 읽지 않은 캐시를 실제 부재로 오인하므로 최초 서버 snapshot 구독을 유지한 뒤 시작한다. 광범위하게 읽히는 `semesters` 아래에 조별 출결을 넣지 않고, `praiseOps/{workspaceId}`를 서버 API에서 필요한 범위만 투영한다. 현행 default-deny Rules의 직접 접근 차단을 검사하며 새 클라이언트 허용을 추가하지 않는다.
 - **재사용 규칙**: 업무·감사·operationId를 한 원자 저장으로 유지하고 동일 내용 재시도는 같은 operationId를 쓴다. 통합 로그 투영은 고정 ID와 내용 일치를 검증한 뒤 완료 표시하며, 외부 historical 감사와 원장 시각을 오늘 사용자 행위로 바꾸지 않는다.
 
+### 교차 원장 검토의 권한 검사는 외부 표식 전에 예약하기 (2026-09-06)
+- **접근법**: `src/features/praise/server/sharedAttendanceWrite.ts`에서 private workspace transaction으로 최신 관리자·원본 요청·operationId를 예약한다 → 같은 `semesters/{sid}` transaction에서 출석 셀과 최소 영구 표식을 함께 저장하거나, 검토 시 표식을 확인·생성한다 → `verified` 영수증과 감사를 완료할 때까지 같은 요청으로 재시도한다. `sharedAttendance.test.ts`의 권한 회수·작업 번호 경합·표식 후 장애 테스트로 순서를 검증한다.
+- **판단 질문**: 외부 `closed` 표식을 먼저 쓰면 이후 권한 거절이나 감사 장애로 고아 요청이 남는다. 반대로 외부 처리가 승인된 뒤 완료 단계에서 최신 권한을 다시 요구하면 이미 저장된 표식이 고착된다. 그래서 최신 권한은 외부 처리 전에 예약하고, 그 뒤에는 영구 증거와 예약 권한으로 감사에 수렴한다.
+- **재사용 규칙**: 교차 원장 관리자 복구도 별도 operation으로 먼저 예약하고, 영구 증거가 있는 완료와 증거 없는 새 시도를 구분해 원장 재적용 없이 복구한다.
+
 ### 인증 응답 순서와 목록 갱신의 의미를 분리하기 (2026-09-05)
 - **접근법**: `src/context/AuthContext.render.test.tsx`에서 A·B 계정의 응답 순서를 뒤집고 로그아웃 뒤 응답을 재현한다 → 조회 시작 시 역할을 비우고 성공·실패에 요청 세대 검사를 둔다 → `src/features/semester/semesterSubscription.test.ts`에서 출석 100회 변경의 콜백 수를 비교해 동일한 학기 metadata 전달을 억제한다.
 - **판단 질문**: 역할 판정은 기존 `resolveMinistryRoles`와 자기조회 경로를 유지했다. 학기 루트 구독 분할은 DB 경로·소유권 설계가 필요하므로 화면 갱신 최적화와 함께 바꾸지 않았다.

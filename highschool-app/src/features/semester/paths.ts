@@ -28,6 +28,9 @@ export const paths = {
     `semesters/${sid}/attendance/${scope}/${sessId}`,
   attendanceEntry: (sid: string, scope: SemesterAttendanceScope, sessId: string, appKey: string) =>
     `semesters/${sid}/attendance/${scope}/${sessId}/${appKey}`,
+  /** 찬양팀 서버가 공통 출석의 적용·종료를 증명하는 비식별 영구 영수증. */
+  praiseOperationReceipt: (sid: string, receiptHash: string) =>
+    `semesters/${sid}/praiseOperationReceipts/${receiptHash}`,
   completion: (sid: string) => `semesters/${sid}/completion`,
   completionEntry: (sid: string, appKey: string) => `semesters/${sid}/completion/${appKey}`,
   archiveLinks: (sid: string) => `semesters/${sid}/archiveLinks`,

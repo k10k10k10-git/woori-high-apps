@@ -127,3 +127,21 @@ function siteRequest(id: string, title: string): SiteRequest {
     roleLabel: "사역팀", createdAt: 1_788_595_200_000, status: "received",
   };
 }
+
+it("찬양팀 바로가기는 내 팀 카드 안에 한 번만 표시한다", () => {
+  mocks.data = { ...mocks.data, loaded: true, roles: { semester: "praise", retreat: "none" } };
+  render(<MyMinistryPanel />);
+  const team = screen.getByRole("region", { name: "팀·주일 운영" });
+  expect(within(team).getByRole("link", { name: "주일 등단표" })).toHaveAttribute("href", "/sunday-ministry/praise?tab=stage");
+  expect(screen.getAllByRole("link", { name: "주일 등단표" })).toHaveLength(1);
+  expect(screen.queryByRole("region", { name: "찬양팀 준비" })).not.toBeInTheDocument();
+});
+it("개인 출석 수와 입력된 기록 수를 구분한다", () => {
+  mocks.data = { ...mocks.data, loaded: true, personalApplication: { application: { id: "application-fixture", studentId: "student-fixture", name: "합성 이름", bu: "1부", grade: 1, class: 1, status: "배치", createdAt: "2026-09-01" }, team: null, trainingClass: null }, personalAttendance: { actualAttended: 1, attended: 1, late: 0, absent: 1, recorded: 2, unrecorded: 1, total: 3, rate: 33 } };
+  render(<MyMinistryPanel />);
+  const attendance = screen.getByText("사역팀 출석", { selector: "dt" });
+  expect(attendance.parentElement).toHaveTextContent("1/3회");
+  expect(screen.getByText("사역팀 입력 현황", { selector: "dt" }).parentElement).toHaveTextContent("2/3회 · 미입력 1회");
+  expect(screen.getByText("사역팀 출석률", { selector: "dt" }).parentElement).toHaveTextContent("33%");
+  expect(screen.getByText("휴강을 제외한 정규·행사 회차 기준입니다. 수료 판정은 학기 출석부에서 정규 회차만 계산합니다.")).toBeInTheDocument();
+});

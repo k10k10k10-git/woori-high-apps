@@ -18,7 +18,7 @@ export type SharedCalendarItem = {
 const KIND_LABEL: Record<SharedCalendarItem["kind"], string> = {
   main: "고등부 메인",
   semester: "훈련·사역팀",
-  sunday: "주일 사역",
+  sunday: "팀·주일 운영",
   retreat: "수련회 행정",
   field: "수련회 이가드",
 };
@@ -38,7 +38,7 @@ export const SHARED_CALENDAR_KIND_OPTIONS: ReadonlyArray<{
 }> = [
   { value: "main", label: "고등부 메인", sourceSite: "portal-main" },
   { value: "semester", label: "훈련·사역팀", sourceSite: "semester-calendar" },
-  { value: "sunday", label: "주일 사역", sourceSite: "sunday-calendar" },
+  { value: "sunday", label: "팀·주일 운영", sourceSite: "sunday-calendar" },
   { value: "retreat", label: "수련회 행정", sourceSite: "retreat-admin" },
   { value: "field", label: "수련회 이가드", sourceSite: "move-guide" },
 ];

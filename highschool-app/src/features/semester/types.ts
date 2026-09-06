@@ -78,6 +78,9 @@ export interface AttendanceEntry {
   s: AttendanceStatus;
   by?: string;
   at?: string;
+  /** 찬양팀 서버가 같은 요청의 재시도를 판별하는 비식별 작업 증거. 일반 입력에서는 없음. */
+  praiseOperationId?: string;
+  praiseOperationFingerprint?: string;
 }
 
 // 회차별 출석 맵: appKey → entry (노드 없음 = 미기록)

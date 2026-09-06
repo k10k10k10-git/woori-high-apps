@@ -23,6 +23,8 @@ import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Semester, Session } from "@/features/semester/types";
 import {
   canAccessArea,
+  canAccessSundayTeam,
+  ownSundayTeam,
   canEditArea,
   iguardScopeOf,
   describeRoles,
@@ -34,6 +36,8 @@ import { buildHomeActions } from "./homeActions";
 import HomeAgendaSummary from "./HomeAgendaSummary";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
 import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dailyMinistryMessage";
+
+import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
 
 export default function PortalHome() {
   const { user, loading, roles, memberName, signIn, signOut } = useAuth();
@@ -58,6 +62,13 @@ export default function PortalHome() {
   const friendlyName = friendlyMinistryName(memberName || user?.displayName);
 
   const semesterAllowed = canAccessArea("semester", roles);
+  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, roles));
+  const assignedSundayTeam = ownSundayTeam(roles);
+  const sundayHref = assignedSundayTeam ? sundayTeamHref(assignedSundayTeam) : "/sunday-ministry";
+  const sundayTitle = sundayTeams.length === 1 ? sundayTeams[0].label : "팀별 운영 공간";
+  const sundayDescription = sundayTeams.length === 1
+    ? `${sundayTeams[0].label}의 ${sundayTeams[0].hint} 업무를 확인합니다.`
+    : "새친구·행정은 연중 관리하고, 찬양·예배는 팀별 모임과 주일 준비를 이어갑니다.";
   const fieldAllowed = canAccessArea("retreat-field", roles);
   const retreatAdminAllowed = canAccessArea("retreat-admin", roles);
 
@@ -174,9 +185,10 @@ export default function PortalHome() {
       title: "개인 큐카드 확인",
       meta: `${currentRetreat.name} 현장 실행`,
     };
+    if (assignedSundayTeam) return { href: sundayHref, title: `${sundayTitle} 열기`, meta: sundayDescription };
     if (semesterAllowed) return {
       href: currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters",
-      title: "학기 중 사역 확인",
+      title: "학기 운영 확인",
       meta: "신청·배치·출석·커리큘럼",
     };
     return {
@@ -184,7 +196,7 @@ export default function PortalHome() {
       title: "수련회 행정 확인",
       meta: "명단·편성·현장 준비",
     };
-  }, [currentRetreat, currentSemester, fieldAllowed, homeActions, roles, semesterAllowed]);
+  }, [assignedSundayTeam, currentRetreat, currentSemester, fieldAllowed, homeActions, roles, semesterAllowed, sundayDescription, sundayHref, sundayTitle]);
 
   async function submitSchedule() {
     if (!scheduleDraft) return;
@@ -242,7 +254,7 @@ export default function PortalHome() {
             <p className="text-xs font-semibold text-slate-500">요청 방법</p>
             <Link href="/field" className="btn-primary justify-center">수련회 이가드 접근 요청</Link>
             <p className="text-xs leading-5 text-slate-500">
-              주일 사역·학기 사역·수련회 행정은 요청 버튼이 따로 없습니다.
+              팀·주일 운영·학기 운영·수련회 행정은 요청 버튼이 따로 없습니다.
               담당 교역자나 통합관리자에게 위 이메일과 맡을 사역을 알려주세요.
             </p>
             <Link href="/suggestions" className="btn-secondary justify-center">건의사항으로 문의하기</Link>
@@ -281,24 +293,24 @@ export default function PortalHome() {
         <section className="grid gap-5 lg:grid-cols-3">
           {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--semester px-3 py-1.5">학기 중 사역</span>
+              <span className="tag home-domain-chip--semester px-3 py-1.5">{MINISTRY_AREA_LABELS.semester}</span>
               <span className="home-domain-arrow--semester grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
           </Link> : <section className="card p-6 text-slate-400 opacity-75">
-            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold">학기 중 사역</span>
+            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold">{MINISTRY_AREA_LABELS.semester}</span>
             <h2 className="mt-5 text-2xl font-bold">통합관리자 승인 후 이용</h2>
             <p className="mt-2 text-sm">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
           </section>}
 
-          {semesterAllowed && <Link href="/sunday-ministry" className="card home-domain-card home-domain-card--sunday group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
+          {sundayTeams.length > 0 && <Link href={sundayHref} className="card home-domain-card home-domain-card--sunday group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--sunday px-3 py-1.5">주일 사역</span>
+              <span className="tag home-domain-chip--sunday px-3 py-1.5">{MINISTRY_AREA_LABELS.sunday}</span>
               <span className="home-domain-arrow--sunday grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
-            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">행정·바나바</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-500">학기 구분 없이 새친구 정착, 등록 현황과 행정 변동을 관리합니다.</p>
+            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{sundayTitle}</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">{sundayDescription}</p>
           </Link>}
 
           <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
@@ -357,7 +369,7 @@ export default function PortalHome() {
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료 판정" tone="semester" />}
-                {semesterAllowed && <MinistryArea href="/sunday-ministry" label="주일 사역 · 행정·바나바" description="새친구·등록 현황·행정 변동" tone="sunday" />}
+                {sundayTeams.length > 0 && <MinistryArea href={sundayHref} label={MINISTRY_AREA_LABELS.sunday} description={sundayDescription} tone="sunday" />}
                 {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="retreat" />}
                 {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="field" />}
               </div>

@@ -32,11 +32,19 @@ export interface ApplicationAssignment {
 }
 
 export interface ApplicationAttendanceSummary {
+  /** 출석 회차 수. 남아 있는 레거시 `지각`도 사용자 결정에 따라 출석으로 계산한다. */
+  actualAttended: number;
+  /** @deprecated `actualAttended`를 사용한다. */
   attended: number;
   late: number;
   absent: number;
+  /** 출석·지각·결석 중 하나가 입력된 회차 수. */
   recorded: number;
+  /** 아직 어떤 상태도 입력되지 않은 회차 수. */
+  unrecorded: number;
+  /** 휴강을 제외한 정규·행사 전체 회차 수. 수료 판정의 정규 회차 분모와 다르다. */
   total: number;
+  /** 휴강을 제외한 정규·행사 전체 회차의 출석 비율. */
   rate: number;
 }
 
@@ -55,7 +63,7 @@ export function roleDashboardTitle(roles: MinistryRoles): string {
   if (roles.semester === "adminTeam" || roles.retreat === "adminTeam") return "처리할 행정 업무를 먼저 확인하세요";
   if (roles.semester === "barnabas") return "새친구 정착 흐름을 이어가세요";
   if (roles.semester === "worship") return "이번 주 예배 준비를 확인하세요";
-  if (["praise", "media", "design"].includes(roles.semester)) return "맡은 주일 사역을 확인하세요";
+  if (["praise", "media", "design"].includes(roles.semester)) return "맡은 팀·주일 운영을 확인하세요";
   if (roles.retreat === "iguardTeam") return "수련회 현장 준비를 확인하세요";
   if (roles.retreat === "fieldStaff") return "내 현장 배정과 다음 동선을 확인하세요";
   if (roles.semester === "staff") return "배정된 학기 사역을 확인하세요";
@@ -69,7 +77,7 @@ function sundayModule(roles: MinistryRoles): MinistryModule | null {
     const team = sundayTeamOf(ownTeam);
     return {
       id: `sunday-${ownTeam}`,
-      title: `주일 ${team?.label ?? "사역팀"}`,
+      title: team?.label ?? "담당 사역팀",
       description: team?.tabs.length ? team.tabs.join(" · ") : "팀 기능 준비 중",
       href: sundayTeamHref(ownTeam),
       accessLabel: canAccessSundayTeam(ownTeam, roles) ? "담당" : "조회",
@@ -78,9 +86,9 @@ function sundayModule(roles: MinistryRoles): MinistryModule | null {
   }
   return {
     id: "sunday-all",
-    title: "주일 사역 전체",
-    description: "행정·바나바·예배팀 운영",
-    href: sundayTeamHref("admin"),
+    title: "팀·주일 운영 전체",
+    description: "행정·바나바·예배·찬양팀 운영",
+    href: "/sunday-ministry",
     accessLabel: canEditArea("sunday", roles) ? "운영" : "조회",
     tone: "sunday",
   };
@@ -164,13 +172,16 @@ export function applicationAttendanceSummary(
   const late = statuses.filter((status) => status === "지각").length;
   const absent = statuses.filter((status) => status === "결석").length;
   const total = countedSessions.length;
+  const recorded = statuses.length;
   return {
+    actualAttended: attended + late,
     attended,
     late,
     absent,
-    recorded: statuses.length,
+    recorded,
+    unrecorded: total - recorded,
     total,
-    rate: total > 0 ? Math.round(((attended + late * 0.5) / total) * 100) : 0,
+    rate: total > 0 ? Math.round(((attended + late) / total) * 100) : 0,
   };
 }
 

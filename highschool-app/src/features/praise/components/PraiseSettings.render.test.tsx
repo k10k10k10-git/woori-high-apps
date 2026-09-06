@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const api = vi.hoisted(() => ({ accounts: vi.fn(), references: vi.fn() }));
 vi.mock("../api", () => ({ listPraiseAccounts: api.accounts, listPraiseReferences: api.references }));
@@ -40,7 +40,7 @@ const click = (name: string) => fireEvent.click(screen.getByRole("button", { nam
 describe("찬양 운영 설정", () => {
   it("대조가 끝나지 않은 가져온 기록은 운영 모드 변경을 잠근다", () => {
     const view = fixture(); view.meta.mode = "shadow"; view.meta.importBlockers = ["source_snapshot_unverified"];
-    const { execute } = setup(view); click("학기 설정 편집");
+    const { execute } = setup(view); click("운영 기간 편집");
     expect(screen.getByLabelText("운영 모드")).toBeDisabled();
     expect(screen.getByLabelText("운영 모드")).toHaveValue("shadow");
     expect(screen.getByText("가져온 기록의 대조가 끝날 때까지 읽기 전용으로 유지됩니다.")).toBeInTheDocument();
@@ -60,46 +60,46 @@ describe("찬양 운영 설정", () => {
 
   it("학기 초안과 기준 버전은 원격 갱신으로 덮지 않는다", async () => {
     const { view, execute, rerender } = setup();
-    click("학기 설정 편집");
-    fireEvent.change(screen.getByLabelText("학기명"), { target: { value: "작성 중 학기" } });
+    click("운영 기간 편집");
+    fireEvent.change(screen.getByLabelText("운영 이름"), { target: { value: "작성 중 학기" } });
     rerender(<PraiseSettings view={{ ...view, meta: { ...view.meta, revision: 8, name: "원격 학기" } }} execute={execute} busy={false} />);
-    expect(screen.getByLabelText("학기명")).toHaveValue("작성 중 학기");
+    expect(screen.getByLabelText("운영 이름")).toHaveValue("작성 중 학기");
     fireEvent.change(screen.getByLabelText("운영 모드"), { target: { value: "live" } });
-    click("학기 설정 저장");
+    click("운영 기간 저장");
     await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({ type: "meta.save", expectedRevision: 3, meta: expect.objectContaining({ name: "작성 중 학기", mode: "live" }) })));
     expect(await screen.findByRole("status")).toHaveTextContent("설정을 저장했습니다.");
   });
 
   it("작업공간을 바꾸면 이전 학기 초안을 제거한다", () => {
-    const { view, execute, rerender } = setup(); click("학기 설정 편집");
-    fireEvent.change(screen.getByLabelText("학기명"), { target: { value: "이전 초안" } });
+    const { view, execute, rerender } = setup(); click("운영 기간 편집");
+    fireEvent.change(screen.getByLabelText("운영 이름"), { target: { value: "이전 초안" } });
     rerender(<PraiseSettings view={{ ...view, meta: { ...view.meta, id: "next-term", name: "다음 학기" } }} execute={execute} busy={false} />);
-    expect(screen.queryByLabelText("학기명")).not.toBeInTheDocument();
-    click("학기 설정 편집");
-    expect(screen.getByLabelText("학기명")).toHaveValue("다음 학기");
+    expect(screen.queryByLabelText("운영 이름")).not.toBeInTheDocument();
+    click("운영 기간 편집");
+    expect(screen.getByLabelText("운영 이름")).toHaveValue("다음 학기");
   });
 
   it("학기와 사역팀은 이름으로 선택하며 학기를 바꾸면 기존 팀 선택을 비운다", async () => {
     const view = fixture(); delete view.meetings[0].linkedSessionId;
-    const { execute } = setup(view); click("학기 설정 편집");
+    const { execute } = setup(view); click("운영 기간 편집");
     await waitFor(() => expect(screen.getByLabelText("연결 학기")).not.toBeDisabled());
     expect(screen.getByRole("option", { name: "합성 기본 학기" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("연결 학기"), { target: { value: "semester-next" } });
     expect(screen.getByLabelText("연결 사역팀")).toHaveValue("");
-    fireEvent.change(screen.getByLabelText("연결 사역팀"), { target: { value: "praise-next" } }); click("학기 설정 저장");
+    fireEvent.change(screen.getByLabelText("연결 사역팀"), { target: { value: "praise-next" } }); click("운영 기간 저장");
     await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({ type: "meta.save", meta: expect.objectContaining({ semesterId: "semester-next", teamId: "praise-next" }) })));
   });
 
   it("연결 회차가 없을 때 학기 연결 안 함을 선택하면 학기·팀 연결을 함께 비운다", async () => {
     const view = fixture(); delete view.meetings[0].linkedSessionId;
-    const { execute } = setup(view); click("학기 설정 편집");
+    const { execute } = setup(view); click("운영 기간 편집");
     await waitFor(() => expect(screen.getByLabelText("연결 학기")).not.toBeDisabled());
-    fireEvent.change(screen.getByLabelText("연결 학기"), { target: { value: "" } }); click("학기 설정 저장");
+    fireEvent.change(screen.getByLabelText("연결 학기"), { target: { value: "" } }); click("운영 기간 저장");
     await waitFor(() => expect(execute).toHaveBeenCalledWith(expect.objectContaining({ type: "meta.save", meta: expect.objectContaining({ semesterId: "", teamId: "" }) })));
   });
 
   it("공통 출석 연결 회차가 있으면 학기·사역팀 선택을 유지한다", async () => {
-    setup(); click("학기 설정 편집");
+    setup(); click("운영 기간 편집");
     await screen.findByRole("option", { name: "합성 기본 학기" });
     expect(screen.getByLabelText("연결 학기")).toBeDisabled();
     expect(screen.getByLabelText("연결 사역팀")).toBeDisabled();
@@ -107,12 +107,12 @@ describe("찬양 운영 설정", () => {
 
   it("학기 목록 조회 실패 후 다시 불러올 수 있고 작성한 학기명은 보존한다", async () => {
     api.references.mockRejectedValueOnce(new Error("합성 학기 조회 오류"));
-    const view = fixture(); delete view.meetings[0].linkedSessionId; setup(view); click("학기 설정 편집");
-    fireEvent.change(screen.getByLabelText("학기명"), { target: { value: "보존할 학기명" } });
+    const view = fixture(); delete view.meetings[0].linkedSessionId; setup(view); click("운영 기간 편집");
+    fireEvent.change(screen.getByLabelText("운영 이름"), { target: { value: "보존할 학기명" } });
     expect(await screen.findByRole("alert")).toHaveTextContent("합성 학기 조회 오류");
     expect(screen.getByLabelText("연결 학기")).toBeDisabled(); click("학기·사역팀 다시 불러오기");
     await waitFor(() => expect(screen.getByLabelText("연결 학기")).not.toBeDisabled());
-    expect(screen.getByLabelText("학기명")).toHaveValue("보존할 학기명");
+    expect(screen.getByLabelText("운영 이름")).toHaveValue("보존할 학기명");
   });
 
   it("회차 수정은 연결된 조 버전을 보존하고 휴강·임시회차를 저장한다", async () => {
@@ -202,7 +202,7 @@ describe("찬양 운영 설정", () => {
       setup(view); expect(screen.getByRole("button", { name: "회차 추가" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "담당 계정 추가" })).toBeDisabled();
       expect(screen.getByRole("button", { name: "등단 정책 편집" })).toBeDisabled();
-      click("학기 설정 편집"); expect(screen.getByLabelText("학기명")).not.toBeDisabled();
+      click("운영 기간 편집"); expect(screen.getByLabelText("운영 이름")).not.toBeDisabled();
     });
   }
 
@@ -219,11 +219,85 @@ describe("찬양 운영 설정", () => {
   it("저장 실패 시 초안을 보존하며 저장 중 중복 실행을 막는다", async () => {
     let finish!: (value: boolean) => void;
     const execute = vi.fn<(command: PraiseCommand) => Promise<boolean>>().mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
-    setup(fixture(), execute); click("학기 설정 편집");
-    fireEvent.change(screen.getByLabelText("학기명"), { target: { value: "실패 보존 초안" } }); click("학기 설정 저장");
-    expect(screen.getByLabelText("학기명")).toBeDisabled(); click("학기 설정 저장"); expect(execute).toHaveBeenCalledTimes(1);
+    setup(fixture(), execute); click("운영 기간 편집");
+    fireEvent.change(screen.getByLabelText("운영 이름"), { target: { value: "실패 보존 초안" } }); click("운영 기간 저장");
+    expect(screen.getByLabelText("운영 이름")).toBeDisabled(); click("운영 기간 저장"); expect(execute).toHaveBeenCalledTimes(1);
     await act(async () => finish(false));
     expect(screen.getByRole("alert")).toHaveTextContent("입력 내용은 유지");
-    expect(screen.getByLabelText("학기명")).toHaveValue("실패 보존 초안"); expect(screen.getByLabelText("학기명")).not.toBeDisabled();
+    expect(screen.getByLabelText("운영 이름")).toHaveValue("실패 보존 초안"); expect(screen.getByLabelText("운영 이름")).not.toBeDisabled();
+  });
+});
+
+
+describe("공통 출석 저장 검토", () => {
+  function pendingView(proof = false): PraiseView {
+    const view = fixture();
+    view.people.push({ ...view.people[0], id: "student-review", kind: "STUDENT", name: "합성 검토 학생", grade: 1 });
+    view.pendingAttendance = [{ operationId: "private-operation", meetingId: "meeting-test", personId: "student-review", requestedAt: Date.UTC(2026, 8, 6, 2, 30), status: "PRESENT", currentStatus: "ABSENT", phase: "attempting", sourceRevision: "a".repeat(64), canFinalize: proof }];
+    return view;
+  }
+  const section = () => screen.getByRole("region", { name: "공통 출석 저장 검토" });
+  const acknowledge = () => fireEvent.click(within(section()).getByRole("checkbox", { name: "현재 출석과 요청 내용을 확인했습니다." }));
+
+  it("관리자만 요청·현재 출석·증거와 이름/모임일을 보고 내부 키를 노출하지 않는다", () => {
+    const view = pendingView(); const { execute, rerender } = setup(view);
+    const content = within(section());
+    expect(content.getByRole("heading", { name: "2026-09-06 · 합성 첫 모임 · 합성 검토 학생" })).toBeInTheDocument();
+    expect(content.getByText("출석")).toBeInTheDocument(); expect(content.getByText("결석")).toBeInTheDocument(); expect(content.getByText("확인되지 않음")).toBeInTheDocument();
+    expect(section().textContent).toContain("한국 시간");
+    for (const privateValue of ["private-operation", "student-review", "meeting-test", "applicationKey", "uid-synthetic", "a".repeat(64)]) expect(section().outerHTML).not.toContain(privateValue);
+    rerender(<PraiseSettings view={{ ...view, permissions: { ...view.permissions, manage: false, role: "editor" } }} execute={execute} busy={false} />);
+    expect(screen.queryByRole("region", { name: "공통 출석 저장 검토" })).not.toBeInTheDocument();
+  });
+
+  it("명시 확인 뒤 증거 없는 요청만 원장 미변경 종료 명령으로 보낸다", async () => {
+    const { execute } = setup(pendingView()); const button = screen.getByRole("button", { name: "원장 변경 없이 요청 종료" });
+    expect(button).toBeDisabled(); fireEvent.click(button); expect(execute).not.toHaveBeenCalled();
+    acknowledge(); fireEvent.click(button);
+    await waitFor(() => expect(execute).toHaveBeenCalledExactlyOnceWith({ type: "attendance.resolve", pendingOperationId: "private-operation", resolution: "close", expectedSourceRevision: "a".repeat(64), acknowledge: true }));
+    expect(await screen.findByRole("status")).toHaveTextContent("현재 출석을 변경하지 않고 요청을 종료했습니다.");
+    expect(screen.getByRole("heading", { name: "공통 출석 저장 검토" })).toHaveFocus();
+  });
+
+  it("저장 증거가 있으면 감사 완료만 제공하고 원래 출석을 다시 저장하지 않는다", async () => {
+    const { execute } = setup(pendingView(true)); expect(screen.queryByRole("button", { name: "원장 변경 없이 요청 종료" })).not.toBeInTheDocument();
+    expect(within(section()).getByText("확인됨")).toBeInTheDocument(); acknowledge(); click("감사 기록 완료");
+    await waitFor(() => expect(execute).toHaveBeenCalledWith({ type: "attendance.resolve", pendingOperationId: "private-operation", resolution: "finalize", expectedSourceRevision: "a".repeat(64), acknowledge: true }));
+    expect(await screen.findByRole("status")).toHaveTextContent("원래 요청의 감사 기록을 완료했습니다.");
+  });
+
+  it("검토 도중 원장 값이나 증거가 바뀌면 확인 체크를 해제한다", () => {
+    const view = pendingView(); const { execute, rerender } = setup(view); acknowledge();
+    expect(screen.getByRole("button", { name: "원장 변경 없이 요청 종료" })).not.toBeDisabled();
+    rerender(<PraiseSettings view={{ ...view, pendingAttendance: [{ ...view.pendingAttendance![0], sourceRevision: "b".repeat(64), currentStatus: null, canFinalize: true }] }} execute={execute} busy={false} />);
+    expect(within(section()).getByRole("checkbox")).not.toBeChecked(); expect(screen.getByRole("button", { name: "감사 기록 완료" })).toBeDisabled();
+    expect(within(section()).getByText("미입력")).toBeInTheDocument();
+  });
+
+  it("처리 중 모든 중복 제출을 막고 실패 시 확인 상태와 재시도 방법을 유지한다", async () => {
+    let finish!: (success: boolean) => void;
+    const execute = vi.fn<(command: PraiseCommand) => Promise<boolean>>().mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    setup(pendingView(), execute); acknowledge(); click("원장 변경 없이 요청 종료");
+    expect(within(section()).getByRole("checkbox")).toBeDisabled(); expect(screen.getByRole("button", { name: "운영 기간 편집" })).toBeDisabled();
+    fireEvent.submit(within(section()).getByRole("form")); fireEvent.submit(within(section()).getByRole("form")); expect(execute).toHaveBeenCalledTimes(1);
+    await act(async () => finish(false));
+    expect(screen.getByRole("alert")).toHaveTextContent("현재 출석을 확인한 뒤 다시 시도"); expect(within(section()).getByRole("checkbox")).toBeChecked(); expect(screen.getByRole("button", { name: "원장 변경 없이 요청 종료" })).not.toBeDisabled();
+  });
+
+  it("API 거절 내용을 알리고 완료됐다고 표시하지 않는다", async () => {
+    const execute = vi.fn<(command: PraiseCommand) => Promise<boolean>>().mockRejectedValue(new Error("검토 중 공통 출석이 변경됐습니다. 다시 확인해 주세요."));
+    setup(pendingView(), execute); acknowledge(); click("원장 변경 없이 요청 종료");
+    expect(await screen.findByRole("alert")).toHaveTextContent("검토 중 공통 출석이 변경"); expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("보관/비교 운영 중에도 관리자는 기존 요청을 종료할 수 있고 일반 설정은 잠긴다", () => {
+    const view = pendingView(); view.meta.mode = "shadow"; setup(view); acknowledge();
+    expect(screen.getByRole("button", { name: "원장 변경 없이 요청 종료" })).not.toBeDisabled(); expect(screen.getByRole("button", { name: "회차 추가" })).toBeDisabled();
+  });
+
+  it("검토 완료 후 요청이 사라지면 빈 상태를 표시한다", () => {
+    const view = pendingView(); const { execute, rerender } = setup(view);
+    rerender(<PraiseSettings view={{ ...view, pendingAttendance: [] }} execute={execute} busy={false} />);
+    expect(within(section()).getByText("검토 대기 중인 공통 출석 요청이 없습니다.")).toBeInTheDocument(); expect(within(section()).queryByRole("checkbox")).not.toBeInTheDocument();
   });
 });

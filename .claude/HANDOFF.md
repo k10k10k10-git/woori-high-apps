@@ -4,6 +4,14 @@
 > 두 번째 문서를 만들지 말 것 — 실제로는 더 오래된 문서가 자기를 최신이라 주장해
 > 36커밋 전 세계관으로 세션을 시작하게 만든 사고가 있었다(2026-08-12 정리).
 
+## 2026-09-06 최신 작업 — 학기 운영·팀 주일 운영 구조 통합 (검증 완료·배포 진행)
+
+- 사용자가 학기 사역팀의 찬양 모임과 찬양팀 전용 모임이 같은 모임이라고 확정하고, 정보구조를 **학기 운영 / 팀·주일 운영** 두 축으로 개편해 운영 배포하도록 요청했다. 학기는 개설·신청·배치·훈련/사역팀 출석·커리큘럼을, 팀·주일은 팀 선택 뒤 주간 실행 업무를 담당한다.
+- 연결된 찬양 회차·신청자는 `semesters/{sid}/attendance/team/{sessionId}/{applicationKey}`를 공통 원장으로 사용한다. 새 출석 저장은 `출석/결석`만 허용하고 레거시 `지각`은 출석으로 읽는다. 이름·날짜만으로 기존 shadow 인물·회차를 자동 연결하지 않으며 `p_import_dc53ee7b2786adbc8675`의 차단 표식과 조회 전용 상태는 유지한다.
+- 공통 출석 쓰기는 workspace 예약 뒤 학기 전체 transaction에서 최신 회차·배치·원본 revision을 재검증하고, 출석 셀과 비식별 영구 `praiseOperationReceipts`를 함께 저장한다. 불확실한 응답은 원장을 재적용하지 않고 관리자 검토 예약·영구 표식으로 감사에 수렴한다. 등단 workspace 저장은 ETag 조건부 쓰기 직전에 공통 출석을 다시 검증한다.
+- 최종 로컬 검증은 통합 앱 lint·typecheck·170파일/1,665테스트(3 skip)·production build와 루트 `npm run verify`의 학생 앱 lint(기존 warning만)·typecheck·277테스트·build, Agent OS 35테스트까지 통과했다. 독립 보안 재리뷰에서 새 P1/P2는 없었다.
+- 운영 DB 직접 쓰기·Rules·계정/권한·학생 앱 Hosting 변경은 없다. 작업 브랜치 `codex/semester-sunday-unify-20260906`에서 PR 검토·병합 후 통합 앱 Vercel 운영 buildId와 읽기 전용 화면을 확인한다. 완료 SHA·배포 상태는 후속 완료 기록을 기준으로 한다.
+
 ## 2026-09-06 17:16 KST 최신 완료 — 실제 찬양팀 CSV 적용
 
 - 사용자가 제공한 운영 CSV의 현재 사이트 적용을 명시 승인했다. PR #22 병합·앱 운영 SHA `27be5e61562e7930368d1178ba5e4727f09b84ee`, Vercel Production `dpl_Bh8eg29MZVTeNhtwUiFRfpY1PNac` Ready와 운영 buildId 일치 후 실제 DB 적용을 완료했다.

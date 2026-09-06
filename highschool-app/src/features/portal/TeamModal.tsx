@@ -374,7 +374,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
             <summary className="cursor-pointer py-3 text-sm font-semibold text-slate-800">역할 안내 <span className="ml-2 text-xs font-normal text-slate-500">학기·방학 역할별 권한과 인원</span></summary>
             <div className="space-y-5 pb-4">
           <section>
-            <h3 className="mb-2 font-bold text-slate-800">학기 역할 <span className="text-xs font-normal text-slate-400">학기 사역 · 주일 사역</span></h3>
+            <h3 className="mb-2 font-bold text-slate-800">학기 역할 <span className="text-xs font-normal text-slate-400">학기 운영 · 팀/주일 운영</span></h3>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {ASSIGNABLE_SEMESTER_ROLES.filter((role) => role !== "none").map((role) => (
                 <div key={role} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2">
