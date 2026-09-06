@@ -55,15 +55,17 @@ describe("활동 로그 조회", () => {
     expect(screen.getByText("조회된 0건에서 검색 · 0건 표시")).toBeInTheDocument();
   });
 
-  it("이름·UID 검색과 영역·동작 필터는 조회된 기록만 좁히고 서버를 재조회하지 않는다", async () => {
+  it("이름·업무·변경 항목 검색과 영역·동작 필터는 조회된 기록만 좁히고 UID는 검색하지 않는다", async () => {
     render(<ActivityLogPanel />);
-    const first = record("new", { actor: { kind: "user", uid: "unique-actor-uid", name: "가상봄담당" } });
+    const first = record("new", { actor: { kind: "user", uid: "unique-actor-uid", name: "가상봄담당" }, changes: [{ field: "학교", redacted: true }] });
     const second = record("attendance", { area: "attendance", action: "create", actor: { kind: "user", uid: "other-user", name: "가상가을담당" } });
     await respond([first, second]);
-    fireEvent.change(screen.getByRole("searchbox", { name: "활동 로그 검색" }), { target: { value: "  unique-actor-uid " } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "활동 로그 검색" }), { target: { value: "  가상봄담당 학교 " } });
     expect(screen.getByText("조회된 2건에서 검색 · 1건 표시")).toBeInTheDocument();
     expect(screen.getByText("새친구 new")).toBeInTheDocument();
     expect(screen.queryByText("새친구 attendance")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox", { name: "활동 로그 검색" }), { target: { value: "unique-actor-uid" } });
+    expect(screen.getByText("조회된 2건에서 검색 · 0건 표시")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "활동 로그 검색 초기화" }));
     fireEvent.change(screen.getByLabelText("활동 영역"), { target: { value: "attendance" } });
     fireEvent.change(screen.getByLabelText("활동 동작"), { target: { value: "create" } });
@@ -82,8 +84,8 @@ describe("활동 로그 조회", () => {
     await respond([record("details", {
       changes: [{ field: "등록 결정", before: "미정", after: "등록" }, { field: "연락처", before: "민감원문이전", after: "민감원문이후", redacted: true }], changedCount: 2,
     }), record("system", { actor: { kind: "system" } }), record("unknown", { actor: { kind: "unknown" } })]);
-    expect(screen.getByText("시스템")).toBeInTheDocument();
-    expect(screen.getByText("주체 미확인")).toBeInTheDocument();
+    expect(screen.getAllByText("시스템")).not.toHaveLength(0);
+    expect(screen.getAllByText("주체 미확인")).not.toHaveLength(0);
     expect(screen.getByText(/저장 요청에 사용된 인증 계정입니다. 사람이 직접 조작했는지는 확인할 수 없습니다/)).toBeInTheDocument();
     expect(screen.getByText(/구버전 화면·직접 DB 수정은 포함되지 않을 수 있습니다/)).toBeInTheDocument();
     expect(screen.getByText(/첫 변경 기록 2026/)).toBeInTheDocument();
@@ -93,7 +95,7 @@ describe("활동 로그 조회", () => {
     expect(within(detail).getByText("미정")).toBeInTheDocument();
     expect(within(detail).getByText("변경 후")).toBeInTheDocument();
     expect(within(detail).getByText("등록")).toBeInTheDocument();
-    expect(screen.getByText("변경됨 · 원문 생략")).toBeInTheDocument();
+    expect(screen.getAllByText("세부 값은 활동 로그에 기록하지 않았습니다.")).not.toHaveLength(0);
     expect(screen.queryByText("민감원문이전")).not.toBeInTheDocument();
     expect(screen.queryByText("민감원문이후")).not.toBeInTheDocument();
   });
@@ -108,7 +110,7 @@ describe("활동 로그 조회", () => {
     const detail = screen.getByText("새친구 attendance-save").closest("details")!;
     expect(within(detail).getByText("저장")).toBeInTheDocument();
     expect(within(detail).queryByText("수정")).not.toBeInTheDocument();
-    expect(within(detail).getByText("저장 상세")).toBeInTheDocument();
+    expect(within(detail).getByText("상세 보기")).toBeInTheDocument();
     fireEvent.click(detail.querySelector("summary")!);
     const changes = detail.querySelectorAll(".activity-log-change");
     expect(within(changes[0] as HTMLElement).getByText("기록하지 않음")).toBeInTheDocument();
@@ -116,6 +118,38 @@ describe("활동 로그 조회", () => {
     expect(within(changes[0] as HTMLElement).queryByText("값 없음")).not.toBeInTheDocument();
     expect(within(changes[1] as HTMLElement).getByText("값 없음")).toBeInTheDocument();
     expect(within(changes[1] as HTMLElement).getByText("변경 후")).toBeInTheDocument();
+  });
+
+  it("기존 새친구 로그를 한국어 세부 항목으로 보여 주고 UID·경로·해시는 DOM에서 숨긴다", async () => {
+    render(<ActivityLogPanel />);
+    const uid = "synthetic_actor_uid_000001";
+    const hash = "id_0123456789abcdef";
+    await respond([record("legacy-new-friend", {
+      actor: { kind: "user", uid, name: "가상관리자" },
+      target: { path: `semesters/2026-sunday/newFriends/${hash}`, label: "새친구 외 1개 대상", context: "2026-sunday · 2개 대상" },
+      changes: [
+        { field: `새친구 ${hash} · 이름·부서·성별`, redacted: true },
+        { field: `새친구 비공개 정보 ${hash} · 생년월일·본인 연락처·보호자 연락처`, redacted: true },
+      ],
+      changedCount: 2,
+    })]);
+    expect(screen.getAllByText("2026년 주일 운영", { exact: false })).not.toHaveLength(0);
+    expect(screen.getByText("이름 · 부서 · 성별 외 3개 항목 저장")).toBeInTheDocument();
+    const detail = screen.getByText("이름 · 부서 · 성별 외 3개 항목 저장").closest("details")!;
+    fireEvent.click(detail.querySelector("summary")!);
+    expect(within(detail).getAllByText("새친구 관련 기록", { exact: false })).not.toHaveLength(0);
+    expect(within(detail).getByText("2건")).toBeInTheDocument();
+    expect(within(detail).getByText("새친구 기본 정보")).toBeInTheDocument();
+    expect(within(detail).getByText("이름 · 부서 · 성별")).toBeInTheDocument();
+    expect(within(detail).getByText("새친구 연락처·개인 정보")).toBeInTheDocument();
+    expect(within(detail).getByText("생년월일 · 본인 연락처 · 보호자 연락처")).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(uid);
+    expect(document.body).not.toHaveTextContent(hash);
+    expect(document.body).not.toHaveTextContent("semesters/2026-sunday");
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "보호자 연락처" } });
+    expect(screen.getByText("조회된 1건에서 검색 · 1건 표시")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: uid } });
+    expect(screen.getByText("조회된 1건에서 검색 · 0건 표시")).toBeInTheDocument();
   });
 
   it("더보기는 cursor를 넘기며 중복 ID를 다시 표시하지 않고 중복 클릭을 막는다", async () => {

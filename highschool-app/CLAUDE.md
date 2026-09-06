@@ -194,6 +194,7 @@
 - 업무 DB 쓰기는 `features/activityLog/write.ts`의 set/update/remove/transaction 도우미를 재사용한다. 일반 쓰기는 기존 원장 patch와 추가 전용 로그 한 건을 루트 update로 묶으며, 직접 Firebase 쓰기를 새로 추가하지 않는다. `activityLogWriteContract.test.ts`가 이 경계를 검사한다.
 - `canViewActivityLogs`는 마이페이지의 UI 가드다. 실제 조회는 `admins/{uid}` 플래그와 로그 Rules가 보호한다. 읽기 오류·계정 전환·늦은 응답은 이전 기록을 폐기한다.
 - 로그의 인증 UID와 서버 시각을 사람의 직접 조작 증거로 설명하지 않는다. 이전 값·과거 변경을 추측해 생성하지 않으며, 구버전/직접 DB 변경과 트랜잭션 후 별도 로그의 누락 한계를 표시한다.
+- 관리자 화면의 사람용 표현은 `features/activityLog/presentation.ts`에서 만든다. UID·DB 경로·해시 식별자는 화면과 검색에 노출하지 않고, 내부 학기 키와 저장 필드만 한국어로 바꾼다. `redacted` 기록에 없던 전후값을 원장 조회로 보충하거나 추측하지 않는다.
 - 2026-09-06 사용자가 로그 Rules 추가와 운영 배포를 명시 승인했다. 원천 규칙을 검증·배포하고 라이브와 대조한 뒤 앱을 활성화한다. [운영·복구 계획](../docs/ACTIVITY_LOG_2026-09-06.md)을 따른다.
 
 

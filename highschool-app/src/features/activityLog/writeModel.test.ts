@@ -63,6 +63,18 @@ describe("활동 기록 경로와 표시 요약", () => {
     expect(JSON.stringify(summary)).not.toContain("민감");
   });
 
+  it("여러 대상의 표시 필드에는 내부 식별자를 넣지 않는다", async () => {
+    const summary = await summarizeWrite({
+      "semesters/2026-sunday/newFriends/friend-a": { name: "가상 학생", part: "1부", gender: "남" },
+      "semestersPrivate/2026-sunday/newFriendsPrivate/friend-a": { birth: "2009-01-01", phone: "010-0000-0000", parentPhone: "010-0000-0000" },
+    }, "update");
+    expect(summary?.changes).toEqual([
+      { field: "새친구 · 이름·부서·성별", redacted: true },
+      { field: "새친구 비공개 정보 · 생년월일·본인 연락처·보호자 연락처", redacted: true },
+    ]);
+    expect(JSON.stringify(summary?.changes)).not.toContain("friend-a");
+  });
+
   it("동일 대상의 필드 쓰기는 하나의 대상으로 합친다", async () => {
     const summary = await summarizeWrite({ "semesters/s1/applications/a1/name": "합성", "semesters/s1/applications/a1/school": "합성학교" }, "update");
     expect(summary?.target.path).toBe("semesters/s1/applications/a1");
