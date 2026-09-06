@@ -51,7 +51,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## 학생·출석·동기화 계약
 
 - 반 키는 `{part}-{grade}-{class}`, 출석 셀 키는 `evKey(mi, di)`의 `{월 인덱스}-{주일 인덱스}`다. 신규 출석 값은 `O`/`X`이며 미입력 쓰기는 해당 셀을 `null`로 지운다. 이전 저장값 `T`는 모든 읽기·이관 경로에서 `O`로 정규화한다. 한 번의 출석 입력은 `attendance/{year}/{ck}/{sid}/{weekKey}` 한 칸만 갱신한다.
-- 교사는 행사·휴일을 제외한 최근 정상 주일 4회만 수정한다. 저장 중·성공·실패·재시도 안내를 보존한다. 관리자의 전체 기간 편집 범위와 구분한다.
+- 교사는 행사·휴일을 제외한 최근 정상 주일 4회만 수정한다. 저장 중·실패·재시도 안내는 유지하고 성공 안내는 2초 뒤 닫아 모바일 명단을 가리지 않는다. 관리자의 전체 기간 편집 범위와 구분한다.
 - 대시보드에서 출석부를 열 때는 선택한 반·학기와 `/attendance?week={주일 키}`를 함께 전달한다. `buildAttendanceEntry()`는 관리자에게 선택 연도 정상 주일 전체, 교사·데모에게 최근 4회만 허용한다. 쿼리로 범위를 확대하지 않고 유효한 수동 선택이 쿼리보다 우선한다. `src/app/attendance/page.tsx`의 `Suspense`를 유지해 `useSearchParams`의 정적 빌드를 지원한다.
 - `jang === true` 학생은 원본을 유지하고 일반 출석·통계·내보내기에서 분리한다. SID의 `J`만 보고 장결자로 판단하지 않는다. 화면 정렬·번호는 `sortAndRenumber()`로 처리한다.
 - 관리자 주간 현황의 전체 출석 통계는 기존 전체 현황처럼 장결 기록을 포함한다. `attendanceRate = present / recorded`이며 `recorded`는 O·X 합계다. 이전 `T`는 O에 포함한다. 입력 업무는 일반 학생의 `inputStudentCount`·`inputRecorded`로만 계산한다. 전원 장결 반(`no-targets`)·빈 반(`no-students`)·조회 주일 없음(`no-week`)을 입력 완료나 확인 필요 반으로 세지 않는다.
