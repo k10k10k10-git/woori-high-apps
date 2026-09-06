@@ -55,123 +55,349 @@ html, body, #root {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ─── Login Screen ───────────────────────────────────────────── */
-.login-screen {
-  position: fixed; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, #f8f6ff 0%, #e8f4fd 100%);
-  padding: 1rem;
+/* ─── 출석부 진입 화면 (데모 반 선택 · 관리자 로그인) ──────── */
+.attendance-entry {
+  --entry-ink: #292a30;
+  --entry-muted: #666773;
+  --entry-line: #e5e5e8;
+  --entry-line-strong: #d8d8dd;
+  --entry-accent: #6355a7;
+  --entry-accent-hover: #55488f;
+  --entry-selected: #eeecf5;
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  background: #f7f7f8;
+  color: var(--entry-ink);
 }
-.login-card {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding: 2rem 1.5rem;
-  width: 100%; max-width: 360px;
-}
-.login-logo {
-  text-align: center; margin-bottom: 1.5rem;
-}
-.login-logo-icon {
-  width: 56px; height: 56px;
-  background: var(--primary-bg);
-  border-radius: 16px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; margin: 0 auto 10px;
-}
-.login-title { font-size: 18px; font-weight: 700; }
-.login-sub { font-size: 12px; color: var(--text2); margin-top: 3px; }
-.login-input {
-  width: 100%;
-  padding: 11px 13px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 16px;
-  font-family: inherit;
-  outline: none;
-  transition: border-color .15s;
-  margin-bottom: 10px;
-}
-.login-input:focus { border-color: var(--primary); }
-.login-btn {
-  width: 100%;
-  padding: 12px;
-  background: var(--primary);
+.entry-skip {
+  position: fixed;
+  top: 8px;
+  left: 12px;
+  z-index: 10000;
+  padding: 9px 12px;
+  border-radius: 6px;
+  background: var(--entry-ink);
   color: #fff;
-  border: none;
-  border-radius: var(--radius);
-  font-size: 15px;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  margin-top: 4px;
-  transition: opacity .15s;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transform: translateY(-150%);
 }
-.login-btn:active { opacity: .85; }
-.login-err { font-size: 12px; color: var(--red); margin-top: 8px; text-align: center; }
-.login-check-row {
-  display: flex; gap: 16px; font-size: 12px; color: var(--text2);
-  margin-bottom: 12px;
+.entry-skip:focus { transform: translateY(0); }
+.entry-header {
+  min-height: 60px;
+  border-bottom: 1px solid var(--entry-line);
+  background: #fff;
 }
-.login-check-row label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-
-/* ─── 데모 모드 (테스트 기간 한정) ─────────────────────────────
-   테스트가 끝나면 NEXT_PUBLIC_DEMO_MODE=0으로 되돌리고 이 블록도 함께 지운다. */
-.demo-wrap {
-  width: 100%; max-width: 420px;
-  margin: auto;
-  padding: 24px 0 32px;
-  display: flex; flex-direction: column; align-items: center; gap: 12px;
-}
-.demo-topbar {
+.entry-header-inner {
   width: 100%;
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  max-width: 1120px;
+  min-height: 60px;
+  margin: 0 auto;
+  padding: max(8px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) 8px max(20px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.demo-badge {
-  font-size: 11px; font-weight: 700;
-  color: var(--primary);
-  background: var(--primary-bg);
-  padding: 5px 10px; border-radius: 999px;
+.entry-brand {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--entry-ink);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -.02em;
 }
-.demo-admin-btn {
-  padding: 7px 12px;
-  border: 1.5px solid var(--border2);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-size: 12px; font-family: inherit; color: var(--text2);
-  cursor: pointer; white-space: nowrap;
+.entry-brand-mark {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--entry-selected);
+  color: var(--entry-accent);
 }
-.demo-field { margin-bottom: 10px; }
-.demo-label {
-  display: block; font-size: 12px; font-weight: 600;
-  color: var(--text2); margin-bottom: 4px;
+.entry-header-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-.demo-select { margin-bottom: 0; background: var(--surface); }
-.demo-recent-btn {
-  width: 100%; margin-bottom: 14px; padding: 12px 14px;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  border: 1.5px solid var(--primary); border-radius: var(--radius);
-  background: var(--primary-bg); color: var(--primary-text);
-  font: inherit; text-align: left; cursor: pointer;
+.entry-mode {
+  flex: 0 0 auto;
+  color: var(--entry-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
-.demo-recent-btn span:first-child { display: flex; flex-direction: column; gap: 3px; }
-.demo-recent-btn strong { font-size: 13px; }
-.demo-recent-btn small { font-size: 12px; color: var(--text2); }
-.demo-recent-btn span:last-child { font-size: 12px; font-weight: 700; white-space: nowrap; }
-.demo-selection-summary {
-  margin-top: 10px; padding: 9px 10px; border-radius: 8px;
-  background: var(--surface2); color: var(--text2); font-size: 12px; text-align: center;
-}
-.demo-note {
-  font-size: 11px; color: var(--text2); text-align: center;
-  line-height: 1.6; padding: 0 8px;
-}
-.demo-back-btn {
-  display: block; width: 100%;
-  margin-top: 14px; padding: 8px;
-  border: none; background: transparent;
-  font-size: 12px; font-family: inherit; color: var(--text2);
+.entry-secondary-action,
+.entry-primary-action,
+.entry-recent,
+.entry-back-action {
+  font: inherit;
   cursor: pointer;
+}
+.entry-secondary-action {
+  min-height: 44px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid var(--entry-line-strong);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--entry-muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.entry-main {
+  width: 100%;
+  min-height: calc(100dvh - 61px);
+  padding: 36px max(20px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  outline: none;
+}
+.entry-panel {
+  width: 100%;
+  max-width: 480px;
+  padding: 28px;
+  border: 1px solid var(--entry-line);
+  border-radius: 8px;
+  background: #fff;
+}
+.entry-intro { margin-bottom: 20px; }
+.entry-intro h1 {
+  color: var(--entry-ink);
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -.035em;
+}
+.entry-intro p {
+  margin-top: 5px;
+  color: var(--entry-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.entry-notice {
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border: 1px solid #ead9b0;
+  border-radius: 6px;
+  background: #fff8e8;
+  color: #765719;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.entry-notice strong { white-space: nowrap; }
+.entry-loading {
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--entry-muted);
+  font-size: 12px;
+}
+.attendance-entry .spinner {
+  width: 30px;
+  height: 30px;
+  border-width: 2px;
+  border-color: var(--entry-line);
+  border-top-color: var(--entry-accent);
+}
+.entry-recent {
+  width: 100%;
+  min-height: 60px;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d8d2e6;
+  border-radius: 6px;
+  background: #f5f3fa;
+  color: var(--entry-accent);
+  text-align: left;
+}
+.entry-recent-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.entry-recent-copy strong { font-size: 12px; }
+.entry-recent-copy small {
+  color: var(--entry-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.entry-recent-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.entry-form fieldset { border: 0; }
+.entry-field { margin-bottom: 14px; }
+.entry-field label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--entry-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.entry-input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--entry-line-strong);
+  border-radius: 6px;
+  outline: none;
+  background: #fff;
+  color: var(--entry-ink);
+  font-family: inherit;
+  font-size: 16px;
+  transition: border-color .15s ease;
+}
+.entry-input:disabled {
+  background: #f4f4f5;
+  color: #777883;
+}
+.entry-selection-summary {
+  min-height: 42px;
+  margin: 2px 0 12px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border-top: 1px solid var(--entry-line);
+  border-bottom: 1px solid var(--entry-line);
+  color: var(--entry-muted);
+  font-size: 11px;
+}
+.entry-selection-summary strong {
+  color: var(--entry-ink);
+  font-size: 12px;
+}
+.entry-selection-summary small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.entry-primary-action {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--entry-accent);
+  border-radius: 6px;
+  background: var(--entry-accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.entry-primary-action:disabled {
+  border-color: #d9d8de;
+  background: #d9d8de;
+  color: #777883;
+  cursor: not-allowed;
+}
+.entry-check-row {
+  margin: -2px 0 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  color: var(--entry-muted);
+  font-size: 12px;
+}
+.entry-check-row label {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.entry-check-row input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--entry-accent);
+}
+.entry-error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #ebcdca;
+  border-radius: 6px;
+  background: #fff7f6;
+  color: #943b35;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.entry-back-action {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--entry-muted);
+  font-size: 12px;
+}
+.entry-back-action svg { transform: rotate(180deg); }
+.entry-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.attendance-entry :is(button, input, select, a):focus-visible {
+  outline: 2px solid var(--entry-accent);
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .entry-secondary-action:hover,
+  .entry-back-action:hover { background: #f4f4f5; color: var(--entry-ink); }
+  .entry-recent:hover { border-color: #bcb3d2; background: #efecf6; }
+  .entry-primary-action:not(:disabled):hover {
+    border-color: var(--entry-accent-hover);
+    background: var(--entry-accent-hover);
+  }
 }
 .topbar-admin-btn { border-color: var(--primary); color: var(--primary); }
 
@@ -1973,11 +2199,31 @@ html, body, #root {
   .roster-tab { padding: 5px 10px; font-size: 11px; }
   .csv-drop-zone { padding: 18px; font-size: 12px; }
 
-  /* ── 로그인 ── */
-  .login-card { padding: 1.5rem 1.25rem; }
-  .login-title { font-size: 16px; }
-  .login-sub { font-size: 11px; }
-  .login-btn { padding: 11px; font-size: 14px; }
+  /* ── 출석부 진입 화면 ── */
+  .entry-header,
+  .entry-header-inner { min-height: 56px; }
+  .entry-header-inner {
+    padding: max(6px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
+    flex-wrap: wrap;
+  }
+  .entry-header-actions { max-width: 100%; margin-left: auto; gap: 6px; }
+  .entry-secondary-action {
+    max-width: 100%;
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: normal;
+  }
+  .entry-main {
+    min-height: calc(100dvh - 57px);
+    padding: 24px max(12px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .entry-panel { padding: 22px 16px; }
+  .entry-intro h1 { font-size: 20px; }
+  .entry-notice { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .entry-notice strong { white-space: normal; }
+  .entry-recent { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; }
+  .entry-selection-summary { flex-wrap: wrap; }
 
   /* ── 사진 프리뷰 ── */
   .photo-preview, .photo-initial { width: 52px; height: 52px; font-size: 20px; }
@@ -1985,6 +2231,11 @@ html, body, #root {
 
 /* ─── Extra small screens (under 380px) ───────────────────── */
 @media (max-width: 380px) {
+  .attendance-entry--demo .entry-mode { display: none; }
+  .entry-brand { font-size: 12px; }
+  .entry-secondary-action { padding-inline: 9px; }
+  .entry-secondary-action svg { display: none; }
+  .entry-recent-action { font-size: 10px; }
   .topbar-title { font-size: 14px; }
   .topbar-teacher-badge { font-size: 10px; }
   .logout-btn { padding: 5px 8px; font-size: 11px; }
@@ -2196,6 +2447,9 @@ html, body, #root {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .attendance-entry .spinner { animation: none; }
+  .attendance-entry .entry-input,
+  .attendance-entry .entry-primary-action { transition: none; }
   .teacher-workspace .class-tab,
   .teacher-workspace .logout-btn,
   .teacher-attendance .attendance-subtabs .view-btn,
