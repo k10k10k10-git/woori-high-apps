@@ -5,6 +5,7 @@ import { db, ref, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { getSundaysForYear, buildHolidayRanges, buildEvents, evKey, getWindowYears } from '@/utils/dates';
 import { normalizeAttendanceValue } from '@/utils/attendanceValue';
+import { useModalFocus } from '@/hooks/useModalFocus';
 import type { Student } from '@/types';
 
 interface MonthStat {
@@ -77,6 +78,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
 
   const [results, setResults] = useState<YearStat[]>([]);
   const [loading, setLoading] = useState(true);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // ─── 드래그 다운 닫기 ────────────────────────────────────────
   const sheetRef  = useRef<HTMLDivElement>(null);
@@ -92,6 +94,8 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
     }
     setTimeout(() => onCloseRef.current(), 210);
   }, []); // ← 의존성 없음: 한 번만 생성, 터치 중 리스너 교체 없음
+
+  useModalFocus({ containerRef: sheetRef, initialFocusRef: closeButtonRef, onDismiss: dismiss });
 
   useEffect(() => {
     const sheet = sheetRef.current;
@@ -128,7 +132,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
       if (delta > 40) {
         dismiss();
       } else {
-        sheet.style.transition = 'transform .3s cubic-bezier(.34,1.4,.64,1)';
+        sheet.style.transition = 'transform .3s cubic-bezier(.22,1,.36,1)';
         sheet.style.transform  = 'translateY(0)';
       }
       delta = 0;
@@ -265,12 +269,13 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
   void mountedCkRef;
 
   return createPortal(
-    <div className="modal-overlay" onClick={dismiss} onKeyDown={e => { if (e.key === 'Escape') dismiss(); }}
+    <div className="modal-overlay" onClick={dismiss}
       role="dialog" aria-modal="true" aria-label={`${student?.name ?? ''} 출석 이력`}>
       <div
         ref={sheetRef}
         className="modal-sheet"
         onClick={e => e.stopPropagation()}
+        tabIndex={-1}
         style={{ maxWidth: 620 }}
       >
         {/* 드래그 핸들 — 모달 상단 70px 영역 전체가 드래그 감지 영역 */}
@@ -290,6 +295,14 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
             <div style={{ fontWeight: 700, fontSize: 15 }}>{student?.name ?? '알 수 없음'}</div>
             <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>출석 이력 (3년)</div>
           </div>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="history-modal-close"
+            onClick={dismiss}
+          >
+            닫기
+          </button>
         </div>
 
         {loading ? (
