@@ -1,6 +1,6 @@
 # 통합관리자 활동 로그 — 2026-09-06
 
-상태: 2026-09-06 사용자가 로그 Rules 추가·운영 배포를 명시 승인했다. 승인된 규칙을 단일 원천에 반영하고 검증·배포를 진행한다. 운영 DB 직접 쓰기·계정 변경·Firebase 요금제 전환은 포함하지 않는다. 실제 배포 완료 여부와 버전은 아래 배포 기록을 기준으로 한다.
+상태: **운영 배포 완료**. 사용자의 2026-09-06 명시 승인에 따라 활동 로그 Rules 배포·대조 후 PR #18을 병합하고 통합 앱 운영 반영을 확인했다. 운영 DB 직접 쓰기·계정 변경·요금제 전환은 수행하지 않았다.
 
 ## 사용자에게 제공하는 기능
 
@@ -34,12 +34,12 @@ Rules는 `actor.uid === auth.uid`, 선택 이름은 `auth.token.name`과 일치,
 
 이 기능에는 Cloud Functions·추가 패키지·Blaze 전환·운영 이력 백필이 필요하지 않다. 기존 Firebase DB 사용량에는 로그 저장과 조회가 더해진다.
 
-## 실행한 검증 결과
+## 구현 당시 검증 결과
 
 - 통합 앱 lint·typecheck·127개 파일/1,201개 테스트·production build 통과.
 - 로컬 DB 에뮬레이터 최초 11개 시나리오 통과. 배포 전 최종 검사는 조회 불가 ID 거부를 추가한 12개 시나리오로 확장했다. 실제 앱 도우미가 생성한 기록의 Rules 통과와 인증 UID 불일치 시 원장 쓰기 취소까지 확인.
 - 독립 보안 리뷰 PASS. 174개 실제 경로 팩터리와 예배/사역 가이드 patch의 분류 회귀 검사 포함.
-- 운영 로그인 E2E·실제 데이터 저장 QA·Rules 배포·Vercel 운영 배포는 수행하지 않았다. 이후 승인된 배포의 실제 결과는 배포 기록에 추가한다.
+- 구현 검증 당시 운영 로그인 E2E·실제 데이터 저장 QA·Rules·Vercel 배포는 수행하지 않았다. 이후 승인된 운영 배포 결과는 아래 기록과 구분한다.
 
 ## 검증 방법
 
@@ -53,3 +53,15 @@ Rules는 `actor.uid === auth.uid`, 선택 이름은 `auth.token.name`과 일치,
 원장 leaf별 Cloud Functions 수집도 검토했으나 적용하지 않았다. RTDB 한 번의 쓰기가 파생시키는 함수 수/이벤트 크기 제한 때문에 기존 학기 전체 삭제나 공개·비공개 명단 원자 교체가 실패할 수 있었다. 예컨대 참가자 501명의 공개/연락처 교체는 1,002개 leaf 이벤트를 만든다. 이 제한을 끄거나 원자 저장을 임의로 나누는 대신 앱 저장 단위의 로그를 선택했다. [Firebase RTDB 제한](https://firebase.google.com/docs/database/usage/limits)
 
 Rules의 `now`, `auth`, 추가 전용 검증 및 문자열 연산은 [Firebase Security Rules 공식 참조](https://firebase.google.com/docs/reference/security/database)를 기준으로 에뮬레이터에서 확인했다. RTDB Rules에는 `numChildren()`이 없으므로 변화 목록은 0~29 인덱스만 허용해 크기를 제한한다.
+
+## 운영 배포 기록 — 2026-09-06
+
+- PR #18 병합 SHA: `68f7bef3c2b2c8adb16ca5455cbf57f1d1442426`.
+- Vercel Production **Ready**, 배포 `dpl_5sULoRu96FQZGrWpMoLsLFDu9Fzd`, 생성 **11:56:22 KST**. 운영 `/api/version`이 병합 SHA와 일치하며 HTTP와 브라우저에서 재확인했다. 익명 사역 안내 화면과 로그인 버튼도 정상 표시됐다.
+- Rules 배포 직전 운영본을 `tmp/rules-backup/20260906T025047Z-activity-log-predeploy.json`에 보존했다. 기존 소스와 구조 일치, 사전 SHA-256 `4779bc2dd50e8656dfdb43fbd69a0c9f37b7c017aea45decdd148b006e6bd64f`. 새 분기는 `activityLogs` 하나뿐이며 기존 원장 규칙은 동일하다.
+- Rules 배포 후 라이브와 원천 파일의 SHA-256이 `b8a096938a0402b51eb992f48d64b3b6b07cf94126eb2a141574afd900120fe0`으로 일치했다. 배포본은 `tmp/rules-backup/20260906T025138Z-activity-log-deployed.json`에 보존했다.
+- 실제 관리자 인증을 메모리에서 갱신해 본인 관리자 플래그와 로그 최신 1건을 **GET만** 검사했다. 관리자 로그 읽기 HTTP 200/당시 0건, 비로그인 HTTP 401. 인증 파일은 바뀌지 않았다. 로그를 만들기 위한 운영 시험 쓰기는 수행하지 않았다.
+- 최종 통합 1,201개·학생 277개·Agent OS 35개 테스트와 두 앱 빌드 통과. 학생 lint 오류 0/기존 경고 19. root verify에서 학생 빌드의 격리 환경 설정 누락을 보완한 뒤 빌드와 남은 검사를 완료했다. 최종 Rules 에뮬레이터는 비정상 ID 거부를 포함한 **12개 시나리오**를 통과했다.
+- PR head `cb4bd7a`의 두 앱 일반 CI·Lighthouse·Rules CI 통과. 인증 E2E는 기존 빈 `E2E_STORAGE_STATE` 사전 검사로 미실행이며 가드를 우회하지 않았다. 전역 알림의 자동 쓰기가 있어 실제 관리자 UI 로그인 저장 시험도 수행하지 않았다.
+- 학생 앱 Hosting과 데모는 유지했다. 운영 SW는 `woori-att-1788642541931` 그대로다. 운영 데이터 직접 변경·계정/권한 버킷 수정·Cloud Functions·요금제 변경은 없다.
+- 구조화한 영수증: `outputs/activity-log-2026-09-06/deployment.json`, `rules-deployment.json`. 이 배포 기록의 후속 루트 문서 커밋은 앱 재배포 대상이 아니다.

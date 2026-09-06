@@ -1,0 +1,11 @@
+{
+  "verifiedAt": "2026-09-06T02:51:38.174Z",
+  "file": "tmp/rules-backup/20260906T025138Z-activity-log-deployed.json",
+  "sha256": "b8a096938a0402b51eb992f48d64b3b6b07cf94126eb2a141574afd900120fe0",
+  "canonicalSha256": "b8a096938a0402b51eb992f48d64b3b6b07cf94126eb2a141574afd900120fe0",
+  "liveMatchesCanonical": true,
+  "onlyAddedBranch": "activityLogs",
+  "project": "woori-high",
+  "beforeBackup": "tmp/rules-backup/20260906T025047Z-activity-log-predeploy.json",
+  "beforeSha256": "4779bc2dd50e8656dfdb43fbd69a0c9f37b7c017aea45decdd148b006e6bd64f"
+}
