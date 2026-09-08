@@ -1,18 +1,16 @@
 'use client';
-import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { db, ref, set, push, onValue, off } from '@/lib/db';
 import { useApp, useClassKey, calcStats } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
-import { showToast } from '@/utils/toast';
-import { downloadCSV, downloadXLSX, escapeHtml, openPrintWindow } from '@/utils/export';
+import { attendanceExport } from '@/utils/attendanceExport';
 import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
-import { BrowserWriteLockError } from '@/utils/browserWriteLock';
+import { useSuggestions } from '@/hooks/useSuggestions';
+import { useAttendanceSave } from '@/hooks/useAttendanceSave';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttendanceSaveBanner from '@/components/AttendanceSaveBanner';
-import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
 import AdminIcon from '@/components/admin/AdminIcon';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
@@ -39,48 +37,9 @@ export default function AttendanceTab() {
   const isTeacher = state.userRole?.role === 'teacher';
   const [attSubView, setAttSubView] = useState<AttendanceSubView>('check');
 
-  // ── 건의사항 ──
-  type Suggestion = { id: string; text: string; createdAt: number; author: string };
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [suggestText, setSuggestText] = useState('');
-  const [suggestSaving, setSuggestSaving] = useState(false);
-  const [suggestLoadError, setSuggestLoadError] = useState(false);
+  const { suggestions, suggestText, setSuggestText, suggestSaving, suggestLoadError, handleSuggestSubmit } =
+    useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
 
-  useEffect(() => {
-    if (attSubView !== 'suggest' || isTeacher) return;
-    const sugRef = ref(db, `suggestions/${curYear}/${ck}`);
-    setSuggestLoadError(false);
-    onValue(sugRef, snap => {
-      setSuggestLoadError(false);
-      if (!snap.exists()) { setSuggestions([]); return; }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const list = Object.entries(snap.val() as Record<string, any>).map(([id, v]: [string, any]) => ({ id, ...v } as Suggestion));
-      list.sort((a, b) => b.createdAt - a.createdAt);
-      setSuggestions(list);
-    }, () => {
-      setSuggestions([]);
-      setSuggestLoadError(true);
-    });
-    return () => off(sugRef);
-  }, [attSubView, curYear, ck, isTeacher]);
-
-  async function handleSuggestSubmit() {
-    if (!suggestText.trim()) return;
-    setSuggestSaving(true);
-    const teacher = classData[ck]?.teacher ?? '';
-    try {
-      await push(ref(db, `suggestions/${curYear}/${ck}`), {
-        text: suggestText.trim(),
-        createdAt: Date.now(),
-        author: teacher,
-      });
-      setSuggestText('');
-      showToast('건의사항이 등록되었습니다.');
-    } catch {
-      showToast('저장에 실패했습니다.');
-    }
-    setSuggestSaving(false);
-  }
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
   const exportButtonRef = useRef<HTMLButtonElement>(null);
@@ -117,10 +76,7 @@ export default function AttendanceTab() {
   );
   const selectedWeekKey = selectedWeek?.key ?? null;
 
-  const [saveFeedback, setSaveFeedback] = useState<AttendanceSaveFeedback | null>(null);
-  const dismissSavedFeedback = useCallback((savedAt: number) => {
-    setSaveFeedback(current => current?.status === 'saved' && current.savedAt === savedAt ? null : current);
-  }, []);
+  const { feedback: saveFeedback, save: saveAttendance, dismissSaved: dismissSavedFeedback, pending: attendanceSaving } = useAttendanceSave();
 
   const displayStudents = sortByName
     ? [...activeStudents].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
@@ -177,23 +133,6 @@ export default function AttendanceTab() {
     dispatch({ type: 'OPEN_ATT_MODAL', payload: { ck, sid, k } });
   }
 
-  async function saveAttendance(target: AttEditTarget, value: AttValue) {
-    const studentName = classData[target.ck]?.students?.find(student => student.id === target.sid)?.name ?? '학생';
-    setSaveFeedback({ status: 'saving', sid: target.sid, studentName, target, value });
-    dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
-    const path = `attendance/${curYear}/${target.ck}/${target.sid}/${target.k}`;
-    try {
-      await set(ref(db, path), value === '' ? null : value);
-      setSaveFeedback({ status: 'saved', sid: target.sid, studentName, target, value, savedAt: Date.now() });
-      dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' });
-    } catch (cause) {
-      setSaveFeedback({ status: 'error', sid: target.sid, studentName, target, value,
-        ...(cause instanceof BrowserWriteLockError ? { message: cause.message } : {}) });
-      dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' });
-      showToast('출석 저장에 실패했습니다. 아래 재시도 버튼을 눌러 주세요.');
-    }
-  }
-
   async function handleQuickCheck(sid: string, val: Exclude<AttValue, ''>) {
     if (!selectedWeekKey) return;
     const current = attData[ck]?.[sid]?.[selectedWeekKey] ?? '';
@@ -206,136 +145,7 @@ export default function AttendanceTab() {
     await saveAttendance(target, value);
   }
 
-  function exportCSV() {
-    const header = ['번호', '이름', ...viewWeeks.map(k => {
-      const [mi, di] = k.split('-').map(Number);
-      return `${months[mi]?.month}/${months[mi]?.sundays[di]}`;
-    })];
-    const rows = [header, ...activeStudents.map(s => [
-      String(s.num ?? ''),
-      s.name,
-      ...viewWeeks.map(k => attData[ck]?.[s.id]?.[k] ?? ''),
-    ])];
-    downloadCSV(rows, `출석_${curYear}_${ck}.csv`);
-    setExportOpen(false);
-  }
-
-  async function exportXLSX() {
-    const header = ['번호', '이름', ...viewWeeks.map(k => {
-      const [mi, di] = k.split('-').map(Number);
-      return `${months[mi]?.month}/${months[mi]?.sundays[di]}`;
-    })];
-    const rows = [header, ...activeStudents.map(s => [
-      String(s.num ?? ''),
-      s.name,
-      ...viewWeeks.map(k => attData[ck]?.[s.id]?.[k] ?? ''),
-    ])];
-    await downloadXLSX(rows, '출석', `출석_${curYear}_${ck}.xlsx`);
-    setExportOpen(false);
-  }
-
-  function exportPDF() {
-    setExportOpen(false);
-    const PAGE_SIZE = 10;
-    const pages: typeof activeStudents[] = [];
-    for (let i = 0; i < activeStudents.length; i += PAGE_SIZE) pages.push(activeStudents.slice(i, i + PAGE_SIZE));
-    if (pages.length === 0) return;
-
-    // PDF용 주차: 이벤트 포함, 학기 필터만 적용
-    const pdfWeeks = months.flatMap(({ sundays }, mi) =>
-      sundays.map((_, di) => evKey(mi, di))
-    ).filter(k => {
-      const [mi] = k.split('-').map(Number);
-      const month = months[mi]?.month ?? 0;
-      if (curView === 'first')  return month >= 1 && month <= 6;
-      if (curView === 'second') return month >= 7 && month <= 12;
-      return true;
-    });
-
-    // 월 헤더 span 계산 (pdfWeeks 기준 — 이벤트 포함)
-    const monthSpans: { month: number; span: number }[] = [];
-    months.forEach(({ month, sundays }, mi) => {
-      const vis = sundays.filter((_, di) => {
-        const m = months[mi].month;
-        if (curView === 'first'  && !(m >= 1 && m <= 6))  return false;
-        if (curView === 'second' && !(m >= 7 && m <= 12)) return false;
-        return true; // 이벤트 포함
-      });
-      if (vis.length > 0) monthSpans.push({ month, span: vis.length });
-    });
-
-    const monthHdr = monthSpans.map(ms =>
-      `<th colspan="${ms.span}" style="background:#F2EFF9;color:#6B5AAF;font-weight:700;">${escapeHtml(ms.month)}월</th>`
-    ).join('');
-
-    const dayHdr = pdfWeeks.map(k => {
-      const [mi, di] = k.split('-').map(Number);
-      const day = months[mi]?.sundays[di];
-      const ev = events[k];
-      return ev
-        ? `<th style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${escapeHtml(ev)}</th>`
-        : `<th style="background:#f8fafc;">${escapeHtml(day ?? '')}</th>`;
-    }).join('');
-
-    // ck 예: "1-1-1" → "1부 1학년 1반"
-    const [ckPart, ckGrade, ckClass] = ck.split('-');
-    const ckLabel = `${ckPart}부 ${ckGrade}학년 ${ckClass}반`;
-
-    const pagesHTML = pages.map((group, pi) => {
-      const isLast = pi === pages.length - 1;
-      const rows = group.map(s => {
-        const stats = calcStats(state, ck, s.id);
-        const rec = stats.present + stats.absent;
-        const rate = rec > 0 ? Math.round((stats.present / rec) * 100) : 0;
-        const grade = rate >= 90 ? 'A' : rate >= 80 ? 'B' : rate >= 70 ? 'C' : 'D';
-        const cells = pdfWeeks.map(k => {
-          const ev = events[k];
-          const val = attData[ck]?.[s.id]?.[k] ?? '';
-          if (ev) return `<td style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${escapeHtml(ev)}</td>`;
-          const bg = val === 'O' ? '#ecfdf5' : val === 'X' ? '#fef2f2' : '';
-          const fg = val === 'O' ? '#059669' : val === 'X' ? '#dc2626' : '';
-          return `<td style="background:${bg};color:${fg};font-weight:${val ? '700' : '400'};">${escapeHtml(val)}</td>`;
-        }).join('');
-        return `<tr class="data-row">
-          <td style="color:#94a3b8;text-align:center;">${escapeHtml(s.num ?? '')}</td>
-          <td style="text-align:left;padding:3px 6px;font-weight:500;">${escapeHtml(s.name)}</td>
-          ${cells}
-          <td style="background:#f8fafc;">${rec > 0 ? `${stats.present}/${rec}` : '-'}</td>
-          <td style="background:#f8fafc;">${rec > 0 ? rate + '%' : '-'}</td>
-          <td style="background:#f8fafc;">${rec > 0 ? grade : '-'}</td>
-        </tr>`;
-      }).join('');
-      return `<div ${isLast ? '' : 'style="page-break-after:always;"'}>
-        <div style="font-size:10pt;font-weight:700;margin-bottom:5px;">${escapeHtml(curYear)}년 ${escapeHtml(ckLabel)} 출석부 &nbsp;${pi + 1}페이지</div>
-        <table><thead>
-          <tr>
-            <th rowspan="2" style="background:#f8fafc;">순</th>
-            <th rowspan="2" style="background:#f8fafc;">이름</th>
-            ${monthHdr}
-            <th rowspan="2" style="background:#f8fafc;">출석/주차</th>
-            <th rowspan="2" style="background:#f8fafc;">출석률</th>
-            <th rowspan="2" style="background:#f8fafc;">등급</th>
-          </tr>
-          <tr>${dayHdr}</tr>
-        </thead><tbody>${rows}</tbody></table>
-      </div>`;
-    }).join('');
-
-    const ok = openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-      <style>
-        *{box-sizing:border-box;}
-        body{font-family:sans-serif;font-size:9pt;margin:0;padding:0;}
-        @page{size:landscape;margin:6mm;}
-        table{border-collapse:collapse;width:100%;}
-        th,td{border:1px solid #e2e8f0;padding:3px 4px;text-align:center;white-space:nowrap;font-size:8pt;}
-        thead{display:table-header-group;}
-        tr.data-row{height:17mm;}
-      </style></head><body>
-      ${pagesHTML}
-      <script>window.onload=function(){setTimeout(function(){window.print();},300);}</script>
-    </body></html>`);
-    if (!ok) showToast('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해 주세요.');
-  }
+  const { exportCSV, exportXLSX, exportPDF } = attendanceExport(state, ck, activeStudents, viewWeeks, () => setExportOpen(false));
 
   // 달력 헤더 렌더
   const headerCols: React.ReactNode[] = [];
@@ -562,7 +372,7 @@ export default function AttendanceTab() {
                             aria-label={`${student.name} ${v === 'O' ? '출석' : '결석'}${val === v ? ' 현재 선택됨, 다시 누르면 미입력으로 변경' : '으로 기록'}`}
                             aria-pressed={val === v}
                             onClick={() => selectedWeekKey && handleQuickCheck(student.id, v)}
-                            disabled={!selectedWeekKey || saveFeedback?.status === 'saving'}
+                            disabled={!selectedWeekKey || attendanceSaving}
                           >
                             {val === v && <AdminIcon name="check" size={12} className="check-btn-selected-icon" />}
                             {v === 'O' ? '출석' : '결석'}
@@ -781,6 +591,7 @@ export default function AttendanceTab() {
                               <button
                                 type="button"
                                 className="att-cell-edit-button"
+                                disabled={attendanceSaving}
                                 aria-label={`${student.name} ${month}월 ${day}일 출석 수정, 현재 ${statusLabel}`}
                                 onClick={() => onCellClick(student.id, k)}
                               >
@@ -839,7 +650,7 @@ export default function AttendanceTab() {
         feedback={saveFeedback}
         visible={attSubView !== 'suggest'}
         onDismissSaved={dismissSavedFeedback}
-        onRetry={feedback => saveAttendance(feedback.target, feedback.value)}
+        onRetry={feedback => saveAttendance(feedback.target, feedback.value, feedback)}
       />
 
       {/* 출석 모달 */}

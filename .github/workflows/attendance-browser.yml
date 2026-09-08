@@ -1,0 +1,36 @@
+name: 출석부 격리 인증 업무 검사
+on:
+  pull_request:
+    paths: ['attendance-app/**', 'scripts/run-attendance-browser.mjs', '.github/workflows/attendance-browser.yml', 'highschool-app/package*.json']
+  push:
+    branches: [main]
+    paths: ['attendance-app/**', 'scripts/run-attendance-browser.mjs', '.github/workflows/attendance-browser.yml', 'highschool-app/package*.json']
+permissions:
+  contents: read
+jobs:
+  authenticated-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            attendance-app/package-lock.json
+            highschool-app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --prefix attendance-app
+      - run: npm ci --prefix highschool-app
+      - run: npm install --global firebase-tools@15.10.0
+      - run: node highschool-app/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
+      - run: node scripts/run-attendance-browser.mjs
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: synthetic-attendance-browser-results
+          path: tmp/attendance-browser-results
+          retention-days: 3

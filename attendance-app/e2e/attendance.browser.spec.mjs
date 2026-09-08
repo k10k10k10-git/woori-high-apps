@@ -1,0 +1,101 @@
+import { test, expect } from '../../highschool-app/node_modules/@playwright/test/index.mjs';
+const namespace = 'demo-attendance-recovery-default-rtdb';
+const database = `http://127.0.0.1:19017/.json?ns=${namespace}`;
+const authUrl = 'http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1';
+const password = 'synthetic-password-123';
+const email = 'teacher@example.test';
+function week() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  now.setDate(now.getDate() - now.getDay());
+  return { year: now.getFullYear(), key: `${now.getMonth()}-${Math.floor((now.getDate() - 1) / 7)}` };
+}
+async function seed(request) {
+  if (process.env.ATTENDANCE_BROWSER_CONTRACTS !== '1' || process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('격리 에뮬레이터 실행이 필요합니다.');
+  const account = await request.post(`${authUrl}/accounts:signUp?key=synthetic-key`, { data: { email, password, returnSecureToken: true } });
+  if (!account.ok()) expect((await account.json()).error.message).toBe('EMAIL_EXISTS');
+  const { year } = week();
+  const result = await request.put(database, { headers: { Authorization: 'Bearer owner' }, data: {
+    userRoles: { teacher__at__example__dot__test: { email, role: 'teacher', part: '1', grade: '1', class: '1', name: '합성 교사' } },
+    classes: { [year]: { '1-1-1': { teacher: '합성 교사', students: { s: { name: '검증 학생', num: 1, personId: 'synthetic-student' } } } } },
+  } });
+  expect(result.ok()).toBe(true);
+}
+async function login(page) {
+  await page.goto(`/attendance?week=${week().key}`);
+  await page.getByLabel('이메일', { exact: true }).fill(email);
+  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.locator('button[type="submit"]').click();
+  await expect(page.getByRole('button', { name: '검증 학생 출석으로 기록' })).toBeVisible();
+}
+async function stored(request) {
+  const { year, key } = week();
+  const result = await request.get(`http://127.0.0.1:19017/attendance/${year}/1-1-1/s/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } });
+  return result.json();
+}
+test.beforeEach(async ({ request }) => seed(request));
+test('실제 로그인·역할 조회·출석 저장·재접속', async ({ page, request }) => {
+  await login(page);
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');
+  expect(await stored(request)).toBe('O');
+  await page.reload();
+  await expect(page.getByRole('button', { name: /검증 학생 출석 현재 선택됨/ })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+test('다른 기기가 먼저 바꾼 셀은 덮지 않고 새 선택을 안내한다', async ({ page, request }) => {
+  await login(page);
+  // 사용자가 보고 있던 값은 미입력. REST 사전 조회 직전에 다른 기기 쓰기를 전달한다.
+  await page.route('**/attendance/**/*.json?**', async route => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const { year, key } = week();
+    const changed = await request.put(`http://127.0.0.1:19017/attendance/${year}/1-1-1/s/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, data: JSON.stringify('X') });
+    expect(changed.ok()).toBe(true);
+    await route.continue();
+  });
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('다른 담당자');
+  await expect(page.locator('.attendance-save-banner button')).toHaveCount(0);
+  expect(await stored(request)).toBe('X');
+});
+test('요청 실패 후 재시도는 최신 값을 확인하고 저장한다', async ({ page, request }) => {
+  await login(page);
+  await page.route('**/attendance/**/*.json?**', route => route.abort());
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('저장하지 않았습니다');
+  expect(await stored(request)).toBeNull();
+  await page.unroute('**/attendance/**/*.json?**');
+  await page.getByRole('button', { name: '재시도', exact: true }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');
+  expect(await stored(request)).toBe('O');
+});
+
+test('조회 후 저장 직전의 다른 기기 쓰기도 ETag로 보호한다', async ({ page, request }) => {
+  await login(page);
+  await page.route('**/attendance/**/*.json?**', async route => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    const { year, key } = week();
+    const changed = await request.put(`http://127.0.0.1:19017/attendance/${year}/1-1-1/s/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, data: JSON.stringify('X') });
+    expect(changed.ok()).toBe(true);
+    await route.continue();
+  });
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('다른 담당자가 먼저 저장');
+  expect(await stored(request)).toBe('X');
+});
+test('서버 저장 후 응답을 잃어도 재시도에서 중복 쓰기를 하지 않는다', async ({ page, request }) => {
+  await login(page);
+  let puts = 0;
+  await page.route('**/attendance/**/*.json?**', async route => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    puts++;
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    await route.abort();
+  });
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('저장 결과를 확인하지 못했습니다');
+  expect(await stored(request)).toBe('O');
+  await page.getByRole('button', { name: '재시도', exact: true }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');
+  expect(puts).toBe(1);
+});

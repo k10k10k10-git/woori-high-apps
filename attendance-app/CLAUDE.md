@@ -411,3 +411,10 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 - **접근법**: `utils/browserWriteLock.ts`에서 동일 출처 Web Locks를 사용한다 → 일반 set/update/remove/runTransaction은 공유 잠금, commitSheetSync 전체는 배타 잠금으로 감싼다 → 이미 배타 잠금을 잡은 프로토콜의 내부 트랜잭션만 syncProtocolDb를 사용한다 → ifAvailable로 지연 저장을 큐에 쌓지 않고 명시 재시도를 안내한다.
 - **판단 질문**: UID가 같다는 이유로 다른 탭의 저장을 안전하다고 간주하지 않는다. Web Locks는 같은 출처·브라우저 범위이므로 다른 기기, 구버전 클라이언트, 직접 SDK 요청, 서버 Rules fencing을 대체하지 않는다. 잠금 미지원 브라우저의 동기화는 중단하고 일반 저장은 유지한다.
 - **재사용 규칙**: 새 원장 쓰기는 lib/db를 사용한다. 동기화 중 발생한 출석 오류는 입력 의도와 재시도를 유지하고 다른 탭 작업이 끝나면 사용자가 다시 저장한다.
+
+### 출석 셀의 조건부 저장과 격리 인증 검증 (2026-09-09)
+- **접근법**: `lib/attendanceSave.ts`에서 최신 값과 ETag를 조회한다 → 화면의 사전값과 다르면 중단한다 → 같은 ETag로 한 번만 PUT한다 → 412 충돌·권한 거절·전송 결과 불명을 분리한다 → `useAttendanceSave`가 원래 사전값과 연도·데이터 세대를 재시도에도 유지한다. 같아진 저장값은 추가 쓰기 없이 완료한다.
+- **판단 질문**: SDK의 무조건 set이나 자동 트랜잭션 재시도 대신 단발 REST 조건부 저장으로 같은 셀의 다른 기기 쓰기를 보호했다. 이 보호는 학생 명단·출석 전체의 원자성이나 구버전 쓰기 차단, 서버 Rules 권한 축소를 의미하지 않는다. 화면 세대가 바뀌면 이전 응답과 재시도를 적용하지 않는다.
+- **재사용 규칙**: `node scripts/run-attendance-browser.mjs`는 고정 loopback Auth·DB 에뮬레이터와 전용 Vite 별칭으로 실제 LoginScreen·AppShell·역할 조회·출석 컴포넌트를 실행한다. Next 탐색만 테스트 어댑터다. Chrome·WebKit에서 사전값 충돌, GET/PUT 사이의 412, 저장 응답 유실과 명시 재시도를 검사한다. `npm run build`의 `tools/check-production-boundary.mjs`가 테스트 주소·자격정보의 운영 번들 혼입을 차단한다. 운영 인증 정보는 PR에 전달하지 않는다.
+
+출석 화면은 `useAttendanceSave`(저장), `useSuggestions`(건의 구독·초안), `attendanceExport`(CSV/XLSX/PDF)로 책임을 나눈다. `globals.css`는 `styles/tokens → entry → layout → widgets → teacher → responsive` 순서의 진입점이며 선언 순서를 바꾸지 않는다.
