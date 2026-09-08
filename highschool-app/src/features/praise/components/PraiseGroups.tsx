@@ -1,4 +1,5 @@
 "use client";
+import { confirmPraiseNavigation, usePraiseDraftGuard } from "../usePraiseDraftGuard";
 import { useState } from "react";
 import { PraiseGroupBoard } from "./PraiseGroupBoard";
 import { DEFAULT_GROUPING } from "../defaults";
@@ -13,7 +14,7 @@ export function PraiseGroups(props: PraiseEditorProps) {
   const [pending, setPending] = useState(false);
   if (pending) { setSelected(versions[0]?.id ?? ""); setNonce((value) => value + 1); setPending(false); }
   const selectedVersion = versions.find((version) => version.id === selected);
-  return <section className="praise-section"><div className="praise-section-heading"><div><h2>조편성</h2><p>학생 조건을 적용해 초안을 만들고, 담당 스탭을 확인한 뒤 확정합니다.</p></div></div><div className="praise-toolbar"><label className="praise-field"><span>편성 기록</span><select disabled={props.busy} value={selected} onChange={(event) => { setSelected(event.target.value); setNonce((value) => value + 1); }}><option value="">새 편성 준비</option>{versions.map((version) => <option key={version.id} value={version.id}>{version.number}차 · {version.kind === "CONFIRMED" ? "확정" : "초안"}{version.id === props.view.meta.activeGroupVersionId ? " · 현재 조" : ""}</option>)}</select></label>{<button className="praise-button" disabled={props.busy} onClick={() => { setSelected(versions[0]?.id ?? ""); setNonce((value) => value + 1); }}>최신 편성 불러오기</button>}</div><GroupEditor key={`${selected}:${nonce}`} {...props} version={selectedVersion} latestId={versions[0]?.id} onSaved={() => setPending(true)} /></section>;
+  return <section className="praise-section"><div className="praise-section-heading"><div><h2>조편성</h2><p>학생 조건을 적용해 초안을 만들고, 담당 스탭을 확인한 뒤 확정합니다.</p></div></div><div className="praise-toolbar"><label className="praise-field"><span>편성 기록</span><select disabled={props.busy} value={selected} onChange={(event) => { if (!confirmPraiseNavigation("groups")) return; setSelected(event.target.value); setNonce((value) => value + 1); }}><option value="">새 편성 준비</option>{versions.map((version) => <option key={version.id} value={version.id}>{version.number}차 · {version.kind === "CONFIRMED" ? "확정" : "초안"}{version.id === props.view.meta.activeGroupVersionId ? " · 현재 조" : ""}</option>)}</select></label>{<button className="praise-button" disabled={props.busy} onClick={() => { if (!confirmPraiseNavigation("groups")) return; setSelected(versions[0]?.id ?? ""); setNonce((value) => value + 1); }}>최신 편성 불러오기</button>}</div><GroupEditor key={`${selected}:${nonce}`} {...props} version={selectedVersion} latestId={versions[0]?.id} onSaved={() => setPending(true)} /></section>;
 }
 function GroupEditor({ view, execute, busy, version, latestId, onSaved }: PraiseEditorProps & { version?: PraiseGroupVersion; latestId?: string; onSaved: () => void }) {
   const [settings, setSettings] = useState<GroupingSettings>(() => structuredClone(version?.settings ?? view.policy?.grouping ?? DEFAULT_GROUPING));
@@ -23,6 +24,7 @@ function GroupEditor({ view, execute, busy, version, latestId, onSaved }: Praise
   const [expectedRevision] = useState(view.meta.revision);
   const [acknowledge, setAcknowledge] = useState(false);
   const [dirty, setDirty] = useState(false);
+  usePraiseDraftGuard("groups", dirty, busy);
   const students = view.people.filter((person) => person.kind === "STUDENT" && person.active);
   const staff = view.people.filter((person) => person.kind === "STAFF" && person.active);
   const stale = Boolean(version && version.id !== latestId);

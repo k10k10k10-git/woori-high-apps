@@ -69,6 +69,14 @@ it("출석 후보를 무대에 올리고 다시 미등단으로 이동한다", (
   expect(screen.getByLabelText("1부 합성학생가 무대 위치")).toHaveValue(
     "CHOIR:RIGHT",
   );
+  fireEvent.click(screen.getByRole("button", { name: "목록으로 편집" }));
+  expect(screen.getByRole("button", { name: "목록으로 편집" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.change(screen.getByRole("searchbox", { name: "미등단 팀원 찾기" }), { target: { value: "없는 이름" } });
+  expect(screen.getByLabelText("1부 합성학생가 무대 위치")).toHaveValue("CHOIR:RIGHT");
+  expect(screen.queryByLabelText("1부 합성학생나 무대 위치")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "무대 보기" }));
+  expect(screen.getByLabelText("1부 합성학생가 무대 위치")).toHaveValue("CHOIR:RIGHT");
+  fireEvent.change(screen.getByRole("searchbox", { name: "미등단 팀원 찾기" }), { target: { value: "" } });
   fireEvent.change(screen.getByLabelText("1부 합성학생가 무대 위치"), {
     target: { value: "off" },
   });

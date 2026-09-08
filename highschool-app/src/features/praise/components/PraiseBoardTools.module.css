@@ -1,0 +1,34 @@
+.tools { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin-bottom:16px; }
+.tools label { display:grid; gap:6px; font-size:14px; color:var(--color-text-primary); min-width:0; }
+.tools input:not([type=checkbox]),.tools select { min-height:44px; font-size:16px; min-width:0; width:100%; padding:8px 12px; border:1px solid var(--praise-line); border-radius:8px; background:var(--color-surface); color:var(--color-text-primary); }
+.search { flex:1; min-width:180px!important; }
+.mobileChoice { display:none!important; }
+.selectPerson { display:flex!important; align-items:center; gap:10px; min-height:44px; font-size:14px; cursor:pointer; }
+.selectPerson input { width:18px; height:18px; accent-color:var(--color-primary); }
+.bulk { display:flex; flex-wrap:wrap; align-items:end; gap:12px; padding:16px; background:var(--color-surface-subtle,var(--color-surface)); border:1px solid var(--praise-line); border-radius:10px; margin-bottom:16px; }
+.bulk label { display:grid; gap:6px; font-size:14px; }
+.bulk select { min-height:44px; font-size:16px; max-width:100%; }
+.board :global(.praise-staff-chips > span) { color:var(--color-text-primary); background:var(--color-surface-subtle,var(--color-surface)); border:1px solid var(--praise-line); font-size:14px; }
+.board :global(.praise-group-distribution) { font-size:14px; line-height:1.7; }
+.board :global(.praise-group-distribution > div) { grid-template-columns:40px minmax(0,1fr); }
+.board :global(.praise-group-staff-heading) { font-size:14px; }
+.compact :global(.praise-stage-zone-people) { display:grid; grid-template-columns:minmax(0,1fr); }
+.compact :global(.praise-stage-person) { grid-template-columns:minmax(80px,1fr) minmax(0,1fr) auto; justify-items:stretch; align-items:center; border:0; border-bottom:1px solid #738e81; border-radius:0; padding:12px 0; }
+.compact :global(.praise-stage-row) { grid-template-columns:minmax(0,1fr); }
+.compact :global(.praise-stage-person select) { max-width:none; min-height:44px; font-size:16px; }
+.compact :global(.praise-stage-person strong) { font-size:16px; }
+.compact :global(.praise-stage-order button) { min-width:44px; min-height:44px; }
+@media(max-width:760px) {
+ .mobileChoice { display:grid!important; flex:1; }
+ .tools { align-items:stretch; }.tools .search { flex-basis:100%; }
+ .mobileHidden { display:none!important; }
+ .board:global(.praise-group-board) { display:grid; grid-template-columns:minmax(0,1fr); overflow:visible; }
+ .board :global(.praise-group-column) { width:100%; min-width:0; }
+ .board :global(.praise-group-student) { padding:12px 0; border:0; border-bottom:1px solid var(--praise-line); border-radius:0; gap:8px; }
+ .board :global(.praise-group-student strong) { font-size:16px; }
+ .board :global(.praise-group-student > span) { font-size:14px; }
+ .board :global(.praise-group-move select),.board :global(.praise-group-staff select) { font-size:16px; }
+ .bulk { align-items:stretch; }.bulk label { flex-basis:100%; }
+ .compact :global(.praise-stage-person) { grid-template-columns:minmax(0,1fr) auto; gap:8px; }.compact :global(.praise-stage-person strong),.compact :global(.praise-stage-person small) { grid-column:1/-1; }
+ .compact :global(.praise-stage-order) { justify-content:flex-end; }
+}
