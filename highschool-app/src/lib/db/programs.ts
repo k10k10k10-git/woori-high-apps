@@ -472,12 +472,11 @@ export async function replaceRetreatProgramCompetitionAssignments(
   const now = Date.now();
   const payload: Record<string, unknown> = {};
   for (const teamId of teamIds) {
-    payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/groupIds`] = null;
+    const groupIds = Object.fromEntries(Object.entries(assignment)
+      .filter(([, assignedTeam]) => assignedTeam === teamId).map(([groupId]) => [groupId, true]));
+    payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/groupIds`] =
+      Object.keys(groupIds).length ? groupIds : null;
     payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/updatedAt`] = now;
-  }
-  for (const [groupId, teamId] of Object.entries(assignment)) {
-    if (!teamIds.includes(teamId)) continue;
-    payload[paths.programCompetitionTeamGroup(retreatId, programId, teamId, groupId)] = true;
   }
   await update(ref(db), payload);
 }

@@ -363,10 +363,9 @@ export async function syncIguardScheduleOwner(
       segmentIdByOrder.set(draft.order, existing.id);
       if (existing.source === "sheet"
         && (existing.label !== draft.label || (existing.zone || undefined) !== draft.zone)) {
-        updates[paths.iguardSegment(retreatId, existing.id)] = stripUndefined({
-          label: draft.label,
-          zone: draft.zone ?? null,
-        });
+        const segmentPath = paths.iguardSegment(retreatId, existing.id);
+        updates[`${segmentPath}/label`] = draft.label;
+        updates[`${segmentPath}/zone`] = draft.zone ?? null;
       }
       return;
     }

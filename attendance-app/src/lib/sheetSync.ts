@@ -42,6 +42,7 @@ export interface ParsedClass {
 }
 
 export interface SyncPlan {
+  studentSources: Record<string, { ck: string; sid: string }>;
   classes: ParsedClass[];
   added:     { ck: string; name: string }[];
   moved:     { name: string; fromCk: string; toCk: string }[];
@@ -364,6 +365,14 @@ export function buildSyncPlan(
     (byName.get(k) ?? byName.set(k, []).get(k)!).push(c);
   });
 
+  classes = classes.map(pc => ({ ...pc, students: pc.students.map(st => ({ ...st })) }));
+  const studentSources: SyncPlan['studentSources'] = {};
+  const reservedByClass = new Map<string, Set<string>>();
+  for (const ck of new Set([...Object.keys(current), ...Object.keys(currentAttendance ?? {})])) {
+    reservedByClass.set(ck, new Set([
+      ...Object.keys(current[ck]?.students ?? {}), ...Object.keys(currentAttendance?.[ck] ?? {}),
+    ]));
+  }
   const added: SyncPlan['added'] = [];
   const moved: SyncPlan['moved'] = [];
   const ambiguous: SyncPlan['ambiguous'] = [];
@@ -379,6 +388,18 @@ export function buildSyncPlan(
       if (st.jang) jangCount++;
       attendanceChanges += Object.keys(st.attendance).length;
       const m = matchCurrent(st, pc.ck, byName, consumed);
+      const matched = m && m !== 'ambiguous' ? m : null;
+      const reserved = reservedByClass.get(pc.ck) ?? new Set<string>();
+      reservedByClass.set(pc.ck, reserved);
+      if (matched?.ck === pc.ck) st.sid = matched.sid;
+      else {
+        const preferred = st.sid;
+        let suffix = 2;
+        while (reserved.has(st.sid)) st.sid = `${preferred}_${suffix++}`;
+      }
+      reserved.add(st.sid);
+      if (matched) studentSources[`${pc.ck}/${st.sid}`] = { ck: matched.ck, sid: matched.sid };
+
       if (m === null) { added.push({ ck: pc.ck, name: st.name }); continue; }
       if (m === 'ambiguous') { ambiguous.push({ ck: pc.ck, name: st.name }); continue; }
       consumed.add(m.uid);
@@ -400,7 +421,7 @@ export function buildSyncPlan(
     if (syncedCks.has(c.ck) && !consumed.has(c.uid)) removed.push({ ck: c.ck, name: c.name });
   }
 
-  return { classes, added, moved, removed, ambiguous, attendanceMoves, attendanceChanges, totalStudents, classCount: classes.length, jangCount };
+  return { classes, studentSources, added, moved, removed, ambiguous, attendanceMoves, attendanceChanges, totalStudents, classCount: classes.length, jangCount };
 }
 
 /**
@@ -418,11 +439,6 @@ export function buildSyncPayload(
   const payload: Record<string, unknown> = {};
 
   const curList = flattenCurrent(current);
-  const byName = new Map<string, CurrentStudent[]>();
-  curList.forEach(c => {
-    const k = normName(c.name);
-    (byName.get(k) ?? byName.set(k, []).get(k)!).push(c);
-  });
   const consumed = new Set<string>();
   const studentsByCk = new Map<string, Record<string, Partial<Student>>>();
 
@@ -430,11 +446,10 @@ export function buildSyncPayload(
     payload[`classes/${year}/${pc.ck}/teacher`] = pc.teacher || '';
     const studentsObj = studentsByCk.get(pc.ck) ?? studentsByCk.set(pc.ck, {}).get(pc.ck)!;
     for (const st of pc.students) {
-      const m = matchCurrent(st, pc.ck, byName, consumed);
-      const matched = (m && m !== 'ambiguous') ? m : null;
+      const source = plan.studentSources[`${pc.ck}/${st.sid}`];
+      const matched = source ? curList.find(c => c.ck === source.ck && c.sid === source.sid) : undefined;
       if (matched) consumed.add(matched.uid);
-      // 같은 반에서 이미 있던 학생이면 기존 sid 재사용(출석 연속성·중복 방지)
-      const sid = (matched && matched.ck === pc.ck) ? matched.sid : st.sid;
+      const sid = st.sid;
       const photo = matched?.photo;
       studentsObj[sid] = {
         id: sid,
@@ -461,6 +476,11 @@ export function buildSyncPayload(
       // 고아로 남는다. 시트에 없는 칸만 새 경로로 옮긴 뒤 옛 기록을 지운다.
       // (시트가 원본이므로 시트에 값이 있는 칸은 덮지 않는다 — 대체 건수는 미리보기에 표시된다.)
       if (matched && matched.ck !== pc.ck) {
+        // 입력 시트에 없는 전출 반은 학생 한 명만 제거하고 나머지 명단은 보존한다.
+        if (!plan.classes.some(pc => pc.ck === matched.ck)) {
+          payload[`classes/${year}/${matched.ck}/students/${matched.sid}`] = null;
+        }
+
         const oldMarks = currentAttendance?.[matched.ck]?.[matched.sid];
         if (oldMarks && Object.keys(oldMarks).length > 0) {
           for (const [cellKey, mark] of splitOldAttendance(oldMarks, st.attendance).carry) {
