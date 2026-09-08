@@ -1,4 +1,5 @@
 "use client";
+import styles from "./PraiseBoardTools.module.css";
 import { useState } from "react";
 import type { PraiseGroup, PraisePerson } from "../types";
 
@@ -25,6 +26,19 @@ export function PraiseGroupBoard({
 }: Props) {
   const [moving, setMoving] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
+  const [chosenGroup, setChosenGroup] = useState(groups[0]?.id ?? "all");
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [destination, setDestination] = useState("");
+  const matches = (person: PraisePerson) => person.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+  const mobileGroup = groups.some(group => group.id === chosenGroup) || chosenGroup === "unassigned" ? chosenGroup : "all";
+  const selectedStudents = people.filter(person => person.active && person.kind === "STUDENT" && selected.has(person.id));
+  const bulkMove = () => {
+    if (!canEdit || !destination || !selectedStudents.length || (destination !== "unassigned" && !groups.some(group => group.id === destination))) return;
+    selectedStudents.forEach(person => onMove(person.id, destination === "unassigned" ? "" : destination, "studentIds"));
+    setNotice(`${selectedStudents.length}명의 배치를 변경했습니다. 초안을 저장하면 반영됩니다.`);
+    setSelected(new Set());
+  };
   const students = people.filter((p) => p.kind === "STUDENT" && p.active);
   const staff = people.filter((p) => p.kind === "STAFF" && p.active);
   const move = (
@@ -51,7 +65,7 @@ export function PraiseGroupBoard({
       }}
       onDragEnd={() => setMoving(null)}
     >
-      <strong>{person.name}</strong>
+      {canEdit ? <label className={styles.selectPerson}><input type="checkbox" aria-label={`${person.name} 함께 이동 선택`} checked={selected.has(person.id)} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(person.id); else next.delete(person.id); return next; })} /><strong>{person.name}</strong></label> : <strong>{person.name}</strong>}
       <span>
         {person.grade}학년 ·{" "}
         {person.gender === "FEMALE"
@@ -85,6 +99,12 @@ export function PraiseGroupBoard({
   );
   return (
     <>
+      <div className={styles.tools}>
+        <label className={styles.search}>학생 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름으로 전체 조 검색" /></label>
+        <label className={styles.mobileChoice}>볼 조<select value={mobileGroup} onChange={event => setChosenGroup(event.target.value)}><option value="all">모든 조</option>{groups.map(group => <option key={group.id} value={group.id}>{group.name} · {group.studentIds.length}명</option>)}<option value="unassigned">미배정 · {unassigned.length}명</option></select></label>
+      </div>
+      {canEdit && selectedStudents.length > 0 && <div className={styles.bulk} aria-label="선택 학생 함께 이동"><strong>{selectedStudents.length}명 선택</strong><label>이동할 조<select value={destination} onChange={event => setDestination(event.target.value)}><option value="">목적지 선택</option>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}<option value="unassigned">미배정</option></select></label><button type="button" className="praise-button praise-button--primary" disabled={!destination} onClick={bulkMove}>선택 학생 이동</button><button type="button" className="praise-button" onClick={() => setSelected(new Set())}>선택 해제</button></div>}
+      {query && <p className="praise-note" role="status">전체 조에서 {students.filter(matches).length}명을 찾았습니다.</p>}
       {canEdit && (
         <p className="praise-note">
           학생 카드를 다른 조로 끌어 놓거나 카드의 조 선택을 이용하세요. 담당
@@ -92,7 +112,7 @@ export function PraiseGroupBoard({
         </p>
       )}
       <div
-        className="praise-group-board"
+        className={`praise-group-board ${styles.board}`}
         role="region"
         aria-label="조별 편성 카드"
         tabIndex={0}
@@ -103,10 +123,11 @@ export function PraiseGroupBoard({
           );
           const count = (test: (person: PraisePerson) => boolean) =>
             members.filter(test).length;
+          if (query.trim() && !members.some(matches)) return null;
           return (
             <section
               key={group.id}
-              className="praise-group-column"
+              className={`praise-group-column ${!query.trim() && mobileGroup !== "all" && mobileGroup !== group.id ? styles.mobileHidden : ""}`}
               onDragOver={(e) => {
                 if (canEdit && moving) e.preventDefault();
               }}
@@ -216,18 +237,18 @@ export function PraiseGroupBoard({
                 </div>
               </div>
               <div className="praise-group-students">
-                {members.map((p) => card(p, group.id))}
+                {members.filter(matches).map((p) => card(p, group.id))}
               </div>
             </section>
           );
         })}
         {unassigned.length > 0 && (
-          <section className="praise-group-column">
+          <section className={`praise-group-column ${!query.trim() && mobileGroup !== "all" && mobileGroup !== "unassigned" ? styles.mobileHidden : ""}`}>
             <header>
               <h3>미배정</h3>
               <span>{unassigned.length}명</span>
             </header>
-            {unassigned.map((p) => card(p, ""))}
+            {unassigned.filter(matches).map((p) => card(p, ""))}
           </section>
         )}
       </div>

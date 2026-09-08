@@ -1,4 +1,5 @@
 "use client";
+import { confirmPraiseNavigation } from "./usePraiseDraftGuard";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -29,7 +30,7 @@ export default function PraiseWorkspace({ workspaceId, initialTab, embedded = fa
   const [selected, setSelected] = useState(requestedWorkspace);
   const [workspaceSource, setWorkspaceSource] = useState(requestedWorkspace);
   if (workspaceSource !== requestedWorkspace) { setWorkspaceSource(requestedWorkspace); setSelected(requestedWorkspace || workspaces.find((item) => item.status === "active")?.id || workspaces[0]?.id || ""); }
-  const selectWorkspace = (id: string) => { setSelected(id); updatePraiseLocation({ workspace: id, tab: praiseTab(requestedTab), meeting: null }); };
+  const selectWorkspace = (id: string) => { if (!confirmPraiseNavigation()) return; setSelected(id); updatePraiseLocation({ workspace: id, tab: praiseTab(requestedTab), meeting: null }); };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
@@ -71,7 +72,7 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPerso
   const [meetingId, setMeetingId] = useState(initialMeetingId);
   const [meetingSource, setMeetingSource] = useState(initialMeetingId);
   if (meetingSource !== initialMeetingId) { setMeetingSource(initialMeetingId); setMeetingId(initialMeetingId); }
-  const selectMeeting = (id: string) => { setMeetingId(id); updatePraiseLocation({ workspace: workspaceId, tab: activeTab, meeting: id, person: activeTab === "people" ? personId || null : null }); };
+  const selectMeeting = (id: string) => { if (!confirmPraiseNavigation("stage")) return; setMeetingId(id); updatePraiseLocation({ workspace: workspaceId, tab: activeTab, meeting: id, person: activeTab === "people" ? personId || null : null }); };
   const tabsRef = useRef<HTMLDivElement>(null);
   if (errorCode === "server_not_configured") return <ConnectionPreparing />;
   if (!view) return <div className="praise-section">{error ? <div className="praise-error" role="alert">{error}<button className="praise-button" onClick={() => { void refresh(); }}>다시 불러오기</button></div> : <p role="status">모임 기록을 불러오고 있습니다…</p>}</div>;

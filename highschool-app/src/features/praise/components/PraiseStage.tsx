@@ -1,4 +1,5 @@
 "use client";
+import { confirmPraiseNavigation, usePraiseDraftGuard } from "../usePraiseDraftGuard";
 import { useState } from "react";
 import { DEFAULT_STAGE } from "../defaults";
 import type { StageOverride } from "../domain/stage";
@@ -23,7 +24,7 @@ export function PraiseStage(props: PraiseMeetingProps) {
   const version = versions.find((item) => item.id === selected);
   return <section className="praise-section" aria-label="주일 등단">
     <div className="praise-section-heading"><div><h2>{meeting.worshipDate} 주일 등단</h2><p>출석 후보와 지난 확정 이력을 바탕으로 편성합니다. 공유할 등단표는 확정해 주세요.</p></div></div>
-    <div className="praise-toolbar"><label className="praise-field"><span>저장된 등단표</span><select disabled={props.busy} value={selected} onChange={(event) => { setSelected(event.target.value); setNonce((value) => value + 1); }}><option value="">{view.permissions.stageEdit ? "새 편성 준비" : "등단표 선택"}</option>{versions.map((item) => <option key={item.id} value={item.id}>{versionName(item)}</option>)}</select></label>{versions[0] && selected !== versions[0].id && <button className="praise-button" type="button" disabled={props.busy} onClick={() => { setSelected(versions[0].id); setNonce((value) => value + 1); }}>최신본 불러오기</button>}</div>
+    <div className="praise-toolbar"><label className="praise-field"><span>저장된 등단표</span><select disabled={props.busy} value={selected} onChange={(event) => { if (!confirmPraiseNavigation("stage")) return; setSelected(event.target.value); setNonce((value) => value + 1); }}><option value="">{view.permissions.stageEdit ? "새 편성 준비" : "등단표 선택"}</option>{versions.map((item) => <option key={item.id} value={item.id}>{versionName(item)}</option>)}</select></label>{versions[0] && selected !== versions[0].id && <button className="praise-button" type="button" disabled={props.busy} onClick={() => { if (!confirmPraiseNavigation("stage")) return; setSelected(versions[0].id); setNonce((value) => value + 1); }}>최신본 불러오기</button>}</div>
     <StageEditor key={`${meeting.id}:${selected}:${nonce}`} {...props} version={version} latestId={versions[0]?.id} onSaved={() => setPendingLatest(true)} />
     <PraiseStageHistory view={view} />
   </section>;
@@ -37,6 +38,7 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
   const [acknowledge, setAcknowledge] = useState(false);
   const [exportError, setExportError] = useState("");
   const [dirty, setDirty] = useState(false);
+  usePraiseDraftGuard("stage", dirty, busy);
   const [selectedService, setSelectedService] = useState(() => version?.services[0]?.department ?? "FIRST");
   if (!meeting) return null;
   const canEdit = view.permissions.stageEdit && !praiseMeetingWriteLocked(view, meeting);

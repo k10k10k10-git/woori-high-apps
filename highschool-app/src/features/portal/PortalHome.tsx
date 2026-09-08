@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, X } from "@phosphor-icons/react";
+import { X } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import LandingPage from "@/features/landing/LandingPage";
@@ -32,6 +32,8 @@ import {
   retreatEntryHref,
 } from "./accessPolicy";
 import SharedMinistryCalendar, { calendarKindForSourceSite, calendarSourceSiteForKind, SHARED_CALENDAR_KIND_OPTIONS, type SharedCalendarItem } from "./SharedMinistryCalendar";
+import { HomeStart } from "./HomeStart";
+import { buildHomeEntry } from "./homeEntry";
 import { buildHomeActions } from "./homeActions";
 import HomeAgendaSummary from "./HomeAgendaSummary";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
@@ -177,26 +179,10 @@ export default function PortalHome() {
   const homeActions = useMemo(() => {
     return buildHomeActions(calendarItems, today);
   }, [calendarItems, today]);
-  const mobilePrimaryAction = useMemo(() => {
-    const scheduled = homeActions.find((item) => item.href);
-    if (scheduled?.href) return { href: scheduled.href, title: scheduled.title, meta: `${scheduled.dayLabel} · ${scheduled.meta}` };
-    if (fieldAllowed && currentRetreat) return {
-      href: `/retreat/${encodeURIComponent(currentRetreat.id)}/field?view=cue`,
-      title: "개인 큐카드 확인",
-      meta: `${currentRetreat.name} 현장 실행`,
-    };
-    if (assignedSundayTeam) return { href: sundayHref, title: `${sundayTitle} 열기`, meta: sundayDescription };
-    if (semesterAllowed) return {
-      href: currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters",
-      title: "학기 운영 확인",
-      meta: "신청·배치·출석·커리큘럼",
-    };
-    return {
-      href: currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/retreats",
-      title: "수련회 행정 확인",
-      meta: "명단·편성·현장 준비",
-    };
-  }, [assignedSundayTeam, currentRetreat, currentSemester, fieldAllowed, homeActions, roles, semesterAllowed, sundayDescription, sundayHref, sundayTitle]);
+  const homeEntry = buildHomeEntry({ roles, actions: homeActions, semesterId: currentSemester?.id,
+    retreat: currentRetreat ?? undefined,
+    fieldActive: periods.some(period => period.retreatId === currentRetreat?.id && period.startDate <= today && today <= period.endDate),
+  });
 
   async function submitSchedule() {
     if (!scheduleDraft) return;
@@ -281,14 +267,7 @@ export default function PortalHome() {
           <HomeAgendaSummary actions={homeActions} />
         </section>
 
-        <Link href={mobilePrimaryAction.href} className="mobile-home-primary mb-4 lg:hidden">
-          <span className="min-w-0">
-            <span className="block text-[11px] font-bold text-emerald-700">지금 바로 열기</span>
-            <strong className="mt-1 block truncate text-base text-slate-900">{mobilePrimaryAction.title}</strong>
-            <span className="mt-0.5 block truncate text-xs text-slate-500">{mobilePrimaryAction.meta}</span>
-          </span>
-          <ArrowRight aria-hidden="true" className="shrink-0 text-emerald-700" size={20} weight="bold" />
-        </Link>
+        <HomeStart entry={homeEntry} roleLabel={describeRoles(roles)} />
 
         <section className="grid gap-5 lg:grid-cols-3">
           {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
@@ -313,14 +292,14 @@ export default function PortalHome() {
             <p className="mt-2 text-sm leading-6 text-slate-500">{sundayDescription}</p>
           </Link>}
 
-          <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
+          {(retreatAdminAllowed || fieldAllowed) && <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
               <span className="tag home-domain-chip--vacation px-3 py-1.5">방학 중 사역</span>
               <span className="home-domain-arrow--vacation grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
-          </Link>
+          </Link>}
         </section>
 
         <Link href="/ministry-guide" className="home-ministry-brief group mt-7" data-hover>

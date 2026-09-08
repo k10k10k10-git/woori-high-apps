@@ -1,4 +1,5 @@
 "use client";
+import styles from "./PraiseBoardTools.module.css";
 import { useState } from "react";
 import type { StageAssignment, StageOverride } from "../domain/stage";
 import {
@@ -37,6 +38,8 @@ export function PraiseStageBoard({
 }: Props) {
   const [moving, setMoving] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [compact, setCompact] = useState(false);
+  const [query, setQuery] = useState("");
   const label = service.department === "FIRST" ? "1부" : "2부";
   const placed = new Set(
     service.assignments.map((p) => `${p.personType}:${p.personId}`),
@@ -156,12 +159,14 @@ export function PraiseStageBoard({
   const waiting = view.people.filter(
     (p) =>
       p.active &&
+      p.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) &&
       !placed.has(stagePersonKey(p)) &&
       !(config.leaderType === p.kind && config.leaderId === p.id),
   );
   return (
     <>
-      <div className="praise-stage-workbench">
+      <div className={styles.tools}><div role="group" aria-label={`${label} 배치 보기 방식`} className="praise-segment"><button type="button" aria-pressed={!compact} onClick={() => setCompact(false)}>무대 보기</button><button type="button" aria-pressed={compact} onClick={() => setCompact(true)}>목록으로 편집</button></div><label className={styles.search}>미등단 팀원 찾기<input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름으로 찾기" /></label></div>
+      <div className={`praise-stage-workbench ${compact ? styles.compact : ""}`}>
         <div
           className="praise-stage-canvas"
           role="region"
@@ -238,6 +243,7 @@ export function PraiseStageBoard({
             if (p) move(p, "off");
           }}
         >
+          {query && <p role="status" className="praise-note">미등단 목록에서 검색 중입니다. 현재 무대 배치는 그대로 표시합니다.</p>}
           <section>
             <h4>반에서 예배하기</h4>
             <p>해당 예배 부서의 미등단 학생</p>
