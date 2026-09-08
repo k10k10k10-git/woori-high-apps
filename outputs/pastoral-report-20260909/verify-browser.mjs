@@ -13,7 +13,9 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('http://127.0.0.1:4189');
   await page.getByText('가상 가람', { exact: true }).waitFor();
-  await page.getByText('등록일 2026', { exact: false }).first().waitFor();
+  await page.getByText('등반 완료 · 등반일 2026', { exact: false }).first().waitFor();
+  assert.equal(await page.locator('.pr-friends > li').count(), 3);
+  assert.equal(await page.getByText('가상 다온', { exact: true }).count(), 0);
   await page.screenshot({ path: `${captures}/desktop.png`, fullPage: true });
   for (const width of [375, 320]) {
     await page.setViewportSize({ width, height: 900 });

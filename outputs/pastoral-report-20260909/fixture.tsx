@@ -20,7 +20,7 @@ function Preview() {
     const attendance: AttData = { '1-1-1': {} };
     students.forEach((student, i) => {
       attendance['1-1-1'][student.id] = Object.fromEntries(weeks.map((week, j) => [week.key, i === 0 || i === 3 ? j < 4 ? 'X' : 'O' : i === 1 ? j === 0 || j > 3 ? 'O' : 'X' : j === 1 ? '' : 'O']));
-      fixture.friends[String(i)] = { name: student.name, part: '1부', grade: 1, owner: '가상 담당', registeredDate: weeks.at(-1) ? new Date(weeks.at(-1)!.dateValue).toISOString().slice(0, 10) : '', rosterSync: { studentId: student.id, classKey: '1-1-1', personId: student.personId } };
+      fixture.friends[String(i)] = { name: student.name, part: '1부', grade: 1, owner: '가상 담당', registeredDate: weeks.at(-1) ? new Date(weeks.at(-1)!.dateValue).toISOString().slice(0, 10) : '', rosterSync: i === 2 ? undefined : { studentId: student.id, classKey: '1-1-1', personId: student.personId, syncedAt: i === 3 ? undefined : new Date(weeks.at(-1)!.dateValue).toISOString() } };
     });
     dispatch({ type: 'SET_CLASS_DATA', revision: state.dataRevision, payload: classes });
     dispatch({ type: 'SET_ATT_DATA', revision: state.dataRevision, payload: attendance });

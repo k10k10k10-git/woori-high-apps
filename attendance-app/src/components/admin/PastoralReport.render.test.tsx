@@ -29,7 +29,8 @@ describe('목양 리포트 실제 화면', () => {
   it('권한 오류를 0명으로 숨기지 않고 재시도하며 해제된 응답을 무시한다', () => {
     const { rerender } = render(<PastoralReport />);
     act(() => mocks.fail(new Error('권한 없음')));
-    expect(screen.getByRole('alert').textContent).toContain('전체 새친구 집계가 아닙니다');
+    expect(screen.getByRole('alert').textContent).toContain('새친구 명단과 집계를 표시하지 않습니다');
+    expect(screen.queryByText('합성 학생')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(mocks.subscribe).toHaveBeenCalledTimes(2);
     const oldReceive = mocks.receive;
@@ -38,6 +39,18 @@ describe('목양 리포트 실제 화면', () => {
     act(() => oldReceive([{ key: 'old', name: '오래된 비공개 이름', part: '1', grade: '1' }]));
     expect(screen.queryByText('오래된 비공개 이름')).toBeNull();
     expect(mocks.stop).toHaveBeenCalled();
+  });
+  it('등반 완료 학생만 표시하고 요약의 새친구 연락 대상도 같은 기준으로 센다', () => {
+    render(<PastoralReport />);
+    act(() => mocks.receive([
+      { key: 'done', name: '등반 완료 학생', part: '1', grade: '1', rosterSync: { studentId: 'nf_one', classKey: '1-1-1', syncedAt: '2026-01-10T00:00:00Z' } },
+      { key: 'pending', name: '등반 대기 학생', part: '1', grade: '1', decision: '등록', registeredDate: '2026-01-01' },
+    ]));
+    expect(screen.getByText('등반 완료 학생')).toBeTruthy();
+    expect(screen.queryByText('등반 대기 학생')).toBeNull();
+    expect(screen.getByText('등반 완료 · 등반일 2026-01-10')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
+    expect(screen.getByText('새친구 2회 연속 결석 · 등반 완료 학생').nextElementSibling?.textContent).toBe('1명');
   });
   it.each(['teacher', 'demo'])('%s는 새친구를 구독하거나 연락처를 표시하지 않는다', mode => {
     if (mode === 'teacher') mocks.state = { ...mocks.state, userRole: { role: 'teacher' } };
