@@ -5,7 +5,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "@phosphor-icons/react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { praiseReturnHref } from "@/features/praise/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import { createSubscriptionReadinessGate } from "@/lib/subscriptionReadiness";
@@ -84,6 +86,9 @@ export function semesterTabFromHref(currentHref: string, isMobileView: boolean):
 
 export default function SemesterClient({ semesterId, initialTab }: { semesterId: string; initialTab?: string }) {
   const router = useRouter();
+  const query = useSearchParams();
+  const praiseHref = praiseReturnHref(new URLSearchParams(query.toString()));
+  const requestedTeam = query.get("team") ?? "";
   const { user, loading: authLoading, roles, signIn } = useAuth();
   const { isMobileView } = useViewMode();
   const allowed = canAccessArea("semester", roles);
@@ -212,6 +217,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
             {canEdit && <button role="tab" aria-selected={activeTab === "설정"} onClick={() => selectTab("설정")}>학기 설정</button>}
           </div>
         )}
+        {praiseHref && <aside className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }} aria-label="찬양팀 업무 연결"><div><strong className="text-sm">{teamById.get(requestedTeam)?.name ?? "찬양팀"} 학기 명단</strong><p className="mt-1 text-sm text-slate-500">여기서 학기 소속을 확인하고, 조편성·출결·등단은 같은 모임으로 돌아가 이어서 진행하세요.</p></div><Link className="btn-secondary" href={praiseHref}>찬양팀 이번 모임으로</Link></aside>}
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div><p className="section-kicker">{tabLabel(activeTab)}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p></div>
           <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 주차 {sessions.filter((session) => session.type !== "휴강").length}주{sessions.some((session) => session.type === "휴강") ? ` · 휴강 ${sessions.filter((session) => session.type === "휴강").length}일` : ""}</p>
@@ -220,7 +226,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
           {!canEdit && <ReadOnlyBanner what="학기 사역 자료" why="편집은 행정팀·스탭팀장·교역자·통합관리자만 가능합니다." />}
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
-            {activeTab === "배치" && <AssignTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
+            {activeTab === "배치" && <AssignTab initialTeamId={requestedTeam} sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
             {activeTab === "출석" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />}
             {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} />}
             {activeTab === "아카이브" && <ArchiveTab sid={semesterId} />}

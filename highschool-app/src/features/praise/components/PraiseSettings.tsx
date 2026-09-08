@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { PraiseConnectionDetails } from "./PraiseConnectionDetails";
 import { listPraiseAccounts, listPraiseReferences } from "../api";
 import { personName, stampTime } from "./shared";
 import GuideContent from "../content/GuideContent";
@@ -11,7 +12,7 @@ import { PRAISE_ROLE_LABELS, PRAISE_ROLE_OPTIONS, type PraiseCommand, type Prais
 type CommandOf<T extends PraiseCommand["type"]> = Extract<PraiseCommand, { type: T }>;
 type Draft<T> = { value: T; revision: number };
 type Props = { view: PraiseView; execute: (command: PraiseCommand) => Promise<boolean>; busy: boolean };
-type AccountOption = { uid: string; name: string; roleLabel: string };
+type AccountOption = { uid: string; name: string; roleLabel: string; email?: string };
 type SemesterOption = { id: string; title: string; startDate?: string; endDate?: string; teams: { id: string; name: string }[] };
 const buttonClass = "praise-button";
 const primaryClass = "praise-button praise-button--primary";
@@ -219,6 +220,7 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
   if (!view.permissions.manage) return <section className="praise-section"><h3>운영 설정</h3><p className="praise-note">운영 설정은 운영 책임자만 변경할 수 있습니다.</p></section>;
 
   return <div>
+    <PraiseConnectionDetails view={view} />
     {error && <p className="praise-note" role="alert">{error}</p>}
     {notice && <p className="praise-note" role="status">{notice}</p>}
     <section className="praise-section" aria-label="공통 출석 저장 검토" aria-busy={saving}>
@@ -252,6 +254,26 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
 
     {dataLocked && <p className="praise-note" role="status">{view.meta.status === "archived" ? "보관된 운영 기간입니다. 운영 기간을 활성화한 뒤 아래 설정을 변경할 수 있습니다." : "비교 운영 중에는 아래 설정이 읽기 전용입니다. 팀 운영 모드를 전환한 뒤 변경할 수 있습니다."}</p>}
     <fieldset disabled={disabled || dataLocked}>
+    <section className="praise-section" aria-label="담당 계정 연결">
+      <div className="praise-toolbar"><h3>담당 계정 연결</h3><button type="button" className={buttonClass} disabled={disabled || !!accessDraft} onClick={() => { clearMessage(); setAccessDraft({ revision: 0, value: { uid: "", staffId: "", role: "member", active: true } }); }}>담당 계정 추가</button></div>
+      <p className="praise-note">사이트에 등록된 계정과 찬양팀 스탭을 연결합니다. 선택한 역할은 이 찬양팀 작업공간에 적용됩니다.</p>
+      {view.access.length === 0 && <p className="praise-empty">연결된 담당 계정이 없습니다.</p>}
+      <div className="praise-table"><table><thead><tr><th scope="col">계정</th><th scope="col">스탭</th><th scope="col">역할</th><th scope="col">상태</th><th scope="col">편집</th></tr></thead><tbody>{view.access.map((access) => <tr key={access.uid}><td>{accounts.find((account) => account.uid === access.uid)?.name ?? "등록 계정"}</td><td>{staff.find((person) => person.id === access.staffId)?.name ?? "스탭 연결 확인 필요"}</td><td>{PRAISE_ROLE_LABELS[access.role]}</td><td>{access.active ? "활성" : "비활성"}</td><td><button type="button" className={buttonClass} disabled={disabled || !!accessDraft} aria-label={`${staff.find((person) => person.id === access.staffId)?.name ?? "연결된 스탭"} 담당 계정 편집`} onClick={() => { clearMessage(); const { uid, staffId, role, active, revision } = access; setAccessDraft({ revision, value: { uid, staffId, role, active } }); }}>편집</button></td></tr>)}</tbody></table></div>
+      {accessDraft && <form onSubmit={(event) => { if (accessDraft.revision === 0 && view.access.some((item) => item.uid === accessDraft.value.uid)) { event.preventDefault(); setError("이미 연결된 계정입니다. 목록에서 해당 계정을 편집해 주세요."); return; } void save(event, { type: "access.save", expectedRevision: accessDraft.revision, access: accessDraft.value }, () => setAccessDraft(null)); }}><fieldset disabled={disabled}>
+        <div className="praise-form-grid">
+          <Field label="담당자 계정"><select required disabled={accountsLoading || !!accountsError || accessDraft.revision > 0} value={accessDraft.value.uid} onChange={(event) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, uid: event.target.value } })}><option value="">{accountsLoading ? "계정을 불러오는 중…" : "등록 계정 선택"}</option>{accessDraft.value.uid && !accounts.some((account) => account.uid === accessDraft.value.uid) && <option value={accessDraft.value.uid}>기존 연결 계정</option>}{accounts.map((account) => <option key={account.uid} value={account.uid}>{account.name}{account.email ? ` · ${account.email}` : " · 이메일 확인 필요"} · {account.roleLabel}</option>)}</select></Field>
+          <Field label="연결 스탭"><select required value={accessDraft.value.staffId} onChange={(event) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, staffId: event.target.value } })}><option value="">스탭 선택</option>{staff.map((person) => <option key={person.id} value={person.id} disabled={!person.active}>{person.name}{person.active ? "" : " · 비활성"}</option>)}</select></Field>
+          <Field label="담당 역할"><select value={accessDraft.value.role} onChange={(event) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, role: event.target.value as typeof accessDraft.value.role } })}>{PRAISE_ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></Field>
+        </div>
+        {accountsError && <div className="praise-toolbar"><p className="praise-note" role="alert">{accountsError}</p><button type="button" className={buttonClass} onClick={() => setAccountsRetry((value) => value + 1)}>담당 계정 다시 불러오기</button></div>}
+        {!accountsLoading && !accountsError && accounts.length === 0 && <p className="praise-note">선택할 등록 계정이 없습니다. 사이트 로그인과 찬양팀 접근 권한을 먼저 확인해 주세요.</p>}
+        <p className="praise-note">이름이 같아도 로그인 계정은 다를 수 있습니다. 계정의 이메일과 연결할 스탭을 함께 확인하세요.</p>
+        <p className="praise-note">{{ manager: "운영 책임자: 명단·계정·전체 출결·조·등단을 관리합니다.", editor: "등단 편성 담당: 등단을 편집하고, 배정된 조가 있으면 그 조의 출결을 입력합니다.", groupStaff: "조 담당 스탭: 배정된 조의 출결과 본인 주일 참석을 입력합니다.", member: "일반 스탭: 본인 주일 참석을 입력하고 확정된 등단표를 확인합니다." }[accessDraft.value.role]}</p>
+        <Check label="담당 계정 활성" value={accessDraft.value.active} change={(active) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, active } })} />
+        {staff.length === 0 && <p className="praise-note">명단에 스탭을 먼저 등록한 뒤 연결해 주세요.</p>}
+        <Actions cancel={() => setAccessDraft(null)} saveLabel="담당 계정 저장" />
+      </fieldset></form>}
+    </section>
     <section className="praise-section" aria-label="회차 관리">
       <div className="praise-toolbar"><h3>회차 관리</h3><button type="button" className={buttonClass} disabled={disabled || !!meetingDraft} onClick={() => { clearMessage(); setMeetingDraft({ revision: 0, value: { id: newId("meeting"), date: view.meta.startDate, worshipDate: view.meta.startDate, sequence: Math.max(0, ...view.meetings.map((meeting) => meeting.sequence)) + 1, title: "", cancelled: false, temporary: false } }); }}>회차 추가</button></div>
       {view.meetings.length === 0 && <p className="praise-empty">등록된 회차가 없습니다.</p>}
@@ -269,24 +291,7 @@ function PraiseSettingsWorkspace({ view, execute, busy }: Props) {
       </fieldset></form>}
     </section>
 
-    <section className="praise-section" aria-label="담당 계정 연결">
-      <div className="praise-toolbar"><h3>담당 계정 연결</h3><button type="button" className={buttonClass} disabled={disabled || !!accessDraft} onClick={() => { clearMessage(); setAccessDraft({ revision: 0, value: { uid: "", staffId: "", role: "member", active: true } }); }}>담당 계정 추가</button></div>
-      <p className="praise-note">사이트에 등록된 계정과 찬양팀 스탭을 연결합니다. 선택한 역할은 이 찬양팀 작업공간에 적용됩니다.</p>
-      {view.access.length === 0 && <p className="praise-empty">연결된 담당 계정이 없습니다.</p>}
-      <div className="praise-table"><table><thead><tr><th scope="col">계정</th><th scope="col">스탭</th><th scope="col">역할</th><th scope="col">상태</th><th scope="col">편집</th></tr></thead><tbody>{view.access.map((access) => <tr key={access.uid}><td>{accounts.find((account) => account.uid === access.uid)?.name ?? "등록 계정"}</td><td>{staff.find((person) => person.id === access.staffId)?.name ?? "스탭 연결 확인 필요"}</td><td>{PRAISE_ROLE_LABELS[access.role]}</td><td>{access.active ? "활성" : "비활성"}</td><td><button type="button" className={buttonClass} disabled={disabled || !!accessDraft} aria-label={`${staff.find((person) => person.id === access.staffId)?.name ?? "연결된 스탭"} 담당 계정 편집`} onClick={() => { clearMessage(); const { uid, staffId, role, active, revision } = access; setAccessDraft({ revision, value: { uid, staffId, role, active } }); }}>편집</button></td></tr>)}</tbody></table></div>
-      {accessDraft && <form onSubmit={(event) => { if (accessDraft.revision === 0 && view.access.some((item) => item.uid === accessDraft.value.uid)) { event.preventDefault(); setError("이미 연결된 계정입니다. 목록에서 해당 계정을 편집해 주세요."); return; } void save(event, { type: "access.save", expectedRevision: accessDraft.revision, access: accessDraft.value }, () => setAccessDraft(null)); }}><fieldset disabled={disabled}>
-        <div className="praise-form-grid">
-          <Field label="담당자 계정"><select required disabled={accountsLoading || !!accountsError || accessDraft.revision > 0} value={accessDraft.value.uid} onChange={(event) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, uid: event.target.value } })}><option value="">{accountsLoading ? "계정을 불러오는 중…" : "등록 계정 선택"}</option>{accessDraft.value.uid && !accounts.some((account) => account.uid === accessDraft.value.uid) && <option value={accessDraft.value.uid}>기존 연결 계정</option>}{accounts.map((account) => <option key={account.uid} value={account.uid}>{account.name} · {account.roleLabel}</option>)}</select></Field>
-          <Field label="연결 스탭"><select required value={accessDraft.value.staffId} onChange={(event) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, staffId: event.target.value } })}><option value="">스탭 선택</option>{staff.map((person) => <option key={person.id} value={person.id} disabled={!person.active}>{person.name}{person.active ? "" : " · 비활성"}</option>)}</select></Field>
-          <Field label="담당 역할"><select value={accessDraft.value.role} onChange={(event) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, role: event.target.value as typeof accessDraft.value.role } })}>{PRAISE_ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></Field>
-        </div>
-        {accountsError && <div className="praise-toolbar"><p className="praise-note" role="alert">{accountsError}</p><button type="button" className={buttonClass} onClick={() => setAccountsRetry((value) => value + 1)}>담당 계정 다시 불러오기</button></div>}
-        {!accountsLoading && !accountsError && accounts.length === 0 && <p className="praise-note">선택할 등록 계정이 없습니다. 사이트 로그인과 찬양팀 접근 권한을 먼저 확인해 주세요.</p>}
-        <Check label="담당 계정 활성" value={accessDraft.value.active} change={(active) => setAccessDraft({ ...accessDraft, value: { ...accessDraft.value, active } })} />
-        {staff.length === 0 && <p className="praise-note">명단에 스탭을 먼저 등록한 뒤 연결해 주세요.</p>}
-        <Actions cancel={() => setAccessDraft(null)} saveLabel="담당 계정 저장" />
-      </fieldset></form>}
-    </section>
+
 
     <section className="praise-section" aria-label="등단 기본 정책">
       <div className="praise-toolbar"><h3>등단 기본 정책</h3>{!policyDraft && <button type="button" className={buttonClass} disabled={disabled || !view.policy} onClick={() => { if (!view.policy) return; clearMessage(); setPolicyDraft({ revision: view.policy.revision, value: structuredClone({ grouping: view.policy.grouping, rules: view.policy.rules, stage: view.policy.stage }) }); }}>등단 정책 편집</button>}</div>

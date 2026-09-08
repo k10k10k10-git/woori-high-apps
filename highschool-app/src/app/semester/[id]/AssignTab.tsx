@@ -22,6 +22,7 @@ import { buildRosterContactMap, resolvedContact } from "@/features/semester/rost
 import { Application, ApplicationPrivate, ClassInfo, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
 
 interface Props {
+  initialTeamId?: string;
   sid: string;
   teams: Team[];
   trainingClasses: TrainingClass[];
@@ -46,8 +47,12 @@ function groupByKind(members: Application[]): { key: string; label: string; rows
   ].filter((section) => section.rows.length > 0);
 }
 
-export default function AssignTab({ sid, teams, trainingClasses, applications, teamById }: Props) {
+export default function AssignTab({ initialTeamId = "", sid, teams, trainingClasses, applications, teamById }: Props) {
   const { toast } = useUI();
+  const [teamSelection, setTeamSelection] = useState(initialTeamId);
+  const [teamSource, setTeamSource] = useState(initialTeamId);
+  if (teamSource !== initialTeamId) { setTeamSource(initialTeamId); setTeamSelection(initialTeamId); }
+  const focusedTeam = teams.find((team) => team.id === teamSelection);
   const canEdit = useSemesterCanEdit();
   const year = sid.split("-")[0];
   const [privateMap, setPrivateMap] = useState<Record<string, ApplicationPrivate>>({});
@@ -131,11 +136,12 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
 
   return (
     <div className="grid gap-6">
+    <label className="flex flex-wrap items-center gap-3 text-sm font-semibold">사역팀 보기<select className="input" style={{ maxWidth: 280 }} value={focusedTeam?.id ?? ""} onChange={(event) => setTeamSelection(event.target.value)}><option value="">전체 사역팀</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
     <section>
       <h3 className="mb-2 text-sm font-bold text-slate-700">사역팀 배치</h3>
-      <div className="grid gap-4 lg:grid-cols-[1fr_2fr]">
+      <div className={focusedTeam ? "grid gap-4" : "grid gap-4 lg:grid-cols-[1fr_2fr]"}>
       {/* 미배정 풀 */}
-      <section className="card card-body">
+      <section hidden={Boolean(focusedTeam)} className="card card-body">
         <h3 className="font-semibold text-slate-800">
           미배정 <span className="text-sm text-slate-400">{unassigned.length}명</span>
         </h3>
@@ -201,7 +207,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
 
       {/* 팀 칼럼 */}
       <section className="grid gap-3 sm:grid-cols-2">
-        {teams.map((t) => {
+        {(focusedTeam ? [focusedTeam] : teams).map((t) => {
           const members = [...(byTeam.get(t.id) ?? [])].sort(byApplicant);
           // 카드 명단은 학생만 둔다. 스탭은 팀마다 몇 명씩 고정으로 붙어 있어
           // 같이 나열하면 학생 배치 현황이 묻힌다. 헤더에서 펼쳐 확인한다.
@@ -266,7 +272,7 @@ export default function AssignTab({ sid, teams, trainingClasses, applications, t
       </div>
     </section>
 
-    <section>
+    <section hidden={Boolean(focusedTeam)}>
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-sm font-bold text-slate-700">훈련 배치</h3>
         <span className="text-xs text-slate-400">교사·스탭은 훈련 대상이 아니라 목록에 없습니다.</span>

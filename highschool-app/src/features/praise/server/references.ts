@@ -44,7 +44,7 @@ async function shallow(path: string): Promise<string[]> {
   }
 }
 
-/** 승인된 플랫폼 계정만 반환한다. 이메일·토큰·원래 역할 원장은 응답에 포함하지 않는다. */
+/** 운영 책임자용 계정 선택에 승인된 이름·등록 이메일을 제공한다. 토큰·원래 역할 원장은 반환하지 않는다. */
 export async function praiseAccounts() {
   const [admins, retreatAdmins, members, iguardRoles] = await Promise.all(
     [
@@ -76,7 +76,8 @@ export async function praiseAccounts() {
         typeof source.name === "string" && source.name.trim()
           ? source.name.trim().slice(0, 80)
           : "이름 미등록 계정";
-      return [{ uid, name, roleLabel: describeRoles(roles) }];
+      const email = typeof source.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(source.email.trim()) ? source.email.trim().slice(0, 254) : undefined;
+      return [{ uid, name, roleLabel: describeRoles(roles), ...(email ? { email } : {}) }];
     })
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
