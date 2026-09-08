@@ -25,6 +25,20 @@ firebase deploy --only database  # 보안 규칙만 배포
 
 ## 테스트
 
+### 목양 리포트 (2026-09-09)
+
+- 일반 관리자 전용 `/pastoral`은 새친구 정착현황 / 연속 결석 / 이번 주 요약을 제공한다. 교사·공용 데모는 `adminNavigation.ts`와 컴포넌트 진입에서 차단한다.
+- `pastoralReport.ts`는 현재 연도 기존 classes/attendance/events를 재사용한다. KST 기준 경과 정상 주일만 선택하며, X가 연속 3회 이상일 때만 결석 목록에 표시한다. 미입력·출석은 연속 계산을 끊고 행사 주일은 제외한다. 장결은 별도 필터이며 주간 연락 대상은 일반 학생이다. 최근 출석 직전 3회가 X인 학생을 출석 회복으로 표시한다.
+- 새친구는 `pastoralFriends.ts`에서 `semesters/{year}-1/newFriends`, `{year}-2/newFriends`, `{year}-sunday/newFriends`만 구독한다. 기존 Rules 읽기 권한을 유지하고 semestersPrivate를 읽지 않는다. 출석부 전용 관리자에게 조회가 거절되면 재시도와 집계 제한을 명시하고 `nf_` 출석부 연결 명단을 표시한다. 등록일 없는 학생의 정착 상태를 추정하지 않는다.
+- 등록일은 통합 앱과 같이 registeredDate 우선, 기존 createdAt의 KST 날짜로 호환한다. 첫 4회·8회는 등록일 이후의 정상 주일이며 미입력 수를 함께 표시한다. rosterSync의 반·학생 ID 또는 현재 연도의 유일한 personId만 연결하고 이름으로 합치지 않는다. 등록 자료의 한 경로라도 실패하면 부분 집계를 전체로 표시하지 않는다.
+- 연락처는 기존 출석부 학생 phone/pphone만 전화 링크로 제공한다. 새로운 저장·내보내기·자동 연락은 없다. 인증 세대·연도 전환 시 원장 연결 상태를 폐기하고 이전 구독 응답을 무시한다.
+- 회귀 검사는 `pastoralReport.test.ts`, `PastoralReport.render.test.tsx`, `adminNavigation.test.ts`. 합성 브라우저 재현은 `outputs/pastoral-report-20260909/start-fixture.mjs`이며 환경값·운영 SDK를 차단한다.
+
+### 다른 앱의 원장으로 집계할 때 불완전 조회 구분 (2026-09-09)
+- **접근법**: `DB_OWNERSHIP.md`와 기존 Rules를 대조 → `pastoralFriends.ts`에서 세 공개 새친구 경로만 구독 → 모두 준비된 경우에만 집계 → 하나라도 실패하면 등록 자료를 비우고 제한·재시도 표시 → `PastoralReport`를 인증 revision·연도 키로 재생성해 이전 응답 폐기.
+- **판단 질문**: 출석부 admin 역할을 통합 앱 새친구 조회 권한으로 간주하지 않았다. 권한 확대나 비공개 메모 조회 대신 기존 출석부 연결 명단을 제한 표시하고, 등록일 없이 정착 상태를 추정하지 않았다.
+- **재사용 규칙**: 다중 원장 집계는 전체 준비·실패·부분 범위를 구분하고, 읽기 실패를 0명 또는 정상으로 표현하지 않는다.
+
 Vitest 기반 단위 테스트. 설정 파일은 `vitest.config.ts`이며 `@/` alias가 `./src`로 해석된다.
 
 테스트 파일 위치: `__tests__/`

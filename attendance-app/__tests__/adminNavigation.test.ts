@@ -25,7 +25,7 @@ describe('관리자 화면 경계', () => {
     expect(canUseAdminWorkspace(null, false)).toBe(false);
   });
 
-  it.each(['/dashboard', '/overall', '/admin', '/dashboard/', '/admin/accounts', '/admin?week=0-0'])('교사·데모의 %s 직접 진입을 차단한다', path => {
+  it.each(['/pastoral', '/pastoral/', '/dashboard', '/overall', '/admin', '/dashboard/', '/admin/accounts', '/admin?week=0-0'])('교사·데모의 %s 직접 진입을 차단한다', path => {
     expect(canAccessAttendancePath(path, teacher, false)).toBe(false);
     expect(canAccessAttendancePath(path, admin, true)).toBe(false);
     expect(canAccessAttendancePath(path, null, false)).toBe(false);
@@ -102,7 +102,8 @@ describe('관리자 로그인 진입', () => {
 
 describe('관리자 메뉴 표시', () => {
   it('실제 경로를 한 번씩 표시하고 현재 경로와 하위 경로를 찾는다', () => {
-    expect(new Set(ADMIN_NAVIGATION.map(item => item.path)).size).toBe(5);
+    expect(new Set(ADMIN_NAVIGATION.map(item => item.path)).size).toBe(6);
+    expect(adminNavigationItem('/pastoral')?.label).toBe('목양 리포트');
     expect(ADMIN_NAVIGATION.filter(item => item.label === '전체 현황')).toHaveLength(1);
     expect(adminNavigationItem('/overall/')?.path).toBe('/dashboard');
     expect(adminNavigationItem('/dashboard')?.label).toBe('전체 현황');

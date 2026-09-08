@@ -2,13 +2,14 @@ import type { UserRole } from '@/types';
 
 export const ADMIN_NAVIGATION = [
   { path: '/dashboard', label: '전체 현황', icon: 'dashboard' },
+  { path: '/pastoral', label: '목양 리포트', icon: 'book' },
   { path: '/attendance', label: '출석 입력', icon: 'calendar' },
   { path: '/manage', label: '학생 관리', icon: 'users' },
   { path: '/stats', label: '반별 통계', icon: 'chart' },
   { path: '/admin', label: '계정·설정', icon: 'settings' },
 ] as const;
 
-const ADMIN_ONLY_PATHS = ['/dashboard', '/overall', '/admin'];
+const ADMIN_ONLY_PATHS = ['/dashboard', '/overall', '/admin', '/pastoral'];
 const CLASS_FILTER_PATHS = ['/attendance', '/manage', '/stats'];
 const ENTRY_STORAGE_KEY = 'attendance-admin-entry-uid';
 
