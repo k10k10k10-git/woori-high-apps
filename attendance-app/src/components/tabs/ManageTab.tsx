@@ -1,8 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import { db, ref, get, update } from '@/lib/db';
 import { useApp, useClassKeys, useClassKey } from '@/store/AppContext';
-import { showToast } from '@/utils/toast';
 import ClassTabBar from '@/components/ClassTabBar';
 import StudentModal from '@/components/modals/StudentModal';
 import TeacherModal from '@/components/modals/TeacherModal';
@@ -10,7 +8,8 @@ import RosterModal from '@/components/modals/RosterModal';
 import AddClassModal from '@/components/modals/AddClassModal';
 import MoveStudentModal from '@/components/modals/MoveStudentModal';
 import TrashModal from '@/components/modals/TrashModal';
-import { trashRecordKey } from '@/utils/trash';
+import { archiveRoster } from '@/lib/rosterRecovery';
+import { adminActor } from '@/utils/adminChange';
 import type { MoveTarget } from '@/types';
 
 export default function ManageTab() {
@@ -27,33 +26,20 @@ export default function ManageTab() {
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const deleteBusy = useRef(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function deleteClass() {
     if (!isAdmin || deleteBusy.current) return;
-    deleteBusy.current = true; setDeleting(true);
+    deleteBusy.current = true; setDeleting(true); setDeleteError(null);
     setDeleteConfirm(false);
     const keys = classKeys.filter(k => k !== ck);
     try {
-      const snapshot = await get(ref(db, `classes/${curYear}/${ck}`));
-      if (!snapshot.exists()) throw new Error('반이 없습니다.');
-      const classInfo = snapshot.val();
-      await update(ref(db), {
-        [`trash/${curYear}/classes/${trashRecordKey(ck, 'class', crypto.randomUUID())}`]: {
-          ...classInfo,
-          ck,
-          teacher: classInfo?.teacher ?? '',
-          teacherPhoto: classInfo?.teacherPhoto ?? null,
-          students: classInfo.students ?? {},
-          deletedAt: Date.now(),
-        },
-        [`classes/${curYear}/${ck}`]: null,
-        [`attendance/${curYear}/${ck}`]: null,
-      });
+      await archiveRoster({ year: curYear, classKey: ck, actor: adminActor(userRole) });
       if (keys.length > 0) {
         dispatch({ type: 'SET_CLASS', payload: keys[0].split('-')[2] });
       }
-    } catch {
-      showToast('반 삭제에 실패했습니다. 다시 시도해 주세요.');
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
     } finally { deleteBusy.current = false; setDeleting(false); }
   }
 
@@ -127,6 +113,7 @@ export default function ManageTab() {
         </div>
       )}
 
+      {deleteError && <p className="management-error" role="alert">{deleteError}</p>}
       {/* 반 삭제 확인 */}
       {deleteConfirm && (
         <div style={{
@@ -141,7 +128,7 @@ export default function ManageTab() {
             {curPart}부 {curGrade}학년 {curClass}반을 삭제할까요?
           </div>
           <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-            출석 데이터도 함께 삭제됩니다. 반 명단은 최근 삭제 목록에 보관됩니다.
+            반 명단은 복구 사본으로 보관하고 출석은 유지합니다. 반을 복원하면 같은 학생의 출석이 다시 연결됩니다.
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn-danger" style={{ padding: '6px 14px', fontSize: 12 }} onClick={deleteClass} disabled={deleting}>삭제</button>

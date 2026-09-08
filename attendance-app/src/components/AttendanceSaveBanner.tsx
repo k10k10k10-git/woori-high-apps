@@ -10,6 +10,7 @@ type FeedbackBase = {
   studentName: string;
   target: AttEditTarget;
   value: AttValue;
+  message?: string;
 };
 
 export type AttendanceSaveFeedback = FeedbackBase & (
@@ -41,7 +42,7 @@ export default function AttendanceSaveBanner({ feedback, visible, onDismissSaved
       <span>
         {feedback.status === 'saving' && `${feedback.studentName} 출석을 저장하고 있습니다.`}
         {feedback.status === 'saved' && `${feedback.studentName} 출석이 저장되었습니다.`}
-        {feedback.status === 'error' && `${feedback.studentName} 출석을 저장하지 못했습니다.`}
+        {feedback.status === 'error' && (feedback.message ?? `${feedback.studentName} 출석을 저장하지 못했습니다.`)}
       </span>
       {feedback.status === 'error' && (
         <button type="button" onClick={() => onRetry(feedback)}>재시도</button>
