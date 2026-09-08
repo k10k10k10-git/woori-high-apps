@@ -1,0 +1,430 @@
+/* ─── Mobile Responsive ────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* ── 공통: iOS 입력 확대 방지 ── */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="tel"],
+  input[type="password"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  /* ── 최소 터치 타겟 ── */
+  button, a, [role="tab"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* ── 탑바 ── */
+  .topbar-main { padding: 0 10px; gap: 6px; }
+  .topbar-title { font-size: 16px; }
+  .topbar-teacher-badge { font-size: 11px; padding: 2px 6px; }
+  .topbar-actions { gap: 4px; }
+  .topbar-filters { padding: 0 10px 8px; gap: 4px; }
+  .topbar-sel { font-size: 13px; padding: 5px 6px; min-height: 38px; }
+  .logout-btn { padding: 6px 10px; font-size: 12px; }
+
+  /* ── 탭 내비게이션 ── */
+  .tab-btn { padding: 6px 4px 5px; font-size: 10px; min-width: 44px; }
+  .tab-icon { font-size: 20px; }
+
+  /* ── 콘텐츠 영역 ── */
+  .content-area { -webkit-overflow-scrolling: touch; }
+
+  /* ── 반 선택 탭 ── */
+  .class-tabs-wrap { padding: 8px 8px 0; gap: 4px; }
+  .class-tab { padding: 7px 12px; font-size: 13px; min-height: 38px; }
+
+  /* ── 통계 카드 — 2열 ── */
+  .stat-row { grid-template-columns: repeat(2, 1fr); gap: 6px; padding: 8px; }
+  .stat-card { padding: 8px; }
+  .stat-card-label { font-size: 11px; }
+  .stat-card-value { font-size: 20px; }
+
+  /* ── 출석 체크 뷰 ── */
+  .check-list-header { padding: 10px 12px; }
+  .check-week-label { font-size: 14px; }
+  .check-progress { font-size: 12px; padding: 2px 8px; }
+  .check-row { padding: 10px 10px; min-height: 64px; gap: 8px; }
+  .check-avatar, .check-avatar-img { width: 36px; height: 36px; }
+  .check-avatar { font-size: 15px; }
+  .check-name { font-size: 15px; }
+  .check-btns { gap: 5px; }
+  .check-btn { height: 44px; min-width: 54px; font-size: 12px; border-radius: 10px; }
+  .check-list-wrap { margin: 8px 8px; }
+  .attendance-week-picker {
+    margin: 8px; grid-template-columns: 1fr; gap: 5px; padding: 10px;
+  }
+  .attendance-week-picker select { width: 100%; min-height: 44px; font-size: 16px; }
+  .attendance-week-picker > span { line-height: 1.5; }
+  .attendance-row-save { display: none; }
+  .attendance-save-banner {
+    bottom: 8px; margin: 8px; font-size: 12px;
+  }
+  .long-absent-panel { margin: 8px; }
+  .long-absent-panel summary { align-items: flex-start; flex-direction: column; }
+
+  .attendance-action-section { margin: 8px; }
+  .attendance-action-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .attendance-action-grid { grid-template-columns: 1fr; gap: 6px; }
+  .attendance-action-card { padding: 10px 12px; }
+  .attendance-action-card strong { font-size: 20px; }
+
+  /* ── 이번 주 요약 카드 ── */
+  .week-summary-row { padding: 8px 8px 4px; gap: 6px; }
+  .week-summary-card { padding: 10px 4px 8px; }
+  .week-summary-icon { font-size: 14px; }
+  .week-summary-count { font-size: 20px; }
+  .week-summary-label { font-size: 10px; }
+
+  /* ── 출석 테이블 ── */
+  .att-table-wrap { padding: 0 6px 8px; }
+  .att-cell { height: 40px; min-width: 36px; }
+  .att-cell.O, .att-cell.X { font-size: 0; }
+  .att-cell.O::after { font-size: 15px; }
+  .att-cell.X::after { font-size: 13px; }
+  .att-cell-name { min-width: 56px; padding: 4px 6px; }
+  .att-header-name { padding: 4px 6px; min-width: 56px; font-size: 11px; }
+  .att-header-cell { font-size: 11px; padding: 3px 1px; }
+  .att-header-month { padding: 3px 4px; font-size: 11px; }
+  .att-stat-cell { font-size: 11px; padding: 3px 4px; }
+
+  /* ── 뷰 버튼 ── */
+  .view-btn-row { padding: 6px 8px 2px; gap: 4px; flex-wrap: wrap; }
+  .view-btn { padding: 6px 10px; font-size: 12px; min-height: 36px; }
+
+  /* ── 내보내기 메뉴 ── */
+  .export-btn { padding: 4px 10px; font-size: 11px; }
+  .export-menu { min-width: 120px; }
+  .export-menu button { padding: 10px 12px; font-size: 12px; }
+
+  /* ── 관리 탭 ── */
+  .manage-container { padding: 8px; }
+  .teacher-card { padding: 12px; gap: 10px; }
+  .teacher-photo { width: 42px; height: 42px; }
+  .student-card { padding: 10px; gap: 8px; }
+  .student-photo { width: 36px; height: 36px; font-size: 14px; }
+  .student-name { font-size: 14px; }
+  .student-num { font-size: 12px; width: 20px; }
+  .edit-btn { padding: 6px 10px; font-size: 12px; }
+
+  /* ── 통계 차트 ── */
+  .charts-container { grid-template-columns: 1fr; gap: 8px; padding: 8px; }
+  .chart-card { padding: 10px; }
+  .chart-title { font-size: 13px; margin-bottom: 8px; }
+  .chart-canvas-wrap { height: 200px; }
+
+  /* ── 주의 학생 카드 ── */
+  .warning-card { margin: 0 8px 12px; }
+  .warning-card-header { padding: 10px 12px; }
+  .warning-card-title { font-size: 12px; }
+
+  /* ── 설정 탭 ── */
+  .admin-container { padding: 8px; }
+  .admin-section-title { font-size: 12px; }
+  .account-card { padding: 9px 10px; gap: 8px; }
+  .account-avatar { width: 30px; height: 30px; font-size: 13px; }
+
+  /* ── 전체 현황 탭 ── */
+  .overall-container { padding: 0.75rem; }
+  .overall-card { margin-bottom: 1rem; }
+  .overall-card-header { padding: 12px 12px; gap: 6px; }
+  .overall-card-title { font-size: 13px; }
+  .dash-stat-card { padding: 8px 10px; min-width: 70px; }
+  .dash-stat-label { font-size: 10px; }
+  .dash-stat-value { font-size: 18px; }
+  .dash-stat-unit { font-size: 11px; }
+
+  /* ── 모달 ── */
+  .modal-sheet { padding: 16px 12px env(safe-area-inset-bottom); max-width: 100%; }
+  .modal-dialog { width: calc(100% - 24px); padding: 16px 12px; }
+  .modal-title { font-size: 15px; margin-bottom: 12px; }
+  .form-field { margin-bottom: 10px; }
+  .form-label { font-size: 11px; }
+  .form-input { padding: 9px 10px; }
+  .form-select { padding: 9px 10px; }
+  .btn-row { gap: 6px; margin-top: 12px; }
+  .btn-primary, .btn-secondary, .btn-danger { padding: 11px; font-size: 13px; }
+  .att-modal-btns { gap: 6px; }
+  .att-modal-btn { padding: 12px 0; font-size: 16px; }
+
+  /* ── 건의사항 ── */
+  .suggest-form-card { padding: 12px; }
+  .suggest-form-title { font-size: 14px; }
+  .suggest-textarea { padding: 9px 10px; }
+  .suggest-submit-btn { padding: 11px; font-size: 14px; }
+  .suggest-item { padding: 12px; }
+  .suggest-item-meta { font-size: 11px; }
+  .suggest-item-text { font-size: 13px; }
+
+  /* ── 토스트 ── */
+  .toast-container { bottom: 72px; }
+  .toast { padding: 8px 16px; font-size: 12px; }
+
+  /* ── 오프라인 배너 ── */
+  .offline-banner { font-size: 12px; padding: 6px 12px; }
+
+  /* ── 명단 모달 ── */
+  .roster-tabs { gap: 4px; }
+  .roster-tab { padding: 5px 10px; font-size: 11px; }
+  .csv-drop-zone { padding: 18px; font-size: 12px; }
+
+  /* ── 출석부 진입 화면 ── */
+  .entry-header,
+  .entry-header-inner { min-height: 56px; }
+  .entry-header-inner {
+    padding: max(6px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
+    flex-wrap: wrap;
+  }
+  .entry-header-actions { max-width: 100%; margin-left: auto; gap: 6px; }
+  .entry-secondary-action {
+    max-width: 100%;
+    padding: 6px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: normal;
+  }
+  .entry-main {
+    min-height: calc(100dvh - 57px);
+    padding: 24px max(12px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+  .entry-panel { padding: 22px 16px; }
+  .entry-intro h1 { font-size: 20px; }
+  .entry-notice { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .entry-notice strong { white-space: normal; }
+  .entry-recent { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; }
+  .entry-selection-summary { flex-wrap: wrap; }
+
+  /* ── 사진 프리뷰 ── */
+  .photo-preview, .photo-initial { width: 52px; height: 52px; font-size: 20px; }
+}
+
+/* ─── Extra small screens (under 380px) ───────────────────── */
+@media (max-width: 380px) {
+  .attendance-entry--demo .entry-mode { display: none; }
+  .entry-brand { font-size: 12px; }
+  .entry-secondary-action { padding-inline: 9px; }
+  .entry-secondary-action svg { display: none; }
+  .entry-recent-action { font-size: 10px; }
+  .topbar-title { font-size: 14px; }
+  .topbar-teacher-badge { font-size: 10px; }
+  .logout-btn { padding: 5px 8px; font-size: 11px; }
+  .check-btn { min-width: 48px; font-size: 11px; }
+  .check-avatar, .check-avatar-img { width: 32px; height: 32px; }
+  .check-name { font-size: 14px; }
+  .class-tab { padding: 6px 10px; font-size: 12px; }
+  .stat-card-value { font-size: 18px; }
+  .week-summary-count { font-size: 18px; }
+  .dash-stat-value { font-size: 16px; }
+  .view-btn { padding: 5px 8px; font-size: 11px; }
+}
+
+.chart-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.chart-canvas-wrap {
+  position: relative;
+  height: 220px;
+}
+.chart-title {
+  font-size: 12px; font-weight: 600;
+  color: var(--text2); margin-bottom: 10px;
+}
+
+/* ─── Dashboard Stat Cards ──────────────────────────────────── */
+.dash-stat-card {
+  flex: 1; min-width: 80px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  text-align: center;
+}
+.dash-stat-label { font-size: 11px; color: var(--text3); margin-bottom: 4px; }
+.dash-stat-value { font-size: 22px; font-weight: 700; color: var(--text); }
+.dash-stat-unit  { font-size: 12px; font-weight: 400; color: var(--text2); margin-left: 2px; }
+
+/* ─── Warning Card ─────────────────────────────────────────── */
+.warning-card {
+  margin: 0 12px 16px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1.5px solid #fde68a;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.warning-card-header {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; background: none; border: none; cursor: pointer;
+  text-align: left;
+}
+.warning-card-title {
+  font-size: 13px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px;
+}
+.warning-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  background: #fef3c7; color: #d97706; font-size: 11px; font-weight: 700;
+}
+
+/* ─── Offline Banner ────────────────────────────────────────── */
+.offline-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  background: #1e293b; color: #f8fafc;
+  text-align: center; padding: 8px 16px;
+  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+/* ─── Toast ────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 9999;
+  pointer-events: none;
+}
+.toast {
+  padding: 10px 20px;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  animation: toastIn .25s ease;
+  white-space: pre-line;
+  text-align: center;
+}
+.toast-error   { background: #ef4444; }
+.toast-success { background: #10b981; }
+.toast-info    { background: #9B8DD4; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 교사 화면은 전역 모바일 규칙 뒤에서 역할 범위를 다시 고정한다. */
+@media (max-width: 760px) {
+  .teacher-workspace .topbar-main {
+    min-height: 56px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .teacher-workspace .topbar-title { gap: 7px; font-size: 13px; }
+  .teacher-workspace .topbar-title-mark { width: 28px; height: 28px; flex-basis: 28px; }
+  .teacher-workspace .topbar-actions { gap: 4px; }
+  .teacher-workspace .logout-btn { min-height: 44px; padding: 0 9px; font-size: 11px; }
+  .teacher-workspace .tab-nav { min-height: 58px; }
+  .teacher-workspace .tab-btn {
+    flex: 1;
+    min-width: 72px;
+    min-height: 58px;
+    padding: 7px 6px 6px;
+    font-size: 11px;
+  }
+  .teacher-workspace .class-tabs-wrap { padding: 10px 12px 0; }
+  .teacher-workspace .manage-container > .class-tabs-wrap { padding: 0 0 12px; }
+
+  .teacher-attendance { padding: 0 12px 20px; }
+  .teacher-attendance .attendance-class-context { min-height: 48px; gap: 8px; }
+  .teacher-attendance .attendance-class-context .class-tabs-wrap { padding: 0; }
+  .teacher-attendance .attendance-class-count { font-size: 11px; }
+  .teacher-attendance .attendance-class-count strong { font-size: 17px; }
+  .teacher-attendance .attendance-subtabs { margin-top: 0; gap: 22px; }
+  .teacher-attendance .attendance-subtabs .view-btn { min-height: 45px; font-size: 12px; }
+  .teacher-attendance .attendance-tab-panel { padding-top: 8px; }
+  .teacher-attendance .attendance-week-picker {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 4px 8px;
+    padding-bottom: 12px;
+  }
+  .teacher-attendance .attendance-week-field {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  .teacher-attendance .attendance-week-picker select { width: 100%; min-width: 0; font-size: 16px; }
+  .teacher-attendance .attendance-week-hint {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding-left: 36px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .teacher-attendance .week-summary-row { padding: 12px 0; }
+  .teacher-attendance .week-summary-card { min-height: 54px; gap: 5px; padding: 0 10px; }
+  .teacher-attendance .week-summary-card:first-child { padding-left: 0; }
+  .teacher-attendance .week-summary-label { font-size: 11px; }
+  .teacher-attendance .week-summary-count { font-size: 23px; }
+  .teacher-attendance .week-summary-count span { font-size: 11px; }
+  .teacher-attendance .check-list-wrap { margin-top: 12px; }
+  .teacher-attendance .check-list-header { min-height: 42px; padding: 8px 10px; }
+  .teacher-attendance .check-row { min-height: 60px; padding: 8px; gap: 8px; }
+  .teacher-attendance .check-avatar,
+  .teacher-attendance .check-avatar-img { width: 32px; height: 32px; }
+  .teacher-attendance .check-name { font-size: 14px; }
+  .teacher-attendance .check-btns { gap: 6px; }
+  .teacher-attendance .check-btn { min-width: 52px; height: 44px; padding: 0 7px; }
+  .teacher-attendance .attendance-row-save { display: none; }
+  .teacher-attendance .attendance-save-banner { bottom: 8px; margin-top: 8px; }
+  .teacher-attendance .long-absent-panel { margin-top: 18px; }
+  .teacher-attendance .long-absent-panel summary { align-items: flex-start; flex-direction: column; }
+  .teacher-attendance .attendance-table-panel { padding-top: 12px; }
+  .teacher-attendance .attendance-table-toolbar { flex-wrap: wrap; }
+  .teacher-attendance .attendance-table-toolbar .view-btn,
+  .teacher-attendance .export-btn { min-height: 44px; padding: 0 10px; }
+  .teacher-attendance .att-table-wrap { padding: 0; }
+  .teacher-attendance .att-cell { min-width: 36px; height: 44px; }
+  .teacher-attendance .att-cell-name,
+  .teacher-attendance .att-header-name { min-width: 68px; padding: 0; }
+  .teacher-attendance .att-student-history-button { padding: 6px; }
+  .teacher-attendance .attendance-suggest-panel { padding-top: 18px; }
+  .teacher-attendance .suggest-label { margin-top: 18px; }
+  .teacher-attendance .suggest-submit-btn { width: 100%; }
+  .teacher-attendance-modal .modal-sheet { max-width: 100%; padding: 14px 12px max(16px, env(safe-area-inset-bottom)); }
+  .teacher-attendance-modal .history-year-card { flex-basis: 148px; }
+}
+
+@media (max-width: 380px) {
+  .teacher-workspace .topbar-title { font-size: 12px; }
+  .teacher-workspace .logout-btn { padding: 0 7px; font-size: 10px; }
+  .teacher-workspace .topbar-save-status .save-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .teacher-attendance { padding-inline: 12px; }
+  .teacher-attendance .attendance-subtabs { gap: 18px; }
+  .teacher-attendance .attendance-class-count > span:first-child { display: none; }
+  .teacher-attendance .check-row { padding-inline: 7px; }
+  .teacher-attendance .check-btn { min-width: 50px; padding-inline: 5px; font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attendance-entry .spinner { animation: none; }
+  .attendance-entry .entry-input,
+  .attendance-entry .entry-primary-action { transition: none; }
+  .teacher-workspace .class-tab,
+  .teacher-workspace .logout-btn,
+  .teacher-attendance .attendance-subtabs .view-btn,
+  .teacher-attendance .check-row,
+  .teacher-attendance .check-btn { transition: none; }
+}

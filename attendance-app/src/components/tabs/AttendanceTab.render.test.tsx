@@ -15,6 +15,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams('week=8-0'),
 }));
 
+vi.mock('@/lib/attendanceSave', () => ({ saveAttendanceCell: mocks.set, AttendanceSaveError: class extends Error {} }));
+
 vi.mock('@/lib/db', () => ({
   db: { name: 'fixture-db' },
   ref: mocks.ref,
@@ -113,13 +115,9 @@ describe('AttendanceTab 교사 출석 입력', () => {
     fireEvent.click(presentButton);
 
     await waitFor(() => {
-      expect(mocks.ref).toHaveBeenCalledWith(
-        { name: 'fixture-db' },
-        'attendance/2026/1-1-1/student-1/8-0',
-      );
       expect(mocks.set).toHaveBeenCalledWith(
-        { path: 'attendance/2026/1-1-1/student-1/8-0' },
-        null,
+        { year: 2026, target: { ck: '1-1-1', sid: 'student-1', k: '8-0' }, expected: 'O', value: '' },
+        expect.any(Function),
       );
     });
   });

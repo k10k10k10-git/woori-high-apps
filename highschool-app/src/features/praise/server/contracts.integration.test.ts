@@ -1,9 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { initializeApp, deleteApp, type App } from "firebase-admin/app";
+import { getAuth, type Auth } from "firebase-admin/auth";
 import { getDatabase, type Database } from "firebase-admin/database";
 vi.mock("server-only", () => ({}));
-const holder = vi.hoisted(() => ({ database: null as Database | null }));
-vi.mock("./firebaseAdmin", () => ({getPraiseFirebaseAdmin:()=>({database:holder.database}),praiseUnavailable:(code:string)=>Object.assign(new Error(code),{code})}));
+const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null }));
+vi.mock("./firebaseAdmin", async importOriginal => ({ ...await importOriginal<typeof import("./firebaseAdmin")>(), getPraiseFirebaseAdmin:()=>({database:holder.database,auth:holder.auth}) }));
+import { authenticatePraiseRequest } from "./httpAuth";
 import { readWorkspace, transactWorkspace } from "./repository";
 import { createPraiseState, applyPraiseCommand } from "./commands";
 import type { PraiseActor, PraiseState } from "../types";
@@ -21,8 +23,8 @@ function state(id:string):PraiseState {
 }
 suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
  beforeAll(async()=>{
-  if(process.env.FIREBASE_DATABASE_EMULATOR_HOST!=="127.0.0.1:19016")throw new Error("합성 에뮬레이터 주소가 아닙니다.");
-  app=initializeApp({projectId:"demo-praise",databaseURL:`${base}/?ns=demo-praise-default-rtdb`,credential:{getAccessToken:async()=>({access_token:"owner",expires_in:3600})}},"praise-contracts");holder.database=getDatabase(app);
+  if(process.env.FIREBASE_DATABASE_EMULATOR_HOST!=="127.0.0.1:19016" || process.env.FIREBASE_AUTH_EMULATOR_HOST!=="127.0.0.1:19098")throw new Error("합성 에뮬레이터 주소가 아닙니다.");
+  app=initializeApp({projectId:"demo-praise",databaseURL:`${base}/?ns=demo-praise-default-rtdb`,credential:{getAccessToken:async()=>({access_token:"owner",expires_in:3600})}},"praise-contracts");holder.database=getDatabase(app);holder.auth=getAuth(app);
   await holder.database.ref().set({admins:{test_admin:true}});
  });
  afterAll(async()=>{if(app)await deleteApp(app);});
@@ -46,4 +48,24 @@ suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
   await expect(write("student_a","stale")).rejects.toMatchObject({status:409});
   await write("student_a","a");expect(Object.keys((await readWorkspace("concurrency"))!.audit)).toHaveLength(3);
  });
+ it("실제 Auth 토큰과 최신 역할 원장을 대조하고 권한 회수를 반영한다",async()=>{
+  const response=await fetch("http://127.0.0.1:19098/identitytoolkit.googleapis.com/v1/accounts:signUp?key=synthetic-key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"contract@example.test",password:"synthetic-password-123",returnSecureToken:true})});
+  expect(response.ok).toBe(true);
+  const account=await response.json() as {idToken:string;localId:string};
+  const request=new Request("http://localhost/api/praise",{headers:{Authorization:`Bearer ${account.idToken}`}});
+  await holder.database!.ref(`admins/${account.localId}`).set(true);
+  expect((await authenticatePraiseRequest(request)).roles.semester).toBe("superAdmin");
+  await holder.database!.ref(`admins/${account.localId}`).remove();
+  expect((await authenticatePraiseRequest(request)).roles.semester).toBe("none");
+  await holder.auth!.updateUser(account.localId,{disabled:true});
+  await expect(authenticatePraiseRequest(request)).rejects.toMatchObject({status:401});
+ });
+ it("인증 형식이 틀린 요청과 실제 익명 토큰을 거절한다",async()=>{
+  await expect(authenticatePraiseRequest(new Request("http://localhost/api/praise",{headers:{Authorization:"Bearer invalid"}}))).rejects.toMatchObject({status:401});
+  const response=await fetch("http://127.0.0.1:19098/identitytoolkit.googleapis.com/v1/accounts:signUp?key=synthetic-key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({returnSecureToken:true})});
+  expect(response.ok).toBe(true);
+  const {idToken}=await response.json() as {idToken:string};
+  await expect(authenticatePraiseRequest(new Request("http://localhost/api/praise",{headers:{Authorization:`Bearer ${idToken}`}}))).rejects.toMatchObject({status:401});
+ });
+
 });
