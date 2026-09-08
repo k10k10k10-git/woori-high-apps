@@ -7,7 +7,7 @@ async function inspect(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) { await inspect(path); continue; }
-    if (!/\.(?:js|html|json|txt)$/.test(entry.name)) continue;
+    if (!/\.(?:js|css|html|json|txt)$/.test(entry.name)) continue;
     const content = await readFile(path, 'utf8');
     if (forbidden.some(value => content.includes(value))) throw new Error(`운영 빌드에 합성 테스트 설정이 포함됐습니다: ${relative(root, path)}`);
   }
