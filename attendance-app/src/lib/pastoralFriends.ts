@@ -20,8 +20,10 @@ export function subscribeReportFriends(year: number, receive: (friends: ReportFr
           registeredDate: typeof value.registeredDate === 'string' && value.registeredDate ? value.registeredDate
             : Number.isFinite(created) ? new Date(created + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) : undefined,
           decision: typeof value.decision === 'string' ? value.decision : undefined,
+          giftDate: typeof value.giftDate === 'string' ? value.giftDate : undefined,
           rosterSync: value.rosterSync && typeof value.rosterSync.studentId === 'string' && typeof value.rosterSync.classKey === 'string'
-            ? { studentId: value.rosterSync.studentId, classKey: value.rosterSync.classKey, personId: value.rosterSync.personId } : undefined });
+            ? { studentId: value.rosterSync.studentId, classKey: value.rosterSync.classKey, personId: value.rosterSync.personId,
+              syncedAt: typeof value.rosterSync.syncedAt === 'string' ? value.rosterSync.syncedAt : undefined } : undefined });
     });
     results.set(workspace, friends);
     if (results.size === workspaces.length) receive([...results.values()].flat());

@@ -95,16 +95,16 @@ function ReportContent() {
     <div id="pr-content" className="ao-content">
       {!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
         {section !== '연속 결석' && <>
-          {load.status === 'loading' && <p role="status" className="pr-note">새친구 등록 정보를 불러오고 있습니다. 출석부 연결 명단을 먼저 표시합니다.</p>}
-          {load.status === 'error' && <div className="ao-error" role="alert"><span>새친구 등록 정보를 불러오지 못했습니다. 출석부 전용 관리자에게는 통합사이트 새친구 조회 권한이 없을 수 있습니다. 아래는 출석부 연결 명단이며 전체 새친구 집계가 아닙니다.</span><button type="button" onClick={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }}>다시 불러오기</button></div>}
+          {load.status === 'loading' && <p role="status" className="pr-note">새친구 등반 완료 정보를 불러오고 있습니다.</p>}
+          {load.status === 'error' && <div className="ao-error" role="alert"><span>새친구 등반 완료 정보를 불러오지 못했습니다. 완료 여부를 확인할 수 없어 새친구 명단과 집계를 표시하지 않습니다. 다시 불러오기를 눌러 주세요.</span><button type="button" onClick={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }}>다시 불러오기</button></div>}
         </>}
         {section === '새친구 정착현황' && <>
-          <h2>새친구 정착현황 <span>{friends.length}명</span></h2>
-          <p className="pr-note">등록일 이후 첫 정상 주일 4회·8회의 출석입니다. 출석 양호는 정착 완료 판정이 아닙니다. 연락처는 출석부에 등록된 값입니다.</p>
-          {!friends.length ? <p className="pr-empty">현재 조회 범위에 표시할 새친구가 없습니다. 필터와 등록 정보 조회 상태를 확인하세요.</p> : <ul className="pr-friends">{friends.map(item => <li key={item.friend.key}>
+          <h2>새친구 정착현황 <span>{load.status === 'ready' ? `${friends.length}명` : '등반 정보 확인 중'}</span></h2>
+          <p className="pr-note">등반 완료 학생만 표시합니다. 등반일(출석부 반영일 또는 기존 등반 기록일)부터 첫 정상 주일 4회·8회의 출석입니다. 출석 양호는 정착 완료 판정이 아닙니다. 연락처는 출석부에 등록된 값입니다.</p>
+          {!friends.length ? load.status === 'ready' && <p className="pr-empty">현재 조회 범위에 등반 완료된 새친구가 없습니다. 필터와 통합사이트의 등반 처리 상태를 확인하세요.</p> : <ul className="pr-friends">{friends.map(item => <li key={item.friend.key}>
             <div className="pr-friend-heading"><strong>{item.friend.name}</strong><span className="pr-badge">{item.status}</span></div>
             <p>{item.row?.label ?? `${item.friend.part}부 ${item.friend.grade}학년 · 출석부 미연결`} · 담당 {item.friend.owner || item.row?.teacher || '미등록'}</p>
-            <p>등록일 {item.friend.registeredDate || '확인 필요'}{item.friend.decision ? ` · 등록 결정 ${item.friend.decision}` : ''}</p>
+            <p>등반 완료 · 등반일 {item.startedDate || '확인 필요'}</p>
             <dl className="pr-windows">{([['첫 4회', item.four], ['첫 8회', item.eight]] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value.elapsed ? `출석 ${value.present}/${value.elapsed}회 · 미입력 ${value.missing}회` : '관찰 자료 부족'}</dd></div>)}</dl>
             <p>마지막 출석: {item.row?.lastPresent?.label ?? '조회 연도 기록 없음'}</p>
             <div className="pr-contacts"><Phone value={item.row?.student.phone} label="학생" /><Phone value={item.row?.student.pphone} label="보호자" /></div>
@@ -118,7 +118,7 @@ function ReportContent() {
         {section === '이번 주 요약' && <>
           <h2>이번 주 요약 <span>{report.selectedWeek.label}</span></h2>
           <p className="pr-note">현재 부서·학년·반·검색 필터 기준입니다. 아직 입력 중인 주일은 결과가 달라질 수 있습니다.</p>
-          <dl className="pr-summary"><div><dt>3회 이상 연속 결석 · 일반 학생</dt><dd>{activeAbsent.length}명</dd></div><div><dt>새친구 2회 연속 결석 · 확인된 등록 자료</dt><dd>{load.status === 'ready' ? `${friends.filter(item => item.status === '연락 필요').length}명` : '등록 정보 확인 필요'}</dd></div><div><dt>3회 이상 결석 후 다시 출석</dt><dd>{recovered.length}명</dd></div><div><dt>기준 주일 미입력 · 일반 학생</dt><dd>{missing}명</dd></div></dl>
+          <dl className="pr-summary"><div><dt>3회 이상 연속 결석 · 일반 학생</dt><dd>{activeAbsent.length}명</dd></div><div><dt>새친구 2회 연속 결석 · 등반 완료 학생</dt><dd>{load.status === 'ready' ? `${friends.filter(item => item.status === '연락 필요').length}명` : '등반 정보 확인 필요'}</dd></div><div><dt>3회 이상 결석 후 다시 출석</dt><dd>{recovered.length}명</dd></div><div><dt>기준 주일 미입력 · 일반 학생</dt><dd>{missing}명</dd></div></dl>
           <h3>연락이 필요한 친구</h3><StudentRows rows={activeAbsent} empty="3회 이상 연속 결석한 일반 학생이 없습니다." />
           <h3>다시 출석한 친구</h3><StudentRows rows={recovered} empty="이번 기준 주일에 3회 연속 결석 후 다시 출석한 학생이 없습니다." />
         </>}

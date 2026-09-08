@@ -5,8 +5,8 @@ import { normalizeAttendanceValue } from './attendanceValue';
 
 export type ReportFriend = {
   key: string; name: string; part: string; grade: string; owner?: string;
-  registeredDate?: string; decision?: string;
-  rosterSync?: { studentId: string; classKey: string; personId?: string };
+  registeredDate?: string; decision?: string; giftDate?: string;
+  rosterSync?: { studentId: string; classKey: string; personId?: string; syncedAt?: string };
 };
 export type ReportStudent = {
   key: string; student: Student; classKey: string; label: string; teacher: string;
@@ -30,6 +30,15 @@ export function reportDate(value?: string): number | null {
   return Number.isFinite(date) && new Date(date).toISOString().slice(0, 10) === value ? date : null;
 }
 
+/** 통합 앱의 완료 기준(rosterSync 또는 과거 giftDate)을 따르며 접수일로 대체하지 않는다. */
+export function settlementStartDate(friend: ReportFriend): string | undefined {
+  if (reportDate(friend.giftDate) !== null) return friend.giftDate;
+  const syncedAt = friend.rosterSync?.syncedAt;
+  if (!syncedAt || !/^\d{4}-\d{2}-\d{2}T/.test(syncedAt) || reportDate(syncedAt.slice(0, 10)) === null) return undefined;
+  const timestamp = Date.parse(syncedAt);
+  return Number.isFinite(timestamp) ? new Date(timestamp + 9 * 60 * 60 * 1000).toISOString().slice(0, 10) : undefined;
+}
+
 export function buildPastoralReport(source: AdminDashboardSource, friends: ReportFriend[] = [], nowMs = Date.now(), weekKey?: string) {
   const weeks = recentEditableWeeks(source.curYear, source.months, source.events, nowMs, 60);
   const selected = weeks.findIndex(week => week.key === weekKey);
@@ -51,11 +60,11 @@ export function buildPastoralReport(source: AdminDashboardSource, friends: Repor
   const absent = rows.filter(row => row.streak >= 3).sort((a, b) => b.streak - a.streak
     || (a.lastPresent?.dateValue ?? -Infinity) - (b.lastPresent?.dateValue ?? -Infinity)
     || a.label.localeCompare(b.label, 'ko', { numeric: true }) || a.student.name.localeCompare(b.student.name, 'ko'));
-  const linked = new Set<string>();
   const settlement = friends.flatMap(friend => {
-    const start = reportDate(friend.registeredDate);
+    if (!friend.rosterSync && !friend.giftDate) return [];
+    const startedDate = settlementStartDate(friend);
+    const start = reportDate(startedDate);
     const row = linkReportFriend(friend, rows);
-    if (row) linked.add(row.key);
     if (start !== null && through[0] && start > through[0].dateValue) return [];
     const observed = start !== null && row ? row.recent.filter(cell => cell.week.dateValue >= start).slice().reverse() : [];
     const window = (count: number) => {
@@ -63,18 +72,13 @@ export function buildPastoralReport(source: AdminDashboardSource, friends: Repor
       return { elapsed: cells.length, present: cells.filter(cell => cell.value === 'O').length, missing: cells.filter(cell => !cell.value).length };
     };
     const lastTwo = observed.slice(-2);
-    const status = !row ? '출석부 연결 확인' : start === null ? '등록일 확인 필요'
+    const status = !row ? '출석부 연결 확인' : start === null ? '등반일 확인 필요'
       : observed.length === 0 ? '관찰 기간 부족'
       : lastTwo.length === 2 && lastTwo.every(cell => cell.value === 'X') ? '연락 필요'
       : observed.some(cell => !cell.value) ? '출석 입력 확인'
       : observed.length < 4 ? '관찰 중' : window(4).present >= 3 ? '초기 4주 출석 양호' : '출석 흐름 확인';
-    return [{ friend, row, four: window(4), eight: window(8), status }];
+    return [{ friend, row, startedDate, four: window(4), eight: window(8), status }];
   });
-  // 출석부 연결 표식이 있는 새친구도 누락하지 않는다. 등록일은 추정하지 않는다.
-  for (const row of rows) if (row.student.id.startsWith('nf_') && !linked.has(row.key)) {
-    settlement.push({ friend: { key: row.key, name: row.student.name, part: row.classKey.split('-')[0], grade: row.classKey.split('-')[1] }, row,
-      four: { elapsed: 0, present: 0, missing: 0 }, eight: { elapsed: 0, present: 0, missing: 0 }, status: '등록일 확인 필요' });
-  }
   return { weeks, selectedWeek: through[0], rows, absent, settlement,
     recovered: rows.filter(row => row.recovered),
     missing: rows.filter(row => row.student.jang !== true && row.recent[0] && !row.recent[0].value).length };
