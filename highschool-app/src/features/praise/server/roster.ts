@@ -151,7 +151,9 @@ export async function praiseRoster(state: PraiseState) {
   let raw: Record<string, Application> | null;
   const database = getPraiseFirebaseAdmin().database;
   try {
-    raw = await database.ref(semesterPaths.applications(semesterId)).orderByChild("teamId").equalTo(teamId).get().then((snapshot) => snapshot.val());
+    // 운영 Rules에는 teamId 인덱스가 없다. 해당 학기의 공개 신청만 읽고 아래에서
+    // 팀·배치·인물키를 검증한다. 다른 학기와 비공개 신청 정보는 조회하지 않는다.
+    raw = await database.ref(semesterPaths.applications(semesterId)).get().then((snapshot) => snapshot.val());
   } catch {
     throw praiseUnavailable("roster_unavailable");
   }

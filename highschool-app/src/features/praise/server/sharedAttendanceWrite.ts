@@ -1,3 +1,4 @@
+import { isPraiseHistoricalReadOnly } from "../domain/operatingBoundary";
 import "server-only";
 import { paths } from "@/features/semester/paths";
 import { canWritePraiseAttendance, groupVersionForMeeting, praisePermissions } from "../permissions";
@@ -93,7 +94,7 @@ export async function executeSharedAttendance(actor: PraiseActor, before: Praise
   requireValue(praisePermissions(actor, before).read, "찬양팀 접근 권한이 없습니다.", "forbidden", 403);
   if (!known || known.sharedAttendance?.phase === "prepared") {
     requireValue(meeting && canWritePraiseAttendance(actor, before, meeting, command.personId), "담당 조의 출결만 수정할 수 있습니다.", "forbidden", 403);
-    requireValue(before.meta.mode !== "shadow" && before.meta.status !== "archived", "읽기 전용 기록입니다.", "read_only", 409);
+    requireValue(before.meta.mode !== "shadow" && before.meta.status !== "archived" && !isPraiseHistoricalReadOnly(before.meta, meeting.date), "읽기 전용 기록입니다.", "read_only", 409);
   }
   if (!known) {
     requireValue(target, "학기 회차와 현재 찬양팀 신청 인물을 먼저 연결해 주세요.", "attendance_mapping_required", 409);

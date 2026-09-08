@@ -455,3 +455,20 @@ describe("스탭 주일 참석 감사 식별", () => {
     expect(apply(next, command, member, "clear-staff")).toEqual(next);
   });
 });
+
+describe("운영 전환 후 과거 기록 보관",()=>{
+ it("과거 출결·스탭 참석·등단 생성과 회차 날짜 우회를 서버에서 거절한다",()=>{
+  const s=fixture();s.meta.readOnlyBefore="2026-09-12";
+  expectError(()=>apply(s,setAttendance()),"historical_read_only",409);
+  expectError(()=>apply(s,{type:"availability.set",meetingId:"meeting",personId:"staff-1",present:false,role:"SINGER",expectedRevision:1}),"historical_read_only",409);
+  expectError(()=>apply(s,{type:"stage.generate",meetingId:"meeting",inputRevision:stageInputRevision(s,s.meetings.meeting),config:stageConfig(),overrides:[]}),"historical_read_only",409);
+  expectError(()=>apply(s,{type:"meeting.save",expectedRevision:0,meeting:{...meetingInput(s),id:"new-past"}}),"historical_read_only",409);
+  s.meetings.meeting.date="2026-09-12";
+  expect(apply(s,setAttendance()).attendance.meeting["student-1"].status).toBe("ABSENT");
+ });
+ it("활동 스탭은 원본 조 담당 플래그와 무관하게 수동 배정할 수 있고 중복은 금지한다",()=>{
+  const s=fixture();s.people["staff-2"].groupStaffCapable=false;const draft=groupDraft(s);
+  expect(apply(s,{type:"groups.confirm",expectedRevision:1,sourceVersionId:"confirmed-group",draft,acknowledgeWarnings:true}).meta.activeGroupVersionId).toBe("v_synthetic-op");
+  draft.groups[1].staffIds.push("staff-2");expect(()=>apply(s,{type:"groups.confirm",expectedRevision:1,sourceVersionId:"confirmed-group",draft,acknowledgeWarnings:true})).toThrow();
+ });
+});

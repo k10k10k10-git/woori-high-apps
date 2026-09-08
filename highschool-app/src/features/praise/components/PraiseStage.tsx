@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
 import { DEFAULT_STAGE } from "../defaults";
-import type { StageOverride, StageAssignment } from "../domain/stage";
-import { reorderStage } from "../domain/stage";
+import type { StageOverride } from "../domain/stage";
+import { PraiseStageAvailability } from "./PraiseStageAvailability";
+import { PraiseStageBoard } from "./PraiseStageBoard";
 import { toSeoulDate } from "../domain/terms";
 import { comparePraiseStageVersions, preferredPraiseStageVersion } from "../stageHistoryModel";
 import type { PraiseStageConfig, PraiseStageService, PraiseStageVersion } from "../types";
-import { Empty, WarningList, praiseDataWriteLocked, sourceTime, stampTime, type PraiseMeetingProps } from "./shared";
+import { Empty, WarningList, praiseMeetingWriteLocked, sourceTime, stampTime, type PraiseMeetingProps } from "./shared";
 import { PraiseStageHistory } from "./PraiseStageHistory";
 import styles from "./PraiseStageHistory.module.css";
 
@@ -38,7 +39,7 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
   const [dirty, setDirty] = useState(false);
   const [selectedService, setSelectedService] = useState(() => version?.services[0]?.department ?? "FIRST");
   if (!meeting) return null;
-  const canEdit = view.permissions.stageEdit && !praiseDataWriteLocked(view);
+  const canEdit = view.permissions.stageEdit && !praiseMeetingWriteLocked(view, meeting);
   const stale = Boolean(version && latestId !== version.id);
   const inputStale = inputRevision !== view.inputRevisions[meeting.id];
   const setSetting = (patch: Partial<PraiseStageConfig>) => { if (busy || !canEdit) return; setConfig((value) => ({ ...value, ...patch })); setDirty(true); };
@@ -49,10 +50,6 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
   const generate = async () => {
     if (busy || !canEdit) return;
     if (await execute({ type: "stage.generate", meetingId: meeting.id, inputRevision: view.inputRevisions[meeting.id], config, overrides })) { setDirty(false); onSaved(); }
-  };
-  const move = (department: "FIRST" | "SECOND", assignment: StageAssignment, role: "SINGER" | "CHOIR", side: "LEFT" | "RIGHT", index: number) => {
-    if (busy || !canEdit) return;
-    setServices((current) => current.map((service) => service.department === department ? { ...service, assignments: reorderStage(service.assignments, `${assignment.personType}:${assignment.personId}`, role, side, index) } : service)); setDirty(true);
   };
   const exportVersion = () => version ? { ...version, config, services, overrides } : null;
   const exportPDF = async () => {
@@ -68,11 +65,13 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
     try { const { exportStagePNG } = await import("./stageExport"); await exportStagePNG(target); } catch { setExportError("이미지를 저장하지 못했습니다. 다시 시도해 주세요."); }
   };
   return <fieldset disabled={busy} className="praise-edit-fieldset"><div className="praise-stack">
+    {view.meta.readOnlyBefore && meeting.date < view.meta.readOnlyBefore && <p className="praise-note">운영 전환 이전의 확정 기록입니다. 과거 기록은 보관하고 다음 회차부터 편성·수정합니다.</p>}
     {stale && <p className="praise-warning">최신 등단표가 따로 있습니다. 입력 중인 내용은 유지했습니다. 상단에서 최신본을 불러온 뒤 편집해 주세요.</p>}
     {version && inputStale && (version.imported
       ? <p className="praise-note">이관본의 생성 당시 조건은 현재 기록과 자동 대조할 수 없습니다.{canEdit && " 새 편성이 필요하면 현재 조건으로 생성해 주세요."}</p>
       : <p className="praise-warning">출결·팀원·설정이 초안 생성 이후 바뀌었습니다. 현재 조건으로 다시 생성한 뒤 확인해 주세요.</p>)}
     {meeting.cancelled && <p className="praise-note">토요 학생 모임은 휴강입니다. 학생 후보는 0명이며, 주일 스탭 참석을 기록해 스탭 등단을 편성할 수 있습니다.</p>}
+    <PraiseStageAvailability view={view} meeting={meeting} execute={execute} busy={busy} />
     {canEdit && <details className="praise-disclosure" open={!version}><summary>등단 조건과 후보 예외</summary><div className="praise-form-grid">
       <label className="praise-field"><span>인도자 구분</span><select value={config.leaderType} onChange={(event) => setSetting({ leaderType: event.target.value as "STAFF" | "STUDENT", leaderId: "" })}><option value="STAFF">스탭</option><option value="STUDENT">학생</option></select></label>
       <label className="praise-field"><span>인도자</span><select value={config.leaderId} onChange={(event) => setSetting({ leaderId: event.target.value })}><option value="">인도자를 선택하세요</option>{view.people.filter((person) => person.active && person.kind === config.leaderType).map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
@@ -90,7 +89,7 @@ function StageEditor({ view, meeting, execute, busy, version, latestId, onSaved 
       {version.imported && <p className="praise-note">외부 사이트에서 이관한 등단표입니다.{version.nameSnapshotAsOf ? ` 이관 시점 명단 기준 · ${sourceTime(version.nameSnapshotAsOf)}` : " 당시 명단 기준 시각은 확인되지 않았습니다."}</p>}
       <WarningList warnings={version.warnings} />
       {services.length > 1 && <div className={`praise-segment ${styles.mobileServiceChoice}`} role="group" aria-label="등단표 예배 선택">{services.map((service) => <button type="button" aria-pressed={selectedService === service.department} key={service.department} onClick={() => setSelectedService(service.department)}>{service.department === "FIRST" ? "1부 예배" : "2부 예배"}</button>)}</div>}
-      {services.map((service) => <section className={`praise-stage-service ${service.department === selectedService ? "" : styles.inactiveService}`} key={service.department}><h3>{service.department === "FIRST" ? "1부" : "2부"} 예배</h3><div className="praise-stage-front">회중석에서 바라본 무대 · 인도 {version.leaderName}</div><div className="praise-stage-grid">{(["CHOIR", "SINGER"] as const).map((role) => <div className="praise-stage-role" key={role}><h4>{role === "CHOIR" ? "콰이어" : "싱어"}</h4><div className="praise-stage-sides">{(["LEFT", "RIGHT"] as const).map((side) => <div key={side}><h5>{side === "LEFT" ? "왼쪽" : "오른쪽"}</h5><ol>{service.assignments.filter((assignment) => assignment.role === role && assignment.side === side).sort((a, b) => a.positionOrder - b.positionOrder).map((assignment, index, entries) => <li key={`${assignment.personType}:${assignment.personId}`}><div><strong>{assignment.name}</strong><span>{assignment.personType === "STAFF" ? "스탭" : "학생"}</span></div>{canEdit && <div className="praise-stage-controls"><label><span className="sr-only">{assignment.name} 역할</span><select disabled={busy || stale || inputStale} value={assignment.role} onChange={(event) => move(service.department, assignment, event.target.value as "SINGER" | "CHOIR", side, index)}><option value="SINGER">싱어</option><option value="CHOIR">콰이어</option></select></label><button disabled={busy || stale || inputStale} onClick={() => move(service.department, assignment, role, side === "LEFT" ? "RIGHT" : "LEFT", index)} aria-label={`${assignment.name} 반대편 이동`}>반대편</button><button disabled={busy || stale || inputStale || index === 0} onClick={() => move(service.department, assignment, role, side, index - 1)} aria-label={`${assignment.name} 앞 순서로`}>앞으로</button><button disabled={busy || stale || inputStale || index === entries.length - 1} onClick={() => move(service.department, assignment, role, side, index + 1)} aria-label={`${assignment.name} 뒤 순서로`}>뒤로</button></div>}</li>)}</ol></div>)}</div></div>)}</div></section>)}
+      {services.map((service) => <section className={`praise-stage-service ${service.department === selectedService ? "" : styles.inactiveService}`} key={service.department}><h3>{service.department === "FIRST" ? "1부" : "2부"} 예배</h3><PraiseStageBoard view={view} meeting={meeting} config={config} overrides={overrides} service={service} leaderName={version.leaderName} canEdit={canEdit && !busy && !stale && !inputStale} onChange={(assignments) => { setServices((current) => current.map((item) => item.department === service.department ? { ...item, assignments } : item)); setDirty(true); }} /></section>)}
       <details className="praise-disclosure"><summary>출석 후보와 제외 사유 {version.candidates.length}명</summary><ul className="praise-candidate-list">{version.candidates.map((candidate) => <li key={candidate.personId}><strong>{view.people.find((person) => person.id === candidate.personId)?.name ?? "보관된 팀원"}</strong><span>{candidate.eligible ? "등단 후보" : "후보 제외"} · {candidate.reason}</span></li>)}</ul></details>
       {canEdit && <div className="praise-save-bar"><label className="praise-check"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} />저장된 초안의 조건 경고와 배치를 확인했습니다</label><button className="praise-button" disabled={busy || stale || inputStale} onClick={() => { void save(false); }}>수정 초안 저장</button><button className="praise-button praise-button--primary" disabled={busy || stale || inputStale || dirty || (version.warnings.length > 0 && !acknowledge)} onClick={() => { void save(true); }}>등단표 확정</button></div>}
     </>}

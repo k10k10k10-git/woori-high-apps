@@ -1,3 +1,4 @@
+import { isPraiseHistoricalReadOnly } from "../domain/operatingBoundary";
 import type { PraiseCommand, PraiseGroupVersion, PraiseMeeting, PraiseView } from "../types";
 export type PraiseEditorProps = { view: PraiseView; execute: (command: PraiseCommand) => Promise<boolean>; busy: boolean };
 export type PraiseMeetingProps = PraiseEditorProps & { meeting: PraiseMeeting | null };
@@ -26,3 +27,5 @@ export function sourceTime(value: string) { const date = new Date(value); return
 export function authorName(view: PraiseView, uid: string) { if (uid.startsWith("supabase:")) return "외부 사이트 기록"; const linked = view.access.find((access) => access.uid === uid); return linked ? personName(view, linked.staffId) : view.audit.find((event) => event.actor.uid === uid)?.actor.name || `계정 ${uid.slice(0, 6)}`; }
 export function Empty({ children }: { children: React.ReactNode }) { return <div className="praise-empty">{children}</div>; }
 export function WarningList({ warnings }: { warnings: string[] }) { return warnings.length > 0 ? <div className="praise-warning" role="status"><strong>확인할 조건 {warnings.length}개</strong><ul>{warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></div> : null; }
+
+export function praiseMeetingWriteLocked(view: PraiseView, meeting: PraiseMeeting): boolean { return praiseDataWriteLocked(view) || isPraiseHistoricalReadOnly(view.meta, meeting.date); }
