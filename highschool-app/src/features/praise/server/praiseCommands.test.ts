@@ -472,3 +472,32 @@ describe("운영 전환 후 과거 기록 보관",()=>{
   draft.groups[1].staffIds.push("staff-2");expect(()=>apply(s,{type:"groups.confirm",expectedRevision:1,sourceVersionId:"confirmed-group",draft,acknowledgeWarnings:true})).toThrow();
  });
 });
+
+
+describe("같은 스탭의 복수 로그인 계정", () => {
+  const second = actor("second-login");
+  const link: PraiseCommand = { type: "access.save", expectedRevision: 0, access: { uid: second.uid, staffId: "staff-2", role: "groupStaff", active: true } };
+  it("두 계정은 같은 조만 조회·입력하며 감사의 로그인 UID는 구분된다", () => {
+    const state = apply(fixture(), link, manager, "link-second");
+    expect(state.access[staffActor.uid].active).toBe(true);
+    for (const who of [staffActor, second]) {
+      expect(praiseView(state, who).people.map(p => p.id)).not.toContain("student-5");
+      expectError(() => apply(state, setAttendance("student-5"), who), "forbidden", 403);
+      const saved = apply(state, setAttendance(), who, who.uid + "-save");
+      expect(saved.attendance.meeting["student-1"].updatedBy).toBe(who.uid);
+      expect(saved.audit[who.uid + "-save"].actor.uid).toBe(who.uid);
+    }
+  });
+  it("한 계정 회수는 다른 계정의 담당 권한을 회수하지 않는다", () => {
+    let state = apply(fixture(), link, manager, "link-second");
+    state = apply(state, { ...link, expectedRevision: 1, access: { ...link.access, active: false } }, manager, "revoke-second");
+    expectError(() => apply(state, setAttendance(), second), "forbidden", 403);
+    expect(praiseView(state, second).attendance).toEqual({});
+    expect(apply(state, setAttendance(), staffActor).attendance.meeting["student-1"].status).toBe("ABSENT");
+  });
+  it("새 연결로 기존 UID를 덮어쓰거나 일반 담당자가 계정을 추가할 수 없다", () => {
+    const state = apply(fixture(), link, manager, "link-second");
+    expectError(() => apply(state, link), "revision_conflict", 409);
+    expectError(() => apply(fixture(), link, staffActor), "forbidden", 403);
+  });
+});
