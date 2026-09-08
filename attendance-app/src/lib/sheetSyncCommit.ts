@@ -1,5 +1,6 @@
 import { auth } from '@/lib/firebase/client';
-import { db, get, ref, runTransaction, onDisconnect } from '@/lib/db';
+import { db, get, ref, syncProtocolDb, onDisconnect } from '@/lib/db';
+import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 import { sameStoredValue } from '@/utils/studentPersistence';
 import { patchStudentMoveOnce } from '@/utils/studentMoveRequest';
 
@@ -18,6 +19,12 @@ export async function commitSheetSync(input: {
   year: number; classKeys: string[]; classes: unknown; attendance: unknown;
   payload: Record<string, unknown>;
 }) {
+  return withBrowserWriteLock('exclusive', () => commitLockedSheetSync(input));
+}
+async function commitLockedSheetSync(input: {
+  year: number; classKeys: string[]; classes: unknown; attendance: unknown; payload: Record<string, unknown>;
+}) {
+  const { runTransaction } = syncProtocolDb;
   const user = auth.currentUser;
   if (!user) throw new Error('다시 로그인해 주세요.');
   const token = await user.getIdToken();

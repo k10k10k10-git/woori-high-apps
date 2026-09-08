@@ -5,11 +5,13 @@ on:
     paths:
       - "attendance-app/**"
       - ".github/workflows/attendance-quality.yml"
+      - "scripts/run-attendance-contracts.mjs"
   push:
     branches: [main]
     paths:
       - "attendance-app/**"
       - ".github/workflows/attendance-quality.yml"
+      - "scripts/run-attendance-contracts.mjs"
 
 concurrency:
   group: attendance-quality-${{ github.ref }}
@@ -44,3 +46,19 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+  recovery-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: attendance-app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci --prefix attendance-app
+      - run: npm install --global firebase-tools@15.10.0
+      - run: node scripts/run-attendance-contracts.mjs

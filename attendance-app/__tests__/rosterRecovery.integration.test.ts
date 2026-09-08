@@ -1,0 +1,74 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { initializeApp, deleteApp, type FirebaseApp } from 'firebase/app';
+import { connectDatabaseEmulator, getDatabase, get, ref, set, type Database } from 'firebase/database';
+const holder = vi.hoisted(() => ({ database: null as Database | null }));
+vi.mock('@/lib/firebase/client', () => ({ get db() { return holder.database; } }));
+import { archiveRoster } from '@/lib/rosterRecovery';
+import { runTransaction } from '@/lib/db';
+import { restoreMissingClass, restoreMissingStudent } from '@/utils/studentPersistence';
+const suite = process.env.ATTENDANCE_CONTRACTS === '1' ? describe : describe.skip;
+const base = 'http://127.0.0.1:19017';
+const ns = 'demo-attendance-recovery-default-rtdb';
+const student = { id: 's', personId: 'person-s', name: '합성 학생' };
+const input = { year: 2026, classKey: '1-1-1', studentId: 's', personId: 'person-s', actor: '합성 관리자' };
+let apps: FirebaseApp[] = [], admin: Database, teacher: Database, second: Database;
+suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약', () => {
+  beforeAll(() => {
+    if (process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('합성 에뮬레이터 주소가 아닙니다.');
+    const client = (uid: string) => {
+      const app = initializeApp({ projectId: 'demo-attendance-recovery', databaseURL: `https://${ns}.firebaseio.com` }, uid);
+      apps.push(app);
+      const database = getDatabase(app);
+      connectDatabaseEmulator(database, '127.0.0.1', 19017, { mockUserToken: { sub: uid, email: `${uid}@example.test` } });
+      return database;
+    };
+    admin = client('admin'); second = client('admin2'); teacher = client('teacher'); holder.database = admin;
+  });
+  beforeEach(async () => {
+    const response = await fetch(`${base}/.json?ns=${ns}`, { method: 'PUT', headers: { Authorization: 'Bearer owner' }, body: JSON.stringify({
+      attendanceAdmins: { admin: true, admin2: true },
+      userRoles: { teacher__at__example__dot__test: { email: 'teacher@example.test', role: 'teacher', part: '1', grade: '1', class: '1' } },
+      classes: { 2026: { '1-1-1': { teacher: '합성 교사', students: { s: student } } } },
+    }) });
+    expect(response.ok).toBe(true);
+  });
+  afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; });
+  it('교사 출석 → 학생 삭제 → 복원에서 출석값과 원래 ID를 유지한다', async () => {
+    await set(ref(teacher, 'attendance/2026/1-1-1/s/0906'), 'O');
+    await archiveRoster(input);
+    expect((await get(ref(admin, 'classes/2026/1-1-1/students/s'))).exists()).toBe(false);
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s/0906'))).val()).toBe('O');
+    await expect(set(ref(teacher, 'attendance/2026/1-1-1/s/0906'), 'X')).rejects.toThrow();
+    const copies = (await get(ref(admin, 'trash/2026/students'))).val();
+    expect(Object.values(copies)).toHaveLength(1);
+    const copy = Object.values(copies)[0] as typeof student & { ck?: string; deletedAt?: number };
+    delete copy.ck; delete copy.deletedAt;
+    const result = await runTransaction(ref(admin, 'classes/2026/1-1-1'), current => restoreMissingStudent(current, copy, 'restored', { action: '학생 복원' }));
+    expect(result.committed).toBe(true);
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s/0906'))).val()).toBe('O');
+    await set(ref(teacher, 'attendance/2026/1-1-1/s/0913'), 'X');
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s'))).val()).toEqual({ '0906': 'O', '0913': 'X' });
+  });
+  it('반 삭제·복원은 보관 출석을 덮지 않고 같은 반이 생기면 복원을 거절한다', async () => {
+    await set(ref(teacher, 'attendance/2026/1-1-1/s/0906'), 'O');
+    await archiveRoster({ ...input, studentId: undefined, personId: undefined });
+    const copies = (await get(ref(admin, 'trash/2026/classes'))).val();
+    const copy = Object.values(copies)[0] as Record<string, unknown>;
+    delete copy.ck; delete copy.deletedAt;
+    const target = ref(admin, 'classes/2026/1-1-1');
+    await get(target);
+    expect((await runTransaction(target, current => restoreMissingClass(current, copy))).committed).toBe(true);
+    expect((await runTransaction(target, current => restoreMissingClass(current, copy))).committed).toBe(false);
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s/0906'))).val()).toBe('O');
+  });
+  it('서로 다른 관리자 두 명의 동시 복원은 한 번만 성공한다', async () => {
+    await archiveRoster(input);
+    const restore = async (database: Database, key: string) => {
+      const target = ref(database, 'classes/2026/1-1-1'); await get(target);
+      return runTransaction(target, current => restoreMissingStudent(current, student, key, { action: '학생 복원' }));
+    };
+    const results = await Promise.all([restore(admin, 'a'), restore(second, 'b')]);
+    expect(results.filter(result => result.committed)).toHaveLength(1);
+    expect((await get(ref(admin, 'classes/2026/1-1-1/students/s'))).val()).toEqual(student);
+  });
+});

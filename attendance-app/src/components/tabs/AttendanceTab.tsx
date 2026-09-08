@@ -9,6 +9,7 @@ import { downloadCSV, downloadXLSX, escapeHtml, openPrintWindow } from '@/utils/
 import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
+import { BrowserWriteLockError } from '@/utils/browserWriteLock';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttendanceSaveBanner from '@/components/AttendanceSaveBanner';
 import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
@@ -185,8 +186,9 @@ export default function AttendanceTab() {
       await set(ref(db, path), value === '' ? null : value);
       setSaveFeedback({ status: 'saved', sid: target.sid, studentName, target, value, savedAt: Date.now() });
       dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' });
-    } catch {
-      setSaveFeedback({ status: 'error', sid: target.sid, studentName, target, value });
+    } catch (cause) {
+      setSaveFeedback({ status: 'error', sid: target.sid, studentName, target, value,
+        ...(cause instanceof BrowserWriteLockError ? { message: cause.message } : {}) });
       dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' });
       showToast('출석 저장에 실패했습니다. 아래 재시도 버튼을 눌러 주세요.');
     }

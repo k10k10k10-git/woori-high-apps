@@ -6,7 +6,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: m.user } }));
 vi.mock('@/lib/db', () => ({ db: {}, ref: (_db: unknown, path: string) => path,
-  get: m.get, runTransaction: m.transaction, onDisconnect: () => m.disconnect }));
+  get: m.get, syncProtocolDb: { runTransaction: m.transaction }, onDisconnect: () => m.disconnect }));
 vi.mock('@/utils/studentMoveRequest', () => ({ patchStudentMoveOnce: m.patch }));
 import { claimSyncLocks, commitSheetSync } from '@/lib/sheetSyncCommit';
 const input = { year: 2026, classKeys: ['a', 'b'], classes: {}, attendance: {}, payload: { 'classes/2026/a/teacher': '교사' } };
