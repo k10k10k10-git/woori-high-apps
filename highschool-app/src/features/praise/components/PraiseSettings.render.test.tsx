@@ -146,12 +146,12 @@ describe("찬양 운영 설정", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("이미 연결된 계정"); expect(execute).not.toHaveBeenCalled();
   });
 
-  it("한 스탭을 활성 담당 계정 두 개에 연결하지 않는다", async () => {
+  it("같은 스탭의 두 번째 로그인 계정을 기존 연결과 별도로 추가한다", async () => {
     const { execute } = setup(); click("담당 계정 추가");
     await waitFor(() => expect(screen.getByLabelText("담당자 계정")).not.toBeDisabled());
     fireEvent.change(screen.getByLabelText("담당자 계정"), { target: { value: "uid-another" } });
     fireEvent.change(screen.getByLabelText("연결 스탭"), { target: { value: "staff-test" } }); click("담당 계정 저장");
-    expect(screen.getByRole("alert")).toHaveTextContent("다른 담당 계정이 연결"); expect(execute).not.toHaveBeenCalled();
+    await waitFor(() => expect(execute).toHaveBeenCalledWith({ type: "access.save", expectedRevision: 0, access: { uid: "uid-another", staffId: "staff-test", role: "member", active: true } }));
   });
 
   it("등록 계정 조회 실패를 알리고 다시 불러올 수 있다", async () => {

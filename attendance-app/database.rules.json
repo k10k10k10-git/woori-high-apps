@@ -71,6 +71,12 @@
     },
     "config": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+      "pastoralReport": {
+        "blockedDemoUid": {
+          ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
+          ".validate": "newData.isString() && newData.val().length > 0"
+        }
+      },
       "sheetSync": {
         ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)"
       },
@@ -378,7 +384,12 @@
     },
     "semesters": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null || root.child('iguardMembers').child(auth.uid).val() != null)",
-      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)"
+      ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
+      "$sid": {
+        "newFriends": {
+          ".read": "auth != null && root.child('attendanceAdmins').child(auth.uid).val() === true && root.child('config').child('pastoralReport').child('blockedDemoUid').isString() && root.child('config').child('pastoralReport').child('blockedDemoUid').val() !== auth.uid"
+        }
+      }
     },
     "semestersPrivate": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('retreatAdmins').child(auth.uid).val() != null)",
