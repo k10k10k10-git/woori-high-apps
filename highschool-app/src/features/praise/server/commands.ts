@@ -1,3 +1,4 @@
+import { isPraiseHistoricalReadOnly } from "../domain/operatingBoundary";
 import { generateGrouping, evaluateGrouping } from "../domain/grouping";
 import { saturdayDates } from "../domain/terms";
 import { createFirstMeetingGuide } from "../content/templates";
@@ -211,9 +212,8 @@ function validateGroups(state: PraiseState, draft: PraiseGroupInput): string[] {
     for (const staffId of group.staffIds) {
       requireValue(
         state.people[staffId]?.kind === "STAFF" &&
-          state.people[staffId]?.active &&
-          state.people[staffId]?.groupStaffCapable,
-        "조 담당 가능한 활동 스탭을 선택해 주세요.",
+          state.people[staffId]?.active,
+        "활동 중인 스탭을 선택해 주세요.",
       );
       requireValue(
         !assignedStaff.has(staffId),
@@ -345,6 +345,8 @@ export function applyPraiseCommand(
       409,
     );
   }
+  const operationMeeting = "meetingId" in command ? previous.meetings[command.meetingId] : command.type === "meeting.save" ? previous.meetings[command.meeting.id] ?? command.meeting : null;
+  requireValue(!operationMeeting || !isPraiseHistoricalReadOnly(previous.meta, operationMeeting.date), "운영 전환 이전의 회차는 과거 기록으로 보관되어 있습니다.", "historical_read_only", 409);
   const state = structuredClone(previous);
   let label = "찬양팀 기록 수정",
     targetId: string | undefined;
@@ -509,6 +511,7 @@ export function applyPraiseCommand(
     }
     case "meeting.save": {
       manage();
+      requireValue(!isPraiseHistoricalReadOnly(state.meta, command.meeting.date), "보관 기간 안으로 회차를 이동하거나 추가할 수 없습니다.", "historical_read_only", 409);
       const m = command.meeting,
         current = state.meetings[m.id];
       revision(current?.revision, command.expectedRevision);
@@ -535,7 +538,7 @@ export function applyPraiseCommand(
         "migration_required",
         409,
       );
-      state.meetings[m.id] = { ...m, ...stamp(current, actor, at) };
+      state.meetings[m.id] = { ...m, ...(current?.sourceDate ? { sourceDate: current.sourceDate } : {}), ...stamp(current, actor, at) };
       label = m.cancelled ? "찬양팀 모임 휴강" : "찬양팀 모임 일정 저장";
       targetId = m.id;
       break;

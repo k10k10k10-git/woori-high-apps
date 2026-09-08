@@ -1,4 +1,5 @@
 import "server-only";
+import { isPraiseHistoricalReadOnly } from "../domain/operatingBoundary";
 import { paths } from "@/features/semester/paths";
 import type { Application } from "@/features/semester/types";
 import { assertPraiseId } from "../paths";
@@ -23,7 +24,7 @@ export async function readSharedPath(path: string): Promise<unknown> {
 }
 /** 연결 변경과 원본 조 변경은 사전에 읽은 외부 스냅샷에 끼워 넣을 수 없다. */
 export function sharedMappingRevision(state: PraiseState) {
-  return fingerprint({ semesterId: state.meta.semesterId, teamId: state.meta.teamId, mode: state.meta.mode,
+  return fingerprint({ semesterId: state.meta.semesterId, teamId: state.meta.teamId, mode: state.meta.mode, readOnlyBefore: state.meta.readOnlyBefore,
     meetings: state.meetings, people: state.people, activeGroupVersionId: state.meta.activeGroupVersionId, groups: state.groupVersions });
 }
 export function sharedSessionOpen(value: unknown): boolean {
@@ -81,7 +82,7 @@ export async function loadSharedAttendance(state: PraiseState): Promise<SharedAt
   assertPraiseId(sid); assertPraiseId(teamId);
   const [team, applicationValue, sessionValue, meta] = await Promise.all([
     readSharedPath(paths.team(sid, teamId)),
-    getPraiseFirebaseAdmin().database.ref(paths.applications(sid)).orderByChild("teamId").equalTo(teamId).get()
+    getPraiseFirebaseAdmin().database.ref(paths.applications(sid)).get()
       .then(s => s.val() as unknown).catch(() => { throw praiseUnavailable("shared_attendance_unavailable"); }),
     readSharedPath(paths.sessions(sid)),
     readSharedPath(paths.semesterMeta(sid)),
@@ -108,7 +109,7 @@ export async function loadSharedAttendance(state: PraiseState): Promise<SharedAt
         fingerprint(candidate.rosterLink) === fingerprint(p.rosterLink) &&
         applicationCounts.get(key) === 1);
       const groupId = groupVersionForMeeting(state, m)?.id ?? "import-unresolved";
-      const source = valid ? { source: "semester" as const, mapping: "linked" as const, writable: true, revision: sharedRevision(raw),
+      const source = valid ? { source: "semester" as const, mapping: "linked" as const, writable: !isPraiseHistoricalReadOnly(state.meta, m.date), revision: sharedRevision(raw),
         ...(["출석", "지각", "결석"].includes(String(record.s)) ? { originalStatus: record.s as "출석" | "지각" | "결석" } : {}) }
         : { source: "praise" as const, mapping: "invalid" as const, writable: false };
       snapshot.sources[m.id][p.id] = source;

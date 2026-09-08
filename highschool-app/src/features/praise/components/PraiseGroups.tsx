@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
+import { PraiseGroupBoard } from "./PraiseGroupBoard";
 import { DEFAULT_GROUPING } from "../defaults";
 import { evaluateGrouping, type GroupingRule, type GroupingSettings } from "../domain/grouping";
 import type { PraiseGroup, PraiseGroupVersion } from "../types";
-import { Empty, WarningList, personName, praiseDataWriteLocked, type PraiseEditorProps } from "./shared";
+import { Empty, WarningList, praiseDataWriteLocked, type PraiseEditorProps } from "./shared";
 
 export function PraiseGroups(props: PraiseEditorProps) {
   const versions = [...props.view.groups].sort((a, b) => b.number - a.number);
@@ -23,7 +24,7 @@ function GroupEditor({ view, execute, busy, version, latestId, onSaved }: Praise
   const [acknowledge, setAcknowledge] = useState(false);
   const [dirty, setDirty] = useState(false);
   const students = view.people.filter((person) => person.kind === "STUDENT" && person.active);
-  const staff = view.people.filter((person) => person.kind === "STAFF" && person.active && person.groupStaffCapable);
+  const staff = view.people.filter((person) => person.kind === "STAFF" && person.active);
   const stale = Boolean(version && version.id !== latestId);
   const warnings = groups.length ? [...evaluateGrouping({ students: students.map((person) => ({ ...person, serviceDepartment: person.department })), settings, rules, assignments: groups.flatMap((group, groupIndex) => group.studentIds.map((termStudentId) => ({ termStudentId, groupIndex }))) }), ...groups.flatMap((group) => group.staffIds.length < settings.staffMin ? [`${group.name} 담당 스탭이 최소 ${settings.staffMin}명보다 적습니다.`] : group.staffIds.length > settings.staffMax ? [`${group.name} 담당 스탭이 최대 ${settings.staffMax}명을 넘습니다.`] : [])] : [];
   const updateSettings = (patch: Partial<GroupingSettings>) => { setSettings((value) => ({ ...value, ...patch })); setDirty(true); };
@@ -38,7 +39,7 @@ function GroupEditor({ view, execute, busy, version, latestId, onSaved }: Praise
     </details>}
     {view.permissions.manage && <div className="praise-toolbar"><button className="praise-button praise-button--primary" disabled={busy || students.length === 0} onClick={async () => { if (await execute({ type: "groups.generate", expectedRevision: view.meta.revision, settings, rules, seed })) { setDirty(false); onSaved(); } }}>자동 조편성 생성</button><span className="praise-note">활동 학생 {students.length}명 · 스탭 {staff.length}명</span></div>}
     <WarningList warnings={warnings} />
-    {groups.length === 0 ? <Empty>아직 조편성이 없습니다. 팀원을 등록하고 조 조건을 설정해 주세요.</Empty> : <><div className="praise-group-overview">{groups.map((group) => <div key={group.id}>{view.permissions.manage ? <label className="praise-field"><span className="sr-only">{group.name} 이름</span><input value={group.name} maxLength={60} onChange={(event) => { setGroups((current) => current.map((item) => item.id === group.id ? { ...item, name: event.target.value } : item)); setDirty(true); }} /></label> : <h3>{group.name}</h3>}<p className="praise-note">담당 {group.staffIds.map((id) => personName(view, id)).join(" · ") || "미배정"}</p><p>{group.studentIds.map((id) => personName(view, id)).join(" · ") || "학생 미배정"}</p></div>)}</div>
+    {groups.length === 0 ? <Empty>아직 조편성이 없습니다. 팀원을 등록하고 조 조건을 설정해 주세요.</Empty> : <><PraiseGroupBoard groups={groups} people={view.people} maximum={settings.studentMax} canEdit={view.permissions.manage && !busy && !praiseDataWriteLocked(view) && !stale} onMove={move} onRename={(id, name) => { setGroups((current) => current.map((group) => group.id === id ? { ...group, name } : group)); setDirty(true); }} />
       {view.permissions.manage && <details className="praise-disclosure"><summary>학생·담당 스탭 수동 이동</summary><div className="praise-table-wrap"><table className="praise-table"><thead><tr><th>팀원</th><th>구분</th><th>이동할 조</th></tr></thead><tbody>{[...students, ...staff].map((person) => { const key = person.kind === "STUDENT" ? "studentIds" : "staffIds"; return <tr key={person.id}><td>{person.name}</td><td>{person.kind === "STUDENT" ? "학생" : "스탭"}</td><td><label><span className="sr-only">{person.name} 조 이동</span><select value={groups.find((group) => group[key].includes(person.id))?.id ?? ""} onChange={(event) => move(person.id, event.target.value, key)}><option value="">미배정</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label></td></tr>; })}</tbody></table></div></details>}
       {view.permissions.manage && <div className="praise-save-bar"><label className="praise-check"><input type="checkbox" checked={acknowledge} onChange={(event) => setAcknowledge(event.target.checked)} />편성 경고와 담당 스탭을 확인했습니다</label>{dirty && <span className="praise-badge">저장 전 변경</span>}<button className="praise-button" disabled={busy || stale || !version} onClick={() => { void save(false); }}>현재 초안 저장</button><button className="praise-button praise-button--primary" disabled={busy || stale || !version || (warnings.length > 0 && !acknowledge)} onClick={() => { void save(true); }}>조편성 확정</button></div>}
     </>}

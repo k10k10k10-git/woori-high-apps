@@ -212,3 +212,9 @@
 
 
 > 2026-09-08 휴지통 호환 계약: 새 삭제본의 키는 `encodeURIComponent(반키)__encodeURIComponent(학생ID 또는 class/roster)__encodeURIComponent(작업ID)`다. 복구 본문의 `id`·`ck`는 원래 학생·반 식별자를 유지한다. 학생 앱은 기존 `sid`·`ck_` 키도 실제 저장 키로 읽고, 복원 뒤 정리·영구 삭제는 그 키와 사본 전체를 대조한다. 통합 앱은 새친구 단건 되돌리기의 쓰기와 재조회 검증에 같은 작업 ID를 사용한다. 기존 사본 이관·운영 DB 직접 쓰기·Rules 변경은 하지 않는다.
+### 찬양팀 운영 전환 경계 (2026-09-08)
+
+- 2026-09-08 사용자가 누락된 학기 배치 2명, 동일 회차 날짜, 출석 충돌 1건의 처리와 통합 사이트 입력 전환을 확인했다. 과거 문서의 2명 보류 상태는 이 결정으로 대체한다.
+- 승인된 신청 추가·출석 정정은 `highschool-app/scripts/praise-cutover.mjs`의 별도 이관 계획으로 수행한다. 일반 명단 대조 API는 `classes`·`teacherStaff`·`applications`에 쓰지 않는다. 이관은 원본 대조·사전 스냅샷·조건부 저장을 요구하며 학기 변경과 workspace 변경을 서로 다른 단계로 검증한다.
+- `praiseOps/{id}/meta/readOnlyBefore` 이전의 출결·스탭 참석·등단·회차 변경은 서버에서 거절한다. `historyReview`는 미확인 과거 조·첨부 자료의 검토 항목이며 이를 전체 자료 이관 완료로 설명하지 않는다. 미래 회차에는 과거 조를 미리 고정하지 않고 첫 출결 저장 시 확정 조를 보존한다.
+- `semesters/{sid}/praiseCutovers/{id}`는 일회성 이관 영수증(시각·작업자·workspace ID·건수)이다. 통합 앱이 소유하며 학생 출석 앱은 읽거나 쓰지 않는다. 개인별 변경 근거는 비공개 사전 스냅샷과 `praiseOps/{id}/audit`에 보존한다.
