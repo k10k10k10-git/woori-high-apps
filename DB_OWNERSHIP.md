@@ -130,10 +130,10 @@
 | `semesters/{sid}/praiseOperationReceipts/{receiptHash}` | highschool-app 찬양팀 서버 | - | highschool-app | 공통 출석 요청의 적용 또는 안전 종료를 증명하는 영구 비식별 표식. 값은 `phase`·요청 지문·서버 처리 시각만 두며 UID·이름·회차/신청키·경로를 넣지 않는다. 출석 셀과 같은 학기 transaction으로 `applied`를 쓰고 기존 표식을 덮어쓰거나 자동 삭제하지 않는다. |
 | `semesters/{sid}/attendance/training/{sessionId}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 출석 원장. 사역팀 출석과 같은 신청자 키를 써도 독립적으로 기록·판정한다. |
 | `semestersPrivate/{sid}/applicationsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 민감정보 — 지원 동기·본인 연락처(`phone`)·보호자 연락처(`parentPhone`) |
-| `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | - | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
+| `semesters/{sid}/newFriends` | highschool-app 학기 모듈 | 학생 앱 목양 리포트(기존 읽기 권한 보유자) | highschool-app | 새친구 진행 단계·반배정·출석부 반영 ID. 연락처·심방 메모 저장 금지 |
 | `semestersPrivate/{sid}/newFriendsPrivate` | highschool-app 학기 모듈 | - | highschool-app | 새친구 연락처·주소·가족·심방 메모 |
 | `semestersPrivate/{sid}/newFriendRosterBackups` | highschool-app 학기 모듈 | - | highschool-app | 출석부 신규 학생 단건 추가 직전 스냅샷과 삭제·등반/배정 취소 직전 학생·출석·새친구 비공개 복구 근거 |
-| `semesters/{year}-sunday/newFriends` | highschool-app 주일 사역 | - | highschool-app | 신규 새친구의 학기 비종속 연도별 내부 작업공간. `meta`를 두지 않아 학기 목록에서 제외 |
+| `semesters/{year}-sunday/newFriends` | highschool-app 주일 사역 | 학생 앱 목양 리포트(기존 읽기 권한 보유자) | highschool-app | 신규 새친구의 학기 비종속 연도별 내부 작업공간. `meta`를 두지 않아 학기 목록에서 제외 |
 | `semestersPrivate/{year}-sunday/newFriendsPrivate` | highschool-app 주일 사역 | - | highschool-app | 주일 사역 신규 새친구의 연락처·주소·가족·심방 메모 |
 
 > `highschool-app` 학기 모듈은 `classes/{year}`(현장 접수 반 명단)·`teacherStaff/{year}`(접수 대상 스탭 명단)·`admins`·`retreatAdmins`(멤버 인증)를 원칙적으로 **읽기만** 한다. 예외는 `canWriteStudentRoster(roles)`가 허용하는 학기 역할 `superAdmin`·`adminTeam`의 새친구 흐름이다. 신규 학생 1명을 결정적 `nf_` ID로 추가하거나, 그 흐름으로 연결된 동일 ID·동일 이름 학생만 사전 백업 후 `classes`·해당 `attendance`에서 제거하고 `trash`에 복구 사본을 남길 수 있다. 되돌리기는 새친구 기록까지 삭제하는 `명단·출석부 삭제`와 새친구 기록은 보존하고 배정 연결만 해제하는 `등반 및 배정 취소`로 제한한다. 범용 기존 학생 수정·이동·삭제와 그 밖의 출석 변경은 계속 학생 앱만 담당한다.
