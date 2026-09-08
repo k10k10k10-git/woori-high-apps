@@ -28,6 +28,9 @@ export interface PraiseMeta extends PraiseStamp {
   status: "active" | "archived";
   mode: "setup" | "shadow" | "live";
   sourceAsOf?: string;
+  /** 운영 전환 전에 보관한 과거 회차의 수정 경계. 관리 UI에서 임의 변경하지 않는다. */
+  readOnlyBefore?: string;
+  historyReview?: string[];
   importBlockers?: string[];
   activeGroupVersionId?: string;
 }
@@ -57,6 +60,8 @@ export interface PraisePerson extends PraiseStamp {
   rosterLink?: PraiseRosterLink;
 }
 export interface PraiseMeeting extends PraiseStamp {
+  /** 연결 대조에서 날짜를 정정한 경우에만 보존하는 원본 날짜. */
+  sourceDate?: string;
   id: string;
   date: string;
   worshipDate: string;

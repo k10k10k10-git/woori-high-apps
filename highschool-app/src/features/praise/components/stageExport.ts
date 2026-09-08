@@ -1,29 +1,136 @@
 import { escapeHtml, printAsPDF } from "@/lib/exportUtils";
 import type { PraiseStageVersion } from "../types";
-function title(version: PraiseStageVersion) { return `${version.worshipDate} 찬양팀 등단표 · ${version.kind === "CONFIRMED" ? "확정" : "초안"} ${version.number}차`; }
+function title(version: PraiseStageVersion) {
+  return `${version.worshipDate} 찬양팀 등단표 · ${version.kind === "CONFIRMED" ? "확정" : "초안"} ${version.number}차`;
+}
+const positions = ["LEFT", "RIGHT"] as const;
+const roles = ["CHOIR", "SINGER"] as const;
+/** 화면과 동일한 좌우 무대 배치로 출력하며 모든 이름은 HTML 이스케이프한다. */
 export function printStagePDF(version: PraiseStageVersion): boolean {
-  const html = `<h1>${escapeHtml(title(version))}</h1><p>인도 ${escapeHtml(version.leaderName)} · 회중석에서 바라본 무대</p>${version.services.map((service) => `<section class="section"><h2>${service.department === "FIRST" ? "1부" : "2부"} 예배</h2><table><thead><tr><th>역할</th><th>왼쪽</th><th>오른쪽</th></tr></thead><tbody>${(["CHOIR", "SINGER"] as const).map((role) => `<tr><th>${role === "CHOIR" ? "콰이어" : "싱어"}</th>${(["LEFT", "RIGHT"] as const).map((side) => `<td>${service.assignments.filter((person) => person.role === role && person.side === side).sort((a, b) => a.positionOrder - b.positionOrder).map((person) => escapeHtml(person.name + (person.personType === "STAFF" ? " (스탭)" : ""))).join(" · ") || "—"}</td>`).join("")}</tr>`).join("")}</tbody></table></section>`).join("")}`;
+  const html = `<style>.stage{background:#13271f;color:#fff;padding:28px;border-radius:16px;break-inside:avoid;margin-bottom:28px}.stage h2,.stage p{color:inherit;text-align:center}.stage-row{display:flex;gap:40px;margin:36px 0}.stage-zone{flex:1;border:1px solid #718579;padding:20px;text-align:center}.stage-person{display:inline-block;border:1px solid #718579;border-radius:8px;padding:12px;margin:5px}.stage-leader{text-align:center}.stage-label{display:block;font-size:12px;color:#c5d4c9}@media print{.stage{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style><h1>${escapeHtml(title(version))}</h1><p>회중석에서 바라본 무대</p>${version.services
+    .map(
+      (service) =>
+        `<section class="stage"><h2>${service.department === "FIRST" ? "1부" : "2부"} 등단표</h2>${roles
+          .map(
+            (role) =>
+              `<div class="stage-row">${positions
+                .map(
+                  (side) =>
+                    `<div class="stage-zone"><span class="stage-label">${role === "CHOIR" ? "콰이어" : "싱어"} · ${side === "LEFT" ? "왼쪽" : "오른쪽"}</span>${
+                      service.assignments
+                        .filter((p) => p.role === role && p.side === side)
+                        .sort((a, b) => a.positionOrder - b.positionOrder)
+                        .map(
+                          (p) =>
+                            `<span class="stage-person">${escapeHtml(p.name)}</span>`,
+                        )
+                        .join("") || "배정 없음"
+                    }</div>`,
+                )
+                .join("")}</div>`,
+          )
+          .join(
+            "",
+          )}<div class="stage-leader">인도자<br /><span class="stage-person">${escapeHtml(version.leaderName)}</span></div></section>`,
+    )
+    .join("")}`;
   return printAsPDF(html, title(version), true);
 }
-/** HTML과 외부 이미지를 사용하지 않고 텍스트·무대 위치만 고해상도 캔버스에 그린다. */
-export async function exportStagePNG(version: PraiseStageVersion): Promise<void> {
+/** 외부 이미지·개인정보 서버 업로드 없이 브라우저 안에서 무대 캔버스를 만든다. */
+export async function exportStagePNG(
+  version: PraiseStageVersion,
+): Promise<void> {
   await document.fonts?.ready;
-  const width = 1600;
-  const rowHeight = 62;
-  const roleRows = version.services.map((service) => (["CHOIR", "SINGER"] as const).map((role) => Math.max(1, ...(["LEFT", "RIGHT"] as const).map((side) => service.assignments.filter((person) => person.role === role && person.side === side).length))));
-  const height = 170 + roleRows.reduce((sum, roles) => sum + 100 + roles.reduce((subtotal, count) => subtotal + 66 + count * rowHeight, 0), 0);
-  const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height;
-  const context = canvas.getContext("2d"); if (!context) throw new Error("canvas_unavailable");
-  context.fillStyle = "#ffffff"; context.fillRect(0, 0, width, height); context.fillStyle = "#20252b"; context.font = "bold 34px sans-serif"; context.fillText(title(version), 60, 70); context.font = "24px sans-serif"; context.fillStyle = "#505b66"; context.fillText(`인도 ${version.leaderName} · 회중석에서 바라본 무대`, 60, 117);
-  let y = 165;
-  version.services.forEach((service, serviceIndex) => {
-    context.fillStyle = "#20252b"; context.font = "bold 30px sans-serif"; context.fillText(service.department === "FIRST" ? "1부 예배" : "2부 예배", 60, y + 34); y += 80;
-    (["CHOIR", "SINGER"] as const).forEach((role, roleIndex) => {
-      const count = roleRows[serviceIndex][roleIndex]; context.fillStyle = "#f3f5f7"; context.fillRect(60, y, width - 120, 54); context.fillStyle = "#505b66"; context.font = "bold 24px sans-serif"; context.fillText(`${role === "CHOIR" ? "콰이어" : "싱어"} · 왼쪽`, 84, y + 36); context.fillText("오른쪽", 840, y + 36); y += 64;
-      (["LEFT", "RIGHT"] as const).forEach((side) => service.assignments.filter((person) => person.role === role && person.side === side).sort((a, b) => a.positionOrder - b.positionOrder).forEach((person, index) => { context.fillStyle = "#20252b"; context.font = "27px sans-serif"; context.fillText(`${index + 1}. ${person.name}${person.personType === "STAFF" ? " (스탭)" : ""}`, side === "LEFT" ? 84 : 840, y + index * rowHeight + 36, 650); }));
-      y += count * rowHeight + 2;
-    }); y += 20;
+  const width = 1600,
+    columns = 4;
+  const layouts = version.services.map((s) =>
+    roles.map((role) =>
+      Math.max(
+        1,
+        ...positions.map((side) =>
+          Math.ceil(
+            s.assignments.filter((p) => p.role === role && p.side === side)
+              .length / columns,
+          ),
+        ),
+      ),
+    ),
+  );
+  const heights = layouts.map(
+    (rows) => 260 + rows.reduce((sum, count) => sum + 85 + count * 80, 0),
+  );
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = 160 + heights.reduce((a, b) => a + b, 0);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas_unavailable");
+  ctx.fillStyle = "#f7f7f2";
+  ctx.fillRect(0, 0, width, canvas.height);
+  ctx.fillStyle = "#17271f";
+  ctx.font = "bold 32px sans-serif";
+  ctx.fillText(title(version), 60, 60);
+  ctx.font = "23px sans-serif";
+  ctx.fillText("회중석에서 바라본 무대", 60, 104);
+  let y = 140;
+  version.services.forEach((service, index) => {
+    ctx.fillStyle = "#13271f";
+    ctx.fillRect(40, y, width - 80, heights[index] - 20);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 34px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(
+      `${service.department === "FIRST" ? "1부" : "2부"} 등단표`,
+      width / 2,
+      y + 60,
+    );
+    let rowY = y + 100;
+    roles.forEach((role, ri) => {
+      positions.forEach((side, si) => {
+        const x = 70 + si * 760,
+          zoneHeight = 60 + layouts[index][ri] * 80;
+        ctx.strokeStyle = "#718579";
+        ctx.strokeRect(x, rowY, 700, zoneHeight);
+        ctx.fillStyle = "#b7cabf";
+        ctx.font = "20px sans-serif";
+        ctx.fillText(
+          `${role === "CHOIR" ? "콰이어" : "싱어"} · ${side === "LEFT" ? "왼쪽" : "오른쪽"}`,
+          x + 350,
+          rowY + 30,
+        );
+        service.assignments
+          .filter((p) => p.role === role && p.side === side)
+          .sort((a, b) => a.positionOrder - b.positionOrder)
+          .forEach((p, i) => {
+            const px = x + 18 + (i % columns) * 167,
+              py = rowY + 48 + Math.floor(i / columns) * 80;
+            ctx.strokeRect(px, py, 154, 62);
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 25px sans-serif";
+            ctx.fillText(p.name, px + 77, py + 40, 145);
+          });
+      });
+      rowY += 85 + layouts[index][ri] * 80;
+    });
+    ctx.fillStyle = "#b7cabf";
+    ctx.font = "20px sans-serif";
+    ctx.fillText("인도자", width / 2, rowY + 22);
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 28px sans-serif";
+    ctx.fillText(version.leaderName, width / 2, rowY + 60);
+    y += heights[index];
   });
-  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((result) => result ? resolve(result) : reject(new Error("이미지 변환 실패")), "image/png"));
-  const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${version.worshipDate}-찬양팀-등단표-${version.number}.png`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("이미지 변환 실패"))),
+      "image/png",
+    ),
+  );
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${version.worshipDate}-찬양팀-등단표-${version.number}.png`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

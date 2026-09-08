@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { PraiseMeeting, PraisePerson, PraiseStatus, PraiseView } from "../types";
 import { canEditViewAttendance, canReadPraiseStudentAttendance } from "../permissions";
 import { PraiseAuditList } from "./PraiseAuditList";
-import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseDataWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
+import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseMeetingWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
 
 type AttendanceProps = PraiseMeetingProps & {
   onSelectMeeting?: (meetingId: string) => void;
@@ -43,7 +43,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
   return <section className="praise-section" aria-label="찬양팀 출결">
     <div className="praise-section-heading"><div><h2>{display === "meeting" ? "모임 출결" : "학기 전체 출결"}</h2><p>{display === "meeting" ? `${kind === "STUDENT" ? meeting.date : meeting.worshipDate} · ${kind === "STAFF" ? "주일 스탭 참석 · " : ""}${meeting.title}${meeting.cancelled ? " · 학생 휴강" : ""}` : `${view.meta.startDate} ~ ${view.meta.endDate} · ${meetings.length}개 회차`}</p></div><span className="praise-badge">{view.permissions.attendanceAll ? "전체 팀원" : kind === "STUDENT" ? "내 담당 조" : "스탭 참석"}</span></div>
     <div className="praise-segment" aria-label="출결 보기"><button type="button" aria-pressed={display === "meeting"} onClick={() => setDisplay("meeting")}>모임별 입력</button><button type="button" aria-pressed={display === "semester"} onClick={() => setDisplay("semester")}>학기 전체 표</button></div>
-    {display === "meeting" && meeting.cancelled && <p className="praise-warning">{praiseDataWriteLocked(view) ? "학생 모임 휴강 회차입니다. 현재 운영 기간은 읽기 전용입니다." : "학생 모임 휴강 회차입니다. 학생 출결은 잠겨 있으며 주일 스탭 참석은 기록할 수 있습니다."}</p>}
+    {display === "meeting" && meeting.cancelled && <p className="praise-warning">{praiseMeetingWriteLocked(view, meeting) ? "학생 모임 휴강 회차입니다. 현재 운영 기간은 읽기 전용입니다." : "학생 모임 휴강 회차입니다. 학생 출결은 잠겨 있으며 주일 스탭 참석은 기록할 수 있습니다."}</p>}
     {display === "meeting" && kind === "STUDENT" && meeting.linkedSessionId && <p className="praise-note">{view.meta.mode === "shadow"
       ? "원본 대조용 출결입니다. 공통 학기 원장의 실시간 조회와 수정은 운영 전환 후 연결을 확인한 뒤 시작됩니다."
       : hasSharedSource
@@ -69,7 +69,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
       const source = kind === "STUDENT" ? view.attendanceSources?.[meeting.id]?.[person.id] : undefined;
       const invalidShared = source?.mapping === "invalid";
       const sharedWritable = !meeting.linkedSessionId || source?.mapping === "linked" && source.writable;
-      const canEdit = !praiseDataWriteLocked(view) && (kind === "STUDENT" ? !meeting.cancelled && sharedWritable && Boolean(groupVersion?.groups.some((group) => group.studentIds.includes(person.id))) && canEditViewAttendance(view, meeting.id, person.id) : view.permissions.stageEdit || person.id === view.permissions.staffId);
+      const canEdit = !praiseMeetingWriteLocked(view, meeting) && (kind === "STUDENT" ? !meeting.cancelled && sharedWritable && Boolean(groupVersion?.groups.some((group) => group.studentIds.includes(person.id))) && canEditViewAttendance(view, meeting.id, person.id) : view.permissions.stageEdit || person.id === view.permissions.staffId);
       const record = records[person.id]; const available = staffRecords[person.id];
       const restricted = kind === "STUDENT" && !record && !view.permissions.attendanceAll;
       const status = kind === "STUDENT" ? record?.status ?? null : available?.present != null ? available.present ? "PRESENT" : "ABSENT" : null;
