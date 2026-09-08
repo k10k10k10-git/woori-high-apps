@@ -54,3 +54,17 @@ describe("이번 주 출결 집계의 확인 범위", () => {
     expect(screen.getByText("출석 0명 · 미입력 0명 · 연결 확인 필요 1명")).toBeInTheDocument();
   });
 });
+
+it("휴강 회차에서는 입력을 다음 행동으로 권하지 않는다", () => {
+  const view = praiseFixture(); view.meetings[0].cancelled = true;
+  render(<PraiseWeek view={view} meeting={view.meetings[0]} onTab={vi.fn()} />);
+  expect(screen.queryByRole("button", { name: "출결 이어서 입력" })).not.toBeInTheDocument();
+  expect(screen.getByText("이번 회차는 휴강입니다")).toBeInTheDocument();
+});
+it("일반 스탭에게 다른 조나 관리 계정 연결 작업을 권하지 않는다", () => {
+  const view = praiseFixture(); view.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "member", staffId: "staff-1" };
+  render(<PraiseWeek view={view} meeting={view.meetings[0]} onTab={vi.fn()} />);
+  expect(screen.getByRole("button", { name: "내 참석 입력" })).toBeInTheDocument();
+  expect(screen.queryByText("합성나조")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "계정 연결 확인" })).not.toBeInTheDocument();
+});

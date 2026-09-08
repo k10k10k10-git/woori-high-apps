@@ -12,7 +12,7 @@ afterEach(cleanup);
 beforeEach(() => {
   api.accounts.mockReset().mockResolvedValue({ accounts: [
     { uid: "uid-synthetic", name: "합성 기존 계정", roleLabel: "찬양팀" },
-    { uid: "uid-another", name: "합성 새 계정", roleLabel: "찬양팀" },
+    { uid: "uid-another", name: "합성 새 계정", roleLabel: "찬양팀", email: "new@example.com" },
   ] });
   api.references.mockReset().mockResolvedValue({ semesters: [
     { id: "semester-test", title: "합성 기본 학기", teams: [{ id: "praise", name: "합성 찬양팀" }] },
@@ -160,7 +160,7 @@ describe("찬양 운영 설정", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("합성 계정 조회 오류");
     expect(screen.getByLabelText("담당자 계정")).toBeDisabled(); click("담당 계정 다시 불러오기");
     await waitFor(() => expect(screen.getByLabelText("담당자 계정")).not.toBeDisabled());
-    expect(screen.getByRole("option", { name: "합성 새 계정 · 찬양팀" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "합성 새 계정 · new@example.com · 찬양팀" })).toBeInTheDocument();
     expect(screen.queryByText("uid-another")).not.toBeInTheDocument();
   });
 
@@ -171,7 +171,7 @@ describe("찬양 운영 설정", () => {
     await waitFor(() => expect(screen.getByLabelText("담당자 계정")).not.toBeDisabled());
     await act(async () => finish({ accounts: [{ uid: "stale-account", name: "과거 응답", roleLabel: "찬양팀" }] }));
     expect(screen.queryByRole("option", { name: "과거 응답 · 찬양팀" })).not.toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "합성 새 계정 · 찬양팀" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "합성 새 계정 · new@example.com · 찬양팀" })).toBeInTheDocument();
   });
 
   it("등단 정책을 저장할 때 조 편성 정책을 보존한다", async () => {
@@ -300,4 +300,13 @@ describe("공통 출석 저장 검토", () => {
     rerender(<PraiseSettings view={{ ...view, pendingAttendance: [] }} execute={execute} busy={false} />);
     expect(within(section()).getByText("검토 대기 중인 공통 출석 요청이 없습니다.")).toBeInTheDocument(); expect(within(section()).queryByRole("checkbox")).not.toBeInTheDocument();
   });
+});
+
+it("계정 연결 전에 담당 역할의 범위와 동명이인 확인 방법을 설명한다", async () => {
+  render(<PraiseSettings view={fixture()} execute={vi.fn()} busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "담당 계정 추가" }));
+  expect(screen.getByText(/계정의 이메일과 연결할 스탭을 함께 확인/)).toBeInTheDocument();
+  expect(screen.getByText(/일반 스탭: 본인 주일 참석/)).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("담당 역할"), { target: { value: "groupStaff" } });
+  expect(screen.getByText(/조 담당 스탭: 배정된 조의 출결/)).toBeInTheDocument();
 });

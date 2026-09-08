@@ -17,6 +17,8 @@ function samePersonInput(left: PraisePersonInput, right: PraisePersonInput) {
 }
 
 type PraisePeopleProps = PraiseEditorProps & {
+  requestedSection?: string;
+  onSectionChange?: (section: string) => void;
   requestedPersonId?: string;
   onRequestedPersonClose?: () => void;
 };
@@ -25,9 +27,11 @@ export function PraisePeople(props: PraisePeopleProps) {
   return <PraisePeopleBody key={props.view.meta.id} {...props} />;
 }
 function PraisePeopleBody(props: PraisePeopleProps) {
-  const { view, execute, busy, requestedPersonId, onRequestedPersonClose } = props;
-  const [section, setSection] = useState("people");
-  const [visited, setVisited] = useState(() => new Set(["people"]));
+  const { view, execute, busy, requestedSection = "people", requestedPersonId, onRequestedPersonClose } = props;
+  const [section, setSection] = useState(requestedSection);
+  const [sectionSource, setSectionSource] = useState(requestedSection);
+  const [visited, setVisited] = useState(() => new Set(["people", requestedSection]));
+  if (sectionSource !== requestedSection) { setSectionSource(requestedSection); setSection(requestedSection); setVisited((current) => new Set([...current, requestedSection])); }
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("");
   const [department, setDepartment] = useState("");
@@ -110,7 +114,7 @@ function PraisePeopleBody(props: PraisePeopleProps) {
   }, [editorOpen, view.meta.id, view.meta.semesterId, view.meta.teamId, rosterAttempt]);
   const selectSection = (value: string) => {
     if (locked || savingRef.current) return;
-    setSection(value); setVisited((current) => new Set([...current, value]));
+    props.onSectionChange?.(value); setSection(value); setVisited((current) => new Set([...current, value]));
   };
   const choose = (opener: HTMLButtonElement, person?: typeof view.people[number]) => {
     if (locked || savingRef.current || (!person && dataWriteLocked)) return;
