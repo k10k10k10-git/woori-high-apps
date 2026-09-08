@@ -818,18 +818,7 @@ export function applyPraiseCommand(
           state.people[a.staffId]?.active,
         "로그인 계정과 연결할 활동 스탭을 선택해 주세요.",
       );
-      if (a.active)
-        requireValue(
-          !Object.values(state.access).some(
-            (other) =>
-              other.uid !== a.uid &&
-              other.active &&
-              other.staffId === a.staffId,
-          ),
-          "이 스탭에는 이미 다른 로그인 계정이 연결되어 있습니다.",
-          "duplicate_account",
-          409,
-        );
+      // 동일 스탭의 복수 로그인은 UID별로 연결한다. 권한·회수·감사는 계정별로 유지한다.
       state.access[a.uid] = { ...a, ...stamp(state.access[a.uid], actor, at) };
       label = "찬양팀 담당 계정·권한 변경";
       targetId = a.uid;
