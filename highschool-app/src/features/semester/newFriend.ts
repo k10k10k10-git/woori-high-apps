@@ -241,6 +241,7 @@ export function buildNewFriendRosterRemovalUpdates(input: {
   attendance: unknown;
   removedAt: string;
   removedAtMs: number;
+  operationId: string;
   removedBy?: string;
 }): Record<string, unknown> {
   const { sid, year, friend, priv, student, attendance, removedAt, removedAtMs, removedBy } = input;
@@ -263,7 +264,7 @@ export function buildNewFriendRosterRemovalUpdates(input: {
     [paths.newFriendPrivate(sid, friend.id)]: null,
   };
   if (student) {
-    updates[paths.trashStudent(year, studentId)] = {
+    updates[paths.trashStudent(year, classKey, studentId, input.operationId)] = {
       ...student,
       ck: classKey,
       deletedAt: removedAtMs,
@@ -281,6 +282,7 @@ export function buildNewFriendPlacementCancellationUpdates(input: {
   attendance: unknown;
   canceledAt: string;
   canceledAtMs: number;
+  operationId: string;
   canceledBy?: string;
 }): Record<string, unknown> {
   const { sid, year, friend, priv, student, attendance, canceledAt, canceledAtMs, canceledBy } = input;
@@ -307,7 +309,7 @@ export function buildNewFriendPlacementCancellationUpdates(input: {
   updates[paths.classStudent(year, classKey, studentId)] = null;
   updates[paths.studentAttendance(year, classKey, studentId)] = null;
   if (student) {
-    updates[paths.trashStudent(year, studentId)] = {
+    updates[paths.trashStudent(year, classKey, studentId, input.operationId)] = {
       ...student,
       ck: classKey,
       deletedAt: canceledAtMs,

@@ -60,7 +60,8 @@ export const paths = {
     `classes/${year}/${classKey}/students/${studentId}`,
   studentAttendance: (year: string, classKey: string, studentId: string) =>
     `attendance/${year}/${classKey}/${studentId}`,
-  trashStudent: (year: string, studentId: string) => `trash/${year}/students/${studentId}`,
+  trashStudent: (year: string, classKey: string, studentId: string, operationId: string) =>
+    `trash/${year}/students/${[classKey, studentId, operationId].map(encodeURIComponent).join("__")}`,
   // 공식스탭 명단 (학생 출석 앱 소유) — 접수 대상에 스탭을 포함하기 위해 읽는다
   teacherStaffByYear: (year: string) => `teacherStaff/${year}`,
   admins: (uid: string) => `admins/${uid}`,

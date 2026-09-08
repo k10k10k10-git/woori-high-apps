@@ -562,6 +562,7 @@ export async function cancelNewFriendPlacement(
   }
 
   const currentPrivate = privateSnap.exists() ? privateSnap.val() as NewFriendPrivate : priv;
+  const operationId = newId();
   const canceledAtMs = Date.now();
   const canceledAt = new Date(canceledAtMs).toISOString();
   let student: ClassStudent | null = null;
@@ -596,6 +597,7 @@ export async function cancelNewFriendPlacement(
     attendance,
     canceledAt,
     canceledAtMs,
+    operationId,
     canceledBy,
   }));
 
@@ -611,7 +613,7 @@ export async function cancelNewFriendPlacement(
       get(ref(db, studentPath)),
       get(ref(db, attendancePath)),
       get(ref(db, backupPath)),
-      student ? get(ref(db, paths.trashStudent(year, currentSync.studentId))) : Promise.resolve(null),
+      student ? get(ref(db, paths.trashStudent(year, currentSync.classKey, currentSync.studentId, operationId))) : Promise.resolve(null),
     ]);
     if (removedStudentSnap.exists() || removedAttendanceSnap.exists() || !backupSnap.exists() || (trashSnap && !trashSnap.exists())) {
       throw new Error("취소 후 출석부·백업 재조회 검증에 실패했습니다.");
@@ -665,6 +667,7 @@ export async function removeNewFriendFromRoster(
   const validationError = validateNewFriendRosterRemoval(currentFriend, student);
   if (validationError) throw new Error(validationError);
 
+  const operationId = newId();
   const removedAtMs = Date.now();
   const removedAt = new Date(removedAtMs).toISOString();
   const backupPath = paths.newFriendRemovalBackup(sid, friend.id, String(removedAtMs));
@@ -677,6 +680,7 @@ export async function removeNewFriendFromRoster(
     attendance: attendanceSnap.val(),
     removedAt,
     removedAtMs,
+    operationId,
     removedBy,
   }));
 
@@ -689,7 +693,7 @@ export async function removeNewFriendFromRoster(
   const [removedSnaps, backupSnap, trashSnap] = await Promise.all([
     Promise.all(verificationPaths.map((path) => get(ref(db, path)))),
     get(ref(db, backupPath)),
-    student ? get(ref(db, paths.trashStudent(year, studentId))) : Promise.resolve(null),
+    student ? get(ref(db, paths.trashStudent(year, classKey, studentId, operationId))) : Promise.resolve(null),
   ]);
   if (removedSnaps.some((snapshot) => snapshot.exists()) || !backupSnap.exists() || (trashSnap && !trashSnap.exists())) {
     throw new Error("삭제 후 재조회 검증에 실패했습니다. 학생 출석부와 새친구 명단을 확인해 주세요.");

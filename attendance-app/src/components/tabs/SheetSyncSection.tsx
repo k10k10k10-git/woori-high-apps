@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db, ref, get, push, set } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
@@ -29,6 +29,9 @@ export default function SheetSyncSection() {
   const [progress, setProgress] = useState('');
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const applyingRef = useRef(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [uncertain, setUncertain] = useState(false);
   const [plan, setPlan] = useState<SyncPlan | null>(null);
   const [currentRef, setCurrentRef] = useState<CurrentClasses | null>(null);
   const [historicalRef, setHistoricalRef] = useState<Record<string, unknown> | null>(null);
@@ -56,6 +59,7 @@ export default function SheetSyncSection() {
   }
 
   async function loadPreview() {
+    if (applyingRef.current || uncertain) return;
     setError(null);
     setPlan(null);
     const id1 = extractSheetId(bu1Url);
@@ -103,7 +107,9 @@ export default function SheetSyncSection() {
   }
 
   async function applySync() {
-    if (!plan || !currentRef || !historicalRef || !attendanceRef || running) return;
+    if (!plan || !currentRef || !historicalRef || !attendanceRef || applyingRef.current || uncertain) return;
+    applyingRef.current = true;
+    setApplyError(null);
     setRunning(true);
     try {
       const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing, historicalRef, attendanceRef ?? undefined);
@@ -130,8 +136,11 @@ export default function SheetSyncSection() {
       setPlan(null);
     } catch (e) {
       setPlan(null);
-      showToast(e instanceof Error ? e.message : '동기화 적용에 실패했습니다.', 'error');
+      const message = e instanceof Error ? e.message : '동기화 적용에 실패했습니다.';
+      setApplyError(message);
+      if (message.includes('불명확')) setUncertain(true);
     } finally {
+      applyingRef.current = false;
       setRunning(false);
     }
   }
@@ -150,12 +159,17 @@ export default function SheetSyncSection() {
         <label className="as-sheet-label"><span>2부 출석부 시트 주소</span><input className="form-input" placeholder="https://docs.google.com/spreadsheets/…" value={bu2Url} onChange={e => setBu2Url(e.target.value)} /></label>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={saveUrls}>주소 저장</button>
-          <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12, marginLeft: 'auto' }} disabled={loading || running} onClick={loadPreview}>
+          <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12, marginLeft: 'auto' }} disabled={loading || running || uncertain} onClick={loadPreview}>
             {loading ? (progress || '불러오는 중…') : '동기화 미리보기'}
           </button>
         </div>
       </div>
 
+      {applyError && <div className="as-sync-error" role="alert" style={{ padding: 14, marginBlock: 12, background: 'var(--red-bg)', color: '#991b1b', borderRadius: 8, lineHeight: 1.6 }}>
+        <strong>{uncertain ? '반영 여부 확인이 필요합니다' : '동기화를 완료하지 못했습니다'}</strong>
+        <p>{applyError}</p>
+        {!uncertain && <p>현재 명단을 확인한 뒤 새 미리보기를 만들어 주세요.</p>}
+      </div>}
       {error && (
         <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red)', borderRadius: 'var(--radius)', padding: '8px 12px', fontSize: 12, color: 'var(--red-text)' }}>
           ⚠ {error}

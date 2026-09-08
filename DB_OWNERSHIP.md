@@ -209,3 +209,6 @@
 - 공통 출석은 찬양 workspace 작업 예약 → `semesters/{sid}` transaction 안의 최신 학기·팀·회차·신청 배치 검증과 출석 셀+`applied` 표식 동시 저장 → 찬양 감사 완료의 세 단계다. 응답이 끊긴 요청은 운영자가 영구 표식을 확인해 감사를 완료하거나, 출석 현재값을 확인한 뒤 원장 변경 없이 `closed` 표식으로 종료한다. 늦게 도착한 요청은 기존 `applied/closed` 표식에서 중단한다. 찬양 workspace와 학기 원장은 하나의 분산 transaction이 아니며, 영구 표식은 자동 삭제하지 않는다. 학생 `classes`·학생 주일 `attendance`·공식 스탭 원장은 수정하지 않는다.
 - `semesters/{sid}` 전체 transaction은 다른 학기 쓰기와 충돌하면 재시도되고 영구 표식 수만큼 학기 노드가 커진다. 현재 규모에서는 정확성을 우선하되 지연·재시도율과 학기별 표식 증가량을 관찰한다. 학기 보관 정책을 정하기 전에는 표식을 정리하지 않는다.
 - 원본 Supabase 보관본·민감 메모·파일·계정 대응표는 공개 API와 Git에 포함하지 않는다. 실제 운영 이관과 shadow→live 전환은 [데이터 전달 절차](docs/PRAISE_DATA_HANDOFF.md)의 백업·대조·승인 조건을 따른다.
+
+
+> 2026-09-08 휴지통 호환 계약: 새 삭제본의 키는 `encodeURIComponent(반키)__encodeURIComponent(학생ID 또는 class/roster)__encodeURIComponent(작업ID)`다. 복구 본문의 `id`·`ck`는 원래 학생·반 식별자를 유지한다. 학생 앱은 기존 `sid`·`ck_` 키도 실제 저장 키로 읽고, 복원 뒤 정리·영구 삭제는 그 키와 사본 전체를 대조한다. 통합 앱은 새친구 단건 되돌리기의 쓰기와 재조회 검증에 같은 작업 ID를 사용한다. 기존 사본 이관·운영 DB 직접 쓰기·Rules 변경은 하지 않는다.
