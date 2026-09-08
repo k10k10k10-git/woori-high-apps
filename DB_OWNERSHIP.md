@@ -32,6 +32,7 @@
 | `suggestions/{year}` | 학생 앱 | - | 학생 앱만 | 없음 |
 | `trash/{year}` | 학생 앱 | 학생 앱 + 통합 앱의 위 새친구 되돌리기 검증만 | 학생 앱 + 위 새친구 되돌리기의 해당 `nf_` 학생 복구 사본만 | 학생·반 복원과 새친구 되돌리기 검증 |
 | `config/sheetSync` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자만 | 구글 시트 주소 설정 |
+| `config/pastoralReport/blockedDemoUid` | 운영 권한 설정 | 공유 Rules | 통합 전권 관리자 또는 승인된 운영 절차만 | 공용 데모 UID 제외. 값이 없으면 출석부 관리자의 새친구 추가 읽기도 닫힘. 데모 계정 교체 시 배포 전에 갱신 |
 | `config/studentMoveLocks/{year}` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자만 | 수동 반 이동 중 원본·목적지 반 명단·출석 쓰기 차단. 작업별 양쪽 leaf를 함께 관리 |
 | `config/studentMoveCommits/{year}` | 학생 앱 | 학생 앱 관리자만 | 학생 앱 관리자 이동 PATCH만 | 지연된 이전 PATCH 재실행을 거부하는 불변 표식. 자동 삭제하지 않음 |
 

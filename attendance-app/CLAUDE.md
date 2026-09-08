@@ -27,6 +27,8 @@ firebase deploy --only database  # 보안 규칙만 배포
 
 ### 목양 리포트 (2026-09-09)
 
+- **2026-09-09 권한 부여 요청**: `attendanceAdmins/{uid}=true`인 실제 출석부 관리자에게 `semesters/{sid}/newFriends` 읽기를 추가한다. `config/pastoralReport/blockedDemoUid`의 문자열이 존재하고 본인 UID와 달라야 하며 공용 데모는 제외한다. 이 설정 쓰기는 `admins` 전권만 허용한다. 학기 상위·다른 하위·비공개·새친구 쓰기 권한은 추가하지 않는다. 아래의 기존 권한 오류 fallback은 네트워크 오류·설정 누락에 대비해 유지한다.
+
 - 일반 관리자 전용 `/pastoral`은 새친구 정착현황 / 연속 결석 / 이번 주 요약을 제공한다. 교사·공용 데모는 `adminNavigation.ts`와 컴포넌트 진입에서 차단한다.
 - `pastoralReport.ts`는 현재 연도 기존 classes/attendance/events를 재사용한다. KST 기준 경과 정상 주일만 선택하며, X가 연속 3회 이상일 때만 결석 목록에 표시한다. 미입력·출석은 연속 계산을 끊고 행사 주일은 제외한다. 장결은 별도 필터이며 주간 연락 대상은 일반 학생이다. 최근 출석 직전 3회가 X인 학생을 출석 회복으로 표시한다.
 - 새친구는 `pastoralFriends.ts`에서 `semesters/{year}-1/newFriends`, `{year}-2/newFriends`, `{year}-sunday/newFriends`만 구독한다. 기존 Rules 읽기 권한을 유지하고 semestersPrivate를 읽지 않는다. 출석부 전용 관리자에게 조회가 거절되면 재시도와 집계 제한을 명시하고 `nf_` 출석부 연결 명단을 표시한다. 등록일 없는 학생의 정착 상태를 추정하지 않는다.

@@ -32,6 +32,16 @@ function ruleExpression(...segments: string[]): string {
 }
 
 describe('database.rules.json 권한 계약', () => {
+  it('출석부 관리자 목양 리포트는 데모 제외 설정을 확인한 공개 새친구 읽기로 제한한다', () => {
+    const read = ruleExpression('semesters', '$sid', 'newFriends', '.read');
+    expect(refers(read, 'attendanceAdmins')).toBe(true);
+    expect(read).toContain("child('blockedDemoUid').isString()");
+    expect(read).toContain("child('blockedDemoUid').val() !== auth.uid");
+    expect(ruleValue('semesters', '$sid', 'newFriends', '.write')).toBeUndefined();
+    expect(refers(rules.semesters['.read'], 'attendanceAdmins')).toBe(false);
+    expect(refers(rules.semestersPrivate['.read'], 'attendanceAdmins')).toBe(false);
+    expect(refers(ruleExpression('config', 'pastoralReport', 'blockedDemoUid', '.write'), 'attendanceAdmins')).toBe(false);
+  });
   describe('semesters — 스탭은 조회만 (2026-08-08 보강)', () => {
     it('read는 admins·retreatAdmins·iguardMembers를 허용한다', () => {
       for (const node of ['admins', 'retreatAdmins', 'iguardMembers']) {
