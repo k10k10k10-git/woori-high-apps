@@ -64,7 +64,7 @@ describe("새친구 목록 검색·수정", () => {
     expect(within(dialog).getByLabelText("본인 연락처")).toHaveValue("010-0000-5678");
     fireEvent.change(within(dialog).getByLabelText("바나바 담당자"), { target: { value: "새담당" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /^저장$/ }));
-    expect(mocks.save).toHaveBeenCalledWith("2026-2", expect.objectContaining({ id: "same-id", name: "박바다", owner: "새담당" }), expect.objectContaining({ phone: "010-0000-5678" }));
+    expect(mocks.save).toHaveBeenCalledWith("2026-2", expect.objectContaining({ id: "same-id", name: "박바다", owner: "새담당" }), expect.objectContaining({ phone: "010-0000-5678" }), { friend: second, privateValue: { phone: "010-0000-5678" } });
     expect(await screen.findByRole("status")).toHaveTextContent("검색 결과 1명");
     expect(screen.getByRole("searchbox")).toHaveValue("5678");
   });

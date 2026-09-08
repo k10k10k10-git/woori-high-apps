@@ -5,7 +5,7 @@ import { db, ref, set, push, onValue, off } from '@/lib/db';
 import { useApp, useClassKey, calcStats } from '@/store/AppContext';
 import { evKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
-import { downloadCSV, downloadXLSX, openPrintWindow } from '@/utils/export';
+import { downloadCSV, downloadXLSX, escapeHtml, openPrintWindow } from '@/utils/export';
 import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
@@ -263,7 +263,7 @@ export default function AttendanceTab() {
     });
 
     const monthHdr = monthSpans.map(ms =>
-      `<th colspan="${ms.span}" style="background:#F2EFF9;color:#6B5AAF;font-weight:700;">${ms.month}월</th>`
+      `<th colspan="${ms.span}" style="background:#F2EFF9;color:#6B5AAF;font-weight:700;">${escapeHtml(ms.month)}월</th>`
     ).join('');
 
     const dayHdr = pdfWeeks.map(k => {
@@ -271,8 +271,8 @@ export default function AttendanceTab() {
       const day = months[mi]?.sundays[di];
       const ev = events[k];
       return ev
-        ? `<th style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${ev}</th>`
-        : `<th style="background:#f8fafc;">${day ?? ''}</th>`;
+        ? `<th style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${escapeHtml(ev)}</th>`
+        : `<th style="background:#f8fafc;">${escapeHtml(day ?? '')}</th>`;
     }).join('');
 
     // ck 예: "1-1-1" → "1부 1학년 1반"
@@ -289,14 +289,14 @@ export default function AttendanceTab() {
         const cells = pdfWeeks.map(k => {
           const ev = events[k];
           const val = attData[ck]?.[s.id]?.[k] ?? '';
-          if (ev) return `<td style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${ev}</td>`;
+          if (ev) return `<td style="background:#fef3c7;color:#92400e;font-size:6pt;word-break:keep-all;">${escapeHtml(ev)}</td>`;
           const bg = val === 'O' ? '#ecfdf5' : val === 'X' ? '#fef2f2' : '';
           const fg = val === 'O' ? '#059669' : val === 'X' ? '#dc2626' : '';
-          return `<td style="background:${bg};color:${fg};font-weight:${val ? '700' : '400'};">${val}</td>`;
+          return `<td style="background:${bg};color:${fg};font-weight:${val ? '700' : '400'};">${escapeHtml(val)}</td>`;
         }).join('');
         return `<tr class="data-row">
-          <td style="color:#94a3b8;text-align:center;">${s.num ?? ''}</td>
-          <td style="text-align:left;padding:3px 6px;font-weight:500;">${s.name}</td>
+          <td style="color:#94a3b8;text-align:center;">${escapeHtml(s.num ?? '')}</td>
+          <td style="text-align:left;padding:3px 6px;font-weight:500;">${escapeHtml(s.name)}</td>
           ${cells}
           <td style="background:#f8fafc;">${rec > 0 ? `${stats.present}/${rec}` : '-'}</td>
           <td style="background:#f8fafc;">${rec > 0 ? rate + '%' : '-'}</td>
@@ -304,7 +304,7 @@ export default function AttendanceTab() {
         </tr>`;
       }).join('');
       return `<div ${isLast ? '' : 'style="page-break-after:always;"'}>
-        <div style="font-size:10pt;font-weight:700;margin-bottom:5px;">${curYear}년 ${ckLabel} 출석부 &nbsp;${pi + 1}페이지</div>
+        <div style="font-size:10pt;font-weight:700;margin-bottom:5px;">${escapeHtml(curYear)}년 ${escapeHtml(ckLabel)} 출석부 &nbsp;${pi + 1}페이지</div>
         <table><thead>
           <tr>
             <th rowspan="2" style="background:#f8fafc;">순</th>

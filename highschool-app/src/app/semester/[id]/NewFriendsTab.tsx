@@ -145,6 +145,7 @@ function NewFriendEditor({
   const { user } = useAuth();
   const { toast, uiConfirm } = useUI();
   const [draft, setDraft] = useState(() => draftFor(friend, priv));
+  const [opened] = useState(() => friend ? { friend: structuredClone(friend), privateValue: structuredClone(priv ?? {}) } : undefined);
   const [saving, setSaving] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
@@ -165,7 +166,6 @@ function NewFriendEditor({
               id: friend.id,
               createdAt: friend.createdAt,
               createdBy: friend.createdBy,
-              rosterSync: friend.rosterSync,
             }
           : { createdAt: now, createdBy: user?.uid }),
         name: draft.name.trim(),
@@ -193,7 +193,7 @@ function NewFriendEditor({
         teamMemo: draft.teamMemo,
         familyNotes: draft.familyNotes,
         pastoralNotes: draft.pastoralNotes,
-      });
+      }, opened);
       toast(friend ? "새친구 기록을 수정했습니다." : "새친구를 접수했습니다.", "success");
       onClose();
     } catch (error) {

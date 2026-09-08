@@ -474,22 +474,44 @@ function privateFieldUpdates(
 
 export async function saveNewFriend(
   sid: string,
-  friend: Omit<NewFriend, "id"> & { id?: string },
+  friend: Omit<NewFriend, "id" | "rosterSync"> & { id?: string },
   priv: NewFriendPrivate,
+  opened?: { friend: NewFriend; privateValue: NewFriendPrivate },
 ): Promise<string> {
   const id = friend.id ?? newId();
-  const publicFields: Array<keyof Omit<NewFriend, "id">> = [
+  const publicFields: Array<keyof Omit<NewFriend, "id" | "rosterSync">> = [
     "name", "part", "gender", "school", "grade", "owner", "decision", "week1Date",
     "week2Date", "registeredDate", "inviter", "faithStep", "assignedClassKey", "giftDate", "createdAt",
-    "createdBy", "updatedAt", "rosterSync",
+    "createdBy", "updatedAt",
   ];
-  const publicUpdates = Object.fromEntries(publicFields.map((key) => {
+  // 연결 표식은 등록/되돌리기 함수만 소유한다. 일반 편집은 공개·비공개를 한 번에 저장한다.
+  if (friend.id) {
+    if (!opened) throw new Error("편집 기준이 없습니다. 목록을 다시 열어 주세요.");
+    const [publicSnap, privateSnap] = await Promise.all([
+      get(ref(db, paths.newFriend(sid, id))), get(ref(db, paths.newFriendPrivate(sid, id))),
+    ]);
+    const latest = publicSnap.val() as NewFriend | null;
+    if (!latest || latest.updatedAt !== opened.friend.updatedAt
+      || JSON.stringify(Object.entries(latest.rosterSync ?? {}).sort()) !== JSON.stringify(Object.entries(opened.friend.rosterSync ?? {}).sort())
+      || JSON.stringify(Object.entries(privateSnap.val() ?? {}).sort()) !== JSON.stringify(Object.entries(opened.privateValue).sort())) {
+      throw new Error("새친구 기록이 변경되었습니다. 다시 열어 최신 내용으로 수정해 주세요.");
+    }
+  }
+  const publicUpdates = Object.fromEntries(publicFields.filter(key => {
+    if (!opened) return true;
+    if (["createdAt", "createdBy", "giftDate"].includes(key)) return false;
+    if (opened.friend.rosterSync && ["name", "part", "gender", "school", "grade", "decision", "assignedClassKey"].includes(key)) return false;
+    return key === "updatedAt" || friend[key] !== opened.friend[key];
+  }).map((key) => {
     const value = key === "registeredDate" ? newFriendRegisteredDate(friend) : friend[key];
     return [`${paths.newFriend(sid, id)}/${key}`, value === undefined || value === "" ? null : value];
   }));
   await update(ref(db), {
     ...publicUpdates,
-    ...privateFieldUpdates(sid, id, priv),
+    ...privateFieldUpdates(sid, id, Object.fromEntries(Object.entries(priv).filter(([key, value]) => {
+      if (opened?.friend.rosterSync && ["birth", "phone", "parentPhone", "address"].includes(key)) return false;
+      return !opened || (value || "") !== (opened.privateValue[key as keyof NewFriendPrivate] || "");
+    }))),
   });
   return id;
 }

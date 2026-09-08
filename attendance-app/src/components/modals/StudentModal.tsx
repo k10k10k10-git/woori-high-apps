@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { db, ref, get, push, update } from '@/lib/db';
+import { useState } from 'react';
+import { db, ref, get, push, runTransaction, update } from '@/lib/db';
 import { useApp, useClassKey } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import { compressImage } from '@/utils/image';
@@ -11,6 +11,7 @@ import {
   buildAdminChangeEntry,
   describeStudentFieldChanges,
 } from '@/utils/adminChange';
+import { editStudent } from '@/utils/studentPersistence';
 import type { Student } from '@/types';
 
 export default function StudentModal({
@@ -35,15 +36,6 @@ export default function StudentModal({
   const [saving, setSaving]     = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
-  useEffect(() => {
-    if (student) {
-      setName(student.name ?? ''); setBirth(student.birth ?? '');
-      setPhone(student.phone ?? ''); setPphone(student.pphone ?? '');
-      setSchool(student.school ?? ''); setAddr(student.addr ?? '');
-      setPhoto(student.photo ?? '');
-    }
-  }, [student]);
-
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -59,8 +51,8 @@ export default function StudentModal({
     setSaving(true);
     const id = editId ?? `s_${Date.now()}`;
 
-    // 단일 학생만 갱신 — 반 전체 명단을 덮어쓰지 않아 동시 편집 충돌 방지.
-    // (번호 num은 읽을 때 sortAndRenumber로 재계산되므로 여기서 저장 불필요)
+    // 최신 반을 기준으로 대상 학생과 감사 기록을 함께 갱신한다.
+    // 다른 학생 및 장결·번호 등 편집 폼 밖 필드는 트랜잭션 재시도에서도 보존한다.
     try {
       let personId = student?.personId;
       if (!personId) {
@@ -72,29 +64,30 @@ export default function StudentModal({
         )
           ?? createPersonId('student');
       }
-      const newStudent: Student = { id, personId, name: name.trim() };
-      if (birth)  newStudent.birth  = birth;
-      if (phone)  newStudent.phone  = phone;
-      if (pphone) newStudent.pphone = pphone;
-      if (school) newStudent.school = school;
-      if (addr)   newStudent.addr   = addr;
-      if (photo)  newStudent.photo  = photo;
-      const updates: Record<string, unknown> = {
-        [`classes/${state.curYear}/${ck}/students/${id}`]: newStudent,
-      };
-      const changedFields = student ? describeStudentFieldChanges(student, newStudent) : [];
-      if (!student || changedFields.length > 0) {
-        const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
-        updates[adminChangePath(state.curYear, ck, changeId)] = buildAdminChangeEntry({
-          classKey: ck,
-          teacher: state.classData[ck]?.teacher,
-          student: newStudent,
-          action: student ? '학생 정보 수정' : '학생 등록',
-          changeSummary: student ? changedFields.join(' · ') : '출석부에 학생 신규 등록',
-          actor: adminActor(state.userRole),
-        });
-      }
-      await update(ref(db), updates);
+      const classRef = ref(db, `classes/${state.curYear}/${ck}`);
+      await get(classRef);
+      const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key!;
+      const changedAt = new Date();
+      const result = await runTransaction(classRef, current => {
+        if (!current) return undefined;
+        const latest = current.students?.[id] as Student | undefined;
+        if ((editId && !latest) || (!editId && latest)) return undefined;
+        const next = editStudent(latest, id, personId!, { name, birth, phone, pphone, school, addr, photo });
+        const changedFields = latest ? describeStudentFieldChanges(latest, next) : [];
+        return {
+          ...current,
+          students: { ...current.students, [id]: next },
+          ...(!latest || changedFields.length ? {
+            adminChanges: { ...current.adminChanges, [changeId]: buildAdminChangeEntry({
+              classKey: ck, teacher: current.teacher, student: next,
+              action: latest ? '학생 정보 수정' : '학생 등록',
+              changeSummary: latest ? changedFields.join(' · ') : '출석부에 학생 신규 등록',
+              actor: adminActor(state.userRole), now: changedAt,
+            }) },
+          } : {}),
+        };
+      }, { applyLocally: false });
+      if (!result.committed) throw new Error('명단이 변경되었습니다. 다시 확인해 주세요.');
     } catch {
       showToast('저장에 실패했습니다. 다시 시도해 주세요.');
       setSaving(false);

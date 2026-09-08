@@ -56,7 +56,9 @@ jobs:
             highschool-app/.lighthouseci
           if-no-files-found: ignore
 
+  # 운영 인증 상태는 PR 코드에 제공하지 않는다. 수동 main 실행은 기존 인증 가드를 유지한다.
   authenticated-e2e:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: verify
     defaults:
@@ -79,6 +81,10 @@ jobs:
         run: |
           mkdir -p .auth
           printf '%s' "$E2E_STORAGE_STATE_B64" | base64 --decode > .auth/user.json
+      - name: Verify deployed commit
+        env:
+          E2E_EXPECTED_BUILD_ID: ${{ github.sha }}
+        run: node scripts/wait-for-e2e-build.mjs
       - run: node scripts/require-e2e-auth.mjs
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e:smoke
@@ -89,3 +95,18 @@ jobs:
           name: highschool-playwright-report
           path: highschool-app/test-results
           if-no-files-found: ignore
+
+  production-version:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify deployed commit without authentication
+        env:
+          E2E_BASE_URL: https://woorihigh-app.vercel.app
+          E2E_EXPECTED_BUILD_ID: ${{ github.sha }}
+        run: node highschool-app/scripts/wait-for-e2e-build.mjs

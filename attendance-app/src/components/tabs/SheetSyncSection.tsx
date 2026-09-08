@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { db, ref, get, push, update, set } from '@/lib/db';
+import { db, ref, get, push, set } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import {
@@ -8,6 +8,7 @@ import {
   buildSyncPlan, buildSyncPayload, describeSheetSyncForClass,
   type SyncPlan, type ParsedClass, type AttendanceYear,
 } from '@/lib/sheetSync';
+import { commitSheetSync } from '@/lib/sheetSyncCommit';
 import type { Student } from '@/types';
 import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 
@@ -102,7 +103,7 @@ export default function SheetSyncSection() {
   }
 
   async function applySync() {
-    if (!plan || !currentRef) return;
+    if (!plan || !currentRef || !historicalRef || !attendanceRef || running) return;
     setRunning(true);
     try {
       const payload = buildSyncPayload(plan, curYear, currentRef, removeMissing, historicalRef, attendanceRef ?? undefined);
@@ -121,10 +122,14 @@ export default function SheetSyncSection() {
           actor: adminActor(state.userRole),
         });
       });
-      await update(ref(db), payload);
+      await commitSheetSync({
+        year: curYear, classes: historicalRef, attendance: attendanceRef, payload,
+        classKeys: [...plan.classes.map(c => c.ck), ...plan.moved.map(m => m.fromCk)],
+      });
       showToast(`${plan.classCount}개 반 · ${plan.totalStudents}명 동기화 완료`, 'success');
       setPlan(null);
     } catch (e) {
+      setPlan(null);
       showToast(e instanceof Error ? e.message : '동기화 적용에 실패했습니다.', 'error');
     } finally {
       setRunning(false);
@@ -145,7 +150,7 @@ export default function SheetSyncSection() {
         <label className="as-sheet-label"><span>2부 출석부 시트 주소</span><input className="form-input" placeholder="https://docs.google.com/spreadsheets/…" value={bu2Url} onChange={e => setBu2Url(e.target.value)} /></label>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-secondary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={saveUrls}>주소 저장</button>
-          <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12, marginLeft: 'auto' }} disabled={loading} onClick={loadPreview}>
+          <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12, marginLeft: 'auto' }} disabled={loading || running} onClick={loadPreview}>
             {loading ? (progress || '불러오는 중…') : '동기화 미리보기'}
           </button>
         </div>
