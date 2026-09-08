@@ -1,8 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { db, ref, get, push, runTransaction, update } from '@/lib/db';
 import { useApp, useClassKey } from '@/store/AppContext';
-import { showToast } from '@/utils/toast';
 import { compressImage } from '@/utils/image';
 import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
 import {
@@ -11,7 +10,9 @@ import {
   buildAdminChangeEntry,
   describeStudentFieldChanges,
 } from '@/utils/adminChange';
-import { editStudent } from '@/utils/studentPersistence';
+import ManagementDialog from './ManagementDialog';
+import { trashRecordKey } from '@/utils/trash';
+import { editStudent, mergeStudentEdit } from '@/utils/studentPersistence';
 import type { Student } from '@/types';
 
 export default function StudentModal({
@@ -26,6 +27,10 @@ export default function StudentModal({
   const students = state.classData[ck]?.students ?? [];
   const student = editId ? students.find(s => s.id === editId) : null;
 
+  const [opened] = useState(() => student ? structuredClone(student) : null);
+  const busyRef = useRef(false);
+  const [error, setError] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [name, setName]     = useState(student?.name ?? '');
   const [birth, setBirth]   = useState(student?.birth ?? '');
   const [phone, setPhone]   = useState(student?.phone ?? '');
@@ -38,18 +43,22 @@ export default function StudentModal({
 
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || busyRef.current || photoBusy) return;
+    setPhotoBusy(true);
     try {
       setPhoto(await compressImage(file));
     } catch {
-      showToast('이미지를 처리하지 못했습니다. 다른 사진을 시도해 주세요.');
-    }
+      setError('이미지를 처리하지 못했습니다. 다른 사진을 선택해 주세요.');
+    } finally { setPhotoBusy(false); }
   }
 
   async function handleSave() {
-    if (!name.trim()) { showToast('이름을 입력하세요.'); return; }
+    if (busyRef.current || photoBusy) return;
+    if (!name.trim()) { setError('학생 이름을 입력해 주세요.'); return; }
+    busyRef.current = true;
+    setError(null);
     setSaving(true);
-    const id = editId ?? `s_${Date.now()}`;
+    const id = editId ?? `s_${crypto.randomUUID()}`;
 
     // 최신 반을 기준으로 대상 학생과 감사 기록을 함께 갱신한다.
     // 다른 학생 및 장결·번호 등 편집 폼 밖 필드는 트랜잭션 재시도에서도 보존한다.
@@ -72,7 +81,10 @@ export default function StudentModal({
         if (!current) return undefined;
         const latest = current.students?.[id] as Student | undefined;
         if ((editId && !latest) || (!editId && latest)) return undefined;
-        const next = editStudent(latest, id, personId!, { name, birth, phone, pphone, school, addr, photo });
+        const values = { name, birth, phone, pphone, school, addr, photo };
+        const next = latest && opened ? mergeStudentEdit(latest, opened, values) : editStudent(latest, id, personId!, values);
+        if (!next) return undefined;
+        next.personId ||= personId!;
         const changedFields = latest ? describeStudentFieldChanges(latest, next) : [];
         return {
           ...current,
@@ -88,51 +100,53 @@ export default function StudentModal({
         };
       }, { applyLocally: false });
       if (!result.committed) throw new Error('명단이 변경되었습니다. 다시 확인해 주세요.');
-    } catch {
-      showToast('저장에 실패했습니다. 다시 시도해 주세요.');
-      setSaving(false);
-      return; // 실패 시 모달 유지
-    }
-    setSaving(false);
+    } catch (cause) {
+      setError(cause instanceof Error && cause.message.startsWith('명단이') ? '다른 작업에서 같은 정보를 수정했습니다. 입력 내용은 유지됩니다. 현재 명단을 확인한 뒤 다시 열어 주세요.' : '저장하지 못했습니다. 입력 내용은 유지됩니다. 연결을 확인하고 다시 저장해 주세요.');
+      return;
+    } finally { busyRef.current = false; setSaving(false); }
     onClose();
   }
 
   async function handleDelete() {
-    if (!editId) return;
+    if (!editId || busyRef.current || photoBusy) return;
+    busyRef.current = true;
+    setError(null);
     setDeleteConfirm(false);
     setSaving(true);
     // 휴지통 보관 + 해당 학생/출석만 삭제 (원자적, 단일 경로)
     try {
+      const latestSnapshot = await get(ref(db, `classes/${state.curYear}/${ck}/students/${editId}`));
+      if (!latestSnapshot.exists()) throw new Error("학생을 찾을 수 없습니다.");
+      const latestStudent = latestSnapshot.val() as Student;
+      if (opened?.personId && latestStudent.personId !== opened.personId) throw new Error("학생 연결이 변경되었습니다.");
       const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
       await update(ref(db), {
-        [`trash/${state.curYear}/students/${editId}`]: { ...student, ck, deletedAt: Date.now() },
+        [`trash/${state.curYear}/students/${trashRecordKey(ck, editId, changeId)}`]: { ...latestStudent, ck, deletedAt: Date.now() },
         [`classes/${state.curYear}/${ck}/students/${editId}`]: null,
         [`attendance/${state.curYear}/${ck}/${editId}`]: null,
         [adminChangePath(state.curYear, ck, changeId)]: buildAdminChangeEntry({
           classKey: ck,
           teacher: state.classData[ck]?.teacher,
-          student: student ?? { id: editId, name: '이름 미확인' },
+          student: latestStudent,
           action: '학생 삭제',
           changeSummary: '출석부 명단 및 해당 학생 출석 기록 삭제',
           actor: adminActor(state.userRole),
         }),
       });
     } catch {
-      showToast('삭제에 실패했습니다. 다시 시도해 주세요.');
-      setSaving(false);
-      return; // 실패 시 모달 유지
-    }
-    setSaving(false);
+      setError('삭제하지 못했습니다. 명단과 연결 상태를 확인한 뒤 다시 시도해 주세요.');
+      return;
+    } finally { busyRef.current = false; setSaving(false); }
     onClose();
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
-      role="dialog" aria-modal="true" aria-label={editId ? '학생 수정' : '학생 추가'}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
-        <div className="modal-handle" />
-        <div className="modal-title">{editId ? '학생 수정' : '학생 추가'}</div>
-
+  const values = { name, birth, phone, pphone, school, addr, photo };
+  const dirty = Object.entries(values).some(([key, value]) => value !== (opened?.[key as keyof typeof values] ?? ''));
+  return <ManagementDialog title={editId ? '학생 수정' : '학생 추가'}
+    description={`${state.curPart}부 ${state.curGrade}학년 ${state.curClass}반 · 학생 정보`}
+    busy={saving || photoBusy} dirty={dirty} onClose={onClose}>{dismiss => <>
+        {error && <p className="management-error" role="alert">{error}</p>}
+        <fieldset disabled={saving || photoBusy} style={{ border: 0, minWidth: 0 }}>
         {/* 사진 */}
         <div className="photo-preview-wrap">
           {photo ? (
@@ -141,10 +155,8 @@ export default function StudentModal({
             <div className="photo-initial">{name.charAt(0) || '?'}</div>
           )}
           <div>
-            <input type="file" accept="image/*" id="photo-input" style={{ display: 'none' }} onChange={handlePhoto} />
-            <label htmlFor="photo-input" style={{ cursor: 'pointer', fontSize: 12, color: 'var(--primary)', padding: '6px 12px', border: '1.5px solid var(--primary)', borderRadius: 'var(--radius)', display: 'inline-block' }}>
-              사진 선택
-            </label>
+            <label className="form-label" htmlFor="photo-input">학생 사진</label>
+            <input type="file" accept="image/*" id="photo-input" className="management-file-input" onChange={handlePhoto} />
             {photo && (
               <button onClick={() => setPhoto('')} style={{ marginLeft: 8, fontSize: 11, color: 'var(--text3)', border: 'none', background: 'none', cursor: 'pointer' }}>
                 초기화
@@ -153,31 +165,33 @@ export default function StudentModal({
           </div>
         </div>
 
-        <div className="form-field">
-          <label className="form-label">이름 *</label>
-          <input className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="홍길동" />
+        <div className="management-fields"><div className="form-field">
+          <label className="form-label" htmlFor="student-name">이름 *</label>
+          <input id="student-name" className="form-input" value={name} onChange={e => setName(e.target.value)} placeholder="홍길동" />
         </div>
         <div className="form-field">
-          <label className="form-label">생년월일</label>
-          <input className="form-input" value={birth} onChange={e => setBirth(e.target.value)} placeholder="2010-01-01" />
+          <label className="form-label" htmlFor="student-birth">생년월일</label>
+          <input id="student-birth" className="form-input" value={birth} onChange={e => setBirth(e.target.value)} placeholder="2010-01-01" />
         </div>
         <div className="form-field">
-          <label className="form-label">연락처</label>
-          <input className="form-input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="010-0000-0000" />
+          <label className="form-label" htmlFor="student-phone">연락처</label>
+          <input id="student-phone" className="form-input" type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="010-0000-0000" />
         </div>
         <div className="form-field">
-          <label className="form-label">부모님 연락처</label>
-          <input className="form-input" value={pphone} onChange={e => setPphone(e.target.value)} placeholder="010-0000-0000" />
+          <label className="form-label" htmlFor="student-pphone">부모님 연락처</label>
+          <input id="student-pphone" className="form-input" type="tel" inputMode="tel" value={pphone} onChange={e => setPphone(e.target.value)} placeholder="010-0000-0000" />
         </div>
         <div className="form-field">
-          <label className="form-label">학교</label>
-          <input className="form-input" value={school} onChange={e => setSchool(e.target.value)} placeholder="○○중학교" />
+          <label className="form-label" htmlFor="student-school">학교</label>
+          <input id="student-school" className="form-input" value={school} onChange={e => setSchool(e.target.value)} placeholder="○○중학교" />
         </div>
         <div className="form-field">
-          <label className="form-label">주소</label>
-          <input className="form-input" value={addr} onChange={e => setAddr(e.target.value)} />
+          <label className="form-label" htmlFor="student-addr">주소</label>
+          <input id="student-addr" className="form-input" value={addr} onChange={e => setAddr(e.target.value)} />
         </div>
 
+        </div></fieldset>
+        {photoBusy && <p role="status" className="management-status">사진을 준비하고 있습니다.</p>}
         {editId && deleteConfirm && (
           <div style={{
             margin: '0 0 10px',
@@ -191,7 +205,7 @@ export default function StudentModal({
               이 학생을 삭제할까요?
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-              최근 삭제 목록에 보관되며, 확인 후 복원하거나 영구 삭제할 수 있습니다.
+              학생 정보는 최근 삭제 목록에서 복원할 수 있습니다. 출석 기록은 함께 삭제되며 이 목록에서 복원되지 않습니다.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-danger" style={{ padding: '6px 14px', fontSize: 12 }} onClick={handleDelete} disabled={saving}>삭제</button>
@@ -203,12 +217,10 @@ export default function StudentModal({
           {editId && !deleteConfirm && (
             <button className="btn-danger" onClick={() => setDeleteConfirm(true)} disabled={saving}>삭제</button>
           )}
-          <button className="btn-secondary" onClick={onClose} disabled={saving}>취소</button>
-          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+          <button className="btn-secondary" onClick={dismiss} disabled={saving || photoBusy}>취소</button>
+          <button className="btn-primary" onClick={handleSave} disabled={saving || photoBusy}>
             {saving ? '저장 중...' : '저장'}
           </button>
         </div>
-      </div>
-    </div>
-  );
+    </>}</ManagementDialog>;
 }

@@ -40,7 +40,11 @@ export function useModalFocus({ containerRef, initialFocusRef, onDismiss }: Opti
       if (event.key !== 'Tab' || !containerRef.current) return;
 
       const focusable = [...containerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
-        .filter(element => element.tabIndex >= 0 && !element.hidden);
+        .filter(element => element.tabIndex >= 0 && !element.matches(':disabled')
+          && !element.closest('[hidden], [aria-hidden="true"]')
+          && !(element instanceof HTMLInputElement && element.type === 'hidden')
+          && getComputedStyle(element).display !== 'none'
+          && getComputedStyle(element).visibility !== 'hidden');
 
       if (focusable.length === 0) {
         event.preventDefault();

@@ -1,0 +1,42 @@
+.management-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgb(15 23 42 / .45); }
+.management-dialog { width: min(100%, 580px); max-height: calc(100dvh - 40px); overflow-y: auto; overscroll-behavior: contain; border-radius: 16px; background: var(--surface); color: var(--text); padding: 24px; outline: none; }
+.management-dialog-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 16px; margin-bottom: 24px; }
+.management-dialog h2 { font-size: 22px; line-height: 1.4; letter-spacing: -.02em; }
+.management-dialog-header p, .management-hint { margin-top: 8px; color: #475569; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.management-close { flex: none; background: var(--surface2); color: #475569; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font: inherit; }
+.management-dialog button { min-height: 44px; cursor: pointer; }
+.management-dialog button:disabled { cursor: wait; opacity: .55; }
+.management-dialog :is(input, select, textarea, button):focus-visible { outline: 3px solid #6355a7; outline-offset: 3px; }
+.management-dialog .form-label { display: block; color: #334155; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.management-dialog .form-input { min-height: 46px; width: 100%; font-size: 16px; color: var(--text); }
+.management-dialog .form-input::placeholder { color: #64748b; }
+.management-dialog .form-field { margin-bottom: 20px; }
+.management-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+.management-fields .management-wide { grid-column: 1 / -1; }
+.management-dialog .btn-row { position: sticky; bottom: -24px; background: var(--surface); padding: 16px 0 max(16px, env(safe-area-inset-bottom)); margin-top: 20px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 10px; }
+.management-dialog .btn-primary { background: #6355a7; color: #fff; border-color: #6355a7; }
+.management-dialog .btn-danger { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+.management-error, .management-discard { padding: 14px; border-radius: 10px; background: #fef2f2; color: #991b1b; font-size: 14px; line-height: 1.6; margin-bottom: 18px; overflow-wrap: anywhere; }
+.management-discard { background: #fffbeb; color: #78350f; }
+.management-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.management-status { font-size: 14px; line-height: 1.6; color: #475569; padding: 16px 0; }
+.management-trash-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+.management-trash-row strong { display: block; overflow-wrap: anywhere; }
+.management-trash-row p { color: #475569; font-size: 14px; line-height: 1.6; margin-top: 4px; }
+.management-trash-row .management-actions { margin-top: 0; }
+.management-trash-section { margin-top: 24px; font-size: 16px; }
+@media (max-width: 540px) {
+  .management-overlay { padding: 12px; align-items: flex-end; }
+  .management-dialog { padding: 20px; max-height: calc(100dvh - 24px); border-radius: 16px; }
+  .management-fields { grid-template-columns: minmax(0, 1fr); }
+  .management-dialog .btn-row { bottom: -20px; }
+  .management-trash-row { grid-template-columns: minmax(0, 1fr); }
+  .management-dialog h2 { font-size: 20px; }
+}
+.management-dialog .photo-preview-wrap { align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+.management-dialog .photo-preview-wrap > div:last-child { min-width: 0; flex: 1; }
+.management-file-input { max-width: 100%; width: 100%; min-height: 44px; color: #475569; font-size: 14px; }
+.management-file-input::file-selector-button { min-height: 44px; padding: 8px 12px; margin-right: 8px; border: 1px solid var(--border2); border-radius: 8px; background: var(--surface2); color: #334155; font: inherit; cursor: pointer; }
+.management-dialog textarea.form-input { resize: vertical; line-height: 1.6; }
+
+.management-dialog-header > p { grid-column: 1 / -1; margin-top: 0; }

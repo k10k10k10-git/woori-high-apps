@@ -96,6 +96,7 @@ describe("새친구 진행 단계", () => {
       student: null,
       attendance: null,
       canceledAt: "2026-08-11T13:30:00.000Z",
+      operationId: "delete-test",
       canceledAtMs: 1786455000000,
     })).toEqual({
       "semesters/2026-sunday/newFriends/friend-1/assignedClassKey": null,
@@ -221,6 +222,7 @@ describe("출석부 반영 새친구 삭제 계획", () => {
       student: { id: "nf_2026_new_1", name: "안정현", phone: "010-1111-2222" },
       attendance: { "2026-08-09": "O" },
       removedAt: "2026-08-11T12:00:00.000Z",
+      operationId: "delete-test",
       removedAtMs: 1786449600000,
       removedBy: "통합관리자",
     });
@@ -231,10 +233,10 @@ describe("출석부 반영 새친구 삭제 계획", () => {
       "semesters/2026-sunday/newFriends/2026_new_1",
       "semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/removals/1786449600000",
       "semestersPrivate/2026-sunday/newFriendsPrivate/2026_new_1",
-      "trash/2026/students/nf_2026_new_1",
+      "trash/2026/students/1-1-1__nf_2026_new_1__delete-test",
     ]);
     expect(updates["attendance/2026/1-1-1/nf_2026_new_1"]).toBeNull();
-    expect(updates["trash/2026/students/nf_2026_new_1"]).toMatchObject({
+    expect(updates["trash/2026/students/1-1-1__nf_2026_new_1__delete-test"]).toMatchObject({
       name: "안정현",
       ck: "1-1-1",
       deletedAt: 1786449600000,
@@ -252,6 +254,7 @@ describe("출석부 반영 새친구 삭제 계획", () => {
       student: { id: "nf_2026_new_1", name: "안정현", phone: "010-1111-2222" },
       attendance: { "2026-08-09": "O" },
       canceledAt: "2026-08-11T13:30:00.000Z",
+      operationId: "delete-test",
       canceledAtMs: 1786455000000,
       canceledBy: "통합관리자",
     });
@@ -264,13 +267,13 @@ describe("출석부 반영 새친구 삭제 계획", () => {
       "semesters/2026-sunday/newFriends/2026_new_1/rosterSync",
       "semesters/2026-sunday/newFriends/2026_new_1/updatedAt",
       "semestersPrivate/2026-sunday/newFriendRosterBackups/2026_new_1/placementCancellations/1786455000000",
-      "trash/2026/students/nf_2026_new_1",
+      "trash/2026/students/1-1-1__nf_2026_new_1__delete-test",
     ]);
     expect(updates["semesters/2026-sunday/newFriends/2026_new_1"]).toBeUndefined();
     expect(updates["semestersPrivate/2026-sunday/newFriendsPrivate/2026_new_1"]).toBeUndefined();
     expect(updates["classes/2026/1-1-1/students/nf_2026_new_1"]).toBeNull();
     expect(updates["attendance/2026/1-1-1/nf_2026_new_1"]).toBeNull();
-    expect(updates["trash/2026/students/nf_2026_new_1"]).toMatchObject({
+    expect(updates["trash/2026/students/1-1-1__nf_2026_new_1__delete-test"]).toMatchObject({
       name: "안정현",
       ck: "1-1-1",
       deletedAt: 1786455000000,
@@ -319,4 +322,14 @@ describe("새친구 목록 검색", () => {
     const other = friend({ name: "박바다", school: "새학교" });
     expect([target, other].filter((item) => matchesNewFriendSearch(item, "바다"))).toEqual([other]);
   });
+});
+
+it('서로 다른 삭제 작업은 학생 원장 ID를 유지하며 별도 휴지통 사본을 만든다', () => {
+  const record = friend({ rosterSync: { studentId: 'nf_same', classKey: '1-1-1', syncedAt: 'now' } });
+  const input = { sid: '2026-sunday', year: '2026', friend: record, priv: {}, student: { id: 'nf_same', name: record.name }, attendance: {}, removedAt: 'now', removedAtMs: 1 };
+  const one = buildNewFriendRosterRemovalUpdates({ ...input, operationId: 'first' });
+  const two = buildNewFriendRosterRemovalUpdates({ ...input, operationId: 'second' });
+  expect(one['trash/2026/students/1-1-1__nf_same__first']).toMatchObject({ id: 'nf_same', ck: '1-1-1' });
+  expect(two['trash/2026/students/1-1-1__nf_same__second']).toMatchObject({ id: 'nf_same', ck: '1-1-1' });
+  expect(one['classes/2026/1-1-1/students/nf_same']).toBeNull();
 });
