@@ -1,17 +1,16 @@
 'use client';
 import { useRef, useState } from 'react';
-import { db, ref, get, push, runTransaction, update } from '@/lib/db';
+import { db, ref, get, push, runTransaction } from '@/lib/db';
 import { useApp, useClassKey } from '@/store/AppContext';
 import { compressImage } from '@/utils/image';
 import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
 import {
   adminActor,
-  adminChangePath,
   buildAdminChangeEntry,
   describeStudentFieldChanges,
 } from '@/utils/adminChange';
 import ManagementDialog from './ManagementDialog';
-import { trashRecordKey } from '@/utils/trash';
+import { archiveRoster } from '@/lib/rosterRecovery';
 import { editStudent, mergeStudentEdit } from '@/utils/studentPersistence';
 import type { Student } from '@/types';
 
@@ -113,28 +112,11 @@ export default function StudentModal({
     setError(null);
     setDeleteConfirm(false);
     setSaving(true);
-    // 휴지통 보관 + 해당 학생/출석만 삭제 (원자적, 단일 경로)
     try {
-      const latestSnapshot = await get(ref(db, `classes/${state.curYear}/${ck}/students/${editId}`));
-      if (!latestSnapshot.exists()) throw new Error("학생을 찾을 수 없습니다.");
-      const latestStudent = latestSnapshot.val() as Student;
-      if (opened?.personId && latestStudent.personId !== opened.personId) throw new Error("학생 연결이 변경되었습니다.");
-      const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key ?? `change_${Date.now()}`;
-      await update(ref(db), {
-        [`trash/${state.curYear}/students/${trashRecordKey(ck, editId, changeId)}`]: { ...latestStudent, ck, deletedAt: Date.now() },
-        [`classes/${state.curYear}/${ck}/students/${editId}`]: null,
-        [`attendance/${state.curYear}/${ck}/${editId}`]: null,
-        [adminChangePath(state.curYear, ck, changeId)]: buildAdminChangeEntry({
-          classKey: ck,
-          teacher: state.classData[ck]?.teacher,
-          student: latestStudent,
-          action: '학생 삭제',
-          changeSummary: '출석부 명단 및 해당 학생 출석 기록 삭제',
-          actor: adminActor(state.userRole),
-        }),
-      });
-    } catch {
-      setError('삭제하지 못했습니다. 명단과 연결 상태를 확인한 뒤 다시 시도해 주세요.');
+      await archiveRoster({ year: state.curYear, classKey: ck, studentId: editId,
+        personId: opened?.personId, actor: adminActor(state.userRole) });
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
       return;
     } finally { busyRef.current = false; setSaving(false); }
     onClose();
@@ -205,7 +187,7 @@ export default function StudentModal({
               이 학생을 삭제할까요?
             </div>
             <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 10 }}>
-              학생 정보는 최근 삭제 목록에서 복원할 수 있습니다. 출석 기록은 함께 삭제되며 이 목록에서 복원되지 않습니다.
+              학생 명단은 복구 사본으로 보관합니다. 출석 기록은 유지되며, 같은 학생을 복원하면 다시 연결됩니다.
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button className="btn-danger" style={{ padding: '6px 14px', fontSize: 12 }} onClick={handleDelete} disabled={saving}>삭제</button>
