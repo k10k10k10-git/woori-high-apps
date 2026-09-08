@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useApp } from '@/store/AppContext';
 import AdminIcon from '@/components/admin/AdminIcon';
 import { showToast } from '@/utils/toast';
-import { downloadCSV, downloadXLSX, openPrintWindow } from '@/utils/export';
+import { downloadCSV, downloadXLSX, escapeHtml, openPrintWindow } from '@/utils/export';
 
 function sortClassKeys(keys: string[]): string[] {
   return [...keys].sort((a, b) => {
@@ -39,22 +39,22 @@ export default function StudentListSection() {
   function exportRosterPDF() {
     setRosterExportOpen(false);
     const hdr1 = Object.entries(gradeGroups).map(([g, cks]) =>
-      `<th colspan="${cks.length}" style="background:#F2EFF9;color:#6B5AAF;font-weight:700;border-left:2px solid #cbd5e1;">${g}학년</th>`
+      `<th colspan="${cks.length}" style="background:#F2EFF9;color:#6B5AAF;font-weight:700;border-left:2px solid #cbd5e1;">${escapeHtml(g)}학년</th>`
     ).join('');
     const hdr2 = rosterClassKeys.map((ck, i) => {
       const c = ck.split('-')[2];
       const first = i === 0 || ck.split('-')[1] !== rosterClassKeys[i-1].split('-')[1];
-      return `<th style="border-left:${first ? '2px solid #cbd5e1' : '1px solid #e2e8f0'};">${c}반</th>`;
+      return `<th style="border-left:${first ? '2px solid #cbd5e1' : '1px solid #e2e8f0'};">${escapeHtml(c)}반</th>`;
     }).join('');
     const hdr3 = rosterClassKeys.map((ck, i) => {
       const first = i === 0 || ck.split('-')[1] !== rosterClassKeys[i-1].split('-')[1];
-      return `<th style="border-left:${first ? '2px solid #cbd5e1' : '1px solid #e2e8f0'};font-weight:400;color:#64748b;">${classData[ck]?.teacher || '-'}</th>`;
+      return `<th style="border-left:${first ? '2px solid #cbd5e1' : '1px solid #e2e8f0'};font-weight:400;color:#64748b;">${escapeHtml(classData[ck]?.teacher || '-')}</th>`;
     }).join('');
     const bodyRows = Array.from({ length: maxStudents }, (_, i) => {
       const cells = rosterClassKeys.map((ck, ci) => {
         const s = classData[ck]?.students[i];
         const first = ci === 0 || ck.split('-')[1] !== rosterClassKeys[ci-1].split('-')[1];
-        return `<td style="border-left:${first ? '2px solid #cbd5e1' : '1px solid #e2e8f0'};text-align:center;">${s?.name ?? ''}</td>`;
+        return `<td style="border-left:${first ? '2px solid #cbd5e1' : '1px solid #e2e8f0'};text-align:center;">${escapeHtml(s?.name ?? '')}</td>`;
       }).join('');
       return `<tr><td style="color:#94a3b8;text-align:center;font-weight:600;">${i + 1}</td>${cells}</tr>`;
     }).join('');
@@ -62,7 +62,7 @@ export default function StudentListSection() {
     const ok = openPrintWindow(`<!DOCTYPE html><html><head><meta charset="UTF-8">
       <style>body{font-family:sans-serif;font-size:9pt;}@page{size:landscape;margin:8mm;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #e2e8f0;padding:4px 6px;white-space:nowrap;font-size:8pt;}thead{display:table-header-group;}h2{font-size:11pt;margin-bottom:8px;}</style>
     </head><body>
-      <h2>${curYear}년 ${rosterPart}부 전체 학생 명단</h2>
+      <h2>${escapeHtml(curYear)}년 ${escapeHtml(rosterPart)}부 전체 학생 명단</h2>
       <table><thead>
         <tr><th></th>${hdr1}</tr>
         <tr><th style="color:#94a3b8;">번호</th>${hdr2}</tr>

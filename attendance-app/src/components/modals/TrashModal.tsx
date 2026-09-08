@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { db, ref, get, push, set, update } from '@/lib/db';
+import { db, ref, get, push, set, runTransaction } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
-import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
+import { adminActor, buildAdminChangeEntry } from '@/utils/adminChange';
+import { restoreMissingClass, restoreMissingStudent, sameStoredValue } from '@/utils/studentPersistence';
 import type { Student } from '@/types';
 
 type TrashStudent = Student & { ck: string; deletedAt: number };
@@ -42,8 +43,19 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
       setClasses(clsList);
       setLoading(false);
     }
-    load();
+    load().catch(() => { setLoading(false); showToast('삭제 목록을 불러오지 못했습니다. 다시 열어 주세요.'); });
   }, [curYear]);
+
+  async function cleanupTrash(path: string, expected: unknown): Promise<boolean> {
+    try {
+      const target = ref(db, path);
+      await get(target);
+      const result = await runTransaction(target, current => sameStoredValue(current, expected) ? null : undefined, { applyLocally: false });
+      if (result.committed) return true;
+    } catch { /* 복원된 원장은 유지하고 휴지통만 재확인하도록 안내한다. */ }
+    showToast('복원은 완료했지만 삭제 목록 정리가 끝나지 않았습니다. 새로고침 후 확인해 주세요.');
+    return false;
+  }
 
   async function restoreStudent(item: TrashStudent) {
     setWorking(item.id);
@@ -52,18 +64,17 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
       delete (restoredStudent as Partial<TrashStudent>).ck;
       delete (restoredStudent as Partial<TrashStudent>).deletedAt;
       const changeId = push(ref(db, `classes/${curYear}/${item.ck}/adminChanges`)).key ?? `change_${Date.now()}`;
-      await update(ref(db), {
-        [`classes/${curYear}/${item.ck}/students/${item.id}`]: restoredStudent,
-        [`trash/${curYear}/students/${item.id}`]: null,
-        [adminChangePath(curYear, item.ck, changeId)]: buildAdminChangeEntry({
-          classKey: item.ck,
-          teacher: state.classData[item.ck]?.teacher,
-          student: restoredStudent,
-          action: '학생 복원',
-          changeSummary: '최근 삭제 목록에서 학생 명단 복원',
-          actor: adminActor(state.userRole),
-        }),
+      const classRef = ref(db, `classes/${curYear}/${item.ck}`);
+      await get(classRef);
+      const change = buildAdminChangeEntry({
+        classKey: item.ck, teacher: state.classData[item.ck]?.teacher,
+        student: restoredStudent, action: '학생 복원',
+        changeSummary: '최근 삭제 목록에서 학생 명단 복원', actor: adminActor(state.userRole),
       });
+      const result = await runTransaction(classRef,
+        current => restoreMissingStudent(current, restoredStudent, changeId, change), { applyLocally: false });
+      if (!result.committed) { showToast('반이 없거나 같은 학생 ID가 이미 존재합니다. 현재 명단을 확인해 주세요.'); return; }
+      if (!await cleanupTrash(`trash/${curYear}/students/${item.id}`, item)) return;
       setStudents(prev => prev.filter(s => s.id !== item.id));
       showToast(`${item.name} 학생이 복원되었습니다.`, 'success');
     } catch {
@@ -87,15 +98,16 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
         changeSummary: '최근 삭제 목록에서 반과 학생 명단 복원',
         actor: adminActor(state.userRole),
       });
-      await update(ref(db), {
-        [`classes/${curYear}/${item.ck}`]: {
-          teacher: item.teacher,
-          ...(item.teacherPhoto ? { teacherPhoto: item.teacherPhoto } : {}),
-          students: studentsObj,
-          adminChanges: { [changeId]: change },
-        },
-        [`trash/${curYear}/classes/${trashKey}`]: null,
-      });
+      const restored = {
+        teacher: item.teacher, ...(item.teacherPhoto ? { teacherPhoto: item.teacherPhoto } : {}),
+        students: studentsObj, adminChanges: { [changeId]: change },
+      };
+      const classRef = ref(db, `classes/${curYear}/${item.ck}`);
+      await get(classRef);
+      const result = await runTransaction(classRef,
+        current => restoreMissingClass(current, restored), { applyLocally: false });
+      if (!result.committed) { showToast('같은 반이 이미 존재해 복원을 중단했습니다.'); return; }
+      if (!await cleanupTrash(`trash/${curYear}/classes/${trashKey}`, item)) return;
       dispatch({ type: 'SET_CLASS', payload: item.ck.split('-')[2] });
       setClasses(prev => prev.filter(c => c.ck !== item.ck));
       showToast(`${item.ck} 반이 복원되었습니다.`, 'success');

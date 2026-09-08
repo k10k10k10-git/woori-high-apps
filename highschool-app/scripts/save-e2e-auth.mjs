@@ -11,7 +11,7 @@
 // 영구 프로필을 쓴다. 그래도 막히면 아래 안내대로 프로필을 재사용한다.
 
 import { chromium } from "@playwright/test";
-import { mkdirSync } from "node:fs";
+import { writeFileSync, chmodSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const BASE_URL = process.env.E2E_BASE_URL || "https://woorihigh-app.vercel.app";
@@ -36,10 +36,22 @@ await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
 
 try {
   // 로그인 완료 신호: 로그아웃 버튼이 생기면 포털에 들어온 것이다.
-  await page.getByText("로그아웃", { exact: false }).first().waitFor({ timeout: WAIT_MS });
+  const deadline = Date.now() + WAIT_MS;
+  while (true) {
+    let ready = false;
+    for (const frame of page.frames()) {
+      if (await frame.getByText("로그아웃", { exact: false }).first().isVisible().catch(() => false)) ready = true;
+    }
+    if (ready) break;
+    if (Date.now() >= deadline) throw new Error("로그인 대기 시간 초과");
+    await page.waitForTimeout(500);
+  }
   // Firebase Auth는 로그인 세션을 IndexedDB에 저장한다. 쿠키·localStorage만
   // 저장하면 다음 E2E 컨텍스트에서 다시 비로그인 상태가 되므로 함께 보존한다.
-  await context.storageState({ path: OUT, indexedDB: true });
+  const state = await context.storageState({ indexedDB: true });
+  const origin = new URL(BASE_URL).origin;
+  writeFileSync(OUT, JSON.stringify({ cookies: [], origins: state.origins.filter(item => item.origin === origin) }), { mode: 0o600 });
+  chmodSync(OUT, 0o600);
   console.log(`\n✅ 저장 완료: ${OUT}`);
   console.log(`   이제 이렇게 돌립니다:\n   E2E_STORAGE_STATE=${OUT} npm run test:e2e:smoke\n`);
 } catch {

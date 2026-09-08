@@ -218,7 +218,7 @@ describe('반 이동 시 옛 반 출석 기록 이관·정리', () => {
 
 describe('행정 변동 사항 - 시트 동기화 기록', () => {
   const plan = (over: Partial<SyncPlan> = {}): SyncPlan => ({
-    classes: [], added: [], moved: [], removed: [], ambiguous: [],
+    classes: [], studentSources: {}, added: [], moved: [], removed: [], ambiguous: [],
     attendanceMoves: [], attendanceChanges: 0, totalStudents: 0, classCount: 0, jangCount: 0,
     ...over,
   });
@@ -309,5 +309,28 @@ describe('주일 당일 동기화 - 앱에서 입력한 출석을 덮지 않는�
   it('토요일에도 다가올 주일을 미리 결석 처리하지 않는다', () => {
     const att = attendanceOf('2026-08-22T03:00:00Z');
     expect(Object.values(att).filter(v => v === 'X')).toHaveLength(1);
+  });
+});
+
+describe('SID 충돌과 일부 시트 이동 보존', () => {
+  it('신규 학생이 기존 학생과 고아 출석의 SID를 차지하지 않는다', () => {
+    const current: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '기존', personId: 'person' } } } };
+    const input = [cls('1-1-1', [st({ name: '신규', sid: 'S11_01', num: 1 }), st({ name: '기존', sid: 'S11_02', num: 2 })])];
+    const plan = buildSyncPlan(input, current, { '1-1-1': { S11_01_2: { day: 'O' } } });
+    expect(plan.classes[0].students.map(s => s.sid)).toEqual(['S11_01_3', 'S11_01']);
+    expect(input[0].students[0].sid).toBe('S11_01');
+    const payload = buildSyncPayload(plan, 2026, current);
+    expect(payload['classes/2026/1-1-1/students']).toMatchObject({ S11_01: { name: '기존', personId: 'person' }, S11_01_3: { name: '신규' } });
+  });
+  it('입력 시트에 없는 전출 반은 해당 학생만 제거하고 출석을 함께 이동한다', () => {
+    const person = { id: 'old', name: '이동', birth: '2010-01-01', phone: '01011112222' };
+    const current: Cur = { '2-1-1': { students: { old: person, other: { id: 'other', name: '남음' } } } };
+    const att = { '2-1-1': { old: { day: 'O' } } };
+    const plan = buildSyncPlan([cls('1-1-1', [st({ ...person, sid: 'new', num: 1 })])], current, att);
+    const payload = buildSyncPayload(plan, 2026, current, false, {}, att);
+    expect(payload['classes/2026/2-1-1/students/old']).toBeNull();
+    expect(payload).not.toHaveProperty('classes/2026/2-1-1/students');
+    expect(payload['attendance/2026/1-1-1/new/day']).toBe('O');
+    expect(payload['attendance/2026/2-1-1/old']).toBeNull();
   });
 });
