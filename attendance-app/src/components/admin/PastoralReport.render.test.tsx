@@ -49,8 +49,20 @@ describe('목양 리포트 실제 화면', () => {
     expect(screen.getByText('등반 완료 학생')).toBeTruthy();
     expect(screen.queryByText('등반 대기 학생')).toBeNull();
     expect(screen.getByText('등반 완료 · 등반일 2026-01-10')).toBeTruthy();
+    expect(screen.getByText('등반 후 마지막 출석: 등반 이후 출석 기록 없음')).toBeTruthy();
+    expect(screen.queryByText('마지막 출석: 1월 4일')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
     expect(screen.getByText('새친구 2회 연속 결석 · 등반 완료 학생').nextElementSibling?.textContent).toBe('1명');
+  });
+  it('연속 결석과 주간 요약에서 날짜 정렬 선택을 공유한다', () => {
+    render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
+    fireEvent.change(screen.getByLabelText('명단 정렬'), { target: { value: 'latest' } });
+    fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
+    expect((screen.getByLabelText('명단 정렬') as HTMLSelectElement).value).toBe('latest');
+    fireEvent.change(screen.getByLabelText('명단 정렬'), { target: { value: 'oldest' } });
+    fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
+    expect((screen.getByLabelText('명단 정렬') as HTMLSelectElement).value).toBe('oldest');
   });
   it.each(['teacher', 'demo'])('%s는 새친구를 구독하거나 연락처를 표시하지 않는다', mode => {
     if (mode === 'teacher') mocks.state = { ...mocks.state, userRole: { role: 'teacher' } };
