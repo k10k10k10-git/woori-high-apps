@@ -14,6 +14,25 @@ export type ReportStudent = {
   recent: { week: EditableWeek; value: string }[]; recovered: boolean;
 };
 
+export type ReportSort = 'absence' | 'latest' | 'oldest';
+
+/** 날짜 정렬은 결석 횟수보다 우선하며, 출석 기록이 없는 학생은 양쪽 모두 마지막에 둔다. */
+export function sortReportStudents(rows: ReportStudent[], order: ReportSort): ReportStudent[] {
+  return [...rows].sort((a, b) => {
+    if (order === 'absence') {
+      const streak = b.streak - a.streak;
+      if (streak) return streak;
+    }
+    const left = a.lastPresent?.dateValue;
+    const right = b.lastPresent?.dateValue;
+    if (left === undefined && right !== undefined) return 1;
+    if (left !== undefined && right === undefined) return -1;
+    const date = left !== undefined && right !== undefined ? (left - right) * (order === 'latest' ? -1 : 1) : 0;
+    return date || a.label.localeCompare(b.label, 'ko', { numeric: true })
+      || a.student.name.localeCompare(b.student.name, 'ko') || a.key.localeCompare(b.key);
+  });
+}
+
 /** 이름으로 연결하지 않는다. 반 이동은 같은 연도의 유일한 personId만 따라간다. */
 export function linkReportFriend(friend: ReportFriend, rows: ReportStudent[]) {
   const sync = friend.rosterSync;
@@ -77,7 +96,8 @@ export function buildPastoralReport(source: AdminDashboardSource, friends: Repor
       : lastTwo.length === 2 && lastTwo.every(cell => cell.value === 'X') ? '연락 필요'
       : observed.some(cell => !cell.value) ? '출석 입력 확인'
       : observed.length < 4 ? '관찰 중' : window(4).present >= 3 ? '초기 4주 출석 양호' : '출석 흐름 확인';
-    return [{ friend, row, startedDate, four: window(4), eight: window(8), status }];
+    const lastPresent = observed.slice().reverse().find(cell => cell.value === 'O')?.week;
+    return [{ friend, row, startedDate, lastPresent, four: window(4), eight: window(8), status }];
   });
   return { weeks, selectedWeek: through[0], rows, absent, settlement,
     recovered: rows.filter(row => row.recovered),

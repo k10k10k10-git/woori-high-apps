@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPastoralReport, reportDate, settlementStartDate, type ReportFriend } from '@/utils/pastoralReport';
+import { buildPastoralReport, reportDate, settlementStartDate, sortReportStudents, type ReportFriend } from '@/utils/pastoralReport';
 import type { AdminDashboardSource } from '@/utils/adminDashboard';
 
 const now = Date.parse('2026-02-02T00:00:00+09:00');
@@ -32,6 +32,28 @@ describe('목양 리포트', () => {
     expect(report.settlement).toHaveLength(1);
     expect(report.settlement[0].four).toEqual({ elapsed: 4, present: 0, missing: 0 });
     expect(report.settlement[0].status).toBe('연락 필요');
+    expect(report.settlement[0].lastPresent).toBeUndefined();
+    expect(report.rows[0].lastPresent?.label).toBe('1월 4일');
+  });
+  it('등반 당일부터 기준 주일까지의 마지막 출석만 표시한다', () => {
+    const source = structuredClone(base);
+    source.attData['1-1-1'].nf_one['0-1'] = 'O';
+    source.attData['1-1-1'].nf_one['1-0'] = 'O';
+    const sameSunday = { ...friend, giftDate: '2026-01-11' };
+    expect(buildPastoralReport(source, [sameSunday], now, '0-3').settlement[0].lastPresent?.label).toBe('1월 11일');
+    expect(buildPastoralReport(source, [sameSunday], now).settlement[0].lastPresent?.label).toBe('2월 1일');
+  });
+  it('날짜 정렬은 결석 횟수와 무관하고 기록 없음은 끝에 두며 원본을 보존한다', () => {
+    const report = buildPastoralReport(base, [], now);
+    const row = report.rows[0];
+    const old = { ...row, key: 'old', streak: 3, lastPresent: report.weeks.at(-1) };
+    const latest = { ...row, key: 'latest', streak: 8, lastPresent: report.weeks[0] };
+    const missing = { ...row, key: 'missing', lastPresent: undefined };
+    const rows = [missing, latest, old];
+    expect(sortReportStudents(rows, 'latest').map(r => r.key)).toEqual(['latest', 'old', 'missing']);
+    expect(sortReportStudents(rows, 'oldest').map(r => r.key)).toEqual(['old', 'latest', 'missing']);
+    expect(rows.map(r => r.key)).toEqual(['missing', 'latest', 'old']);
+    expect(sortReportStudents([], 'latest')).toEqual([]);
   });
   it('등반 완료 근거가 없으면 nf_ 명단도 추정 포함하지 않는다', () => {
     expect(buildPastoralReport(base, [], now).settlement).toHaveLength(0);
