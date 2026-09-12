@@ -18,7 +18,7 @@ function att(map: Record<string, Record<string, "출석" | "지각" | "결석">>
   return out;
 }
 
-describe("calcCompletion — 출석·레거시 지각2/결석0, 휴강 제외", () => {
+describe("calcCompletion — 출석2/지각1/결석0, 휴강 제외", () => {
   it("전부 출석이면 만점·수료", () => {
     const r = calcCompletion("a", sessions, att({ s1: { a: "출석" }, s2: { a: "출석" }, s4: { a: "출석" } }), 0.7);
     expect(r.maxScore).toBe(6); // 정규 3회 × 2 (휴강 s3 제외)
@@ -26,16 +26,16 @@ describe("calcCompletion — 출석·레거시 지각2/결석0, 휴강 제외", 
     expect(r.completed).toBe(true);
   });
 
-  it("남아 있는 지각은 출석과 같은 2점, 미기록은 0점으로 집계", () => {
-    // 출석2 + 레거시 지각2 + 미기록0 = 4/6 → 70% 기준 미수료
+  it("지각은 1점, 미기록은 0점으로 집계", () => {
+    // 출석2 + 지각1 + 미기록0 = 3/6 → 70% 기준 미수료
     const r = calcCompletion("a", sessions, att({ s1: { a: "출석" }, s2: { a: "지각" } }), 0.7);
-    expect(r.score).toBe(4);
+    expect(r.score).toBe(3);
     expect(r.completed).toBe(false);
   });
 
-  it("새 입력은 출석·결석만 허용하고 레거시 지각은 출석으로 정규화한다", () => {
-    expect(EDITABLE_ATTENDANCE_STATUSES).toEqual(["출석", "결석"]);
-    expect(normalizeAttendanceStatus("지각")).toBe("출석");
+  it("새 입력과 저장된 지각을 출석과 구분해 보존한다", () => {
+    expect(EDITABLE_ATTENDANCE_STATUSES).toEqual(["출석", "지각", "결석"]);
+    expect(normalizeAttendanceStatus("지각")).toBe("지각");
     expect(normalizeAttendanceStatus("결석")).toBe("결석");
   });
 

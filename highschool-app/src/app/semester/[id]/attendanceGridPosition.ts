@@ -1,7 +1,7 @@
 export function attendanceMenuPosition(
   rect: Pick<DOMRect, "left" | "top" | "right" | "bottom" | "width">,
   viewport: { width: number; height: number },
-  menu: { width: number; height: number } = { width: 148, height: 140 },
+  menu: { width: number; height: number } = { width: 148, height: 190 },
 ) {
   const maxLeft = Math.max(8, viewport.width - menu.width - 8);
   const left = Math.min(Math.max(rect.left + rect.width / 2 - menu.width / 2, 8), maxLeft);

@@ -1,6 +1,6 @@
 "use client";
 
-// 출석 체크 — 모바일 최우선(375px). 학생별 [출석/결석] 2버튼.
+// 출석 체크 — 모바일 최우선(375px). 학생별 [출석/지각/결석] 3버튼.
 // ⚠ 토글 아님: 멱등 명시 상태 기록 (같은 버튼 재탭 = 동일 상태 유지, 실수 규칙 11).
 // 기록 취소는 별도 '지우기'로만.
 
@@ -52,6 +52,7 @@ interface Props {
 
 const STATUS_STYLE: Record<EditableAttendanceStatus, string> = {
   출석: "bg-green-100 text-green-900 border-green-300",
+  지각: "bg-amber-100 text-amber-900 border-amber-300",
   결석: "bg-red-100 text-red-900 border-red-300",
 };
 
@@ -182,7 +183,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
   }
 
-  const counts = { 출석: 0, 결석: 0, 미기록: 0 };
+  const counts = { 출석: 0, 지각: 0, 결석: 0, 미기록: 0 };
   for (const m of members) {
     const e = att[m.id];
     if (e) counts[normalizeAttendanceStatus(e.s)]++;
@@ -310,6 +311,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
       <>
       <div className="flex gap-3 text-xs text-slate-500 mb-3">
         <span>출석 {counts.출석}</span>
+        <span>지각 {counts.지각}</span>
         <span>결석 {counts.결석}</span>
         <span>미기록 {counts.미기록}</span>
         <span className="ml-auto">{members.length}명</span>
