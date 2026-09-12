@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
-import { db, get, onDisconnect, ref, runTransaction } from '@/lib/db';
+import { useRef, useState } from 'react';
+import { db, get, onDisconnect, onValue, push, ref, runTransaction } from '@/lib/db';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
+import { useModalFocus } from '@/hooks/useModalFocus';
 import { showToast } from '@/utils/toast';
 import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 import {
@@ -20,6 +21,8 @@ import {
   releaseStudentMoveLocks,
   serverAdjustedStudentMoveTime,
   studentMoveCommitPath,
+  studentMoveDestinationId,
+  studentMoveOperationWithDestination,
   studentMoveLockDisconnectPayload,
   studentMoveLockPaths,
   studentMoveLockYearPath,
@@ -39,6 +42,10 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
   const [toGrade, setToGrade] = useState(target.fromCk.split('-')[1]);
   const [toClass, setToClass] = useState('');
   const [saving, setSaving] = useState(false);
+  const inFlight = useRef(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const close = () => { if (!inFlight.current) onClose(); };
+  useModalFocus({ containerRef: dialogRef, onDismiss: close });
 
   const toCk = toClass ? `${toPart}-${toGrade}-${toClass}` : '';
   const classLabel = (value: string) => {
@@ -54,6 +61,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
   };
 
   async function handleMove() {
+    if (inFlight.current) return;
     if (!isValidStudentMoveDestination(Object.keys(classData), target.fromCk, toCk)) {
       showToast('현재 명단에 있는 다른 반을 선택하세요.');
       return;
@@ -64,10 +72,26 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
       showToast('로그인 사용자를 확인할 수 없습니다. 다시 로그인해 주세요.');
       return;
     }
-    setSaving(true);
-
     const startedAt = Date.now();
-    const operationId = createStudentMoveOperationId(startedAt);
+    // 화면 스냅샷은 ID 선택에만 사용한다. 쓰기 직전 두 반 잠금 안에서 다시 검사한다.
+    const collision = classData[toCk]?.students.some(s => s.id === target.sid)
+      || state.attData[toCk]?.[target.sid] != null;
+    const destinationId = collision
+      ? push(ref(db, `classes/${curYear}/${toCk}/students`)).key!
+      : target.sid;
+    if (collision && !student.personId) {
+      showToast('영구 인물 ID가 없어 통합 사이트 연결을 보존할 수 없습니다. 관리자에게 확인해 주세요.');
+      return;
+    }
+    let operationId: string;
+    try {
+      operationId = studentMoveOperationWithDestination(createStudentMoveOperationId(startedAt), destinationId);
+    } catch {
+      showToast('학생 내부 ID를 확인할 수 없어 이동을 시작하지 않았습니다. 관리자에게 확인해 주세요.');
+      return;
+    }
+    inFlight.current = true;
+    setSaving(true);
     let lock: StudentMoveLockIdentity = {
       ownerUid: currentUser.uid,
       operationId,
@@ -90,16 +114,30 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
     let preserveUncertainLock = false;
     let operationCompleted = false;
     let disconnectCleanup: ReturnType<typeof onDisconnect> | null = null;
+    // .info는 서버 GET 경로가 아니라 SDK의 로컬 연결 정보 구독이다.
+    const readInfo = async (path: string): Promise<unknown> => {
+      let unsubscribe: (() => void) | undefined;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await new Promise((resolve, reject) => {
+          timeout = setTimeout(() => reject(new Error('연결 정보 응답 없음')), 5000);
+          unsubscribe = onValue(ref(db, path), snapshot => resolve(snapshot.val()), reject, { onlyOnce: true });
+        });
+      } finally {
+        clearTimeout(timeout);
+        unsubscribe?.();
+      }
+    };
     const readServerNow = async (): Promise<number | null> => {
       try {
-        const [connectedSnap, offsetSnap] = await Promise.all([
-          get(ref(db, '.info/connected')),
-          get(ref(db, '.info/serverTimeOffset')),
+        const [connected, offset] = await Promise.all([
+          readInfo('.info/connected'),
+          readInfo('.info/serverTimeOffset'),
         ]);
         return serverAdjustedStudentMoveTime(
           Date.now(),
-          offsetSnap.val(),
-          connectedSnap.val(),
+          offset,
+          connected,
         );
       } catch {
         return null;
@@ -130,7 +168,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
             const [commitSnap, sourceSnap, destinationSnap] = await Promise.all([
               get(ref(db, staleCommitPath)),
               get(ref(db, `classes/${curYear}/${staleLock.record.fromCk}/students/${staleLock.record.sid}`)),
-              get(ref(db, `classes/${curYear}/${staleLock.record.toCk}/students/${staleLock.record.sid}`)),
+              get(ref(db, `classes/${curYear}/${staleLock.record.toCk}/students/${studentMoveDestinationId(staleLock)}`)),
             ]);
             return {
               commitMarkerState: !commitSnap.exists()
@@ -178,7 +216,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           get(ref(db, `classes/${curYear}/${target.fromCk}/students/${target.sid}`)),
           get(ref(db, `classes/${curYear}/${toCk}`)),
           get(ref(db, `attendance/${curYear}/${target.fromCk}/${target.sid}`)),
-          get(ref(db, `attendance/${curYear}/${toCk}/${target.sid}`)),
+          get(ref(db, `attendance/${curYear}/${toCk}/${destinationId}`)),
         ]);
 
         if (!sourceStudentSnap.exists()) {
@@ -189,12 +227,21 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           showToast('이동할 반이 더 이상 존재하지 않습니다. 명단을 새로 확인해 주세요.');
           return;
         }
-        if (destinationClassSnap.child(`students/${target.sid}`).exists()) {
-          showToast('이동할 반에 같은 학생 ID가 있습니다. 목적지 명단을 먼저 확인해 주세요.');
+        if (destinationClassSnap.child(`students/${destinationId}`).exists() || destinationAttendanceSnap.exists()) {
+          showToast('이동할 반의 명단 또는 출석이 변경되었습니다. 기존 기록은 유지했습니다. 명단을 확인하고 다시 이동해 주세요.');
           return;
         }
 
         const latestStudent = { ...(sourceStudentSnap.val() as Student), id: target.sid };
+        if (latestStudent.personId !== student.personId || latestStudent.name !== student.name) {
+          showToast('원래 반의 학생 정보가 변경되었습니다. 명단을 새로 확인해 주세요.');
+          return;
+        }
+        const destinationStudents = (destinationClassSnap.child('students').val() ?? {}) as Record<string, Student>;
+        if (latestStudent.personId && Object.values(destinationStudents).some(s => s.personId === latestStudent.personId)) {
+          showToast('같은 인물의 학생이 목적지에 이미 있습니다. 중복 명단을 먼저 확인해 주세요.');
+          return;
+        }
         const sourceAttendance = sourceAttendanceSnap.exists()
           ? sourceAttendanceSnap.val() as AttendanceRecord
           : undefined;
@@ -208,6 +255,8 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           fromCk: target.fromCk,
           toCk,
           student: latestStudent,
+          destinationId,
+          destinationStudent: destinationClassSnap.child(`students/${destinationId}`).val(),
           sourceAttendance,
           destinationAttendance,
           lockPaths,
@@ -258,12 +307,14 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
             const [commitSnap, latestSourceSnap, latestDestinationSnap] = await Promise.all([
               get(ref(db, commitPath)),
               get(ref(db, `classes/${curYear}/${target.fromCk}/students/${target.sid}`)),
-              get(ref(db, `classes/${curYear}/${toCk}/students/${target.sid}`)),
+              get(ref(db, `classes/${curYear}/${toCk}/students/${destinationId}`)),
             ]);
             committed = isStudentMoveCommitted({
               commitMarkerIsTrue: commitSnap.val() === true,
               sourceStudentExists: latestSourceSnap.exists(),
-              destinationStudentExists: latestDestinationSnap.exists(),
+              destinationStudentExists: latestDestinationSnap.exists()
+                && latestDestinationSnap.val().personId === latestStudent.personId
+                && latestDestinationSnap.val().name === latestStudent.name,
             });
           } catch {
             // 네트워크가 끊긴 경우 성공과 실패를 추측하지 않는다.
@@ -276,6 +327,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         }
         ownLockState = 'none';
         selectClass(toCk);
+        showToast('기존 명단을 보존하고 학생과 출석 기록을 함께 이동했습니다.', 'success');
         operationCompleted = true;
       }
     } catch {
@@ -298,33 +350,34 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         disconnectCleanup = null;
       }
       setSaving(false);
+      inFlight.current = false;
     }
     if (operationCompleted) onClose();
   }
 
   return (
-    <div className="modal-overlay center-modal" onClick={onClose} onKeyDown={e => { if (e.key === 'Escape') onClose(); }}
-      role="dialog" aria-modal="true" aria-label="학생 이동">
+    <div ref={dialogRef} tabIndex={-1} className="modal-overlay center-modal" onClick={close}
+      role="dialog" aria-modal="true" aria-label="학생 이동" aria-busy={saving}>
       <div className="modal-dialog" onClick={e => e.stopPropagation()}>
         <div className="modal-title">학생 이동</div>
         <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
           <strong>{student?.name}</strong>을(를) 다른 반으로 이동합니다.
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <select className="form-select" style={{ flex: 1 }} value={toPart} onChange={e => {
+          <select aria-label="이동할 부서" disabled={saving} className="form-select" style={{ flex: 1 }} value={toPart} onChange={e => {
             setToPart(e.target.value);
             setToClass('');
           }}>
             <option value="1">1부</option>
             <option value="2">2부</option>
           </select>
-          <select className="form-select" style={{ flex: 1 }} value={toGrade} onChange={e => {
+          <select aria-label="이동할 학년" disabled={saving} className="form-select" style={{ flex: 1 }} value={toGrade} onChange={e => {
             setToGrade(e.target.value);
             setToClass('');
           }}>
             {[1,2,3].map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
-          <select className="form-select" style={{ flex: 1 }} value={toClass} onChange={e => setToClass(e.target.value)}>
+          <select aria-label="이동할 반" disabled={saving} className="form-select" style={{ flex: 1 }} value={toClass} onChange={e => setToClass(e.target.value)}>
             <option value="">반 선택</option>
             {Object.keys(classData)
               .filter(ck => ck.startsWith(`${toPart}-${toGrade}-`) && ck !== target.fromCk)
@@ -337,7 +390,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           </select>
         </div>
         <div className="btn-row">
-          <button className="btn-secondary" onClick={onClose} disabled={saving}>취소</button>
+          <button className="btn-secondary" onClick={close} disabled={saving}>취소</button>
           <button className="btn-primary" onClick={handleMove} disabled={!toCk || saving}>
             {saving ? '이동 중...' : '이동'}
           </button>

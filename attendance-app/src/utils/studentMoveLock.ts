@@ -189,6 +189,26 @@ export function createStudentMoveOperationId(
   return `student_move_${now}_${nonce}`;
 }
 
+/** 잠금 필드를 늘리지 않고 재접속 시에도 확정된 목적지 ID를 복원한다. */
+export function studentMoveOperationWithDestination(operationId: string, destinationId: string): string {
+  if (!destinationId || /[.#$\[\]/\u0000-\u001f\u007f]/.test(destinationId)) {
+    throw new Error('학생 이동 ID가 올바르지 않습니다.');
+  }
+  const value = `student_move_v2~${encodeURIComponent(destinationId).replaceAll('~', '%7E')}~${operationId}`;
+  if (new TextEncoder().encode(value).length > 768) throw new Error('학생 이동 ID가 너무 깁니다.');
+  return value;
+}
+
+export function studentMoveDestinationId(identity: StudentMoveLockIdentity): string {
+  if (!identity.operationId.startsWith('student_move_v2~')) return identity.record.sid;
+  const parts = identity.operationId.split('~');
+  const destinationId = decodeURIComponent(parts[1] ?? '');
+  if (parts.length !== 3 || studentMoveOperationWithDestination(parts[2], destinationId) !== identity.operationId) {
+    throw new Error('학생 이동 목적지를 확인할 수 없습니다.');
+  }
+  return destinationId;
+}
+
 export function createStudentMoveLockRecord(input: {
   startedAt: number;
   fromCk: string;

@@ -4,6 +4,19 @@
 
 export const STAFF_BU = "스탭";
 
+/** 과거 신청 키는 유지하고 이동한 학생은 유일한 영구 ID로 찾는다. */
+export function applicationForRosterPerson<T extends { id: string; bu: string; personId?: string }>(
+  applications: T[], person: { bu: string; studentId: string; personId?: string },
+): T | undefined {
+  if (person.personId) {
+    const matches = applications.filter(app => app.personId === person.personId
+      && (app.bu === STAFF_BU) === (person.bu === STAFF_BU));
+    if (matches.length > 0) return matches.length === 1 ? matches[0] : undefined;
+  }
+  const exact = applications.find(app => app.id === makeAppKey(person.bu, person.studentId));
+  return exact && (!exact.personId || exact.personId === person.personId) ? exact : undefined;
+}
+
 /**
  * appKey 규칙
  *   학생: "{부번호}_{학생ID}"  (1부/2부에 같은 학생ID가 있어 부 번호를 접두어로 쓴다)

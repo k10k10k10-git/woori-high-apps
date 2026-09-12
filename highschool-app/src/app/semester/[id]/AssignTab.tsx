@@ -81,7 +81,7 @@ export default function AssignTab({ initialTeamId = "", sid, teams, trainingClas
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
   }, [sid, year, canEdit, toast]);
 
-  const rosterContactMap = useMemo(() => buildRosterContactMap(classes, staff), [classes, staff]);
+  const rosterContactMap = useMemo(() => buildRosterContactMap(classes, staff, applications), [classes, staff, applications]);
 
   const targets = useMemo(
     () => applications.filter((a) => a.status !== "취소" && !a.trainingOnly),

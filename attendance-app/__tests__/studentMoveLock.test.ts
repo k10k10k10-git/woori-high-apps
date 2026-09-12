@@ -13,6 +13,8 @@ import {
   releaseStudentMoveLocksValue,
   serverAdjustedStudentMoveTime,
   studentMoveCommitPath,
+  studentMoveDestinationId,
+  studentMoveOperationWithDestination,
   studentMoveLockDisconnectPayload,
   studentMoveLockParentPath,
   studentMoveLockPath,
@@ -23,6 +25,25 @@ import {
   type StudentMoveLockIdentity,
   type StudentMoveLockTransaction,
 } from '@/utils/studentMoveLock';
+
+describe('이동 목적지 ID의 재접속 호환', () => {
+  const record = createStudentMoveLockRecord({ startedAt: 123, fromCk: '2-1-7', toCk: '1-1-7', sid: 'S17_05' });
+  it('구버전은 원래 ID, 새버전은 확정된 새 ID로 복구 증거를 조회한다', () => {
+    const old = { ownerUid: 'admin', operationId: createStudentMoveOperationId(123, 'nonce'), record };
+    expect(studentMoveDestinationId(old)).toBe('S17_05');
+    for (const destinationId of ['S17_05', '-new-key', 'safe~id']) {
+      const next = { ...old, operationId: studentMoveOperationWithDestination(old.operationId, destinationId) };
+      expect(studentMoveDestinationId(next)).toBe(destinationId);
+      expect(studentMoveDestinationId(pendingStudentMoveLock(next, 999))).toBe(destinationId);
+      expect(studentMoveCommitPath(2026, next)).toContain('/S17_05/admin/');
+    }
+  });
+  it('손상되거나 경로를 침범하는 목적지는 추정하지 않는다', () => {
+    expect(() => studentMoveOperationWithDestination('op', '../other')).toThrow();
+    expect(() => studentMoveOperationWithDestination('op', 'a'.repeat(769))).toThrow();
+    expect(() => studentMoveDestinationId({ ownerUid: 'admin', operationId: 'student_move_v2~%ZZ~op', record })).toThrow();
+  });
+});
 
 function memoryTransaction(initialValue: unknown) {
   let value = initialValue;

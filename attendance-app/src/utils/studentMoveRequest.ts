@@ -37,8 +37,11 @@ export async function patchStudentMoveOnce(input: {
     input.timeoutMs ?? STUDENT_MOVE_PATCH_TIMEOUT_MS,
   );
   try {
+    const url = new URL(databaseUrl);
+    url.pathname = '/.json';
+    url.searchParams.set('auth', input.idToken);
     const response = await fetchOnce(
-      `${databaseUrl}/.json?auth=${encodeURIComponent(input.idToken)}`,
+      url.toString(),
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
