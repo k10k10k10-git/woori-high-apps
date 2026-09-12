@@ -62,46 +62,45 @@ describe('buildStudentMovePayload', () => {
     expect(payload['attendance/2026/1-1-2/S11_01']).toEqual({ '0-0': 'O', '0-1': 'O' });
   });
 
-  it('목적지에 이미 있는 출석 셀은 보존하고, 없는 셀만 원본에서 채운다', () => {
+  it('목적지 출석은 동일인으로 추정해 병합하지 않고 거절한다', () => {
     const sourceAttendance = { '0-0': 'O', '0-1': 'T', '1-0': 'X' } as const;
     const destinationAttendance = { '0-1': 'O', '2-0': 'T' } as const;
-    const payload = buildStudentMovePayload({
+    expect(() => buildStudentMovePayload({
       ...base,
       sourceAttendance,
       destinationAttendance,
-    });
-
-    expect(payload['attendance/2026/1-1-2/S11_01']).toEqual({
-      '0-0': 'O',
-      '0-1': 'O',
-      '1-0': 'X',
-      '2-0': 'O',
-    });
+    })).toThrow('덮어쓸 수 없습니다');
     expect(sourceAttendance).toEqual({ '0-0': 'O', '0-1': 'T', '1-0': 'X' });
     expect(destinationAttendance).toEqual({ '0-1': 'O', '2-0': 'T' });
   });
 
-  it('목적지에서 명시적으로 비운 셀도 원본보다 우선한다', () => {
-    const payload = buildStudentMovePayload({
+  it('비운 셀만 남은 목적지도 점유된 기록으로 보호한다', () => {
+    expect(() => buildStudentMovePayload({
       ...base,
       sourceAttendance: { '0-0': 'O', '0-1': 'T' },
       destinationAttendance: { '0-0': '' },
-    });
-
-    expect(payload['attendance/2026/1-1-2/S11_01']).toEqual({
-      '0-0': '',
-      '0-1': 'O',
-    });
+    })).toThrow('덮어쓸 수 없습니다');
   });
 
   it('원본 출석이 없으면 목적지 출석을 다시 쓰거나 원본 경로를 추측 삭제하지 않는다', () => {
-    const payload = buildStudentMovePayload({
-      ...base,
-      destinationAttendance: { '0-0': 'X' },
-    });
+    const payload = buildStudentMovePayload(base);
 
     expect(payload['attendance/2026/1-1-1/S11_01']).toBeUndefined();
     expect(payload['attendance/2026/1-1-2/S11_01']).toBeUndefined();
+  });
+
+  it('새 목적지 ID로만 학생·출석·이력을 옮겨 기존 슬롯을 전혀 쓰지 않는다', () => {
+    const payload = buildStudentMovePayload({ ...base, destinationId: '-new-key', sourceAttendance: { '0-0': 'X' } });
+    expect(payload['classes/2026/1-1-2/students/S11_01']).toBeUndefined();
+    expect(payload['attendance/2026/1-1-2/S11_01']).toBeUndefined();
+    expect(payload['classes/2026/1-1-2/students/-new-key']).toEqual({ ...student, id: '-new-key' });
+    expect(payload['attendance/2026/1-1-2/-new-key']).toEqual({ '0-0': 'X' });
+    expect(payload[base.adminChangePath]).toEqual({ ...adminChange, studentId: '-new-key' });
+    expect(student.id).toBe('S11_01');
+  });
+
+  it('목적지에 학생이 있으면 출석 유무와 관계없이 중단한다', () => {
+    expect(() => buildStudentMovePayload({ ...base, destinationStudent: { name: '다른 학생' } })).toThrow('덮어쓸 수 없습니다');
   });
 
   it('같은 반으로의 이동 payload는 만들지 않는다', () => {

@@ -4,6 +4,7 @@ import { STAFF_BU, makeAppKey } from "@/features/semester/applicant";
 import { validateIntake } from "@/features/semester/intakeRule";
 import type { Application } from "@/features/semester/types";
 import { normalizeName } from "@/lib/studentMatcher";
+import { uniqueRosterStudent } from "@/lib/rosterIdentity";
 import type {
   PraisePersonInput,
   PraiseRosterLink,
@@ -143,6 +144,18 @@ function officialPath(candidate: PraiseRosterCandidate, year: string) {
     ? `${semesterPaths.teacherStaffByYear(year)}/${candidate.rosterLink.staffId}`
     : semesterPaths.classStudent(year, candidate.rosterLink.classKey!, candidate.rosterLink.studentId!);
 }
+
+/** 정상 연결은 단건만 조회한다. 이동한 후보가 있을 때만 연도 원장을 한 번 읽어 동일인을 확인한다. */
+function officialRosterReader(database: ReturnType<typeof getPraiseFirebaseAdmin>['database'], year: string) {
+  let movedRoster: Promise<Record<string, { students?: Record<string, MainRosterIdentity> }> | null> | undefined;
+  return async (candidate: PraiseRosterCandidate): Promise<MainRosterIdentity | null> => {
+    const official = (await database.ref(officialPath(candidate, year)).get()).val() as MainRosterIdentity | null;
+    if (candidate.kind === 'STAFF' || !candidate.rosterLink.personId
+      || official?.personId === candidate.rosterLink.personId) return official;
+    movedRoster ??= database.ref(semesterPaths.classesByYear(year)).get().then(snapshot => snapshot.val());
+    return uniqueRosterStudent(await movedRoster, candidate.rosterLink.personId);
+  };
+}
 export async function praiseRoster(state: PraiseState) {
   const { semesterId, teamId } = state.meta;
   if (!semesterId || !teamId) return { people: [], semesterHref: null };
@@ -162,11 +175,12 @@ export async function praiseRoster(state: PraiseState) {
     return candidate ? [{ applicationKey, source, candidate }] : [];
   });
   const people: PraiseRosterCandidate[] = [];
+  const readOfficial = officialRosterReader(database, year);
   try {
-    // 전체 학생·스탭 개인정보 노드를 받지 않고 후보의 정확한 공식 레코드만 제한 병렬로 확인한다.
+    // 공식 레코드를 제한 병렬로 먼저 확인하고 이동한 학생만 요청 내 공통 원장 조회로 보완한다.
     for (let start = 0; start < preliminary.length; start += 12) {
       const verified = await Promise.all(preliminary.slice(start, start + 12).map(async ({ applicationKey, source, candidate }) => {
-        const official = (await database.ref(officialPath(candidate, year)).get()).val() as MainRosterIdentity | null;
+        const official = await readOfficial(candidate);
         return verifiedRosterCandidate(applicationKey, source, semesterId, teamId, official);
       }));
       people.push(...verified.filter((candidate): candidate is PraiseRosterCandidate => Boolean(candidate)));
@@ -213,11 +227,9 @@ export async function validatePraiseRosterLink(
         ).get()).val();
     const year = semesterId.match(/^\d{4}/)?.[0] ?? "";
     if (!source || !year) official = null;
-    else if (source.bu === STAFF_BU) {
-      official = (await database.ref(`${semesterPaths.teacherStaffByYear(year)}/${source.studentId}`).get()).val();
-    } else {
-      const classKey = `${source.bu === "2부" ? 2 : 1}-${source.grade}-${source.class}`;
-      official = (await database.ref(semesterPaths.classStudent(year, classKey, source.studentId)).get()).val();
+    else {
+      const preliminary = rosterCandidate(person.rosterLink.applicationKey, source, semesterId, teamId);
+      official = preliminary ? await officialRosterReader(database, year)(preliminary) : null;
     }
   } catch {
     throw praiseUnavailable("roster_unavailable");

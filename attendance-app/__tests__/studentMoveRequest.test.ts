@@ -22,7 +22,7 @@ describe('patchStudentMoveOnce', () => {
 
     expect(fetchOnce).toHaveBeenCalledTimes(1);
     expect(fetchOnce).toHaveBeenCalledWith(
-      'https://example.firebaseio.com/.json?auth=token%20value',
+      'https://example.firebaseio.com/.json?auth=token+value',
       expect.objectContaining({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

@@ -32,6 +32,8 @@ type StudentMovePayloadInput = {
   fromCk: string;
   toCk: string;
   student: Student;
+  destinationId?: string;
+  destinationStudent?: unknown;
   sourceAttendance?: AttendanceRecord;
   destinationAttendance?: AttendanceRecord;
   lockPaths: readonly [string, string];
@@ -43,14 +45,16 @@ type StudentMovePayloadInput = {
 /**
  * 학생과 출석을 같은 루트 update로 옮긴다.
  *
- * 목적지에 같은 출석 셀이 이미 있으면 목적지 값을 유지한다. 출석 구독 스냅샷이 없는
- * 상태에서 원본 경로를 추측해 지우지 않도록, 실제 원본 출석이 전달된 경우에만 이관한다.
+ * 목적지 명단 또는 출석이 있으면 다른 학생의 기록일 수 있으므로 병합하지 않는다.
+ * 잠금 안에서 확인한 빈 ID로만 이동하고 원본 출석이 있는 경우에만 이관한다.
  */
 export function buildStudentMovePayload({
   year,
   fromCk,
   toCk,
   student,
+  destinationId = student.id,
+  destinationStudent,
   sourceAttendance,
   destinationAttendance,
   lockPaths,
@@ -59,24 +63,24 @@ export function buildStudentMovePayload({
   adminChange,
 }: StudentMovePayloadInput): Record<string, Student | NormalizedAttendanceRecord | AdminChangeEntry | boolean | null> {
   if (fromCk === toCk) throw new Error('학생 이동의 원본 반과 목적지 반이 같습니다.');
+  if (!destinationId || /[.#$\[\]/\u0000-\u001f\u007f]/.test(destinationId)) throw new Error('목적지 학생 ID가 올바르지 않습니다.');
+  if (destinationStudent != null || destinationAttendance != null) {
+    throw new Error('목적지의 기존 학생 또는 출석을 덮어쓸 수 없습니다.');
+  }
 
   const payload: Record<string, Student | NormalizedAttendanceRecord | AdminChangeEntry | boolean | null> = {
     [`classes/${year}/${fromCk}/students/${student.id}`]: null,
-    [`classes/${year}/${toCk}/students/${student.id}`]: { ...student },
+    [`classes/${year}/${toCk}/students/${destinationId}`]: { ...student, id: destinationId },
     [lockPaths[0]]: null,
     [lockPaths[1]]: null,
     [commitPath]: true,
-    [adminChangePath]: adminChange,
+    [adminChangePath]: { ...adminChange, studentId: destinationId },
   };
 
   const normalizedSource = normalizeMoveRecord(sourceAttendance);
-  const normalizedDestination = normalizeMoveRecord(destinationAttendance);
   if (Object.keys(normalizedSource).length > 0) {
     payload[`attendance/${year}/${fromCk}/${student.id}`] = null;
-    payload[`attendance/${year}/${toCk}/${student.id}`] = {
-      ...normalizedSource,
-      ...normalizedDestination,
-    };
+    payload[`attendance/${year}/${toCk}/${destinationId}`] = normalizedSource;
   }
 
   return payload;

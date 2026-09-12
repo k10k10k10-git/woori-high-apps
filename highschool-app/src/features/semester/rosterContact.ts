@@ -1,6 +1,7 @@
 import { makeAppKey, STAFF_BU } from "./applicant";
 import { parseClassKey } from "./classKey";
-import type { ApplicationPrivate, ClassInfo, StaffPerson } from "./types";
+import type { Application, ApplicationPrivate, ClassInfo, StaffPerson } from "./types";
+import { uniqueRosterStudent } from "@/lib/rosterIdentity";
 
 export type RosterContact = {
   phone?: string;
@@ -8,7 +9,7 @@ export type RosterContact = {
 };
 
 /** 학생·스탭 원장의 연락처를 신청 appKey 기준으로 묶는다. 원장 데이터는 읽기 전용이다. */
-export function buildRosterContactMap(classes: ClassInfo[], staff: StaffPerson[]): Record<string, RosterContact> {
+export function buildRosterContactMap(classes: ClassInfo[], staff: StaffPerson[], applications: Application[] = []): Record<string, RosterContact> {
   const result: Record<string, RosterContact> = {};
   for (const classInfo of classes) {
     const parsed = parseClassKey(classInfo.classKey);
@@ -24,6 +25,16 @@ export function buildRosterContactMap(classes: ClassInfo[], staff: StaffPerson[]
     result[makeAppKey(STAFF_BU, person.staffId)] = {
       ...(person.phone?.trim() ? { phone: person.phone.trim() } : {}),
     };
+  }
+  const classesByKey = Object.fromEntries(classes.map(c => [c.classKey, c]));
+  for (const app of applications) {
+    if (app.bu === STAFF_BU || !app.personId) continue;
+    const student = uniqueRosterStudent(classesByKey, app.personId);
+    // 같은 과거 키를 다른 학생이 쓰는 경우에도 연락처를 잘못 연결하지 않는다.
+    result[app.id] = student ? {
+      ...(student.phone?.trim() ? { phone: student.phone.trim() } : {}),
+      ...(student.pphone?.trim() ? { parentPhone: student.pphone.trim() } : {}),
+    } : {};
   }
   return result;
 }
