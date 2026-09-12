@@ -1,4 +1,4 @@
-// 수료 판정 순수 로직 — 현재 입력은 출석/결석만 허용하고, 남아 있는 지각은 출석으로 본다.
+// 수료 판정 순수 로직 — 학기 출석은 출석 2점 / 지각 1점 / 결석 0점으로 계산한다.
 // 수료 여부는 DB에 저장하지 않고 항상 이 함수로 계산한다(이중 원장 방지).
 
 import {
@@ -11,18 +11,18 @@ import {
 
 export const SCORE: Record<AttendanceStatus, number> = {
   출석: 2,
-  지각: 2,
+  지각: 1,
   결석: 0,
 };
 
-export type EditableAttendanceStatus = Exclude<AttendanceStatus, "지각">;
+export type EditableAttendanceStatus = AttendanceStatus;
 
-/** 새 기록에서 선택할 수 있는 상태. `지각`은 레거시 조회 호환에만 남긴다. */
-export const EDITABLE_ATTENDANCE_STATUSES = ["출석", "결석"] as const satisfies readonly EditableAttendanceStatus[];
+/** 학기 사역팀·훈련 출석 상태. 학생 주일 출석부의 두 상태 정책과 구분한다. */
+export const EDITABLE_ATTENDANCE_STATUSES = ["출석", "지각", "결석"] as const satisfies readonly EditableAttendanceStatus[];
 
-/** 기존 지각 레코드를 현재의 출석/결석 계약으로 표시하고 계산한다. */
+/** 저장된 학기 출결 상태를 그대로 표시하고 계산한다. */
 export function normalizeAttendanceStatus(status: AttendanceStatus): EditableAttendanceStatus {
-  return status === "지각" ? "출석" : status;
+  return status;
 }
 
 export interface CompletionResult {

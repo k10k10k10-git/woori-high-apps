@@ -21,7 +21,7 @@ const member: Application = {
 };
 const sessions: Session[] = [{ id: "session-a", date: "2026-09-05", type: "정규" }];
 
-it("레거시 지각을 출석으로 표시하고 새 상태 메뉴에는 출석과 결석만 제공한다", () => {
+it("저장된 지각을 유지하고 메뉴에서 지각을 명시적으로 선택할 수 있다", () => {
   const onMark = vi.fn();
   const attendanceByScope: AttendanceByScope = {
     team: { "session-a": { "application-a": { s: "지각" } } },
@@ -43,14 +43,16 @@ it("레거시 지각을 출석으로 표시하고 새 상태 메뉴에는 출석
     />,
   );
 
-  const cell = screen.getByRole("button", { name: /출석 상태 \(현재 출석\)/ });
-  expect(cell).toHaveTextContent("✓");
+  const cell = screen.getByRole("button", { name: /출석 상태 \(현재 지각\)/ });
+  expect(cell).toHaveTextContent("△");
   fireEvent.click(cell);
 
-  expect(screen.getByRole("menuitem", { name: "✓ 출석 (현재)" })).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: "△ 지각 (현재)" })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: "✕ 결석" })).toBeInTheDocument();
-  expect(screen.queryByRole("menuitem", { name: /지각/ })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "△ 지각 (현재)" }));
+  expect(onMark).toHaveBeenCalledWith("application-a", "session-a", "지각");
 
+  fireEvent.click(cell);
   fireEvent.click(screen.getByRole("menuitem", { name: "✕ 결석" }));
   expect(onMark).toHaveBeenCalledWith("application-a", "session-a", "결석");
 });

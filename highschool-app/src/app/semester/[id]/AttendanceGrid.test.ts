@@ -15,7 +15,7 @@ describe("출석 표 상태 메뉴 위치", () => {
     expect(attendanceMenuPosition(
       { left: 760, top: 620, right: 804, bottom: 656, width: 44 },
       { width: 800, height: 700 },
-    )).toEqual({ left: 644, top: 476 });
+    )).toEqual({ left: 644, top: 426 });
   });
 });
 

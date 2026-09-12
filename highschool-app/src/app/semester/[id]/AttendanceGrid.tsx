@@ -1,7 +1,7 @@
 "use client";
 
 // 출석 표 — 학생 출석부와 같은 인원×회차 격자.
-// ⚠ 셀은 토글이 아니다. 셀을 누르면 출석/결석/지우기를 명시적으로 고른다.
+// ⚠ 셀은 토글이 아니다. 셀을 누르면 출석/지각/결석/지우기를 명시적으로 고른다.
 //   (같은 값을 다시 골라도 결과가 같은 멱등 기록 — 모노레포 실수 규칙 11).
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -41,6 +41,7 @@ type Props = {
 
 const MARK: Record<EditableAttendanceStatus, { text: string; cell: string }> = {
   출석: { text: "✓", cell: "bg-emerald-50 text-emerald-600" },
+  지각: { text: "△", cell: "bg-amber-50 text-amber-700" },
   결석: { text: "✕", cell: "bg-red-50 text-red-500" },
 };
 
