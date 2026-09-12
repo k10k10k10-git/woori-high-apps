@@ -15,7 +15,7 @@ import {
   subscribeApplicationsPrivate,
   upsertApplication,
 } from "@/features/semester/db";
-import { STAFF_BU } from "@/features/semester/applicant";
+import { applicationForRosterPerson, STAFF_BU } from "@/features/semester/applicant";
 import { deriveTrainingOnly, isStaffApplicant, validateIntake } from "@/features/semester/intakeRule";
 import { isStaffApplication } from "@/features/semester/roster";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
@@ -91,8 +91,6 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
     return subscribeApplicationsPrivate(sid, setPrivateMap, (e) => setLoadError(e.message));
   }, [sid, canEdit]);
 
-  const appByKey = useMemo(() => new Map(applications.map((a) => [a.id, a])), [applications]);
-
   const buckets = useMemo<Bucket[]>(() => {
     const classBuckets = classes
       .map((c) => ({ c, p: parseClassKey(c.classKey) }))
@@ -144,6 +142,15 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
     return [...classBuckets, ...staffBucket];
   }, [classes, staff]);
 
+  const appByKey = useMemo(() => {
+    const result = new Map<string, Application>();
+    for (const { rows } of buckets) for (const row of rows) {
+      const app = applicationForRosterPerson(applications, { bu: row.bu, studentId: row.personId, personId: row.canonicalPersonId });
+      if (app) result.set(makeAppKey(row.bu, row.personId), app);
+    }
+    return result;
+  }, [applications, buckets]);
+
   const SEARCH_LIMIT = 40;
   const matched = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase("ko");
@@ -166,12 +173,13 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
   // 명단에 섞어 두면 학생 접수 현황을 훑기 어려워 따로 묶어 접어 둔다.
   const appliedStudents = useMemo(() => applied.filter(({ row }) => !isStaffApplication(row)), [applied]);
   const appliedStaff = useMemo(() => applied.filter(({ row }) => isStaffApplication(row)), [applied]);
+  const editingApplication = editing ? appByKey.get(makeAppKey(editing.bu, editing.personId)) : undefined;
 
   const renderAppliedCard = (entry: (typeof applied)[number]) => {
     const { bucket, row } = entry;
     const appKey = makeAppKey(row.bu, row.personId);
     const app = appByKey.get(appKey);
-    const priv = visiblePrivateMap[appKey];
+    const priv = visiblePrivateMap[app?.id ?? appKey];
     const team = app?.teamId ? teams.find((t) => t.id === app.teamId) : undefined;
     const choice1 = app?.choice1 ? teams.find((t) => t.id === app.choice1) : undefined;
     const trainingClass = app?.trainingClassId ? trainingClasses.find((c) => c.id === app.trainingClassId) : undefined;
@@ -327,14 +335,15 @@ export default function IntakeTab({ sid, teams, trainingClasses, applications }:
           teams={teams}
           trainingClasses={trainingClasses}
           person={editing}
-          existing={appByKey.get(makeAppKey(editing.bu, editing.personId))}
-          existingPrivate={visiblePrivateMap[makeAppKey(editing.bu, editing.personId)]}
+          existing={editingApplication}
+          existingPrivate={editingApplication ? visiblePrivateMap[editingApplication.id] : undefined}
           canEdit={canEdit}
           byUid={user?.uid}
           onClose={() => setEditing(null)}
           onRemove={async () => {
             if (!(await uiConfirm(`${editing.name} 신청을 삭제할까요?`))) return;
-            await removeApplication(sid, makeAppKey(editing.bu, editing.personId));
+            const existing = appByKey.get(makeAppKey(editing.bu, editing.personId));
+            if (existing) await removeApplication(sid, existing.id);
             toast("신청이 삭제되었습니다", "info");
             setEditing(null);
           }}
@@ -394,11 +403,12 @@ function IntakeModal({
       await upsertApplication(
         sid,
         {
-          studentId: person.personId,
+          // 기존 신청·출석·비공개 자료의 키는 학생 이동 후에도 바꾸지 않는다.
+          studentId: existing?.studentId ?? person.personId,
           ...(person.canonicalPersonId ?? existing?.personId ? { personId: person.canonicalPersonId ?? existing?.personId } : {}),
-          bu: person.bu,
-          grade: person.grade,
-          class: person.classNum,
+          bu: existing?.bu ?? person.bu,
+          grade: existing?.grade ?? person.grade,
+          class: existing?.class ?? person.classNum,
           name: person.name,
           choice1: isStaff ? "" : choice1 || "",
           choice2: isStaff ? "" : (choice1 && choice2 ? choice2 : ""),

@@ -202,7 +202,7 @@ layout.tsx
 - 일괄 임포트된 학생: `S{grade}{class}_{num:02d}` (예: `S23_01`, `S311_01`)
 - 앱에서 추가된 학생: `s_${Date.now()}`
 
-`personId`는 연도별 sid와 별개인 영구 인물 식별자다. 기존 sid·`pid`·출석 경로는 절대 교체하지 않고, 학생 추가·명단 교체·시트 동기화·진급·이동·편집에서 `person_student_*` 값을 보존한다. 다른 연도 학생은 정규화 이름·생년월일·같은 부서·정상 진급선(`학년 차이 === 연도 차이`)이 일치하고 각 연도 후보가 한 명뿐일 때 과거 ID를 재사용한다. 연락처 변경·누락은 허용하지만 같은 연도 다른 ID와 보호자 연락처 단독 일치는 분리한다. 교사·스탭 명단은 각각 `person_teacher_*`, `person_staff_*` namespace를 사용한다.
+`personId`는 연도별 sid와 별개인 영구 인물 식별자다. 기존 sid·`pid`·출석 경로는 원칙적으로 유지하되, 2026-09-12 승인된 수동 이동의 목적지 충돌 SID 분리는 아래 이동 패턴을 따른다. 학생 추가·명단 교체·시트 동기화·진급·이동·편집에서 `person_student_*` 값을 보존한다. 다른 연도 학생은 정규화 이름·생년월일·같은 부서·정상 진급선(`학년 차이 === 연도 차이`)이 일치하고 각 연도 후보가 한 명뿐일 때 과거 ID를 재사용한다. 연락처 변경·누락은 허용하지만 같은 연도 다른 ID와 보호자 연락처 단독 일치는 분리한다. 교사·스탭 명단은 각각 `person_teacher_*`, `person_staff_*` namespace를 사용한다.
 
 **출석 셀 키**: `evKey(mi, di)` = `"{monthIndex}-{sundayIndex}"` (예: `"0-0"` = 1월 첫 번째 주일, `"4-1"` = 5월 두 번째 주일). `mi`는 0부터 시작하는 월 인덱스, `di`는 해당 월의 주일 순번.
 
@@ -334,9 +334,14 @@ CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/global
 
 ### 학생 데이터 쓰기 패턴 — 단일 경로만 수정 (전체 덮어쓰기 금지)
 
+#### 충돌 학생 ID 분리와 재접속 결과 확인 (2026-09-12)
+- **접근법**: `MoveStudentModal.tsx`에서 명단·출석 충돌 학생에만 새 push key를 선택한다 → 양쪽 반 잠금 안에서 원본 동일인·빈 목적지·중복 personId를 재검사한다 → `studentMove.ts`에서 목적지 출석 병합을 거부하고 학생·출석·이력·commit을 함께 저장한다 → 목적지 ID를 인코딩한 작업 키로 응답 유실·재접속을 확인한다.
+- **판단 질문**: 부서 없는 시트 SID가 같아도 같은 학생이 아니다. 명단이 없어도 출석이 남은 슬롯은 재사용하지 않는다. Rules 필드는 변경하지 않으며 구버전 작업 복구를 유지한다. 영구 ID 없는 충돌 학생은 자동 이동하지 않는다. 과거 피해 복구·구버전 쓰기·같은 UID의 직접 쓰기 차단은 별도 경계다.
+- **재사용 규칙**: `studentMove*.test.ts`와 `e2e/student-move.browser.spec.mjs`에서 기존 명단·출석 불변, 새 ID 이관, 단발 요청·응답 유실을 검사한다. 통합 앱의 과거 신청 키를 바꾸지 말고 personId로 현재 원장을 확인한다.
+
 Firebase Realtime Database SDK와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다.
 
-`StudentModal`(저장/삭제), `MoveStudentModal`(이동)은 반 전체 명단(`classes/{year}/{ck}/students`)을 통째로 `set()`하지 않고, 항상 **해당 학생 1명의 경로만** 갱신한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 목적지에 같은 SID 학생이 있으면 중단하고, 원본 출석은 목적지 셀 우선으로 병합한다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:
+`StudentModal`(저장/삭제), `MoveStudentModal`(이동)은 반 전체 명단(`classes/{year}/{ck}/students`)을 통째로 `set()`하지 않고, 항상 **해당 학생 1명의 경로만** 갱신한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 충돌 학생은 사전에 새 목적지 SID를 선택하고, 잠금 안에서 선택한 SID의 명단·출석이 비었는지 재검사한다. 다른 학생의 출석과 병합하지 않는다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:
 ```typescript
 // ✅ 올바른 방법 — 단일 학생 경로만 갱신
 await update(ref(db), { [`classes/${year}/${ck}/students/${id}`]: newStudent });
