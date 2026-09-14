@@ -4,7 +4,7 @@ import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 import { sameStoredValue } from '@/utils/studentPersistence';
 import { patchStudentMoveOnce } from '@/utils/studentMoveRequest';
 
-/** 기존 반 이동 잠금 계약을 재사용한다. 같은 UID의 다른 탭은 Rules상 차단되지 않는다. */
+/** 기존 반 이동 잠금 계약을 재사용한다. 소유 UID의 일반 쓰기도 Rules에서 차단한다. */
 export function claimSyncLocks(current: Record<string, unknown> | null, keys: string[], uid: string, operation: string, startedAt: number) {
   if (keys.some(key => current?.[key] != null)) return undefined;
   const next = { ...current };
@@ -59,7 +59,9 @@ async function commitLockedSheetSync(input: {
     const resultPatch = await patchStudentMoveOnce({
       databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken: token,
       payload: { ...input.payload, ...Object.fromEntries(Object.entries(cleanup)
-        .map(([path, value]) => [`config/studentMoveLocks/${input.year}/${path}`, value])) },
+        .map(([path, value]) => [`config/studentMoveLocks/${input.year}/${path}`, value])),
+        ...Object.fromEntries(keys.map(key => [`config/rosterBatchCommits/${input.year}/${key}/${user.uid}/${operation}`, true])),
+      },
     });
     if (resultPatch.status === 'unknown') {
       uncertain = true;

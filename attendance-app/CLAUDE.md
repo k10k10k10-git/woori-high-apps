@@ -31,6 +31,7 @@ firebase deploy --only database  # 보안 규칙만 배포
 - 같은 반 시트 행도 이름만으로 연결하지 않는다. 생년 또는 본인 전화 근거가 있고 두 필드에 충돌 없는 유일 후보만 사용한다. 식별 불확실/동점은 `ambiguous`이며 `buildSyncPayload`와 적용 버튼 모두 반영을 차단한다. 다른 반 매칭도 강한 식별 근거와 기존 2필드 조건을 함께 요구한다.
 - 학생 수정은 원장 키를 id로 정규화하고 열린 시점의 personId와 다르면 중단한다. personId 없는 레거시는 편집 필드 스냅샷이 바뀌면 자동 병합하지 않는다. 표시용 번호 재계산은 신원 변경으로 취급하지 않는다.
 - 이동 잠금 소유 UID도 일반 명단·출석 쓰기가 거부된다. Rules는 잠금 없는 일반 저장 또는 소유 잠금을 같은 원자 요청에서 해제하는 확정만 허용한다. 기존 이동의 불변 commit marker 검사도 유지한다. 서버 검사이므로 같은 계정의 다른 탭·기기·통합 앱에도 적용된다.
+- 진급·시트 배치는 각 반의 `config/rosterBatchCommits` 불변 표식을 함께 보낸다. 사전 잠금이 사라지거나 표식이 이미 존재하면 서버가 전체 PATCH를 거절하므로, 연결 종료 후 늦게 도착하는 요청도 명단을 덮지 않는다. 표식은 삭제하지 않는다.
 - 회귀: `promotion.test.ts`, `sheetSyncCommit.test.ts`, `sheetSync.test.ts`, `studentPersistence.test.ts`, 관리 모달 렌더 테스트. 실제 Rules는 `run-attendance-contracts.mjs`, 정상/충돌 진급과 이동 중 같은 계정 REST 경합은 `run-attendance-browser.mjs`의 Chromium·모바일 WebKit에서 검증한다. 운영 데이터에 합성 레코드를 쓰지 않는다.
 
 ### 목양 리포트 (2026-09-09)

@@ -45,6 +45,7 @@ it('명단 변경과 자기 잠금 해제는 한 PATCH로 전송한다', async (
   const payload = m.patch.mock.calls[0][0].payload;
   expect(payload['classes/2026/a/teacher']).toBe('교사');
   expect(Object.keys(payload).filter(key => key.startsWith('config/studentMoveLocks/'))).toHaveLength(2);
+  expect(Object.keys(payload).filter(key => key.startsWith('config/rosterBatchCommits/'))).toHaveLength(2);
 });
 it('결과 불명확 시 재시도·잠금 해제 없이 오류를 보고한다', async () => {
   m.patch.mockResolvedValue({ status: 'unknown' });

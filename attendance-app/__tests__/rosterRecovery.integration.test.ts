@@ -36,6 +36,23 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     expect(response.ok).toBe(true);
   });
   afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; });
+  it('진급·시트 배치는 잠금 상실 후 지연 도착과 같은 요청 재생을 거절한다', async () => {
+    const lockPath = 'config/studentMoveLocks/2026/1-1-1/admin/batch';
+    const markerPath = 'config/rosterBatchCommits/2026/1-1-1/admin/batch';
+    const lock = { phase: 'preparing', startedAt: Date.now(), sid: '__sheet_sync__', fromCk: '1-1-1', toCk: '1-1-2' };
+    const payload = { 'classes/2026/1-1-1/teacher': '배치 담임', [lockPath]: null, [markerPath]: true };
+    await set(ref(admin, lockPath), lock);
+    await set(ref(admin, lockPath), null);
+    await expect(update(ref(admin), payload)).rejects.toThrow();
+    expect((await get(ref(admin, 'classes/2026/1-1-1/teacher'))).val()).toBe('합성 교사');
+    await set(ref(admin, lockPath), lock);
+    await update(ref(admin), payload);
+    expect((await get(ref(admin, markerPath))).val()).toBe(true);
+    await set(ref(admin, 'classes/2026/1-1-1/teacher'), '최신 담임');
+    await expect(update(ref(admin), payload)).rejects.toThrow();
+    expect((await get(ref(admin, 'classes/2026/1-1-1/teacher'))).val()).toBe('최신 담임');
+    await expect(set(ref(admin, markerPath), null)).rejects.toThrow();
+  });
   it('이동 잠금은 같은 UID의 일반 쓰기도 거절하고 잠금 해제를 포함한 원자 확정만 허용한다', async () => {
     const destination = '1-1-2';
     await set(ref(admin, `classes/2026/${destination}`), { teacher: '목적지', students: { other: { id: 'other', name: '기존 합성 학생' } } });

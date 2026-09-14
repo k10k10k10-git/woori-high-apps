@@ -110,6 +110,18 @@
           }
         }
       },
+      "rosterBatchCommits": {
+        "$year": {
+          "$classKey": {
+            "$ownerUid": {
+              "$operationId": {
+                ".write": "auth != null && auth.uid === $ownerUid && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true) && !data.exists() && newData.val() === true && root.child('config').child('studentMoveLocks').child($year).child($classKey).child($ownerUid).child($operationId).child('phase').val() === 'preparing' && root.child('config').child('studentMoveLocks').child($year).child($classKey).child($ownerUid).child($operationId).child('sid').val() === '__sheet_sync__' && root.child('config').child('studentMoveLocks').child($year).child($classKey).child($ownerUid).child($operationId).child('fromCk').val() === $classKey",
+                ".validate": "newData.val() === true"
+              }
+            }
+          }
+        }
+      },
       "studentMoveCommits": {
         "$year": {
           "$fromCk": {
