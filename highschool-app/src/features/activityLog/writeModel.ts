@@ -18,6 +18,7 @@ const FIELD_LABELS: Readonly<Record<string, string>> = {
   members: "명단", groupIds: "조 배정", studentIds: "학생 배정", teacherIds: "교사 배정", checked: "확인 상태",
   completed: "완료 상태", certPrinted: "수료증 확인", photoChecked: "사진 확인", completionRule: "수료 기준",
   role: "권한", semesterRole: "학기 권한", retreatRole: "수련회 권한", sundayWrite: "주일 편집 권한", requestedAt: "요청 시각",
+  teamKey: "연결 팀", teamMemberships: "팀별 권한", active: "사용 상태", semesters: "적용 학기",
   attachment: "첨부", resolutionNote: "처리 메모", resolvedAt: "처리 시각", resolvedBy: "처리자 표기", notifiedAt: "알림 확인",
   studentId: "학생 연결", participantKey: "참가자 연결", sourceSite: "업무 구분", isOnSite: "현장 등록 구분", paid: "입금 상태",
 };

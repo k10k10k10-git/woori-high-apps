@@ -20,6 +20,7 @@ import {
   isRetreatRole, isSemesterRole, ownSundayTeam,
   type MinistryRoles, type RetreatRole, type SemesterRole,
 } from "@/features/portal/accessPolicy";
+import { normalizeTeamMemberships, type TeamMemberships } from "@/features/teams/teamModel";
 import { normalizeIguardPendingRequests, type IguardPendingReq } from "./pendingAccess";
 import { isMinistryGuideMilestone } from "@/features/ministryGuide/ministryGuidePersistence";
 import { isWorshipMilestone } from "@/features/sundayWorship/worshipSeating";
@@ -1015,6 +1016,7 @@ export interface IguardMemberInfo {
   /** 두 축 역할 — 없으면 iguardRoles에서 파생한다(resolveMinistryRoles) */
   semesterRole?: SemesterRole;
   retreatRole?: RetreatRole;
+  teamMemberships?: TeamMemberships;
 }
 
 /** 로그인했지만 권한 없는 사용자가 접근 요청 */
@@ -1045,6 +1047,7 @@ function normalizeIguardMembers(raw: unknown): Record<string, IguardMemberInfo> 
       name: v?.name || undefined,
       ...(isSemesterRole(v?.semesterRole) ? { semesterRole: v.semesterRole } : {}),
       ...(isRetreatRole(v?.retreatRole) ? { retreatRole: v.retreatRole } : {}),
+      teamMemberships: normalizeTeamMemberships(v?.teamMemberships),
     }];
   });
   return Object.fromEntries(entries.filter(([, value]) => value.email || value.name));
@@ -1073,17 +1076,14 @@ export async function approveIguardMember(
   name?: string,
   roles?: MinistryRoles,
 ): Promise<void> {
+  const memberPath = paths.iguardMember(uid);
   await update(ref(db), {
-    [paths.iguardMember(uid)]: stripUndefined({
-      email,
-      name: name?.trim() || undefined,
-      semesterRole: roles?.semester,
-      retreatRole: roles?.retreat,
-      // 주일 사역 자기 팀 저장을 Rules가 확인하는 플래그.
-      // iguardRoles는 'staff'|'team'만 허용(validate)이라 여기에 따로 둔다.
-      // 이 경로는 노드를 통째로 교체하므로, 자격을 잃으면 키가 사라져 플래그도 함께 꺼진다.
-      sundayWrite: roles && ownSundayTeam(roles) ? true : undefined,
-    }),
+    [`${memberPath}/email`]: email,
+    [`${memberPath}/name`]: name?.trim() || null,
+    [`${memberPath}/semesterRole`]: roles?.semester ?? null,
+    [`${memberPath}/retreatRole`]: roles?.retreat ?? null,
+    // 기존 Rules 호환 플래그. 담당 팀 원장은 teamMemberships가 맡는다.
+    [`${memberPath}/sundayWrite`]: roles && ownSundayTeam(roles) ? true : null,
     [paths.iguardRole(uid)]: role,
     [paths.iguardPendingEmail(uid)]: null,
     [paths.iguardPendingName(uid)]: null,
@@ -1098,6 +1098,7 @@ export async function updateIguardMemberName(uid: string, email: string, name: s
   }));
 }
 
+export async function updateIguardTeamMemberships(uid: string, teamMemberships: TeamMemberships): Promise<void> { await update(ref(db, paths.iguardMember(uid)), { teamMemberships }); }
 export async function denyIguardPending(uid: string): Promise<void> {
   await update(ref(db), {
     [paths.iguardPendingEmail(uid)]: null,

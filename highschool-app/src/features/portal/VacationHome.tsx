@@ -46,10 +46,10 @@ export default function VacationHome({
   // 프로그램 준비 홈만 목록 선택에 집중하도록 감춘다.
   const canCreate = mode !== "program" && canCreateRetreat(roles);
   const entryHref = (id: string) => mode === "admin"
-    ? `/retreat/${id}`
+    ? `/events/${id}/administration`
     : mode === "program"
-      ? `/retreat/${id}/programs`
-      : `/retreat/${id}/field`;
+      ? `/events/${id}/programs`
+      : `/events/${id}/field`;
   const entryLabel = mode === "admin" ? "행정 화면" : mode === "program" ? "프로그램 준비" : "현장 화면";
   const selected = retreats.find((retreat) => retreat.id === selectedId);
 
@@ -83,17 +83,17 @@ export default function VacationHome({
             {mode === "field" ? (
               <>
                 <span>지금 해야 할 일은 개인 큐카드에서 바로 확인합니다.</span>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=cue`)} className="btn-primary">개인 큐카드 열기</button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=cue`)} className="btn-primary">개인 큐카드 열기</button>
               </>
             ) : mode === "program" ? (
               <>
                 <span>기획·진행안·브리핑·할 일을 프로그램별로 정리합니다.</span>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/programs`)} className="btn-primary">프로그램 준비 열기</button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/programs`)} className="btn-primary">프로그램 준비 열기</button>
               </>
             ) : (
               <>
                 <span>신청 명단과 편성, 물품, 비용을 관리합니다.</span>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}`)} className="btn-primary">수련회 행정 열기</button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/administration`)} className="btn-primary">수련회 행정 열기</button>
               </>
             )}
           </section>
@@ -102,23 +102,23 @@ export default function VacationHome({
             <section className="vacation-mobile-actions" aria-label="현장 바로가기">
               <h2>현장 바로가기</h2>
               <div>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=board`)}><strong>포스트 현황</strong><span>배치와 현재 위치</span></button>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=check`)}><strong>인원체크</strong><span>조·버스·전체 확인</span></button>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=rooms`)}><strong>조별 정보</strong><span>조원과 담당 스탭</span></button>
-                <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field?view=lodging`)}><strong>숙소 안내</strong><span>호실과 배치 확인</span></button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=board`)}><strong>포스트 현황</strong><span>배치와 현재 위치</span></button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=check`)}><strong>인원체크</strong><span>조·버스·전체 확인</span></button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=rooms`)}><strong>조별 정보</strong><span>조원과 담당 스탭</span></button>
+                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=lodging`)}><strong>숙소 안내</strong><span>호실과 배치 확인</span></button>
               </div>
-              {canAccessArea("retreat-admin", roles) && <button type="button" className="vacation-mobile-admin-link" onClick={() => router.push(`/retreat/${selected.id}`)}>수련회 행정 보기 →</button>}
+              {canAccessArea("retreat-admin", roles) && <button type="button" className="vacation-mobile-admin-link" onClick={() => router.push(`/events/${selected.id}/administration`)}>수련회 행정 보기 →</button>}
             </section>
           )}
 
           {mode === "admin" && canAccessArea("retreat-field", roles) && (
-            <button type="button" className="vacation-mobile-field-link" onClick={() => router.push(`/retreat/${selected.id}/field`)}>이가드 현장으로 이동 →</button>
+            <button type="button" className="vacation-mobile-field-link" onClick={() => router.push(`/events/${selected.id}/field`)}>이가드 현장으로 이동 →</button>
           )}
 
           {mode === "program" && (
             <div className="vacation-mobile-cross-links">
-              <button type="button" onClick={() => router.push(`/retreat/${selected.id}`)}>행정 보기</button>
-              {canAccessArea("retreat-field", roles) && <button type="button" onClick={() => router.push(`/retreat/${selected.id}/field`)}>이가드 보기</button>}
+              <button type="button" onClick={() => router.push(`/events/${selected.id}/administration`)}>행정 보기</button>
+              {canAccessArea("retreat-field", roles) && <button type="button" onClick={() => router.push(`/events/${selected.id}/field`)}>이가드 보기</button>}
             </div>
           )}
 

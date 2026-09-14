@@ -30,9 +30,9 @@ export default function RetreatAreaNav({
   const router = useRouter();
   const navigate = onNavigate ?? ((href: string) => router.push(href));
   const encoded = encodeURIComponent(retreatId);
-  const adminHref = `/retreat/${encoded}`;
-  const programsHref = `/retreat/${encoded}/programs`;
-  const fieldHref = `/retreat/${encoded}/field`;
+  const adminHref = `/events/${encoded}/administration`;
+  const programsHref = `/events/${encoded}/programs`;
+  const fieldHref = `/events/${encoded}/field`;
 
   // 세 영역은 사용자가 탭처럼 오간다. 보이는 동안 목적지 RSC를 준비해
   // 클릭 뒤 전체 화면 로딩 경계가 먼저 나타나는 시간을 없앤다.

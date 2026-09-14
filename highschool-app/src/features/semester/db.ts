@@ -42,6 +42,7 @@ import {
 } from "./newFriend";
 
 import { snapToList } from "@/lib/db/core";
+import { teamKeyFromName } from "@/features/teams/teamModel";
 
 
 const nowISO = () => new Date().toISOString();
@@ -122,11 +123,18 @@ export function subscribeTeams(
 }
 
 export async function addTeam(sid: string, name: string, color: string, order: number): Promise<void> {
-  await update(ref(db, paths.team(sid, newId())), { name, color, order });
+  await update(ref(db, paths.team(sid, newId())), {
+    name,
+    color,
+    order,
+    ...(teamKeyFromName(name) ? { teamKey: teamKeyFromName(name) } : {}),
+  });
 }
 
 export async function updateTeam(sid: string, teamId: string, partial: Partial<Omit<Team, "id">>): Promise<void> {
-  await update(ref(db, paths.team(sid, teamId)), partial);
+  await update(ref(db, paths.team(sid, teamId)), partial.name && teamKeyFromName(partial.name)
+    ? { ...partial, teamKey: teamKeyFromName(partial.name) }
+    : partial);
 }
 
 export async function removeTeam(sid: string, teamId: string): Promise<void> {

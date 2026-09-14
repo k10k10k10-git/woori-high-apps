@@ -31,6 +31,7 @@ beforeEach(() => {
   mocks.data = {
     user: null,
     roles: { semester: "staff", retreat: "fieldStaff" },
+    teamMemberships: {},
     memberName: "테스트 담당자", today: "2026-09-05", connected: true, loaded: false, loadError: null,
     currentSemester: null, currentRetreat: null, homeActions: [], requests: [],
     requestSummary: { total: 0, received: 0, resolved: 0 }, newFriends: [],
@@ -74,7 +75,7 @@ describe("개인 대시보드의 미확인 상태", () => {
   });
 
   it("바나바팀 새친구 지표도 첫 응답 전에 0명으로 확정하지 않는다", () => {
-    mocks.data = { ...mocks.data, roles: { semester: "barnabas", retreat: "none" } };
+    mocks.data = { ...mocks.data, roles: { semester: "barnabas", retreat: "none" }, teamMemberships: { barnabas: { active: true, role: "staff" } } };
     const { rerender } = render(<RoleDashboardPanel />);
     const section = screen.getByRole("region", { name: "새친구 정착 현황" });
     expect(within(section).queryByText("전체")).toBeNull();
@@ -129,7 +130,7 @@ function siteRequest(id: string, title: string): SiteRequest {
 }
 
 it("찬양팀 바로가기는 내 팀 카드 안에 한 번만 표시한다", () => {
-  mocks.data = { ...mocks.data, loaded: true, roles: { semester: "praise", retreat: "none" } };
+  mocks.data = { ...mocks.data, loaded: true, roles: { semester: "praise", retreat: "none" }, teamMemberships: { praise: { active: true, role: "staff" } } };
   render(<MyMinistryPanel />);
   const team = screen.getByRole("region", { name: "팀·주일 운영" });
   expect(within(team).getByRole("link", { name: "주일 등단표" })).toHaveAttribute("href", "/sunday-ministry/praise?tab=stage");

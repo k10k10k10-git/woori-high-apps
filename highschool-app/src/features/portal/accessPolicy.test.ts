@@ -295,11 +295,11 @@ describe("표시·이동", () => {
   });
 
   it("행정 권한이 있으면 행정 화면으로, 아니면 현장 화면으로 연결한다", () => {
-    expect(retreatEntryHref("summer 2026", roles("none", "adminTeam"))).toBe("/retreat/summer%202026");
-    expect(retreatEntryHref("summer 2026", roles("praise", "fieldStaff"))).toBe("/retreat/summer%202026/field");
+    expect(retreatEntryHref("summer 2026", roles("none", "adminTeam"))).toBe("/events/summer%202026/administration");
+    expect(retreatEntryHref("summer 2026", roles("praise", "fieldStaff"))).toBe("/events/summer%202026/field");
     // 조회만 가능한 역할은 현장이 주 사용처다
-    expect(retreatEntryHref("summer 2026", roles("none", "iguardTeam"))).toBe("/retreat/summer%202026/field");
-    expect(retreatEntryHref("summer 2026", roles("none", "leader"))).toBe("/retreat/summer%202026/field");
+    expect(retreatEntryHref("summer 2026", roles("none", "iguardTeam"))).toBe("/events/summer%202026/field");
+    expect(retreatEntryHref("summer 2026", roles("none", "leader"))).toBe("/events/summer%202026/field");
   });
 });
 
@@ -331,6 +331,14 @@ describe("주일 사역 - 팀 경계", () => {
         expect(canEditSundayTeam(team, roles)).toBe(true);
       }
     }
+  });
+
+  it("명시 담당 팀이 있으면 스탭팀장도 그 팀만 조회하고 수정한다", () => {
+    const leader = semester("leader");
+    expect(canAccessSundayTeam("media", leader, ["media"])).toBe(true);
+    expect(canEditSundayTeam("media", leader, ["media"])).toBe(true);
+    expect(canAccessSundayTeam("praise", leader, ["media"])).toBe(false);
+    expect(canEditSundayTeam("praise", leader, ["media"])).toBe(false);
   });
 
   it("행정팀은 모든 주일팀을 조회하되 행정팀만 수정한다", () => {

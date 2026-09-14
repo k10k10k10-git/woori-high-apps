@@ -15,6 +15,8 @@ export interface Semester {
 
 export interface Team {
   id: string;
+  /** 학기마다 달라지는 id와 영구 팀 작업 공간을 연결한다. */
+  teamKey?: import("@/features/portal/featureCatalog").SundayTeamKey;
   name: string;
   color: string; // Tailwind 파스텔 클래스 (예: "bg-blue-100")
   room?: string;

@@ -12,19 +12,19 @@ import ThemeToggle from "@/components/ThemeToggle";
 import ViewModeToggle from "@/components/ViewModeToggle";
 import OverlayShell from "@/components/OverlayShell";
 import { useViewMode } from "@/context/ViewModeContext";
-import { canAccessArea, canAccessSundayTeam, canManageRolesOf, ownSundayTeam } from "./accessPolicy";
-import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
+import { canAccessArea, canAccessSundayTeam, canManageRolesOf } from "./accessPolicy";
+import { SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
+import { accessibleTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
 
 const MyPageModal = dynamic(() => import("./MyPageModal"), { ssr: false });
 
-type GlobalArea = "home" | "semester" | "sunday" | "guide" | "vacation" | "suggestions";
+type GlobalArea = "home" | "teams" | "events" | "operations" | "library" | "help";
 type MyPageSession = { pathname: string; uid: string; initialTab: MyPageTab };
 
 type NavItem = { href: string; label: string; hint: string; disabled?: boolean };
 
 /**
- * 상단 메뉴의 hover 드롭다운. 주일 사역과 방학 중 사역이 **같은 컴포넌트**를 써야
- * 두 메뉴의 여닫힘·키보드·바깥클릭 동작이 갈라지지 않는다.
+ * 상단 메뉴의 hover 드롭다운. 팀 목록을 키보드·바깥클릭으로 일관되게 다룬다.
  * 열림 상태는 부모가 들고 있어 한쪽을 열면 다른 쪽이 닫힌다.
  */
 function NavDropdown({ label, items, active, open, onOpen, onClose }: {
@@ -106,28 +106,28 @@ function NavDropdown({ label, items, active, open, onOpen, onClose }: {
 
 function activeArea(pathname: string): GlobalArea {
   if (pathname === "/") return "home";
-  if (pathname.startsWith("/sunday-ministry") || pathname.startsWith("/semester-admin")) return "sunday";
-  if (pathname.startsWith("/semester")) return "semester";
-  if (pathname.startsWith("/ministry-guide")) return "guide";
-  if (pathname.startsWith("/suggestions")) return "suggestions";
-  return "vacation";
+  if (pathname.startsWith("/teams") || pathname.startsWith("/sunday-ministry")) return "teams";
+  if (pathname.startsWith("/operations") || pathname.startsWith("/semester")) return "operations";
+  if (pathname.startsWith("/library") || pathname.startsWith("/ministry-guide")) return "library";
+  if (pathname.startsWith("/help") || pathname.startsWith("/suggestions")) return "help";
+  return "events";
 }
 
 const AREA_LABEL: Record<GlobalArea, string> = {
   home: "통합 홈",
-  semester: MINISTRY_AREA_LABELS.semester,
-  sunday: MINISTRY_AREA_LABELS.sunday,
-  vacation: "방학 중 사역",
-  guide: "사역 가이드",
-  suggestions: "사이트 건의사항",
+  teams: "팀",
+  events: "행사",
+  operations: "운영센터",
+  library: "자료",
+  help: "도움말",
 };
 
 export default function GlobalPortalHeader() {
   const pathname = usePathname();
-  const { user, loading, roles, signOut } = useAuth();
+  const { user, loading, roles, teamMemberships, signOut } = useAuth();
   const { mode, isViewportMobile } = useViewMode();
   const [myPage, setMyPage] = useState<MyPageSession | null>(null);
-  const [openMenu, setOpenMenu] = useState<"sunday" | "vacation" | null>(null);
+  const [openMenu, setOpenMenu] = useState<"teams" | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const currentArea = activeArea(pathname);
   // 다른 업무로 이동하면 이전 모달을 폐기한다. 뒤로가기로 돌아와도 다시 열리지 않는다.
@@ -143,8 +143,7 @@ export default function GlobalPortalHeader() {
     openMyPage("team");
   }, [openMyPage, roles]);
   const closeMenu = useCallback(() => setOpenMenu(null), []);
-  const openSunday = useCallback(() => setOpenMenu("sunday"), []);
-  const openVacation = useCallback(() => setOpenMenu("vacation"), []);
+  const openTeams = useCallback(() => setOpenMenu("teams"), []);
 
   useEffect(() => {
     window.addEventListener("portal:open-team", openTeam);
@@ -164,26 +163,17 @@ export default function GlobalPortalHeader() {
 
   const isMobilePreview = !isViewportMobile && mode === "mobile";
 
-  const semesterAllowed = canAccessArea("semester", roles);
-  const assignedSundayTeam = ownSundayTeam(roles);
-  // 방학 중 사역은 행정·프로그램 준비·이가드 세 갈래다.
-  // 세 경로 모두 **같은 홈 화면**(VacationHome)을 보여주고, 선택 후 업무 화면만 달라진다.
-  const vacationItems: NavItem[] = [
-    ...(canAccessArea("retreat-admin", roles) ? [{ href: "/retreats", label: "수련회 행정팀", hint: "신청·편성·물품" }] : []),
-    ...(canAccessArea("retreat-admin", roles) ? [{ href: "/programs", label: "수련회 프로그램팀", hint: "기획·진행안·브리핑" }] : []),
-    ...(canAccessArea("retreat-field", roles) ? [{ href: "/field", label: "수련회 이가드팀", hint: "현장 운영·큐싯" }] : []),
-  ];
-  // 주일 사역도 같은 드롭다운 구조다. 팀 목록은 featureCatalog가 단일 원천.
-  // 들어갈 수 없는 팀은 메뉴에서 뺀다 — 눌러도 막히는 항목을 남겨두면 목록이 거짓말이 된다.
-  const sundayItems: NavItem[] = SUNDAY_MINISTRY_TEAMS
-    .filter((team) => canAccessSundayTeam(team.key, roles))
+  const operationsAllowed = canAccessOperationsCenter(roles, teamMemberships) || canManageRolesOf(roles);
+  const eventsAllowed = canAccessArea("retreat-admin", roles) || canAccessArea("retreat-field", roles);
+  const teamKeys = teamMemberships
+    ? accessibleTeamKeys(roles, teamMemberships)
+    : SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, roles)).map((team) => team.key);
+  const teamItems: NavItem[] = SUNDAY_MINISTRY_TEAMS
+    .filter((team) => teamKeys.includes(team.key))
     .map((team) => ({
-      href: sundayTeamHref(team.key),
+      href: `/teams/${team.key}`,
       label: team.label,
       hint: team.hint,
-      // 기획 중 팀은 완성된 기능처럼 열지 않는다. 다만 그 팀으로 배정된
-      // 사용자는 자신의 준비 화면과 건의사항 진입을 계속 쓸 수 있다.
-      disabled: team.status === "planned" && assignedSundayTeam !== team.key,
     }));
 
   // PC에서 모바일버전을 볼 때 이 헤더는 사이트 내비게이션이 아니라 미리보기
@@ -237,53 +227,30 @@ export default function GlobalPortalHeader() {
           </button>
 
           <nav className={`portal-nav ${openMenu ? "portal-nav-menu-open" : ""}`} aria-label="통합 사역 메뉴">
-            {semesterAllowed && (
+            {teamItems.length > 0 && (
+              <NavDropdown
+                label="팀"
+                items={teamItems}
+                active={currentArea === "teams"}
+                open={openMenu === "teams"}
+                onOpen={openTeams}
+                onClose={closeMenu}
+              />
+            )}
+
+            {eventsAllowed && (
               <Link
-                href="/semesters"
+                href="/events"
                 className="portal-nav-link"
-                aria-current={currentArea === "semester" ? "page" : undefined}
+                aria-current={currentArea === "events" ? "page" : undefined}
               >
-                {MINISTRY_AREA_LABELS.semester}
+                행사
               </Link>
             )}
 
-            {sundayItems.length > 0 && (
-              <NavDropdown
-                label={MINISTRY_AREA_LABELS.sunday}
-                items={sundayItems}
-                active={currentArea === "sunday"}
-                open={openMenu === "sunday"}
-                onOpen={openSunday}
-                onClose={closeMenu}
-              />
-            )}
+            {operationsAllowed && <Link href="/operations" className="portal-nav-link" aria-current={currentArea === "operations" ? "page" : undefined}>운영센터</Link>}
 
-            {vacationItems.length > 0 && (
-              <NavDropdown
-                label="방학 중 사역"
-                items={vacationItems}
-                active={currentArea === "vacation"}
-                open={openMenu === "vacation"}
-                onOpen={openVacation}
-                onClose={closeMenu}
-              />
-            )}
-
-            <Link
-              href="/ministry-guide"
-              className="portal-nav-link"
-              aria-current={currentArea === "guide" ? "page" : undefined}
-            >
-              사역 가이드
-            </Link>
-
-            <Link
-              href="/suggestions"
-              className="portal-nav-link"
-              aria-current={currentArea === "suggestions" ? "page" : undefined}
-            >
-              사이트 건의사항
-            </Link>
+            <Link href="/library" className="portal-nav-link" aria-current={currentArea === "library" ? "page" : undefined}>자료</Link>
           </nav>
 
           <div className="portal-header-tools">
@@ -313,6 +280,13 @@ export default function GlobalPortalHeader() {
           </div>
         </div>
       </header>
+      <nav className="portal-mobile-bottom-nav" aria-label="주요 메뉴">
+        <Link href="/" aria-current={currentArea === "home" ? "page" : undefined}><span>홈</span></Link>
+        {teamItems.length > 0 && <Link href="/teams" aria-current={currentArea === "teams" ? "page" : undefined}><span>팀</span></Link>}
+        {eventsAllowed && <Link href="/events" aria-current={currentArea === "events" ? "page" : undefined}><span>행사</span></Link>}
+        {operationsAllowed && <Link href="/operations" aria-current={currentArea === "operations" ? "page" : undefined}><span>운영</span></Link>}
+        <Link href="/library" aria-current={currentArea === "library" ? "page" : undefined}><span>자료</span></Link>
+      </nav>
       {mobileMenuOpen && (
         <OverlayShell
           label="사이트 메뉴"
@@ -323,12 +297,12 @@ export default function GlobalPortalHeader() {
             <div className="portal-mobile-sheet-handle" aria-hidden="true" />
             <p className="portal-mobile-sheet-title">사역 메뉴</p>
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
-              <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>통합 홈</Link>
-              {semesterAllowed && <Link href="/semesters" aria-current={currentArea === "semester" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>{MINISTRY_AREA_LABELS.semester}</Link>}
-              {sundayItems.length > 0 && <Link href="/sunday-ministry" aria-current={currentArea === "sunday" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>{MINISTRY_AREA_LABELS.sunday}</Link>}
-              {vacationItems.length > 0 && <Link href={(vacationItems.find((item) => item.href === "/field") ?? vacationItems[0]).href} aria-current={currentArea === "vacation" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>방학 중 사역</Link>}
-              <Link href="/ministry-guide" aria-current={currentArea === "guide" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사역 가이드</Link>
-              <Link href="/suggestions" aria-current={currentArea === "suggestions" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사이트 건의사항</Link>
+              <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>홈</Link>
+              {teamItems.length > 0 && <Link href="/teams" aria-current={currentArea === "teams" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>팀</Link>}
+              {eventsAllowed && <Link href="/events" aria-current={currentArea === "events" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>행사</Link>}
+              {operationsAllowed && <Link href="/operations" aria-current={currentArea === "operations" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>운영센터</Link>}
+              <Link href="/library" aria-current={currentArea === "library" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>자료</Link>
+              <Link href="/help/feedback" aria-current={currentArea === "help" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>문제 제보</Link>
             </nav>
             <div className="portal-mobile-account">
               <ThemeToggle showLabel />

@@ -11,8 +11,9 @@ import {
   ownSundayTeam,
   type MinistryRoles,
 } from "./accessPolicy";
-import { sundayTeamHref, sundayTeamOf, type SundayTeamKey } from "./featureCatalog";
+import { sundayTeamOf, type SundayTeamKey } from "./featureCatalog";
 import type { SharedCalendarItem } from "./SharedMinistryCalendar";
+import { activeTeamKeys, canAccessOperationsCenter, type TeamMemberships } from "@/features/teams/teamModel";
 
 export type MinistryModuleTone = "semester" | "sunday" | "retreat" | "field" | "guide";
 
@@ -70,17 +71,18 @@ export function roleDashboardTitle(roles: MinistryRoles): string {
   return "배정된 사역과 요청 상태를 확인하세요";
 }
 
-function sundayModule(roles: MinistryRoles): MinistryModule | null {
+function sundayModule(roles: MinistryRoles, memberships?: TeamMemberships): MinistryModule | null {
   if (!canAccessArea("sunday", roles)) return null;
-  const ownTeam = ownSundayTeam(roles);
+  const assignedTeamKeys = memberships === undefined ? undefined : activeTeamKeys(memberships);
+  const ownTeam = ownSundayTeam(roles, assignedTeamKeys);
   if (ownTeam) {
     const team = sundayTeamOf(ownTeam);
     return {
       id: `sunday-${ownTeam}`,
       title: team?.label ?? "담당 사역팀",
       description: team?.tabs.length ? team.tabs.join(" · ") : "팀 기능 준비 중",
-      href: sundayTeamHref(ownTeam),
-      accessLabel: canAccessSundayTeam(ownTeam, roles) ? "담당" : "조회",
+      href: `/teams/${ownTeam}`,
+      accessLabel: canAccessSundayTeam(ownTeam, roles, assignedTeamKeys) ? "담당" : "조회",
       tone: "sunday",
     };
   }
@@ -94,26 +96,26 @@ function sundayModule(roles: MinistryRoles): MinistryModule | null {
   };
 }
 
-export function ministryModulesFor(roles: MinistryRoles): MinistryModule[] {
+export function ministryModulesFor(roles: MinistryRoles, memberships?: TeamMemberships): MinistryModule[] {
   const modules: MinistryModule[] = [];
-  if (canAccessArea("semester", roles)) {
+  if (canAccessOperationsCenter(roles, memberships)) {
     modules.push({
       id: "semester",
       title: canEditArea("semester", roles) ? "학기 운영" : "학기 사역 조회",
       description: "신청·배치·출석·커리큘럼",
-      href: "/semesters",
+      href: "/operations/semesters",
       accessLabel: canEditArea("semester", roles) ? "수정" : "조회",
       tone: "semester",
     });
   }
-  const sunday = sundayModule(roles);
+  const sunday = sundayModule(roles, memberships);
   if (sunday) modules.push(sunday);
   if (canAccessArea("retreat-admin", roles)) {
     modules.push({
       id: "retreat-admin",
       title: "수련회 행정",
       description: "신청·편성·물품·정산",
-      href: "/retreats",
+      href: "/events",
       accessLabel: canEditArea("retreat-admin", roles) ? "수정" : "조회",
       tone: "retreat",
     });
@@ -123,7 +125,7 @@ export function ministryModulesFor(roles: MinistryRoles): MinistryModule[] {
       id: "retreat-field",
       title: "수련회 이가드",
       description: iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "개인 큐카드·조별 정보·인원체크",
-      href: "/field",
+      href: "/events",
       accessLabel: iguardScopeOf(roles) === "all" ? "전체" : "실행",
       tone: "field",
     });

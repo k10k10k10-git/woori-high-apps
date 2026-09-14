@@ -12,7 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import { createSubscriptionReadinessGate } from "@/lib/subscriptionReadiness";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
-import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
+import { canEditArea } from "@/features/portal/accessPolicy";
 import {
   subscribeSemesterMeta,
   subscribeTeams,
@@ -26,6 +26,7 @@ import { SemesterEditProvider } from "@/features/semester/EditContext";
 import { SEMESTER_TRAINING_TABS } from "@/features/portal/featureCatalog";
 import LoginButton from "@/components/LoginButton";
 import { useViewMode } from "@/context/ViewModeContext";
+import { activeTeamKeys, canAccessOperationsCenter, ownTeamKey } from "@/features/teams/teamModel";
 import IntakeTab from "./IntakeTab";
 import AssignTab from "./AssignTab";
 import AttendanceTab from "./AttendanceTab";
@@ -89,10 +90,12 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
   const query = useSearchParams();
   const praiseHref = praiseReturnHref(new URLSearchParams(query.toString()));
   const requestedTeam = query.get("team") ?? "";
-  const { user, loading: authLoading, roles, signIn } = useAuth();
+  const { user, loading: authLoading, roles, teamMemberships, signIn } = useAuth();
   const { isMobileView } = useViewMode();
-  const allowed = canAccessArea("semester", roles);
-  const canEdit = canEditArea("semester", roles);
+  const allowed = canAccessOperationsCenter(roles, teamMemberships);
+  const canEdit = allowed && canEditArea("semester", roles);
+  const assignedTeam = ownTeamKey(roles, teamMemberships);
+  const assignedTeams = activeTeamKeys(teamMemberships);
   const tabSource = `${semesterId}\u0000${initialTab ?? ""}`;
   const [tabSelection, setTabSelection] = useState<{ source: string; tab: TabName | null }>(() => ({ source: tabSource, tab: null }));
   const pickedTab = tabSelection.source === tabSource ? tabSelection.tab : null;
@@ -105,6 +108,13 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
   const { fail, ok, message: loadError } = useLoadErrors(`${semesterId}|${user?.uid ?? ""}`);
   const dataScope = user && allowed ? `${semesterId}|${user.uid}` : null;
   const dataLoading = dataScope == null || loadedScope !== dataScope;
+
+  useEffect(() => {
+    if (authLoading || !user || allowed || assignedTeams.length === 0) return;
+    router.replace(assignedTeam
+      ? `/teams/${assignedTeam}/terms/${encodeURIComponent(semesterId)}/overview`
+      : "/teams");
+  }, [allowed, assignedTeam, assignedTeams.length, authLoading, router, semesterId, user]);
 
   useEffect(() => {
     if (!user || !allowed) return;
@@ -169,6 +179,7 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
   if (authLoading) return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
   if (!user) return <main className="min-h-screen flex flex-col items-center justify-center gap-4"><p className="text-sm text-slate-500">로그인이 필요합니다</p><LoginButton signIn={signIn} /></main>;
   if (!allowed) {
+    if (assignedTeams.length > 0) return <main className="team-first-state" role="status">담당 팀의 학기 화면으로 이동하고 있습니다…</main>;
     return <main className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center"><h1 className="text-xl font-bold text-slate-800">학기 화면 접근 권한이 없습니다</h1><p className="text-sm text-slate-500">이가드팀 계정은 현장 운영 화면만 사용할 수 있습니다.</p><button onClick={() => router.push("/")} className="btn-secondary">통합 홈으로</button></main>;
   }
 
@@ -178,8 +189,8 @@ export default function SemesterClient({ semesterId, initialTab }: { semesterId:
         <div className="workspace-header">
           <div className="mx-auto max-w-6xl px-4">
             <div className="flex min-w-0 items-center gap-1.5 py-3 sm:gap-3">
-              <button onClick={() => router.push("/semesters")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="학기 목록으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={14} /> 목록</button>
-              <button onClick={() => router.push("/semesters")} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }} aria-label="학기 선택">{semesterId}</button>
+              <button onClick={() => router.push("/operations/semesters")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition-colors hover:bg-white/10 hover:text-white sm:text-xs" aria-label="학기 목록으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={14} /> 목록</button>
+              <button onClick={() => router.push("/operations/semesters")} className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-xs" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }} aria-label="학기 선택">{semesterId}</button>
               <h1 className="min-w-0 flex-1 truncate text-xs font-bold text-white sm:text-base">{meta?.title ?? "학기 운영"}</h1>
               {!canEdit && <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">조회 전용</span>}
             </div>

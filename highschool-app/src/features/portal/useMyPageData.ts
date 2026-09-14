@@ -54,6 +54,7 @@ import { buildHomeActions } from "./homeActions";
 import { buildMyRetreatMinistry } from "./myRetreatMinistry";
 import { seoulDateKey } from "./dailyMinistryMessage";
 import { calendarKindForSourceSite, type SharedCalendarItem } from "./SharedMinistryCalendar";
+import { canAccessOperationsCenter, ownTeamKey } from "@/features/teams/teamModel";
 import {
   applicationAttendanceSummary,
   canSeeCalendarKind,
@@ -138,7 +139,7 @@ function subscriptionGroup<T extends object>(
 }
 
 export function useMyPageData() {
-  const { user, roles, memberName } = useAuth();
+  const { user, roles, teamMemberships, memberName } = useAuth();
   const [today] = useState(seoulDateKey);
   const uid = user?.uid;
   const accountScope = JSON.stringify([uid ?? "signed-out", roles.semester, roles.retreat]);
@@ -233,7 +234,12 @@ export function useMyPageData() {
   const loadError = [base.loadError, periodData.loadError, semesterData.loadError, retreatData.loadError].filter(Boolean).join(" · ") || null;
 
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
-    const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters";
+    const assignedTeam = ownTeamKey(roles, teamMemberships);
+    const semesterHref = currentSemester
+      ? canAccessOperationsCenter(roles, teamMemberships)
+        ? `/operations/semesters/${encodeURIComponent(currentSemester.id)}/overview`
+        : assignedTeam ? `/teams/${assignedTeam}/terms/${encodeURIComponent(currentSemester.id)}/overview` : "/teams"
+      : canAccessOperationsCenter(roles, teamMemberships) ? "/operations/semesters" : "/teams";
     const semesterItems = currentSemester ? sessions.map((session) => ({
       id: `semester-${session.id}`,
       date: session.date,
@@ -264,7 +270,7 @@ export function useMyPageData() {
     return [...semesterItems, ...retreatItems, ...sharedItems]
       .filter((item) => canSeeCalendarKind(item.kind, roles))
       .sort((a, b) => a.date.localeCompare(b.date));
-  }, [currentSemester, milestones, periods, retreats, roles, sessions]);
+  }, [currentSemester, milestones, periods, retreats, roles, sessions, teamMemberships]);
 
   const homeActions = useMemo(() => buildHomeActions(calendarItems, today), [calendarItems, today]);
   const personalApplication = useMemo(() => currentSemester ? findUniqueApplicationAssignment(
@@ -290,6 +296,7 @@ export function useMyPageData() {
   return {
     user,
     roles,
+    teamMemberships,
     memberName,
     today,
     connected,

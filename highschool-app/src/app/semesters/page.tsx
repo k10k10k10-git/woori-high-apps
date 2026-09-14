@@ -5,18 +5,23 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
-import { canAccessArea, canDestroySemester, canEditArea } from "@/features/portal/accessPolicy";
+import { canDestroySemester, canEditArea } from "@/features/portal/accessPolicy";
 import { subscribeSemesters, createSemester, removeSemester } from "@/features/semester/db";
 import { Semester } from "@/features/semester/types";
 import LoginButton from "@/components/LoginButton";
+import { activeTeamKeys, canAccessOperationsCenter, ownTeamKey } from "@/features/teams/teamModel";
 
 export default function SemestersPage() {
-  const { user, loading, roles, signIn, signOut } = useAuth();
+  const router = useRouter();
+  const { user, loading, roles, teamMemberships, signIn, signOut } = useAuth();
   const { toast } = useUI();
-  const allowed = canAccessArea("semester", roles);
-  const canEdit = canEditArea("semester", roles);
+  const allowed = canAccessOperationsCenter(roles, teamMemberships);
+  const canEdit = allowed && canEditArea("semester", roles);
+  const ownTeam = ownTeamKey(roles, teamMemberships);
+  const assignedTeams = activeTeamKeys(teamMemberships);
   // 학기 삭제·아카이브는 되돌릴 수 없다 — 통합관리자·교역자만.
   const canDestroy = canDestroySemester(roles);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -29,6 +34,11 @@ export default function SemestersPage() {
   const [deleteTarget, setDeleteTarget] = useState<Semester | null>(null);
   const [deleteInput, setDeleteInput] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    if (loading || !user || allowed || assignedTeams.length === 0) return;
+    router.replace(ownTeam ? `/teams/${ownTeam}` : "/teams");
+  }, [allowed, assignedTeams.length, loading, ownTeam, router, user]);
 
   useEffect(() => {
     if (!user || !allowed) return;
@@ -93,6 +103,7 @@ export default function SemestersPage() {
   }
 
   if (!allowed) {
+    if (assignedTeams.length > 0) return <main className="team-first-state" role="status">담당 팀 화면으로 이동하고 있습니다…</main>;
     return (
       <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center">
         <h1 className="text-xl font-bold">접근 권한이 없습니다</h1>
@@ -136,7 +147,7 @@ export default function SemestersPage() {
           )}
           {semesters.map((s) => (
             <div key={s.id} className="card card-body relative" data-hover>
-              <Link href={`/semester/${s.id}`} className="flex flex-col gap-2">
+              <Link href={`/operations/semesters/${encodeURIComponent(s.id)}/overview`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span
                     className="rounded-full px-2.5 py-0.5 text-xs font-semibold"

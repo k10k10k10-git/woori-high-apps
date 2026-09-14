@@ -204,7 +204,7 @@ export default function RetreatPageClient() {
         </p>
         <div className="mt-5 flex justify-center gap-2">
           {canAccessArea("retreat-field", roles) && (
-            <button onClick={() => router.push(`/retreat/${encodeURIComponent(id)}/field`)} className="btn-primary">
+            <button onClick={() => router.push(`/events/${encodeURIComponent(id)}/field`)} className="btn-primary">
               현장 화면으로
             </button>
           )}
@@ -219,7 +219,7 @@ export default function RetreatPageClient() {
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <div className="mb-3 text-3xl" aria-hidden="true">⚠️</div>
       <p className="mb-4 max-w-md text-sm text-red-700" role="alert">{lockError}</p>
-      <button onClick={() => router.push("/retreats")} className="btn-secondary">수련회 목록으로</button>
+      <button onClick={() => router.push("/events")} className="btn-secondary">행사 목록으로</button>
     </div>
   );
   if (lock === undefined) return (
@@ -228,7 +228,7 @@ export default function RetreatPageClient() {
     </div>
   );
   if (lock && !unlocked) return (
-    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/retreats")} />
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/events")} />
   );
 
   if (!retreat) return (
@@ -255,7 +255,7 @@ export default function RetreatPageClient() {
             {/* 타이틀 */}
             <div className="pt-2 sm:pt-3 pb-1.5 sm:pb-2 flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
-                onClick={() => router.push("/retreats")}
+                onClick={() => router.push("/events")}
                 className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white sm:text-xs"
                 aria-label="수련회 목록으로 돌아가기"
               >

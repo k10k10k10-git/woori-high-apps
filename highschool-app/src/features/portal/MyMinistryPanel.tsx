@@ -4,14 +4,22 @@ import Link from "next/link";
 import { ArrowRight, CalendarBlank, CheckCircle, MapPin, UsersThree } from "@phosphor-icons/react";
 import { canAccessArea, canAccessSundayTeam, describeRoles, iguardScopeOf, ownSundayTeam } from "./accessPolicy";
 import { ministryModulesFor } from "./myPageDashboard";
-import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
+import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 import { useMyPageData } from "./useMyPageData";
+import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
 
 export default function MyMinistryPanel() {
   const data = useMyPageData();
-  const modules = ministryModulesFor(data.roles);
-  const sundayTeam = ownSundayTeam(data.roles);
-  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, data.roles) && (!sundayTeam || team.key === sundayTeam));
+  const modules = ministryModulesFor(data.roles, data.teamMemberships);
+  const assignedTeamKeys = activeTeamKeys(data.teamMemberships);
+  const sundayTeam = ownSundayTeam(data.roles, assignedTeamKeys);
+  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, data.roles, assignedTeamKeys) && (!sundayTeam || team.key === sundayTeam));
+  const operationsAllowed = canAccessOperationsCenter(data.roles, data.teamMemberships);
+  const semesterHref = data.currentSemester
+    ? operationsAllowed
+      ? `/operations/semesters/${encodeURIComponent(data.currentSemester.id)}/overview`
+      : sundayTeam ? `/teams/${sundayTeam}/terms/${encodeURIComponent(data.currentSemester.id)}/overview` : "/teams"
+    : operationsAllowed ? "/operations/semesters" : "/teams";
   const ready = data.loaded && !data.loadError;
   const pendingDetail = data.loadError ? "배정 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." : "내 사역 배정을 확인하고 있습니다.";
 
@@ -33,7 +41,7 @@ export default function MyMinistryPanel() {
                 <h4 id="my-semester-title">학기 배정</h4>
                 <p>{ready ? data.currentSemester?.meta.title ?? "현재 학기가 없습니다" : "학기 정보 확인"}</p>
               </div>
-              <Link href={data.currentSemester ? `/semester/${encodeURIComponent(data.currentSemester.id)}` : "/semesters"}>학기 열기 <ArrowRight weight="bold" /></Link>
+              <Link href={semesterHref}>학기 열기 <ArrowRight weight="bold" /></Link>
             </div>
             {!ready ? <p className="mypage-unmatched" role={data.loadError ? undefined : "status"}>{pendingDetail}</p> : data.personalApplication ? (
               <div className="mypage-assignment">
@@ -59,7 +67,7 @@ export default function MyMinistryPanel() {
             <div className="mypage-section-header"><div><h4 id="my-sunday-title">{MINISTRY_AREA_LABELS.sunday}</h4><p>담당 팀의 운영과 이번 주 준비를 확인하세요.</p></div></div>
             <div className="mypage-module-grid is-compact">
               {sundayTeams.map((team) => <div key={team.key}>
-                {team.status === "planned" && sundayTeam !== team.key ? <div className="mypage-feature-link" aria-disabled="true"><span className="min-w-0 flex-1"><strong>{team.label}</strong><small>기능 기획 중</small></span></div> : <Link href={sundayTeamHref(team.key)} className="mypage-feature-link">
+                {team.status === "planned" && sundayTeam !== team.key ? <div className="mypage-feature-link" aria-disabled="true"><span className="min-w-0 flex-1"><strong>{team.label}</strong><small>기능 기획 중</small></span></div> : <Link href={`/teams/${team.key}`} className="mypage-feature-link">
                   <span className="mypage-feature-icon"><CalendarBlank weight="duotone" /></span>
                   <span className="min-w-0 flex-1"><strong>{team.label}</strong><small>{team.hint}</small></span><ArrowRight weight="bold" />
                 </Link>}
@@ -80,7 +88,7 @@ export default function MyMinistryPanel() {
               <h4 id="my-retreat-title">수련회 현장 배정</h4>
               <p>{ready ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 기준 수련회가 없습니다" : "수련회 정보 확인"}</p>
             </div>
-            <Link href={data.currentRetreat ? `/retreat/${encodeURIComponent(data.currentRetreat.id)}/field` : "/field"}>현장 열기 <ArrowRight weight="bold" /></Link>
+            <Link href={data.currentRetreat ? `/events/${encodeURIComponent(data.currentRetreat.id)}/field` : "/events"}>현장 열기 <ArrowRight weight="bold" /></Link>
           </div>
           {!ready ? <p className="mypage-unmatched" role={data.loadError ? undefined : "status"}>{pendingDetail}</p> : data.personalRetreat.matchedStaffId ? (
             <div className="grid gap-4 lg:grid-cols-[minmax(220px,.65fr)_minmax(0,1.35fr)]">

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
@@ -39,10 +40,12 @@ import HomeAgendaSummary from "./HomeAgendaSummary";
 import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideContent";
 import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dailyMinistryMessage";
 
-import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS, sundayTeamHref } from "./featureCatalog";
+import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
+import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
 
 export default function PortalHome() {
-  const { user, loading, roles, memberName, signIn, signOut } = useAuth();
+  const router = useRouter();
+  const { user, loading, roles, teamMemberships, memberName, signIn, signOut } = useAuth();
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
@@ -64,15 +67,25 @@ export default function PortalHome() {
   const friendlyName = friendlyMinistryName(memberName || user?.displayName);
 
   const semesterAllowed = canAccessArea("semester", roles);
-  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, roles));
-  const assignedSundayTeam = ownSundayTeam(roles);
-  const sundayHref = assignedSundayTeam ? sundayTeamHref(assignedSundayTeam) : "/sunday-ministry";
+  const assignedTeamKeys = teamMemberships ? activeTeamKeys(teamMemberships) : undefined;
+  const operationsAllowed = canAccessOperationsCenter(roles, teamMemberships);
+  const sundayTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessSundayTeam(team.key, roles, assignedTeamKeys));
+  const assignedSundayTeam = ownSundayTeam(roles, assignedTeamKeys);
+  const sundayHref = assignedSundayTeam ? `/teams/${assignedSundayTeam}` : "/teams";
   const sundayTitle = sundayTeams.length === 1 ? sundayTeams[0].label : "팀별 운영 공간";
   const sundayDescription = sundayTeams.length === 1
     ? `${sundayTeams[0].label}의 ${sundayTeams[0].hint} 업무를 확인합니다.`
     : "새친구·행정은 연중 관리하고, 찬양·예배는 팀별 모임과 주일 준비를 이어갑니다.";
   const fieldAllowed = canAccessArea("retreat-field", roles);
   const retreatAdminAllowed = canAccessArea("retreat-admin", roles);
+
+  useEffect(() => {
+    if (!user || !assignedSundayTeam || teamMemberships?.[assignedSundayTeam]?.role === "viewer") return;
+    const key = `woori-team-entry:${user.uid}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+    router.replace(`/teams/${assignedSundayTeam}`);
+  }, [assignedSundayTeam, router, teamMemberships, user]);
 
   useEffect(() => {
     if (!user || !canAccessArea("home", roles)) return;
@@ -86,14 +99,14 @@ export default function PortalHome() {
         fail("수련회 목록"),
       ),
     ];
-    if (canAccessArea("semester", roles)) {
+    if (semesterAllowed) {
       unsubs.push(subscribeSemesters(
         (list) => { setSemesters(list); ok("학기 목록"); },
         fail("학기 목록"),
       ));
     }
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [user, roles, fail, ok]);
+  }, [user, roles, semesterAllowed, fail, ok]);
 
   const currentSemester = useMemo(() => {
     return semesters.find((semester) => {
@@ -142,8 +155,14 @@ export default function PortalHome() {
     const next = periods.find((period) => period.startDate >= today);
     return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
   }, [periods, retreats, today]);
+  const semesterCalendarHref = currentSemester
+    ? operationsAllowed
+      ? `/operations/semesters/${encodeURIComponent(currentSemester.id)}/overview`
+      : assignedSundayTeam
+        ? `/teams/${assignedSundayTeam}/terms/${encodeURIComponent(currentSemester.id)}/overview`
+        : "/teams"
+    : operationsAllowed ? "/operations/semesters" : "/teams";
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
-    const semesterHref = currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters";
     const semesterItems: SharedCalendarItem[] = currentSemester
       ? sessions.map((session) => ({
           id: `semester-${session.id}`,
@@ -151,7 +170,7 @@ export default function PortalHome() {
           ...(session.endDate ? { endDate: session.endDate } : {}),
           title: sessionDisplayLabel(session),
           kind: "semester" as const,
-          href: semesterHref,
+          href: semesterCalendarHref,
         }))
       : [];
     const retreatItems = periods.map((period) => {
@@ -174,7 +193,7 @@ export default function PortalHome() {
       editable: true,
     }));
     return [...semesterItems, ...retreatItems, ...sharedItems].sort((a, b) => a.date.localeCompare(b.date));
-  }, [currentSemester, milestones, periods, retreats, roles, sessions]);
+  }, [currentSemester, milestones, periods, retreats, roles, semesterCalendarHref, sessions]);
 
   const homeActions = useMemo(() => {
     return buildHomeActions(calendarItems, today);
@@ -182,6 +201,8 @@ export default function PortalHome() {
   const homeEntry = buildHomeEntry({ roles, actions: homeActions, semesterId: currentSemester?.id,
     retreat: currentRetreat ?? undefined,
     fieldActive: periods.some(period => period.retreatId === currentRetreat?.id && period.startDate <= today && today <= period.endDate),
+    assignedTeamKeys,
+    operationsAllowed,
   });
 
   async function submitSchedule() {
@@ -270,31 +291,27 @@ export default function PortalHome() {
         <HomeStart entry={homeEntry} roleLabel={describeRoles(roles)} />
 
         <section className="grid gap-5 lg:grid-cols-3">
-          {semesterAllowed ? <Link href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
+          {operationsAllowed && <Link href={currentSemester ? `/operations/semesters/${encodeURIComponent(currentSemester.id)}/overview` : "/operations/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--semester px-3 py-1.5">{MINISTRY_AREA_LABELS.semester}</span>
+              <span className="tag home-domain-chip--semester px-3 py-1.5">운영센터</span>
               <span className="home-domain-arrow--semester grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
-          </Link> : <section className="card p-6 text-slate-400 opacity-75">
-            <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold">{MINISTRY_AREA_LABELS.semester}</span>
-            <h2 className="mt-5 text-2xl font-bold">통합관리자 승인 후 이용</h2>
-            <p className="mt-2 text-sm">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
-          </section>}
+          </Link>}
 
           {sundayTeams.length > 0 && <Link href={sundayHref} className="card home-domain-card home-domain-card--sunday group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--sunday px-3 py-1.5">{MINISTRY_AREA_LABELS.sunday}</span>
+              <span className="tag home-domain-chip--sunday px-3 py-1.5">팀</span>
               <span className="home-domain-arrow--sunday grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{sundayTitle}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">{sundayDescription}</p>
           </Link>}
 
-          {(retreatAdminAllowed || fieldAllowed) && <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : (retreatAdminAllowed ? "/retreats" : "/field")} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
+          {(retreatAdminAllowed || fieldAllowed) && <Link href={currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/events"} className="card home-domain-card home-domain-card--vacation group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>
             <div className="flex items-center justify-between">
-              <span className="tag home-domain-chip--vacation px-3 py-1.5">방학 중 사역</span>
+              <span className="tag home-domain-chip--vacation px-3 py-1.5">행사</span>
               <span className="home-domain-arrow--vacation grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
             <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
@@ -302,7 +319,7 @@ export default function PortalHome() {
           </Link>}
         </section>
 
-        <Link href="/ministry-guide" className="home-ministry-brief group mt-7" data-hover>
+        <Link href="/library/guide" className="home-ministry-brief group mt-7" data-hover>
           <div className="home-ministry-brief__month">
             <span>{monthlyMinistry.month}</span>월
           </div>
@@ -347,10 +364,10 @@ export default function PortalHome() {
                 <p className="mt-1 text-xs text-slate-400">{describeRolesHint(roles)}</p>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                {semesterAllowed && <MinistryArea href={currentSemester ? `/semester/${encodeURIComponent(currentSemester.id)}` : "/semesters"} label="훈련·사역팀" description="접수·배치·출석·수료 판정" tone="semester" />}
+                {operationsAllowed && <MinistryArea href={currentSemester ? `/operations/semesters/${encodeURIComponent(currentSemester.id)}/overview` : "/operations/semesters"} label="학기 운영" description="접수·배치·전체 출석·수료 판정" tone="semester" />}
                 {sundayTeams.length > 0 && <MinistryArea href={sundayHref} label={MINISTRY_AREA_LABELS.sunday} description={sundayDescription} tone="sunday" />}
-                {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}` : "/retreats"} label="수련회 행정" description="명단·편성·물품·현장" tone="retreat" />}
-                {fieldAllowed && <MinistryArea href={currentRetreat ? `/retreat/${encodeURIComponent(currentRetreat.id)}/field` : "/field"} label="수련회 이가드" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="field" />}
+                {retreatAdminAllowed && <MinistryArea href={currentRetreat ? `/events/${encodeURIComponent(currentRetreat.id)}/administration` : "/events"} label="행사 행정" description="명단·편성·물품·현장" tone="retreat" />}
+                {fieldAllowed && <MinistryArea href={currentRetreat ? `/events/${encodeURIComponent(currentRetreat.id)}/field` : "/events"} label="행사 현장" description={iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "현장 실행"} tone="field" />}
               </div>
             </section>
             <section className="surface-panel order-1 p-5 sm:p-6">
@@ -383,7 +400,7 @@ export default function PortalHome() {
                   </div>
                 )}
               </div>
-              <Link href="/suggestions" className="mt-4 inline-flex min-h-10 items-center text-xs font-semibold text-[var(--color-primary)] hover:underline">사이트 건의사항 작성 →</Link>
+              <Link href="/help/feedback" className="mt-4 inline-flex min-h-10 items-center text-xs font-semibold text-[var(--color-primary)] hover:underline">문제 제보 →</Link>
             </section>
           </div>
         </section>

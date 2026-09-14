@@ -20,7 +20,7 @@ export default function ProgramWorkspaceHeader({ retreat, fieldAllowed, onNaviga
     <header className="workspace-sticky-header workspace-header program-workspace-header">
       <div className="mx-auto max-w-6xl px-3 sm:px-4">
         <div className="program-workspace-title-row">
-          <button type="button" onClick={() => navigate("/programs")} className="program-header-back" aria-label="프로그램 준비 수련회 목록으로">
+          <button type="button" onClick={() => navigate("/events")} className="program-header-back" aria-label="행사 목록으로">
             <ArrowLeft aria-hidden="true" size={16} weight="bold" />
             <span>목록</span>
           </button>
