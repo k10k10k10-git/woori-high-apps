@@ -56,8 +56,9 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
     // 별도 REST 요청은 브라우저 잠금을 공유하지 않는다. 같은 관리자 계정도 서버에서 차단해야 한다.
     const token = new URL(route.request().url()).searchParams.get('auth');
     expect(token).toBeTruthy();
-    const concurrent = await request.put(`${url(`attendance/${year}/2-1-7/S17_05/0-0`)}&auth=${encodeURIComponent(token)}`, { data: 'X' });
+    const concurrent = await request.put(`${url(`attendance/${year}/2-1-7/S17_05/0-0`)}&auth=${encodeURIComponent(token)}`, { data: JSON.stringify('X'), headers: { 'Content-Type': 'application/json' } });
     expect(concurrent.status()).toBe(401);
+    expect(await concurrent.json()).toMatchObject({ error: 'Permission denied' });
     const edit = await request.patch(`${url(`classes/${year}/2-1-7/students/S17_05`)}&auth=${encodeURIComponent(token)}`, { data: { school: '경쟁 수정' } });
     expect(edit.status()).toBe(401);
     const response = await route.fetch();

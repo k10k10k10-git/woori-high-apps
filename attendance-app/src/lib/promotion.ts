@@ -30,9 +30,9 @@ export function buildPromotionPayload(snapshot: PromotionSnapshot, overwrite: bo
       }
     }
     if (target) payload[`trash/${year}/classes/${trashRecordKey(toCk, 'roster', operation)}`] = {
-      ...target, ck: toCk, deletedAt: Date.now(),
+      ...target, teacher: typeof target.teacher === 'string' ? target.teacher : '', ck: toCk, deletedAt: Date.now(),
     };
-    payload[`classes/${year}/${toCk}/students`] = source.students;
+    payload[`classes/${year}/${toCk}/students`] = Object.fromEntries(Object.entries(source.students!).map(([id, student]) => [id, { ...student, id }]));
     payload[`classes/${year}/${toCk}/adminChanges/${operation}`] = buildAdminChangeEntry({
       classKey: toCk, teacher: typeof target?.teacher === 'string' ? target.teacher : '', actor,
       action: '명단 일괄 반영', studentName: `진급 ${Object.keys(source.students!).length}명`,
