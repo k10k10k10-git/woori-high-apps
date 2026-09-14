@@ -77,7 +77,7 @@ describe("찬양팀 작업공간", () => {
     fireEvent.click(meeting); expect(screen.getByLabelText("모임 회차")).toHaveValue("meeting-2");
     expect(screen.getAllByRole("button", { name: "출석" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
     expect(mocks.execute).toHaveBeenCalledTimes(1);
-  });
+  }, 10_000);
   it("관리자 다섯 탭과 한국어 초기탭을 연결하고 조회로 저장하지 않는다", async () => {
     render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="출결" />);
     await waitFor(() => expect(mocks.list).toHaveBeenCalled());

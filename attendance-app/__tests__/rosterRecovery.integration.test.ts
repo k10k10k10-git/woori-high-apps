@@ -12,6 +12,8 @@ const ns = 'demo-attendance-recovery-default-rtdb';
 const student = { id: 's', personId: 'person-s', name: '합성 학생' };
 const input = { year: 2026, classKey: '1-1-1', studentId: 's', personId: 'person-s', actor: '합성 관리자' };
 let apps: FirebaseApp[] = [], admin: Database, teacher: Database, second: Database, demo: Database, stranger: Database;
+let superAdmin: Database, retreatPastor: Database, retreatAdmin: Database, retreatLeader: Database;
+let legacyRetreatAdmin: Database, legacyRetreatPastor: Database, legacyRetreatLeader: Database, iguard: Database;
 suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약', () => {
   beforeAll(() => {
     if (process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('합성 에뮬레이터 주소가 아닙니다.');
@@ -22,11 +24,27 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
       connectDatabaseEmulator(database, '127.0.0.1', 19017, { mockUserToken: { sub: uid, email: `${uid}@example.test` } });
       return database;
     };
-    admin = client('admin'); second = client('admin2'); teacher = client('teacher'); demo = client('demo'); stranger = client('stranger'); holder.database = admin;
+    admin = client('admin'); second = client('admin2'); teacher = client('teacher'); demo = client('demo'); stranger = client('stranger');
+    superAdmin = client('super'); retreatPastor = client('retreat-pastor'); retreatAdmin = client('retreat-admin');
+    retreatLeader = client('retreat-leader'); legacyRetreatAdmin = client('retreat-legacy'); iguard = client('iguard');
+    legacyRetreatPastor = client('retreat-legacy-pastor'); legacyRetreatLeader = client('retreat-legacy-leader');
+    holder.database = admin;
   });
   beforeEach(async () => {
     const response = await fetch(`${base}/.json?ns=${ns}`, { method: 'PUT', headers: { Authorization: 'Bearer owner' }, body: JSON.stringify({
       attendanceAdmins: { admin: true, admin2: true, demo: true },
+      admins: { super: true },
+      retreatAdmins: {
+        'retreat-pastor': { email: 'pastor@example.test', role: 'pastor', retreatRole: 'pastor' },
+        'retreat-admin': { email: 'admin-team@example.test', role: 'adminTeam', retreatRole: 'adminTeam' },
+        'retreat-leader': { email: 'leader@example.test', role: 'leader', retreatRole: 'leader' },
+        'retreat-legacy': { email: 'legacy@example.test' },
+        'retreat-legacy-pastor': { email: 'legacy-pastor@example.test', role: 'pastor' },
+        'retreat-legacy-leader': { email: 'legacy-leader@example.test', role: 'leader' },
+      },
+      iguardMembers: { iguard: { email: 'iguard@example.test', retreatRole: 'iguardTeam' } },
+      iguardRoles: { iguard: 'team' },
+      retreatsPrivate: { 'retreat-contract': { medicalLogs: { existing: { note: '합성 의료 기록' } } } },
       config: { pastoralReport: { blockedDemoUid: 'demo' } },
       semesters: { '2026-1': { newFriends: { f: { name: '합성 새친구' } }, applications: { privateScope: true } }, '2026-2': { newFriends: { f: { name: '합성 새친구' } } }, '2026-sunday': { newFriends: { f: { name: '합성 새친구' } } } },
       semestersPrivate: { '2026-sunday': { newFriendsPrivate: { f: { pastoralNotes: '비공개 합성 메모' } } } },
@@ -52,6 +70,16 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     await expect(update(ref(admin), payload)).rejects.toThrow();
     expect((await get(ref(admin, 'classes/2026/1-1-1/teacher'))).val()).toBe('최신 담임');
     await expect(set(ref(admin, markerPath), null)).rejects.toThrow();
+  });
+  it('수련회 민감정보는 통합관리자·교역자·행정팀과 레거시 행정팀만 읽고 쓴다', async () => {
+    for (const database of [superAdmin, retreatPastor, retreatAdmin, legacyRetreatAdmin, legacyRetreatPastor]) {
+      expect((await get(ref(database, 'retreatsPrivate/retreat-contract/medicalLogs'))).exists()).toBe(true);
+      await set(ref(database, 'retreatsPrivate/retreat-contract/medicalLogs/verified'), { note: '권한 확인' });
+    }
+    for (const database of [retreatLeader, legacyRetreatLeader, iguard, stranger]) {
+      await expect(get(ref(database, 'retreatsPrivate/retreat-contract/medicalLogs'))).rejects.toThrow();
+      await expect(set(ref(database, 'retreatsPrivate/retreat-contract/medicalLogs/blocked'), { note: '차단 확인' })).rejects.toThrow();
+    }
   });
   it('이동 잠금은 같은 UID의 일반 쓰기도 거절하고 잠금 해제를 포함한 원자 확정만 허용한다', async () => {
     const destination = '1-1-2';

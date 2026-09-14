@@ -314,7 +314,7 @@ export default function RetreatCalendarPanel({
                         <span className={`text-sm font-semibold ${c.text}`}>
                           {p.startDate.replace(/-/g, "/")} ~ {p.endDate.slice(5).replace("-", "/")}
                         </span>
-                        <span className={`text-xs ${c.text} opacity-70`}>{calcDuration(p.startDate, p.endDate)}</span>
+                        <span className={`text-xs font-medium ${c.text}`}>{calcDuration(p.startDate, p.endDate)}</span>
                         {p.endDate >= today && (
                           <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full border ${c.border} ${c.text}`}>
                             {d === 0 ? "D-Day" : d > 0 ? `D-${d}` : `D+${Math.abs(d)}`}
@@ -322,13 +322,13 @@ export default function RetreatCalendarPanel({
                         )}
                       </div>
                       {p.theme && (
-                        <p className={`text-xs mt-1 ${c.text} opacity-80`}>📌 {p.theme}</p>
+                        <p className={`mt-1 text-xs font-medium ${c.text}`}>📌 {p.theme}</p>
                       )}
                     </div>
                     <div className="flex gap-2 shrink-0">
                       {canEditPeriods && <>
-                        <button onClick={() => openEditPeriod(p)} className={`text-xs ${c.text} opacity-60 hover:opacity-100`}>수정</button>
-                        <button onClick={() => handleDeletePeriod(p.retreatId, p.id)} className="text-xs text-red-400 hover:text-red-600">삭제</button>
+                        <button onClick={() => openEditPeriod(p)} className={`text-xs font-semibold ${c.text} hover:underline`}>수정</button>
+                        <button onClick={() => handleDeletePeriod(p.retreatId, p.id)} className="text-xs font-semibold text-red-700 hover:underline">삭제</button>
                       </>}
                     </div>
                   </div>
