@@ -1,4 +1,5 @@
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
+import type { TeamMemberships } from "@/features/teams/teamModel";
 import type { GroupingRule, GroupingSettings } from "./domain/grouping";
 import type {
   StageAssignment,
@@ -8,7 +9,7 @@ import type {
 } from "./domain/stage";
 import type { PraiseMeetingGuide } from "./content/types";
 
-export type PraiseActor = { uid: string; name?: string; roles: MinistryRoles };
+export type PraiseActor = { uid: string; name?: string; roles: MinistryRoles; teamMemberships: TeamMemberships };
 export type PraiseRole = "manager" | "editor" | "groupStaff" | "member";
 export type PraiseGender = "FEMALE" | "MALE" | "UNSPECIFIED";
 export type PraiseDepartment = "FIRST" | "SECOND";

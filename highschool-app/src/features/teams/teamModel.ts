@@ -43,6 +43,11 @@ export function normalizeTeamMemberships(value: unknown): TeamMemberships {
   return result;
 }
 
+/** 권한 원장이 두 버킷에 나뉜 레거시 계정도 담당 팀을 잃지 않게 한 번만 합친다. */
+export function mergeTeamMemberships(...values: unknown[]): TeamMemberships {
+  return Object.assign({}, ...values.map(normalizeTeamMemberships));
+}
+
 export function activeTeamKeys(memberships: TeamMemberships = {}, semesterId?: string): SundayTeamKey[] {
   return SUNDAY_MINISTRY_TEAMS
     .filter(({ key }) => {
@@ -72,14 +77,16 @@ export function accessibleTeamKeys(roles: MinistryRoles, memberships: TeamMember
   return activeTeamKeys(memberships);
 }
 
-export function canAccessTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}): boolean {
-  return canAccessEveryTeam(roles) || activeTeamKeys(memberships).includes(teamKey);
+export function canAccessTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
+  return canAccessEveryTeam(roles) || activeTeamKeys(memberships, semesterId).includes(teamKey);
 }
 
-export function canEditTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}): boolean {
+export function canEditTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
   if (canAccessEveryTeam(roles)) return true;
   const membership = memberships[teamKey];
-  return membership?.active === true && membership.role !== "viewer";
+  return membership?.active === true
+    && membership.role !== "viewer"
+    && (!semesterId || !membership.semesters || membership.semesters[semesterId] === true);
 }
 
 export function ownTeamKey(roles: MinistryRoles, memberships: TeamMemberships = {}): SundayTeamKey | null {

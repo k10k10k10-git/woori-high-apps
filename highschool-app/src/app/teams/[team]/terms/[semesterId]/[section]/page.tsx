@@ -8,5 +8,6 @@ export default async function Page({ params }: { params: Promise<{ team: string;
   const { team, semesterId, section } = await params;
   const meta = sundayTeamOf(team);
   if (!meta || !SECTIONS.has(section as TeamTermSection)) notFound();
-  return <TeamTermWorkspace teamKey={meta.key} semesterId={decodeURIComponent(semesterId)} section={section as TeamTermSection} />;
+  const decodedSemesterId = decodeURIComponent(semesterId);
+  return <TeamTermWorkspace key={`${meta.key}:${decodedSemesterId}`} teamKey={meta.key} semesterId={decodedSemesterId} section={section as TeamTermSection} />;
 }

@@ -7,7 +7,7 @@ vi.mock("./firebaseAdmin", () => ({ getPraiseFirebaseAdmin: () => ({ database: {
 vi.mock("./repository", () => ({ transactWorkspace: mocks.workspace }));
 import { praiseActivityRecord, projectPraiseAudit } from "./projection";
 function state(): PraiseState {
-  const value = createPraiseState({ operationId: "create", workspace: { id: "review-workspace", name: "검증 공간", startDate: "2026-09-05", endDate: "2026-09-05" } }, { uid: "review-manager", roles: { semester: "superAdmin", retreat: "none" } }, 1_800_000_000_000);
+  const value = createPraiseState({ operationId: "create", workspace: { id: "review-workspace", name: "검증 공간", startDate: "2026-09-05", endDate: "2026-09-05" } }, { uid: "review-manager", roles: { semester: "superAdmin", retreat: "none" }, teamMemberships: {} }, 1_800_000_000_000);
   value.audit = { event: { id: "event", at: 1_800_000_000_001, actor: { uid: "review-manager" }, action: "attendance.set", label: "검증 출결", changes: [{ field: "출결", before: "미입력", after: "출석" }] } };
   return value;
 }

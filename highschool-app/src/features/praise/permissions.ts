@@ -1,7 +1,4 @@
-import {
-  canAccessSundayTeam,
-  type MinistryRoles,
-} from "@/features/portal/accessPolicy";
+import { canAccessEveryTeam, canAccessTeam } from "@/features/teams/teamModel";
 import type {
   PraiseActor,
   PraiseMeeting,
@@ -11,19 +8,19 @@ import type {
 } from "./types";
 
 /** 전역 권한과 찬양팀 내부 위임은 별개다. 수련회 관리자 버킷으로 승격하지 않는다. */
-export function canAdministerPraise(roles: MinistryRoles): boolean {
-  return (
-    roles.semester === "superAdmin" ||
-    roles.semester === "pastor" ||
-    roles.semester === "leader"
-  );
+export function canAdministerPraise(actor: PraiseActor, semesterId?: string): boolean {
+  if (canAccessEveryTeam(actor.roles)) return true;
+  const membership = actor.teamMemberships.praise;
+  return membership?.active === true
+    && (membership.role === "leader" || membership.role === "operator")
+    && (!semesterId || !membership.semesters || membership.semesters[semesterId] === true);
 }
 export function praisePermissions(
   actor: PraiseActor,
   state?: PraiseState | null,
 ): PraisePermissions {
-  const read = canAccessSundayTeam("praise", actor.roles);
-  const globalManager = read && canAdministerPraise(actor.roles);
+  const read = canAccessTeam("praise", actor.roles, actor.teamMemberships, state?.meta.semesterId);
+  const globalManager = read && canAdministerPraise(actor, state?.meta.semesterId);
   const access = state?.access[actor.uid];
   const local = read && access?.active ? access : null;
   const manage = globalManager || local?.role === "manager";

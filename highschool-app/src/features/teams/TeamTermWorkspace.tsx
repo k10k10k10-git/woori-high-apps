@@ -27,7 +27,7 @@ const SECTIONS: Array<{ key: TeamTermSection; label: string }> = [
 
 export default function TeamTermWorkspace({ teamKey, semesterId, section }: { teamKey: SundayTeamKey; semesterId: string; section: TeamTermSection }) {
   const { user, roles, teamMemberships } = useAuth();
-  const allowed = canAccessTeam(teamKey, roles, teamMemberships);
+  const allowed = canAccessTeam(teamKey, roles, teamMemberships, semesterId);
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
@@ -58,7 +58,7 @@ export default function TeamTermWorkspace({ teamKey, semesterId, section }: { te
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const past = !!meta?.endDate && meta.endDate < today;
   const broadEditor = roles.semester === "superAdmin" || roles.semester === "pastor";
-  const editable = canEditTeam(teamKey, roles, teamMemberships) && (!past || broadEditor);
+  const editable = canEditTeam(teamKey, roles, teamMemberships, semesterId) && (!past || broadEditor);
   const loaded = ready.size === 5;
   const teamMeta = sundayTeamOf(teamKey)!;
 
@@ -77,7 +77,7 @@ export default function TeamTermWorkspace({ teamKey, semesterId, section }: { te
           {section === "roster" && <TeamRoster team={team} roster={roster} />}
           {section === "attendance" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedTeamId={team.id} />}
           {section === "curriculum" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} lockedTeamId={team.id} />}
-          {section === "records" && <div><div className="team-context-note"><strong>학기 공용 자료</strong><span>현재 자료 원장을 그대로 사용하며 팀 중심 화면에서 함께 확인합니다.</span></div><ArchiveTab sid={semesterId} /></div>}
+          {section === "records" && <div><div className="team-context-note"><strong>학기 공용 자료</strong><span>팀 화면에서는 공용 자료를 조회만 합니다. 추가와 삭제는 운영센터에서 진행합니다.</span></div><SemesterEditProvider canEdit={broadEditor}><ArchiveTab sid={semesterId} /></SemesterEditProvider></div>}
         </SemesterEditProvider>
       </>}
     </section>

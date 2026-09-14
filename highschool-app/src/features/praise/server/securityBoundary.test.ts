@@ -5,8 +5,8 @@ import { transformSupabaseSnapshot } from "../migration/transform";
 import { applyPraiseCommand } from "./commands";
 import { praiseView } from "./view";
 
-const manager: PraiseActor = { uid: "manager", roles: { semester: "superAdmin", retreat: "none" } };
-const delegate: PraiseActor = { uid: "delegate", roles: { semester: "praise", retreat: "none" } };
+const manager: PraiseActor = { uid: "manager", roles: { semester: "superAdmin", retreat: "none" }, teamMemberships: {} };
+const delegate: PraiseActor = { uid: "delegate", roles: { semester: "praise", retreat: "none" }, teamMemberships: { praise: { role: "staff", active: true } } };
 function importedState(mapped = false) {
   const state = transformSupabaseSnapshot(sourceFixture(), { ...fixtureOptions, ...(mapped ? { map: { meetingGroupVersions: { [sourceId(6)]: sourceId(8) } } } : {}) }).state;
   state.access.delegate = { uid: "delegate", staffId: `staff_${sourceId(3)}`, role: "groupStaff", active: true, revision: 1, updatedAt: 1000, updatedBy: "manager" };

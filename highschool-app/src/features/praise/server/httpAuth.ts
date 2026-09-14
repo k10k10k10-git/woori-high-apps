@@ -1,5 +1,6 @@
 import "server-only";
 import { resolveMinistryRoles } from "@/features/portal/accessPolicy";
+import { mergeTeamMemberships } from "@/features/teams/teamModel";
 import type { PraiseActor } from "../types";
 import { getPraiseFirebaseAdmin, PraiseRequestError, praiseUnavailable } from "./firebaseAdmin";
 
@@ -51,5 +52,13 @@ export async function authenticatePraiseRequest(request: Request): Promise<Prais
   });
   const name = typeof token.name === "string" && token.name.trim().length > 0 && token.name.length <= 80 && !/[\u0000-\u001f\u007f]/.test(token.name)
     ? token.name.trim() : undefined;
-  return { uid, ...(name ? { name } : {}), roles };
+  return {
+    uid,
+    ...(name ? { name } : {}),
+    roles,
+    teamMemberships: mergeTeamMemberships(
+      record(iguardMember)?.teamMemberships,
+      record(retreatAdmin)?.teamMemberships,
+    ),
+  };
 }

@@ -54,6 +54,7 @@ import { useLoadErrors } from "@/lib/useLoadErrors";
 import { SUNDAY_MINISTRY_TEAMS, type SundayTeamKey } from "./featureCatalog";
 import {
   TEAM_MEMBERSHIP_ROLE_LABELS,
+  mergeTeamMemberships,
   type TeamMembershipRole,
   type TeamMemberships,
 } from "@/features/teams/teamModel";
@@ -185,7 +186,10 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
             semesterRole: roleSource?.semesterRole,
             retreatRole: roleSource?.retreatRole,
           }),
-          teamMemberships: roleSource?.teamMemberships ?? {},
+          teamMemberships: mergeTeamMemberships(
+            iguard?.teamMemberships,
+            admin?.teamMemberships,
+          ),
         };
       })
       // 학기 역할군(높은 권한 → 낮은 권한)으로 먼저 묶고, 같은 역할 안에서만 이름순으로 정렬한다.
