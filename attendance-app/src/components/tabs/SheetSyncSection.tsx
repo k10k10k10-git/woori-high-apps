@@ -195,7 +195,7 @@ export default function SheetSyncSection() {
 
           {plan.ambiguous.length > 0 && (
             <div style={{ marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber-text)', marginBottom: 4 }}>확인 필요 (동명이인 — 일치 정보 부족으로 신규 등록됨)</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber-text)', marginBottom: 4 }}>확인 필요 — 동명이인·생년월일·본인 연락처를 확인하고 다시 미리보기해 주세요. 확인 전에는 반영하지 않습니다.</div>
               <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: 12, color: 'var(--text2)' }}>
                 {plan.ambiguous.map((a, i) => <span key={i} style={{ marginRight: 8 }}>{a.name}({ckLabel(a.ck)})</span>)}
               </div>
@@ -262,7 +262,7 @@ export default function SheetSyncSection() {
 
           <div className="btn-row" style={{ marginTop: 10 }}>
             <button className="btn-secondary" onClick={() => setPlan(null)} disabled={running}>취소</button>
-            <button className="btn-primary" onClick={applySync} disabled={running}>
+            <button className="btn-primary" onClick={applySync} disabled={running || plan.ambiguous.length > 0}>
               {running ? '적용 중…' : '동기화 적용'}
             </button>
           </div>

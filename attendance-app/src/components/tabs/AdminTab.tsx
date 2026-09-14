@@ -1,6 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback, useRef, useId, type ReactNode, type KeyboardEvent } from 'react';
-import { db, ref, set, get, update } from '@/lib/db';
+import { db, ref, set, get } from '@/lib/db';
+import { buildPromotionPayload, type PromotionSnapshot } from '@/lib/promotion';
+import { commitSheetSync } from '@/lib/sheetSyncCommit';
+import { adminActor } from '@/utils/adminChange';
 import { useApp } from '@/store/AppContext';
 import { emailToKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
@@ -59,6 +62,8 @@ export default function AdminTab() {
   const [promotionLoading, setPromotionLoading]   = useState(false);
   const [promotionRunning, setPromotionRunning]   = useState(false);
   const [overwrite, setOverwrite]                 = useState(false);
+  const [promotionSnapshot, setPromotionSnapshot] = useState<PromotionSnapshot | null>(null);
+  const promotionBusy = useRef(false);
   const [deleteAccountConfirm, setDeleteAccountConfirm] = useState(false);
   const [confirmEventKey, setConfirmEventKey]     = useState<string | null>(null);
 
@@ -143,22 +148,25 @@ export default function AdminTab() {
 
   // ─── 진급 처리 ───────────────────────────────────────────────
   async function loadPromotionPreview() {
+    if (promotionBusy.current) return;
+    promotionBusy.current = true;
     setPromotionLoading(true);
     setPromotionRows(null);
+    setPromotionSnapshot(null);
+    try {
     const prevYear = curYear - 1;
-    const [prevSnap, curSnap] = await Promise.all([
-      get(ref(db, `classes/${prevYear}`)),
-      get(ref(db, `classes/${curYear}`)),
+    const [allSnap, attSnap] = await Promise.all([
+      get(ref(db, 'classes')),
+      get(ref(db, `attendance/${curYear}`)),
     ]);
-    if (!prevSnap.exists()) {
+    const classes = (allSnap.val() ?? {}) as PromotionSnapshot['classes'];
+    if (!classes[prevYear]) {
       showToast(`${prevYear}년 데이터가 없습니다.`);
       setPromotionLoading(false);
       return;
     }
-    const prevData = prevSnap.val() as Record<string, { students?: Record<string, unknown> }>;
-    const curData  = curSnap.exists()
-      ? (curSnap.val() as Record<string, { students?: Record<string, unknown> }>)
-      : {};
+    const prevData = classes[prevYear];
+    const curData = classes[curYear] ?? {};
 
     const rows: PromotionRow[] = [];
     const grads: GraduateRow[] = [];
@@ -179,42 +187,31 @@ export default function AdminTab() {
     }
 
     setPromotionRows(rows);
+    setPromotionSnapshot({ year: curYear, classes, attendance: attSnap.val() ?? {} });
     setGraduateRows(grads);
     setOverwrite(false);
     setPromotionLoading(false);
+    } catch {
+      showToast('진급 명단을 불러오지 못했습니다. 연결과 권한을 확인해 주세요.');
+    } finally { promotionBusy.current = false; setPromotionLoading(false); }
   }
 
   async function runPromotion() {
-    if (!promotionRows) return;
-    const prevYear = curYear - 1;
-    const prevSnap = await get(ref(db, `classes/${prevYear}`));
-    if (!prevSnap.exists()) return;
-    const prevData = prevSnap.val() as Record<string, { students?: Record<string, unknown> }>;
-
-    const updates: Record<string, unknown> = {};
-    for (const row of promotionRows) {
-      if (row.hasConflict && !overwrite) continue;
-      const classInfo = prevData[row.fromCk];
-      if (!classInfo?.students) continue;
-      updates[`classes/${curYear}/${row.toCk}/students`] = classInfo.students;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      showToast('덮어쓸 반이 없습니다. 충돌 반도 덮어쓰기를 체크해 주세요.');
-      return;
-    }
-
+    if (!promotionRows || !promotionSnapshot || promotionBusy.current) return;
+    if (promotionSnapshot.year !== curYear) { setPromotionRows(null); showToast('조회 연도가 변경되었습니다. 다시 미리보기해 주세요.'); return; }
+    promotionBusy.current = true;
     setPromotionRunning(true);
     try {
-      await update(ref(db), updates);
-      const count = promotionRows
-        .filter(r => overwrite || !r.hasConflict)
-        .reduce((s, r) => s + r.studentCount, 0);
+      const { payload, classKeys, count } = buildPromotionPayload(promotionSnapshot, overwrite, crypto.randomUUID(), adminActor(state.userRole));
+      await commitSheetSync({ year: curYear, classes: promotionSnapshot.classes,
+        attendance: promotionSnapshot.attendance, classKeys, payload });
       showToast(`${count}명의 학생을 ${curYear}년으로 진급 처리했습니다.`, 'success');
       setPromotionRows(null);
-    } catch {
-      showToast('진급 처리에 실패했습니다. 다시 시도해 주세요.');
+    } catch (error) {
+      setPromotionRows(null); setPromotionSnapshot(null);
+      showToast(error instanceof Error ? error.message : '진급 처리 결과를 확인하지 못했습니다. 명단을 다시 확인해 주세요.');
     } finally {
+      promotionBusy.current = false;
       setPromotionRunning(false);
     }
   }

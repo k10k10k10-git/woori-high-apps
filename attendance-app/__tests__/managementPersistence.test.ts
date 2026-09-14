@@ -3,13 +3,13 @@ import { mergeStudentEdit } from '@/utils/studentPersistence';
 import { trashEntries, trashRecordKey } from '@/utils/trash';
 
 it('편집하지 않은 필드의 최신 원격 값을 보존한다', () => {
-  const opened = { id: 's', name: '학생', phone: 'old', school: '이전 학교', jang: true };
+  const opened = { id: 's', personId: 'person_s', name: '학생', phone: 'old', school: '이전 학교', jang: true };
   const latest = { ...opened, phone: 'remote', num: 8 };
   expect(mergeStudentEdit(latest, opened, { name: '학생', phone: 'old', school: '새 학교' }))
     .toEqual({ ...latest, school: '새 학교' });
 });
 it('같은 필드를 서로 다르게 수정하면 최신 원장을 덮지 않는다', () => {
-  const opened = { id: 's', name: '학생', phone: 'old' };
+  const opened = { id: 's', personId: 'person_s', name: '학생', phone: 'old' };
   expect(mergeStudentEdit({ ...opened, phone: 'remote' }, opened, { name: '학생', phone: 'mine' })).toBeUndefined();
   expect(mergeStudentEdit({ ...opened, phone: 'mine' }, opened, { name: '학생', phone: 'mine' })?.phone).toBe('mine');
 });

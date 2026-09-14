@@ -20,6 +20,17 @@ beforeEach(() => {
   m.transaction.mockResolvedValue({ committed: true });
 });
 afterEach(cleanup);
+it('수정창이 열린 뒤 같은 SID의 인물이 교체되면 저장을 중단한다', async () => {
+  const onClose = vi.fn();
+  m.transaction.mockImplementation(async (_path, change) => ({ committed: change({ students: { s: {
+    ...student, personId: 'person_other', name: '다른 학생',
+  } } }) !== undefined }));
+  render(<StudentModal editId="s" onClose={onClose} />);
+  fireEvent.change(screen.getByLabelText('학교'), { target: { value: '새 학교' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await screen.findByRole('alert');
+  expect(onClose).not.toHaveBeenCalled();
+});
 it('작성 중 닫기는 확인을 거치며 저장 중 ESC·배경 클릭은 창을 닫지 않는다', () => {
   const onClose = vi.fn();
   const { rerender } = render(<ManagementDialog title="시험 편집" dirty onClose={onClose}>{() => <input aria-label="내용" />}</ManagementDialog>);

@@ -9,6 +9,7 @@ vi.mock('@/lib/db', () => ({ db: {}, ref: (_db: unknown, path: string) => path,
   get: m.get, syncProtocolDb: { runTransaction: m.transaction }, onDisconnect: () => m.disconnect }));
 vi.mock('@/utils/studentMoveRequest', () => ({ patchStudentMoveOnce: m.patch }));
 import { claimSyncLocks, commitSheetSync } from '@/lib/sheetSyncCommit';
+import { buildPromotionPayload } from '@/lib/promotion';
 const input = { year: 2026, classKeys: ['a', 'b'], classes: {}, attendance: {}, payload: { 'classes/2026/a/teacher': '교사' } };
 beforeEach(() => {
   vi.clearAllMocks();
@@ -27,6 +28,16 @@ it('미리보기 후 새 출석이 있으면 쓰기를 보내지 않는다', asy
   await expect(commitSheetSync(input)).rejects.toThrow('미리보기 이후');
   expect(m.patch).not.toHaveBeenCalled();
   expect(m.transaction).toHaveBeenCalledTimes(2);
+});
+it('진급 미리보기 후 추가된 학생은 덮어쓰기 설정과 무관하게 보존한다', async () => {
+  const snapshot = { year: 2026, classes: { 2025: { '1-1-1': { students: { s: { id: 's', name: '진급생' } } } } }, attendance: {} };
+  const latest = { ...snapshot.classes, 2026: { '1-2-1': { students: { added: { id: 'added', name: '새 전입생' } } } } };
+  m.get.mockImplementation(async (path: string) => ({ val: () => path === 'classes' ? latest : {} }));
+  for (const overwrite of [false, true]) {
+    const plan = buildPromotionPayload(snapshot, overwrite, 'operation');
+    await expect(commitSheetSync({ ...snapshot, ...plan })).rejects.toThrow('미리보기 이후');
+  }
+  expect(m.patch).not.toHaveBeenCalled();
 });
 it('명단 변경과 자기 잠금 해제는 한 PATCH로 전송한다', async () => {
   await commitSheetSync(input);
