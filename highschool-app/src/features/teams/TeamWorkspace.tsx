@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { subscribeSemesters, subscribeTeams } from "@/features/semester/db";
 import type { Semester, Team } from "@/features/semester/types";
 import { sundayTeamOf, type SundayTeamKey } from "@/features/portal/featureCatalog";
-import { canAccessTeam, membershipLabel, semesterTeamForKey } from "./teamModel";
+import { activeTeamKeys, canAccessEveryTeam, canAccessTeam, membershipLabel, semesterTeamForKey } from "./teamModel";
 import { TeamAccessState } from "./TeamAccessState";
 
 type TermTeams = Record<string, Team[]>;
@@ -33,7 +33,11 @@ export default function TeamWorkspace({ teamKey }: { teamKey: SundayTeamKey }) {
     return subscribeSemesters((items) => { setSemesters(items); setLoaded(true); }, (reason) => { setError(reason.message); setLoaded(true); });
   }, [allowed]);
 
-  const semesterIds = useMemo(() => semesters.map((semester) => semester.id).join("\u0000"), [semesters]);
+  const visibleSemesters = useMemo(() => canAccessEveryTeam(roles)
+    ? semesters
+    : semesters.filter((semester) => activeTeamKeys(teamMemberships, semester.id).includes(teamKey)),
+  [roles, semesters, teamKey, teamMemberships]);
+  const semesterIds = useMemo(() => visibleSemesters.map((semester) => semester.id).join("\u0000"), [visibleSemesters]);
   useEffect(() => {
     if (!allowed || !semesterIds) return;
     const ids = semesterIds.split("\u0000");
@@ -43,8 +47,8 @@ export default function TeamWorkspace({ teamKey }: { teamKey: SundayTeamKey }) {
     })();
   }, [allowed, semesterIds]);
 
-  const current = currentSemesterOf(semesters);
-  const connectedTerms = semesters.filter((semester) => semesterTeamForKey(termTeams[semester.id] ?? [], teamKey));
+  const current = currentSemesterOf(visibleSemesters);
+  const connectedTerms = visibleSemesters.filter((semester) => semesterTeamForKey(termTeams[semester.id] ?? [], teamKey));
 
   return <TeamAccessState allowed={allowed}><main className="team-first-page">
     <header className="team-workspace-header">

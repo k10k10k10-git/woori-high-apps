@@ -9,8 +9,8 @@ import { parseCommand, parseCreate } from "./parsers";
 import { generatePraiseStage, stageHistory, stageInputRevision, validateManualStage } from "./stageModel";
 import { praiseView } from "./view";
 
-const manager: PraiseActor = { uid: "manager", name: "합성 관리자", roles: { semester: "superAdmin", retreat: "none" } };
-const actor = (uid: string): PraiseActor => ({ uid, name: `합성 ${uid}`, roles: { semester: "praise", retreat: "none" } });
+const manager: PraiseActor = { uid: "manager", name: "합성 관리자", roles: { semester: "superAdmin", retreat: "none" }, teamMemberships: {} };
+const actor = (uid: string): PraiseActor => ({ uid, name: `합성 ${uid}`, roles: { semester: "praise", retreat: "none" }, teamMemberships: { praise: { role: "staff", active: true } } });
 const staffActor = actor("group-staff"), editor = actor("editor"), member = actor("member"), observer = actor("observer");
 const stamp = { revision: 1, updatedAt: 1000, updatedBy: manager.uid };
 
@@ -95,7 +95,7 @@ describe("찬양 명령의 담당 조·충돌·멱등 계약", () => {
     const state = fixture(); state.access[staffActor.uid].active = false;
     expectError(() => apply(state, setAttendance(), staffActor), "forbidden", 403);
     state.access[staffActor.uid].active = true;
-    expectError(() => apply(state, setAttendance(), { ...staffActor, roles: { semester: "none", retreat: "superAdmin" } }), "forbidden", 403);
+    expectError(() => apply(state, setAttendance(), { ...staffActor, roles: { semester: "none", retreat: "superAdmin" }, teamMemberships: {} }), "forbidden", 403);
   });
 
   it("일반 스탭의 참석은 본인만 기록한다", () => {
@@ -401,7 +401,7 @@ describe("권한별 조회 응답", () => {
   });
 
   it("주일 찬양팀 접근이 없으면 공개 확정본도 읽지 못한다", () => {
-    expectError(() => praiseView(fixture(), { ...observer, roles: { semester: "none", retreat: "none" } }), "forbidden", 403);
+    expectError(() => praiseView(fixture(), { ...observer, roles: { semester: "none", retreat: "none" }, teamMemberships: {} }), "forbidden", 403);
   });
 });
 

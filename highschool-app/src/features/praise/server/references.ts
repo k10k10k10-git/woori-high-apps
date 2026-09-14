@@ -2,10 +2,11 @@ import "server-only";
 import { paths } from "@/lib/paths";
 import { paths as semesterPaths } from "@/features/semester/paths";
 import {
-  canAccessSundayTeam,
   describeRoles,
   resolveMinistryRoles,
 } from "@/features/portal/accessPolicy";
+import { canAccessTeam, mergeTeamMemberships, teamKeyFromName } from "@/features/teams/teamModel";
+import type { PraiseActor } from "../types";
 import { assertPraiseId } from "../paths";
 import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
 import { requireValue } from "./validation";
@@ -71,7 +72,11 @@ export async function praiseAccounts() {
         semesterRole: source.semesterRole,
         retreatRole: source.retreatRole,
       });
-      if (!canAccessSundayTeam("praise", roles)) return [];
+      const teamMemberships = mergeTeamMemberships(
+        record(members[uid]).teamMemberships,
+        record(retreatAdmins[uid]).teamMemberships,
+      );
+      if (!canAccessTeam("praise", roles, teamMemberships)) return [];
       const name =
         typeof source.name === "string" && source.name.trim()
           ? source.name.trim().slice(0, 80)
@@ -83,16 +88,24 @@ export async function praiseAccounts() {
 }
 
 /** 학기 키와 meta/teams만 읽고, 신청·출결·연락처 원장은 다운로드하지 않는다. */
-export async function praiseReferences() {
+export async function praiseReferences(actor: PraiseActor) {
   const ids = await shallow("semesters");
   const semesters = [];
   for (const id of ids.sort().reverse()) {
+    if (!canAccessTeam("praise", actor.roles, actor.teamMemberships, id)) continue;
     const [metaValue, teamsValue] = await Promise.all([
       read(semesterPaths.semesterMeta(id)),
       read(semesterPaths.teams(id)),
     ]);
     if (!metaValue) continue;
     const meta = record(metaValue);
+    const teams = Object.entries(record(teamsValue)).flatMap(([teamId, value]) => {
+      const team = record(value);
+      const name = typeof team.name === "string" ? team.name : teamId;
+      if (team.teamKey !== "praise" && teamKeyFromName(name) !== "praise") return [];
+      return [{ id: teamId, name }];
+    });
+    if (teams.length === 0) continue;
     semesters.push({
       id,
       title: typeof meta.title === "string" ? meta.title : id,
@@ -100,13 +113,7 @@ export async function praiseReferences() {
         ? { startDate: meta.startDate }
         : {}),
       ...(typeof meta.endDate === "string" ? { endDate: meta.endDate } : {}),
-      teams: Object.entries(record(teamsValue)).map(([teamId, value]) => ({
-        id: teamId,
-        name:
-          typeof record(value).name === "string"
-            ? (record(value).name as string)
-            : teamId,
-      })),
+      teams,
     });
   }
   return semesters;
@@ -126,7 +133,7 @@ export async function validateSemesterLink(
     read(`${semesterPaths.teams(semesterId)}/${assertPraiseId(teamId)}`),
   ]);
   requireValue(
-    Boolean(meta && team),
-    "연결할 학기 또는 팀이 없습니다. 목록을 새로고침해 주세요.",
+    Boolean(meta && team && (record(team).teamKey === "praise" || teamKeyFromName(String(record(team).name ?? "")) === "praise")),
+    "연결할 학기 또는 찬양팀이 없습니다. 목록을 새로고침해 주세요.",
   );
 }

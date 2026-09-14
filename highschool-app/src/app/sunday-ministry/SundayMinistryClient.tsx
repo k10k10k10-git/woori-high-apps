@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessArea, canAccessSundayTeam, canEditSundayTeam, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
+import { canAccessArea, canAccessSundayTeam, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
 import {
   MINISTRY_AREA_LABELS,
   SUNDAY_MINISTRY_DEFAULT_TEAM,
@@ -37,7 +37,7 @@ import WorshipDocsTab from "@/features/sundayWorship/WorshipDocsTab";
 import WorshipDutyTab from "@/features/sundayWorship/WorshipDutyTab";
 import WorshipSeatingTab from "@/features/sundayWorship/WorshipSeatingTab";
 import { useLoadErrors } from "@/lib/useLoadErrors";
-import { activeTeamKeys } from "@/features/teams/teamModel";
+import { activeTeamKeys, canEditTeam } from "@/features/teams/teamModel";
 import NewFriendsTab from "../semester/[id]/NewFriendsTab";
 
 const PraiseWorkspace = dynamic(() => import("@/features/praise/PraiseWorkspace"), { loading: () => <p role="status" className="p-8">찬양팀 화면을 불러오고 있습니다…</p> });
@@ -100,7 +100,7 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
   const teamMeta = sundayTeamOf(team) ?? tabTeam ?? sundayTeamOf(landingTeam)!;
   const teamChooser = team === undefined && !tabTeam && ownSundayTeam(roles, assignedTeamKeys) === null && accessibleTeams.length > 1;
   const allowed = canAccessArea("sunday", roles) && canAccessSundayTeam(teamMeta.key, roles, assignedTeamKeys);
-  const canEdit = canEditSundayTeam(teamMeta.key, roles, assignedTeamKeys);
+  const canEdit = canEditTeam(teamMeta.key, roles, teamMemberships);
   const tabs = teamMeta.tabs as readonly SundayTab[];
   // 팀 라우트를 오갈 때 컴포넌트가 재사용될 수 있으므로, 선택 탭은 렌더 중 파생으로 보정한다
   // (effect에서 setState하면 실수 13 — 사용자의 선택이 덮인다).

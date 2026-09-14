@@ -9,11 +9,19 @@ import { authenticatePraiseRequest } from "./httpAuth";
 import { readWorkspace, transactWorkspace } from "./repository";
 import { createPraiseState, applyPraiseCommand } from "./commands";
 import type { PraiseActor, PraiseState } from "../types";
-const admin: PraiseActor={uid:"test_admin",name:"합성 관리자",roles:{semester:"superAdmin",retreat:"none"}};
+const admin: PraiseActor={uid:"test_admin",name:"합성 관리자",roles:{semester:"superAdmin",retreat:"none"},teamMemberships:{}};
 const enabled=process.env.PRAISE_CONTRACTS==="1";
 const suite=enabled?describe:describe.skip;
 let app:App;
 const base="http://127.0.0.1:19016";
+async function signup(email:string){
+ const response=await fetch("http://127.0.0.1:19098/identitytoolkit.googleapis.com/v1/accounts:signUp?key=synthetic-key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:"synthetic-password-123",returnSecureToken:true})});
+ expect(response.ok).toBe(true);return response.json() as Promise<{idToken:string;localId:string}>;
+}
+async function clientDb(path:string,token:string,method:"GET"|"PUT"="GET",body?:unknown){
+ const url=new URL(`/${path}.json`,base);url.searchParams.set("ns","demo-praise-default-rtdb");url.searchParams.set("auth",token);
+ return fetch(url,{method,...(method==="PUT"?{headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}:{})});
+}
 function state(id:string):PraiseState {
  const value=createPraiseState({operationId:"create",workspace:{id,name:"합성 검증",startDate:"2026-09-05",endDate:"2026-09-05"}},admin,1800000000000);
  value.meta.mode="live";
@@ -49,9 +57,7 @@ suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
   await write("student_a","a");expect(Object.keys((await readWorkspace("concurrency"))!.audit)).toHaveLength(3);
  });
  it("실제 Auth 토큰과 최신 역할 원장을 대조하고 권한 회수를 반영한다",async()=>{
-  const response=await fetch("http://127.0.0.1:19098/identitytoolkit.googleapis.com/v1/accounts:signUp?key=synthetic-key",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:"contract@example.test",password:"synthetic-password-123",returnSecureToken:true})});
-  expect(response.ok).toBe(true);
-  const account=await response.json() as {idToken:string;localId:string};
+  const account=await signup("contract@example.test");
   const request=new Request("http://localhost/api/praise",{headers:{Authorization:`Bearer ${account.idToken}`}});
   await holder.database!.ref(`admins/${account.localId}`).set(true);
   expect((await authenticatePraiseRequest(request)).roles.semester).toBe("superAdmin");
@@ -59,6 +65,47 @@ suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
   expect((await authenticatePraiseRequest(request)).roles.semester).toBe("none");
   await holder.auth!.updateUser(account.localId,{disabled:true});
   await expect(authenticatePraiseRequest(request)).rejects.toMatchObject({status:401});
+ });
+ it("담당 팀 쓰기와 학기 공용·비공개 쓰기를 실제 Rules에서 분리한다",async()=>{
+  await holder.database!.ref("semesters/team-contract").set({
+   meta:{title:"합성 학기"},
+   teams:{media:{name:"미디어팀",teamKey:"media"},praise:{name:"찬양팀",teamKey:"praise"}},
+   applications:{mediaStudent:{name:"미디어 학생",teamId:"media"},praiseStudent:{name:"찬양 학생",teamId:"praise"}},
+  });
+  await holder.database!.ref("semesters/other-contract").set({
+   meta:{title:"다른 학기"},teams:{media:{name:"미디어팀",teamKey:"media"}},applications:{mediaStudent:{name:"미디어 학생",teamId:"media"}},
+  });
+  const media=await signup("media-contract@example.test");
+  await holder.database!.ref(`retreatAdmins/${media.localId}`).set({email:"media-contract@example.test",role:"leader",semesterRole:"leader",retreatRole:"none",teamMemberships:{media:{role:"leader",active:true,semesters:{"team-contract":true}}}});
+  expect((await clientDb("semesters/team-contract/teams/media/goal",media.idToken,"PUT","담당 목표")).ok).toBe(true);
+  expect((await clientDb("semesters/team-contract/curriculum/media/session-1",media.idToken,"PUT",{plan:"담당 계획"})).ok).toBe(true);
+  expect((await clientDb("semesters/team-contract/attendance/team/session-1/mediaStudent",media.idToken,"PUT",{s:"출석"})).ok).toBe(true);
+  expect((await clientDb("semesters/team-contract/teams/praise/goal",media.idToken,"PUT","다른 팀 목표")).ok).toBe(false);
+  expect((await clientDb("semesters/team-contract/attendance/team/session-1/praiseStudent",media.idToken,"PUT",{s:"출석"})).ok).toBe(false);
+  expect((await clientDb("semesters/team-contract/archiveLinks/link-1",media.idToken,"PUT",{title:"공용 자료"})).ok).toBe(false);
+  expect((await clientDb("semesters/other-contract/teams/media/goal",media.idToken,"PUT","범위 밖 목표")).ok).toBe(false);
+  expect((await clientDb("semestersPrivate/team-contract/applicationsPrivate/mediaStudent",media.idToken)).ok).toBe(false);
+
+  const viewer=await signup("viewer-contract@example.test");
+  await holder.database!.ref(`iguardMembers/${viewer.localId}`).set({email:"viewer-contract@example.test",semesterRole:"staff",teamMemberships:{media:{role:"viewer",active:true}}});
+  expect((await clientDb("semesters/team-contract/teams/media/goal",viewer.idToken,"PUT","조회자 변경")).ok).toBe(false);
+
+  const central=await signup("central-contract@example.test");
+  await holder.database!.ref(`retreatAdmins/${central.localId}`).set({email:"central-contract@example.test",role:"adminTeam",semesterRole:"adminTeam",retreatRole:"none"});
+  expect((await clientDb("semesters/team-contract/meta/title",central.idToken,"PUT","중앙 수정")).ok).toBe(true);
+  expect((await clientDb("semestersPrivate/team-contract/applicationsPrivate/mediaStudent",central.idToken,"PUT",{phone:"010-0000-0000"})).ok).toBe(true);
+
+  const platform=await signup("platform-contract@example.test");
+  await holder.database!.ref(`retreatAdmins/${platform.localId}`).set({email:"platform-contract@example.test",role:"superAdmin",semesterRole:"superAdmin",retreatRole:"none"});
+  expect((await clientDb("semesters/team-contract/meta/title",platform.idToken,"PUT","통합관리자 수정")).ok).toBe(true);
+  expect((await clientDb("semestersPrivate/team-contract/applicationsPrivate/mediaStudent",platform.idToken)).ok).toBe(true);
+ });
+ it("바나바팀은 새친구 원장만 수정하고 다른 지원자 개인정보에는 접근하지 못한다",async()=>{
+  const barnabas=await signup("barnabas-contract@example.test");
+  await holder.database!.ref(`iguardMembers/${barnabas.localId}`).set({email:"barnabas-contract@example.test",semesterRole:"staff",teamMemberships:{barnabas:{role:"leader",active:true}}});
+  expect((await clientDb("semesters/team-contract/newFriends/friend-1",barnabas.idToken,"PUT",{name:"합성 새친구"})).ok).toBe(true);
+  expect((await clientDb("semestersPrivate/team-contract/newFriendsPrivate/friend-1",barnabas.idToken,"PUT",{phone:"010-0000-0000"})).ok).toBe(true);
+  expect((await clientDb("semestersPrivate/team-contract/applicationsPrivate/mediaStudent",barnabas.idToken)).ok).toBe(false);
  });
  it("인증 형식이 틀린 요청과 실제 익명 토큰을 거절한다",async()=>{
   await expect(authenticatePraiseRequest(new Request("http://localhost/api/praise",{headers:{Authorization:"Bearer invalid"}}))).rejects.toMatchObject({status:401});

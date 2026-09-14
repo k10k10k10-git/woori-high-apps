@@ -88,7 +88,7 @@
 | `retreatsPrivate/{id}/teacherIdNumbers` | 행정 | - | 행정만 | 없음 (민감정보 — 주민번호) |
 | `retreatsPrivate/{id}/participantContacts` | 행정 | - | 행정만 | 참가자 키별 본인·보호자 연락처. 공개 명단과 키를 같게 유지 |
 | `retreatsPrivate/{id}/participantContactsBackups` | 행정 | - | 행정만 | 연락처 전체 덮어쓰기 전 롤링 백업. 기존 공개 participants 백업은 이관하지 않음 |
-| `retreatAdmins` | 행정 | 통합 앱 인증·역할 판정 | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role, semesterRole?, retreatRole?}` — 두 선택 필드가 없으면 `role`에서 하위호환 파생 |
+| `retreatAdmins` | 행정 | 통합 앱 인증·역할 판정 | 행정만 | 통합 역할 판정 원천. `{email, name, approvedAt, role, semesterRole?, retreatRole?, teamMemberships?}` — 두 역할 필드가 없으면 `role`에서 하위호환 파생. 팀 연결은 이가드 원장과 병합해 읽음 |
 | `retreatPending` | 행정 | - | 행정만 | 없음 |
 
 ## 이가드 도메인 (소유: highschool-app 현장 모듈)
@@ -111,7 +111,7 @@
 | `retreats/{id}/milestones` | (레거시) | - | 없음 | **미사용** — 전역 `prepMilestones`로 이관됨(코드에 쓰기 함수 없음) |
 | `prepMilestones` | **공유** | - | 행정+이가드 | 준비 마일스톤 + `sourceSite=ministry-guide*` 사역 가이드 편집 조각. 일반 일정 구독은 가이드 조각을 필터링 (유일한 공유 쓰기 노드) |
 | `brainstorm` | 행정 | - | 행정만(admins·retreatAdmins) | 홈 화면 브레인스토밍 보드 (전역, 수련회 무관) |
-| `iguardMembers` | 이가드 | 통합 앱 인증·역할 판정 | 이가드만 | 이가드 멤버 인증과 선택 필드 `semesterRole?`·`retreatRole?`. 필드가 없으면 기존 멤버 정보와 `iguardRoles`에서 하위호환 파생 |
+| `iguardMembers` | 이가드 | 통합 앱 인증·역할 판정 | 이가드만 | 이가드 멤버 인증과 선택 필드 `semesterRole?`·`retreatRole?`·`teamMemberships?`. 팀 연결은 `{teamKey: {role, active, semesters?}}`이며 다른 계정 원장과 병합해 읽음 |
 | `iguardRoles` | 이가드 | 통합 앱 역할 판정 | 이가드만 | `staff` / `team`만 저장 — Rules validate가 이 두 값만 허용하며 세부 화면 역할 문자열을 새로 넣지 않음 |
 | `iguardPending` | highschool-app 접근 관리 | - | highschool-app | 사용자별 접근 요청 필드 + `siteRequests/{requestId}`. 요청 첨부 본문은 Firebase Storage `site-requests/{uid}/{requestId}/attachment.jpg`에 분리하고 RTDB에는 메타데이터만 둔다. 팀원 승인·거절은 접근 필드만 지우고 사이트 요청을 보존해야 함 |
 
@@ -141,7 +141,7 @@
 > **2026-08-09 권한 축소**: `teacherStaff`·`teacherSpecial`·`teacherExtra`·`teacherAdditional`·`teacherPhones`·`userRoles`의 `.read`가 `auth != null`이라 역할 없는 구글 계정도 교사 40명의 전화·생년월일과 계정 51건을 읽을 수 있었다. 읽는 주체를 grep으로 증명해 좁혔다 — 교사 명단 계열은 `admins`·`attendanceAdmins`·`retreatAdmins`·`iguardMembers`, 나머지는 관리자만, `userRoles`는 본인 레코드만 자기조회(`auth.token.email` 일치). 새 노드를 만들 때 `.read: "auth != null"`을 기본값처럼 쓰지 말 것.
 >
 > Rules는 2026-07-10 학생 앱에서 추가했다. 2026-09-05 감사 후속으로 교사 권한 원천과 학생 이동 잠금 계약을 보강했으며 실제 배포 상태는 `.claude/HANDOFF.md` 최신 항목을 확인한다.
-> **2026-08-08 보강**: `semesters` `.read`에 `iguardMembers`를 추가해 스탭의 학기 조회를 열었다(6단계 역할표의 "스탭=조회만"). `.write`는 `admins`·`retreatAdmins`만 그대로이고, `semestersPrivate`(연락처·지원 동기)는 **읽기까지 행정 전용**이다 — 새 민감 필드는 계속 `semestersPrivate` 아래에만 둘 것.
+> **2026-09-14 최소 권한 보강**: 공개 학기 원장은 승인된 통합 앱 계정이 공동 운영 정보로 읽는다. 전체 학기 쓰기와 `semestersPrivate`는 통합관리자·교역자·행정팀 및 팀 연결이 없는 레거시 중앙 팀장만 허용한다. 명시 팀 담당자는 `teamMemberships`의 활성 역할·선택 학기 범위를 Rules가 검사해 자기 팀 목표·커리큘럼·출석만 쓰고, `viewer`는 쓰지 못한다. 바나바 담당자는 새친구 공개·비공개 원장과 복구 근거만 쓴다.
 
 ---
 

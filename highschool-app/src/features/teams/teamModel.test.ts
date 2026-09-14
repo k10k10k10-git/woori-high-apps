@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   accessibleTeamKeys,
   canAccessOperationsCenter,
+  canAccessTeam,
   canEditTeam,
+  mergeTeamMemberships,
   normalizeTeamMemberships,
   ownTeamKey,
   semesterTeamForKey,
@@ -27,6 +29,26 @@ describe("teamModel", () => {
     const memberships = normalizeTeamMemberships({ praise: { role: "viewer", active: true } });
     expect(accessibleTeamKeys(leader, memberships)).toEqual(["praise"]);
     expect(canEditTeam("praise", leader, memberships)).toBe(false);
+  });
+
+  it("두 계정 원장에 나뉜 팀 연결을 하나도 잃지 않고 합친다", () => {
+    expect(mergeTeamMemberships(
+      { media: { role: "leader", active: true } },
+      { praise: { role: "staff", active: true } },
+    )).toEqual({
+      media: { role: "leader", active: true },
+      praise: { role: "staff", active: true },
+    });
+  });
+
+  it("학기가 지정된 팀 연결은 해당 학기에서만 조회·수정한다", () => {
+    const memberships = normalizeTeamMemberships({
+      praise: { role: "leader", active: true, semesters: { "2026-2": true } },
+    });
+    expect(canAccessTeam("praise", leader, memberships, "2026-2")).toBe(true);
+    expect(canEditTeam("praise", leader, memberships, "2026-2")).toBe(true);
+    expect(canAccessTeam("praise", leader, memberships, "2026-1")).toBe(false);
+    expect(canEditTeam("praise", leader, memberships, "2026-1")).toBe(false);
   });
 
   it("학기 동적 팀 ID를 저장된 키 또는 이전 이름으로 연결한다", () => {
