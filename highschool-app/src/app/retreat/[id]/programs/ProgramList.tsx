@@ -39,7 +39,7 @@ export default function ProgramList({ programs, selectedId, canEdit, busy, onSel
                 <strong>{meta.label}</strong><span>{meta.description}</span><ArrowRight aria-hidden="true" size={17} />
               </button>
             ))}
-            <button type="button" className="btn-secondary program-template-default" onClick={onCreateDefaults} disabled={busy}>빈 프로그램 2개 만들기</button>
+            <button type="button" className="btn-secondary program-template-default" onClick={onCreateDefaults} disabled={busy}>직접 작성할 프로그램 2개 만들기</button>
           </div>
         )}
       </section>
@@ -66,7 +66,7 @@ export default function ProgramList({ programs, selectedId, canEdit, busy, onSel
           <div><h2 id="program-attention-heading">지금 처리할 것</h2><p>프로그램을 열기 전에 막힌 준비부터 확인합니다.</p></div>
           {canEdit && (
             <details className="program-add-menu">
-              <summary><Plus aria-hidden="true" size={16} weight="bold" /> 프로그램 추가</summary>
+              <summary><Plus aria-hidden="true" size={16} weight="bold" /> 새 프로그램 만들기</summary>
               <div>{(Object.entries(PROGRAM_TEMPLATE_META) as Array<[ProgramTemplateKey, (typeof PROGRAM_TEMPLATE_META)[ProgramTemplateKey]]>).map(([key, meta]) => (
                 <button key={key} type="button" onClick={() => onAddTemplate(key)} disabled={busy}><strong>{meta.label}</strong><span>{meta.description}</span></button>
               ))}</div>

@@ -311,7 +311,6 @@ export default function ProgramEditor({
 
       {section === "overview" && (
         <>
-        <ProgramTaskBoard tasks={tasks} posts={posts} canEdit={canEdit} onCreate={onCreateTask} onUpdate={onUpdateTask} onDelete={onDeleteTask} onRestore={onRestoreTask} />
         <section className="program-readiness-checklist" aria-labelledby="program-readiness-heading">
           <div className="program-readiness-checklist__heading">
             <div>
@@ -409,6 +408,7 @@ export default function ProgramEditor({
             </div>
           </section>
         </fieldset>
+        <ProgramTaskBoard tasks={tasks} posts={posts} canEdit={canEdit} onCreate={onCreateTask} onUpdate={onUpdateTask} onDelete={onDeleteTask} onRestore={onRestoreTask} />
         <details className="program-detail-document">
           <summary><span><strong>상세 문서</strong><small>브리핑, 아이디어와 기록은 필요할 때만 펼쳐 작성합니다.</small></span><ArrowRight aria-hidden="true" size={17} /></summary>
           <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
