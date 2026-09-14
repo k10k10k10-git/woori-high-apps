@@ -6,12 +6,14 @@ import { get, ref } from "firebase/database";
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";
+import { normalizeTeamMemberships, type TeamMemberships } from "@/features/teams/teamModel";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   /** 두 축 역할(학기·방학) — 화면 게이트는 accessPolicy의 판정 함수를 통해서만 쓴다 */
   roles: MinistryRoles;
+  teamMemberships: TeamMemberships;
   memberName: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -32,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<MinistryRoles>(NO_ROLES);
+  const [teamMemberships, setTeamMemberships] = useState<TeamMemberships>({});
   const [memberName, setMemberName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(u);
       setLoading(true);
       setRoles(NO_ROLES);
+      setTeamMemberships({});
       setMemberName(null);
       if (u) {
         try {
@@ -73,9 +77,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             semesterRole: roleSource?.semesterRole,
             retreatRole: roleSource?.retreatRole,
           }));
+          // 같은 사람이 두 운영 계정 목록에 함께 있을 수 있다. 한쪽만 고르면 다른 쪽에
+          // 연결된 팀이 사라져 보이므로 두 목록의 팀 연결을 합쳐 읽는다.
+          setTeamMemberships({
+            ...normalizeTeamMemberships(iguardMember?.teamMemberships),
+            ...normalizeTeamMemberships(retreatAdmin?.teamMemberships),
+          });
         } catch {
           if (request !== authRequest) return;
           setRoles(NO_ROLES);
+          setTeamMemberships({});
           setMemberName(null);
         }
       }
@@ -94,11 +105,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function signOut() {
     await firebaseSignOut(auth);
     setRoles(NO_ROLES);
+    setTeamMemberships({});
     setMemberName(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, roles, memberName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, roles, teamMemberships, memberName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -33,6 +33,11 @@ function AuthState() {
   return <output data-testid="auth-state">{JSON.stringify({ uid: user?.uid ?? null, loading, roles, memberName })}</output>;
 }
 
+function MembershipState() {
+  const { teamMemberships } = useAuth();
+  return <output data-testid="team-memberships">{JSON.stringify(teamMemberships)}</output>;
+}
+
 const state = () => JSON.parse(screen.getByTestId("auth-state").textContent!);
 const user = (uid: string) => ({ uid }) as User;
 
@@ -143,6 +148,20 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
     });
     expect(state()).toMatchObject({ uid: "a", loading: false, memberName: "현장 담당" });
     expect(state().roles).not.toEqual(NO_ROLES);
+  });
+
+  it("두 계정 저장소에 나뉜 담당 팀을 합쳐 읽는다", async () => {
+    render(<AuthProvider><AuthState /><MembershipState /></AuthProvider>);
+    let pending!: Promise<void>;
+    act(() => { pending = onAuth(user("a")); });
+    await settle("a", {
+      retreatAdmins: { teamMemberships: { design: { active: true, role: "staff" } } },
+      iguardMembers: { teamMemberships: { praise: { active: true, role: "staff" } } },
+    }, pending);
+    expect(JSON.parse(screen.getByTestId("team-memberships").textContent!)).toEqual({
+      design: { active: true, role: "staff" },
+      praise: { active: true, role: "staff" },
+    });
   });
 
   it("Provider 해제 시 인증 구독을 해제하고 미완료 조회를 마무리할 수 있다", async () => {

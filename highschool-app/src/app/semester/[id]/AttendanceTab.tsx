@@ -48,6 +48,7 @@ interface Props {
   applications: Application[];
   teamById: Map<string, Team>;
   meta: SemesterMeta | null;
+  lockedTeamId?: string;
 }
 
 const STATUS_STYLE: Record<EditableAttendanceStatus, string> = {
@@ -65,13 +66,18 @@ function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta }: Props) {
+export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
   const { isMobileView } = useViewMode();
   const canEdit = useSemesterCanEdit();
   const [sessId, setSessId] = useState<string>("");
-  const [teamFilter, setTeamFilter] = useState<string>("");
+  const [teamFilter, setTeamFilter] = useState<string>(lockedTeamId ?? "");
+  const [teamFilterSource, setTeamFilterSource] = useState(lockedTeamId);
+  if (teamFilterSource !== lockedTeamId) {
+    setTeamFilterSource(lockedTeamId);
+    setTeamFilter(lockedTeamId ?? "");
+  }
   const [classFilter, setClassFilter] = useState<string>("");
   const [scope, setScope] = useState<SemesterRosterScope>("team");
   const [sessionAttendance, setSessionAttendance] = useState<{ key: string; values: SessionAttendance }>({
@@ -198,7 +204,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         </div>
       )}
 
-      <div className="mobile-sticky-controls mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+      {!lockedTeamId && <div className="mobile-sticky-controls mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="출석 명단 구분">
           <button
             role="tab"
@@ -220,7 +226,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             훈련 출석부 <span className="ml-1 text-xs">{semesterRoster(applications, "training").length}명</span>
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* .input은 레이어 밖 규칙(width:100%)이라 유틸리티 w-*를 이긴다 → 폭은 감싼 div로 준다.
           높이도 h-*로 고정하지 않는다(모바일 16px 글꼴에서 글자 아랫부분이 잘렸다). */}
@@ -258,7 +264,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             </select>
           </div>
         )}
-        {scope === "team" && (
+        {scope === "team" && !lockedTeamId && (
           <div>
             <select
               aria-label="팀 필터"

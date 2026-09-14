@@ -1,5 +1,5 @@
 import { ref, get, onValue } from "firebase/database";
-import { auditedSet as set, auditedRemove as remove } from "@/features/activityLog/write";
+import { auditedSet as set, auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { paths } from "../paths";
 import { stripUndefined } from "./core";
@@ -7,6 +7,7 @@ import {
   isAdminSideRole, isRetreatRole, isSemesterRole,
   type AdminSideRole, type MinistryRoles, type RetreatRole, type SemesterRole,
 } from "@/features/portal/accessPolicy";
+import { normalizeTeamMemberships, type TeamMemberships } from "@/features/teams/teamModel";
 
 export interface RetreatAdminMember {
   email: string;
@@ -17,6 +18,7 @@ export interface RetreatAdminMember {
   /** 두 축 역할 — 없으면 role에서 파생한다(resolveMinistryRoles) */
   semesterRole?: SemesterRole;
   retreatRole?: RetreatRole;
+  teamMemberships?: TeamMemberships;
 }
 
 function normalizeRetreatAdminMember(value: unknown): RetreatAdminMember {
@@ -30,6 +32,7 @@ function normalizeRetreatAdminMember(value: unknown): RetreatAdminMember {
       ...(isAdminSideRole(data.role) ? { role: data.role } : {}),
       ...(isSemesterRole(data.semesterRole) ? { semesterRole: data.semesterRole } : {}),
       ...(isRetreatRole(data.retreatRole) ? { retreatRole: data.retreatRole } : {}),
+      teamMemberships: normalizeTeamMemberships(data.teamMemberships),
     };
   }
   return { email: "" };
@@ -66,26 +69,30 @@ export async function addRetreatAdmin(
   role: AdminSideRole = "adminTeam",
   roles?: MinistryRoles,
 ): Promise<void> {
-  await set(ref(db, paths.retreatAdmin(uid)), stripUndefined({
+  await update(ref(db, paths.retreatAdmin(uid)), stripUndefined({
     email,
     name: name?.trim() || undefined,
     approvedAt: Date.now(),
     role,
-    semesterRole: roles?.semester,
-    retreatRole: roles?.retreat,
+    semesterRole: roles?.semester ?? null,
+    retreatRole: roles?.retreat ?? null,
   }));
 }
 
 export async function updateRetreatAdminMemberName(uid: string, member: RetreatAdminMember, name: string): Promise<void> {
-  // ⚠ 노드 전체를 set으로 덮어쓴다 — 두 축 역할을 함께 넣지 않으면 이름만 고쳐도 역할이 지워진다.
-  await set(ref(db, paths.retreatAdmin(uid)), stripUndefined({
+  // 부분 갱신으로 담당 팀 같은 별도 계정 속성을 보존한다.
+  await update(ref(db, paths.retreatAdmin(uid)), stripUndefined({
     email: member.email,
     name: name.trim() || undefined,
     approvedAt: member.approvedAt ?? Date.now(),
     role: member.role ?? "adminTeam",
-    semesterRole: member.semesterRole,
-    retreatRole: member.retreatRole,
+    semesterRole: member.semesterRole ?? null,
+    retreatRole: member.retreatRole ?? null,
   }));
+}
+
+export async function updateRetreatAdminTeamMemberships(uid: string, teamMemberships: TeamMemberships): Promise<void> {
+  await update(ref(db, paths.retreatAdmin(uid)), { teamMemberships });
 }
 
 export async function removeRetreatAdmin(uid: string): Promise<void> {

@@ -115,12 +115,12 @@ export default function IguardClient() {
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <WarningCircle aria-hidden="true" className="mb-3 text-red-600" size={32} weight="regular" />
       <p className="mb-4 max-w-md text-sm text-red-700" role="alert">{lockError}</p>
-      <button onClick={() => router.push(`/retreat/${id}`)} className="btn-secondary">행정 화면으로</button>
+      <button onClick={() => router.push(`/events/${id}/administration`)} className="btn-secondary">행정 화면으로</button>
     </div>
   );
   if (lock === undefined) return <CenterSpinner />;
   if (lock && !unlocked) return (
-    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/retreat/${id}`)} />
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/events/${id}/administration`)} />
   );
   // 같은 현장 탭에서는 상태를 유지하고, 다른 수련회에서는 해당 ID의 캐시·구독으로 시작한다.
   return <IguardWorkspace key={id} id={id} />;
@@ -151,7 +151,7 @@ function IguardWorkspace({ id }: { id: string }) {
     nextParams.set("view", nextView);
     // 같은 현장 작업 화면의 탭 상태다. 서버 라우트를 다시 탐색하지 않고
     // 공유 가능한 URL만 갱신해 인증·실시간 구독·현재 화면을 유지한다.
-    window.history.replaceState(null, "", `/retreat/${encodeURIComponent(id)}/field?${nextParams.toString()}`);
+    window.history.replaceState(null, "", `/events/${encodeURIComponent(id)}/field?${nextParams.toString()}`);
   }, [id, searchParams]);
 
   // 데이터 허브 — 모든 구독을 커스텀 훅에서 관리

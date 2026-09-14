@@ -218,19 +218,25 @@ export function canEditArea(area: PortalArea, roles: MinistryRoles): boolean {
  * 주일 사역에서 이 사람이 들어갈 수 있는 팀인가.
  * 사역팀은 자기 팀 하나만 참이다 — 옆 팀은 메뉴에서도 빠지고 주소를 직접 쳐도 막힌다.
  */
-export function canAccessSundayTeam(team: SundayTeamKey, roles: MinistryRoles): boolean {
+export function canAccessSundayTeam(team: SundayTeamKey, roles: MinistryRoles, assignedTeamKeys?: readonly SundayTeamKey[]): boolean {
+  if (roles.semester === "superAdmin" || roles.semester === "pastor") return true;
+  if (assignedTeamKeys) return assignedTeamKeys.includes(team);
   const sem = SEMESTER_CAPS[roles.semester];
   return sem.sunday !== "none" || sem.sundayTeam === team;
 }
 
 /** 그 팀 화면을 저장까지 할 수 있는가. */
-export function canEditSundayTeam(team: SundayTeamKey, roles: MinistryRoles): boolean {
+export function canEditSundayTeam(team: SundayTeamKey, roles: MinistryRoles, assignedTeamKeys?: readonly SundayTeamKey[]): boolean {
+  if (roles.semester === "superAdmin" || roles.semester === "pastor") return true;
+  if (assignedTeamKeys) return assignedTeamKeys.includes(team);
   const sem = SEMESTER_CAPS[roles.semester];
   return sem.sunday === "write" || sem.sundayTeam === team;
 }
 
 /** 자기 팀 하나만 여는 역할이면 그 팀 키, 전체 권한이거나 접근 불가면 null. */
-export function ownSundayTeam(roles: MinistryRoles): SundayTeamKey | null {
+export function ownSundayTeam(roles: MinistryRoles, assignedTeamKeys?: readonly SundayTeamKey[]): SundayTeamKey | null {
+  if (roles.semester === "superAdmin" || roles.semester === "pastor") return null;
+  if (assignedTeamKeys) return assignedTeamKeys.length === 1 ? assignedTeamKeys[0] : null;
   return SEMESTER_CAPS[roles.semester].sundayTeam;
 }
 
@@ -302,8 +308,8 @@ export function searchScope(roles: MinistryRoles): AreaPermission {
 export function retreatEntryHref(retreatId: string, roles: MinistryRoles): string {
   const encodedId = encodeURIComponent(retreatId);
   return canEditArea("retreat-admin", roles)
-    ? `/retreat/${encodedId}`
-    : `/retreat/${encodedId}/field`;
+    ? `/events/${encodedId}/administration`
+    : `/events/${encodedId}/field`;
 }
 
 // ── DB 값 → 역할 ──────────────────────────────────────────────

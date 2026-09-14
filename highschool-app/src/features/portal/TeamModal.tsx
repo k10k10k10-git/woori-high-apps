@@ -13,6 +13,7 @@ import {
   subscribeToPendingRequests,
   subscribeToRetreatAdmins,
   updateRetreatAdminMemberName,
+  updateRetreatAdminTeamMemberships,
   type RetreatAdminMember,
 } from "@/lib/db";
 import {
@@ -21,6 +22,7 @@ import {
   subscribeToIguardPending,
   subscribeToIguardRoles,
   updateIguardMemberName,
+  updateIguardTeamMemberships,
   type IguardMemberInfo,
   type IguardPendingReq,
   type IguardRole,
@@ -45,10 +47,16 @@ import {
   type RetreatRole,
   type SemesterRole,
 } from "./accessPolicy";
-import { planRoleAssignment } from "./roleAssign";
+import { desiredStateFor, planRoleAssignment } from "./roleAssign";
 import { applyRoleSteps } from "./applyRole";
 import OverlayShell from "@/components/OverlayShell";
 import { useLoadErrors } from "@/lib/useLoadErrors";
+import { SUNDAY_MINISTRY_TEAMS, type SundayTeamKey } from "./featureCatalog";
+import {
+  TEAM_MEMBERSHIP_ROLE_LABELS,
+  type TeamMembershipRole,
+  type TeamMemberships,
+} from "@/features/teams/teamModel";
 
 type TeamMember = {
   uid: string;
@@ -59,6 +67,7 @@ type TeamMember = {
   admin?: RetreatAdminMember;
   iguard?: IguardMemberInfo;
   iguardRole?: IguardRole;
+  teamMemberships: TeamMemberships;
 };
 
 const SEMESTER_CHIP: Record<SemesterRole, string> = {
@@ -116,6 +125,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
   const [editingUid, setEditingUid] = useState<string | null>(null);
   const [draftName, setDraftName] = useState("");
   const [pendingRoleChoice, setPendingRoleChoice] = useState<Record<string, MinistryRoles>>({});
+  const [pendingTeamChoice, setPendingTeamChoice] = useState<Record<string, SundayTeamKey[]>>({});
   const [busyUid, setBusyUid] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Partial<Record<TeamSource, "ready" | "error">>>({});
   const { fail, ok, message: loadError } = useLoadErrors("team-management");
@@ -175,6 +185,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
             semesterRole: roleSource?.semesterRole,
             retreatRole: roleSource?.retreatRole,
           }),
+          teamMemberships: roleSource?.teamMemberships ?? {},
         };
       })
       // 학기 역할군(높은 권한 → 낮은 권한)으로 먼저 묶고, 같은 역할 안에서만 이름순으로 정렬한다.
@@ -192,6 +203,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
       member.email,
       SEMESTER_ROLE_LABELS[member.roles.semester],
       RETREAT_ROLE_LABELS[member.roles.retreat],
+      ...Object.keys(member.teamMemberships).map((key) => SUNDAY_MINISTRY_TEAMS.find((team) => team.key === key)?.label ?? key),
     ].some((value) => value.toLocaleLowerCase("ko").includes(query)));
   }, [memberQuery, members]);
 
@@ -272,14 +284,33 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
     }
     await run(
       member.uid,
-      () => applyRoleSteps(steps, {
+      async () => {
+        await applyRoleSteps(steps, {
         uid: member.uid,
         email: member.email,
         name: member.name,
         hasIguardMember: member.iguard != null,
-      }),
+        });
+        const desired = desiredStateFor(next);
+        if (desired.retreatAdmin) await updateRetreatAdminTeamMemberships(member.uid, member.teamMemberships);
+        if (desired.iguard) await updateIguardTeamMemberships(member.uid, member.teamMemberships);
+      },
       `${memberLabel(member)} → 학기 ${SEMESTER_ROLE_LABELS[next.semester]} · 방학 ${RETREAT_ROLE_LABELS[next.retreat]}`,
     );
+  }
+
+  async function changeTeamMembership(member: TeamMember, teamKey: SundayTeamKey, role: TeamMembershipRole | null) {
+    const next: TeamMemberships = { ...member.teamMemberships };
+    if (role) next[teamKey] = { role, active: true };
+    else delete next[teamKey];
+    await run(member.uid, async () => {
+      const writes: Promise<void>[] = [];
+      if (member.admin) writes.push(updateRetreatAdminTeamMemberships(member.uid, next));
+      if (member.iguard) writes.push(updateIguardTeamMemberships(member.uid, next));
+      await Promise.all(writes);
+    }, role
+      ? `${memberLabel(member)} → ${SUNDAY_MINISTRY_TEAMS.find((team) => team.key === teamKey)?.label} ${TEAM_MEMBERSHIP_ROLE_LABELS[role]}`
+      : `${memberLabel(member)}님의 담당 팀 연결을 해제했습니다.`);
   }
 
   /**
@@ -323,6 +354,12 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
       toast("학기 또는 방학 역할을 하나 이상 선택해 주세요.", "error");
       return;
     }
+    const selectedTeams = pendingTeamChoice[request.uid] ?? [];
+    const needsTeam = ["leader", "adminTeam", "barnabas", "worship", "praise", "media", "design", "staff"].includes(choice.semester);
+    if (needsTeam && selectedTeams.length === 0) {
+      toast("담당 팀을 하나 이상 선택해 주세요.", "error");
+      return;
+    }
     const steps = planRoleAssignment(choice, {
       mainAdmin: false,
       hasRetreatAdmin: false,
@@ -330,6 +367,13 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
     });
     await run(request.uid, async () => {
       await applyRoleSteps(steps, { uid: request.uid, email: info.email, name: info.name, hasIguardMember: false });
+      const memberships = Object.fromEntries(selectedTeams.map((teamKey) => [teamKey, {
+        role: choice.semester === "leader" ? "leader" : "staff",
+        active: true,
+      }])) as TeamMemberships;
+      const desired = desiredStateFor(choice);
+      if (desired.retreatAdmin) await updateRetreatAdminTeamMemberships(request.uid, memberships);
+      if (desired.iguard) await updateIguardTeamMemberships(request.uid, memberships);
       if (request.admin) await denyRetreatRequest(request.uid);
       if (request.iguard) await denyIguardPending(request.uid);
     }, `${info.name || info.email} → 학기 ${SEMESTER_ROLE_LABELS[choice.semester]} · 방학 ${RETREAT_ROLE_LABELS[choice.retreat]} 승인`);
@@ -436,6 +480,15 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                             ))}
                           </select>
                         </label>
+                        <fieldset className="w-full">
+                          <legend className="mb-1 text-[11px] font-semibold text-slate-500">담당 팀</legend>
+                          <div className="flex flex-wrap gap-1.5">
+                            {SUNDAY_MINISTRY_TEAMS.map((team) => {
+                              const checked = (pendingTeamChoice[request.uid] ?? []).includes(team.key);
+                              return <label key={team.key} className="team-membership-choice"><input type="checkbox" checked={checked} disabled={!canManage || busyUid === request.uid} onChange={() => setPendingTeamChoice((current) => ({ ...current, [request.uid]: checked ? (current[request.uid] ?? []).filter((key) => key !== team.key) : [...(current[request.uid] ?? []), team.key] }))} />{team.label}</label>;
+                            })}
+                          </div>
+                        </fieldset>
                         <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
                           방학 역할
                           <select
@@ -568,6 +621,21 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                             </select>
                           </label>
                         </div>
+                        <fieldset className="mt-3 border-t border-slate-100 pt-3">
+                          <legend className="mb-2 text-[11px] font-semibold text-slate-500">담당 팀과 팀 내 역할</legend>
+                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {SUNDAY_MINISTRY_TEAMS.map((team) => {
+                              const membership = member.teamMemberships[team.key];
+                              return <label key={team.key} className="team-membership-editor">
+                                <span>{team.label}</span>
+                                <select aria-label={`${memberLabel(member)} ${team.label} 담당`} value={membership?.role ?? ""} disabled={!canManage || isMe || busyUid === member.uid || member.mainAdmin} onChange={(event) => void changeTeamMembership(member, team.key, (event.target.value || null) as TeamMembershipRole | null)}>
+                                  <option value="">미연결</option>
+                                  {Object.entries(TEAM_MEMBERSHIP_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                                </select>
+                              </label>;
+                            })}
+                          </div>
+                        </fieldset>
                       </div>
                     );
                   })}

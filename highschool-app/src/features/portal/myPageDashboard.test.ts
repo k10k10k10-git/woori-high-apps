@@ -15,8 +15,8 @@ const roles = (semester: MinistryRoles["semester"], retreat: MinistryRoles["retr
 describe("역할별 마이페이지 읽기 모델", () => {
   it.each([
     [roles("pastor", "pastor"), ["semester", "sunday-all", "retreat-admin", "retreat-field", "guide"]],
-    [roles("barnabas", "none"), ["semester", "sunday-barnabas", "guide"]],
-    [roles("worship", "fieldStaff"), ["semester", "sunday-worship", "retreat-field", "guide"]],
+    [roles("barnabas", "none"), ["sunday-barnabas", "guide"]],
+    [roles("worship", "fieldStaff"), ["sunday-worship", "retreat-field", "guide"]],
     [roles("none", "iguardTeam"), ["retreat-admin", "retreat-field", "guide"]],
     [roles("none", "none"), ["guide"]],
   ])("권한 조합 %o에 허용된 모듈만 제공한다", (input, ids) => {

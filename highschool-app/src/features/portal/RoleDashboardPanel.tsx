@@ -14,11 +14,13 @@ import {
 import { canAccessArea, canAccessSundayTeam, describeRoles } from "./accessPolicy";
 import { ministryModulesFor, roleDashboardTitle } from "./myPageDashboard";
 import { useMyPageData } from "./useMyPageData";
+import { activeTeamKeys } from "@/features/teams/teamModel";
 
 export default function RoleDashboardPanel() {
   const data = useMyPageData();
-  const modules = ministryModulesFor(data.roles);
-  const showNewFriends = canAccessArea("sunday", data.roles) && canAccessSundayTeam("barnabas", data.roles);
+  const modules = ministryModulesFor(data.roles, data.teamMemberships);
+  const assignedTeamKeys = activeTeamKeys(data.teamMemberships);
+  const showNewFriends = canAccessArea("sunday", data.roles) && canAccessSundayTeam("barnabas", data.roles, assignedTeamKeys);
   const assignmentCount = (data.personalApplication ? 1 : 0)
     + data.personalRetreat.groups.length
     + data.personalRetreat.duties.length;
@@ -135,7 +137,7 @@ export default function RoleDashboardPanel() {
               <h4 id="mypage-new-friends-title">새친구 정착 현황</h4>
               <p>{data.today.slice(0, 4)}년 접수 중 완료되지 않은 흐름을 먼저 집계합니다.</p>
             </div>
-            <Link href="/sunday-ministry/barnabas">바나바팀 열기 <ArrowRight weight="bold" /></Link>
+            <Link href="/teams/barnabas">바나바팀 열기 <ArrowRight weight="bold" /></Link>
           </div>
           {ready ? <div className="mypage-inline-stats">
             <InlineStat label="전체" value={data.newFriendSummary.total} />

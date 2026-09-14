@@ -37,6 +37,7 @@ import WorshipDocsTab from "@/features/sundayWorship/WorshipDocsTab";
 import WorshipDutyTab from "@/features/sundayWorship/WorshipDutyTab";
 import WorshipSeatingTab from "@/features/sundayWorship/WorshipSeatingTab";
 import { useLoadErrors } from "@/lib/useLoadErrors";
+import { activeTeamKeys } from "@/features/teams/teamModel";
 import NewFriendsTab from "../semester/[id]/NewFriendsTab";
 
 const PraiseWorkspace = dynamic(() => import("@/features/praise/PraiseWorkspace"), { loading: () => <p role="status" className="p-8">찬양팀 화면을 불러오고 있습니다…</p> });
@@ -88,17 +89,18 @@ const TAB_INTRO: Partial<Record<SundayTab, { title: string; description: string 
 
 export default function SundayMinistryClient({ team, initialTab, workspaceId }: { team?: SundayTeamKey; initialTab?: string; workspaceId?: string }) {
   const router = useRouter();
-  const { user, loading: authLoading, roles, signIn } = useAuth();
+  const { user, loading: authLoading, roles, teamMemberships, signIn } = useAuth();
+  const assignedTeamKeys = teamMemberships ? activeTeamKeys(teamMemberships) : undefined;
   // 팀 단위로 판정한다. 사역팀은 자기 팀 하나만 열리고 옆 팀은 주소를 직접 쳐도 막힌다.
   // 팀이 배정되지 않은 사람은 들어갈 팀이 없으므로 진입 자체가 막힌다.
-  const accessibleTeams = SUNDAY_MINISTRY_TEAMS.filter((item) => canAccessSundayTeam(item.key, roles));
+  const accessibleTeams = SUNDAY_MINISTRY_TEAMS.filter((item) => canAccessSundayTeam(item.key, roles, assignedTeamKeys));
   const matchingTeams = accessibleTeams.filter((item) => teamHasTab(item.key, initialTab));
   const tabTeam = matchingTeams.length === 1 ? matchingTeams[0] : undefined;
-  const landingTeam = ownSundayTeam(roles) ?? SUNDAY_MINISTRY_DEFAULT_TEAM;
+  const landingTeam = ownSundayTeam(roles, assignedTeamKeys) ?? SUNDAY_MINISTRY_DEFAULT_TEAM;
   const teamMeta = sundayTeamOf(team) ?? tabTeam ?? sundayTeamOf(landingTeam)!;
-  const teamChooser = team === undefined && !tabTeam && ownSundayTeam(roles) === null && accessibleTeams.length > 1;
-  const allowed = canAccessArea("sunday", roles) && canAccessSundayTeam(teamMeta.key, roles);
-  const canEdit = canEditSundayTeam(teamMeta.key, roles);
+  const teamChooser = team === undefined && !tabTeam && ownSundayTeam(roles, assignedTeamKeys) === null && accessibleTeams.length > 1;
+  const allowed = canAccessArea("sunday", roles) && canAccessSundayTeam(teamMeta.key, roles, assignedTeamKeys);
+  const canEdit = canEditSundayTeam(teamMeta.key, roles, assignedTeamKeys);
   const tabs = teamMeta.tabs as readonly SundayTab[];
   // 팀 라우트를 오갈 때 컴포넌트가 재사용될 수 있으므로, 선택 탭은 렌더 중 파생으로 보정한다
   // (effect에서 setState하면 실수 13 — 사용자의 선택이 덮인다).
@@ -193,7 +195,7 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
           </div>
           <div className="sunday-team-picker">
             {accessibleTeams.map((item) => (
-              <button key={item.key} type="button" onClick={() => router.push(teamHrefWithTab(item.key, initialTab))} disabled={item.status === "planned" && ownSundayTeam(roles) !== item.key}>
+              <button key={item.key} type="button" onClick={() => router.push(teamHrefWithTab(item.key, initialTab))} disabled={item.status === "planned" && ownSundayTeam(roles, assignedTeamKeys) !== item.key}>
                 <span><strong>{item.label}</strong><small>{item.hint}</small></span>
                 <span aria-hidden="true">→</span>
               </button>
@@ -211,7 +213,7 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
         <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">{MINISTRY_AREA_LABELS.sunday}</span>
         <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
         <label className="flex min-w-0 items-center gap-2 text-xs text-slate-300"><span className="shrink-0">팀 변경</span><select aria-label="현재 팀·팀 변경" className="max-w-36 rounded-lg border border-white/20 bg-slate-800 px-2 py-1.5 text-xs text-white" value={teamMeta.key} onChange={(event) => router.push(teamHrefWithTab(event.target.value as SundayTeamKey, initialTab))}>
-          {accessibleTeams.map((item) => <option key={item.key} value={item.key} disabled={item.status === "planned" && ownSundayTeam(roles) !== item.key}>{item.label}{item.status === "planned" ? " · 기획 중" : ""}</option>)}
+          {accessibleTeams.map((item) => <option key={item.key} value={item.key} disabled={item.status === "planned" && ownSundayTeam(roles, assignedTeamKeys) !== item.key}>{item.label}{item.status === "planned" ? " · 기획 중" : ""}</option>)}
         </select></label>
         {teamMeta.key !== "praise" && !canEdit && <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 sm:text-xs">조회 전용</span>}
       </div>

@@ -115,7 +115,7 @@ export default function ProgramPreparationClient() {
     params.delete("program");
     params.delete("section");
     const query = params.toString();
-    const pathname = `/retreat/${encodeURIComponent(retreatId)}/programs`;
+    const pathname = `/events/${encodeURIComponent(retreatId)}/programs`;
     window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
   }
 
@@ -342,11 +342,11 @@ export default function ProgramPreparationClient() {
   );
 
   if (lockError) return (
-    <div className="program-access-state" role="alert"><h1>잠금 상태를 확인하지 못했습니다</h1><p>{lockError}</p><button type="button" className="btn-secondary" onClick={() => router.push("/programs")}>목록으로</button></div>
+    <div className="program-access-state" role="alert"><h1>잠금 상태를 확인하지 못했습니다</h1><p>{lockError}</p><button type="button" className="btn-secondary" onClick={() => router.push("/events")}>목록으로</button></div>
   );
-  if (lock && !unlocked) return <RetreatPinGate retreatId={retreatId} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/programs")} />;
+  if (lock && !unlocked) return <RetreatPinGate retreatId={retreatId} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/events")} />;
   if (!retreat) return (
-    <div className="program-access-state"><h1>수련회를 찾을 수 없습니다</h1><button type="button" className="btn-secondary" onClick={() => router.push("/programs")}>목록으로</button></div>
+    <div className="program-access-state"><h1>수련회를 찾을 수 없습니다</h1><button type="button" className="btn-secondary" onClick={() => router.push("/events")}>목록으로</button></div>
   );
 
   return (

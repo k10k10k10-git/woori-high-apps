@@ -15,19 +15,27 @@ interface Props {
   teams: Team[];
   trainingClasses: TrainingClass[];
   sessions: Session[];
+  lockedTeamId?: string;
 }
 
-export default function CurriculumTab({ sid, teams, trainingClasses, sessions }: Props) {
+export default function CurriculumTab({ sid, teams, trainingClasses, sessions, lockedTeamId }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
   // 사역팀과 훈련 반은 같은 curriculum/{id} 맵을 쓴다 (id가 서로 겹치지 않는다)
   const [scope, setScope] = useState<"team" | "training">("team");
-  const [teamId, setTeamId] = useState<string>("");
+  const [teamId, setTeamId] = useState<string>(lockedTeamId ?? "");
+  const [teamSource, setTeamSource] = useState(lockedTeamId);
+  if (teamSource !== lockedTeamId) {
+    setTeamSource(lockedTeamId);
+    setTeamId(lockedTeamId ?? "");
+  }
   const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [goalDraft, setGoalDraft] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const groups = scope === "team" ? teams : trainingClasses;
+  const groups = scope === "team"
+    ? (lockedTeamId ? teams.filter((team) => team.id === lockedTeamId) : teams)
+    : trainingClasses;
   const activeTeamId = groups.some((group) => group.id === teamId) ? teamId : groups[0]?.id ?? "";
 
   useEffect(() => {
@@ -71,7 +79,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions }:
         </div>
       )}
 
-      <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+      {!lockedTeamId && <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="커리큘럼 구분">
           {([["team", `사역팀 ${teams.length}개`], ["training", `훈련 ${trainingClasses.length}개`]] as const).map(([key, label]) => (
             <button key={key} role="tab" aria-selected={scope === key}
@@ -81,7 +89,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions }:
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {groups.length === 0 ? (
         <p className="text-sm text-slate-400">
@@ -89,7 +97,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions }:
         </p>
       ) : (
       <>
-      <div role="tablist" aria-label={scope === "team" ? "사역팀 선택" : "훈련 반 선택"} className="flex gap-1 overflow-x-auto mb-4">
+      {!lockedTeamId && <div role="tablist" aria-label={scope === "team" ? "사역팀 선택" : "훈련 반 선택"} className="flex gap-1 overflow-x-auto mb-4">
         {groups.map((t) => (
           <button
             key={t.id}
@@ -107,7 +115,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions }:
             {t.name}
           </button>
         ))}
-      </div>
+      </div>}
 
       {activeTeam && scope === "team" && (
         <section className="card card-body mb-4">
