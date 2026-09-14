@@ -222,6 +222,10 @@ describe("program preparation interaction contract", () => {
     expect(views).toContain("catalogNextAction");
     expect(views).toContain("다음 할 일");
     expect(views).not.toContain("활동 형식 미정");
+    const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
+    expect(editor).toContain("needsProgramIdentity");
+    expect(editor).toContain("프로그램 이름과 총괄 입력");
+    expect(editor).toContain('id="program-title"');
   });
 
   it("현장은 활성 배포본만 읽고 편집 원본의 후속 변경을 노출하지 않는다", () => {

@@ -201,6 +201,7 @@ export default function ProgramEditor({
   const posts = useMemo(() => programPosts(program), [program]);
   const competitionTeams = useMemo(() => programCompetitionTeams(program), [program]);
   const taskProgress = useMemo(() => programTaskProgress(program), [program]);
+  const needsProgramIdentity = !draft.title.trim() || /^프로그램\s*\d+$/u.test(draft.title.trim()) || !draft.lead?.trim();
 
   useEffect(() => {
     if (!pendingTarget || pendingTarget.section !== section) return;
@@ -315,12 +316,22 @@ export default function ProgramEditor({
           <div className="program-readiness-checklist__heading">
             <div>
               <span className="program-eyebrow">다음 준비</span>
-              <h3 id="program-readiness-heading">{readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : taskProgress.done < taskProgress.total ? "현장 점검은 끝났습니다" : "현장 공유 준비가 끝났습니다"}</h3>
-              <p>{readiness.missingLabels.length > 0 ? "가장 먼저 채울 항목만 보여드립니다." : taskProgress.done < taskProgress.total ? `실행 할 일 ${taskProgress.total - taskProgress.done}건을 마치면 현장에 공유할 수 있습니다.` : "점검·현장 공유에서 최종 공개할 수 있습니다."}</p>
+              <h3 id="program-readiness-heading">{needsProgramIdentity ? "이름과 담당자를 먼저 정해 주세요" : readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : taskProgress.done < taskProgress.total ? "현장 점검은 끝났습니다" : "현장 공유 준비가 끝났습니다"}</h3>
+              <p>{needsProgramIdentity ? "프로그램을 구별할 이름과 전체 진행을 맡을 사람부터 입력합니다." : readiness.missingLabels.length > 0 ? "가장 먼저 채울 항목만 보여드립니다." : taskProgress.done < taskProgress.total ? `실행 할 일 ${taskProgress.total - taskProgress.done}건을 마치면 현장에 공유할 수 있습니다.` : "점검·현장 공유에서 최종 공개할 수 있습니다."}</p>
             </div>
             <span>{readiness.percent}%</span>
           </div>
-          {readiness.missingLabels.length === 0 ? (
+          {needsProgramIdentity ? (
+            <ul className="program-next-actions">
+              <li>
+                <button type="button" onClick={() => goToReadinessTarget("overview", "program-title")}>
+                  <b aria-hidden="true">1</b>
+                  <span><strong>프로그램 이름과 총괄 입력</strong><small>1 기획 시작</small></span>
+                  <ArrowRight aria-hidden="true" size={16} />
+                </button>
+              </li>
+            </ul>
+          ) : readiness.missingLabels.length === 0 ? (
             <button type="button" className="program-readiness-complete" onClick={() => onSelectSection("tasks")}>
               <CheckCircle aria-hidden="true" size={20} weight="fill" />
               <span><strong>최종 점검과 현장 공유</strong><small>공유 대상을 확인한 뒤 공개합니다.</small></span>
@@ -369,7 +380,7 @@ export default function ProgramEditor({
             <div className="program-form-grid">
               <label className="program-field program-field--wide">
                 <span>프로그램 이름</span>
-                <input className="input" value={draft.title} maxLength={80} onChange={(event) => setField("title", event.target.value)} />
+                <input id="program-title" className="input" value={draft.title} maxLength={80} onChange={(event) => setField("title", event.target.value)} />
               </label>
               <label className="program-field">
                 <span>유형</span>
