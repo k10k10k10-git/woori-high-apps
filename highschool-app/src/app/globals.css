@@ -6,7 +6,7 @@
 ════════════════════════════════════════════════════ */
 :root {
   /* Brand — Naver의 쉬운 초록 + CHZZK의 명료한 다크 셸을 업무 도구에 맞게 절제 */
-  --color-primary:         #087a57;
+  --color-primary:         #077451;
   --color-primary-hover:   #066c4d;
   --color-primary-active:  #055c42;
   --color-primary-light:   #9ce8cc;
@@ -15,7 +15,7 @@
   --color-primary-ring:    rgba(8, 122, 87, 0.22);
   --color-badge-bg:        rgba(8, 122, 87, 0.09);
   --color-badge-border:    rgba(8, 122, 87, 0.20);
-  --color-badge-text:      #087a57;
+  --color-badge-text:      #077451;
   --color-primary-contrast:#ffffff;
   --color-primary-disabled-text: #245541;
   --color-accent:          #2563eb;
@@ -33,7 +33,7 @@
   --domain-sunday-ink:          #9a5b0b;
   --domain-retreat-soft:        #edf7f3;
   --domain-retreat-soft-hover:  #e3f2ec;
-  --domain-retreat-ink:         #087a57;
+  --domain-retreat-ink:         #077451;
   --domain-field-soft:          #f3f6f5;
   --domain-field-soft-hover:    #eaf0ed;
   --domain-field-ink:           #34423c;
@@ -70,7 +70,7 @@
   --color-danger-action:   #a92537;
   --color-danger-bg:       #fff0f2;
   --color-danger-border:   #f4b9c0;
-  --color-success:         #087a57;
+  --color-success:         #077451;
   --color-success-bg:      #e8f8f2;
   --color-warning:         #b97912;
   --color-warning-bg:      #fff6df;

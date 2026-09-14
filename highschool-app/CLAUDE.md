@@ -97,7 +97,7 @@
 
 🔒 민감정보 = 취소·환불 계좌, 의료 일지, 교사 주민번호, 입금 미대조(`retreatsPrivate` 계열). 해당 탭은 `canSeeSensitiveRetreat`가 거짓이면 **탭 목록에서 빠지고, 주소를 직접 입력해도 첫 탭으로 되돌립니다**.
 
-**DB 저장** (Rules 변경 없음 — 버킷은 두 축의 **합집합**으로 결정)
+**DB 저장** (역할 버킷은 두 축의 **합집합**으로 결정하되 민감 경로는 역할을 한 번 더 검사)
 
 | 버킷 | 들어가는 역할 | 저장 |
 |---|---|---|
@@ -107,10 +107,10 @@
 
 **출석부 반영은 `canWriteStudentRoster(roles)`가 허용하는 학기 역할 `superAdmin`·`adminTeam`만 실행합니다.** 행정팀은 2026-08-12 Rules 보강으로 열렸고, `classes/{year}/{ck}/students/{sid}`·`attendance/{year}/{ck}/{sid}`·`trash/{year}/students/{backupKey}` **학생 1명 경로**만 씁니다. 반 노드 전체(`students` 통째·`teacher`)와 `trash` 노드 전체는 통합관리자·담임 그대로입니다. `semesterRole`은 `retreatAdmins` 쓰기가 통합관리자 전용이라 자가 승급이 불가능합니다. 계약은 `accessPolicy.test.ts`와 `attendance-app/__tests__/rulesContract.test.ts`가 지킵니다.
 
-※ **화면 차단 ≠ 실제 차단.** Rules는 그 외에는 세 버킷만 구분합니다. 아래는 화면에서만 막히며, 실제 차단은 Rules 변경이 필요합니다.
+※ **화면 차단 ≠ 실제 차단.** `retreatsPrivate/*`는 Rules에서도 통합관리자·교역자·행정팀만 읽고 쓰도록 제한합니다. 역할 필드가 생기기 전 승인된 운영 계정은 기존 `role`을 하위호환으로 판정하며, `leader`와 이가드 계정은 차단합니다. 공개 `retreats/*` 등 나머지 경로는 아직 역할 버킷 단위 규칙이 있으므로 아래 화면 제한을 서버 권한으로 오해하지 않습니다.
 - 행정 화면의 **조회 전용 모드**는 `RetreatEditProvider`(`features/portal/RetreatEditContext.tsx`) + `RetreatPageClient`의 `<fieldset disabled className="contents">` 두 겹입니다. fieldset이 내부 `button`·`input`·`select`·`textarea`를 브라우저 수준에서 잠그고(클릭 이벤트도 발생하지 않음), `display:contents`라 레이아웃에는 영향이 없습니다. 드래그처럼 폼 요소가 아닌 조작은 각 컴포넌트가 `useRetreatCanEdit()`으로 따로 잠급니다(`GroupComponents`·`RoomsTab`의 `draggable`). 새 행정 탭을 만들 때 드래그·div 클릭 편집이 있으면 이 훅을 반드시 쓰세요.
 - 이가드팀·스탭팀장의 행정 **조회**는 민감 탭을 감춰야 성립합니다. `ParticipantsTab`의 `getSyncDuplicates`는 `retreatsPrivate`라 실패해도 명단이 보이도록 `.catch(() => [])`로 삼킵니다 — 이 방어를 지우면 조회 전용 역할에게 첫 탭이 통째로 에러가 됩니다.
-- 사역팀의 "내 팀만 편집", 민감정보 실차단, 스탭의 `classes` 전체 읽기 차단도 Rules 작업입니다.
+- 사역팀의 "내 팀만 편집", 공개 수련회 쓰기 역할 세분화, 스탭의 `classes` 전체 읽기 차단은 후속 Rules 작업입니다.
 
 **원칙: 화면에서 막는 것은 언제나 안전하지만, 화면에서 여는 것은 Rules가 허용할 때만 합니다.** (Rules가 막는 걸 화면에서 열면 "눌렀는데 실패"가 됩니다.)
 

@@ -75,6 +75,19 @@ describe('database.rules.json 권한 계약', () => {
     });
   });
 
+  describe('retreatsPrivate — 계좌·의료·주민번호는 민감정보 역할만 허용한다', () => {
+    it('read·write가 방학 역할을 검사하고 조회 전용 역할·이가드 버킷을 허용하지 않는다', () => {
+      for (const action of ['.read', '.write'] as const) {
+        const expression = ruleExpression('retreatsPrivate', action);
+        expect(expression).toContain("child('retreatRole').val() === 'pastor'");
+        expect(expression).toContain("child('retreatRole').val() === 'adminTeam'");
+        expect(expression).toContain("!root.child('retreatAdmins').child(auth.uid).child('retreatRole').exists()");
+        expect(expression).not.toContain("child('retreatRole').val() === 'leader'");
+        expect(refers(expression, 'iguardMembers')).toBe(false);
+      }
+    });
+  });
+
   describe('attendanceAdmins — 출석부 전용 관리자는 플랫폼 노드에 접근하지 못한다', () => {
     it.each(['semesters', 'semestersPrivate', 'retreats', 'retreatsPrivate', 'admins'])(
       '%s 규칙에 attendanceAdmins가 없다',
