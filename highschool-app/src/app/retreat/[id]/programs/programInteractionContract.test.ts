@@ -24,12 +24,13 @@ describe("program preparation interaction contract", () => {
     expect(list).toContain("PROGRAM_TEMPLATE_META");
   });
 
-  it("실행 할 일은 첫 화면에 있고 회의 결정은 재시도해도 기존 작업을 덮지 않는다", () => {
+  it("첫 화면은 다음 준비와 기본 정보 뒤에 실행 할 일을 두고 회의 결정은 기존 작업을 덮지 않는다", () => {
     const editor = source("src/app/retreat/[id]/programs/ProgramEditor.tsx");
     const meeting = source("src/app/retreat/[id]/programs/ProgramMeetingMode.tsx");
     const db = source("src/lib/db/programs.ts");
     const paths = source("src/lib/paths.ts");
-    expect(editor.indexOf("<ProgramTaskBoard")).toBeLessThan(editor.indexOf("program-readiness-checklist"));
+    expect(editor.indexOf("program-readiness-checklist")).toBeLessThan(editor.indexOf("program-form--manual"));
+    expect(editor.indexOf("program-form--manual")).toBeLessThan(editor.indexOf("<ProgramTaskBoard"));
     expect(meeting).toContain("결정과 실행");
     expect(meeting).toContain("할 일로 보내기");
     expect(db).toContain("convertRetreatProgramDecisionToTask");
@@ -201,13 +202,26 @@ describe("program preparation interaction contract", () => {
     const preparation = source("src/lib/programPreparation.ts");
     const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
     const views = source("src/app/retreat/[id]/programs/ProgramWorkspaceViews.tsx");
-    for (const label of ["준비 현황", "프로그램", "일정·배치", "물품·비용", "회의·할 일", "자료·현장"]) {
+    for (const label of ["한눈에 보기", "프로그램 준비", "시간·장소", "준비물·비용", "담당자·할 일", "현장 공유"]) {
       expect(preparation).toContain(`label: "${label}"`);
     }
     expect(client).toContain('params.set("workspace", next)');
     expect(client).toContain("<ProgramScheduleWorkspace");
     expect(client).toContain("<ProgramSupplyWorkspace");
     expect(views).toContain('onOpen(program.id, "roles")');
+  });
+
+  it("처음 온 스탭에게 네 단계 순서와 각 프로그램의 다음 행동을 바로 안내한다", () => {
+    const preparation = source("src/lib/programPreparation.ts");
+    const views = source("src/app/retreat/[id]/programs/ProgramWorkspaceViews.tsx");
+    for (const label of ["1 기획 시작", "2 진행 순서", "3 준비물·담당", "4 확인·현장 공유"]) {
+      expect(preparation).toContain(`label: "${label}"`);
+    }
+    expect(views).toContain("처음 준비한다면");
+    expect(views).toContain("아래 네 단계만 차례로 진행하면 됩니다.");
+    expect(views).toContain("catalogNextAction");
+    expect(views).toContain("다음 할 일");
+    expect(views).not.toContain("활동 형식 미정");
   });
 
   it("현장은 활성 배포본만 읽고 편집 원본의 후속 변경을 노출하지 않는다", () => {

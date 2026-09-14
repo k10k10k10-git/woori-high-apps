@@ -146,13 +146,13 @@ export function createProgramDraft(order: number, title = `프로그램 ${order}
 export type ProgramTemplateKey = "blank" | "host" | "course" | "group" | "alliance" | "reflection" | "mixed";
 
 export const PROGRAM_TEMPLATE_META: Record<ProgramTemplateKey, { label: string; description: string }> = {
-  blank: { label: "빈 프로그램", description: "진행 방식이 아직 정해지지 않았을 때" },
-  host: { label: "MC 전체 진행", description: "앞에서 모두를 이끄는 레크리에이션·집중 게임" },
-  course: { label: "코스 순환", description: "조가 여러 장소를 이동하는 포스트 게임" },
-  group: { label: "조별 협력", description: "각 조가 함께 해결하는 아이스브레이킹" },
-  alliance: { label: "연합팀 경쟁", description: "여러 조를 큰 팀으로 묶는 운동회·경쟁" },
-  reflection: { label: "묵상·메시지", description: "말씀, 영상, 나눔과 기도를 잇는 프로그램" },
-  mixed: { label: "혼합 진행", description: "전체·분산·이동·묵상을 한 흐름으로 구성" },
+  blank: { label: "직접 만들기", description: "정해진 형식 없이 빈 프로그램에서 시작합니다." },
+  host: { label: "한 장소에서 함께 진행", description: "진행자가 앞에서 전체를 이끄는 활동입니다." },
+  course: { label: "조별로 장소 이동", description: "조가 여러 장소를 차례로 이동합니다." },
+  group: { label: "현재 조대로 진행", description: "수련회 조별로 함께 참여하는 활동입니다." },
+  alliance: { label: "여러 조를 큰 팀으로", description: "여러 조를 묶어 팀 대항으로 진행합니다." },
+  reflection: { label: "말씀·묵상 중심", description: "말씀, 영상, 나눔과 기도를 이어갑니다." },
+  mixed: { label: "여러 형식을 섞어 진행", description: "전체 진행과 조별 활동 등을 한 흐름에 섞습니다." },
 };
 
 /** 새 프로그램의 시작 비용만 줄이고 이후 편집 방식은 제한하지 않는다. */
@@ -678,12 +678,12 @@ export function parseProgramActivityPaste(value: string): ProgramActivityPasteRo
 }
 
 export const PROGRAM_WORKSPACE_SECTIONS = [
-  { key: "overview", label: "준비 현황", description: "막힌 준비와 다음 행동" },
-  { key: "programs", label: "프로그램", description: "프로그램별 기획과 활동" },
-  { key: "schedule", label: "일정·배치", description: "시간, 장소와 담당 충돌" },
-  { key: "supplies", label: "물품·비용", description: "요청부터 현장 도착과 정산" },
-  { key: "collaboration", label: "회의·할 일", description: "결정과 실행 업무" },
-  { key: "resources", label: "자료·현장", description: "브리핑과 현장 공유" },
+  { key: "overview", label: "한눈에 보기", description: "막힌 준비와 다음 행동" },
+  { key: "programs", label: "프로그램 준비", description: "프로그램별 기획과 진행 순서" },
+  { key: "schedule", label: "시간·장소", description: "시간, 장소와 담당 충돌" },
+  { key: "supplies", label: "준비물·비용", description: "요청부터 현장 도착과 정산" },
+  { key: "collaboration", label: "담당자·할 일", description: "결정과 실행 업무" },
+  { key: "resources", label: "현장 공유", description: "브리핑과 현장 공유" },
 ] as const;
 
 export type ProgramWorkspaceSectionKey = (typeof PROGRAM_WORKSPACE_SECTIONS)[number]["key"];
@@ -696,10 +696,10 @@ export function programWorkspaceSectionFromParam(value: string | null | undefine
 
 /** 편집기 상단 내비게이션 — 각 탭이 서로 다른 일을 맡는다. */
 export const PROGRAM_SECTIONS = [
-  { key: "overview", label: "개요·할 일" },
-  { key: "posts", label: "활동 작업실" },
-  { key: "roles", label: "물품·역할" },
-  { key: "tasks", label: "검토·공유" },
+  { key: "overview", label: "1 기획 시작" },
+  { key: "posts", label: "2 진행 순서" },
+  { key: "roles", label: "3 준비물·담당" },
+  { key: "tasks", label: "4 확인·현장 공유" },
 ] as const;
 
 export type ProgramSectionKey = (typeof PROGRAM_SECTIONS)[number]["key"];
