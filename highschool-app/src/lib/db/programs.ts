@@ -1,8 +1,8 @@
 import { get, onValue, push, ref } from "firebase/database";
-import { auditedRemove as remove, auditedSet as set, auditedUpdate as update } from "@/features/activityLog/write";
+import { auditedRunTransaction as runTransaction, auditedSet as set, auditedUpdate as update } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { paths } from "../paths";
-import { createProgramDraft, programDecisionTaskId, sortRetreatPrograms } from "../programPreparation";
+import { canPublishProgram, createProgramDraft, programDecisionTaskId, sortRetreatPrograms } from "../programPreparation";
 import type {
   RetreatProgram,
   RetreatProgramCompetitionTeam,
@@ -13,6 +13,7 @@ import type {
   RetreatProgramPost,
   RetreatProgramRole,
   RetreatProgramTask,
+  RetreatProgramPublishedSnapshot,
 } from "../types";
 import { snapToList, stripUndefined } from "./core";
 
@@ -72,7 +73,7 @@ export async function createDefaultRetreatPrograms(retreatId: string): Promise<s
 export async function updateRetreatProgram(
   retreatId: string,
   programId: string,
-  data: Partial<Omit<RetreatProgram, "id" | "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams" | "createdAt">>,
+  data: Partial<Omit<RetreatProgram, "id" | "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams" | "releases" | "activeReleaseId" | "createdAt">>,
 ): Promise<void> {
   await update(ref(db, paths.program(retreatId, programId)), stripUndefined({ ...data, updatedAt: Date.now() }));
 }
@@ -101,7 +102,10 @@ export async function createRetreatProgramTask(
 ): Promise<string> {
   const taskRef = push(ref(db, paths.programTasks(retreatId, programId)));
   const now = Date.now();
-  await set(taskRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  await update(ref(db), {
+    [paths.programTask(retreatId, programId, taskRef.key!)]: stripUndefined({ ...data, createdAt: now, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
   return taskRef.key!;
 }
 
@@ -111,7 +115,11 @@ export async function updateRetreatProgramTask(
   taskId: string,
   data: Partial<Omit<RetreatProgramTask, "id" | "createdAt">>,
 ): Promise<void> {
-  await update(ref(db, paths.programTask(retreatId, programId, taskId)), stripUndefined({ ...data, updatedAt: Date.now() }));
+  const now = Date.now();
+  await update(ref(db), {
+    [paths.programTask(retreatId, programId, taskId)]: stripUndefined({ ...data, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
 }
 
 export async function deleteRetreatProgramTask(
@@ -120,13 +128,18 @@ export async function deleteRetreatProgramTask(
   taskId: string,
   source?: { meetingId: string; decisionId: string },
 ): Promise<void> {
+  const now = Date.now();
   if (!source) {
-    await remove(ref(db, paths.programTask(retreatId, programId, taskId)));
+    await update(ref(db), {
+      [paths.programTask(retreatId, programId, taskId)]: null,
+      [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+    });
     return;
   }
   await update(ref(db), {
     [paths.programTask(retreatId, programId, taskId)]: null,
     [`${paths.programDecision(retreatId, programId, source.meetingId, source.decisionId)}/taskId`]: null,
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
   });
 }
 
@@ -147,7 +160,10 @@ export async function restoreRetreatProgramTask(
   if (!programSnapshot.exists() || taskSnapshot.exists()) {
     throw new Error("다른 변경이 먼저 반영되어 이 할 일은 되돌리지 않았습니다.");
   }
-  const payload: Record<string, unknown> = { [taskPath]: restored };
+  const payload: Record<string, unknown> = {
+    [taskPath]: restored,
+    [`${programPath}/updatedAt`]: now,
+  };
   if (task.sourceMeetingId && task.sourceDecisionId) {
     const decisionPath = paths.programDecision(retreatId, programId, task.sourceMeetingId, task.sourceDecisionId);
     const decisionSnapshot = await get(ref(db, decisionPath));
@@ -250,6 +266,7 @@ export async function convertRetreatProgramDecisionToTask(
       createdAt: currentDecision.createdAt,
       updatedAt: currentDecision.updatedAt,
     });
+    payload[`${paths.program(retreatId, programId)}/updatedAt`] = now;
   }
   // 공개 작업 생성과 private 결정 링크를 한 번의 root update로 적용해 고아 상태를 막는다.
   await update(ref(db), payload);
@@ -275,7 +292,10 @@ async function createSubEntry<T extends object>(
 ): Promise<string> {
   const entryRef = push(ref(db, subPath(retreatId, programId, kind)));
   const now = Date.now();
-  await set(entryRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  await update(ref(db), {
+    [subPath(retreatId, programId, kind, entryRef.key!)]: stripUndefined({ ...data, createdAt: now, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
   return entryRef.key!;
 }
 
@@ -286,11 +306,18 @@ async function updateSubEntry<T extends object>(
   id: string,
   data: T,
 ): Promise<void> {
-  await update(ref(db, subPath(retreatId, programId, kind, id)), stripUndefined({ ...data, updatedAt: Date.now() }));
+  const now = Date.now();
+  await update(ref(db), {
+    [subPath(retreatId, programId, kind, id)]: stripUndefined({ ...data, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
 }
 
 async function deleteSubEntry(retreatId: string, programId: string, kind: SubCollection, id: string): Promise<void> {
-  await remove(ref(db, subPath(retreatId, programId, kind, id)));
+  await update(ref(db), {
+    [subPath(retreatId, programId, kind, id)]: null,
+    [`${paths.program(retreatId, programId)}/updatedAt`]: Date.now(),
+  });
 }
 
 async function restoreSubEntry<T extends { id: string }>(
@@ -300,7 +327,11 @@ async function restoreSubEntry<T extends { id: string }>(
   entry: T,
 ): Promise<void> {
   const { id, ...value } = entry;
-  await set(ref(db, subPath(retreatId, programId, kind, id)), stripUndefined({ ...value, updatedAt: Date.now() }));
+  const now = Date.now();
+  await update(ref(db), {
+    [subPath(retreatId, programId, kind, id)]: stripUndefined({ ...value, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
 }
 
 export function createRetreatProgramPost(
@@ -308,6 +339,29 @@ export function createRetreatProgramPost(
   data: Omit<RetreatProgramPost, "id" | "createdAt" | "updatedAt">,
 ): Promise<string> {
   return createSubEntry(retreatId, programId, "posts", data);
+}
+
+export async function createRetreatProgramPosts(
+  retreatId: string,
+  programId: string,
+  rows: Array<Omit<RetreatProgramPost, "id" | "createdAt" | "updatedAt">>,
+): Promise<string[]> {
+  const now = Date.now();
+  const payload: Record<string, unknown> = {};
+  const ids = rows.map((row, index) => {
+    const entryRef = push(ref(db, subPath(retreatId, programId, "posts")));
+    payload[subPath(retreatId, programId, "posts", entryRef.key!)] = stripUndefined({
+      ...row,
+      createdAt: now + index,
+      updatedAt: now + index,
+    });
+    return entryRef.key!;
+  });
+  if (ids.length > 0) {
+    payload[`${paths.program(retreatId, programId)}/updatedAt`] = now + ids.length - 1;
+    await update(ref(db), payload);
+  }
+  return ids;
 }
 
 export function updateRetreatProgramPost(
@@ -441,6 +495,7 @@ export async function createDefaultRetreatProgramCompetitionTeams(
       updatedAt: now,
     };
   }
+  payload[`${paths.program(retreatId, programId)}/updatedAt`] = now;
   await update(ref(db), payload);
 }
 
@@ -459,6 +514,7 @@ export async function assignRetreatGroupToProgramCompetitionTeam(
       teamId === selectedTeamId ? true : null;
     payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/updatedAt`] = now;
   }
+  payload[`${paths.program(retreatId, programId)}/updatedAt`] = now;
   await update(ref(db), payload);
 }
 
@@ -478,6 +534,7 @@ export async function replaceRetreatProgramCompetitionAssignments(
       Object.keys(groupIds).length ? groupIds : null;
     payload[`${paths.programCompetitionTeam(retreatId, programId, teamId)}/updatedAt`] = now;
   }
+  payload[`${paths.program(retreatId, programId)}/updatedAt`] = now;
   await update(ref(db), payload);
 }
 
@@ -491,7 +548,10 @@ export async function createRetreatProgramMatch(
 ): Promise<string> {
   const matchRef = push(ref(db, `${paths.program(retreatId, programId)}/posts/${postId}/matches`));
   const now = Date.now();
-  await set(matchRef, stripUndefined({ ...data, createdAt: now, updatedAt: now }));
+  await update(ref(db), {
+    [`${paths.program(retreatId, programId)}/posts/${postId}/matches/${matchRef.key!}`]: stripUndefined({ ...data, createdAt: now, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
   return matchRef.key!;
 }
 
@@ -499,16 +559,20 @@ export async function updateRetreatProgramMatch(
   retreatId: string, programId: string, postId: string, matchId: string,
   data: Partial<Omit<RetreatProgramMatch, "id" | "createdAt">>,
 ): Promise<void> {
-  await update(
-    ref(db, paths.programPostMatch(retreatId, programId, postId, matchId)),
-    stripUndefined({ ...data, updatedAt: Date.now() }),
-  );
+  const now = Date.now();
+  await update(ref(db), {
+    [paths.programPostMatch(retreatId, programId, postId, matchId)]: stripUndefined({ ...data, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
 }
 
 export async function deleteRetreatProgramMatch(
   retreatId: string, programId: string, postId: string, matchId: string,
 ): Promise<void> {
-  await remove(ref(db, paths.programPostMatch(retreatId, programId, postId, matchId)));
+  await update(ref(db), {
+    [paths.programPostMatch(retreatId, programId, postId, matchId)]: null,
+    [`${paths.program(retreatId, programId)}/updatedAt`]: Date.now(),
+  });
 }
 
 export async function restoreRetreatProgramMatch(
@@ -518,8 +582,65 @@ export async function restoreRetreatProgramMatch(
   match: RetreatProgramMatch,
 ): Promise<void> {
   const { id, ...value } = match;
-  await set(
-    ref(db, paths.programPostMatch(retreatId, programId, postId, id)),
-    stripUndefined({ ...value, updatedAt: Date.now() }),
-  );
+  const now = Date.now();
+  await update(ref(db), {
+    [paths.programPostMatch(retreatId, programId, postId, id)]: stripUndefined({ ...value, updatedAt: now }),
+    [`${paths.program(retreatId, programId)}/updatedAt`]: now,
+  });
+}
+
+function releaseSnapshot(program: RetreatProgram): RetreatProgramPublishedSnapshot {
+  const {
+    order, title, kind, date, startTime, endTime, place, lead, team, theme, scripture,
+    objective, summary, flow, rules, briefing, script, materials, tasks, posts, items, roles, competitionTeams,
+  } = program;
+  return stripUndefined({
+    order, title, kind, date, startTime, endTime, place, lead, team, theme, scripture,
+    objective, summary, flow, rules, briefing, script, materials, tasks, posts, items, roles, competitionTeams,
+  });
+}
+
+/** 현재 원본 버전을 확인하고 현장용 읽기 전용 배포본과 포인터를 한 번에 만든다. */
+export async function publishRetreatProgramRelease(
+  retreatId: string,
+  programId: string,
+  expectedUpdatedAt: number,
+): Promise<string> {
+  const programPath = paths.program(retreatId, programId);
+  const releaseRef = push(ref(db, paths.programReleases(retreatId, programId)));
+  const releaseId = releaseRef.key!;
+  const releasedAt = Date.now();
+  let failure: "missing" | "changed" | "incomplete" | null = null;
+  const result = await runTransaction(ref(db, programPath), (value: Omit<RetreatProgram, "id"> | null) => {
+    if (!value) { failure = "missing"; return undefined; }
+    const current = { id: programId, ...value } as RetreatProgram;
+    if (current.updatedAt !== expectedUpdatedAt) { failure = "changed"; return undefined; }
+    if (!canPublishProgram(current)) { failure = "incomplete"; return undefined; }
+    failure = null;
+    return stripUndefined({
+      ...value,
+      releases: {
+        ...(current.releases ?? {}),
+        [releaseId]: {
+          sourceUpdatedAt: current.updatedAt,
+          releasedAt,
+          snapshot: releaseSnapshot(current),
+        },
+      },
+      activeReleaseId: releaseId,
+      status: "published",
+      updatedAt: releasedAt,
+    });
+  });
+  if (!result.committed) {
+    if (failure === "missing") throw new Error("프로그램이 삭제되어 현장에 공유하지 못했습니다.");
+    if (failure === "changed") throw new Error("다른 변경이 먼저 반영되었습니다. 최신 내용을 확인한 뒤 다시 공유해 주세요.");
+    if (failure === "incomplete") throw new Error("현장 준비와 실행 할 일을 모두 완료한 뒤 공유해 주세요.");
+    throw new Error("현장 배포본을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+  }
+  return releaseId;
+}
+
+export async function unpublishRetreatProgramRelease(retreatId: string, programId: string): Promise<void> {
+  await update(ref(db, paths.program(retreatId, programId)), { status: "confirmed", updatedAt: Date.now() });
 }

@@ -2,9 +2,10 @@
 
 import PublishedProgramCard from "@/components/PublishedProgramCard";
 import type { Group, RetreatProgram } from "@/lib/types";
+import { publishedProgramForField } from "@/lib/programPreparation";
 
 export default function PublishedProgramsView({ programs, groups }: { programs: RetreatProgram[]; groups: Group[] }) {
-  const published = programs.filter((program) => program.status === "published");
+  const published = programs.map(publishedProgramForField).filter((program): program is RetreatProgram => Boolean(program));
 
   if (published.length === 0) {
     return (

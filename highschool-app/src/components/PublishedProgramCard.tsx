@@ -2,9 +2,11 @@
 
 import { CalendarBlank, Clock, MapPin, UserCircle } from "@phosphor-icons/react";
 import {
+  PROGRAM_ACTIVITY_TYPE_META,
   PROGRAM_OPERATION_MODE_META,
   PROGRAM_PARTICIPATION_MODE_META,
   programCompetitionTeams,
+  programActivityType,
   programKindMeta,
   programOperationMode,
   programParticipationMode,
@@ -57,13 +59,20 @@ export default function PublishedProgramCard({ program, groups, sequence, embedd
         <section className="published-program-blocks">
           <h4>진행 순서</h4>
           <ol>
-            {blocks.map((block) => (
-              <li key={block.id}>
-                <span>{block.name}</span>
-                <small>{PROGRAM_OPERATION_MODE_META[programOperationMode(block)].label} · {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(block)]}{block.duration ? ` · ${block.duration}` : ""}</small>
-                {(block.rules || block.runCautions) && <p>{block.rules || block.runCautions}</p>}
-              </li>
-            ))}
+            {blocks.map((block) => {
+              const logistics = [
+                block.startTime && `${block.startTime}${block.endTime ? `–${block.endTime}` : ""}`,
+                block.place,
+                block.staff,
+              ].filter(Boolean).join(" · ");
+              return (
+                <li key={block.id}>
+                  <span>{block.name}</span>
+                  <small>{PROGRAM_ACTIVITY_TYPE_META[programActivityType(block)].label} · {PROGRAM_OPERATION_MODE_META[programOperationMode(block)].label} · {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(block)]}{block.duration ? ` · ${block.duration}` : ""}{logistics ? ` · ${logistics}` : ""}</small>
+                  {(block.rules || block.runCautions) && <p>{block.rules || block.runCautions}</p>}
+                </li>
+              );
+            })}
           </ol>
         </section>
       )}

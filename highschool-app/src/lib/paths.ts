@@ -112,6 +112,9 @@ export const paths = {
     `retreats/${id}/programs/${programId}/competitionTeams/${teamId}`,
   programCompetitionTeamGroup: (id: string, programId: string, teamId: string, groupId: string) =>
     `retreats/${id}/programs/${programId}/competitionTeams/${teamId}/groupIds/${groupId}`,
+  programReleases: (id: string, programId: string) => `retreats/${id}/programs/${programId}/releases`,
+  programRelease: (id: string, programId: string, releaseId: string) =>
+    `retreats/${id}/programs/${programId}/releases/${releaseId}`,
 
   // ── 민감정보 (retreatsPrivate) ──
   retreatsPrivate: () => "retreatsPrivate",

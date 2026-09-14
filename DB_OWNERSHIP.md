@@ -80,7 +80,7 @@
 | `retreats/{id}/tshirtOrders` | 행정 | - | 행정만 | 없음 (단체티 신청) |
 | `retreats/{id}/groupsBackups` | 행정 | - | 행정만 | 없음 (groups 전체 덮어쓰기 직전 롤링 백업) |
 | `retreats/{id}/roomsBackups` | 행정 | - | 행정만 | 없음 (rooms 전체 덮어쓰기 직전 롤링 백업) |
-| `retreats/{id}/programs/{programId}` | 행정 | 이가드 | 행정만 | 프로그램별 기획·진행 블록(`posts`)·규칙·브리핑·대본·물품·실행 할 일(`tasks`)·프로그램 전용 연합팀(`competitionTeams`). 연합팀은 기본 `groups` ID만 참조하고 원본 조를 수정하지 않음. 이가드는 `status=published`만 화면에 노출하며 별도 복제하지 않음 |
+| `retreats/{id}/programs/{programId}` | 행정 | 이가드 | 행정만 | 프로그램별 다형식 활동 블록(`posts`)·규칙·브리핑·대본·물품·실행 할 일(`tasks`)·프로그램 전용 연합팀(`competitionTeams`). 현장용 변경 불가 배포본은 `releases/{releaseId}/snapshot`, 현재 포인터는 `activeReleaseId`; 이가드는 `status=published`인 활성 배포본만 읽음. 연합팀은 기본 `groups` ID만 참조하고 원본 조를 수정하지 않음 |
 | `retreatsPrivate/{id}/programMeetings/{programId}` | 행정 | - | 행정만 | 준비회의 원문과 결정(`{meetingId}/decisions/{decisionId}`). 공개 프로그램 구독·캐시에 섞지 않으며, 결정→공개 실행 할 일 전환은 결정적 ID·최신값 사전 확인·root multi-location update로 한 작업에 수렴 |
 | `retreatsPrivate/{id}/cancellations` | 행정 | - | 행정만 | 민감 취소정보; 학생키만 `cellColors/{studentKey}=red`로 원자 동기화 |
 | `retreatsPrivate/{id}/unmatchedPayments` | 행정 | - | 행정만 | 없음 (민감정보) |

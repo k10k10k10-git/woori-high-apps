@@ -1,6 +1,8 @@
 import type {
   Group,
   RetreatProgram,
+  RetreatProgramActivityType,
+  RetreatProgramFulfillmentStatus,
   RetreatProgramItem,
   RetreatProgramItemStatus,
   RetreatProgramKind,
@@ -13,6 +15,7 @@ import type {
   RetreatProgramCompetitionTeam,
   RetreatProgramDecision,
   RetreatProgramMeeting,
+  RetreatProgramRelease,
   RetreatProgramTask,
 } from "./types";
 import { seoulDateKey } from "../features/portal/dailyMinistryMessage";
@@ -28,7 +31,33 @@ export const PROGRAM_KIND_META: Record<RetreatProgramKind, string> = {
   main: "집중형",
   post: "포스트·코스형",
   sports: "운동회·대진형",
+  reflection: "묵상·메시지형",
+  mixed: "혼합형",
   other: "기타",
+};
+
+export const PROGRAM_ACTIVITY_TYPE_META: Record<RetreatProgramActivityType, { label: string; help: string }> = {
+  game: { label: "게임·미션", help: "규칙, 판정과 준비물을 중심으로 작성합니다." },
+  reflection: { label: "묵상·나눔", help: "말씀, 질문과 교사 안내를 중심으로 작성합니다." },
+  video: { label: "영상", help: "재생 파일, 장비, 담당과 대체 진행을 확인합니다." },
+  briefing: { label: "브리핑·설명", help: "대상별 안내와 다음 행동을 명확하게 적습니다." },
+  movement: { label: "이동·전환", help: "출발지, 도착지, 인솔과 합류 조건을 확인합니다." },
+  setup: { label: "세팅", help: "설치 위치, 필요한 장비와 완료 확인을 기록합니다." },
+  worship: { label: "찬양·기도", help: "진행 순서, 음향·영상과 교사 안내를 준비합니다." },
+  cleanup: { label: "정리·회수", help: "회수 물품, 반납 장소와 담당을 기록합니다." },
+  other: { label: "일반 활동", help: "필요한 진행 내용과 담당을 자유롭게 작성합니다." },
+};
+
+const PROGRAM_ACTIVITY_REQUIREMENTS: Record<RetreatProgramActivityType, { items: boolean; test: boolean }> = {
+  game: { items: true, test: true },
+  reflection: { items: false, test: false },
+  video: { items: true, test: true },
+  briefing: { items: false, test: false },
+  movement: { items: false, test: false },
+  setup: { items: true, test: true },
+  worship: { items: false, test: true },
+  cleanup: { items: false, test: false },
+  other: { items: false, test: false },
 };
 
 export const PROGRAM_OPERATION_MODE_META: Record<RetreatProgramOperationMode, { label: string; description: string }> = {
@@ -76,6 +105,15 @@ export function programKindMeta(kind: RetreatProgramKind) {
   return PROGRAM_KIND_META[kind] ?? PROGRAM_KIND_META.other;
 }
 
+export function programActivityType(post: Pick<RetreatProgramPost, "activityType">): RetreatProgramActivityType {
+  return post.activityType && PROGRAM_ACTIVITY_TYPE_META[post.activityType] ? post.activityType : "game";
+}
+
+export function programActivityRequirements(post: Pick<RetreatProgramPost, "activityType" | "operationMode">): { items: boolean; test: boolean } {
+  if ((post.operationMode ?? "whole") === "break") return { items: false, test: false };
+  return PROGRAM_ACTIVITY_REQUIREMENTS[programActivityType(post)];
+}
+
 /**
  * 편집기가 서버 값으로 초안을 덮어써도 되는지 판단한다.
  *
@@ -105,7 +143,7 @@ export function createProgramDraft(order: number, title = `프로그램 ${order}
   };
 }
 
-export type ProgramTemplateKey = "blank" | "host" | "course" | "group" | "alliance";
+export type ProgramTemplateKey = "blank" | "host" | "course" | "group" | "alliance" | "reflection" | "mixed";
 
 export const PROGRAM_TEMPLATE_META: Record<ProgramTemplateKey, { label: string; description: string }> = {
   blank: { label: "빈 프로그램", description: "진행 방식이 아직 정해지지 않았을 때" },
@@ -113,6 +151,8 @@ export const PROGRAM_TEMPLATE_META: Record<ProgramTemplateKey, { label: string; 
   course: { label: "코스 순환", description: "조가 여러 장소를 이동하는 포스트 게임" },
   group: { label: "조별 협력", description: "각 조가 함께 해결하는 아이스브레이킹" },
   alliance: { label: "연합팀 경쟁", description: "여러 조를 큰 팀으로 묶는 운동회·경쟁" },
+  reflection: { label: "묵상·메시지", description: "말씀, 영상, 나눔과 기도를 잇는 프로그램" },
+  mixed: { label: "혼합 진행", description: "전체·분산·이동·묵상을 한 흐름으로 구성" },
 };
 
 /** 새 프로그램의 시작 비용만 줄이고 이후 편집 방식은 제한하지 않는다. */
@@ -125,21 +165,28 @@ export function createProgramFromTemplate(order: number, template: ProgramTempla
     name: string,
     operationMode: RetreatProgramOperationMode,
     participationMode: RetreatProgramParticipationMode,
-  ): RetreatProgramPost => ({
-    id: `template-${index}`,
-    order: index,
-    name,
-    operationMode,
-    participationMode,
-    scoreEnabled: operationMode === "alliance",
-    testStatus: operationMode === "break" ? "notNeeded" : "needed",
-    createdAt: now + index,
-    updatedAt: now + index,
-  });
+    activityType: RetreatProgramActivityType = "game",
+  ): RetreatProgramPost => {
+    const requirements = operationMode === "break"
+      ? { items: false, test: false }
+      : PROGRAM_ACTIVITY_REQUIREMENTS[activityType];
+    return {
+      id: `template-${index}`,
+      order: index,
+      name,
+      activityType,
+      operationMode,
+      participationMode,
+      scoreEnabled: operationMode === "alliance",
+      testStatus: requirements.test ? "needed" : "notNeeded",
+      createdAt: now + index,
+      updatedAt: now + index,
+    };
+  };
   const presets: Record<Exclude<ProgramTemplateKey, "blank">, {
     title: string;
     kind: RetreatProgramKind;
-    blocks: Array<[string, RetreatProgramOperationMode, RetreatProgramParticipationMode]>;
+    blocks: Array<[string, RetreatProgramOperationMode, RetreatProgramParticipationMode, RetreatProgramActivityType?]>;
   }> = {
     host: {
       title: "전체 진행 프로그램",
@@ -161,10 +208,31 @@ export function createProgramFromTemplate(order: number, template: ProgramTempla
       kind: "sports",
       blocks: [["연합팀 편성·설명", "break", "allianceTeam"], ["연합팀 메인 경기", "alliance", "allianceTeam"], ["점수 집계·시상", "break", "allianceTeam"]],
     },
+    reflection: {
+      title: "묵상·메시지 프로그램",
+      kind: "reflection",
+      blocks: [
+        ["오프닝·안내", "whole", "retreatGroup", "briefing"],
+        ["말씀·영상", "whole", "retreatGroup", "video"],
+        ["개인 묵상", "group", "individual", "reflection"],
+        ["조별 나눔", "group", "retreatGroup", "reflection"],
+        ["찬양·기도", "whole", "retreatGroup", "worship"],
+      ],
+    },
+    mixed: {
+      title: "혼합 진행 프로그램",
+      kind: "mixed",
+      blocks: [
+        ["전체 오프닝", "whole", "retreatGroup", "briefing"],
+        ["장소별 활동", "course", "retreatGroup", "game"],
+        ["이동·합류", "break", "retreatGroup", "movement"],
+        ["전체 마무리", "whole", "retreatGroup", "reflection"],
+      ],
+    },
   };
   const preset = presets[template];
-  const posts = Object.fromEntries(preset.blocks.map(([name, operationMode, participationMode], index) => {
-    const entry = block(index + 1, name, operationMode, participationMode);
+  const posts = Object.fromEntries(preset.blocks.map(([name, operationMode, participationMode, activityType], index) => {
+    const entry = block(index + 1, name, operationMode, participationMode, activityType);
     return [entry.id, entry];
   }));
   return { ...base, title: preset.title, kind: preset.kind, posts };
@@ -232,12 +300,13 @@ export function programPostReadiness(
   roles: RetreatProgramRole[],
 ) {
   const operationMode = programOperationMode(post);
+  const requirements = programActivityRequirements(post);
   const roleCount = roles.filter((role) => role.assignee?.trim()).length;
   const itemCount = items.length;
   const contentReady = Boolean(post.rules?.trim() || post.concept?.trim());
   const rolesReady = roles.length > 0 && roleCount === roles.length;
-  // 안내·이동·휴식 블록은 별도 준비물이 없어도 된다. 실제 활동은 준비물과 조달 가능한 수량을 요구한다.
-  const itemsReady = operationMode === "break" || (
+  // 묵상·브리핑·이동처럼 물품이 본질이 아닌 형식은 빈 물품표를 정상으로 본다.
+  const itemsReady = !requirements.items || operationMode === "break" || (
     itemCount > 0
     && items.every((item) =>
       item.status === "inChurch"
@@ -245,7 +314,7 @@ export function programPostReadiness(
       || Number(item.quantity ?? 0) > 0,
     )
   );
-  const testReady = post.testStatus === "passed" || post.testStatus === "notNeeded";
+  const testReady = !requirements.test || post.testStatus === "passed" || post.testStatus === "notNeeded";
   const blocked = Boolean(post.blocker?.trim());
   return {
     contentReady,
@@ -266,9 +335,9 @@ export function sortRetreatPrograms(programs: RetreatProgram[]): RetreatProgram[
 /**
  * 준비율이 보는 항목.
  *
- * 본문 필드만 세면 게임 11개와 물품 30줄을 다 채워도 0%에 머문다 — 실제로 한 일과
+ * 본문 필드만 세면 활동 11개와 물품 30줄을 다 채워도 0%에 머문다 — 실제로 한 일과
  * 화면의 진행 표시가 어긋나 "뭘 해도 진도가 안 나가는" 화면이 된다.
- * 그래서 게임·역할·물품도 함께 센다.
+ * 그래서 활동·역할·물품도 함께 센다.
  */
 const CHECKS: Array<{
   key: string;
@@ -287,10 +356,10 @@ const CHECKS: Array<{
   { key: "담당", section: "overview", action: "총괄 담당 지정", targetId: () => "program-lead", ready: (program) => Boolean(program.lead?.trim()) },
   { key: "목표", section: "overview", action: "프로그램 목표 작성", targetId: () => "program-objective", ready: (program) => Boolean(program.objective?.trim()) },
   { key: "진행안", section: "posts", action: "전체 진행안 작성", targetId: () => "program-flow", ready: (program) => Boolean(program.flow?.trim()) },
-  // 존재 여부만 세면 이름만 적은 게임·담당 없는 역할·수량 없는 물품으로도 100%가 된다.
+  // 존재 여부만 세면 이름만 적은 활동·담당 없는 역할·수량 없는 물품으로도 100%가 된다.
   // 지표가 거짓말하지 않도록 "현장에서 쓸 수 있는 최소한"이 채워졌는지까지 본다.
   {
-    key: "게임 구성",
+    key: "활동 구성",
     section: "posts",
     action: "진행 블록 내용 채우기",
     targetId: (program) => {
@@ -326,7 +395,7 @@ const CHECKS: Array<{
     action: "진행 블록에 준비물 입력",
     targetId: (program) => {
       for (const post of programPosts(program)) {
-        if (programOperationMode(post) === "break") continue;
+        if (!programActivityRequirements(post).items) continue;
         const items = itemsOfPost(program, post.id);
         const incomplete = items.find((item) =>
           item.status !== "inChurch" && item.status !== "toMake" && Number(item.quantity ?? 0) <= 0,
@@ -480,6 +549,16 @@ export const PROGRAM_ITEM_STATUS_META: Record<RetreatProgramItemStatus, { label:
   toMake: { label: "제작 예정", counts: false },
 };
 
+export const PROGRAM_FULFILLMENT_STATUS_META: Record<RetreatProgramFulfillmentStatus, string> = {
+  requested: "요청",
+  approved: "확인",
+  ordered: "주문",
+  received: "수령",
+  packed: "포장",
+  onsite: "현장 도착",
+  returned: "반납",
+};
+
 export function programItemStatusMeta(status: RetreatProgramItemStatus) {
   return PROGRAM_ITEM_STATUS_META[status] ?? PROGRAM_ITEM_STATUS_META.todo;
 }
@@ -508,12 +587,119 @@ export function programBudget(items: RetreatProgramItem[]) {
   return { spent, planned, total: spent + planned, count: items.length };
 }
 
+export function programActualSpend(items: RetreatProgramItem[]): number {
+  return items.reduce((sum, item) => sum + Math.max(0, Number(item.actualAmount ?? 0) || 0), 0);
+}
+
+export function programFulfillmentStatus(item: RetreatProgramItem): RetreatProgramFulfillmentStatus {
+  if (item.fulfillmentStatus && PROGRAM_FULFILLMENT_STATUS_META[item.fulfillmentStatus]) return item.fulfillmentStatus;
+  if (item.status === "ordered") return "ordered";
+  if (item.status === "purchased") return "received";
+  if (item.status === "inChurch") return "onsite";
+  return "requested";
+}
+
+export function programFormatLabels(program: RetreatProgram): string[] {
+  const labels = new Set(programPosts(program).map((post) => PROGRAM_ACTIVITY_TYPE_META[programActivityType(post)].label));
+  return [...labels];
+}
+
+export function programReleases(program: RetreatProgram): RetreatProgramRelease[] {
+  return Object.entries(program.releases ?? {}).map(([id, release]) => ({ ...release, id: release.id || id }))
+    .sort((a, b) => b.releasedAt - a.releasedAt || b.id.localeCompare(a.id));
+}
+
+/** 현장은 활성 배포본을 읽고, 배포본 도입 전 published 데이터만 기존 방식으로 호환한다. */
+export function publishedProgramForField(program: RetreatProgram): RetreatProgram | null {
+  if (program.status !== "published") return null;
+  if (!program.activeReleaseId) return program;
+  const release = program.releases?.[program.activeReleaseId];
+  if (!release?.snapshot) return null;
+  return {
+    id: program.id,
+    status: "published",
+    createdAt: program.createdAt,
+    updatedAt: release.releasedAt,
+    activeReleaseId: program.activeReleaseId,
+    ...release.snapshot,
+  };
+}
+
+function minutes(value?: string): number | null {
+  if (!value || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+/** 같은 날짜·장소에 시간이 겹치는 프로그램을 찾는다. 미정 값은 충돌로 단정하지 않는다. */
+export function programScheduleConflicts(programs: RetreatProgram[]): Array<{ firstId: string; secondId: string; place: string }> {
+  const conflicts: Array<{ firstId: string; secondId: string; place: string }> = [];
+  for (let left = 0; left < programs.length; left += 1) {
+    const first = programs[left];
+    const firstStart = minutes(first.startTime);
+    const firstEnd = minutes(first.endTime);
+    if (!first.date || !first.place?.trim() || firstStart === null || firstEnd === null) continue;
+    for (let right = left + 1; right < programs.length; right += 1) {
+      const second = programs[right];
+      const secondStart = minutes(second.startTime);
+      const secondEnd = minutes(second.endTime);
+      if (second.date !== first.date || secondStart === null || secondEnd === null) continue;
+      if (second.place?.trim().toLocaleLowerCase("ko-KR") !== first.place.trim().toLocaleLowerCase("ko-KR")) continue;
+      if (firstStart < secondEnd && secondStart < firstEnd) {
+        conflicts.push({ firstId: first.id, secondId: second.id, place: first.place.trim() });
+      }
+    }
+  }
+  return conflicts;
+}
+
+export type ProgramActivityPasteRow = Pick<RetreatProgramPost, "name" | "activityType" | "operationMode" | "place" | "startTime" | "endTime" | "staff">;
+
+/**
+ * 스프레드시트의 행을 활동 작업실에 붙여넣는다.
+ * 열 순서: 활동명 / 종류 / 운영 방식 / 장소 / 시작 / 종료 / 담당. 첫 행이 제목이면 건너뛴다.
+ */
+export function parseProgramActivityPaste(value: string): ProgramActivityPasteRow[] {
+  const activityLabels = new Map(Object.entries(PROGRAM_ACTIVITY_TYPE_META).flatMap(([key, meta]) => [[key, key], [meta.label, key]]));
+  const operationLabels = new Map(Object.entries(PROGRAM_OPERATION_MODE_META).flatMap(([key, meta]) => [[key, key], [meta.label, key]]));
+  const clock = (cell?: string) => cell && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(cell) ? cell : undefined;
+  return value.split(/\r?\n/).map((line) => line.split("\t").map((cell) => cell.trim())).filter((cells, index) => {
+    if (!cells[0]) return false;
+    return !(index === 0 && ["활동", "활동명", "이름"].includes(cells[0]));
+  }).slice(0, 100).map(([name, activity, operation, place, startTime, endTime, staff]) => ({
+    name: name.slice(0, 80),
+    activityType: (activityLabels.get(activity) || "other") as RetreatProgramActivityType,
+    operationMode: (operationLabels.get(operation) || "whole") as RetreatProgramOperationMode,
+    place: place?.slice(0, 120) || undefined,
+    startTime: clock(startTime),
+    endTime: clock(endTime),
+    staff: staff?.slice(0, 120) || undefined,
+  }));
+}
+
+export const PROGRAM_WORKSPACE_SECTIONS = [
+  { key: "overview", label: "준비 현황", description: "막힌 준비와 다음 행동" },
+  { key: "programs", label: "프로그램", description: "프로그램별 기획과 활동" },
+  { key: "schedule", label: "일정·배치", description: "시간, 장소와 담당 충돌" },
+  { key: "supplies", label: "물품·비용", description: "요청부터 현장 도착과 정산" },
+  { key: "collaboration", label: "회의·할 일", description: "결정과 실행 업무" },
+  { key: "resources", label: "자료·현장", description: "브리핑과 현장 공유" },
+] as const;
+
+export type ProgramWorkspaceSectionKey = (typeof PROGRAM_WORKSPACE_SECTIONS)[number]["key"];
+
+export function programWorkspaceSectionFromParam(value: string | null | undefined): ProgramWorkspaceSectionKey {
+  return PROGRAM_WORKSPACE_SECTIONS.some((section) => section.key === value)
+    ? value as ProgramWorkspaceSectionKey
+    : "overview";
+}
+
 /** 편집기 상단 내비게이션 — 각 탭이 서로 다른 일을 맡는다. */
 export const PROGRAM_SECTIONS = [
-  { key: "overview", label: "전체 준비" },
-  { key: "posts", label: "프로그램 작업실" },
+  { key: "overview", label: "개요·할 일" },
+  { key: "posts", label: "활동 작업실" },
   { key: "roles", label: "물품·역할" },
-  { key: "tasks", label: "현장 공유" },
+  { key: "tasks", label: "검토·공유" },
 ] as const;
 
 export type ProgramSectionKey = (typeof PROGRAM_SECTIONS)[number]["key"];
@@ -554,11 +740,9 @@ export function nextMatchRound(post: RetreatProgramPost): number {
   return rounds.length === 0 ? 1 : rounds[rounds.length - 1].round;
 }
 
-// ── 게임 ↔ 물품·역할 연결 ────────────────────────────────────
-// 준비 시트는 게임 탭 하나에 규칙·준비물·스탭이 함께 있었다. 프로그램 단위로 흩어 놓으면
-// 게임 하나를 준비하는 데 탭을 세 번 오가고 게임 이름을 세 번 다시 적게 된다.
-// 그래서 물품·역할은 프로그램 아래 그대로 두되 postId로 게임에 묶고,
-// 물품·예산·역할·배치 탭은 "입력하는 곳"이 아니라 게임별로 모아 보는 집계 화면이 된다.
+// ── 활동 ↔ 물품·역할 연결 ────────────────────────────────────
+// 원본 시트는 게임 탭 하나에 규칙·준비물·스탭이 함께 있었다. 이를 묵상·영상 등 모든 활동으로
+// 확장하되, 물품·역할은 postId로 같은 활동에 묶어 한 사실을 여러 번 입력하지 않는다.
 
 export function itemsOfPost(program: RetreatProgram, postId: string): RetreatProgramItem[] {
   return programItems(program).filter((item) => item.postId === postId);
@@ -568,7 +752,7 @@ export function rolesOfPost(program: RetreatProgram, postId: string): RetreatPro
   return programRoles(program).filter((role) => role.postId === postId);
 }
 
-/** 어느 게임에도 묶이지 않은 항목 — 프로그램 공통. postId 도입 이전 데이터도 여기 모인다. */
+/** 어느 활동에도 묶이지 않은 항목 — 프로그램 공통. postId 도입 이전 데이터도 여기 모인다. */
 export function commonItems(program: RetreatProgram): RetreatProgramItem[] {
   const postIds = new Set(programPosts(program).map((post) => post.id));
   return programItems(program).filter((item) => !item.postId || !postIds.has(item.postId));
@@ -581,12 +765,12 @@ export function commonRoles(program: RetreatProgram): RetreatProgramRole[] {
 
 export interface ProgramGroupedEntries<T> {
   postId: string | null;
-  /** 화면에 보여줄 이름 — 게임 이름, 또는 공통 묶음 */
+  /** 화면에 보여줄 이름 — 활동 이름, 또는 공통 묶음 */
   label: string;
   entries: T[];
 }
 
-/** 게임 순서대로 묶고, 공통 묶음을 마지막에 둔다. 비어 있는 게임도 자리를 남겨 어디가 비었는지 보이게 한다. */
+/** 활동 순서대로 묶고, 공통 묶음을 마지막에 둔다. 비어 있는 활동도 자리를 남겨 어디가 비었는지 보이게 한다. */
 export function groupItemsByPost(program: RetreatProgram): Array<ProgramGroupedEntries<RetreatProgramItem>> {
   const groups = programPosts(program).map((post) => ({
     postId: post.id as string | null,

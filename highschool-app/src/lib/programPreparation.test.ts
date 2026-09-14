@@ -13,9 +13,14 @@ import {
   isProgramSection,
   itemsOfPost,
   moveProgramPostOrder,
+  parseProgramActivityPaste,
   nextMatchRound,
   postMatchRounds,
   programBudget,
+  programActivityType,
+  programActualSpend,
+  programFormatLabels,
+  programFulfillmentStatus,
   programItemStatusMeta,
   programItemTotal,
   programItems,
@@ -23,6 +28,7 @@ import {
   programMeetings,
   programPostReadiness,
   programPosts,
+  programReleases,
   programReadiness,
   programStatusMeta,
   programTaskProgress,
@@ -31,6 +37,9 @@ import {
   programTaskStatus,
   programTasks,
   programSectionFromParam,
+  programScheduleConflicts,
+  programWorkspaceSectionFromParam,
+  publishedProgramForField,
   rolesOfPost,
   shouldSyncEditorDraft,
   sortRetreatPrograms,
@@ -98,7 +107,7 @@ describe("수련회 프로그램 준비", () => {
       briefing: "교사 역할을 안내합니다.",
     };
     expect(programReadiness(base(body))).toMatchObject({
-      ready: 6, total: 10, missingLabels: ["게임 구성", "역할", "물품", "사전 테스트"],
+      ready: 6, total: 10, missingLabels: ["활동 구성", "역할", "물품", "사전 테스트"],
     });
 
     const filled = programReadiness(base({
@@ -116,9 +125,9 @@ describe("수련회 프로그램 준비", () => {
       roles: { r1: { order: 1, role: "진행", postId: "g1", createdAt: 1, updatedAt: 1 } },
       items: { i1: { order: 1, name: "줄자", status: "todo", postId: "g1", createdAt: 1, updatedAt: 1 } },
     } as never));
-    expect(shallow.missingLabels).toEqual(["게임 구성", "역할", "물품", "사전 테스트"]);
+    expect(shallow.missingLabels).toEqual(["활동 구성", "역할", "물품", "사전 테스트"]);
     expect(shallow.items).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: "게임 구성", section: "posts", targetId: "program-post-rules-g1", ready: false }),
+      expect.objectContaining({ label: "활동 구성", section: "posts", targetId: "program-post-rules-g1", ready: false }),
       expect.objectContaining({ label: "역할", section: "posts", targetId: "program-role-assignee-r1", action: "진행 블록에 담당 배치", ready: false }),
       expect.objectContaining({ label: "물품", section: "posts", targetId: "program-item-quantity-i1", ready: false }),
       expect.objectContaining({ label: "브리핑 또는 대본", section: "overview", targetId: "program-briefing", ready: true }),
@@ -216,6 +225,9 @@ describe("실행 중심 준비 흐름", () => {
 
     const breakPost = { ...post, operationMode: "break" as const, testStatus: "notNeeded" as const };
     expect(programPostReadiness(breakPost, [], roles)).toMatchObject({ itemsReady: true, testReady: true, ready: true });
+
+    const reflection = { ...post, activityType: "reflection" as const, concept: "말씀 묵상 질문", rules: undefined, testStatus: undefined };
+    expect(programPostReadiness(reflection, [], roles)).toMatchObject({ itemsReady: true, testReady: true, ready: true });
   });
 
   it("현장 준비율과 실행 할 일 완료를 분리하되 둘 다 끝나야 공유한다", () => {
@@ -462,7 +474,77 @@ describe("게임 ↔ 물품·역할 연결", () => {
 
   it("준비율은 일부 블록만 채운 상태를 완료로 세지 않는다", () => {
     const readiness = programReadiness(program);
-    expect(readiness.missingLabels).toEqual(expect.arrayContaining(["게임 구성", "역할", "물품", "사전 테스트"]));
+    expect(readiness.missingLabels).toEqual(expect.arrayContaining(["활동 구성", "역할", "물품", "사전 테스트"]));
     expect(readiness.total).toBe(10);
+  });
+});
+
+describe("수련회 전체 프로그램 작업공간", () => {
+  it("프로그램 안에서 서로 다른 활동 형식을 함께 보존한다", () => {
+    const program = base({
+      kind: "mixed",
+      posts: {
+        a: { id: "a", order: 1, name: "영상", activityType: "video", createdAt: 1, updatedAt: 1 },
+        b: { id: "b", order: 2, name: "묵상", activityType: "reflection", createdAt: 2, updatedAt: 2 },
+        c: { id: "c", order: 3, name: "이전 블록", createdAt: 3, updatedAt: 3 },
+      },
+    });
+    expect(programFormatLabels(program)).toEqual(["영상", "묵상·나눔", "게임·미션"]);
+    expect(programActivityType(programPosts(program)[2])).toBe("game");
+  });
+
+  it("같은 날짜와 장소에서 겹치는 프로그램만 충돌로 표시한다", () => {
+    const programs = [
+      base({ id: "a", date: "2026-10-01", startTime: "14:00", endTime: "15:00", place: "체육관" }),
+      base({ id: "b", date: "2026-10-01", startTime: "14:30", endTime: "16:00", place: "체육관" }),
+      base({ id: "c", date: "2026-10-01", startTime: "14:30", endTime: "16:00", place: "본당" }),
+      base({ id: "d", date: "2026-10-02", startTime: "14:30", endTime: "16:00", place: "체육관" }),
+    ];
+    expect(programScheduleConflicts(programs)).toEqual([{ firstId: "a", secondId: "b", place: "체육관" }]);
+  });
+
+  it("기존 물품 상태를 새 준비 단계로 호환하고 실제 지출만 합산한다", () => {
+    const items = [
+      { id: "a", order: 1, name: "종이", status: "ordered", actualAmount: 1200, createdAt: 1, updatedAt: 1 },
+      { id: "b", order: 2, name: "테이프", status: "purchased", actualAmount: 800, createdAt: 2, updatedAt: 2 },
+    ] as RetreatProgramItem[];
+    expect(programFulfillmentStatus(items[0])).toBe("ordered");
+    expect(programFulfillmentStatus(items[1])).toBe("received");
+    expect(programActualSpend(items)).toBe(2000);
+  });
+
+  it("알 수 없는 작업공간 주소는 준비 현황으로 돌아온다", () => {
+    expect(programWorkspaceSectionFromParam("schedule")).toBe("schedule");
+    expect(programWorkspaceSectionFromParam("unknown")).toBe("overview");
+  });
+
+  it("현장은 활성 배포본을 읽어 이후 편집 원본 변경의 영향을 받지 않는다", () => {
+    const program = base({
+      title: "수정 중 이름",
+      status: "published",
+      activeReleaseId: "r1",
+      releases: {
+        r1: {
+          id: "r1",
+          sourceUpdatedAt: 20,
+          releasedAt: 30,
+          snapshot: { order: 1, title: "현장 확정 이름", kind: "mixed" },
+        },
+      },
+    });
+    expect(publishedProgramForField(program)?.title).toBe("현장 확정 이름");
+    expect(programReleases(program).map((release) => release.id)).toEqual(["r1"]);
+    expect(publishedProgramForField(base({ status: "confirmed" }))).toBeNull();
+  });
+
+  it("시트의 여러 활동 행을 헤더 제외 후 형식과 함께 읽는다", () => {
+    const rows = parseProgramActivityPaste("활동명\t종류\t운영 방식\t장소\t시작\t종료\t담당\n영상 시청\t영상\t전체 진행\t본당\t14:00\t14:10\t미디어팀\n조 이동\t이동·전환\t코스 순환\t복도\t14:10\t14:15\t인솔");
+    expect(rows).toEqual([
+      { name: "영상 시청", activityType: "video", operationMode: "whole", place: "본당", startTime: "14:00", endTime: "14:10", staff: "미디어팀" },
+      { name: "조 이동", activityType: "movement", operationMode: "course", place: "복도", startTime: "14:10", endTime: "14:15", staff: "인솔" },
+    ]);
+    expect(parseProgramActivityPaste("잘못된 시간\t영상\t전체 진행\t본당\t25:00\t14:99\t담당")[0]).toMatchObject({
+      name: "잘못된 시간", startTime: undefined, endTime: undefined,
+    });
   });
 });

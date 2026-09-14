@@ -42,7 +42,7 @@ import type {
   RetreatProgramTask,
 } from "@/lib/types";
 
-type EditableProgram = Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams">;
+type EditableProgram = Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams" | "releases" | "activeReleaseId">;
 
 type Props = {
   program: RetreatProgram;
@@ -52,6 +52,8 @@ type Props = {
   saving: boolean;
   resetVersion?: number;
   onSave: (program: EditableProgram) => Promise<void>;
+  onPublish: (expectedUpdatedAt: number) => Promise<void>;
+  onUnpublish: () => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
   onRequestDelete: (program: RetreatProgram) => void;
   onSelectSection: (section: ProgramSectionKey) => void;
@@ -66,6 +68,7 @@ type Props = {
   onConvertDecision: (meetingId: string, decision: RetreatProgramDecision) => Promise<string>;
   section: ProgramSectionKey;
   onCreatePost: (name: string, order: number) => Promise<void>;
+  onCreatePosts: (rows: Array<Omit<RetreatProgramPost, "id" | "createdAt" | "updatedAt">>) => Promise<void>;
   onReorderPosts: (orderedIds: string[]) => Promise<void>;
   onUpdatePost: (postId: string, data: Partial<RetreatProgramPost>) => Promise<void>;
   onDeletePost: (postId: string) => Promise<void>;
@@ -117,6 +120,8 @@ export default function ProgramEditor({
   saving,
   resetVersion = 0,
   onSave,
+  onPublish,
+  onUnpublish,
   onDirtyChange,
   onRequestDelete,
   onSelectSection,
@@ -126,7 +131,7 @@ export default function ProgramEditor({
   onRestoreTask,
   onCreateMeeting, onUpdateMeeting, onCreateDecision, onUpdateDecision, onConvertDecision,
   section,
-  onCreatePost, onReorderPosts, onUpdatePost, onDeletePost,
+  onCreatePost, onCreatePosts, onReorderPosts, onUpdatePost, onDeletePost,
   onRestorePost, onRestoreItem, onRestoreRole, onRestoreMatch,
   onCreateMatch, onUpdateMatch, onDeleteMatch,
   onCreateRole, onUpdateRole, onDeleteRole,
@@ -259,7 +264,8 @@ export default function ProgramEditor({
     const nextStatus: RetreatProgramStatus = publicationAction === "publish" ? "published" : "confirmed";
     const next = { ...draft, title: draft.title.trim(), status: nextStatus };
     try {
-      await onSave(next);
+      if (publicationAction === "publish") await onPublish(program.updatedAt);
+      else await onUnpublish();
       setDraft(next);
       setDirty(false);
       setPublicationAction(null);
@@ -456,7 +462,7 @@ export default function ProgramEditor({
           onAssignGroup={onAssignCompetitionGroup}
           onApplyBalanced={onApplyBalancedCompetitionTeams}
         />
-        <ProgramPostsSection posts={posts} canEdit={canEdit} onCreate={onCreatePost} onUpdate={onUpdatePost} onDelete={onDeletePost}
+        <ProgramPostsSection posts={posts} canEdit={canEdit} onCreate={onCreatePost} onCreateBulk={onCreatePosts} onUpdate={onUpdatePost} onDelete={onDeletePost}
           onReorder={onReorderPosts}
           onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
           itemsOf={(postId) => itemsOfPost(program, postId)} rolesOf={(postId) => rolesOfPost(program, postId)}
@@ -484,7 +490,7 @@ export default function ProgramEditor({
       )}
 
       {section === "tasks" && (
-        <ProgramPublicationPanel program={{ ...program, ...draft }} groups={groups} readiness={readiness} canEdit={canEdit} busy={saving || remoteUpdated} onRequestPublish={() => setPublicationAction("publish")} onRequestUnpublish={() => setPublicationAction("unpublish")} />
+        <ProgramPublicationPanel program={{ ...program, ...draft }} groups={groups} readiness={readiness} canEdit={canEdit} busy={saving || remoteUpdated} hasUnsavedChanges={dirty} onRequestPublish={() => setPublicationAction("publish")} onRequestUnpublish={() => setPublicationAction("unpublish")} />
       )}
 
       {meetingOpen && <ProgramMeetingMode program={program} posts={posts} canEdit={canEdit} onClose={() => setMeetingSession(null)} onCreateMeeting={onCreateMeeting} onUpdateMeeting={onUpdateMeeting} onCreateDecision={onCreateDecision} onUpdateDecision={onUpdateDecision} onConvertDecision={onConvertDecision} />}
@@ -499,7 +505,7 @@ export default function ProgramEditor({
           <div className="program-confirm-dialog__body">
             <h2>{publicationAction === "publish" ? "이가드 현장에 공유할까요?" : "현장 공유를 해제할까요?"}</h2>
             <p>{publicationAction === "publish"
-              ? "공유 즉시 이가드 정보 화면에 표시됩니다. 이후 수정한 내용도 같은 원본에서 바로 반영됩니다."
+              ? "현재 준비 내용을 새 배포본으로 고정해 이가드 정보 화면에 표시합니다. 이후 수정한 내용은 다시 공유하기 전까지 현장 화면에 반영되지 않습니다."
               : "이가드 정보 화면 목록에서 즉시 숨겨집니다. 작성한 준비 내용은 삭제되지 않습니다."}</p>
             <div className="program-confirm-dialog__actions">
               <button type="button" className="btn-secondary" disabled={saving} onClick={() => setPublicationAction(null)}>취소</button>
@@ -527,5 +533,7 @@ function withoutTasks(program: RetreatProgram): EditableProgram {
   delete copy.items;
   delete copy.roles;
   delete copy.competitionTeams;
+  delete copy.releases;
+  delete copy.activeReleaseId;
   return copy as EditableProgram;
 }

@@ -19,6 +19,7 @@ import {
   createRetreatProgramItem,
   createRetreatProgramMatch,
   createRetreatProgramPost,
+  createRetreatProgramPosts,
   createRetreatProgramRole,
   createRetreatProgramTask,
   deleteRetreatProgram,
@@ -51,17 +52,22 @@ import {
   updateRetreatProgramTask,
   assignRetreatGroupToProgramCompetitionTeam,
   replaceRetreatProgramCompetitionAssignments,
+  publishRetreatProgramRelease,
+  unpublishRetreatProgramRelease,
 } from "@/lib/db";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
 import { useRetreatPinGate } from "@/features/portal/useRetreatPinGate";
 import {
   PROGRAM_SECTIONS,
+  PROGRAM_WORKSPACE_SECTIONS,
   createProgramDraft,
   createProgramFromTemplate,
   programSectionFromParam,
+  programWorkspaceSectionFromParam,
   programTaskDecisionLink,
   type ProgramSectionKey,
   type ProgramTemplateKey,
+  type ProgramWorkspaceSectionKey,
 } from "@/lib/programPreparation";
 import type {
   Group,
@@ -80,6 +86,13 @@ import ProgramDiscardDialog from "./ProgramDiscardDialog";
 import ProgramEditor from "./ProgramEditor";
 import ProgramList from "./ProgramList";
 import ProgramWorkspaceHeader from "./ProgramWorkspaceHeader";
+import {
+  ProgramCatalog,
+  ProgramCollaborationWorkspace,
+  ProgramResourcesWorkspace,
+  ProgramScheduleWorkspace,
+  ProgramSupplyWorkspace,
+} from "./ProgramWorkspaceViews";
 import { useProgramDiscardGuard } from "./useProgramDiscardGuard";
 import { getRetreatWorkspaceSnapshot, mergeRetreatWorkspaceSnapshot } from "@/lib/retreatWorkspaceCache";
 
@@ -97,12 +110,14 @@ export default function ProgramPreparationClient() {
   // 선택한 항목은 렌더 중 파생 — effect에서 setState로 맞추면 사용자의 선택을 덮는다(실수 13).
   const sectionParam = searchParams.get("section");
   const section: ProgramSectionKey = programSectionFromParam(sectionParam);
+  const workspace: ProgramWorkspaceSectionKey = programWorkspaceSectionFromParam(searchParams.get("workspace"));
   // 목록과 상세를 한 화면에 붙여 두면 둘 다 좁아진다. 선택한 프로그램을 주소에 두고
   // 화면을 가른다 — 목록에서 고르면 상세로, 상세에서 목록으로 되돌아온다.
   const selectedId = searchParams.get("program");
 
   function goToProgram(programId: string, nextSection: ProgramSectionKey = section) {
     const params = new URLSearchParams(searchParams.toString());
+    params.set("workspace", "programs");
     params.set("program", programId);
     params.set("section", nextSection);
     // 프로그램·섹션은 같은 작업 화면 안의 상태다. Next 라우터 탐색을 쓰면
@@ -114,6 +129,7 @@ export default function ProgramPreparationClient() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("program");
     params.delete("section");
+    params.set("workspace", "programs");
     const query = params.toString();
     const pathname = `/events/${encodeURIComponent(retreatId)}/programs`;
     window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
@@ -123,6 +139,27 @@ export default function ProgramPreparationClient() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("section", next);
     window.history.replaceState(null, "", `?${params.toString()}`);
+  }
+
+  function selectWorkspace(next: ProgramWorkspaceSectionKey, focusIndex?: number) {
+    if (next === workspace) {
+      if (focusIndex !== undefined) workspaceTabRefs.current[focusIndex]?.focus();
+      return;
+    }
+    discardGuard.requestAction("다른 준비 화면으로 이동", () => {
+      applyWorkspace(next);
+      if (focusIndex !== undefined) queueMicrotask(() => workspaceTabRefs.current[focusIndex]?.focus());
+    });
+  }
+
+  function applyWorkspace(next: ProgramWorkspaceSectionKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("workspace", next);
+    if (next !== "programs") {
+      params.delete("program");
+      params.delete("section");
+    }
+    window.history.pushState(null, "", `?${params.toString()}`);
   }
   const { user, loading: authLoading, roles } = useAuth();
   const { toast } = useUI();
@@ -160,6 +197,7 @@ export default function ProgramPreparationClient() {
   const [deleteTarget, setDeleteTarget] = useState<RetreatProgram | null>(null);
   const discardGuard = useProgramDiscardGuard();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const workspaceTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -172,6 +210,17 @@ export default function ProgramPreparationClient() {
     const next = PROGRAM_SECTIONS[nextIndex];
     selectSection(next.key);
     tabRefs.current[nextIndex]?.focus();
+  }
+
+  function handleWorkspaceTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const nextIndex = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? PROGRAM_WORKSPACE_SECTIONS.length - 1
+        : (index + (event.key === "ArrowRight" ? 1 : -1) + PROGRAM_WORKSPACE_SECTIONS.length) % PROGRAM_WORKSPACE_SECTIONS.length;
+    selectWorkspace(PROGRAM_WORKSPACE_SECTIONS[nextIndex].key, nextIndex);
   }
 
   useEffect(() => {
@@ -290,7 +339,7 @@ export default function ProgramPreparationClient() {
     }
   }
 
-  async function saveProgram(program: Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams">) {
+  async function saveProgram(program: Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams" | "releases" | "activeReleaseId">) {
     setSaving(true);
     try {
       const { id } = program;
@@ -356,23 +405,42 @@ export default function ProgramPreparationClient() {
         fieldAllowed={fieldAllowed}
         onNavigate={(href) => discardGuard.requestAction("다른 화면으로 이동", () => router.push(href))}
       >
-        {/* 2단 탭 — 행정·이가드와 같은 workspace-tabs 구조를 그대로 쓴다. */}
-        {selectedProgram && (
-          <div className="workspace-tabs">
-            <div className="mx-auto flex max-w-6xl gap-0 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label="프로그램 준비 항목">
-              {PROGRAM_SECTIONS.map((entry) => (
+        <div className="workspace-tabs program-workspace-tabs">
+          <div className="mx-auto flex max-w-6xl gap-0 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label="수련회 프로그램 준비">
+            {PROGRAM_WORKSPACE_SECTIONS.map((entry, index) => (
+              <button
+                key={entry.key}
+                ref={(node) => { workspaceTabRefs.current[index] = node; }}
+                type="button"
+                role="tab"
+                id={`program-workspace-tab-${entry.key}`}
+                aria-controls="program-workspace-panel"
+                aria-selected={entry.key === workspace}
+                tabIndex={entry.key === workspace ? 0 : -1}
+                className="workspace-tab shrink-0"
+                onClick={() => selectWorkspace(entry.key)}
+                onKeyDown={(event) => handleWorkspaceTabKeyDown(event, index)}
+              >
+                {entry.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {workspace === "programs" && selectedProgram && (
+          <div className="program-editor-tabs">
+            <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label={`${selectedProgram.title} 편집 항목`}>
+              {PROGRAM_SECTIONS.map((entry, index) => (
                 <button
                   key={entry.key}
-                  ref={(node) => { tabRefs.current[PROGRAM_SECTIONS.findIndex((candidate) => candidate.key === entry.key)] = node; }}
+                  ref={(node) => { tabRefs.current[index] = node; }}
                   type="button"
                   role="tab"
                   id={`program-tab-${entry.key}`}
                   aria-controls={`program-panel-${entry.key}`}
                   aria-selected={entry.key === section}
                   tabIndex={entry.key === section ? 0 : -1}
-                  className="workspace-tab shrink-0"
                   onClick={() => selectSection(entry.key)}
-                  onKeyDown={(event) => handleTabKeyDown(event, PROGRAM_SECTIONS.findIndex((candidate) => candidate.key === entry.key))}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
                 >
                   {entry.label}
                 </button>
@@ -381,13 +449,17 @@ export default function ProgramPreparationClient() {
           </div>
         )}
       </ProgramWorkspaceHeader>
-      <main className="program-preparation-main">
-        {/* 목록 화면용 안내와 집계다. 특정 프로그램을 편집하는 중에는 자리만 차지한다. */}
-        {!selectedProgram && (
+      <main
+        className="program-preparation-main"
+        id="program-workspace-panel"
+        role="tabpanel"
+        aria-labelledby={`program-workspace-tab-${workspace}`}
+      >
+        {workspace === "overview" && (
           <div className="program-page-intro">
             <div>
-              <h2>프로그램 준비</h2>
-              <p>기획, 진행안, 브리핑과 현장 전달 내용을 프로그램별로 정리합니다.</p>
+              <h2>수련회 준비 공간</h2>
+              <p>여러 프로그램의 일정, 물품, 회의와 현장 전달을 한곳에서 이어갑니다.</p>
             </div>
             <div className="program-page-summary" aria-label="프로그램 상태 요약">
               <span>전체 <strong>{programs.length}</strong></span>
@@ -401,9 +473,7 @@ export default function ProgramPreparationClient() {
         {meetingLoadError && <div className="program-load-error" role="alert">{meetingLoadError} 회의 기록만 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>}
         {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀, 교역자, 통합관리자만 가능합니다." />}
 
-        {programs.length === 0 ? (
-          <ProgramList programs={programs} selectedId={null} canEdit={canEdit} busy={busy} onSelect={(id) => goToProgram(id)} onAddTemplate={(template) => void addProgram(template)} onCreateDefaults={() => void createDefaults()} onMove={() => {}} />
-        ) : !selectedProgram ? (
+        {workspace === "overview" && (
           <div className="program-list-screen">
             <ProgramList
               programs={programs}
@@ -416,7 +486,13 @@ export default function ProgramPreparationClient() {
               onMove={(id, direction) => moveProgram(id, direction)}
             />
           </div>
-        ) : (
+        )}
+
+        {workspace === "programs" && !selectedProgram && (
+          <ProgramCatalog programs={programs} canEdit={canEdit} busy={busy} onOpen={goToProgram} onAdd={(template) => void addProgram(template)} />
+        )}
+
+        {workspace === "programs" && selectedProgram && (
           <div
             className="program-detail-screen"
             id={`program-panel-${section}`}
@@ -429,8 +505,7 @@ export default function ProgramPreparationClient() {
               <ArrowLeft aria-hidden="true" size={15} weight="bold" />
               프로그램 목록
             </button>
-            {selectedProgram && (
-              <ProgramEditor
+            <ProgramEditor
                 program={selectedProgram}
                 canEdit={canEdit}
                 meetingsAvailable={!meetingLoadError}
@@ -438,6 +513,8 @@ export default function ProgramPreparationClient() {
                 saving={saving}
                 resetVersion={discardGuard.resetVersion}
                 onSave={saveProgram}
+                onPublish={(expectedUpdatedAt) => publishRetreatProgramRelease(retreatId, selectedProgram.id, expectedUpdatedAt).then(() => undefined)}
+                onUnpublish={() => unpublishRetreatProgramRelease(retreatId, selectedProgram.id)}
                 onDirtyChange={discardGuard.setDirty}
                 onRequestDelete={setDeleteTarget}
                 onSelectSection={selectSection}
@@ -464,10 +541,12 @@ export default function ProgramPreparationClient() {
                 onCreatePost={(name, order) => createRetreatProgramPost(retreatId, selectedProgram.id, {
                   name,
                   order,
+                  activityType: "other",
                   operationMode: "whole",
                   participationMode: "retreatGroup",
                   scoreEnabled: false,
                 }).then(() => undefined)}
+                onCreatePosts={(rows) => createRetreatProgramPosts(retreatId, selectedProgram.id, rows).then(() => undefined)}
                 onReorderPosts={(orderedIds) => reorderRetreatProgramPosts(retreatId, selectedProgram.id, orderedIds)}
                 onUpdatePost={(postId, data: Partial<RetreatProgramPost>) => updateRetreatProgramPost(retreatId, selectedProgram.id, postId, data)}
                 onDeletePost={(postId) => deleteRetreatProgramPost(retreatId, selectedProgram.id, postId)}
@@ -503,10 +582,28 @@ export default function ProgramPreparationClient() {
                   Object.keys(selectedProgram.competitionTeams ?? {}),
                   assignment,
                 )}
-              />
-            )}
+            />
           </div>
         )}
+
+        {workspace === "schedule" && <ProgramScheduleWorkspace programs={programs} onOpen={goToProgram} />}
+        {workspace === "supplies" && (
+          <ProgramSupplyWorkspace
+            programs={programs}
+            canEdit={canEdit}
+            onOpen={goToProgram}
+            onUpdateItem={(programId, itemId, data) => updateRetreatProgramItem(retreatId, programId, itemId, data)}
+          />
+        )}
+        {workspace === "collaboration" && (
+          <ProgramCollaborationWorkspace
+            programs={programs}
+            canEdit={canEdit}
+            onOpen={goToProgram}
+            onUpdateTask={(programId, taskId, data) => updateRetreatProgramTask(retreatId, programId, taskId, data)}
+          />
+        )}
+        {workspace === "resources" && <ProgramResourcesWorkspace programs={programs} onOpen={goToProgram} />}
       </main>
 
       {deleteTarget && (
