@@ -102,10 +102,22 @@ jobs:
     needs: verify
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Detect highschool app changes
+        id: app_changes
+        run: |
+          if git diff --quiet HEAD^ HEAD -- highschool-app; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-node@v7
+        if: steps.app_changes.outputs.changed == 'true'
         with:
           node-version: 22
       - name: Verify deployed commit without authentication
+        if: steps.app_changes.outputs.changed == 'true'
         env:
           E2E_BASE_URL: https://woorihigh-app.vercel.app
           E2E_EXPECTED_BUILD_ID: ${{ github.sha }}
