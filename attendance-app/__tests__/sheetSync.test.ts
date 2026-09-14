@@ -14,13 +14,27 @@ function cls(ck: string, students: ParsedStudent[]): ParsedClass {
 type Cur = Record<string, { students?: Record<string, Student> }>;
 
 describe('buildSyncPlan 복합 매칭', () => {
-  it('고유 이름은 필드 없이도 같은 인물로 인정 (오탐 없음)', () => {
+  it('이름만 같은 학생은 기존 출석에 연결하거나 신규로 저장하지 않는다', () => {
     const classes = [cls('1-1-1', [st({ name: '홍길동', sid: 'S11_01', num: 1 })])];
     const cur: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '홍길동' } } } };
     const plan = buildSyncPlan(classes, cur);
     expect(plan.added).toHaveLength(0);
     expect(plan.moved).toHaveLength(0);
-    expect(plan.removed).toHaveLength(0);
+    expect(plan.ambiguous).toEqual([{ ck: '1-1-1', name: '홍길동' }]);
+    expect(() => buildSyncPayload(plan, 2026, cur)).toThrow('동일 인물');
+  });
+
+  it('같은 반의 생년·전화 충돌과 동점 후보는 자동 연결하지 않는다', () => {
+    const student = st({ sid: 'row', name: '동명', num: 1, birth: '20100101', phone: '01011112222' });
+    for (const students of [
+      { a: { id: 'a', name: '동명', birth: '20110202', phone: '01099998888' } },
+      { a: { ...student, id: 'a' }, b: { ...student, id: 'b' } },
+    ]) {
+      const current = { '1-1-1': { students } } as Cur;
+      const plan = buildSyncPlan([cls('1-1-1', [student])], current);
+      expect(plan.ambiguous).toHaveLength(1);
+      expect(() => buildSyncPayload(plan, 2026, current, true)).toThrow('동일 인물');
+    }
   });
 
   it('다른 반 + 필드 2개 이상 일치 → 반 이동으로 인식', () => {
@@ -84,9 +98,9 @@ describe('buildSyncPlan 복합 매칭', () => {
 
 describe('buildSyncPayload 제외 학생 처리', () => {
   it('기본(removeMissing=false): 제외 학생을 해당 반에 유지', () => {
-    const classes = [cls('1-1-1', [st({ name: '재학생', sid: 'S11_01', num: 1 })])];
+    const classes = [cls('1-1-1', [st({ name: '재학생', sid: 'S11_01', num: 1, birth: '20100101' })])];
     const cur: Cur = { '1-1-1': { students: {
-      S11_01: { id: 'S11_01', name: '재학생' },
+      S11_01: { id: 'S11_01', name: '재학생', birth: '20100101' },
       S11_09: { id: 'S11_09', name: '이동간학생' },
     } } };
     const plan = buildSyncPlan(classes, cur);
@@ -96,9 +110,9 @@ describe('buildSyncPayload 제외 학생 처리', () => {
   });
 
   it('removeMissing=true: 제외 학생 삭제', () => {
-    const classes = [cls('1-1-1', [st({ name: '재학생', sid: 'S11_01', num: 1 })])];
+    const classes = [cls('1-1-1', [st({ name: '재학생', sid: 'S11_01', num: 1, birth: '20100101' })])];
     const cur: Cur = { '1-1-1': { students: {
-      S11_01: { id: 'S11_01', name: '재학생' },
+      S11_01: { id: 'S11_01', name: '재학생', birth: '20100101' },
       S11_09: { id: 'S11_09', name: '이동간학생' },
     } } };
     const plan = buildSyncPlan(classes, cur);
@@ -201,8 +215,8 @@ describe('반 이동 시 옛 반 출석 기록 이관·정리', () => {
   });
 
   it('같은 반에 남은 학생의 출석은 건드리지 않는다', () => {
-    const classes = [cls('1-1-1', [st({ name: '홍길동', sid: 'S11_01', num: 1, attendance: { '0-0': 'O' } })])];
-    const cur: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '홍길동' } } } };
+    const classes = [cls('1-1-1', [st({ name: '홍길동', sid: 'S11_01', num: 1, birth: '20100101', attendance: { '0-0': 'O' } })])];
+    const cur: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '홍길동', birth: '20100101' } } } };
     const att = { '1-1-1': { S11_01: { '5-2': 'O' } } } as Record<string, Record<string, Record<string, 'O' | 'X' | 'T'>>>;
     const payload = buildSyncPayload(buildSyncPlan(classes, cur, att), 2026, cur, false, undefined, att);
     expect(payload['attendance/2026/1-1-1/S11_01']).toBeUndefined();
@@ -314,8 +328,8 @@ describe('주일 당일 동기화 - 앱에서 입력한 출석을 덮지 않는�
 
 describe('SID 충돌과 일부 시트 이동 보존', () => {
   it('신규 학생이 기존 학생과 고아 출석의 SID를 차지하지 않는다', () => {
-    const current: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '기존', personId: 'person' } } } };
-    const input = [cls('1-1-1', [st({ name: '신규', sid: 'S11_01', num: 1 }), st({ name: '기존', sid: 'S11_02', num: 2 })])];
+    const current: Cur = { '1-1-1': { students: { S11_01: { id: 'S11_01', name: '기존', personId: 'person', birth: '20100101' } } } };
+    const input = [cls('1-1-1', [st({ name: '신규', sid: 'S11_01', num: 1 }), st({ name: '기존', sid: 'S11_02', num: 2, birth: '20100101' })])];
     const plan = buildSyncPlan(input, current, { '1-1-1': { S11_01_2: { day: 'O' } } });
     expect(plan.classes[0].students.map(s => s.sid)).toEqual(['S11_01_3', 'S11_01']);
     expect(input[0].students[0].sid).toBe('S11_01');

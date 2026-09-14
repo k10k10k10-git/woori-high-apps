@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeApp, deleteApp, type FirebaseApp } from 'firebase/app';
-import { connectDatabaseEmulator, getDatabase, get, ref, set, type Database } from 'firebase/database';
+import { connectDatabaseEmulator, getDatabase, get, ref, set, update, type Database } from 'firebase/database';
 const holder = vi.hoisted(() => ({ database: null as Database | null }));
 vi.mock('@/lib/firebase/client', () => ({ get db() { return holder.database; } }));
 import { archiveRoster } from '@/lib/rosterRecovery';
@@ -36,6 +36,50 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     expect(response.ok).toBe(true);
   });
   afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; });
+  it('진급·시트 배치는 잠금 상실 후 지연 도착과 같은 요청 재생을 거절한다', async () => {
+    const lockPath = 'config/studentMoveLocks/2026/1-1-1/admin/batch';
+    const markerPath = 'config/rosterBatchCommits/2026/1-1-1/admin/batch';
+    const lock = { phase: 'preparing', startedAt: Date.now(), sid: '__sheet_sync__', fromCk: '1-1-1', toCk: '1-1-2' };
+    const payload = { 'classes/2026/1-1-1/teacher': '배치 담임', [lockPath]: null, [markerPath]: true };
+    await set(ref(admin, lockPath), lock);
+    await set(ref(admin, lockPath), null);
+    await expect(update(ref(admin), payload)).rejects.toThrow();
+    expect((await get(ref(admin, 'classes/2026/1-1-1/teacher'))).val()).toBe('합성 교사');
+    await set(ref(admin, lockPath), lock);
+    await update(ref(admin), payload);
+    expect((await get(ref(admin, markerPath))).val()).toBe(true);
+    await set(ref(admin, 'classes/2026/1-1-1/teacher'), '최신 담임');
+    await expect(update(ref(admin), payload)).rejects.toThrow();
+    expect((await get(ref(admin, 'classes/2026/1-1-1/teacher'))).val()).toBe('최신 담임');
+    await expect(set(ref(admin, markerPath), null)).rejects.toThrow();
+  });
+  it('이동 잠금은 같은 UID의 일반 쓰기도 거절하고 잠금 해제를 포함한 원자 확정만 허용한다', async () => {
+    const destination = '1-1-2';
+    await set(ref(admin, `classes/2026/${destination}`), { teacher: '목적지', students: { other: { id: 'other', name: '기존 합성 학생' } } });
+    await set(ref(admin, 'attendance/2026/1-1-1/s/0906'), 'O');
+    const operation = 'contract-move';
+    const record = { phase: 'pending', startedAt: Date.now(), fromCk: '1-1-1', toCk: destination, sid: 's' };
+    await set(ref(admin, 'config/studentMoveLocks/2026'), {
+      '1-1-1': { admin: { [operation]: record } }, [destination]: { admin: { [operation]: record } },
+    });
+    for (const database of [admin, second, teacher]) {
+      await expect(set(ref(database, 'attendance/2026/1-1-1/s/0906'), 'X')).rejects.toThrow();
+      await expect(update(ref(database, 'classes/2026/1-1-1/students/s'), { school: '경쟁 수정' })).rejects.toThrow();
+    }
+    await update(ref(admin), {
+      'classes/2026/1-1-1/students/s': null,
+      [`classes/2026/${destination}/students/s`]: student,
+      'attendance/2026/1-1-1/s': null,
+      [`attendance/2026/${destination}/s`]: { '0906': 'O' },
+      'config/studentMoveLocks/2026/1-1-1/admin/contract-move': null,
+      [`config/studentMoveLocks/2026/${destination}/admin/contract-move`]: null,
+      [`config/studentMoveCommits/2026/1-1-1/${destination}/s/admin/${operation}`]: true,
+    });
+    expect((await get(ref(admin, `attendance/2026/${destination}/s/0906`))).val()).toBe('O');
+    expect((await get(ref(admin, `classes/2026/${destination}/students/other/name`))).val()).toBe('기존 합성 학생');
+    expect((await get(ref(admin, 'config/studentMoveLocks/2026'))).exists()).toBe(false);
+    await set(ref(admin, `attendance/2026/${destination}/s/0906`), 'X');
+  });
   it('출석부 관리자는 세 공개 새친구 원장만 읽고 다른 학기 영역·비공개·수정 권한을 얻지 않는다', async () => {
     for (const sid of ['2026-1', '2026-2', '2026-sunday']) {
       expect((await get(ref(admin, `semesters/${sid}/newFriends`))).exists()).toBe(true);

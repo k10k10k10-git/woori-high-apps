@@ -7,6 +7,9 @@ const fieldValue = (value: string | undefined) => (value ?? '').trim();
 
 /** 사용자가 수정한 필드만 병합하고, 같은 필드의 원격 수정과 충돌하면 중단한다. */
 export function mergeStudentEdit(latest: Student, opened: Student, values: StudentEditValues): Student | undefined {
+  if (latest.id !== opened.id || latest.personId !== opened.personId) return undefined;
+  // 영구 ID가 없는 옛 명단은 같은 경로라는 이유만으로 동일인이라 단정하지 않는다.
+  if (!opened.personId && editableFields.some(key => fieldValue(latest[key]) !== fieldValue(opened[key]))) return undefined;
   const next = { ...latest };
   for (const key of editableFields) {
     const before = fieldValue(opened[key]), desired = fieldValue(values[key]), current = fieldValue(latest[key]);

@@ -53,6 +53,14 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog', { name: '학생 이동' })).toBeVisible();
     await expect(page.getByLabel('이동할 부서')).toBeDisabled();
+    // 별도 REST 요청은 브라우저 잠금을 공유하지 않는다. 같은 관리자 계정도 서버에서 차단해야 한다.
+    const token = new URL(route.request().url()).searchParams.get('auth');
+    expect(token).toBeTruthy();
+    const concurrent = await request.put(`${url(`attendance/${year}/2-1-7/S17_05/0-0`)}&auth=${encodeURIComponent(token)}`, { data: JSON.stringify('X'), headers: { 'Content-Type': 'application/json' } });
+    expect(concurrent.status()).toBe(401);
+    expect(await concurrent.json()).toMatchObject({ error: 'Permission denied' });
+    const edit = await request.patch(`${url(`classes/${year}/2-1-7/students/S17_05`)}&auth=${encodeURIComponent(token)}`, { data: { school: '경쟁 수정' } });
+    expect(edit.status()).toBe(401);
     const response = await route.fetch();
     expect(response.ok()).toBe(true);
     await route.abort();
@@ -91,4 +99,28 @@ test('목적지에 같은 인물이 있으면 중복 이동을 차단한다', as
   await expect(page.getByText('같은 인물의 학생이 목적지에 이미 있습니다. 중복 명단을 먼저 확인해 주세요.')).toBeVisible();
   expect(await read(request, `classes/${year}/2-1-7/students/S17_05`)).toEqual(source);
   expect(await read(request, `attendance/${year}/1-1-7/S17_05`)).toEqual({ '0-0': 'X' });
+});
+
+for (const concurrent of [false, true]) test(`진급 ${concurrent ? '미리보기 이후 전입생 보호' : '정상 반영과 복구 사본 보존'}`, async ({ page, request }) => {
+  await seed(request);
+  await request.put(url(`classes/${year - 1}/1-1-1`), { headers, data: { students: { promoted: { id: 'promoted', name: '합성 진급생', personId: 'person_student_promoted' } } } });
+  await request.put(url(`classes/${year}/1-2-1`), { headers, data: { teacher: '진급 담임' } });
+  await openMove(page);
+  await page.getByRole('dialog', { name: '학생 이동' }).getByRole('button', { name: '취소', exact: true }).click();
+  await page.goto('/admin');
+  await page.getByRole('tab', { name: '데이터 관리' }).click();
+  await page.locator('.as-promotion-section summary').click();
+  await page.getByRole('button', { name: '진급 미리보기', exact: true }).click();
+  await expect(page.getByRole('button', { name: '진급 실행', exact: true })).toBeVisible();
+  if (concurrent) await request.put(url(`classes/${year}/1-2-1/students/arrival`), { headers, data: { id: 'arrival', name: '합성 전입생' } });
+  await page.getByRole('button', { name: '진급 실행', exact: true }).click();
+  if (concurrent) {
+    await expect(page.getByText('미리보기 이후 명단·출석이 변경되었습니다. 다시 미리보기해 주세요.')).toBeVisible();
+    expect(await read(request, `classes/${year}/1-2-1/students`)).toEqual({ arrival: { id: 'arrival', name: '합성 전입생' } });
+  } else {
+    await expect(page.getByText(`1명의 학생을 ${year}년으로 진급 처리했습니다.`)).toBeVisible();
+    expect(await read(request, `classes/${year}/1-2-1/students/promoted/personId`)).toBe('person_student_promoted');
+    const backups = await read(request, `trash/${year}/classes`);
+    expect(Object.values(backups)).toEqual([expect.objectContaining({ teacher: '진급 담임', ck: '1-2-1' })]);
+  }
 });

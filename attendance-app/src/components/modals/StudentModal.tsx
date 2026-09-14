@@ -78,7 +78,8 @@ export default function StudentModal({
       const changedAt = new Date();
       const result = await runTransaction(classRef, current => {
         if (!current) return undefined;
-        const latest = current.students?.[id] as Student | undefined;
+        const raw = current.students?.[id] as Student | undefined;
+        const latest = raw ? { ...raw, id } : undefined;
         if ((editId && !latest) || (!editId && latest)) return undefined;
         const values = { name, birth, phone, pphone, school, addr, photo };
         const next = latest && opened ? mergeStudentEdit(latest, opened, values) : editStudent(latest, id, personId!, values);

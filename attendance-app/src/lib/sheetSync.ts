@@ -311,10 +311,17 @@ function fieldStats(a: ParsedStudent, b: CurrentStudent): { match: number; compa
   return { match, comparable };
 }
 
+function hasStudentIdentityMatch(st: ParsedStudent, current: CurrentStudent): boolean {
+  const birth = digits(st.birth), phone = digits(st.phone);
+  const oldBirth = digits(current.birth ?? ''), oldPhone = digits(current.phone ?? '');
+  return !(birth && oldBirth && birth !== oldBirth) && !(phone && oldPhone && phone !== oldPhone)
+    && ((birth.length >= 6 && birth === oldBirth) || (phone.length >= 8 && phone === oldPhone));
+}
+
 /**
  * 시트 학생 → 현재 명단에서 동일 인물 찾기.
  * 규칙(이름(접미사 제거) 일치 필수):
- *  - 같은 반의 동명 → 같은 사람으로 인정(필드 점수로 최적 후보 선택)
+ *  - 같은 반의 동명 → 생년/본인 전화 근거가 있고 비교 필드 충돌 없는 유일 후보만 인정
  *  - 다른 반의 동명 → 필드 2개 이상 일치해야만 같은 사람(이동)으로 인정
  *  - 다른 반 동명이 있으나 비교할 필드가 전혀 없으면 → 'ambiguous'(확인 필요, 신규 처리)
  * @returns 매칭된 현재 학생, 'ambiguous', 또는 null(신규)
@@ -328,15 +335,11 @@ function matchCurrent(
   const cands = (byName.get(normName(st.name)) ?? []).filter(c => !consumed.has(c.uid));
   if (cands.length === 0) return null;
 
-  // 1) 같은 반에 동명이 있으면 같은 사람 — 필드 점수 최고 후보 선택
+  // 1) 같은 반이어도 동명이인일 수 있다. 이름·학교·보호자 전화만으로 연결하지 않는다.
   const sameClass = cands.filter(c => c.ck === ck);
   if (sameClass.length > 0) {
-    let best = sameClass[0], bestScore = -1;
-    for (const c of sameClass) {
-      const sc = fieldStats(st, c).match;
-      if (sc > bestScore) { best = c; bestScore = sc; }
-    }
-    return best;
+    const matches = sameClass.filter(c => hasStudentIdentityMatch(st, c));
+    return matches.length === 1 ? matches[0] : 'ambiguous';
   }
 
   // 2) 다른 반 동명 — 필드 2개 이상 일치하는 유일 후보만 이동으로 인정
@@ -345,6 +348,7 @@ function matchCurrent(
   for (const c of cands) {
     const { match, comparable } = fieldStats(st, c);
     if (comparable > 0) anyComparable = true;
+    if (!hasStudentIdentityMatch(st, c)) continue;
     if (match > bestScore) { best = c; bestScore = match; tie = false; }
     else if (match === bestScore) tie = true;
   }
@@ -436,6 +440,7 @@ export function buildSyncPayload(
   historicalClasses?: unknown,
   currentAttendance?: AttendanceYear,
 ): Record<string, unknown> {
+  if (plan.ambiguous.length) throw new Error('동일 인물을 확인하지 못한 학생이 있습니다. 생년월일·본인 연락처와 동명이인을 확인한 후 다시 미리보기해 주세요.');
   const payload: Record<string, unknown> = {};
 
   const curList = flattenCurrent(current);
