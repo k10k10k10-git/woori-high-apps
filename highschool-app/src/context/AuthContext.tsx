@@ -6,7 +6,7 @@ import { get, ref } from "firebase/database";
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";
-import { normalizeTeamMemberships, type TeamMemberships } from "@/features/teams/teamModel";
+import { mergeTeamMemberships, type TeamMemberships } from "@/features/teams/teamModel";
 
 interface AuthContextValue {
   user: User | null;
@@ -79,10 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }));
           // 같은 사람이 두 운영 계정 목록에 함께 있을 수 있다. 한쪽만 고르면 다른 쪽에
           // 연결된 팀이 사라져 보이므로 두 목록의 팀 연결을 합쳐 읽는다.
-          setTeamMemberships({
-            ...normalizeTeamMemberships(iguardMember?.teamMemberships),
-            ...normalizeTeamMemberships(retreatAdmin?.teamMemberships),
-          });
+          setTeamMemberships(mergeTeamMemberships(
+            iguardMember?.teamMemberships,
+            retreatAdmin?.teamMemberships,
+          ));
         } catch {
           if (request !== authRequest) return;
           setRoles(NO_ROLES);

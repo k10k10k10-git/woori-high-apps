@@ -11,13 +11,13 @@ import type { SundayTeamKey } from "./featureCatalog";
  *   방학 역할 → 수련회 행정·수련회 현장 화면
  *   공통 화면(홈·공유 일정·통합검색) → 두 축 중 높은 쪽
  *
- * DB 저장 형태 (Rules 변경 없음 — 기존 세 노드를 그대로 쓴다):
+ * DB 저장 형태 (기존 세 노드와 teamMemberships를 함께 쓴다):
  *   통합관리자        : admins/{uid} === true
  *   행정 계열·바나바  : retreatAdmins/{uid} = { …, semesterRole, retreatRole }
  *   이가드·사역팀     : iguardMembers/{uid} = { …, semesterRole, retreatRole } + iguardRoles/{uid}
  *
- * ⚠ Rules는 여전히 세 버킷(admins / retreatAdmins / iguardMembers)만 구분한다.
- *   여기서 정의하는 15종 역할은 **화면 게이트**다. 그래서 원칙이 하나 있다 —
+ * ⚠ Rules는 세 버킷과 teamMemberships의 팀·역할·학기 범위를 함께 검사한다.
+ *   여기서 정의하는 15종 역할은 **화면 게이트**이기도 하다. 그래서 원칙이 하나 있다 —
  *   **화면에서 막는 것은 언제나 안전하지만, 화면에서 여는 것은 Rules가 허용할 때만 한다.**
  *   (Rules가 막는 걸 화면에서 열면 "눌렀는데 실패"가 된다.)
  */

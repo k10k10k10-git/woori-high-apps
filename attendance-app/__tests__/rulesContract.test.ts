@@ -37,21 +37,33 @@ describe('database.rules.json 권한 계약', () => {
     expect(refers(read, 'attendanceAdmins')).toBe(true);
     expect(read).toContain("child('blockedDemoUid').isString()");
     expect(read).toContain("child('blockedDemoUid').val() !== auth.uid");
-    expect(ruleValue('semesters', '$sid', 'newFriends', '.write')).toBeUndefined();
+    const newFriendsWrite = ruleExpression('semesters', '$sid', 'newFriends', '.write');
+    expect(refers(newFriendsWrite, 'attendanceAdmins')).toBe(false);
+    expect(newFriendsWrite).toContain("child('barnabas')");
     expect(refers(rules.semesters['.read'], 'attendanceAdmins')).toBe(false);
     expect(refers(rules.semestersPrivate['.read'], 'attendanceAdmins')).toBe(false);
     expect(refers(ruleExpression('config', 'pastoralReport', 'blockedDemoUid', '.write'), 'attendanceAdmins')).toBe(false);
   });
-  describe('semesters — 스탭은 조회만 (2026-08-08 보강)', () => {
+  describe('semesters — 중앙 운영과 담당 팀 쓰기를 분리한다', () => {
     it('read는 admins·retreatAdmins·iguardMembers를 허용한다', () => {
       for (const node of ['admins', 'retreatAdmins', 'iguardMembers']) {
         expect(refers(rules.semesters['.read'], node)).toBe(true);
       }
     });
 
-    it('write에는 iguardMembers가 없다 — 스탭·이가드팀은 학기 데이터를 저장할 수 없다', () => {
-      expect(refers(rules.semesters['.write'], 'iguardMembers')).toBe(false);
-      expect(refers(rules.semesters['.write'], 'retreatAdmins')).toBe(true);
+    it('루트 전체 쓰기를 없애고 학기·팀 경로에서 각각 권한을 검사한다', () => {
+      expect(rules.semesters['.write']).toBeUndefined();
+      const semesterWrite = ruleExpression('semesters', '$sid', '.write');
+      expect(refers(semesterWrite, 'retreatAdmins')).toBe(true);
+      expect(semesterWrite).toContain("child('semesterRole')");
+      expect(semesterWrite).toContain("=== 'superAdmin'");
+
+      const teamWrite = ruleExpression('semesters', '$sid', 'attendance', 'team', '$sessionId', '$applicationId', '.write');
+      expect(refers(teamWrite, 'retreatAdmins')).toBe(true);
+      expect(refers(teamWrite, 'iguardMembers')).toBe(true);
+      expect(teamWrite).toContain("child('teamMemberships')");
+      expect(teamWrite).toContain("child('semesters').child($sid)");
+      expect(teamWrite).toContain("!== 'viewer'");
     });
   });
 
@@ -59,6 +71,7 @@ describe('database.rules.json 권한 계약', () => {
     it('read·write 모두 iguardMembers를 허용하지 않는다', () => {
       expect(refers(rules.semestersPrivate['.read'], 'iguardMembers')).toBe(false);
       expect(refers(rules.semestersPrivate['.write'], 'iguardMembers')).toBe(false);
+      expect(rules.semestersPrivate['.read']).toContain("child('semesterRole')");
     });
   });
 

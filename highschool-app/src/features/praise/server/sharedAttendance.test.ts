@@ -78,8 +78,8 @@ import { praiseView } from "./view";
 import { stageInputRevision, generatePraiseStage } from "./stageModel";
 import { parseCommand } from "./parsers";
 
-const actor: PraiseActor = { uid: "synthetic_manager", roles: { semester: "superAdmin", retreat: "none" } };
-const staff: PraiseActor = { uid: "synthetic_staff", roles: { semester: "praise", retreat: "none" } };
+const actor: PraiseActor = { uid: "synthetic_manager", roles: { semester: "superAdmin", retreat: "none" }, teamMemberships: {} };
+const staff: PraiseActor = { uid: "synthetic_staff", roles: { semester: "praise", retreat: "none" }, teamMemberships: { praise: { role: "staff", active: true } } };
 const entryPath = "semesters/2026-2/attendance/team/session/1_student";
 function fixture(): PraiseState {
   const s = createPraiseState({ operationId: "create", workspace: { id: "synthetic", name: "합성 학기", startDate: "2026-09-05", endDate: "2026-09-05", semesterId: "2026-2", teamId: "praise" } }, actor, 1000);

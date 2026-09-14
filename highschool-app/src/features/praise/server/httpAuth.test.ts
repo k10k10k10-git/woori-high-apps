@@ -22,7 +22,7 @@ describe("찬양팀 요청 인증", () => {
   it("폐기 확인을 요청하고 토큰의 역할 주장을 무시한다", async () => {
     const actor = await authenticatePraiseRequest(request());
     expect(mocks.verify).toHaveBeenCalledWith("signed-token", true);
-    expect(actor).toEqual({ uid: "test-user", name: "테스트", roles: { semester: "none", retreat: "none" } });
+    expect(actor).toEqual({ uid: "test-user", name: "테스트", roles: { semester: "none", retreat: "none" }, teamMemberships: {} });
     expect(mocks.ref).toHaveBeenCalledTimes(4);
   });
   it("현재 admins의 true만 통합관리자로 인정한다", async () => {
@@ -42,6 +42,14 @@ describe("찬양팀 요청 인증", () => {
     mocks.values["retreatAdmins/test-user"] = { role: "pastor", semesterRole: "staff", retreatRole: "leader" };
     mocks.values["iguardMembers/test-user"] = { semesterRole: "adminTeam" };
     expect((await authenticatePraiseRequest(request())).roles).toEqual({ semester: "staff", retreat: "leader" });
+  });
+  it("두 권한 원장에 나뉜 담당 팀을 합쳐 서버 권한에 전달한다", async () => {
+    mocks.values["retreatAdmins/test-user"] = { teamMemberships: { media: { role: "viewer", active: true } } };
+    mocks.values["iguardMembers/test-user"] = { teamMemberships: { praise: { role: "staff", active: true } } };
+    expect((await authenticatePraiseRequest(request())).teamMemberships).toEqual({
+      media: { role: "viewer", active: true },
+      praise: { role: "staff", active: true },
+    });
   });
   it.each(["auth/id-token-revoked", "auth/id-token-expired", "auth/user-disabled"])("폐기·만료·정지된 계정은 원장 조회 전에 거절한다", async (code) => {
     mocks.verify.mockRejectedValue({ code, message: "비공개 내부 오류" });

@@ -112,7 +112,7 @@ export function createPraiseState(
   at: number,
 ): PraiseState {
   requireValue(
-    canAdministerPraise(actor.roles),
+    canAdministerPraise(actor),
     "찬양팀 운영 공간 개설 권한이 없습니다.",
     "forbidden",
     403,

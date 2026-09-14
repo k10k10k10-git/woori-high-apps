@@ -1,5 +1,5 @@
 import "server-only";
-import { canAccessSundayTeam } from "@/features/portal/accessPolicy";
+import { canAccessTeam } from "@/features/teams/teamModel";
 import { canAdministerPraise, praisePermissions } from "../permissions";
 import type {
   PraiseActor,
@@ -27,8 +27,8 @@ import { assertSharedAttendanceCurrent, initialSharedSessions, loadSharedAttenda
 import { executeSharedAttendance, pendingSharedAttendance, resolveSharedAttendance } from "./sharedAttendanceWrite";
 
 export async function createPraiseReferences(actor: PraiseActor) {
-  requireValue(canAdministerPraise(actor.roles), "찬양팀 운영 공간 개설 권한이 없습니다.", "forbidden", 403);
-  return { semesters: await praiseReferences() };
+  requireValue(canAdministerPraise(actor), "찬양팀 운영 공간 개설 권한이 없습니다.", "forbidden", 403);
+  return { semesters: await praiseReferences(actor) };
 }
 export async function readPraiseView(actor: PraiseActor, workspaceId: string) {
   const state = await requireWorkspace(actor, workspaceId);
@@ -42,7 +42,7 @@ async function resolvedPraiseView(state: PraiseState, actor: PraiseActor) {
 
 export function requirePraiseAccess(actor: PraiseActor) {
   requireValue(
-    canAccessSundayTeam("praise", actor.roles),
+    canAccessTeam("praise", actor.roles, actor.teamMemberships),
     "찬양팀 접근 권한이 없습니다.",
     "forbidden",
     403,
@@ -64,13 +64,13 @@ export async function listPraise(actor: PraiseActor) {
     } catch {
       throw praiseUnavailable("workspace_list_unavailable");
     }
-    if (meta?.id === id) workspaces.push(meta);
+    if (meta?.id === id && canAccessTeam("praise", actor.roles, actor.teamMemberships, meta.semesterId)) workspaces.push(meta);
   }
   return {
     workspaces: workspaces.sort((a, b) =>
       b.startDate.localeCompare(a.startDate),
     ),
-    canCreate: canAdministerPraise(actor.roles),
+    canCreate: canAdministerPraise(actor),
   };
 }
 export async function requireWorkspace(
@@ -81,6 +81,12 @@ export async function requireWorkspace(
   requirePraiseAccess(actor);
   const state = await readWorkspace(workspaceId);
   requireValue(state, "찬양팀 운영 공간이 없습니다.", "not_found", 404);
+  requireValue(
+    praisePermissions(actor, state).read,
+    "이 학기의 찬양팀 접근 권한이 없습니다.",
+    "forbidden",
+    403,
+  );
   requireValue(
     !manage || praisePermissions(actor, state).manage,
     "찬양팀 운영 관리 권한이 없습니다.",
@@ -94,7 +100,7 @@ export async function createPraise(
   request: PraiseCreateRequest,
 ) {
   requireValue(
-    canAdministerPraise(actor.roles),
+    canAdministerPraise(actor, request.workspace.semesterId),
     "찬양팀 운영 공간 개설 권한이 없습니다.",
     "forbidden",
     403,
@@ -178,9 +184,15 @@ export async function executePraise(
       "forbidden",
       403,
     );
-    if (command.type === "meta.save")
+    if (command.type === "meta.save") {
+      requireValue(
+        canAdministerPraise(actor, command.meta.semesterId),
+        "연결할 학기의 찬양팀 운영 권한이 없습니다.",
+        "forbidden",
+        403,
+      );
       await validateSemesterLink(command.meta.semesterId, command.meta.teamId);
-    else if (command.access.active) {
+    } else if (command.access.active) {
       const accounts = await praiseAccounts();
       requireValue(
         accounts.some((account) => account.uid === command.access.uid),
