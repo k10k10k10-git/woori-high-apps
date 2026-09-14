@@ -120,7 +120,19 @@ export interface Retreat {
 
 export type RetreatProgramStatus = "draft" | "review" | "confirmed" | "published";
 
-export type RetreatProgramKind = "main" | "post" | "sports" | "other";
+export type RetreatProgramKind = "main" | "post" | "sports" | "reflection" | "mixed" | "other";
+
+/** 게임 여부와 별개인 실제 활동의 성격. 프로그램 하나에서 여러 종류를 섞을 수 있다. */
+export type RetreatProgramActivityType =
+  | "game"
+  | "reflection"
+  | "video"
+  | "briefing"
+  | "movement"
+  | "setup"
+  | "worship"
+  | "cleanup"
+  | "other";
 
 /** 프로그램 안의 한 활동이 실제로 운영되는 방식. 프로그램 전체 유형과 분리한다. */
 export type RetreatProgramOperationMode = "whole" | "course" | "group" | "alliance" | "break";
@@ -184,6 +196,8 @@ export interface RetreatProgramPost {
   id: string;
   order: number;
   name: string;
+  /** 없으면 구버전 게임 블록으로 읽는다. */
+  activityType?: RetreatProgramActivityType;
   /** 전체 진행·코스 순환·조별 협력 등 이 활동의 운영 방식. 없으면 구버전 기본값(전체 진행)으로 읽는다. */
   operationMode?: RetreatProgramOperationMode;
   /** 개인·기존 조·연합팀 등 참가자 묶음. 없으면 구버전 기본값(기존 조)으로 읽는다. */
@@ -195,6 +209,8 @@ export interface RetreatProgramPost {
   concept?: string;
   place?: string;
   duration?: string;
+  startTime?: string;
+  endTime?: string;
   hint?: string;
   headcount?: string;
   staff?: string;
@@ -241,6 +257,10 @@ export interface RetreatProgramMatch {
 /** 물품 상태 — 시트의 "구매 여부" 열이 쓰던 값들. */
 export type RetreatProgramItemStatus = "todo" | "ordered" | "purchased" | "inChurch" | "toMake";
 
+export type RetreatProgramProcurementType = "purchase" | "church" | "borrow" | "rent" | "make" | "service";
+export type RetreatProgramFulfillmentStatus = "requested" | "approved" | "ordered" | "received" | "packed" | "onsite" | "returned";
+export type RetreatProgramSettlementStatus = "notNeeded" | "pending" | "submitted" | "settled";
+
 /** 물품·예산 한 줄. 시트의 물품리스트(항목·이름·수량·가격·총액·링크)를 옮겼다. */
 export interface RetreatProgramItem {
   id: string;
@@ -255,8 +275,14 @@ export interface RetreatProgramItem {
   /** postId 이전에 쓰던 자유 텍스트 항목명 — 읽기 호환용. 새 입력은 postId를 쓴다. */
   group?: string;
   status: RetreatProgramItemStatus;
+  procurementType?: RetreatProgramProcurementType;
+  fulfillmentStatus?: RetreatProgramFulfillmentStatus;
+  settlementStatus?: RetreatProgramSettlementStatus;
   quantity?: number;
   unitPrice?: number;
+  actualAmount?: number;
+  assignee?: string;
+  storagePlace?: string;
   link?: string;
   note?: string;
   createdAt: number;
@@ -276,6 +302,19 @@ export interface RetreatProgramRole {
   detail?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+export type RetreatProgramPublishedSnapshot = Pick<RetreatProgram,
+  | "order" | "title" | "kind" | "date" | "startTime" | "endTime" | "place" | "lead" | "team"
+  | "theme" | "scripture" | "objective" | "summary" | "flow" | "rules" | "briefing" | "script"
+  | "materials" | "tasks" | "posts" | "items" | "roles" | "competitionTeams"
+>;
+
+export interface RetreatProgramRelease {
+  id: string;
+  sourceUpdatedAt: number;
+  releasedAt: number;
+  snapshot: RetreatProgramPublishedSnapshot;
 }
 
 /**
@@ -315,6 +354,9 @@ export interface RetreatProgram {
   roles?: Record<string, RetreatProgramRole>;
   /** 프로그램 전용 연합팀. 수련회 기본 조 편성과는 독립이다. */
   competitionTeams?: Record<string, RetreatProgramCompetitionTeam>;
+  /** 현장에서 읽는 변경 불가 배포본. 편집 원본과 분리한다. */
+  releases?: Record<string, RetreatProgramRelease>;
+  activeReleaseId?: string;
   createdAt: number;
   updatedAt: number;
 }

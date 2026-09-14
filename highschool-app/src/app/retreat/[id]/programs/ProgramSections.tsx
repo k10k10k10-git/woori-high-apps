@@ -8,6 +8,7 @@ import ProgramRunOfShow from "./ProgramRunOfShow";
 import ProgramUndoNotice from "./ProgramUndoNotice";
 import { useProgramUndo } from "./useProgramUndo";
 import {
+  PROGRAM_ACTIVITY_TYPE_META,
   PROGRAM_ITEM_STATUS_META,
   PROGRAM_OPERATION_MODE_META,
   PROGRAM_PARTICIPATION_MODE_META,
@@ -15,12 +16,16 @@ import {
   nextMatchRound,
   postMatchRounds,
   programBudget,
+  programActivityType,
+  programActivityRequirements,
   programItemTotal,
   programOperationMode,
   programParticipationMode,
+  parseProgramActivityPaste,
 } from "@/lib/programPreparation";
 import type { ProgramGroupedEntries } from "@/lib/programPreparation";
 import type {
+  RetreatProgramActivityType,
   RetreatProgramItem,
   RetreatProgramItemStatus,
   RetreatProgramMatch,
@@ -390,7 +395,7 @@ function PostLegacyText({
 
 // 준비물·스탭 역할은 아래 표(items·roles)가 단일 원천이다. 자유 입력으로 다시 받지 않는다.
 const POST_FIELDS = [
-  { key: "concept", label: "컨셉", rows: 2, placeholder: "이 게임이 전하려는 장면·분위기" },
+  { key: "concept", label: "컨셉", rows: 2, placeholder: "이 활동이 전하려는 장면·분위기" },
   { key: "rules", label: "규칙", rows: 6, placeholder: "1. 조별 대항\n2. 3라운드 진행…" },
   { key: "prepCautions", label: "준비 시 주의", rows: 3, placeholder: "물품을 미리 숨겨두기" },
   { key: "runCautions", label: "진행 시 주의", rows: 4, placeholder: "정해진 시각 이후 새 라운드 시작 금지" },
@@ -398,7 +403,7 @@ const POST_FIELDS = [
 ] as const;
 
 export function ProgramPostsSection({
-  posts, canEdit, onCreate, onUpdate, onDelete, onCreateMatch, onUpdateMatch, onDeleteMatch,
+  posts, canEdit, onCreate, onCreateBulk, onUpdate, onDelete, onCreateMatch, onUpdateMatch, onDeleteMatch,
   itemsOf, rolesOf, onCreateItem, onUpdateItem, onDeleteItem, onCreateRole, onUpdateRole, onDeleteRole,
   onRestore, onRestoreItem, onRestoreRole, onRestoreMatch, onReorder,
 }: {
@@ -413,6 +418,7 @@ export function ProgramPostsSection({
   onUpdateRole: (roleId: string, data: Partial<RetreatProgramRole>) => Promise<void>;
   onDeleteRole: (roleId: string) => Promise<void>;
   onCreate: (name: string, order: number) => Promise<void>;
+  onCreateBulk: (rows: Array<Omit<RetreatProgramPost, "id" | "createdAt" | "updatedAt">>) => Promise<void>;
   onUpdate: (postId: string, data: Partial<RetreatProgramPost>) => Promise<void>;
   onDelete: (postId: string) => Promise<void>;
   onCreateMatch: (postId: string, data: { round: number; order: number }) => Promise<void>;
@@ -425,11 +431,13 @@ export function ProgramPostsSection({
   onReorder: (orderedIds: string[]) => Promise<void>;
 }) {
   const [name, setName] = useState("");
+  const [bulkText, setBulkText] = useState("");
   const [adding, setAdding] = useState(false);
   const { busyId, run } = useRowBusy();
   const { toast } = useUI();
   const undo = useProgramUndo();
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const bulkRows = parseProgramActivityPaste(bulkText);
 
   async function add() {
     const trimmed = name.trim();
@@ -438,6 +446,26 @@ export function ProgramPostsSection({
     try {
       await onCreate(trimmed, posts.length + 1);
       setName("");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function importBulk() {
+    if (bulkRows.length === 0) return;
+    setAdding(true);
+    try {
+      await onCreateBulk(bulkRows.map((row, index) => ({
+        ...row,
+        order: posts.length + index + 1,
+        participationMode: "retreatGroup",
+        scoreEnabled: false,
+        testStatus: programActivityRequirements(row).test ? "needed" : "notNeeded",
+      })));
+      setBulkText("");
+      toast(`${bulkRows.length}개 활동을 추가했습니다.`, "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "활동을 한꺼번에 추가하지 못했습니다.", "error");
     } finally {
       setAdding(false);
     }
@@ -462,13 +490,13 @@ export function ProgramPostsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-posts-heading">진행 블록</h3>
-          <p>게임, 설명과 이동을 실제 순서대로 추가하고 각 블록의 운영 방식과 참가 단위를 정합니다.</p>
+          <p>게임, 묵상, 영상, 설명과 이동을 실제 순서대로 추가하고 활동마다 맞는 진행 방식을 정합니다.</p>
         </div>
         <span className="program-count">{posts.length}개</span>
       </div>
 
       {canEdit && (
-        <div className="program-inline-form">
+        <><div className="program-inline-form">
           <label className="program-field program-field--wide">
             <span>활동 이름</span>
             <input id="program-new-block-name" className="input" value={name} maxLength={80} placeholder="예: 전체 오프닝 / 물코기 / 코스 이동"
@@ -479,6 +507,15 @@ export function ProgramPostsSection({
             <Plus aria-hidden="true" size={16} /> 추가
           </button>
         </div>
+        <details className="program-bulk-paste">
+          <summary>스프레드시트에서 여러 활동 붙여넣기</summary>
+          <div>
+            <p>열 순서: 활동명 · 종류 · 운영 방식 · 장소 · 시작 · 종료 · 담당. 최대 100행까지 미리 확인한 뒤 한 번에 추가합니다.</p>
+            <textarea className="input" rows={6} value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={"활동명\t종류\t운영 방식\t장소\t시작\t종료\t담당\n전체 오프닝\t브리핑·설명\t전체 진행\t본당\t14:00\t14:10\t홍길동"} />
+            {bulkRows.length > 0 && <div className="program-bulk-paste__preview"><strong>{bulkRows.length}개 활동</strong><span>{bulkRows.slice(0, 3).map((row) => row.name).join(" · ")}{bulkRows.length > 3 ? ` 외 ${bulkRows.length - 3}개` : ""}</span></div>}
+            <button type="button" className="btn-primary" disabled={adding || bulkRows.length === 0} onClick={() => void importBulk()}>{adding ? "추가 중…" : `${bulkRows.length}개 활동 추가`}</button>
+          </div>
+        </details></>
       )}
 
       <ProgramRunOfShow
@@ -494,13 +531,15 @@ export function ProgramPostsSection({
         <p className="program-task-empty">아직 진행 블록이 없습니다. 실제 진행 순서대로 활동을 추가해 주세요.</p>
       ) : (
         <ul className="program-card-list">
-          {posts.map((post, index) => (
+          {posts.map((post, index) => {
+            const requirements = programActivityRequirements(post);
+            return (
             <li key={post.id}>
               <details className="program-card" id={`program-block-${post.id}`}>
                 <summary>
                   <b className="program-card-sequence" aria-hidden="true">{String(index + 1).padStart(2, "0")}</b>
                   <strong>{post.name}</strong>
-                  <span>{PROGRAM_OPERATION_MODE_META[programOperationMode(post)].label} / {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(post)]}</span>
+                  <span>{PROGRAM_ACTIVITY_TYPE_META[programActivityType(post)].label} · {PROGRAM_OPERATION_MODE_META[programOperationMode(post)].label} / {PROGRAM_PARTICIPATION_MODE_META[programParticipationMode(post)]}</span>
                   <em className="program-card-counts">준비물 {itemsOf(post.id).length} / 역할 {rolesOf(post.id).length}</em>
                   <CaretDown className="program-card-caret" aria-hidden="true" size={17} weight="bold" />
                 </summary>
@@ -519,6 +558,13 @@ export function ProgramPostsSection({
                         onSave={(next) => onUpdate(post.id, { name: next })}
                         errorMessage="블록 이름을 수정하지 못했습니다."
                       /></label>
+                    <label className="program-field"><span>활동 종류</span>
+                      <select className="input" value={programActivityType(post)}
+                        onChange={(event) => void run(post.id, () => onUpdate(post.id, { activityType: event.target.value as RetreatProgramActivityType }), "활동 종류를 바꾸지 못했습니다.")}>
+                        {Object.entries(PROGRAM_ACTIVITY_TYPE_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
+                      </select>
+                      <small className="program-field-help">{PROGRAM_ACTIVITY_TYPE_META[programActivityType(post)].help}</small>
+                    </label>
                     <label className="program-field"><span>운영 방식</span>
                       <select className="input" value={programOperationMode(post)}
                         onChange={(event) => void run(post.id, () => onUpdate(post.id, {
@@ -557,6 +603,24 @@ export function ProgramPostsSection({
                         onSave={(next) => onUpdate(post.id, { duration: next })}
                         errorMessage="시간을 수정하지 못했습니다."
                       /></label>
+                    <label className="program-field"><span>시작 시각</span>
+                      <ProgramAutosaveField
+                        value={post.startTime ?? ""}
+                        ariaLabel="시작 시각"
+                        placeholder="14:20"
+                        maxLength={5}
+                        onSave={(next) => onUpdate(post.id, { startTime: next })}
+                        errorMessage="시작 시각을 수정하지 못했습니다."
+                      /></label>
+                    <label className="program-field"><span>종료 시각</span>
+                      <ProgramAutosaveField
+                        value={post.endTime ?? ""}
+                        ariaLabel="종료 시각"
+                        placeholder="14:35"
+                        maxLength={5}
+                        onSave={(next) => onUpdate(post.id, { endTime: next })}
+                        errorMessage="종료 시각을 수정하지 못했습니다."
+                      /></label>
                     <label className="program-field"><span>참여 인원</span>
                       <ProgramAutosaveField
                         value={post.headcount ?? ""}
@@ -583,8 +647,8 @@ export function ProgramPostsSection({
                         onSave={(next) => onUpdate(post.id, { hint: next })}
                         errorMessage="힌트를 수정하지 못했습니다."
                       /></label>
-                    <label className="program-field"><span>사전 테스트</span>
-                      <select id={`program-post-test-${post.id}`} className="input" value={post.testStatus ?? "needed"}
+                    <label className="program-field"><span>사전 테스트 {requirements.test ? "(필수)" : "(선택)"}</span>
+                      <select id={`program-post-test-${post.id}`} className="input" value={post.testStatus ?? (requirements.test ? "needed" : "notNeeded")}
                         onChange={(event) => void run(post.id, () => onUpdate(post.id, { testStatus: event.target.value as NonNullable<RetreatProgramPost["testStatus"]> }), "테스트 상태를 바꾸지 못했습니다.")}>
                         <option value="notNeeded">테스트 불필요</option>
                         <option value="needed">테스트 필요</option>
@@ -637,7 +701,7 @@ export function ProgramPostsSection({
                   {canEdit && (
                     <div className="program-card-actions">
                       <span className="program-autosave-hint">입력한 칸에서 벗어나면 바로 저장됩니다.</span>
-                      <button type="button" className="btn-danger btn-sm" onClick={() => void run(post.id, async () => { await onDelete(post.id); undo.remember(post.name, () => onRestore(post)); }, "게임을 삭제하지 못했습니다.")}>
+                      <button type="button" className="btn-danger btn-sm" onClick={() => void run(post.id, async () => { await onDelete(post.id); undo.remember(post.name, () => onRestore(post)); }, "활동을 삭제하지 못했습니다.")}>
                         <Trash aria-hidden="true" size={15} /> 이 블록 삭제
                       </button>
                     </div>
@@ -645,7 +709,8 @@ export function ProgramPostsSection({
                 </fieldset>
               </details>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -705,7 +770,7 @@ export function ProgramRolesSection({
             <span>{group.entries.length}명</span>
           </div>
           {group.entries.length === 0 ? (
-            <p className="program-task-empty">{group.postId ? "이 게임에 배정된 역할이 없습니다." : "프로그램 전체 역할이 없습니다."}</p>
+            <p className="program-task-empty">{group.postId ? "이 활동에 배정된 역할이 없습니다." : "프로그램 전체 역할이 없습니다."}</p>
           ) : (
             <div className="program-table-scroll program-table-scroll--adaptive">
               <table className="program-table program-table--adaptive">
@@ -830,7 +895,7 @@ export function ProgramItemsSection({
               <span>{group.entries.length}건 / {won(groupBudget.total)}</span>
             </div>
             {group.entries.length === 0 ? (
-              <p className="program-task-empty">{group.postId ? "이 게임의 준비물이 없습니다." : "공통 물품이 없습니다."}</p>
+              <p className="program-task-empty">{group.postId ? "이 활동의 준비물이 없습니다." : "공통 물품이 없습니다."}</p>
             ) : (
               <div className="program-table-scroll program-table-scroll--adaptive">
                 <table className="program-table program-table--adaptive">

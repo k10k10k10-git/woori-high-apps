@@ -191,8 +191,34 @@ describe("program preparation interaction contract", () => {
     expect(editor).toContain('publicationAction === "publish" && !canPublishProgram');
     expect(editor).toContain("이가드 현장에 공유할까요?");
     expect(publication).toContain('disabled={busy || !ready}');
-    expect(publication).toContain("이가드 화면 미리보기");
+    expect(publication).toContain("변경사항 다시 공유");
+    expect(publication).toContain("hasUnsavedChanges");
+    expect(publication).toContain("새 배포본 미리보기");
     expect(publication).toContain("<PublishedProgramCard");
+  });
+
+  it("수련회 준비는 여섯 업무 화면을 URL로 유지하고 프로그램 원본으로 돌아간다", () => {
+    const preparation = source("src/lib/programPreparation.ts");
+    const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
+    const views = source("src/app/retreat/[id]/programs/ProgramWorkspaceViews.tsx");
+    for (const label of ["준비 현황", "프로그램", "일정·배치", "물품·비용", "회의·할 일", "자료·현장"]) {
+      expect(preparation).toContain(`label: "${label}"`);
+    }
+    expect(client).toContain('params.set("workspace", next)');
+    expect(client).toContain("<ProgramScheduleWorkspace");
+    expect(client).toContain("<ProgramSupplyWorkspace");
+    expect(views).toContain('onOpen(program.id, "roles")');
+  });
+
+  it("현장은 활성 배포본만 읽고 편집 원본의 후속 변경을 노출하지 않는다", () => {
+    const db = source("src/lib/db/programs.ts");
+    const field = source("src/app/retreat/[id]/field/PublishedProgramsView.tsx");
+    expect(db).toContain("publishRetreatProgramRelease");
+    expect(db).toContain("sourceUpdatedAt: current.updatedAt");
+    expect(db).toContain("if (!canPublishProgram(current))");
+    expect(db).toContain("runTransaction(ref(db, programPath)");
+    expect(db).toContain("activeReleaseId: releaseId");
+    expect(field).toContain("publishedProgramForField");
   });
 
   it("프로그램 탭은 방향키 이동과 tabpanel 연결을 제공한다", () => {
