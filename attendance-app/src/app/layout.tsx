@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { AppProvider } from '@/store/AppContext';
 import AppShell from '@/components/AppShell';
+import InstallPrompt from '@/components/InstallPrompt';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AppProvider>
           <AppShell>{children}</AppShell>
+          <InstallPrompt />
         </AppProvider>
       </body>
     </html>
