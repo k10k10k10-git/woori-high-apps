@@ -11,7 +11,7 @@
   box-shadow: 0 4px 24px rgba(155,141,212,.35);
   width: calc(100% - 32px); max-width: 420px;
   z-index: 9999;
-  animation: toast-slide-in .4s cubic-bezier(.34,1.4,.64,1) both;
+  animation: toast-slide-in .4s cubic-bezier(.22,1,.36,1) both;
 }
 @keyframes toast-slide-in {
   from { opacity: 0; transform: translateX(-50%) translateY(-24px); }
@@ -39,6 +39,77 @@
   font-size: 12px; font-weight: 700;
   font-family: inherit; cursor: pointer;
   white-space: nowrap;
+}
+
+/* ─── PWA Install Prompt ───────────────────────────────────── */
+.install-prompt {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 9998;
+  width: min(520px, calc(100% - 32px));
+  min-height: 68px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+.teacher-workspace + .install-prompt { bottom: calc(72px + env(safe-area-inset-bottom)); }
+.install-prompt-icon {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--primary-bg);
+  color: var(--primary-text);
+}
+.install-prompt-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  line-height: 1.45;
+}
+.install-prompt-copy strong { font-size: 13px; font-weight: 700; }
+.install-prompt-copy span { color: var(--text2); font-size: 11px; }
+.install-prompt-actions { display: flex; align-items: center; gap: 6px; }
+.install-prompt-actions button {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.install-prompt-primary { border: 0; background: var(--primary-text); color: #fff; }
+.install-prompt-primary:disabled { opacity: .6; cursor: wait; }
+.install-prompt-dismiss { border: 1px solid var(--border2); background: var(--surface); color: var(--text2); }
+.install-prompt-actions button:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; }
+@media (hover: hover) {
+  .install-prompt-primary:not(:disabled):hover { background: #55488f; }
+  .install-prompt-dismiss:hover { background: var(--bg); color: var(--text); }
+}
+@media (max-width: 640px) {
+  .install-prompt {
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    width: calc(100% - 20px);
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+  .teacher-workspace + .install-prompt { bottom: calc(68px + env(safe-area-inset-bottom)); }
+  .install-prompt-icon { width: 34px; height: 34px; }
+  .install-prompt-actions { grid-column: 2; }
+  .install-prompt-actions button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .install-prompt-actions button { transition: none; }
 }
 
 /* ─── App Layout ─────────────────────────────────────────────── */
