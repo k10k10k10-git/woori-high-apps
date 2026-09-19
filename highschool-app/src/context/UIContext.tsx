@@ -95,6 +95,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         handleConfirm(false);
         return;
       }
@@ -103,11 +104,12 @@ export function UIProvider({ children }: { children: ReactNode }) {
       const ok = okBtnRef.current;
       if (!cancel || !ok) return;
       e.preventDefault();
+      e.stopPropagation();
       (document.activeElement === cancel ? ok : cancel).focus();
     }
 
-    document.addEventListener("keydown", onKeyDown, true);
-    return () => document.removeEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [confirmState, handleConfirm]);
 
   return (
@@ -130,7 +132,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
 
       {/* ── Confirm 모달 ── */}
       {confirmState && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[140] p-4">
           <div className="card p-6 w-full max-w-sm modal-card"
             role="dialog" aria-modal="true" aria-labelledby={messageId}>
             <p id={messageId} className="text-sm text-slate-700 mb-5 leading-relaxed">{confirmState.message}</p>
