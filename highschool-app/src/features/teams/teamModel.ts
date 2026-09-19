@@ -62,6 +62,11 @@ export function canAccessEveryTeam(roles: MinistryRoles): boolean {
   return roles.semester === "superAdmin" || roles.semester === "pastor";
 }
 
+/** 팀 디렉터리와 공개 학기 기록의 조회 범위. 저장·찬양 서버 권한과 분리한다. */
+export function canBrowseEveryTeam(roles: MinistryRoles): boolean {
+  return canAccessEveryTeam(roles) || roles.semester === "leader";
+}
+
 /** 모집·배치·전체 출석은 중앙 운영 역할만 연다. 팀이 명시된 팀장은 자기 팀 공간을 쓴다. */
 export function canAccessOperationsCenter(roles: MinistryRoles, memberships?: TeamMemberships): boolean {
   if (memberships === undefined) {
@@ -72,9 +77,19 @@ export function canAccessOperationsCenter(roles: MinistryRoles, memberships?: Te
   return roles.semester === "leader" && activeTeamKeys(memberships).length === 0;
 }
 
+/** semestersPrivate Rules와 같은 판정. 팀 화면에서 연락처를 구독하기 전에 반드시 확인한다. */
+export function canReadSemesterPrivate(roles: MinistryRoles, memberships?: TeamMemberships): boolean {
+  if (["superAdmin", "pastor", "adminTeam"].includes(roles.semester)) return true;
+  return roles.semester === "leader" && (memberships === undefined || activeTeamKeys(memberships).length === 0);
+}
+
 export function accessibleTeamKeys(roles: MinistryRoles, memberships: TeamMemberships = {}): SundayTeamKey[] {
-  if (canAccessEveryTeam(roles)) return SUNDAY_MINISTRY_TEAMS.map((team) => team.key);
+  if (canBrowseEveryTeam(roles)) return SUNDAY_MINISTRY_TEAMS.map((team) => team.key);
   return activeTeamKeys(memberships);
+}
+
+export function canBrowseTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
+  return canBrowseEveryTeam(roles) || activeTeamKeys(memberships, semesterId).includes(teamKey);
 }
 
 export function canAccessTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
@@ -82,7 +97,8 @@ export function canAccessTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memb
 }
 
 export function canEditTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
-  if (canAccessEveryTeam(roles)) return true;
+  if (roles.semester === "superAdmin" || roles.semester === "pastor") return true;
+  if (roles.semester === "leader" && activeTeamKeys(memberships).length === 0) return true;
   const membership = memberships[teamKey];
   return membership?.active === true
     && membership.role !== "viewer"

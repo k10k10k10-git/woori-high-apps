@@ -131,3 +131,10 @@ it("찬양팀 사용자는 팀 운영 메뉴에서 자기 팀에만 진입한다
   expect(screen.getByRole("link", { name: /찬양팀 모임/ })).toHaveAttribute("href", "/teams/praise");
   expect(screen.queryByRole("link", { name: /바나바팀/ })).not.toBeInTheDocument();
 });
+
+it.each(["pastor", "adminTeam"] as const)("%s 계정에 훈련과 운영센터를 연다", (semester) => {
+  state.auth.roles = { semester, retreat: "none" };
+  render(<GlobalPortalHeader />);
+  expect(screen.getAllByRole("link", { name: "훈련" }).some((link) => link.getAttribute("href") === "/training")).toBe(true);
+  expect(screen.getAllByRole("link", { name: "운영센터" }).some((link) => link.getAttribute("href") === "/operations")).toBe(true);
+});

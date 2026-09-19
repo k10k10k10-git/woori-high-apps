@@ -153,6 +153,8 @@ export const UNIFIED_ROUTES = [
   "/teams/[team]",
   "/teams/[team]/ongoing",
   "/teams/[team]/terms/[semesterId]/[section]",
+  "/training",
+  "/training/terms/[semesterId]/[section]",
   "/events",
   "/events/[id]/administration",
   "/events/[id]/programs",
