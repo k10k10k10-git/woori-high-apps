@@ -26,6 +26,15 @@ describe('목양 리포트 실제 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
     expect(screen.getByText('3회 이상 연속 결석 · 일반 학생')).toBeTruthy();
   });
+  it('미입력 이후 결석은 확인된 횟수와 중단 지점을 함께 표시한다', () => {
+    mocks.state = { ...mocks.state, attData: { '1-1-1': { nf_one: { '0-1': 'X', '0-2': 'X', '0-3': 'X' } } } };
+    render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
+    expect(screen.getByText('확인된 연속 결석 3회')).toBeTruthy();
+    expect(screen.getByText('이전 미입력 있음')).toBeTruthy();
+    expect(screen.getByText('1월 4일 미입력 이전은 연속 횟수에서 제외됩니다.')).toBeTruthy();
+    expect(screen.getByText('마지막 출석: 조회 연도 기록 없음')).toBeTruthy();
+  });
   it('권한 오류를 0명으로 숨기지 않고 재시도하며 해제된 응답을 무시한다', () => {
     const { rerender } = render(<PastoralReport />);
     act(() => mocks.fail(new Error('권한 없음')));

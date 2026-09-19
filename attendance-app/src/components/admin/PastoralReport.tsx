@@ -22,14 +22,20 @@ function Phone({ value, label }: { value?: string; label: string }) {
 
 function StudentRows({ rows, empty }: { rows: ReportStudent[]; empty: string }) {
   if (!rows.length) return <p className="pr-empty">{empty}</p>;
-  return <ul className="pr-students">{rows.map(row => <li key={row.key}>
-    <div><strong>{row.student.name}</strong>{row.student.jang && <span className="pr-badge">기존 장결</span>}
-      <p>{row.label} · 담임 {row.teacher || '미등록'}</p></div>
-    <div><strong>{row.recovered ? '다시 출석' : `${row.streak}회 연속 결석`}</strong>
-      <p>마지막 출석: {row.lastPresent?.label ?? '조회 연도 기록 없음'}</p>
-      <p>최근 4회: {row.recent.slice(0, 4).reverse().map(cell => `${cell.week.label} ${cell.value === 'O' ? '출석' : cell.value === 'X' ? '결석' : '미입력'}`).join(' / ')}</p></div>
-    <div><Phone value={row.student.phone} label="학생" /><Phone value={row.student.pphone} label="보호자" /></div>
-  </li>)}</ul>;
+  return <ul className="pr-students">{rows.map(row => {
+    const boundary = row.recent[row.streak];
+    const interruptedByMissing = !row.recovered && !!boundary && !boundary.value;
+    return <li key={row.key}>
+      <div><strong>{row.student.name}</strong>{row.student.jang && <span className="pr-badge">기존 장결</span>}
+        <p>{row.label} · 담임 {row.teacher || '미등록'}</p></div>
+      <div><strong>{row.recovered ? '다시 출석' : `확인된 연속 결석 ${row.streak}회`}</strong>
+        {interruptedByMissing && <span className="pr-badge">이전 미입력 있음</span>}
+        <p>마지막 출석: {row.lastPresent?.label ?? '조회 연도 기록 없음'}</p>
+        {interruptedByMissing && <p>{boundary.week.label} 미입력 이전은 연속 횟수에서 제외됩니다.</p>}
+        <p>최근 4회: {row.recent.slice(0, 4).reverse().map(cell => `${cell.week.label} ${cell.value === 'O' ? '출석' : cell.value === 'X' ? '결석' : '미입력'}`).join(' / ')}</p></div>
+      <div><Phone value={row.student.phone} label="학생" /><Phone value={row.student.pphone} label="보호자" /></div>
+    </li>;
+  })}</ul>;
 }
 
 export default function PastoralReport() {
@@ -114,7 +120,7 @@ function ReportContent() {
         </>}
         {section === '연속 결석' && <>
           <div className="pr-section-heading"><h2>연속 결석 <span>{absent.length}명</span></h2><label>장결 구분<select value={longAbsent} onChange={e => setLongAbsent(e.target.value)}><option value="active">일반 학생</option><option value="long">기존 장결</option><option value="all">모두</option></select></label></div>
-          <p className="pr-note">기준 주일부터 거슬러 3회 이상 연속 결석한 학생입니다. 선택한 명단 정렬 순서로 표시합니다. 출석·미입력에서 연속 계산을 멈춥니다.</p>
+          <p className="pr-note">기준 주일부터 거슬러 확인된 결석이 3회 이상 이어진 학생입니다. 선택한 명단 정렬 순서로 표시합니다. 출석·미입력에서 연속 계산을 멈추며, 이전 미입력이 있으면 학생별로 표시합니다.</p>
           <StudentRows rows={absent} empty="이 조건에 해당하는 연속 결석 학생이 없습니다." />
         </>}
         {section === '이번 주 요약' && <>
