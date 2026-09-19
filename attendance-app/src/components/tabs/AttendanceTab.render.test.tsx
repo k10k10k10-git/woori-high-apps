@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   ref: vi.fn((_db: unknown, path: string) => ({ path })),
   set: vi.fn(),
+  push: vi.fn(),
   onValue: vi.fn(),
   state: { current: null as unknown },
 }));
@@ -21,7 +22,7 @@ vi.mock('@/lib/db', () => ({
   db: { name: 'fixture-db' },
   ref: mocks.ref,
   set: mocks.set,
-  push: vi.fn(),
+  push: mocks.push,
   onValue: mocks.onValue,
   off: vi.fn(),
 }));
@@ -86,6 +87,8 @@ describe('AttendanceTab 교사 출석 입력', () => {
     mocks.ref.mockClear();
     mocks.set.mockReset();
     mocks.set.mockResolvedValue(undefined);
+    mocks.push.mockReset();
+    mocks.push.mockResolvedValue(undefined);
     mocks.onValue.mockReset();
   });
 
@@ -189,16 +192,38 @@ describe('AttendanceTab 교사 출석 입력', () => {
     await waitFor(() => expect(document.activeElement).toBe(tableTab));
   });
 
-  it('건의 내용의 레이블과 등록 가능 상태를 제공한다', () => {
+  it('특이사항에 학생을 선택해 등록할 수 있고 반 전체 기록도 허용한다', async () => {
     render(<AttendanceTab />);
-    fireEvent.click(screen.getByRole('tab', { name: '건의사항' }));
+    fireEvent.click(screen.getByRole('tab', { name: '특이사항' }));
 
-    const textbox = screen.getByRole('textbox', { name: '전달할 내용' });
+    const textbox = screen.getByRole('textbox', { name: '특이사항' });
     const submit = screen.getByRole('button', { name: '등록하기' });
     expect((submit as HTMLButtonElement).disabled).toBe(true);
 
+    fireEvent.change(screen.getByLabelText(/학생/), { target: { value: 'student-1' } });
     fireEvent.change(textbox, { target: { value: '화면 제안' } });
     expect((submit as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(submit);
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith(
+      { path: 'suggestions/2026/1-1-1' },
+      expect.objectContaining({ kind: 'note', studentId: 'student-1', studentName: '홍길동' }),
+    ));
+  });
+
+  it('교사가 학생과 사유를 선택해 심방을 요청한다', async () => {
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '심방 요청' }));
+
+    const submit = screen.getByRole('button', { name: '심방 요청하기' });
+    expect((submit as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('학생'), { target: { value: 'student-1' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '요청 이유' }), { target: { value: '연락이 필요합니다.' } });
+    fireEvent.click(submit);
+
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith(
+      { path: 'suggestions/2026/1-1-1' },
+      expect.objectContaining({ kind: 'visit', studentId: 'student-1', studentName: '홍길동', status: 'open' }),
+    ));
   });
 
   it('출석표의 행과 열 헤더 관계를 제공한다', () => {
@@ -225,7 +250,7 @@ describe('AttendanceTab 교사 출석 입력', () => {
     expect(document.activeElement).toBe(exportButton);
   });
 
-  it('관리자 건의사항 구독 실패를 빈 목록과 구분한다', async () => {
+  it('관리자 특이사항 구독 실패를 빈 목록과 구분한다', async () => {
     mocks.state.current = {
       ...teacherState(),
       userRole: { role: 'admin', name: '관리자' },
@@ -233,10 +258,10 @@ describe('AttendanceTab 교사 출석 입력', () => {
     mocks.onValue.mockImplementation((_query, _next, onError) => onError?.(new Error('권한 없음')));
 
     render(<AttendanceTab />);
-    fireEvent.click(screen.getByRole('tab', { name: '건의사항' }));
+    fireEvent.click(screen.getByRole('tab', { name: '특이사항' }));
 
-    expect((await screen.findByRole('alert')).textContent).toContain('건의사항을 불러오지 못했습니다');
-    expect(screen.queryByText('등록된 건의사항이 없습니다.')).toBeNull();
+    expect((await screen.findByRole('alert')).textContent).toContain('특이사항을 불러오지 못했습니다');
+    expect(screen.queryByText('등록된 특이사항이 없습니다.')).toBeNull();
   });
 
   it('관리자는 최근 범위 밖 날짜도 기존처럼 수정할 수 있다', () => {

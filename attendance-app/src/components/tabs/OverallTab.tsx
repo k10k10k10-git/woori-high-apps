@@ -11,11 +11,13 @@ const OverallDashboard = dynamic(() => import('./overall/OverallDashboard'), { l
 const TeacherManagement = dynamic(() => import('./overall/TeacherManagement'), { loading });
 const StudentListSection = dynamic(() => import('./overall/StudentListSection'), { loading });
 const SuggestionsSection = dynamic(() => import('./overall/SuggestionsSection'), { loading });
+const VisitRequestsSection = dynamic(() => import('./overall/VisitRequestsSection'), { loading });
 
 const SECTIONS = [
   { id: 'attendance', label: '출석 현황' },
   { id: 'roster', label: '교사·학생 명단' },
-  { id: 'suggest', label: '건의사항' },
+  { id: 'suggest', label: '특이사항' },
+  { id: 'visit', label: '심방 요청' },
 ] as const;
 
 export default function OverallTab() {
@@ -33,7 +35,7 @@ export default function OverallTab() {
     <div className="admin-overview">
       <header className="ao-heading">
         <h1>전체 현황</h1>
-        <p>출석과 구성원, 건의사항을 한곳에서 확인하세요.</p>
+        <p>출석과 구성원, 특이사항과 심방 요청을 한곳에서 확인하세요.</p>
       </header>
       <div className="ao-sections" role="group" aria-label="전체 현황 보기 선택">
         {SECTIONS.map(section => <button key={section.id} type="button" aria-pressed={page === section.id}
@@ -41,7 +43,7 @@ export default function OverallTab() {
       </div>
       <div id="ao-content" className="ao-content">
         {page === 'attendance' && <>
-          <AdminDashboard onShowTrends={showTrends} />
+          <AdminDashboard onShowTrends={showTrends} onShowVisits={() => setPage('visit')} />
           <section ref={trendsRef} className="ao-trends" aria-labelledby="ao-trends-title">
             <button type="button" className="ao-trends-toggle" aria-expanded={trendsOpen} aria-controls="ao-trends-content"
               onClick={() => setTrendsOpen(open => !open)}>
@@ -57,6 +59,7 @@ export default function OverallTab() {
           <StudentListSection />
         </div>}
         {page === 'suggest' && <SuggestionsSection />}
+        {page === 'visit' && <VisitRequestsSection />}
       </div>
     </div>
   );
