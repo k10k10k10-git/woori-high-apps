@@ -49,6 +49,7 @@ interface Props {
   teamById: Map<string, Team>;
   meta: SemesterMeta | null;
   lockedTeamId?: string;
+  lockedScope?: SemesterRosterScope;
 }
 
 const STATUS_STYLE: Record<EditableAttendanceStatus, string> = {
@@ -66,7 +67,7 @@ function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId }: Props) {
+export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId, lockedScope }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
   const { isMobileView } = useViewMode();
@@ -79,7 +80,12 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     setTeamFilter(lockedTeamId ?? "");
   }
   const [classFilter, setClassFilter] = useState<string>("");
-  const [scope, setScope] = useState<SemesterRosterScope>("team");
+  const [scope, setScope] = useState<SemesterRosterScope>(lockedScope ?? "team");
+  const [scopeSource, setScopeSource] = useState(lockedScope);
+  if (scopeSource !== lockedScope) {
+    setScopeSource(lockedScope);
+    if (lockedScope) setScope(lockedScope);
+  }
   const [sessionAttendance, setSessionAttendance] = useState<{ key: string; values: SessionAttendance }>({
     key: "",
     values: {},
@@ -204,7 +210,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         </div>
       )}
 
-      {!lockedTeamId && <div className="mobile-sticky-controls mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+      {!lockedTeamId && !lockedScope && <div className="mobile-sticky-controls mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="출석 명단 구분">
           <button
             role="tab"

@@ -156,6 +156,25 @@
 .team-roster-list > div:nth-child(odd) { border-right: 1px solid var(--color-border); }
 .team-roster-list strong { color: var(--color-text-primary); font-size: 0.82rem; }
 .team-roster-list span { color: var(--color-text-muted); font-size: 0.72rem; }
+.team-roster-person > span:first-child { min-width: 0; }
+.team-roster-person > span:first-child small { display: block; margin-top: 3px; color: var(--color-text-muted); }
+.team-contact-list { display: grid; flex: none; justify-items: end; gap: 2px; font-size: 0.72rem; font-style: normal; text-align: right; }
+.team-contact-list a { color: var(--color-primary); font-weight: 700; }
+.team-contact-list em { color: var(--color-text-muted); font-style: normal; }
+.team-contact-list small { color: var(--color-text-muted); font-size: 0.68rem; }
+
+.training-current-card { grid-template-columns: minmax(0, 1fr); max-width: 590px; }
+.training-roster-table { overflow-x: auto; }
+.training-roster-head,
+.training-roster-row { display: grid; grid-template-columns: minmax(140px, 1.2fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(150px, 1fr); gap: 14px; align-items: center; min-width: 660px; padding: 11px 18px; }
+.training-roster-head.is-public,
+.training-roster-row.is-public { grid-template-columns: minmax(140px, 1.2fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr); min-width: 480px; }
+.training-roster-head { border-bottom: 1px solid var(--color-border); background: var(--color-surface-hover); color: var(--color-text-muted); font-size: 0.69rem; font-weight: 730; }
+.training-roster-row { min-height: 58px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 0.75rem; }
+.training-roster-row:last-child { border-bottom: 0; }
+.training-roster-row strong { display: block; color: var(--color-text-primary); font-size: 0.82rem; }
+.training-roster-row > span:first-child small { display: block; margin-top: 3px; font-size: 0.7rem; }
+.training-roster-row .team-contact-list { justify-items: start; text-align: left; }
 
 .operations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .operations-card { display: grid; min-height: 112px; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; border-radius: 14px; padding: 17px; }
@@ -184,6 +203,7 @@
   .team-goal-card { grid-column: auto; }
   .team-roster-list { grid-template-columns: 1fr; }
   .team-roster-list > div:nth-child(odd) { border-right: 0; }
+  .team-roster-person { align-items: flex-start !important; }
   .team-context-note { align-items: flex-start; flex-direction: column; }
   .portal-mobile-bottom-nav { position: fixed; z-index: 58; right: 0; bottom: 0; left: 0; display: flex; min-height: calc(58px + env(safe-area-inset-bottom)); align-items: flex-start; justify-content: space-around; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-surface) 94%, transparent); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); backdrop-filter: blur(18px); }
   .portal-mobile-bottom-nav a { display: grid; min-width: 52px; min-height: 44px; place-items: center; border-radius: 10px; color: var(--color-text-muted); font-size: 0.68rem; font-weight: 700; }

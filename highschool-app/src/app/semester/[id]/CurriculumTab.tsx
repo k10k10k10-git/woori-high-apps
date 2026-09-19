@@ -16,13 +16,19 @@ interface Props {
   trainingClasses: TrainingClass[];
   sessions: Session[];
   lockedTeamId?: string;
+  lockedScope?: "team" | "training";
 }
 
-export default function CurriculumTab({ sid, teams, trainingClasses, sessions, lockedTeamId }: Props) {
+export default function CurriculumTab({ sid, teams, trainingClasses, sessions, lockedTeamId, lockedScope }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
   // 사역팀과 훈련 반은 같은 curriculum/{id} 맵을 쓴다 (id가 서로 겹치지 않는다)
-  const [scope, setScope] = useState<"team" | "training">("team");
+  const [scope, setScope] = useState<"team" | "training">(lockedScope ?? "team");
+  const [scopeSource, setScopeSource] = useState(lockedScope);
+  if (scopeSource !== lockedScope) {
+    setScopeSource(lockedScope);
+    if (lockedScope) setScope(lockedScope);
+  }
   const [teamId, setTeamId] = useState<string>(lockedTeamId ?? "");
   const [teamSource, setTeamSource] = useState(lockedTeamId);
   if (teamSource !== lockedTeamId) {
@@ -79,7 +85,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
         </div>
       )}
 
-      {!lockedTeamId && <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
+      {!lockedTeamId && !lockedScope && <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="커리큘럼 구분">
           {([["team", `사역팀 ${teams.length}개`], ["training", `훈련 ${trainingClasses.length}개`]] as const).map(([key, label]) => (
             <button key={key} role="tab" aria-selected={scope === key}

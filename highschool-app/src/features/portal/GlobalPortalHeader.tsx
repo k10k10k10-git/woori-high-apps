@@ -18,7 +18,7 @@ import { accessibleTeamKeys, canAccessOperationsCenter } from "@/features/teams/
 
 const MyPageModal = dynamic(() => import("./MyPageModal"), { ssr: false });
 
-type GlobalArea = "home" | "teams" | "events" | "operations" | "library" | "help";
+type GlobalArea = "home" | "teams" | "training" | "events" | "operations" | "library" | "help";
 type MyPageSession = { pathname: string; uid: string; initialTab: MyPageTab };
 
 type NavItem = { href: string; label: string; hint: string; disabled?: boolean };
@@ -107,6 +107,7 @@ function NavDropdown({ label, items, active, open, onOpen, onClose }: {
 function activeArea(pathname: string): GlobalArea {
   if (pathname === "/") return "home";
   if (pathname.startsWith("/teams") || pathname.startsWith("/sunday-ministry")) return "teams";
+  if (pathname.startsWith("/training")) return "training";
   if (pathname.startsWith("/operations") || pathname.startsWith("/semester")) return "operations";
   if (pathname.startsWith("/library") || pathname.startsWith("/ministry-guide")) return "library";
   if (pathname.startsWith("/help") || pathname.startsWith("/suggestions")) return "help";
@@ -116,6 +117,7 @@ function activeArea(pathname: string): GlobalArea {
 const AREA_LABEL: Record<GlobalArea, string> = {
   home: "통합 홈",
   teams: "팀",
+  training: "훈련",
   events: "행사",
   operations: "운영센터",
   library: "자료",
@@ -164,6 +166,7 @@ export default function GlobalPortalHeader() {
   const isMobilePreview = !isViewportMobile && mode === "mobile";
 
   const operationsAllowed = canAccessOperationsCenter(roles, teamMemberships) || canManageRolesOf(roles);
+  const trainingAllowed = canAccessArea("semester", roles);
   const eventsAllowed = canAccessArea("retreat-admin", roles) || canAccessArea("retreat-field", roles);
   const teamKeys = teamMemberships
     ? accessibleTeamKeys(roles, teamMemberships)
@@ -238,6 +241,8 @@ export default function GlobalPortalHeader() {
               />
             )}
 
+            {trainingAllowed && <Link href="/training" className="portal-nav-link" aria-current={currentArea === "training" ? "page" : undefined}>훈련</Link>}
+
             {eventsAllowed && (
               <Link
                 href="/events"
@@ -283,6 +288,7 @@ export default function GlobalPortalHeader() {
       <nav className="portal-mobile-bottom-nav" aria-label="주요 메뉴">
         <Link href="/" aria-current={currentArea === "home" ? "page" : undefined}><span>홈</span></Link>
         {teamItems.length > 0 && <Link href="/teams" aria-current={currentArea === "teams" ? "page" : undefined}><span>팀</span></Link>}
+        {trainingAllowed && <Link href="/training" aria-current={currentArea === "training" ? "page" : undefined}><span>훈련</span></Link>}
         {eventsAllowed && <Link href="/events" aria-current={currentArea === "events" ? "page" : undefined}><span>행사</span></Link>}
         {operationsAllowed && <Link href="/operations" aria-current={currentArea === "operations" ? "page" : undefined}><span>운영</span></Link>}
         <Link href="/library" aria-current={currentArea === "library" ? "page" : undefined}><span>자료</span></Link>
@@ -299,6 +305,7 @@ export default function GlobalPortalHeader() {
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
               <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>홈</Link>
               {teamItems.length > 0 && <Link href="/teams" aria-current={currentArea === "teams" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>팀</Link>}
+              {trainingAllowed && <Link href="/training" aria-current={currentArea === "training" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>훈련</Link>}
               {eventsAllowed && <Link href="/events" aria-current={currentArea === "events" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>행사</Link>}
               {operationsAllowed && <Link href="/operations" aria-current={currentArea === "operations" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>운영센터</Link>}
               <Link href="/library" aria-current={currentArea === "library" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>자료</Link>

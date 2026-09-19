@@ -3,7 +3,9 @@ import {
   accessibleTeamKeys,
   canAccessOperationsCenter,
   canAccessTeam,
+  canBrowseTeam,
   canEditTeam,
+  canReadSemesterPrivate,
   mergeTeamMemberships,
   normalizeTeamMemberships,
   ownTeamKey,
@@ -19,7 +21,7 @@ describe("teamModel", () => {
       praise: { role: "staff", active: false },
       unknown: { role: "leader", active: true },
     });
-    expect(accessibleTeamKeys(leader, memberships)).toEqual(["media"]);
+    expect(accessibleTeamKeys(leader, memberships)).toHaveLength(6);
     expect(ownTeamKey(leader, memberships)).toBe("media");
     expect(canEditTeam("media", leader, memberships)).toBe(true);
     expect(canEditTeam("praise", leader, memberships)).toBe(false);
@@ -27,7 +29,7 @@ describe("teamModel", () => {
 
   it("조회자는 담당 팀을 볼 수 있지만 수정하지 못한다", () => {
     const memberships = normalizeTeamMemberships({ praise: { role: "viewer", active: true } });
-    expect(accessibleTeamKeys(leader, memberships)).toEqual(["praise"]);
+    expect(accessibleTeamKeys(leader, memberships)).toHaveLength(6);
     expect(canEditTeam("praise", leader, memberships)).toBe(false);
   });
 
@@ -48,6 +50,7 @@ describe("teamModel", () => {
     expect(canAccessTeam("praise", leader, memberships, "2026-2")).toBe(true);
     expect(canEditTeam("praise", leader, memberships, "2026-2")).toBe(true);
     expect(canAccessTeam("praise", leader, memberships, "2026-1")).toBe(false);
+    expect(canBrowseTeam("praise", leader, memberships, "2026-1")).toBe(true);
     expect(canEditTeam("praise", leader, memberships, "2026-1")).toBe(false);
   });
 
@@ -65,5 +68,15 @@ describe("teamModel", () => {
     expect(canAccessOperationsCenter(leader, memberships)).toBe(false);
     expect(canAccessOperationsCenter({ semester: "adminTeam", retreat: "none" }, memberships)).toBe(true);
     expect(canAccessOperationsCenter({ semester: "superAdmin", retreat: "none" }, memberships)).toBe(true);
+  });
+
+  it("교역자·행정팀은 운영센터와 학기 비공개 연락처를 함께 읽는다", () => {
+    const memberships = normalizeTeamMemberships({ media: { role: "staff", active: true } });
+    for (const semester of ["pastor", "adminTeam", "superAdmin"] as const) {
+      const roles = { semester, retreat: "none" } as const;
+      expect(canAccessOperationsCenter(roles, memberships)).toBe(true);
+      expect(canReadSemesterPrivate(roles, memberships)).toBe(true);
+    }
+    expect(canReadSemesterPrivate(leader, memberships)).toBe(false);
   });
 });
