@@ -5,6 +5,8 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/store/AppContext';
 import { buildAdminDashboard, type AdminDashboardRow, type AdminDashboardStatus } from '@/utils/adminDashboard';
+import { buildPastoralReport } from '@/utils/pastoralReport';
+import { useOpenVisitRequestCount } from '@/hooks/useVisitRequests';
 import AdminIcon from './AdminIcon';
 import './admin-dashboard.css';
 
@@ -14,7 +16,7 @@ const STATUS_LABELS: Record<AdminDashboardStatus, string> = {
 };
 type StatusFilter = 'all' | 'pending' | 'complete';
 
-export default function AdminDashboard({ onShowTrends }: { onShowTrends: () => void }) {
+export default function AdminDashboard({ onShowTrends, onShowVisits }: { onShowTrends: () => void; onShowVisits: () => void }) {
   const { state, dispatch } = useApp();
   const router = useRouter();
   const [pickedWeek, setPickedWeek] = useState<{ year: number; key: string } | null>(null);
@@ -31,6 +33,10 @@ export default function AdminDashboard({ onShowTrends }: { onShowTrends: () => v
     part, grade, search,
   }), [classData, attData, months, events, curYear, pickedWeek, part, grade, search]);
   const { weeks, selectedWeek, overallSummary: totals, summary } = model;
+  const visitSummary = useOpenVisitRequestCount(curYear);
+  const longAbsenceCount = useMemo(() => buildPastoralReport({ classData, attData, months, events, curYear }, [], Date.now(), selectedWeek?.key)
+    .absent.filter(row => row.student.jang !== true).length,
+  [classData, attData, months, events, curYear, selectedWeek?.key]);
   const inputClassCount = model.allRows.filter(row => row.inputStudentCount > 0).length;
   const rows = model.rows.filter(row => status === 'all'
     || (status === 'complete' ? row.status === 'complete' : row.status === 'empty' || row.status === 'partial'));
@@ -101,15 +107,23 @@ export default function AdminDashboard({ onShowTrends }: { onShowTrends: () => v
           <dd className="ad-summary-detail">입력률 {totals.inputRate === null ? '—' : `${totals.inputRate}%`} · 장결 제외</dd></div>
       </dl>
 
-      {selectedWeek && totals.pendingClassCount > 0 ? (
-        <div className="ad-notice">
-          <AdminIcon name="clock" size={18} />
-          <div><strong>{totals.pendingClassCount}개 반의 출석 입력이 남아 있어요.</strong><p>미입력 {totals.emptyClassCount}개 · 입력 중 {totals.partialClassCount}개</p></div>
-          <button type="button" onClick={showPending}>확인할 반 보기 <AdminIcon name="arrow" /></button>
+      <section className="ad-today" aria-labelledby="ad-today-title">
+        <div className="ad-today-heading"><div><h2 id="ad-today-title">오늘 확인할 일</h2><p>{selectedWeek?.label ?? '조회 주일 없음'} 기준으로 먼저 살펴볼 항목입니다.</p></div></div>
+        <div className="ad-today-list">
+          <button type="button" onClick={showPending} disabled={!selectedWeek || totals.pendingClassCount === 0}>
+            <span><AdminIcon name={totals.pendingClassCount ? 'clock' : 'check'} size={17} /><strong>출석 입력 확인</strong><small>미입력 {totals.emptyClassCount}개 · 입력 중 {totals.partialClassCount}개 반</small></span>
+            <b>{selectedWeek ? `${totals.pendingClassCount}개 반` : '—'}</b><AdminIcon name="arrow" />
+          </button>
+          <button type="button" onClick={onShowVisits} disabled={visitSummary.status !== 'ready' || visitSummary.count === 0}>
+            <span><AdminIcon name="book" size={17} /><strong>심방 요청</strong><small>교사가 직접 확인을 요청한 학생</small></span>
+            <b>{visitSummary.status === 'ready' ? `${visitSummary.count}명` : '—'}</b><AdminIcon name="arrow" />
+          </button>
+          <Link href="/pastoral">
+            <span><AdminIcon name="users" size={17} /><strong>연속 결석</strong><small>3회 이상 연속 결석한 일반 학생</small></span>
+            <b>{selectedWeek ? `${longAbsenceCount}명` : '—'}</b><AdminIcon name="arrow" />
+          </Link>
         </div>
-      ) : selectedWeek && totals.inputStudentCount > 0 ? (
-        <div className="ad-notice ad-notice-complete"><AdminIcon name="check" size={18} /><strong>출석 대상 학생의 입력이 모두 완료됐습니다.</strong><span>{selectedWeek.label} 기준</span></div>
-      ) : null}
+      </section>
 
       <section className="ad-roster" aria-labelledby="ad-roster-title">
         <div className="ad-roster-heading">

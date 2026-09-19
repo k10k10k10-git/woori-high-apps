@@ -81,6 +81,7 @@
 .ao-suggestion-toggle small { display: block; margin-top: 4px; font-size: 12px; color: #666773; }
 .ao-suggestion-toggle > time { color: #666773; font-size: 12px; white-space: nowrap; }
 .ao-suggestion-preview { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #666773; }
+.ao-suggestion-preview strong { color: #584a97; font-weight: 600; }
 .ao-suggestion-item { padding: 12px 16px 18px; margin-top: 12px; background: #f8f8fa; border-radius: 6px; }
 .ao-suggestion-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; color: #666773; font-size: 11px; }
 .ao-suggestion-meta button { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #666773; font: inherit; cursor: pointer; }
@@ -88,3 +89,18 @@
 .ao-suggestion-meta button.ao-delete-confirm { color: #a03935; }
 .ao-suggestion-meta button:disabled { opacity: .5; cursor: wait; }
 .ao-suggestion-item > p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.ao-suggestion-student { display: inline-block; margin: 8px 0 2px; color: #584a97; font-size: 12px; font-weight: 600; }
+.ao-visit-tabs { margin-bottom: 14px; }
+.ao-visit-list { border-top: 1px solid #e5e5e8; }
+.ao-visit-row { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(260px, 1.5fr) auto; align-items: center; gap: 18px; padding: 16px 0; border-bottom: 1px solid #e5e5e8; }
+.ao-visit-person strong { display: block; font-size: 14px; font-weight: 600; }
+.ao-visit-person span { display: block; margin-top: 3px; color: #666773; font-size: 11px; }
+.ao-visit-row > p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ao-visit-action { display: flex; align-items: center; gap: 10px; color: #666773; font-size: 11px; white-space: nowrap; }
+.ao-visit-action button { min-height: 44px; padding: 0 11px; border: 1px solid #dedce6; border-radius: 6px; background: #fff; color: #584a97; font: inherit; cursor: pointer; }
+.ao-visit-action button:hover { background: #f3f0fa; }
+.ao-visit-action button:disabled { opacity: .5; cursor: wait; }
+@media (max-width: 760px) {
+  .ao-visit-row { grid-template-columns: 1fr; gap: 8px; padding: 16px 0; }
+  .ao-visit-action { justify-content: space-between; }
+}

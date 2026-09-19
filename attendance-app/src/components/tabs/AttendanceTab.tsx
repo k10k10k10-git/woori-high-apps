@@ -8,6 +8,7 @@ import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
 import { useSuggestions } from '@/hooks/useSuggestions';
+import { useVisitRequests } from '@/hooks/useVisitRequests';
 import { useAttendanceSave } from '@/hooks/useAttendanceSave';
 import ClassTabBar from '@/components/ClassTabBar';
 import AttendanceSaveBanner from '@/components/AttendanceSaveBanner';
@@ -19,7 +20,8 @@ import type { AttEditTarget, AttValue, ViewKey } from '@/types';
 const ATTENDANCE_SUBVIEWS = [
   { key: 'check', label: '출석 체크' },
   { key: 'table', label: '출석부' },
-  { key: 'suggest', label: '건의사항' },
+  { key: 'suggest', label: '특이사항' },
+  { key: 'visit', label: '심방 요청' },
 ] as const;
 
 type AttendanceSubView = typeof ATTENDANCE_SUBVIEWS[number]['key'];
@@ -37,8 +39,14 @@ export default function AttendanceTab() {
   const isTeacher = state.userRole?.role === 'teacher';
   const [attSubView, setAttSubView] = useState<AttendanceSubView>('check');
 
-  const { suggestions, suggestText, setSuggestText, suggestSaving, suggestLoadError, handleSuggestSubmit } =
+  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, handleSuggestSubmit } =
     useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
+  const suggestStudent = students.find(student => student.id === suggestStudentId);
+  const {
+    visitRequests, visitStudentId, setVisitStudentId, visitText, setVisitText,
+    visitSaving, visitLoadError, handleVisitSubmit,
+  } = useVisitRequests(curYear, ck, attSubView === 'visit', classData[ck]?.teacher ?? '');
+  const visitStudent = students.find(student => student.id === visitStudentId);
 
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -196,7 +204,7 @@ export default function AttendanceTab() {
         </div>
       ) : <ClassTabBar />}
 
-      {/* 출석 체크 / 출석부 / 건의사항 서브탭 */}
+      {/* 출석 체크 / 출석부 / 특이사항 / 심방 요청 서브탭 */}
       <div className="view-btn-row attendance-subtabs" role="tablist" aria-label="출석 서브 탭">
         {ATTENDANCE_SUBVIEWS.map((view, index) => (
           <button
@@ -389,7 +397,7 @@ export default function AttendanceTab() {
         </section>
       )}
 
-      {/* ── 건의사항 뷰 ── */}
+      {/* ── 특이사항 뷰 ── */}
       {attSubView === 'suggest' && (
         <section
           id="attendance-panel-suggest"
@@ -399,14 +407,19 @@ export default function AttendanceTab() {
         >
           {suggestLoadError && (
             <div className="suggest-load-error" role="alert">
-              건의사항을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.
+              특이사항을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.
             </div>
           )}
           {isTeacher && (
             <div className="suggest-form-card">
-              <h2 className="suggest-form-title">건의사항 작성</h2>
-              <p id="suggest-help" className="suggest-form-help">교역자 또는 부서에 전달할 내용을 남겨 주세요.</p>
-              <label className="suggest-label" htmlFor="teacher-suggestion">전달할 내용</label>
+              <h2 className="suggest-form-title">특이사항 작성</h2>
+              <p id="suggest-help" className="suggest-form-help">학생 돌봄이나 반 운영에 참고할 내용을 남겨 주세요. 민감한 개인정보는 필요한 만큼만 적어 주세요.</p>
+              <label className="suggest-label" htmlFor="note-student">학생 <span className="suggest-optional">선택</span></label>
+              <select id="note-student" className="visit-student-select" value={suggestStudentId} onChange={event => setSuggestStudentId(event.target.value)}>
+                <option value="">반 전체·운영 관련</option>
+                {students.map(student => <option key={student.id} value={student.id}>{student.name}{student.jang ? ' · 장결' : ''}</option>)}
+              </select>
+              <label className="suggest-label" htmlFor="teacher-suggestion">특이사항</label>
               <textarea
                 id="teacher-suggestion"
                 className="suggest-textarea"
@@ -419,7 +432,7 @@ export default function AttendanceTab() {
               <button
                 type="button"
                 className="suggest-submit-btn"
-                onClick={handleSuggestSubmit}
+                onClick={() => handleSuggestSubmit(suggestStudent?.name)}
                 disabled={!suggestText.trim() || suggestSaving}
               >
                 {suggestSaving ? '등록 중...' : '등록하기'}
@@ -430,12 +443,12 @@ export default function AttendanceTab() {
           {!isTeacher && !suggestLoadError && (
             <>
               <div className="suggest-list-header">
-                {classData[ck]?.teacher || ''} 교사 건의사항
+                {classData[ck]?.teacher || ''} 교사 특이사항
                 <span className="suggest-count">{suggestions.length}건</span>
               </div>
               {suggestions.length === 0 ? (
                 <div style={{ textAlign: 'center', color: 'var(--text3)', padding: '30px', fontSize: 14 }}>
-                  등록된 건의사항이 없습니다.
+                  등록된 특이사항이 없습니다.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -448,11 +461,53 @@ export default function AttendanceTab() {
                         })}
                         {s.author && ` · ${s.author}`}
                       </div>
+                      {s.studentName && <div className="suggest-item-student">{s.studentName}</div>}
                       <div className="suggest-item-text">{s.text}</div>
                     </div>
                   ))}
                 </div>
               )}
+            </>
+          )}
+        </section>
+      )}
+
+      {/* ── 심방 요청 뷰 ── */}
+      {attSubView === 'visit' && (
+        <section
+          id="attendance-panel-visit"
+          role="tabpanel"
+          aria-labelledby="attendance-tab-visit"
+          className="attendance-tab-panel attendance-suggest-panel"
+        >
+          {visitLoadError && <div className="suggest-load-error" role="alert">심방 요청을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>}
+          {isTeacher && (
+            <div className="suggest-form-card visit-form-card">
+              <h2 className="suggest-form-title">학생 심방 요청</h2>
+              <p id="visit-help" className="suggest-form-help">교역자와 관리자에게 확인이 필요한 학생과 이유를 전달합니다.</p>
+              <label className="suggest-label" htmlFor="visit-student">학생</label>
+              <select id="visit-student" className="visit-student-select" value={visitStudentId} onChange={event => setVisitStudentId(event.target.value)}>
+                <option value="">학생을 선택해 주세요</option>
+                {students.map(student => <option key={student.id} value={student.id}>{student.name}{student.jang ? ' · 장결' : ''}</option>)}
+              </select>
+              <label className="suggest-label" htmlFor="visit-reason">요청 이유</label>
+              <textarea id="visit-reason" className="suggest-textarea" value={visitText} onChange={event => setVisitText(event.target.value)}
+                aria-describedby="visit-help" placeholder="최근 상황과 확인이 필요한 내용을 간단히 적어 주세요" rows={4} />
+              <button type="button" className="suggest-submit-btn" onClick={() => visitStudent && handleVisitSubmit(visitStudent.name)}
+                disabled={!visitStudent || !visitText.trim() || visitSaving}>
+                {visitSaving ? '요청 중...' : '심방 요청하기'}
+              </button>
+            </div>
+          )}
+          {!visitLoadError && (
+            <>
+              <div className="suggest-list-header">이 반의 심방 요청 <span className="suggest-count">{visitRequests.length}건</span></div>
+              {visitRequests.length === 0 ? <div className="visit-empty">등록된 심방 요청이 없습니다.</div>
+                : <div className="visit-request-list">{visitRequests.map(request => <article key={request.id} className="suggest-item visit-request-item">
+                  <div className="visit-request-heading"><strong>{request.studentName}</strong><span className={`visit-status ${request.status === 'done' ? 'done' : ''}`}>{request.status === 'done' ? '처리 완료' : '확인 필요'}</span></div>
+                  <div className="suggest-item-meta">{new Date(request.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}{request.author && ` · ${request.author}`}</div>
+                  <p className="suggest-item-text">{request.text}</p>
+                </article>)}</div>}
             </>
           )}
         </section>
