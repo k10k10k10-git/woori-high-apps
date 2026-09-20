@@ -35,13 +35,18 @@ async function openMove(page) {
   await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type="submit"]').click();
   await expect(page.locator('.aw-account')).toBeVisible();
-  await page.goto('/manage');
-  await page.locator('.aw-class-filters select').first().selectOption('2');
+  await page.goto('/manage?view=class');
+  await page.locator('.mw-scope select').first().selectOption('2');
   await page.getByRole('button', { name: '7반 · 출발 담임', exact: true }).click();
   await page.locator('.student-card').filter({ hasText: '이동 학생' }).getByRole('button', { name: '이동', exact: true }).click();
   await page.getByLabel('이동할 부서').selectOption('1');
   await page.getByLabel('이동할 반').selectOption('7');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+}
+async function confirmMove(page) {
+  const dialog = page.getByRole('dialog', { name: '학생 이동' });
+  await dialog.getByRole('button', { name: '이동 내용 확인', exact: true }).click();
+  await dialog.getByRole('button', { name: '이동 확정', exact: true }).click();
 }
 for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '기존 학생 ID'} 충돌을 새 ID로 분리하고 응답 유실도 확인한다`, async ({ page, request }) => {
   await seed(request, orphan);
@@ -65,7 +70,7 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
     expect(response.ok()).toBe(true);
     await route.abort();
   });
-  await page.getByRole('dialog', { name: '학생 이동' }).getByRole('button', { name: '이동', exact: true }).click();
+  await confirmMove(page);
   await expect(page.getByRole('dialog', { name: '학생 이동' })).toHaveCount(0);
   const students = await read(request, `classes/${year}/1-1-7/students`);
   expect(Object.keys(students)).toHaveLength(2);
@@ -85,7 +90,7 @@ test('충돌이 없으면 기존 학생 ID를 유지한다', async ({ page, requ
   await seed(request, true);
   expect((await request.delete(url(`attendance/${year}/1-1-7/S17_05`), { headers })).ok()).toBe(true);
   await openMove(page);
-  await page.getByRole('dialog', { name: '학생 이동' }).getByRole('button', { name: '이동', exact: true }).click();
+  await confirmMove(page);
   await expect(page.getByRole('dialog', { name: '학생 이동' })).toHaveCount(0);
   expect(await read(request, `classes/${year}/1-1-7/students/S17_05`)).toMatchObject({ ...source, id: 'S17_05' });
   expect(await read(request, `classes/${year}/1-1-7/students/other`)).toEqual(resident);
@@ -95,7 +100,7 @@ test('목적지에 같은 인물이 있으면 중복 이동을 차단한다', as
   await seed(request);
   expect((await request.put(url(`classes/${year}/1-1-7/students/S17_05`), { headers, data: source })).ok()).toBe(true);
   await openMove(page);
-  await page.getByRole('dialog', { name: '학생 이동' }).getByRole('button', { name: '이동', exact: true }).click();
+  await confirmMove(page);
   await expect(page.getByText('같은 인물의 학생이 목적지에 이미 있습니다. 중복 명단을 먼저 확인해 주세요.')).toBeVisible();
   expect(await read(request, `classes/${year}/2-1-7/students/S17_05`)).toEqual(source);
   expect(await read(request, `attendance/${year}/1-1-7/S17_05`)).toEqual({ '0-0': 'X' });

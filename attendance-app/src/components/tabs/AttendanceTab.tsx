@@ -26,7 +26,7 @@ const ATTENDANCE_SUBVIEWS = [
 
 type AttendanceSubView = typeof ATTENDANCE_SUBVIEWS[number]['key'];
 
-export default function AttendanceTab() {
+export default function AttendanceTab({ initialSubview = 'check', hideAdminSubtabs = false }: { initialSubview?: AttendanceSubView; hideAdminSubtabs?: boolean }) {
   const { state, dispatch } = useApp();
   const { curYear, months, events, attData, classData, curView } = state;
   const requestedWeekKey = useSearchParams().get('week');
@@ -37,7 +37,7 @@ export default function AttendanceTab() {
     [students],
   );
   const isTeacher = state.userRole?.role === 'teacher';
-  const [attSubView, setAttSubView] = useState<AttendanceSubView>('check');
+  const [attSubView, setAttSubView] = useState<AttendanceSubView>(initialSubview);
 
   const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, handleSuggestSubmit } =
     useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
@@ -205,7 +205,7 @@ export default function AttendanceTab() {
       ) : <ClassTabBar />}
 
       {/* 출석 체크 / 출석부 / 특이사항 / 심방 요청 서브탭 */}
-      <div className="view-btn-row attendance-subtabs" role="tablist" aria-label="출석 서브 탭">
+      {(!hideAdminSubtabs || isTeacher) && <div className="view-btn-row attendance-subtabs" role="tablist" aria-label="출석 서브 탭">
         {ATTENDANCE_SUBVIEWS.map((view, index) => (
           <button
             key={view.key}
@@ -234,7 +234,7 @@ export default function AttendanceTab() {
             {view.label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {/* 통계 카드 */}
       {!isTeacher && (

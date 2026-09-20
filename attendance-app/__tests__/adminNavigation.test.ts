@@ -102,18 +102,18 @@ describe('관리자 로그인 진입', () => {
 
 describe('관리자 메뉴 표시', () => {
   it('실제 경로를 한 번씩 표시하고 현재 경로와 하위 경로를 찾는다', () => {
-    expect(new Set(ADMIN_NAVIGATION.map(item => item.path)).size).toBe(6);
-    expect(adminNavigationItem('/pastoral')?.label).toBe('목양 리포트');
-    expect(ADMIN_NAVIGATION.filter(item => item.label === '전체 현황')).toHaveLength(1);
+    expect(new Set(ADMIN_NAVIGATION.map(item => item.path)).size).toBe(5);
+    expect(ADMIN_NAVIGATION.map(item => item.label)).toEqual(['오늘 업무', '목양 관리', '출석 관리', '학생·반 관리', '운영 설정']);
+    expect(adminNavigationItem('/pastoral')?.label).toBe('목양 관리');
     expect(adminNavigationItem('/overall/')?.path).toBe('/dashboard');
-    expect(adminNavigationItem('/dashboard')?.label).toBe('전체 현황');
-    expect(adminNavigationItem('/overall/')?.label).toBe('전체 현황');
+    expect(adminNavigationItem('/dashboard')?.label).toBe('오늘 업무');
+    expect(adminNavigationItem('/overall/')?.label).toBe('오늘 업무');
+    expect(adminNavigationItem('/stats')?.label).toBe('출석 관리');
     expect(adminNavigationItem('/admin/accounts')?.path).toBe('/admin');
     expect(adminNavigationItem('/administrator')).toBeUndefined();
   });
 
   it('반 단위 화면에서만 부서·학년 필터를 표시한다', () => {
-    for (const path of ['/attendance', '/manage', '/stats']) expect(hasClassFilters(path)).toBe(true);
-    for (const path of ['/dashboard', '/overall', '/admin']) expect(hasClassFilters(path)).toBe(false);
+    for (const path of ['/attendance', '/stats', '/dashboard', '/overall', '/manage', '/admin']) expect(hasClassFilters(path)).toBe(false);
   });
 });

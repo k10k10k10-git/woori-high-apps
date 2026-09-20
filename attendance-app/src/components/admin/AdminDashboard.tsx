@@ -16,7 +16,7 @@ const STATUS_LABELS: Record<AdminDashboardStatus, string> = {
 };
 type StatusFilter = 'all' | 'pending' | 'complete';
 
-export default function AdminDashboard({ onShowTrends, onShowVisits }: { onShowTrends: () => void; onShowVisits: () => void }) {
+export default function AdminDashboard() {
   const { state, dispatch } = useApp();
   const router = useRouter();
   const [pickedWeek, setPickedWeek] = useState<{ year: number; key: string } | null>(null);
@@ -24,7 +24,7 @@ export default function AdminDashboard({ onShowTrends, onShowVisits }: { onShowT
   const [grade, setGrade] = useState('all');
   const [query, setQuery] = useState('');
   const search = useDeferredValue(query);
-  const [status, setStatus] = useState<StatusFilter>('all');
+  const [status, setStatus] = useState<StatusFilter>('pending');
   const searchRef = useRef<HTMLInputElement>(null);
   const { classData, attData, months, events, curYear } = state;
 
@@ -67,14 +67,15 @@ export default function AdminDashboard({ onShowTrends, onShowVisits }: { onShowT
       const month = new Date(selectedWeek.dateValue).getUTCMonth() + 1;
       dispatch({ type: 'SET_VIEW', payload: month <= 6 ? 'first' : 'second' });
     }
-    router.push(selectedWeek ? `/attendance?week=${encodeURIComponent(selectedWeek.key)}` : '/attendance');
+    router.push(selectedWeek ? `/attendance?view=check&week=${encodeURIComponent(selectedWeek.key)}` : '/attendance?view=check');
   }
 
   return (
     <div className="admin-dashboard">
       <div className="ad-heading">
         <div>
-          <h2>주간 출석</h2>
+          <h2>오늘 업무</h2>
+          <p>심방·연속 결석·출석 미입력 순으로 먼저 확인하세요.</p>
         </div>
         <div className="ad-week-control">
           <button className="ad-icon-button ad-previous" type="button" aria-label="이전 주일"
@@ -110,25 +111,32 @@ export default function AdminDashboard({ onShowTrends, onShowVisits }: { onShowT
       <section className="ad-today" aria-labelledby="ad-today-title">
         <div className="ad-today-heading"><div><h2 id="ad-today-title">오늘 확인할 일</h2><p>{selectedWeek?.label ?? '조회 주일 없음'} 기준으로 먼저 살펴볼 항목입니다.</p></div></div>
         <div className="ad-today-list">
-          <button type="button" onClick={showPending} disabled={!selectedWeek || totals.pendingClassCount === 0}>
-            <span><AdminIcon name={totals.pendingClassCount ? 'clock' : 'check'} size={17} /><strong>출석 입력 확인</strong><small>미입력 {totals.emptyClassCount}개 · 입력 중 {totals.partialClassCount}개 반</small></span>
-            <b>{selectedWeek ? `${totals.pendingClassCount}개 반` : '—'}</b><AdminIcon name="arrow" />
-          </button>
-          <button type="button" onClick={onShowVisits} disabled={visitSummary.status !== 'ready' || visitSummary.count === 0}>
+          <Link href="/pastoral?view=visits">
             <span><AdminIcon name="book" size={17} /><strong>심방 요청</strong><small>교사가 직접 확인을 요청한 학생</small></span>
             <b>{visitSummary.status === 'ready' ? `${visitSummary.count}명` : '—'}</b><AdminIcon name="arrow" />
-          </button>
-          <Link href="/pastoral">
+          </Link>
+          <Link href="/pastoral?view=absence">
             <span><AdminIcon name="users" size={17} /><strong>연속 결석</strong><small>3회 이상 연속 결석한 일반 학생</small></span>
             <b>{selectedWeek ? `${longAbsenceCount}명` : '—'}</b><AdminIcon name="arrow" />
           </Link>
+          <button type="button" onClick={showPending} disabled={!selectedWeek || totals.pendingClassCount === 0}>
+            <span><AdminIcon name={totals.pendingClassCount ? 'clock' : 'check'} size={17} /><strong>출석 미입력</strong><small>미입력 {totals.emptyClassCount}개 · 입력 중 {totals.partialClassCount}개 반</small></span>
+            <b>{selectedWeek ? `${totals.pendingClassCount}개 반` : '—'}</b><AdminIcon name="arrow" />
+          </button>
         </div>
+      </section>
+
+      <section className="ad-quick" aria-labelledby="ad-quick-title">
+        <h2 id="ad-quick-title">빠른 작업</h2>
+        <div><Link href="/manage?view=directory"><AdminIcon name="search" /><span><strong>학생 찾기·이동</strong><small>전체 명단에서 검색</small></span><AdminIcon name="arrow" /></Link>
+          <Link href="/manage?view=class"><AdminIcon name="users" /><span><strong>학생·반 관리</strong><small>추가·수정·명단 반영</small></span><AdminIcon name="arrow" /></Link>
+          <Link href="/admin"><AdminIcon name="settings" /><span><strong>특별 일정·계정</strong><small>운영 설정 열기</small></span><AdminIcon name="arrow" /></Link></div>
       </section>
 
       <section className="ad-roster" aria-labelledby="ad-roster-title">
         <div className="ad-roster-heading">
-          <h2 id="ad-roster-title">반별 입력 현황 <span>{totals.classCount}</span></h2>
-          <button type="button" className="ad-text-link" onClick={onShowTrends}>연간 추이 보기 <AdminIcon name="arrow" /></button>
+          <h2 id="ad-roster-title">출석 입력 확인 <span>{totals.pendingClassCount}</span></h2>
+          <Link className="ad-text-link" href="/attendance?view=overview">전체 반 현황 <AdminIcon name="arrow" /></Link>
         </div>
         <div className="ad-toolbar">
           <div className="ad-status-tabs" role="group" aria-label="입력 상태 필터">
@@ -186,7 +194,7 @@ export default function AdminDashboard({ onShowTrends, onShowVisits }: { onShowT
         <div className="ad-table-footer"><span role="status" aria-live="polite">{rows.length}개 반 표시{hasFilters && ' · 필터 적용 중'}</span>{hasFilters && <button type="button" onClick={resetFilters}>필터 초기화</button>}</div>
       </section>
 
-      <div className="ad-bottom-note"><span>입력 현황은 장결 학생을 제외합니다. 출석률은 장결을 포함한 입력 기록(O·X) 중 출석(O)의 비율입니다.</span><Link href="/admin">계정·행사 설정 <AdminIcon name="arrow" /></Link></div>
+      <div className="ad-bottom-note"><span>미입력은 결석으로 계산하지 않습니다. 입력 현황은 장결 학생을 제외하고, 출석률은 입력된 O·X 기록을 기준으로 합니다.</span><Link href="/admin">운영 설정 <AdminIcon name="arrow" /></Link></div>
     </div>
   );
 }

@@ -41,6 +41,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
   const [toPart, setToPart]   = useState(target.fromCk.split('-')[0]);
   const [toGrade, setToGrade] = useState(target.fromCk.split('-')[1]);
   const [toClass, setToClass] = useState('');
+  const [reviewing, setReviewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -360,24 +361,29 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
       role="dialog" aria-modal="true" aria-label="학생 이동" aria-busy={saving}>
       <div className="modal-dialog" onClick={e => e.stopPropagation()}>
         <div className="modal-title">학생 이동</div>
-        <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14 }}>
-          <strong>{student?.name}</strong>을(를) 다른 반으로 이동합니다.
+        <p className="move-intro"><strong>{student?.name}</strong> 학생의 현재 소속과 이동할 반을 확인해 주세요.</p>
+        <div className="move-comparison" aria-label="학생 이동 전후">
+          <div><span>현재 소속</span><strong>{classLabel(target.fromCk)}</strong><small>담임 {classData[target.fromCk]?.teacher || '미등록'} · {classData[target.fromCk]?.students.length ?? 0}명</small></div>
+          <span aria-hidden="true">→</span>
+          <div><span>이동할 소속</span><strong>{toCk ? classLabel(toCk) : '반을 선택하세요'}</strong><small>{toCk ? `담임 ${classData[toCk]?.teacher || '미등록'} · ${classData[toCk]?.students.length ?? 0}명` : '등록된 반만 선택할 수 있습니다.'}</small></div>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <select aria-label="이동할 부서" disabled={saving} className="form-select" style={{ flex: 1 }} value={toPart} onChange={e => {
+        <div className="move-selects">
+          <select aria-label="이동할 부서" disabled={saving || reviewing} className="form-select" style={{ flex: 1 }} value={toPart} onChange={e => {
             setToPart(e.target.value);
             setToClass('');
+            setReviewing(false);
           }}>
             <option value="1">1부</option>
             <option value="2">2부</option>
           </select>
-          <select aria-label="이동할 학년" disabled={saving} className="form-select" style={{ flex: 1 }} value={toGrade} onChange={e => {
+          <select aria-label="이동할 학년" disabled={saving || reviewing} className="form-select" style={{ flex: 1 }} value={toGrade} onChange={e => {
             setToGrade(e.target.value);
             setToClass('');
+            setReviewing(false);
           }}>
             {[1,2,3].map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
-          <select aria-label="이동할 반" disabled={saving} className="form-select" style={{ flex: 1 }} value={toClass} onChange={e => setToClass(e.target.value)}>
+          <select aria-label="이동할 반" disabled={saving || reviewing} className="form-select" style={{ flex: 1 }} value={toClass} onChange={e => { setToClass(e.target.value); setReviewing(false); }}>
             <option value="">반 선택</option>
             {Object.keys(classData)
               .filter(ck => ck.startsWith(`${toPart}-${toGrade}-`) && ck !== target.fromCk)
@@ -389,11 +395,15 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
               })}
           </select>
         </div>
+        {reviewing && <div className="move-review" role="status">
+          <strong>이동 전 마지막으로 확인해 주세요.</strong>
+          <p>{classLabel(target.fromCk)}에서 {classLabel(toCk)}으로 이동합니다.</p>
+          <ul><li>학생 기본 정보를 유지합니다.</li><li>기존 출석 기록을 함께 이동합니다.</li><li>목적지의 기존 명단은 덮어쓰지 않습니다.</li></ul>
+        </div>}
         <div className="btn-row">
-          <button className="btn-secondary" onClick={close} disabled={saving}>취소</button>
-          <button className="btn-primary" onClick={handleMove} disabled={!toCk || saving}>
-            {saving ? '이동 중...' : '이동'}
-          </button>
+          <button className="btn-secondary" onClick={() => reviewing ? setReviewing(false) : close()} disabled={saving}>{reviewing ? '이전' : '취소'}</button>
+          {!reviewing ? <button className="btn-primary" onClick={() => setReviewing(true)} disabled={!toCk || saving}>이동 내용 확인</button>
+            : <button className="btn-primary" onClick={handleMove} disabled={!toCk || saving}>{saving ? '이동 중...' : '이동 확정'}</button>}
         </div>
       </div>
     </div>
