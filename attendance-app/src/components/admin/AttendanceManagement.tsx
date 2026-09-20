@@ -2,6 +2,7 @@
 
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useState } from 'react';
 import { useApp } from '@/store/AppContext';
 import AttendanceTab from '@/components/tabs/AttendanceTab';
 import StatTab from '@/components/tabs/StatTab';
@@ -19,7 +20,9 @@ type View = typeof VIEWS[number]['key'];
 
 export default function AttendanceManagement() {
   const { state, dispatch } = useApp();
-  const requested = useSearchParams().get('view') as View | null;
+  const params = useSearchParams();
+  const requested = params.get('view') as View | null;
+  const [week, setWeek] = useState(params.get('week') ?? '');
   const isTeacher = state.userRole?.role === 'teacher';
   if (isTeacher) return <AttendanceTab />;
   const view = VIEWS.some(item => item.key === requested) ? requested! : 'overview';
@@ -33,9 +36,9 @@ export default function AttendanceManagement() {
 
   return <div className="management-workspace">
     <header className="mw-heading"><h1>출석 관리</h1><p>반별 입력 상태를 먼저 확인하고 필요한 반의 출석부로 바로 이동하세요.</p></header>
-    <nav className="mw-tabs" aria-label="출석 관리 메뉴">{VIEWS.map(item => <Link key={item.key} href={`/attendance?view=${item.key}`} aria-current={view === item.key ? 'page' : undefined}>{item.label}</Link>)}</nav>
+    <nav className="mw-tabs" aria-label="출석 관리 메뉴">{VIEWS.map(item => <Link key={item.key} href={`/attendance?view=${item.key}${week ? `&week=${encodeURIComponent(week)}` : ''}`} aria-current={view === item.key ? 'page' : undefined}>{item.label}</Link>)}</nav>
     <div className="mw-content">
-      {view === 'overview' && <ClassAttendanceOverview />}
+      {view === 'overview' && <ClassAttendanceOverview weekKey={week} onWeekChange={setWeek} />}
       {view !== 'overview' && <div className="mw-scope" aria-label="출석 관리 범위">
         <label><span>부서</span><select value={state.curPart} onChange={event => changeScope(event.target.value, state.curGrade)}><option value="1">1부</option><option value="2">2부</option></select></label>
         <label><span>학년</span><select value={state.curGrade} onChange={event => changeScope(state.curPart, event.target.value)}>{[1, 2, 3].map(value => <option value={String(value)} key={value}>{value}학년</option>)}</select></label>
