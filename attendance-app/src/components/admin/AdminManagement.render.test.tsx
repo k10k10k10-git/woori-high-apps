@@ -28,7 +28,7 @@ beforeEach(() => {
     events: {},
     classData: {
       '1-1-1': { teacher: '김담임', students: [
-        { id: 'a', name: '김하나', phone: '010-1111-2222', pphone: '010-9999-0000', school: '새봄고' },
+        { id: 'a', name: '김하나', birth: '2010-03-14', phone: '010-1111-2222', pphone: '010-9999-0000', school: '새봄고' },
         { id: 'b', name: '박두나', jang: true },
       ] },
       '2-2-3': { teacher: '이담임', students: [{ id: 'c', name: '이세나', phone: '010-3333-4444' }] },
@@ -48,6 +48,18 @@ describe('관리자 명단·출석 접근 경로', () => {
     expect(within(table).queryByText('김하나')).toBeNull();
     fireEvent.click(within(table).getByRole('button', { name: '이동' }));
     expect(screen.getByText('학생 이동 창 c')).toBeTruthy();
+  });
+
+  it('상세 표에서 연락처와 생년월일까지 한눈에 보여 준다', () => {
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '상세 표' }));
+    const table = screen.getByRole('table', { name: '2026년 전체 학생 상세 표' });
+    expect(within(table).getByRole('columnheader', { name: '학생 연락처' })).toBeTruthy();
+    expect(within(table).getByRole('columnheader', { name: '보호자 연락처' })).toBeTruthy();
+    expect(within(table).getByRole('columnheader', { name: '생년월일' })).toBeTruthy();
+    expect(within(table).getByRole('link', { name: '010-1111-2222' }).getAttribute('href')).toBe('tel:01011112222');
+    expect(within(table).getByText('2010-03-14')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '상세 표' }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('반별 입력률과 출석률을 구분하고 미입력을 결석으로 계산하지 않는다', () => {
