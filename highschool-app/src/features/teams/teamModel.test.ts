@@ -6,6 +6,7 @@ import {
   canBrowseTeam,
   canEditTeam,
   canReadSemesterPrivate,
+  canReadTeamContacts,
   mergeTeamMemberships,
   normalizeTeamMemberships,
   ownTeamKey,
@@ -78,5 +79,14 @@ describe("teamModel", () => {
       expect(canReadSemesterPrivate(roles, memberships)).toBe(true);
     }
     expect(canReadSemesterPrivate(leader, memberships)).toBe(false);
+  });
+
+  it("팀장과 일반 팀원은 조회 가능한 팀의 공식 원장 연락처를 읽는다", () => {
+    const memberships = normalizeTeamMemberships({ praise: { role: "staff", active: true } });
+    const member = { semester: "praise", retreat: "none" } as const;
+    expect(canReadTeamContacts("praise", member, memberships)).toBe(true);
+    expect(canReadTeamContacts("media", member, memberships)).toBe(false);
+    expect(canReadTeamContacts("media", leader, memberships)).toBe(true);
+    expect(canReadSemesterPrivate(member, memberships)).toBe(false);
   });
 });
