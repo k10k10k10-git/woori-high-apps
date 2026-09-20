@@ -10,7 +10,9 @@ import { parseYearTeacherMessages, type TeacherMessage, type VisitRequestStatus 
 type VisitRow = TeacherMessage & { classKey: string };
 type VisitLoad = { year: number; rows: VisitRow[]; status: 'loading' | 'ready' | 'error' };
 
-export default function VisitRequestsSection({ initialView = 'open' }: { initialView?: 'open' | 'done' }) {
+type VisitFilter = { part?: string; grade?: string; classKey?: string; search?: string };
+
+export default function VisitRequestsSection({ initialView = 'open', filter }: { initialView?: 'open' | 'done'; filter?: VisitFilter }) {
   const { state } = useApp();
   const { classData, curYear } = state;
   const [load, setLoad] = useState<VisitLoad>({ year: curYear, rows: [], status: 'loading' });
@@ -31,9 +33,17 @@ export default function VisitRequestsSection({ initialView = 'open' }: { initial
   }, [curYear, retry]);
 
   const current = load.year === curYear ? load : { year: curYear, rows: [], status: 'loading' as const };
-  const openCount = current.rows.filter(row => row.status !== 'done').length;
-  const doneCount = current.rows.length - openCount;
-  const rows = current.rows.filter(row => view === 'done' ? row.status === 'done' : row.status !== 'done');
+  const query = (filter?.search ?? '').trim().normalize('NFC').toLocaleLowerCase('ko');
+  const scopedRows = current.rows.filter(row => {
+    const [part, grade] = row.classKey.split('-');
+    if (filter?.part && filter.part !== part) return false;
+    if (filter?.grade && filter.grade !== grade) return false;
+    if (filter?.classKey && filter.classKey !== row.classKey) return false;
+    return !query || `${row.studentName} ${row.text} ${classData[row.classKey]?.teacher ?? row.author ?? ''}`.normalize('NFC').toLocaleLowerCase('ko').includes(query);
+  });
+  const openCount = scopedRows.filter(row => row.status !== 'done').length;
+  const doneCount = scopedRows.length - openCount;
+  const rows = scopedRows.filter(row => view === 'done' ? row.status === 'done' : row.status !== 'done');
 
   async function changeStatus(row: VisitRow, status: VisitRequestStatus) {
     const key = `${row.classKey}/${row.id}`;

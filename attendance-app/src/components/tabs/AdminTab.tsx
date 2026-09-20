@@ -21,8 +21,8 @@ type PromotionRow = {
 type GraduateRow = { ck: string; studentCount: number };
 type SettingsSection = 'accounts' | 'events' | 'data';
 const SETTINGS_SECTIONS = [
-  { id: 'accounts', label: '계정 관리', icon: 'users' },
-  { id: 'events', label: '특별 일정', icon: 'calendar' },
+  { id: 'accounts', label: '이메일 역할', icon: 'users' },
+  { id: 'events', label: '출석 제외 일정', icon: 'calendar' },
   { id: 'data', label: '데이터 관리', icon: 'layers' },
 ] as const;
 
@@ -256,7 +256,7 @@ export default function AdminTab() {
     <div className="admin-settings">
       <header className="as-heading">
         <h1>운영 설정</h1>
-        <p>교사 계정, 특별 일정, 명단 데이터 같은 운영 업무를 관리하세요.</p>
+        <p>이메일 역할, 출석 제외 일정, 명단 반영을 순서대로 관리하세요.</p>
       </header>
       <div className="as-section-tabs" role="tablist" aria-label="설정 메뉴">
         {SETTINGS_SECTIONS.map((item, index) => (
@@ -271,8 +271,8 @@ export default function AdminTab() {
 
       <section className="as-panel" id={`${settingsId}-panel-accounts`} role="tabpanel" aria-labelledby={`${settingsId}-tab-accounts`} hidden={section !== 'accounts'}>
         <div className="as-section-heading">
-          <div><h2>등록된 계정 <span>{accountStatus === 'ready' ? `${entries.length}개` : '—'}</span></h2><p>교사는 담당 반을, 관리자는 전체 출석부를 관리합니다.</p></div>
-          <button type="button" className="as-button as-button-primary" onClick={openAddAccount}>계정 추가 <AdminIcon name="arrow" /></button>
+          <div><h2>등록된 이메일 역할 <span>{accountStatus === 'ready' ? `${entries.length}개` : '—'}</span></h2><p>이 화면은 로그인 계정을 새로 만들지 않고, 이미 로그인할 수 있는 이메일의 출석부 역할과 담당 반만 등록합니다.</p></div>
+          <button type="button" className="as-button as-button-primary" onClick={openAddAccount}>이메일 역할 등록 <AdminIcon name="arrow" /></button>
         </div>
         <div className="as-toolbar">
           <label className="as-search"><AdminIcon name="search" /><span className="as-sr-only">이메일, 이름, 담당 반 검색</span><input type="search" value={accountQuery} onChange={event => setAccountQuery(event.target.value)} placeholder="이메일, 이름, 담당 반 검색" /></label>
@@ -296,7 +296,7 @@ export default function AdminTab() {
       </section>
 
       <section className="as-panel" id={`${settingsId}-panel-events`} role="tabpanel" aria-labelledby={`${settingsId}-tab-events`} hidden={section !== 'events'}>
-        <div className="as-section-heading"><div><h2>특별 일정 <span>{curYear}년</span></h2><p>수련회 등 특별한 일정을 출석부에 함께 표시합니다.</p></div></div>
+        <div className="as-section-heading"><div><h2>출석 제외 일정 <span>{curYear}년</span></h2><p>수련회 등 일반 주일이 아닌 날을 등록하면 주일 선택 목록과 출석 집계에서 제외됩니다.</p></div></div>
         <form className="as-event-form" onSubmit={event => { event.preventDefault(); void addEvent(); }}>
           <label><span>월</span><input type="number" min="1" max="12" required value={evMonth} onChange={event => setEvMonth(event.target.value)} placeholder="예: 8" /></label>
           <label><span>일</span><input type="number" min="1" max="31" required value={evDay} onChange={event => setEvDay(event.target.value)} placeholder="예: 15" /></label>
@@ -333,7 +333,7 @@ export default function AdminTab() {
         </details>
       </section>
 
-      {accountModal.open && <AccountDialog title={accountModal.editKey ? '계정 수정' : '계정 추가'} busy={saving} onClose={closeAccount}>
+      {accountModal.open && <AccountDialog title={accountModal.editKey ? '이메일 역할 수정' : '이메일 역할 등록'} busy={saving} onClose={closeAccount}>
         <form onSubmit={event => { event.preventDefault(); void saveAccount(); }}>
           <div className="as-account-fields">
             <label className="as-field"><span>이메일 <b aria-hidden="true">*</b></span><input type="email" required autoComplete="off" value={formEmail} onChange={event => setFormEmail(event.target.value)} disabled={!!accountModal.editKey || saving} placeholder="teacher@example.com" /></label>

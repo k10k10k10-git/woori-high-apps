@@ -2,7 +2,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { db, onValue, push, ref } from '@/lib/db';
 import { showToast } from '@/utils/toast';
-import { countOpenVisitRequests, parseTeacherMessages, type TeacherMessage } from '@/utils/teacherMessages';
+import { parseTeacherMessages, parseYearTeacherMessages, type TeacherMessage } from '@/utils/teacherMessages';
+
+export type OpenVisitRequest = TeacherMessage & { classKey: string };
 
 export function useVisitRequests(year: number, classKey: string, enabled: boolean, teacher: string) {
   const scope = `${year}/${classKey}`;
@@ -49,14 +51,19 @@ export function useVisitRequests(year: number, classKey: string, enabled: boolea
   };
 }
 
-export function useOpenVisitRequestCount(year: number) {
-  const [load, setLoad] = useState<{ year: number; count: number; status: 'loading' | 'ready' | 'error' }>({ year, count: 0, status: 'loading' });
+export function useOpenVisitRequests(year: number) {
+  const [load, setLoad] = useState<{ year: number; rows: OpenVisitRequest[]; status: 'loading' | 'ready' | 'error' }>({ year, rows: [], status: 'loading' });
   useEffect(() => {
     let active = true;
     const stop = onValue(ref(db, `suggestions/${year}`), snap => {
-      if (active) setLoad({ year, count: countOpenVisitRequests(snap.val()), status: 'ready' });
-    }, () => { if (active) setLoad({ year, count: 0, status: 'error' }); });
+      if (!active) return;
+      const rows = Object.entries(parseYearTeacherMessages(snap.val(), 'visit'))
+        .flatMap(([classKey, items]) => items.map(item => ({ ...item, classKey })))
+        .filter(item => item.status !== 'done')
+        .sort((a, b) => b.createdAt - a.createdAt);
+      setLoad({ year, rows, status: 'ready' });
+    }, () => { if (active) setLoad({ year, rows: [], status: 'error' }); });
     return () => { active = false; stop?.(); };
   }, [year]);
-  return load.year === year ? load : { year, count: 0, status: 'loading' as const };
+  return load.year === year ? load : { year, rows: [], status: 'loading' as const };
 }

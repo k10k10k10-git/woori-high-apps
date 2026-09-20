@@ -3,20 +3,24 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
 
-const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, dispatch: vi.fn(), push: vi.fn() }));
+const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, dispatch: vi.fn(), push: vi.fn(), params: '' }));
 vi.mock('@/store/AppContext', async original => ({
   ...await original<typeof import('@/store/AppContext')>(),
   useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),
 }));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }), useSearchParams: () => new URLSearchParams(mocks.params) }));
 vi.mock('@/components/modals/StudentModal', () => ({ default: () => <div>학생 수정 창</div> }));
 vi.mock('@/components/modals/MoveStudentModal', () => ({ default: ({ target }: { target: { sid: string } }) => <div>학생 이동 창 {target.sid}</div> }));
+vi.mock('@/components/tabs/AttendanceTab', () => ({ default: () => <div>출석 입력 화면</div> }));
+vi.mock('@/components/tabs/StatTab', () => ({ default: () => <div>출석 통계 화면</div> }));
+vi.mock('@/components/tabs/overall/OverallDashboard', () => ({ default: () => <div>전체 통계 화면</div> }));
 
 import ClassAttendanceOverview from './ClassAttendanceOverview';
+import AttendanceManagement from './AttendanceManagement';
 import StudentDirectory from './StudentDirectory';
 
 beforeEach(() => {
-  mocks.dispatch.mockClear(); mocks.push.mockClear();
+  mocks.dispatch.mockClear(); mocks.push.mockClear(); mocks.params = '';
   mocks.state = {
     ...initialState,
     curYear: 2026,
@@ -37,7 +41,7 @@ afterEach(cleanup);
 describe('관리자 명단·출석 접근 경로', () => {
   it('반을 먼저 선택하지 않고 전체 학생을 검색하고 이동을 시작한다', () => {
     render(<StudentDirectory onOpenClass={vi.fn()} />);
-    expect(screen.getByText('전체').nextElementSibling?.textContent).toBe('3명');
+    expect(screen.getByRole('status').textContent).toContain('3명 / 전체 3명');
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '33334444' } });
     const table = screen.getByRole('table');
     expect(within(table).getByText('이세나')).toBeTruthy();
@@ -48,13 +52,22 @@ describe('관리자 명단·출석 접근 경로', () => {
 
   it('반별 입력률과 출석률을 구분하고 미입력을 결석으로 계산하지 않는다', () => {
     render(<ClassAttendanceOverview />);
+    fireEvent.click(screen.getByRole('button', { name: /^\uc804\uccb4/ }));
     const row = screen.getByRole('button', { name: '1부 1학년 1반 김담임' }).closest('tr')!;
-    expect(within(row).getByText('100%')).toBeTruthy();
+    expect(within(row).getByText('입력률 100%')).toBeTruthy();
     expect(within(row).getByText('50%')).toBeTruthy();
     const emptyRow = screen.getByRole('button', { name: '2부 2학년 3반 이담임' }).closest('tr')!;
-    const cells = within(emptyRow).getAllByRole('cell');
-    expect(cells[1].textContent).toBe('1명');
-    expect(cells[5].textContent).toBe('1명');
-    expect(cells[7].textContent).toBe('—');
+    expect(within(emptyRow).getByText('1명')).toBeTruthy();
+    expect(within(emptyRow).getByText('입력률 0%')).toBeTruthy();
+    expect(within(emptyRow).getByText('—')).toBeTruthy();
+  });
+
+  it('현황에서 고른 주일을 출석 입력 탭까지 유지한다', () => {
+    mocks.state = { ...mocks.state, userRole: { role: 'admin' }, months: [{ month: 9, sundays: [6, 13] }] };
+    render(<AttendanceManagement />);
+    const week = screen.getByLabelText('조회 주일') as HTMLSelectElement;
+    const target = [...week.options].map(option => option.value).find(value => value !== week.value)!;
+    fireEvent.change(week, { target: { value: target } });
+    expect(screen.getByRole('link', { name: '출석 입력' }).getAttribute('href')).toContain(`week=${encodeURIComponent(target)}`);
   });
 });
