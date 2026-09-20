@@ -5,3 +5,21 @@
 @import "./styles/widgets.css";
 @import "./styles/teacher.css";
 @import "./styles/responsive.css";
+
+.move-intro { margin: 8px 0 16px; color: var(--text2); font-size: 13px; line-height: 1.6; }
+.move-comparison { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 10px; margin-bottom: 16px; }
+.move-comparison > div { padding: 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); }
+.move-comparison > span { align-self: center; color: var(--text3); }
+.move-comparison div > span, .move-comparison strong, .move-comparison small { display: block; }
+.move-comparison div > span { color: var(--text3); font-size: 11px; }
+.move-comparison strong { margin-top: 5px; font-size: 14px; }
+.move-comparison small { margin-top: 5px; color: var(--text2); font-size: 11px; line-height: 1.5; }
+.move-selects { display: flex; gap: 8px; margin-bottom: 12px; }
+.move-review { margin-bottom: 12px; padding: 14px; border-radius: 8px; background: var(--primary-bg); color: var(--primary-text); font-size: 12px; line-height: 1.7; }
+.move-review p { margin-top: 4px; }
+.move-review ul { margin: 8px 0 0; padding-left: 18px; color: var(--text2); }
+@media (max-width: 540px) {
+  .move-comparison { grid-template-columns: 1fr; }
+  .move-comparison > span { transform: rotate(90deg); justify-self: center; }
+  .move-selects { flex-direction: column; }
+}

@@ -1,16 +1,15 @@
 import type { UserRole } from '@/types';
 
 export const ADMIN_NAVIGATION = [
-  { path: '/dashboard', label: '전체 현황', icon: 'dashboard' },
-  { path: '/pastoral', label: '목양 리포트', icon: 'book' },
-  { path: '/attendance', label: '출석 입력', icon: 'calendar' },
-  { path: '/manage', label: '학생 관리', icon: 'users' },
-  { path: '/stats', label: '반별 통계', icon: 'chart' },
-  { path: '/admin', label: '계정·설정', icon: 'settings' },
+  { path: '/dashboard', label: '오늘 업무', icon: 'dashboard' },
+  { path: '/pastoral', label: '목양 관리', icon: 'book' },
+  { path: '/attendance', label: '출석 관리', icon: 'calendar' },
+  { path: '/manage', label: '학생·반 관리', icon: 'users' },
+  { path: '/admin', label: '운영 설정', icon: 'settings' },
 ] as const;
 
 const ADMIN_ONLY_PATHS = ['/dashboard', '/overall', '/admin', '/pastoral'];
-const CLASS_FILTER_PATHS = ['/attendance', '/manage', '/stats'];
+const CLASS_FILTER_PATHS: string[] = [];
 const ENTRY_STORAGE_KEY = 'attendance-admin-entry-uid';
 
 function normalizePath(pathname: string): string {
@@ -37,7 +36,9 @@ export function homePathForRole(role: UserRole | null, isDemo: boolean): '/dashb
 
 export function adminNavigationItem(pathname: string) {
   // 이전 전체 현황 주소도 통합 메뉴의 활성 상태를 공유한다.
-  const current = isWithinPath(pathname, '/overall') ? '/dashboard' : pathname;
+  const current = isWithinPath(pathname, '/overall') ? '/dashboard'
+    : isWithinPath(pathname, '/stats') ? '/attendance'
+      : pathname;
   return ADMIN_NAVIGATION.find(item => isWithinPath(current, item.path));
 }
 

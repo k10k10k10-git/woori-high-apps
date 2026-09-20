@@ -10,11 +10,11 @@ import { parseYearTeacherMessages, type TeacherMessage, type VisitRequestStatus 
 type VisitRow = TeacherMessage & { classKey: string };
 type VisitLoad = { year: number; rows: VisitRow[]; status: 'loading' | 'ready' | 'error' };
 
-export default function VisitRequestsSection() {
+export default function VisitRequestsSection({ initialView = 'open' }: { initialView?: 'open' | 'done' }) {
   const { state } = useApp();
   const { classData, curYear } = state;
   const [load, setLoad] = useState<VisitLoad>({ year: curYear, rows: [], status: 'loading' });
-  const [view, setView] = useState<'open' | 'done'>('open');
+  const [view, setView] = useState<'open' | 'done'>(initialView);
   const [retry, setRetry] = useState(0);
   const [savingKey, setSavingKey] = useState<string | null>(null);
 

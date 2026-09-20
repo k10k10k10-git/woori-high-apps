@@ -255,8 +255,8 @@ export default function AdminTab() {
   return (
     <div className="admin-settings">
       <header className="as-heading">
-        <h1>계정·설정</h1>
-        <p>교사 계정과 일정, 새 명단을 관리하세요.</p>
+        <h1>운영 설정</h1>
+        <p>교사 계정, 특별 일정, 명단 데이터 같은 운영 업무를 관리하세요.</p>
       </header>
       <div className="as-section-tabs" role="tablist" aria-label="설정 메뉴">
         {SETTINGS_SECTIONS.map((item, index) => (

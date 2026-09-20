@@ -3,11 +3,14 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
 import type { ReportFriend } from '@/utils/pastoralReport';
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
 const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, demo: false, receive: (() => {}) as (friends: ReportFriend[]) => void, fail: (() => {}) as (error: Error) => void, stop: vi.fn(), subscribe: vi.fn() }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: mocks.state }) }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { email: 'synthetic@example.test' } } }));
 vi.mock('@/lib/demo', () => ({ isDemoAccount: () => mocks.demo }));
 vi.mock('@/lib/pastoralFriends', () => ({ subscribeReportFriends: (...args: unknown[]) => mocks.subscribe(...args) }));
+vi.mock('@/components/tabs/overall/VisitRequestsSection', () => ({ default: () => <section><h2>심방 요청</h2></section> }));
+vi.mock('@/components/tabs/overall/SuggestionsSection', () => ({ default: () => <section><h2>특이사항</h2></section> }));
 import PastoralReport from './PastoralReport';
 beforeEach(() => {
   mocks.demo = false; mocks.stop.mockClear(); mocks.subscribe.mockReset();
@@ -23,7 +26,7 @@ describe('목양 리포트 실제 화면', () => {
     fireEvent.change(screen.getByRole('searchbox'), { target: { value: '없는 이름' } });
     expect(screen.getByText('이 조건에 해당하는 연속 결석 학생이 없습니다.')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '필터 초기화' }));
-    fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인 필요' }));
     expect(screen.getByText('3회 이상 연속 결석 · 일반 학생')).toBeTruthy();
   });
   it('미입력 이후 결석은 확인된 횟수와 중단 지점을 함께 표시한다', () => {
@@ -39,6 +42,7 @@ describe('목양 리포트 실제 화면', () => {
     const { rerender } = render(<PastoralReport />);
     act(() => mocks.fail(new Error('권한 없음')));
     expect(screen.getByRole('alert').textContent).toContain('새친구 명단과 집계를 표시하지 않습니다');
+    fireEvent.click(screen.getByRole('button', { name: '새친구 정착' }));
     expect(screen.queryByText('합성 학생')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
     expect(mocks.subscribe).toHaveBeenCalledTimes(2);
@@ -55,19 +59,20 @@ describe('목양 리포트 실제 화면', () => {
       { key: 'done', name: '등반 완료 학생', part: '1', grade: '1', rosterSync: { studentId: 'nf_one', classKey: '1-1-1', syncedAt: '2026-01-10T00:00:00Z' } },
       { key: 'pending', name: '등반 대기 학생', part: '1', grade: '1', decision: '등록', registeredDate: '2026-01-01' },
     ]));
+    fireEvent.click(screen.getByRole('button', { name: '새친구 정착' }));
     expect(screen.getByText('등반 완료 학생')).toBeTruthy();
     expect(screen.queryByText('등반 대기 학생')).toBeNull();
     expect(screen.getByText('등반 완료 · 등반일 2026-01-10')).toBeTruthy();
     expect(screen.getByText('등반 후 마지막 출석: 등반 이후 출석 기록 없음')).toBeTruthy();
     expect(screen.queryByText('마지막 출석: 1월 4일')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인 필요' }));
     expect(screen.getByText('새친구 2회 연속 결석 · 등반 완료 학생').nextElementSibling?.textContent).toBe('1명');
   });
-  it('연속 결석과 주간 요약에서 날짜 정렬 선택을 공유한다', () => {
+  it('연속 결석과 확인 필요에서 날짜 정렬 선택을 공유한다', () => {
     render(<PastoralReport />);
     fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
     fireEvent.change(screen.getByLabelText('명단 정렬'), { target: { value: 'latest' } });
-    fireEvent.click(screen.getByRole('button', { name: '이번 주 요약' }));
+    fireEvent.click(screen.getByRole('button', { name: '확인 필요' }));
     expect((screen.getByLabelText('명단 정렬') as HTMLSelectElement).value).toBe('latest');
     fireEvent.change(screen.getByLabelText('명단 정렬'), { target: { value: 'oldest' } });
     fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));

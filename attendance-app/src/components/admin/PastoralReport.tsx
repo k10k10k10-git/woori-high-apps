@@ -1,16 +1,26 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useApp } from '@/store/AppContext';
 import { auth } from '@/lib/firebase/client';
 import { isDemoAccount } from '@/lib/demo';
 import { canUseAdminWorkspace } from '@/lib/adminNavigation';
 import { subscribeReportFriends } from '@/lib/pastoralFriends';
 import { buildPastoralReport, sortReportStudents, type ReportSort, type ReportFriend, type ReportStudent } from '@/utils/pastoralReport';
+import VisitRequestsSection from '@/components/tabs/overall/VisitRequestsSection';
+import SuggestionsSection from '@/components/tabs/overall/SuggestionsSection';
 import './admin-overview.css';
 import './pastoral-report.css';
 
-const SECTIONS = ['새친구 정착현황', '연속 결석', '이번 주 요약'] as const;
+const SECTIONS = [
+  { key: 'attention', label: '확인 필요' },
+  { key: 'visits', label: '심방 요청' },
+  { key: 'absence', label: '연속 결석' },
+  { key: 'friends', label: '새친구 정착' },
+  { key: 'notes', label: '특이사항' },
+  { key: 'done', label: '처리 완료' },
+] as const;
 type Section = typeof SECTIONS[number];
 type FriendLoad = { status: 'loading' | 'ready' | 'error'; friends: ReportFriend[] };
 
@@ -47,7 +57,9 @@ export default function PastoralReport() {
 
 function ReportContent() {
   const { state } = useApp();
-  const [section, setSection] = useState<Section>('새친구 정착현황');
+  const requested = useSearchParams().get('view');
+  const initialSection = SECTIONS.find(item => item.key === requested) ?? SECTIONS[0];
+  const [section, setSection] = useState<Section>(initialSection);
   const [part, setPart] = useState('');
   const [grade, setGrade] = useState('');
   const [classKey, setClassKey] = useState('');
@@ -87,9 +99,9 @@ function ReportContent() {
   const missing = filteredRows.filter(row => row.student.jang !== true && row.recent[0] && !row.recent[0].value).length;
 
   return <div className="admin-overview pastoral-report">
-    <header className="ao-heading"><h1>목양 리포트</h1><p>새친구의 출석 흐름과 연락이 필요한 친구들을 살펴보세요.</p></header>
-    <div className="ao-sections" role="group" aria-label="목양 리포트 보기 선택">{SECTIONS.map(name => <button type="button" key={name} aria-pressed={section === name} aria-controls="pr-content" onClick={() => setSection(name)}>{name}</button>)}</div>
-    <div className={`pr-filters${filtersOpen ? ' pr-filters-open' : ''}`}>
+    <header className="ao-heading"><h1>목양 관리</h1><p>심방 요청과 연속 결석, 새친구 정착, 특이사항을 한곳에서 확인하세요.</p></header>
+    <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">{SECTIONS.map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => setSection(item)}>{item.label}</button>)}</div>
+    {['attention', 'absence', 'friends'].includes(section.key) && <div className={`pr-filters${filtersOpen ? ' pr-filters-open' : ''}`}>
       <label>기준 주일<select value={report.selectedWeek?.key ?? ''} onChange={e => setWeekKey(e.target.value)}>{!report.weeks.length && <option value="">조회할 주일 없음</option>}{report.weeks.map(week => <option key={week.key} value={week.key}>{week.label}</option>)}</select></label>
       <button className="pr-filter-toggle" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>상세 필터{part || grade || selectedClass ? ' · 적용 중' : ''}</button>
       <label className="pr-advanced">부서<select value={part} onChange={e => { setPart(e.target.value); setClassKey(''); }}><option value="">전체 부서</option>{[...new Set(Object.keys(state.classData).map(key => key.split('-')[0]))].sort().map(p => <option key={p} value={p}>{p}부</option>)}</select></label>
@@ -97,17 +109,20 @@ function ReportContent() {
       <label className="pr-advanced">반<select value={selectedClass} onChange={e => setClassKey(e.target.value)}><option value="">전체 반</option>{classes.map(key => <option key={key} value={key}>{key.split('-').map((value, i) => `${value}${['부', '학년', '반'][i]}`).join(' ')}</option>)}</select></label>
       <label className="pr-search">이름·반·담임 검색<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="이름 또는 담당 교사" /></label>
       <button className={search ? '' : 'pr-advanced'} type="button" onClick={() => { setPart(''); setGrade(''); setClassKey(''); setSearch(''); }}>필터 초기화</button>
-    </div>
-    <p className="pr-note">{state.curYear}년 {report.selectedWeek?.label ?? '조회할 정상 주일 없음'} 기준 · 행사 주일 제외 · 미입력은 결석으로 계산하지 않습니다.</p>
+    </div>}
+    {['attention', 'absence', 'friends'].includes(section.key) && <p className="pr-note">{state.curYear}년 {report.selectedWeek?.label ?? '조회할 정상 주일 없음'} 기준 · 행사 주일 제외 · 미입력은 결석으로 계산하지 않습니다.</p>}
     <div id="pr-content" className="ao-content">
-      {section !== '새친구 정착현황' && <div className="pr-section-heading"><label>명단 정렬<select value={sortOrder} onChange={event => setSortOrder(event.target.value as ReportSort)}><option value="absence">결석 횟수순</option><option value="latest">마지막 출석 최신순</option><option value="oldest">마지막 출석 오래된순</option></select></label><p className="pr-note">마지막 출석일은 기준 주일까지의 기록입니다. 출석 기록이 없으면 날짜 정렬에서 마지막에 표시합니다.</p></div>}
-      {!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
-        {section !== '연속 결석' && <>
+      {['attention', 'absence'].includes(section.key) && <div className="pr-section-heading"><label>명단 정렬<select value={sortOrder} onChange={event => setSortOrder(event.target.value as ReportSort)}><option value="absence">결석 횟수순</option><option value="latest">마지막 출석 최신순</option><option value="oldest">마지막 출석 오래된순</option></select></label><p className="pr-note">마지막 출석일은 기준 주일까지의 기록입니다. 출석 기록이 없으면 날짜 정렬에서 마지막에 표시합니다.</p></div>}
+      {section.key === 'visits' && <VisitRequestsSection key="visits" />}
+      {section.key === 'done' && <VisitRequestsSection key="done" initialView="done" />}
+      {section.key === 'notes' && <SuggestionsSection />}
+      {['attention', 'absence', 'friends'].includes(section.key) && (!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
+        {section.key !== 'absence' && <>
           {load.status === 'loading' && <p role="status" className="pr-note">새친구 등반 완료 정보를 불러오고 있습니다.</p>}
           {load.status === 'error' && <div className="ao-error" role="alert"><span>새친구 등반 완료 정보를 불러오지 못했습니다. 완료 여부를 확인할 수 없어 새친구 명단과 집계를 표시하지 않습니다. 다시 불러오기를 눌러 주세요.</span><button type="button" onClick={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }}>다시 불러오기</button></div>}
         </>}
-        {section === '새친구 정착현황' && <>
-          <h2>새친구 정착현황 <span>{load.status === 'ready' ? `${friends.length}명` : '등반 정보 확인 중'}</span></h2>
+        {section.key === 'friends' && <>
+          <h2>새친구 정착 <span>{load.status === 'ready' ? `${friends.length}명` : '등반 정보 확인 중'}</span></h2>
           <p className="pr-note">등반 완료 학생만 표시합니다. 등반일(출석부 반영일 또는 기존 등반 기록일)부터 첫 정상 주일 4회·8회의 출석입니다. 출석 양호는 정착 완료 판정이 아닙니다. 연락처는 출석부에 등록된 값입니다.</p>
           {!friends.length ? load.status === 'ready' && <p className="pr-empty">현재 조회 범위에 등반 완료된 새친구가 없습니다. 필터와 통합사이트의 등반 처리 상태를 확인하세요.</p> : <ul className="pr-friends">{friends.map(item => <li key={item.friend.key}>
             <div className="pr-friend-heading"><strong>{item.friend.name}</strong><span className="pr-badge">{item.status}</span></div>
@@ -118,19 +133,20 @@ function ReportContent() {
             <div className="pr-contacts"><Phone value={item.row?.student.phone} label="학생" /><Phone value={item.row?.student.pphone} label="보호자" /></div>
           </li>)}</ul>}
         </>}
-        {section === '연속 결석' && <>
+        {section.key === 'absence' && <>
           <div className="pr-section-heading"><h2>연속 결석 <span>{absent.length}명</span></h2><label>장결 구분<select value={longAbsent} onChange={e => setLongAbsent(e.target.value)}><option value="active">일반 학생</option><option value="long">기존 장결</option><option value="all">모두</option></select></label></div>
           <p className="pr-note">기준 주일부터 거슬러 확인된 결석이 3회 이상 이어진 학생입니다. 선택한 명단 정렬 순서로 표시합니다. 출석·미입력에서 연속 계산을 멈추며, 이전 미입력이 있으면 학생별로 표시합니다.</p>
           <StudentRows rows={absent} empty="이 조건에 해당하는 연속 결석 학생이 없습니다." />
         </>}
-        {section === '이번 주 요약' && <>
-          <h2>이번 주 요약 <span>{report.selectedWeek.label}</span></h2>
-          <p className="pr-note">현재 부서·학년·반·검색 필터 기준입니다. 아직 입력 중인 주일은 결과가 달라질 수 있습니다.</p>
+        {section.key === 'attention' && <>
+          <h2>확인 필요 <span>{report.selectedWeek.label}</span></h2>
+          <p className="pr-note">현재 필터 기준으로 관리자가 먼저 연락과 입력 상태를 확인할 항목입니다.</p>
           <dl className="pr-summary"><div><dt>3회 이상 연속 결석 · 일반 학생</dt><dd>{activeAbsent.length}명</dd></div><div><dt>새친구 2회 연속 결석 · 등반 완료 학생</dt><dd>{load.status === 'ready' ? `${friends.filter(item => item.status === '연락 필요').length}명` : '등반 정보 확인 필요'}</dd></div><div><dt>3회 이상 결석 후 다시 출석</dt><dd>{recovered.length}명</dd></div><div><dt>기준 주일 미입력 · 일반 학생</dt><dd>{missing}명</dd></div></dl>
-          <h3>연락이 필요한 친구</h3><StudentRows rows={activeAbsent} empty="3회 이상 연속 결석한 일반 학생이 없습니다." />
+          <VisitRequestsSection key="attention-visits" />
+          <h3>연락이 필요한 학생</h3><StudentRows rows={activeAbsent} empty="3회 이상 연속 결석한 일반 학생이 없습니다." />
           <h3>다시 출석한 친구</h3><StudentRows rows={recovered} empty="이번 기준 주일에 3회 연속 결석 후 다시 출석한 학생이 없습니다." />
         </>}
-      </>}
+      </>)}
     </div>
   </div>;
 }
