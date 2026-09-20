@@ -92,6 +92,11 @@ export function canBrowseTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memb
   return canBrowseEveryTeam(roles) || activeTeamKeys(memberships, semesterId).includes(teamKey);
 }
 
+/** 팀 명단의 공식 원장 연락처는 그 팀을 조회할 수 있는 구성원에게만 연다. */
+export function canReadTeamContacts(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
+  return canBrowseTeam(teamKey, roles, memberships, semesterId);
+}
+
 export function canAccessTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
   return canAccessEveryTeam(roles) || activeTeamKeys(memberships, semesterId).includes(teamKey);
 }
