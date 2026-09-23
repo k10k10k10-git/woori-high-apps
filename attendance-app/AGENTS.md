@@ -1,7 +1,11 @@
 <!-- BEGIN:nextjs-agent-rules -->
+
 # This is NOT the Next.js you know
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
 <!-- END:nextjs-agent-rules -->
 
 # 학생 출석부 에이전트 가이드
@@ -67,10 +71,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## 데모·운영 화면 점검 주의
 
-- 데모는 `src/lib/demo.ts`와 빌드 시 `NEXT_PUBLIC_DEMO_*` 값으로 켜진다. 공용 Firebase 계정으로 실제 로그인하며 **운영 DB와 분리된 샘플 모드가 아니다**. `attendanceAdmins` 권한을 가진 계정의 화면만 교사처럼 제한한다.
-- 반 선택은 보안 경계가 아니다. `AppShell`과 `adminNavigation.ts`의 교사·데모 `/dashboard`·`/admin`·`/overall` 차단, `demoSelection`/`demoLastSelection` 구분, 관리자 로그인 의도 플래그를 유지한다. 데모 값을 보고서·로그에 출력하거나 자격정보를 커밋하지 않는다.
-- `canUseAdminWorkspace(role, isDemo)`가 허용하는 일반 관리자만 `AdminWorkspace`를 사용한다. 관리자의 첫 기본 진입은 `/dashboard`로 안내하되 `createAdminEntryTracker()`가 저장한 방문과 날짜 직접 링크를 보존한다. 교사·공용 데모의 기존 `TopBar`·`TabNav`, 자동 로그인·반 선택·관리자 접근 흐름은 유지하고 새 인증 구독이나 데모 권한 변경을 추가하지 않는다.
-- 2026-09-05 사용자가 데모 모드 유지를 요청해 `NEXT_PUBLIC_DEMO_MODE=1`과 기존 데모 자격정보를 복구하고 Hosting을 다시 배포했다. 운영 브라우저에서 공용 계정 자동 로그인 뒤 부서·학년·반 선택 화면이 나타나는 것을 확인했다. Firebase Auth 데모 계정과 `attendanceAdmins/{demoUid}` 레코드도 의도적으로 유지한다. 이후 종료 요청 시 플래그·공개 자격정보·Auth 계정·권한 레코드를 함께 회수하되, 운영 DB 레코드 삭제는 명시 승인과 사전 스냅샷 뒤에만 수행한다.
+- 공개 데모는 `NEXT_PUBLIC_DEMO_MODE=1`에서 가상 반·가상 학생의 출석/결석 입력과 표 조회만 제공한다. Firebase Auth 로그인·운영 DB 읽기/쓰기를 실행하지 않는다. `NEXT_PUBLIC_DEMO_EMAIL/PASSWORD`를 다시 쓰지 않는다.
+- `AppShell`에서 데모 진입을 별도 컴포넌트로 분리한다. `DemoClassPicker`는 정적 반 목록만 사용하고 `DemoAttendance`는 로컬 메모리만 갱신한다. 실제 교사·관리자에게는 기존 인증·`FirebaseDataLoader`·`DataLoadGate`를 유지한다.
+- `demoSelection`/`demoLastSelection`은 기존 브라우저의 실제 담임 이름을 버리고 허용된 가상 반 키만 복원한다. 관리자 접근은 일반 로그인으로 전환한다. 기존에 공개된 데모 계정과 `attendanceAdmins/{uid}`는 코드 배포와 별개로 정확한 대상을 확인해 철회해야 한다.
 - `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS=false`는 임시 노출 정책이다. 문서 정리 중 임의로 켜지 않는다.
 - 관리자 로그인·연도 변경만으로 오래된 `classes`·`attendance`·`events`를 정리하지 않는다. `TrashModal`도 모든 복구본을 조회만 하며, 영구 삭제는 사용자가 항목별 `삭제` → `확인`을 누른 경우에만 실행한다. 이 계약을 화면 진입 effect의 자동 쓰기로 되돌리지 않는다.
 
@@ -129,10 +132,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - **재사용 규칙**: 참조 키를 유지하는 반 이동은 양쪽 최신 스냅샷과 목적지 충돌을 확인한 뒤 한 원자 payload로 처리하고, 화면 진입 effect에서는 운영 데이터 삭제를 실행하지 않는다.
 - **검증 한계**: 잠금 선점·phase 전환·exact 복구·commit marker·단발 PATCH·응답 분류는 순수 회귀 테스트로 검증한다. 실제 브라우저와 RTDB 연결을 강제로 끊는 통합 시험은 운영 DB 무쓰기 범위에서 실행하지 않았다. 잠긴 동안에는 원본·목적지 반의 전체 명단·출석 쓰기가 잠시 차단된다. 같은 UID의 다른 탭은 Rules에서 이동 owner로 보이므로, 그 탭의 일반 명단·출석 쓰기까지 막지는 못한다. 잠금 전에 이미 SDK 오프라인 큐에 들어간 관리자 쓰기는 잠금 해제 후 재생될 수 있다. 교사의 늦은 출석 쓰기는 Rules에서 원본 학생 존재를 함께 요구해 거절하되 관리자 큐까지 완전히 fencing하려면 모든 관리자 쓰기에 별도 버전 계약이 필요하다. 연결 종료 예약이 한 번 실행된 직후 SDK 트랜잭션이 재연결에서 선점되고 코드가 예약을 다시 등록하기 전 다시 끊기는 매우 짧은 구간에는 `preparing` 잠금이 남을 수 있으며, 이를 시각만으로 자동 제거하지 않는다. 연도 잠금 트랜잭션 권한을 가진 신뢰 관리자의 직접 잠금 변조도 클라이언트 프로토콜만으로 차단할 수 없다.
 
-### 데모 모드를 자격정보 없이 종료하고 정적 배포를 검증하는 법 (2026-09-05)
-- **접근법**: 1→ `.env.local`에서 `NEXT_PUBLIC_DEMO_MODE`뿐 아니라 공개 빌드용 데모 이메일·비밀번호도 비운다. 2→ 배포용 Git worktree에는 git에서 제외된 `.env.local`이 없으므로 원본 파일을 복제하거나 출력하지 말고 존재와 대상 소스 일치부터 확인한 뒤 소유자 전용 파일 또는 심볼릭 링크로 빌드에만 연결한다. 3→ `NEXT_PUBLIC_*` 값을 바꾼 뒤에는 생성물 `.next/`와 `out/`을 제거하고 완전 재빌드해 이전 상수가 캐시에 남지 않게 한다. 4→ 알려진 데모 이메일이 새 `out/`에 없는지 확인하고 Hosting을 배포한다. 5→ 라이브 `sw.js`의 캐시 이름·SHA를 로컬 산출물과 대조하고, 캐시를 우회한 운영 첫 화면이 반 선택 데모가 아니라 일반 로그인인지 실제 브라우저로 확인한다.
-- **판단 질문**: 플래그만 0으로 두고 데모 자격정보를 남기지 않았다. `NEXT_PUBLIC_*`는 클라이언트 번들 상수이므로 비활성 분기라도 값이 산출물에 포함될 수 있고, 기존 빌드 캐시가 공개 환경 변경을 재사용하면 소스 설정과 배포 번들이 다를 수 있다. 프런트 비활성화를 Auth 계정·`attendanceAdmins` 권한 회수로 간주하지도 않았다. 후자는 운영 데이터 변경이므로 별도 승인과 스냅샷이 필요하다.
-- **재사용 규칙**: 공개 빌드 환경으로 임시 계정을 종료할 때는 `플래그 해제 + 공개 자격정보 제거 + 생성물 완전 재빌드 + 번들 문자열 검사 + 라이브 SW 대조 + 실제 첫 화면 확인`을 한 세트로 수행하고, 계정·권한 회수는 별도 운영 변경으로 끝까지 추적한다.
+### 과거 공용 데모 자격정보 철회와 배포 검증
+- **접근법**: 빌드 환경에서 과거 `NEXT_PUBLIC_DEMO_EMAIL/PASSWORD`를 제거하고 완전 재빌드한다. 새 산출물에 과거 데모 이메일 문자열이 없는지 확인한다. Hosting 배포 후 라이브 `sw.js` 캐시 이름과 화면의 가상 반 선택·가상 명단 입력을 대조한다. 이전 번들이 캐시에 남을 수 있으므로 기존 Firebase Auth 데모 계정과 `attendanceAdmins/{uid}` 권한은 정확한 대상을 확인하고 별도 운영 철회한다.
+- **판단 질문**: 프런트 코드에서 자격정보를 제거해도 이미 노출된 과거 자격정보는 유효할 수 있다. 계정/권한 철회는 운영 변경이므로 사전 스냅샷과 사후 권한 거부 검증을 남긴다.
 
 ## 검증과 배포
 

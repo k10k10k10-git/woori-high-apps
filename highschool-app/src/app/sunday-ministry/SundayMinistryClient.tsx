@@ -89,17 +89,23 @@ const TAB_INTRO: Partial<Record<SundayTab, { title: string; description: string 
 
 export default function SundayMinistryClient({ team, initialTab, workspaceId }: { team?: SundayTeamKey; initialTab?: string; workspaceId?: string }) {
   const router = useRouter();
-  const { user, loading: authLoading, roles, teamMemberships, signIn } = useAuth();
+  const { user, loading: authLoading, roles, teamMemberships, canSearchOfficialRoster, signIn } = useAuth();
   const assignedTeamKeys = teamMemberships ? activeTeamKeys(teamMemberships) : undefined;
   // 팀 단위로 판정한다. 사역팀은 자기 팀 하나만 열리고 옆 팀은 주소를 직접 쳐도 막힌다.
   // 팀이 배정되지 않은 사람은 들어갈 팀이 없으므로 진입 자체가 막힌다.
-  const accessibleTeams = SUNDAY_MINISTRY_TEAMS.filter((item) => canAccessSundayTeam(item.key, roles, assignedTeamKeys));
+  const accessibleTeams = SUNDAY_MINISTRY_TEAMS.filter((item) =>
+    canAccessSundayTeam(item.key, roles, assignedTeamKeys)
+    && (item.key !== "admin" || canSearchOfficialRoster));
   const matchingTeams = accessibleTeams.filter((item) => teamHasTab(item.key, initialTab));
   const tabTeam = matchingTeams.length === 1 ? matchingTeams[0] : undefined;
   const landingTeam = ownSundayTeam(roles, assignedTeamKeys) ?? SUNDAY_MINISTRY_DEFAULT_TEAM;
   const teamMeta = sundayTeamOf(team) ?? tabTeam ?? sundayTeamOf(landingTeam)!;
   const teamChooser = team === undefined && !tabTeam && ownSundayTeam(roles, assignedTeamKeys) === null && accessibleTeams.length > 1;
-  const allowed = canAccessArea("sunday", roles) && canAccessSundayTeam(teamMeta.key, roles, assignedTeamKeys);
+  // 행정팀 주일 화면은 연간 학생·출석 원장과 새친구 비공개 원장을 읽는다.
+  // 팀 배정만으로 진입시키면 Rules가 막는 구독을 화면에서 열게 된다.
+  const allowed = canAccessArea("sunday", roles)
+    && canAccessSundayTeam(teamMeta.key, roles, assignedTeamKeys)
+    && (teamMeta.key !== "admin" || canSearchOfficialRoster);
   const canEdit = canEditTeam(teamMeta.key, roles, teamMemberships);
   const tabs = teamMeta.tabs as readonly SundayTab[];
   // 팀 라우트를 오갈 때 컴포넌트가 재사용될 수 있으므로, 선택 탭은 렌더 중 파생으로 보정한다

@@ -4,7 +4,7 @@ import { Retreat, Participant, OnSiteEntry, Group, TeacherAttendance, PartialAtt
 import {
   subscribeToParticipants, subscribeToCellColors,
   subscribeToOnSiteReg, unregisterOnSite, addWalkIn, toggleOnSiteCheckIn,
-  subscribeToGroups, subscribeToClassesByYear, subscribeToConnection,
+  subscribeToGroups, subscribeToRetreatClassesByYear, subscribeToConnection,
   subscribeToTeachers, subscribeToPartialAttendances,
 } from "@/lib/db";
 import { useUI } from "@/context/UIContext";
@@ -62,7 +62,7 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
   useEffect(() => {
     setLoading(true);
     setLoadError(null);
-    const unsubClasses = subscribeToClassesByYear(retreat.year, (classesRaw) => {
+    const unsubClasses = subscribeToRetreatClassesByYear(retreat.id, retreat.year, (classesRaw) => {
       const students: ClassStudent[] = [];
       Object.entries(classesRaw).forEach(([classKey, cd]) => {
         const parsed = parseClassKey(classKey);

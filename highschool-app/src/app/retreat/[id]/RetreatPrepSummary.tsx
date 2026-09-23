@@ -7,7 +7,7 @@ import {
   subscribeToPartialAttendances,
   subscribeToParticipants,
   subscribeToRooms,
-  subscribeToStudentsByYear,
+  subscribeToRetreatStudentsByYear,
 } from "@/lib/db";
 import type { Group, Participant, PartialAttendance, Room, Student } from "@/lib/types";
 import { buildRetreatPrepStatus } from "@/features/portal/retreatPrepStatus";
@@ -42,7 +42,7 @@ export default function RetreatPrepSummary({
       subscribeToParticipants(retreatId, setParticipants, fail),
       subscribeToGroups(retreatId, setGroups, fail),
       subscribeToRooms(retreatId, setRooms, fail),
-      subscribeToStudentsByYear(retreatYear, setStudents, fail),
+      subscribeToRetreatStudentsByYear(retreatId, retreatYear, setStudents, fail),
       subscribeToCellColors(retreatId, setCellColors, fail),
       subscribeToPartialAttendances(retreatId, setPartialAttendances, fail),
     ];

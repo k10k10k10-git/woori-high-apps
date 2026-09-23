@@ -88,6 +88,31 @@ describe('database.rules.json 권한 계약', () => {
     });
   });
 
+  describe('공식 명단·출석과 수련회 쓰기는 승인 역할로 제한한다', () => {
+    it('버킷 소속만으로 연간 원장을 읽지 못한다', () => {
+      for (const node of ['classes', 'attendance', 'teacherStaff']) {
+        const read = ruleExpression(node, '.read');
+        expect(read).not.toContain("child(auth.uid).val() != null");
+        expect(read).toContain("child('semesterRole')");
+        expect(read).toContain("child('iguardMembers').child(auth.uid).child('semesterRole').val() === 'adminTeam'");
+        expect(read).not.toContain("child('retreatRole').val() === 'adminTeam'");
+        expect(read).not.toContain("child('retreatRole').val() === 'pastor'");
+        expect(read).not.toContain("child('teamMemberships').child('worship')");
+        expect(read).not.toContain("child('teamMemberships').child('barnabas')");
+      }
+      expect(ruleExpression('attendance', '.read')).not.toContain("child('iguardRoles')");
+    });
+
+    it('수련회 최상위 쓰기를 없애고 행정·현장 경로를 나눈다', () => {
+      expect(ruleValue('retreats', '.write')).toBeUndefined();
+      expect(ruleExpression('retreats', '$retreatId', '.write')).toContain("child('retreatRole').val() === 'adminTeam'");
+      expect(ruleExpression('retreats', '$retreatId', 'iguard', '.write')).toContain("child('retreatRole').val() === 'iguardTeam'");
+      expect(ruleExpression('retreats', '$retreatId', 'iguard', 'attendance', '.write')).toContain("child('retreatRole').val() === 'fieldStaff'");
+      expect(ruleExpression('retreats', '$retreatId', 'iguard', '.write')).toContain("child('retreatAdmins').child(auth.uid).child('retreatRole').val() === 'iguardTeam'");
+      expect(ruleExpression('retreats', '$retreatId', 'iguard', 'attendance', '.write')).toContain("child('retreatAdmins').child(auth.uid).child('retreatRole').val() === 'fieldStaff'");
+    });
+  });
+
   describe('attendanceAdmins — 출석부 전용 관리자는 플랫폼 노드에 접근하지 못한다', () => {
     it.each(['semesters', 'semestersPrivate', 'retreats', 'retreatsPrivate', 'admins'])(
       '%s 규칙에 attendanceAdmins가 없다',
@@ -115,10 +140,10 @@ describe('database.rules.json 권한 계약', () => {
       expect(refers(rules[node]['.read'], 'admins')).toBe(true);
     });
 
-    it('teacherStaff는 학기 접수·수련회 명단이 읽으므로 retreatAdmins·iguardMembers도 허용한다', () => {
-      for (const role of ['retreatAdmins', 'iguardMembers']) {
-        expect(refers(rules.teacherStaff['.read'], role)).toBe(true);
-      }
+    it('teacherStaff 전체는 두 계정 버킷의 명시 중앙 운영 역할만 읽는다', () => {
+      expect(refers(rules.teacherStaff['.read'], 'retreatAdmins')).toBe(true);
+      expect(refers(rules.teacherStaff['.read'], 'iguardMembers')).toBe(true);
+      expect(rules.teacherStaff['.read']).toContain("child('semesterRole').val() === 'adminTeam'");
     });
 
     // 2026-08-09 2차: 역할 멤버십 목록(이메일·이름)도 로그인만으로 읽혔다.

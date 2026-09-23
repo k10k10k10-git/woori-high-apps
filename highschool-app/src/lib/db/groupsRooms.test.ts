@@ -31,12 +31,36 @@ vi.mock("./core", () => ({
 }));
 
 import {
+  saveGroups,
+  saveRooms,
   clearGroups,
   clearRooms,
   clearRoomAssignments,
   restoreGroupsBackup,
   restoreRoomsBackup,
 } from "./groupsRooms";
+
+describe.each([
+  ["saveGroups", saveGroups, "retreats/retreat-1/groups"],
+  ["saveRooms", saveRooms, "retreats/retreat-1/rooms"],
+] as const)("%s", (_name, save, nodePath) => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("백업이 성공하면 해당 노드를 저장한다", async () => {
+    mocks.backupNodeBeforeOverwrite.mockResolvedValue(true);
+
+    await save("retreat-1", [{ id: "a", name: "A" }] as never);
+
+    expect(mocks.set).toHaveBeenCalledWith(nodePath, { a: { name: "A" } });
+  });
+
+  it("백업이 실패하면 해당 노드를 덮어쓰지 않는다", async () => {
+    mocks.backupNodeBeforeOverwrite.mockResolvedValue(false);
+
+    await expect(save("retreat-1", [{ id: "a", name: "A" }] as never)).rejects.toThrow("백업에 실패");
+    expect(mocks.set).not.toHaveBeenCalled();
+  });
+});
 
 // 복구는 현재 상태를 통째로 덮어쓴다 — 사전 백업이 실패했는데도 덮어쓰면 되돌릴 수 없다.
 describe.each([

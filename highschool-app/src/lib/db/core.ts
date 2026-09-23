@@ -30,7 +30,7 @@ function stripUndefinedValue(value: unknown): unknown {
  * 노드 전체 덮어쓰기(set) 직전, 현재 상태를 롤링 백업(최근 5개)한다.
  * groups/rooms는 participants와 달리 전체 set으로 저장돼 저장 버그·실수 시 복구 수단이 없었다.
  * 편집 중 저장이 잦으므로 마지막 백업이 minIntervalMs 이내면 건너뛰어 쓰기 폭주를 막는다.
- * 일반 저장은 반환값을 무시해 베스트 에포트로 동작하고, 파괴적 작업은 false일 때 중단할 수 있다.
+ * 백업에 실패하면 호출자가 false를 확인하고 전체 덮어쓰기를 중단한다.
  */
 async function backupNodeBeforeOverwrite(
   currentPath: string,
@@ -52,7 +52,7 @@ async function backupNodeBeforeOverwrite(
     await update(ref(db), payload);
     return true;
   } catch {
-    // 일반 저장은 베스트 에포트, 파괴적 호출자는 false를 확인해 작업을 중단한다.
+    // 백업을 확인할 수 없으면 호출자가 저장을 중단한다.
     return false;
   }
 }

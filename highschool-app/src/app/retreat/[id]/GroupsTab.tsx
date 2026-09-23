@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { X } from "@phosphor-icons/react";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
-import { clearGroups, saveGroups, subscribeToGroups, subscribeToStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
+import { clearGroups, saveGroups, subscribeToGroups, subscribeToRetreatStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
 import { useUI } from "@/context/UIContext";
 import { loadXlsx, saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
@@ -65,12 +65,15 @@ export default function GroupsTab({ retreat }: Props) {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (isDirtyRef.current && !isSavingRef.current) {
       isSavingRef.current = true;
-      void saveGroups(retreat.id, groupsRef.current).finally(() => {
+      void saveGroups(retreat.id, groupsRef.current).then(() => {
         isDirtyRef.current = false;
+      }).catch((error) => {
+        toast(error instanceof Error ? error.message : "조편성을 저장하지 못했습니다.", "error");
+      }).finally(() => {
         isSavingRef.current = false;
       });
     }
-  }, [retreat.id, retreat.year]);
+  }, [retreat.id, retreat.year, toast]);
 
   async function flushAutoSave(updateUi = true) {
     if (saveTimerRef.current) {
@@ -115,7 +118,7 @@ export default function GroupsTab({ retreat }: Props) {
 
     setLoadError(null);
     // 출석부 학생 변경도 열린 조편성 화면에 즉시 반영한다.
-    unsubs.push(subscribeToStudentsByYear(retreat.year, stds => {
+    unsubs.push(subscribeToRetreatStudentsByYear(retreat.id, retreat.year, stds => {
       studentsBaseRef.current = stds;
       // Re-process any already-loaded participants with student data
       const parts = participantsRef.current;

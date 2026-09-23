@@ -1,15 +1,15 @@
 /** @vitest-environment jsdom */
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { MinistryRoles } from "@/features/portal/accessPolicy";
 
 const mocks = vi.hoisted(() => ({
   private: vi.fn(),
-  classes: vi.fn(),
-  staff: vi.fn(),
+  contacts: vi.fn(),
   auth: {
     user: { uid: "team-member" },
     loading: false,
-    roles: { semester: "praise", retreat: "none" } as const,
+    roles: { semester: "praise", retreat: "none" } as MinistryRoles,
     teamMemberships: { praise: { role: "staff" as const, active: true } },
     signIn: vi.fn(),
   },
@@ -17,6 +17,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => mocks.auth,
+}));
+
+vi.mock("./teamContacts", () => ({
+  fetchTeamRosterContacts: mocks.contacts,
 }));
 
 vi.mock("@/app/semester/[id]/AttendanceTab", () => ({ default: () => null }));
@@ -29,23 +33,53 @@ vi.mock("@/features/semester/db", () => ({
   subscribeTrainingClasses: (_id: string, cb: (value: unknown) => void) => { cb([]); return () => {}; },
   subscribeSessions: (_id: string, cb: (value: unknown) => void) => { cb([]); return () => {}; },
   subscribeApplications: (_id: string, cb: (value: unknown) => void) => { cb([{ id: "1_student-1", studentId: "student-1", bu: "1부", grade: 1, class: 2, name: "팀원학생", status: "배치", teamId: "team-1", createdAt: "2026-08-01" }]); return () => {}; },
-  subscribeApplicationsPrivate: mocks.private,
-  subscribeClassesByYear: (_year: string, cb: (value: unknown) => void) => { mocks.classes(); cb([{ classKey: "1-1-2", students: { "student-1": { name: "팀원학생", phone: "010-1111-2222", pphone: "010-3333-4444" } } }]); return () => {}; },
-  subscribeStaffByYear: (_year: string, cb: (value: unknown) => void) => { mocks.staff(); cb([]); return () => {}; },
+  subscribeApplicationsPrivate: (_id: string, cb: (value: unknown) => void) => { mocks.private(); cb({ "1_student-1": { phone: "010-9999-0000", parentPhone: "010-8888-0000" } }); return () => {}; },
 }));
 
 import TeamTermWorkspace from "./TeamTermWorkspace";
 
 describe("TeamTermWorkspace 팀 연락처", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.contacts.mockResolvedValue({ "1_student-1": { phone: "010-1111-2222", parentPhone: "010-3333-4444" } });
+    mocks.auth.user = { uid: "team-member" };
+    mocks.auth.roles = { semester: "praise", retreat: "none" };
+  });
 
   it("일반 팀원에게 공식 원장 연락처만 표시한다", async () => {
     render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
 
     expect(await screen.findByRole("link", { name: "010-1111-2222" })).toHaveAttribute("href", "tel:010-1111-2222");
     expect(screen.getByText(/보호자 010-3333-4444/)).toBeInTheDocument();
-    await waitFor(() => expect(mocks.classes).toHaveBeenCalledOnce());
-    expect(mocks.staff).toHaveBeenCalledOnce();
+    await waitFor(() => expect(mocks.contacts).toHaveBeenCalledOnce());
     expect(mocks.private).not.toHaveBeenCalled();
+  });
+
+  it("팀 화면으로 돌아오면 공식 원장 연락처를 다시 읽는다", async () => {
+    mocks.contacts
+      .mockResolvedValueOnce({ "1_student-1": { phone: "010-1111-2222" } })
+      .mockResolvedValueOnce({ "1_student-1": { phone: "010-2222-3333" } });
+    render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
+    expect(await screen.findByRole("link", { name: "010-1111-2222" })).toBeInTheDocument();
+
+    fireEvent.focus(window);
+    expect(await screen.findByRole("link", { name: "010-2222-3333" })).toBeInTheDocument();
+    expect(mocks.contacts).toHaveBeenCalledTimes(2);
+  });
+
+  it("관리자에서 일반 팀원으로 계정을 바꾸면 이전 계정의 신청서 연락처를 남기지 않는다", async () => {
+    mocks.auth.user = { uid: "admin" };
+    mocks.auth.roles = { semester: "superAdmin", retreat: "none" };
+    const view = render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
+    expect(await screen.findByRole("link", { name: "010-9999-0000" })).toBeInTheDocument();
+
+    mocks.auth.user = { uid: "team-member" };
+    mocks.auth.roles = { semester: "praise", retreat: "none" };
+    view.rerender(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
+
+    expect(await screen.findByRole("link", { name: "010-1111-2222" })).toBeInTheDocument();
+    expect(screen.queryByText("010-9999-0000")).not.toBeInTheDocument();
+    expect(screen.queryByText(/010-8888-0000/)).not.toBeInTheDocument();
+    expect(mocks.private).toHaveBeenCalledOnce();
   });
 });

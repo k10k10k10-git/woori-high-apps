@@ -38,6 +38,11 @@ function MembershipState() {
   return <output data-testid="team-memberships">{JSON.stringify(teamMemberships)}</output>;
 }
 
+function RosterSearchState() {
+  const { canSearchOfficialRoster } = useAuth();
+  return <output data-testid="roster-search">{String(canSearchOfficialRoster)}</output>;
+}
+
 const state = () => JSON.parse(screen.getByTestId("auth-state").textContent!);
 const user = (uid: string) => ({ uid }) as User;
 
@@ -162,6 +167,21 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
       design: { active: true, role: "staff" },
       praise: { active: true, role: "staff" },
     });
+  });
+
+  it("팀장이 가진 비활성 원시 팀 연결도 Rules와 같이 전체 인물검색을 닫는다", async () => {
+    render(<AuthProvider><RosterSearchState /></AuthProvider>);
+    let pending!: Promise<void>;
+    act(() => { pending = onAuth(user("a")); });
+    await settle("a", { retreatAdmins: { role: "leader" } }, pending);
+    expect(screen.getByTestId("roster-search")).toHaveTextContent("true");
+
+    act(() => { pending = onAuth(user("b")); });
+    expect(screen.getByTestId("roster-search")).toHaveTextContent("false");
+    await settle("b", {
+      retreatAdmins: { role: "leader", teamMemberships: { praise: { active: false, role: "leader" } } },
+    }, pending);
+    expect(screen.getByTestId("roster-search")).toHaveTextContent("false");
   });
 
   it("Provider 해제 시 인증 구독을 해제하고 미완료 조회를 마무리할 수 있다", async () => {

@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { Student, ClassData } from "../types";
 import { paths } from "../paths";
 import { parseClassKey } from "../classKey";
+import { getRetreatRoster, subscribeRetreatRoster } from "./retreatRoster";
 
 // ── Firebase Students ──────────────────────────────────────
 
@@ -83,6 +84,29 @@ export function subscribeToClassesByYear(
   onError?: (error: Error) => void,
 ): () => void {
   return onValue(ref(db, paths.classes(year)), (snap) => callback(snap.exists() ? snap.val() : {}), onError);
+}
+
+/** 수련회 조회 역할은 연결된 학생만, 중앙 운영 역할은 전체 명단을 받는다. */
+export async function getRetreatStudentsByYear(retreatId: string, year: number): Promise<Record<string, Student>> {
+  return (await getRetreatRoster(retreatId, year)).students;
+}
+
+export function subscribeToRetreatStudentsByYear(
+  retreatId: string, year: number, callback: (students: Record<string, Student>) => void, onError?: (error: Error) => void,
+): () => void {
+  return subscribeRetreatRoster(retreatId, year, ({ students }) => callback(students), onError);
+}
+
+export async function getRetreatClassesByYear(retreatId: string, year: number) {
+  return (await getRetreatRoster(retreatId, year)).classes;
+}
+
+export function subscribeToRetreatClassesByYear(
+  retreatId: string, year: number,
+  callback: (classes: Record<string, { teacher?: string; students?: Record<string, Student> }>) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  return subscribeRetreatRoster(retreatId, year, ({ classes }) => callback(classes), onError);
 }
 
 export async function getAttendanceByYear(year: number): Promise<Record<string, Record<string, Record<string, string>>>> {

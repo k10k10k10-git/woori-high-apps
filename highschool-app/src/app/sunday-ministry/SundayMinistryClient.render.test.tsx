@@ -4,10 +4,10 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
 import type { TeamMemberships } from "@/features/teams/teamModel";
 
-const state = vi.hoisted(() => ({ roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles, teamMemberships: {} as TeamMemberships, push: vi.fn(), friends: vi.fn(), friendsPrivate: vi.fn(), changes: vi.fn() }));
+const state = vi.hoisted(() => ({ roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles, teamMemberships: {} as TeamMemberships, canSearchOfficialRoster: true, push: vi.fn(), friends: vi.fn(), friendsPrivate: vi.fn(), changes: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock("next/dynamic", () => ({ default: () => function PraiseFixture({ workspaceId, initialTab, embedded }: { workspaceId?: string; initialTab?: string; embedded?: boolean }) { return <div data-testid="praise-workspace">{workspaceId} {initialTab} {embedded ? "공통 팀 헤더 사용" : "독립 헤더"}</div>; } }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "synthetic-user" }, loading: false, roles: state.roles, teamMemberships: state.teamMemberships, signIn: vi.fn() }) }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "synthetic-user" }, loading: false, roles: state.roles, teamMemberships: state.teamMemberships, canSearchOfficialRoster: state.canSearchOfficialRoster, signIn: vi.fn() }) }));
 vi.mock("@/features/sundayMinistry/db", () => ({ subscribeSundayAdminChanges: state.changes, subscribeSundayNewFriends: state.friends, subscribeSundayNewFriendsPrivate: state.friendsPrivate }));
 vi.mock("@/features/sundayMinistry/SundayMinistryTabs", () => ({ AdminChangesTab: () => null, PendingTab: () => null, RegistrationStatusTab: () => null }));
 vi.mock("@/features/sundayMinistry/AttendanceBookTab", () => ({ default: () => null }));
@@ -17,7 +17,7 @@ vi.mock("@/features/sundayWorship/WorshipSeatingTab", () => ({ default: () => nu
 vi.mock("../semester/[id]/NewFriendsTab", () => ({ default: () => null }));
 import SundayMinistryClient, { sundayTabHref } from "./SundayMinistryClient";
 
-beforeEach(() => { state.roles = { semester: "superAdmin", retreat: "superAdmin" }; state.teamMemberships = {}; vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry"); state.friends.mockReturnValue(() => {}); state.friendsPrivate.mockReturnValue(() => {}); state.changes.mockReturnValue(() => {}); });
+beforeEach(() => { state.roles = { semester: "superAdmin", retreat: "superAdmin" }; state.teamMemberships = {}; state.canSearchOfficialRoster = true; vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry"); state.friends.mockReturnValue(() => {}); state.friendsPrivate.mockReturnValue(() => {}); state.changes.mockReturnValue(() => {}); });
 afterEach(cleanup);
 
 it("찬양팀에 현재 팀과 팀 변경을 표시하고 기존 선택을 전달한다", () => {
@@ -132,4 +132,15 @@ it("조회자 membership은 담당 팀을 열되 주일 편집 권한은 주지 
   state.teamMemberships = { worship: { role: "viewer", active: true } };
   render(<SundayMinistryClient team="worship" />);
   expect(screen.getByText("조회 전용")).toBeInTheDocument();
+});
+
+it("행정팀 배정만 있고 연간 원장 권한이 없으면 출석부와 비공개 구독을 열지 않는다", () => {
+  state.roles = { semester: "staff", retreat: "none" };
+  state.teamMemberships = { admin: { role: "staff", active: true } };
+  state.canSearchOfficialRoster = false;
+  render(<SundayMinistryClient team="admin" initialTab="출석부" />);
+  expect(screen.getByRole("heading", { name: "팀·주일 운영 접근 권한이 없습니다" })).toBeInTheDocument();
+  expect(state.friends).not.toHaveBeenCalled();
+  expect(state.friendsPrivate).not.toHaveBeenCalled();
+  expect(state.changes).not.toHaveBeenCalled();
 });

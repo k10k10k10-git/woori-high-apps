@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Retreat, Cancellation } from "@/lib/types";
 import {
-  deleteCancellation, deleteCancellationWithRosterMarker, getCancellations, getCellColors, getClassesByYear,
-  subscribeToCancellations, subscribeToClassesByYear,
+  deleteCancellation, deleteCancellationWithRosterMarker, getCancellations, getCellColors, getRetreatClassesByYear,
+  subscribeToCancellations, subscribeToRetreatClassesByYear,
   saveCancellation, saveCancellationWithRosterMarker, setCellColor,
   updateCancellationWithRosterMarker,
 } from "@/lib/db";
@@ -44,7 +44,7 @@ export default function CancellationTab({ retreat }: Props) {
       // 1) cellColors + 학생 DB + 기존 취소명단 동시 로드
       const [colors, classesRaw, existing] = await Promise.all([
         getCellColors(retreat.id),
-        getClassesByYear(retreat.year),
+        getRetreatClassesByYear(retreat.id, retreat.year),
         getCancellations(retreat.id),
       ]);
       const roster = buildCancellationRosterStudents(classesRaw);
@@ -109,7 +109,7 @@ export default function CancellationTab({ retreat }: Props) {
       }));
     },
       (error) => setLoadError((previous) => previous ?? error.message));
-    const unsubClasses = subscribeToClassesByYear(retreat.year, (classesRaw) => {
+    const unsubClasses = subscribeToRetreatClassesByYear(retreat.id, retreat.year, (classesRaw) => {
       const roster = buildCancellationRosterStudents(classesRaw);
       rosterStudentsRef.current = roster;
       setRosterStudents(roster);

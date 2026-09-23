@@ -13,7 +13,8 @@ const student = { id: 's', personId: 'person-s', name: '합성 학생' };
 const input = { year: 2026, classKey: '1-1-1', studentId: 's', personId: 'person-s', actor: '합성 관리자' };
 let apps: FirebaseApp[] = [], admin: Database, teacher: Database, second: Database, demo: Database, stranger: Database;
 let superAdmin: Database, retreatPastor: Database, retreatAdmin: Database, retreatLeader: Database;
-let legacyRetreatAdmin: Database, legacyRetreatPastor: Database, legacyRetreatLeader: Database, iguard: Database;
+let legacyRetreatAdmin: Database, legacyRetreatPastor: Database, legacyRetreatLeader: Database, iguard: Database, member: Database, field: Database, iguardCentral: Database;
+let mixedIguard: Database, mixedField: Database, retreatOnlyPastor: Database, legacyIguard: Database;
 suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약', () => {
   beforeAll(() => {
     if (process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('합성 에뮬레이터 주소가 아닙니다.');
@@ -28,6 +29,9 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     superAdmin = client('super'); retreatPastor = client('retreat-pastor'); retreatAdmin = client('retreat-admin');
     retreatLeader = client('retreat-leader'); legacyRetreatAdmin = client('retreat-legacy'); iguard = client('iguard');
     legacyRetreatPastor = client('retreat-legacy-pastor'); legacyRetreatLeader = client('retreat-legacy-leader');
+    member = client('member'); field = client('field'); iguardCentral = client('iguard-central');
+    mixedIguard = client('mixed-iguard'); mixedField = client('mixed-field');
+    retreatOnlyPastor = client('retreat-only-pastor'); legacyIguard = client('iguard-legacy');
     holder.database = admin;
   });
   beforeEach(async () => {
@@ -37,19 +41,31 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
       retreatAdmins: {
         'retreat-pastor': { email: 'pastor@example.test', role: 'pastor', retreatRole: 'pastor' },
         'retreat-admin': { email: 'admin-team@example.test', role: 'adminTeam', retreatRole: 'adminTeam' },
-        'retreat-leader': { email: 'leader@example.test', role: 'leader', retreatRole: 'leader' },
+        'retreat-leader': { email: 'leader@example.test', role: 'leader', retreatRole: 'leader', teamMemberships: { praise: { role: 'leader', active: true } } },
         'retreat-legacy': { email: 'legacy@example.test' },
         'retreat-legacy-pastor': { email: 'legacy-pastor@example.test', role: 'pastor' },
         'retreat-legacy-leader': { email: 'legacy-leader@example.test', role: 'leader' },
+        'mixed-iguard': { email: 'mixed-iguard@example.test', role: 'adminTeam', semesterRole: 'barnabas', retreatRole: 'iguardTeam' },
+        'mixed-field': { email: 'mixed-field@example.test', role: 'adminTeam', semesterRole: 'barnabas', retreatRole: 'fieldStaff' },
+        'retreat-only-pastor': { email: 'retreat-only-pastor@example.test', role: 'pastor', semesterRole: 'praise', retreatRole: 'pastor' },
       },
-      iguardMembers: { iguard: { email: 'iguard@example.test', retreatRole: 'iguardTeam' } },
-      iguardRoles: { iguard: 'team' },
+      iguardMembers: {
+        iguard: { email: 'iguard@example.test', retreatRole: 'iguardTeam' },
+        member: { email: 'member@example.test', semesterRole: 'praise', teamMemberships: { praise: { role: 'staff', active: true } } },
+        field: { email: 'field@example.test', retreatRole: 'fieldStaff' },
+        'iguard-central': { email: 'central@example.test', semesterRole: 'adminTeam', retreatRole: 'adminTeam' },
+        'iguard-legacy': { email: 'iguard-legacy@example.test' },
+      },
+      iguardRoles: { iguard: 'team', field: 'staff' },
       retreatsPrivate: { 'retreat-contract': { medicalLogs: { existing: { note: '합성 의료 기록' } } } },
       config: { pastoralReport: { blockedDemoUid: 'demo' } },
       semesters: { '2026-1': { newFriends: { f: { name: '합성 새친구' } }, applications: { privateScope: true } }, '2026-2': { newFriends: { f: { name: '합성 새친구' } } }, '2026-sunday': { newFriends: { f: { name: '합성 새친구' } } } },
       semestersPrivate: { '2026-sunday': { newFriendsPrivate: { f: { pastoralNotes: '비공개 합성 메모' } } } },
       userRoles: { teacher__at__example__dot__test: { email: 'teacher@example.test', role: 'teacher', part: '1', grade: '1', class: '1' } },
       classes: { 2026: { '1-1-1': { teacher: '합성 교사', students: { s: student } } } },
+      attendance: { 2026: { '1-1-1': { s: { '0906': 'O' } } } },
+      teacherStaff: { 2026: { t1: { name: '합성 스탭' } } },
+      retreats: { 'retreat-contract': { name: '합성 수련회', year: 2026, iguard: { guide: ['기존 안내'] } } },
     }) });
     expect(response.ok).toBe(true);
   });
@@ -79,6 +95,29 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     for (const database of [retreatLeader, legacyRetreatLeader, iguard, stranger]) {
       await expect(get(ref(database, 'retreatsPrivate/retreat-contract/medicalLogs'))).rejects.toThrow();
       await expect(set(ref(database, 'retreatsPrivate/retreat-contract/medicalLogs/blocked'), { note: '차단 확인' })).rejects.toThrow();
+    }
+  });
+  it('일반 팀원은 연간 원장 전체를 읽지 못하고 수련회 행정 필드를 쓰지 못한다', async () => {
+    for (const database of [member, field, iguard, retreatLeader, mixedIguard, mixedField, retreatOnlyPastor]) {
+      for (const path of ['classes/2026', 'attendance/2026', 'teacherStaff/2026']) {
+        await expect(get(ref(database, path))).rejects.toThrow();
+      }
+    }
+    await expect(set(ref(member, 'retreats/retreat-contract/name'), '변경')).rejects.toThrow();
+    for (const database of [retreatLeader, iguard, field, mixedIguard, mixedField]) {
+      await expect(set(ref(database, 'retreats/retreat-contract/name'), '변경')).rejects.toThrow();
+    }
+    await set(ref(retreatAdmin, 'retreats/retreat-contract/name'), '행정 변경');
+    expect((await get(ref(retreatAdmin, 'retreats/retreat-contract/name'))).val()).toBe('행정 변경');
+    await set(ref(iguard, 'retreats/retreat-contract/iguard/guide'), ['현장 안내']);
+    await set(ref(field, 'retreats/retreat-contract/iguard/attendance/s'), { checked: true });
+    await set(ref(mixedIguard, 'retreats/retreat-contract/iguard/guide'), ['혼합 역할 안내']);
+    await set(ref(mixedField, 'retreats/retreat-contract/iguard/attendance/s'), { checked: true });
+    await set(ref(legacyIguard, 'retreats/retreat-contract/iguard/guide'), ['레거시 안내']);
+    await set(ref(mixedIguard, 'retreats/retreat-contract/milestones/guide'), { title: '준비', done: false });
+    await expect(set(ref(field, 'retreats/retreat-contract/iguard/guide'), ['무단 변경'])).rejects.toThrow();
+    for (const path of ['classes/2026', 'attendance/2026', 'teacherStaff/2026']) {
+      expect((await get(ref(iguardCentral, path))).exists()).toBe(true);
     }
   });
   it('이동 잠금은 같은 UID의 일반 쓰기도 거절하고 잠금 해제를 포함한 원자 확정만 허용한다', async () => {

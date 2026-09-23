@@ -29,7 +29,7 @@ vi.mock("./core", () => ({
   stripUndefined: <T>(value: T) => value,
 }));
 
-import { saveParticipants, restoreParticipantsBackup, updateParticipant } from "./participants";
+import { backupParticipants, saveParticipants, restoreParticipantsBackup, updateParticipant } from "./participants";
 
 const SAMPLE = {
   "1_a": { name: "김학생", gender: "남", grade: 1, class: 1, bu: "1부" },
@@ -74,6 +74,31 @@ describe("saveParticipants", () => {
       "retreats/retreat-1/participantsBackups/1700000000000": SAMPLE,
       "retreatsPrivate/retreat-1/participantContactsBackups/1700000000000": { __empty: true },
     });
+  });
+
+  it("사전 백업 쓰기가 실패하면 공개·비공개 명단을 덮어쓰지 않는다", async () => {
+    mocks.get
+      .mockResolvedValueOnce(snap(SAMPLE))
+      .mockResolvedValueOnce(snap(null))
+      .mockResolvedValueOnce(snap(null));
+    mocks.update.mockRejectedValueOnce(new Error("backup denied"));
+
+    await expect(saveParticipants("retreat-1", SAMPLE as never)).rejects.toThrow("백업에 실패");
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.update).not.toHaveBeenCalledWith(undefined, expect.objectContaining({
+      "retreats/retreat-1/participants": expect.anything(),
+    }));
+  });
+});
+
+describe("backupParticipants", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("백업 읽기에 실패하면 대량 재매칭 전에 호출자에게 오류를 전달한다", async () => {
+    mocks.get.mockRejectedValueOnce(new Error("backup read denied"));
+
+    await expect(backupParticipants("retreat-1")).rejects.toThrow("백업에 실패");
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });
 
