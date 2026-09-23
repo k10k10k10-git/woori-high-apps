@@ -13,12 +13,12 @@ const STATUS_LABELS: Record<AdminDashboardStatus, string> = {
 
 type StatusFilter = 'all' | 'pending' | 'complete';
 
-export default function ClassAttendanceOverview({ weekKey = '', onWeekChange }: { weekKey?: string; onWeekChange?: (weekKey: string) => void }) {
+export default function ClassAttendanceOverview({ weekKey = '', onWeekChange, initialStatus = 'all' }: { weekKey?: string; onWeekChange?: (weekKey: string) => void; initialStatus?: StatusFilter }) {
   const { state, dispatch } = useApp();
   const router = useRouter();
   const [part, setPart] = useState('all');
   const [grade, setGrade] = useState('all');
-  const [status, setStatus] = useState<StatusFilter>('pending');
+  const [status, setStatus] = useState<StatusFilter>(initialStatus);
   const [query, setQuery] = useState('');
   const search = useDeferredValue(query);
   const model = useMemo(() => buildAdminDashboard(state, { weekKey, part, grade, search }), [state, weekKey, part, grade, search]);

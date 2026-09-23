@@ -38,23 +38,39 @@ function ReportContent() {
   const { state } = useApp();
   const params = useSearchParams();
   const requested = params.get('view');
-  const initialSection = SECTIONS.find(item => item.key === requested) ?? SECTIONS[0];
+  const requestedStudentKey = params.get('student') ?? '';
+  const requestedVisitKey = params.get('request') ?? '';
+  const requestedWeekKey = params.get('week') ?? '';
+  const initialSection = SECTIONS.find(item => item.key === requested) ?? (requestedStudentKey ? SECTIONS[1] : SECTIONS[0]);
   const [section, setSection] = useState<Section>(initialSection);
   const [part, setPart] = useState('');
   const [grade, setGrade] = useState('');
   const [classKey, setClassKey] = useState('');
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [weekKey, setWeekKey] = useState(params.get('week') ?? '');
+  const [weekKey, setWeekKey] = useState(requestedWeekKey);
   const [longAbsent, setLongAbsent] = useState('active');
   const [absenceView, setAbsenceView] = useState<'absent' | 'recovered'>('absent');
   const [sortOrder, setSortOrder] = useState<ReportSort>('absence');
   const [load, setLoad] = useState<FriendLoad>({ status: 'loading', friends: [] });
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(Date.now);
-  const [selectedStudentKey, setSelectedStudentKey] = useState('');
+  const [selectedStudentKey, setSelectedStudentKey] = useState(requestedStudentKey);
+  const [activeVisitKey, setActiveVisitKey] = useState(requestedVisitKey);
   const [selectedFriendKey, setSelectedFriendKey] = useState('');
   const detailRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    setSection(requestedStudentKey ? SECTIONS[1] : requestedVisitKey ? SECTIONS[0] : SECTIONS.find(item => item.key === requested) ?? SECTIONS[0]);
+  }, [requested, requestedStudentKey, requestedVisitKey]);
+  useEffect(() => { setWeekKey(requestedWeekKey); }, [requestedWeekKey]);
+  useEffect(() => { setActiveVisitKey(requestedVisitKey); }, [requestedVisitKey]);
+  useEffect(() => {
+    if (!requestedStudentKey) { setSelectedStudentKey(''); return; }
+    setAbsenceView('absent');
+    setSelectedStudentKey(requestedStudentKey);
+    setPart(''); setGrade(''); setClassKey(''); setSearch('');
+  }, [requestedStudentKey]);
 
   useEffect(() => {
     let active = true;
@@ -93,7 +109,7 @@ function ReportContent() {
 
   return <div className="admin-overview pastoral-report">
     <header className="ao-heading"><h1>목양 관리</h1><p>학생 이름을 먼저 보고, 필요한 연락과 후속 조치를 바로 확인하세요.</p></header>
-    <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">{SECTIONS.map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => { setSection(item); setSelectedStudentKey(''); setSelectedFriendKey(''); }}>{item.label}</button>)}</div>
+    <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">{SECTIONS.map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => { setSection(item); setSelectedStudentKey(''); setSelectedFriendKey(''); setActiveVisitKey(''); }}>{item.label}</button>)}</div>
 
     {showFilters && <div className={`pr-filters${filtersOpen ? ' pr-filters-open' : ''}`}>
       {section.key !== 'visits' && <label>기준 주일<select value={report.selectedWeek?.key ?? ''} onChange={e => setWeekKey(e.target.value)}>{!report.weeks.length && <option value="">조회할 주일 없음</option>}{report.weeks.map(week => <option key={week.key} value={week.key}>{week.label}</option>)}</select></label>}
@@ -107,10 +123,11 @@ function ReportContent() {
     {showFilters && section.key !== 'visits' && <p className="pr-note">{state.curYear}년 {report.selectedWeek?.label ?? '조회할 정상 주일 없음'} 기준 · 행사 주일 제외 · 미입력은 결석으로 계산하지 않습니다.</p>}
 
     <div id="pr-content" className="ao-content">
-      {section.key === 'visits' && <VisitRequestsSection filter={visitFilter} />}
+      {section.key === 'visits' && <VisitRequestsSection filter={visitFilter} requestKey={activeVisitKey} />}
       {section.key === 'notes' && <SuggestionsSection />}
       {section.key === 'absence' && (!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
         <div className="pr-section-heading"><div><h2>{absenceView === 'absent' ? '연속 결석' : '다시 출석'} <span>{absenceRows.length}명</span></h2><p className="pr-note">{absenceView === 'absent' ? '행마다 최근 주일의 기록과 확인된 연속 결석 횟수를 보여드립니다.' : '3회 이상 결석한 뒤 기준 주일에 다시 출석한 학생입니다.'}</p><div className="ad-status-tabs" role="group" aria-label="결석 상태"><button type="button" aria-pressed={absenceView === 'absent'} onClick={() => { setAbsenceView('absent'); setSelectedStudentKey(''); }}>연속 결석 <span>{absent.length}</span></button><button type="button" aria-pressed={absenceView === 'recovered'} onClick={() => { setAbsenceView('recovered'); setSelectedStudentKey(''); }}>다시 출석 <span>{recovered.length}</span></button></div></div><div className="pr-inline-controls">{absenceView === 'absent' && <label>장결<select value={longAbsent} onChange={e => setLongAbsent(e.target.value)}><option value="active">일반 학생</option><option value="long">기존 장결</option><option value="all">모두</option></select></label>}<label>정렬<select value={sortOrder} onChange={e => setSortOrder(e.target.value as ReportSort)}><option value="absence">결석 많은 순</option><option value="latest">마지막 출석 최신순</option><option value="oldest">마지막 출석 오래된순</option></select></label></div></div>
+        {requestedStudentKey === selectedStudentKey && !selectedStudent && <p className="pr-empty" role="status">요청한 학생이 현재 연속 결석 명단에 없습니다. 조회 주일과 장결 필터를 확인해 주세요.</p>}
         <div className={`pr-master-detail${selectedStudent ? ' is-open' : ''}`}>
           <div className="pr-table-wrap"><table className="pr-table"><caption>{absenceView === 'absent' ? '연속 결석' : '다시 출석'} 학생 명단</caption><thead><tr><th>학생</th><th>반 / 담임</th><th>최근 4회</th><th>{absenceView === 'absent' ? '연속 결석' : '확인 내용'}</th><th>마지막 출석</th><th><span className="ad-sr-only">상세</span></th></tr></thead><tbody>{absenceRows.map(row => <tr key={row.key}><th scope="row"><button type="button" onClick={() => setSelectedStudentKey(row.key)}>{row.student.name}{row.student.jang && <small>장결</small>}</button></th><td>{row.label}<small>{row.teacher || '담임 미등록'}</small></td><td><div className="pr-week-cells">{row.recent.slice(0, 4).reverse().map(cell => <span key={cell.week.key} data-value={cell.value || '-'} title={`${cell.week.label} ${cell.value === 'O' ? '출석' : cell.value === 'X' ? '결석' : '미입력'}`}>{cell.value || '·'}</span>)}</div></td><td><strong>{row.recovered ? '3회 이상 결석 후 출석' : `${row.streak}회`}</strong>{!row.recovered && row.recent[row.streak] && !row.recent[row.streak].value && <small>이전 미입력 있음</small>}</td><td>{row.lastPresent?.label ?? '기록 없음'}</td><td><button type="button" className="pr-open" aria-label={`${row.student.name} 상세 보기`} onClick={() => setSelectedStudentKey(row.key)}><AdminIcon name="arrow" /></button></td></tr>)}</tbody></table>{!absenceRows.length && <p className="pr-empty">{absenceView === 'absent' ? '이 조건에 해당하는 연속 결석 학생이 없습니다.' : '이 기준 주일에 다시 출석한 학생이 없습니다.'}</p>}</div>
           {selectedStudent && <aside ref={detailRef} tabIndex={-1} aria-label={`${selectedStudent.student.name} 상세`} className="pr-detail"><button className="pr-close" type="button" aria-label="상세 닫기" onClick={() => setSelectedStudentKey('')}>닫기</button><h3>{selectedStudent.student.name}</h3><p>{selectedStudent.label} · 담임 {selectedStudent.teacher || '미등록'}</p><dl><div><dt>{selectedStudent.recovered ? '다시 출석 전 연속 결석' : '확인된 연속 결석'}</dt><dd>{selectedStudent.recovered ? '3회 이상' : `${selectedStudent.streak}회`}</dd></div><div><dt>마지막 출석</dt><dd>{selectedStudent.lastPresent?.label ?? '조회 연도 기록 없음'}</dd></div><div><dt>최근 기록</dt><dd>{selectedStudent.recent.slice(0, 8).reverse().map(cell => `${cell.week.label} ${cell.value || '미입력'}`).join(' / ')}</dd></div></dl><div className="pr-contacts"><Phone value={selectedStudent.student.phone} label="학생" /><Phone value={selectedStudent.student.pphone} label="보호자" /></div></aside>}

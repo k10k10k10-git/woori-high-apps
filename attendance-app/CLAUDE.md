@@ -175,9 +175,12 @@ layout.tsx
 - `src/lib/adminNavigation.ts`의 `canUseAdminWorkspace(role, isDemo)`는 **일반 관리자 계정만** 관리자 셸에 진입시킨다. `/dashboard`·`/overall`·`/admin`은 교사·공용 데모에게 열지 않는다. 일반 관리자의 인증 세션 첫 기본 진입은 `/dashboard`로 이동하며, 이미 선택한 작업과 `/attendance?view=check&week=…` 직접 링크는 `createAdminEntryTracker()`가 보존한다. `/admin`은 기존 계정·행사 설정 화면이고 새 대시보드 주소는 `/dashboard`다.
 - `AdminWorkspace`는 `오늘 업무`·`목양 관리`·`출석 관리`·`학생·반 관리`·`운영 설정`의 다섯 업무 메뉴와 조회 연도·연결 상태·로그아웃을 제공한다. 전역 부서·학년 필터는 제거하고, 해당 작업 화면 안에서만 필요한 필터를 제공한다. `DataLoadGate`의 원장 준비 조건과 오류 재시도는 두 셸에서 동일하게 유지한다.
 - `AdminDashboard`의 출석 현황은 기존 `classes/{year}`·`attendance/{year}`·`events/{year}` 구독 결과로 계산한다. `오늘 확인할 일`의 열린 심방 요청 수만 기존 `suggestions/{year}`를 읽으며 새 경로를 만들지 않는다. `buildAdminDashboard()`의 기본 날짜는 최근 KST 경과 정상 주일이며, 과거 연도는 마지막 정상 주일, 미래 연도는 첫 정상 주일이다. 행사 주일은 제외하고 반·교사·학생 검색은 해당 반의 전체 현황을 반환한다.
+- 첫 화면은 선택 주일의 출석 지표와 조회 연도의 현재 미처리 심방 요청을 별도 범위로 표시한다. 학생별 링크는 `/pastoral?view=absence&student=…` 또는 `/pastoral?view=visits&request=…`로 해당 상세·요청을 직접 연다. 조회 시 대상이 사라졌으면 목록과 안내를 유지한다.
 - **출석 통계와 입력 업무는 분모가 다르다.** `studentCount`·`recorded`·`present`·`attendanceRate`는 기존 전체 현황처럼 장결자를 포함하며 출석률은 `O / (O + X)`다. 이전 `T`는 `O`로 먼저 정규화한다. 입력률·미입력 인원·완료 상태는 실제 출석 체크 대상인 일반 학생만 사용한다(`inputStudentCount`, `inputRecorded`). 일반 20명 전원 입력·장결 1명 미기록은 입력 완료다. 전원 장결 반은 `no-targets`, 빈 반은 `no-students`, 조회할 정상 주일이 없으면 `no-week`로 구분하고 입력 대기 반에 넣지 않는다.
+- 첫 화면의 출석률 옆에는 분모인 입력된 O·X 기록 수를 명시하고, 일반 학생의 입력 완료 인원은 별도로 적는다. 수치만으로 전체 학생 기준 출석률이나 미입력을 결석으로 읽게 하지 않는다.
 - 대시보드에서 반을 열면 부서·학년·반·학기를 선택한 뒤 `/attendance?view=check&week={주일 키}`로 이동한다. `buildAttendanceEntry()`는 관리자의 해당 연도 정상 주일 전체와 교사·데모의 최근 4회 목록을 분리한다. URL 날짜는 허용 목록 안에서만 적용하고 행사·잘못된 키는 기본 날짜로 복구한다. 콤보의 유효한 수동 선택이 URL보다 우선하며, 출석 페이지의 `Suspense`는 `useSearchParams`를 사용하는 정적 export에 필요하다.
 - `AttendanceManagement`의 기본 화면은 주차별 반 입력률과 출석률을 분리해 보여 주는 `ClassAttendanceOverview`다. `ManageWorkspace`의 기본 화면은 전체 학생 검색·필터·내보내기·편집·이동을 제공하는 `StudentDirectory`다. 학생 이동은 기존 잠금·충돌 방지·원본 보존 로직을 그대로 사용하고, `MoveStudentModal`에서 현재 소속과 목적지 및 보존 항목을 확인한 뒤 실행한다.
+- `ClassAttendanceOverview`는 전체 반을 기본으로 표시하고 `확인 필요`·`완료` 필터를 유지한다. `StudentDirectory`는 PC에서 상세 표, 모바일에서 간편 목록을 기본으로 하며 사용자가 바꾼 보기는 로컬 저장소에서 복원한다. 개인 정보나 명단 데이터는 보기 설정에 저장하지 않는다.
 - 공용 데모의 자동 로그인·부서·학년·반 선택·관리자 접근 버튼 흐름은 유지한다. 관리자 셸을 만들기 위해 데모 계정의 실제 권한·환경값을 바꾸거나 별도 인증 구독을 추가하지 않는다. 화면 제한을 Firebase Rules의 새로운 보안 경계로 설명하지 않는다.
 
 ### 공유 컴포넌트

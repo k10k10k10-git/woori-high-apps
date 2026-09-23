@@ -21,6 +21,7 @@ import StudentDirectory from './StudentDirectory';
 
 beforeEach(() => {
   mocks.dispatch.mockClear(); mocks.push.mockClear(); mocks.params = '';
+  localStorage.clear();
   mocks.state = {
     ...initialState,
     curYear: 2026,
@@ -36,7 +37,7 @@ beforeEach(() => {
     attData: { '1-1-1': { a: { '0-0': 'O' }, b: { '0-0': 'X' } } },
   };
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('관리자 명단·출석 접근 경로', () => {
   it('반을 먼저 선택하지 않고 전체 학생을 검색하고 이동을 시작한다', () => {
@@ -52,7 +53,7 @@ describe('관리자 명단·출석 접근 경로', () => {
 
   it('상세 표에서 연락처와 생년월일까지 한눈에 보여 준다', () => {
     render(<StudentDirectory onOpenClass={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '상세 표' }));
+    expect(screen.getByRole('button', { name: '상세 표' }).getAttribute('aria-pressed')).toBe('true');
     const table = screen.getByRole('table', { name: '2026년 전체 학생 상세 표' });
     expect(within(table).getByRole('columnheader', { name: '학생 연락처' })).toBeTruthy();
     expect(within(table).getByRole('columnheader', { name: '보호자 연락처' })).toBeTruthy();
@@ -62,9 +63,29 @@ describe('관리자 명단·출석 접근 경로', () => {
     expect(screen.getByRole('button', { name: '상세 표' }).getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('바꾼 명단 보기를 저장하고 다시 열 때 복원한다', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '간편 목록' }));
+    expect(localStorage.getItem('woori-admin-directory-view')).toBe('compact');
+    cleanup();
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    expect(screen.getByRole('table', { name: '2026년 전체 학생 간편 목록' })).toBeTruthy();
+  });
+
+  it('모바일 첫 진입은 간편 목록이고 수동 선택은 기기 기본값보다 우선한다', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    expect(screen.getByRole('table', { name: '2026년 전체 학생 간편 목록' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '상세 표' }));
+    cleanup();
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    expect(screen.getByRole('table', { name: '2026년 전체 학생 상세 표' })).toBeTruthy();
+  });
+
   it('반별 입력률과 출석률을 구분하고 미입력을 결석으로 계산하지 않는다', () => {
     render(<ClassAttendanceOverview />);
-    fireEvent.click(screen.getByRole('button', { name: /^\uc804\uccb4/ }));
+    expect(screen.getByRole('button', { name: /^\uc804\uccb4/ }).getAttribute('aria-pressed')).toBe('true');
     const row = screen.getByRole('button', { name: '1부 1학년 1반 김담임' }).closest('tr')!;
     expect(within(row).getByText('입력률 100%')).toBeTruthy();
     expect(within(row).getByText('50%')).toBeTruthy();
@@ -72,6 +93,22 @@ describe('관리자 명단·출석 접근 경로', () => {
     expect(within(emptyRow).getByText('1명')).toBeTruthy();
     expect(within(emptyRow).getByText('입력률 0%')).toBeTruthy();
     expect(within(emptyRow).getByText('—')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^확인 필요/ }));
+    expect(screen.queryByRole('button', { name: '1부 1학년 1반 김담임' })).toBeNull();
+    expect(screen.getByRole('button', { name: '2부 2학년 3반 이담임' })).toBeTruthy();
+  });
+
+  it('대시보드의 출석 미입력 링크만 확인 필요 반으로 시작한다', () => {
+    mocks.params = 'view=overview&status=pending';
+    const page = render(<AttendanceManagement />);
+    expect(screen.getByRole('button', { name: /^확인 필요/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByRole('button', { name: '1부 1학년 1반 김담임' })).toBeNull();
+    expect(screen.getByRole('button', { name: '2부 2학년 3반 이담임' })).toBeTruthy();
+
+    mocks.params = 'view=overview';
+    page.rerender(<AttendanceManagement />);
+    expect(screen.getByRole('button', { name: /^전체/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '1부 1학년 1반 김담임' })).toBeTruthy();
   });
 
   it('현황에서 고른 주일을 출석 입력 탭까지 유지한다', () => {

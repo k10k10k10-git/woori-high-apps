@@ -3,17 +3,17 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
 import type { ReportFriend } from '@/utils/pastoralReport';
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
-const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, demo: false, receive: (() => {}) as (friends: ReportFriend[]) => void, fail: (() => {}) as (error: Error) => void, stop: vi.fn(), subscribe: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: '', state: {} as typeof initialState, demo: false, receive: (() => {}) as (friends: ReportFriend[]) => void, fail: (() => {}) as (error: Error) => void, stop: vi.fn(), subscribe: vi.fn() }));
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(mocks.query) }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: mocks.state }) }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { email: 'synthetic@example.test' } } }));
 vi.mock('@/lib/demo', () => ({ isDemoAccount: () => mocks.demo }));
 vi.mock('@/lib/pastoralFriends', () => ({ subscribeReportFriends: (...args: unknown[]) => mocks.subscribe(...args) }));
-vi.mock('@/components/tabs/overall/VisitRequestsSection', () => ({ default: () => <section><h2>심방 요청</h2></section> }));
+vi.mock('@/components/tabs/overall/VisitRequestsSection', () => ({ default: ({ requestKey }: { requestKey?: string }) => <section data-testid="visit-section" data-request-key={requestKey}><h2>심방 요청</h2></section> }));
 vi.mock('@/components/tabs/overall/SuggestionsSection', () => ({ default: () => <section><h2>특이사항</h2></section> }));
 import PastoralReport from './PastoralReport';
 beforeEach(() => {
-  mocks.demo = false; mocks.stop.mockClear(); mocks.subscribe.mockReset();
+  mocks.query = ''; mocks.demo = false; mocks.stop.mockClear(); mocks.subscribe.mockReset();
   mocks.state = { ...initialState, curYear: 2026, userRole: { role: 'admin' }, months: [{ month: 1, sundays: [4, 11, 18, 25] }], events: {}, classData: { '1-1-1': { students: [{ id: 'nf_one', name: '합성 학생', phone: '010-0000-0000' }] } }, attData: { '1-1-1': { nf_one: { '0-0': 'O', '0-1': 'X', '0-2': 'X', '0-3': 'X' } } } };
   mocks.subscribe.mockImplementation((_year, receive, fail) => { mocks.receive = receive; mocks.fail = fail; return mocks.stop; });
 });
@@ -38,6 +38,38 @@ describe('목양 리포트 실제 화면', () => {
     expect(screen.getByText('이전 미입력 있음')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '합성 학생 상세 보기' }));
     expect(screen.getByText('조회 연도 기록 없음')).toBeTruthy();
+  });
+  it('학생 직접 링크가 해당 연속 결석 상세를 열고 초점을 옮긴다', () => {
+    mocks.query = 'view=absence&week=0-3&student=1-1-1%2Fnf_one';
+    render(<PastoralReport />);
+    const detail = screen.getByRole('complementary', { name: '합성 학생 상세' });
+    expect(detail).toBe(document.activeElement);
+    expect(detail.textContent).toContain('010-0000-0000');
+  });
+  it('학생 직접 링크의 대상이 현재 명단에 없으면 이유를 안내한다', () => {
+    mocks.query = 'view=absence&student=1-1-1%2Fmissing';
+    render(<PastoralReport />);
+    expect(screen.getByRole('status').textContent).toContain('현재 연속 결석 명단에 없습니다');
+  });
+  it('주소가 바뀔 때만 주일·탭을 동기화하고, 수동 전환 뒤에는 이전 심방 강조를 지운다', () => {
+    mocks.query = 'view=visits&request=1-1-1%2Fopen';
+    const { rerender } = render(<PastoralReport />);
+    expect(screen.getByTestId('visit-section').getAttribute('data-request-key')).toBe('1-1-1/open');
+    fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
+    rerender(<PastoralReport />);
+    expect(screen.getByRole('button', { name: '연속 결석' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: '심방 요청' }));
+    expect(screen.getByTestId('visit-section').getAttribute('data-request-key')).toBe('');
+    mocks.query = 'view=visits&request=1-1-1%2Fdone';
+    rerender(<PastoralReport />);
+    expect(screen.getByTestId('visit-section').getAttribute('data-request-key')).toBe('1-1-1/done');
+
+    mocks.query = 'view=absence&week=0-2';
+    rerender(<PastoralReport />);
+    expect(screen.queryByRole('complementary', { name: '합성 학생 상세' })).toBeNull();
+    mocks.query = 'view=absence&week=0-3&student=1-1-1%2Fnf_one';
+    rerender(<PastoralReport />);
+    expect(screen.getByRole('complementary', { name: '합성 학생 상세' })).toBeTruthy();
   });
   it('권한 오류를 0명으로 숨기지 않고 재시도하며 해제된 응답을 무시한다', () => {
     const { rerender } = render(<PastoralReport />);
