@@ -48,4 +48,15 @@ describe('관리자 심방 요청', () => {
     expect(screen.getByText('완료 학생')).toBeTruthy();
     expect(screen.getByRole('button', { name: '다시 열기' })).toBeTruthy();
   });
+  it('심방 직접 링크가 처리 완료 건도 찾아 초점을 옮긴다', async () => {
+    render(<VisitRequestsSection requestKey="1-1-1/done" />);
+    const target = await screen.findByRole('article', { name: '완료 학생 심방 요청' });
+    await waitFor(() => expect(target).toBe(document.activeElement));
+    expect(screen.getByRole('button', { name: /처리 완료 1/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+  it('심방 직접 링크의 대상이 사라지면 빈 목록과 구분해 안내한다', () => {
+    render(<VisitRequestsSection requestKey="1-1-1/missing" />);
+    expect(screen.getByRole('status').textContent).toContain('요청한 심방 건을 찾을 수 없습니다');
+  });
 });
