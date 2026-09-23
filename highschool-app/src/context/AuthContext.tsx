@@ -14,6 +14,8 @@ interface AuthContextValue {
   /** 두 축 역할(학기·방학) — 화면 게이트는 accessPolicy의 판정 함수를 통해서만 쓴다 */
   roles: MinistryRoles;
   teamMemberships: TeamMemberships;
+  /** 원시 역할 원장의 학적·출석 전체 조회 권한. 비활성 팀 연결도 Rules처럼 계산한다. */
+  canSearchOfficialRoster: boolean;
   memberName: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [roles, setRoles] = useState<MinistryRoles>(NO_ROLES);
   const [teamMemberships, setTeamMemberships] = useState<TeamMemberships>({});
+  const [canSearchOfficialRoster, setCanSearchOfficialRoster] = useState(false);
   const [memberName, setMemberName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setRoles(NO_ROLES);
       setTeamMemberships({});
+      setCanSearchOfficialRoster(false);
       setMemberName(null);
       if (u) {
         try {
@@ -68,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const roleSource = (retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin : null)
             ?? (iguardMember && typeof iguardMember === "object" ? iguardMember : null);
 
-          setRoles(resolveMinistryRoles({
+          const nextRoles = resolveMinistryRoles({
             isMainAdmin,
             hasRetreatAdmin: retreatAdmin != null,
             retreatAdminRole: retreatAdmin && typeof retreatAdmin === "object" ? retreatAdmin.role : undefined,
@@ -76,7 +80,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             iguardRole: iguardRoleSnap.val(),
             semesterRole: roleSource?.semesterRole,
             retreatRole: roleSource?.retreatRole,
-          }));
+          });
+          setRoles(nextRoles);
+          setCanSearchOfficialRoster(
+            nextRoles.semester === "superAdmin" || nextRoles.semester === "pastor" || nextRoles.semester === "adminTeam"
+            || (nextRoles.semester === "leader" && retreatAdmin != null && !retreatAdmin.teamMemberships),
+          );
           // 같은 사람이 두 운영 계정 목록에 함께 있을 수 있다. 한쪽만 고르면 다른 쪽에
           // 연결된 팀이 사라져 보이므로 두 목록의 팀 연결을 합쳐 읽는다.
           setTeamMemberships(mergeTeamMemberships(
@@ -87,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (request !== authRequest) return;
           setRoles(NO_ROLES);
           setTeamMemberships({});
+          setCanSearchOfficialRoster(false);
           setMemberName(null);
         }
       }
@@ -106,11 +116,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await firebaseSignOut(auth);
     setRoles(NO_ROLES);
     setTeamMemberships({});
+    setCanSearchOfficialRoster(false);
     setMemberName(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, roles, teamMemberships, memberName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, roles, teamMemberships, canSearchOfficialRoster, memberName, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

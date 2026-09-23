@@ -13,7 +13,8 @@ export async function getGroups(retreatId: string): Promise<Group[]> {
 }
 
 export async function saveGroups(retreatId: string, groups: Group[]): Promise<void> {
-  await backupNodeBeforeOverwrite(paths.groups(retreatId), paths.groupsBackups(retreatId));
+  const backedUp = await backupNodeBeforeOverwrite(paths.groups(retreatId), paths.groupsBackups(retreatId));
+  if (!backedUp) throw new Error("조편성 백업에 실패하여 저장을 중단했습니다.");
   const data: Record<string, Omit<Group, "id">> = {};
   groups.forEach((g) => {
     const { id, ...rest } = g;
@@ -68,7 +69,8 @@ export async function getRooms(retreatId: string): Promise<Room[]> {
 }
 
 export async function saveRooms(retreatId: string, rooms: Room[]): Promise<void> {
-  await backupNodeBeforeOverwrite(paths.rooms(retreatId), paths.roomsBackups(retreatId));
+  const backedUp = await backupNodeBeforeOverwrite(paths.rooms(retreatId), paths.roomsBackups(retreatId));
+  if (!backedUp) throw new Error("방배정 백업에 실패하여 저장을 중단했습니다.");
   const data: Record<string, Omit<Room, "id">> = {};
   rooms.forEach((r) => {
     const { id, ...rest } = r;

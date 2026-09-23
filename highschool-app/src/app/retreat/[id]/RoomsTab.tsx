@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { Retreat, Room, Group, Student, Participant, TeacherAttendance, PartialAttendance } from "@/lib/types";
-import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, subscribeToStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, subscribeToPartialAttendances, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
+import { clearRooms, clearRoomAssignments, saveRooms, subscribeToRooms, subscribeToGroups, subscribeToRetreatStudentsByYear, subscribeToParticipants, subscribeToCellColors, subscribeToTeachers, subscribeToPartialAttendances, getRoomsBackups, restoreRoomsBackup } from "@/lib/db";
 import { groupDisplayName } from "@/lib/groupNumber";
 import BackupRestoreButton from "./BackupRestoreButton";
 import { useUI } from "@/context/UIContext";
@@ -70,12 +70,15 @@ export default function RoomsTab({ retreat }: Props) {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (isDirtyRef.current && !isSavingRef.current) {
       isSavingRef.current = true;
-      void saveRooms(retreat.id, roomsRef.current).finally(() => {
+      void saveRooms(retreat.id, roomsRef.current).then(() => {
         isDirtyRef.current = false;
+      }).catch((error) => {
+        toast(error instanceof Error ? error.message : "방배정을 저장하지 못했습니다.", "error");
+      }).finally(() => {
         isSavingRef.current = false;
       });
     }
-  }, [retreat.id]);
+  }, [retreat.id, toast]);
 
   async function flushAutoSave(updateUi = true) {
     if (saveTimerRef.current) {
@@ -120,7 +123,7 @@ export default function RoomsTab({ retreat }: Props) {
 
     setLoadError(null);
     // 출석부 학생 변경도 열린 방배정 화면에 즉시 반영한다.
-    unsubs.push(subscribeToStudentsByYear(retreat.year, stds => {
+    unsubs.push(subscribeToRetreatStudentsByYear(retreat.id, retreat.year, stds => {
       studentsBaseRef.current = stds;
       // Re-process if participants already loaded
       const parts = participantsRef.current;

@@ -135,6 +135,22 @@ export function attendanceAverage(students: ClassAttendance | undefined, cellKey
   return counts.reduce((sum, value) => sum + value, 0) / counts.length;
 }
 
+/** 예배팀 화면에는 개인별 출결 대신 반별 평균만 전달한다. */
+export function worshipSeatingSource(
+  classes: Record<string, unknown>,
+  attendance: Record<string, ClassAttendance>,
+  week: string,
+  service: WorshipService,
+) {
+  const classKeys = classKeysForService(Object.keys(classes), service);
+  const cellKeys = recentAttendedSundays(attendance, classKeys, week);
+  return {
+    classKeys,
+    cellKeys,
+    averageByClass: Object.fromEntries(classKeys.map((key) => [key, attendanceAverage(attendance[key], cellKeys)])),
+  };
+}
+
 /**
  * 필요한 줄 수 = 올림((출석 평균 + 반 선생님 1명) / 한 줄 의자 수).
  * 전체 명단으로 계산하면 허수가 많아 지난 3주 출석 평균을 쓴다.

@@ -1,8 +1,9 @@
 import { ref, get, push, onValue, DataSnapshot } from "firebase/database";
 import { auditedSet as set, auditedUpdate as update, auditedRemove as remove, auditedRunTransaction as runTransaction } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
+import { subscribeRetreatRoster } from "@/lib/db/retreatRoster";
 import { paths } from "./paths";
-import type { Retreat, Group, Room, Participant, Student, ClassData, IguardMeal,
+import type { Retreat, Group, Room, Participant, Student, IguardMeal,
   IguardScheduleBlock, IguardSegment, IguardPost, IguardMovement, IguardBus, IguardSeating,
   RetreatPeriod, Milestone, IguardAttendance, IguardAttendanceInfo, TeacherAttendance, PartialAttendanceMap,
   IguardAccessLock, IguardGbsPlace, IguardLodgingHotspot, IguardLodgingMap } from "./types";
@@ -79,39 +80,9 @@ export function subscribeToTeacherAttendances(retreatId: string, callback: (teac
     (error) => { console.warn("subscribeToTeacherAttendances error:", error); onError?.(error); });
 }
 
-/** classes/{year} 원시 데이터를 uniqueKey(`${buNum}_${studentId}`)로 정규화.
- *  src/lib/db/students.ts 의 getStudentsByYear 와 동일 규칙 (단일 원천). */
-function normalizeClasses(classesData: Record<string, ClassData> | null): Record<string, Student> {
-  if (!classesData) return {};
-  const result: Record<string, Student> = {};
-  Object.entries(classesData).forEach(([classKey, classData]) => {
-    // classKey 형식: {부}-{학년}-{반} (예: "1-2-3" = 1부 2학년 3반)
-    const parts = classKey.split("-");
-    const buNum = parseInt(parts[0]);
-    const grade = parseInt(parts[1]);
-    const cls   = parseInt(parts[2]);
-    if (classData.students) {
-      Object.entries(classData.students).forEach(([studentId, student]) => {
-        const normalizedStudent = student as Student;
-        const sourceId = typeof normalizedStudent.id === "string" && normalizedStudent.id.trim()
-          ? normalizedStudent.id.trim()
-          : studentId;
-        const uniqueKey = `${buNum}_${sourceId}`;
-        result[uniqueKey] = { ...normalizedStudent, id: uniqueKey, buNum, grade, class: cls };
-      });
-    }
-  });
-  return result;
-}
-
-export async function getStudentsByYear(year: number): Promise<Record<string, Student>> {
-  const snap = await get(ref(db, paths.classes(year)));
-  return normalizeClasses(snap.exists() ? snap.val() : null);
-}
-
-export function subscribeToStudentsByYear(year: number, cb: (students: Record<string, Student>) => void, onError?: (error: Error) => void): () => void {
-  return onValue(ref(db, paths.classes(year)), (snap) => cb(normalizeClasses(snap.exists() ? snap.val() : null)),
-    (error) => { console.warn("subscribeToStudentsByYear error:", error); onError?.(error); });
+/** 현장 화면에는 연간 원장 대신 해당 수련회에 연결된 학생만 전달한다. */
+export function subscribeToRetreatStudents(retreatId: string, year: number, cb: (students: Record<string, Student>) => void, onError?: (error: Error) => void): () => void {
+  return subscribeRetreatRoster(retreatId, year, (roster) => cb(roster.students), onError);
 }
 
 // 부분참(선복귀/후발대/당일참석) — 행정 소유, 이가드는 읽기 전용 소비

@@ -7,12 +7,12 @@ import { useUI } from "@/context/UIContext";
 import OverlayShell from "@/components/OverlayShell";
 import {
   cancelNewFriendPlacement,
-  subscribeClassesByYear,
   registerNewFriendInRoster,
   removeNewFriend,
   removeNewFriendFromRoster,
   saveNewFriend,
 } from "@/features/semester/db";
+import { fetchClassOptions } from "@/features/semester/classOptions";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import {
   deriveNewFriendRosterProgress,
@@ -377,24 +377,31 @@ export default function NewFriendsTab({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchHelpId = useId();
   const [editing, setEditing] = useState<NewFriend | "new" | null>(null);
-  const [classesByYear, setClassesByYear] = useState<Record<string, ClassInfo[]>>({});
+  const [classesBySid, setClassesBySid] = useState<Record<string, ClassInfo[]>>({});
   const [classError, setClassError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const storageSidFor = (friend: NewFriend) => getStorageSid?.(friend) ?? sid;
   const privateValueFor = (friend: NewFriend) => getPrivateValue?.(friend) ?? privateMap[friend.id];
   const recordKeyFor = (friend: NewFriend) => getRecordKey?.(friend) ?? friend.id;
-  const years = useMemo(() => [...new Set([
-    yearForStorageSid(sid),
-    ...friends.map((friend) => yearForStorageSid(getStorageSid?.(friend) ?? sid)),
+  const storageSids = useMemo(() => [...new Set([
+    sid,
+    ...friends.map((friend) => getStorageSid?.(friend) ?? sid),
   ])].sort(), [friends, getStorageSid, sid]);
 
   useEffect(() => {
     setClassError(null);
-    const unsubs = years.map((year) => subscribeClassesByYear(year, (next) => {
-      setClassesByYear((current) => ({ ...current, [year]: next }));
-    }, (error) => setClassError((current) => [current, `${year}: ${error.message}`].filter(Boolean).join(" / "))));
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [years]);
+    if (!user) return;
+    const controller = new AbortController();
+    storageSids.forEach((storageSid) => {
+      const year = yearForStorageSid(storageSid);
+      fetchClassOptions(user, storageSid, controller.signal).then((next) => {
+        if (!controller.signal.aborted) setClassesBySid((current) => ({ ...current, [storageSid]: next }));
+      }).catch((error: Error) => {
+        if (!controller.signal.aborted) setClassError((current) => [current, `${year}: ${error.message}`].filter(Boolean).join(" / "));
+      });
+    });
+    return () => controller.abort();
+  }, [user, storageSids]);
 
   const stageCounts = useMemo(() => friends.reduce<Record<string, number>>((acc, friend) => {
     const stage = deriveNewFriendStage(friend);
@@ -640,7 +647,7 @@ export default function NewFriendsTab({
           sid={editorSid}
           friend={friend}
           priv={friend ? privateValueFor(friend) : undefined}
-          classes={classesByYear[yearForStorageSid(editorSid)] ?? []}
+          classes={classesBySid[editorSid] ?? []}
           canSyncRoster={canSyncRoster}
           onClose={() => setEditing(null)}
         />;

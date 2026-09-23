@@ -96,23 +96,39 @@ firebase deploy --only database
   - 복구: `highschool-app`의 `restoreParticipantsBackup()` 함수 사용
 
 ### 수동 DB 백업
-Firebase 콘솔 또는 CLI로 전체 데이터를 내보낼 수 있습니다.
+Firebase 콘솔에서 전체 데이터를 내보내거나 CLI로 주요 노드를 백업할 수 있습니다.
 
 **방법 1: Firebase 콘솔**
 1. https://console.firebase.google.com/project/woori-high/database 접속
 2. 우측 상단 ⋮ 메뉴 → "JSON 내보내기"
 3. 다운로드된 파일을 날짜별로 보관
 
-**방법 2: CLI (REST API)**
-```bash
-# Firebase CLI 토큰 사용
-TOKEN=$(cat ~/.config/configstore/firebase-tools.json | python3 -c "import sys,json; print(json.load(sys.stdin)['tokens']['refresh_token'])" 2>/dev/null)
+**방법 2: Firebase CLI**
 
-# 주요 노드별 백업
-curl -s "https://woori-high-default-rtdb.firebaseio.com/classes.json?auth=$TOKEN" > backup_classes_$(date +%Y%m%d).json
-curl -s "https://woori-high-default-rtdb.firebaseio.com/retreats.json?auth=$TOKEN" > backup_retreats_$(date +%Y%m%d).json
-curl -s "https://woori-high-default-rtdb.firebaseio.com/retreatsPrivate.json?auth=$TOKEN" > backup_retreatsPrivate_$(date +%Y%m%d).json
+`firebase login`으로 승인된 관리자 계정에 로그인한 뒤 실행합니다. CLI가 인증과 HTTP 실패 판정을 처리하므로, 설정 파일의 refresh token을 REST `auth=`에 넣지 않습니다. 백업 파일에는 개인정보가 들어 있으므로 저장 위치의 권한을 제한하고 사용 후 삭제합니다.
+
+```bash
+set -euo pipefail
+umask 077
+BACKUP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/woori-high-db.XXXXXX")"
+trap 'rm -f "$BACKUP_DIR"/*.tmp' EXIT
+
+for NODE in classes retreats retreatsPrivate; do
+  TEMP_FILE="$BACKUP_DIR/$NODE.json.tmp"
+  firebase --project woori-high database:get "/$NODE" --instance woori-high-default-rtdb > "$TEMP_FILE"
+  python3 - "$TEMP_FILE" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    data = json.load(source)
+if not isinstance(data, dict) or not data or set(data) == {"error"}:
+    raise SystemExit("백업 검증 실패: 데이터가 없거나 정상 JSON 객체가 아닙니다.")
+PY
+  mv "$TEMP_FILE" "$BACKUP_DIR/$NODE.json"
+done
+printf '검증된 백업 위치: %s\n' "$BACKUP_DIR"
 ```
+
+명령이 실패하면 중단되며, `*.json.tmp`는 삭제됩니다. 성공한 파일만 안전한 보관 위치로 옮기고, 복구 확인 후 임시 사본은 삭제합니다.
 
 ### 수동 Rules 백업
 ```bash

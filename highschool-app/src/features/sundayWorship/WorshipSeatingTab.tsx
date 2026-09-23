@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { subscribeToAttendanceByYear, subscribeToClassesByYear } from "@/lib/db/students";
+import { useAuth } from "@/context/AuthContext";
 import { escapeHtml, printAsPDF } from "@/lib/exportUtils";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import { saveSeatingPlan, subscribeToSeatingPlans } from "./db";
@@ -13,15 +13,12 @@ import {
   MAX_SECTIONS,
   SEATS_PER_ROW,
   assignedKeys,
-  attendanceAverage,
   blockStartRow,
-  classKeysForService,
   defaultSections,
   isFrontBlock,
   isOverCapacity,
   planKey,
   previousSunday,
-  recentAttendedSundays,
   remainingRows,
   resizeSections,
   rowsForAverage,
@@ -46,10 +43,11 @@ const CELL_NUMBER: React.CSSProperties = {
   // 단위 "줄"과 붙여 한 덩어리로 읽히게 오른쪽 정렬하고, 글꼴·색은 감싼 span에서 물려받는다.
   textAlign: "right", font: "inherit", color: "inherit",
 };
-type AttendanceYear = Record<string, Record<string, Record<string, string>>>;
-type ClassesYear = Record<string, { teacher?: string; students?: Record<string, unknown> }>;
+type SeatingSource = { classKeys: string[]; cellKeys: string[]; averageByClass: Record<string, number | null> };
+const EMPTY_SOURCE: SeatingSource = { classKeys: [], cellKeys: [], averageByClass: {} };
 
 export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
+  const { user } = useAuth();
   const [week, setWeek] = useState(() => sundayOf(new Date()));
   const [service, setService] = useState<WorshipService>("1");
   const [plans, setPlans] = useState<SeatingPlans>({});
@@ -57,20 +55,36 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [classes, setClasses] = useState<ClassesYear>({});
-  const [attendance, setAttendance] = useState<AttendanceYear>({});
-  const { fail, ok, message: loadError } = useLoadErrors(`worship|${week}|${service}`);
-
-  const year = Number(week.slice(0, 4));
+  const [sourceState, setSourceState] = useState<{ scope: string; data: SeatingSource } | null>(null);
+  const scope = `worship|${user?.uid ?? "guest"}|${week}|${service}`;
+  const source = sourceState?.scope === scope ? sourceState.data : EMPTY_SOURCE;
+  const { fail, ok, message: loadError } = useLoadErrors(scope);
 
   useEffect(() => {
-    const unsubs = [
-      subscribeToSeatingPlans((value) => { setPlans(value); ok("자리 배치"); }, fail("자리 배치")),
-      subscribeToClassesByYear(year, (value) => { setClasses(value as ClassesYear); ok("반 명단"); }, fail("반 명단")),
-      subscribeToAttendanceByYear(year, (value) => { setAttendance(value); ok("출석 기록"); }, fail("출석 기록")),
-    ];
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [fail, ok, year]);
+    return subscribeToSeatingPlans((value) => { setPlans(value); ok("자리 배치"); }, fail("자리 배치"));
+  }, [fail, ok]);
+
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    void (async () => {
+      const token = await user.getIdToken();
+      if (controller.signal.aborted) return;
+      const query = new URLSearchParams({ week, service });
+      const response = await fetch(`/api/worship-seating-source?${query}`, {
+        cache: "no-store", signal: controller.signal,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(typeof body?.error === "string" ? body.error : "출석 평균을 불러오지 못했습니다.");
+      if (controller.signal.aborted) return;
+      setSourceState({ scope, data: body as SeatingSource });
+      ok("출석 평균");
+    })().catch((error) => {
+      if (!controller.signal.aborted) fail("출석 평균")(error instanceof Error ? error : new Error("출석 평균을 불러오지 못했습니다."));
+    });
+    return () => controller.abort();
+  }, [fail, ok, scope, service, user, week]);
 
   // 저장본이 곧 화면이다. 편집 중에만 draft가 화면을 대신한다(구독 echo가 입력을 덮지 않게).
   const saved = plans[planKey(week, service)];
@@ -79,21 +93,17 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
 
   // 출석이 있었던 최근 3주. 수련회·교사 방학처럼 예배가 없던 주를 그냥 세면
   // 그 주가 0으로 들어가 평균이 실제보다 낮아진다(근거가 하나도 없으면 1줄).
-  const cellKeys = useMemo(
-    () => recentAttendedSundays(attendance, classKeysForService(Object.keys(classes), service), week),
-    [attendance, classes, service, week],
-  );
+  const cellKeys = source.cellKeys;
 
   const averageFor = useCallback(
-    (key: string) => (key.startsWith("fixed:") ? null : attendanceAverage(attendance[key], cellKeys)),
-    [attendance, cellKeys],
+    (key: string) => (key.startsWith("fixed:") ? null : source.averageByClass[key] ?? null),
+    [source],
   );
 
   const available = useMemo(() => {
     const used = assignedKeys(sections);
-    const classOptions = classKeysForService(Object.keys(classes), service);
-    return [...classOptions, ...FIXED_SEATS.map((seat) => seat.key)].filter((key) => !used.has(key));
-  }, [classes, sections, service]);
+    return [...source.classKeys, ...FIXED_SEATS.map((seat) => seat.key)].filter((key) => !used.has(key));
+  }, [sections, source]);
 
   const edit = useCallback((next: SeatSection[]) => { setDraft(next); setNotice(null); }, []);
 
@@ -209,7 +219,7 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
             onChange={(event) => edit(resizeSections(sections, Math.min(MAX_SECTIONS, Math.max(1, Number(event.target.value) || 1)), sections[0]?.totalRows ?? 6))} /></div>
         </div>
         <div className="ml-auto flex flex-wrap gap-2">
-          <button type="button" className="btn-secondary" onClick={recalcAll} disabled={!canEdit}>출석으로 줄 수 계산</button>
+          <button type="button" className="btn-secondary" onClick={recalcAll} disabled={!canEdit || sourceState?.scope !== scope}>출석으로 줄 수 계산</button>
           <button type="button" className="btn-secondary" onClick={loadPreviousWeek} disabled={!canEdit}>지난주 불러오기</button>
           <button type="button" className="btn-secondary" onClick={print}>PDF 인쇄</button>
           <button type="button" className="btn-primary" onClick={() => void save()} disabled={!canEdit || !dirty || saving}>

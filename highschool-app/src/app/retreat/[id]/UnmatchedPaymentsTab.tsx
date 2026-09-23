@@ -7,7 +7,7 @@ import { normalizeName } from "@/lib/studentMatcher";
 import { resolvePaymentColorKey } from "@/lib/paymentColorKey";
 type BuTab = "1부" | "2부";
 import {
-  subscribeToParticipants, subscribeToParticipantsWithContacts, subscribeToClassesByYear, subscribeToCellColors,
+  subscribeToParticipants, subscribeToParticipantsWithContacts, subscribeToRetreatClassesByYear, subscribeToCellColors,
   subscribeToUnmatchedPayments,
   addUnmatchedPayment, resolveUnmatchedPayment,
   unresolveUnmatchedPayment, deleteUnmatchedPayment, updateUnmatchedPayment,
@@ -50,7 +50,7 @@ export default function UnmatchedPaymentsTab({ retreat }: { retreat: Retreat }) 
   useEffect(() => {
     // 클래스 DB 로드 (이름 맵 구성용)
     setLoadError(null);
-    const unsubClasses = subscribeToClassesByYear(retreat.year, (classesRaw) => {
+    const unsubClasses = subscribeToRetreatClassesByYear(retreat.id, retreat.year, (classesRaw) => {
       // 이름 변형 → cellColor키 맵 구성
       // ClassRosterTab과 동일한 키 형식: "${buNum}_${studentId}"
       const map = new Map<string, string>();

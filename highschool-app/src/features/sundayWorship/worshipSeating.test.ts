@@ -23,6 +23,7 @@ import {
   sundayCellKey,
   sundayOf,
   usedRows,
+  worshipSeatingSource,
   type ClassAttendance,
   type SeatSection,
 } from "./worshipSeating";
@@ -64,6 +65,16 @@ describe("줄 수 계산 - 지난 3주 출석 평균 + 담임 1명", () => {
     expect(attendanceAverage({ a: {} }, ["7-0"])).toBeNull();
     expect(rowsForAverage(null)).toBe(1);
   });
+});
+
+it("예배 자리 배치 자료는 개인 명단·연락처·출석 원본 없이 반별 평균만 돌려준다", () => {
+  const result = worshipSeatingSource(
+    { "1-1-1": { students: { student: { name: "노출금지", phone: "010-9999-9999" } } }, "2-1-1": {} },
+    { "1-1-1": { student: { "7-1": "O", "7-0": "T" } }, "2-1-1": { other: { "7-1": "O" } } },
+    "2026-08-16", "1",
+  );
+  expect(result).toEqual({ classKeys: ["1-1-1"], cellKeys: ["7-1", "7-0"], averageByClass: { "1-1-1": 1 } });
+  expect(JSON.stringify(result)).not.toMatch(/노출금지|010-9999-9999|student|"O"|"T"/);
 });
 
 describe("평균 기준 주 고르기 - 수련회·방학 주는 건너뛴다", () => {

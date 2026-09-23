@@ -23,7 +23,7 @@ import {
   subscribeToRetreatPeriods,
   subscribeToRetreatPrograms,
   subscribeToRooms,
-  subscribeToStudentsByYear,
+  subscribeToRetreatStudents,
   subscribeToTeacherAttendances,
 } from "@/features/iguard/lib/db";
 import type { Group as AdminGroup, Retreat as AdminRetreat, RetreatProgram } from "@/lib/types";
@@ -205,7 +205,7 @@ export function useRetreatData(id: string): RetreatData {
       readiness.markReady(key);
     };
     const unsubs = [
-      subscribeToStudentsByYear(retreatYear, receive(setStudents, "students"), fail("students")),
+      subscribeToRetreatStudents(id, retreatYear, receive(setStudents, "students"), fail("students")),
       subscribeToParticipants(id, receive(setParticipants, "participants"), fail("participants")),
       subscribeToTeacherAttendances(id, receive(setAdminTeachers, "adminTeachers"), fail("adminTeachers")),
       subscribeToGroups(id, value => {

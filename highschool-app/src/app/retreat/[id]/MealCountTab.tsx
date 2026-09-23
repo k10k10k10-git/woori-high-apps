@@ -8,7 +8,7 @@ import {
 import {
   subscribeToMealCount, saveMealCount, getParticipants, getCellColors, getTeachers,
   subscribeToParticipants, subscribeToTeachers, subscribeToPartialAttendances,
-  subscribeToStudentsByYear, subscribeToRetreatPeriods,
+  subscribeToRetreatStudentsByYear, subscribeToRetreatPeriods,
 } from "@/lib/db";
 import { toYMD } from "@/lib/dateFormat";
 import { useUI } from "@/context/UIContext";
@@ -109,7 +109,7 @@ export default function MealCountTab({ retreat }: Props) {
     const unsubs = [
       subscribeToTeachers(retreat.id, setDbTeachers, onDbError),
       subscribeToParticipants(retreat.id, setDbParticipants, onDbError),
-      subscribeToStudentsByYear(retreat.year, setDbStudents, onDbError),
+      subscribeToRetreatStudentsByYear(retreat.id, retreat.year, setDbStudents, onDbError),
       subscribeToPartialAttendances(retreat.id, setDbPartials, onDbError),
       subscribeToMealCount(retreat.id, (data) => {
         if (data) {

@@ -156,7 +156,7 @@ database.rules.json          # Firebase RTDB 보안 규칙 (운영 앱 2개의 �
 
 ### 라우팅 vs. 탭 구조
 
-Next.js App Router 라우트(`/dashboard`, `/attendance`, `/manage`, `/stats`, `/overall`, `/admin`)는 해당 화면 컴포넌트를 렌더링하는 래퍼다. `AppShell`은 일반 관리자에게 `AdminWorkspace`를, 교사와 공용 데모에게 기존 `TopBar`·`TabNav` 셸을 보여 준다. 인증과 데이터 구독은 공통이다.
+Next.js App Router 라우트(`/dashboard`, `/attendance`, `/manage`, `/stats`, `/overall`, `/admin`)는 해당 화면 컴포넌트를 렌더링하는 래퍼다. `AppShell`은 일반 관리자에게 `AdminWorkspace`를, 교사에게 `TopBar`·`TabNav` 셸을 보여 준다. 공개 데모는 별도 가상 출석 화면을 사용하며 Firebase 데이터 구독을 시작하지 않는다.
 
 ```
 layout.tsx
@@ -181,7 +181,7 @@ layout.tsx
 - 대시보드에서 반을 열면 부서·학년·반·학기를 선택한 뒤 `/attendance?view=check&week={주일 키}`로 이동한다. `buildAttendanceEntry()`는 관리자의 해당 연도 정상 주일 전체와 교사·데모의 최근 4회 목록을 분리한다. URL 날짜는 허용 목록 안에서만 적용하고 행사·잘못된 키는 기본 날짜로 복구한다. 콤보의 유효한 수동 선택이 URL보다 우선하며, 출석 페이지의 `Suspense`는 `useSearchParams`를 사용하는 정적 export에 필요하다.
 - `AttendanceManagement`의 기본 화면은 주차별 반 입력률과 출석률을 분리해 보여 주는 `ClassAttendanceOverview`다. `ManageWorkspace`의 기본 화면은 전체 학생 검색·필터·내보내기·편집·이동을 제공하는 `StudentDirectory`다. 학생 이동은 기존 잠금·충돌 방지·원본 보존 로직을 그대로 사용하고, `MoveStudentModal`에서 현재 소속과 목적지 및 보존 항목을 확인한 뒤 실행한다.
 - `ClassAttendanceOverview`는 전체 반을 기본으로 표시하고 `확인 필요`·`완료` 필터를 유지한다. `StudentDirectory`는 PC에서 상세 표, 모바일에서 간편 목록을 기본으로 하며 사용자가 바꾼 보기는 로컬 저장소에서 복원한다. 개인 정보나 명단 데이터는 보기 설정에 저장하지 않는다.
-- 공용 데모의 자동 로그인·부서·학년·반 선택·관리자 접근 버튼 흐름은 유지한다. 관리자 셸을 만들기 위해 데모 계정의 실제 권한·환경값을 바꾸거나 별도 인증 구독을 추가하지 않는다. 화면 제한을 Firebase Rules의 새로운 보안 경계로 설명하지 않는다.
+- 공개 데모는 부서·학년·반 선택과 관리자 접근 버튼을 유지하지만 Firebase 자동 로그인과 운영 데이터 구독은 제거한다. 화면 제한을 Firebase Rules의 새로운 보안 경계로 설명하지 않는다.
 
 ### 공유 컴포넌트
 
@@ -307,16 +307,13 @@ CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/global
 
 **읽기 권한도 본인 반으로 제한됨**: `classes`/`attendance`의 `.read`는 admin·retreatAdmins·iguardMembers·attendanceAdmins에 전체 범위를 주고, 교사는 위 `userRoles` 계약으로 파생한 본인 반만 허용한다. `useFirebaseData.ts`도 교사 로그인 시 `classes/{year}/{ck}`와 같은 반 출석만 구독하며 `loadUserRole`은 DB 쓰기 없이 화면 선택을 맞춘다. 교사 출석 쓰기는 본인 반 명단에 실제로 존재하는 학생 한 명에 한정하고 학생 이동 잠금 중에는 거부한다.
 
-### 데모 모드 (`src/lib/demo.ts`) — 교사 테스트 기간 한정, 끝나면 되돌린다
+### 공개 데모 (`src/lib/demo.ts`, `DemoAttendance.tsx`)
 
-로그인 대신 **부서·학년·반을 골라** 그 반 담임처럼 보게 하는 임시 접속 방식. 화면 뒤에서 **공용 데모 계정 하나로 로그인**하고, 고른 반만 보이도록 **화면에서** 제한한다 — 보안 규칙이 모든 읽기에 인증을 요구하므로 "로그인 없음"은 불가능하다.
+`NEXT_PUBLIC_DEMO_MODE=1`이면 로그인 없이 부서·학년·반을 고르는 가상 출석 화면을 연다. 정적 가상 명단과 최근 주일의 출석/결석 입력·표 조회만 제공하며 Firebase Auth/DB를 호출하지 않는다. 입력은 브라우저 메모리에만 반영되고 새로고침하면 초기화된다. `NEXT_PUBLIC_DEMO_EMAIL`·`NEXT_PUBLIC_DEMO_PASSWORD`는 빌드에 필요하지 않으며 사용하지 않는다.
 
-- 켜고 끄기: `.env.local`의 `NEXT_PUBLIC_DEMO_MODE`(`1`/`0`) + `NEXT_PUBLIC_DEMO_EMAIL`·`NEXT_PUBLIC_DEMO_PASSWORD`. **0으로 되돌리고 재배포하면 원래 로그인 화면으로 완전히 복귀**한다(다른 코드 경로를 건드리지 않는다).
-- 데모 계정에는 `attendanceAdmins`를 준다. 공용 계정 하나로 여러 반을 고르는 데모는 이메일에 고정된 교사 반 권한으로 표현할 수 없으므로 전체 출석부 권한을 쓰고, 보이는 반은 데모 화면에서만 제한한다.
-- 반 제한은 UI 계약일 뿐 **보안 경계가 아니다**. 그래서 `AppShell`의 `ADMIN_ONLY_PATHS`가 `/admin`·`/overall`을 셸에서 막는다 — 탭만 감추면 주소를 직접 입력해 관리 기능(진급·명단 교체·계정 관리)에 닿을 수 있고, 데모 계정은 그게 실제로 성공한다.
-- 역할은 `buildDemoRole`이 만드는 `role: 'teacher'`다. `admin`으로 만들면 전체 반이 보인다. 이름에 `(데모)`가 붙어 학생 정보 수정 시 남는 `adminChanges.actor`에서 실제 담임과 구분된다.
-- 현재 선택은 `demoSelection`, 직전 선택은 `demoLastSelection`에 따로 저장한다. `반 바꾸기`는 현재 선택만 비우므로 선택 화면에서 직전 반을 한 번에 다시 열 수 있다.
-- ⚠ 데모 계정 정보는 정적 번들에 그대로 들어간다. 주소를 아는 사람은 누구나 쓸 수 있으므로 **테스트 종료 시 계정 삭제 + `DEMO_MODE=0` 재배포**가 한 세트다.
+- 현재 선택은 `demoSelection`, 직전 선택은 `demoLastSelection`에 저장하되 옛 실제 담임 이름은 버리고 가상 반 목록의 키만 허용한다.
+- 관리자 접근 버튼을 누르면 일반 Firebase 로그인 화면으로 이동한다. 실제 교사·관리자는 종전 인증·권한 확인과 운영 데이터 흐름을 사용한다.
+- 이전 공개 데모 계정/`attendanceAdmins/{uid}` 레코드는 별도 운영 철회 대상이다. 새 화면 배포만으로 이미 노출된 과거 자격정보가 폐기되지는 않는다. 정확한 계정·권한을 확인하고 운영 스냅샷 후 철회 결과를 검증한다.
 
 ### 교사 출석 입력·장결 분리 (`AttendanceTab.tsx`)
 

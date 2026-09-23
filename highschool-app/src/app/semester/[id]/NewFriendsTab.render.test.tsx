@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("@/features/semester/classOptions", () => ({ fetchClassOptions: async () => [] }));
 import NewFriendsTab from "./NewFriendsTab";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import type { NewFriend } from "@/features/semester/types";

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { Retreat, Participant, PartialAttendance } from "@/lib/types";
 import { useUI } from "@/context/UIContext";
-import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getClassesByYear, subscribeToClassesByYear, getPartialAttendances, subscribeToPartialAttendances } from "@/lib/db";
+import { getParticipants, getCellColors, subscribeToCellColors, subscribeToParticipants, setCellColor, saveCancellation, getCancellations, getCancellationByStudentKey, deleteCancellation, getRetreatClassesByYear, subscribeToRetreatClassesByYear, getPartialAttendances, subscribeToPartialAttendances } from "@/lib/db";
 import { loadXlsx, saveWorkbook, printAsPDF, exportAsJPG, escapeHtml } from "@/lib/exportUtils";
 import { normalizeName, stripSuffix as stripSuffixStrict } from "@/lib/studentMatcher";
 import { LATE_REGISTRANT_COLORS } from "@/lib/constants";
@@ -54,7 +54,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     setLoadError(null);
     try {
       const [classesRaw, partsMap, colors, existingCancellations, partials] = await Promise.all([
-        getClassesByYear(retreat.year),
+        getRetreatClassesByYear(retreat.id, retreat.year),
         getParticipants(retreat.id),
         getCellColors(retreat.id),
         getCancellations(retreat.id),
@@ -105,7 +105,7 @@ export default function ClassRosterTab({ retreat }: { retreat: Retreat }) {
     const unsubPartial = subscribeToPartialAttendances(retreat.id, (list) => {
       setPartialMap(buildPartialMap(list));
     }, e => setLoadError(prev => prev ?? `구독 실패 - ${e.message}`));
-    const unsubClasses = subscribeToClassesByYear(retreat.year, (next) => {
+    const unsubClasses = subscribeToRetreatClassesByYear(retreat.id, retreat.year, (next) => {
       setClasses(buildClassInfos(next));
     }, e => setLoadError(prev => prev ?? `출석부 반 구독 실패 - ${e.message}`));
     return () => { unsubColors(); unsubParts(); unsubPartial(); unsubClasses(); };

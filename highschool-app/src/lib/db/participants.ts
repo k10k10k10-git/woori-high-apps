@@ -59,7 +59,9 @@ export async function saveParticipants(
   retreatId: string,
   participants: Record<string, Participant>
 ): Promise<void> {
-  await backupParticipantBundle(retreatId);
+  if (!await backupParticipantBundle(retreatId)) {
+    throw new Error("참가자 명단 백업에 실패하여 저장을 중단했습니다.");
+  }
   const { publicParticipants, contacts } = splitParticipants(participants);
   await update(ref(db), stripUndefined({
     [paths.participants(retreatId)]: publicParticipants,
@@ -73,7 +75,9 @@ export async function saveParticipants(
  * 최근 5개만 유지 (오래된 백업은 자동 삭제).
  */
 export async function backupParticipants(retreatId: string): Promise<void> {
-  await backupParticipantBundle(retreatId);
+  if (!await backupParticipantBundle(retreatId)) {
+    throw new Error("참가자 명단 백업에 실패하여 변경을 중단했습니다.");
+  }
 }
 
 export async function getParticipantsBackups(retreatId: string): Promise<Record<string, Record<string, Participant>>> {

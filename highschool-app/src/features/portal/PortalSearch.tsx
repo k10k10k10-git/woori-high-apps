@@ -16,7 +16,10 @@ const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
 };
 
 export default function PortalSearch() {
-  const { roles } = useAuth();
+  const { roles, canSearchOfficialRoster } = useAuth();
+  // 인물검색은 연간 학생·출석·교사 원장 전체를 구독한다. 팀별 권한은
+  // 서버에서 범위를 제한하는 검색을 갖추기 전까지 여기서 열지 않는다.
+  const canSearch = canSearchOfficialRoster;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [profiles, setProfiles] = useState<PersonProfile[]>([]);
@@ -39,7 +42,7 @@ export default function PortalSearch() {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !canSearch) return;
     return subscribePeopleSearchData(
       { includeSemester, includePrivate, includeAttendancePrivate },
       (data) => { setProfiles(buildPeopleProfiles(data)); setLoading(false); },
@@ -49,7 +52,7 @@ export default function PortalSearch() {
         setLoading(false);
       },
     );
-  }, [includeAttendancePrivate, includePrivate, includeSemester, loadKey, open]);
+  }, [canSearch, includeAttendancePrivate, includePrivate, includeSemester, loadKey, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -58,6 +61,7 @@ export default function PortalSearch() {
   }, [open]);
 
   useEffect(() => {
+    if (!canSearch) return;
     function onKeyDown(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       const typing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable;
@@ -74,7 +78,7 @@ export default function PortalSearch() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [beginOpen, selectedId]);
+  }, [beginOpen, canSearch, selectedId]);
 
   const results = useMemo(() => searchPeople(profiles, query), [profiles, query]);
   const selected = useMemo(() => profiles.find((profile) => profile.id === selectedId) ?? null, [profiles, selectedId]);
@@ -84,6 +88,8 @@ export default function PortalSearch() {
     setQuery("");
     setSelectedId(null);
   }
+
+  if (!canSearch) return null;
 
   return (
     <>

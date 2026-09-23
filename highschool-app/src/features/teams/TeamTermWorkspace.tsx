@@ -5,11 +5,12 @@ import { useEffect, useMemo, useState } from "react";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { useAuth } from "@/context/AuthContext";
-import { subscribeApplications, subscribeApplicationsPrivate, subscribeClassesByYear, subscribeSemesterMeta, subscribeSessions, subscribeStaffByYear, subscribeTeams, subscribeTrainingClasses } from "@/features/semester/db";
-import type { Application, ApplicationPrivate, ClassInfo, SemesterMeta, Session, StaffPerson, Team, TrainingClass } from "@/features/semester/types";
-import { buildRosterContactMap, resolvedContact, type RosterContact } from "@/features/semester/rosterContact";
+import { subscribeApplications, subscribeApplicationsPrivate, subscribeSemesterMeta, subscribeSessions, subscribeTeams, subscribeTrainingClasses } from "@/features/semester/db";
+import type { Application, ApplicationPrivate, SemesterMeta, Session, Team, TrainingClass } from "@/features/semester/types";
+import { resolvedContact, type RosterContact } from "@/features/semester/rosterContact";
 import { sundayTeamOf, type SundayTeamKey } from "@/features/portal/featureCatalog";
 import { canBrowseTeam, canEditTeam, canReadSemesterPrivate, canReadTeamContacts, semesterTeamForKey } from "./teamModel";
+import { fetchTeamRosterContacts } from "./teamContacts";
 import { TeamAccessState } from "./TeamAccessState";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import AttendanceTab from "@/app/semester/[id]/AttendanceTab";
@@ -27,17 +28,22 @@ const SECTIONS: Array<{ key: TeamTermSection; label: string }> = [
 ];
 
 export default function TeamTermWorkspace({ teamKey, semesterId, section }: { teamKey: SundayTeamKey; semesterId: string; section: TeamTermSection }) {
+  const { user } = useAuth();
+  return <TeamTermWorkspaceForUser key={user?.uid ?? "anonymous"} teamKey={teamKey} semesterId={semesterId} section={section} />;
+}
+
+function TeamTermWorkspaceForUser({ teamKey, semesterId, section }: { teamKey: SundayTeamKey; semesterId: string; section: TeamTermSection }) {
   const { user, roles, teamMemberships } = useAuth();
   const allowed = canBrowseTeam(teamKey, roles, teamMemberships, semesterId);
   const contactAllowed = canReadTeamContacts(teamKey, roles, teamMemberships, semesterId);
+  const privateAllowed = canReadSemesterPrivate(roles, teamMemberships);
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [applicationPrivates, setApplicationPrivates] = useState<Record<string, ApplicationPrivate>>({});
-  const [classes, setClasses] = useState<ClassInfo[]>([]);
-  const [staff, setStaff] = useState<StaffPerson[]>([]);
+  const [rosterContacts, setRosterContacts] = useState<Record<string, RosterContact>>({});
   const [ready, setReady] = useState(new Set<string>());
   const [error, setError] = useState<string | null>(null);
 
@@ -45,10 +51,9 @@ export default function TeamTermWorkspace({ teamKey, semesterId, section }: { te
     if (!user || !allowed) return;
     const mark = (key: string) => setReady((current) => new Set(current).add(key));
     const fail = (key: string) => (reason: Error) => { setError(reason.message); mark(key); };
-    const privateAllowed = canReadSemesterPrivate(roles, teamMemberships);
     if (!privateAllowed) mark("private");
-    if (!contactAllowed) { mark("classes"); mark("staff"); }
-    const year = semesterId.split("-")[0];
+    if (!contactAllowed) mark("contacts");
+    const controller = new AbortController();
     return (() => {
       const unsubs = [
         subscribeSemesterMeta(semesterId, (value) => { setMeta(value); mark("meta"); }, fail("meta")),
@@ -58,29 +63,41 @@ export default function TeamTermWorkspace({ teamKey, semesterId, section }: { te
         subscribeApplications(semesterId, (value) => { setApplications(value); mark("applications"); }, fail("applications")),
       ];
       if (contactAllowed) {
-        unsubs.push(
-          subscribeClassesByYear(year, (value) => { setClasses(value); mark("classes"); }, fail("classes")),
-          subscribeStaffByYear(year, (value) => { setStaff(value); mark("staff"); }, fail("staff")),
-        );
+        let pending = false;
+        const refresh = () => {
+          if (pending) return;
+          pending = true;
+          void fetchTeamRosterContacts(user, semesterId, teamKey, controller.signal)
+            .then((value) => { if (!controller.signal.aborted) { setRosterContacts(value); mark("contacts"); } })
+            .catch((reason) => { if (!controller.signal.aborted) fail("contacts")(reason); })
+            .finally(() => { pending = false; });
+        };
+        const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+        refresh();
+        window.addEventListener("focus", refresh);
+        document.addEventListener("visibilitychange", onVisible);
+        unsubs.push(() => {
+          window.removeEventListener("focus", refresh);
+          document.removeEventListener("visibilitychange", onVisible);
+        });
       }
       if (privateAllowed) {
         unsubs.push(
           subscribeApplicationsPrivate(semesterId, (value) => { setApplicationPrivates(value); mark("private"); }, fail("private")),
         );
       }
-      return () => unsubs.forEach((unsubscribe) => unsubscribe());
+      return () => { controller.abort(); unsubs.forEach((unsubscribe) => unsubscribe()); };
     })();
-  }, [allowed, contactAllowed, roles, semesterId, teamMemberships, user]);
+  }, [allowed, contactAllowed, privateAllowed, roles, semesterId, teamKey, teamMemberships, user]);
 
   const team = semesterTeamForKey(teams, teamKey);
   const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
   const roster = useMemo(() => team ? applications.filter((item) => item.status !== "취소" && item.teamId === team.id) : [], [applications, team]);
-  const rosterContacts = useMemo(() => buildRosterContactMap(classes, staff, applications), [applications, classes, staff]);
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const past = !!meta?.endDate && meta.endDate < today;
   const broadEditor = roles.semester === "superAdmin" || roles.semester === "pastor";
   const editable = canEditTeam(teamKey, roles, teamMemberships, semesterId) && (!past || broadEditor);
-  const loaded = ready.size === 8;
+  const loaded = ready.size === 7;
   const teamMeta = sundayTeamOf(teamKey)!;
 
   return <TeamAccessState allowed={allowed}><main className="team-term-page">
@@ -95,7 +112,7 @@ export default function TeamTermWorkspace({ teamKey, semesterId, section }: { te
         {!editable && <ReadOnlyBanner what={`${teamMeta.label} ${semesterId} 기록`} why={past ? "지난 학기는 기본적으로 조회 전용입니다." : "조회 역할은 이 팀 기록을 수정할 수 없습니다."} />}
         <SemesterEditProvider canEdit={editable}>
           {section === "overview" && <TeamTermOverview team={team} roster={roster} sessions={sessions} />}
-          {section === "roster" && <TeamRoster team={team} roster={roster} applicationPrivates={applicationPrivates} rosterContacts={rosterContacts} showContacts={contactAllowed} />}
+          {section === "roster" && <TeamRoster team={team} roster={roster} applicationPrivates={privateAllowed ? applicationPrivates : {}} rosterContacts={rosterContacts} showContacts={contactAllowed} />}
           {section === "attendance" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedTeamId={team.id} />}
           {section === "curriculum" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} lockedTeamId={team.id} />}
           {section === "records" && <div><div className="team-context-note"><strong>학기 공용 자료</strong><span>팀 화면에서는 공용 자료를 조회만 합니다. 추가와 삭제는 운영센터에서 진행합니다.</span></div><SemesterEditProvider canEdit={broadEditor}><ArchiveTab sid={semesterId} /></SemesterEditProvider></div>}

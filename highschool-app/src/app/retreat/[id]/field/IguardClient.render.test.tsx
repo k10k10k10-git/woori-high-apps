@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
     "subscribeToIguardLodgingMaps", "subscribeToIguardMeals", "subscribeToIguardMovements", "subscribeToIguardPosts",
     "subscribeToIguardSchedule", "subscribeToIguardSeating", "subscribeToIguardSegments", "subscribeToMilestones",
     "subscribeToPartialAttendances", "subscribeToParticipants", "subscribeToRetreat", "subscribeToRetreatPeriods",
-    "subscribeToRetreatPrograms", "subscribeToRooms", "subscribeToStudentsByYear", "subscribeToTeacherAttendances",
+    "subscribeToRetreatPrograms", "subscribeToRooms", "subscribeToRetreatStudents", "subscribeToTeacherAttendances",
   ].map((name) => [name, vi.fn()])),
 }));
 
@@ -62,7 +62,7 @@ function loadData(id: string) {
     for (const listener of dataListeners().filter((listener) => listener.unsubscribe.mock.calls.length === 0)) {
       if (listener.name === "subscribeToIguardAttendance") listener.value(new Set(), {});
       else if (listener.name === "subscribeToGroups") listener.value([group(`${id} 조`)]);
-      else if (["subscribeToStudentsByYear", "subscribeToParticipants", "subscribeToPartialAttendances", "subscribeToCellColors", "subscribeToIguardGroupStaff", "subscribeToIguardGbs"].includes(listener.name)) listener.value({});
+      else if (["subscribeToRetreatStudents", "subscribeToParticipants", "subscribeToPartialAttendances", "subscribeToCellColors", "subscribeToIguardGroupStaff", "subscribeToIguardGbs"].includes(listener.name)) listener.value({});
       else listener.value([]);
     }
   });
@@ -78,7 +78,7 @@ beforeEach(() => {
   for (const [name, subscribe] of Object.entries(mocks.db)) {
     subscribe.mockImplementation((...args: unknown[]) => {
       const global = name === "subscribeToConnection" || name === "subscribeToMilestones";
-      const offset = global ? 0 : 1;
+      const offset = global ? 0 : name === "subscribeToRetreatStudents" ? 2 : 1;
       const listener: Listener = {
         name, target: global ? null : args[0] as string | number,
         value: args[offset] as Listener["value"], error: args[offset + 1] as Listener["error"], unsubscribe: vi.fn(),
@@ -108,7 +108,7 @@ describe("IguardClient — 관리자 수련회 전환의 구독 생명주기", (
     loadData("b");
     expect(screen.getByTestId("cue-groups")).toHaveTextContent("b 조");
     expect(dataListeners()).toHaveLength(44);
-    expect(mocks.db.subscribeToStudentsByYear.mock.calls.map(([year]) => year)).toEqual([2026, 2027]);
+    expect(mocks.db.subscribeToRetreatStudents.mock.calls.map(([, year]) => year)).toEqual([2026, 2027]);
   });
 
   it("다음 수련회 메타 조회 실패 시 이전 명단을 정상 화면으로 남기지 않는다", () => {

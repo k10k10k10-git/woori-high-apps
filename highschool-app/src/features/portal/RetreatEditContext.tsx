@@ -8,7 +8,7 @@
 //   ② RetreatPageClient의 <fieldset disabled> — 내부의 button·input·select·textarea를
 //      브라우저가 전부 비활성화한다(display:contents라 레이아웃에는 영향이 없다)
 //
-// ⚠ 화면 차단은 보안 경계가 아니다. Rules는 여전히 retreatAdmins 전체에 쓰기를 허용한다.
+// ⚠ 화면 차단은 사용성 장치다. Rules도 방학 역할에 따라 행정·현장 쓰기를 분리한다.
 
 import { createContext, useContext, type ReactNode } from "react";
 
