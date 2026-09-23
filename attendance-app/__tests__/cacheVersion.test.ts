@@ -45,7 +45,7 @@ describe('서비스워커 캐시 버전', () => {
       .map(entry => entry.source);
 
     expect(noCacheSources).toEqual(expect.arrayContaining([
-      '/', '/dashboard', '/attendance', '/manage', '/stats', '/overall', '/admin', '**/*.html', '**/*.txt',
+      '/', '/dashboard', '/pastoral', '/attendance', '/manage', '/stats', '/overall', '/admin', '**/*.html', '**/*.txt',
     ]));
   });
 });
