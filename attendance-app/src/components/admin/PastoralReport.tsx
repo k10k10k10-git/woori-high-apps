@@ -6,22 +6,24 @@ import { useApp } from '@/store/AppContext';
 import { auth } from '@/lib/firebase/client';
 import { isDemoAccount } from '@/lib/demo';
 import { canUseAdminWorkspace } from '@/lib/adminNavigation';
-import { subscribeReportFriends } from '@/lib/pastoralFriends';
-import { buildPastoralReport, sortReportStudents, type ReportSort, type ReportFriend, type ReportStudent } from '@/utils/pastoralReport';
+import { subscribeReportFriends, type PublicReportFriend } from '@/lib/pastoralFriends';
+import { buildPastoralReport, sortReportStudents, type ReportSort, type ReportStudent } from '@/utils/pastoralReport';
 import VisitRequestsSection from '@/components/tabs/overall/VisitRequestsSection';
 import SuggestionsSection from '@/components/tabs/overall/SuggestionsSection';
 import AdminIcon from './AdminIcon';
+import NewFriendRegistrationSection from './NewFriendRegistrationSection';
 import './admin-overview.css';
 import './pastoral-report.css';
 
 const SECTIONS = [
   { key: 'visits', label: '심방 요청' },
   { key: 'absence', label: '연속 결석' },
-  { key: 'friends', label: '새친구 정착' },
+  { key: 'registration', label: '새친구 등록현황' },
+  { key: 'friends', label: '새친구 부서정착' },
   { key: 'notes', label: '특이사항' },
 ] as const;
 type Section = typeof SECTIONS[number];
-type FriendLoad = { status: 'loading' | 'ready' | 'error'; friends: ReportFriend[] };
+type FriendLoad = { status: 'loading' | 'ready' | 'error'; friends: PublicReportFriend[] };
 
 function Phone({ value, label }: { value?: string; label: string }) {
   const number = value?.replace(/[^\d+]/g, '');
@@ -112,19 +114,20 @@ function ReportContent() {
     <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">{SECTIONS.map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => { setSection(item); setSelectedStudentKey(''); setSelectedFriendKey(''); setActiveVisitKey(''); }}>{item.label}</button>)}</div>
 
     {showFilters && <div className={`pr-filters${filtersOpen ? ' pr-filters-open' : ''}`}>
-      {section.key !== 'visits' && <label>기준 주일<select value={report.selectedWeek?.key ?? ''} onChange={e => setWeekKey(e.target.value)}>{!report.weeks.length && <option value="">조회할 주일 없음</option>}{report.weeks.map(week => <option key={week.key} value={week.key}>{week.label}</option>)}</select></label>}
-      <label className="pr-search">학생 검색<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="이름 또는 담당 교사" /></label>
+      {(section.key === 'absence' || section.key === 'friends') && <label>기준 주일<select value={report.selectedWeek?.key ?? ''} onChange={e => setWeekKey(e.target.value)}>{!report.weeks.length && <option value="">조회할 주일 없음</option>}{report.weeks.map(week => <option key={week.key} value={week.key}>{week.label}</option>)}</select></label>}
+      <label className="pr-search">학생 검색<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={section.key === 'registration' ? '이름, 학교, 바나바 담당' : '이름 또는 담당 교사'} /></label>
       <label>부서<select value={part} onChange={e => { setPart(e.target.value); setClassKey(''); }}><option value="">전체 부서</option>{[...new Set(Object.keys(state.classData).map(key => key.split('-')[0]))].sort().map(p => <option key={p} value={p}>{p}부</option>)}</select></label>
-      <button className="pr-filter-toggle" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>필터 더보기{grade || selectedClass ? ' · 적용 중' : ''}</button>
+      <button className="pr-filter-toggle" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>필터 더보기{grade || (section.key !== 'registration' && selectedClass) ? ' · 적용 중' : ''}</button>
       <label className="pr-advanced">학년<select value={grade} onChange={e => { setGrade(e.target.value); setClassKey(''); }}><option value="">전체 학년</option>{[...new Set(Object.keys(state.classData).map(key => key.split('-')[1]))].sort().map(g => <option key={g} value={g}>{g}학년</option>)}</select></label>
-      <label className="pr-advanced">반<select value={selectedClass} onChange={e => setClassKey(e.target.value)}><option value="">전체 반</option>{classes.map(key => <option key={key} value={key}>{key.split('-').map((value, i) => `${value}${['부', '학년', '반'][i]}`).join(' ')}</option>)}</select></label>
-      {(part || grade || selectedClass || search) && <button type="button" onClick={resetFilters}>초기화</button>}
+      {section.key !== 'registration' && <label className="pr-advanced">반<select value={selectedClass} onChange={e => setClassKey(e.target.value)}><option value="">전체 반</option>{classes.map(key => <option key={key} value={key}>{key.split('-').map((value, i) => `${value}${['부', '학년', '반'][i]}`).join(' ')}</option>)}</select></label>}
+      {(part || grade || (section.key !== 'registration' && selectedClass) || search) && <button type="button" onClick={resetFilters}>초기화</button>}
     </div>}
-    {showFilters && section.key !== 'visits' && <p className="pr-note">{state.curYear}년 {report.selectedWeek?.label ?? '조회할 정상 주일 없음'} 기준 · 행사 주일 제외 · 미입력은 결석으로 계산하지 않습니다.</p>}
+    {(section.key === 'absence' || section.key === 'friends') && <p className="pr-note">{state.curYear}년 {report.selectedWeek?.label ?? '조회할 정상 주일 없음'} 기준 · 행사 주일 제외 · 미입력은 결석으로 계산하지 않습니다.</p>}
 
     <div id="pr-content" className="ao-content">
       {section.key === 'visits' && <VisitRequestsSection filter={visitFilter} requestKey={activeVisitKey} />}
       {section.key === 'notes' && <SuggestionsSection />}
+      {section.key === 'registration' && <NewFriendRegistrationSection year={state.curYear} friends={load.friends} status={load.status} part={part} grade={grade} search={search} onRetry={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }} />}
       {section.key === 'absence' && (!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
         <div className="pr-section-heading"><div><h2>{absenceView === 'absent' ? '연속 결석' : '다시 출석'} <span>{absenceRows.length}명</span></h2><p className="pr-note">{absenceView === 'absent' ? '행마다 최근 주일의 기록과 확인된 연속 결석 횟수를 보여드립니다.' : '3회 이상 결석한 뒤 기준 주일에 다시 출석한 학생입니다.'}</p><div className="ad-status-tabs" role="group" aria-label="결석 상태"><button type="button" aria-pressed={absenceView === 'absent'} onClick={() => { setAbsenceView('absent'); setSelectedStudentKey(''); }}>연속 결석 <span>{absent.length}</span></button><button type="button" aria-pressed={absenceView === 'recovered'} onClick={() => { setAbsenceView('recovered'); setSelectedStudentKey(''); }}>다시 출석 <span>{recovered.length}</span></button></div></div><div className="pr-inline-controls">{absenceView === 'absent' && <label>장결<select value={longAbsent} onChange={e => setLongAbsent(e.target.value)}><option value="active">일반 학생</option><option value="long">기존 장결</option><option value="all">모두</option></select></label>}<label>정렬<select value={sortOrder} onChange={e => setSortOrder(e.target.value as ReportSort)}><option value="absence">결석 많은 순</option><option value="latest">마지막 출석 최신순</option><option value="oldest">마지막 출석 오래된순</option></select></label></div></div>
         {requestedStudentKey === selectedStudentKey && !selectedStudent && <p className="pr-empty" role="status">요청한 학생이 현재 연속 결석 명단에 없습니다. 조회 주일과 장결 필터를 확인해 주세요.</p>}
@@ -134,9 +137,9 @@ function ReportContent() {
         </div>
       </>)}
       {section.key === 'friends' && (!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
-        <div className="pr-section-heading"><div><h2>새친구 정착 <span>{load.status === 'ready' ? `${friends.length}명` : '확인 중'}</span></h2><p className="pr-note">등반 완료 학생만 표시하며, 4회·8회 출석 흐름은 정착 판단을 돕는 자료입니다.</p></div></div>
+        <div className="pr-section-heading"><div><h2>새친구 부서정착 <span>{load.status === 'ready' ? `${friends.length}명` : '확인 중'}</span></h2><p className="pr-note">등반 완료 학생만 표시하며, 4회·8회 출석 흐름은 정착 판단을 돕는 자료입니다.</p></div></div>
         {load.status === 'error' && <div className="ao-error" role="alert"><span>등반 완료 정보를 불러오지 못해 명단을 표시하지 않습니다.</span><button type="button" onClick={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }}>다시 불러오기</button></div>}
-        {load.status === 'loading' ? <p className="pr-empty" role="status">등반 완료 정보를 불러오고 있습니다.</p> : <div className={`pr-master-detail${selectedFriend ? ' is-open' : ''}`}><div className="pr-table-wrap"><table className="pr-table"><caption>등반 완료 새친구 정착 현황</caption><thead><tr><th>학생</th><th>반 / 담당</th><th>등반일</th><th>첫 4회</th><th>첫 8회</th><th>상태</th></tr></thead><tbody>{friends.map(item => <tr key={item.friend.key}><th scope="row"><button type="button" onClick={() => setSelectedFriendKey(item.friend.key)}>{item.friend.name}</button></th><td>{item.row?.label ?? `${item.friend.part}부 ${item.friend.grade}학년`}<small>{item.friend.owner || item.row?.teacher || '담당 미등록'}</small></td><td>{item.startedDate || '확인 필요'}</td><td>출석 {item.four.present}/{item.four.elapsed}<small>미입력 {item.four.missing}</small></td><td>출석 {item.eight.present}/{item.eight.elapsed}<small>미입력 {item.eight.missing}</small></td><td><button className="pr-status-button" type="button" onClick={() => setSelectedFriendKey(item.friend.key)}>{item.status}</button></td></tr>)}</tbody></table>{!friends.length && <p className="pr-empty">현재 조회 범위에 등반 완료된 새친구가 없습니다.</p>}</div>{selectedFriend && <aside className="pr-detail"><button className="pr-close" type="button" onClick={() => setSelectedFriendKey('')}>닫기</button><h3>{selectedFriend.friend.name}</h3><p>{selectedFriend.row?.label ?? '출석부 연결 확인 필요'} · 담당 {selectedFriend.friend.owner || selectedFriend.row?.teacher || '미등록'}</p><dl><div><dt>등반일</dt><dd>{selectedFriend.startedDate || '확인 필요'}</dd></div><div><dt>등반 후 마지막 출석</dt><dd>{selectedFriend.lastPresent?.label ?? '기록 없음'}</dd></div><div><dt>현재 표시</dt><dd>{selectedFriend.status}</dd></div></dl><div className="pr-contacts"><Phone value={selectedFriend.row?.student.phone} label="학생" /><Phone value={selectedFriend.row?.student.pphone} label="보호자" /></div></aside>}</div>}
+        {load.status === 'loading' ? <p className="pr-empty" role="status">등반 완료 정보를 불러오고 있습니다.</p> : load.status === 'ready' ? <div className={`pr-master-detail${selectedFriend ? ' is-open' : ''}`}><div className="pr-table-wrap"><table className="pr-table"><caption>등반 완료 새친구 부서정착 현황</caption><thead><tr><th>학생</th><th>반 / 담당</th><th>등반일</th><th>첫 4회</th><th>첫 8회</th><th>상태</th></tr></thead><tbody>{friends.map(item => <tr key={item.friend.key}><th scope="row"><button type="button" onClick={() => setSelectedFriendKey(item.friend.key)}>{item.friend.name}</button></th><td>{item.row?.label ?? `${item.friend.part}부 ${item.friend.grade}학년`}<small>{item.friend.owner || item.row?.teacher || '담당 미등록'}</small></td><td>{item.startedDate || '확인 필요'}</td><td>출석 {item.four.present}/{item.four.elapsed}<small>미입력 {item.four.missing}</small></td><td>출석 {item.eight.present}/{item.eight.elapsed}<small>미입력 {item.eight.missing}</small></td><td><button className="pr-status-button" type="button" onClick={() => setSelectedFriendKey(item.friend.key)}>{item.status}</button></td></tr>)}</tbody></table>{!friends.length && <p className="pr-empty">현재 조회 범위에 등반 완료된 새친구가 없습니다.</p>}</div>{selectedFriend && <aside className="pr-detail"><button className="pr-close" type="button" onClick={() => setSelectedFriendKey('')}>닫기</button><h3>{selectedFriend.friend.name}</h3><p>{selectedFriend.row?.label ?? '출석부 연결 확인 필요'} · 담당 {selectedFriend.friend.owner || selectedFriend.row?.teacher || '미등록'}</p><dl><div><dt>등반일</dt><dd>{selectedFriend.startedDate || '확인 필요'}</dd></div><div><dt>등반 후 마지막 출석</dt><dd>{selectedFriend.lastPresent?.label ?? '기록 없음'}</dd></div><div><dt>현재 표시</dt><dd>{selectedFriend.status}</dd></div></dl><div className="pr-contacts"><Phone value={selectedFriend.row?.student.phone} label="학생" /><Phone value={selectedFriend.row?.student.pphone} label="보호자" /></div></aside>}</div> : null}
       </>)}
     </div>
   </div>;
