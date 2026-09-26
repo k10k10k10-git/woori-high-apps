@@ -40,9 +40,10 @@ firebase deploy --only database  # 보안 규칙만 배포
 
 - **2026-09-09 권한 부여 요청**: `attendanceAdmins/{uid}=true`인 실제 출석부 관리자에게 `semesters/{sid}/newFriends` 읽기를 추가한다. `config/pastoralReport/blockedDemoUid`의 문자열이 존재하고 본인 UID와 달라야 하며 공용 데모는 제외한다. 이 설정 쓰기는 `admins` 전권만 허용한다. 학기 상위·다른 하위·비공개·새친구 쓰기 권한은 추가하지 않는다. 아래의 기존 권한 오류 fallback은 네트워크 오류·설정 누락에 대비해 유지한다.
 
-- 일반 관리자 전용 `/pastoral`은 새친구 정착현황 / 연속 결석 / 이번 주 요약을 제공한다. 교사·공용 데모는 `adminNavigation.ts`와 컴포넌트 진입에서 차단한다.
+- 일반 관리자 전용 `/pastoral`은 심방 요청 / 연속 결석 / 새친구 등록현황 / 새친구 부서정착 / 특이사항을 제공한다. 교사·공용 데모는 `adminNavigation.ts`와 컴포넌트 진입에서 차단한다.
 - `pastoralReport.ts`는 현재 연도 기존 classes/attendance/events를 재사용한다. KST 기준 경과 정상 주일만 선택하며, X가 연속 3회 이상일 때만 결석 목록에 표시한다. 미입력·출석은 연속 계산을 끊고 행사 주일은 제외한다. 목록의 횟수는 `확인된 연속 결석`으로 표현하며 미입력에서 중단된 학생은 중단 주일을 함께 표시한다. 장결은 별도 필터이며 주간 연락 대상은 일반 학생이다. 최근 출석 직전 3회가 X인 학생을 출석 회복으로 표시한다.
 - 새친구는 `pastoralFriends.ts`에서 `semesters/{year}-1/newFriends`, `{year}-2/newFriends`, `{year}-sunday/newFriends`만 구독한다. 기존 Rules 읽기 권한을 유지하고 semestersPrivate를 읽지 않는다. 조회 실패 시 재시도를 표시하고 등반 완료 여부를 확인할 수 없는 명단·집계를 숨긴다. `nf_` ID만으로 등반 완료를 추정하지 않는다.
+- `새친구 등록현황`은 위 3개 공개 경로의 학교·등록일·1/2주차·등록 결정·배정 반·진행 단계를 실시간으로 투영한다. 통합사이트의 단계 판정은 `pastoralFriendProgress.ts`에 맞추되 `giftDate`만 있는 과거 완료 기록을 실제 출석부 반영으로 표기하지 않는다. 비공개 연락처·주소·심방 메모는 읽지 않는다. 등록현황에는 기준 주일을 적용하지 않고, `새친구 부서정착`의 등반 후 출석 계산 계약은 유지한다.
 - 2026-09-09 기준 보완: 통합 앱의 완료 계약과 동일하게 `rosterSync` 또는 과거 `giftDate`가 있는 학생만 정착현황·주간 새친구 집계에 포함한다. 첫 4회·8회는 유효한 기존 giftDate 또는 rosterSync.syncedAt의 KST 날짜부터 정상 주일을 계산하고 미입력 수를 함께 표시한다. 등반일이 없으면 접수일로 대체하지 않고 확인 필요로 표시한다. 기준 주일 이후 등반은 제외한다. rosterSync의 반·학생 ID 또는 현재 연도의 유일한 personId만 연결하고 이름으로 합치지 않는다. 등록 자료의 한 경로라도 실패하면 부분 집계를 전체로 표시하지 않는다.
 - 연락처는 기존 출석부 학생 phone/pphone만 전화 링크로 제공한다. 새로운 저장·내보내기·자동 연락은 없다. 인증 세대·연도 전환 시 원장 연결 상태를 폐기하고 이전 구독 응답을 무시한다.
 - 회귀 검사는 `pastoralReport.test.ts`, `PastoralReport.render.test.tsx`, `adminNavigation.test.ts`. 합성 브라우저 재현은 `outputs/pastoral-report-20260909/start-fixture.mjs`이며 환경값·운영 SDK를 차단한다.
@@ -180,7 +181,7 @@ layout.tsx
 - 첫 화면의 출석률 옆에는 분모인 입력된 O·X 기록 수를 명시하고, 일반 학생의 입력 완료 인원은 별도로 적는다. 수치만으로 전체 학생 기준 출석률이나 미입력을 결석으로 읽게 하지 않는다.
 - 대시보드에서 반을 열면 부서·학년·반·학기를 선택한 뒤 `/attendance?view=check&week={주일 키}`로 이동한다. `buildAttendanceEntry()`는 관리자의 해당 연도 정상 주일 전체와 교사·데모의 최근 4회 목록을 분리한다. URL 날짜는 허용 목록 안에서만 적용하고 행사·잘못된 키는 기본 날짜로 복구한다. 콤보의 유효한 수동 선택이 URL보다 우선하며, 출석 페이지의 `Suspense`는 `useSearchParams`를 사용하는 정적 export에 필요하다.
 - `AttendanceManagement`의 기본 화면은 주차별 반 입력률과 출석률을 분리해 보여 주는 `ClassAttendanceOverview`다. `ManageWorkspace`의 기본 화면은 전체 학생 검색·필터·내보내기·편집·이동을 제공하는 `StudentDirectory`다. 학생 이동은 기존 잠금·충돌 방지·원본 보존 로직을 그대로 사용하고, `MoveStudentModal`에서 현재 소속과 목적지 및 보존 항목을 확인한 뒤 실행한다.
-- `ClassAttendanceOverview`는 전체 반을 기본으로 표시하고 `확인 필요`·`완료` 필터를 유지한다. `StudentDirectory`는 PC에서 상세 표, 모바일에서 간편 목록을 기본으로 하며 사용자가 바꾼 보기는 로컬 저장소에서 복원한다. 개인 정보나 명단 데이터는 보기 설정에 저장하지 않는다.
+- `ClassAttendanceOverview`는 전체 반을 기본으로 표시하고 `확인 필요`·`완료` 필터를 유지한다. `StudentDirectory`는 PC에서 상세 표, 모바일에서 간편 목록을 기본으로 하며, 같은 필터 결과를 반별 이름으로 묶는 `한눈에` 보기를 추가한다. 사용자가 바꾼 보기는 로컬 저장소에서 복원한다. 개인 정보나 명단 데이터는 보기 설정에 저장하지 않는다.
 - 공개 데모는 부서·학년·반 선택과 관리자 접근 버튼을 유지하지만 Firebase 자동 로그인과 운영 데이터 구독은 제거한다. 화면 제한을 Firebase Rules의 새로운 보안 경계로 설명하지 않는다.
 
 ### 공유 컴포넌트
