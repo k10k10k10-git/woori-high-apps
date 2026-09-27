@@ -56,6 +56,14 @@ export default function StudentDirectory({ onOpenClass }: { onOpenClass: (classK
     else groups.set(row.classKey, [row]);
     return groups;
   }, new Map<string, DirectoryRow[]>());
+  const overviewGrades = [...overviewGroups].reduce((groups, classGroup) => {
+    const first = classGroup[1][0];
+    const key = `${first.part}-${first.grade}`;
+    const classes = groups.get(key);
+    if (classes) classes.push(classGroup);
+    else groups.set(key, [classGroup]);
+    return groups;
+  }, new Map<string, [string, DirectoryRow[]][]>());
   const selected = rows.find(row => `${row.classKey}/${row.student.id}` === selectedKey) ?? null;
   const hasFilters = !!query || part !== 'all' || grade !== 'all' || effectiveClass !== 'all' || studentStatus !== 'all';
 
@@ -73,13 +81,20 @@ export default function StudentDirectory({ onOpenClass }: { onOpenClass: (classK
     <div className="sd-toolbar"><label className="sd-search"><AdminIcon name="search" /><span className="ad-sr-only">학생 명단 검색</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="이름·연락처·학교·담임 검색" /></label><select aria-label="명단 부서 필터" value={part} onChange={event => { setPart(event.target.value); setClassKey('all'); }}><option value="all">전체 부서</option><option value="1">1부</option><option value="2">2부</option></select><details className="sd-more"><summary>필터 더보기{grade !== 'all' || effectiveClass !== 'all' || studentStatus !== 'all' ? ' · 적용 중' : ''}</summary><div><label>학년<select value={grade} onChange={event => { setGrade(event.target.value); setClassKey('all'); }}><option value="all">전체 학년</option>{[1,2,3].map(value => <option value={String(value)} key={value}>{value}학년</option>)}</select></label><label>반<select value={effectiveClass} onChange={event => setClassKey(event.target.value)}><option value="all">전체 반</option>{classOptions.map(key => { const [p,g,c] = key.split('-'); return <option key={key} value={key}>{p}부 {g}학년 {c}반</option>; })}</select></label><label>상태<select value={studentStatus} onChange={event => setStudentStatus(event.target.value as typeof studentStatus)}><option value="all">전체 상태</option><option value="active">일반 학생</option><option value="long">장결 학생</option></select></label></div></details></div>
     <div className="sd-result-bar"><span role="status" aria-live="polite"><b>{rows.length}명</b> / 전체 {allRows.length}명{hasFilters && ' · 필터 적용 중'}</span><div><div className="sd-view-switch" role="group" aria-label="명단 보기 방식"><button type="button" aria-pressed={directoryView === 'overview'} onClick={() => changeDirectoryView('overview')}>한눈에</button><button type="button" aria-pressed={directoryView === 'compact'} onClick={() => changeDirectoryView('compact')}>간편 목록</button><button type="button" aria-pressed={directoryView === 'table'} onClick={() => changeDirectoryView('table')}>상세 표</button></div>{hasFilters && <button type="button" onClick={resetFilters}>필터 초기화</button>}<details className="sd-export"><summary>명단 내보내기</summary><div><button type="button" onClick={() => exportRows('xlsx')}>Excel</button><button type="button" onClick={() => exportRows('csv')}>CSV</button></div></details></div></div>
     {directoryView === 'overview' && rows.length > 0 && <div className="sd-overview">
-      <p>반별로 이름을 빠르게 훑어보세요. 연락처와 관리 작업은 상세 표에 있습니다.</p>
-      <div className="sd-overview-grid">
-        {[...overviewGroups].map(([key, group]) => {
-          const first = group[0];
-          return <section className="sd-overview-class" key={key} aria-labelledby={`sd-overview-${key}`}>
-            <div className="sd-overview-class-heading"><div><h3 id={`sd-overview-${key}`}>{first.part}부 {first.grade}학년 {first.classNumber}반</h3><p>담임 {first.teacher || '미등록'}</p></div><span>{group.length}명</span></div>
-            <ul className="sd-overview-names">{group.map(row => <li key={`${row.classKey}/${row.student.id}`}><span className="sd-overview-number">{row.student.num ?? '—'}</span><span className="sd-overview-name">{row.student.name}</span>{row.student.jang && <span className="sd-overview-long">장결</span>}</li>)}</ul>
+      <p>부·학년별로 반과 학생 이름을 확인하세요. 연락처와 관리 작업은 상세 표에 있습니다.</p>
+      <div className="sd-overview-grades">
+        {[...overviewGrades].map(([gradeKey, classes]) => {
+          const first = classes[0][1][0];
+          const studentCount = classes.reduce((count, [, group]) => count + group.length, 0);
+          return <section className="sd-overview-grade" key={gradeKey} aria-labelledby={`sd-overview-grade-${gradeKey}`}>
+            <div className="sd-overview-grade-heading"><h3 id={`sd-overview-grade-${gradeKey}`}>{first.part}부 {first.grade}학년</h3><span>{classes.length}개 반 · {studentCount}명</span></div>
+            <div className="sd-overview-grid">{classes.map(([key, group]) => {
+              const classRow = group[0];
+              return <section className="sd-overview-class" key={key} aria-labelledby={`sd-overview-${key}`}>
+                <div className="sd-overview-class-heading"><div><h4 id={`sd-overview-${key}`}><span className="ad-sr-only">{classRow.part}부 {classRow.grade}학년 </span>{classRow.classNumber}반</h4><p>담임 {classRow.teacher || '미등록'}</p></div><span>{group.length}명</span></div>
+                <ul className="sd-overview-names">{group.map(row => <li key={`${row.classKey}/${row.student.id}`}><span className="sd-overview-number">{row.student.num ?? '—'}</span><span className="sd-overview-name">{row.student.name}</span>{row.student.jang && <span className="sd-overview-long">장결</span>}</li>)}</ul>
+              </section>;
+            })}</div>
           </section>;
         })}
       </div>
