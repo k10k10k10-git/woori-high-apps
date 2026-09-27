@@ -29,16 +29,16 @@
 .ao-directory .overall-card { min-width: 0; width: 100%; margin: 0; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
 .ao-directory .overall-card-header { padding: 0 0 16px; border-bottom: 1px solid #e5e5e8; gap: 12px; flex-wrap: wrap; }
 .ao-directory .overall-card-title { color: #292a30; font-size: 16px; font-weight: 600; }
-.ao-directory :is(.view-btn, .btn-primary) { min-height: 44px; border-radius: 6px; font-family: inherit; }
+.ao-directory :is(.view-btn, .btn-primary) { min-height: 44px; border-radius: 10px; font-family: inherit; }
 .ao-directory .view-btn { color: #666773; border-color: transparent; background: transparent; }
 .ao-directory .view-btn.active { background: #eeecf5; color: #584a97; border-color: transparent; }
 .ao-directory .ao-teacher-tools { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.ao-directory .ao-quiet-button { min-height: 44px; padding: 0 12px; font: inherit; font-size: 12px; border: 1px solid #e5e5e8; border-radius: 6px; background: #fff; color: #666773; cursor: pointer; }
+.ao-directory .ao-quiet-button { min-height: 44px; padding: 0 12px; font: inherit; font-size: 12px; border: 1px solid #e5e5e8; border-radius: 10px; background: #fff; color: #666773; cursor: pointer; }
 .ao-directory .ao-edit-button { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; background: transparent; color: #6355a7; font: inherit; font-size: 12px; cursor: pointer; }
-.ao-directory .ao-edit-button:hover { background: #f3f0fa; border-radius: 6px; }
+.ao-directory .ao-edit-button:hover { background: #f3f0fa; border-radius: 10px; }
 .ao-directory table { font-variant-numeric: tabular-nums; }
-.ao-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: #fff4f2; color: #963e32; border-radius: 6px; }
-.ao-error button { min-height: 44px; border: 1px solid #dcbab3; border-radius: 6px; background: transparent; color: inherit; font: inherit; padding: 0 12px; cursor: pointer; }
+.ao-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: #fff4f2; color: #963e32; border-radius: 10px; }
+.ao-error button { min-height: 44px; border: 1px solid #dcbab3; border-radius: 10px; background: transparent; color: inherit; font: inherit; padding: 0 12px; cursor: pointer; }
 .ao-students-heading { display: flex; align-items: baseline; gap: 10px; }
 .ao-students-heading > span { color: #666773; font-size: 12px; }
 .ao-students-tools { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 12px 0 16px; }
@@ -49,10 +49,10 @@
 .ao-student-group ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid #e5e5e8; }
 .ao-student-group li { display: flex; gap: 12px; align-items: center; min-height: 38px; border-bottom: 1px solid #efeff2; }
 .ao-student-number { width: 24px; color: #666773; font-size: 12px; }
-.ao-jang-label { margin-left: auto; font-size: 11px; color: #666773; background: #f4f4f6; padding: 1px 6px; border-radius: 4px; }
+.ao-jang-label { margin-left: auto; font-size: 11px; color: #666773; background: #f4f4f6; padding: 1px 6px; border-radius: 8px; }
 .ao-export { position: relative; margin-left: auto; }
-.ao-export-menu { position: absolute; right: 0; top: 100%; margin-top: 4px; background: #fff; border: 1px solid #e5e5e8; border-radius: 8px; z-index: 10; min-width: 150px; padding: 4px; }
-.ao-export-menu button { display: block; width: 100%; min-height: 44px; padding: 8px 10px; font: inherit; font-size: 12px; text-align: left; background: none; border: 0; border-radius: 4px; cursor: pointer; color: #292a30; }
+.ao-export-menu { position: absolute; right: 0; top: 100%; margin-top: 4px; background: #fff; border: 1px solid #e5e5e8; border-radius: 12px; z-index: 10; min-width: 150px; padding: 4px; }
+.ao-export-menu button { display: block; width: 100%; min-height: 44px; padding: 8px 10px; font: inherit; font-size: 12px; text-align: left; background: none; border: 0; border-radius: 8px; cursor: pointer; color: #292a30; }
 .ao-export-menu button:hover { background: #f3f0fa; }
 @media (max-width: 1100px) { .admin-overview { padding: 28px 24px; } }
 @media (max-width: 760px) {
@@ -82,9 +82,9 @@
 .ao-suggestion-toggle > time { color: #666773; font-size: 12px; white-space: nowrap; }
 .ao-suggestion-preview { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #666773; }
 .ao-suggestion-preview strong { color: #584a97; font-weight: 600; }
-.ao-suggestion-item { padding: 12px 16px 18px; margin-top: 12px; background: #f8f8fa; border-radius: 6px; }
+.ao-suggestion-item { padding: 12px 16px 18px; margin-top: 12px; background: #f8f8fa; border-radius: 10px; }
 .ao-suggestion-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; color: #666773; font-size: 11px; }
-.ao-suggestion-meta button { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; border-radius: 4px; background: transparent; color: #666773; font: inherit; cursor: pointer; }
+.ao-suggestion-meta button { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: #666773; font: inherit; cursor: pointer; }
 .ao-suggestion-meta button:hover { background: #eeecf5; }
 .ao-suggestion-meta button.ao-delete-confirm { color: #a03935; }
 .ao-suggestion-meta button:disabled { opacity: .5; cursor: wait; }
@@ -97,7 +97,7 @@
 .ao-visit-person span { display: block; margin-top: 3px; color: #666773; font-size: 11px; }
 .ao-visit-row > p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .ao-visit-action { display: flex; align-items: center; gap: 10px; color: #666773; font-size: 11px; white-space: nowrap; }
-.ao-visit-action button { min-height: 44px; padding: 0 11px; border: 1px solid #dedce6; border-radius: 6px; background: #fff; color: #584a97; font: inherit; cursor: pointer; }
+.ao-visit-action button { min-height: 44px; padding: 0 11px; border: 1px solid #dedce6; border-radius: 10px; background: #fff; color: #584a97; font: inherit; cursor: pointer; }
 .ao-visit-action button:hover { background: #f3f0fa; }
 .ao-visit-action button:disabled { opacity: .5; cursor: wait; }
 @media (max-width: 760px) {

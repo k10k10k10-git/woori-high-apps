@@ -52,7 +52,7 @@
   .check-avatar { font-size: 15px; }
   .check-name { font-size: 15px; }
   .check-btns { gap: 5px; }
-  .check-btn { height: 44px; min-width: 54px; font-size: 12px; border-radius: 10px; }
+  .check-btn { height: 44px; min-width: 54px; font-size: 12px; border-radius: 12px; }
   .check-list-wrap { margin: 8px 8px; }
   .attendance-week-picker {
     margin: 8px; grid-template-columns: 1fr; gap: 5px; padding: 10px;
