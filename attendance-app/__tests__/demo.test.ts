@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parseClassKey,
   DEMO_OPTIONS, resolveDemoSelection,
-  clearDemoSelection, loadDemoSelection, loadLastDemoSelection, saveDemoSelection,
+  loadLastDemoSelection, saveDemoSelection,
 } from '@/lib/demo';
 
 // 저장된 예전 실제 반/담임 정보가 가상 데모 화면으로 새어 나오지 않도록 검증한다.
@@ -33,7 +33,7 @@ describe('가상 반만 허용', () => {
 });
 
 describe('데모 최근 반 선택', () => {
-  it('현재 반을 비워도 최근 반은 유지한다', () => {
+  it('최근 반만 저장하고 오래된 자동 진입 키는 사용하지 않는다', () => {
     const storage = new Map<string, string>();
     Object.defineProperty(globalThis, 'window', { value: globalThis, configurable: true });
     Object.defineProperty(globalThis, 'localStorage', {
@@ -47,9 +47,8 @@ describe('데모 최근 반 선택', () => {
 
     const selection = { ck: '2-3-3', teacherName: '' };
     saveDemoSelection(selection);
-    clearDemoSelection();
 
-    expect(loadDemoSelection()).toBeNull();
+    expect(storage.has('demoSelection')).toBe(false);
     expect(loadLastDemoSelection()).toEqual(selection);
   });
 });

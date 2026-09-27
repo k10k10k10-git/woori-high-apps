@@ -11,7 +11,7 @@ vi.mock('@/hooks/useAuth', () => ({ doLogin: mocks.doLogin }));
 
 import LoginScreen from './LoginScreen';
 
-describe('관리자 로그인 진입 화면', () => {
+describe('교사·관리자 로그인 진입 화면', () => {
   beforeEach(() => {
     mocks.doLogin.mockReset();
     mocks.onBackToDemo.mockReset();
@@ -23,6 +23,7 @@ describe('관리자 로그인 진입 화면', () => {
   it('명시적인 입력 이름과 기존 로그인 옵션을 그대로 전달한다', async () => {
     mocks.doLogin.mockResolvedValue(undefined);
     render(<LoginScreen onBackToDemo={mocks.onBackToDemo} />);
+    expect(screen.getByRole('heading', { name: '실제 출석부 로그인' })).not.toBeNull();
 
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'admin@example.com' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'secret-password' } });
@@ -49,7 +50,7 @@ describe('관리자 로그인 진입 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: /로그인$/ }));
     expect(screen.getByRole('alert').textContent).toContain('이메일과 비밀번호를 입력하세요');
 
-    fireEvent.click(screen.getByRole('button', { name: /반 선택 화면으로 돌아가기/ }));
+    fireEvent.click(screen.getByRole('button', { name: /가상 출석부 체험/ }));
     expect(mocks.onBackToDemo).toHaveBeenCalledTimes(1);
 
     rerender(<LoginScreen authError="권한 정보를 확인할 수 없습니다" onBackToDemo={mocks.onBackToDemo} />);

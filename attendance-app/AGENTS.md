@@ -71,9 +71,9 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 ## 데모·운영 화면 점검 주의
 
-- 공개 데모는 `NEXT_PUBLIC_DEMO_MODE=1`에서 가상 반·가상 학생의 출석/결석 입력과 표 조회만 제공한다. Firebase Auth 로그인·운영 DB 읽기/쓰기를 실행하지 않는다. `NEXT_PUBLIC_DEMO_EMAIL/PASSWORD`를 다시 쓰지 않는다.
+- 공개 데모는 `NEXT_PUBLIC_DEMO_MODE=1`에서 실제 로그인 화면의 `가상 출석부 체험`을 누른 경우에만 가상 반·가상 학생의 출석/결석 입력과 표 조회를 제공한다. 비로그인 기본 진입과 세션 만료 후 복귀는 실제 로그인 화면이며, 저장된 가상 반으로 자동 진입하지 않는다. 데모는 Firebase Auth 로그인·운영 DB 읽기/쓰기를 실행하지 않는다. `NEXT_PUBLIC_DEMO_EMAIL/PASSWORD`를 다시 쓰지 않는다.
 - `AppShell`에서 데모 진입을 별도 컴포넌트로 분리한다. `DemoClassPicker`는 정적 반 목록만 사용하고 `DemoAttendance`는 로컬 메모리만 갱신한다. 실제 교사·관리자에게는 기존 인증·`FirebaseDataLoader`·`DataLoadGate`를 유지한다.
-- `demoSelection`/`demoLastSelection`은 기존 브라우저의 실제 담임 이름을 버리고 허용된 가상 반 키만 복원한다. 관리자 접근은 일반 로그인으로 전환한다. 기존에 공개된 데모 계정과 `attendanceAdmins/{uid}`는 코드 배포와 별개로 정확한 대상을 확인해 철회해야 한다.
+- `demoLastSelection`은 기존 브라우저의 실제 담임 이름을 버리고 허용된 가상 반 키만 복원한다. 이전 `demoSelection`은 읽지 않으며 새로 저장하지 않는다. `실제 출석부 로그인`은 교사·관리자 공용 로그인으로 전환한다. 역할 조회 오류를 미등록 계정으로 오인해 로그아웃시키지 않는다. 기존에 공개된 데모 계정과 `attendanceAdmins/{uid}`는 코드 배포와 별개로 정확한 대상을 확인해 철회해야 한다.
 - `src/lib/releaseFlags.ts`의 `SHOW_ATTENDANCE_RISK_SECTIONS=false`는 임시 노출 정책이다. 문서 정리 중 임의로 켜지 않는다.
 - 관리자 로그인·연도 변경만으로 오래된 `classes`·`attendance`·`events`를 정리하지 않는다. `TrashModal`도 모든 복구본을 조회만 하며, 영구 삭제는 사용자가 항목별 `삭제` → `확인`을 누른 경우에만 실행한다. 이 계약을 화면 진입 effect의 자동 쓰기로 되돌리지 않는다.
 

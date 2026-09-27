@@ -53,7 +53,7 @@ export default function DemoAttendance({ selection, onChangeClass, onAdminLogin 
         <div className="topbar-title"><span className="topbar-title-mark" aria-hidden="true"><AdminIcon name="book" size={17} /></span><span>출석부</span><span className="demo-badge">데모</span></div>
         <div className="topbar-actions">
           <button className="logout-btn" type="button" onClick={onChangeClass}>반 바꾸기</button>
-          <button className="logout-btn topbar-admin-btn" type="button" onClick={onAdminLogin}>관리자 접근</button>
+          <button className="logout-btn topbar-admin-btn" type="button" onClick={onAdminLogin}>실제 출석부 로그인</button>
         </div>
       </div>
     </header>
