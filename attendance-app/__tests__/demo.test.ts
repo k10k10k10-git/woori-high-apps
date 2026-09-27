@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  parseClassKey,
-  DEMO_OPTIONS, resolveDemoSelection,
-  loadLastDemoSelection, saveDemoSelection,
+  parseClassKey, buildDemoRole,
+  buildDemoOptionsFromClasses, resolveDemoSelection,
+  loadLastDemoSelection, saveDemoSelection, clearDemoSelection,
 } from '@/lib/demo';
 
-// 저장된 예전 실제 반/담임 정보가 가상 데모 화면으로 새어 나오지 않도록 검증한다.
 describe('parseClassKey', () => {
   it('부-학년-반을 분리한다', () => {
     expect(parseClassKey('1-2-3')).toEqual({ part: '1', grade: '2', cls: '3' });
@@ -20,20 +19,21 @@ describe('parseClassKey', () => {
   });
 });
 
-describe('가상 반만 허용', () => {
-  it('운영 명단을 읽지 않아도 부서·학년·반 선택지가 있다', () => {
-    expect(DEMO_OPTIONS).toHaveLength(18);
-    expect(DEMO_OPTIONS[0]).toMatchObject({ ck: '1-1-1', teacherName: '' });
-  });
-
-  it('이전 저장된 실제 담임 이름을 버리고 가상 선택지 밖 반을 거부한다', () => {
-    expect(resolveDemoSelection({ ck: '1-2-3', teacherName: '실제 담임' })).toEqual({ ck: '1-2-3', teacherName: '' });
-    expect(resolveDemoSelection({ ck: '1-2-10', teacherName: '실제 담임' })).toBeNull();
+describe('실제 반 선택', () => {
+  it('실제 반 노드에서 정렬된 선택지를 만들고 선택 반 교사 역할을 만든다', () => {
+    const options = buildDemoOptionsFromClasses({
+      '2-3-10': { teacher: '담임' },
+      '1-1-2': { teacher: '첫 담임' },
+      invalid: { teacher: '제외' },
+    });
+    expect(options.map(option => option.ck)).toEqual(['1-1-2', '2-3-10']);
+    expect(buildDemoRole(options[1])).toMatchObject({ role: 'teacher', part: '2', grade: '3', class: '10', name: '담임 (데모)' });
+    expect(resolveDemoSelection({ ck: '2-3-10', teacherName: '담임' })).toEqual({ ck: '2-3-10', teacherName: '담임' });
   });
 });
 
-describe('데모 최근 반 선택', () => {
-  it('최근 반만 저장하고 오래된 자동 진입 키는 사용하지 않는다', () => {
+describe('공용 출석 반 선택 저장', () => {
+  it('최근 반만 저장하고 과거 자동 진입 키를 버린다', () => {
     const storage = new Map<string, string>();
     Object.defineProperty(globalThis, 'window', { value: globalThis, configurable: true });
     Object.defineProperty(globalThis, 'localStorage', {
@@ -45,10 +45,13 @@ describe('데모 최근 반 선택', () => {
       configurable: true,
     });
 
-    const selection = { ck: '2-3-3', teacherName: '' };
+    const selection = { ck: '2-3-3', teacherName: '담임' };
+    storage.set('demoSelection', JSON.stringify(selection));
     saveDemoSelection(selection);
 
     expect(storage.has('demoSelection')).toBe(false);
+    expect(loadLastDemoSelection()).toEqual(selection);
+    clearDemoSelection();
     expect(loadLastDemoSelection()).toEqual(selection);
   });
 });

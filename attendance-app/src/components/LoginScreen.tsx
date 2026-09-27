@@ -5,7 +5,7 @@ import AdminIcon from '@/components/admin/AdminIcon';
 
 export default function LoginScreen({ authError, onBackToDemo }: {
   authError?: string | null;
-  /** 공개 데모가 켜져 있을 때만 가상 체험 선택지를 표시한다. */
+  /** 공용 반 선택이 켜져 있을 때만 복귀 버튼을 표시한다. */
   onBackToDemo?: () => void;
 }) {
   const [email, setEmail] = useState('');
@@ -58,8 +58,8 @@ export default function LoginScreen({ authError, onBackToDemo }: {
       <main id="entry-main" className="entry-main" tabIndex={-1}>
         <section className="entry-panel" aria-labelledby="admin-login-title">
           <div className="entry-intro">
-            <h1 id="admin-login-title">실제 출석부 로그인</h1>
-            <p>교사·관리자 계정으로 로그인하면 실제 명단과 출석 기록을 볼 수 있습니다.</p>
+            <h1 id="admin-login-title">교사·관리자 로그인</h1>
+            <p>개별 계정으로 로그인해 출석부와 관리자 업무를 이용합니다.</p>
           </div>
 
           <form className="entry-form" onSubmit={handleLogin} aria-busy={loading}>
@@ -110,7 +110,7 @@ export default function LoginScreen({ authError, onBackToDemo }: {
           {onBackToDemo && (
             <button type="button" className="entry-back-action" onClick={onBackToDemo}>
               <AdminIcon name="arrow" size={14} />
-              가상 출석부 체험
+              반 선택으로 돌아가기
             </button>
           )}
         </section>

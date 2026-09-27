@@ -6,13 +6,13 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
 import { loadUserRole } from '@/hooks/useFirebaseData';
-import { doLogout } from '@/hooks/useAuth';
+import { doDemoLogin, doLogout } from '@/hooks/useAuth';
 import {
-  DEMO_MODE, resolveDemoSelection,
-  saveDemoSelection, type DemoSelection,
+  DEMO_MODE, demoConfigured, isDemoAccount, buildDemoRole,
+  saveDemoSelection, clearDemoSelection,
+  getAdminIntent, setAdminIntent, type DemoSelection,
 } from '@/lib/demo';
 import DemoClassPicker from '@/components/DemoClassPicker';
-import DemoAttendance from '@/components/DemoAttendance';
 import LoginScreen from '@/components/LoginScreen';
 import TopBar from '@/components/TopBar';
 import TabNav from '@/components/TabNav';
@@ -24,7 +24,7 @@ import { watchCalendarYear } from '@/utils/yearRollover';
 import AdminWorkspace from '@/components/admin/AdminWorkspace';
 import { canAccessAttendancePath, canUseAdminWorkspace, createAdminEntryTracker } from '@/lib/adminNavigation';
 
-type AuthState = 'loading' | 'demo-pick' | 'demo-app' | 'login' | 'role-error' | 'app';
+type AuthState = 'loading' | 'demo-pick' | 'login' | 'role-error' | 'app';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { state, dispatch } = useApp();
@@ -32,11 +32,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
-  const [demoSelection, setDemoSelection] = useState<DemoSelection | null>(null);
+  const [demoError, setDemoError] = useState<string | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const demoTriedRef = useRef(false);
+  const personalLoginIntentRef = useRef(false);
   const adminEntryRef = useRef<ReturnType<typeof createAdminEntryTracker> | null>(null);
 
   useEffect(() => {
@@ -45,6 +47,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     try { storage = window.sessionStorage; } catch { /* 제한된 브라우저에서는 메모리 기록을 사용한다. */ }
     adminEntryRef.current = createAdminEntryTracker(storage);
   }, []);
+
+  const applyDemoSelection = useCallback((sel: DemoSelection): boolean => {
+    const role = buildDemoRole(sel);
+    if (!role) return false;
+    dispatch({ type: 'SET_USER_ROLE', payload: role });
+    dispatch({ type: 'SET_PART', payload: role.part! });
+    dispatch({ type: 'SET_GRADE', payload: role.grade! });
+    dispatch({ type: 'SET_CLASS', payload: role.class! });
+    return true;
+  }, [dispatch]);
 
   // Firebase Auth 감지
   useEffect(() => {
@@ -59,9 +71,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_USER_ROLE', payload: null });
       setAuthState('loading');
       if (user) {
+        if (isDemoAccount(user.email)) {
+          setDemoError(null);
+          setAuthState('demo-pick');
+          return;
+        }
         const result = await loadUserRole({ uid: user.uid, email: user.email }, dispatch, isCurrent);
         if (!isCurrent() || result === 'stale') return;
         if (result === 'unauthorized') {
+          personalLoginIntentRef.current = true;
+          setAdminIntent(true);
           setAuthError('권한이 부여되지 않은 계정입니다.\n관리자에게 문의해 주세요.');
           setAuthState('login');
           try { await doLogout(); } catch { /* 권한 없는 화면은 계속 로그인 게이트에 둔다. */ }
@@ -74,53 +93,80 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }
       } else {
         adminEntryRef.current?.reset();
-        // 세션이 만료돼도 저장된 가상 반으로 자동 진입하지 않는다.
-        setDemoSelection(null);
+        if (DEMO_MODE && !personalLoginIntentRef.current && !getAdminIntent()) {
+          if (!demoConfigured) {
+            setDemoError('공용 출석 계정 설정이 없습니다. 관리자에게 문의해 주세요.');
+            setAuthState('demo-pick');
+            return;
+          }
+          if (!demoTriedRef.current) {
+            demoTriedRef.current = true;
+            try {
+              await doDemoLogin(); // 성공하면 Auth 구독이 다시 호출된다.
+              return;
+            } catch (error) {
+              if (!isCurrent()) return;
+              const code = (error as { code?: string })?.code ?? '';
+              setDemoError(code.includes('invalid-credential') || code.includes('user-not-found') || code.includes('wrong-password')
+                ? '공용 출석 계정에 접속하지 못했습니다. 관리자에게 문의해 주세요.'
+                : `공용 출석 계정에 접속하지 못했습니다. ${code || (error instanceof Error ? error.message : '')}`);
+            }
+          }
+          setAuthState('demo-pick');
+          return;
+        }
         setAuthState('login');
       }
     });
     return () => { active = false; request++; unsub(); };
-  }, [dispatch]);
+  }, [dispatch, applyDemoSelection]);
 
   // 첫 로그인만 대시보드로 안내한다. 이후 메뉴 이동·새로고침·깊은 링크는 사용자의 선택이다.
   useEffect(() => {
     if (authState !== 'app' || !state.userRole || !auth.currentUser) return;
     const target = adminEntryRef.current?.take(
-      auth.currentUser.uid, `${pathname}${window.location.search}`, state.userRole, false,
+      auth.currentUser.uid, `${pathname}${window.location.search}`, state.userRole, isDemoAccount(auth.currentUser.email),
     );
     if (target) router.replace(target);
   }, [authState, pathname, router, state.userRole]);
 
-  // 데모: 반 선택 → Firebase와 분리된 가상 출석 화면으로
+  // 공용 출석: 반 선택 → 실제 원장의 해당 반 교사 화면으로
   const handleDemoPick = useCallback((sel: DemoSelection) => {
-    const safe = resolveDemoSelection(sel);
-    if (!safe) return;
-    saveDemoSelection(safe);
-    setDemoSelection(safe);
-    setAuthState('demo-app');
-  }, []);
+    if (!isDemoAccount(auth.currentUser?.email) || !applyDemoSelection(sel)) return;
+    saveDemoSelection(sel);
+    setAuthState('app');
+  }, [applyDemoSelection]);
 
-  // 데모: 다른 가상 반 고르기
+  // 공용 출석: 다른 반 고르기 (인증 유지)
   const handleDemoChangeClass = useCallback(() => {
-    setDemoSelection(null);
+    clearDemoSelection();
+    dispatch({ type: 'SET_USER_ROLE', payload: null });
     setAuthState('demo-pick');
-  }, []);
+  }, [dispatch]);
 
-  // 데모에서 실제 교사·관리자 로그인으로 돌아간다.
-  const handleAdminLogin = useCallback(() => {
-    setDemoSelection(null);
+  // 공용 계정을 끊고 개인 교사·관리자 로그인으로 전환한다.
+  const handleAdminLogin = useCallback(async () => {
+    personalLoginIntentRef.current = true;
+    setAdminIntent(true);
+    clearDemoSelection();
+    demoTriedRef.current = false;
+    setDemoError(null);
     setAuthError(null);
     setAuthState('login');
+    try { await doLogout(); }
+    catch { setAuthError('공용 계정에서 로그아웃하지 못했습니다. 네트워크를 확인해 주세요.'); }
   }, []);
 
-  // 실제 로그인 화면 → 사용자가 명시적으로 가상 체험 선택
+  // 개인 로그인 화면 → 공용 반 선택으로 복귀
   const handleBackToDemo = useCallback(() => {
-    setAuthError(null);
-    setDemoSelection(null);
-    setAuthState('demo-pick');
+    personalLoginIntentRef.current = false;
+    setAdminIntent(false);
+    window.location.reload();
   }, []);
 
   const handleSwitchAccount = useCallback(async () => {
+    personalLoginIntentRef.current = true;
+    setAdminIntent(true);
     try {
       await doLogout();
       setAuthError(null);
@@ -244,12 +290,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <DemoClassPicker
         onPick={handleDemoPick}
         onAdminLogin={() => void handleAdminLogin()}
+        signInError={demoError}
       />
     );
-  }
-
-  if (authState === 'demo-app' && demoSelection) {
-    return <DemoAttendance key={demoSelection.ck} selection={demoSelection} onChangeClass={handleDemoChangeClass} onAdminLogin={() => void handleAdminLogin()} />;
   }
 
   if (authState === 'login') {
@@ -261,7 +304,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isDemoRole = false;
+  const isDemoRole = isDemoAccount(auth.currentUser?.email);
 
   if (canUseAdminWorkspace(state.userRole, isDemoRole)) {
     return (
@@ -302,7 +345,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14, lineHeight: 1.7 }}>
             관리자 전용 화면입니다.<br />
             {isDemoRole
-              ? <>상단의 <strong>실제 출석부 로그인</strong> 버튼으로 로그인해 주세요.</>
+              ? <>상단의 <strong>교사·관리자 로그인</strong> 버튼으로 로그인해 주세요.</>
               : <>담당 반의 출석부에서 업무를 이어갈 수 있습니다.</>}
             <div style={{ marginTop: 16 }}><Link href="/attendance" className="btn-secondary" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', padding: '10px 20px', textDecoration: 'none' }}>출석부로 돌아가기</Link></div>
           </div>
