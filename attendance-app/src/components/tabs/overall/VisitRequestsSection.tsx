@@ -73,7 +73,7 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
 
   return <section className="ao-visits" aria-labelledby="ao-visits-title">
     <header className="ao-suggestions-heading">
-      <div><h2 id="ao-visits-title">심방 요청 <span>{current.status === 'ready' ? openCount : '—'}</span></h2>
+      <div><h2 id="ao-visits-title">심방 요청 <span>{current.status === 'ready' ? `${rows.length}건` : '—'}</span></h2>
         <p>교사가 요청한 학생과 이유를 확인하고 처리 상태를 관리하세요.</p></div>
     </header>
     <div className="ad-status-tabs ao-visit-tabs" role="group" aria-label="심방 요청 상태">

@@ -32,6 +32,11 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('관리자 심방 요청', () => {
+  it('제목 건수는 현재 선택한 상태의 명단과 일치한다', () => {
+    render(<VisitRequestsSection initialView="done" filter={{ search: '완료 학생' }} />);
+    expect(screen.getByRole('heading', { name: '심방 요청 1건' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /처리 완료 1/ }).getAttribute('aria-pressed')).toBe('true');
+  });
   it('확인 필요와 처리 완료를 분리하고 상태만 안전하게 갱신한다', async () => {
     render(<VisitRequestsSection />);
     expect(screen.getByText('합성 학생')).toBeTruthy();
