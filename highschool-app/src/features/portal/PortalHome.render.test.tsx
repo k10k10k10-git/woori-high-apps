@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
 import type { SharedCalendarItem } from "./SharedMinistryCalendar";
 
-const mocks = vi.hoisted(() => ({ retreats: vi.fn(), periods: vi.fn(), unsubscribe: vi.fn(), roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles }));
+const mocks = vi.hoisted(() => ({ retreats: vi.fn(), periods: vi.fn(), unsubscribe: vi.fn(), retryRoles: vi.fn(), roleError: false, roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn() }) }));
 vi.mock("@/context/AuthContext", () => {
   const user = { uid: "home-user" };
-  return { useAuth: () => ({ user, roles: mocks.roles, loading: false, memberName: "테스트" }) };
+  return { useAuth: () => ({ user, roles: mocks.roles, loading: false, roleError: mocks.roleError, retryRoles: mocks.retryRoles, memberName: "테스트" }) };
 });
 vi.mock("@/features/landing/LandingPage", () => ({ default: () => null }));
 vi.mock("@/features/semester/db", () => ({
@@ -29,12 +29,33 @@ import PortalHome from "./PortalHome";
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.roles = { semester: "superAdmin", retreat: "superAdmin" };
+  mocks.roleError = false;
   mocks.retreats.mockReturnValue(mocks.unsubscribe);
   mocks.periods.mockReturnValue(() => {});
+});
+
+it("역할 조회 실패는 권한 미배정 안내로 오인시키지 않고 재시도한다", () => {
+  mocks.roles = { semester: "none", retreat: "none" };
+  mocks.roleError = true;
+  render(<PortalHome />);
+  expect(screen.getByRole("heading", { name: "담당 사역을 확인하지 못했습니다" })).toBeInTheDocument();
+  expect(screen.queryByText("접근 승인이 필요합니다")).not.toBeInTheDocument();
+  screen.getByRole("button", { name: "다시 시도" }).click();
+  expect(mocks.retryRoles).toHaveBeenCalledOnce();
 });
 afterEach(cleanup);
 
 describe("PortalHome — 기간 구독과 표시 metadata 분리", () => {
+  it("수련회 목록과 기간의 첫 응답 전에는 기록 없음으로 확정하지 않는다", () => {
+    render(<PortalHome />);
+    expect(screen.queryByText("등록된 수련회가 없습니다")).not.toBeInTheDocument();
+    act(() => mocks.retreats.mock.calls[0][0]([{ id: "a", name: "합성 행사", year: 2026, createdAt: 1 }]));
+    expect(screen.queryByText("등록된 수련회가 없습니다")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "수련회를 확인하는 중입니다…" })).toBeInTheDocument();
+    act(() => mocks.periods.mock.calls[1][1]([]));
+    expect(screen.getByRole("heading", { name: "2026년 합성 행사" })).toBeInTheDocument();
+  });
+
   it("수련회 이름만 바뀌면 일정 구독은 유지하고 카드·캘린더 이름은 즉시 갱신한다", () => {
     render(<PortalHome />);
     const retreat = { id: "a", name: "처음 이름", year: 2026, createdAt: 1 };

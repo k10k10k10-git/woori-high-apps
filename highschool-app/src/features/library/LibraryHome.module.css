@@ -1,0 +1,89 @@
+.guide,
+.events {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  padding: 20px;
+}
+.guide > div {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 12px;
+  align-items: center;
+}
+.guide > div > svg { grid-row: span 2; color: var(--color-primary); }
+.guide h2,
+.events h2,
+.heading h2 { color: var(--color-text-primary); font-size: 1.05rem; font-weight: 720; }
+.guide p,
+.events p,
+.heading p { margin-top: 4px; color: var(--color-text-muted); font-size: .85rem; line-height: 1.55; }
+.guide a,
+.events a,
+.list li > a {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  border-radius: 10px;
+  color: var(--color-primary);
+  font-size: .85rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.guide a:hover,
+.events a:hover,
+.list li > a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.archive { margin: 30px 0; }
+.heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.heading > span { color: var(--color-text-muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, 190px); gap: 12px; margin: 18px 0; }
+.filters label { display: grid; gap: 7px; color: var(--color-text-secondary); font-size: .8rem; font-weight: 650; }
+.filters input,
+.filters select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: .9rem;
+}
+.filters input::placeholder { color: var(--color-text-muted); }
+.filters :is(input,select):focus-visible,
+.guide a:focus-visible,
+.events a:focus-visible,
+.list a:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.search { position: relative; }
+.search svg { position: absolute; top: 13px; left: 12px; color: var(--color-text-muted); }
+.search input { padding-left: 39px; }
+.state { border: 1px dashed var(--color-border); border-radius: 12px; background: var(--color-surface); padding: 28px 18px; color: var(--color-text-muted); text-align: center; font-size: .85rem; }
+.list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); padding: 12px 16px; }
+.list li > div { display: grid; min-width: 0; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; align-items: center; }
+.kind { grid-row: span 2; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-text-secondary); padding: 5px 7px; font-size: .72rem; font-weight: 650; }
+.list li > div > a { overflow: hidden; color: var(--color-text-primary); font-size: .88rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.list li > div > a:hover { color: var(--color-primary); text-decoration: underline; text-underline-offset: 3px; }
+.list small { color: var(--color-text-muted); font-size: .75rem; }
+.events > svg { flex: none; color: var(--color-primary); }
+.events > div { flex: 1; }
+@media (max-width: 640px) {
+  .guide,
+  .events { align-items: flex-start; flex-wrap: wrap; gap: 10px 14px; padding: 16px; }
+  .guide > div,
+  .events > div { flex: 1; min-width: 220px; }
+  .guide a,
+  .events a { margin-left: 40px; }
+  .filters { grid-template-columns: 1fr; }
+  .list li { align-items: flex-start; flex-direction: column; }
+  .list li > div > a { white-space: normal; overflow-wrap: anywhere; }
+  .list li > a { align-self: flex-end; }
+}

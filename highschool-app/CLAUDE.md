@@ -25,6 +25,8 @@
 
 서비스 이름은 **분당우리교회 서현고등부**이고, 운영 주소는 `https://woorihigh-app.vercel.app` 입니다(구 `highschool-app-flame.vercel.app`도 같은 배포를 가리킵니다).
 
+2026-09-27 사용자 결정: 이 사이트는 **우리 고등부 내부 운영 플랫폼**이다. 로그인 전후 안내는 교역자·행정팀·팀장·교사·스탭이 이번 주 맡은 일을 찾고 같은 기록을 확인하는 데 집중한다. 타부서·타교회 도입이나 구매를 권하는 문구를 다시 넣지 않는다.
+
 **배포는 2026-08-29부터 자동입니다.** Vercel 프로젝트가 `k10k10k10-git/woori-high-apps`에 연결돼 있고 Root Directory는 `highschool-app`입니다 — `main`에 푸시하면 배포가 시작됩니다. 수동 배포가 필요하면 **저장소 루트에서** `npx vercel --prod`를 실행하세요(`.vercel/` 링크가 루트에 있고 Root Directory가 앱 폴더라, 앱 폴더 안에서 실행하면 경로가 어긋나 깨집니다). Ignored Build Step `git diff --quiet HEAD^ HEAD -- .`가 걸려 있어 이 폴더 밖만 바뀐 푸시는 빌드를 건너뜁니다 — 그때 새 배포가 안 잡히는 건 정상입니다.
 
 ## 화면 셸 규칙

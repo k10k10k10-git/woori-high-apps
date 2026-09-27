@@ -8,6 +8,14 @@ import { useRetreatCanEdit } from "@/features/portal/RetreatEditContext";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 
+export function moveGroupStudent(groups: Group[], studentId: string, targetGroupId: string | null): Group[] {
+  if (targetGroupId && !groups.some(group => group.id === targetGroupId)) return groups;
+  return groups.map(group => {
+    const studentIds = (group.studentIds || []).filter(id => id !== studentId);
+    return { ...group, studentIds: group.id === targetGroupId ? [...studentIds, studentId] : studentIds };
+  });
+}
+
 export interface StudentInfo extends Student {
   bu?: string;
   participantKey?: string;
@@ -423,7 +431,7 @@ export function GroupCard({ group, displayName, students, teacherStatusMap, allT
               onDragOver={e => e.preventDefault()}
             >
               {sortedClasses.length === 0 && unknownIds.length === 0 && (
-                <p className="text-xs text-slate-300 py-1">여기에 드래그하세요</p>
+                <p className="text-xs text-slate-500 py-1">위의 학생 이동에서 배정하거나 여기로 드래그하세요.</p>
               )}
               {/* 학교 자리표처럼 반마다 하나의 분단(열) — 반이 좌우로 나란히, 학생은 그 아래 세로 한 줄 */}
               <div className="grid grid-cols-2 gap-x-3 gap-y-3 items-start">

@@ -426,6 +426,12 @@ export default function ProgramPreparationClient() {
             ))}
           </div>
         </div>
+        <label className="program-mobile-workspace-nav">
+          <span>준비 메뉴</span>
+          <select value={workspace} onChange={(event) => selectWorkspace(event.target.value as ProgramWorkspaceSectionKey)} aria-label="수련회 프로그램 준비 메뉴">
+            {PROGRAM_WORKSPACE_SECTIONS.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}
+          </select>
+        </label>
         {workspace === "programs" && selectedProgram && (
           <div className="program-editor-tabs">
             <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label={`${selectedProgram.title} 편집 항목`}>
@@ -446,6 +452,7 @@ export default function ProgramPreparationClient() {
                 </button>
               ))}
             </div>
+            <label className="program-mobile-section-nav"><span>{selectedProgram.title} 편집 항목</span><select value={section} onChange={(event) => selectSection(event.target.value as ProgramSectionKey)}>{PROGRAM_SECTIONS.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}</select></label>
           </div>
         )}
       </ProgramWorkspaceHeader>

@@ -78,7 +78,7 @@ export default function RetreatPageClient() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { user, loading: authLoading, roles } = useAuth();
+  const { user, loading: authLoading, roleError, retryRoles, roles } = useAuth();
   const adminAllowed = canAccessArea("retreat-admin", roles);
   const canSeeSensitive = canSeeSensitiveRetreat(roles);
   // 스탭팀장·이가드팀은 행정 화면을 조회만 한다.
@@ -94,6 +94,8 @@ export default function RetreatPageClient() {
   const [retreat, setRetreat] = useState<Retreat | null>(initialSnapshot?.retreat ?? null);
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(initialSnapshot?.retreat === undefined);
+  const [loadError, setLoadError] = useState<"permission" | "failed" | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [editingSheet, setEditingSheet] = useState(false);
   const editingSheetRef = useRef(false);
   const [sheetForm, setSheetForm] = useState({ name: "", sheetUrl: "" });
@@ -129,6 +131,7 @@ export default function RetreatPageClient() {
     return subscribeToRetreat(id,
       (r) => {
         setRetreat(r);
+        setLoadError(null);
         mergeRetreatWorkspaceSnapshot(id, { retreat: r });
         if (r && !editingSheetRef.current) setSheetForm({
           name: r.name || "",
@@ -137,12 +140,14 @@ export default function RetreatPageClient() {
         setLoading(false);
       },
       (e) => {
-        toast(e instanceof Error ? e.message : "수련회 정보를 불러오지 못했습니다.", "error");
+        const message = e instanceof Error ? e.message : String(e);
+        const code = typeof e === "object" && e !== null && "code" in e ? String(e.code) : "";
+        setLoadError(/permission[_-]denied/i.test(`${code} ${message}`) ? "permission" : "failed");
         setRetreat(null);
         setLoading(false);
       },
     );
-  }, [adminAllowed, authLoading, id, router, toast, user]);
+  }, [adminAllowed, authLoading, id, retryKey, router, user]);
 
   const parsedSheetUrl = useMemo(() => parseSheetUrl(sheetForm.sheetUrl), [sheetForm.sheetUrl]);
 
@@ -195,6 +200,14 @@ export default function RetreatPageClient() {
     </div>
   );
 
+  if (roleError) return (
+    <div className="min-h-screen flex items-center justify-center px-6"><div className="max-w-md text-center" role="alert">
+      <h1 className="text-xl font-bold">담당 사역을 확인하지 못했습니다</h1>
+      <p className="mt-2 text-sm text-slate-500">권한 정보를 불러오는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.</p>
+      <button onClick={retryRoles} className="btn-primary mt-5">다시 시도</button>
+    </div></div>
+  );
+
   if (!adminAllowed) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
       <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm">
@@ -209,6 +222,19 @@ export default function RetreatPageClient() {
             </button>
           )}
           <button onClick={() => router.push("/")} className="btn-secondary">통합 홈으로</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (loadError) return (
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="max-w-md text-center" role="alert">
+        <h1 className="text-xl font-bold">{loadError === "permission" ? "수련회 조회 권한을 확인해 주세요" : "수련회 정보를 불러오지 못했습니다"}</h1>
+        <p className="mt-2 text-sm text-slate-500">{loadError === "permission" ? "현재 계정으로 이 수련회 기록을 읽을 수 없습니다. 담당자에게 권한을 확인해 주세요." : "일시적인 연결 문제일 수 있습니다. 다시 시도해 주세요."}</p>
+        <div className="mt-5 flex justify-center gap-2">
+          <button onClick={() => { setLoadError(null); setLoading(true); setRetryKey((key) => key + 1); }} className="btn-primary">다시 시도</button>
+          <button onClick={() => router.push("/events")} className="btn-secondary">행사 목록으로</button>
         </div>
       </div>
     </div>

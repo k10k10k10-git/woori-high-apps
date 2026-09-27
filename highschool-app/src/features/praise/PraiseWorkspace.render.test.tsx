@@ -12,6 +12,19 @@ import type { PraiseStageVersion } from "./types";
 beforeEach(() => { vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry/praise"); mocks.references.mockResolvedValue({ semesters: [] }); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
 afterEach(cleanup);
 describe("찬양팀 작업공간", () => {
+  it("작은 화면에서 기간·모임 변경을 펼칠 수 있게 한다", async () => {
+    render(<PraiseWorkspace workspaceId="synthetic-workspace" />);
+    await waitFor(() => expect(mocks.list).toHaveBeenCalled());
+    const period = screen.getByRole("button", { name: /운영 기간.*변경/ });
+    const meeting = screen.getByRole("button", { name: /모임.*변경/ });
+    expect(period).toHaveAttribute("aria-expanded", "false");
+    expect(meeting).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(period);
+    fireEvent.click(meeting);
+    expect(period).toHaveAttribute("aria-expanded", "true");
+    expect(meeting).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByLabelText("모임 회차")).toBeInTheDocument();
+  });
   it("첫 계층은 학기·회차와 다음 업무이며 연결 통계는 설정에 둔다", async () => {
     const view = praiseFixture(); view.meta.semesterId = "2026-2"; view.meta.teamId = "praise-team";
     mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });

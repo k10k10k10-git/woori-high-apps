@@ -68,6 +68,22 @@ describe("OverlayShell — 모달 3종 세트", () => {
 });
 
 describe("OverlayShell — 포커스", () => {
+  it("조 추가 팝업을 닫으면 열기 버튼으로 포커스가 돌아온다", () => {
+    const trigger = document.createElement("button");
+    trigger.textContent = "조 추가";
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const { unmount } = render(
+      <OverlayShell label="조 추가" onClose={() => {}}>
+        <input data-autofocus aria-label="조 이름" />
+      </OverlayShell>,
+    );
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "조 이름" }));
+    unmount();
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
   it("data-autofocus가 있으면 그 요소로 포커스를 옮긴다", () => {
     render(
       <OverlayShell label="테스트 모달" onClose={() => {}}>
