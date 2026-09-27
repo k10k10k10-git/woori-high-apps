@@ -5,7 +5,7 @@
 .at-section-heading h3 { font-size: 14px; font-weight: 600; }
 .at-section-heading p { color: #666773; margin-top: 4px; font-size: 12px; }
 .at-parts { display: flex; gap: 2px; flex-shrink: 0; }
-.at-parts button { min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: none; color: #666773; font: inherit; cursor: pointer; border-radius: 6px; }
+.at-parts button { min-height: 44px; min-width: 44px; padding: 0 12px; border: 0; background: none; color: #666773; font: inherit; cursor: pointer; border-radius: 10px; }
 .at-parts button[aria-pressed="true"] { color: #584a97; background: #eeecf5; }
 .at-parts button:hover { background: #f4f2f8; }
 .at-table-wrap { overflow-x: auto; }

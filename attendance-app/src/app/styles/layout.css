@@ -18,7 +18,7 @@
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 .update-toast-icon {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 40px; height: 40px; border-radius: 12px;
   flex-shrink: 0; object-fit: cover;
 }
 .update-toast-body {
@@ -55,7 +55,7 @@
   align-items: center;
   gap: 10px;
   border: 1px solid var(--border2);
-  border-radius: 8px;
+  border-radius: 16px;
   background: var(--surface);
   color: var(--text);
 }
@@ -66,7 +66,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--primary-bg);
   color: var(--primary-text);
 }
@@ -82,7 +82,7 @@
 .install-prompt-actions button {
   min-height: 40px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: 10px;
   font: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -382,7 +382,7 @@
 .attendance-week-picker label { font-size: 12px; font-weight: 700; color: var(--text2); }
 .attendance-week-picker select {
   min-height: 38px; padding: 6px 30px 6px 10px;
-  border: 1px solid var(--border2); border-radius: 8px;
+  border: 1px solid var(--border2); border-radius: 12px;
   background: var(--surface); color: var(--text); font: inherit; font-size: 13px;
 }
 .attendance-week-picker > span { font-size: 11px; color: var(--text3); }
@@ -404,7 +404,7 @@
 .attendance-save-banner.saved { border-color: var(--green); color: var(--green-text); }
 .attendance-save-banner.error { border-color: var(--red); color: var(--red-text); }
 .attendance-save-banner button {
-  padding: 7px 12px; border: 0; border-radius: 8px;
+  padding: 7px 12px; border: 0; border-radius: 12px;
   background: var(--red); color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
 }
 .long-absent-panel {
@@ -428,7 +428,7 @@
 .att-modal-close {
   min-width: 44px; min-height: 40px;
   margin-left: auto; padding: 7px 10px;
-  border: 1px solid var(--border2); border-radius: 8px;
+  border: 1px solid var(--border2); border-radius: 12px;
   background: var(--surface); color: var(--text2);
   font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
 }

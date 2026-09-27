@@ -39,7 +39,7 @@
   left: 12px;
   z-index: 10000;
   padding: 9px 12px;
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--entry-ink);
   color: #fff;
   font-size: 12px;
@@ -81,7 +81,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: 10px;
   background: var(--entry-selected);
   color: var(--entry-accent);
 }
@@ -112,7 +112,7 @@
   justify-content: center;
   gap: 7px;
   border: 1px solid var(--entry-line-strong);
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff;
   color: var(--entry-muted);
   font-size: 12px;
@@ -133,7 +133,7 @@
   max-width: 480px;
   padding: 28px;
   border: 1px solid var(--entry-line);
-  border-radius: 8px;
+  border-radius: 18px;
   background: #fff;
 }
 .entry-intro { margin-bottom: 20px; }
@@ -158,7 +158,7 @@
   align-items: start;
   gap: 8px;
   border: 1px solid #ead9b0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff8e8;
   color: #765719;
   font-size: 12px;
@@ -192,7 +192,7 @@
   align-items: center;
   gap: 10px;
   border: 1px solid #d8d2e6;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #f5f3fa;
   color: var(--entry-accent);
   text-align: left;
@@ -232,7 +232,7 @@
   min-height: 48px;
   padding: 0 12px;
   border: 1px solid var(--entry-line-strong);
-  border-radius: 6px;
+  border-radius: 10px;
   outline: none;
   background: #fff;
   color: var(--entry-ink);
@@ -273,7 +273,7 @@
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--entry-accent);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--entry-accent);
   color: #fff;
   font-size: 14px;
@@ -311,7 +311,7 @@
   margin-top: 12px;
   padding: 10px 12px;
   border: 1px solid #ebcdca;
-  border-radius: 6px;
+  border-radius: 10px;
   background: #fff7f6;
   color: #943b35;
   font-size: 12px;
@@ -328,7 +328,7 @@
   justify-content: center;
   gap: 7px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 10px;
   background: transparent;
   color: var(--entry-muted);
   font-size: 12px;

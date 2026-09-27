@@ -41,7 +41,7 @@
 .modal-handle {
   width: 48px; height: 5px;
   background: var(--border2);
-  border-radius: 3px;
+  border-radius: 6px;
 }
 .modal-title {
   font-size: 16px; font-weight: 700;
@@ -311,7 +311,7 @@
 .check-student-info:focus-visible {
   outline: 2px solid var(--primary-text);
   outline-offset: 3px;
-  border-radius: 8px;
+  border-radius: 12px;
 }
 .check-avatar {
   width: 40px;
@@ -385,7 +385,7 @@
 .suggest-textarea {
   width: 100%;
   border: 1.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 10px 12px;
   font-size: 16px;
   font-family: inherit;
@@ -398,7 +398,7 @@
 .suggest-textarea:focus { outline: none; border-color: var(--primary); }
 .visit-student-select {
   width: 100%; min-height: 44px; margin-bottom: 12px; padding: 8px 10px;
-  border: 1.5px solid var(--border); border-radius: 8px;
+  border: 1.5px solid var(--border); border-radius: 12px;
   color: var(--text); background: var(--surface); font: inherit; font-size: 16px;
 }
 .visit-student-select:focus { outline: none; border-color: var(--primary); }
@@ -409,7 +409,7 @@
   background: var(--primary);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 15px;
   font-weight: 700;
   font-family: inherit;
@@ -495,7 +495,7 @@
   background: var(--red-bg);
   color: var(--red-text);
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 12px;
   font-weight: 600;
   font-family: inherit;
