@@ -108,6 +108,28 @@ const semester = (id: string, title = id) => ({ id, meta: { title, completionRul
 const application = { id: "application-a", studentId: "student-a", bu: "1부", grade: 3, class: 1, name: "테스트 사용자", status: "배치", teamId: "team-a", createdAt: "2026-01-01" };
 
 describe("useMyPageData — 계정과 현재 사역의 수명", () => {
+  it("무관한 수련회 목록이 지연돼도 받은 학기 배정은 준비 완료로 둔다", () => {
+    const { result } = renderHook(useMyPageData);
+    act(() => mocks.semesters.mock.calls[0][0]([semester("semester-a")]));
+    expect(result.current.loaded).toBe(false);
+    expect(result.current.semesterLoaded).toBe(true);
+    expect(result.current.semesterError).toBe(false);
+    expect(result.current.retreatLoaded).toBe(false);
+    act(() => mocks.retreats.mock.calls[0][1](new Error("permission_denied")));
+    expect(result.current.semesterLoaded).toBe(true);
+    expect(result.current.semesterError).toBe(false);
+    expect(result.current.retreatError).toBe(true);
+  });
+
+  it("같은 학기의 출석 조회가 지연돼도 배정 명단은 준비 완료로 둔다", () => {
+    mocks.attendance.mockReturnValue(() => {});
+    const { result } = renderHook(useMyPageData);
+    act(() => mocks.semesters.mock.calls[0][0]([semester("semester-a")]));
+    expect(result.current.semesterAssignmentLoaded).toBe(true);
+    expect(result.current.semesterAttendanceLoaded).toBe(false);
+    expect(result.current.semesterLoaded).toBe(false);
+  });
+
   it("수련회 응답만으로 준비를 끝내지 않고 내 요청과 학기 하위 응답도 기다린다", () => {
     mocks.requests.mockReturnValue(() => {});
     mocks.applications.mockReturnValue(() => {});

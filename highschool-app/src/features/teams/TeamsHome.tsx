@@ -23,8 +23,8 @@ export default function TeamsHome() {
     {teams.length === 0 ? <section className="team-first-empty"><UsersThree size={24} aria-hidden="true" /><h2>담당 팀 연결이 필요합니다</h2><p>계정 승인은 완료됐지만 담당 팀이 지정되지 않았습니다. 통합관리자가 운영센터의 계정·권한에서 연결할 수 있습니다.</p></section> :
       <section className="team-directory-grid" aria-label="접근 가능한 팀">
         {teams.map((team) => <Link key={team.key} href={`/teams/${team.key}`} className="team-directory-card">
-          <div className="team-directory-card__top"><span className="team-directory-mark">{team.label.slice(0, 1)}</span><span className={`team-directory-status${team.status === "planned" ? " is-planned" : ""}`}>{team.status === "planned" ? "공통 공간" : "운영 중"}</span></div>
-          <div><h2>{team.label}</h2><p>{team.hint}</p></div>
+          <div className="team-directory-card__top"><span className="team-directory-mark">{team.label.slice(0, 1)}</span><span className={`team-directory-status${team.status === "planned" ? " is-planned" : ""}`}>{team.status === "planned" ? "기획 중" : "운영 중"}</span></div>
+          <div><h2>{team.label}</h2><p>{team.status === "planned" ? "상시 운영 화면은 준비 중입니다. 연결된 학기의 명단과 기록은 팀 안에서 확인할 수 있습니다." : team.hint}</p></div>
           <footer><span>{membershipLabel(teamMemberships[team.key])}</span><ArrowRight size={16} aria-hidden="true" /></footer>
         </Link>)}
       </section>}

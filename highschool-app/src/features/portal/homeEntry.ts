@@ -4,6 +4,14 @@ import type { HomeAction } from './homeActions';
 import type { SundayTeamKey } from './featureCatalog';
 
 type Entry = { href: string; title: string; description: string; steps: string[] };
+const TEAM_START_STEPS: Record<SundayTeamKey, string[]> = {
+  admin: ['이번 주 출석부 확인', '행정 변동 사항 기록', '저장 결과 확인'],
+  barnabas: ['새친구와 등록 현황 확인', '처리 대기 건 확인', '변경 결과 확인'],
+  worship: ['이번 주 자리 배치 확인', '예배 담당표와 자료 점검', '변경 결과 확인'],
+  praise: ['운영 기간·회차 확인', '모임 출결과 주일 스탭 참석 기록', '조편성·등단표 저장 확인'],
+  media: ['사용 가능한 학기 기록 확인', '팀 업무 준비 상태 확인', '필요한 기능 건의하기'],
+  design: ['사용 가능한 학기 기록 확인', '팀 업무 준비 상태 확인', '필요한 기능 건의하기'],
+};
 /** 담당 업무를 우선하고, 현장 바로가기는 실제 진행 기간에만 추천한다. */
 export function buildHomeEntry({ roles, actions, semesterId, retreat, fieldActive, assignedTeamKeys, operationsAllowed }: {
   roles: MinistryRoles; actions: HomeAction[]; semesterId?: string;
@@ -18,8 +26,8 @@ export function buildHomeEntry({ roles, actions, semesterId, retreat, fieldActiv
   const team = ownSundayTeam(roles, assignedTeamKeys);
   if (team) {
     const label = SUNDAY_MINISTRY_TEAMS.find(item => item.key === team)!.label;
-    return { href: `/teams/${team}`, title: `${label} 업무 시작`, description: '배정된 팀의 현재 학기와 상시 업무를 한곳에서 엽니다.',
-      steps: team === 'praise' ? ['운영 기간·회차 확인', '모임 출결과 주일 스탭 참석 기록', '조편성·등단표를 저장하고 확정'] : ['팀의 진행 상황 확인', '담당 업무 처리', '변경 결과 확인'] };
+    return { href: `/teams/${team}`, title: `${label} 업무 시작`, description: '배정된 팀의 학기 기록과 상시 업무를 한곳에서 엽니다.',
+      steps: TEAM_START_STEPS[team] };
   }
   const scheduled = actions.find(item => item.href && item.urgency === 'today' &&
     (item.kind === 'semester' ? canUseOperations : item.kind === 'retreat' || item.kind === 'field' ? canAccessArea('retreat-admin', roles) || canAccessArea('retreat-field', roles) : false));

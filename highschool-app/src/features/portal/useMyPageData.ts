@@ -11,6 +11,7 @@ import {
   subscribeTrainingClasses,
 } from "@/features/semester/db";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
+import { featuredTerm } from "@/features/semester/termPhase";
 import type {
   Application,
   Session,
@@ -88,29 +89,31 @@ const RETREAT_LABELS = { groups: "조 편성", teachers: "교사 참석", groupS
 
 /** 계정·권한·행사 전환 직후에는 이전 응답을 표시하지 않는다. */
 function useMyPageSnapshot<T extends object>(scope: string, initial: T, labels: Record<keyof T, string>) {
-  const [state, setState] = useState<{ scope: string; revision: number; values: T; settled: Partial<Record<keyof T, boolean>> }>({ scope, revision: 0, values: initial, settled: {} });
+  const [state, setState] = useState<{ scope: string; revision: number; values: T; settled: Partial<Record<keyof T, boolean>>; failed: Partial<Record<keyof T, boolean>> }>({ scope, revision: 0, values: initial, settled: {}, failed: {} });
   // 다른 계정을 거쳤다가 돌아와도 첫 계정의 스냅샷이 다시 드러나지 않게 폐기한다.
   const revision = state.scope === scope ? state.revision : state.revision + 1;
-  if (state.scope !== scope) setState({ scope, revision, values: initial, settled: {} });
+  if (state.scope !== scope) setState({ scope, revision, values: initial, settled: {}, failed: {} });
   const { fail, ok, message } = useLoadErrors(`${scope}|${revision}`);
   const receive = useCallback(<K extends keyof T>(key: K, value: T[K]) => {
     setState((previous) => {
-      const current = previous.scope === scope ? previous : { values: initial, settled: {} };
-      return { scope, revision, values: { ...current.values, [key]: value }, settled: { ...current.settled, [key]: true } };
+      const current = previous.scope === scope ? previous : { values: initial, settled: {}, failed: {} };
+      return { scope, revision, values: { ...current.values, [key]: value }, settled: { ...current.settled, [key]: true }, failed: { ...current.failed, [key]: false } };
     });
     ok(labels[key]);
   }, [initial, labels, ok, revision, scope]);
   const reject = useCallback((key: keyof T, error: Error) => {
     setState((previous) => {
-      const current = previous.scope === scope ? previous : { values: initial, settled: {} };
-      return { scope, revision, values: { ...current.values, [key]: initial[key] }, settled: { ...current.settled, [key]: true } };
+      const current = previous.scope === scope ? previous : { values: initial, settled: {}, failed: {} };
+      return { scope, revision, values: { ...current.values, [key]: initial[key] }, settled: { ...current.settled, [key]: true }, failed: { ...current.failed, [key]: true } };
     });
     fail(labels[key])(error);
   }, [fail, initial, labels, revision, scope]);
   const settled: Partial<Record<keyof T, boolean>> = state.scope === scope ? state.settled : {};
+  const failed: Partial<Record<keyof T, boolean>> = state.scope === scope ? state.failed : {};
   return {
     values: state.scope === scope ? state.values : initial,
     settled,
+    failed,
     receive,
     reject,
     loadError: message,
@@ -179,12 +182,8 @@ export function useMyPageData() {
     return subscriptions.close;
   }, [hasPortalAccess, receivePeriods, rejectPeriods, retreatIdsKey, uid]);
 
-  const currentSemester = useMemo<Semester | null>(() => (
-    semesters.find((semester) => {
-      const { startDate, endDate } = semester.meta;
-      return !!startDate && !!endDate && startDate <= today && today <= endDate;
-    }) ?? semesters[0] ?? null
-  ), [semesters, today]);
+  const featuredSemester = useMemo(() => featuredTerm(semesters, today), [semesters, today]);
+  const currentSemester = featuredSemester?.semester ?? null;
   const currentSemesterId = currentSemester?.id;
   const semesterData = useMyPageSnapshot(`${accountScope}|semester|${currentSemesterId ?? ""}`, EMPTY_SEMESTER, SEMESTER_LABELS);
   const { sessions, applications, teams, trainingClasses, attendance } = semesterData.values;
@@ -231,6 +230,39 @@ export function useMyPageData() {
     && (!hasPortalAccess || !!periodData.settled.periods)
     && (!currentSemesterId || !hasSemesterAccess || Object.keys(EMPTY_SEMESTER).every((key) => semesterData.settled[key as keyof typeof EMPTY_SEMESTER]))
     && (!currentRetreatId || !hasFieldAccess || Object.keys(EMPTY_RETREAT).every((key) => retreatData.settled[key as keyof typeof EMPTY_RETREAT]));
+  const semesterLoaded = !uid || !hasSemesterAccess || !!base.settled.semesters
+    && (!currentSemesterId || Object.keys(EMPTY_SEMESTER).every((key) => semesterData.settled[key as keyof typeof EMPTY_SEMESTER]));
+  const semesterError = !!base.failed.semesters || Object.values(semesterData.failed).some(Boolean);
+  const semesterAssignmentLoaded = !uid || !hasSemesterAccess || !!base.settled.semesters
+    && (!currentSemesterId || (["applications", "teams", "trainingClasses"] as const).every((key) => semesterData.settled[key]));
+  const semesterAssignmentError = !!base.failed.semesters
+    || (["applications", "teams", "trainingClasses"] as const).some((key) => semesterData.failed[key]);
+  const semesterAttendanceLoaded = !uid || !hasSemesterAccess || !!base.settled.semesters
+    && (!currentSemesterId || !!semesterData.settled.sessions && !!semesterData.settled.attendance);
+  const semesterAttendanceError = !!base.failed.semesters || !!semesterData.failed.sessions || !!semesterData.failed.attendance;
+  const retreatLoaded = !uid || !!base.settled.retreats && !!periodData.settled.periods
+    && (!currentRetreatId || !hasFieldAccess || Object.keys(EMPTY_RETREAT).every((key) => retreatData.settled[key as keyof typeof EMPTY_RETREAT]));
+  const retreatError = !!base.failed.retreats || !!periodData.failed.periods || Object.values(retreatData.failed).some(Boolean);
+  const retreatAssignmentLoaded = !uid || !!base.settled.retreats && !!periodData.settled.periods
+    && (!currentRetreatId || !hasFieldAccess || (["teachers", "groups", "groupStaff"] as const).every((key) => retreatData.settled[key]));
+  const retreatAssignmentError = !!base.failed.retreats || !!periodData.failed.periods
+    || (["teachers", "groups", "groupStaff"] as const).some((key) => retreatData.failed[key]);
+  const retreatDutiesLoaded = retreatAssignmentLoaded
+    && (!currentRetreatId || !hasFieldAccess || (["schedule", "segments", "movements", "posts"] as const).every((key) => retreatData.settled[key]));
+  const retreatDutiesError = retreatAssignmentError
+    || (["schedule", "segments", "movements", "posts"] as const).some((key) => retreatData.failed[key]);
+  const calendarLoaded = !uid || !!base.settled.retreats && !!periodData.settled.periods && !!base.settled.milestones
+    && (!hasSemesterAccess || !!base.settled.semesters && (!currentSemesterId || !!semesterData.settled.sessions));
+  const calendarError = !!base.failed.retreats || !!periodData.failed.periods || !!base.failed.milestones
+    || !!base.failed.semesters || !!semesterData.failed.sessions;
+  const requestsLoaded = !uid || !!base.settled.requests;
+  const requestsError = !!base.failed.requests;
+  const newFriendsLoaded = !uid || !hasNewFriendsAccess || !!base.settled.newFriends;
+  const newFriendsError = !!base.failed.newFriends;
+  const semesterContextLoaded = !uid || !hasSemesterAccess || !!base.settled.semesters;
+  const semesterContextError = !!base.failed.semesters;
+  const retreatContextLoaded = !uid || !!base.settled.retreats && !!periodData.settled.periods;
+  const retreatContextError = !!base.failed.retreats || !!periodData.failed.periods;
   const loadError = [base.loadError, periodData.loadError, semesterData.loadError, retreatData.loadError].filter(Boolean).join(" · ") || null;
 
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
@@ -302,7 +334,30 @@ export function useMyPageData() {
     connected,
     loaded,
     loadError,
+    semesterLoaded,
+    semesterError,
+    semesterAssignmentLoaded,
+    semesterAssignmentError,
+    semesterAttendanceLoaded,
+    semesterAttendanceError,
+    retreatLoaded,
+    retreatError,
+    retreatAssignmentLoaded,
+    retreatAssignmentError,
+    retreatDutiesLoaded,
+    retreatDutiesError,
+    calendarLoaded,
+    calendarError,
+    requestsLoaded,
+    requestsError,
+    newFriendsLoaded,
+    newFriendsError,
+    semesterContextLoaded,
+    semesterContextError,
+    retreatContextLoaded,
+    retreatContextError,
     currentSemester,
+    semesterPhase: featuredSemester?.phase ?? null,
     currentRetreat,
     homeActions,
     requests,

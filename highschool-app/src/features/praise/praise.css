@@ -13,6 +13,7 @@
 .praise-edit-fieldset{border:0;padding:0;margin:0;min-width:0;width:100%}
 
 .praise-workspace fieldset{min-width:0;max-width:100%}#praise-panel-settings>div>fieldset{border:0;padding:0;margin:20px 0 0}#praise-panel-settings fieldset>.praise-section+.praise-section{margin-top:20px}
+.praise-mobile-context-toggle,.praise-tabs-hint{display:none}
 
 .praise-people-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
 .praise-people-layout.is-editing{grid-template-columns:minmax(0,1fr) minmax(340px,.95fr)}
@@ -186,6 +187,21 @@
   .praise-work-list>div{min-height:0}
   .praise-stage-sides{grid-template-columns:1fr}
 }
+@media(max-width:760px){
+  .praise-header--compact{gap:10px;padding-bottom:10px}
+  .praise-mobile-context-toggle{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;border:1px solid var(--praise-line);border-radius:9px;background:var(--color-surface);padding:8px 11px;color:var(--color-text-secondary);font:inherit;font-size:13px;text-align:left}
+  .praise-mobile-context-toggle strong{min-width:0;overflow:hidden;color:var(--color-text-primary);font-size:13px;text-overflow:ellipsis;white-space:nowrap}
+  .praise-mobile-context-toggle span{flex:none;color:var(--color-primary);font-weight:700}
+  .praise-header--compact .praise-header-actions,.praise-meeting-bar .praise-context-controls{display:none}
+  .praise-header--compact .praise-header-actions.is-mobile-open,.praise-meeting-bar .praise-context-controls.is-mobile-open{display:flex}
+  .praise-header-actions[hidden]{display:none!important}
+  .praise-header--compact .praise-header-actions.is-mobile-open{width:100%;padding:10px}
+  .praise-meeting-bar{display:grid;gap:8px;padding:8px 0 12px}
+  .praise-meeting-links{padding-bottom:0}
+  .praise-meeting-bar .praise-context-controls.is-mobile-open{width:100%;align-items:flex-end}
+  .praise-meeting-bar .praise-context-controls .praise-field{flex:1}
+  .praise-tabs-hint{display:block;margin:5px 0 0;color:var(--color-text-muted);font-size:12px}
+}
 [data-theme="dark"] .praise-badge--warning{color:#f3c16d}
 
 /* 원본의 조 카드·무대 배치 업무를 통합 사이트 안에서 보존한다. */
@@ -263,3 +279,8 @@
   .praise-header--compact .praise-header-actions select{font-size:14px;padding:8px;min-height:44px}
 }
 @media(max-width:760px){.praise-header--compact .praise-header-actions{display:flex}}
+@media(max-width:760px){
+  .praise-header--compact{display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;gap:10px}
+  .praise-header--compact .praise-header-actions:not(.is-mobile-open){display:none}
+  .praise-header--compact .praise-header-actions.is-mobile-open{display:flex;width:100%}
+}

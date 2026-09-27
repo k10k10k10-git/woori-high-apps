@@ -103,12 +103,12 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section }: { teamKey: S
   return <TeamAccessState allowed={allowed}><main className="team-term-page">
     <header className="team-term-header">
       <div className="team-workspace-title"><Link href="/teams">팀</Link><span>/</span><Link href={`/teams/${teamKey}`}>{teamMeta.label}</Link><span>/</span><span>{semesterId}</span></div>
-      <div className="team-term-heading"><div><p className="section-kicker">TERM</p><h1>{teamMeta.label} · {meta?.title ?? semesterId}</h1><p>현재 팀과 학기를 고정해 다른 팀 기록을 잘못 수정하지 않도록 했습니다.</p></div>{past && <span className="team-role-badge">지난 학기</span>}</div>
+      <div className="team-term-heading"><div><p className="section-kicker">TERM</p><h1>{teamMeta.label} · {meta?.title ?? semesterId}</h1><p>이 학기의 {teamMeta.label} 명단, 출석과 자료를 확인합니다.</p></div>{past && <span className="team-role-badge">지난 학기</span>}</div>
       <nav className="team-term-tabs" aria-label={`${teamMeta.label} ${semesterId} 메뉴`}>{SECTIONS.map((item) => <Link key={item.key} href={`/teams/${teamKey}/terms/${encodeURIComponent(semesterId)}/${item.key}`} aria-current={section === item.key ? "page" : undefined}>{item.label}</Link>)}</nav>
     </header>
     <section className="team-term-content">
       {error && <div className="team-first-alert" role="alert">학기 정보를 불러오지 못했습니다: {error}</div>}
-      {!loaded ? <WorkspaceSkeleton label="팀 학기 정보를 불러오는 중입니다." rows={7} variant="page" /> : !team ? <div className="team-first-empty"><h2>이 학기에 연결된 팀이 없습니다</h2><p>운영센터의 학기 설정에서 {teamMeta.label}의 영구 팀 키를 연결해 주세요.</p></div> : <>
+      {!loaded ? <WorkspaceSkeleton label="팀 학기 정보를 불러오는 중입니다." rows={7} variant="page" /> : !team ? <div className="team-first-empty"><h2>이 학기에 연결된 팀이 없습니다</h2><p>운영센터의 학기 팀 설정에서 {teamMeta.label}을 이 학기에 연결해 주세요.</p></div> : <>
         {!editable && <ReadOnlyBanner what={`${teamMeta.label} ${semesterId} 기록`} why={past ? "지난 학기는 기본적으로 조회 전용입니다." : "조회 역할은 이 팀 기록을 수정할 수 없습니다."} />}
         <SemesterEditProvider canEdit={editable}>
           {section === "overview" && <TeamTermOverview team={team} roster={roster} sessions={sessions} />}
@@ -128,7 +128,7 @@ function TeamTermOverview({ team, roster, sessions }: { team: Team; roster: Appl
 }
 
 function TeamRoster({ team, roster, applicationPrivates, rosterContacts, showContacts }: { team: Team; roster: Application[]; applicationPrivates: Record<string, ApplicationPrivate>; rosterContacts: Record<string, RosterContact>; showContacts: boolean }) {
-  return <section className="team-roster-panel"><header><div><h2>{team.name} 명단</h2><p>{showContacts ? "운영센터에서 확정된 배치와 연락처를 같은 신청 기록으로 연결합니다." : "운영센터에서 확정된 배치 결과를 실시간으로 표시합니다."}</p></div><span>{roster.length}명</span></header>{roster.length === 0 ? <div className="team-first-empty is-compact"><p>배치된 팀원이 없습니다.</p></div> : <div className="team-roster-list">{roster.map((person) => {
+  return <section className="team-roster-panel"><header><div><h2>{team.name} 명단</h2><p>{showContacts ? "확정된 팀 배치와 연락처를 함께 확인합니다." : "확정된 팀 배치 결과를 표시합니다."}</p></div><span>{roster.length}명</span></header>{roster.length === 0 ? <div className="team-first-empty is-compact"><p>배치된 팀원이 없습니다.</p></div> : <div className="team-roster-list">{roster.map((person) => {
     const contact = resolvedContact(applicationPrivates[person.id], rosterContacts[person.id]);
     return <div key={person.id} className="team-roster-person"><span><strong>{person.name}</strong><small>{person.bu === "스탭" ? "스탭" : `${person.bu} ${person.grade}학년 ${person.class}반`}</small></span>{showContacts && <span className="team-contact-list">{contact?.phone ? <a href={`tel:${contact.phone}`}>{contact.phone}</a> : <em>연락처 없음</em>}{contact?.parentPhone && <small>보호자 {contact.parentPhone}</small>}</span>}</div>;
   })}</div>}</section>;

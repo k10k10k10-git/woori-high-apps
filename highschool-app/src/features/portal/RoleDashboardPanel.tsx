@@ -11,10 +11,11 @@ import {
   WifiHigh,
   WifiSlash,
 } from "@phosphor-icons/react";
-import { canAccessArea, canAccessSundayTeam, describeRoles } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, describeRoles, iguardScopeOf } from "./accessPolicy";
 import { ministryModulesFor, roleDashboardTitle } from "./myPageDashboard";
 import { useMyPageData } from "./useMyPageData";
 import { activeTeamKeys } from "@/features/teams/teamModel";
+import { TERM_PHASE_LABEL } from "@/features/semester/termPhase";
 
 export default function RoleDashboardPanel() {
   const data = useMyPageData();
@@ -24,8 +25,15 @@ export default function RoleDashboardPanel() {
   const assignmentCount = (data.personalApplication ? 1 : 0)
     + data.personalRetreat.groups.length
     + data.personalRetreat.duties.length;
-  const ready = data.loaded && !data.loadError;
-  const pendingDetail = data.loadError ? "정보를 불러오지 못했습니다" : "정보를 확인하고 있습니다";
+  const calendarReady = data.calendarLoaded && !data.calendarError;
+  const requestsReady = data.requestsLoaded && !data.requestsError;
+  const assignmentLoaded = (!canAccessArea("semester", data.roles) || data.semesterAssignmentLoaded)
+    && (iguardScopeOf(data.roles) === "none" || data.retreatDutiesLoaded);
+  const assignmentError = canAccessArea("semester", data.roles) && data.semesterAssignmentError
+    || iguardScopeOf(data.roles) !== "none" && data.retreatDutiesError;
+  const assignmentReady = assignmentLoaded && !assignmentError;
+  const newFriendsReady = data.newFriendsLoaded && !data.newFriendsError;
+  const pendingDetail = (error: boolean) => error ? "정보를 불러오지 못했습니다" : "정보를 확인하고 있습니다";
 
   return (
     <div className="mypage-dashboard space-y-5">
@@ -49,25 +57,25 @@ export default function RoleDashboardPanel() {
           icon={<ClockCountdown weight="duotone" />}
           label="다가오는 일정"
           value={data.homeActions.length}
-          detail={ready ? data.homeActions[0] ? `${data.homeActions[0].dayLabel} ${data.homeActions[0].title}` : "예정된 일정 없음" : pendingDetail}
-          loading={!data.loaded}
-          unavailable={!!data.loadError}
+          detail={calendarReady ? data.homeActions[0] ? `${data.homeActions[0].dayLabel} ${data.homeActions[0].title}` : "예정된 일정 없음" : pendingDetail(data.calendarError)}
+          loading={!data.calendarLoaded}
+          unavailable={data.calendarError}
         />
         <Metric
           icon={<EnvelopeSimple weight="duotone" />}
           label="처리 중인 내 요청"
           value={data.requestSummary.received}
-          detail={ready ? `해결 ${data.requestSummary.resolved}건` : pendingDetail}
-          loading={!data.loaded}
-          unavailable={!!data.loadError}
+          detail={requestsReady ? `해결 ${data.requestSummary.resolved}건` : pendingDetail(data.requestsError)}
+          loading={!data.requestsLoaded}
+          unavailable={data.requestsError}
         />
         <Metric
           icon={<UserFocus weight="duotone" />}
           label="확인된 내 배정"
           value={assignmentCount}
-          detail={ready ? "학기·조·현장 역할 합계" : pendingDetail}
-          loading={!data.loaded}
-          unavailable={!!data.loadError}
+          detail={assignmentReady ? "학기·조·현장 역할 합계" : pendingDetail(assignmentError)}
+          loading={!assignmentLoaded}
+          unavailable={assignmentError}
         />
         <Metric
           icon={<Compass weight="duotone" />}
@@ -85,10 +93,10 @@ export default function RoleDashboardPanel() {
               <h4 id="mypage-actions-title">지금 확인할 일</h4>
               <p>공유 캘린더에서 가까운 일정과 미완료 준비를 날짜순으로 보여 줍니다.</p>
             </div>
-            <span>{ready ? `${data.homeActions.length}건` : "—"}</span>
+            <span>{calendarReady ? `${data.homeActions.length}건` : "—"}</span>
           </div>
           <div className="mypage-row-list">
-            {!ready ? <div className="mypage-empty" role={data.loadError ? undefined : "status"}><p>{pendingDetail}</p></div> : data.homeActions.length > 0 ? data.homeActions.slice(0, 5).map((item) => {
+            {!calendarReady ? <div className="mypage-empty" role={data.calendarError ? undefined : "status"}><p>{pendingDetail(data.calendarError)}</p></div> : data.homeActions.length > 0 ? data.homeActions.slice(0, 5).map((item) => {
               const content = (
                 <>
                   <span className={`mypage-day mypage-day--${item.urgency}`}>{item.dayLabel}</span>
@@ -118,13 +126,13 @@ export default function RoleDashboardPanel() {
           <dl className="mypage-context-list">
             <div>
               <dt>학기</dt>
-              <dd>{ready ? data.currentSemester?.meta.title ?? "현재 학기 없음" : "—"}</dd>
-              <small>{ready ? data.currentSemester?.id ?? "등록된 학기를 확인해 주세요" : pendingDetail}</small>
+              <dd>{data.semesterContextLoaded && !data.semesterContextError ? data.currentSemester?.meta.title ?? "등록된 학기 없음" : "—"}</dd>
+              <small>{data.semesterContextLoaded && !data.semesterContextError ? data.currentSemester ? `${data.semesterPhase ? `${TERM_PHASE_LABEL[data.semesterPhase]} · ` : ""}${data.currentSemester.id}` : "등록된 학기를 확인해 주세요" : pendingDetail(data.semesterContextError)}</small>
             </div>
             <div>
               <dt>수련회</dt>
-              <dd>{ready ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 수련회 없음" : "—"}</dd>
-              <small>{ready ? data.currentRetreat ? "현장 배정은 이 수련회를 기준으로 표시" : "등록된 수련회를 확인해 주세요" : pendingDetail}</small>
+              <dd>{data.retreatContextLoaded && !data.retreatContextError ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 수련회 없음" : "—"}</dd>
+              <small>{data.retreatContextLoaded && !data.retreatContextError ? data.currentRetreat ? "현장 배정은 이 수련회를 기준으로 표시" : "등록된 수련회를 확인해 주세요" : pendingDetail(data.retreatContextError)}</small>
             </div>
           </dl>
         </section>
@@ -139,13 +147,13 @@ export default function RoleDashboardPanel() {
             </div>
             <Link href="/teams/barnabas">바나바팀 열기 <ArrowRight weight="bold" /></Link>
           </div>
-          {ready ? <div className="mypage-inline-stats">
+          {newFriendsReady ? <div className="mypage-inline-stats">
             <InlineStat label="전체" value={data.newFriendSummary.total} />
             <InlineStat label="진행 중" value={data.newFriendSummary.active} tone="attention" />
             <InlineStat label="반배정 대기" value={data.newFriendSummary.classPending} tone="attention" />
             <InlineStat label="출석부 반영 대기" value={data.newFriendSummary.rosterPending} tone="attention" />
             <InlineStat label="완료" value={data.newFriendSummary.completed} tone="success" />
-          </div> : <div className="mypage-empty"><p>{pendingDetail}</p></div>}
+          </div> : <div className="mypage-empty"><p>{pendingDetail(data.newFriendsError)}</p></div>}
         </section>
       )}
 

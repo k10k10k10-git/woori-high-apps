@@ -20,6 +20,7 @@ import {
 import type { Milestone } from "@/lib/types";
 import type { Retreat } from "@/lib/types";
 import { subscribeSemesters, subscribeSessions } from "@/features/semester/db";
+import { featuredTerm, TERM_PHASE_LABEL } from "@/features/semester/termPhase";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
 import type { Semester, Session } from "@/features/semester/types";
 import {
@@ -45,11 +46,13 @@ import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/team
 
 export default function PortalHome() {
   const router = useRouter();
-  const { user, loading, roles, teamMemberships, memberName, signIn, signOut } = useAuth();
+  const { user, loading, roleError, retryRoles, roles, teamMemberships, memberName, signIn, signOut } = useAuth();
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [retreats, setRetreats] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<RetreatPeriodWithOwner[]>([]);
-  const [sessionState, setSessionState] = useState<{ semesterId: string; items: Session[] }>({
+  const [sourceStatus, setSourceStatus] = useState<Record<string, "ready" | "error">>({});
+  const [sessionState, setSessionState] = useState<{ uid: string; semesterId: string; items: Session[] }>({
+    uid: "",
     semesterId: "",
     items: [],
   });
@@ -78,6 +81,9 @@ export default function PortalHome() {
     : "새친구·행정은 연중 관리하고, 찬양·예배는 팀별 모임과 주일 준비를 이어갑니다.";
   const fieldAllowed = canAccessArea("retreat-field", roles);
   const retreatAdminAllowed = canAccessArea("retreat-admin", roles);
+  const scope = user?.uid ?? "";
+  const semesterListStatus = sourceStatus[`${scope}:semesters`];
+  const retreatListStatus = sourceStatus[`${scope}:retreats`];
 
   useEffect(() => {
     if (!user || !assignedSundayTeam || teamMemberships?.[assignedSundayTeam]?.role === "viewer") return;
@@ -94,26 +100,23 @@ export default function PortalHome() {
       subscribeToRetreats(
         (retreatList) => {
           setRetreats([...retreatList].sort((a, b) => b.year - a.year || b.createdAt - a.createdAt));
+          setSourceStatus((current) => ({ ...current, [`${scope}:retreats`]: "ready" }));
           ok("수련회 목록");
         },
-        fail("수련회 목록"),
+        (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:retreats`]: "error" })); fail("수련회 목록")(error); },
       ),
     ];
     if (semesterAllowed) {
       unsubs.push(subscribeSemesters(
-        (list) => { setSemesters(list); ok("학기 목록"); },
-        fail("학기 목록"),
+        (list) => { setSemesters(list); setSourceStatus((current) => ({ ...current, [`${scope}:semesters`]: "ready" })); ok("학기 목록"); },
+        (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:semesters`]: "error" })); fail("학기 목록")(error); },
       ));
     }
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [user, roles, semesterAllowed, fail, ok]);
+  }, [user, roles, scope, semesterAllowed, fail, ok]);
 
-  const currentSemester = useMemo(() => {
-    return semesters.find((semester) => {
-      const { startDate, endDate } = semester.meta;
-      return !!startDate && !!endDate && startDate <= today && today <= endDate;
-    }) ?? semesters[0] ?? null;
-  }, [semesters, today]);
+  const featuredSemester = useMemo(() => semesterListStatus === "ready" ? featuredTerm(semesters, today) : null, [semesterListStatus, semesters, today]);
+  const currentSemester = featuredSemester?.semester ?? null;
 
   // user 가드가 필요하다 — 로그아웃해도 semesters 상태는 남아 currentSemester가 유지되므로,
   // 가드가 없으면 인증이 끊긴 채 재구독해 엉뚱한 permission_denied 배너가 뜬다.
@@ -121,40 +124,51 @@ export default function PortalHome() {
     if (!user || !currentSemester) return;
     return subscribeSessions(
       currentSemester.id,
-      items => { setSessionState({ semesterId: currentSemester.id, items }); ok("회차"); },
-      fail("회차"),
+      items => { setSessionState({ uid: scope, semesterId: currentSemester.id, items }); setSourceStatus((current) => ({ ...current, [`${scope}:sessions:${currentSemester.id}`]: "ready" })); ok("회차"); },
+      (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:sessions:${currentSemester.id}`]: "error" })); fail("회차")(error); },
     );
-  }, [user, currentSemester, fail, ok]);
+  }, [user, currentSemester, scope, fail, ok]);
 
   const sessions = useMemo(
-    () => sessionState.semesterId === currentSemester?.id ? sessionState.items : [],
-    [currentSemester?.id, sessionState],
+    () => sessionState.uid === scope && sessionState.semesterId === currentSemester?.id ? sessionState.items : [],
+    [currentSemester?.id, scope, sessionState],
   );
 
   useEffect(() => {
     if (!user || !canAccessArea("home", roles)) return;
-    return subscribeToMilestones((v) => { setMilestones(v); ok("공유 일정"); }, fail("공유 일정"));
-  }, [user, roles, fail, ok]);
+    return subscribeToMilestones((v) => { setMilestones(v); setSourceStatus((current) => ({ ...current, [`${scope}:milestones`]: "ready" })); ok("공유 일정"); },
+      (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:milestones`]: "error" })); fail("공유 일정")(error); });
+  }, [user, roles, scope, fail, ok]);
 
   // 회차 구독과 같은 이유로 user 가드가 필요하다 — 로그아웃해도 retreats 상태가 남아
   // 인증이 끊긴 채 재구독하면서 엉뚱한 permission_denied 배너가 뜬다.
   // 같은 날짜의 기간은 목록 순서가 우선순위다. 이름만 바뀌면 구독을 유지하고 ID 순서는 보존한다.
-  const retreatIdsKey = JSON.stringify(retreats.map((retreat) => retreat.id));
+  const retreatIdsKey = JSON.stringify((retreatListStatus === "ready" ? retreats : []).map((retreat) => retreat.id));
+  const retreatPeriodStatus = sourceStatus[`${scope}:periods:${retreatIdsKey}`];
   useEffect(() => {
     if (!user) return;
     return subscribeToAllRetreatPeriods(
       JSON.parse(retreatIdsKey) as string[],
-      (v) => { setPeriods(v); ok("수련회 기간"); },
-      fail("수련회 기간"),
+      (v) => { setPeriods(v); setSourceStatus((current) => ({ ...current, [`${scope}:periods:${retreatIdsKey}`]: "ready" })); ok("수련회 기간"); },
+      (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:periods:${retreatIdsKey}`]: "error" })); fail("수련회 기간")(error); },
     );
-  }, [user, retreatIdsKey, fail, ok]);
+  }, [user, retreatIdsKey, scope, fail, ok]);
 
   const currentRetreat = useMemo(() => {
+    if (retreatListStatus !== "ready" || retreatPeriodStatus !== "ready") return null;
     const active = periods.find((period) => period.startDate <= today && today <= period.endDate);
     if (active) return retreats.find((retreat) => retreat.id === active.retreatId) ?? null;
     const next = periods.find((period) => period.startDate >= today);
     return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
-  }, [periods, retreats, today]);
+  }, [periods, retreatListStatus, retreatPeriodStatus, retreats, today]);
+  const calendarStatuses = [
+    retreatListStatus,
+    retreatPeriodStatus,
+    sourceStatus[`${scope}:milestones`],
+    ...(semesterAllowed ? [semesterListStatus, ...(currentSemester ? [sourceStatus[`${scope}:sessions:${currentSemester.id}`]] : [])] : []),
+  ];
+  const calendarPending = calendarStatuses.some((status) => !status);
+  const calendarFailed = calendarStatuses.some((status) => status === "error");
   const semesterCalendarHref = currentSemester
     ? operationsAllowed
       ? `/operations/semesters/${encodeURIComponent(currentSemester.id)}/overview`
@@ -163,6 +177,9 @@ export default function PortalHome() {
         : "/teams"
     : operationsAllowed ? "/operations/semesters" : "/teams";
   const calendarItems = useMemo<SharedCalendarItem[]>(() => {
+    const visibleRetreats = retreatListStatus === "ready" ? retreats : [];
+    const visiblePeriods = retreatListStatus === "ready" && retreatPeriodStatus === "ready" ? periods : [];
+    const visibleMilestones = sourceStatus[`${scope}:milestones`] === "ready" ? milestones : [];
     const semesterItems: SharedCalendarItem[] = currentSemester
       ? sessions.map((session) => ({
           id: `semester-${session.id}`,
@@ -173,8 +190,8 @@ export default function PortalHome() {
           href: semesterCalendarHref,
         }))
       : [];
-    const retreatItems = periods.map((period) => {
-      const retreat = retreats.find((item) => item.id === period.retreatId);
+    const retreatItems = visiblePeriods.map((period) => {
+      const retreat = visibleRetreats.find((item) => item.id === period.retreatId);
       return {
         id: `retreat-${period.retreatId}-${period.id}`,
         date: period.startDate,
@@ -184,7 +201,7 @@ export default function PortalHome() {
         href: retreatEntryHref(period.retreatId, roles),
       };
     });
-    const sharedItems: SharedCalendarItem[] = milestones.map((milestone) => ({
+    const sharedItems: SharedCalendarItem[] = visibleMilestones.map((milestone) => ({
       id: `shared-${milestone.id}`,
       date: milestone.targetDate,
       title: milestone.title,
@@ -193,7 +210,7 @@ export default function PortalHome() {
       editable: true,
     }));
     return [...semesterItems, ...retreatItems, ...sharedItems].sort((a, b) => a.date.localeCompare(b.date));
-  }, [currentSemester, milestones, periods, retreats, roles, semesterCalendarHref, sessions]);
+  }, [currentSemester, milestones, periods, retreatListStatus, retreatPeriodStatus, retreats, roles, scope, semesterCalendarHref, sessions, sourceStatus]);
 
   const homeActions = useMemo(() => {
     return buildHomeActions(calendarItems, today);
@@ -237,6 +254,14 @@ export default function PortalHome() {
 
   if (!user) {
     return <LandingPage signIn={signIn} />;
+  }
+
+  if (roleError) {
+    return <main className="min-h-screen grid place-items-center px-6 py-10"><div className="w-full max-w-md text-center" role="alert">
+      <h1 className="text-xl font-bold">담당 사역을 확인하지 못했습니다</h1>
+      <p className="mt-2 text-sm leading-6 text-slate-500">권한 정보를 불러오는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.</p>
+      <button type="button" onClick={retryRoles} className="btn-primary mt-5">다시 시도</button>
+    </div></main>;
   }
 
   if (!canAccessArea("home", roles)) {
@@ -285,7 +310,9 @@ export default function PortalHome() {
             </h1>
             <p className="page-description">{dailyMessage.verse.text} {dailyMessage.verse.reference}</p>
           </div>
-          <HomeAgendaSummary actions={homeActions} />
+          {homeActions.length > 0 || (!calendarPending && !calendarFailed)
+            ? <HomeAgendaSummary actions={homeActions} />
+            : <div className="hero-agenda" role={calendarFailed ? "alert" : "status"}><p className="hero-agenda__title">다음 공유 일정</p><p className="py-2 text-xs text-slate-300">{calendarFailed ? "일부 일정을 확인하지 못했습니다." : "일정을 확인하는 중입니다…"}</p></div>}
         </section>
 
         <HomeStart entry={homeEntry} roleLabel={describeRoles(roles)} />
@@ -296,7 +323,8 @@ export default function PortalHome() {
               <span className="tag home-domain-chip--semester px-3 py-1.5">운영센터</span>
               <span className="home-domain-arrow--semester grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
-            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
+            {featuredSemester && <p className="mt-5 text-xs font-semibold text-slate-500">{TERM_PHASE_LABEL[featuredSemester.phase]}</p>}
+            <h2 className={`${featuredSemester ? "mt-2" : "mt-6"} text-2xl font-bold tracking-[-0.025em]`}>{semesterListStatus === "error" ? "학기를 확인할 수 없습니다" : !semesterListStatus ? "학기를 확인하는 중입니다…" : currentSemester?.meta.title ?? "등록된 학기가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">훈련·사역팀 출석, 수료, 커리큘럼과 자료를 관리합니다.</p>
           </Link>}
 
@@ -314,7 +342,7 @@ export default function PortalHome() {
               <span className="tag home-domain-chip--vacation px-3 py-1.5">행사</span>
               <span className="home-domain-arrow--vacation grid h-9 w-9 place-items-center rounded-full transition group-hover:translate-x-1">→</span>
             </div>
-            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
+            <h2 className="mt-6 text-2xl font-bold tracking-[-0.025em]">{retreatListStatus === "error" || retreatPeriodStatus === "error" ? "수련회를 확인할 수 없습니다" : !retreatListStatus || !retreatPeriodStatus ? "수련회를 확인하는 중입니다…" : currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다"}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">행정 편성과 이가드 현장 운영을 같은 수련회 데이터로 연결합니다.</p>
           </Link>}
         </section>
@@ -337,7 +365,7 @@ export default function PortalHome() {
         </Link>
 
         <section className="mt-7 grid gap-6">
-          <SharedMinistryCalendar
+          {calendarPending && calendarItems.length === 0 ? <div className="surface-panel p-6 text-sm text-slate-500" role="status">공유 사역 일정을 확인하는 중입니다…</div> : calendarFailed && calendarItems.length === 0 ? <div className="surface-panel p-6 text-sm text-red-700" role="alert">일부 일정을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.</div> : <SharedMinistryCalendar
             items={calendarItems}
             canEdit={canEditSchedule}
             onAdd={(date) => setScheduleDraft({ date, title: "", kind: "main" })}
@@ -350,7 +378,7 @@ export default function PortalHome() {
                 setActionError(error instanceof Error ? error.message : String(error));
               }
             }}
-          />
+          />}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="surface-panel order-2 p-5 sm:p-6">
@@ -376,7 +404,7 @@ export default function PortalHome() {
                   <h2 className="text-lg font-bold">지금 확인할 일</h2>
                   <p className="mt-1 text-xs text-slate-500">공유 준비 일정과 다음 사역을 날짜순으로 모았습니다.</p>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-600">{homeActions.length}건</span>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold tabular-nums text-slate-600">{calendarFailed ? "일부 조회 실패" : calendarPending ? "확인 중" : `${homeActions.length}건`}</span>
               </div>
               <div className="mt-4 space-y-2">
                 {homeActions.length > 0 ? homeActions.map((item) => {
@@ -393,7 +421,7 @@ export default function PortalHome() {
                   return item.href
                     ? <Link key={item.id} href={item.href} className="home-action-row">{content}</Link>
                     : <div key={item.id} className="home-action-row">{content}</div>;
-                }) : (
+                }) : calendarPending || calendarFailed ? <div className="rounded-xl bg-slate-50 px-4 py-8 text-center" role={calendarFailed ? "alert" : "status"}><p className="text-sm font-semibold text-slate-700">{calendarFailed ? "일부 업무를 확인하지 못했습니다." : "이번 주 업무를 확인하는 중입니다…"}</p></div> : (
                   <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
                     <p className="text-sm font-semibold text-slate-700">급히 확인할 일이 없습니다.</p>
                     <p className="mt-1 text-xs text-slate-400">공유 일정을 추가하면 여기에 나타납니다.</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup } from "firebase/auth";
 import { get, ref } from "firebase/database";
 import { auth, googleProvider, db } from "@/lib/firebase";
@@ -11,6 +11,7 @@ import { mergeTeamMemberships, type TeamMemberships } from "@/features/teams/tea
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  roleError: boolean;
   /** 두 축 역할(학기·방학) — 화면 게이트는 accessPolicy의 판정 함수를 통해서만 쓴다 */
   roles: MinistryRoles;
   teamMemberships: TeamMemberships;
@@ -19,6 +20,7 @@ interface AuthContextValue {
   memberName: string | null;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  retryRoles: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -27,8 +29,11 @@ async function canReadAsMainAdmin(uid: string): Promise<boolean> {
   try {
     const snap = await get(ref(db, paths.admins(uid)));
     return snap.val() === true;
-  } catch {
-    return false;
+  } catch (error) {
+    const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
+    const message = error instanceof Error ? error.message : String(error);
+    if (/permission[_-]denied/i.test(`${code} ${message}`)) return false;
+    throw error;
   }
 }
 
@@ -39,13 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [teamMemberships, setTeamMemberships] = useState<TeamMemberships>({});
   const [canSearchOfficialRoster, setCanSearchOfficialRoster] = useState(false);
   const [memberName, setMemberName] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState(false);
+  const authRequest = useRef(0);
 
-  useEffect(() => {
-    let authRequest = 0;
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      const request = ++authRequest;
+  const loadRoles = useCallback(async (u: User | null) => {
+      const request = ++authRequest.current;
       setUser(u);
       setLoading(true);
+      setRoleError(false);
       setRoles(NO_ROLES);
       setTeamMemberships({});
       setCanSearchOfficialRoster(false);
@@ -59,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             canReadAsMainAdmin(u.uid),
           ]);
           // 로그아웃·계정 전환 뒤 늦게 도착한 이전 조회가 현재 역할을 덮지 않게 한다.
-          if (request !== authRequest) return;
+          if (request !== authRequest.current) return;
           const retreatAdmin = retreatAdminSnap.val();
           const iguardMember = iguardMemberSnap.val();
 
@@ -93,20 +99,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             retreatAdmin?.teamMemberships,
           ));
         } catch {
-          if (request !== authRequest) return;
+          if (request !== authRequest.current) return;
           setRoles(NO_ROLES);
           setTeamMemberships({});
           setCanSearchOfficialRoster(false);
           setMemberName(null);
+          setRoleError(true);
         }
       }
+      if (request !== authRequest.current) return;
       setLoading(false);
-    });
+  }, []);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, loadRoles);
     return () => {
-      authRequest += 1;
+      authRequest.current += 1;
       unsub();
     };
-  }, []);
+  }, [loadRoles]);
+
+  function retryRoles() {
+    if (user) void loadRoles(user);
+  }
 
   async function signIn() {
     await signInWithPopup(auth, googleProvider);
@@ -118,10 +133,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTeamMemberships({});
     setCanSearchOfficialRoster(false);
     setMemberName(null);
+    setRoleError(false);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, roles, teamMemberships, canSearchOfficialRoster, memberName, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, roleError, roles, teamMemberships, canSearchOfficialRoster, memberName, signIn, signOut, retryRoles }}>
       {children}
     </AuthContext.Provider>
   );

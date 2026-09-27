@@ -20,8 +20,14 @@ export default function MyMinistryPanel() {
       ? `/operations/semesters/${encodeURIComponent(data.currentSemester.id)}/overview`
       : sundayTeam ? `/teams/${sundayTeam}/terms/${encodeURIComponent(data.currentSemester.id)}/overview` : "/teams"
     : operationsAllowed ? "/operations/semesters" : "/teams";
-  const ready = data.loaded && !data.loadError;
-  const pendingDetail = data.loadError ? "배정 정보를 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." : "내 사역 배정을 확인하고 있습니다.";
+  const semesterReady = data.semesterAssignmentLoaded && !data.semesterAssignmentError;
+  const attendanceReady = data.semesterAttendanceLoaded && !data.semesterAttendanceError;
+  const retreatReady = data.retreatAssignmentLoaded && !data.retreatAssignmentError;
+  const dutiesReady = data.retreatDutiesLoaded && !data.retreatDutiesError;
+  const semesterPending = data.semesterAssignmentError ? "학기 배정을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." : "학기 배정을 확인하고 있습니다.";
+  const retreatPending = data.retreatAssignmentError ? "현장 배정을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요." : "현장 배정을 확인하고 있습니다.";
+  const attendancePending = data.semesterAttendanceError ? "출석 조회 실패" : "출석 확인 중";
+  const dutiesPending = data.retreatDutiesError ? "큐·포스트 조회 실패" : "큐·포스트 확인 중";
 
   return (
     <div className="space-y-5">
@@ -39,11 +45,11 @@ export default function MyMinistryPanel() {
             <div className="mypage-section-header">
               <div>
                 <h4 id="my-semester-title">학기 배정</h4>
-                <p>{ready ? data.currentSemester?.meta.title ?? "현재 학기가 없습니다" : "학기 정보 확인"}</p>
+                <p>{semesterReady ? data.currentSemester?.meta.title ?? "등록된 학기가 없습니다" : "학기 정보 확인"}</p>
               </div>
               <Link href={semesterHref}>학기 열기 <ArrowRight weight="bold" /></Link>
             </div>
-            {!ready ? <p className="mypage-unmatched" role={data.loadError ? undefined : "status"}>{pendingDetail}</p> : data.personalApplication ? (
+            {!semesterReady ? <p className="mypage-unmatched" role={data.semesterAssignmentError ? undefined : "status"}>{semesterPending}</p> : data.personalApplication ? (
               <div className="mypage-assignment">
                 <div className="mypage-assignment-title">
                   <span><UsersThree weight="duotone" /></span>
@@ -52,9 +58,9 @@ export default function MyMinistryPanel() {
                 <dl>
                   <div><dt>사역팀</dt><dd>{data.personalApplication.team?.name ?? "미배정"}</dd></div>
                   <div><dt>훈련 반</dt><dd>{data.personalApplication.trainingClass?.name ?? "미배정"}</dd></div>
-                  <div><dt>사역팀 출석</dt><dd>{data.personalAttendance ? `${data.personalAttendance.actualAttended}/${data.personalAttendance.total}회` : "기록 없음"}</dd></div>
-                  <div><dt>사역팀 입력 현황</dt><dd>{data.personalAttendance ? `${data.personalAttendance.recorded}/${data.personalAttendance.total}회 · 미입력 ${data.personalAttendance.unrecorded}회` : "기록 없음"}</dd></div>
-                  <div><dt>사역팀 출석률</dt><dd>{data.personalAttendance ? `${data.personalAttendance.rate}%` : "0%"}</dd></div>
+                  <div><dt>사역팀 출석</dt><dd>{attendanceReady ? data.personalAttendance ? `${data.personalAttendance.actualAttended}/${data.personalAttendance.total}회` : "기록 없음" : attendancePending}</dd></div>
+                  <div><dt>사역팀 입력 현황</dt><dd>{attendanceReady ? data.personalAttendance ? `${data.personalAttendance.recorded}/${data.personalAttendance.total}회 · 미입력 ${data.personalAttendance.unrecorded}회` : "기록 없음" : attendancePending}</dd></div>
+                  <div><dt>사역팀 출석률</dt><dd>{attendanceReady ? data.personalAttendance ? `${data.personalAttendance.rate}%` : "0%" : attendancePending}</dd></div>
                 </dl>
                 <p className="mypage-assignment-note">휴강을 제외한 정규·행사 회차 기준입니다. 수료 판정은 학기 출석부에서 정규 회차만 계산합니다.</p>
               </div>
@@ -86,11 +92,11 @@ export default function MyMinistryPanel() {
           <div className="mypage-section-header">
             <div>
               <h4 id="my-retreat-title">수련회 현장 배정</h4>
-              <p>{ready ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 기준 수련회가 없습니다" : "수련회 정보 확인"}</p>
+              <p>{retreatReady ? data.currentRetreat ? `${data.currentRetreat.year}년 ${data.currentRetreat.name}` : "현재 기준 수련회가 없습니다" : "수련회 정보 확인"}</p>
             </div>
             <Link href={data.currentRetreat ? `/events/${encodeURIComponent(data.currentRetreat.id)}/field` : "/events"}>현장 열기 <ArrowRight weight="bold" /></Link>
           </div>
-          {!ready ? <p className="mypage-unmatched" role={data.loadError ? undefined : "status"}>{pendingDetail}</p> : data.personalRetreat.matchedStaffId ? (
+          {!retreatReady ? <p className="mypage-unmatched" role={data.retreatAssignmentError ? undefined : "status"}>{retreatPending}</p> : data.personalRetreat.matchedStaffId ? (
             <div className="grid gap-4 lg:grid-cols-[minmax(220px,.65fr)_minmax(0,1.35fr)]">
               <div className="mypage-assignment">
                 <div className="mypage-assignment-title">
@@ -99,12 +105,12 @@ export default function MyMinistryPanel() {
                 </div>
                 <dl>
                   <div><dt>담당 조</dt><dd>{data.personalRetreat.groups.length}개</dd></div>
-                  <div><dt>큐·포스트</dt><dd>{data.personalRetreat.duties.length}건</dd></div>
+                  <div><dt>큐·포스트</dt><dd>{dutiesReady ? `${data.personalRetreat.duties.length}건` : dutiesPending}</dd></div>
                 </dl>
                 {data.personalRetreat.groups.length > 0 && <p className="mypage-assignment-note">{data.personalRetreat.groups.map((group) => `${group.bu} ${group.name}`).join(", ")}</p>}
               </div>
               <div className="mypage-duty-list">
-                {data.personalRetreat.duties.length > 0 ? data.personalRetreat.duties.slice(0, 6).map((duty) => (
+                {!dutiesReady ? <p role={data.retreatDutiesError ? undefined : "status"}>{dutiesPending}</p> : data.personalRetreat.duties.length > 0 ? data.personalRetreat.duties.slice(0, 6).map((duty) => (
                   <div key={duty.blockId}>
                     <time>{duty.day}일차 {duty.start}</time>
                     <span><strong>{duty.scheduleLabel}</strong><small>{[...duty.roles, ...duty.posts].join(" · ")}</small></span>

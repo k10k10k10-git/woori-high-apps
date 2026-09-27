@@ -29,8 +29,8 @@ let onAuth: (user: User | null) => Promise<void>;
 let reads: Map<string, PendingRead>;
 
 function AuthState() {
-  const { user, loading, roles, memberName } = useAuth();
-  return <output data-testid="auth-state">{JSON.stringify({ uid: user?.uid ?? null, loading, roles, memberName })}</output>;
+  const { user, loading, roleError, roles, memberName, retryRoles } = useAuth();
+  return <><output data-testid="auth-state">{JSON.stringify({ uid: user?.uid ?? null, loading, roleError, roles, memberName })}</output><button onClick={retryRoles}>역할 다시 시도</button></>;
 }
 
 function MembershipState() {
@@ -93,7 +93,7 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
     act(() => { pending = onAuth(user("a")); });
     await act(() => onAuth(null));
     await settle("a", { admins: true, retreatAdmins: { name: "이전 사용자" } }, pending);
-    expect(state()).toEqual({ uid: null, loading: false, roles: NO_ROLES, memberName: null });
+    expect(state()).toEqual({ uid: null, loading: false, roleError: false, roles: NO_ROLES, memberName: null });
   });
 
   it.each(["성공", "실패"])("다음 계정 조회가 먼저 끝나도 이전 계정의 %s 응답이 덮지 않는다", async (result) => {
@@ -123,12 +123,12 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
     act(() => { first = onAuth(user("a")); });
     await settle("a", { admins: true }, first);
     act(() => { second = onAuth(user("b")); });
-    expect(state()).toEqual({ uid: "b", loading: true, roles: NO_ROLES, memberName: null });
+    expect(state()).toEqual({ uid: "b", loading: true, roleError: false, roles: NO_ROLES, memberName: null });
     await settle("b", {}, second);
     expect(state().loading).toBe(false);
   });
 
-  it("현재 요청 중 필수 역할 조회가 실패하면 권한 없는 상태로 로딩을 끝낸다", async () => {
+  it("필수 역할 조회 실패와 권한 미배정을 구분하고 다시 읽을 수 있다", async () => {
     render(<AuthProvider><AuthState /></AuthProvider>);
     let pending!: Promise<void>;
     act(() => { pending = onAuth(user("a")); });
@@ -136,7 +136,12 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
       reads.get("retreatAdmins/a")!.reject(new Error("permission_denied"));
       await pending;
     });
-    expect(state()).toEqual({ uid: "a", loading: false, roles: NO_ROLES, memberName: null });
+    expect(state()).toEqual({ uid: "a", loading: false, roleError: true, roles: NO_ROLES, memberName: null });
+    act(() => screen.getByRole("button", { name: "역할 다시 시도" }).click());
+    expect(state().loading).toBe(true);
+    await act(async () => finishReads("a", { admins: true }));
+    expect(state()).toMatchObject({ uid: "a", loading: false, roleError: false });
+    expect(state().roles).not.toEqual(NO_ROLES);
   });
 
   it("admins 자기조회 거부는 일반 현장 역할을 막지 않는다", async () => {
@@ -153,6 +158,18 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
     });
     expect(state()).toMatchObject({ uid: "a", loading: false, memberName: "현장 담당" });
     expect(state().roles).not.toEqual(NO_ROLES);
+  });
+
+  it("선택적 관리자 조회라도 연결 실패면 권한 미배정으로 확정하지 않는다", async () => {
+    render(<AuthProvider><AuthState /></AuthProvider>);
+    let pending!: Promise<void>;
+    act(() => { pending = onAuth(user("a")); });
+    await act(async () => {
+      reads.get("admins/a")!.reject(new Error("network unavailable"));
+      finishReads("a", {});
+      await pending;
+    });
+    expect(state()).toMatchObject({ uid: "a", loading: false, roleError: true, roles: NO_ROLES });
   });
 
   it("두 계정 저장소에 나뉜 담당 팀을 합쳐 읽는다", async () => {

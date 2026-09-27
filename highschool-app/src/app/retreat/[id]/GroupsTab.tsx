@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { X } from "@phosphor-icons/react";
+import OverlayShell from "@/components/OverlayShell";
+import { useRetreatCanEdit } from "@/features/portal/RetreatEditContext";
 import { Retreat, Group, Student, Participant, TeacherAttendance } from "@/lib/types";
 import { clearGroups, saveGroups, subscribeToGroups, subscribeToRetreatStudentsByYear, subscribeToParticipants, subscribeToTeachers, subscribeToCellColors, subscribeToIguardGroupStaff, getGroupsBackups, restoreGroupsBackup } from "@/lib/db";
 import BackupRestoreButton from "./BackupRestoreButton";
@@ -18,7 +20,7 @@ import { resolveIguardGroupStaffNames, studentPrintRowClass, teacherPrintStatus,
 import { resolveGroupRoleStudent } from "@/lib/groupRoleStudent";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import { buildGroupsGridColumns, type GroupsGridCell } from "@/lib/groupsGrid";
-import { GroupCard, UnassignedBySection, type StudentInfo } from "./GroupComponents";
+import { GroupCard, UnassignedBySection, moveGroupStudent, type StudentInfo } from "./GroupComponents";
 
 const parseNames = (csv: string) => (csv || "").split(",").map(s => s.trim()).filter(Boolean);
 
@@ -29,6 +31,7 @@ interface Props {
 
 export default function GroupsTab({ retreat }: Props) {
   const { toast, uiConfirm } = useUI();
+  const canEditRetreat = useRetreatCanEdit();
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Record<string, StudentInfo>>({});
   const [unassigned, setUnassigned] = useState<string[]>([]);
@@ -49,6 +52,9 @@ export default function GroupsTab({ retreat }: Props) {
   const [dragFrom, setDragFrom] = useState<string | null>(null);
   const [showAddGroup, setShowAddGroup] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: "", bu: "1부", teachers: "", leader: "" });
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [selectedTargetId, setSelectedTargetId] = useState("");
 
   const isDirtyRef = useRef(false);
   const isDragging = useRef(false);
@@ -230,6 +236,14 @@ export default function GroupsTab({ retreat }: Props) {
       unassigned, lateRegistrantIds, rooms: groups, cellColors, dayAttendanceIds: EMPTY_DAY_ATTENDANCE,
     }),
     [unassigned, lateRegistrantIds, groups, cellColors]);
+  const movableStudentIds = useMemo(
+    () => [...new Set([...allUnassigned, ...groups.flatMap(group => group.studentIds || [])])].filter(id => !!students[id]),
+    [allUnassigned, groups, students]);
+  const filteredStudentIds = useMemo(() => {
+    const query = studentSearch.trim();
+    return movableStudentIds.filter(id => id === selectedStudentId || !query ||
+      `${students[id].name} ${students[id].bu || ""} ${students[id].grade}학년 ${students[id].class}반`.includes(query));
+  }, [movableStudentIds, selectedStudentId, studentSearch, students]);
 
   const unassignedTeachers = useMemo(() => {
     const assigned = new Set(groups.flatMap(g => [
@@ -265,10 +279,21 @@ export default function GroupsTab({ retreat }: Props) {
     setDragFrom(fromGroupId || "unassigned");
   }
 
+  function moveStudent(studentId: string, targetGroupId: string | null) {
+    if (!canEditRetreat) return;
+    const currentGroup = groups.find(group => (group.studentIds || []).includes(studentId));
+    if (currentGroup?.id === targetGroupId || (!currentGroup && !targetGroupId)) return;
+    if (targetGroupId && !groups.some(group => group.id === targetGroupId)) return;
+    setGroups(prev => moveGroupStudent(prev, studentId, targetGroupId));
+    setUnassigned(prev => targetGroupId
+      ? prev.filter(id => id !== studentId)
+      : lateRegistrantIds.includes(studentId) || prev.includes(studentId) ? prev : [...prev, studentId]);
+    markDirty();
+  }
+
   function handleDrop(targetGroupId: string | null) {
     isDragging.current = false;
     if (!dragItem) return;
-    markDirty();
 
     if (dragItemType === "teacher") {
       const teacherName = dragItem;
@@ -284,27 +309,9 @@ export default function GroupsTab({ retreat }: Props) {
         }
         return updated;
       });
+      markDirty();
     } else {
-      const studentId = dragItem;
-      setGroups(prev => {
-        const updated = prev.map(g => ({ ...g, studentIds: [...(g.studentIds || [])] }));
-        if (dragFrom && dragFrom !== "unassigned") {
-          const src = updated.find(g => g.id === dragFrom);
-          if (src) src.studentIds = src.studentIds.filter(id => id !== studentId);
-        } else {
-          setUnassigned(u => u.filter(id => id !== studentId));
-        }
-        if (targetGroupId) {
-          const tgt = updated.find(g => g.id === targetGroupId);
-          if (tgt && !tgt.studentIds.includes(studentId)) tgt.studentIds.push(studentId);
-        } else {
-          // 후기 신청자는 allUnassigned memo가 처리하므로 state에 추가하지 않음
-          if (!lateRegistrantIds.includes(studentId)) {
-            setUnassigned(u => u.includes(studentId) ? u : [...u, studentId]);
-          }
-        }
-        return updated;
-      });
+      moveStudent(dragItem, targetGroupId);
     }
 
     setDragItem(null);
@@ -626,6 +633,7 @@ export default function GroupsTab({ retreat }: Props) {
   }
 
   function addGroup() {
+    if (!canEditRetreat) return;
     const id = `g_${Date.now()}`;
     const g: Group = {
       id,
@@ -778,29 +786,61 @@ export default function GroupsTab({ retreat }: Props) {
       </div>
 
       {showAddGroup && (
-        <div role="dialog" aria-modal="true" aria-label="조 추가" className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+        <OverlayShell label="조 추가" onClose={() => setShowAddGroup(false)} panelClassName="group-add-dialog p-6">
             <h3 className="font-bold mb-4">조 추가</h3>
             <div className="space-y-3">
-              <input className="input" placeholder="조 이름 (예: 1조)" value={newGroup.name}
-                onChange={e => setNewGroup(p => ({...p, name: e.target.value}))} />
-              <select className="input" value={newGroup.bu}
+              <label className="block text-sm font-medium text-slate-700">조 이름<input data-autofocus className="input mt-1" placeholder="예: 1조" value={newGroup.name}
+                onChange={e => setNewGroup(p => ({...p, name: e.target.value}))} /></label>
+              <label className="block text-sm font-medium text-slate-700">부서<select className="input mt-1" value={newGroup.bu}
                 onChange={e => setNewGroup(p => ({...p, bu: e.target.value}))}>
                 <option>1부</option>
                 <option>2부</option>
-              </select>
-              <input className="input" placeholder="교사 (쉼표로 구분)" value={newGroup.teachers}
-                onChange={e => setNewGroup(p => ({...p, teachers: e.target.value}))} />
-              <input className="input" placeholder="조장" value={newGroup.leader}
-                onChange={e => setNewGroup(p => ({...p, leader: e.target.value}))} />
+              </select></label>
+              <label className="block text-sm font-medium text-slate-700">교사<input className="input mt-1" placeholder="쉼표로 구분" value={newGroup.teachers}
+                onChange={e => setNewGroup(p => ({...p, teachers: e.target.value}))} /></label>
+              <label className="block text-sm font-medium text-slate-700">조장<input className="input mt-1" value={newGroup.leader}
+                onChange={e => setNewGroup(p => ({...p, leader: e.target.value}))} /></label>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={addGroup} className="btn-primary flex-1 justify-center">추가</button>
-              <button onClick={() => setShowAddGroup(false)} className="btn-secondary flex-1 justify-center">취소</button>
+              <button type="button" onClick={addGroup} className="btn-primary flex-1 justify-center">추가</button>
+              <button type="button" onClick={() => setShowAddGroup(false)} className="btn-secondary flex-1 justify-center">취소</button>
             </div>
+        </OverlayShell>
+      )}
+
+      {canEditRetreat && <section className="card p-3 sm:p-4 mb-3" aria-labelledby="manual-group-move-heading">
+        <h3 id="manual-group-move-heading" className="font-semibold text-slate-800 text-sm">학생 수동 이동</h3>
+        <p className="mt-1 mb-3 text-xs text-slate-600">학생과 이동할 조를 고르세요. 이동 후 자동 저장됩니다.</p>
+        <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+          <label className="min-w-0 flex-1 text-xs font-medium text-slate-700">학생 찾기
+            <input type="search" className="input mt-1 min-h-11 w-full" value={studentSearch} placeholder="이름 또는 반 검색"
+              onChange={event => setStudentSearch(event.target.value)} />
+          </label>
+          <label className="min-w-0 flex-1 text-xs font-medium text-slate-700">학생
+            <select className="input mt-1 min-h-11 w-full" value={selectedStudentId} onChange={event => { setSelectedStudentId(event.target.value); setSelectedTargetId(""); }}>
+              <option value="">학생 선택</option>
+              {filteredStudentIds.map(id => {
+                const student = students[id];
+                const currentGroup = groups.find(group => (group.studentIds || []).includes(id));
+                return <option key={id} value={id}>{student.name} · {student.bu || "부 미정"} {student.grade || "?"}학년 {student.class || "?"}반 · {currentGroup ? groupDisplayName(currentGroup, groups) : "미배정"}</option>;
+              })}
+            </select>
+          </label>
+          <label className="min-w-0 flex-1 text-xs font-medium text-slate-700">이동할 곳
+            <select className="input mt-1 min-h-11 w-full" value={selectedTargetId} disabled={!selectedStudentId} onChange={event => setSelectedTargetId(event.target.value)}>
+              <option value="">이동할 곳 선택</option>
+              <option value="unassigned">미배정</option>
+              {groups.map(group => <option key={group.id} value={group.id}>{group.bu} · {groupDisplayName(group, groups)}</option>)}
+            </select>
+          </label>
+          <div className="flex gap-2 sm:pb-0">
+            <button type="button" className="btn-primary min-h-11 justify-center" disabled={!selectedStudentId || !selectedTargetId || (groups.find(group => (group.studentIds || []).includes(selectedStudentId))?.id ?? "unassigned") === selectedTargetId}
+              onClick={() => { moveStudent(selectedStudentId, selectedTargetId === "unassigned" ? null : selectedTargetId); setSelectedStudentId(""); setSelectedTargetId(""); }}>이동</button>
+            <button type="button" className="btn-secondary min-h-11 justify-center" disabled={!selectedStudentId && !selectedTargetId}
+              onClick={() => { setSelectedStudentId(""); setSelectedTargetId(""); }}>선택 취소</button>
           </div>
         </div>
-      )}
+      </section>}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Auto Assign Panel */}

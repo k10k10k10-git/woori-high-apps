@@ -224,7 +224,7 @@ export default function AutoAssignConfigPanel({
     <div className="card p-4 space-y-4 text-sm sticky top-4 max-h-[calc(100vh-5rem)] overflow-y-auto">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-slate-700 flex items-center gap-1.5">🎲 자동 조편성</h3>
-        <button onClick={onCollapse} className="text-slate-300 hover:text-slate-500 text-xs">◀ 접기</button>
+        <button onClick={onCollapse} className="text-slate-600 hover:text-slate-500 text-xs">◀ 접기</button>
       </div>
 
       <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-2.5">
@@ -233,10 +233,10 @@ export default function AutoAssignConfigPanel({
             className="btn-secondary btn-sm text-xs disabled:opacity-50">
             {configLoading ? "⏳ 설정 불러오는 중" : configSaving ? "⏳ 설정 저장 중" : "💾 설정 저장"}
           </button>
-          <span className="text-[10px] text-emerald-700">조장·규칙·고려 관계를 이 수련회에 저장</span>
+          <span className="text-xs text-emerald-700">조장·규칙·고려 관계를 이 수련회에 저장</span>
         </div>
-        {configNotice && <p className="mt-1.5 text-[10px] text-emerald-700">✓ {configNotice}</p>}
-        {configError && <p className="mt-1.5 text-[10px] text-red-600">⚠ {configError}</p>}
+        {configNotice && <p className="mt-1.5 text-xs text-emerald-700" role="status">✓ {configNotice}</p>}
+        {configError && <p className="mt-1.5 text-xs text-red-700" role="alert">⚠ {configError}</p>}
       </div>
 
       <fieldset className="rounded-lg border border-sky-200 bg-sky-50 p-2.5">
@@ -258,7 +258,7 @@ export default function AutoAssignConfigPanel({
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[10px] leading-relaxed text-sky-700">
+        <p className="mt-2 text-xs leading-relaxed text-sky-700">
           {scope === "all"
             ? "1부와 2부를 모두 새로 편성합니다."
             : `${scope}만 새로 편성하고 ${scope === "1부" ? "2부" : "1부"}의 현재 조편성은 그대로 유지합니다.`}
@@ -268,7 +268,7 @@ export default function AutoAssignConfigPanel({
       {/* 기본 적용 알고리즘 */}
       <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-600">
         <p className="font-semibold text-slate-700">기본 적용 알고리즘</p>
-        <p className="mt-0.5 mb-2 text-[10px] text-slate-400">필요한 규칙만 체크해서 자동배정에 적용하세요.</p>
+        <p className="mt-0.5 mb-2 text-xs text-slate-600">필요한 규칙만 체크해서 자동배정에 적용하세요.</p>
 
         <div className="space-y-1.5">
           {([
@@ -307,7 +307,7 @@ export default function AutoAssignConfigPanel({
         </div>
 
         <div className="mt-2.5 border-t border-slate-200 pt-2">
-          <p className="mb-1.5 text-[10px] font-semibold text-slate-400">배정 구조 선택</p>
+          <p className="mb-1.5 text-xs font-semibold text-slate-600">배정 구조 선택</p>
           <div className="space-y-1.5">
             {([
               { label: "같은 반 학생은 반드시 같은 조로 배정", key: "keepSameClass" as const },
@@ -349,7 +349,7 @@ export default function AutoAssignConfigPanel({
                     else setRules(r => ({ ...r, [key]: e.target.checked }));
                   }} />
                 <span className={!checked ? "line-through opacity-50" : ""}>{label}</span>
-                <span className="ml-auto text-blue-400 text-[10px] shrink-0">택1</span>
+                <span className="ml-auto text-blue-700 text-xs shrink-0">택1</span>
               </label>
             );
           })}
@@ -362,7 +362,7 @@ export default function AutoAssignConfigPanel({
             </span>
           </label>
         </div>
-        <p className="text-[10px] text-blue-400 mt-2 leading-relaxed">
+        <p className="text-xs text-blue-700 mt-2 leading-relaxed">
           ※ 선택 규칙과 고려 관계는 <b>반드시 지켜지도록</b> 동일한 최우선순위로 배정됩니다. 동시에 만족할 수 없을 때만 위반이 최소화됩니다.
         </p>
       </div>
@@ -372,16 +372,17 @@ export default function AutoAssignConfigPanel({
         <p className="text-xs font-semibold text-slate-500 mb-2">👥 조당 최대 인원</p>
         <div className="flex items-center gap-2">
           <input type="number" min={0} max={30} value={rules.maxGroupSize || ""}
+            aria-label="조당 최대 인원"
             placeholder="제한 없음"
             onChange={e => {
               const v = parseInt(e.target.value) || 0;
               setRules(r => ({ ...r, maxGroupSize: Math.max(0, Math.min(30, v)) }));
             }}
-            className="input w-20 text-center text-sm py-1" />
+            className="input min-h-11 w-20 text-center text-sm py-1" />
           <span className="text-xs text-slate-500">명</span>
           {rules.maxGroupSize > 0 && (
             <button onClick={() => setRules(r => ({ ...r, maxGroupSize: 0 }))}
-              className="text-xs text-slate-400 hover:text-slate-600 ml-1">해제</button>
+              className="text-xs text-slate-600 hover:text-slate-600 ml-1">해제</button>
           )}
         </div>
         {rules.maxGroupSize > 0 && (
@@ -395,7 +396,7 @@ export default function AutoAssignConfigPanel({
 
       {/* 조 수 */}
       <div>
-        <p className="text-xs font-semibold text-slate-500 mb-2">📊 조 수 설정{rules.maxGroupSize > 0 && <span className="text-blue-400 font-normal ml-1">(자동 계산됨)</span>}</p>
+        <p className="text-xs font-semibold text-slate-500 mb-2">📊 조 수 설정{rules.maxGroupSize > 0 && <span className="text-blue-700 font-normal ml-1">(자동 계산됨)</span>}</p>
         <div className="space-y-2">
           {([
             { bu: "1부", total: bu1Count, classes: classUnits1.length, maxG: maxGroups1, val: groupCount1bu, set: setGroupCount1bu, cls: "tag-green", fullT: fullTimer1, warn: warn1 },
@@ -404,10 +405,11 @@ export default function AutoAssignConfigPanel({
             <div key={row.bu} className="space-y-1">
               <div className="flex items-center gap-2">
                 <span className={`tag ${row.cls} text-xs w-10 text-center shrink-0`}>{row.bu}</span>
-                <span className="text-xs text-slate-400">{row.classes}개반 / {row.total}명</span>
+                <span className="text-xs text-slate-600">{row.classes}개반 / {row.total}명</span>
                 <input type="number" min={1} max={row.maxG} value={row.val}
+                  aria-label={`${row.bu} 조 수`}
                   onChange={e => row.set(Math.min(row.maxG, Math.max(1, parseInt(e.target.value) || 1)))}
-                  className="input w-14 text-center text-sm py-1 ml-auto"
+                  className="input min-h-11 w-14 text-center text-sm py-1 ml-auto"
                   disabled={rules.maxGroupSize > 0} />
                 <span className="text-xs text-slate-500">조</span>
               </div>
@@ -415,17 +417,17 @@ export default function AutoAssignConfigPanel({
                 <p className="text-xs text-blue-500">ℹ 최소 2반 규칙: 최대 {row.maxG}조까지 ({row.classes}개반 ÷ 2)</p>
               )}
               {rules.keepSameClass && rules.ensureNonEmptyGroups && row.val > row.classes && (
-                <p className="text-xs text-orange-500">⚠ 조 수({row.val})가 반 수({row.classes})보다 많습니다</p>
+                <p className="text-xs text-orange-700">⚠ 조 수({row.val})가 반 수({row.classes})보다 많습니다</p>
               )}
               {row.warn && (
                 <p className="text-xs text-red-500">⚠ 전참 교사({row.fullT}명)가 조 수({row.val})보다 적어 일부 조에 전참 교사 미배정될 수 있습니다</p>
               )}
-              <p className="text-xs text-slate-300 text-right">
+              <p className="text-xs text-slate-600 text-right">
                 ≈ {Math.round(row.total / row.val)}명/조
                 {rules.maxGroupSize > 0 && row.total > 0 && Math.round(row.total / row.val) > rules.maxGroupSize && (
-                  <span className="ml-2 text-red-400">최대 {rules.maxGroupSize}명 초과</span>
+                  <span className="ml-2 text-red-600">최대 {rules.maxGroupSize}명 초과</span>
                 )}
-                {row.total > 0 && <span className="ml-2 text-green-400">전참교사 {row.fullT}명</span>}
+                {row.total > 0 && <span className="ml-2 text-green-700">전참교사 {row.fullT}명</span>}
               </p>
             </div>
           ))}
@@ -448,7 +450,7 @@ export default function AutoAssignConfigPanel({
       {/* 조장 반 설정 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-2">⭐ 조장 설정</p>
-        <p className="text-[10px] text-slate-400 mb-2">
+        <p className="text-xs text-slate-600 mb-2">
           {rules.keepSameClass
             ? <>기본은 본인반 동반입니다. 본인반 없이 다른 조를 섬기는 조장만 <strong className="text-emerald-600">파송</strong>을 체크하세요.</>
             : <>같은 반 유지가 꺼져 있어 조장 본인만 해당 조에 고정됩니다. 본인반 학생을 해당 조에서 제외하려면 <strong className="text-emerald-600">파송</strong>을 체크하세요.</>}
@@ -458,7 +460,7 @@ export default function AutoAssignConfigPanel({
           { bu: "2부" as const, count: groupCount2bu, entries: leaderEntries2, setEntries: setLeaderEntries2, show: bu2Count > 0, tagCls: "tag-purple", units: classUnits2 },
         ]).map(row => !row.show ? null : (
           <div key={row.bu} className="mb-3">
-            <p className={`tag ${row.tagCls} text-[10px] mb-1.5`}>{row.bu}</p>
+            <p className={`tag ${row.tagCls} text-xs mb-1.5`}>{row.bu}</p>
             <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
               {Array.from({ length: row.count }, (_, i) => {
                 const entry: LeaderEntry = row.entries[i] || emptyEntry();
@@ -482,7 +484,7 @@ export default function AutoAssignConfigPanel({
 
                 return (
                   <div key={i} className="flex items-center gap-1">
-                    <span className="text-[10px] text-slate-400 w-5 shrink-0 text-right">{i + 1}조</span>
+                    <span className="text-xs text-slate-600 w-5 shrink-0 text-right">{i + 1}조</span>
                     <StudentNamePicker
                       value={{ bu: row.bu, grade: entry.grade, cls: entry.cls, name: entry.name, studentId: entry.studentId }}
                       candidates={cands}
@@ -495,7 +497,7 @@ export default function AutoAssignConfigPanel({
                       }}
                     />
                     {entry.name && (
-                      <label className={`flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-1 text-[10px] cursor-pointer ${entry.mode === "sent" ? "border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold" : "border-slate-200 bg-white text-slate-500"}`}>
+                      <label className={`flex items-center gap-1 shrink-0 rounded-md border px-1.5 py-1 text-xs cursor-pointer ${entry.mode === "sent" ? "border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold" : "border-slate-200 bg-white text-slate-500"}`}>
                         <input type="checkbox" className="accent-emerald-600"
                           aria-label={`${entry.name} 파송`}
                           checked={entry.mode === "sent"}
@@ -508,7 +510,7 @@ export default function AutoAssignConfigPanel({
                         파송
                       </label>
                     )}
-                    {isDuplicate && <span className="text-[10px] text-orange-500 shrink-0">중복</span>}
+                    {isDuplicate && <span className="text-xs text-orange-700 shrink-0">중복</span>}
                   </div>
                 );
               })}
@@ -520,24 +522,26 @@ export default function AutoAssignConfigPanel({
       {/* 학생 고려 관계 — 이름 입력 → 후보(부·학년·반) 선택 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-1">🙅 학생 고려 관계</p>
-        <p className="text-[10px] text-slate-400 mb-2">이름을 입력하면 아래에 후보가 떠요. 두 학생은 다른 조로 분리됩니다.</p>
+        <p className="text-xs text-slate-600 mb-2">이름을 입력하면 아래에 후보가 떠요. 두 학생은 다른 조로 분리됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
-          {studentConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {studentConflicts.length === 0 && <p className="text-xs text-slate-600 italic">없음</p>}
           {studentConflicts.map((c, i) => (
             <div key={i} className="flex items-center gap-1 text-xs bg-red-50 rounded px-2 py-1">
               <span className="text-red-700 font-medium">{c.a}</span>
-              <span className="text-slate-400">↔</span>
+              <span className="text-slate-600">↔</span>
               <span className="text-red-700 font-medium">{c.b}</span>
-              <button onClick={() => setStudentConflicts(p => p.filter((_, j) => j !== i))}
-                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+              <button onClick={() => setStudentConflicts(p => p.filter((_, j) => j !== i))} aria-label={`${c.a}와 ${c.b} 학생 분리 조건 삭제`}
+                className="ml-auto text-slate-600 hover:text-red-600 text-base leading-none">×</button>
             </div>
           ))}
         </div>
-        <div className="flex gap-1 mb-1">
+        <p className="mb-1 text-xs font-medium text-slate-700">첫 번째 학생</p>
+        <div className="flex gap-1 mb-2" role="group" aria-label="첫 번째 학생">
           <StudentNamePicker value={newSC.a} candidates={studentCandidates} placeholder="이름A 입력"
             onPick={p => setNewSC(prev => ({ ...prev, a: p }))} />
         </div>
-        <div className="flex gap-1 items-stretch">
+        <p className="mb-1 text-xs font-medium text-slate-700">두 번째 학생</p>
+        <div className="flex gap-1 items-stretch" role="group" aria-label="두 번째 학생">
           <StudentNamePicker value={newSC.b} candidates={studentCandidates} placeholder="이름B 입력"
             onPick={p => setNewSC(prev => ({ ...prev, b: p }))} />
           <button onClick={addSC} disabled={!newSC.a.name || !newSC.b.name}
@@ -548,24 +552,26 @@ export default function AutoAssignConfigPanel({
       {/* 교사 고려 관계 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-1">🙅 교사 고려 관계</p>
-        <p className="text-[10px] text-slate-400 mb-2">이름을 입력하면 아래에 후보가 떠요. 두 교사는 다른 조로 분리됩니다.</p>
+        <p className="text-xs text-slate-600 mb-2">이름을 입력하면 아래에 후보가 떠요. 두 교사는 다른 조로 분리됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
-          {teacherConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {teacherConflicts.length === 0 && <p className="text-xs text-slate-600 italic">없음</p>}
           {teacherConflicts.map((c, i) => (
             <div key={i} className="flex items-center gap-1 text-xs bg-orange-50 rounded px-2 py-1">
               <span className="text-orange-700 font-medium">{c.a}</span>
-              <span className="text-slate-400">↔</span>
+              <span className="text-slate-600">↔</span>
               <span className="text-orange-700 font-medium">{c.b}</span>
-              <button onClick={() => setTeacherConflicts(p => p.filter((_, j) => j !== i))}
-                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+              <button onClick={() => setTeacherConflicts(p => p.filter((_, j) => j !== i))} aria-label={`${c.a}와 ${c.b} 교사 분리 조건 삭제`}
+                className="ml-auto text-slate-600 hover:text-red-600 text-base leading-none">×</button>
             </div>
           ))}
         </div>
-        <div className="flex gap-1 mb-1">
+        <p className="mb-1 text-xs font-medium text-slate-700">첫 번째 교사</p>
+        <div className="flex gap-1 mb-2" role="group" aria-label="첫 번째 교사">
           <TeacherNamePicker value={newTC.a} candidates={teacherCandidates} placeholder="선생님A 입력"
             onPick={p => setNewTC(prev => ({ ...prev, a: p }))} />
         </div>
-        <div className="flex gap-1 items-stretch">
+        <p className="mb-1 text-xs font-medium text-slate-700">두 번째 교사</p>
+        <div className="flex gap-1 items-stretch" role="group" aria-label="두 번째 교사">
           <TeacherNamePicker value={newTC.b} candidates={teacherCandidates} placeholder="선생님B 입력"
             onPick={p => setNewTC(prev => ({ ...prev, b: p }))} />
           <button onClick={addTC} disabled={!newTC.a.name || !newTC.b.name}
@@ -576,24 +582,26 @@ export default function AutoAssignConfigPanel({
       {/* 교사-학생 고려 관계 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-1">🙅 교사-학생 고려 관계</p>
-        <p className="text-[10px] text-slate-400 mb-2">교사·학생 이름을 각각 입력해 후보를 고르면, 둘은 다른 조로 분리됩니다.</p>
+        <p className="text-xs text-slate-600 mb-2">교사·학생 이름을 각각 입력해 후보를 고르면, 둘은 다른 조로 분리됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
-          {teacherStudentConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {teacherStudentConflicts.length === 0 && <p className="text-xs text-slate-600 italic">없음</p>}
           {teacherStudentConflicts.map((c, i) => (
             <div key={i} className="flex items-center gap-1 text-xs bg-purple-50 rounded px-2 py-1">
               <span className="text-purple-700 font-medium">{c.a}</span>
-              <span className="text-slate-400">↔</span>
+              <span className="text-slate-600">↔</span>
               <span className="text-purple-700 font-medium">{c.b}</span>
-              <button onClick={() => setTeacherStudentConflicts(p => p.filter((_, j) => j !== i))}
-                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+              <button onClick={() => setTeacherStudentConflicts(p => p.filter((_, j) => j !== i))} aria-label={`${c.a} 교사와 ${c.b} 학생 분리 조건 삭제`}
+                className="ml-auto text-slate-600 hover:text-red-600 text-base leading-none">×</button>
             </div>
           ))}
         </div>
-        <div className="flex gap-1 mb-1">
+        <p className="mb-1 text-xs font-medium text-slate-700">교사</p>
+        <div className="flex gap-1 mb-2" role="group" aria-label="분리할 교사">
           <TeacherNamePicker value={newTSC.teacher} candidates={teacherCandidates} placeholder="선생님 입력"
             onPick={p => setNewTSC(prev => ({ ...prev, teacher: p }))} />
         </div>
-        <div className="flex gap-1 items-stretch">
+        <p className="mb-1 text-xs font-medium text-slate-700">학생</p>
+        <div className="flex gap-1 items-stretch" role="group" aria-label="분리할 학생">
           <StudentNamePicker value={newTSC.student} candidates={studentCandidates} placeholder="학생 이름 입력"
             onPick={p => setNewTSC(prev => ({ ...prev, student: p }))} />
           <button onClick={addTSC} disabled={!newTSC.teacher.name || !newTSC.student.name}
@@ -604,39 +612,43 @@ export default function AutoAssignConfigPanel({
       {/* 반 고려 관계 — 두 반을 같은 조에서 분리 */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-1">🙅 반 고려 관계</p>
-        <p className="text-[10px] text-slate-400 mb-2">선택한 두 반은 같은 조에 배정되지 않습니다.</p>
+        <p className="text-xs text-slate-600 mb-2">선택한 두 반은 같은 조에 배정되지 않습니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
-          {classConflicts.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {classConflicts.length === 0 && <p className="text-xs text-slate-600 italic">없음</p>}
           {classConflicts.map((c, i) => (
             <div key={i} className="flex items-center gap-1 text-xs bg-teal-50 rounded px-2 py-1">
               <span className="text-teal-700 font-medium">{classLabel(c.a)}</span>
-              <span className="text-slate-400">↔</span>
+              <span className="text-slate-600">↔</span>
               <span className="text-teal-700 font-medium">{classLabel(c.b)}</span>
-              <button onClick={() => setClassConflicts(p => p.filter((_, j) => j !== i))}
-                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+              <button onClick={() => setClassConflicts(p => p.filter((_, j) => j !== i))} aria-label={`${classLabel(c.a)}와 ${classLabel(c.b)} 반 분리 조건 삭제`}
+                className="ml-auto text-slate-600 hover:text-red-600 text-base leading-none">×</button>
             </div>
           ))}
         </div>
         {/* 반A/반B — 부서·학년·반·(추가버튼) 4트랙 grid로 두 줄 폭을 고정 통일
             (각 줄을 독립 flex로 두면 B줄만 버튼 때문에 select가 좁아져 A줄과 어긋난다) */}
-        <div className="grid gap-1 mb-1" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+        <p className="mb-1 text-xs font-medium text-slate-700">분리할 첫 번째 반</p>
+        <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="분리할 첫 번째 반 부서"
             value={newCC.a.bu}
             onChange={e => setNewCC(p => ({ ...p, a: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
             <option value="1부">1부</option>
             <option value="2부">2부</option>
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="분리할 첫 번째 반 학년"
             value={newCC.a.grade}
             onChange={e => setNewCC(p => ({ ...p, a: { ...p.a, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCC.a.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="분리할 첫 번째 반 반"
             value={newCC.a.cls}
             onChange={e => setNewCC(p => ({ ...p, a: { ...p.a, cls: e.target.value } }))}>
             <option value="">반A</option>
@@ -645,24 +657,28 @@ export default function AutoAssignConfigPanel({
           {/* 4번째 트랙 폭 확보용 빈 칸 (B줄 버튼과 같은 폭) */}
           <div />
         </div>
+        <p className="mb-1 text-xs font-medium text-slate-700">분리할 두 번째 반</p>
         <div className="grid gap-1 items-stretch" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="분리할 두 번째 반 부서"
             value={newCC.b.bu}
             onChange={e => setNewCC(p => ({ ...p, b: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
             <option value="1부">1부</option>
             <option value="2부">2부</option>
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="분리할 두 번째 반 학년"
             value={newCC.b.grade}
             onChange={e => setNewCC(p => ({ ...p, b: { ...p.b, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCC.b.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="분리할 두 번째 반 반"
             value={newCC.b.cls}
             onChange={e => setNewCC(p => ({ ...p, b: { ...p.b, cls: e.target.value } }))}>
             <option value="">반B</option>
@@ -676,38 +692,42 @@ export default function AutoAssignConfigPanel({
       {/* 반 붙임 관계 — 두 반을 반드시 같은 조로 (붙임끼리 연쇄되면 한 묶음) */}
       <div>
         <p className="text-xs font-semibold text-slate-500 mb-1">🤝 반 붙임 관계</p>
-        <p className="text-[10px] text-slate-400 mb-2">선택한 두 반은 반드시 같은 조에 배정됩니다. 붙임끼리 이어지면(A+B, B+C) 전부 한 조가 됩니다.</p>
+        <p className="text-xs text-slate-600 mb-2">선택한 두 반은 반드시 같은 조에 배정됩니다. 붙임끼리 이어지면(A+B, B+C) 전부 한 조가 됩니다.</p>
         <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
-          {classAffinities.length === 0 && <p className="text-xs text-slate-300 italic">없음</p>}
+          {classAffinities.length === 0 && <p className="text-xs text-slate-600 italic">없음</p>}
           {classAffinities.map((c, i) => (
             <div key={i} className="flex items-center gap-1 text-xs bg-amber-50 rounded px-2 py-1">
               <span className="text-amber-700 font-medium">{classLabel(c.a)}</span>
-              <span className="text-slate-400">+</span>
+              <span className="text-slate-600">+</span>
               <span className="text-amber-700 font-medium">{classLabel(c.b)}</span>
               <button onClick={() => setClassAffinities(p => p.filter((_, j) => j !== i))}
                 aria-label="붙임 관계 삭제"
-                className="ml-auto text-slate-300 hover:text-red-400 text-base leading-none">×</button>
+                className="ml-auto text-slate-600 hover:text-red-600 text-base leading-none">×</button>
             </div>
           ))}
         </div>
-        <div className="grid gap-1 mb-1" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+        <p className="mb-1 text-xs font-medium text-slate-700">붙일 첫 번째 반</p>
+        <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="붙일 첫 번째 반 부서"
             value={newCA.a.bu}
             onChange={e => setNewCA(p => ({ ...p, a: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
             <option value="1부">1부</option>
             <option value="2부">2부</option>
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="붙일 첫 번째 반 학년"
             value={newCA.a.grade}
             onChange={e => setNewCA(p => ({ ...p, a: { ...p.a, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCA.a.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="붙일 첫 번째 반 반"
             value={newCA.a.cls}
             onChange={e => setNewCA(p => ({ ...p, a: { ...p.a, cls: e.target.value } }))}>
             <option value="">반A</option>
@@ -715,24 +735,28 @@ export default function AutoAssignConfigPanel({
           </select>
           <div />
         </div>
+        <p className="mb-1 text-xs font-medium text-slate-700">붙일 두 번째 반</p>
         <div className="grid gap-1 items-stretch" style={{ gridTemplateColumns: "1fr 1fr 1fr 40px" }}>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="붙일 두 번째 반 부서"
             value={newCA.b.bu}
             onChange={e => setNewCA(p => ({ ...p, b: { bu: e.target.value, grade: "", cls: "" } }))}>
             <option value="">부서</option>
             <option value="1부">1부</option>
             <option value="2부">2부</option>
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="붙일 두 번째 반 학년"
             value={newCA.b.grade}
             onChange={e => setNewCA(p => ({ ...p, b: { ...p.b, grade: e.target.value, cls: "" } }))}>
             <option value="">학년</option>
             {getGrades(newCA.b.bu).map(g => <option key={g} value={String(g)}>{g}학년</option>)}
           </select>
-          <select style={{ minWidth: 0, padding: "2px 2px", fontSize: 11 }}
-            className="border border-slate-200 rounded-lg bg-white text-slate-700 w-full"
+          <select style={{ minWidth: 0 }}
+            className="min-h-11 border border-slate-200 rounded-lg bg-white text-slate-700 w-full text-xs"
+            aria-label="붙일 두 번째 반 반"
             value={newCA.b.cls}
             onChange={e => setNewCA(p => ({ ...p, b: { ...p.b, cls: e.target.value } }))}>
             <option value="">반B</option>

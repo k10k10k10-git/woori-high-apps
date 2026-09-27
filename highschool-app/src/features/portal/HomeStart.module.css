@@ -4,8 +4,9 @@
 .role { display:block; margin-top:8px; font-size:14px; color:var(--color-text-secondary); }
 .action { display:inline-flex; min-height:48px; align-items:center; justify-content:center; gap:16px; padding:12px 20px; border-radius:10px; color:var(--color-text-primary); background:var(--color-surface-subtle,var(--color-surface)); border:1px solid var(--color-border); font-weight:700; }
 .action:hover { background:var(--color-surface); }
-.action:focus-visible,.guide summary:focus-visible { outline:3px solid var(--color-primary); outline-offset:3px; }
+.action:focus-visible,.guide summary:focus-visible,.guide a:focus-visible { outline:3px solid var(--color-primary); outline-offset:3px; }
 .guide { grid-column:1/-1; font-size:14px; line-height:1.7; }
 .guide summary { cursor:pointer; min-height:44px; align-content:center; width:fit-content; }
 .guide ol { margin:8px 0 0; padding-left:24px; display:grid; gap:6px; }
+.guide a { display:inline-flex; min-height:44px; align-items:center; margin-top:8px; color:var(--color-primary); font-weight:700; text-decoration:underline; text-underline-offset:3px; }
 @media(max-width:600px) { .start { grid-template-columns:minmax(0,1fr); padding-block:20px; gap:12px; }.action { width:100%; }.start h2 { font-size:20px; } }

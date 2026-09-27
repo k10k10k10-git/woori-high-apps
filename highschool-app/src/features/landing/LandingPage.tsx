@@ -9,7 +9,7 @@ import {
   PROBLEMS,
   SOLUTION_STEPS,
   START_STEPS,
-  TARGETS,
+  ROLE_STARTS,
 } from "./landingContent";
 
 function Brand() {
@@ -29,7 +29,7 @@ function LandingHeader({ signIn }: { signIn: () => Promise<void> }) {
         <nav className="landing-nav" aria-label="페이지 안내">
           <a href="#solution">운영 방식</a>
           <a href="#features">주요 기능</a>
-          <a href="#for-whom">추천 대상</a>
+          <a href="#for-whom">역할별 시작</a>
         </nav>
         <div className="landing-header-actions">
           <ThemeToggle showLabel />
@@ -51,8 +51,8 @@ function HeroMedia() {
         sizes="(max-width: 900px) 92vw, 48vw"
       />
       <figcaption>
-        <span>한 번 정리한 정보가</span>
-        <strong>다음 사역까지 이어집니다.</strong>
+        <span>함께 확인한 기록이</span>
+        <strong>다음 담당자에게 이어집니다.</strong>
       </figcaption>
     </figure>
   );
@@ -65,8 +65,8 @@ function FeatureSection() {
   return (
     <section className="landing-section landing-features" id="features" aria-labelledby="features-title">
       <div className="landing-section-heading">
-        <h2 id="features-title">사역의 처음과 끝을 잇는 하나의 도구</h2>
-        <p>각 기능이 같은 명단과 권한 위에서 다음 사역으로 이어집니다.</p>
+        <h2 id="features-title">맡은 사역에서 필요한 화면을 찾으세요</h2>
+        <p>학기와 팀, 수련회에서 할 수 있는 일을 확인할 수 있습니다.</p>
       </div>
       <div className="landing-feature-tabs" role="tablist" aria-label="주요 기능">
         {LANDING_FEATURES.map((item) => (
@@ -78,9 +78,7 @@ function FeatureSection() {
           <p>{active.eyebrow}</p>
           <h3>{active.title}</h3>
           <span>{active.body}</span>
-          {/* 아래 수치는 화면 구성을 보여주는 예시다 — 운영 성과로 읽히지 않게 명시한다. */}
-          <ul aria-describedby="landing-metric-note">{active.metrics.map((metric) => <li key={metric}>{metric}</li>)}</ul>
-          <small id="landing-metric-note" className="landing-feature-note">화면 예시입니다. 실제 운영 수치가 아닙니다.</small>
+          <ul>{active.metrics.map((metric) => <li key={metric}>{metric}</li>)}</ul>
         </div>
         <div className="landing-feature-flow" aria-label={`${active.label} 업무 흐름`}>
           <p>연결되는 업무</p>
@@ -106,8 +104,8 @@ export default function LandingPage({ signIn }: { signIn: () => Promise<void> })
         <section className="landing-hero">
           <div className="landing-hero-inner">
             <div className="landing-hero-copy">
-              <h1>출석부부터 수련회 현장까지,<br /><em>고등부 사역을 하나의 흐름으로.</em></h1>
-              <p className="landing-hero-description">한 번 정리한 명단이 준비와 현장까지 안전하게 이어집니다.</p>
+              <h1>이번 주 사역,<br /><em>맡은 일부터 확인하세요.</em></h1>
+              <p className="landing-hero-description">일정과 명단 변경을 한곳에서 확인하고 다음 담당자와 이어갑니다.</p>
               <div className="landing-hero-actions">
                 <LoginButton signIn={signIn} />
                 <a href="#features" className="landing-secondary-button">기능 둘러보기 <span>↓</span></a>
@@ -148,12 +146,12 @@ export default function LandingPage({ signIn }: { signIn: () => Promise<void> })
         <FeatureSection />
 
         <section className="landing-section landing-target" id="for-whom" aria-labelledby="target-title">
-          <div className="landing-section-heading"><h2 id="target-title">이런 부서라면 더 잘 맞습니다.</h2></div>
-          <div className="landing-target-grid">{TARGETS.map((target) => <article key={target}><span aria-hidden="true">✓</span><p>{target}</p></article>)}</div>
+          <div className="landing-section-heading"><h2 id="target-title">고등부에서 맡은 일을 이렇게 시작합니다.</h2></div>
+          <div className="landing-target-grid">{ROLE_STARTS.map(({ role, action }) => <article key={role}><span aria-hidden="true">✓</span><p><strong className="block text-[var(--color-text-primary)]">{role}</strong>{action}</p></article>)}</div>
         </section>
 
         <section className="landing-action" id="action">
-          <div className="landing-action-copy"><p className="landing-kicker">START SMALL</p><h2>다음 사역은<br />하나의 기준에서 시작하세요.</h2><p>한 팀, 한 학기, 한 번의 수련회부터 시작하면 됩니다.</p><LoginButton signIn={signIn} /></div>
+          <div className="landing-action-copy"><p className="landing-kicker">WOORI HIGH</p><h2>이번 주 사역은<br />여기서 시작하세요.</h2><p>내 담당 업무를 확인하고, 필요한 기록을 다음 사람에게 이어주세요.</p><LoginButton signIn={signIn} /></div>
           <ol>{START_STEPS.map((step, index) => <li key={step}><span>{String(index + 1).padStart(2, "0")}</span><p>{step}</p></li>)}</ol>
         </section>
       </main>

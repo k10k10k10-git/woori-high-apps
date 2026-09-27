@@ -33,7 +33,13 @@ beforeEach(() => {
     roles: { semester: "staff", retreat: "fieldStaff" },
     teamMemberships: {},
     memberName: "테스트 담당자", today: "2026-09-05", connected: true, loaded: false, loadError: null,
-    currentSemester: null, currentRetreat: null, homeActions: [], requests: [],
+    semesterLoaded: false, semesterError: false, retreatLoaded: false, retreatError: false,
+    semesterAssignmentLoaded: false, semesterAssignmentError: false, semesterAttendanceLoaded: false, semesterAttendanceError: false,
+    retreatAssignmentLoaded: false, retreatAssignmentError: false, retreatDutiesLoaded: false, retreatDutiesError: false,
+    calendarLoaded: false, calendarError: false, requestsLoaded: false, requestsError: false,
+    newFriendsLoaded: false, newFriendsError: false,
+    semesterContextLoaded: false, semesterContextError: false, retreatContextLoaded: false, retreatContextError: false,
+    currentSemester: null, semesterPhase: null, currentRetreat: null, homeActions: [], requests: [],
     requestSummary: { total: 0, received: 0, resolved: 0 }, newFriends: [],
     newFriendSummary: { total: 0, active: 0, classPending: 0, rosterPending: 0, completed: 0 },
     personalApplication: null, personalAttendance: null,
@@ -49,29 +55,62 @@ describe("개인 대시보드의 미확인 상태", () => {
     expect(screen.queryByText("급히 확인할 일정이 없습니다")).toBeNull();
     expect(screen.queryByText("현재 학기 없음")).toBeNull();
     expect(screen.queryByText("해결 0건")).toBeNull();
-    mocks.data = { ...mocks.data, loaded: true, loadError: "학기 정보를 읽을 수 없습니다" };
+    mocks.data = { ...mocks.data, loaded: true, loadError: "학기 정보를 읽을 수 없습니다", calendarLoaded: true, calendarError: true, requestsLoaded: true, requestsError: true, semesterContextLoaded: true, semesterContextError: true };
     rerender(<RoleDashboardPanel />);
     expect(screen.getByRole("alert").textContent).toContain("학기 정보를 읽을 수 없습니다");
     expect(screen.queryByText("급히 확인할 일정이 없습니다")).toBeNull();
     expect(screen.queryByText("해결 0건")).toBeNull();
-    mocks.data = { ...mocks.data, loadError: null };
+    mocks.data = { ...mocks.data, loadError: null, calendarError: false, requestsError: false, semesterContextError: false };
     rerender(<RoleDashboardPanel />);
     expect(screen.getByText("급히 확인할 일정이 없습니다")).toBeTruthy();
-    expect(screen.getByText("현재 학기 없음")).toBeTruthy();
+    expect(screen.getByText("등록된 학기 없음")).toBeTruthy();
   });
 
   it("내 사역 조회가 끝나기 전에는 미배정으로 안내하지 않고 성공 뒤에만 안내한다", () => {
     const { rerender } = render(<MyMinistryPanel />);
     expect(screen.queryByText(/내 학기 배정을 찾지 못했습니다/)).toBeNull();
     expect(screen.queryByText(/내 현장 배정을 확인할 수 없습니다/)).toBeNull();
-    mocks.data = { ...mocks.data, loaded: true, loadError: "현장 조회 실패" };
+    mocks.data = { ...mocks.data, loaded: true, loadError: "현장 조회 실패", semesterAssignmentLoaded: true, semesterAssignmentError: true, retreatAssignmentLoaded: true, retreatAssignmentError: true };
     rerender(<MyMinistryPanel />);
     expect(screen.getByRole("alert").textContent).toContain("현장 조회 실패");
     expect(screen.queryByText(/내 학기 배정을 찾지 못했습니다/)).toBeNull();
-    mocks.data = { ...mocks.data, loadError: null };
+    mocks.data = { ...mocks.data, loadError: null, semesterAssignmentError: false, retreatAssignmentError: false };
     rerender(<MyMinistryPanel />);
     expect(screen.getByText(/내 학기 배정을 찾지 못했습니다/)).toBeTruthy();
     expect(screen.getByText(/내 현장 배정을 확인할 수 없습니다/)).toBeTruthy();
+  });
+
+  it("현장 조회 오류가 있어도 이미 받은 학기 배정을 보여준다", () => {
+    mocks.data = {
+      ...mocks.data, loadError: "현장 조회 실패", semesterAssignmentLoaded: true,
+      retreatAssignmentLoaded: true, retreatAssignmentError: true,
+      currentSemester: { id: "term", meta: { title: "테스트 학기" } } as PersonalPageFixture["currentSemester"],
+      personalApplication: {
+        application: { id: "student", studentId: "student", name: "합성 학생", bu: "1부", grade: 1, class: 1, status: "배치", createdAt: "2026-09-01" },
+        team: null, trainingClass: null,
+      },
+    };
+    render(<MyMinistryPanel />);
+    expect(screen.getByText("합성 학생")).toBeInTheDocument();
+    expect(screen.getAllByText("출석 확인 중")).toHaveLength(3);
+    expect(screen.getByText("현장 배정을 불러오지 못했습니다. 잠시 후 다시 확인해 주세요.")).toBeInTheDocument();
+  });
+
+  it("현장 큐 조회가 지연돼도 담당 조는 먼저 표시한다", () => {
+    mocks.data = { ...mocks.data, retreatAssignmentLoaded: true, personalRetreat: {
+      matchedStaffId: "staff", matchedName: "합성 스탭", groups: [{ id: "group", bu: "1부", name: "1조" }], duties: [],
+    } };
+    render(<MyMinistryPanel />);
+    expect(screen.getByText("합성 스탭")).toBeInTheDocument();
+    expect(screen.getByText("1부 1조")).toBeInTheDocument();
+    expect(screen.getAllByText("큐·포스트 확인 중")).toHaveLength(2);
+  });
+
+  it("일정 조회가 지연돼도 내 요청 지표는 표시한다", () => {
+    mocks.data = { ...mocks.data, requestsLoaded: true, requestSummary: { total: 2, received: 1, resolved: 1 } };
+    render(<RoleDashboardPanel />);
+    expect(screen.getByText("해결 1건")).toBeInTheDocument();
+    expect(screen.queryByText("예정된 일정 없음")).not.toBeInTheDocument();
   });
 
   it("바나바팀 새친구 지표도 첫 응답 전에 0명으로 확정하지 않는다", () => {
@@ -79,7 +118,7 @@ describe("개인 대시보드의 미확인 상태", () => {
     const { rerender } = render(<RoleDashboardPanel />);
     const section = screen.getByRole("region", { name: "새친구 정착 현황" });
     expect(within(section).queryByText("전체")).toBeNull();
-    mocks.data = { ...mocks.data, loaded: true };
+    mocks.data = { ...mocks.data, loaded: true, newFriendsLoaded: true };
     rerender(<RoleDashboardPanel />);
     expect(within(section).getByText("전체")).toBeTruthy();
   });
@@ -138,7 +177,7 @@ it("찬양팀 바로가기는 내 팀 카드 안에 한 번만 표시한다", ()
   expect(screen.queryByRole("region", { name: "찬양팀 준비" })).not.toBeInTheDocument();
 });
 it("개인 출석 수와 입력된 기록 수를 구분한다", () => {
-  mocks.data = { ...mocks.data, loaded: true, personalApplication: { application: { id: "application-fixture", studentId: "student-fixture", name: "합성 이름", bu: "1부", grade: 1, class: 1, status: "배치", createdAt: "2026-09-01" }, team: null, trainingClass: null }, personalAttendance: { actualAttended: 1, attended: 1, late: 0, absent: 1, recorded: 2, unrecorded: 1, total: 3, rate: 33 } };
+  mocks.data = { ...mocks.data, loaded: true, semesterAssignmentLoaded: true, semesterAttendanceLoaded: true, personalApplication: { application: { id: "application-fixture", studentId: "student-fixture", name: "합성 이름", bu: "1부", grade: 1, class: 1, status: "배치", createdAt: "2026-09-01" }, team: null, trainingClass: null }, personalAttendance: { actualAttended: 1, attended: 1, late: 0, absent: 1, recorded: 2, unrecorded: 1, total: 3, rate: 33 } };
   render(<MyMinistryPanel />);
   const attendance = screen.getByText("사역팀 출석", { selector: "dt" });
   expect(attendance.parentElement).toHaveTextContent("1/3회");

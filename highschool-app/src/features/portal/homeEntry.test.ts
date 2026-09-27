@@ -18,3 +18,7 @@ it('학기 관리자와 기간 미등록 현장 담당자의 다음 행동을 �
   expect(buildHomeEntry({roles:{semester:'superAdmin',retreat:'none'},actions:[],semesterId:'학기/1',fieldActive:false})?.href).toBe('/operations/semesters/%ED%95%99%EA%B8%B0%2F1/overview');
   expect(buildHomeEntry({roles:{semester:'none',retreat:'fieldStaff'},actions:[],fieldActive:false})?.steps).toHaveLength(3);
 });
+it('팀별 첫 사용 안내는 실제 담당 업무를 가리킨다', () => {
+  expect(buildHomeEntry({roles:{semester:'barnabas',retreat:'none'},actions:[],fieldActive:false})?.steps[0]).toContain('새친구');
+  expect(buildHomeEntry({roles:{semester:'praise',retreat:'none'},actions:[],fieldActive:false})?.steps[2]).toContain('등단표');
+});

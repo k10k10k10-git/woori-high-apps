@@ -175,6 +175,8 @@
 .training-roster-row strong { display: block; color: var(--color-text-primary); font-size: 0.82rem; }
 .training-roster-row > span:first-child small { display: block; margin-top: 3px; font-size: 0.7rem; }
 .training-roster-row .team-contact-list { justify-items: start; text-align: left; }
+.training-roster-cards { display: none; }
+.overlay-shell__panel.group-add-dialog { width: min(100%, 384px); overflow-y: auto; }
 
 .operations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .operations-card { display: grid; min-height: 112px; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; border-radius: 14px; padding: 17px; }
@@ -204,6 +206,19 @@
   .team-roster-list { grid-template-columns: 1fr; }
   .team-roster-list > div:nth-child(odd) { border-right: 0; }
   .team-roster-person { align-items: flex-start !important; }
+  .training-roster-table { display: none; }
+  .training-roster-cards { display: grid; }
+  .training-roster-card { min-width: 0; padding: 16px 18px; border-bottom: 1px solid var(--color-border); }
+  .training-roster-card:last-child { border-bottom: 0; }
+  .training-roster-card-person { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 10px; }
+  .training-roster-card-person strong { color: var(--color-text-primary); font-size: 0.94rem; }
+  .training-roster-card-person span { color: var(--color-text-muted); font-size: 0.8rem; }
+  .training-roster-card dl { display: grid; gap: 7px; }
+  .training-roster-card dl > div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: center; }
+  .training-roster-card dt { color: var(--color-text-muted); font-size: 0.78rem; }
+  .training-roster-card dd { min-width: 0; overflow-wrap: anywhere; color: var(--color-text-primary); font-size: 0.84rem; font-weight: 650; }
+  .training-roster-card dd a { display: inline-flex; min-height: 44px; align-items: center; color: var(--color-primary); }
+  .training-roster-card dd small { display: block; color: var(--color-text-muted); font-size: 0.78rem; font-weight: 400; }
   .team-context-note { align-items: flex-start; flex-direction: column; }
   .portal-mobile-bottom-nav { position: fixed; z-index: 58; right: 0; bottom: 0; left: 0; display: flex; min-height: calc(58px + env(safe-area-inset-bottom)); align-items: flex-start; justify-content: space-around; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-surface) 94%, transparent); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); backdrop-filter: blur(18px); }
   .portal-mobile-bottom-nav a { display: grid; min-width: 52px; min-height: 44px; place-items: center; border-radius: 10px; color: var(--color-text-muted); font-size: 0.68rem; font-weight: 700; }
