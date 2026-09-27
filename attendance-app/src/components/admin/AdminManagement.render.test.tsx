@@ -116,6 +116,26 @@ describe('관리자 명단·출석 접근 경로', () => {
     expect(screen.queryByRole('region', { name: '2부 2학년 3반' })).toBeNull();
   });
 
+  it('한눈에 보기를 부·학년 순서로 묶고 반이 많은 학년도 다음 학년과 섞지 않는다', () => {
+    const classKeys = ['2-3-1', '1-2-1', '2-1-1', '1-3-1', '2-2-1',
+      ...Array.from({ length: 7 }, (_, index) => `1-1-${7 - index}`)];
+    mocks.state = { ...mocks.state, classData: Object.fromEntries(classKeys.map(key => [key, {
+      teacher: '담임', students: [{ id: key, num: 1, name: key }],
+    }])) };
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '한눈에' }));
+    const grades = screen.getAllByRole('region', { name: /^[12]부 [123]학년$/ });
+    expect(grades.map(section => section.querySelector('h3')?.textContent))
+      .toEqual(['1부 1학년', '1부 2학년', '1부 3학년', '2부 1학년', '2부 2학년', '2부 3학년']);
+    expect(within(grades[0]).getAllByRole('region').map(section => section.querySelector('h4')?.textContent))
+      .toEqual(Array.from({ length: 7 }, (_, index) => `1부 1학년 ${index + 1}반`));
+    expect(within(grades[1]).getByRole('region', { name: '1부 2학년 1반' })).toBeTruthy();
+
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '2-3-1' } });
+    expect(screen.getAllByRole('region', { name: /^[12]부 [123]학년$/ }).map(section => section.querySelector('h3')?.textContent))
+      .toEqual(['2부 3학년']);
+  });
+
   it('반별 입력률과 출석률을 구분하고 미입력을 결석으로 계산하지 않는다', () => {
     render(<ClassAttendanceOverview />);
     expect(screen.getByRole('button', { name: /^\uc804\uccb4/ }).getAttribute('aria-pressed')).toBe('true');

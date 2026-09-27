@@ -7,10 +7,15 @@
 .sd-view-switch{flex-wrap:wrap}.sd-view-switch button{white-space:nowrap}
 .sd-overview{border-top:1px solid #e5e5e8}
 .sd-overview>p{padding:10px 0 14px;color:#666773;font-size:11px}
-.sd-overview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));align-items:start;gap:8px}
+.sd-overview-grades{display:grid;gap:22px}
+.sd-overview-grade+.sd-overview-grade{padding-top:18px;border-top:1px solid #ededf0}
+.sd-overview-grade-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin-bottom:10px}
+.sd-overview-grade-heading h3{font-size:15px;font-weight:650}
+.sd-overview-grade-heading span{color:#666773;font-size:11px}
+.sd-overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr));align-items:start;gap:8px}
 .sd-overview-class{min-width:0;border:1px solid #e5e5e8;border-radius:6px;background:#fff}
 .sd-overview-class-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:9px 10px;border-bottom:1px solid #ededf0}
-.sd-overview-class-heading h3{font-size:13px;font-weight:650;line-height:1.5}
+.sd-overview-class-heading h4{font-size:13px;font-weight:650;line-height:1.5}
 .sd-overview-class-heading p{margin-top:2px;color:#666773;font-size:11px}
 .sd-overview-class-heading>span{flex:none;color:#666773;font-size:11px;white-space:nowrap}
 .sd-overview-names{margin:0;padding:4px 10px 6px;list-style:none}
