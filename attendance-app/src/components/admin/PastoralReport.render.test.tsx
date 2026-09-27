@@ -115,10 +115,11 @@ describe('목양 리포트 실제 화면', () => {
     expect(within(table).getByText('합성학교')).toBeTruthy();
     expect(within(table).getByText('담당 교사')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toContain('전체 2명');
-    const stageSummary = document.querySelector('.pr-registration-summary');
-    expect(stageSummary?.querySelectorAll(':scope > div').length).toBe(8);
-    expect([...stageSummary!.querySelectorAll('strong')].reduce((sum, node) => sum + Number(node.textContent?.replace('명', '')), 0)).toBe(2);
-    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '등록대기학생' } });
+    const stageSummary = screen.getByRole('group', { name: '새친구 진행 단계별 학생 보기' });
+    expect(within(stageSummary).getAllByRole('button').length).toBe(8);
+    expect([...stageSummary.querySelectorAll('strong')].reduce((sum, node) => sum + Number(node.textContent?.replace('명', '')), 0)).toBe(2);
+    expect(screen.getAllByRole('searchbox').length).toBe(1);
+    fireEvent.change(screen.getByRole('searchbox', { name: '새친구 검색' }), { target: { value: '등록대기학생' } });
     expect(within(table).getByText('등록 대기 학생')).toBeTruthy();
     expect(within(table).queryByText('등반 완료 학생')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '초기화' }));
@@ -127,6 +128,44 @@ describe('목양 리포트 실제 화면', () => {
     expect(within(table).getByText('관리자 확인 대기')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
     expect(screen.queryByText('등록 대기 학생')).toBeNull();
+  });
+  it('등록현황은 이름 검색과 단계별 명단 선택을 제공하고 과거 완료를 출석부 반영으로 오인하지 않는다', () => {
+    render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
+    act(() => mocks.receive([
+      { key: '2026-1/a', name: '김 하나', part: '1', grade: '1' },
+      { key: '2026-1/b', name: '박 둘', part: '1', grade: '1', week1Date: '2026-09-06' },
+      { key: '2026-1/c', name: '이 보류', part: '1', grade: '1', decision: '보류' },
+      { key: '2026-1/d', name: '최 과거', part: '1', grade: '1', giftDate: '2026-09-13' },
+      { key: '2026-1/e', name: '정 반영', part: '1', grade: '1', rosterSync: { studentId: 'nf_e', classKey: '1-1-1' } },
+      { key: '2026-1/f', name: '한 종료', part: '1', grade: '1', decision: '미등록' },
+    ]));
+    const table = screen.getByRole('table', { name: /통합사이트 새친구 등록일/ });
+    const summary = screen.getByRole('group', { name: '새친구 진행 단계별 학생 보기' });
+    expect(within(table).getAllByRole('row').length).toBe(7);
+    expect(within(table).getByRole('row', { name: /최 과거/ }).textContent).toContain('연결 확인 필요');
+    expect(within(table).getByRole('row', { name: /정 반영/ }).textContent).toContain('반영 완료');
+    expect(within(summary).getByRole('button', { name: /종료\s+1\s*명/ })).toBeTruthy();
+    const secondWeek = within(summary).getByRole('button', { name: /2주차\s+1\s*명/ });
+    fireEvent.click(secondWeek);
+    expect(secondWeek.getAttribute('aria-pressed')).toBe('true');
+    expect(within(table).getAllByRole('row').length).toBe(2);
+    expect(within(table).getByText('박 둘')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '초기화' }));
+    expect(secondWeek.getAttribute('aria-pressed')).toBe('false');
+    expect(within(table).getAllByRole('row').length).toBe(7);
+    fireEvent.click(secondWeek);
+    fireEvent.click(screen.getByRole('button', { name: '전체 단계 보기' }));
+    expect(within(table).getAllByRole('row').length).toBe(7);
+    fireEvent.click(within(summary).getByRole('button', { name: /2주차\s+1\s*명/ }));
+    fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
+    fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
+    expect(within(screen.getByRole('group', { name: '새친구 진행 단계별 학생 보기' })).getByRole('button', { name: /2주차\s+1\s*명/ }).getAttribute('aria-pressed')).toBe('false');
+    fireEvent.change(screen.getByRole('searchbox', { name: '새친구 검색' }), { target: { value: '김하나' } });
+    const restoredTable = screen.getByRole('table', { name: /통합사이트 새친구 등록일/ });
+    expect(within(restoredTable).getAllByRole('row').length).toBe(2);
+    expect(within(restoredTable).getByText('김 하나')).toBeTruthy();
+    expect(within(screen.getByRole('group', { name: '새친구 진행 단계별 학생 보기' })).getByRole('button', { name: /1주차\s+1\s*명/ })).toBeTruthy();
   });
   it('등록현황 읽기 오류는 빈 명단으로 위장하지 않고 재시도한다', () => {
     render(<PastoralReport />);
