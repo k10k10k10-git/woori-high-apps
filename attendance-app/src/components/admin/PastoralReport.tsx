@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase/client';
 import { isDemoAccount } from '@/lib/demo';
 import { canUseAdminWorkspace } from '@/lib/adminNavigation';
 import { subscribeReportFriends, type PublicReportFriend } from '@/lib/pastoralFriends';
+import { type NewFriendStage } from '@/lib/pastoralFriendProgress';
 import { buildPastoralReport, sortReportStudents, type ReportSort, type ReportStudent } from '@/utils/pastoralReport';
 import VisitRequestsSection from '@/components/tabs/overall/VisitRequestsSection';
 import SuggestionsSection from '@/components/tabs/overall/SuggestionsSection';
@@ -49,6 +50,7 @@ function ReportContent() {
   const [grade, setGrade] = useState('');
   const [classKey, setClassKey] = useState('');
   const [search, setSearch] = useState('');
+  const [registrationStage, setRegistrationStage] = useState<NewFriendStage | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [weekKey, setWeekKey] = useState(requestedWeekKey);
   const [longAbsent, setLongAbsent] = useState('active');
@@ -107,27 +109,27 @@ function ReportContent() {
   const visitFilter = { part, grade, classKey: selectedClass, search };
   const showFilters = section.key !== 'notes';
 
-  function resetFilters() { setPart(''); setGrade(''); setClassKey(''); setSearch(''); }
+  function resetFilters() { setPart(''); setGrade(''); setClassKey(''); setSearch(''); setRegistrationStage(null); }
 
   return <div className="admin-overview pastoral-report">
     <header className="ao-heading"><h1>목양 관리</h1><p>학생 이름을 먼저 보고, 필요한 연락과 후속 조치를 바로 확인하세요.</p></header>
-    <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">{SECTIONS.map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => { setSection(item); setSelectedStudentKey(''); setSelectedFriendKey(''); setActiveVisitKey(''); }}>{item.label}</button>)}</div>
+    <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">{SECTIONS.map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => { setSection(item); setSelectedStudentKey(''); setSelectedFriendKey(''); setActiveVisitKey(''); if (item.key !== 'registration') setRegistrationStage(null); }}>{item.label}</button>)}</div>
 
     {showFilters && <div className={`pr-filters${filtersOpen ? ' pr-filters-open' : ''}`}>
       {(section.key === 'absence' || section.key === 'friends') && <label>기준 주일<select value={report.selectedWeek?.key ?? ''} onChange={e => setWeekKey(e.target.value)}>{!report.weeks.length && <option value="">조회할 주일 없음</option>}{report.weeks.map(week => <option key={week.key} value={week.key}>{week.label}</option>)}</select></label>}
-      <label className="pr-search">학생 검색<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder={section.key === 'registration' ? '이름, 학교, 바나바 담당' : '이름 또는 담당 교사'} /></label>
+      {section.key !== 'registration' && <label className="pr-search">학생 검색<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="이름 또는 담당 교사" /></label>}
       <label>부서<select value={part} onChange={e => { setPart(e.target.value); setClassKey(''); }}><option value="">전체 부서</option>{[...new Set(Object.keys(state.classData).map(key => key.split('-')[0]))].sort().map(p => <option key={p} value={p}>{p}부</option>)}</select></label>
       <button className="pr-filter-toggle" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(open => !open)}>필터 더보기{grade || (section.key !== 'registration' && selectedClass) ? ' · 적용 중' : ''}</button>
       <label className="pr-advanced">학년<select value={grade} onChange={e => { setGrade(e.target.value); setClassKey(''); }}><option value="">전체 학년</option>{[...new Set(Object.keys(state.classData).map(key => key.split('-')[1]))].sort().map(g => <option key={g} value={g}>{g}학년</option>)}</select></label>
       {section.key !== 'registration' && <label className="pr-advanced">반<select value={selectedClass} onChange={e => setClassKey(e.target.value)}><option value="">전체 반</option>{classes.map(key => <option key={key} value={key}>{key.split('-').map((value, i) => `${value}${['부', '학년', '반'][i]}`).join(' ')}</option>)}</select></label>}
-      {(part || grade || (section.key !== 'registration' && selectedClass) || search) && <button type="button" onClick={resetFilters}>초기화</button>}
+      {(part || grade || (section.key !== 'registration' && selectedClass) || search || (section.key === 'registration' && registrationStage)) && <button type="button" onClick={resetFilters}>초기화</button>}
     </div>}
     {(section.key === 'absence' || section.key === 'friends') && <p className="pr-note">{state.curYear}년 {report.selectedWeek?.label ?? '조회할 정상 주일 없음'} 기준 · 행사 주일 제외 · 미입력은 결석으로 계산하지 않습니다.</p>}
 
     <div id="pr-content" className="ao-content">
       {section.key === 'visits' && <VisitRequestsSection filter={visitFilter} requestKey={activeVisitKey} />}
       {section.key === 'notes' && <SuggestionsSection />}
-      {section.key === 'registration' && <NewFriendRegistrationSection year={state.curYear} friends={load.friends} status={load.status} part={part} grade={grade} search={search} onRetry={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }} />}
+      {section.key === 'registration' && <NewFriendRegistrationSection year={state.curYear} friends={load.friends} status={load.status} part={part} grade={grade} search={search} onSearchChange={setSearch} activeStage={registrationStage} onStageChange={setRegistrationStage} onRetry={() => { setLoad({ status: 'loading', friends: [] }); setRevision(value => value + 1); }} />}
       {section.key === 'absence' && (!report.selectedWeek ? <p className="pr-empty">선택 연도에 아직 지난 정상 주일이 없습니다.</p> : <>
         <div className="pr-section-heading"><div><h2>{absenceView === 'absent' ? '연속 결석' : '다시 출석'} <span>{absenceRows.length}명</span></h2><p className="pr-note">{absenceView === 'absent' ? '행마다 최근 주일의 기록과 확인된 연속 결석 횟수를 보여드립니다.' : '3회 이상 결석한 뒤 기준 주일에 다시 출석한 학생입니다.'}</p><div className="ad-status-tabs" role="group" aria-label="결석 상태"><button type="button" aria-pressed={absenceView === 'absent'} onClick={() => { setAbsenceView('absent'); setSelectedStudentKey(''); }}>연속 결석 <span>{absent.length}</span></button><button type="button" aria-pressed={absenceView === 'recovered'} onClick={() => { setAbsenceView('recovered'); setSelectedStudentKey(''); }}>다시 출석 <span>{recovered.length}</span></button></div></div><div className="pr-inline-controls">{absenceView === 'absent' && <label>장결<select value={longAbsent} onChange={e => setLongAbsent(e.target.value)}><option value="active">일반 학생</option><option value="long">기존 장결</option><option value="all">모두</option></select></label>}<label>정렬<select value={sortOrder} onChange={e => setSortOrder(e.target.value as ReportSort)}><option value="absence">결석 많은 순</option><option value="latest">마지막 출석 최신순</option><option value="oldest">마지막 출석 오래된순</option></select></label></div></div>
         {requestedStudentKey === selectedStudentKey && !selectedStudent && <p className="pr-empty" role="status">요청한 학생이 현재 연속 결석 명단에 없습니다. 조회 주일과 장결 필터를 확인해 주세요.</p>}
