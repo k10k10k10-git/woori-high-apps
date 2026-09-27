@@ -33,6 +33,19 @@
 .admin-workspace :is(button, select, input, a) { font-family: inherit; }
 .admin-workspace :is(button, select, input) { caret-color: var(--aw-accent); }
 .admin-workspace :is(button, select, input, a):focus-visible { outline: 2px solid var(--aw-accent); outline-offset: 3px; }
+.admin-workspace .ad-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.admin-workspace .ad-status-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; width: max-content; max-width: 100%; padding: 4px; border: 1px solid #ebe9f0; border-radius: 10px; background: #f7f6f9; }
+.admin-workspace .ad-status-tabs button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 0 13px; border: 0; border-radius: 7px; background: transparent; color: var(--aw-muted); font: inherit; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+.admin-workspace .ad-status-tabs button:hover { background: #eeecf5; color: #584a97; }
+.admin-workspace .ad-status-tabs button[aria-pressed="true"] { background: #fff; color: #584a97; font-weight: 650; box-shadow: 0 1px 4px rgba(44, 36, 72, .1); }
+.admin-workspace .ad-status-tabs button span { display: inline-grid; place-items: center; min-width: 21px; min-height: 21px; padding: 0 5px; border-radius: 6px; background: #ebe9f0; color: #555661; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.admin-workspace .ad-status-tabs button[aria-pressed="true"] span { background: #eeecf5; color: #584a97; }
+.admin-workspace .ad-empty { margin-top: 16px; padding: 32px 20px; border-radius: 10px; background: #faf9fc; color: var(--aw-muted); text-align: center; }
+.admin-workspace .ad-empty > svg { display: block; width: 44px; height: 44px; margin: 0 auto 12px; padding: 9px; border-radius: 11px; background: #eeecf5; color: var(--aw-accent); }
+.admin-workspace .ad-empty h3 { margin: 0; color: var(--aw-ink); font-size: 14px; font-weight: 600; }
+.admin-workspace .ad-empty p { margin: 6px auto 0; font-size: 12px; }
+.admin-workspace .ad-empty button { min-height: 44px; margin-top: 16px; padding: 0 14px; border: 0; border-radius: 7px; background: #eeecf5; color: #584a97; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.admin-workspace .ad-empty button:hover { background: #e4e0f0; }
 .admin-workspace :is(.aw-navigation, .aw-main) { scrollbar-width: thin; scrollbar-color: #c8c8d0 transparent; }
 .admin-workspace .aw-skip { position: fixed; z-index: 10000; top: 8px; left: 8px; transform: translateY(-160%); padding: 12px 16px; background: #fff; color: var(--aw-accent); border: 1px solid var(--aw-line); border-radius: 6px; }
 .admin-workspace .aw-skip:focus { transform: translateY(0); }
@@ -93,4 +106,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .admin-workspace .aw-nav-link { transition: none; }
+  .admin-workspace .ad-status-tabs button { transition: none; }
 }
