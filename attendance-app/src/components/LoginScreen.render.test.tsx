@@ -23,7 +23,7 @@ describe('교사·관리자 로그인 진입 화면', () => {
   it('명시적인 입력 이름과 기존 로그인 옵션을 그대로 전달한다', async () => {
     mocks.doLogin.mockResolvedValue(undefined);
     render(<LoginScreen onBackToDemo={mocks.onBackToDemo} />);
-    expect(screen.getByRole('heading', { name: '실제 출석부 로그인' })).not.toBeNull();
+    expect(screen.getByRole('heading', { name: '교사·관리자 로그인' })).not.toBeNull();
 
     fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'admin@example.com' } });
     fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'secret-password' } });
@@ -44,13 +44,13 @@ describe('교사·관리자 로그인 진입 화면', () => {
     expect(screen.getByLabelText('비밀번호').getAttribute('autocomplete')).toBe('current-password');
   });
 
-  it('빈 입력과 인증 오류를 alert로 알리고 데모 복귀 동작을 유지한다', () => {
+  it('빈 입력과 인증 오류를 alert로 알리고 반 선택 복귀 동작을 유지한다', () => {
     const { rerender } = render(<LoginScreen onBackToDemo={mocks.onBackToDemo} />);
 
     fireEvent.click(screen.getByRole('button', { name: /로그인$/ }));
     expect(screen.getByRole('alert').textContent).toContain('이메일과 비밀번호를 입력하세요');
 
-    fireEvent.click(screen.getByRole('button', { name: /가상 출석부 체험/ }));
+    fireEvent.click(screen.getByRole('button', { name: /반 선택으로 돌아가기/ }));
     expect(mocks.onBackToDemo).toHaveBeenCalledTimes(1);
 
     rerender(<LoginScreen authError="권한 정보를 확인할 수 없습니다" onBackToDemo={mocks.onBackToDemo} />);

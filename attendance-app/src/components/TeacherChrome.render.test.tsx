@@ -90,7 +90,7 @@ describe('교사 공통 셀', () => {
     expect(container.querySelector('.topbar-title svg')).not.toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '반 바꾸기' }));
-    fireEvent.click(screen.getByRole('button', { name: '실제 출석부 로그인' }));
+    fireEvent.click(screen.getByRole('button', { name: '교사·관리자 로그인' }));
     expect(mocks.onChangeClass).toHaveBeenCalledTimes(1);
     expect(mocks.onAdminLogin).toHaveBeenCalledTimes(1);
   });

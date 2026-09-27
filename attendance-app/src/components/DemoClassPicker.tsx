@@ -1,18 +1,25 @@
 'use client';
-// 데모 첫 화면 — 실제 반/교사/학생 정보를 조회하지 않는다.
+// 공용 출석 첫 화면 — 실제 반 목록을 읽고 선택한 반의 출석부로 들어간다.
 import { useEffect, useMemo, useState } from 'react';
+import { db, ref, get } from '@/lib/db';
+import { getKSTYear } from '@/utils/dates';
 import {
-  DEMO_OPTIONS, loadLastDemoSelection, type DemoSelection,
+  buildDemoOptionsFromClasses,
+  loadLastDemoSelection, type DemoOption, type DemoSelection,
 } from '@/lib/demo';
 import AdminIcon from '@/components/admin/AdminIcon';
 
 export default function DemoClassPicker({
   onPick,
   onAdminLogin,
+  signInError,
 }: {
   onPick: (sel: DemoSelection) => void;
   onAdminLogin: () => void;
+  signInError?: string | null;
 }) {
+  const [options, setOptions] = useState<DemoOption[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [part, setPart] = useState('1');
   const [grade, setGrade] = useState('1');
   const [cls, setCls] = useState('');
@@ -20,16 +27,33 @@ export default function DemoClassPicker({
 
   useEffect(() => setLastSelection(loadLastDemoSelection()), []);
 
+  useEffect(() => {
+    if (signInError) return;
+    let active = true;
+    (async () => {
+      try {
+        const classes = await get(ref(db, `classes/${getKSTYear()}`));
+        if (active) setOptions(buildDemoOptionsFromClasses(
+          classes.exists() ? classes.val() as Record<string, { teacher?: string }> : null));
+      } catch (error) {
+        if (!active) return;
+        setLoadError(error instanceof Error ? error.message : String(error));
+        setOptions([]);
+      }
+    })();
+    return () => { active = false; };
+  }, [signInError]);
+
   const parts = useMemo(
-    () => [...new Set(DEMO_OPTIONS.map(o => o.part))].sort(), []);
+    () => [...new Set((options ?? []).map(o => o.part))].sort(), [options]);
   const effectivePart = parts.includes(part) ? part : (parts[0] ?? part);
   const grades = useMemo(
-    () => [...new Set(DEMO_OPTIONS.filter(o => o.part === effectivePart).map(o => o.grade))].sort(),
-    [effectivePart]);
+    () => [...new Set((options ?? []).filter(o => o.part === effectivePart).map(o => o.grade))].sort(),
+    [options, effectivePart]);
   const effectiveGrade = grades.includes(grade) ? grade : (grades[0] ?? grade);
   const classesInGrade = useMemo(
-    () => DEMO_OPTIONS.filter(o => o.part === effectivePart && o.grade === effectiveGrade),
-    [effectivePart, effectiveGrade]);
+    () => (options ?? []).filter(o => o.part === effectivePart && o.grade === effectiveGrade),
+    [options, effectivePart, effectiveGrade]);
 
   // 상위 선택을 바꿔도 유효한 하위 값을 바로 보여 준다.
   // effect에서 setState로 고치지 않고 렌더 중에 파생한다(선택 상태를 effect가 덮는 사고 방지).
@@ -48,9 +72,9 @@ export default function DemoClassPicker({
             <span>출석부</span>
           </div>
           <div className="entry-header-actions">
-            <span className="entry-mode">데모 테스트</span>
+            <span className="entry-mode">반 선택</span>
             <button type="button" className="entry-secondary-action" onClick={onAdminLogin}>
-              <span>실제 출석부 로그인</span>
+              <span>교사·관리자 로그인</span>
               <AdminIcon name="arrow" size={14} />
             </button>
           </div>
@@ -61,19 +85,31 @@ export default function DemoClassPicker({
         <section className="entry-panel" aria-labelledby="demo-picker-title">
           <div className="entry-intro">
             <h1 id="demo-picker-title">고등부 출석부</h1>
-            <p>체험할 가상 반을 선택해 주세요</p>
+            <p>담당하시는 반을 선택해 주세요</p>
           </div>
 
           <div className="entry-notice" id="demo-data-notice">
-            <strong>가상 자료 안내</strong>
-            <span>가상 명단으로 체험합니다. 실제 학생 자료를 조회하지 않으며 입력 내용은 운영 출석부에 저장되지 않습니다.</span>
+            <strong>실제 자료 안내</strong>
+            <span>선택한 반의 실제 학생 명단과 출석 기록을 불러옵니다. 입력한 내용은 운영 출석부에 저장됩니다.</span>
           </div>
 
-              {lastSelection && (
+          {signInError ? (
+            <div className="entry-error" role="alert">{signInError}</div>
+          ) : options === null ? (
+            <div className="entry-loading" role="status" aria-live="polite">
+              <div className="spinner" />
+              <span>반 목록을 불러오는 중입니다</span>
+            </div>
+          ) : (
+            <>
+              {lastSelection && options.some(option => option.ck === lastSelection.ck) && (
                 <button
                   type="button"
                   className="entry-recent"
-                  onClick={() => onPick(lastSelection)}
+                  onClick={() => {
+                    const current = options.find(option => option.ck === lastSelection.ck);
+                    if (current) onPick({ ck: current.ck, teacherName: current.teacherName });
+                  }}
                 >
                   <AdminIcon name="clock" size={17} />
                   <span className="entry-recent-copy">
@@ -150,6 +186,11 @@ export default function DemoClassPicker({
                   <AdminIcon name="arrow" size={15} />
                 </button>
               </form>
+
+              {loadError && <div className="entry-error" role="alert">반 목록을 불러오지 못했습니다: {loadError}</div>}
+              {!loadError && options.length === 0 && <div className="entry-error" role="alert">등록된 반이 없습니다. 관리자에게 문의해 주세요.</div>}
+            </>
+          )}
 
         </section>
       </main>

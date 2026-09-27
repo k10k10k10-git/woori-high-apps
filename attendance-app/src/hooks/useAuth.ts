@@ -4,6 +4,7 @@ import { onAuthStateChanged, signInWithEmailAndPassword, signOut,
   setPersistence, browserLocalPersistence, browserSessionPersistence } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
+import { demoCredentials } from '@/lib/demo';
 import { loadUserRole } from './useFirebaseData';
 
 export function useAuth() {
@@ -48,4 +49,12 @@ export async function doLogin(
 
 export async function doLogout() {
   await signOut(auth);
+}
+
+/** 임시 공용 출석 계정으로 로그인한다. 사용자의 명시적 복원 요청에 따른 기존 접속 방식. */
+export async function doDemoLogin() {
+  const { email, password } = demoCredentials();
+  if (!email || !password) throw new Error('공용 출석 계정이 설정되지 않았습니다.');
+  await setPersistence(auth, browserLocalPersistence);
+  await signInWithEmailAndPassword(auth, email, password);
 }

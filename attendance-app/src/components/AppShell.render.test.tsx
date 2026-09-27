@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   listener: null as ((user: AuthUser | null) => void | Promise<void>) | null,
   onAuthStateChanged: vi.fn(),
   loadUserRole: vi.fn(),
+  doDemoLogin: vi.fn(),
   doLogout: vi.fn(),
   dispatch: vi.fn(),
   replace: vi.fn(),
@@ -18,13 +19,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock('firebase/auth', () => ({ onAuthStateChanged: mocks.onAuthStateChanged }));
 vi.mock('@/lib/firebase/client', () => ({ auth: mocks.auth }));
 vi.mock('@/hooks/useFirebaseData', () => ({ loadUserRole: mocks.loadUserRole }));
-vi.mock('@/hooks/useAuth', () => ({ doLogout: mocks.doLogout, doLogin: vi.fn() }));
+vi.mock('@/hooks/useAuth', () => ({ doLogout: mocks.doLogout, doDemoLogin: mocks.doDemoLogin, doLogin: vi.fn() }));
 vi.mock('@/store/AppContext', () => ({
   useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),
 }));
 vi.mock('@/lib/demo', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/demo')>(),
   DEMO_MODE: true,
+  demoConfigured: true,
+  isDemoAccount: (email?: string | null) => email === 'public@example.com',
 }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/attendance',
@@ -37,6 +40,18 @@ vi.mock('@/components/TopBar', () => ({ default: () => null }));
 vi.mock('@/components/TabNav', () => ({ default: () => null }));
 vi.mock('@/components/Toast', () => ({ default: () => null }));
 vi.mock('@/components/UpdateBanner', () => ({ default: () => null }));
+vi.mock('@/components/DemoClassPicker', () => ({
+  default: ({ onPick, onAdminLogin, signInError }: {
+    onPick: (sel: { ck: string; teacherName: string }) => void;
+    onAdminLogin: () => void;
+    signInError?: string | null;
+  }) => <div>
+    <h1>실제 반 선택</h1>
+    {signInError && <p role="alert">{signInError}</p>}
+    <button onClick={() => onPick({ ck: '1-2-3', teacherName: '담임' })}>1부 2학년 3반</button>
+    <button onClick={onAdminLogin}>교사·관리자 로그인</button>
+  </div>,
+}));
 
 import AppShell from './AppShell';
 
@@ -58,6 +73,7 @@ describe('실제 출석부 진입과 권한 조회 실패', () => {
       return vi.fn();
     });
     mocks.loadUserRole.mockReset();
+    mocks.doDemoLogin.mockReset().mockResolvedValue(undefined);
     mocks.doLogout.mockReset().mockResolvedValue(undefined);
     mocks.dispatch.mockReset();
     mocks.replace.mockReset();
@@ -65,19 +81,44 @@ describe('실제 출석부 진입과 권한 조회 실패', () => {
 
   afterEach(() => cleanup());
 
-  it('가상 반이 저장돼 있어도 비인증 상태에서는 실제 로그인을 먼저 보여 준다', async () => {
-    localStorage.setItem('demoSelection', JSON.stringify({ ck: '1-1-1', teacherName: '' }));
+  it('비인증 상태에서 공용 계정 로그인 후 실제 반을 선택해 교사 원장을 연다', async () => {
     render(<AppShell><div>실제 원장 화면</div></AppShell>);
 
     await emitAuth(null);
-
-    expect(screen.getByRole('heading', { name: '실제 출석부 로그인' })).not.toBeNull();
-    expect(screen.queryByText('가상 학생 1')).toBeNull();
+    expect(mocks.doDemoLogin).toHaveBeenCalledTimes(1);
     expect(mocks.loadUserRole).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '가상 출석부 체험' }));
-    expect(screen.getByRole('heading', { name: '고등부 출석부' })).not.toBeNull();
-    expect(screen.getByText(/운영 출석부에 저장되지 않습니다/)).not.toBeNull();
+    await emitAuth({ uid: 'public-uid', email: 'public@example.com' });
+    expect(screen.getByRole('heading', { name: '실제 반 선택' })).not.toBeNull();
+    expect(mocks.loadUserRole).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '1부 2학년 3반' }));
+    expect(mocks.dispatch).toHaveBeenCalledWith({ type: 'SET_USER_ROLE', payload: expect.objectContaining({ role: 'teacher', part: '1', grade: '2', class: '3' }) });
+    expect(JSON.parse(localStorage.getItem('demoLastSelection') ?? '{}')).toMatchObject({ ck: '1-2-3', teacherName: '담임' });
+    expect(screen.queryByRole('heading', { name: '실제 반 선택' })).toBeNull();
+  });
+
+  it('과거 저장된 반이 있어도 공용 계정은 실제 반 선택을 먼저 보여 준다', async () => {
+    localStorage.setItem('demoSelection', JSON.stringify({ ck: '2-3-4', teacherName: '담임' }));
+    render(<AppShell><div>실제 원장 화면</div></AppShell>);
+
+    await emitAuth({ uid: 'public-uid', email: 'public@example.com' });
+
+    expect(screen.getByRole('heading', { name: '실제 반 선택' })).not.toBeNull();
+    expect(mocks.dispatch).not.toHaveBeenCalledWith({ type: 'SET_USER_ROLE', payload: expect.objectContaining({ role: 'teacher' }) });
+    expect(mocks.loadUserRole).not.toHaveBeenCalled();
+  });
+
+  it('개인 계정 로그인을 누르면 공용 계정을 끊고 다시 자동 접속하지 않는다', async () => {
+    render(<AppShell><div>실제 원장 화면</div></AppShell>);
+    await emitAuth({ uid: 'public-uid', email: 'public@example.com' });
+
+    fireEvent.click(screen.getByRole('button', { name: '교사·관리자 로그인' }));
+    await waitFor(() => expect(mocks.doLogout).toHaveBeenCalledTimes(1));
+    await emitAuth(null);
+
+    expect(screen.getByRole('heading', { name: '교사·관리자 로그인' })).not.toBeNull();
+    expect(mocks.doDemoLogin).not.toHaveBeenCalled();
   });
 
   it('역할 조회의 일시적 오류는 로그아웃시키지 않고 재시도를 안내한다', async () => {
@@ -96,8 +137,41 @@ describe('실제 출석부 진입과 권한 조회 실패', () => {
 
     mocks.doLogout.mockImplementation(async () => { mocks.auth.currentUser = null; });
     fireEvent.click(screen.getByRole('button', { name: '다른 계정으로 로그인' }));
-    await waitFor(() => expect(screen.getByRole('heading', { name: '실제 출석부 로그인' })).not.toBeNull());
+    await waitFor(() => expect(screen.getByRole('heading', { name: '교사·관리자 로그인' })).not.toBeNull());
     expect(mocks.doLogout).toHaveBeenCalledTimes(1);
+    await emitAuth(null);
+    expect(screen.getByRole('heading', { name: '교사·관리자 로그인' })).not.toBeNull();
+    expect(mocks.doDemoLogin).not.toHaveBeenCalled();
+  });
+
+  it('미등록 계정 로그아웃 후에도 공용 계정으로 자동 접속하지 않는다', async () => {
+    mocks.loadUserRole.mockResolvedValue('unauthorized');
+    render(<AppShell><div>실제 원장 화면</div></AppShell>);
+
+    await emitAuth({ uid: 'unknown-uid', email: 'unknown@example.com' });
+    expect(mocks.doLogout).toHaveBeenCalledTimes(1);
+    await emitAuth(null);
+
+    expect(screen.getByRole('heading', { name: '교사·관리자 로그인' })).not.toBeNull();
+    expect(mocks.doDemoLogin).not.toHaveBeenCalled();
+  });
+
+  it('sessionStorage가 막혀도 다른 계정 전환은 공용 자동 로그인으로 튀지 않는다', async () => {
+    const storage = Object.getOwnPropertyDescriptor(window, 'sessionStorage');
+    Object.defineProperty(window, 'sessionStorage', { configurable: true, get: () => { throw new Error('blocked'); } });
+    try {
+      mocks.loadUserRole.mockResolvedValue('error');
+      render(<AppShell><div>실제 원장 화면</div></AppShell>);
+      await emitAuth({ uid: 'teacher-uid', email: 'teacher@example.com' });
+      fireEvent.click(screen.getByRole('button', { name: '다른 계정으로 로그인' }));
+      await waitFor(() => expect(mocks.doLogout).toHaveBeenCalledTimes(1));
+      await emitAuth(null);
+
+      expect(screen.getByRole('heading', { name: '교사·관리자 로그인' })).not.toBeNull();
+      expect(mocks.doDemoLogin).not.toHaveBeenCalled();
+    } finally {
+      if (storage) Object.defineProperty(window, 'sessionStorage', storage);
+    }
   });
 
   it('다른 계정 전환에 실패하면 인증 오류 화면을 유지한다', async () => {
@@ -111,6 +185,6 @@ describe('실제 출석부 진입과 권한 조회 실패', () => {
 
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('로그아웃하지 못했습니다'));
     expect(mocks.auth.currentUser).toBe(user);
-    expect(screen.queryByRole('heading', { name: '실제 출석부 로그인' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '교사·관리자 로그인' })).toBeNull();
   });
 });

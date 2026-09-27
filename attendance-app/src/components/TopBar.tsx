@@ -38,7 +38,7 @@ export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?
           {demo ? (
             <>
               <button className="logout-btn" onClick={demo.onChangeClass} aria-label="반 바꾸기">반 바꾸기</button>
-              <button className="logout-btn topbar-admin-btn" onClick={demo.onAdminLogin} aria-label="실제 출석부 로그인">실제 출석부 로그인</button>
+              <button className="logout-btn topbar-admin-btn" onClick={demo.onAdminLogin} aria-label="교사·관리자 로그인">교사·관리자 로그인</button>
             </>
           ) : (
             <button className="logout-btn" onClick={onLogout} aria-label="로그아웃">로그아웃</button>
