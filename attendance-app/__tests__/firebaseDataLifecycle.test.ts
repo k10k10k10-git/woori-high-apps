@@ -172,6 +172,18 @@ describe('원장 초기화와 구독 세대', () => {
 });
 
 describe('사용자 역할 조회 경쟁', () => {
+  it('현재 계정의 일시적 조회 실패를 무권한으로 오인하지 않는다', async () => {
+    database.get.mockRejectedValue(new Error('network unavailable'));
+    const dispatch = vi.fn();
+    expect(await loadUserRole({ uid: 'teacher', email: 'teacher@example.invalid' }, dispatch)).toBe('error');
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('조회에 성공했지만 등록된 역할이 없으면 무권한으로 처리한다', async () => {
+    database.get.mockResolvedValue(snapshot(null));
+    expect(await loadUserRole({ uid: 'unknown', email: 'unknown@example.invalid' }, vi.fn())).toBe('unauthorized');
+  });
+
   it('이전 계정의 지연된 성공은 최신 계정 역할과 반 선택을 덮지 않는다', async () => {
     const pending: ((snapshot: Snapshot) => void)[] = [];
     database.get.mockImplementation(() => new Promise(resolve => pending.push(resolve)));

@@ -9,8 +9,7 @@ import { loadUserRole } from '@/hooks/useFirebaseData';
 import { doLogout } from '@/hooks/useAuth';
 import {
   DEMO_MODE, resolveDemoSelection,
-  loadDemoSelection, saveDemoSelection, clearDemoSelection,
-  getAdminIntent, setAdminIntent, type DemoSelection,
+  saveDemoSelection, type DemoSelection,
 } from '@/lib/demo';
 import DemoClassPicker from '@/components/DemoClassPicker';
 import DemoAttendance from '@/components/DemoAttendance';
@@ -25,7 +24,7 @@ import { watchCalendarYear } from '@/utils/yearRollover';
 import AdminWorkspace from '@/components/admin/AdminWorkspace';
 import { canAccessAttendancePath, canUseAdminWorkspace, createAdminEntryTracker } from '@/lib/adminNavigation';
 
-type AuthState = 'loading' | 'demo-pick' | 'demo-app' | 'login' | 'app';
+type AuthState = 'loading' | 'demo-pick' | 'demo-app' | 'login' | 'role-error' | 'app';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { state, dispatch } = useApp();
@@ -66,19 +65,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setAuthError('권한이 부여되지 않은 계정입니다.\n관리자에게 문의해 주세요.');
           setAuthState('login');
           try { await doLogout(); } catch { /* 권한 없는 화면은 계속 로그인 게이트에 둔다. */ }
+        } else if (result === 'error') {
+          setAuthError('계정 권한 정보를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+          setAuthState('role-error');
         } else {
           setAuthError(null);
           setAuthState('app');
         }
       } else {
         adminEntryRef.current?.reset();
-        // 공개 데모는 Auth 로그인 없이 가상 명단만 연다.
-        if (DEMO_MODE && !getAdminIntent()) {
-          const saved = loadDemoSelection();
-          setDemoSelection(saved);
-          setAuthState(saved ? 'demo-app' : 'demo-pick');
-          return;
-        }
+        // 세션이 만료돼도 저장된 가상 반으로 자동 진입하지 않는다.
+        setDemoSelection(null);
         setAuthState('login');
       }
     });
@@ -105,24 +102,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // 데모: 다른 가상 반 고르기
   const handleDemoChangeClass = useCallback(() => {
-    clearDemoSelection();
     setDemoSelection(null);
     setAuthState('demo-pick');
   }, []);
 
-  // 데모: 관리자 계정으로 접근
-  const handleAdminLogin = useCallback(async () => {
-    setAdminIntent(true);
-    clearDemoSelection();
+  // 데모에서 실제 교사·관리자 로그인으로 돌아간다.
+  const handleAdminLogin = useCallback(() => {
     setDemoSelection(null);
+    setAuthError(null);
     setAuthState('login');
-    await doLogout();
   }, []);
 
-  // 관리자 로그인 화면 → 데모로 되돌아가기
+  // 실제 로그인 화면 → 사용자가 명시적으로 가상 체험 선택
   const handleBackToDemo = useCallback(() => {
-    setAdminIntent(false);
-    window.location.reload();
+    setAuthError(null);
+    setDemoSelection(null);
+    setAuthState('demo-pick');
+  }, []);
+
+  const handleSwitchAccount = useCallback(async () => {
+    try {
+      await doLogout();
+      setAuthError(null);
+      setAuthState('login');
+    } catch {
+      setAuthError('로그아웃하지 못했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+    }
   }, []);
 
   // 로딩 게이트 타임아웃 — onAuthStateChanged가 끝내 안 오면(캐시 깨짐 등)
@@ -218,6 +223,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
+  if (authState === 'role-error') {
+    return (
+      <div className="loading-screen" role="alert" style={{ flexDirection: 'column', gap: 16, padding: 24, textAlign: 'center' }}>
+        <p style={{ maxWidth: 360, fontSize: 14, lineHeight: 1.6 }}>{authError}<br />로그인 상태는 유지됩니다.</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
+          <button className="btn-primary" style={{ padding: '10px 20px' }} onClick={() => window.location.reload()}>
+            다시 불러오기
+          </button>
+          <button className="btn-secondary" style={{ padding: '10px 20px' }} onClick={() => void handleSwitchAccount()}>
+            다른 계정으로 로그인
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (authState === 'demo-pick') {
     return (
       <DemoClassPicker
@@ -281,7 +302,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{ padding: 32, textAlign: 'center', color: 'var(--text2)', fontSize: 14, lineHeight: 1.7 }}>
             관리자 전용 화면입니다.<br />
             {isDemoRole
-              ? <>상단의 <strong>관리자 접근</strong> 버튼으로 관리자 계정에 로그인해 주세요.</>
+              ? <>상단의 <strong>실제 출석부 로그인</strong> 버튼으로 로그인해 주세요.</>
               : <>담당 반의 출석부에서 업무를 이어갈 수 있습니다.</>}
             <div style={{ marginTop: 16 }}><Link href="/attendance" className="btn-secondary" style={{ display: 'inline-flex', minHeight: 44, alignItems: 'center', padding: '10px 20px', textDecoration: 'none' }}>출석부로 돌아가기</Link></div>
           </div>

@@ -50,7 +50,7 @@ export default function DemoClassPicker({
           <div className="entry-header-actions">
             <span className="entry-mode">데모 테스트</span>
             <button type="button" className="entry-secondary-action" onClick={onAdminLogin}>
-              <span>관리자 계정으로 접근</span>
+              <span>실제 출석부 로그인</span>
               <AdminIcon name="arrow" size={14} />
             </button>
           </div>
@@ -61,7 +61,7 @@ export default function DemoClassPicker({
         <section className="entry-panel" aria-labelledby="demo-picker-title">
           <div className="entry-intro">
             <h1 id="demo-picker-title">고등부 출석부</h1>
-            <p>담당하시는 반을 선택해 주세요</p>
+            <p>체험할 가상 반을 선택해 주세요</p>
           </div>
 
           <div className="entry-notice" id="demo-data-notice">

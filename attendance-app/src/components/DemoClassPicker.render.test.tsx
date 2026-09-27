@@ -21,12 +21,12 @@ describe('가상 데모 반 선택', () => {
     expect(screen.getByText(/운영 출석부에 저장되지 않습니다/)).not.toBeNull();
   });
 
-  it('이전 실제 반 이름을 표시하지 않고 관리자 로그인 진입은 유지한다', () => {
+  it('이전 실제 반 이름을 표시하지 않고 교사·관리자 로그인을 안내한다', () => {
     localStorage.setItem('demoLastSelection', JSON.stringify({ ck: '1-2-3', teacherName: '실제 담임' }));
     render(<DemoClassPicker onPick={onPick} onAdminLogin={onAdminLogin} />);
     expect(screen.queryByText('실제 담임')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /최근 선택한 반/ }));
-    fireEvent.click(screen.getByRole('button', { name: /관리자 계정으로 접근/ }));
+    fireEvent.click(screen.getByRole('button', { name: /실제 출석부 로그인/ }));
     expect(onPick).toHaveBeenCalledWith({ ck: '1-2-3', teacherName: '' });
     expect(onAdminLogin).toHaveBeenCalledTimes(1);
   });

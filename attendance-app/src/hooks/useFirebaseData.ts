@@ -98,7 +98,7 @@ export async function loadUserRole(
   user: { uid: string; email: string | null },
   dispatch: ReturnType<typeof useApp>['dispatch'],
   isCurrent: () => boolean = () => true,
-): Promise<'ok' | 'unauthorized' | 'stale'> {
+): Promise<'ok' | 'unauthorized' | 'error' | 'stale'> {
   if (!user?.email) return 'unauthorized';
   const key = emailToKey(user.email);
   try {
@@ -127,6 +127,7 @@ export async function loadUserRole(
     //   dataLoadMessage가 "볼 권한이 없습니다"로 정확히 안내한다.
     return 'ok';
   } catch {
-    return isCurrent() ? 'unauthorized' : 'stale';
+    // 일시적인 네트워크·DB 조회 실패는 실제 권한 없음과 구분해 로그인 세션을 보존한다.
+    return isCurrent() ? 'error' : 'stale';
   }
 }
