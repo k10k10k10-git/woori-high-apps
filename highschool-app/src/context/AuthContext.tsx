@@ -32,7 +32,7 @@ async function canReadAsMainAdmin(uid: string): Promise<boolean> {
   } catch (error) {
     const code = typeof error === "object" && error !== null && "code" in error ? String(error.code) : "";
     const message = error instanceof Error ? error.message : String(error);
-    if (/permission[_-]denied/i.test(`${code} ${message}`)) return false;
+    if (/permission[\s_-]+denied/i.test(`${code} ${message}`)) return false;
     throw error;
   }
 }
