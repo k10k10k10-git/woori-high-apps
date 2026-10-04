@@ -144,16 +144,16 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
     expect(state().roles).not.toEqual(NO_ROLES);
   });
 
-  it("admins 자기조회 거부는 일반 현장 역할을 막지 않는다", async () => {
+  it.each(["permission_denied", "Permission denied"])("admins 자기조회 거부(%s)는 일반 현장 역할을 막지 않는다", async (deniedMessage) => {
     render(<AuthProvider><AuthState /></AuthProvider>);
     let pending!: Promise<void>;
     act(() => { pending = onAuth(user("a")); });
     await act(async () => {
-      reads.get("admins/a")?.reject(new Error("permission_denied"));
+      reads.get("admins/a")?.reject(new Error(deniedMessage));
       finishReads("a", { iguardMembers: { name: "현장 담당" }, iguardRoles: "staff" });
       await Promise.resolve();
       await Promise.resolve();
-      reads.get("admins/a")!.reject(new Error("permission_denied"));
+      reads.get("admins/a")!.reject(new Error(deniedMessage));
       await pending;
     });
     expect(state()).toMatchObject({ uid: "a", loading: false, memberName: "현장 담당" });
