@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useRef } from 'react';
 import type {
   UserRole, ClassDataMap, AttData, CustomEventData, EventsMap,
   MonthEntry, HolidayRanges, ViewKey, AttEditTarget, MoveTarget, AttValue,
@@ -7,6 +7,7 @@ import type {
 import { getKSTYear, getSundaysForYear, getWindowYears, buildHolidayRanges, buildEvents } from '@/utils/dates';
 import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 import type { TeacherMessageWrite } from '@/lib/teacherMessageSave';
+import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
 
 export type DataKey = 'classes' | 'attendance' | 'events';
 export type TeacherDraft = { studentId: string; text: string };
@@ -46,6 +47,7 @@ export interface AppState {
   // 저장 상태
   saveStatus: 'idle' | 'saving' | 'saved' | 'error' | 'unknown';
   lastAttendanceSavedAt: number | null;
+  attendanceFeedback: AttendanceSaveFeedback | null;
 
   // 모달 상태
   attModal: { open: boolean; target: AttEditTarget | null };
@@ -91,6 +93,7 @@ export const initialState: AppState = {
 
   saveStatus: 'idle',
   lastAttendanceSavedAt: null,
+  attendanceFeedback: null,
 
   attModal: { open: false, target: null },
   studentModal: { open: false, editId: null },
@@ -122,7 +125,7 @@ type Action =
   | { type: 'SET_CUSTOM_EVENTS'; revision: number; payload: CustomEventData }
   | { type: 'SET_DATA_ERROR'; revision: number; payload: { key: DataKey; message: string } }
   | { type: 'RETRY_DATA_LOAD' }
-  | { type: 'SET_SAVE_STATUS'; payload: AppState['saveStatus']; savedAt?: number }
+  | { type: 'SET_SAVE_STATUS'; payload: AppState['saveStatus']; savedAt?: number; revision?: number; feedback?: AttendanceSaveFeedback }
   | { type: 'OPEN_ATT_MODAL'; payload: AttEditTarget }
   | { type: 'CLOSE_ATT_MODAL' }
   | { type: 'OPEN_STUDENT_MODAL'; payload: { editId: string | null } }
@@ -165,6 +168,7 @@ function resetData(state: AppState): AppState {
     dataErrors: { classes: null, attendance: null, events: null },
     saveStatus: 'idle',
     lastAttendanceSavedAt: null,
+    attendanceFeedback: null,
   };
 }
 
@@ -243,6 +247,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return resetData(state);
     case 'SET_SAVE_STATUS':
       return { ...state, saveStatus: action.payload,
+        attendanceFeedback: action.feedback ?? state.attendanceFeedback,
         lastAttendanceSavedAt: action.payload === 'saved' && action.savedAt !== undefined
           ? action.savedAt : state.lastAttendanceSavedAt };
     case 'OPEN_ATT_MODAL':
@@ -286,19 +291,23 @@ export function reducer(state: AppState, action: Action): AppState {
 const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<Action>;
+  getState: () => AppState;
 } | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const current = useRef(state);
+  current.current = state;
+  const getState = useCallback(() => current.current, []);
   const hasDrafts = Object.values(state.teacherDrafts).some(draft => !!draft.text.trim());
   useEffect(() => {
-    if (!hasDrafts) return;
+    if (!hasDrafts && state.saveStatus !== 'saving' && state.saveStatus !== 'unknown') return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [hasDrafts]);
+  }, [hasDrafts, state.saveStatus]);
   return (
-    <AppContext.Provider value={{ state, dispatch }}>
+    <AppContext.Provider value={{ state, dispatch, getState }}>
       {children}
     </AppContext.Provider>
   );

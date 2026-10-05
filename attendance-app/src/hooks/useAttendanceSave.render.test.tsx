@@ -5,12 +5,12 @@ import type { AppState } from '@/store/AppContext';
 const m = vi.hoisted(() => ({ save: vi.fn(), state: null as AppState | null, dispatch: vi.fn() }));
 vi.mock('@/lib/firebase/client', () => ({ auth: {} }));
 vi.mock('@/lib/attendanceSave', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/attendanceSave')>(), saveAttendanceCell: m.save }));
-vi.mock('@/store/AppContext', async importOriginal => ({ ...await importOriginal<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state, dispatch: m.dispatch }) }));
-import { initialState } from '@/store/AppContext';
+vi.mock('@/store/AppContext', async importOriginal => ({ ...await importOriginal<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state, dispatch: m.dispatch, getState: () => m.state }) }));
+import { initialState, reducer } from '@/store/AppContext';
 import { AttendanceSaveError } from '@/lib/attendanceSave';
 import { useAttendanceSave } from './useAttendanceSave';
 const target = { ck: '1-1-1', sid: 's', k: '8-0' };
-beforeEach(() => { vi.clearAllMocks(); m.state = { ...initialState, curYear: 2026, attData: {}, classData: {} }; });
+beforeEach(() => { vi.clearAllMocks(); m.dispatch.mockReset(); m.state = { ...initialState, curYear: 2026, attData: {}, classData: {} }; });
 afterEach(cleanup);
 it('실패 뒤 화면 값이 바뀌어도 재시도는 원래 사전값을 유지한다', async () => {
   m.save.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
@@ -66,7 +66,7 @@ it('결과 불명은 실패와 구분하고 재시도 시 사전값을 보존한
   await act(async () => { await result.current.save(target, 'X'); });
   const unknown = result.current.feedback!;
   expect(unknown).toMatchObject({ status: 'unknown', retryable: true });
-  expect(m.dispatch).toHaveBeenLastCalledWith({ type: 'SET_SAVE_STATUS', payload: 'unknown' });
+  expect(m.dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'SET_SAVE_STATUS', payload: 'unknown' }));
   await act(async () => { await result.current.save(target, 'X', unknown); });
   expect(m.save.mock.calls[1][0]).toMatchObject({ expected: '', value: 'X' });
   expect(m.dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ payload: 'saved', savedAt: expect.any(Number) }));
@@ -76,5 +76,39 @@ it('명시적 저장 거절은 실패로 표시한다', async () => {
   const { result } = renderHook(useAttendanceSave);
   await act(async () => { await result.current.save(target, 'O'); });
   expect(result.current.feedback?.status).toBe('error');
-  expect(m.dispatch).toHaveBeenLastCalledWith({ type: 'SET_SAVE_STATUS', payload: 'error' });
+  expect(m.dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'SET_SAVE_STATUS', payload: 'error' }));
+});
+it.each(['saved', 'error'] as const)('화면 이동 후에도 전역 저장 결과를 %s로 갱신한다', async status => {
+  let finish!: () => void;
+  m.save.mockImplementation(() => new Promise<void>((resolve, reject) => { finish = () => status === 'saved' ? resolve() : reject(new Error('offline')); }));
+  const { result, unmount } = renderHook(useAttendanceSave);
+  let saving!: Promise<void>;
+  act(() => { saving = result.current.save(target, 'O'); });
+  unmount();
+  await act(async () => { finish(); await saving; });
+  expect(m.dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ payload: status, revision: m.state!.dataRevision, feedback: expect.objectContaining({ target, expected: '', value: 'O' }) }));
+});
+it('재진입 시 세션에 보관한 결과 불명 요청을 복원한다', () => {
+  m.state = { ...m.state!, saveStatus: 'unknown', attendanceFeedback: { sid: 's', studentName: '가상 학생', target, value: 'O', expected: '', scope: '2026/0', status: 'unknown', retryable: true } };
+  const { result } = renderHook(useAttendanceSave);
+  expect(result.current.feedback).toMatchObject({ status: 'unknown', expected: '', target });
+});
+it('저장 도중 재진입한 화면도 완료 결과로 전환하고 성공 안내만 닫을 수 있다', async () => {
+  m.state = { ...m.state!, userRole: { role: 'admin' } };
+  m.dispatch.mockImplementation(action => { m.state = reducer(m.state!, action); });
+  let finish!: () => void;
+  m.save.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
+  const first = renderHook(useAttendanceSave);
+  let saving!: Promise<void>;
+  act(() => { saving = first.result.current.save(target, 'O'); });
+  first.unmount();
+  const next = renderHook(useAttendanceSave);
+  expect(next.result.current.feedback?.status).toBe('saving');
+  await act(async () => { finish(); await saving; });
+  next.rerender();
+  expect(next.result.current.feedback?.status).toBe('saved');
+  expect(next.result.current.pending).toBe(false);
+  const saved = next.result.current.feedback!;
+  act(() => { if (saved.status === 'saved') next.result.current.dismissSaved(saved.savedAt); });
+  expect(next.result.current.feedback).toBeNull();
 });

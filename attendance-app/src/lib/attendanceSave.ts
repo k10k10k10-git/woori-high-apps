@@ -11,7 +11,8 @@ export type AttendanceWrite = { year: number; target: AttEditTarget; expected: A
 /** 서버에서 읽은 ETag에 한 번만 조건부 저장한다. SDK 오프라인 큐·자동 덮어쓰기 재시도를 사용하지 않는다. */
 export async function compareAndSaveAttendance(input: AttendanceWrite, connection: {
   databaseUrl: string;
-  token: string;
+  token?: string;
+  getToken?: () => Promise<string>;
   isCurrent: () => boolean;
   fetch?: typeof fetch;
   timeoutMs?: number;
@@ -20,17 +21,20 @@ export async function compareAndSaveAttendance(input: AttendanceWrite, connectio
   if (!Number.isInteger(year) || [target.ck, target.sid, target.k].some(key => !key || /[.#$\[\]/\u0000-\u001f]/.test(key))
     || !['', 'O', 'X'].includes(value) || !['', 'O', 'X'].includes(expected)) throw new Error('출석 저장 대상을 확인해 주세요.');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), connection.timeoutMs ?? 15000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   let sent = false;
   const assertCurrent = () => {
     if (!connection.isCurrent()) throw new AttendanceSaveError('session', '계정 또는 조회 연도가 변경되었습니다. 현재 화면에서 다시 선택해 주세요.');
     if (controller.signal.aborted) throw new Error('timeout');
   };
-  try {
+  const work = async () => {
     assertCurrent();
+    const token = connection.getToken ? await connection.getToken() : connection.token;
+    assertCurrent();
+    if (!token) throw new AttendanceSaveError('session', '다시 로그인한 뒤 출석을 선택해 주세요.');
     const endpoint = new URL(connection.databaseUrl);
     endpoint.pathname = `/attendance/${year}/${[target.ck, target.sid, target.k].map(encodeURIComponent).join('/')}.json`;
-    endpoint.searchParams.set('auth', connection.token);
+    endpoint.searchParams.set('auth', token);
     const url = endpoint.toString();
     const request = connection.fetch ?? globalThis.fetch;
     const options = { cache: 'no-store' as const, signal: controller.signal };
@@ -51,6 +55,11 @@ export async function compareAndSaveAttendance(input: AttendanceWrite, connectio
     if (result.status === 412) throw new AttendanceSaveError('conflict', '다른 담당자가 먼저 저장했습니다. 최신 기록을 확인하고 다시 선택해 주세요.');
     if (result.status >= 400 && result.status < 500) throw new AttendanceSaveError('unavailable', '출석 저장이 거절되었습니다. 권한을 확인한 뒤 재시도해 주세요.');
     if (!result.ok || controller.signal.aborted) throw new Error('unknown');
+  };
+  try {
+    await Promise.race([work(), new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, connection.timeoutMs ?? 15000);
+    })]);
   } catch (error) {
     if (error instanceof AttendanceSaveError) throw error;
     throw new AttendanceSaveError(sent ? 'unknown' : 'unavailable', sent
@@ -63,9 +72,8 @@ export function saveAttendanceCell(input: AttendanceWrite, isCurrent: () => bool
   return withBrowserWriteLock('shared', async () => {
     const user = auth.currentUser;
     if (!user) throw new AttendanceSaveError('session', '다시 로그인한 뒤 출석을 선택해 주세요.');
-    const token = await user.getIdToken();
     return compareAndSaveAttendance(input, {
-      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', token,
+      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', getToken: () => user.getIdToken(),
       isCurrent: () => auth.currentUser === user && isCurrent(),
     });
   });

@@ -1,9 +1,11 @@
 'use client';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { db, ref, get, set } from '@/lib/db';
+import { db, ref, get, set, runTransaction } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import { createPersonId, findHistoricalPersonId } from '@/utils/personId';
+import { mergeTeacherEdit, type TeacherFields } from '@/utils/teacherPersistence';
+import TeacherModal from '@/components/modals/TeacherModal';
 import '../../admin/admin-teacher-dialog.css';
 
 interface SpecialTeacher { title: string; name: string; phone: string; birth?: string; personId?: string; }
@@ -29,7 +31,7 @@ function sortClassKeys(keys: string[]): string[] {
 const tdCell: React.CSSProperties = { padding: '7px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' };
 
 export default function TeacherManagement() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const { classData, curYear } = state;
 
   const [teacherPart, setTeacherPart] = useState<'1' | '2' | 'staff'>('1');
@@ -51,6 +53,8 @@ export default function TeacherManagement() {
   const [teacherForm, setTeacherForm] = useState({ title: '', name: '', phone: '', birth: '' });
   const [deleteStaffConfirm, setDeleteStaffConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const openedTeacher = useRef<TeacherFields>({});
   const teacherFormId = useId();
 
   const loadTeacherData = useCallback(async () => {
@@ -99,6 +103,8 @@ export default function TeacherManagement() {
 
   function openEditSpecial(idx: number) {
     const t = specialTeachers[idx];
+    openedTeacher.current = { ...t };
+    setSaveError('');
     setTeacherForm({ title: t.title, name: t.name, phone: t.phone, birth: t.birth ?? '' });
     setEditingTeacher({ kind: 'special', idx });
   }
@@ -107,9 +113,11 @@ export default function TeacherManagement() {
     const [, g, c] = ck.split('-');
     const key = ck.replace(/-/g, '_');
     const extra = teacherExtra[key] ?? {};
+    openedTeacher.current = { ...extra };
+    setSaveError('');
     setTeacherForm({
       title: extra.title ?? `${g}학년 ${c}반 담임`,
-      name:  extra.name  ?? classData[ck]?.teacher ?? '',
+      name: classData[ck]?.teacher ?? '',
       phone: extra.phone ?? '',
       birth: extra.birth ?? '',
     });
@@ -117,6 +125,7 @@ export default function TeacherManagement() {
   }
 
   function openEditStaff(key: string | null) {
+    setSaveError('');
     if (key && staffList[key]) {
       const s = staffList[key];
       setTeacherForm({ title: s.title, name: s.name, phone: s.phone, birth: s.birth ?? '' });
@@ -128,6 +137,7 @@ export default function TeacherManagement() {
   }
 
   function openEditAdditional(key: string | null) {
+    setSaveError('');
     if (key && additionalTeachers[key]) {
       const s = additionalTeachers[key];
       setTeacherForm({ title: s.title, name: s.name, phone: s.phone, birth: s.birth ?? '' });
@@ -153,11 +163,13 @@ export default function TeacherManagement() {
     setSaving(true);
     try {
       if (editingTeacher.kind === 'special') {
-        const current = specialTeachers[editingTeacher.idx];
+        const index = editingTeacher.idx;
+        const current = specialTeachers[index];
         const personId = await resolveWorkerPersonId('teacher', current);
-        const updated = specialTeachers.map((t, i) => i === editingTeacher.idx ? { ...teacherForm, personId } : t);
-        await set(ref(db, `teacherSpecial/${curYear}/${teacherPart}`), updated);
-        setSpecialTeachers(updated);
+        const target = ref(db, `teacherSpecial/${curYear}/${teacherPart}/${editingTeacher.idx}`);
+        const result = await runTransaction(target, latest => mergeTeacherEdit(latest, openedTeacher.current, teacherForm, personId), { applyLocally: false });
+        if (!result.committed) { setSaveError('다른 관리자가 교사 정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.'); return; }
+        setSpecialTeachers(previous => previous.map((value, position) => position === index ? result.snapshot.val() : value));
       } else if (editingTeacher.kind === 'staff') {
         const staffKey = editingTeacher.key ?? `staff_${Date.now()}`;
         if (!teacherForm.name.trim()) { showToast('이름을 입력하세요.'); setSaving(false); return; }
@@ -176,13 +188,14 @@ export default function TeacherManagement() {
         const part = editingTeacher.ck.split('-')[0];
         const key = editingTeacher.ck.replace(/-/g, '_');
         const personId = await resolveWorkerPersonId('teacher', teacherExtra[key]);
-        const value = { ...teacherForm, personId };
-        await set(ref(db, `teacherExtra/${curYear}/${part}/${key}`), value);
-        setTeacherExtra(prev => ({ ...prev, [key]: value }));
+        const result = await runTransaction(ref(db, `teacherExtra/${curYear}/${part}/${key}`), latest =>
+          mergeTeacherEdit(latest, openedTeacher.current, { title: teacherForm.title, phone: teacherForm.phone, birth: teacherForm.birth }, personId), { applyLocally: false });
+        if (!result.committed) { setSaveError('다른 관리자가 추가정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.'); return; }
+        setTeacherExtra(prev => ({ ...prev, [key]: result.snapshot.val() }));
       }
       setEditingTeacher(null);
     } catch {
-      showToast('저장에 실패했습니다. 다시 시도해 주세요.');
+      setSaveError('저장하지 못했습니다. 입력은 유지했으니 연결을 확인하고 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
@@ -309,7 +322,7 @@ export default function TeacherManagement() {
                   const key = ck.replace(/-/g, '_');
                   const extra = teacherExtra[key] ?? {};
                   const displayTitle = extra.title ?? `${g}학년 ${c}반 담임`;
-                  const displayName  = extra.name  ?? classData[ck]?.teacher ?? '';
+                  const displayName = classData[ck]?.teacher ?? '';
                   const displayPhone = extra.phone ?? '';
                   const displayBirth = extra.birth ?? '';
                   if (!displayName) return null;
@@ -372,7 +385,13 @@ export default function TeacherManagement() {
             <div className="form-field">
               <label className="form-label" htmlFor={`${teacherFormId}-name`}>이름</label>
               <input id={`${teacherFormId}-name`} className="form-input" value={teacherForm.name} disabled={saving} autoComplete="name"
+                readOnly={editingTeacher.kind === 'regular'}
                 onChange={e => setTeacherForm(f => ({ ...f, name: e.target.value }))} />
+              {editingTeacher.kind === 'regular' && <div><p className="pr-note">담임 이름은 반 정보와 같은 값을 사용합니다.</p><button type="button" className="ao-edit-button" disabled={saving} onClick={() => {
+                const [part, grade, cls] = editingTeacher.ck.split('-');
+                dispatch({ type: 'SET_PART', payload: part }); dispatch({ type: 'SET_GRADE', payload: grade }); dispatch({ type: 'SET_CLASS', payload: cls });
+                setEditingTeacher(null); dispatch({ type: 'OPEN_TEACHER_MODAL' });
+              }}>담임 이름·사진 변경</button></div>}
             </div>
             <div className="form-field">
               <label className="form-label" htmlFor={`${teacherFormId}-birth`}>년생</label>
@@ -409,8 +428,10 @@ export default function TeacherManagement() {
                 {saving ? '저장 중...' : '저장'}
               </button>
             </div>
+            {saveError && <p role="alert" className="ao-error">{saveError}</p>}
         </TeacherDialog>
       )}
+      {state.teacherModal.open && <TeacherModal onClose={() => dispatch({ type: 'CLOSE_TEACHER_MODAL' })} />}
     </>
   );
 }
