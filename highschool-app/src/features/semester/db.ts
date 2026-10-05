@@ -5,6 +5,7 @@ import { ref, get, onValue } from "firebase/database";
 import { auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
+import { semesterSummaryMeta } from "./termPhase";
 import {
   Application,
   ApplicationPrivate,
@@ -65,9 +66,9 @@ export function subscribeSemesters(
 ): () => void {
   let previousMetadata: string | undefined;
   return onValue(ref(db, paths.semesters()), (snap) => {
-    const semesters = Object.entries((snap.val() ?? {}) as Record<string, { meta?: SemesterMeta }>)
+    const semesters = Object.entries((snap.val() ?? {}) as Record<string, { meta?: SemesterMeta; sessions?: Record<string, Session> }>)
       .filter(([, value]) => !!value.meta)
-      .map(([id, value]) => ({ id, meta: value.meta! }))
+      .map(([id, value]) => ({ id, meta: semesterSummaryMeta(value.meta!, value.sessions) }))
       .sort((a, b) => b.id.localeCompare(a.id));
     // 출석·신청 갱신도 루트에 도착한다. 목록에 쓰는 meta가 같으면 React 상태와
     // 현재 학기에 연결된 하위 구독들을 다시 만들지 않는다. 첫 빈 목록은 전달한다.

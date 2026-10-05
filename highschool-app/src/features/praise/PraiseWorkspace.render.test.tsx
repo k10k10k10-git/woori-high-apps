@@ -231,3 +231,22 @@ it("조편성 바로가기 뒤 팀원 하위 메뉴를 바꾸고 다시 조편�
   expect(screen.getByRole("button", { name: "조편성" })).toHaveAttribute("aria-pressed", "true");
   await waitFor(() => expect(mocks.list).toHaveBeenCalled());
 });
+
+it("학기 명단에서 출결로 들어오면 해당 학기를 열고 없는 학기는 안내한다", async () => {
+  window.history.replaceState(null, "", "/teams/praise/ongoing?semester=2026-2&tab=attendance");
+  const view = praiseFixture();
+  const current = { ...view.meta, id: "current", semesterId: "2027-1" };
+  const matching = { ...view.meta, id: "matching", semesterId: "2026-2" };
+  mocks.list.mockResolvedValue({ workspaces: [current, matching], canCreate: true });
+  const rendered = render(<PraiseWorkspace />);
+  await waitFor(() => expect(screen.getByLabelText("찬양팀 운영 기간")).toHaveValue("matching"));
+  expect(mocks.data).toHaveBeenLastCalledWith("matching");
+  expect(screen.getByRole("tab", { name: "출결" })).toHaveAttribute("aria-selected", "true");
+  rendered.unmount();
+  mocks.data.mockClear();
+  window.history.replaceState(null, "", "/teams/praise/ongoing?semester=2025-1");
+  render(<PraiseWorkspace />);
+  expect(await screen.findByText("이 학기에 연결된 찬양팀 운영이 없습니다")).toBeInTheDocument();
+  expect(mocks.data).not.toHaveBeenCalled();
+  expect(mocks.execute).not.toHaveBeenCalled();
+});

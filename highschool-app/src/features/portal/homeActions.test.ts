@@ -26,3 +26,7 @@ describe("공유 캘린더 기반 홈 할 일", () => {
     expect(homeActionDayLabel({ date: "2026-08-18" }, "2026-08-21")).toBe("D+3");
   });
 });
+
+it("휴강 공지는 달력에 남아 있어도 해야 할 업무로 표시하지 않는다", () => {
+  expect(buildHomeActions([{ id: "holiday", title: "휴강", date: "2026-10-10", kind: "semester", noticeOnly: true }], "2026-10-05")).toEqual([]);
+});

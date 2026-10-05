@@ -27,7 +27,7 @@ it("찬양팀에 현재 팀과 팀 변경을 표시하고 기존 선택을 전�
   const team = screen.getByLabelText("현재 팀·팀 변경");
   expect(team).toHaveValue("praise");
   fireEvent.change(team, { target: { value: "worship" } });
-  expect(state.push).toHaveBeenCalledWith("/sunday-ministry/worship");
+  expect(state.push).toHaveBeenCalledWith("/teams/worship/ongoing");
 });
 
 it("팀이 지정되지 않은 전체 관리자는 화면 크기와 관계없이 먼저 팀을 선택한다", () => {
@@ -76,16 +76,16 @@ it("명시 탭이 바뀐 기존 링크를 다시 열면 같은 팀의 두 번째
 it("팀 변경은 대상 팀에 있는 탭만 쿼리로 인코딩해서 전달한다", () => {
   render(<SundayMinistryClient team="admin" initialTab="예배 자료" />);
   fireEvent.change(screen.getByLabelText("현재 팀·팀 변경"), { target: { value: "worship" } });
-  expect(state.push).toHaveBeenLastCalledWith(`/sunday-ministry/worship?tab=${encodeURIComponent("예배 자료")}`);
+  expect(state.push).toHaveBeenLastCalledWith(`/teams/worship/ongoing?tab=${encodeURIComponent("예배 자료")}`);
   expect(new URL(state.push.mock.calls.at(-1)![0], "https://example.test").searchParams.get("tab")).toBe("예배 자료");
   fireEvent.change(screen.getByLabelText("현재 팀·팀 변경"), { target: { value: "barnabas" } });
-  expect(state.push).toHaveBeenLastCalledWith("/sunday-ministry/barnabas");
+  expect(state.push).toHaveBeenLastCalledWith("/teams/barnabas/ongoing");
 });
 
 it("어느 팀에도 없는 탭은 선택 화면과 선택 후 URL에 이어 붙이지 않는다", () => {
   render(<SundayMinistryClient initialTab="없는 탭&workspace=다른 값" />);
   fireEvent.click(screen.getByRole("button", { name: /찬양팀/ }));
-  expect(state.push).toHaveBeenCalledWith("/sunday-ministry/praise");
+  expect(state.push).toHaveBeenCalledWith("/teams/praise/ongoing");
 });
 
 it("접근할 수 없는 팀의 탭으로 자기 팀을 벗어나지 않는다", () => {

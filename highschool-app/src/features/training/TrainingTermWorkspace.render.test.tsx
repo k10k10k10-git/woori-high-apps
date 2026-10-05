@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Application } from "@/features/semester/types";
 
@@ -39,4 +39,14 @@ describe("훈련 명단 모바일 카드", () => {
     expect(card).toHaveTextContent("찬양팀");
     expect(card?.querySelector('a[href="tel:010-0000-0000"]')).toBeTruthy();
   });
+});
+
+it("이름과 훈련반으로 표·모바일 카드를 함께 좁힌다", () => {
+  render(<TrainingRoster {...base} roster={[person, { ...person, id: "app-2", name: "다른 학생", trainingClassId: "other" }]} showContacts={false} />);
+  fireEvent.change(screen.getByLabelText("이름 검색"), { target: { value: "가상" } });
+  expect(screen.getAllByText("가상 학생")).toHaveLength(2);
+  expect(screen.queryByText("다른 학생")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("이름 검색"), { target: { value: "" } });
+  fireEvent.change(screen.getByLabelText("훈련반"), { target: { value: "training-2" } });
+  expect(screen.queryByText("다른 학생")).not.toBeInTheDocument();
 });

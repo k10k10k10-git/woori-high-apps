@@ -76,10 +76,16 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
   const [labelDraft, setLabelDraft] = useState<{ sessionId: string; text: string } | null>(null);
 
   async function saveMeta() {
+    if ((draft.startDate || draft.endDate) && (!draft.startDate || !draft.endDate || draft.endDate < draft.startDate)) {
+      toast("학기 시작일과 종료일을 모두 입력하고 날짜 순서를 확인해 주세요", "error");
+      return;
+    }
     try {
       await updateSemesterMeta(sid, {
         ...(draft.title.trim() ? { title: draft.title.trim() } : {}),
         completionRule: { minRate: Math.min(100, Math.max(0, draft.minRatePct)) / 100 },
+        startDate: draft.startDate,
+        endDate: draft.endDate,
       });
       toast("설정이 저장되었습니다", "success");
     } catch (e) {
@@ -179,6 +185,8 @@ export default function SettingsTab({ sid, meta, teams, trainingClasses, session
               className="input mt-0.5 sm:w-28"
             />
           </label>
+          <label className="text-sm"><span className="text-xs text-slate-500">학기 시작일</span><input type="date" className="input mt-0.5" value={draft.startDate} onChange={(event) => setDraft((current) => editSettingsDraft(current, { startDate: event.target.value }))} /></label>
+          <label className="text-sm"><span className="text-xs text-slate-500">학기 종료일</span><input type="date" className="input mt-0.5" min={draft.startDate || undefined} value={draft.endDate} onChange={(event) => setDraft((current) => editSettingsDraft(current, { endDate: event.target.value }))} /></label>
           <button onClick={() => void saveMeta()} className="btn-primary justify-center">저장</button>
         </div>
       </section>

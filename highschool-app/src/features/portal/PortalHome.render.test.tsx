@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
 import type { SharedCalendarItem } from "./SharedMinistryCalendar";
@@ -93,4 +93,15 @@ it("찬양팀 홈은 맡은 팀의 업무와 직접 진입 경로를 안내한�
   expect(screen.getByRole("heading", { name: "찬양팀" })).toBeInTheDocument();
   expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/teams")).every((link) => link.getAttribute("href") === "/teams/praise")).toBe(true);
   expect(screen.queryByRole("heading", { name: "행정·바나바" })).not.toBeInTheDocument();
+});
+
+it("홈 데이터 재시도는 거부된 구독을 해제하고 성공한 경로의 오류를 지운다", () => {
+  render(<PortalHome />);
+  act(() => mocks.retreats.mock.calls[0][1](new Error("수련회 연결 실패")));
+  expect(screen.getByRole("button", { name: "다시 불러오기" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+  expect(mocks.unsubscribe).toHaveBeenCalledOnce();
+  expect(mocks.retreats).toHaveBeenCalledTimes(2);
+  act(() => mocks.retreats.mock.calls[1][0]([]));
+  expect(screen.queryByRole("button", { name: "다시 불러오기" })).not.toBeInTheDocument();
 });

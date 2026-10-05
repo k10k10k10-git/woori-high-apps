@@ -11,6 +11,7 @@ export type SharedCalendarItem = {
   kind: "main" | "semester" | "sunday" | "retreat" | "field";
   href?: string;
   done?: boolean;
+  noticeOnly?: boolean;
   /** prepMilestones에서 온 일정만 이 화면에서 수정·삭제한다. */
   editable?: boolean;
 };

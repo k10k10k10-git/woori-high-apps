@@ -7,12 +7,13 @@ import { canAccessArea } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import { subscribeToAllRetreatPeriods, subscribeToRetreats } from "@/lib/db";
 import type { Retreat } from "@/lib/types";
+import { selectRetreatForWork } from "@/lib/retreatSelection";
 
 export default function ProgramsHome() {
   const { user, loading, roles } = useAuth();
   const allowed = canAccessArea("retreat-admin", roles);
   const [records, setRecords] = useState<Retreat[]>([]);
-  const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string }>>([]);
+  const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string; endDate?: string }>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
   const [generation, setGeneration] = useState(0);
@@ -21,7 +22,7 @@ export default function ProgramsHome() {
     if (loading || !user || !allowed) return;
     return subscribeToRetreats((next) => {
       setRecords(next);
-      setSelectedId((previous) => previous && next.some((retreat) => retreat.id === previous) ? previous : next[0]?.id ?? null);
+      setSelectedId((previous) => previous && next.some((retreat) => retreat.id === previous) ? previous : null);
     }, (error) => setLoadError(error.message));
   }, [allowed, generation, loading, user]);
 
@@ -30,7 +31,7 @@ export default function ProgramsHome() {
     if (!user || !allowed) return;
     const ids = idsKey ? idsKey.split(",") : [];
     return subscribeToAllRetreatPeriods(ids, setPeriods, (error) => setLoadError((previous) => previous || error.message));
-  }, [allowed, idsKey, user]);
+  }, [allowed, idsKey, user, generation]);
 
   const retreats = useMemo(() => {
     const earliest: Record<string, string> = {};
@@ -54,7 +55,7 @@ export default function ProgramsHome() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <VacationHome mode="program" roles={roles} retreats={retreats} selectedId={selectedId} onSelect={setSelectedId} loadError={loadError || null} onRetry={() => { setLoadError(""); setGeneration((value) => value + 1); }} />
+      <VacationHome mode="program" roles={roles} retreats={retreats} selectedId={selectedId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null} onSelect={setSelectedId} loadError={loadError || null} onRetry={() => { setLoadError(""); setGeneration((value) => value + 1); }} />
     </div>
   );
 }

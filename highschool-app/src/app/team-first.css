@@ -176,6 +176,11 @@
 .training-roster-row > span:first-child small { display: block; margin-top: 3px; font-size: 0.7rem; }
 .training-roster-row .team-contact-list { justify-items: start; text-align: left; }
 .training-roster-cards { display: none; }
+.team-roster-filters { display: flex; flex-wrap: wrap; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--color-border); }
+.team-roster-filters label { display: grid; flex: 1 1 180px; min-width: 0; gap: 6px; color: var(--color-text-muted); font-size: 0.75rem; }
+.team-roster-filters .input { min-height: 44px; }
+.team-first-alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.team-context-note a { flex: none; min-height: 44px; }
 .overlay-shell__panel.group-add-dialog { width: min(100%, 384px); overflow-y: auto; }
 
 .operations-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

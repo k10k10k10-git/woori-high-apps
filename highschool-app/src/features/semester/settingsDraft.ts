@@ -5,6 +5,8 @@ export interface SettingsDraft {
   initialized: boolean;
   dirty: boolean;
   title: string;
+  startDate: string;
+  endDate: string;
   minRatePct: number;
 }
 
@@ -14,6 +16,8 @@ export function createSettingsDraft(sid: string, meta: SemesterMeta | null): Set
     initialized: meta !== null,
     dirty: false,
     title: meta?.title ?? "",
+    startDate: meta?.startDate ?? "",
+    endDate: meta?.endDate ?? "",
     minRatePct: Math.round((meta?.completionRule?.minRate ?? 0.7) * 100),
   };
 }
@@ -30,7 +34,7 @@ export function syncSettingsDraft(
 
 export function editSettingsDraft(
   current: SettingsDraft,
-  partial: Pick<SettingsDraft, "title"> | Pick<SettingsDraft, "minRatePct">,
+  partial: Partial<Pick<SettingsDraft, "title" | "minRatePct" | "startDate" | "endDate">>,
 ): SettingsDraft {
   return { ...current, ...partial, dirty: true };
 }

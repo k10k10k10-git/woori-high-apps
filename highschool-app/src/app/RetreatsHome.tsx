@@ -8,6 +8,7 @@ import {
   deleteRetreat, requestRetreatAccess, subscribeToAllRetreatPeriods, subscribeToRetreats,
 } from "@/lib/db";
 import { Retreat } from "@/lib/types";
+import { selectRetreatForWork } from "@/lib/retreatSelection";
 import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import BrainstormPanel from "./BrainstormPanel";
@@ -24,7 +25,7 @@ export default function HomePage() {
   const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
   const [retreatRecords, setRetreatRecords] = useState<Retreat[]>([]);
-  const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string }>>([]);
+  const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string; endDate?: string }>>([]);
   const [retreatLoadError, setRetreatLoadError] = useState("");
   const [subscriptionGeneration, setSubscriptionGeneration] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
@@ -56,7 +57,7 @@ export default function HomePage() {
     if (loading || !canUseAdmin || !user) return;
     return subscribeToRetreats((list) => {
       setRetreatRecords(list);
-      setSelectedRetreatId((previous) => previous && list.some((item) => item.id === previous) ? previous : list[0]?.id ?? null);
+      setSelectedRetreatId((previous) => previous && list.some((item) => item.id === previous) ? previous : null);
     }, (error) => {
       setRetreatLoadError(error.message);
       toast(error.message, "error");
@@ -69,7 +70,7 @@ export default function HomePage() {
     const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
     return subscribeToAllRetreatPeriods(ids, setPeriods,
       (error) => setRetreatLoadError((previous) => previous || `수련회 기간 구독 실패 - ${error.message}`));
-  }, [user, canUseAdmin, retreatIdsKey]);
+  }, [user, canUseAdmin, retreatIdsKey, subscriptionGeneration]);
 
   // 잠금 상태 — 목록의 자물쇠 배지와 관리자 모달이 함께 쓴다(현장 화면과 같은 노드).
   const sortedRetreatIdsKey = retreats.map((r) => r.id).join(",");
@@ -78,7 +79,7 @@ export default function HomePage() {
     const ids = sortedRetreatIdsKey ? sortedRetreatIdsKey.split(",") : [];
     return subscribeToIguardAccessLocks(ids, setAccessLocks,
       (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 - ${e.message}`));
-  }, [user, canUseAdmin, sortedRetreatIdsKey]);
+  }, [user, canUseAdmin, sortedRetreatIdsKey, subscriptionGeneration]);
 
   async function handleRequestAccess() {
     if (!user) return;
@@ -205,7 +206,7 @@ export default function HomePage() {
         mode="admin"
         roles={roles}
         retreats={retreats}
-        selectedId={selectedRetreatId}
+        selectedId={selectedRetreatId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null}
         onSelect={setSelectedRetreatId}
         onDelete={handleDelete}
         loadError={retreatLoadError || null}
