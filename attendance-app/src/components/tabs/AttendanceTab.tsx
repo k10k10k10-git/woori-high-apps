@@ -39,12 +39,12 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
   const isTeacher = state.userRole?.role === 'teacher';
   const [attSubView, setAttSubView] = useState<AttendanceSubView>(initialSubview);
 
-  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, handleSuggestSubmit } =
+  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestSaveError, suggestRetrying, handleSuggestSubmit } =
     useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
   const suggestStudent = students.find(student => student.id === suggestStudentId);
   const {
     visitRequests, visitStudentId, setVisitStudentId, visitText, setVisitText,
-    visitSaving, visitLoadError, handleVisitSubmit,
+    visitSaving, visitLoadError, visitSaveError, visitRetrying, handleVisitSubmit,
   } = useVisitRequests(curYear, ck, attSubView === 'visit', classData[ck]?.teacher ?? '');
   const visitStudent = students.find(student => student.id === visitStudentId);
 
@@ -419,8 +419,10 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               <label className="suggest-label" htmlFor="note-student">학생 <span className="suggest-optional">선택</span></label>
               <select id="note-student" className="visit-student-select" value={suggestStudentId} onChange={event => setSuggestStudentId(event.target.value)}>
                 <option value="">반 전체·운영 관련</option>
+                {suggestStudentId && !suggestStudent && <option value={suggestStudentId}>이동·삭제된 학생 · 다시 선택해 주세요</option>}
                 {students.map(student => <option key={student.id} value={student.id}>{student.name}{student.jang ? ' · 장결' : ''}</option>)}
               </select>
+              {suggestStudentId && !suggestStudent && <p className="suggest-load-error" role="alert">선택한 학생이 현재 반에 없습니다. 작성 내용은 보존했습니다. 학생을 다시 선택하거나 반 전체 기록으로 직접 변경해 주세요.</p>}
               <label className="suggest-label" htmlFor="teacher-suggestion">특이사항</label>
               <textarea
                 id="teacher-suggestion"
@@ -435,10 +437,12 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
                 type="button"
                 className="suggest-submit-btn"
                 onClick={() => handleSuggestSubmit(suggestStudent?.name)}
-                disabled={!suggestText.trim() || suggestSaving}
+                disabled={suggestSaving || (!suggestRetrying && (!suggestText.trim() || (!!suggestStudentId && !suggestStudent)))}
               >
-                {suggestSaving ? '등록 중...' : '등록하기'}
+                {suggestSaving ? '등록 중...' : suggestRetrying ? '저장 결과 확인·재시도' : '등록하기'}
               </button>
+              {suggestSaveError && <p className="suggest-load-error" role="alert">{suggestSaveError}</p>}
+              {suggestRetrying && !suggestSaving && <p className="suggest-form-help">이전에 등록한 내용부터 확인합니다. 이후에 추가로 작성한 내용은 지우지 않습니다.</p>}
             </div>
           )}
           {/* 관리자만 목록 표시 */}
@@ -496,10 +500,12 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               <label className="suggest-label" htmlFor="visit-reason">요청 이유</label>
               <textarea id="visit-reason" className="suggest-textarea" value={visitText} onChange={event => setVisitText(event.target.value)}
                 aria-describedby="visit-help" placeholder="최근 상황과 확인이 필요한 내용을 간단히 적어 주세요" rows={4} />
-              <button type="button" className="suggest-submit-btn" onClick={() => visitStudent && handleVisitSubmit(visitStudent.name, visitStudent.personId)}
-                disabled={!visitStudent || !visitText.trim() || visitSaving}>
-                {visitSaving ? '요청 중...' : '심방 요청하기'}
+              <button type="button" className="suggest-submit-btn" onClick={() => handleVisitSubmit(visitStudent?.name ?? '', visitStudent?.personId)}
+                disabled={visitSaving || (!visitRetrying && (!visitStudent || !visitText.trim()))}>
+                {visitSaving ? '요청 중...' : visitRetrying ? '저장 결과 확인·재시도' : '심방 요청하기'}
               </button>
+              {visitSaveError && <p className="suggest-load-error" role="alert">{visitSaveError}</p>}
+              {visitRetrying && !visitSaving && <p className="suggest-form-help">이전에 요청한 내용부터 확인합니다. 이후에 추가로 작성한 내용은 지우지 않습니다.</p>}
             </div>
           )}
           {!visitLoadError && (

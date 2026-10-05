@@ -130,7 +130,8 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
 
   useEffect(() => {
     let active = true;
-    const allYears = [gradeOneYear, gradeOneYear + 1, gradeOneYear + 2].filter(y => y > 2020);
+    // 개별 교사는 현재 배정 반만 읽을 수 있다. 연도 전체 조회를 반복해 권한 오류를 내지 않는다.
+    const allYears = isTeacher ? [curYear] : [gradeOneYear, gradeOneYear + 1, gradeOneYear + 2].filter(y => y > 2020);
     void Promise.all(allYears.map(async (year): Promise<YearStat> => {
       const grade = 1 + (year - gradeOneYear);
       const empty = { year, grade, ck: null, ...EMPTY_STATS };
@@ -172,7 +173,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
       }
     })).then(results => { if (active) setLoad({ scope, results }); });
     return () => { active = false; };
-  }, [curYear, gradeOneYear, reference, scope]);
+  }, [curYear, gradeOneYear, reference, scope, isTeacher]);
 
   const gradeColor = (rate: number) =>
     rate >= 90 ? '#397052' : rate >= 80 ? '#6355a7' : rate >= 70 ? '#795a1c' : '#a53f3f';
@@ -202,7 +203,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
           )}
           <div className="history-modal-copy">
             <div className="history-modal-name">{student?.name ?? '알 수 없음'}</div>
-            <div className="history-modal-subtitle">출석 이력 (3년) · 행사·미입력 제외</div>
+            <div className="history-modal-subtitle">{isTeacher ? `${curYear}년 현재 반 출석 이력` : '출석 이력 (3년)'} · 행사·미입력 제외</div>
           </div>
           <button
             ref={closeButtonRef}
@@ -214,6 +215,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
           </button>
         </div>
 
+        {isTeacher && <p className="history-year-empty" role="note">교사 계정은 현재 반의 출석 이력을 볼 수 있습니다. 이전 학년·다른 반 이력은 관리자에게 확인해 주세요.</p>}
         {loading ? (
           <div className="history-modal-loading" role="status">출석 이력을 불러오는 중...</div>
         ) : (

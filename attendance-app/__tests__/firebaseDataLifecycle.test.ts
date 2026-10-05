@@ -159,6 +159,18 @@ describe('원장 초기화와 구독 세대', () => {
     stop();
   });
 
+  it.each([null, '1-1-1'])('옛 내부 id가 다른 학생 키와 겹쳐도 실제 원장 키로 두 학생을 구별한다: %s', teacherCk => {
+    const dispatch = vi.fn();
+    const stop = subscribeFirebaseData(2026, teacherCk, 0, dispatch);
+    const info = { students: {
+      actualA: { id: 'actualB', name: '합성 A', personId: 'person_A' },
+      actualB: { id: 'actualB', name: '합성 B', personId: 'person_B' },
+    } };
+    subscriptions[0].receive(snapshot(teacherCk ? info : { '1-1-1': info }));
+    expect(dispatch.mock.calls[0][0].payload['1-1-1'].students.map((student: { id: string }) => student.id)).toEqual(['actualA', 'actualB']);
+    stop();
+  });
+
   it('동기적인 구독 시작 실패도 오류 상태로 끝나고 나머지 구독을 계속 등록한다', () => {
     let state = loadedState();
     database.onValue.mockImplementationOnce(() => { throw new Error('조회 시작 실패'); });

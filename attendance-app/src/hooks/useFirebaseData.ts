@@ -19,7 +19,7 @@ function toClassInfo(fc: FbClass): ClassDataMap[string] {
     teacher: fc.teacher ?? '',
     teacherPhoto: fc.teacherPhoto ?? '',
     students: fc.students
-      ? sortAndRenumber(Object.entries(fc.students).map(([id, s]) => ({ id, ...s as object })) as Student[])
+      ? sortAndRenumber(Object.entries(fc.students).map(([id, s]) => ({ ...s as object, id })) as Student[])
       : [],
   };
 }

@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/attendanceSave', () => ({ saveAttendanceCell: mocks.set, AttendanceSaveError: class extends Error {} }));
+vi.mock('@/lib/teacherMessageSave', () => ({ TeacherMessageSaveError: class extends Error {}, saveTeacherMessage: (year: number, ck: string, _id: string, payload: unknown) => mocks.push({ path: `suggestions/${year}/${ck}` }, payload) }));
 
 vi.mock('@/lib/db', () => ({
   db: { name: 'fixture-db' },
@@ -58,7 +59,8 @@ vi.mock('@/hooks/useTeacherDraft', async () => {
   return { useTeacherDraft: () => {
     const [current, setCurrent] = useState({ studentId: '', text: '' });
     const [saving, setSaving] = useState(false);
-    return { current, saving, setSaving, setStudentId: (studentId: string) => setCurrent(v => ({ ...v, studentId })),
+    const [submission, setSubmission] = useState<import('@/store/AppContext').TeacherSubmission | undefined>();
+    return { current, saving, submission, setSubmission, setSaving, setStudentId: (studentId: string) => setCurrent(v => ({ ...v, studentId })),
       setText: (text: string) => setCurrent(v => ({ ...v, text })), clearSaved: () => setCurrent({ studentId: '', text: '' }) };
   } };
 });
@@ -116,6 +118,19 @@ describe('AttendanceTab 교사 출석 입력', () => {
     expect(label.parentElement?.textContent).toContain('—');
     expect(label.parentElement?.textContent).toContain('입력 기록 없음');
     expect(label.parentElement?.textContent).not.toContain('0%');
+  });
+
+  it('작성 도중 학생이 이동하면 내용은 보존하고 학생 재선택 전 등록을 막는다', () => {
+    const { rerender } = render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '특이사항' }));
+    fireEvent.change(screen.getByLabelText(/학생/), { target: { value: 'student-1' } });
+    fireEvent.change(screen.getByRole('textbox', { name: '특이사항' }), { target: { value: '보존할 상담 내용' } });
+    mocks.state.current = { ...teacherState(), classData: { '1-1-1': { students: [] } } };
+    rerender(<AttendanceTab />);
+    expect(screen.getByRole('alert').textContent).toContain('현재 반에 없습니다');
+    expect((screen.getByRole('button', { name: '등록하기' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('textbox', { name: '특이사항' }) as HTMLTextAreaElement).value).toBe('보존할 상담 내용');
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 
   it('학생 이름을 실제 버튼으로 제공하고 출석 이력을 연다', () => {

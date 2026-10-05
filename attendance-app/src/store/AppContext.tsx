@@ -6,9 +6,11 @@ import type {
 } from '@/types';
 import { getKSTYear, getSundaysForYear, getWindowYears, buildHolidayRanges, buildEvents } from '@/utils/dates';
 import { normalizeAttendanceValue } from '@/utils/attendanceValue';
+import type { TeacherMessageWrite } from '@/lib/teacherMessageSave';
 
 export type DataKey = 'classes' | 'attendance' | 'events';
 export type TeacherDraft = { studentId: string; text: string };
+export type TeacherSubmission = { id: string; draft: TeacherDraft; payload: TeacherMessageWrite; error?: string; uncertain?: boolean };
 
 // ─── State ────────────────────────────────────────────────────
 export interface AppState {
@@ -18,6 +20,7 @@ export interface AppState {
   allUserRoles: Record<string, UserRole & { email?: string; name?: string }>;
   teacherDrafts: Record<string, TeacherDraft>;
   teacherDraftSaves: Record<string, boolean>;
+  teacherSubmissions: Record<string, TeacherSubmission>;
   draftSession: number;
 
   // 뷰/반 선택
@@ -66,6 +69,7 @@ export const initialState: AppState = {
   allUserRoles: {},
   teacherDrafts: {},
   teacherDraftSaves: {},
+  teacherSubmissions: {},
   draftSession: 0,
 
   curView: 'first',
@@ -105,6 +109,7 @@ type Action =
   | { type: 'SET_TEACHER_DRAFT'; session: number; key: string; payload: TeacherDraft }
   | { type: 'SET_TEACHER_DRAFT_SAVING'; session: number; key: string; payload: boolean }
   | { type: 'CLEAR_TEACHER_DRAFT'; session: number; key: string; expected: TeacherDraft }
+  | { type: 'SET_TEACHER_SUBMISSION'; session: number; key: string; payload: TeacherSubmission | null }
   | { type: 'SET_ALL_USER_ROLES'; revision: number; payload: Record<string, UserRole & { email?: string }> }
   | { type: 'SET_VIEW'; payload: ViewKey }
   | { type: 'SET_YEAR'; payload: number }
@@ -169,7 +174,14 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'SET_FB_READY':
       return { ...state, fbReady: true };
     case 'SET_USER_ROLE':
-      return resetData({ ...state, userRole: action.payload, teacherDrafts: {}, teacherDraftSaves: {}, draftSession: state.draftSession + 1 });
+      return resetData({ ...state, userRole: action.payload, teacherDrafts: {}, teacherDraftSaves: {}, teacherSubmissions: {}, draftSession: state.draftSession + 1 });
+    case 'SET_TEACHER_SUBMISSION': {
+      if (action.session !== state.draftSession || !state.userRole) return state;
+      const next = { ...state.teacherSubmissions };
+      if (action.payload) next[action.key] = action.payload;
+      else delete next[action.key];
+      return { ...state, teacherSubmissions: next };
+    }
     case 'SET_TEACHER_DRAFT_SAVING':
       return action.session !== state.draftSession || !state.userRole ? state
         : { ...state, teacherDraftSaves: { ...state.teacherDraftSaves, [action.key]: action.payload } };
