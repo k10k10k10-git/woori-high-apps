@@ -21,7 +21,8 @@ describe("program preparation interaction contract", () => {
     expect(list).toContain("programTaskProgress");
     expect(list).toContain("다가오는 할 일");
     expect(list).toContain("현장 점검");
-    expect(list).toContain("PROGRAM_TEMPLATE_META");
+    const catalog = source("src/app/retreat/[id]/programs/ProgramWorkspaceViews.tsx");
+    expect(catalog).toContain("PROGRAM_TEMPLATE_META");
   });
 
   it("첫 화면은 다음 준비와 기본 정보 뒤에 실행 할 일을 두고 회의 결정은 기존 작업을 덮지 않는다", () => {
@@ -202,7 +203,7 @@ describe("program preparation interaction contract", () => {
     const preparation = source("src/lib/programPreparation.ts");
     const client = source("src/app/retreat/[id]/programs/ProgramPreparationClient.tsx");
     const views = source("src/app/retreat/[id]/programs/ProgramWorkspaceViews.tsx");
-    for (const label of ["한눈에 보기", "프로그램 준비", "시간·장소", "준비물·비용", "담당자·할 일", "현장 공유"]) {
+    for (const label of ["전체 준비", "프로그램 준비", "시간·장소", "준비물·비용", "담당자·할 일", "현장 공유"]) {
       expect(preparation).toContain(`label: "${label}"`);
     }
     expect(client).toContain('params.set("workspace", next)');

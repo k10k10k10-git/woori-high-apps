@@ -1,22 +1,17 @@
 "use client";
 
-import { ArrowDown, ArrowRight, ArrowUp, CalendarBlank, Plus, WarningCircle } from "@phosphor-icons/react";
+import { ArrowRight } from "@phosphor-icons/react";
 import {
-  PROGRAM_TASK_STATUS_META, PROGRAM_TEMPLATE_META, programKindMeta, programReadiness,
-  programStatusMeta, programTaskProgress, programTaskStatus, programTasks, type ProgramTemplateKey,
+  PROGRAM_TASK_STATUS_META, programReadiness, programTaskProgress, programTaskStatus, programTasks,
 } from "@/lib/programPreparation";
 import { seoulDateKey } from "@/features/portal/dailyMinistryMessage";
 import type { RetreatProgram } from "@/lib/types";
 
 type Props = {
   programs: RetreatProgram[];
-  selectedId: string | null;
-  canEdit: boolean;
   busy: boolean;
   onSelect: (id: string) => void;
-  onAddTemplate: (template: ProgramTemplateKey) => void;
-  onCreateDefaults: () => void;
-  onMove: (id: string, direction: -1 | 1) => void;
+  onOpenPrograms: () => void;
 };
 
 function dueLabel(value?: string | null) {
@@ -27,25 +22,7 @@ function dueLabel(value?: string | null) {
   return `${value.slice(5).replace("-", "/")}까지`;
 }
 
-export default function ProgramList({ programs, selectedId, canEdit, busy, onSelect, onAddTemplate, onCreateDefaults, onMove }: Props) {
-  if (programs.length === 0) {
-    return (
-      <section className="program-empty" aria-labelledby="program-empty-heading">
-        <div><h2 id="program-empty-heading">어떤 방식으로 준비할까요?</h2><p>빈 문서 대신 실제 진행 방식에서 시작하세요. 만든 뒤에는 서로 다른 방식을 자유롭게 섞을 수 있습니다.</p></div>
-        {canEdit && (
-          <div className="program-template-grid">
-            {(Object.entries(PROGRAM_TEMPLATE_META) as Array<[ProgramTemplateKey, (typeof PROGRAM_TEMPLATE_META)[ProgramTemplateKey]]>).map(([key, meta]) => (
-              <button key={key} type="button" className={key === "blank" ? "program-template-option program-template-option--quiet" : "program-template-option"} onClick={() => onAddTemplate(key)} disabled={busy}>
-                <strong>{meta.label}</strong><span>{meta.description}</span><ArrowRight aria-hidden="true" size={17} />
-              </button>
-            ))}
-            <button type="button" className="btn-secondary program-template-default" onClick={onCreateDefaults} disabled={busy}>직접 작성할 프로그램 2개 만들기</button>
-          </div>
-        )}
-      </section>
-    );
-  }
-
+export default function ProgramList({ programs, busy, onSelect, onOpenPrograms }: Props) {
   const progress = programs.map((program) => ({ program, task: programTaskProgress(program), field: programReadiness(program) }));
   const actionCounts = progress.reduce((sum, entry) => ({
     overdue: sum.overdue + entry.task.overdue,
@@ -64,14 +41,7 @@ export default function ProgramList({ programs, selectedId, canEdit, busy, onSel
       <section className="program-attention" aria-labelledby="program-attention-heading">
         <div className="program-attention__heading">
           <div><h2 id="program-attention-heading">지금 처리할 것</h2><p>프로그램을 열기 전에 막힌 준비부터 확인합니다.</p></div>
-          {canEdit && (
-            <details className="program-add-menu">
-              <summary><Plus aria-hidden="true" size={16} weight="bold" /> 새 프로그램 만들기</summary>
-              <div>{(Object.entries(PROGRAM_TEMPLATE_META) as Array<[ProgramTemplateKey, (typeof PROGRAM_TEMPLATE_META)[ProgramTemplateKey]]>).map(([key, meta]) => (
-                <button key={key} type="button" onClick={() => onAddTemplate(key)} disabled={busy}><strong>{meta.label}</strong><span>{meta.description}</span></button>
-              ))}</div>
-            </details>
-          )}
+          <button type="button" className="btn-primary" onClick={onOpenPrograms} disabled={busy}>프로그램 준비 열기<ArrowRight aria-hidden="true" size={16} /></button>
         </div>
         <div className="program-attention__signals">
           <span data-alert={actionCounts.overdue > 0 ? "true" : undefined}><b>{actionCounts.overdue}</b> 기한 지남</span>
@@ -81,41 +51,10 @@ export default function ProgramList({ programs, selectedId, canEdit, busy, onSel
         </div>
       </section>
 
-      <section className="program-board" aria-labelledby="program-board-heading">
-        <div className="program-list-heading"><div><h2 id="program-board-heading">프로그램 준비 현황</h2><p>작업 진행과 현장 점검을 분리해 봅니다.</p></div></div>
-        <div className="program-board__grid">
-          {progress.map(({ program, task, field }, index) => {
-            const openTasks = programTasks(program).filter((entry) => programTaskStatus(entry) !== "done");
-            const next = [...openTasks].sort((a, b) => {
-              const blockedRank = Number(programTaskStatus(b) === "blocked") - Number(programTaskStatus(a) === "blocked");
-              return blockedRank || (a.dueDate || "9999").localeCompare(b.dueDate || "9999") || a.createdAt - b.createdAt;
-            })[0];
-            return (
-              <article key={program.id} className="program-board-card" data-selected={selectedId === program.id ? "true" : undefined}>
-                <button type="button" className="program-board-card__main" disabled={busy} onClick={() => onSelect(program.id)}>
-                  <span className="program-board-card__meta">{index + 1} · {programKindMeta(program.kind)} · {programStatusMeta(program.status).label}</span>
-                  <strong>{program.title}</strong>
-                  <div className="program-board-card__progress"><span><b>{task.done}/{task.total}</b> 작업 완료</span><span><b>{field.ready}/{field.total}</b> 현장 점검</span></div>
-                  <div className="program-board-card__next">
-                    {next && programTaskStatus(next) === "blocked" ? <WarningCircle aria-hidden="true" size={17} weight="fill" /> : <CalendarBlank aria-hidden="true" size={17} />}
-                    <span>{next ? <><small>다음 할 일</small><b>{next.title}</b><em>{dueLabel(next.dueDate)}</em></> : <><small>다음 할 일</small><b>등록된 작업이 없습니다</b><em>작업실에서 추가</em></>}</span>
-                    <ArrowRight aria-hidden="true" size={17} />
-                  </div>
-                </button>
-                {canEdit && programs.length > 1 && <div className="program-order-controls" aria-label={`${program.title} 순서 변경`}>
-                  <button type="button" onClick={() => onMove(program.id, -1)} disabled={busy || index === 0} aria-label="앞으로 이동"><ArrowUp aria-hidden="true" size={14} /></button>
-                  <button type="button" onClick={() => onMove(program.id, 1)} disabled={busy || index === programs.length - 1} aria-label="뒤로 이동"><ArrowDown aria-hidden="true" size={14} /></button>
-                </div>}
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
       <section className="program-global-tasks" aria-labelledby="program-global-tasks-heading">
         <div className="program-list-heading"><div><h2 id="program-global-tasks-heading">다가오는 할 일</h2><p>모든 프로그램의 미완료 작업을 기한순으로 모았습니다.</p></div></div>
-        {nextTasks.length === 0 ? <p className="program-task-empty">아직 할 일이 없습니다. 프로그램 작업실에서 첫 작업을 등록해 주세요.</p> : <ul>{nextTasks.map(({ program, task }) => (
-          <li key={`${program.id}-${task.id}`}><button type="button" onClick={() => onSelect(program.id)}>
+        {nextTasks.length === 0 ? <p className="program-task-empty">{programs.length === 0 ? "아직 프로그램이 없습니다. 프로그램 준비에서 진행 형식을 고르고 시작하세요." : "아직 할 일이 없습니다. 프로그램 준비에서 할 일을 등록해 주세요."}</p> : <ul>{nextTasks.map(({ program, task }) => (
+          <li key={`${program.id}-${task.id}`}><button type="button" disabled={busy} onClick={() => onSelect(program.id)}>
             <span data-status={programTaskStatus(task)}>{PROGRAM_TASK_STATUS_META[programTaskStatus(task)]}</span><strong>{task.title}</strong><small>{program.title}</small><em>{task.assignee?.trim() || "담당 없음"} · {dueLabel(task.dueDate)}</em><ArrowRight aria-hidden="true" size={16} />
           </button></li>
         ))}</ul>}

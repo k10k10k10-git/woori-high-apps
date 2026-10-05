@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
   CheckCircle,
   FileText,
   MapPin,
@@ -22,6 +24,7 @@ import {
   programFormatLabels,
   programFulfillmentStatus,
   programItems,
+  programKindMeta,
   programMeetings,
   programPosts,
   programReadiness,
@@ -40,7 +43,7 @@ import ProgramAutosaveField from "./ProgramAutosaveField";
 
 type OpenProgram = (programId: string, section?: ProgramSectionKey) => void;
 
-function catalogNextAction(program: RetreatProgram): { label: string; section: ProgramSectionKey } {
+export function catalogNextAction(program: RetreatProgram): { label: string; section: ProgramSectionKey } {
   const title = program.title.trim();
   if (!title || /^프로그램\s*\d+$/u.test(title) || !program.lead?.trim()) {
     return { label: "이름과 담당자를 먼저 정해 주세요", section: "overview" };
@@ -70,16 +73,18 @@ function SectionHeading({ title, description, aside }: { title: string; descript
 }
 
 export function ProgramCatalog({
-  programs, canEdit, busy, onOpen, onAdd,
+  programs, canEdit, busy, onOpen, onAdd, onCreateDefaults, onMove,
 }: {
   programs: RetreatProgram[];
   canEdit: boolean;
   busy: boolean;
   onOpen: OpenProgram;
   onAdd: (template: ProgramTemplateKey) => void;
+  onCreateDefaults: () => void;
+  onMove: (id: string, direction: -1 | 1) => void;
 }) {
   const [query, setQuery] = useState("");
-  const filtered = programs.filter((program) => {
+  const filtered = programs.map((program, index) => ({ program, index })).filter(({ program }) => {
     const haystack = [program.title, program.lead, program.team, program.place, ...programFormatLabels(program)].filter(Boolean).join(" ").toLocaleLowerCase("ko-KR");
     return haystack.includes(query.trim().toLocaleLowerCase("ko-KR"));
   });
@@ -89,7 +94,7 @@ export function ProgramCatalog({
       <SectionHeading
         title="프로그램 준비"
         description="프로그램 하나를 열고 안내되는 다음 할 일부터 채워가세요."
-        aside={canEdit ? (
+        aside={canEdit && programs.length > 0 ? (
           <details className="program-add-menu">
             <summary><Plus aria-hidden="true" size={16} weight="bold" /> 새 프로그램 만들기</summary>
             <div>{(Object.entries(PROGRAM_TEMPLATE_META) as Array<[ProgramTemplateKey, (typeof PROGRAM_TEMPLATE_META)[ProgramTemplateKey]]>).map(([key, meta]) => (
@@ -107,25 +112,40 @@ export function ProgramCatalog({
           <li><b>4</b><span>확인·공유</span></li>
         </ol>
       </div>
-      {programs.length > 4 && <label className="program-workspace-search"><span>프로그램 찾기</span><input className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름, 담당, 장소로 검색" /></label>}
+      {programs.length === 0 && canEdit && <div className="program-template-grid program-catalog-templates">
+        {(Object.entries(PROGRAM_TEMPLATE_META) as Array<[ProgramTemplateKey, (typeof PROGRAM_TEMPLATE_META)[ProgramTemplateKey]]>).map(([key, meta]) => (
+          <button key={key} type="button" className={key === "blank" ? "program-template-option program-template-option--quiet" : "program-template-option"} onClick={() => onAdd(key)} disabled={busy}>
+            <strong>{meta.label}</strong><span>{meta.description}</span><ArrowRight aria-hidden="true" size={17} />
+          </button>
+        ))}
+        <button type="button" className="btn-secondary program-template-default" onClick={onCreateDefaults} disabled={busy}>직접 작성할 프로그램 2개 만들기</button>
+      </div>}
+      {(programs.length > 4 || query.trim().length > 0) && <label className="program-workspace-search"><span>프로그램 찾기</span><input className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름, 담당, 장소로 검색" /></label>}
       {filtered.length === 0 ? <EmptyWorkspace title={query ? "검색 결과가 없습니다" : "프로그램이 없습니다"} description={query ? "검색어를 바꾸거나 전체 목록으로 돌아가세요." : "진행 형식에서 시작하면 기본 활동까지 함께 만들어집니다."} /> : (
         <div className="program-catalog-list">
-          {filtered.map((program, index) => {
+          {filtered.map(({ program, index }) => {
             const readiness = programReadiness(program);
+            const tasks = programTaskProgress(program);
             const next = catalogNextAction(program);
             const summary = [program.date, program.startTime, program.lead?.trim(), program.place?.trim()].filter(Boolean).join(" · ");
             return (
-              <button key={program.id} type="button" className="program-catalog-row" onClick={() => onOpen(program.id, next.section)}>
+              <article key={program.id} className="program-catalog-entry" aria-label={program.title}>
+              <button type="button" className="program-catalog-row" disabled={busy} onClick={() => onOpen(program.id, next.section)}>
                 <span className="program-catalog-row__number">{String(index + 1).padStart(2, "0")}</span>
                 <span className="program-catalog-row__main">
-                  <small>{programStatusMeta(program.status).label}</small>
+                  <small>{programKindMeta(program.kind)} · {programStatusMeta(program.status).label}</small>
                   <strong>{program.title}</strong>
                   <span>{summary || "기본 정보를 입력해 주세요"}</span>
                 </span>
                 <span className="program-catalog-row__next"><small>다음 할 일</small><strong>{next.label}</strong></span>
-                <span className="program-catalog-row__progress"><b>{readiness.percent}%</b><small>준비됨</small></span>
+                <span className="program-catalog-row__progress"><span><b>{tasks.done}/{tasks.total}</b><small>작업 완료</small></span><span><b>{readiness.ready}/{readiness.total}</b><small>현장 점검</small></span></span>
                 <ArrowRight aria-hidden="true" size={18} />
               </button>
+              {canEdit && programs.length > 1 && <div className="program-order-controls" role="group" aria-label={`${program.title} 순서 변경`}>
+                <button type="button" onClick={() => onMove(program.id, -1)} disabled={busy || index === 0} aria-label="앞으로 이동"><ArrowUp aria-hidden="true" size={14} /></button>
+                <button type="button" onClick={() => onMove(program.id, 1)} disabled={busy || index === programs.length - 1} aria-label="뒤로 이동"><ArrowDown aria-hidden="true" size={14} /></button>
+              </div>}
+              </article>
             );
           })}
         </div>

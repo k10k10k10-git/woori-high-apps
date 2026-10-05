@@ -89,6 +89,7 @@ import ProgramEditor from "./ProgramEditor";
 import ProgramList from "./ProgramList";
 import ProgramWorkspaceHeader from "./ProgramWorkspaceHeader";
 import {
+  catalogNextAction,
   ProgramCatalog,
   ProgramCollaborationWorkspace,
   ProgramResourcesWorkspace,
@@ -145,11 +146,12 @@ function ProgramPreparationWorkspace() {
   // 화면을 가른다 — 목록에서 고르면 상세로, 상세에서 목록으로 되돌아온다.
   const selectedId = searchParams.get("program");
 
-  function goToProgram(programId: string, nextSection: ProgramSectionKey = section) {
+  function goToProgram(programId: string, nextSection?: ProgramSectionKey) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("workspace", "programs");
     params.set("program", programId);
-    params.set("section", nextSection);
+    const program = programs.find((item) => item.id === programId);
+    params.set("section", nextSection ?? (program ? catalogNextAction(program).section : "overview"));
     // 프로그램·섹션은 같은 작업 화면 안의 상태다. Next 라우터 탐색을 쓰면
     // 서버 라우트와 로딩 경계가 다시 실행되므로 URL만 갱신해 구독과 화면을 유지한다.
     window.history.pushState(null, "", `?${params.toString()}`);
@@ -545,19 +547,15 @@ function ProgramPreparationWorkspace() {
           <div className="program-list-screen">
             <ProgramList
               programs={programs}
-              selectedId={null}
-              canEdit={editingAllowed}
               busy={busy}
               onSelect={(id) => goToProgram(id)}
-              onAddTemplate={(template) => void addProgram(template)}
-              onCreateDefaults={() => void createDefaults()}
-              onMove={(id, direction) => moveProgram(id, direction)}
+              onOpenPrograms={() => discardGuard.requestAction("프로그램 목록으로 이동", goToList)}
             />
           </div>
         )}
 
         {workspace === "programs" && !selectedProgram && (
-          <ProgramCatalog programs={programs} canEdit={editingAllowed} busy={busy} onOpen={goToProgram} onAdd={(template) => void addProgram(template)} />
+          <ProgramCatalog programs={programs} canEdit={editingAllowed} busy={busy} onOpen={goToProgram} onAdd={(template) => void addProgram(template)} onCreateDefaults={() => void createDefaults()} onMove={(id, direction) => void moveProgram(id, direction)} />
         )}
 
         {workspace === "programs" && selectedProgram && (

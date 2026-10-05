@@ -678,7 +678,7 @@ export function parseProgramActivityPaste(value: string): ProgramActivityPasteRo
 }
 
 export const PROGRAM_WORKSPACE_SECTIONS = [
-  { key: "overview", label: "한눈에 보기", description: "막힌 준비와 다음 행동" },
+  { key: "overview", label: "전체 준비", description: "막힌 준비와 다음 행동" },
   { key: "programs", label: "프로그램 준비", description: "프로그램별 기획과 진행 순서" },
   { key: "schedule", label: "시간·장소", description: "시간, 장소와 담당 충돌" },
   { key: "supplies", label: "준비물·비용", description: "요청부터 현장 도착과 정산" },
