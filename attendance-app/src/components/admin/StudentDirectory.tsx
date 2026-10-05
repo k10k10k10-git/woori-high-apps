@@ -79,7 +79,20 @@ export default function StudentDirectory({ onOpenClass }: { onOpenClass: (classK
   function resetFilters() { setQuery(''); setPart('all'); setGrade('all'); setClassKey('all'); setStudentStatus('all'); }
   function addStudent() { if (!addClassKey) return; selectClass(addClassKey); dispatch({ type: 'OPEN_STUDENT_MODAL', payload: { editId: null } }); }
   function exportRows(format: 'csv' | 'xlsx') {
-    const data = [['이름', '부서', '학년', '반', '담임 교사', '학생 연락처', '보호자 연락처', '학교', '상태'], ...rows.map(row => [row.student.name, `${row.part}부`, `${row.grade}학년`, `${row.classNumber}반`, row.teacher, row.student.phone ?? '', row.student.pphone ?? '', row.student.school ?? '', row.student.jang ? '장결' : '일반'])];
+    const source = { months: state.months, attData: state.attData, events: state.events, curView: 'all' as const };
+    const data = [
+      ['이름', '부서', '학년', '반', '담임 교사', '학생 연락처', '보호자 연락처', '학교', '출석률', '등급'],
+      ...rows.map(row => {
+        const { present, absent, rate } = calcStats(source, row.classKey, row.student.id);
+        const recorded = present + absent;
+        const attendanceGrade = rate >= 90 ? 'A' : rate >= 80 ? 'B' : rate >= 70 ? 'C' : 'D';
+        return [
+          row.student.name, `${row.part}부`, `${row.grade}학년`, `${row.classNumber}반`, row.teacher,
+          row.student.phone ?? '', row.student.pphone ?? '', row.student.school ?? '',
+          recorded > 0 ? `${rate}%` : '—', recorded > 0 ? attendanceGrade : '—',
+        ];
+      }),
+    ];
     if (format === 'csv') downloadCSV(data, `전체명단_${state.curYear}.csv`); else void downloadXLSX(data, '전체명단', `전체명단_${state.curYear}.xlsx`);
   }
 
