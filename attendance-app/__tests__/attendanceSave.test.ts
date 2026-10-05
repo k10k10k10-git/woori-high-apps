@@ -53,3 +53,11 @@ it('네트워크 단절은 제한 시간 후 중단하고 큐에 남기지 않�
   await expect(compareAndSaveAttendance(input, { ...connection, timeoutMs: 10 })).rejects.toMatchObject({ kind: 'unavailable' });
   expect(request).toHaveBeenCalledTimes(1);
 });
+it('토큰 갱신도 전체 시간 제한에 포함하고 늦은 토큰은 요청을 시작하지 않는다', async () => {
+  let finish!: (value: string) => void;
+  const getToken = () => new Promise<string>(resolve => { finish = resolve; });
+  await expect(compareAndSaveAttendance(input, { ...connection, getToken, timeoutMs: 10 })).rejects.toMatchObject({ kind: 'unavailable' });
+  finish('late-token');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(request).not.toHaveBeenCalled();
+});

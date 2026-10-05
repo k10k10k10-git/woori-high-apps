@@ -18,3 +18,8 @@
 .pastoral-report :is(.pr-section-heading,.ao-suggestions-heading) h2 span{display:inline-flex;align-items:center;min-height:24px;margin-left:8px;padding:2px 8px;border-radius:999px;background:#f1eef8;color:#584a97;font-size:12px;font-weight:600;vertical-align:2px}
 .pastoral-report .ao-suggestions-heading{padding-bottom:14px}
 .pastoral-report .ao-visit-tabs{margin-bottom:20px}
+.pr-subsections{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 20px}
+.pr-subsections button{min-height:44px;padding:8px 15px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text2);font:inherit;cursor:pointer}
+.pr-subsections button[aria-pressed=true]{background:var(--primary-bg);color:var(--primary-text);border-color:var(--primary-light);font-weight:600}
+.pr-subsections button:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.pastoral-report .ao-sections .pr-secondary-link{margin-left:auto}

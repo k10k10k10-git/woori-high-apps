@@ -74,6 +74,7 @@ describe('목양 리포트 실제 화면', () => {
   it('권한 오류를 0명으로 숨기지 않고 재시도하며 해제된 응답을 무시한다', () => {
     const { rerender } = render(<PastoralReport />);
     act(() => mocks.fail(new Error('권한 없음')));
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
     expect(screen.getByRole('alert').textContent).toContain('명단을 표시하지 않습니다');
     expect(screen.queryByRole('table', { name: '등반 완료 새친구 부서정착 현황' })).toBeNull();
@@ -93,6 +94,7 @@ describe('목양 리포트 실제 화면', () => {
       { key: 'done', name: '등반 완료 학생', part: '1', grade: '1', rosterSync: { studentId: 'nf_one', classKey: '1-1-1', syncedAt: '2026-01-10T00:00:00Z' } },
       { key: 'pending', name: '등반 대기 학생', part: '1', grade: '1', decision: '등록', registeredDate: '2026-01-01' },
     ]));
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
     expect(screen.getByText('등반 완료 학생')).toBeTruthy();
     expect(screen.queryByText('등반 대기 학생')).toBeNull();
@@ -102,6 +104,7 @@ describe('목양 리포트 실제 화면', () => {
   });
   it('등록현황은 통합사이트 공개 진행 기록을 실시간 갱신하고 부서정착과 구분한다', () => {
     render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
     expect(screen.getByRole('status').textContent).toContain('불러오고 있습니다');
     expect(screen.queryByLabelText('기준 주일')).toBeNull();
@@ -126,11 +129,13 @@ describe('목양 리포트 실제 화면', () => {
     act(() => mocks.receive([{ key: '2026-sunday/a', name: '등록 대기 학생', part: '1', grade: '1', decision: '등록', week1Date: '2026-01-12', week2Date: '2026-01-19', assignedClassKey: '1-1-1' }]));
     expect(within(table).queryByText('등반 완료 학생')).toBeNull();
     expect(within(table).getByText('관리자 확인 대기')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
     expect(screen.queryByText('등록 대기 학생')).toBeNull();
   });
   it('등록현황은 이름 검색과 단계별 명단 선택을 제공하고 과거 완료를 출석부 반영으로 오인하지 않는다', () => {
     render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
     act(() => mocks.receive([
       { key: '2026-1/a', name: '김 하나', part: '1', grade: '1' },
@@ -158,7 +163,9 @@ describe('목양 리포트 실제 화면', () => {
     fireEvent.click(screen.getByRole('button', { name: '전체 단계 보기' }));
     expect(within(table).getAllByRole('row').length).toBe(7);
     fireEvent.click(within(summary).getByRole('button', { name: /2주차\s+1\s*명/ }));
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
     expect(within(screen.getByRole('group', { name: '새친구 진행 단계별 학생 보기' })).getByRole('button', { name: /2주차\s+1\s*명/ }).getAttribute('aria-pressed')).toBe('false');
     fireEvent.change(screen.getByRole('searchbox', { name: '새친구 검색' }), { target: { value: '김하나' } });
@@ -169,6 +176,7 @@ describe('목양 리포트 실제 화면', () => {
   });
   it('등록현황 읽기 오류는 빈 명단으로 위장하지 않고 재시도한다', () => {
     render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
     act(() => mocks.fail(new Error('권한 없음')));
     expect(screen.getByRole('alert').textContent).toContain('명단과 집계를 표시하지 않습니다');
@@ -179,8 +187,10 @@ describe('목양 리포트 실제 화면', () => {
   it('부서정착에서 선택한 반 필터를 등록현황의 숨은 적용 필터로 표시하지 않는다', () => {
     render(<PastoralReport />);
     act(() => mocks.receive([{ key: '2026-sunday/a', name: '등록 학생', part: '1', grade: '1', decision: '미정' }]));
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
     fireEvent.change(screen.getByLabelText('반'), { target: { value: '1-1-1' } });
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 등록현황' }));
     expect(screen.getByRole('button', { name: '필터 더보기' })).toBeTruthy();
     expect(within(screen.getByRole('table', { name: /통합사이트 새친구 등록일/ })).getByText('등록 학생')).toBeTruthy();
@@ -189,6 +199,7 @@ describe('목양 리포트 실제 화면', () => {
     render(<PastoralReport />);
     fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
     fireEvent.change(screen.getByLabelText('정렬'), { target: { value: 'latest' } });
+    fireEvent.click(screen.getByRole('button', { name: '새친구' }));
     fireEvent.click(screen.getByRole('button', { name: '새친구 부서정착' }));
     fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
     expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('latest');

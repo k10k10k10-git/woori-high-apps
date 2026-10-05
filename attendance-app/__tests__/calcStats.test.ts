@@ -29,6 +29,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
     holidayRanges: {},
     events: {},
     saveStatus: 'idle',
+    attendanceFeedback: null,
     lastAttendanceSavedAt: null,
     attModal: { open: false, target: null },
     studentModal: { open: false, editId: null },

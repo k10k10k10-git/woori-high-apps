@@ -35,10 +35,18 @@ export default function AttendanceManagement() {
     if (!classes.includes(`${part}-${grade}-${state.curClass}`)) dispatch({ type: 'SET_CLASS', payload: classes[0]?.split('-')[2] ?? '1' });
   }
 
+  const href = (next: View) => `/attendance?view=${next}${week ? `&week=${encodeURIComponent(week)}` : ''}`;
+  const isClassView = view === 'check' || view === 'table';
+
   return <div className="management-workspace">
     <header className="mw-heading"><h1>출석 관리</h1><p>반별 입력 상태를 먼저 확인하고 필요한 반의 출석부로 바로 이동하세요.</p></header>
-    <nav className="mw-tabs" aria-label="출석 관리 메뉴">{VIEWS.map(item => <Link key={item.key} href={`/attendance?view=${item.key}${week ? `&week=${encodeURIComponent(week)}` : ''}`} aria-current={view === item.key ? 'page' : undefined}>{item.label}</Link>)}</nav>
+    <nav className="mw-tabs" aria-label="출석 관리 메뉴">
+      <Link href={href('overview')} aria-current={view === 'overview' ? 'page' : undefined}>반별 출석 현황</Link>
+      <Link href={href(isClassView ? view : 'check')} aria-current={isClassView ? 'page' : undefined}>반 출석부</Link>
+      <Link className="mw-secondary-link" href={href('analysis')} aria-current={view === 'analysis' ? 'page' : undefined}>출석 분석</Link>
+    </nav>
     <div className="mw-content">
+      {isClassView && <nav className="mw-tabs mw-class-tabs" aria-label="선택한 반 출석부 보기">{VIEWS.filter(item => item.key === 'check' || item.key === 'table').map(item => <Link key={item.key} href={href(item.key)} aria-current={view === item.key ? 'page' : undefined}>{item.label}</Link>)}</nav>}
       {view === 'overview' && <ClassAttendanceOverview key={initialOverviewStatus} weekKey={week} onWeekChange={setWeek} initialStatus={initialOverviewStatus} />}
       {view !== 'overview' && <div className="mw-scope" aria-label="출석 관리 범위">
         <label><span>부서</span><select value={state.curPart} onChange={event => changeScope(event.target.value, state.curGrade)}><option value="1">1부</option><option value="2">2부</option></select></label>
