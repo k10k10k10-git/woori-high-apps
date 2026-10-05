@@ -1,8 +1,8 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-const { ref } = vi.hoisted(() => ({ ref: vi.fn() }));
-vi.mock("./firebaseAdmin", () => ({ getPraiseFirebaseAdmin: () => ({ database: { ref } }), praiseUnavailable: (code: string) => new Error(code) }));
-import { praiseAccounts, validateSemesterLink } from "./references";
+const { ref, token, fetcher } = vi.hoisted(() => ({ ref: vi.fn(), token: vi.fn(), fetcher: vi.fn() }));
+vi.mock("./firebaseAdmin", () => ({ getPraiseFirebaseAdmin: () => ({ database: { ref }, app: { options: { databaseURL: "https://test-project.firebaseio.com", credential: { getAccessToken: token } } } }), praiseUnavailable: (code: string) => new Error(code) }));
+import { praiseAccounts, validateSemesterLink, listSemesterIds } from "./references";
 beforeEach(() => vi.clearAllMocks());
 it("담당 계정은 승인된 찬양 접근 계정만 반환하고 동명이인을 이메일로 구분한다", async () => {
   const nodes: Record<string, unknown> = { admins: {}, retreatAdmins: {}, iguardMembers: {
@@ -32,4 +32,33 @@ it("학기 연결은 찬양팀으로 확인된 팀만 허용한다", async () =>
   ref.mockImplementation((path: string) => ({ get: async () => ({ val: () => nodes[path] }) }));
   await expect(validateSemesterLink("2026-2", "praise-id")).resolves.toBeUndefined();
   await expect(validateSemesterLink("2026-2", "media-id")).rejects.toThrow("찬양팀");
+});
+
+
+afterEach(() => vi.unstubAllGlobals());
+it("학기 탐색은 shallow ID만 받으며 원장을 읽지 않고 토큰은 헤더에만 둔다", async () => {
+  token.mockResolvedValue({ access_token: "server-test-token" });
+  fetcher.mockResolvedValue({ ok: true, json: async () => ({ "2026-2": true, "2026-sunday": true }) });
+  vi.stubGlobal("fetch", fetcher);
+  await expect(listSemesterIds()).resolves.toEqual(["2026-2", "2026-sunday"]);
+  const [url, options] = fetcher.mock.calls[0];
+  expect(url.toString()).toBe("https://test-project.firebaseio.com/semesters.json?shallow=true");
+  expect(options.headers).toEqual({ Authorization: "Bearer server-test-token" });
+  expect(options.cache).toBe("no-store");
+  expect(ref).not.toHaveBeenCalled();
+});
+it.each([[], "wrong", 0, { "2026-2": { attendance: { s: "출석" } } }, { "bad/key": true }])(
+  "잘못된 shallow 응답 %j는 성공한 빈 목록으로 숨기지 않는다", async (body) => {
+    token.mockResolvedValue({ access_token: "server-test-token" });
+    fetcher.mockResolvedValue({ ok: true, json: async () => body }); vi.stubGlobal("fetch", fetcher);
+    await expect(listSemesterIds()).rejects.toThrow("reference_unavailable");
+    expect(ref).not.toHaveBeenCalled();
+  },
+);
+it("null은 실제 빈 학기 목록으로 읽고 네트워크 실패는 구분한다", async () => {
+  token.mockResolvedValue({ access_token: "server-test-token" });
+  fetcher.mockResolvedValueOnce({ ok: true, json: async () => null }).mockRejectedValueOnce(new Error("private-token-error"));
+  vi.stubGlobal("fetch", fetcher);
+  await expect(listSemesterIds()).resolves.toEqual([]);
+  await expect(listSemesterIds()).rejects.toThrow("reference_unavailable");
 });

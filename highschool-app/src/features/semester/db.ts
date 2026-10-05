@@ -5,7 +5,8 @@ import { ref, get, onValue } from "firebase/database";
 import { auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
-import { semesterSummaryMeta } from "./termPhase";
+import { refreshSemesterList } from "./semesterList";
+export { getSemesters, subscribeSemesters } from "./semesterList";
 import {
   Application,
   ApplicationPrivate,
@@ -17,7 +18,6 @@ import {
   CurriculumEntry,
   NewFriend,
   NewFriendPrivate,
-  Semester,
   SemesterAttendanceScope,
   SemesterMeta,
   Session,
@@ -51,34 +51,6 @@ const newId = () => `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
 // ── 학기 ──────────────────────────────────────────────────────────────
 
-export async function getSemesters(): Promise<Semester[]> {
-  const snap = await get(ref(db, paths.semesters()));
-  if (!snap.exists()) return [];
-  return Object.entries(snap.val() as Record<string, { meta: SemesterMeta }>)
-    .map(([id, v]) => ({ id, meta: v.meta }))
-    .filter((s) => !!s.meta)
-    .sort((a, b) => b.id.localeCompare(a.id)); // 최신 학기 먼저
-}
-
-export function subscribeSemesters(
-  cb: (semesters: Semester[]) => void,
-  onError?: (e: Error) => void,
-): () => void {
-  let previousMetadata: string | undefined;
-  return onValue(ref(db, paths.semesters()), (snap) => {
-    const semesters = Object.entries((snap.val() ?? {}) as Record<string, { meta?: SemesterMeta; sessions?: Record<string, Session> }>)
-      .filter(([, value]) => !!value.meta)
-      .map(([id, value]) => ({ id, meta: semesterSummaryMeta(value.meta!, value.sessions) }))
-      .sort((a, b) => b.id.localeCompare(a.id));
-    // 출석·신청 갱신도 루트에 도착한다. 목록에 쓰는 meta가 같으면 React 상태와
-    // 현재 학기에 연결된 하위 구독들을 다시 만들지 않는다. 첫 빈 목록은 전달한다.
-    const metadata = JSON.stringify(semesters);
-    if (metadata === previousMetadata) return;
-    previousMetadata = metadata;
-    cb(semesters);
-  }, onError);
-}
-
 export async function createSemester(id: string, title: string): Promise<void> {
   const meta: SemesterMeta = {
     title,
@@ -86,6 +58,7 @@ export async function createSemester(id: string, title: string): Promise<void> {
     createdAt: nowISO(),
   };
   await update(ref(db, paths.semesterMeta(id)), meta);
+  refreshSemesterList();
 }
 
 /** 학기 전체 삭제 — 공개·비공개 노드를 한 번의 루트 update로 함께 지운다.
@@ -95,6 +68,7 @@ export async function removeSemester(sid: string): Promise<void> {
     [paths.semester(sid)]: null,
     [paths.semesterPrivate(sid)]: null,
   });
+  refreshSemesterList();
 }
 
 export async function updateSemesterMeta(id: string, partial: Partial<SemesterMeta>): Promise<void> {

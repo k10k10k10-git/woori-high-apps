@@ -3,8 +3,9 @@ import { initializeApp, deleteApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getDatabase, type Database } from "firebase-admin/database";
 vi.mock("server-only", () => ({}));
-const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null }));
-vi.mock("./firebaseAdmin", async importOriginal => ({ ...await importOriginal<typeof import("./firebaseAdmin")>(), getPraiseFirebaseAdmin:()=>({database:holder.database,auth:holder.auth}) }));
+const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null, app: null as App | null }));
+vi.mock("./firebaseAdmin", async importOriginal => ({ ...await importOriginal<typeof import("./firebaseAdmin")>(), getPraiseFirebaseAdmin:()=>({database:holder.database,auth:holder.auth,app:holder.app}) }));
+import { GET as semesterIds } from "@/app/api/semester-ids/route";
 import { authenticatePraiseRequest } from "./httpAuth";
 import { readWorkspace, transactWorkspace } from "./repository";
 import { createPraiseState, applyPraiseCommand } from "./commands";
@@ -32,7 +33,7 @@ function state(id:string):PraiseState {
 suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
  beforeAll(async()=>{
   if(process.env.FIREBASE_DATABASE_EMULATOR_HOST!=="127.0.0.1:19016" || process.env.FIREBASE_AUTH_EMULATOR_HOST!=="127.0.0.1:19098")throw new Error("합성 에뮬레이터 주소가 아닙니다.");
-  app=initializeApp({projectId:"demo-praise",databaseURL:`${base}/?ns=demo-praise-default-rtdb`,credential:{getAccessToken:async()=>({access_token:"owner",expires_in:3600})}},"praise-contracts");holder.database=getDatabase(app);holder.auth=getAuth(app);
+  app=initializeApp({projectId:"demo-praise",databaseURL:`${base}/?ns=demo-praise-default-rtdb`,credential:{getAccessToken:async()=>({access_token:"owner",expires_in:3600})}},"praise-contracts");holder.database=getDatabase(app);holder.auth=getAuth(app);holder.app=app;
   await holder.database.ref().set({admins:{test_admin:true}});
  });
  afterAll(async()=>{if(app)await deleteApp(app);});
@@ -113,6 +114,21 @@ suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
   expect(response.ok).toBe(true);
   const {idToken}=await response.json() as {idToken:string};
   await expect(authenticatePraiseRequest(new Request("http://localhost/api/praise",{headers:{Authorization:`Bearer ${idToken}`}}))).rejects.toMatchObject({status:401});
+ });
+
+ it("실제 인증·shallow 탐색·하위 읽기와 미승인·회수 계정 거부를 확인한다",async()=>{
+  const member=await signup("semester-list@example.test");
+  const request=new Request("http://localhost/api/semester-ids",{headers:{Authorization:`Bearer ${member.idToken}`}});
+  expect((await semesterIds(request)).status).toBe(403);
+  await holder.database!.ref(`iguardMembers/${member.localId}`).set({semesterRole:"staff",retreatRole:"none"});
+  const response=await semesterIds(request);
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ids:expect.arrayContaining(["team-contract","other-contract"])});
+  expect((await clientDb("semesters/team-contract/meta",member.idToken)).ok).toBe(true);
+  expect((await clientDb("semesters/team-contract/sessions",member.idToken)).ok).toBe(true);
+  await holder.database!.ref(`iguardMembers/${member.localId}`).remove();
+  expect((await semesterIds(request)).status).toBe(403);
+  expect((await semesterIds(new Request("http://localhost/api/semester-ids"))).status).toBe(401);
  });
 
 });
