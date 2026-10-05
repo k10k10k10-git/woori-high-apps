@@ -99,3 +99,49 @@ test('서버 저장 후 응답을 잃어도 재시도에서 중복 쓰기를 하
   await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');
   expect(puts).toBe(1);
 });
+
+test('내부 id가 겹쳐도 실제 학생 키에만 출석을 저장한다', async ({ page, request }) => {
+  const { year, key } = week();
+  await request.patch(`http://127.0.0.1:19017/classes/${year}/1-1-1/students.json?ns=${namespace}`, {
+    headers: { Authorization: 'Bearer owner' }, data: {
+      s: { id: 'other', name: '검증 학생', personId: 'synthetic-student' },
+      other: { id: 'other', name: '다른 합성 학생', personId: 'synthetic-other' },
+    },
+  });
+  await login(page);
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');
+  expect(await stored(request)).toBe('O');
+  expect(await (await request.get(`http://127.0.0.1:19017/attendance/${year}/1-1-1/other/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } })).json()).toBeNull();
+});
+
+for (const kind of ['note', 'visit']) test(`${kind} 응답 유실 재시도는 한 건만 등록하고 처리 완료를 보존한다`, async ({ page, request }) => {
+  await login(page);
+  const visit = kind === 'visit';
+  await page.getByRole('tab', { name: visit ? '심방 요청' : '특이사항' }).click();
+  await page.locator(visit ? '#visit-student' : '#note-student').selectOption('s');
+  await page.locator(visit ? '#visit-reason' : '#teacher-suggestion').fill('격리 합성 상담 요청');
+  let puts = 0;
+  await page.route('**/suggestions/**/*.json?**', async route => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    puts++;
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    if (visit) {
+      const done = await request.patch(route.request().url(), { headers: { Authorization: 'Bearer owner' }, data: { status: 'done', resolvedAt: 100 } });
+      expect(done.ok()).toBe(true);
+    }
+    await route.abort();
+  });
+  await page.getByRole('button', { name: visit ? '심방 요청하기' : '등록하기', exact: true }).click();
+  await expect(page.getByRole('button', { name: '저장 결과 확인·재시도' })).toBeEnabled();
+  await page.getByRole('tab', { name: '출석 체크' }).click();
+  await page.getByRole('tab', { name: visit ? '심방 요청' : '특이사항' }).click();
+  await page.getByRole('button', { name: '저장 결과 확인·재시도' }).click();
+  await expect(page.locator(visit ? '#visit-reason' : '#teacher-suggestion')).toHaveValue('');
+  expect(puts).toBe(1);
+  const { year } = week();
+  const records = await (await request.get(`http://127.0.0.1:19017/suggestions/${year}/1-1-1.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } })).json();
+  expect(Object.keys(records)).toHaveLength(1);
+  expect(Object.values(records)[0]).toMatchObject({ kind, studentId: 's', text: '격리 합성 상담 요청', ...(visit ? { status: 'done' } : {}) });
+});

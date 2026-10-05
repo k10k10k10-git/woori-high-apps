@@ -1,17 +1,16 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
-import { db, onValue, push, ref } from '@/lib/db';
+import { useEffect, useState } from 'react';
+import { db, onValue, ref } from '@/lib/db';
 import { showToast } from '@/utils/toast';
 import { parseTeacherMessages, parseYearTeacherMessages, type TeacherMessage } from '@/utils/teacherMessages';
-import { useTeacherDraft } from './useTeacherDraft';
+import { useTeacherMessageSave } from './useTeacherMessageSave';
 
 export type OpenVisitRequest = TeacherMessage & { classKey: string };
 
 export function useVisitRequests(year: number, classKey: string, enabled: boolean, teacher: string) {
   const scope = `${year}/${classKey}`;
   const [list, setList] = useState<{ scope: string; items: TeacherMessage[]; error: boolean } | null>(null);
-  const { current, setStudentId, setText, clearSaved, saving, setSaving } = useTeacherDraft(scope, 'visit');
-  const inFlight = useRef(false);
+  const { current, setStudentId, setText, saving, submit: save, saveError, retrying } = useTeacherMessageSave(year, classKey, 'visit');
 
   useEffect(() => {
     if (!enabled) return;
@@ -23,19 +22,15 @@ export function useVisitRequests(year: number, classKey: string, enabled: boolea
   }, [enabled, scope]);
 
   async function submit(studentName: string, studentPersonId?: string) {
-    if (!current.studentId || !studentName || !current.text.trim() || inFlight.current || saving) return;
-    inFlight.current = true;
-    setSaving(true);
-    try {
-      await push(ref(db, `suggestions/${scope}`), {
+    const saved = await save(() => {
+      if (!current.studentId || !studentName || !current.text.trim()) return null;
+      return {
         kind: 'visit', studentId: current.studentId, studentName,
         ...(studentPersonId ? { studentPersonId } : {}),
         text: current.text.trim(), status: 'open', createdAt: Date.now(), author: teacher,
-      });
-      clearSaved();
-      showToast('심방 요청이 등록되었습니다.');
-    } catch { showToast('저장에 실패했습니다. 내용을 보존했으니 다시 시도해 주세요.'); }
-    finally { inFlight.current = false; setSaving(false); }
+      };
+    });
+    if (saved) showToast('심방 요청이 등록되었습니다.');
   }
 
   return {
@@ -46,6 +41,8 @@ export function useVisitRequests(year: number, classKey: string, enabled: boolea
     visitText: current.text,
     setVisitText: setText,
     visitSaving: saving,
+    visitSaveError: saveError,
+    visitRetrying: retrying,
     handleVisitSubmit: submit,
   };
 }

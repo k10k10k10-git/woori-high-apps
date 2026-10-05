@@ -22,6 +22,16 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe('학생 출석 이력 보호', () => {
+  it.each(['2', '3'])('개별 %s학년 교사는 현재 반 이력만 표시하고 연도 전체 원장을 요청하지 않는다', async grade => {
+    mocks.state = { ...mocks.state, userRole: { role: 'teacher', part: '1', grade, class: '1' },
+      classData: { [`1-${grade}-1`]: { students: [{ id: 's1', name: '합성학생' }] } },
+      attData: { [`1-${grade}-1`]: { s1: { '0-0': 'O' } } } };
+    render(<HistoryModal sid="s1" curCk={`1-${grade}-1`} onClose={vi.fn()} />);
+    expect(screen.getByRole('note').textContent).toContain('관리자에게 확인');
+    await screen.findByText('100%');
+    expect(mocks.get).not.toHaveBeenCalled();
+  });
+
   it('현재·과거 행사와 같은 통계 기준으로 100%를 표시하고 미래 연도는 읽지 않는다', async () => {
     render(<HistoryModal sid="s1" curCk="1-2-1" onClose={vi.fn()} />);
     await screen.findByText('아직 해당 학년이 아닙니다.');
