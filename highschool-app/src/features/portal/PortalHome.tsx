@@ -43,7 +43,7 @@ import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dail
 
 import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 import { selectRetreatForWork } from "@/lib/retreatSelection";
-import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
+import { activeTeamKeys, canAccessOperationsCenter, canEditTeam } from "@/features/teams/teamModel";
 
 export default function PortalHome() {
   const router = useRouter();
@@ -90,8 +90,10 @@ export default function PortalHome() {
   useEffect(() => {
     if (!user || !assignedSundayTeam || teamMemberships?.[assignedSundayTeam]?.role === "viewer") return;
     const key = `woori-team-entry:${user.uid}`;
-    if (sessionStorage.getItem(key)) return;
-    sessionStorage.setItem(key, "1");
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch { return; } // 저장소가 차단된 브라우저에서는 홈의 업무 바로가기를 그대로 이용한다.
     router.replace(`/teams/${assignedSundayTeam}`);
   }, [assignedSundayTeam, router, teamMemberships, user]);
 
@@ -261,6 +263,8 @@ export default function PortalHome() {
       <h1 className="text-xl font-bold">담당 사역을 확인하지 못했습니다</h1>
       <p className="mt-2 text-sm leading-6 text-slate-500">권한 정보를 불러오는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.</p>
       <button type="button" onClick={retryRoles} className="btn-primary mt-5">다시 시도</button>
+      <Link href="/library/help#connection" className="btn-secondary mt-3">접속 문제 도움말</Link>
+      <Link href="/help/feedback" className="btn-secondary mt-3">접속 문제 문의하기</Link>
     </div></main>;
   }
 
@@ -279,17 +283,14 @@ export default function PortalHome() {
           {user.email && (
             <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
               로그인한 계정 <strong className="text-slate-700">{user.email}</strong>
-              <span className="mt-1 block text-[11px]">이 주소를 통합관리자에게 알려주시면 배정이 빠릅니다.</span>
+              <span className="mt-1 block text-xs">이 주소와 담당 팀 이름을 담당 팀장 또는 교역자에게 알려 주세요.</span>
             </p>
           )}
           <div className="mt-5 grid gap-2 text-left">
-            <p className="text-xs font-semibold text-slate-500">요청 방법</p>
-            <Link href="/field" className="btn-primary justify-center">수련회 이가드 접근 요청</Link>
-            <p className="text-xs leading-5 text-slate-500">
-              팀·주일 운영·학기 운영·수련회 행정은 요청 버튼이 따로 없습니다.
-              담당 교역자나 통합관리자에게 위 이메일과 맡을 사역을 알려주세요.
-            </p>
-            <Link href="/suggestions" className="btn-secondary justify-center">건의사항으로 문의하기</Link>
+            <p className="text-sm leading-6 text-slate-500">담당 팀장·교역자에게 로그인 이메일과 맡을 팀을 알려 주세요. 교역자 또는 통합관리자가 역할과 팀 연결을 확인해 드립니다.</p>
+            <Link href="/library/help#access" className="btn-primary justify-center">사용법·권한 안내 보기</Link>
+            <Link href="/help/feedback" className="btn-secondary justify-center">승인·팀 연결 문의하기</Link>
+            <details className="mt-2"><summary className="min-h-11 cursor-pointer text-sm leading-6 text-slate-500">수련회 현장 스탭으로 참여하나요?</summary><p className="text-sm leading-6 text-slate-500">아래 요청은 수련회 현장(이가드) 접근을 위한 것입니다. 일반 사역팀·훈련 역할 연결은 담당자에게 알려 주세요.</p><Link href="/field" className="btn-secondary mt-2 justify-center">수련회 현장 접근 요청</Link></details>
           </div>
           <button onClick={() => void signOut()} className="mt-6 text-sm text-slate-500 underline">다른 계정으로 로그인</button>
         </div>
@@ -300,7 +301,7 @@ export default function PortalHome() {
   return (
     <div className="app-page">
       <main className="page-container">
-        {loadError && <div className="team-first-alert mb-5" role="alert">⚠ {loadError}{dataError && <button className="btn-secondary" onClick={() => setSubscriptionGeneration((value) => value + 1)}>다시 불러오기</button>}</div>}
+        {loadError && <div className="team-first-alert mb-5" role="alert">{dataError ? "일부 사역 일정과 업무를 확인하지 못했습니다. 다시 불러오거나 사용 안내를 확인해 주세요." : "변경 내용을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요."}{dataError && <button className="btn-secondary" onClick={() => setSubscriptionGeneration((value) => value + 1)}>다시 불러오기</button>}<Link className="btn-secondary" href="/library/help#connection">연결 문제 도움말</Link></div>}
 
         <section className="page-hero home-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
           <div className="min-w-0">
@@ -315,7 +316,7 @@ export default function PortalHome() {
             : <div className="hero-agenda" role={calendarFailed ? "alert" : "status"}><p className="hero-agenda__title">다음 공유 일정</p><p className="py-2 text-xs text-slate-300">{calendarFailed ? "일부 일정을 확인하지 못했습니다." : "일정을 확인하는 중입니다…"}</p></div>}
         </section>
 
-        <HomeStart entry={homeEntry} roleLabel={describeRoles(roles)} />
+        <HomeStart entry={homeEntry} roleLabel={describeRoles(roles)} userId={user.uid} viewOnly={!!assignedSundayTeam && !canEditTeam(assignedSundayTeam, roles, teamMemberships)} />
 
         <section className="grid gap-5 lg:grid-cols-3">
           {operationsAllowed && <Link href={currentSemester ? `/operations/semesters/${encodeURIComponent(currentSemester.id)}/overview` : "/operations/semesters"} className="card home-domain-card home-domain-card--semester group p-6 pl-7 sm:p-7 sm:pl-8" data-hover>

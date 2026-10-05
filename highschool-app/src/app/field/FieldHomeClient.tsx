@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canManageRetreatPin } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
@@ -10,24 +11,46 @@ import { Retreat, type IguardAccessLock } from "@/features/iguard/lib/types";
 import { useUI } from "@/context/UIContext";
 import AdminModal from "./AdminModal";
 import CenterSpinner from "@/components/CenterSpinner";
-// 인앱 감지·탈출·배너는 전부 공용 컴포넌트가 담당한다(로그인 화면들과 같은 것).
-import InAppBrowserNotice from "@/components/InAppBrowserNotice";
+import LoginButton from "@/components/LoginButton";
+import { useLoadErrors } from "@/lib/useLoadErrors";
 
 
 export default function FieldHomeClient() {
-  const { user, loading: authLoading, roles, signIn, signOut } = useAuth();
+  const { user, roles } = useAuth();
+  const uid = user?.uid ?? "guest";
+  const [attempt, setAttempt] = useState(0);
+  const [selection, setSelection] = useState<{ uid: string; id: string | null }>({ uid, id: null });
+  const selectedId = selection.uid === uid ? selection.id : null;
+  // 재구독은 수련회 선택을 유지하되 계정이 바뀌면 이전 계정의 선택을 넘기지 않는다.
+  const setSelectedId = useCallback((value: SetStateAction<string | null>) => {
+    setSelection((previous) => {
+      const currentId = previous.uid === uid ? previous.id : null;
+      const id = typeof value === "function" ? value(currentId) : value;
+      return previous.uid === uid && previous.id === id ? previous : { uid, id };
+    });
+  }, [uid]);
+  return <FieldHomeContent key={`${uid}:${roles.semester}:${roles.retreat}:${attempt}`} selectedId={selectedId} setSelectedId={setSelectedId} onRetry={() => setAttempt((value) => value + 1)} />;
+}
+
+function FieldHomeContent({ onRetry, selectedId, setSelectedId }: {
+  onRetry: () => void;
+  selectedId: string | null;
+  setSelectedId: Dispatch<SetStateAction<string | null>>;
+}) {
+  const { user, loading: authLoading, roleError, retryRoles, roles, signIn, signOut } = useAuth();
   const fieldAllowed = canAccessArea("retreat-field", roles);
+  const canLoad = !!user && !authLoading && !roleError && fieldAllowed;
   const { toast } = useUI();
 
   const [retreatRecords, setRetreatRecords] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string }>>([]);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const { errors, fail, ok } = useLoadErrors(user?.uid ?? "guest");
   const [showAdmin, setShowAdmin] = useState(false);
   const [accessLocks, setAccessLocks] = useState<Record<string, IguardAccessLock>>({});
-  const [requested, setRequested] = useState(false);
+  const [requestState, setRequestState] = useState<"checking" | "pending" | "none" | "error">("checking");
+  const [requestBusy, setRequestBusy] = useState(false);
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const earliestByRetreat = useMemo(() => {
     const result: Record<string, string> = {};
     periods.forEach((period) => {
@@ -45,96 +68,122 @@ export default function FieldHomeClient() {
   }), [earliestByRetreat, retreatRecords]);
 
   useEffect(() => {
-    if (!user || !fieldAllowed) return;
-    setLoading(true);
-    setLoadError(null);
-    return subscribeToRetreats((list) => {
+    if (!canLoad) return;
+    let active = true;
+    const stop = subscribeToRetreats((list) => {
+      if (!active) return;
       setRetreatRecords(list);
       setSelectedId((previous) => previous && list.some((item) => item.id === previous) ? previous : list[0]?.id ?? null);
-      setLoading(false);
-    }, (error) => { setLoadError(error.message); setLoading(false); });
-  }, [user, fieldAllowed]);
+      ok("retreats");
+      setLoaded(true);
+    }, (error) => { if (active) { fail("retreats")(error); setLoaded(true); } });
+    return () => { active = false; stop(); };
+  }, [canLoad, fail, ok, setSelectedId]);
 
   const retreatIdsKey = retreatRecords.map((retreat) => retreat.id).join(",");
   useEffect(() => {
-    if (!user || !fieldAllowed) return;
+    if (!canLoad) return;
     const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
-    return subscribeToAllRetreatPeriods(ids, setPeriods,
-      (error) => setLoadError((previous) => previous ?? `수련회 기간 구독 실패 - ${error.message}`));
-  }, [user, fieldAllowed, retreatIdsKey]);
+    let active = true;
+    const stop = subscribeToAllRetreatPeriods(ids, (items) => {
+      if (active) setPeriods(items);
+    }, (error) => { if (active) fail("periods")(error); });
+    return () => { active = false; stop(); };
+  }, [canLoad, retreatIdsKey, fail]);
 
   // 승인 사용자에게 수련회별 PIN 잠금 상태를 표시한다. 실제 PIN 검증은 내부 화면 진입 전에 다시 수행한다.
   useEffect(() => {
-    if (!user || !fieldAllowed) { setAccessLocks({}); return; }
-    const ids = retreats.map(r => r.id);
-    return subscribeToIguardAccessLocks(ids, setAccessLocks,
-      e => setLoadError(prev => prev ?? `PIN 잠금 상태 구독 실패 - ${e.message}`));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, fieldAllowed, retreats.map(r => r.id).join(",")]);
+    if (!canLoad) return;
+    const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
+    let active = true;
+    const stop = subscribeToIguardAccessLocks(ids, (locks) => {
+      if (active) setAccessLocks(locks);
+    }, (error) => { if (active) fail("locks")(error); });
+    return () => { active = false; stop(); };
+  }, [canLoad, retreatIdsKey, fail]);
 
   useEffect(() => {
-    if (user && !fieldAllowed) getMyIguardPending(user.uid).then(setRequested).catch(() => {});
-  }, [user, fieldAllowed]);
+    if (!user || authLoading || roleError || fieldAllowed) return;
+    let active = true;
+    getMyIguardPending(user.uid).then((requested) => {
+      if (active) setRequestState(requested ? "pending" : "none");
+    }).catch(() => { if (active) setRequestState("error"); });
+    return () => { active = false; };
+  }, [user, authLoading, roleError, fieldAllowed]);
 
   async function sendRequest() {
-    if (!user) return;
+    if (!user || requestBusy || requestState !== "none") return;
+    setRequestBusy(true);
     try {
       await requestIguardAccess(user.uid, user.email || "", user.displayName || "");
-      setRequested(true);
+      setRequestState("pending");
       toast("접근 요청을 보냈습니다. 관리자 승인을 기다려주세요.", "success");
-    } catch (e) {
-      toast(`요청 오류: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } catch {
+      setRequestState("error");
+      toast("요청 전송 여부를 확인하지 못했습니다. 요청 상태를 다시 확인해 주세요.", "error");
+    } finally {
+      setRequestBusy(false);
     }
   }
 
 
   if (authLoading) return <CenterSpinner />;
 
+  if (user && roleError) return <main className="team-first-state" role="alert">
+    <h1 className="page-title">행사 이용 권한을 확인하지 못했습니다.</h1>
+    <p>계정 정보를 불러오지 못해 승인 여부를 아직 확인할 수 없습니다. 다시 시도해 주세요.</p>
+    <button className="btn-primary" onClick={retryRoles}>다시 시도</button>
+    <Link className="btn-secondary" href="/library/help#connection">접속 문제 도움말</Link>
+  </main>;
+
   // ── 미로그인 ──
   if (!user) return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6" style={{ background: "var(--color-screen-bg)" }}>
-      <div className="text-center mb-8">
-        <div className="text-4xl mb-3">🧭</div>
-        <h1 className="text-2xl font-bold text-white mb-1">수련회 이동가이드</h1>
-        <p className="text-sm text-slate-400">고등부 수련회 이동 동선·안전 관리</p>
-      </div>
-      <InAppBrowserNotice />
-      <button onClick={() => signIn().catch((e: unknown) => {
-        // 사용자가 팝업을 직접 닫은 경우는 조용히 — 그 외(팝업 차단·네트워크 등)는 안내해야 현장에서 "눌러도 무반응"이 안 된다.
-        const code = (e as { code?: string })?.code ?? "";
-        if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return;
-        toast(`로그인 실패 - ${code === "auth/popup-blocked" ? "브라우저가 팝업을 차단했습니다. 팝업 허용 후 다시 시도해주세요." : (e instanceof Error ? e.message : String(e))}`, "error");
-      })} className="btn-primary px-6 py-3 text-base">Google 계정으로 로그인</button>
-      <p className="text-xs text-slate-500 mt-4 text-center max-w-xs">처음이면 로그인 후 <strong>접근 요청</strong>을 보내면 관리자가 승인합니다.</p>
-    </div>
+    <main className="team-first-state">
+      <h1 className="page-title">수련회 현장 업무를 보려면 로그인해 주세요.</h1>
+      <p>고등부에 등록한 Google 계정으로 로그인해 주세요. 현장 담당이 처음이라면 로그인 후 접근 요청을 보낼 수 있습니다.</p>
+      <LoginButton signIn={signIn} />
+      <Link className="btn-secondary" href="/library/help#access">로그인·권한 안내</Link>
+    </main>
   );
 
   // ── 권한 없음 ──
   if (!fieldAllowed) return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
-      <div className="text-3xl mb-3">🔒</div>
-      {requested ? (
+    <main className="team-first-state">
+      <h1 className="page-title">수련회 현장 접근 승인이 필요합니다.</h1>
+      {user.email && <p>로그인한 계정: <strong>{user.email}</strong></p>}
+      <p>고등부에 등록한 계정인지 확인해 주세요. 현장 담당이라면 아래에서 요청하고, 행정·프로그램 담당이라면 교역자 또는 통합관리자에게 이 이메일과 맡은 업무를 알려 주세요.</p>
+      {requestState === "checking" ? <p role="status">보낸 접근 요청을 확인하고 있습니다…</p> : requestState === "error" ? <>
+        <p role="alert">접근 요청 상태를 확인하지 못했습니다. 다시 확인해 주세요.</p>
+        <button onClick={onRetry} className="btn-primary">요청 상태 다시 확인</button>
+      </> : requestState === "pending" ? (
         <>
-          <p className="text-slate-700 font-medium mb-1">승인 대기 중입니다.</p>
-          <p className="text-sm text-slate-500 mb-6">관리자가 승인하면 바로 접속할 수 있어요.<br />({user.email})</p>
+          <p role="status">접근 요청을 보냈습니다. 관리자 승인을 기다리고 있습니다.</p>
+          <button onClick={retryRoles} className="btn-primary">승인 여부 다시 확인</button>
         </>
       ) : (
         <>
-          <p className="text-slate-700 font-medium mb-1">아직 접근 권한이 없습니다.</p>
-          <p className="text-sm text-slate-500 mb-6">아래 버튼으로 접근을 요청하면 관리자가 승인합니다.<br />({user.email})</p>
-          <button onClick={sendRequest} className="btn-primary mb-3">접근 요청 보내기</button>
+          <button onClick={() => void sendRequest()} disabled={requestBusy} className="btn-primary">{requestBusy ? "요청 보내는 중…" : "수련회 현장 접근 요청 보내기"}</button>
         </>
       )}
-      <button onClick={() => signOut()} className="btn-secondary">로그아웃</button>
-    </div>
+      <Link className="btn-secondary" href="/library/help#access">계정 확인·담당자 문의 방법</Link>
+      <Link className="btn-secondary" href="/">홈으로</Link>
+      <button onClick={() => void signOut().catch(() => toast("로그아웃하지 못했습니다. 다시 시도해 주세요.", "error"))} className="btn-secondary">다른 계정으로 로그인</button>
+    </main>
   );
+
+  if (errors.retreats) return <main className="team-first-state" role="alert">
+    <h1 className="page-title">수련회 목록을 불러오지 못했습니다.</h1>
+    <p>등록된 수련회가 없는 상태와는 다릅니다. 다시 불러오기를 눌러 주세요.</p>
+    <button className="btn-primary" onClick={onRetry}>다시 불러오기</button>
+    <Link className="btn-secondary" href="/library/help#connection">접속 문제 도움말</Link>
+  </main>;
 
   // ── 수련회 목록 + 준비 일정 ──
   return (
     <div className="min-h-screen overflow-x-hidden bg-slate-50">
       {/* 행정(/retreats)과 같은 화면을 쓴다 — 들어가는 곳만 현장으로 다르다 */}
-      {loading ? (
-        <div className="mx-auto max-w-7xl px-4 py-6"><div className="card p-8 text-center text-slate-400">로딩 중...</div></div>
+      {!loaded ? (
+        <div className="mx-auto max-w-7xl px-4 py-6"><div className="card p-8 text-center text-slate-400" role="status">수련회 목록을 불러오고 있습니다…</div></div>
       ) : (
         <VacationHome
           mode="field"
@@ -142,7 +191,8 @@ export default function FieldHomeClient() {
           retreats={retreats as unknown as PortalRetreat[]}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          loadError={loadError}
+          loadError={Object.keys(errors).length > 0 ? "수련회 일정 또는 입장 잠금 상태를 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null}
+          onRetry={onRetry}
           lockedIds={new Set(Object.keys(accessLocks))}
           headerActions={canManageRetreatPin(roles) ? (
             <button onClick={() => setShowAdmin(true)} aria-label="현장 관리자 도구"

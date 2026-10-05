@@ -61,7 +61,7 @@ describe("찬양팀 출결 권한과 명시 입력", () => {
     fireEvent.click(within(group).getByRole("button", { name: "출석" }));
     expect(execute).toHaveBeenCalledWith({ type: "attendance.set", meetingId: "meeting-1", personId: "student-1", status: "PRESENT", expectedRevision: 0 });
   });
-  it("연결된 모임은 공통 학기 원장을 같은 화면에서 수정하고 연결이 깨진 학생은 잠근다", () => {
+  it("연결된 모임은 학기 출석과 같은 기록을 같은 화면에서 수정하고 연결이 깨진 학생은 잠근다", () => {
     const view = praiseFixture();
     const sourceRevision = "a".repeat(64);
     view.meetings[0].linkedSessionId = "semester-session";
@@ -73,7 +73,7 @@ describe("찬양팀 출결 권한과 명시 입력", () => {
     const execute = vi.fn();
     render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
     expect(screen.getByText(/학기 운영과 이 화면에서 같은 기록/)).toBeInTheDocument();
-    expect(screen.getByText("공통 학기 원장")).toBeInTheDocument();
+    expect(screen.getByText("학기 출석과 같은 기록")).toBeInTheDocument();
     expect(screen.getByText("기존 지각 기록 · 출석으로 표시")).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("group", { name: "합성학생가 출결" })).getByRole("button", { name: "결석" }));
     expect(execute).toHaveBeenCalledWith({ type: "attendance.set", meetingId: "meeting-1", personId: "student-1", status: "ABSENT", expectedRevision: 7, expectedSourceRevision: sourceRevision });
@@ -102,16 +102,50 @@ describe("찬양팀 출결 권한과 명시 입력", () => {
     rerender(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
     expect(screen.getByRole("searchbox", { name: "출결 이름 검색" })).toHaveValue("합성학생가"); expect(screen.queryByText("합성학생나")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "합성학생가 출결 지우기" }));
+    expect(execute).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("dialog", { name: "합성학생가 출결 기록 지우기" })).getByRole("button", { name: "기록 지우기" }));
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ status: null, expectedRevision: 5 }));
   });
   it("스탭 미입력 복원과 휴강 주일 스탭 참석 입력을 지원한다", () => {
     const view = praiseFixture(); view.availability = { "meeting-1": { "staff-1": { revision: 4, updatedAt: 1000, updatedBy: "actor", present: true, role: "SINGER" } } };
     const execute = vi.fn(); const { rerender } = render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
     fireEvent.click(screen.getByRole("button", { name: "스탭" })); fireEvent.click(screen.getByRole("button", { name: "합성스탭가 출결 지우기" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "합성스탭가 출결 기록 지우기" })).getByRole("button", { name: "기록 지우기" }));
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({ type: "availability.set", present: null, expectedRevision: 4 }));
     rerender(<PraiseAttendance view={view} meeting={{ ...view.meetings[0], cancelled: true }} execute={execute} busy={false} />);
     expect(within(screen.getByRole("group", { name: "합성스탭나 출결" })).getByRole("button", { name: "출석" })).not.toBeDisabled();
   });
+});
+
+it("출결 지우기를 취소하거나 Escape로 닫으면 기록을 변경하지 않는다", () => {
+  const view = praiseFixture();
+  view.attendance = { "meeting-1": { "student-1": { status: "PRESENT", revision: 3, updatedAt: 1000, updatedBy: "actor", groupVersionId: "groups-1" } } };
+  const execute = vi.fn();
+  render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+  const trigger = screen.getByRole("button", { name: "합성학생가 출결 지우기" });
+  expect(trigger).toHaveTextContent("기록 지우기");
+  trigger.focus();
+  fireEvent.click(trigger);
+  expect(screen.getByRole("button", { name: "취소" })).toHaveFocus();
+  fireEvent.click(screen.getByRole("button", { name: "취소" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+  fireEvent.click(trigger);
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it("확인 중 원격 출결이 바뀌어도 지우기 요청은 처음 확인한 revision을 보존한다", () => {
+  const view = praiseFixture();
+  view.attendance = { "meeting-1": { "student-1": { status: "PRESENT", revision: 3, updatedAt: 1000, updatedBy: "actor", groupVersionId: "groups-1" } } };
+  const execute = vi.fn();
+  const { rerender } = render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "합성학생가 출결 지우기" }));
+  view.attendance["meeting-1"]["student-1"].revision = 4;
+  rerender(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "기록 지우기" }));
+  expect(execute).toHaveBeenCalledWith(expect.objectContaining({ status: null, expectedRevision: 3 }));
 });
 
 it("shadow의 연결 표식은 공통 원장을 실시간으로 쓰는 안내 대신 원본 대조로 표시한다", () => {
@@ -122,7 +156,7 @@ it("shadow의 연결 표식은 공통 원장을 실시간으로 쓰는 안내 �
   render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
   expect(screen.getByText(/원본 대조용 출결입니다/)).toBeInTheDocument();
   expect(screen.queryByText(/학기 운영과 이 화면에서 같은 기록/)).not.toBeInTheDocument();
-  expect(screen.queryByText("공통 학기 원장")).not.toBeInTheDocument();
+  expect(screen.queryByText("학기 출석과 같은 기록")).not.toBeInTheDocument();
   const row = screen.getByRole("group", { name: "합성학생가 출결" });
   expect(within(row).getByRole("button", { name: "출석" })).toHaveAttribute("aria-pressed", "true");
   expect(within(row).getByRole("button", { name: "결석" })).toBeDisabled();

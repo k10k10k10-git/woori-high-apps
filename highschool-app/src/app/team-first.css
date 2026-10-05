@@ -80,7 +80,7 @@
 .team-roster-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .team-workspace-heading > div { justify-content: flex-start; }
 
-.team-directory-mark { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border-radius: 11px; background: var(--color-primary); color: white; font-weight: 800; }
+.team-directory-mark { display: grid; width: 38px; height: 38px; flex: none; place-items: center; border-radius: 11px; background: var(--color-primary); color: var(--color-primary-contrast); font-weight: 800; }
 .team-directory-status { border-radius: 999px; background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); padding: 5px 8px; font-size: 0.68rem; font-weight: 750; }
 .team-directory-status.is-planned { background: var(--color-surface-hover); color: var(--color-text-muted); }
 .team-directory-card h2,
@@ -112,7 +112,7 @@
 .team-action-card.is-primary h2,
 .team-action-card.is-primary p,
 .team-action-card.is-primary span,
-.team-action-card.is-primary svg { color: white; }
+.team-action-card.is-primary svg { color: var(--color-primary-contrast); }
 .team-action-card.is-muted { opacity: 0.72; }
 
 .team-term-section { margin-top: 28px; }
@@ -232,3 +232,4 @@
 
 @media (min-width: 768px) and (max-width: 980px) { .team-directory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .team-directory-card { transition: none; } }
+#team-work-actions { scroll-margin-top: 100px; }

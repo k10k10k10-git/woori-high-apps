@@ -284,3 +284,9 @@
   .praise-header--compact .praise-header-actions:not(.is-mobile-open){display:none}
   .praise-header--compact .praise-header-actions.is-mobile-open{display:flex;width:100%}
 }
+.praise-clear-dialog { width: min(480px, calc(100vw - 32px)); padding: 24px; color: var(--color-text-primary); }
+.praise-clear-dialog h2 { font-size: 1.2rem; font-weight: 720; line-height: 1.5; }
+.praise-clear-dialog p { margin-top: 12px; color: var(--color-text-secondary); line-height: 1.7; }
+.praise-clear-dialog > div { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.praise-clear-dialog button { min-height: 44px; }
+.praise-clear-dialog :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }

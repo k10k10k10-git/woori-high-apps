@@ -6,6 +6,7 @@ const storageState = process.env.E2E_STORAGE_STATE;
 export default defineConfig({
   testDir: "./e2e",
   testMatch: "**/*.e2e.ts",
+  testIgnore: "**/new-staff-local.e2e.ts",
   timeout: 30_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,
