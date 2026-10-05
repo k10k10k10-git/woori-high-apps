@@ -36,7 +36,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showUpdate, setShowUpdate] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const demoTriedRef = useRef(false);
   const personalLoginIntentRef = useRef(false);
   const adminEntryRef = useRef<ReturnType<typeof createAdminEntryTracker> | null>(null);
@@ -215,16 +214,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     return () => navigator.serviceWorker.removeEventListener('message', handler);
   }, []);
-
-  // 저장 상태 자동 초기화
-  useEffect(() => {
-    if (state.saveStatus === 'saved') {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' });
-      }, 2000);
-    }
-  }, [state.saveStatus, dispatch]);
 
   // KST 자정 연도 전환
   useEffect(() => {

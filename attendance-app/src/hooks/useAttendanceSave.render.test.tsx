@@ -43,3 +43,38 @@ it('연도 전환 후 이전 요청의 응답과 재시도를 현재 화면에 �
   await waitFor(() => expect(result.current.pending).toBe(false));
   expect(result.current.feedback).toBeNull();
 });
+
+it('연속 저장 중 이전 성공 안내를 닫아도 진행 상태는 유지한다', async () => {
+  m.save.mockResolvedValueOnce(undefined);
+  const { result } = renderHook(useAttendanceSave);
+  await act(async () => { await result.current.save(target, 'O'); });
+  const saved = result.current.feedback!;
+  expect(saved.status).toBe('saved');
+  let finish!: () => void;
+  m.save.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+  let saving!: Promise<void>;
+  act(() => { saving = result.current.save({ ...target, sid: 'second' }, 'X'); });
+  act(() => { if (saved.status === 'saved') result.current.dismissSaved(saved.savedAt); });
+  expect(result.current.feedback?.status).toBe('saving');
+  expect(result.current.pending).toBe(true);
+  await act(async () => { finish(); await saving; });
+  expect(result.current.feedback).toMatchObject({ status: 'saved', sid: 'second' });
+});
+it('결과 불명은 실패와 구분하고 재시도 시 사전값을 보존한다', async () => {
+  m.save.mockRejectedValueOnce(new AttendanceSaveError('unknown', '결과 확인 필요')).mockResolvedValueOnce(undefined);
+  const { result } = renderHook(useAttendanceSave);
+  await act(async () => { await result.current.save(target, 'X'); });
+  const unknown = result.current.feedback!;
+  expect(unknown).toMatchObject({ status: 'unknown', retryable: true });
+  expect(m.dispatch).toHaveBeenLastCalledWith({ type: 'SET_SAVE_STATUS', payload: 'unknown' });
+  await act(async () => { await result.current.save(target, 'X', unknown); });
+  expect(m.save.mock.calls[1][0]).toMatchObject({ expected: '', value: 'X' });
+  expect(m.dispatch).toHaveBeenLastCalledWith(expect.objectContaining({ payload: 'saved', savedAt: expect.any(Number) }));
+});
+it('명시적 저장 거절은 실패로 표시한다', async () => {
+  m.save.mockRejectedValueOnce(new AttendanceSaveError('unavailable', '거절됨'));
+  const { result } = renderHook(useAttendanceSave);
+  await act(async () => { await result.current.save(target, 'O'); });
+  expect(result.current.feedback?.status).toBe('error');
+  expect(m.dispatch).toHaveBeenLastCalledWith({ type: 'SET_SAVE_STATUS', payload: 'error' });
+});

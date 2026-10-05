@@ -558,3 +558,17 @@
   font-size: 13px; font-family: inherit;
   color: var(--text2);
 }
+
+/* 저장 성공 시각은 유지하고 실패·결과 불명은 서로 다른 상태로 표시한다. */
+.attendance-save-status { display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+.attendance-save-status > span { font-weight: 600; }
+.attendance-save-status small { font-size: 10px; color: var(--text2); white-space: normal; }
+.attendance-save-status.saved > span { color: var(--green-text); }
+.attendance-save-status.error > span { color: var(--red-text); }
+.attendance-save-status.saving > span, .attendance-save-status.unknown > span { color: var(--amber-text); }
+.attendance-save-target { display: block; margin-bottom: 3px; font-size: 11px; color: var(--text2); }
+.attendance-row-save.unknown { background: var(--amber-bg); color: var(--amber-text); }
+.attendance-save-banner.unknown { border-color: var(--amber); color: var(--amber-text); }
+.attendance-save-banner.unknown button { background: var(--amber); color: var(--text); }
+
+.attendance-save-banner button { flex-shrink: 0; min-width: 60px; white-space: nowrap; }

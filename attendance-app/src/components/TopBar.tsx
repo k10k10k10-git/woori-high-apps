@@ -1,13 +1,14 @@
 'use client';
 import { useApp } from '@/store/AppContext';
 import { getWindowYears, getKSTYear } from '@/utils/dates';
+import AttendanceSaveStatus from '@/components/AttendanceSaveStatus';
 import AdminIcon from '@/components/admin/AdminIcon';
 
 type DemoActions = { onChangeClass: () => void; onAdminLogin: () => void };
 
 export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?: DemoActions }) {
   const { state, dispatch } = useApp();
-  const { curYear, curPart, curGrade, userRole, saveStatus } = state;
+  const { curYear, curPart, curGrade, userRole } = state;
   const isAdmin = !userRole || userRole.role === 'admin';
   const isTeacher = userRole?.role === 'teacher';
 
@@ -26,14 +27,7 @@ export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?
         </div>
         <div className="topbar-actions">
           <div className="topbar-save-status" role="status" aria-live="polite" aria-atomic="true">
-            {saveStatus !== 'idle' && (
-              <>
-                <span className={`save-dot${saveStatus === 'saving' ? ' saving' : ' saved'}`} aria-hidden="true" />
-                <span className="save-label">
-                  {saveStatus === 'saving' ? '저장 중' : '저장됨'}
-                </span>
-              </>
-            )}
+            <AttendanceSaveStatus />
           </div>
           {demo ? (
             <>

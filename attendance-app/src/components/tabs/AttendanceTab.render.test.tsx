@@ -37,13 +37,13 @@ vi.mock('@/store/AppContext', async importOriginal => {
 });
 
 vi.mock('@/utils/attendanceEntry', () => ({
-  buildAttendanceEntry: ({ userRole }: { userRole?: { role?: string } }) => {
+  buildAttendanceEntry: ({ userRole }: { userRole?: { role?: string } }, { pickedWeekKey }: { pickedWeekKey?: string }) => {
     const currentWeek = { key: '8-0', label: '9월 6일' };
     return {
       editableWeeks: userRole?.role === 'admin'
         ? [{ key: '7-0', label: '8월 30일' }, currentWeek]
         : [currentWeek],
-      selectedWeek: currentWeek,
+      selectedWeek: pickedWeekKey === '7-0' ? { key: '7-0', label: '8월 30일' } : currentWeek,
     };
   },
 }));
@@ -277,4 +277,25 @@ describe('AttendanceTab 교사 출석 입력', () => {
       name: '홍길동 8월 30일 출석 수정, 현재 결석',
     })).not.toBeNull();
   });
+});
+
+it('같은 학생 ID라도 반을 바꾸면 이전 반의 행 저장 표시를 붙이지 않는다', async () => {
+  mocks.state.current = teacherState(); mocks.set.mockResolvedValue(undefined);
+  const { container, rerender } = render(<AttendanceTab />);
+  fireEvent.click(screen.getByRole('button', { name: /홍길동.*결석/ }));
+  await waitFor(() => expect(container.querySelector('.attendance-row-save')?.textContent).toBe('저장됨'));
+  const state = mocks.state.current as AppState;
+  mocks.state.current = { ...state, curClass: '2', classData: { ...state.classData, '1-1-2': state.classData['1-1-1'] } };
+  rerender(<AttendanceTab />);
+  expect(container.querySelector('.attendance-row-save')).toBeNull();
+});
+
+it('날짜를 바꾸면 같은 학생의 이전 날짜 행 저장 표시를 붙이지 않는다', async () => {
+  const state = teacherState(); mocks.state.current = { ...state, userRole: { role: 'admin' } };
+  mocks.set.mockResolvedValue(undefined);
+  const { container } = render(<AttendanceTab />);
+  fireEvent.click(screen.getByRole('button', { name: /홍길동.*결석/ }));
+  await waitFor(() => expect(container.querySelector('.attendance-row-save')?.textContent).toBe('저장됨'));
+  fireEvent.change(screen.getByLabelText('출석 날짜'), { target: { value: '7-0' } });
+  expect(container.querySelector('.attendance-row-save')).toBeNull();
 });

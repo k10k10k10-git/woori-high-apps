@@ -24,21 +24,26 @@ export function useAttendanceSave() {
     const year = state.curYear, revision = state.dataRevision;
     const expected = retry?.expected ?? state.attData[target.ck]?.[target.sid]?.[target.k] ?? '';
     const studentName = state.classData[target.ck]?.students.find(student => student.id === target.sid)?.name ?? '학생';
-    const base = { sid: target.sid, studentName, target, value, expected, scope };
+    const [mi, di] = target.k.split('-').map(Number);
+    const [part, grade, cls] = target.ck.split('-');
+    const targetLabel = `${year}년 ${part}부 ${grade}학년 ${cls}반 · ${state.months[mi]?.month}월 ${state.months[mi]?.sundays[di]}일`;
+    const base = { sid: target.sid, studentName, target, value, expected, scope, targetLabel };
     running.current = true; setPending(true);
     setFeedback({ ...base, status: 'saving' });
     dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
     try {
       await saveAttendanceCell({ year, target, value, expected }, () => valid(year, revision));
       if (!valid(year, revision)) return;
-      setFeedback({ ...base, status: 'saved', savedAt: Date.now() });
-      dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved' });
+      const savedAt = Date.now();
+      setFeedback({ ...base, status: 'saved', savedAt });
+      dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved', savedAt });
     } catch (error) {
       if (!valid(year, revision)) return;
       const known = error instanceof AttendanceSaveError || error instanceof BrowserWriteLockError;
-      setFeedback({ ...base, status: 'error', ...(known ? { message: error.message } : {}),
+      const status = error instanceof AttendanceSaveError && error.kind === 'unknown' ? 'unknown' : 'error';
+      setFeedback({ ...base, status, ...(known ? { message: error.message } : {}),
         retryable: !(error instanceof AttendanceSaveError && ['conflict', 'session'].includes(error.kind)) });
-      dispatch({ type: 'SET_SAVE_STATUS', payload: 'idle' });
+      dispatch({ type: 'SET_SAVE_STATUS', payload: status });
     } finally { running.current = false; if (active.current) setPending(false); }
   }
   const dismissSaved = useCallback((savedAt: number) => {

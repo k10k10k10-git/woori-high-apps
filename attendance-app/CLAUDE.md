@@ -455,3 +455,8 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 - **재사용 규칙**: `node scripts/run-attendance-browser.mjs`는 고정 loopback Auth·DB 에뮬레이터와 전용 Vite 별칭으로 실제 LoginScreen·AppShell·역할 조회·출석 컴포넌트를 실행한다. Next 탐색만 테스트 어댑터다. Chrome·WebKit에서 사전값 충돌, GET/PUT 사이의 412, 저장 응답 유실과 명시 재시도를 검사한다. `npm run build`의 `tools/check-production-boundary.mjs`가 테스트 주소·자격정보의 운영 번들 혼입을 차단한다. 운영 인증 정보는 PR에 전달하지 않는다.
 
 출석 화면은 `useAttendanceSave`(저장), `useSuggestions`(건의 구독·초안), `attendanceExport`(CSV/XLSX/PDF)로 책임을 나눈다. `globals.css`는 `styles/tokens → entry → layout → widgets → teacher → responsive` 순서의 진입점이며 선언 순서를 바꾸지 않는다.
+
+### 출석 저장 상태와 입력 완료를 구분하기 (2026-10-05)
+- **접근법**: 조건부 저장 응답 분류를 유지 → 성공 응답의 시각을 AppContext에 보관 → 공통 AttendanceSaveStatus로 교사·관리자 셸에 KST 마지막 확인 시각 표시 → 학생 행은 반·학생·날짜를 모두 비교한다. 큰 성공 배너만 2초 뒤 닫으며 전역 상태를 타이머로 초기화하지 않는다.
+- **판단 질문**: 마지막 단건 저장 성공은 전체 학생 입력 완료를 증명하지 않는다. 결과 불명은 실패로 단정하지 않고 확인 필요로 표시하며 기존 사전값·ETag 재시도를 유지한다. 시각은 현재 로그인·연도 세션에서 확인된 응답 기준이며 새로고침 후 복구되는 서버 감사 기록이 아니다.
+- **재사용 규칙**: 저장 상태의 생명주기와 일시적인 안내 배너의 생명주기를 분리하고, 저장 표시를 셀의 전체 대상 키로 제한한다.
