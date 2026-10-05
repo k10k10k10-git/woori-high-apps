@@ -86,7 +86,12 @@ function LibraryForUser({ roles, teamMemberships }: { roles: MinistryRoles; team
     && visibleTerms.every(({ semester }) => readyLinks.has(semester.id));
 
   return <main className="team-first-page">
-    <header className="team-first-page-header"><div><h1>자료</h1><p>고등부 사역 가이드와 접근 가능한 학기 자료를 여기서 찾습니다.</p></div></header>
+    <header className="team-first-page-header"><div><h1>자료</h1><p>사이트 사용법, 고등부 사역 가이드와 학기 자료를 여기서 찾습니다.</p></div></header>
+
+    <section className={styles.guide} aria-labelledby="library-help-heading">
+      <div><MagnifyingGlass size={22} aria-hidden="true" /><h2 id="library-help-heading">사이트 사용법</h2><p>출결 입력, 담당 조, 접속·권한 문제를 업무별로 찾아봅니다.</p></div>
+      <Link href="/library/help">사용법 찾기 <ArrowRight size={16} aria-hidden="true" /></Link>
+    </section>
 
     <section className={styles.guide} aria-labelledby="library-guide-heading">
       <div><Books size={22} aria-hidden="true" /><h2 id="library-guide-heading">사역 가이드</h2><p>연간 흐름과 운영 기준을 확인합니다.</p></div>

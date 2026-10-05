@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Trash } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import CenterSpinner from "@/components/CenterSpinner";
@@ -28,6 +29,9 @@ export default function HomePage() {
   const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string; endDate?: string }>>([]);
   const [retreatLoadError, setRetreatLoadError] = useState("");
   const [subscriptionGeneration, setSubscriptionGeneration] = useState(0);
+  const listScope = `${user?.uid ?? "guest"}:${subscriptionGeneration}`;
+  const [listResult, setListResult] = useState<{ scope: string; error: string | null } | null>(null);
+  const listReady = listResult?.scope === listScope;
   const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [selectedRetreatId, setSelectedRetreatId] = useState<string | null>(null);
@@ -55,14 +59,19 @@ export default function HomePage() {
 
   useEffect(() => {
     if (loading || !canUseAdmin || !user) return;
-    return subscribeToRetreats((list) => {
+    let active = true;
+    const stop = subscribeToRetreats((list) => {
+      if (!active) return;
       setRetreatRecords(list);
       setSelectedRetreatId((previous) => previous && list.some((item) => item.id === previous) ? previous : null);
+      setListResult({ scope: listScope, error: null });
     }, (error) => {
-      setRetreatLoadError(error.message);
-      toast(error.message, "error");
+      if (!active) return;
+      setListResult({ scope: listScope, error: error.message });
+      toast("수련회 목록을 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.", "error");
     });
-  }, [loading, canUseAdmin, user, toast, subscriptionGeneration]);
+    return () => { active = false; stop(); };
+  }, [loading, canUseAdmin, user, toast, listScope]);
 
   const retreatIdsKey = retreatRecords.map((r) => r.id).join(",");
   useEffect(() => {
@@ -80,6 +89,11 @@ export default function HomePage() {
     return subscribeToIguardAccessLocks(ids, setAccessLocks,
       (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 - ${e.message}`));
   }, [user, canUseAdmin, sortedRetreatIdsKey, subscriptionGeneration]);
+
+  function retryRetreats() {
+    setRetreatLoadError("");
+    setSubscriptionGeneration((value) => value + 1);
+  }
 
   async function handleRequestAccess() {
     if (!user) return;
@@ -161,6 +175,18 @@ export default function HomePage() {
     </main>
   );
 
+  if (!listReady) return <main className="team-first-state" role="status">
+    <h1 className="page-title">수련회 목록을 불러오고 있습니다…</h1>
+    <p>등록된 수련회를 확인한 뒤 행사 업무를 열어 드립니다.</p>
+  </main>;
+
+  if (listResult && listResult.error !== null) return <main className="team-first-state" role="alert">
+    <h1 className="page-title">수련회 목록을 불러오지 못했습니다.</h1>
+    <p>수련회가 없는 상태와는 다릅니다. 다시 불러오기를 눌러 주세요.</p>
+    <button className="btn-primary" onClick={retryRetreats}>다시 불러오기</button>
+    <Link className="btn-secondary" href="/library/help#connection">접속 문제 도움말</Link>
+  </main>;
+
   // ── 메인 화면 ───────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50">
@@ -209,14 +235,12 @@ export default function HomePage() {
         selectedId={selectedRetreatId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null}
         onSelect={setSelectedRetreatId}
         onDelete={handleDelete}
-        loadError={retreatLoadError || null}
-        onRetry={() => {
-          setRetreatLoadError("");
-          setSubscriptionGeneration((value) => value + 1);
-        }}
+        loadError={retreatLoadError ? "수련회 일정 또는 입장 잠금 상태를 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null}
+        onRetry={retryRetreats}
         lockedIds={new Set(Object.keys(accessLocks))}
         headerActions={
           <>
+            {retreatLoadError && <Link className="btn-secondary btn-sm" href="/library/help#connection">접속 문제 도움말</Link>}
             <button
               onClick={() => setShowGuide(true)}
               className="btn-secondary btn-sm"

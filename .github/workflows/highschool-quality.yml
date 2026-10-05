@@ -56,6 +56,29 @@ jobs:
             highschool-app/.lighthouseci
           if-no-files-found: ignore
 
+  # 합성 데이터로 UI를 확인하며 운영 인증 상태와 DB를 사용하지 않는다.
+  new-staff-ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: highschool-app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: highschool-app/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - run: npm run test:e2e:new-staff
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: new-staff-ui-report
+          path: highschool-app/test-results/new-staff-local
+          if-no-files-found: ignore
+
   # 운영 인증 상태는 PR 코드에 제공하지 않는다. 수동 main 실행은 기존 인증 가드를 유지한다.
   authenticated-e2e:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'

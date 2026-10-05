@@ -42,8 +42,21 @@ it("역할 조회 실패는 권한 미배정 안내로 오인시키지 않고 �
   expect(screen.queryByText("접근 승인이 필요합니다")).not.toBeInTheDocument();
   screen.getByRole("button", { name: "다시 시도" }).click();
   expect(mocks.retryRoles).toHaveBeenCalledOnce();
+  expect(screen.getByRole("link", { name: "접속 문제 도움말" })).toHaveAttribute("href", "/library/help#connection");
 });
 afterEach(cleanup);
+
+it("미승인 스탭은 담당자 안내와 일반 사용법을 먼저 보고 현장 요청을 구분한다", () => {
+  mocks.roles = { semester: "none", retreat: "none" };
+  render(<PortalHome />);
+  expect(screen.getByRole("heading", { name: "접근 승인이 필요합니다" })).toBeInTheDocument();
+  const guide = screen.getByRole("link", { name: "사용법·권한 안내 보기" });
+  expect(guide).toHaveAttribute("href", "/library/help#access");
+  expect(screen.getByText(/담당 팀장·교역자에게 로그인 이메일과 맡을 팀/)).toBeInTheDocument();
+  const fieldRequest = screen.getByText("수련회 현장 접근 요청");
+  expect(fieldRequest.closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByRole("link", { name: "승인·팀 연결 문의하기" })).toHaveAttribute("href", "/help/feedback");
+});
 
 describe("PortalHome — 기간 구독과 표시 metadata 분리", () => {
   it("수련회 목록과 기간의 첫 응답 전에는 기록 없음으로 확정하지 않는다", () => {

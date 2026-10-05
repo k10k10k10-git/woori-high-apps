@@ -109,6 +109,7 @@ function activeArea(pathname: string): GlobalArea {
   if (pathname.startsWith("/teams") || pathname.startsWith("/sunday-ministry")) return "teams";
   if (pathname.startsWith("/training")) return "training";
   if (pathname.startsWith("/operations") || pathname.startsWith("/semester")) return "operations";
+  if (pathname.startsWith("/library/help")) return "help";
   if (pathname.startsWith("/library") || pathname.startsWith("/ministry-guide")) return "library";
   if (pathname.startsWith("/help") || pathname.startsWith("/suggestions")) return "help";
   return "events";
@@ -255,7 +256,7 @@ export default function GlobalPortalHeader() {
 
             {operationsAllowed && <Link href="/operations" className="portal-nav-link" aria-current={currentArea === "operations" ? "page" : undefined}>운영센터</Link>}
 
-            <Link href="/library" className="portal-nav-link" aria-current={currentArea === "library" ? "page" : undefined}>자료</Link>
+            <Link href="/library" className="portal-nav-link" aria-current={currentArea === "library" ? "page" : undefined} data-active={pathname.startsWith("/library/help") ? "true" : undefined}>자료</Link>
           </nav>
 
           <div className="portal-header-tools">
@@ -309,7 +310,8 @@ export default function GlobalPortalHeader() {
               {eventsAllowed && <Link href="/events" aria-current={currentArea === "events" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>행사</Link>}
               {operationsAllowed && <Link href="/operations" aria-current={currentArea === "operations" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>운영센터</Link>}
               <Link href="/library" aria-current={currentArea === "library" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>자료</Link>
-              <Link href="/help/feedback" aria-current={currentArea === "help" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>문제 제보</Link>
+              <Link href="/library/help" aria-current={pathname.startsWith("/library/help") ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>사이트 사용법</Link>
+              <Link href="/help/feedback" aria-current={pathname.startsWith("/help") || pathname.startsWith("/suggestions") ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>문제 제보</Link>
             </nav>
             <div className="portal-mobile-account">
               <ThemeToggle showLabel />

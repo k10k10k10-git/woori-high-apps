@@ -62,7 +62,7 @@ export default function VacationHome({
       )}
 
       {loadError && (
-        <div className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+        <div role="alert" className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
           <span>⚠ {loadError}</span>
           {onRetry && <button onClick={onRetry} className="btn-secondary btn-sm justify-center">다시 불러오기</button>}
         </div>

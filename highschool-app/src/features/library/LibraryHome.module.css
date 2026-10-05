@@ -15,6 +15,7 @@
   column-gap: 12px;
   align-items: center;
 }
+.guide + .guide { margin-top: 14px; }
 .guide > div > svg { grid-row: span 2; color: var(--color-primary); }
 .guide h2,
 .events h2,

@@ -1,11 +1,11 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Semester, Team } from "@/features/semester/types";
 
-const mocks = vi.hoisted(() => ({ semesters: vi.fn(), teams: vi.fn(), retryRoles: vi.fn(), roleError: false }));
+const mocks = vi.hoisted(() => ({ semesters: vi.fn(), teams: vi.fn(), applications: vi.fn(), sessions: vi.fn(), retryRoles: vi.fn(), roleError: false }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "fixture-user" }, loading: false, roleError: mocks.roleError, retryRoles: mocks.retryRoles, roles: { semester: "superAdmin", retreat: "none" }, teamMemberships: {} }) }));
-vi.mock("@/features/semester/db", () => ({ subscribeSemesters: mocks.semesters, subscribeTeams: mocks.teams }));
+vi.mock("@/features/semester/db", () => ({ subscribeSemesters: mocks.semesters, subscribeTeams: mocks.teams, subscribeApplications: mocks.applications, subscribeSessions: mocks.sessions }));
 
 import TeamWorkspace from "./TeamWorkspace";
 import TeamsHome from "./TeamsHome";
@@ -18,6 +18,8 @@ beforeEach(() => {
   mocks.roleError = false;
   mocks.semesters.mockReturnValue(() => {});
   mocks.teams.mockReturnValue(() => {});
+  mocks.applications.mockReturnValue(() => {});
+  mocks.sessions.mockReturnValue(() => {});
 });
 
 it("팀 직접 주소에서 역할 조회 실패를 실제 미배정과 구분한다", () => {
@@ -67,10 +69,11 @@ it("한 학기 조회 실패가 이번 주 업무를 막지 않으며 재시도�
   render(<TeamWorkspace teamKey="praise" />);
   act(() => mocks.semesters.mock.calls[0][0]([past]));
   act(() => mocks.teams.mock.calls[0][2](new Error("권한 조회 실패")));
-  expect(screen.getByRole("link", { name: /이번 주 업무/ })).toHaveAttribute("href", "/teams/praise/ongoing");
+  expect(within(screen.getByRole("region", { name: "주간 업무와 학기 기록" })).getByRole("link", { name: /주간·주일 업무/ })).toHaveAttribute("href", "/teams/praise/ongoing");
   expect(screen.queryByText("연결된 학기가 없습니다")).not.toBeInTheDocument();
   act(() => mocks.semesters.mock.calls[0][0]([past]));
-  expect(screen.getByRole("alert")).toHaveTextContent("권한 조회 실패");
+  expect(screen.getByRole("alert")).toHaveTextContent("팀 정보를 확인하지 못했습니다");
+  expect(screen.getByRole("link", { name: "접속 문제 도움말" })).toHaveAttribute("href", "/library/help#connection");
   fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
   expect(unsubscribe).toHaveBeenCalledOnce();
   act(() => mocks.semesters.mock.calls.at(-1)![0]([past]));
