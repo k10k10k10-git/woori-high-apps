@@ -186,6 +186,8 @@ layout.tsx
 
 ### 공유 컴포넌트
 
+- `StudentDirectory` 상세 표는 담임 교사 대신 기존 학생 `addr` 주소와 조회 연도 전체 출석률을 표시한다. 다른 화면의 학기 선택과 무관하며 행사·미입력은 분모에서 제외하고 기록이 없으면 `—`로 구분한다. 출석부 Excel은 선택한 학기의 `출석/주차`·`출석률`·`등급`을 함께 내보내며 기존 `calcStats` 기준과 A≥90/B≥80/C≥70/D 등급을 유지한다.
+
 - **`ClassTabBar`**: 반 선택 UI. `role="tablist"` + `role="tab"` + `aria-selected` 적용. `AttendanceTab`, `ManageTab`, `StatTab`에서 공유한다.
 
 ### 공유 유틸리티

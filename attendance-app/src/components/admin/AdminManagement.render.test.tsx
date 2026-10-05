@@ -29,7 +29,7 @@ beforeEach(() => {
     events: {},
     classData: {
       '1-1-1': { teacher: '김담임', students: [
-        { id: 'a', num: 1, name: '김하나', birth: '2010-03-14', phone: '010-1111-2222', pphone: '010-9999-0000', school: '새봄고' },
+        { id: 'a', num: 1, name: '김하나', birth: '2010-03-14', phone: '010-1111-2222', pphone: '010-9999-0000', school: '새봄고', addr: '경기도 성남시 테스트로 12' },
         { id: 'b', num: 2, name: '박두나', jang: true },
       ] },
       '2-2-3': { teacher: '이담임', students: [{ id: 'c', num: 1, name: '이세나', phone: '010-3333-4444' }] },
@@ -60,7 +60,29 @@ describe('관리자 명단·출석 접근 경로', () => {
     expect(within(table).getByRole('columnheader', { name: '생년월일' })).toBeTruthy();
     expect(within(table).getByRole('link', { name: '010-1111-2222' }).getAttribute('href')).toBe('tel:01011112222');
     expect(within(table).getByText('2010-03-14')).toBeTruthy();
+    expect(within(table).queryByRole('columnheader', { name: '담임 교사' })).toBeNull();
+    expect(within(table).getByRole('columnheader', { name: '주소' })).toBeTruthy();
+    expect(within(table).getByRole('columnheader', { name: '출석률' })).toBeTruthy();
+    expect(within(table).getByText('경기도 성남시 테스트로 12')).toBeTruthy();
+    expect(within(table).getByText('100%')).toBeTruthy();
     expect(screen.getByRole('button', { name: '상세 표' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('명단 출석률은 학기 선택과 무관한 연간 기록이며 행사·미입력은 결석으로 세지 않는다', () => {
+    mocks.state = { ...mocks.state, curView: 'first',
+      months: [{ month: 1, sundays: [4, 11, 18] }, { month: 9, sundays: [6, 13] }],
+      events: { '0-1': '행사' },
+      attData: { '1-1-1': { a: { '0-0': 'O', '0-1': 'X', '1-0': 'X' } } },
+    };
+    const page = render(<StudentDirectory onOpenClass={vi.fn()} />);
+    const table = screen.getByRole('table');
+    const student = within(table).getByRole('row', { name: /김하나/ });
+    expect(within(student).getByText('50%')).toBeTruthy();
+    const noRecords = within(table).getByRole('row', { name: /이세나/ });
+    expect(within(noRecords).getAllByRole('cell')[7].textContent).toBe('—');
+    mocks.state = { ...mocks.state, attData: { '1-1-1': { a: { '0-0': 'O', '1-0': 'O' } } } };
+    page.rerender(<StudentDirectory onOpenClass={vi.fn()} />);
+    expect(within(student).getByText('100%')).toBeTruthy();
   });
 
   it('바꾼 명단 보기를 저장하고 다시 열 때 복원한다', () => {

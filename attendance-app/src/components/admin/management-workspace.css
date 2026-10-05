@@ -24,3 +24,4 @@
 .sd-overview-number{color:#777882;font-size:11px;text-align:right}
 .sd-overview-name{min-width:0;overflow-wrap:anywhere;font-weight:500}
 .sd-overview-long{color:#666773;font-size:10px;white-space:nowrap}
+.sd-detailed-table .sd-address{min-width:180px;max-width:260px;white-space:normal;overflow-wrap:anywhere}
