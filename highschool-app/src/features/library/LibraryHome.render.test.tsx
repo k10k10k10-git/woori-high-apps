@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
 
 const mocks = vi.hoisted(() => ({
+  semesterCalls: vi.fn(),
+  roleError: false,
   archiveCalls: [] as string[],
   auth: {
     user: { uid: "synthetic-staff" },
@@ -14,9 +16,10 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => mocks.auth }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ ...mocks.auth, roleError: mocks.roleError }) }));
 vi.mock("@/features/semester/db", () => ({
   subscribeSemesters: (cb: (items: unknown[]) => void) => {
+    mocks.semesterCalls();
     cb([
       { id: "2026-2", meta: { title: "2026년 2학기" } },
       { id: "2026-1", meta: { title: "2026년 1학기" } },
@@ -41,7 +44,10 @@ import LibraryHome from "./LibraryHome";
 afterEach(cleanup);
 beforeEach(() => {
   mocks.archiveCalls.length = 0;
+  mocks.roleError = false;
+  mocks.semesterCalls.mockClear();
   mocks.auth.roles = { semester: "praise", retreat: "none" };
+  mocks.auth.teamMemberships = { praise: { role: "staff", active: true } };
 });
 
 describe("자료 화면", () => {
@@ -65,4 +71,13 @@ describe("자료 화면", () => {
     expect(await screen.findByRole("link", { name: "다른 팀 비공개 자료" })).toBeInTheDocument();
     await waitFor(() => expect(mocks.archiveCalls).toEqual(["2026-2", "2026-1"]));
   });
+});
+
+it.each(["roleError", "none"])("자료의 %s 계정은 제한 데이터 구독을 시작하지 않는다", (state) => {
+  mocks.roleError = state === "roleError";
+  if (state === "none") { mocks.auth.roles = { semester: "none", retreat: "none" }; mocks.auth.teamMemberships = {} as typeof mocks.auth.teamMemberships; }
+  render(<LibraryHome />);
+  expect(mocks.semesterCalls).not.toHaveBeenCalled();
+  expect(mocks.archiveCalls).toHaveLength(0);
+  expect(screen.getByRole("heading")).toHaveTextContent(state === "roleError" ? "권한을 확인하지 못했습니다" : "접근 권한이 필요합니다");
 });

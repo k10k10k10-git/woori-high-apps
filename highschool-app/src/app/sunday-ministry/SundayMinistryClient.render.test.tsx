@@ -40,11 +40,11 @@ it("팀이 지정되지 않은 전체 관리자는 화면 크기와 관계없이
   expect(state.changes).not.toHaveBeenCalled();
 });
 
-it("팀 선택에는 권한이 있는 팀만 남기고 자기 기획 팀 진입을 유지한다", () => {
+it("팀 선택은 전체 팀을 표시하며 자기 기획 팀 진입을 유지한다", () => {
   state.roles = { semester: "media", retreat: "none" };
   state.teamMemberships = { media: { role: "staff", active: true } };
   render(<SundayMinistryClient team="media" />);
-  expect(screen.getAllByRole("option")).toHaveLength(1);
+  expect(screen.getAllByRole("option")).toHaveLength(6);
   expect(screen.getByRole("option", { name: "미디어팀 · 기획 중" })).not.toBeDisabled();
   expect(screen.getByText("기능 기획 중")).toBeInTheDocument();
 });
@@ -139,7 +139,7 @@ it("행정팀 배정만 있고 연간 원장 권한이 없으면 출석부와 �
   state.teamMemberships = { admin: { role: "staff", active: true } };
   state.canSearchOfficialRoster = false;
   render(<SundayMinistryClient team="admin" initialTab="출석부" />);
-  expect(screen.getByRole("heading", { name: "팀·주일 운영 접근 권한이 없습니다" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "행정팀 주간·주일 업무 접근 권한이 필요합니다." })).toBeInTheDocument();
   expect(state.friends).not.toHaveBeenCalled();
   expect(state.friendsPrivate).not.toHaveBeenCalled();
   expect(state.changes).not.toHaveBeenCalled();

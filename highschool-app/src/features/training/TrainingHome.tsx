@@ -11,25 +11,26 @@ import type { Semester } from "@/features/semester/types";
 import TrainingAccessState from "./TrainingAccessState";
 
 export default function TrainingHome() {
-  const { user, roles } = useAuth();
+  const { user, loading, roleError, roles } = useAuth();
   const [attempt, setAttempt] = useState(0);
-  return <TrainingHomeContent key={`${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${attempt}`} onRetry={() => setAttempt((value) => value + 1)} />;
+  return <TrainingHomeContent key={`${loading}:${!!roleError}:${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${attempt}`} onRetry={() => setAttempt((value) => value + 1)} />;
 }
 
 function TrainingHomeContent({ onRetry }: { onRetry: () => void }) {
-  const { roles } = useAuth();
+  const { user, loading, roleError, roles } = useAuth();
+  const uid = user?.uid;
   const allowed = canAccessArea("semester", roles);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!allowed) return;
+    if (!uid || loading || roleError || !allowed) return;
     return subscribeSemesters(
       (items) => { setSemesters(items); setLoaded(true); setError(null); },
       (reason) => { setError(reason.message); setLoaded(true); },
     );
-  }, [allowed]);
+  }, [uid, loading, roleError, allowed]);
 
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
   const featured = featuredTerm(semesters, today);

@@ -233,3 +233,16 @@
 @media (min-width: 768px) and (max-width: 980px) { .team-directory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: reduce) { .team-directory-card { transition: none; } }
 #team-work-actions { scroll-margin-top: 100px; }
+
+/* 권한 안내·오류 회복은 상세 화면의 크기와 테마가 달라도 같은 기준으로 읽힌다. */
+.workspace-access-state { overflow-wrap: anywhere; }
+.workspace-access-state p { font-size: 1rem; line-height: 1.7; }
+.workspace-access-state .page-title { max-width: 28ch; color: var(--color-text-primary); font-size: clamp(1.3rem, 2.8vw, 1.8rem); line-height: 1.4; word-break: keep-all; }
+.workspace-access-state.is-embedded { min-height: 280px; padding: 24px 16px; }
+.workspace-access-state .btn-primary,
+.workspace-access-state .btn-secondary,
+.workspace-load-failure .btn-secondary { min-height: 44px; }
+.workspace-load-failure { font-size: 1rem; line-height: 1.6; }
+.workspace-load-failure > div { flex: 1 1 280px; min-width: 0; }
+.workspace-load-failure p { margin-top: 6px; }
+[data-theme="dark"] .workspace-load-failure { background: #351c1c; border-color: #7f3939; color: #fecaca; }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import {
   subscribeToCellColors,
   subscribeToConnection,
@@ -44,6 +44,7 @@ export interface RetreatData {
   retreatLoading: boolean;
   dataLoading: boolean;
   loadError: string | null;
+  retryData: () => void;
   groups: Group[];
   rooms: Room[];
   students: Record<string, Student>;
@@ -73,7 +74,7 @@ export interface RetreatData {
   connected: boolean;
 }
 
-type CachedRetreatData = Omit<RetreatData, "retreatLoading" | "dataLoading" | "loadError"> & {
+type CachedRetreatData = Omit<RetreatData, "retreatLoading" | "dataLoading" | "loadError" | "retryData"> & {
   loadedScope: string;
   cachedAt: number;
 };
@@ -111,6 +112,8 @@ function getCachedRetreatData(id: string): CachedRetreatData | null {
  * IguardClient에서 추출한 22개 실시간 구독 로직.
  */
 export function useRetreatData(id: string): RetreatData {
+  const [attempt, setAttempt] = useState(0);
+  const retryData = useCallback(() => setAttempt(value => value + 1), []);
   const [initialCache] = useState(() => getCachedRetreatData(id));
   const [retreat, setRetreat] = useState<Retreat | null>(initialCache?.retreat ?? null);
   const [retreatLoading, setRetreatLoading] = useState(!initialCache);
@@ -162,7 +165,7 @@ export function useRetreatData(id: string): RetreatData {
       },
       e => { if (alive) { failPath("수련회 정보")(e); setRetreatLoading(false); } });
     return () => { alive = false; unsub(); };
-  }, [id, failPath, okPath]);
+  }, [attempt, id, failPath, okPath]);
 
   // 연결 상태 구독 — 수련회와 무관한 앱 전역 상태라 별도 useEffect
   useEffect(() => {
@@ -172,7 +175,7 @@ export function useRetreatData(id: string): RetreatData {
       error => { if (alive) failPath("연결 상태")(error); },
     );
     return () => { alive = false; unsub(); };
-  }, [failPath, okPath]);
+  }, [attempt, failPath, okPath]);
 
   // 데이터 구독은 id·연도에만 의존 — 메타(이름/날짜) 실시간 변경 시 재구독하지 않도록
   const retreatYear = retreat?.id === id ? retreat.year : undefined;
@@ -245,7 +248,7 @@ export function useRetreatData(id: string): RetreatData {
       alive = false;
       unsubs.forEach(u => u());
     };
-  }, [id, retreatYear, failPath, okPath]);
+  }, [attempt, id, retreatYear, failPath, okPath]);
 
   // 같은 수련회 안에서 행정·프로그램·이가드를 오갈 때 마지막 정상 화면을 즉시
   // 복원한다. 현재 구독은 계속 다시 연결되어 캐시 뒤에서 최신 값을 덮어쓴다.
@@ -291,7 +294,7 @@ export function useRetreatData(id: string): RetreatData {
   ]);
 
   return {
-    retreat, retreatLoading, dataLoading, loadError,
+    retreat, retreatLoading, dataLoading, loadError, retryData,
     groups, rooms, students, participants, adminTeachers,
     meals, schedule, segments, posts, movements, movementRecords, buses, seating,
     todos, guide, periods, attendanceKeys, attendanceInfo, partial, cellColors, groupStaff, gbs, lodgingMaps, programs,

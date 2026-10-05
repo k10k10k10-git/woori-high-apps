@@ -12,6 +12,7 @@ import RetreatCalendarPanel from "@/app/RetreatCalendarPanel";
 import type { Retreat } from "@/lib/types";
 import { canAccessArea, canCreateRetreat, canEditArea, type MinistryRoles } from "./accessPolicy";
 import NewRetreatButton from "./NewRetreatButton";
+import RetreatAreaNav from "./RetreatAreaNav";
 import { useViewMode } from "@/context/ViewModeContext";
 
 export type VacationMode = "admin" | "program" | "field";
@@ -52,6 +53,7 @@ export default function VacationHome({
       : `/events/${id}/field`;
   const entryLabel = mode === "admin" ? "행정 화면" : mode === "program" ? "프로그램 준비" : "현장 화면";
   const selected = retreats.find((retreat) => retreat.id === selectedId);
+  const selectedAreaNav = selected && <RetreatAreaNav retreatId={selected.id} adminAllowed={canAccessArea("retreat-admin", roles)} fieldAllowed={canAccessArea("retreat-field", roles)} tone="surface" />;
 
   return (
     <main className="page-container max-w-7xl">
@@ -98,6 +100,8 @@ export default function VacationHome({
             )}
           </section>
 
+          {selectedAreaNav}
+
           {mode === "field" && (
             <section className="vacation-mobile-actions" aria-label="현장 바로가기">
               <h2>현장 바로가기</h2>
@@ -107,19 +111,7 @@ export default function VacationHome({
                 <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=rooms`)}><strong>조별 정보</strong><span>조원과 담당 스탭</span></button>
                 <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=lodging`)}><strong>숙소 안내</strong><span>호실과 배치 확인</span></button>
               </div>
-              {canAccessArea("retreat-admin", roles) && <button type="button" className="vacation-mobile-admin-link" onClick={() => router.push(`/events/${selected.id}/administration`)}>수련회 행정 보기 →</button>}
             </section>
-          )}
-
-          {mode === "admin" && canAccessArea("retreat-field", roles) && (
-            <button type="button" className="vacation-mobile-field-link" onClick={() => router.push(`/events/${selected.id}/field`)}>이가드 현장으로 이동 →</button>
-          )}
-
-          {mode === "program" && (
-            <div className="vacation-mobile-cross-links">
-              <button type="button" onClick={() => router.push(`/events/${selected.id}/administration`)}>행정 보기</button>
-              {canAccessArea("retreat-field", roles) && <button type="button" onClick={() => router.push(`/events/${selected.id}/field`)}>이가드 보기</button>}
-            </div>
           )}
 
           <details className="vacation-mobile-calendar">
@@ -242,6 +234,7 @@ export default function VacationHome({
 
           {/* 오른쪽: 준비 일정 — 행정·이가드가 공유하는 전역 캘린더 */}
           <div className="w-full min-w-0 flex-1">
+            {selectedAreaNav && <div className="mb-4">{selectedAreaNav}</div>}
             <div className="mb-3">
               <h2 className="text-lg font-bold text-slate-800">
                 준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span>

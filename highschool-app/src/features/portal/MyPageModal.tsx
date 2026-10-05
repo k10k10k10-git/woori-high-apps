@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent,
 import { CaretRight, ChartBar, ChatCircleText, ClockCounterClockwise, EnvelopeSimple, SquaresFour, UsersThree, X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useIsDesktop } from "@/lib/useIsDesktop";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import OverlayShell from "@/components/OverlayShell";
 import { canManageRolesOf, canManageSiteRequests, canViewActivityLogs, describeRoles } from "./accessPolicy";
 import { friendlyMinistryName } from "./dailyMinistryMessage";
@@ -38,10 +39,11 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
   const canViewActivity = canViewActivityLogs(roles);
   const tabs = [
     ...PERSONAL_TABS,
-    ...(canManageTeam ? [{ id: "team" as const, label: "팀원 관리", icon: UsersThree }] : []),
-    ...(canManageRequests ? [{ id: "requests" as const, label: "요청사항", icon: EnvelopeSimple }] : []),
-    ...(canViewActivity ? [{ id: "activity" as const, label: "활동 로그", icon: ClockCounterClockwise }] : []),
+    { id: "team" as const, label: "팀원 관리", icon: UsersThree },
+    { id: "requests" as const, label: "요청사항", icon: EnvelopeSimple },
+    { id: "activity" as const, label: "활동 로그", icon: ClockCounterClockwise },
   ];
+  const allowedTab = (id: MyPageTab) => id === "team" ? canManageTeam : id === "requests" ? canManageRequests : id === "activity" ? canViewActivity : true;
   const [requestedTab, setTab] = useState<MyPageTab>(initialTab);
   const tab = tabs.find((item) => item.id === requestedTab) ?? tabs[0];
   const displayName = friendlyMinistryName(memberName || user?.displayName) || "사용자";
@@ -97,7 +99,7 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
                 className="mypage-workspace-nav-item"
               >
                 <item.icon size={18} weight={tab.id === item.id ? "fill" : "regular"} aria-hidden="true" />
-                <span>{item.label}</span>
+                <span>{item.label}{!allowedTab(item.id) && <small> · 권한 필요</small>}</span>
               </button>
             </div>
           ))}
@@ -113,14 +115,14 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
           <button type="button" onClick={onClose} className="mypage-workspace-close" aria-label="마이페이지 닫기"><span>닫기</span><X size={18} aria-hidden="true" /></button>
         </header>
         <div key={tab.id} id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-tab-${tab.id}`} tabIndex={0} className="mypage-workspace-content" onClickCapture={followShortcut}>
-          <Suspense fallback={<div role="status" className="mypage-workspace-loading">{tab.label}을 불러오고 있습니다…</div>}>
+          <WorkspaceAccessGate allowed area={tab.label} embedded><Suspense fallback={<div role="status" className="mypage-workspace-loading">{tab.label}을 불러오고 있습니다…</div>}>
             {tab.id === "dashboard" && (canManageRequests ? <AdminDashboard onNavigate={setTab} /> : <RoleDashboardPanel />)}
             {tab.id === "ministry" && <MyMinistryPanel />}
             {tab.id === "myRequests" && <MyRequestsPanel />}
-            {tab.id === "team" && canManageTeam && <TeamModal embedded />}
-            {tab.id === "requests" && canManageRequests && <SiteRequestsPanel />}
-            {tab.id === "activity" && canViewActivity && <ActivityLogPanel />}
-          </Suspense>
+            {tab.id === "team" && <WorkspaceAccessGate allowed={canManageTeam} area="팀원 관리" embedded><TeamModal embedded /></WorkspaceAccessGate>}
+            {tab.id === "requests" && <WorkspaceAccessGate allowed={canManageRequests} area="요청 관리" embedded><SiteRequestsPanel /></WorkspaceAccessGate>}
+            {tab.id === "activity" && <WorkspaceAccessGate allowed={canViewActivity} area="활동 로그" embedded><ActivityLogPanel /></WorkspaceAccessGate>}
+          </Suspense></WorkspaceAccessGate>
         </div>
       </div>
     </OverlayShell>
