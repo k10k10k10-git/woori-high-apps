@@ -16,21 +16,20 @@ export default function TeamsHome() {
   if (roleError) return <TeamAccessState allowed>{null}</TeamAccessState>;
 
   const keys = accessibleTeamKeys(roles, teamMemberships);
-  const teams = SUNDAY_MINISTRY_TEAMS.filter((team) => keys.includes(team.key));
   const hasApprovedRole = canAccessArea("home", roles);
 
   return <main className="team-first-page">
     <header className="team-first-page-header">
-      <div><h1>팀</h1><p>학기가 바뀌어도 같은 팀 공간에서 명단, 출석, 자료와 주간 업무를 이어갑니다.</p></div>
-      <span className="team-first-count">{teams.length}개 팀</span>
+      <div><h1>팀</h1><p>학기가 바뀌어도 같은 팀 공간에서 명단, 출석, 자료와 주간 업무를 이어갑니다. 모든 팀 메뉴가 보이며, 내용은 담당 권한에 따라 열립니다.</p></div>
+      <span className="team-first-count">{SUNDAY_MINISTRY_TEAMS.length}개 팀</span>
     </header>
-    {teams.length === 0 ? <section className="team-first-empty"><UsersThree size={24} aria-hidden="true" /><h2>{hasApprovedRole ? "담당 팀 연결이 필요합니다" : "접근 승인이 필요합니다"}</h2><p>{hasApprovedRole ? "사용할 수 있는 역할은 확인됐지만 이 계정에 담당 팀이 연결되지 않았습니다." : "로그인은 완료됐지만 사용할 역할과 담당 팀이 아직 연결되지 않았습니다."}</p><p>교역자 또는 통합관리자에게 로그인 이메일과 담당 팀 이름을 알려 주세요. 담당자가 운영센터의 계정·권한에서 확인할 수 있습니다.</p><Link className="btn-secondary" href="/library/help#access">승인·팀 연결 방법 보기</Link><Link className="btn-secondary" href="/help/feedback">연결 문제 문의하기</Link></section> :
-      <section className="team-directory-grid" aria-label="접근 가능한 팀">
-        {teams.map((team) => <Link key={team.key} href={`/teams/${team.key}`} className="team-directory-card">
+    {keys.length === 0 && <section className="team-first-empty is-compact"><UsersThree size={24} aria-hidden="true" /><h2>{hasApprovedRole ? "담당 팀 연결이 필요합니다" : "접근 승인이 필요합니다"}</h2><p>{hasApprovedRole ? "사용할 수 있는 역할은 확인됐지만 이 계정에 담당 팀이 연결되지 않았습니다." : "로그인은 완료됐지만 사용할 역할과 담당 팀이 아직 연결되지 않았습니다."}</p><p>교역자 또는 통합관리자에게 로그인 이메일과 담당 팀 이름을 알려 주세요. 담당자가 운영센터의 계정·권한에서 확인할 수 있습니다.</p><Link className="btn-secondary" href="/library/help#access">승인·팀 연결 방법 보기</Link><Link className="btn-secondary" href="/help/feedback">연결 문제 문의하기</Link></section>}
+      <section className="team-directory-grid" aria-label="전체 팀 목록">
+        {SUNDAY_MINISTRY_TEAMS.map((team) => <Link key={team.key} href={`/teams/${team.key}`} prefetch={keys.includes(team.key) ? undefined : false} className="team-directory-card">
           <div className="team-directory-card__top"><span className="team-directory-mark">{team.label.slice(0, 1)}</span><span className={`team-directory-status${team.status === "planned" ? " is-planned" : ""}`}>{team.status === "planned" ? "기획 중" : "운영 중"}</span></div>
           <div><h2>{team.label}</h2><p>{team.status === "planned" ? "상시 운영 화면은 준비 중입니다. 연결된 학기의 명단과 기록은 팀 안에서 확인할 수 있습니다." : team.hint}</p></div>
-          <footer><span>{membershipLabel(teamMemberships[team.key])}</span><ArrowRight size={16} aria-hidden="true" /></footer>
+          <footer><span>{keys.includes(team.key) ? membershipLabel(teamMemberships[team.key]) : "권한 필요"}</span><ArrowRight size={16} aria-hidden="true" /></footer>
         </Link>)}
-      </section>}
+      </section>
   </main>;
 }

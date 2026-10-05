@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { useAuth } from "@/context/AuthContext";
@@ -33,13 +34,13 @@ const SECTIONS: Array<{ key: TeamTermSection; label: string }> = [
 ];
 
 export default function TeamTermWorkspace({ teamKey, semesterId, section }: { teamKey: SundayTeamKey; semesterId: string; section: TeamTermSection }) {
-  const { user, roles, teamMemberships } = useAuth();
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
   const [attempt, setAttempt] = useState(0);
-  return <TeamTermWorkspaceForUser key={`${user?.uid ?? "anonymous"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${teamKey}:${semesterId}:${attempt}`} teamKey={teamKey} semesterId={semesterId} section={section} onRetry={() => setAttempt((value) => value + 1)} />;
+  return <TeamTermWorkspaceForUser key={`${loading}:${!!roleError}:${user?.uid ?? "anonymous"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${teamKey}:${semesterId}:${attempt}`} teamKey={teamKey} semesterId={semesterId} section={section} onRetry={() => setAttempt((value) => value + 1)} />;
 }
 
 function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { teamKey: SundayTeamKey; semesterId: string; section: TeamTermSection; onRetry: () => void }) {
-  const { user, roles, teamMemberships } = useAuth();
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
   const allowed = canBrowseTeam(teamKey, roles, teamMemberships, semesterId);
   const contactAllowed = canReadTeamContacts(teamKey, roles, teamMemberships, semesterId);
   const privateAllowed = canReadSemesterPrivate(roles, teamMemberships);
@@ -62,7 +63,7 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
   const { fail: recordFailure, ok, errors, message: error } = useLoadErrors(`${teamKey}:${semesterId}`);
 
   useEffect(() => {
-    if (!user || !allowed) return;
+    if (!user || loading || roleError || !allowed) return;
     const mark = (key: string, success = true) => { setReady((current) => new Set(current).add(key)); if (success) ok(WORKSPACE_SOURCE_LABELS[key]); };
     const fail = (key: string) => (reason: Error) => { recordFailure(WORKSPACE_SOURCE_LABELS[key])(reason); mark(key, false); };
     if (!privateAllowed) mark("private");
@@ -102,7 +103,7 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
       }
       return () => { controller.abort(); unsubs.forEach((unsubscribe) => unsubscribe()); };
     })();
-  }, [allowed, contactAllowed, privateAllowed, roles, semesterId, teamKey, teamMemberships, user, ok, recordFailure]);
+  }, [loading, roleError, allowed, contactAllowed, privateAllowed, roles, semesterId, teamKey, teamMemberships, user, ok, recordFailure]);
 
   const team = semesterTeamForKey(teams, teamKey);
   const teamById = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
@@ -119,12 +120,12 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
   return <TeamAccessState allowed={allowed}><main className="team-term-page">
     <header className="team-term-header">
       <div className="team-workspace-title"><Link href="/teams">팀</Link><span>/</span><Link href={`/teams/${teamKey}`}>{teamMeta.label}</Link><span>/</span><span>{semesterId}</span></div>
-      <div className="team-term-heading"><div><p className="section-kicker">TERM</p><h1>{teamMeta.label} · {meta?.title ?? semesterId}</h1><p>이 학기의 {teamMeta.label} 명단, 출석과 자료를 확인합니다.</p></div>{past && <span className="team-role-badge">지난 학기</span>}</div>
+      <div className="team-term-heading"><div><h1>{teamMeta.label} · {meta?.title ?? semesterId}</h1><p>이 학기의 {teamMeta.label} 명단, 출석과 자료를 확인합니다.</p></div>{past && <span className="team-role-badge">지난 학기</span>}</div>
       {weeklyAllowed && <div className="team-context-note"><strong>{teamKey === "praise" ? "모임 출결은 주간 업무에서 입력하며 같은 학기 출석 원장에 저장됩니다." : "학기 기록과 주간·주일 업무를 같은 팀 공간에서 이어갑니다."}</strong><Link className="btn-secondary" href={praiseBack ?? weeklyHref}>{praiseBack ? "같은 모임 업무로 돌아가기" : "주간·주일 업무 열기"}</Link></div>}
       <nav className="team-term-tabs" aria-label={`${teamMeta.label} ${semesterId} 메뉴`}>{SECTIONS.map((item) => <Link key={item.key} href={item.key === "attendance" && teamKey === "praise" && weeklyAllowed ? praiseAttendanceHref : `/teams/${teamKey}/terms/${encodeURIComponent(semesterId)}/${item.key}`} aria-current={section === item.key ? "page" : undefined}>{item.label}</Link>)}</nav>
     </header>
     <section className="team-term-content">
-      {error && <div className="team-first-alert" role="alert">일부 학기 정보를 불러오지 못했습니다: {error}<button className="btn-secondary" onClick={onRetry}>다시 불러오기</button></div>}
+      {error && <LoadFailureNotice title="일부 학기 정보를 불러오지 못했습니다." sources={Object.keys(errors)} onRetry={onRetry} />}
       {!loaded ? <WorkspaceSkeleton label="팀 학기 정보를 불러오는 중입니다." rows={7} variant="page" /> : blocked ? <div className="team-first-state">학기 명단과 회차를 확인한 뒤 기록을 열 수 있습니다. 다시 불러오기를 눌러 주세요.</div> : !team ? <div className="team-first-empty"><h2>이 학기에 연결된 팀이 없습니다</h2><p>운영센터의 학기 팀 설정에서 {teamMeta.label}을 이 학기에 연결해 주세요.</p></div> : <>
         {!editable && <ReadOnlyBanner what={`${teamMeta.label} ${semesterId} 기록`} why={past ? "지난 학기는 기본적으로 조회 전용입니다." : "조회 역할은 이 팀 기록을 수정할 수 없습니다."} />}
         <SemesterEditProvider canEdit={editable}>

@@ -24,11 +24,11 @@ export function withoutError(prev: LoadErrorMap, key: string): LoadErrorMap {
 }
 
 /**
- * 배너 문구. 실패한 경로를 **전부** 이름으로 나열하고, 원인 메시지는 처음 것 하나만 붙인다
- * (권한 거부는 대개 원인이 하나라 같은 메시지가 반복된다).
+ * 배너 문구. 실패한 업무를 전부 이름으로 안내한다.
+ * 내부 오류와 DB 경로는 진단 상태에 보존하되 사용자 문구에 노출하지 않는다.
  */
 export function formatLoadErrors(errors: LoadErrorMap): string | null {
   const keys = Object.keys(errors);
   if (keys.length === 0) return null;
-  return `${keys.join(" · ")} 불러오기 실패 - ${errors[keys[0]]}`;
+  return `${keys.join(" · ")} 정보를 확인하지 못했습니다. 연결 상태를 확인한 뒤 다시 불러오기를 눌러 주세요.`;
 }

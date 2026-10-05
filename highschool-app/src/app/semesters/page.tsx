@@ -5,27 +5,34 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import { canDestroySemester, canEditArea } from "@/features/portal/accessPolicy";
 import { subscribeSemesters, createSemester, removeSemester } from "@/features/semester/db";
 import { Semester } from "@/features/semester/types";
-import LoginButton from "@/components/LoginButton";
-import { activeTeamKeys, canAccessOperationsCenter, ownTeamKey } from "@/features/teams/teamModel";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
+import OverlayShell from "@/components/OverlayShell";
+import { canAccessOperationsCenter } from "@/features/teams/teamModel";
 
 export default function SemestersPage() {
-  const router = useRouter();
-  const { user, loading, roles, teamMemberships, signIn, signOut } = useAuth();
+  const { user, roles, teamMemberships } = useAuth();
+  return <WorkspaceAccessGate allowed={canAccessOperationsCenter(roles, teamMemberships)} area="학기 운영" backHref="/operations" backLabel="운영센터 메뉴로">
+    <SemestersWorkspace key={`${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}`} />
+  </WorkspaceAccessGate>;
+}
+
+function SemestersWorkspace() {
+  const { user, roles, teamMemberships } = useAuth();
   const { toast } = useUI();
   const allowed = canAccessOperationsCenter(roles, teamMemberships);
   const canEdit = allowed && canEditArea("semester", roles);
-  const ownTeam = ownTeamKey(roles, teamMemberships);
-  const assignedTeams = activeTeamKeys(teamMemberships);
   // 학기 삭제·아카이브는 되돌릴 수 없다 — 통합관리자·교역자만.
   const canDestroy = canDestroySemester(roles);
   const [semesters, setSemesters] = useState<Semester[]>([]);
-  const [listLoading, setListLoading] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [loadedAttempt, setLoadedAttempt] = useState<number | null>(null);
+  const listLoading = loadedAttempt !== attempt;
   const [loadError, setLoadError] = useState<string | null>(null);
   const [newId, setNewId] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -36,21 +43,17 @@ export default function SemestersPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (loading || !user || allowed || assignedTeams.length === 0) return;
-    router.replace(ownTeam ? `/teams/${ownTeam}` : "/teams");
-  }, [allowed, assignedTeams.length, loading, ownTeam, router, user]);
-
-  useEffect(() => {
     if (!user || !allowed) return;
-    setListLoading(true);
-    setLoadError(null);
-    return subscribeSemesters(
-      (list) => { setSemesters(list); setListLoading(false); },
-      (error) => { setLoadError(error.message); setListLoading(false); },
+    let active = true;
+    const unsubscribe = subscribeSemesters(
+      (list) => { if (active) { setSemesters(list); setLoadError(null); setLoadedAttempt(attempt); } },
+      (error) => { if (active) { setLoadError(error.message); setLoadedAttempt(attempt); } },
     );
-  }, [user, allowed]);
+    return () => { active = false; unsubscribe(); };
+  }, [user, allowed, attempt]);
 
   async function handleCreate() {
+    if (creating || listLoading || loadError) return;
     const id = newId.trim();
     if (!/^\d{4}-[12]$/.test(id)) {
       toast("학기 ID는 '2026-1' 형식이어야 합니다", "warning");
@@ -74,7 +77,7 @@ export default function SemestersPage() {
   }
 
   async function handleDelete() {
-    if (!deleteTarget || deleteInput.trim() !== deleteTarget.id) return;
+    if (deleting || !deleteTarget || deleteInput.trim() !== deleteTarget.id) return;
     setDeleting(true);
     try {
       await removeSemester(deleteTarget.id);
@@ -86,37 +89,6 @@ export default function SemestersPage() {
     } finally {
       setDeleting(false);
     }
-  }
-
-  if (loading) {
-    return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
-  }
-
-  if (!user) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-4 p-6">
-        <h1 className="text-2xl font-bold">학기 운영</h1>
-        <p className="text-sm text-slate-500">분당우리교회 고등부 · 훈련·사역팀 관리</p>
-        <LoginButton signIn={signIn} />
-      </main>
-    );
-  }
-
-  if (!allowed) {
-    if (assignedTeams.length > 0) return <main className="team-first-state" role="status">담당 팀 화면으로 이동하고 있습니다…</main>;
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 p-6 text-center">
-        <h1 className="text-xl font-bold">접근 권한이 없습니다</h1>
-        <p className="text-sm text-slate-500">
-          이가드팀 계정은 현장 운영 화면만 사용할 수 있습니다.
-          <br />
-          통합관리자에게 역할 배정을 요청해주세요.
-        </p>
-        <button onClick={() => void signOut()} className="text-sm text-slate-400 underline">
-          로그아웃
-        </button>
-      </main>
-    );
   }
 
   return (
@@ -133,9 +105,7 @@ export default function SemestersPage() {
         </div>
 
         {loadError && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            ⚠ 로드 오류: {loadError}
-          </div>
+          <LoadFailureNotice title="학기 목록을 불러오지 못했습니다." onRetry={() => { setLoadError(null); setAttempt(value => value + 1); }} />
         )}
 
         <section className="mb-7 grid gap-4 sm:grid-cols-2">
@@ -186,25 +156,14 @@ export default function SemestersPage() {
                 학기 제목
                 <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="비우면 자동 입력" className="input mt-1 w-full" />
               </label>
-              <button onClick={() => void handleCreate()} disabled={creating || !newId.trim()} className="btn-primary justify-center">
+              <button onClick={() => void handleCreate()} disabled={creating || listLoading || !!loadError || !newId.trim()} className="btn-primary justify-center">
                 {creating ? "생성 중…" : "생성"}
               </button>
             </div>
           </section>
         )}
         {deleteTarget && (
-          <div
-            className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4"
-            onClick={() => setDeleteTarget(null)}
-            onKeyDown={(e) => e.key === "Escape" && setDeleteTarget(null)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label="학기 삭제 확인"
-              className="modal-card card w-full max-w-md p-5"
-              onClick={(e) => e.stopPropagation()}
-            >
+          <OverlayShell label="학기 삭제 확인" onClose={() => { if (!deleting) setDeleteTarget(null); }} closeOnBackdrop={!deleting} panelClassName="card p-6 w-full max-w-md">
               <h3 className="font-bold text-slate-900">학기를 삭제할까요?</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">
                 <strong>{deleteTarget.meta.title}</strong>({deleteTarget.id})의 신청·배치·출석·수료·커리큘럼·아카이브와
@@ -213,7 +172,8 @@ export default function SemestersPage() {
               <label className="mt-4 block text-sm">
                 <span className="text-xs text-slate-500">확인을 위해 학기 ID <strong>{deleteTarget.id}</strong>를 입력하세요</span>
                 <input
-                  autoFocus
+                  data-autofocus
+                  disabled={deleting}
                   value={deleteInput}
                   onChange={(e) => setDeleteInput(e.target.value)}
                   placeholder={deleteTarget.id}
@@ -222,7 +182,7 @@ export default function SemestersPage() {
                 />
               </label>
               <div className="mt-5 flex justify-end gap-2">
-                <button onClick={() => setDeleteTarget(null)} className="btn-secondary">취소</button>
+                <button disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-secondary">취소</button>
                 <button
                   onClick={() => void handleDelete()}
                   disabled={deleting || deleteInput.trim() !== deleteTarget.id}
@@ -231,8 +191,7 @@ export default function SemestersPage() {
                   {deleting ? "삭제 중…" : "영구 삭제"}
                 </button>
               </div>
-            </div>
-          </div>
+          </OverlayShell>
         )}
       </main>
     </div>

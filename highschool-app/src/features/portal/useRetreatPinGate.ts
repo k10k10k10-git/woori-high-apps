@@ -42,29 +42,35 @@ export function useRetreatPinGate(
 ) {
   const { enabled, roles } = options;
   const bypass = canManageRetreatPin(roles);
-  const scope = `${retreatId}|${enabled}|${bypass}`;
+  const [attempt, setAttempt] = useState(0);
+  const scope = `${retreatId}|${enabled}|${bypass}|${attempt}`;
   const [state, setState] = useState<GateState>({ scope, ...PENDING });
 
   useEffect(() => {
     if (!enabled || bypass) return;
-    return subscribeToIguardAccessLock(retreatId, nextLock => {
+    let active = true;
+    const unsubscribe = subscribeToIguardAccessLock(retreatId, nextLock => {
+      if (!active) return;
       setState({
         scope,
         lock: nextLock,
         unlocked: !nextLock || sessionUnlocked(retreatId, nextLock),
         lockError: null,
       });
-    }, error => {
-      setState({ scope, ...PENDING, lockError: `PIN 잠금 상태를 확인하지 못했습니다 - ${error.message}` });
+    }, () => {
+      if (!active) return;
+      setState({ scope, ...PENDING, lockError: "PIN 잠금 상태를 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." });
     });
+    return () => { active = false; unsubscribe(); };
   }, [enabled, bypass, retreatId, scope]);
 
   const markUnlocked = useCallback(() => {
     setState(prev => (prev.scope === scope ? { ...prev, unlocked: true } : prev));
   }, [scope]);
+  const retryLock = useCallback(() => setAttempt(value => value + 1), []);
 
   // 우회 대상(통합관리자·교역자)은 구독 없이 통과. 그 외에는 이번 scope의 구독 결과만 신뢰한다.
-  if (bypass) return { lock: null, unlocked: true, lockError: null, markUnlocked };
+  if (bypass) return { lock: null, unlocked: true, lockError: null, markUnlocked, retryLock };
   const current = state.scope === scope ? state : { scope, ...PENDING };
-  return { lock: current.lock, unlocked: current.unlocked, lockError: current.lockError, markUnlocked };
+  return { lock: current.lock, unlocked: current.unlocked, lockError: current.lockError, markUnlocked, retryLock };
 }

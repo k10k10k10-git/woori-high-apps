@@ -1,8 +1,10 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyPageTab } from "./MyPageModal";
 import type { MinistryRoles } from "./accessPolicy";
+import type { TeamMemberships } from "@/features/teams/teamModel";
 
 const state = vi.hoisted(() => ({
   pathname: "/",
@@ -10,12 +12,14 @@ const state = vi.hoisted(() => ({
     user: { uid: "header-user", displayName: "테스트 사용자", email: "test@example.test" } as { uid: string; displayName: string; email: string } | null,
     loading: false,
     roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles,
+    teamMemberships: {} as TeamMemberships,
     signOut: vi.fn(),
   },
   view: { mode: "desktop", isViewportMobile: false },
 }));
 
 vi.mock("next/navigation", () => ({ usePathname: () => state.pathname }));
+vi.mock("next/link", () => ({ default: ({ prefetch, onClick, ...props }: ComponentProps<"a"> & { prefetch?: boolean }) => <a {...props} onClick={(event) => { event.preventDefault(); onClick?.(event); }} data-prefetch={prefetch === false ? "false" : "default"} /> }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => state.auth }));
 vi.mock("@/context/ViewModeContext", () => ({ useViewMode: () => state.view }));
 vi.mock("./PortalSearch", () => ({ default: () => null }));
@@ -39,6 +43,7 @@ beforeEach(() => {
   state.auth.user = { uid: "header-user", displayName: "테스트 사용자", email: "test@example.test" };
   state.auth.loading = false;
   state.auth.roles = { semester: "superAdmin", retreat: "superAdmin" };
+  state.auth.teamMemberships = {};
   state.view.mode = "desktop";
   state.view.isViewportMobile = false;
   vi.clearAllMocks();
@@ -118,18 +123,68 @@ describe("전역 헤더 마이페이지 진입", () => {
   });
 });
 
-it("담당 팀이 없는 일반 스탭에게 운영센터와 빈 팀 메뉴를 숨긴다", () => {
+it("담당 팀이 없는 일반 스탭도 전체 메뉴를 보고 제한된 목적지는 미리 불러오지 않는다", () => {
   state.auth.roles = { semester: "staff", retreat: "none" };
   render(<GlobalPortalHeader />);
-  expect(screen.queryByRole("link", { name: "운영센터" })).not.toBeInTheDocument();
-  expect(screen.queryByRole("button", { name: "팀" })).not.toBeInTheDocument();
+  const nav = within(screen.getByRole("navigation", { name: "통합 사역 메뉴" }));
+  expect(nav.getByRole("link", { name: "운영센터 권한 필요" })).toHaveAttribute("data-prefetch", "false");
+  expect(nav.getByRole("link", { name: "행사 권한 필요" })).toHaveAttribute("href", "/events");
+  expect(nav.getByRole("link", { name: /훈련/ })).toHaveAttribute("href", "/training");
+  fireEvent.click(nav.getByRole("button", { name: "팀" }));
+  const teams = nav.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/teams/"));
+  expect(teams).toHaveLength(6);
+  for (const team of teams) {
+    expect(team).toHaveTextContent("권한 필요");
+    expect(team).toHaveAttribute("data-prefetch", "false");
+  }
 });
-it("찬양팀 사용자는 팀 운영 메뉴에서 자기 팀에만 진입한다", () => {
+it("찬양팀 사용자는 자기 팀을 바로 열고 나머지 다섯 팀도 권한 안내 링크로 본다", () => {
   state.auth.roles = { semester: "praise", retreat: "none" };
+  state.auth.teamMemberships = { praise: { role: "staff", active: true } };
   render(<GlobalPortalHeader />);
   fireEvent.click(screen.getByRole("button", { name: "팀" }));
   expect(screen.getByRole("link", { name: /찬양팀 모임/ })).toHaveAttribute("href", "/teams/praise");
+  expect(screen.getByRole("link", { name: /찬양팀 모임/ })).not.toHaveTextContent("권한 필요");
+  expect(screen.getByRole("link", { name: /바나바팀/ })).toHaveTextContent("권한 필요");
+  expect(screen.getByRole("link", { name: /바나바팀/ })).toHaveAttribute("data-prefetch", "false");
+});
+
+it("팀 메뉴 링크에서 Escape를 누르면 닫힌 메뉴 대신 열기 버튼에 포커스를 돌린다", () => {
+  render(<GlobalPortalHeader />);
+  const trigger = screen.getByRole("button", { name: "팀" });
+  fireEvent.click(trigger);
+  screen.getByRole("link", { name: /바나바팀/ }).focus();
+  fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByRole("link", { name: /바나바팀/ })).not.toBeInTheDocument();
+  expect(trigger).toHaveFocus();
+});
+
+it("마이페이지에서 Escape를 누를 때 남아 있던 팀 메뉴가 포커스를 가져가지 않는다", async () => {
+  render(<GlobalPortalHeader />);
+  fireEvent.click(screen.getByRole("button", { name: "팀" }));
+  await openMyPage();
+  const close = screen.getByRole("button", { name: "마이페이지 닫기" });
+  close.focus();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(close).toHaveFocus();
+});
+
+it("모바일 주요 메뉴와 펼친 메뉴에도 모든 영역과 여섯 팀이 표시된다", () => {
+  state.auth.roles = { semester: "none", retreat: "none" };
+  state.view.isViewportMobile = true;
+  render(<GlobalPortalHeader />);
+  expect(within(screen.getByRole("navigation", { name: "주요 메뉴" })).getAllByRole("link")).toHaveLength(6);
+  fireEvent.click(screen.getByRole("button", { name: "사이트 메뉴 열기" }));
+  const dialog = within(screen.getByRole("dialog", { name: "사이트 메뉴" }));
+  const teams = within(dialog.getByRole("navigation", { name: "모바일 팀 메뉴" })).getAllByRole("link");
+  expect(teams).toHaveLength(6);
+  for (const team of teams) expect(team).toHaveAttribute("data-prefetch", "false");
+  const main = within(dialog.getByRole("navigation", { name: "모바일 통합 사역 메뉴" }));
+  for (const label of ["훈련", "행사", "운영센터"]) {
+    expect(main.getByRole("link", { name: `${label} 권한 필요` })).toHaveAttribute("data-prefetch", "false");
+  }
+  fireEvent.click(main.getByRole("link", { name: "행사 권한 필요" }));
+  expect(screen.queryByRole("dialog", { name: "사이트 메뉴" })).not.toBeInTheDocument();
 });
 
 it.each(["pastor", "adminTeam"] as const)("%s 계정에 훈련과 운영센터를 연다", (semester) => {

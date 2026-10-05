@@ -3,6 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ArrowLeft, DotsThree, GearSix } from "@phosphor-icons/react";
+import OverlayShell from "@/components/OverlayShell";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeToRetreat, updateRetreat } from "@/lib/db";
 import { Retreat } from "@/lib/types";
@@ -72,21 +75,26 @@ const TAB_IDX = {
 } as const;
 
 // ── 탭 그룹 구조 (대그룹 → 소그룹) ─────────────────────────────
-type TabEntry = { label: string; idx: number };
 
 export default function RetreatPageClient() {
+  const { user, loading, roleError, roles } = useAuth();
+  const { id } = useParams();
+  return <RetreatPageContent key={`${id}:${user?.uid ?? "guest"}:${loading}:${!!roleError}:${roles.semester}:${roles.retreat}`} />;
+}
+
+function RetreatPageContent() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { user, loading: authLoading, roleError, retryRoles, roles } = useAuth();
+  const { user, loading: authLoading, roleError, roles } = useAuth();
   const adminAllowed = canAccessArea("retreat-admin", roles);
   const canSeeSensitive = canSeeSensitiveRetreat(roles);
   // 스탭팀장·이가드팀은 행정 화면을 조회만 한다.
   const canEditAdmin = canEditArea("retreat-admin", roles);
   const { toast } = useUI();
   // 현장 화면과 같은 잠금 — 어느 쪽에서 PIN을 걸어도 행정·이가드 모두 잠긴다.
-  const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(id, {
-    enabled: !authLoading && !!user && adminAllowed,
+  const { lock, unlocked, lockError, markUnlocked, retryLock } = useRetreatPinGate(id, {
+    enabled: !authLoading && !roleError && !!user && adminAllowed,
     roles,
   });
 
@@ -121,15 +129,13 @@ export default function RetreatPageClient() {
   }, [tab]);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push("/");
-      return;
-    }
+    if (authLoading || roleError || !user) return;
     if (!adminAllowed || !id) return;
 
-    return subscribeToRetreat(id,
+    let active = true;
+    const unsubscribe = subscribeToRetreat(id,
       (r) => {
+        if (!active) return;
         setRetreat(r);
         setLoadError(null);
         mergeRetreatWorkspaceSnapshot(id, { retreat: r });
@@ -140,6 +146,7 @@ export default function RetreatPageClient() {
         setLoading(false);
       },
       (e) => {
+        if (!active) return;
         const message = e instanceof Error ? e.message : String(e);
         const code = typeof e === "object" && e !== null && "code" in e ? String(e.code) : "";
         setLoadError(/permission[_-]denied/i.test(`${code} ${message}`) ? "permission" : "failed");
@@ -147,7 +154,8 @@ export default function RetreatPageClient() {
         setLoading(false);
       },
     );
-  }, [adminAllowed, authLoading, id, retryKey, router, user]);
+    return () => { active = false; unsubscribe(); };
+  }, [adminAllowed, authLoading, roleError, id, retryKey, router, user]);
 
   const parsedSheetUrl = useMemo(() => parseSheetUrl(sheetForm.sheetUrl), [sheetForm.sheetUrl]);
 
@@ -178,9 +186,7 @@ export default function RetreatPageClient() {
   // 민감 탭(환불계좌·주민번호·의료 기록)은 역할이 허용할 때만 보여준다.
   // retreatsPrivate는 Rules에서도 통합관리자·교역자·행정팀만 허용한다.
   const sensitiveTabs: number[] = canSeeSensitive ? [] : [TAB_IDX.CANCELLATION, TAB_IDX.MEDICAL, TAB_IDX.INSURANCE, TAB_IDX.PAYMENTS];
-  const visibleGroups = RETREAT_TAB_GROUPS
-    .map((group) => ({ ...group, tabs: (group.tabs as ReadonlyArray<TabEntry>).filter((t) => !sensitiveTabs.includes(t.idx)) }))
-    .filter((group) => group.tabs.length > 0);
+  const visibleGroups = RETREAT_TAB_GROUPS;
 
   // 현재 탭이 속한 그룹
   const activeGroupIdx = visibleGroups.findIndex(g => g.tabs.some(t => t.idx === tab));
@@ -191,41 +197,10 @@ export default function RetreatPageClient() {
   const primaryGroups = visibleGroups.filter((_, index) => index < 3 || index === safeGroupIdx);
   const moreGroups = visibleGroups.filter((group) => !primaryGroups.includes(group));
   // 주소를 직접 입력해 민감 탭으로 들어오는 경로도 막는다.
-  const effectiveTab = sensitiveTabs.includes(tab) ? (activeGroup?.tabs[0]?.idx ?? 0) : tab;
+  const effectiveTab = tab;
 
-  // ── 로딩 화면 ────────────────────────────────────────────────
-  if (authLoading || !user || (adminAllowed && loading)) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-screen-bg)" }}>
-      <div className="w-full max-w-5xl px-4"><WorkspaceSkeleton label="수련회 행정 화면을 불러오는 중입니다." rows={7} variant="page" /></div>
-    </div>
-  );
-
-  if (roleError) return (
-    <div className="min-h-screen flex items-center justify-center px-6"><div className="max-w-md text-center" role="alert">
-      <h1 className="text-xl font-bold">담당 사역을 확인하지 못했습니다</h1>
-      <p className="mt-2 text-sm text-slate-500">권한 정보를 불러오는 중 문제가 생겼습니다. 잠시 후 다시 시도해 주세요.</p>
-      <button onClick={retryRoles} className="btn-primary mt-5">다시 시도</button>
-    </div></div>
-  );
-
-  if (!adminAllowed) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
-      <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm">
-        <h1 className="text-xl font-bold text-slate-800">행정 화면 접근 권한이 없습니다</h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-500">
-          이가드 전용 계정은 현장 운영 화면만 사용할 수 있습니다.
-        </p>
-        <div className="mt-5 flex justify-center gap-2">
-          {canAccessArea("retreat-field", roles) && (
-            <button onClick={() => router.push(`/events/${encodeURIComponent(id)}/field`)} className="btn-primary">
-              현장 화면으로
-            </button>
-          )}
-          <button onClick={() => router.push("/")} className="btn-secondary">통합 홈으로</button>
-        </div>
-      </div>
-    </div>
-  );
+  if (authLoading || !user || roleError || !adminAllowed) return <WorkspaceAccessGate allowed={adminAllowed} area="수련회 행정" backHref="/events" backLabel="행사 목록으로">{null}</WorkspaceAccessGate>;
+  if (loading) return <div className="team-first-page"><WorkspaceSkeleton label="수련회 행정 화면을 불러오는 중입니다." rows={7} variant="page" /></div>;
 
   if (loadError) return (
     <div className="min-h-screen flex items-center justify-center px-6">
@@ -241,13 +216,7 @@ export default function RetreatPageClient() {
   );
 
   // ── PIN 잠금 게이트 (현장 화면과 동일) ───────────────────────
-  if (lockError) return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
-      <div className="mb-3 text-3xl" aria-hidden="true">⚠️</div>
-      <p className="mb-4 max-w-md text-sm text-red-700" role="alert">{lockError}</p>
-      <button onClick={() => router.push("/events")} className="btn-secondary">행사 목록으로</button>
-    </div>
-  );
+  if (lockError) return <main className="team-first-page"><LoadFailureNotice title="PIN 잠금 상태를 확인하지 못했습니다." onRetry={retryLock} /></main>;
   if (lock === undefined) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--color-screen-bg)" }}>
       <div className="text-slate-400 text-sm">잠금 확인 중...</div>
@@ -367,7 +336,7 @@ export default function RetreatPageClient() {
                   aria-selected={tab === t.idx}
                   className="workspace-tab shrink-0"
                 >
-                  {t.label}
+                  {t.label}{sensitiveTabs.includes(t.idx) ? " · 권한 필요" : ""}
                 </button>
               ))}
               {/* 오른쪽 여백 (스크롤 시 마지막 탭이 잘리지 않도록) */}
@@ -385,9 +354,7 @@ export default function RetreatPageClient() {
           시트 설정 모달
       ══════════════════════════════════════════════════════ */}
       {editingSheet && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onKeyDown={e => { if (e.key === 'Escape') setEditingSheet(false); }}>
-          <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-label="신청 응답 시트 설정">
+        <OverlayShell label="신청 응답 시트 설정" onClose={() => setEditingSheet(false)} panelClassName="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-lg mb-4">신청 응답 시트 설정</h3>
             <p className="text-sm text-slate-500 mb-4">
               Google 시트를 <strong>웹에 게시</strong>해야 데이터를 불러올 수 있습니다.<br />
@@ -438,8 +405,7 @@ export default function RetreatPageClient() {
                 취소
               </button>
             </div>
-          </div>
-        </div>
+        </OverlayShell>
       )}
 
       {/* ══════════════════════════════════════════════════════
@@ -458,6 +424,7 @@ export default function RetreatPageClient() {
               display:contents라 레이아웃에는 영향이 없다. 드래그처럼 폼 요소가 아닌 조작은
               각 탭이 useRetreatCanEdit()으로 따로 잠근다. */}
           {!canEditAdmin && <ReadOnlyBanner what="수련회 행정 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
+          {sensitiveTabs.includes(tab) && <WorkspaceAccessGate allowed={false} area="민감 행정 기록" embedded backHref="/events" backLabel="행사 목록으로">{null}</WorkspaceAccessGate>}
           <fieldset disabled={!canEditAdmin} className="contents">
           <RetreatEditProvider canEdit={canEditAdmin}>
           {/* 방문한 탭은 모두 마운트 후 유지한다. 첫 방문에만 준비하고 재방문은 즉시 복귀한다. */}
@@ -485,15 +452,15 @@ export default function RetreatPageClient() {
           {mountedTabs.has(TAB_IDX.TEACHERS) && <div style={{ display: effectiveTab === TAB_IDX.TEACHERS ? "block" : "none" }}><TeachersTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.CARPOOL) && <div style={{ display: effectiveTab === TAB_IDX.CARPOOL ? "block" : "none" }}><CarpoolTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.PARTIAL) && <div style={{ display: effectiveTab === TAB_IDX.PARTIAL ? "block" : "none" }}><PartialAttendanceTab retreat={retreat} /></div>}
-          {mountedTabs.has(TAB_IDX.INSURANCE) && <div style={{ display: effectiveTab === TAB_IDX.INSURANCE ? "block" : "none" }}><InsuranceTab retreat={retreat} /></div>}
-          {mountedTabs.has(TAB_IDX.CANCELLATION) && <div style={{ display: effectiveTab === TAB_IDX.CANCELLATION ? "block" : "none" }}><CancellationTab retreat={retreat} /></div>}
+          {canSeeSensitive && mountedTabs.has(TAB_IDX.INSURANCE) && <div style={{ display: effectiveTab === TAB_IDX.INSURANCE ? "block" : "none" }}><InsuranceTab retreat={retreat} /></div>}
+          {canSeeSensitive && mountedTabs.has(TAB_IDX.CANCELLATION) && <div style={{ display: effectiveTab === TAB_IDX.CANCELLATION ? "block" : "none" }}><CancellationTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.SUPPLIES) && <div style={{ display: effectiveTab === TAB_IDX.SUPPLIES ? "block" : "none" }}><SuppliesTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.ONSITE) && <div style={{ display: effectiveTab === TAB_IDX.ONSITE ? "block" : "none" }}><OnSiteRegistrationTab retreat={retreat} /></div>}
-          {mountedTabs.has(TAB_IDX.PAYMENTS) && <div style={{ display: effectiveTab === TAB_IDX.PAYMENTS ? "block" : "none" }}><UnmatchedPaymentsTab retreat={retreat} /></div>}
+          {canSeeSensitive && mountedTabs.has(TAB_IDX.PAYMENTS) && <div style={{ display: effectiveTab === TAB_IDX.PAYMENTS ? "block" : "none" }}><UnmatchedPaymentsTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.TSHIRT) && <div style={{ display: effectiveTab === TAB_IDX.TSHIRT ? "block" : "none" }}><TshirtTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.MEALCOUNT) && <div style={{ display: effectiveTab === TAB_IDX.MEALCOUNT ? "block" : "none" }}><MealCountTab retreat={retreat} /></div>}
           {mountedTabs.has(TAB_IDX.ADMINSUPPLIES) && <div style={{ display: effectiveTab === TAB_IDX.ADMINSUPPLIES ? "block" : "none" }}><AdminSuppliesTab retreat={retreat} /></div>}
-          {mountedTabs.has(TAB_IDX.MEDICAL) && <div style={{ display: effectiveTab === TAB_IDX.MEDICAL ? "block" : "none" }}><MedicalLogTab retreat={retreat} /></div>}
+          {canSeeSensitive && mountedTabs.has(TAB_IDX.MEDICAL) && <div style={{ display: effectiveTab === TAB_IDX.MEDICAL ? "block" : "none" }}><MedicalLogTab retreat={retreat} /></div>}
           </RetreatEditProvider>
           </fieldset>
         </main>

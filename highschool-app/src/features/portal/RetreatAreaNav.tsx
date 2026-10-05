@@ -1,8 +1,10 @@
 "use client";
 
 import { ClipboardText, ShieldCheck, UsersThree } from "@phosphor-icons/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import styles from "./RetreatAreaNav.module.css";
 
 export type RetreatAreaKey = "admin" | "programs" | "field";
 
@@ -19,11 +21,14 @@ export default function RetreatAreaNav({
   adminAllowed,
   fieldAllowed,
   onNavigate,
+  tone = "header",
 }: {
   retreatId: string;
-  current: RetreatAreaKey;
+  current?: RetreatAreaKey;
   adminAllowed: boolean;
   fieldAllowed: boolean;
+  /** 목록의 밝은/어두운 표면에서는 해당 테마의 본문 색상을 쓴다. */
+  tone?: "header" | "surface";
   /** 미저장 초안 가드가 있는 화면은 여기로 가로채 확인창을 띄운다. */
   onNavigate?: (href: string) => void;
 }) {
@@ -45,30 +50,34 @@ export default function RetreatAreaNav({
   }, [adminAllowed, adminHref, fieldAllowed, fieldHref, programsHref, router]);
 
   const items = [
-    adminAllowed ? { key: "admin" as const, label: "행정", Icon: UsersThree, href: adminHref } : null,
-    adminAllowed ? { key: "programs" as const, label: "프로그램 준비", Icon: ClipboardText, href: programsHref } : null,
-    fieldAllowed ? { key: "field" as const, label: "이가드", Icon: ShieldCheck, href: fieldHref } : null,
-  ].filter((item): item is NonNullable<typeof item> => item !== null);
-
-  if (items.length < 2) return null;
+    { key: "admin" as const, label: "행정", Icon: UsersThree, href: adminHref, allowed: adminAllowed },
+    { key: "programs" as const, label: "프로그램 준비", Icon: ClipboardText, href: programsHref, allowed: adminAllowed },
+    { key: "field" as const, label: "이가드", Icon: ShieldCheck, href: fieldHref, allowed: fieldAllowed },
+  ];
 
   return (
-    <nav className="retreat-area-nav" aria-label="수련회 업무 영역">
-      {items.map(({ key, label, Icon, href }) => {
+    <nav className={`retreat-area-nav ${styles.nav}${tone === "surface" ? ` ${styles.surface}` : ""}`} aria-label="수련회 업무 영역">
+      {items.map(({ key, label, Icon, href, allowed }) => {
         const isCurrent = key === current;
         return (
-          <button
+          <Link
             key={key}
-            type="button"
+            href={href}
+            prefetch={false}
+            className={styles.link}
             aria-current={isCurrent ? "page" : undefined}
-            aria-label={label}
-            onPointerEnter={() => router.prefetch(href)}
-            onFocus={() => router.prefetch(href)}
-            onClick={() => { if (!isCurrent) navigate(href); }}
+            onPointerEnter={() => { if (allowed) router.prefetch(href); }}
+            onFocus={() => { if (allowed) router.prefetch(href); }}
+            onClick={(event) => {
+              if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              if (!isCurrent) navigate(href);
+            }}
           >
             <Icon aria-hidden="true" size={17} weight={isCurrent ? "fill" : "regular"} />
             <span>{label}</span>
-          </button>
+            {!allowed && <small className={styles.permissionLabel}>권한 필요</small>}
+          </Link>
         );
       })}
     </nav>

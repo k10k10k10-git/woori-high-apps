@@ -142,6 +142,174 @@ test("도움말을 확인한 뒤 이전 팀 업무 화면으로 돌아갈 수 �
   await expectNoOverflow(page);
 });
 
+test("일반 스탭도 전체 상단 메뉴를 보고 모바일 메뉴를 키보드로 닫을 수 있다", async ({ page }, info) => {
+  await open(page, "header");
+  if ((page.viewportSize()?.width ?? 1280) <= 900) {
+    const trigger = page.getByRole("button", { name: "사이트 메뉴 열기" });
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "사이트 메뉴" });
+    await expect(dialog).toBeVisible();
+    const nav = dialog.getByRole("navigation", { name: "모바일 통합 사역 메뉴" });
+    for (const [label, href] of [["팀", "/teams"], ["훈련", "/training"], ["행사", "/events"], ["운영센터", "/operations"], ["자료", "/library"]]) {
+      await expect(nav.locator(`a[href="${href}"]`)).toContainText(label);
+    }
+    await expect(dialog.getByRole("navigation", { name: "모바일 팀 메뉴" }).getByRole("link")).toHaveCount(6);
+    await expect(nav.locator('a[href="/operations"]')).toHaveAttribute("data-qa-prefetch", "disabled");
+    await page.keyboard.press("Tab");
+    await expect(dialog.locator(":focus")).toBeVisible();
+    await page.screenshot({ path: info.outputPath("navigation-sheet.png") });
+    await expectAccessible(page);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  } else {
+    const nav = page.getByRole("navigation", { name: "통합 사역 메뉴" });
+    for (const href of ["/training", "/events", "/operations", "/library"]) await expect(nav.locator(`a[href="${href}"]`)).toBeVisible();
+    await expect(nav.locator('a[href="/operations"]')).toHaveAttribute("data-qa-prefetch", "disabled");
+    await page.screenshot({ path: info.outputPath("navigation-desktop.png") });
+    await expectAccessible(page);
+  }
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("일반 스탭에게 전체 팀과 운영센터의 모든 업무 메뉴를 표시한다", async ({ page }) => {
+  await open(page, "teams");
+  await expect(page.getByRole("region", { name: "전체 팀 목록" }).getByRole("link")).toHaveCount(6);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  await open(page, "operations");
+  for (const href of ["/operations/semesters", "/operations/accounts", "/operations/requests", "/operations/activity"]) await expect(page.locator(`main a[href="${href}"]`)).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("보이는 타팀 메뉴를 열어도 실제 팀 화면과 제한 데이터 구독은 차단된다", async ({ page }) => {
+  await open(page, "teams");
+  await page.getByRole("region", { name: "전체 팀 목록" }).locator('a[href="/teams/media"]').click();
+  await expect(page).toHaveURL(/\/teams\/media$/);
+  await expect(page.getByRole("heading", { name: /권한|접근|연결/ }).first()).toBeVisible();
+  await expect(page.getByText("synthetic-staff-a@example.invalid", { exact: false }).first()).toBeVisible();
+  await expect(page.locator('main a[href="/library/help#access"]')).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes.length)).toBe(0);
+  await expectNoOverflow(page);
+});
+
+test("권한 확인 중이거나 조회 오류가 있으면 이전 팀 권한이 있어도 구독하지 않는다", async ({ page }) => {
+  await open(page, "team", "loading");
+  await expect(page.getByRole("status").first()).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  await open(page, "team", "roleErrorAssigned");
+  await expect(page.getByRole("alert")).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  await page.getByRole("button", { name: /다시/ }).click();
+  await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toContain("applications");
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.retries)).toBe(1);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes.length)).toBe(0);
+});
+
+test("실제 운영 gate는 거부·로딩·권한 오류에서 제한 자녀를 마운트하지 않는다", async ({ page }) => {
+  for (const state of ["ready", "loading", "roleErrorAssigned"]) {
+    await open(page, "operationsGateProbe", state);
+    if (state === "loading") await expect(page.getByRole("status").first()).toBeVisible();
+    else if (state === "roleErrorAssigned") await expect(page.getByRole("alert")).toBeVisible();
+    else await expect(page.getByRole("heading", { name: /권한|접근/ }).first()).toBeVisible();
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.childMounts)).toBe(0);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  }
+});
+
+test("수련회 메뉴는 모두 보이지만 권한 없는 목적지는 미리 요청하지 않는다", async ({ page }) => {
+  await open(page, "retreatNav");
+  const nav = page.getByRole("navigation", { name: "수련회 업무 영역" });
+  await expect(nav.getByRole("link")).toHaveCount(3);
+  for (const area of ["administration", "programs", "field"]) {
+    const link = nav.locator(`a[href="/events/synthetic-retreat/${area}"]`);
+    await expect(link).toHaveAttribute("data-qa-prefetch", "disabled");
+    await expect(link).toContainText("권한 필요");
+    await link.focus();
+    await link.hover();
+  }
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.prefetches)).toEqual([]);
+  await nav.locator('a[href="/events/synthetic-retreat/administration"]').click();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toContain("/events/synthetic-retreat/administration");
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+});
+
+test("보완 검증: 다크 메뉴의 접근성과 데스크톱 팀 메뉴 키보드 복귀", async ({ page }, info) => {
+  await open(page, "header", "ready", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  if ((page.viewportSize()?.width ?? 1280) <= 900) {
+    const trigger = page.getByRole("button", { name: "사이트 메뉴 열기" });
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", { name: "사이트 메뉴" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("navigation", { name: "모바일 팀 메뉴" }).getByRole("link")).toHaveCount(6);
+    await page.screenshot({ path: info.outputPath("navigation-dark.png") });
+    await expectAccessible(page);
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+  } else {
+    const trigger = page.getByRole("navigation", { name: "통합 사역 메뉴" }).getByRole("button", { name: "팀", exact: true });
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const links = page.locator('.portal-dropdown-panel a[href^="/teams/"]');
+    await expect(links).toHaveCount(6);
+    await page.screenshot({ path: info.outputPath("navigation-dark.png") });
+    await expectAccessible(page);
+    await page.keyboard.press("Tab");
+    await expect(links.first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(links).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  }
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("보완 검증: 운영 메뉴와 실제 권한 거부 화면의 light·dark 품질", async ({ page }, info) => {
+  for (const theme of ["light", "dark"]) {
+    await open(page, "operations", "ready", theme);
+    await expect(page.getByRole("heading", { name: "운영센터", exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`operations-${theme}.png`), fullPage: true });
+    await expectNoOverflow(page);
+    await expectAccessible(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+    await open(page, "operationsGateProbe", "ready", theme);
+    await expect(page.getByRole("heading", { name: "운영센터 접근 권한이 필요합니다." })).toBeVisible();
+    await expect(page.getByText("synthetic-staff-a@example.invalid", { exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`operations-denied-${theme}.png`), fullPage: true });
+    await expectNoOverflow(page);
+    await expectAccessible(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.childMounts)).toBe(0);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  }
+});
+
+test("보완 검증: 수련회 밝은 배경 메뉴의 light·dark 접근성과 줄바꿈", async ({ page }, info) => {
+  for (const theme of ["light", "dark"]) {
+    await open(page, "retreatNavSurface", "ready", theme);
+    const nav = page.getByRole("navigation", { name: "수련회 업무 영역" });
+    await expect(nav.getByRole("link")).toHaveCount(3);
+    for (const link of await nav.getByRole("link").all()) {
+      await expect(link).toHaveAttribute("data-qa-prefetch", "disabled");
+      await expect(link).toContainText("권한 필요");
+      await link.focus();
+      await link.hover();
+    }
+    await page.screenshot({ path: info.outputPath(`retreat-navigation-${theme}.png`) });
+    await expectNoOverflow(page);
+    await expectAccessible(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.prefetches)).toEqual([]);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  }
+});
+
 test("승인 전 계정과 팀 미배정 계정에 다른 안내와 해결 경로를 제공한다", async ({ page }) => {
   await open(page, "teams", "unapproved");
   await expect(page.getByText(/승인|권한/, { exact: false }).first()).toBeVisible();

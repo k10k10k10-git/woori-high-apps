@@ -1,15 +1,16 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ list: vi.fn(), references: vi.fn(), create: vi.fn(), data: vi.fn(), execute: vi.fn(), refresh: vi.fn(), png: vi.fn(), pdf: vi.fn() }));
+const mocks = vi.hoisted(() => ({ list: vi.fn(), references: vi.fn(), create: vi.fn(), data: vi.fn(), execute: vi.fn(), refresh: vi.fn(), png: vi.fn(), pdf: vi.fn(), accounts: vi.fn(), sharedReferences: vi.fn(), roster: vi.fn() }));
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(window.location.search) }));
-vi.mock("./api", () => ({ listPraiseCreateReferences: mocks.references, listPraiseWorkspaces: mocks.list, createPraiseWorkspace: mocks.create, praiseOperationId: () => "operation-test", listPraiseAccounts: async () => ({ accounts: [] }), listPraiseReferences: async () => ({ semesters: [] }), listPraiseRoster: async () => ({ people: [], semesterHref: null }) }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "praise-user", email: "praise@example.test" }, loading: false, roleError: false }) }));
+vi.mock("./api", () => ({ listPraiseCreateReferences: mocks.references, listPraiseWorkspaces: mocks.list, createPraiseWorkspace: mocks.create, praiseOperationId: () => "operation-test", listPraiseAccounts: mocks.accounts, listPraiseReferences: mocks.sharedReferences, listPraiseRoster: mocks.roster }));
 vi.mock("./usePraiseData", () => ({ usePraiseData: mocks.data }));
 vi.mock("./components/stageExport", () => ({ exportStagePNG: mocks.png, printStagePDF: mocks.pdf }));
 import PraiseWorkspace from "./PraiseWorkspace";
 import { praiseFixture } from "./components/praiseTestFixtures";
 import type { PraiseStageVersion } from "./types";
-beforeEach(() => { vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry/praise"); mocks.references.mockResolvedValue({ semesters: [] }); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
+beforeEach(() => { vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry/praise"); mocks.references.mockResolvedValue({ semesters: [] }); mocks.accounts.mockResolvedValue({ accounts: [] }); mocks.sharedReferences.mockResolvedValue({ semesters: [] }); mocks.roster.mockResolvedValue({ people: [], semesterHref: null }); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
 afterEach(cleanup);
 describe("찬양팀 작업공간", () => {
   it("작은 화면에서 기간·모임 변경을 펼칠 수 있게 한다", async () => {
@@ -131,15 +132,62 @@ describe("찬양팀 작업공간", () => {
     expect(within(connection).getByText("1 / 4명 연결")).toBeInTheDocument();
     expect(within(connection).getByText("0 / 2명 연결")).toBeInTheDocument();
   });
-  it("멤버는 본인 참석·확정본·가이드만 보며 관리자 query로 편집탭을 열 수 없다", () => {
+  it("멤버도 다섯 탭을 보며 관리자 query는 선택을 유지한 채 권한 안내를 표시한다", () => {
     const view = praiseFixture(); view.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "member", staffId: "staff-1" };
     mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="praiseSettings" />);
-    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["이번 주", "출결", "등단"]);
+    expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["이번 주", "출결", "등단", "팀원·조 · 권한 필요", "운영 설정 · 권한 필요"]);
     expect(screen.queryByRole("button", { name: "팀원 등록" })).not.toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "이번 주" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "운영 설정 · 권한 필요" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "찬양팀 운영 설정 접근 권한이 필요합니다." })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "이번 주" }));
     expect(screen.getByRole("button", { name: "내 참석 입력" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "계정 연결 확인" })).not.toBeInTheDocument();
+  });
+  it.each([
+    ["attendance", "출결"], ["people", "팀원·조"], ["settings", "운영 설정"],
+  ])("조회자가 %s 주소를 열어도 탭 선택을 유지하고 보호된 조회·저장을 추가하지 않는다", async (tabId, label) => {
+    const view = praiseFixture();
+    view.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "observer", staffId: null };
+    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    window.history.replaceState(null, "", `/teams/praise/ongoing?workspace=synthetic-workspace&tab=${tabId}&meeting=meeting-1&origin=team`);
+    render(<PraiseWorkspace />);
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledOnce());
+    expect(screen.getAllByRole("tab")).toHaveLength(5);
+    expect(screen.getByRole("tab", { name: `${label} · 권한 필요` })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel", { name: `${label} · 권한 필요` })).toHaveTextContent(`찬양팀 ${label} 접근 권한이 필요합니다.`);
+    expect(screen.queryByRole("heading", { name: "모임 출결" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "팀원 등록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "계정 연결 확인" })).not.toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("tab")).toBe(tabId);
+    fireEvent.keyDown(screen.getByRole("tab", { name: `${label} · 권한 필요` }), { key: "Home" });
+    expect(screen.getByRole("tab", { name: "이번 주" })).toHaveFocus();
+    fireEvent.keyDown(screen.getByRole("tab", { name: "이번 주" }), { key: "End" });
+    expect(screen.getByRole("tab", { name: "운영 설정 · 권한 필요" })).toHaveFocus();
+    expect(screen.getByRole("heading", { name: "찬양팀 운영 설정 접근 권한이 필요합니다." })).toBeInTheDocument();
+    expect(mocks.accounts).not.toHaveBeenCalled();
+    expect(mocks.sharedReferences).not.toHaveBeenCalled();
+    expect(mocks.roster).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it("방문했던 보호된 탭도 권한이 회수되면 즉시 닫고 현재 선택에 권한 안내를 표시한다", async () => {
+    const view = praiseFixture();
+    const rendered = render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="운영 설정" />);
+    await waitFor(() => expect(mocks.list).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole("tab", { name: "팀원·조" }));
+    expect(screen.getByRole("button", { name: "팀원 등록" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "운영 설정" }));
+    const next = structuredClone(view);
+    next.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "observer", staffId: null };
+    mocks.data.mockReturnValue({ view: next, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    rendered.rerender(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="운영 설정" />);
+    expect(screen.getByRole("tab", { name: "운영 설정 · 권한 필요" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("heading", { name: "찬양팀 운영 설정 접근 권한이 필요합니다." })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "팀원 등록", hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "계정 연결 확인", hidden: true })).not.toBeInTheDocument();
+    expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("학생 연결 정보가 비공개인 비관리자에게 연결수를 0명으로 표시하지 않는다", async () => {
     const view = praiseFixture(); view.meta.semesterId = "semester-fixture"; view.meta.teamId = "praise-team";
