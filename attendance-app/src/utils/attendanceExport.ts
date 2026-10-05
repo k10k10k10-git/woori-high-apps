@@ -24,12 +24,20 @@ export function attendanceExport(state: AppState, ck: string, activeStudents: St
     const header = ['번호', '이름', ...viewWeeks.map(k => {
       const [mi, di] = k.split('-').map(Number);
       return `${months[mi]?.month}/${months[mi]?.sundays[di]}`;
+    }), '출석/주차', '출석률', '등급'];
+    const rows = [header, ...activeStudents.map(s => {
+      const { present, absent, rate } = calcStats(state, ck, s.id);
+      const recorded = present + absent;
+      const grade = rate >= 90 ? 'A' : rate >= 80 ? 'B' : rate >= 70 ? 'C' : 'D';
+      return [
+        String(s.num ?? ''),
+        s.name,
+        ...viewWeeks.map(k => attData[ck]?.[s.id]?.[k] ?? ''),
+        recorded > 0 ? `${present}/${recorded}` : '—',
+        recorded > 0 ? `${rate}%` : '—',
+        recorded > 0 ? grade : '—',
+      ];
     })];
-    const rows = [header, ...activeStudents.map(s => [
-      String(s.num ?? ''),
-      s.name,
-      ...viewWeeks.map(k => attData[ck]?.[s.id]?.[k] ?? ''),
-    ])];
     await downloadXLSX(rows, '출석', `출석_${curYear}_${ck}.xlsx`);
     close();
   }
