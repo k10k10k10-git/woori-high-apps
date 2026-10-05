@@ -365,9 +365,9 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
                           <span className="check-avatar" aria-hidden="true">{student.name.charAt(0)}</span>
                         )}
                         <span className="check-name">{student.name}</span>
-                        {saveFeedback?.sid === student.id && (
+                        {saveFeedback?.target.ck === ck && saveFeedback.target.k === selectedWeekKey && saveFeedback.sid === student.id && (
                           <span className={`attendance-row-save ${saveFeedback.status}`}>
-                            {saveFeedback.status === 'saving' ? '저장 중' : saveFeedback.status === 'saved' ? '저장됨' : '저장 실패'}
+                            {saveFeedback.status === 'saving' ? '저장 중' : saveFeedback.status === 'saved' ? '저장됨' : saveFeedback.status === 'unknown' ? '확인 필요' : '저장 실패'}
                           </span>
                         )}
                       </button>

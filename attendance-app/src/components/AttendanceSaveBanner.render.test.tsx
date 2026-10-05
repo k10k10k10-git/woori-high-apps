@@ -100,3 +100,14 @@ describe('AttendanceSaveBanner', () => {
     expect(dismissSaved).toHaveBeenCalledWith(200);
   });
 });
+
+it('결과 불명 안내와 재시도는 2초 후에도 남는다', () => {
+  vi.useFakeTimers();
+  const feedback: AttendanceSaveFeedback = { status: 'unknown', sid: target.sid, target, studentName: '가상 학생', value: 'X', targetLabel: '2026년 1부 1학년 1반 · 9월 6일' };
+  render(<AttendanceSaveBanner feedback={feedback} visible onDismissSaved={() => {}} onRetry={() => {}} />);
+  act(() => vi.advanceTimersByTime(5000));
+  expect(screen.getByRole('status').textContent).toContain('확인 필요');
+  expect(screen.getByRole('status').textContent).toContain('9월 6일 · 결석');
+  expect(screen.getByRole('button', { name: '재시도' })).toBeDefined();
+  cleanup(); vi.useRealTimers();
+});

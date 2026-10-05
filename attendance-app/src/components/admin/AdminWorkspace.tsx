@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '@/store/AppContext';
 import { getWindowYears, getKSTYear } from '@/utils/dates';
 import { ADMIN_NAVIGATION, adminNavigationItem, hasClassFilters } from '@/lib/adminNavigation';
+import AttendanceSaveStatus from '@/components/AttendanceSaveStatus';
 import AdminIcon from './AdminIcon';
 import './admin-workspace.css';
 
@@ -70,7 +71,7 @@ export default function AdminWorkspace({ children, onLogout, isOnline }: { child
           <div className="aw-page-name"><AdminIcon name={activeItem?.icon ?? 'dashboard'} size={17} /><span>{activeItem?.label ?? '출석부'}</span></div>
           <div className="aw-header-tools">
             <span className="aw-save-status" role="status" aria-live="polite">
-              {state.saveStatus !== 'idle' && <><span className={`aw-status-dot ${state.saveStatus}`} aria-hidden="true" />{state.saveStatus === 'saving' ? '저장 중' : '저장됨'}</>}
+              <AttendanceSaveStatus />
             </span>
             <label className="aw-year"><span>조회 연도</span><select value={state.curYear} onChange={event => dispatch({ type: 'SET_YEAR', payload: Number(event.target.value) })}>
               {getWindowYears(state.curYear).map(year => <option key={year} value={year}>{year}년{year === currentYear ? ' · 올해' : ''}</option>)}

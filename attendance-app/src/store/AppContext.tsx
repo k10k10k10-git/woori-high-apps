@@ -37,7 +37,8 @@ export interface AppState {
   events: EventsMap;
 
   // 저장 상태
-  saveStatus: 'idle' | 'saving' | 'saved';
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error' | 'unknown';
+  lastAttendanceSavedAt: number | null;
 
   // 모달 상태
   attModal: { open: boolean; target: AttEditTarget | null };
@@ -78,6 +79,7 @@ export const initialState: AppState = {
   events: buildEvents(kstYear, months, holidayRanges, {}),
 
   saveStatus: 'idle',
+  lastAttendanceSavedAt: null,
 
   attModal: { open: false, target: null },
   studentModal: { open: false, editId: null },
@@ -105,7 +107,7 @@ type Action =
   | { type: 'SET_CUSTOM_EVENTS'; revision: number; payload: CustomEventData }
   | { type: 'SET_DATA_ERROR'; revision: number; payload: { key: DataKey; message: string } }
   | { type: 'RETRY_DATA_LOAD' }
-  | { type: 'SET_SAVE_STATUS'; payload: AppState['saveStatus'] }
+  | { type: 'SET_SAVE_STATUS'; payload: AppState['saveStatus']; savedAt?: number }
   | { type: 'OPEN_ATT_MODAL'; payload: AttEditTarget }
   | { type: 'CLOSE_ATT_MODAL' }
   | { type: 'OPEN_STUDENT_MODAL'; payload: { editId: string | null } }
@@ -147,6 +149,7 @@ function resetData(state: AppState): AppState {
     dataLoaded: { classes: false, attendance: false, events: false },
     dataErrors: { classes: null, attendance: null, events: null },
     saveStatus: 'idle',
+    lastAttendanceSavedAt: null,
   };
 }
 
@@ -204,7 +207,9 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'RETRY_DATA_LOAD':
       return resetData(state);
     case 'SET_SAVE_STATUS':
-      return { ...state, saveStatus: action.payload };
+      return { ...state, saveStatus: action.payload,
+        lastAttendanceSavedAt: action.payload === 'saved' && action.savedAt !== undefined
+          ? action.savedAt : state.lastAttendanceSavedAt };
     case 'OPEN_ATT_MODAL':
       return { ...state, attModal: { open: true, target: action.payload } };
     case 'CLOSE_ATT_MODAL':
