@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { CaretRight, ChartBar, ChatCircleText, ClockCounterClockwise, EnvelopeSimple, SquaresFour, UsersThree, X } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
@@ -13,9 +14,6 @@ const AdminDashboard = lazy(() => import("./AdminDashboardPanel"));
 const RoleDashboardPanel = lazy(() => import("./RoleDashboardPanel"));
 const MyMinistryPanel = lazy(() => import("./MyMinistryPanel"));
 const MyRequestsPanel = lazy(() => import("./MyRequestsPanel"));
-const TeamModal = lazy(() => import("./TeamModal"));
-const SiteRequestsPanel = lazy(() => import("./SiteRequestsPanel"));
-const ActivityLogPanel = lazy(() => import("./ActivityLogPanel"));
 
 export type MyPageTab = "dashboard" | "ministry" | "myRequests" | "team" | "requests" | "activity";
 type Props = { onClose: () => void; initialTab?: MyPageTab };
@@ -25,6 +23,14 @@ const PERSONAL_TABS = [
   { id: "ministry", label: "내 사역", icon: SquaresFour },
   { id: "myRequests", label: "내 요청", icon: ChatCircleText },
 ] as const;
+
+function OperationsShortcut({ title, description, href }: { title: string; description: string; href: string }) {
+  return <section className="team-first-state workspace-access-state is-embedded">
+    <h2 className="page-title">{title}</h2>
+    <p>{description} 이 업무는 운영센터에서 이어서 진행합니다.</p>
+    <Link className="btn-primary" href={href} prefetch={false}>운영센터에서 {title} 열기<CaretRight size={16} aria-hidden="true" /></Link>
+  </section>;
+}
 
 export default function MyPageModal(props: Props) {
   const { user, roles } = useAuth();
@@ -119,9 +125,9 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
             {tab.id === "dashboard" && (canManageRequests ? <AdminDashboard onNavigate={setTab} /> : <RoleDashboardPanel />)}
             {tab.id === "ministry" && <MyMinistryPanel />}
             {tab.id === "myRequests" && <MyRequestsPanel />}
-            {tab.id === "team" && <WorkspaceAccessGate allowed={canManageTeam} area="팀원 관리" embedded><TeamModal embedded /></WorkspaceAccessGate>}
-            {tab.id === "requests" && <WorkspaceAccessGate allowed={canManageRequests} area="요청 관리" embedded><SiteRequestsPanel /></WorkspaceAccessGate>}
-            {tab.id === "activity" && <WorkspaceAccessGate allowed={canViewActivity} area="활동 로그" embedded><ActivityLogPanel /></WorkspaceAccessGate>}
+            {tab.id === "team" && <WorkspaceAccessGate allowed={canManageTeam} area="팀원 관리" embedded><OperationsShortcut title="계정·권한" description="팀원의 사이트 권한과 담당 팀을 관리합니다." href="/operations/accounts" /></WorkspaceAccessGate>}
+            {tab.id === "requests" && <WorkspaceAccessGate allowed={canManageRequests} area="요청 관리" embedded><OperationsShortcut title="요청 관리" description="접수된 문제 제보를 확인하고 처리 결과를 남깁니다." href="/operations/requests" /></WorkspaceAccessGate>}
+            {tab.id === "activity" && <WorkspaceAccessGate allowed={canViewActivity} area="활동 로그" embedded><OperationsShortcut title="활동 로그" description="누가 어떤 업무를 변경했는지 확인합니다." href="/operations/activity" /></WorkspaceAccessGate>}
           </Suspense></WorkspaceAccessGate>
         </div>
       </div>
