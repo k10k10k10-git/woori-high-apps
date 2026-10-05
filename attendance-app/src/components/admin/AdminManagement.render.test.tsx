@@ -42,6 +42,17 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it('개인 상세도 주소·생년월일·연간 출석률·등급을 같은 기준으로 표시한다', () => {
+  render(<StudentDirectory onOpenClass={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: '간편 목록' }));
+  fireEvent.click(screen.getByRole('button', { name: '김하나' }));
+  const detail = screen.getByRole('complementary');
+  expect(within(detail).getByText('경기도 성남시 테스트로 12')).toBeTruthy();
+  expect(within(detail).getByText('2010-03-14')).toBeTruthy();
+  expect(within(detail).getByText('100%')).toBeTruthy();
+  expect(within(detail).getByText('A')).toBeTruthy();
+});
+
 describe('관리자 명단·출석 접근 경로', () => {
   it.each(['CSV', 'Excel'])('%s 명단에는 상태 대신 연간 출석률·등급을 내보내고 장결 기록과 무기록을 구분한다', format => {
     render(<StudentDirectory onOpenClass={vi.fn()} />);
@@ -49,7 +60,8 @@ describe('관리자 명단·출석 접근 경로', () => {
     fireEvent.click(screen.getByRole('button', { name: format }));
     const download = format === 'CSV' ? mocks.downloadCSV : mocks.downloadXLSX;
     const rows = download.mock.calls[0][0];
-    expect(rows[0]).toEqual(['이름', '부서', '학년', '반', '담임 교사', '학생 연락처', '보호자 연락처', '학교', '출석률', '등급']);
+    expect(rows[0]).toEqual(['이름', '부서', '학년', '반', '담임 교사', '학생 연락처', '보호자 연락처', '학교', '주소', '생년월일', '출석률', '등급']);
+    expect(rows[1].slice(8, 10)).toEqual(['경기도 성남시 테스트로 12', '2010-03-14']);
     expect(rows.slice(1).map((row: string[]) => [row[0], ...row.slice(-2)]))
       .toEqual([['김하나', '100%', 'A'], ['박두나', '0%', 'D'], ['이세나', '—', '—']]);
     expect(JSON.stringify(rows)).not.toMatch(/장결|일반|정상/);

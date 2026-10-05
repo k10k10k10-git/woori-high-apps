@@ -512,6 +512,14 @@
   font-size: 18px;
   font-weight: 700;
 }
+.history-modal-sheet {
+  --text: #292a30;
+  --text2: #666773;
+  --text3: #666773;
+  --primary: #6355a7;
+  --green-text: #397052;
+  --red-text: #a53f3f;
+}
 .history-modal-copy { min-width: 0; }
 .history-modal-name { overflow: hidden; font-size: 15px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .history-modal-subtitle { margin-top: 1px; color: var(--text3); font-size: 11px; }
@@ -527,13 +535,19 @@
 }
 .history-year-card.is-current { border-color: var(--primary); }
 .history-year-heading { padding: 7px 10px; color: var(--text); background: var(--surface2); font-size: 13px; font-weight: 700; }
-.history-year-card.is-current .history-year-heading { color: #fff; background: var(--primary); }
+.history-year-card.is-current .history-year-heading { color: #584a97; background: #f3f0fa; }
 .history-year-summary { padding: 8px 10px; border-bottom: 1px solid var(--border); }
-.history-year-class { margin-bottom: 6px; color: var(--text2); font-size: 11px; }
-.history-year-empty { color: var(--text3); font-size: 11px; }
+.history-year-class { margin-bottom: 6px; color: var(--text2); font-size: 12px; }
+.history-year-empty { color: var(--text2); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
 .history-year-grade { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.history-year-totals { color: var(--text3); font-size: 10px; }
+.history-year-totals { color: var(--text2); font-size: 12px; line-height: 1.7; }
 .history-month-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 10px; }
+.history-month { min-width: 32px; text-align: center; }
+.history-month-label { color: var(--text2); font-size: 12px; }
+.history-month-value { color: var(--text); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.history-current-label { font-size: 12px; font-weight: 400; }
+.history-retry { display: block; min-height: 44px; margin-top: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--primary-text); font: inherit; cursor: pointer; }
+.history-retry:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .teacher-attendance-modal { background: rgba(27, 28, 33, .42); }
 .teacher-attendance-modal .modal-sheet {
@@ -580,8 +594,8 @@
 .teacher-attendance-modal .history-year-heading { padding: 9px 10px; color: var(--tw-muted, #666773); background: #fafafa; font-size: 12px; font-weight: 600; }
 .teacher-attendance-modal .history-year-card.is-current .history-year-heading { color: #584a97; background: #f3f0fa; }
 .teacher-attendance-modal .history-year-summary { min-height: 100px; padding: 10px; border-bottom: 1px solid var(--tw-line-soft, #efeff2); }
-.teacher-attendance-modal .history-year-class { margin-bottom: 7px; color: var(--tw-muted, #666773); font-size: 11px; }
-.teacher-attendance-modal .history-year-empty { color: #747580; font-size: 11px; }
+.teacher-attendance-modal .history-year-class { margin-bottom: 7px; color: var(--tw-muted, #666773); font-size: 12px; }
+.teacher-attendance-modal .history-year-empty { color: #666773; font-size: 12px; }
 .teacher-attendance-modal .history-year-grade { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-.teacher-attendance-modal .history-year-totals { color: #747580; font-size: 10px; }
+.teacher-attendance-modal .history-year-totals { color: #666773; font-size: 12px; }
 .teacher-attendance-modal .history-month-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 9px 10px; }

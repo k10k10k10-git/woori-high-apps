@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   onValue: vi.fn(),
   state: { current: null as unknown },
+  stats: null as null | { present: number; absent: number; rate: number },
 }));
 
 vi.mock('next/navigation', () => ({
@@ -32,7 +33,7 @@ vi.mock('@/store/AppContext', async importOriginal => {
   return {
     ...actual,
     useApp: () => ({ state: mocks.state.current as AppState, dispatch: mocks.dispatch }),
-    calcStats: () => ({ present: 1, absent: 0, rate: 100 }),
+    calcStats: () => mocks.stats ?? ({ present: 1, absent: 0, rate: 100 }),
   };
 });
 
@@ -50,6 +51,17 @@ vi.mock('@/utils/attendanceEntry', () => ({
 
 import { initialState } from '@/store/AppContext';
 import AttendanceTab from './AttendanceTab';
+
+// 화면 단위 검사는 폼 훅을 격리한다. 실제 세션 보존·저장 경합은 TeacherDraft.render.test.tsx에서 검증한다.
+vi.mock('@/hooks/useTeacherDraft', async () => {
+  const { useState } = await import('react');
+  return { useTeacherDraft: () => {
+    const [current, setCurrent] = useState({ studentId: '', text: '' });
+    const [saving, setSaving] = useState(false);
+    return { current, saving, setSaving, setStudentId: (studentId: string) => setCurrent(v => ({ ...v, studentId })),
+      setText: (text: string) => setCurrent(v => ({ ...v, text })), clearSaved: () => setCurrent({ studentId: '', text: '' }) };
+  } };
+});
 
 function teacherState(): AppState {
   return {
@@ -83,6 +95,7 @@ function teacherState(): AppState {
 describe('AttendanceTab 교사 출석 입력', () => {
   beforeEach(() => {
     mocks.state.current = teacherState();
+    mocks.stats = null;
     mocks.dispatch.mockReset();
     mocks.ref.mockClear();
     mocks.set.mockReset();
@@ -93,6 +106,17 @@ describe('AttendanceTab 교사 출석 입력', () => {
   });
 
   afterEach(() => cleanup());
+
+  it('무기록 평균은 0%가 아닌 입력 기록 없음으로 구분한다', () => {
+    mocks.stats = { present: 0, absent: 0, rate: 0 };
+    mocks.state.current = { ...teacherState(), userRole: { role: 'admin' } };
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '출석부' }));
+    const label = screen.getByText('평균 출석률');
+    expect(label.parentElement?.textContent).toContain('—');
+    expect(label.parentElement?.textContent).toContain('입력 기록 없음');
+    expect(label.parentElement?.textContent).not.toContain('0%');
+  });
 
   it('학생 이름을 실제 버튼으로 제공하고 출석 이력을 연다', () => {
     render(<AttendanceTab />);

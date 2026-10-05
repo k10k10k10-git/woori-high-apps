@@ -110,9 +110,9 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
   }), [allWeeks, curView, months]);
 
   const avgRate = useMemo(() => {
-    if (totalStudents === 0) return 0;
+    if (totalStudents === 0) return null;
     const statsArr = activeStudents.map(s => calcStats(state, ck, s.id)).filter(st => (st.present + st.absent) > 0);
-    if (statsArr.length === 0) return 0;
+    if (statsArr.length === 0) return null;
     const sum = statsArr.reduce((acc, st) => {
       const rec = st.present + st.absent;
       return acc + Math.round((st.present / rec) * 100);
@@ -249,7 +249,8 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
           </div>
           <div className="stat-card">
             <div className="stat-card-label">평균 출석률</div>
-            <div className="stat-card-value">{avgRate}%</div>
+            <div className="stat-card-value">{avgRate === null ? '—' : `${avgRate}%`}</div>
+            <div className="stat-card-label">{avgRate === null ? '입력 기록 없음' : '기록 있는 일반 학생 평균 · 행사·미입력 제외'}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card-label">담당 교사</div>
@@ -414,6 +415,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
             <div className="suggest-form-card">
               <h2 className="suggest-form-title">특이사항 작성</h2>
               <p id="suggest-help" className="suggest-form-help">학생 돌봄이나 반 운영에 참고할 내용을 남겨 주세요. 민감한 개인정보는 필요한 만큼만 적어 주세요.</p>
+              <p className="suggest-form-help">작성 중 내용은 화면을 이동해도 유지됩니다. 새로고침·로그아웃하면 지워집니다.</p>
               <label className="suggest-label" htmlFor="note-student">학생 <span className="suggest-optional">선택</span></label>
               <select id="note-student" className="visit-student-select" value={suggestStudentId} onChange={event => setSuggestStudentId(event.target.value)}>
                 <option value="">반 전체·운영 관련</option>
@@ -485,6 +487,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
             <div className="suggest-form-card visit-form-card">
               <h2 className="suggest-form-title">학생 심방 요청</h2>
               <p id="visit-help" className="suggest-form-help">교역자와 관리자에게 확인이 필요한 학생과 이유를 전달합니다.</p>
+              <p className="suggest-form-help">작성 중 내용은 화면을 이동해도 유지됩니다. 새로고침·로그아웃하면 지워집니다.</p>
               <label className="suggest-label" htmlFor="visit-student">학생</label>
               <select id="visit-student" className="visit-student-select" value={visitStudentId} onChange={event => setVisitStudentId(event.target.value)}>
                 <option value="">학생을 선택해 주세요</option>
@@ -493,7 +496,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               <label className="suggest-label" htmlFor="visit-reason">요청 이유</label>
               <textarea id="visit-reason" className="suggest-textarea" value={visitText} onChange={event => setVisitText(event.target.value)}
                 aria-describedby="visit-help" placeholder="최근 상황과 확인이 필요한 내용을 간단히 적어 주세요" rows={4} />
-              <button type="button" className="suggest-submit-btn" onClick={() => visitStudent && handleVisitSubmit(visitStudent.name)}
+              <button type="button" className="suggest-submit-btn" onClick={() => visitStudent && handleVisitSubmit(visitStudent.name, visitStudent.personId)}
                 disabled={!visitStudent || !visitText.trim() || visitSaving}>
                 {visitSaving ? '요청 중...' : '심방 요청하기'}
               </button>

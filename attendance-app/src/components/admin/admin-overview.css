@@ -95,6 +95,10 @@
 .ao-visit-row { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(260px, 1.5fr) auto; align-items: center; gap: 18px; padding: 16px 0; border-bottom: 1px solid #e5e5e8; }
 .ao-visit-person strong { display: block; font-size: 14px; font-weight: 600; }
 .ao-visit-person span { display: block; margin-top: 3px; color: #666773; font-size: 11px; }
+.ao-visit-contacts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; min-width: 0; }
+.ao-visit-contacts a { display: inline-flex; align-items: center; min-height: 44px; color: #584a97; font-size: 12px; overflow-wrap: anywhere; text-underline-offset: 3px; }
+.ao-visit-contacts button { min-height: 44px; padding: 6px 10px; border: 1px solid #dedce6; border-radius: 10px; background: #fff; color: #584a97; font: inherit; cursor: pointer; }
+.ao-visit-contacts :is(a, button):focus-visible { outline: 2px solid #6355a7; outline-offset: 3px; }
 .ao-visit-row > p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .ao-visit-action { display: flex; align-items: center; gap: 10px; color: #666773; font-size: 11px; white-space: nowrap; }
 .ao-visit-action button { min-height: 44px; padding: 0 11px; border: 1px solid #dedce6; border-radius: 10px; background: #fff; color: #584a97; font: inherit; cursor: pointer; }
