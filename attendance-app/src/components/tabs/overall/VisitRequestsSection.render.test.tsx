@@ -4,25 +4,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
 
 const mocks = vi.hoisted(() => ({
-  update: vi.fn(),
+  save: vi.fn(),
   onValue: vi.fn(),
   dispatch: vi.fn(),
   state: {} as typeof initialState,
   ref: vi.fn((_db: unknown, path: string) => ({ path })),
 }));
 
-vi.mock('@/lib/db', () => ({ db: {}, ref: mocks.ref, onValue: mocks.onValue, update: mocks.update }));
+vi.mock('@/lib/db', () => ({ db: {}, ref: mocks.ref, onValue: mocks.onValue }));
+vi.mock('@/lib/visitRequestStatus', () => ({ saveVisitRequestStatus: mocks.save }));
 vi.mock('@/store/AppContext', async original => ({
   ...await original<typeof import('@/store/AppContext')>(),
-  useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),
+  useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch, getState: () => mocks.state }),
 }));
 
 import VisitRequestsSection from './VisitRequestsSection';
 
 beforeEach(() => {
-  mocks.state = { ...initialState, curYear: 2026, classData: { '1-1-1': { teacher: '김교사', students: [] } } };
+  mocks.state = { ...initialState, userRole: { role: 'admin', email: 'fixture@example.com' }, curYear: 2026, classData: { '1-1-1': { teacher: '김교사', students: [] } } };
   mocks.dispatch.mockClear();
-  mocks.update.mockReset().mockResolvedValue(undefined);
+  mocks.save.mockReset().mockResolvedValue(undefined);
   mocks.ref.mockClear();
   mocks.onValue.mockReset().mockImplementation((_query, receive) => {
     receive({ val: () => ({ '1-1-1': {
@@ -48,7 +49,7 @@ describe('관리자 심방 요청', () => {
     fireEvent.click(screen.getByRole('button', { name: '출석 이력 보기' }));
     expect(mocks.dispatch).toHaveBeenCalledWith({ type: 'OPEN_HISTORY_MODAL', payload: { sid: 'moved', ck: '2-1-7' } });
     fireEvent.click(screen.getByRole('button', { name: '처리 완료' }));
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ path: 'suggestions/2026/1-1-1/open' }, expect.objectContaining({ status: 'done' })));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith(2026, '1-1-1', expect.objectContaining({ id: 'open' }), 'done', expect.any(Function)));
   });
   it('연결이 불확실하면 연락처와 이력 버튼을 표시하지 않는다', () => {
     mocks.state.classData = { '1-1-1': { students: [{ id: 's1', name: '다른 학생', phone: '010-0000-9999' }] } };
@@ -69,10 +70,7 @@ describe('관리자 심방 요청', () => {
     expect(screen.queryByText('특이사항')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: '처리 완료' }));
-    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(
-      { path: 'suggestions/2026/1-1-1/open' },
-      expect.objectContaining({ status: 'done' }),
-    ));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith(2026, '1-1-1', expect.objectContaining({ id: 'open' }), 'done', expect.any(Function)));
 
     fireEvent.click(screen.getByRole('button', { name: /처리 완료 1/ }));
     expect(screen.getByText('완료 학생')).toBeTruthy();
@@ -83,10 +81,34 @@ describe('관리자 심방 요청', () => {
     const target = await screen.findByRole('article', { name: '완료 학생 심방 요청' });
     await waitFor(() => expect(target).toBe(document.activeElement));
     expect(screen.getByRole('button', { name: /처리 완료 1/ }).getAttribute('aria-pressed')).toBe('true');
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.save).not.toHaveBeenCalled();
   });
   it('심방 직접 링크의 대상이 사라지면 빈 목록과 구분해 안내한다', () => {
     render(<VisitRequestsSection requestKey="1-1-1/missing" />);
     expect(screen.getByRole('status').textContent).toContain('요청한 심방 건을 찾을 수 없습니다');
+  });
+  it('저장 실패를 지속 오류와 다시 불러오기 동작으로 안내한다', async () => {
+    mocks.save.mockRejectedValue(new Error('처리 중 요청이 변경되었습니다.'));
+    render(<VisitRequestsSection />);
+    fireEvent.click(screen.getByRole('button', { name: '처리 완료' }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('변경되었습니다'));
+    fireEvent.click(screen.getByRole('button', { name: '목록 다시 불러오기' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mocks.onValue).toHaveBeenCalledTimes(2);
+  });
+  it('저장 중 다른 행도 비활성화하고 연도 전환은 저장 결과 알림을 무시한다', async () => {
+    let complete!: () => void;
+    mocks.save.mockImplementation(() => new Promise<void>(resolve => { complete = resolve; }));
+    const { rerender } = render(<VisitRequestsSection />);
+    fireEvent.click(screen.getByRole('button', { name: '처리 완료' }));
+    fireEvent.click(screen.getByRole('button', { name: /처리 완료 1/ }));
+    expect(screen.getByRole('button', { name: '다시 열기' })).toHaveProperty('disabled', true);
+    const guard = mocks.save.mock.calls[0][4] as () => boolean;
+    expect(guard()).toBe(true);
+    mocks.state = { ...mocks.state, curYear: 2025 };
+    rerender(<VisitRequestsSection />);
+    expect(guard()).toBe(false);
+    complete();
+    await waitFor(() => expect(screen.queryByRole('button', { name: '저장 중' })).toBeNull());
   });
 });

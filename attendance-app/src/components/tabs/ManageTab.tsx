@@ -18,7 +18,7 @@ export default function ManageTab() {
   const classKeys = useClassKeys(state);
   const ck = useClassKey(state);
   const students = classData[ck]?.students ?? [];
-  const isAdmin = !userRole || userRole.role === 'admin';
+  const isAdmin = userRole?.role === 'admin';
   const teacher = classData[ck]?.teacher ?? '';
   const teacherPhoto = classData[ck]?.teacherPhoto ?? '';
   const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);

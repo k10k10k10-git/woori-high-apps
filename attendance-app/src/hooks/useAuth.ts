@@ -6,6 +6,7 @@ import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
 import { demoCredentials } from '@/lib/demo';
 import { loadUserRole } from './useFirebaseData';
+import { writeLoginPreferences } from '@/utils/loginPreferences';
 
 export function useAuth() {
   const { dispatch } = useApp();
@@ -38,13 +39,7 @@ export async function doLogin(
   await setPersistence(auth, persistence);
   await signInWithEmailAndPassword(auth, email, pw);
 
-  localStorage.setItem('saveEmail', saveEmail ? '1' : '0');
-  localStorage.setItem('stayLogin', stayLogin ? '1' : '0');
-  if (saveEmail) {
-    localStorage.setItem('savedEmail', email);
-  } else {
-    localStorage.removeItem('savedEmail');
-  }
+  writeLoginPreferences(email, saveEmail, stayLogin);
 }
 
 export async function doLogout() {

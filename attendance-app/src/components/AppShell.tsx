@@ -226,18 +226,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => { watcher.stop(); document.removeEventListener('visibilitychange', vis); };
   }, [authState, dispatch]);
 
-  // 로그인 후 모바일 줌 리셋
-  // iOS Safari는 input focus 시 자동 확대되는데, 화면 전환 후에도 줌이 유지됨
-  // viewport content를 잠깐 갱신해 브라우저가 줌을 1.0으로 되돌리도록 강제
-  useEffect(() => {
-    if (authState !== 'app') return;
-    const meta = document.querySelector('meta[name="viewport"]') as HTMLMetaElement | null;
-    if (!meta) return;
-    const saved = meta.content;
-    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-    requestAnimationFrame(() => { meta.content = saved; });
-  }, [authState]);
-
   if (authState === 'loading') {
     if (loadTimedOut) {
       return (
