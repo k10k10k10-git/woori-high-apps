@@ -73,3 +73,15 @@ describe("subscribeSemesters — 목록에 영향 없는 하위 갱신 억제", 
     expect(mocks.unsubscribe).toHaveBeenCalledOnce();
   });
 });
+
+it("회차 범위가 바뀌면 목록 날짜를 다시 계산하지만 출결 변화로 재발행하지 않는다", () => {
+  const callback = vi.fn();
+  subscribeSemesters(callback);
+  const sessions = { first: { date: "2026-08-29" }, last: { date: "2026-10-23", endDate: "2026-10-24" } };
+  deliver(snapshot({ "2026-2": { meta, sessions } }));
+  deliver(snapshot({ "2026-2": { meta, sessions, attendance: { value: "changed" } } }));
+  expect(callback).toHaveBeenCalledOnce();
+  expect(callback).toHaveBeenLastCalledWith([{ id: "2026-2", meta: { ...meta, startDate: "2026-08-29", endDate: "2026-10-24" } }]);
+  deliver(snapshot({ "2026-2": { meta, sessions: { ...sessions, next: { date: "2026-11-07" } } } }));
+  expect(callback).toHaveBeenLastCalledWith([{ id: "2026-2", meta: { ...meta, startDate: "2026-08-29", endDate: "2026-11-07" } }]);
+});

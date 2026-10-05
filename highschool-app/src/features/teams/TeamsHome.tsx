@@ -6,11 +6,13 @@ import LoginButton from "@/components/LoginButton";
 import { useAuth } from "@/context/AuthContext";
 import { SUNDAY_MINISTRY_TEAMS } from "@/features/portal/featureCatalog";
 import { accessibleTeamKeys, membershipLabel } from "./teamModel";
+import { TeamAccessState } from "./TeamAccessState";
 
 export default function TeamsHome() {
-  const { user, loading, roles, teamMemberships, signIn } = useAuth();
+  const { user, loading, roles, teamMemberships, signIn, roleError } = useAuth();
   if (loading) return <main className="team-first-state" role="status">팀 목록을 불러오는 중입니다…</main>;
   if (!user) return <main className="team-first-state"><p>로그인이 필요합니다.</p><LoginButton signIn={signIn} /></main>;
+  if (roleError) return <TeamAccessState allowed>{null}</TeamAccessState>;
 
   const keys = accessibleTeamKeys(roles, teamMemberships);
   const teams = SUNDAY_MINISTRY_TEAMS.filter((team) => keys.includes(team.key));

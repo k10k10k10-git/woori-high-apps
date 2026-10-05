@@ -41,7 +41,7 @@ export function homeActionDayLabel(item: Pick<SharedCalendarItem, "date" | "endD
 export function buildHomeActions(items: SharedCalendarItem[], today: string, limit = 6): HomeAction[] {
   const priority: Record<HomeAction["urgency"], number> = { overdue: 0, today: 1, upcoming: 2 };
   return items
-    .filter((item) => !item.done && ((item.endDate ?? item.date) >= today || item.editable))
+    .filter((item) => !item.noticeOnly && !item.done && ((item.endDate ?? item.date) >= today || item.editable))
     .map((item) => {
       const urgency = urgencyFor(item, today);
       return {

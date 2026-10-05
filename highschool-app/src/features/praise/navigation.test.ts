@@ -1,16 +1,25 @@
 import { expect, it } from "vitest";
 import { praiseFixture } from "./components/praiseTestFixtures";
-import { praiseReturnHref, praiseSemesterHref } from "./navigation";
+import { praiseReturnHref, praiseSemesterHref, selectPraiseWorkspace } from "./navigation";
 it("학기 배치와 찬양팀 왕복에서 workspace와 회차를 보존한다", () => {
   const view = praiseFixture(); view.meta.semesterId = "2026-2"; view.meta.teamId = "team-1";
   const href = praiseSemesterHref(view.meta, view.meetings[0])!;
+  expect(href).toMatch(/^\/teams\/praise\/terms\/2026-2\/roster\?/);
   const query = new URL(href, "https://test.invalid").searchParams;
   expect(query.get("team")).toBe("team-1");
   expect(query.get("tab")).toBe("배치");
-  expect(praiseReturnHref(query)).toBe("/sunday-ministry/praise?workspace=synthetic-workspace&tab=week&meeting=meeting-1");
+  expect(praiseReturnHref(query)).toBe("/teams/praise/ongoing?workspace=synthetic-workspace&tab=week&meeting=meeting-1");
 });
 it("외부 주소나 경로 구분자가 있는 복귀 대상으로 이동하지 않는다", () => {
   expect(praiseReturnHref(new URLSearchParams({ praiseWorkspace: "https://evil.example" }))).toBeNull();
-  expect(praiseReturnHref(new URLSearchParams({ praiseWorkspace: "valid", praiseMeeting: "../../escape" }))).toBe("/sunday-ministry/praise?workspace=valid&tab=week");
+  expect(praiseReturnHref(new URLSearchParams({ praiseWorkspace: "valid", praiseMeeting: "../../escape" }))).toBe("/teams/praise/ongoing?workspace=valid&tab=week");
   expect(praiseSemesterHref(praiseFixture().meta)).toBeNull();
+});
+
+it("지정 학기의 운영 공간만 선택하고 잘못된 연결은 다른 기간으로 대체하지 않는다", () => {
+  const meta = praiseFixture().meta;
+  const spaces = [{ ...meta, id: "new", semesterId: "2027-1" }, { ...meta, id: "old", semesterId: "2026-2" }];
+  expect(selectPraiseWorkspace(spaces, "", "2026-2")).toBe("old");
+  expect(selectPraiseWorkspace(spaces, "new", "2026-2")).toBe("");
+  expect(selectPraiseWorkspace(spaces, "", "2025-1")).toBe("");
 });

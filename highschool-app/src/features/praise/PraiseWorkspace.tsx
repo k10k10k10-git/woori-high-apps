@@ -8,7 +8,7 @@ import { createPraiseWorkspace, listPraiseCreateReferences, listPraiseWorkspaces
 import { canOpenPraiseAttendance } from "./permissions";
 import { usePraiseData } from "./usePraiseData";
 import { defaultPraiseMeeting } from "./domain/workflow";
-import { praiseSemesterHref } from "./navigation";
+import { praiseSemesterHref, selectPraiseWorkspace } from "./navigation";
 import { isPraiseHistoricalReadOnly } from "./domain/operatingBoundary";
 import { toSeoulDate } from "./domain/terms";
 import type { PraiseMeta } from "./types";
@@ -24,6 +24,7 @@ import "./praise.css";
 export default function PraiseWorkspace({ workspaceId, initialTab, embedded = false }: { workspaceId?: string; initialTab?: string; embedded?: boolean }) {
   const query = useSearchParams();
   const requestedWorkspace = query.get("workspace") ?? workspaceId ?? "";
+  const requestedSemester = query.get("semester") ?? "";
   const requestedTab = query.get("tab") ?? initialTab;
   const requestedMeeting = query.get("meeting") ?? "";
   const requestedSection = ["groups", "import"].includes(query.get("section") ?? "") ? query.get("section")! : "people";
@@ -31,10 +32,11 @@ export default function PraiseWorkspace({ workspaceId, initialTab, embedded = fa
   const [workspaces, setWorkspaces] = useState<PraiseMeta[]>([]);
   const [workspaceMeta, setWorkspaceMeta] = useState<Record<string, PraiseMeta>>({});
   const [canCreate, setCanCreate] = useState(false);
-  const [selected, setSelected] = useState(requestedWorkspace);
-  const [workspaceSource, setWorkspaceSource] = useState(requestedWorkspace);
-  if (workspaceSource !== requestedWorkspace) { setWorkspaceSource(requestedWorkspace); setSelected(requestedWorkspace || workspaces.find((item) => item.status === "active")?.id || workspaces[0]?.id || ""); }
-  const selectWorkspace = (id: string) => { if (!confirmPraiseNavigation()) return; setSelected(id); updatePraiseLocation({ workspace: id, tab: praiseTab(requestedTab), meeting: null }); };
+  const [selected, setSelected] = useState(requestedSemester ? "" : requestedWorkspace);
+  const requestedSource = `${requestedWorkspace}:${requestedSemester}`;
+  const [workspaceSource, setWorkspaceSource] = useState(requestedSource);
+  if (workspaceSource !== requestedSource) { setWorkspaceSource(requestedSource); setSelected(selectPraiseWorkspace(workspaces, requestedWorkspace, requestedSemester)); }
+  const selectWorkspace = (id: string) => { if (!confirmPraiseNavigation()) return; setSelected(id); updatePraiseLocation({ workspace: id, tab: praiseTab(requestedTab), meeting: null, semester: null }); };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [errorCode, setErrorCode] = useState("");
@@ -45,20 +47,20 @@ export default function PraiseWorkspace({ workspaceId, initialTab, embedded = fa
   const selectedWorkspace = workspaceMeta[selected] ?? workspaces.find((workspace) => workspace.id === selected);
   const syncWorkspaceMeta = useCallback((meta: PraiseMeta) => {
     setWorkspaceMeta((current) => current[meta.id] === meta ? current : { ...current, [meta.id]: meta });
-  }, []);
+  }, [setWorkspaceMeta]);
   const reloadList = () => { setLoading(true); setError(""); setErrorCode(""); setRetry((value) => value + 1); };
   useEffect(() => {
     const controller = new AbortController();
-    void listPraiseWorkspaces(controller.signal).then((result) => { if (controller.signal.aborted) return; setWorkspaces(result.workspaces); setCanCreate(result.canCreate); setSelected((current) => current || result.workspaces.find((item) => item.status === "active")?.id || result.workspaces[0]?.id || ""); }).catch((failure) => { if (!controller.signal.aborted) { setError(failure instanceof Error ? failure.message : "운영 공간을 불러오지 못했습니다."); setErrorCode(failure instanceof Error && "code" in failure && typeof failure.code === "string" ? failure.code : ""); } }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    void listPraiseWorkspaces(controller.signal).then((result) => { if (controller.signal.aborted) return; setWorkspaces(result.workspaces); setCanCreate(result.canCreate); setSelected((current) => current && result.workspaces.some((item) => item.id === current && (!requestedSemester || item.semesterId === requestedSemester)) ? current : selectPraiseWorkspace(result.workspaces, requestedWorkspace, requestedSemester)); }).catch((failure) => { if (!controller.signal.aborted) { setError(failure instanceof Error ? failure.message : "운영 공간을 불러오지 못했습니다."); setErrorCode(failure instanceof Error && "code" in failure && typeof failure.code === "string" ? failure.code : ""); } }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [retry]);
+  }, [retry, requestedWorkspace, requestedSemester]);
   return <main className={`praise-workspace${embedded ? " praise-workspace--embedded" : ""}`}>
     <header className="praise-header praise-header--compact"><div className="praise-header-copy">{!embedded && <Link className="praise-back" href="/"><CaretLeft size={14} aria-hidden="true" />통합 사이트</Link>}{embedded ? <h2 className="praise-page-title">찬양팀</h2> : <h1 className="praise-page-title">찬양팀</h1>}{!selectedWorkspace && <p>모임 출결부터 주일 등단까지</p>}</div>{errorCode !== "server_not_configured" && <button type="button" className="praise-mobile-context-toggle" aria-label={`운영 기간 ${selectedWorkspace?.name ?? "선택"} ${showPeriodControls ? "접기" : "변경"}`} aria-expanded={showPeriodControls} aria-controls="praise-period-controls" onClick={() => setShowPeriodControls((value) => !value)}>운영 기간 <strong>{selectedWorkspace?.name ?? "선택"}</strong><span aria-hidden="true">{showPeriodControls ? "접기" : "변경"}</span></button>}<div id="praise-period-controls" className={`praise-header-actions${showPeriodControls ? " is-mobile-open" : ""}`} hidden={errorCode === "server_not_configured"}><label className="praise-field praise-period-field"><span>{selectedWorkspace?.semesterId ? "학기" : "운영 기간"}</span><select aria-label="찬양팀 운영 기간" value={selected} onChange={(event) => { selectWorkspace(event.target.value); setShowPeriodControls(false); }} disabled={loading || creating}><option value="">운영 기간 선택</option>{workspaces.map((workspace) => { const current = workspaceMeta[workspace.id] ?? workspace; return <option value={current.id} key={current.id}>{current.name}{current.status === "archived" ? " · 보관됨" : ""}</option>; })}</select></label>{canCreate && <button className="praise-text-button" type="button" disabled={creating} onClick={() => setShowCreate((value) => !value)}>{showCreate ? "개설 닫기" : "새 운영 기간"}</button>}</div></header>
     {error && errorCode !== "server_not_configured" && <div className="praise-error" role="alert">{error}<button className="praise-text-button" onClick={reloadList}>다시 불러오기</button></div>}
     {errorCode === "server_not_configured" && <ConnectionPreparing />}
     {showCreate && canCreate && errorCode !== "server_not_configured" && <CreateWorkspace creating={creating} onCreating={setCreating} onCreated={(id) => { selectWorkspace(id); setShowCreate(false); reloadList(); }} onError={(message) => setError(message)} /> }
     {loading && !selected && <p className="praise-loading" role="status">찬양팀 운영 공간을 불러오고 있습니다…</p>}
-    {!loading && !selected && !error && <section className="praise-section praise-welcome"><h2>찬양팀 운영을 시작해 주세요</h2><p>{canCreate ? "공통 학기와 사역팀을 연결하면 팀원 명단, 출결, 조편성, 주일 등단표를 함께 관리할 수 있습니다." : "아직 접근할 수 있는 운영 기간이 없습니다. 담당자에게 운영 공간과 권한을 확인해 주세요."}</p>{canCreate && <button className="praise-button praise-button--primary" onClick={() => setShowCreate(true)}>팀 운영 개설하기</button>}</section>}
+    {!loading && !selected && !error && <section className="praise-section praise-welcome"><h2>{requestedSemester ? "이 학기에 연결된 찬양팀 운영이 없습니다" : "찬양팀 운영을 시작해 주세요"}</h2><p>{requestedSemester ? "다른 학기 기록으로 이동하지 않았습니다. 운영 기간을 선택하거나 담당자에게 학기 연결을 확인해 주세요." : canCreate ? "공통 학기와 사역팀을 연결하면 팀원 명단, 출결, 조편성, 주일 등단표를 함께 관리할 수 있습니다." : "아직 접근할 수 있는 운영 기간이 없습니다. 담당자에게 운영 공간과 권한을 확인해 주세요."}</p>{canCreate && <button className="praise-button praise-button--primary" onClick={() => setShowCreate(true)}>팀 운영 개설하기</button>}</section>}
     {selected && errorCode !== "server_not_configured" && <WorkspaceBody key={selected} workspaceId={selected} initialTab={requestedTab} initialMeetingId={requestedMeeting} initialPersonId={requestedPerson} initialSection={requestedSection} onWorkspaceMeta={syncWorkspaceMeta} />}
   </main>;
 }
@@ -119,10 +121,11 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPerso
 }
 
 /** 선택한 운영 기간·탭·회차를 함께 기록해 새로고침과 뒤로가기에 같은 화면을 연다. */
-function updatePraiseLocation(values: { workspace: string; tab: string; meeting: string | null; person?: string | null; section?: string | null }) {
+function updatePraiseLocation(values: { workspace: string; tab: string; meeting: string | null; person?: string | null; section?: string | null; semester?: string | null }) {
   const url = new URL(window.location.href);
   url.searchParams.set("workspace", values.workspace);
   url.searchParams.set("tab", values.tab);
+  if (values.semester !== undefined) { if (values.semester) url.searchParams.set("semester", values.semester); else url.searchParams.delete("semester"); }
   if (values.meeting) url.searchParams.set("meeting", values.meeting); else url.searchParams.delete("meeting");
   if (values.person) url.searchParams.set("person", values.person); else url.searchParams.delete("person");
   if (values.section !== undefined) { if (values.section) url.searchParams.set("section", values.section); else url.searchParams.delete("section"); }

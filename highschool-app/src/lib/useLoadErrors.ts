@@ -40,5 +40,5 @@ export function useLoadErrors(scope: string) {
     [scope],
   );
 
-  return { fail, ok, message: formatLoadErrors(errors) };
+  return { fail, ok, errors, message: formatLoadErrors(errors) };
 }

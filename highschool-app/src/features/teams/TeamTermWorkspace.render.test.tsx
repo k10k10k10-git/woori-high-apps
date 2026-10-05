@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
+
 vi.mock("@/context/AuthContext", () => ({
   useAuth: () => mocks.auth,
 }));
@@ -50,7 +52,7 @@ describe("TeamTermWorkspace 팀 연락처", () => {
     render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
 
     expect(await screen.findByRole("link", { name: "010-1111-2222" })).toHaveAttribute("href", "tel:010-1111-2222");
-    expect(screen.getByText(/보호자 010-3333-4444/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "010-3333-4444" })).toHaveAttribute("href", "tel:010-3333-4444");
     await waitFor(() => expect(mocks.contacts).toHaveBeenCalledOnce());
     expect(mocks.private).not.toHaveBeenCalled();
   });
@@ -65,6 +67,17 @@ describe("TeamTermWorkspace 팀 연락처", () => {
     fireEvent.focus(window);
     expect(await screen.findByRole("link", { name: "010-2222-3333" })).toBeInTheDocument();
     expect(mocks.contacts).toHaveBeenCalledTimes(2);
+  });
+
+  it("연락처만 실패해도 명단을 표시하고 재조회 성공 후 오류를 지운다", async () => {
+    mocks.contacts.mockRejectedValueOnce(new Error("연락처 조회 실패"))
+      .mockResolvedValueOnce({ "1_student-1": { phone: "010-1111-2222" } });
+    render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
+    expect(await screen.findByRole("alert")).toHaveTextContent("연락처 조회 실패");
+    expect(screen.getByText("팀원학생")).toBeInTheDocument();
+    fireEvent.focus(window);
+    expect(await screen.findByRole("link", { name: "010-1111-2222" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
   it("관리자에서 일반 팀원으로 계정을 바꾸면 이전 계정의 신청서 연락처를 남기지 않는다", async () => {
@@ -82,4 +95,13 @@ describe("TeamTermWorkspace 팀 연락처", () => {
     expect(screen.queryByText(/010-8888-0000/)).not.toBeInTheDocument();
     expect(mocks.private).toHaveBeenCalledOnce();
   });
+});
+
+it("팀 명단 검색과 출결 링크가 같은 학기를 유지한다", async () => {
+  render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
+  expect(await screen.findByText("팀원학생")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "출석" })).toHaveAttribute("href", "/teams/praise/ongoing?semester=2026-2&tab=attendance");
+  fireEvent.change(screen.getByLabelText("이름 검색"), { target: { value: "없는 이름" } });
+  expect(screen.queryByText("팀원학생")).not.toBeInTheDocument();
+  expect(screen.getByText(/검색 결과가 없습니다/)).toBeInTheDocument();
 });

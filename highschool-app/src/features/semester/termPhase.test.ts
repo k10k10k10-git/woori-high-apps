@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Semester } from "./types";
-import { featuredTerm } from "./termPhase";
+import { featuredTerm, semesterSummaryMeta } from "./termPhase";
 
 const term = (id: string, startDate?: string, endDate?: string) => ({ id, meta: { title: id, startDate, endDate } }) as Semester;
 
@@ -17,4 +17,12 @@ describe("featuredTerm", () => {
       .toMatchObject({ semester: { id: "active" }, phase: "current" });
     expect(featuredTerm([term("unscheduled")], today)).toMatchObject({ phase: "unscheduled" });
   });
+});
+
+it("메타 날짜가 없는 학기는 실제 회차 범위로 판정하고 명시 날짜를 보존한다", () => {
+  const meta = { title: "학기", completionRule: { minRate: 0.7 }, createdAt: "2026-08-01" };
+  const sessions = { later: { id: "later", type: "행사", date: "2026-10-23", endDate: "2026-10-24" }, first: { id: "first", type: "정규", date: "2026-08-29" } } satisfies NonNullable<Parameters<typeof semesterSummaryMeta>[1]>;
+  expect(semesterSummaryMeta(meta, sessions)).toMatchObject({ startDate: "2026-08-29", endDate: "2026-10-24" });
+  expect(meta).not.toHaveProperty("startDate");
+  expect(semesterSummaryMeta({ ...meta, startDate: "2026-08-01", endDate: "2026-12-01" }, sessions)).toMatchObject({ startDate: "2026-08-01", endDate: "2026-12-01" });
 });

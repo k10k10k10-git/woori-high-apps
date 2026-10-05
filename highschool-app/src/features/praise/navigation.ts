@@ -5,7 +5,7 @@ export function praiseSemesterHref(meta: PraiseMeta, meeting?: PraiseMeeting | n
   if (!meta.semesterId || !meta.teamId) return null;
   const query = new URLSearchParams({ tab: "배치", team: meta.teamId, praiseWorkspace: meta.id });
   if (meeting) query.set("praiseMeeting", meeting.id);
-  return `/semester/${encodeURIComponent(meta.semesterId)}?${query}`;
+  return `/teams/praise/terms/${encodeURIComponent(meta.semesterId)}/roster?${query}`;
 }
 
 export function praiseReturnHref(query: URLSearchParams): string | null {
@@ -14,5 +14,12 @@ export function praiseReturnHref(query: URLSearchParams): string | null {
   const params = new URLSearchParams({ workspace, tab: "week" });
   const meeting = query.get("praiseMeeting");
   if (meeting && /^[A-Za-z0-9_-]{1,160}$/.test(meeting)) params.set("meeting", meeting);
-  return `/sunday-ministry/praise?${params}`;
+  return `/teams/praise/ongoing?${params}`;
+}
+
+/** 학기 화면에서 들어왔으면 그 학기만 연다. 없는 학기를 다른 기간으로 대체하지 않는다. */
+export function selectPraiseWorkspace(workspaces: PraiseMeta[], workspaceId: string, semesterId: string): string {
+  if (workspaceId) return workspaces.find((item) => item.id === workspaceId && (!semesterId || item.semesterId === semesterId))?.id ?? "";
+  const candidates = semesterId ? workspaces.filter((item) => item.semesterId === semesterId) : workspaces;
+  return candidates.find((item) => item.status === "active")?.id ?? candidates[0]?.id ?? "";
 }

@@ -12,7 +12,6 @@ import {
   SUNDAY_MINISTRY_DEFAULT_TEAM,
   SUNDAY_MINISTRY_TEAMS,
   SUNDAY_MINISTRY_TABS,
-  sundayTeamHref,
   sundayTeamOf,
   type SundayTeamKey,
 } from "@/features/portal/featureCatalog";
@@ -58,7 +57,7 @@ function teamHasTab(team: SundayTeamKey, tab?: string) {
 
 /** 기존 북마크의 탭은 그 탭을 실제로 제공하는 팀으로 이동할 때만 전달한다. */
 function teamHrefWithTab(team: SundayTeamKey, tab?: string) {
-  const href = sundayTeamHref(team);
+  const href = `/teams/${team}/ongoing`;
   return tab && teamHasTab(team, tab)
     ? `${href}?tab=${encodeURIComponent(tab)}`
     : href;
@@ -215,8 +214,8 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
   const teamHeader = <div className="workspace-header">
     <div className="mx-auto max-w-6xl px-4">
       <div className="flex min-w-0 flex-wrap items-center gap-2 py-3 sm:gap-3">
-        <button onClick={() => router.push("/")} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white" aria-label="통합 홈으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={13} /> 홈</button>
-        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">{MINISTRY_AREA_LABELS.sunday}</span>
+        <button onClick={() => router.push(`/teams/${teamMeta.key}`)} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white" aria-label="팀 공간으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={13} /> 팀</button>
+        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">주간·주일 업무</span>
         <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
         <label className="flex min-w-0 items-center gap-2 text-xs text-slate-300"><span className="shrink-0">팀 변경</span><select aria-label="현재 팀·팀 변경" className="max-w-36 rounded-lg border border-white/20 bg-slate-800 px-2 py-1.5 text-xs text-white" value={teamMeta.key} onChange={(event) => router.push(teamHrefWithTab(event.target.value as SundayTeamKey, initialTab))}>
           {accessibleTeams.map((item) => <option key={item.key} value={item.key} disabled={item.status === "planned" && ownSundayTeam(roles, assignedTeamKeys) !== item.key}>{item.label}{item.status === "planned" ? " · 기획 중" : ""}</option>)}

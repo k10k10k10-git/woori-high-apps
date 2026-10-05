@@ -42,6 +42,7 @@ import { getMonthlyMinistry } from "@/features/ministryGuide/ministryGuideConten
 import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dailyMinistryMessage";
 
 import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
+import { selectRetreatForWork } from "@/lib/retreatSelection";
 import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
 
 export default function PortalHome() {
@@ -58,6 +59,7 @@ export default function PortalHome() {
   });
   // 로드 실패는 경로별로 모으고(마지막 하나만 보이던 문제), 저장·삭제 실패는 따로 둔다.
   const { fail, ok, message: dataError } = useLoadErrors(user?.uid ?? "");
+  const [subscriptionGeneration, setSubscriptionGeneration] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const loadError = dataError ?? actionError;
   // 공유 일정(prepMilestones) — 행정·이가드가 함께 쓰는 전역 노드. 스탭은 Rules상 쓰기 불가.
@@ -113,7 +115,7 @@ export default function PortalHome() {
       ));
     }
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [user, roles, scope, semesterAllowed, fail, ok]);
+  }, [user, roles, scope, semesterAllowed, fail, ok, subscriptionGeneration]);
 
   const featuredSemester = useMemo(() => semesterListStatus === "ready" ? featuredTerm(semesters, today) : null, [semesterListStatus, semesters, today]);
   const currentSemester = featuredSemester?.semester ?? null;
@@ -127,7 +129,7 @@ export default function PortalHome() {
       items => { setSessionState({ uid: scope, semesterId: currentSemester.id, items }); setSourceStatus((current) => ({ ...current, [`${scope}:sessions:${currentSemester.id}`]: "ready" })); ok("회차"); },
       (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:sessions:${currentSemester.id}`]: "error" })); fail("회차")(error); },
     );
-  }, [user, currentSemester, scope, fail, ok]);
+  }, [user, currentSemester, scope, fail, ok, subscriptionGeneration]);
 
   const sessions = useMemo(
     () => sessionState.uid === scope && sessionState.semesterId === currentSemester?.id ? sessionState.items : [],
@@ -138,7 +140,7 @@ export default function PortalHome() {
     if (!user || !canAccessArea("home", roles)) return;
     return subscribeToMilestones((v) => { setMilestones(v); setSourceStatus((current) => ({ ...current, [`${scope}:milestones`]: "ready" })); ok("공유 일정"); },
       (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:milestones`]: "error" })); fail("공유 일정")(error); });
-  }, [user, roles, scope, fail, ok]);
+  }, [user, roles, scope, fail, ok, subscriptionGeneration]);
 
   // 회차 구독과 같은 이유로 user 가드가 필요하다 — 로그아웃해도 retreats 상태가 남아
   // 인증이 끊긴 채 재구독하면서 엉뚱한 permission_denied 배너가 뜬다.
@@ -152,14 +154,11 @@ export default function PortalHome() {
       (v) => { setPeriods(v); setSourceStatus((current) => ({ ...current, [`${scope}:periods:${retreatIdsKey}`]: "ready" })); ok("수련회 기간"); },
       (error) => { setSourceStatus((current) => ({ ...current, [`${scope}:periods:${retreatIdsKey}`]: "error" })); fail("수련회 기간")(error); },
     );
-  }, [user, retreatIdsKey, scope, fail, ok]);
+  }, [user, retreatIdsKey, scope, fail, ok, subscriptionGeneration]);
 
   const currentRetreat = useMemo(() => {
     if (retreatListStatus !== "ready" || retreatPeriodStatus !== "ready") return null;
-    const active = periods.find((period) => period.startDate <= today && today <= period.endDate);
-    if (active) return retreats.find((retreat) => retreat.id === active.retreatId) ?? null;
-    const next = periods.find((period) => period.startDate >= today);
-    return retreats.find((retreat) => retreat.id === next?.retreatId) ?? retreats[0] ?? null;
+    return selectRetreatForWork(retreats, periods, today);
   }, [periods, retreatListStatus, retreatPeriodStatus, retreats, today]);
   const calendarStatuses = [
     retreatListStatus,
@@ -186,6 +185,7 @@ export default function PortalHome() {
           date: session.date,
           ...(session.endDate ? { endDate: session.endDate } : {}),
           title: sessionDisplayLabel(session),
+          noticeOnly: session.type === "휴강",
           kind: "semester" as const,
           href: semesterCalendarHref,
         }))
@@ -300,7 +300,7 @@ export default function PortalHome() {
   return (
     <div className="app-page">
       <main className="page-container">
-        {loadError && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ {loadError}</div>}
+        {loadError && <div className="team-first-alert mb-5" role="alert">⚠ {loadError}{dataError && <button className="btn-secondary" onClick={() => setSubscriptionGeneration((value) => value + 1)}>다시 불러오기</button>}</div>}
 
         <section className="page-hero home-hero mb-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.72fr)] lg:items-end">
           <div className="min-w-0">
