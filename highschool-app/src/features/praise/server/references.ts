@@ -26,7 +26,8 @@ async function shallow(path: string): Promise<string[]> {
   const { app } = getPraiseFirebaseAdmin();
   try {
     const token = await app.options.credential!.getAccessToken();
-    const url = new URL(`${path}.json`, `${app.options.databaseURL}/`);
+    const url = new URL(app.options.databaseURL!);
+    url.pathname = `/${path}.json`;
     url.searchParams.set("shallow", "true");
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token.access_token}` },
@@ -36,6 +37,7 @@ async function shallow(path: string): Promise<string[]> {
     if (!response.ok) throw new Error();
     const value = await response.json();
     if (value === null) return [];
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return Object.entries(record(value)).map(([key, exists]) => {
       if (exists !== true) throw new Error();
       return assertPraiseId(key);
@@ -43,6 +45,11 @@ async function shallow(path: string): Promise<string[]> {
   } catch {
     throw praiseUnavailable("reference_unavailable");
   }
+}
+
+/** 목록 탐색용 ID만 읽는다. 학기 원장 전체 get()으로 대체하지 않는다. */
+export function listSemesterIds(): Promise<string[]> {
+  return shallow(semesterPaths.semesters());
 }
 
 /** 운영 책임자용 계정 선택에 승인된 이름·등록 이메일을 제공한다. 토큰·원래 역할 원장은 반환하지 않는다. */
@@ -89,7 +96,7 @@ export async function praiseAccounts() {
 
 /** 학기 키와 meta/teams만 읽고, 신청·출결·연락처 원장은 다운로드하지 않는다. */
 export async function praiseReferences(actor: PraiseActor) {
-  const ids = await shallow("semesters");
+  const ids = await listSemesterIds();
   const semesters = [];
   for (const id of ids.sort().reverse()) {
     if (!canAccessTeam("praise", actor.roles, actor.teamMemberships, id)) continue;
