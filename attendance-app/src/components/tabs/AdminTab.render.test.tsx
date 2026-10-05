@@ -23,3 +23,11 @@ it('설정을 계정·교사·행사·데이터로 구분하고 교사 화면은
   expect(screen.getByRole('tab', { name: '출석 제외 일정' }).getAttribute('aria-selected')).toBe('true');
   expect(screen.queryByText('교사 명단 합성 화면')).toBeNull();
 });
+it('청년부 인계는 데이터 관리에서 열고 계정 화면에는 노출하지 않는다', async () => {
+  render(<AdminTab />);
+  await screen.findByText('등록된 계정이 없습니다');
+  expect(screen.queryByRole('button', { name: '전체 고3 엑셀 내려받기' })).toBeNull();
+  fireEvent.click(screen.getByRole('tab', { name: '데이터 관리' }));
+  expect(screen.getByRole('button', { name: '전체 고3 엑셀 내려받기' }).hasAttribute('disabled')).toBe(true);
+  expect(screen.getByRole('heading', { name: /청년부 인계/ })).toBeTruthy();
+});
