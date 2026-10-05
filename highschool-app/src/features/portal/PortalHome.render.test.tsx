@@ -21,7 +21,7 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("./SharedMinistryCalendar", async (importOriginal) => ({
   ...await importOriginal<typeof import("./SharedMinistryCalendar")>(),
-  default: ({ items }: { items: SharedCalendarItem[] }) => <output data-testid="calendar-items">{JSON.stringify(items)}</output>,
+  default: ({ items, canEdit, onAdd }: { items: SharedCalendarItem[]; canEdit: boolean; onAdd: (date: string) => void }) => <><output data-testid="calendar-items">{JSON.stringify(items)}</output>{canEdit && <button type="button" onClick={() => onAdd("2026-10-06")}>합성 일정 추가</button>}</>,
 }));
 
 import PortalHome from "./PortalHome";
@@ -51,6 +51,25 @@ it("역할 조회 실패는 권한 미배정 안내로 오인시키지 않고 �
   expect(screen.getByRole("link", { name: "접속 문제 도움말" })).toHaveAttribute("href", "/library/help#connection");
 });
 afterEach(cleanup);
+
+it.each(["account", "roles"])("공유 일정 작성 중 %s 전환은 이전 초안을 폐기한다", (change) => {
+  const { rerender } = render(<PortalHome />);
+  act(() => {
+    mocks.milestones.mock.calls[0][0]([]);
+    mocks.retreats.mock.calls[0][0]([]);
+    mocks.semesters.mock.calls[0][0]([]);
+    mocks.periods.mock.calls.at(-1)![1]([]);
+  });
+  fireEvent.click(screen.getByText("전체 일정 보기·관리"));
+  fireEvent.click(screen.getByRole("button", { name: "합성 일정 추가" }));
+  fireEvent.change(screen.getByPlaceholderText("예: 사역팀 모임 준비"), { target: { value: "이전 계정 초안" } });
+  expect(screen.getByRole("dialog", { name: "공유 일정 추가" })).toBeInTheDocument();
+  if (change === "account") mocks.uid = "another-user";
+  else mocks.roles = { semester: "staff", retreat: "none" };
+  rerender(<PortalHome />);
+  expect(screen.queryByRole("dialog", { name: "공유 일정 추가" })).not.toBeInTheDocument();
+  expect(screen.queryByDisplayValue("이전 계정 초안")).not.toBeInTheDocument();
+});
 
 it("미승인 스탭은 담당자 안내와 일반 사용법을 먼저 보고 현장 요청을 구분한다", () => {
   mocks.roles = { semester: "none", retreat: "none" };

@@ -46,6 +46,12 @@ import { activeTeamKeys, canAccessOperationsCenter, canEditTeam } from "@/featur
 import styles from "./PortalHome.module.css";
 
 export default function PortalHome() {
+  const { user, roles } = useAuth();
+  // 계정·역할 전환에는 조회 결과와 공유 일정 초안을 함께 폐기한다.
+  return <PortalHomeWorkspace key={`${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}`} />;
+}
+
+function PortalHomeWorkspace() {
   const router = useRouter();
   const { user, loading, roleError, retryRoles, roles, teamMemberships, memberName, signIn, signOut } = useAuth();
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -246,7 +252,7 @@ export default function PortalHome() {
   ].filter((item, index, list) => item.href.split("?")[0] !== homeEntry?.href.split("?")[0] && list.findIndex((other) => other.href === item.href) === index);
 
   async function submitSchedule() {
-    if (!scheduleDraft) return;
+    if (!scheduleDraft || !authReady || !canEditSchedule) return;
     const title = scheduleDraft.title.trim();
     if (!title) return;
     setActionError(null);
@@ -355,7 +361,7 @@ export default function PortalHome() {
         />}</details>
 
         <div className={styles.guide}><Link href="/library/guide"><strong>{monthlyMinistry.month}월 사역 가이드</strong><span>{monthlyMinistry.curriculum}</span><small>사역계획 가안 · {monthlyMinistry.focus.join(" · ")}</small></Link><Link href="/help/feedback">문제 제보</Link></div>
-        {scheduleDraft && (
+        {authReady && canEditSchedule && scheduleDraft && (
           <OverlayShell
             label={scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}
             onClose={() => setScheduleDraft(null)}
