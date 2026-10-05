@@ -6,6 +6,8 @@ import { ArrowLeft } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
 import {
@@ -102,7 +104,35 @@ function stripPrivateMeetings(program: RetreatProgram): RetreatProgram {
   return publicProgram;
 }
 
+function programWriteFailure(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) return fallback;
+  if ("businessCommitted" in error && error.businessCommitted === true) {
+    return "업무는 저장됐으나 활동 로그 저장에 실패했습니다. 새로고침 후 확인해 주세요.";
+  }
+  // 현재 저장 경계의 계정·충돌·준비 완료 안내는 보존하고 서버 경로·기술 오류는 노출하지 않는다.
+  const actionMessages = [
+    "활동 기록을 남기려면 로그인 상태를 확인해 주세요. 새로고침 후 다시 저장해 주세요.",
+    "저장 중 로그인 계정이 변경되었습니다. 새로고침 후 다시 저장해 주세요.",
+    "프로그램이 삭제되어 현장에 공유하지 못했습니다.",
+    "다른 변경이 먼저 반영되었습니다. 최신 내용을 확인한 뒤 다시 공유해 주세요.",
+    "현장 준비와 실행 할 일을 모두 완료한 뒤 공유해 주세요.",
+    "현장 배포본을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  ];
+  return actionMessages.includes(error.message) ? error.message : fallback;
+}
+
 export default function ProgramPreparationClient() {
+  const auth = useAuth();
+  const route = useParams();
+  const allowed = canAccessArea("retreat-admin", auth.roles);
+  // 계정·수련회·회의 조회 범위가 바뀌면 이전 작업 상태를 버린다. 연결 재시도는 이 키를 바꾸지 않는다.
+  const scope = `${auth.user?.uid ?? "guest"}:${route.id}:${canEditArea("retreat-admin", auth.roles)}`;
+  return <WorkspaceAccessGate allowed={allowed} area="프로그램 준비" backHref="/events" backLabel="행사 목록으로">
+    <ProgramPreparationWorkspace key={scope} />
+  </WorkspaceAccessGate>;
+}
+
+function ProgramPreparationWorkspace() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -166,7 +196,7 @@ export default function ProgramPreparationClient() {
   const adminAllowed = canAccessArea("retreat-admin", roles);
   const fieldAllowed = canAccessArea("retreat-field", roles);
   const canEdit = canEditArea("retreat-admin", roles);
-  const { lock, unlocked, lockError, markUnlocked } = useRetreatPinGate(retreatId, {
+  const { lock, unlocked, lockError, markUnlocked, retryLock } = useRetreatPinGate(retreatId, {
     enabled: !authLoading && !!user && adminAllowed,
     roles,
   });
@@ -189,7 +219,9 @@ export default function ProgramPreparationClient() {
   const [programsReady, setProgramsReady] = useState(initialSnapshot?.programs !== undefined);
   const [meetingsReady, setMeetingsReady] = useState(!canEdit);
   const [groupsReady, setGroupsReady] = useState(initialSnapshot?.groups !== undefined);
-  const [loadError, setLoadError] = useState("");
+  const [loadErrors, setLoadErrors] = useState<Record<string, string>>({});
+  const loadError = Object.keys(loadErrors).length > 0;
+  const [subscriptionGeneration, setSubscriptionGeneration] = useState(0);
   const [meetingLoadError, setMeetingLoadError] = useState("");
   const [meetingSessionVersion, setMeetingSessionVersion] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -230,55 +262,61 @@ export default function ProgramPreparationClient() {
       return;
     }
     if (!adminAllowed || !retreatId) return;
-    const cached = getRetreatWorkspaceSnapshot(retreatId);
-    setRetreat(cached?.retreat ?? null);
-    const cachedPrograms = (cached?.programs ?? []).map(stripPrivateMeetings);
-    setPublicPrograms(cachedPrograms);
-    setMeetingsByProgram({});
-    setGroups(cached?.groups ?? []);
-    setRetreatReady(cached?.retreat !== undefined);
-    setProgramsReady(cached?.programs !== undefined);
-    setMeetingsReady(!canEdit);
-    setGroupsReady(cached?.groups !== undefined);
-    setLoadError("");
-    setMeetingLoadError("");
+    let active = true;
+    const clearError = (source: string) => setLoadErrors((previous) => {
+      if (!(source in previous)) return previous;
+      const next = { ...previous };
+      delete next[source];
+      return next;
+    });
+    const fail = (source: string, error: Error) => {
+      if (active) setLoadErrors((previous) => ({ ...previous, [source]: error.message }));
+    };
     const unsubscribeRetreat = subscribeToRetreat(
       retreatId,
       (next) => {
+        if (!active) return;
         setRetreat(next);
         mergeRetreatWorkspaceSnapshot(retreatId, { retreat: next });
         setRetreatReady(true);
+        clearError("수련회 정보");
       },
-      (error) => { setLoadError(`수련회 정보 - ${error.message}`); setRetreatReady(true); },
+      (error) => fail("수련회 정보", error),
     );
     const unsubscribePrograms = subscribeToRetreatPrograms(
       retreatId,
       (next) => {
+        if (!active) return;
         const publicOnly = next.map(stripPrivateMeetings);
         setPublicPrograms(publicOnly);
         mergeRetreatWorkspaceSnapshot(retreatId, { programs: publicOnly });
         setProgramsReady(true);
+        clearError("프로그램 정보");
       },
-      (error) => { setLoadError(`프로그램 정보 - ${error.message}`); setProgramsReady(true); },
+      (error) => fail("프로그램 정보", error),
     );
     const unsubscribeGroups = subscribeToGroups(
       retreatId,
       (next) => {
+        if (!active) return;
         setGroups(next);
         mergeRetreatWorkspaceSnapshot(retreatId, { groups: next });
         setGroupsReady(true);
+        clearError("조 편성 정보");
       },
-      (error) => { setLoadError(`조 편성 정보 - ${error.message}`); setGroupsReady(true); },
+      (error) => fail("조 편성 정보", error),
     );
     const unsubscribeMeetings = canEdit
       ? subscribeToRetreatProgramMeetings(
           retreatId,
           (next) => {
+            if (!active) return;
             setMeetingsByProgram(next);
             setMeetingLoadError("");
             setMeetingsReady(true);
           },
           (error) => {
+            if (!active) return;
             // 권한·연결이 끊긴 뒤 메모리에 남은 private 회의를 계속 편집하면 안 된다.
             setMeetingsByProgram({});
             setMeetingSessionVersion((version) => version + 1);
@@ -287,8 +325,14 @@ export default function ProgramPreparationClient() {
           },
         )
       : () => {};
-    return () => { unsubscribeRetreat(); unsubscribePrograms(); unsubscribeGroups(); unsubscribeMeetings(); };
-  }, [adminAllowed, authLoading, canEdit, retreatId, router, user]);
+    return () => { active = false; unsubscribeRetreat(); unsubscribePrograms(); unsubscribeGroups(); unsubscribeMeetings(); };
+  }, [adminAllowed, authLoading, canEdit, retreatId, router, user, subscriptionGeneration]);
+
+  function retryPreparation() {
+    // 초안과 URL 선택은 유지하고 실제 구독만 교체한다. 항목별 실패는 해당 성공 응답으로 해제한다.
+    setSubscriptionGeneration((value) => value + 1);
+  }
+  const editingAllowed = canEdit && !loadError;
 
   const selectedProgram = useMemo(
     () => (selectedId ? programs.find((program) => program.id === selectedId) ?? null : null),
@@ -303,7 +347,7 @@ export default function ProgramPreparationClient() {
       goToProgram(id, "overview");
       toast("프로그램 초안을 만들었습니다.", "success");
     } catch (error) {
-      toast(error instanceof Error ? error.message : "프로그램을 만들지 못했습니다.", "error");
+      toast(programWriteFailure(error, "프로그램 초안을 만들지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."), "error");
     } finally {
       setBusy(false);
     }
@@ -317,7 +361,7 @@ export default function ProgramPreparationClient() {
       goToProgram(ids[0], "overview");
       toast("프로그램 초안 2개를 만들었습니다.", "success");
     } catch (error) {
-      toast(error instanceof Error ? error.message : "기본 프로그램을 만들지 못했습니다.", "error");
+      toast(programWriteFailure(error, "기본 프로그램 초안을 만들지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."), "error");
     } finally {
       setBusy(false);
     }
@@ -333,7 +377,7 @@ export default function ProgramPreparationClient() {
     try {
       await reorderRetreatPrograms(retreatId, next.map((program) => program.id));
     } catch (error) {
-      toast(error instanceof Error ? error.message : "프로그램 순서를 바꾸지 못했습니다.", "error");
+      toast(programWriteFailure(error, "프로그램 순서를 바꾸지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."), "error");
     } finally {
       setBusy(false);
     }
@@ -349,7 +393,7 @@ export default function ProgramPreparationClient() {
       await updateRetreatProgram(retreatId, id, updates);
       toast("프로그램을 저장했습니다.", "success");
     } catch (error) {
-      toast(error instanceof Error ? error.message : "프로그램을 저장하지 못했습니다.", "error");
+      toast(programWriteFailure(error, "프로그램을 저장하지 못했습니다. 작성 중인 초안은 유지됩니다. 연결 상태를 확인한 뒤 다시 저장해 주세요."), "error");
       throw error;
     } finally {
       setSaving(false);
@@ -364,9 +408,22 @@ export default function ProgramPreparationClient() {
       setDeleteTarget(null);
       toast("프로그램을 삭제했습니다.", "success");
     } catch (error) {
-      toast(error instanceof Error ? error.message : "프로그램을 삭제하지 못했습니다.", "error");
+      toast(programWriteFailure(error, "프로그램을 삭제하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."), "error");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function changeProgramPublication(programId: string, expectedUpdatedAt?: number) {
+    const publishing = expectedUpdatedAt !== undefined;
+    try {
+      if (publishing) await publishRetreatProgramRelease(retreatId, programId, expectedUpdatedAt);
+      else await unpublishRetreatProgramRelease(retreatId, programId);
+    } catch (error) {
+      toast(programWriteFailure(error, publishing
+        ? "프로그램을 현장에 공유하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."
+        : "현장 공유 상태를 변경하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요."), "error");
+      throw error;
     }
   }
 
@@ -384,15 +441,19 @@ export default function ProgramPreparationClient() {
     </div>
   );
 
+  if (lockError) return <div className="program-access-state">
+    <LoadFailureNotice title="프로그램 준비 입장 상태를 확인하지 못했습니다." sources={["PIN 잠금 상태"]} onRetry={retryLock} />
+  </div>;
+  if (loadError && (!retreatReady || !programsReady || !groupsReady)) return <div className="program-access-state">
+    <LoadFailureNotice title="프로그램 준비 자료를 불러오지 못했습니다." sources={Object.keys(loadErrors)} onRetry={retryPreparation} description="프로그램이 없는 상태와는 다릅니다. 다시 불러오기를 눌러 주세요." />
+  </div>;
+
   if (!retreatReady || !programsReady || !groupsReady || !meetingsReady || lock === undefined) return (
     <div className="min-h-screen px-4 py-8" style={{ background: "var(--color-bg)" }}>
       <div className="mx-auto max-w-6xl"><WorkspaceSkeleton label="프로그램 준비 화면을 불러오는 중입니다." rows={7} variant="page" /></div>
     </div>
   );
 
-  if (lockError) return (
-    <div className="program-access-state" role="alert"><h1>잠금 상태를 확인하지 못했습니다</h1><p>{lockError}</p><button type="button" className="btn-secondary" onClick={() => router.push("/events")}>목록으로</button></div>
-  );
   if (lock && !unlocked) return <RetreatPinGate retreatId={retreatId} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/events")} />;
   if (!retreat) return (
     <div className="program-access-state"><h1>수련회를 찾을 수 없습니다</h1><button type="button" className="btn-secondary" onClick={() => router.push("/events")}>목록으로</button></div>
@@ -476,8 +537,8 @@ export default function ProgramPreparationClient() {
           </div>
         )}
 
-        {loadError && <div className="program-load-error" role="alert">{loadError} 새로고침하면 다시 연결합니다.</div>}
-        {meetingLoadError && <div className="program-load-error" role="alert">{meetingLoadError} 회의 기록만 불러오지 못했습니다. 잠시 후 새로고침해 주세요.</div>}
+        {loadError && <LoadFailureNotice title="준비 자료의 최신 내용을 확인하지 못했습니다." sources={Object.keys(loadErrors)} onRetry={retryPreparation} description="현재 내용과 작성 중인 초안은 유지됩니다. 다시 불러온 뒤 저장해 주세요." />}
+        {meetingLoadError && <LoadFailureNotice title="준비회의 기록을 불러오지 못했습니다." sources={["준비회의 기록"]} onRetry={retryPreparation} description="다른 준비 자료는 계속 볼 수 있습니다. 회의 기록은 다시 불러온 뒤 편집할 수 있습니다." />}
         {!canEdit && <ReadOnlyBanner what="프로그램 준비 자료" why="편집은 행정팀, 교역자, 통합관리자만 가능합니다." />}
 
         {workspace === "overview" && (
@@ -485,7 +546,7 @@ export default function ProgramPreparationClient() {
             <ProgramList
               programs={programs}
               selectedId={null}
-              canEdit={canEdit}
+              canEdit={editingAllowed}
               busy={busy}
               onSelect={(id) => goToProgram(id)}
               onAddTemplate={(template) => void addProgram(template)}
@@ -496,7 +557,7 @@ export default function ProgramPreparationClient() {
         )}
 
         {workspace === "programs" && !selectedProgram && (
-          <ProgramCatalog programs={programs} canEdit={canEdit} busy={busy} onOpen={goToProgram} onAdd={(template) => void addProgram(template)} />
+          <ProgramCatalog programs={programs} canEdit={editingAllowed} busy={busy} onOpen={goToProgram} onAdd={(template) => void addProgram(template)} />
         )}
 
         {workspace === "programs" && selectedProgram && (
@@ -514,14 +575,14 @@ export default function ProgramPreparationClient() {
             </button>
             <ProgramEditor
                 program={selectedProgram}
-                canEdit={canEdit}
+                canEdit={editingAllowed}
                 meetingsAvailable={!meetingLoadError}
                 meetingSessionVersion={meetingSessionVersion}
                 saving={saving}
                 resetVersion={discardGuard.resetVersion}
                 onSave={saveProgram}
-                onPublish={(expectedUpdatedAt) => publishRetreatProgramRelease(retreatId, selectedProgram.id, expectedUpdatedAt).then(() => undefined)}
-                onUnpublish={() => unpublishRetreatProgramRelease(retreatId, selectedProgram.id)}
+                onPublish={(expectedUpdatedAt) => changeProgramPublication(selectedProgram.id, expectedUpdatedAt)}
+                onUnpublish={() => changeProgramPublication(selectedProgram.id)}
                 onDirtyChange={discardGuard.setDirty}
                 onRequestDelete={setDeleteTarget}
                 onSelectSection={selectSection}
@@ -597,7 +658,7 @@ export default function ProgramPreparationClient() {
         {workspace === "supplies" && (
           <ProgramSupplyWorkspace
             programs={programs}
-            canEdit={canEdit}
+            canEdit={editingAllowed}
             onOpen={goToProgram}
             onUpdateItem={(programId, itemId, data) => updateRetreatProgramItem(retreatId, programId, itemId, data)}
           />
@@ -605,7 +666,7 @@ export default function ProgramPreparationClient() {
         {workspace === "collaboration" && (
           <ProgramCollaborationWorkspace
             programs={programs}
-            canEdit={canEdit}
+            canEdit={editingAllowed}
             onOpen={goToProgram}
             onUpdateTask={(programId, taskId, data) => updateRetreatProgramTask(retreatId, programId, taskId, data)}
           />

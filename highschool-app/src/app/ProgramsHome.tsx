@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import CenterSpinner from "@/components/CenterSpinner";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
@@ -10,28 +11,45 @@ import type { Retreat } from "@/lib/types";
 import { selectRetreatForWork } from "@/lib/retreatSelection";
 
 export default function ProgramsHome() {
-  const { user, loading, roles } = useAuth();
+  const { user, roles } = useAuth();
   const allowed = canAccessArea("retreat-admin", roles);
+  return <WorkspaceAccessGate allowed={allowed} area="프로그램 준비">
+    <ProgramsWorkspace key={user?.uid ?? "guest"} />
+  </WorkspaceAccessGate>;
+}
+
+function ProgramsWorkspace() {
+  const { user, roles } = useAuth();
   const [records, setRecords] = useState<Retreat[]>([]);
   const [periods, setPeriods] = useState<Array<{ retreatId: string; startDate: string; endDate?: string }>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState("");
+  const [periodError, setPeriodError] = useState("");
   const [generation, setGeneration] = useState(0);
+  const scope = `${user?.uid ?? "guest"}:${generation}`;
+  const [listResult, setListResult] = useState<{ scope: string; error: string | null } | null>(null);
 
   useEffect(() => {
-    if (loading || !user || !allowed) return;
-    return subscribeToRetreats((next) => {
+    let active = true;
+    const stop = subscribeToRetreats((next) => {
+      if (!active) return;
       setRecords(next);
       setSelectedId((previous) => previous && next.some((retreat) => retreat.id === previous) ? previous : null);
-    }, (error) => setLoadError(error.message));
-  }, [allowed, generation, loading, user]);
+      setListResult({ scope, error: null });
+    }, (error) => { if (active) setListResult({ scope, error: error.message }); });
+    return () => { active = false; stop(); };
+  }, [scope]);
 
   const idsKey = records.map((retreat) => retreat.id).join(",");
   useEffect(() => {
-    if (!user || !allowed) return;
+    let active = true;
     const ids = idsKey ? idsKey.split(",") : [];
-    return subscribeToAllRetreatPeriods(ids, setPeriods, (error) => setLoadError((previous) => previous || error.message));
-  }, [allowed, idsKey, user, generation]);
+    const stop = subscribeToAllRetreatPeriods(ids, (next) => {
+      if (!active) return;
+      setPeriods(next);
+      setPeriodError("");
+    }, (error) => { if (active) setPeriodError(error.message); });
+    return () => { active = false; stop(); };
+  }, [idsKey, generation]);
 
   const retreats = useMemo(() => {
     const earliest: Record<string, string> = {};
@@ -48,14 +66,22 @@ export default function ProgramsHome() {
     });
   }, [periods, records]);
 
-  if (loading) return <CenterSpinner />;
-  if (!user || !allowed) return (
-    <div className="program-access-state"><h1>프로그램 준비 접근 권한이 없습니다</h1><p>수련회 행정 조회 권한이 있는 계정만 사용할 수 있습니다.</p></div>
-  );
+  function retryPrograms() {
+    setPeriodError("");
+    setGeneration((value) => value + 1);
+  }
+
+  if (listResult?.scope !== scope) return <main className="team-first-state" role="status">
+    <h1 className="page-title">프로그램 준비 목록을 불러오고 있습니다…</h1>
+    <p>등록된 수련회를 확인한 뒤 준비 화면을 열어 드립니다.</p>
+  </main>;
+  if (listResult.error !== null) return <main className="team-first-state">
+    <LoadFailureNotice title="프로그램 준비 목록을 불러오지 못했습니다." sources={["수련회 목록"]} onRetry={retryPrograms} description="등록된 수련회가 없는 상태와는 다릅니다. 다시 불러오기를 눌러 주세요." />
+  </main>;
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <VacationHome mode="program" roles={roles} retreats={retreats} selectedId={selectedId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null} onSelect={setSelectedId} loadError={loadError || null} onRetry={() => { setLoadError(""); setGeneration((value) => value + 1); }} />
+      <VacationHome mode="program" roles={roles} retreats={retreats} selectedId={selectedId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null} onSelect={setSelectedId} loadError={periodError ? "수련회 일정을 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null} onRetry={retryPrograms} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ type QaAuth = {
 const callbacks = new Set<() => void>();
 const params = new URLSearchParams(window.location.search);
 const qaTeam = params.get("team") === "media" ? "media" : "praise";
-export const qa = { writes: [] as unknown[], retries: 0, signInCalls: 0, navigation: [] as string[] };
+export const qa = { writes: [] as unknown[], retries: 0, signInCalls: 0, navigation: [] as string[], prefetches: [] as string[], subscriptions: [] as string[], childMounts: 0 };
 let auth: QaAuth;
 
 export function setQaAuth(state: string, uid = "synthetic-staff-a") {
@@ -28,7 +28,7 @@ export function setQaAuth(state: string, uid = "synthetic-staff-a") {
     teamMemberships: state === "unassigned" || state === "unapproved" || state === "roleError"
       ? {} : { [qaTeam]: { active: true, role: state === "viewer" ? "viewer" : "staff" } },
     loading: state === "loading",
-    roleError: state === "roleError",
+    roleError: state === "roleError" || state === "roleErrorAssigned",
     canSearchOfficialRoster: false,
     memberName: "합성 스탭",
     signIn: async () => {
@@ -47,15 +47,16 @@ export function useAuth() {
   return useSyncExternalStore((callback) => { callbacks.add(callback); return () => { callbacks.delete(callback); }; }, () => auth);
 }
 
-export default function Link({ href, ...props }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { href: string }) {
-  return <a href={href} {...props} />;
+export default function Link({ href, prefetch, ...props }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & { href: string; prefetch?: boolean | null }) {
+  return <a href={href} {...props} data-qa-prefetch={prefetch === false ? "disabled" : "default"} />;
 }
 
-export function useRouter() { return { replace: (href: string) => { qa.navigation.push(href); }, push: (href: string) => { qa.navigation.push(href); }, back: () => { window.history.back(); }, refresh: () => {} }; }
+export function useRouter() { return { replace: (href: string) => { qa.navigation.push(href); }, push: (href: string) => { qa.navigation.push(href); }, prefetch: (href: string) => { qa.prefetches.push(href); }, back: () => { window.history.back(); }, refresh: () => {} }; }
 export function usePathname() { return window.location.pathname; }
 export function useSearchParams() { return new URLSearchParams(window.location.search); }
 
 export function subscribeSemesters(callback: (items: unknown[]) => void) {
+  qa.subscriptions.push("semesters");
   const term = params.get("term");
   const dates = term === "past" ? { startDate: "2026-01-01", endDate: "2026-03-01" }
     : term === "upcoming" ? { startDate: "2027-01-01", endDate: "2027-03-01" }
@@ -64,10 +65,12 @@ export function subscribeSemesters(callback: (items: unknown[]) => void) {
   return () => {};
 }
 export function subscribeTeams(_id: string, callback: (items: unknown[]) => void) {
+  qa.subscriptions.push("teams");
   callback([{ id: "praise-semester-team", teamKey: "praise", name: "찬양팀", color: "bg-green-100", order: 1, room: "합성 연습실", goal: "합성 팀 목표" }, { id: "media-semester-team", teamKey: "media", name: "미디어팀", color: "bg-blue-100", order: 2 }]);
   return () => {};
 }
 export function subscribeApplications(_id: string, callback: (items: unknown[]) => void) {
+  qa.subscriptions.push("applications");
   const common = { status: "배치", teamId: `${qaTeam}-semester-team`, createdAt: "2026-08-01" };
   callback([
     { ...common, id: "1_student-1", studentId: "student-1", bu: "1부", grade: 1, class: 1, name: "합성학생가", trainingClassId: "training-1" },
@@ -77,8 +80,14 @@ export function subscribeApplications(_id: string, callback: (items: unknown[]) 
   return () => {};
 }
 export function subscribeSessions(_id: string, callback: (items: unknown[]) => void) {
+  qa.subscriptions.push("sessions");
   const term = params.get("term");
   const date = term === "past" ? "2026-02-07" : term === "upcoming" ? "2027-01-02" : "2026-10-10";
   callback([{ id: "meeting-1", date, type: "정규", label: "합성 정규 모임" }, { id: "holiday-1", date: "2026-10-06", type: "휴강", label: "합성 휴강" }]);
+  return () => {};
+}
+
+export function subscribePeopleSearchData() {
+  qa.subscriptions.push("peopleSearch");
   return () => {};
 }

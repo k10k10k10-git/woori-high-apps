@@ -51,7 +51,7 @@ describe("수련회 영역 내비게이션 계약", () => {
     expect(nav).toContain("router.prefetch(adminHref)");
     expect(nav).toContain("router.prefetch(programsHref)");
     expect(nav).toContain("router.prefetch(fieldHref)");
-    expect(nav).toContain("onPointerEnter={() => router.prefetch(href)}");
-    expect(nav).toContain("onFocus={() => router.prefetch(href)}");
+    expect(nav).toContain("onPointerEnter={() => { if (allowed) router.prefetch(href); }}");
+    expect(nav).toContain("onFocus={() => { if (allowed) router.prefetch(href); }}");
   });
 });

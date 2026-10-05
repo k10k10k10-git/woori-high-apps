@@ -21,7 +21,8 @@ it("필수 명단 구독 실패를 빈 명단으로 보이지 않고 재시도 �
   mocks.applications.mockImplementationOnce((_id, _cb, fail) => { fail(new Error("명단 연결 실패")); return mocks.stopped; })
     .mockImplementation((_id, cb) => { cb([{ id: "app", name: "가상 학생", trainingClassId: "class", status: "배치" }]); return () => {}; });
   render(<TrainingTermWorkspace semesterId="2026-2" section="roster" />);
-  expect(await screen.findByRole("alert")).toHaveTextContent("명단 연결 실패");
+  expect(await screen.findByRole("alert")).toHaveTextContent("신청 명단");
+  expect(screen.getByRole("alert")).not.toHaveTextContent("명단 연결 실패");
   expect(screen.queryByText("훈련반에 배치된 인원이 없습니다.")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
   expect(await screen.findAllByText("가상 학생")).toHaveLength(2);

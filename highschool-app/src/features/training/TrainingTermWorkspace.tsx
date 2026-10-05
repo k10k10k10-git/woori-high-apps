@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { useAuth } from "@/context/AuthContext";
@@ -24,13 +25,13 @@ const SECTIONS: Array<{ key: TrainingTermSection; label: string }> = [
 ];
 
 export default function TrainingTermWorkspace({ semesterId, section }: { semesterId: string; section: TrainingTermSection }) {
-  const { user, roles, teamMemberships } = useAuth();
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
   const [attempt, setAttempt] = useState(0);
-  return <TrainingTermContent key={`${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${semesterId}:${attempt}`} semesterId={semesterId} section={section} onRetry={() => setAttempt((value) => value + 1)} />;
+  return <TrainingTermContent key={`${loading}:${!!roleError}:${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${semesterId}:${attempt}`} semesterId={semesterId} section={section} onRetry={() => setAttempt((value) => value + 1)} />;
 }
 
 function TrainingTermContent({ semesterId, section, onRetry }: { semesterId: string; section: TrainingTermSection; onRetry: () => void }) {
-  const { user, roles, teamMemberships } = useAuth();
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
   const allowed = canAccessArea("semester", roles);
   const privateAllowed = canReadSemesterPrivate(roles, teamMemberships);
   const editable = canAccessOperationsCenter(roles, teamMemberships) && canEditArea("semester", roles);
@@ -46,7 +47,7 @@ function TrainingTermContent({ semesterId, section, onRetry }: { semesterId: str
   const { fail: recordFailure, ok, errors, message: error } = useLoadErrors(semesterId);
 
   useEffect(() => {
-    if (!user || !allowed) return;
+    if (!user || loading || roleError || !allowed) return;
     const mark = (key: string, success = true) => { setReady((current) => new Set(current).add(key)); if (success) ok(WORKSPACE_SOURCE_LABELS[key]); };
     const fail = (key: string) => (reason: Error) => { recordFailure(WORKSPACE_SOURCE_LABELS[key])(reason); mark(key, false); };
     if (!privateAllowed) { mark("private"); mark("classes"); mark("staff"); }
@@ -66,7 +67,7 @@ function TrainingTermContent({ semesterId, section, onRetry }: { semesterId: str
       );
     }
     return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [allowed, privateAllowed, semesterId, user, ok, recordFailure]);
+  }, [loading, roleError, allowed, privateAllowed, semesterId, user, ok, recordFailure]);
 
   const roster = useMemo(() => applications.filter((application) => application.status !== "취소" && !!application.trainingClassId), [applications]);
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
@@ -76,8 +77,8 @@ function TrainingTermContent({ semesterId, section, onRetry }: { semesterId: str
   const blocked = REQUIRED_WORKSPACE_SOURCES.some((key) => errors[WORKSPACE_SOURCE_LABELS[key]]);
 
   return <TrainingAccessState allowed={allowed}><main className="team-term-page">
-    <header className="team-term-header"><div className="team-workspace-title"><Link href="/training">훈련</Link><span>/</span><span>{semesterId}</span></div><div className="team-term-heading"><div><p className="section-kicker">TRAINING TERM</p><h1>훈련 · {meta?.title ?? semesterId}</h1><p>운영센터의 학기 훈련 데이터를 같은 원장에서 보여줍니다.</p></div>{!editable && <span className="team-role-badge">조회 전용</span>}</div><nav className="team-term-tabs" aria-label={`${semesterId} 훈련 메뉴`}>{SECTIONS.map((item) => <Link key={item.key} href={`/training/terms/${encodeURIComponent(semesterId)}/${item.key}`} aria-current={section === item.key ? "page" : undefined}>{item.label}</Link>)}</nav></header>
-    <section className="team-term-content">{error && <div className="team-first-alert" role="alert">일부 훈련 정보를 불러오지 못했습니다: {error}<button className="btn-secondary" onClick={onRetry}>다시 불러오기</button></div>}{ready.size < 8 ? <WorkspaceSkeleton label="훈련 학기 정보를 불러오는 중입니다." rows={7} variant="page" /> : blocked ? <div className="team-first-state">훈련 명단과 회차를 확인한 뒤 기록을 열 수 있습니다. 다시 불러오기를 눌러 주세요.</div> : <><SemesterEditProvider canEdit={editable}>
+    <header className="team-term-header"><div className="team-workspace-title"><Link href="/training">훈련</Link><span>/</span><span>{semesterId}</span></div><div className="team-term-heading"><div><h1>훈련 · {meta?.title ?? semesterId}</h1><p>운영센터의 학기 훈련 데이터를 같은 원장에서 보여줍니다.</p></div>{!editable && <span className="team-role-badge">조회 전용</span>}</div><nav className="team-term-tabs" aria-label={`${semesterId} 훈련 메뉴`}>{SECTIONS.map((item) => <Link key={item.key} href={`/training/terms/${encodeURIComponent(semesterId)}/${item.key}`} aria-current={section === item.key ? "page" : undefined}>{item.label}</Link>)}</nav></header>
+    <section className="team-term-content">{error && <LoadFailureNotice title="일부 훈련 정보를 불러오지 못했습니다." sources={Object.keys(errors)} onRetry={onRetry} />}{ready.size < 8 ? <WorkspaceSkeleton label="훈련 학기 정보를 불러오는 중입니다." rows={7} variant="page" /> : blocked ? <div className="team-first-state">훈련 명단과 회차를 확인한 뒤 기록을 열 수 있습니다. 다시 불러오기를 눌러 주세요.</div> : <><SemesterEditProvider canEdit={editable}>
       {!editable && <ReadOnlyBanner what={`${semesterId} 훈련 기록`} why="교역자와 행정팀이 운영센터 권한으로 수정할 수 있습니다." />}
       {section === "overview" && <div className="team-overview-grid"><section className="team-stat-card"><span>훈련반</span><strong>{trainingClasses.length}개</strong><p>{trainingClasses.map((item) => item.name).join(" · ") || "등록된 훈련반 없음"}</p></section><section className="team-stat-card"><span>훈련 명단</span><strong>{roster.length}명</strong><p>{upcoming ? `다음 모임 ${upcoming.date}` : "예정된 회차 없음"}</p></section><section className="team-goal-card"><span>운영 기준</span><p>훈련과 사역팀은 같은 학기 신청자를 공유하며, 출석 원장만 훈련과 팀으로 분리합니다.</p></section></div>}
       {section === "roster" && <TrainingRoster roster={roster} classById={classById} teamById={teamById} privates={privates} rosterContacts={rosterContacts} showContacts={privateAllowed} />}

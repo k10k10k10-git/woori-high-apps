@@ -28,13 +28,14 @@ const WEEKLY_TASKS: Record<SundayTeamKey, string> = {
 };
 
 export default function TeamWorkspace({ teamKey }: { teamKey: SundayTeamKey }) {
-  const { user, roles, teamMemberships } = useAuth();
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
   const [attempt, setAttempt] = useState(0);
-  return <TeamWorkspaceContent key={`${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${teamKey}:${attempt}`} teamKey={teamKey} onRetry={() => setAttempt((value) => value + 1)} />;
+  return <TeamWorkspaceContent key={`${loading}:${!!roleError}:${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${teamKey}:${attempt}`} teamKey={teamKey} onRetry={() => setAttempt((value) => value + 1)} />;
 }
 
 function TeamWorkspaceContent({ teamKey, onRetry }: { teamKey: SundayTeamKey; onRetry: () => void }) {
-  const { user, roles, teamMemberships } = useAuth();
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
+  const uid = user?.uid;
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [termTeams, setTermTeams] = useState<TermTeams>({});
   const [termLoaded, setTermLoaded] = useState<Record<string, boolean>>({});
@@ -45,9 +46,9 @@ function TeamWorkspaceContent({ teamKey, onRetry }: { teamKey: SundayTeamKey; on
   const teamMeta = sundayTeamOf(teamKey)!;
 
   useEffect(() => {
-    if (!allowed) return;
+    if (!uid || loading || roleError || !allowed) return;
     return subscribeSemesters((items) => { setSemesters(items); setLoaded(true); ok("학기 목록"); }, (reason) => { fail("학기 목록")(reason); setLoaded(true); });
-  }, [allowed, fail, ok]);
+  }, [uid, loading, roleError, allowed, fail, ok]);
 
   const visibleSemesters = useMemo(() => canBrowseEveryTeam(roles)
     ? semesters
@@ -55,7 +56,7 @@ function TeamWorkspaceContent({ teamKey, onRetry }: { teamKey: SundayTeamKey; on
   [roles, semesters, teamKey, teamMemberships]);
   const semesterIds = useMemo(() => visibleSemesters.map((semester) => semester.id).join("\u0000"), [visibleSemesters]);
   useEffect(() => {
-    if (!allowed || !semesterIds) return;
+    if (!uid || loading || roleError || !allowed || !semesterIds) return;
     const ids = semesterIds.split("\u0000");
     return (() => {
       const unsubs = ids.map((id) => subscribeTeams(id, (teams) => {
@@ -68,7 +69,7 @@ function TeamWorkspaceContent({ teamKey, onRetry }: { teamKey: SundayTeamKey; on
       }));
       return () => unsubs.forEach((unsubscribe) => unsubscribe());
     })();
-  }, [allowed, semesterIds, fail, ok]);
+  }, [uid, loading, roleError, allowed, semesterIds, fail, ok]);
 
   const teamsReady = visibleSemesters.every((semester) => termLoaded[semester.id]);
   const connectedTerms = visibleSemesters.filter((semester) => semesterTeamForKey(termTeams[semester.id] ?? [], teamKey));

@@ -17,7 +17,9 @@ describe("loadErrors", () => {
     expect(message).toContain("회차");
     expect(message).toContain("신청 명단");
     expect(message).toContain("사역팀");
-    expect(message).toContain(DENIED);
+    expect(message).not.toContain(DENIED);
+    expect(message).not.toContain("/semesters/");
+    expect(message).toContain("다시 불러오기");
   });
 
   it("성공한 경로는 배너에서 빠지고, 전부 성공하면 배너가 사라진다", () => {

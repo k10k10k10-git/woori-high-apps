@@ -35,11 +35,11 @@ describe("마이페이지 작업 화면", () => {
     expect(panel).toHaveAttribute("aria-labelledby", selected.id);
   });
 
-  it.each(["team", "requests", "activity"] as const)("일반 사용자의 금지 초기 메뉴 %s는 개인 대시보드로 돌아간다", async (initialTab) => {
+  it.each(["team", "requests", "activity"] as const)("일반 사용자의 제한된 초기 메뉴 %s를 표시하고 내용을 차단한다", async (initialTab) => {
     auth.roles = { semester: "staff", retreat: "fieldStaff" };
     render(<MyPageModal onClose={vi.fn()} initialTab={initialTab} />);
-    expect(menu().getAllByRole("tab")).toHaveLength(3);
-    expect(await screen.findByText("개인 요약 내용")).toBeInTheDocument();
+    expect(menu().getAllByRole("tab")).toHaveLength(6);
+    expect(await screen.findByRole("heading", { name: /접근 권한이 필요합니다/ })).toBeInTheDocument();
     expect(screen.queryByText("팀원 관리 내용")).not.toBeInTheDocument();
     expect(screen.queryByText("관리 요청 내용")).not.toBeInTheDocument();
     expect(screen.queryByText("활동 로그 내용")).not.toBeInTheDocument();
@@ -69,9 +69,9 @@ describe("마이페이지 작업 화면", () => {
     expect(await screen.findByText("팀원 관리 내용")).toBeInTheDocument();
     auth.roles = { semester: "staff", retreat: "none" };
     rerender(<MyPageModal onClose={vi.fn()} initialTab="team" />);
-    expect(await screen.findByText("개인 요약 내용")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "팀원 관리 접근 권한이 필요합니다." })).toBeInTheDocument();
     expect(screen.queryByText("팀원 관리 내용")).not.toBeInTheDocument();
-    expect(menu().getByRole("tab", { selected: true })).toHaveTextContent("대시보드");
+    expect(menu().getByRole("tab", { selected: true })).toHaveTextContent("팀원 관리");
   });
 
   it("다른 계정에는 이전 패널 입력 상태를 넘기지 않는다", async () => {
@@ -88,8 +88,8 @@ describe("마이페이지 작업 화면", () => {
     auth.roles = { semester: "pastor", retreat: "pastor" };
     rerender(<MyPageModal onClose={vi.fn()} initialTab="activity" />);
     expect(screen.queryByText("활동 로그 내용")).not.toBeInTheDocument();
-    expect(menu().queryByRole("tab", { name: "활동 로그" })).not.toBeInTheDocument();
-    expect(await screen.findByText("개인 요약 내용")).toBeInTheDocument();
+    expect(menu().getByRole("tab", { name: /활동 로그/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "활동 로그 접근 권한이 필요합니다." })).toBeInTheDocument();
   });
 
   it("모바일의 마지막 초기 탭을 수평 메뉴 안으로 드러낸다", async () => {

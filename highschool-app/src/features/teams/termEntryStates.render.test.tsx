@@ -25,14 +25,14 @@ beforeEach(() => {
 it("팀 직접 주소에서 역할 조회 실패를 실제 미배정과 구분한다", () => {
   mocks.roleError = true;
   render(<TeamWorkspace teamKey="praise" />);
-  expect(screen.getByRole("alert")).toHaveTextContent("담당 팀을 확인하지 못했습니다");
+  expect(screen.getByRole("alert")).toHaveTextContent("팀 업무 권한을 확인하지 못했습니다");
   screen.getByRole("button", { name: "다시 시도" }).click();
   expect(mocks.retryRoles).toHaveBeenCalledOnce();
 });
 it("팀 목록에서도 역할 조회 실패를 미배정으로 안내하지 않는다", () => {
   mocks.roleError = true;
   render(<TeamsHome />);
-  expect(screen.getByRole("alert")).toHaveTextContent("담당 팀을 확인하지 못했습니다");
+  expect(screen.getByRole("alert")).toHaveTextContent("팀 업무 권한을 확인하지 못했습니다");
   expect(screen.queryByText("담당 팀 연결이 필요합니다")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
   expect(mocks.retryRoles).toHaveBeenCalledOnce();

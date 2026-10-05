@@ -1,10 +1,12 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Trash } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import CenterSpinner from "@/components/CenterSpinner";
 import LoginButton from "@/components/LoginButton";
+import OverlayShell from "@/components/OverlayShell";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import {
   deleteRetreat, requestRetreatAccess, subscribeToAllRetreatPeriods, subscribeToRetreats,
 } from "@/lib/db";
@@ -21,7 +23,7 @@ import type { IguardAccessLock, Retreat as IguardRetreat } from "@/features/igua
 
 
 export default function HomePage() {
-  const { user, loading, roles, signIn, signOut } = useAuth();
+  const { user, loading, roles, roleError, signIn, signOut } = useAuth();
   const canUseAdmin = canAccessArea("retreat-admin", roles);
   const { toast } = useUI();
   const [requestSent, setRequestSent] = useState(false);
@@ -34,6 +36,8 @@ export default function HomePage() {
   const listReady = listResult?.scope === listScope;
   const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
   const [selectedRetreatId, setSelectedRetreatId] = useState<string | null>(null);
   // PIN 잠금은 현장(/field)과 같은 노드(retreats/{id}/iguard/accessLock)를 쓴다 —
   // 어느 화면에서 잠가도 행정·이가드 양쪽에 똑같이 반영된다.
@@ -58,7 +62,7 @@ export default function HomePage() {
   }), [earliestByRetreat, retreatRecords]);
 
   useEffect(() => {
-    if (loading || !canUseAdmin || !user) return;
+    if (loading || roleError || !canUseAdmin || !user) return;
     let active = true;
     const stop = subscribeToRetreats((list) => {
       if (!active) return;
@@ -71,24 +75,28 @@ export default function HomePage() {
       toast("수련회 목록을 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.", "error");
     });
     return () => { active = false; stop(); };
-  }, [loading, canUseAdmin, user, toast, listScope]);
+  }, [loading, roleError, canUseAdmin, user, toast, listScope]);
 
   const retreatIdsKey = retreatRecords.map((r) => r.id).join(",");
   useEffect(() => {
-    if (!user || !canUseAdmin) return;
+    if (loading || roleError || !user || !canUseAdmin) return;
+    let active = true;
     const ids = retreatIdsKey ? retreatIdsKey.split(",") : [];
-    return subscribeToAllRetreatPeriods(ids, setPeriods,
-      (error) => setRetreatLoadError((previous) => previous || `수련회 기간 구독 실패 - ${error.message}`));
-  }, [user, canUseAdmin, retreatIdsKey, subscriptionGeneration]);
+    const stop = subscribeToAllRetreatPeriods(ids, (next) => { if (active) setPeriods(next); },
+      (error) => { if (active) setRetreatLoadError((previous) => previous || `수련회 기간 구독 실패 - ${error.message}`); });
+    return () => { active = false; stop(); };
+  }, [loading, roleError, user, canUseAdmin, retreatIdsKey, subscriptionGeneration]);
 
   // 잠금 상태 — 목록의 자물쇠 배지와 관리자 모달이 함께 쓴다(현장 화면과 같은 노드).
   const sortedRetreatIdsKey = retreats.map((r) => r.id).join(",");
   useEffect(() => {
-    if (!user || !canUseAdmin) return;
+    if (loading || roleError || !user || !canUseAdmin) return;
+    let active = true;
     const ids = sortedRetreatIdsKey ? sortedRetreatIdsKey.split(",") : [];
-    return subscribeToIguardAccessLocks(ids, setAccessLocks,
-      (e) => setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 - ${e.message}`));
-  }, [user, canUseAdmin, sortedRetreatIdsKey, subscriptionGeneration]);
+    const stop = subscribeToIguardAccessLocks(ids, (next) => { if (active) setAccessLocks(next); },
+      (e) => { if (active) setRetreatLoadError((prev) => prev || `PIN 잠금 상태 구독 실패 - ${e.message}`); });
+    return () => { active = false; stop(); };
+  }, [loading, roleError, user, canUseAdmin, sortedRetreatIdsKey, subscriptionGeneration]);
 
   function retryRetreats() {
     setRetreatLoadError("");
@@ -100,8 +108,8 @@ export default function HomePage() {
     try {
       await requestRetreatAccess(user.uid, user.email || "", user.displayName || "");
       setRequestSent(true);
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "접근 요청을 보내지 못했습니다.", "error");
+    } catch {
+      toast("접근 요청을 보내지 못했습니다. 잠시 후 다시 시도하거나 통합관리자에게 문의해 주세요.", "error");
     }
   }
 
@@ -110,20 +118,26 @@ export default function HomePage() {
   }
 
   async function confirmDelete() {
-    if (!deleteTarget) return;
+    if (!deleteTarget || deletingRef.current) return;
+    deletingRef.current = true;
+    setDeleting(true);
     const deletedId = deleteTarget.id;
     try {
       await deleteRetreat(deletedId);
       setDeleteTarget(null);
       if (selectedRetreatId === deletedId) setSelectedRetreatId(null);
       toast("수련회를 삭제했습니다.", "success");
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "수련회를 삭제하지 못했습니다.", "error");
+    } catch {
+      toast("수련회를 삭제하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.", "error");
+    } finally {
+      deletingRef.current = false;
+      setDeleting(false);
     }
   }
 
   // ── 로딩 ────────────────────────────────────────────────────
   if (loading) return <CenterSpinner />;
+  if (roleError) return <WorkspaceAccessGate allowed={canUseAdmin} area="행사 관리">{null}</WorkspaceAccessGate>;
 
   // ── 로그인 화면 ─────────────────────────────────────────────
   // 통합 플랫폼의 한 영역이므로 독립 앱 시절의 남색 배경·파란 산 로고를 쓰지 않는다.
@@ -171,6 +185,7 @@ export default function HomePage() {
           )}
         </div>
         <button onClick={signOut} className="mt-6 text-sm text-slate-500 underline">다른 계정으로 로그인</button>
+        <Link className="mt-4 block text-sm underline" href="/library/help#access">계정 확인·담당자 문의 방법</Link>
       </div>
     </main>
   );
@@ -196,9 +211,7 @@ export default function HomePage() {
 
       {/* ═══ 삭제 확인 모달 ═══════════════════════════════════════ */}
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
-          onKeyDown={e => { if (e.key === 'Escape') setDeleteTarget(null); }}>
-          <div className="card p-6 w-full max-w-sm" role="dialog" aria-modal="true" aria-label="수련회 삭제">
+        <OverlayShell label="수련회 삭제" onClose={() => { if (!deletingRef.current) setDeleteTarget(null); }} closeOnBackdrop={!deleting} panelClassName="card p-6 w-full max-w-sm">
             <div className="text-center mb-5">
               <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
                 style={{ background: "var(--color-danger-bg)" }}>
@@ -211,15 +224,14 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex gap-2">
-              <button onClick={() => setDeleteTarget(null)} className="btn-secondary flex-1 justify-center">
+              <button type="button" data-autofocus disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-secondary flex-1 justify-center">
                 취소
               </button>
-              <button onClick={confirmDelete} className="btn-danger flex-1 justify-center">
-                삭제
+              <button type="button" disabled={deleting} onClick={confirmDelete} className="btn-danger flex-1 justify-center">
+                {deleting ? "삭제 중…" : "삭제"}
               </button>
             </div>
-          </div>
-        </div>
+        </OverlayShell>
       )}
 
       {/* ═══ 구글폼 가이드 모달 ══════════════════════════════════ */}

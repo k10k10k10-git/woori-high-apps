@@ -73,7 +73,8 @@ describe("TeamTermWorkspace 팀 연락처", () => {
     mocks.contacts.mockRejectedValueOnce(new Error("연락처 조회 실패"))
       .mockResolvedValueOnce({ "1_student-1": { phone: "010-1111-2222" } });
     render(<TeamTermWorkspace teamKey="praise" semesterId="2026-2" section="roster" />);
-    expect(await screen.findByRole("alert")).toHaveTextContent("연락처 조회 실패");
+    expect(await screen.findByRole("alert")).toHaveTextContent("팀 연락처");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("연락처 조회 실패");
     expect(screen.getByText("팀원학생")).toBeInTheDocument();
     fireEvent.focus(window);
     expect(await screen.findByRole("link", { name: "010-1111-2222" })).toBeInTheDocument();

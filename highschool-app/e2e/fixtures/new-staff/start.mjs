@@ -8,6 +8,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 const app = resolve(root, "../../..");
 const source = resolve(app, "src");
 const mock = resolve(root, "mocks.tsx");
+const dynamicMock = resolve(root, "dynamic.tsx");
 const intercepted = new Set();
 const rejected = new Set();
 const boundaries = new Set([
@@ -17,6 +18,7 @@ const boundaries = new Set([
   "features/iguard/lib/db",
   "features/sundayMinistry/db",
   "features/suggestions/db",
+  "features/portal/peopleSearchDb",
 ]);
 
 const server = await createServer({
@@ -41,6 +43,7 @@ const server = await createServer({
         return mock;
       }
       if (id === "next/link" || id === "next/navigation") return mock;
+      if (id === "next/dynamic") return dynamicMock;
       if (id.startsWith("@/")) return this.resolve(absolute, importer, { skipSelf: true });
       return null;
     },

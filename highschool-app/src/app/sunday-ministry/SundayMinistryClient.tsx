@@ -4,7 +4,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import LoginButton from "@/components/LoginButton";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, canAccessSundayTeam, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
 import {
@@ -86,9 +87,14 @@ const TAB_INTRO: Partial<Record<SundayTab, { title: string; description: string 
   "예배 자료": { title: "예배 자료", description: "헌금 기도문 양식처럼 자주 바뀌지 않는 문서를 글로 두고 복사·인쇄합니다." },
 };
 
-export default function SundayMinistryClient({ team, initialTab, workspaceId }: { team?: SundayTeamKey; initialTab?: string; workspaceId?: string }) {
+export default function SundayMinistryClient(props: { team?: SundayTeamKey; initialTab?: string; workspaceId?: string }) {
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
+  return <SundayMinistryClientContent key={`${user?.uid ?? "guest"}:${loading}:${!!roleError}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}`} {...props} />;
+}
+
+function SundayMinistryClientContent({ team, initialTab, workspaceId }: { team?: SundayTeamKey; initialTab?: string; workspaceId?: string }) {
   const router = useRouter();
-  const { user, loading: authLoading, roles, teamMemberships, canSearchOfficialRoster, signIn } = useAuth();
+  const { user, loading: authLoading, roleError, roles, teamMemberships, canSearchOfficialRoster } = useAuth();
   const assignedTeamKeys = teamMemberships ? activeTeamKeys(teamMemberships) : undefined;
   // 팀 단위로 판정한다. 사역팀은 자기 팀 하나만 열리고 옆 팀은 주소를 직접 쳐도 막힌다.
   // 팀이 배정되지 않은 사람은 들어갈 팀이 없으므로 진입 자체가 막힌다.
@@ -133,26 +139,29 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
   const [friends, setFriends] = useState<SundayNewFriend[]>([]);
   const [privateMap, setPrivateMap] = useState<Record<string, NewFriendPrivate>>({});
   const [adminChanges, setAdminChanges] = useState<SundayAdminChange[]>([]);
-  const { fail, ok, message: loadError } = useLoadErrors(`sunday|${teamMeta.key}|${user?.uid ?? ""}`);
+  const [attempt, setAttempt] = useState(0);
+  const { fail, ok, errors, message: loadError } = useLoadErrors(`sunday|${teamMeta.key}|${user?.uid ?? ""}|${attempt}`);
   const storageSid = sundayWorkspaceId(new Date().getFullYear());
 
   useEffect(() => {
-    if (!user || !allowed || teamChooser) return;
+    if (!user || authLoading || roleError || !allowed || teamChooser) return;
+    let active = true;
+    const failure = (key: string) => (error: Error) => { if (active) fail(key)(error); };
     const unsubs: Array<() => void> = [];
     if (needsFriends) {
-      unsubs.push(subscribeSundayNewFriends((values) => { setFriends(values); ok("새친구"); }, fail("새친구")));
+      unsubs.push(subscribeSundayNewFriends((values) => { if (!active) return; setFriends(values); ok("새친구"); }, failure("새친구")));
       if (canEdit) {
         unsubs.push(subscribeSundayNewFriendsPrivate(
-          (values) => { setPrivateMap(values); ok("새친구 비공개 정보"); },
-          fail("새친구 비공개 정보"),
+          (values) => { if (!active) return; setPrivateMap(values); ok("새친구 비공개 정보"); },
+          failure("새친구 비공개 정보"),
         ));
       }
     }
     if (needsAdminChanges) {
-      unsubs.push(subscribeSundayAdminChanges((values) => { setAdminChanges(values); ok("행정 변동 사항"); }, fail("행정 변동 사항")));
+      unsubs.push(subscribeSundayAdminChanges((values) => { if (!active) return; setAdminChanges(values); ok("행정 변동 사항"); }, failure("행정 변동 사항")));
     }
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [allowed, canEdit, fail, needsAdminChanges, needsFriends, ok, teamChooser, user]);
+    return () => { active = false; unsubs.forEach((unsubscribe) => unsubscribe()); };
+  }, [attempt, authLoading, roleError, allowed, canEdit, fail, needsAdminChanges, needsFriends, ok, teamChooser, user]);
 
   const pendingCount = useMemo(() => friends.filter((friend) =>
     !["완료", "종료", "보류"].includes(deriveNewFriendStage(friend)),
@@ -167,19 +176,7 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
   const scopedPrivateValueFor = useCallback((friend: SundayNewFriend) =>
     privateValueForSundayFriend(privateMap, friend), [privateMap]);
 
-  if (authLoading) return <main className="min-h-screen flex items-center justify-center text-slate-500">불러오는 중…</main>;
-  if (!user) {
-    return <main className="min-h-screen flex flex-col items-center justify-center gap-4"><p className="text-sm text-slate-500">로그인이 필요합니다</p><LoginButton signIn={signIn} /></main>;
-  }
-  if (!allowed) {
-    return (
-      <main className="min-h-screen flex flex-col items-center justify-center gap-3 px-6 text-center">
-        <h1 className="text-xl font-bold text-slate-800">팀·주일 운영 접근 권한이 없습니다</h1>
-        <p className="text-sm text-slate-500">통합관리자에게 역할 배정을 요청해주세요.</p>
-        <button onClick={() => router.push("/")} className="btn-secondary">통합 홈으로</button>
-      </main>
-    );
-  }
+  if (authLoading || !user || roleError || !allowed) return <WorkspaceAccessGate allowed={allowed} area={`${teamMeta.label} 주간·주일 업무`} backHref="/teams" backLabel="팀 목록으로">{null}</WorkspaceAccessGate>;
 
   if (teamChooser) {
     return (
@@ -199,9 +196,9 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
             <p className="mt-1 text-sm text-slate-500">팀을 선택하면 해당 주일 업무만 보여줍니다.</p>
           </div>
           <div className="sunday-team-picker">
-            {accessibleTeams.map((item) => (
-              <button key={item.key} type="button" onClick={() => router.push(teamHrefWithTab(item.key, initialTab))} disabled={item.status === "planned" && ownSundayTeam(roles, assignedTeamKeys) !== item.key}>
-                <span><strong>{item.label}</strong><small>{item.hint}</small></span>
+            {SUNDAY_MINISTRY_TEAMS.map((item) => (
+              <button key={item.key} type="button" onClick={() => router.push(teamHrefWithTab(item.key, initialTab))}>
+                <span><strong>{item.label}</strong><small>{item.hint}{!accessibleTeams.includes(item) ? " · 권한 필요" : ""}</small></span>
                 <span aria-hidden="true">→</span>
               </button>
             ))}
@@ -218,7 +215,7 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
         <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">주간·주일 업무</span>
         <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
         <label className="flex min-w-0 items-center gap-2 text-xs text-slate-300"><span className="shrink-0">팀 변경</span><select aria-label="현재 팀·팀 변경" className="max-w-36 rounded-lg border border-white/20 bg-slate-800 px-2 py-1.5 text-xs text-white" value={teamMeta.key} onChange={(event) => router.push(teamHrefWithTab(event.target.value as SundayTeamKey, initialTab))}>
-          {accessibleTeams.map((item) => <option key={item.key} value={item.key} disabled={item.status === "planned" && ownSundayTeam(roles, assignedTeamKeys) !== item.key}>{item.label}{item.status === "planned" ? " · 기획 중" : ""}</option>)}
+          {SUNDAY_MINISTRY_TEAMS.map((item) => <option key={item.key} value={item.key}>{item.label}{item.status === "planned" ? " · 기획 중" : ""}{!accessibleTeams.includes(item) ? " · 권한 필요" : ""}</option>)}
         </select></label>
         {teamMeta.key !== "praise" && !canEdit && <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 sm:text-xs">조회 전용</span>}
       </div>
@@ -243,7 +240,7 @@ export default function SundayMinistryClient({ team, initialTab, workspaceId }: 
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        {loadError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 로드 오류: {loadError}</div>}
+        {loadError && <LoadFailureNotice title="팀 운영 정보를 불러오지 못했습니다." sources={Object.keys(errors)} onRetry={() => setAttempt(value => value + 1)} />}
         {!tab ? (
           <section className="card card-body">
             <div className="rounded-xl border border-dashed border-slate-200 px-5 py-14 text-center">

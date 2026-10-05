@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Books, CalendarBlank, MagnifyingGlass } from "@phosphor-icons/react";
-import LoginButton from "@/components/LoginButton";
+import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
 import { useAuth } from "@/context/AuthContext";
 import { subscribeArchiveLinks, subscribeSemesters, subscribeTeams } from "@/features/semester/db";
 import type { ArchiveLink, Semester, Team } from "@/features/semester/types";
-import type { MinistryRoles } from "@/features/portal/accessPolicy";
+import { hasAnyMinistryRole, type MinistryRoles } from "@/features/portal/accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS } from "@/features/portal/featureCatalog";
 import { activeTeamKeys, canAccessOperationsCenter, canBrowseEveryTeam, semesterTeamForKey, type TeamMemberships } from "@/features/teams/teamModel";
 import styles from "./LibraryHome.module.css";
@@ -17,13 +18,14 @@ const KIND_LABEL: Record<ArchiveLink["kind"], string> = {
 };
 
 export default function LibraryHome() {
-  const { user, loading, roles, teamMemberships, signIn } = useAuth();
-  if (loading) return <main className="team-first-state" role="status">자료를 불러오는 중입니다…</main>;
-  if (!user) return <main className="team-first-state"><p>자료를 보려면 로그인해 주세요.</p><LoginButton signIn={signIn} /></main>;
-  return <LibraryForUser key={user.uid} roles={roles} teamMemberships={teamMemberships} />;
+  const { user, loading, roleError, roles, teamMemberships } = useAuth();
+  const [attempt, setAttempt] = useState(0);
+  return <WorkspaceAccessGate allowed={hasAnyMinistryRole(roles) || activeTeamKeys(teamMemberships).length > 0} area="학기 자료">
+    <LibraryForUser key={`${user?.uid}:${loading}:${!!roleError}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}:${attempt}`} roles={roles} teamMemberships={teamMemberships} onRetry={() => setAttempt(value => value + 1)} />
+  </WorkspaceAccessGate>;
 }
 
-function LibraryForUser({ roles, teamMemberships }: { roles: MinistryRoles; teamMemberships: TeamMemberships }) {
+function LibraryForUser({ roles, teamMemberships, onRetry }: { roles: MinistryRoles; teamMemberships: TeamMemberships; onRetry: () => void }) {
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [teamsByTerm, setTeamsByTerm] = useState<Record<string, Team[]>>({});
   const [readyTeams, setReadyTeams] = useState<Set<string>>(new Set());
@@ -104,7 +106,7 @@ function LibraryForUser({ roles, teamMemberships }: { roles: MinistryRoles; team
         <label><span>자료 검색</span><div className={styles.search}><MagnifyingGlass size={18} aria-hidden="true" /><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="제목 또는 학기 검색" /></div></label>
         <label><span>자료 종류</span><select value={kind} onChange={(event) => setKind(event.target.value as ArchiveLink["kind"] | "all")}><option value="all">전체 종류</option>{Object.entries(KIND_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       </div>
-      {error && <div className="team-first-alert" role="alert">일부 자료를 불러오지 못했습니다. <button type="button" onClick={() => window.location.reload()}>다시 불러오기</button></div>}
+      {error && <LoadFailureNotice title="일부 자료를 불러오지 못했습니다." onRetry={onRetry} />}
       {!finished && !error && <p className={styles.state} role="status">학기 자료를 확인하는 중입니다…</p>}
       {finished && !error && records.length === 0 && <p className={styles.state}>{query || kind !== "all" ? "검색 조건에 맞는 자료가 없습니다." : "아직 접근 가능한 학기 자료가 없습니다."}</p>}
       {records.length > 0 && <ul className={styles.list}>{records.map(({ link, semester, href }) => {
