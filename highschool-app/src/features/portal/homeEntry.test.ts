@@ -22,3 +22,9 @@ it('팀별 첫 사용 안내는 실제 담당 업무를 가리킨다', () => {
   expect(buildHomeEntry({roles:{semester:'barnabas',retreat:'none'},actions:[],fieldActive:false})?.steps[0]).toContain('새친구');
   expect(buildHomeEntry({roles:{semester:'praise',retreat:'none'},actions:[],fieldActive:false})?.steps[2]).toContain('등단표');
 });
+it('여러 팀을 맡은 스탭에게 담당 팀 선택과 첫 사용 안내를 제공한다', () => {
+  const entry = buildHomeEntry({ roles: { semester: 'staff', retreat: 'none' }, actions: [], fieldActive: false, assignedTeamKeys: ['praise', 'media'], operationsAllowed: false });
+  expect(entry?.href).toBe('/teams');
+  expect(entry?.steps[0]).toBe('담당 팀 선택');
+  expect(entry?.steps).toHaveLength(3);
+});

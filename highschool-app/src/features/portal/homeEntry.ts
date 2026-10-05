@@ -29,6 +29,11 @@ export function buildHomeEntry({ roles, actions, semesterId, retreat, fieldActiv
     return { href: `/teams/${team}`, title: `${label} 업무 시작`, description: '배정된 팀의 학기 기록과 상시 업무를 한곳에서 엽니다.',
       steps: TEAM_START_STEPS[team] };
   }
+  if (assignedTeamKeys && assignedTeamKeys.length > 1) return {
+    href: '/teams', title: '담당 팀 전체 현황 확인',
+    description: '함께 맡은 팀 중 오늘 사용할 팀을 선택해 주세요.',
+    steps: ['담당 팀 선택', '팀 전체 현황과 사용 안내 확인', '주간 업무 또는 학기 명단·기록 열기'],
+  };
   const scheduled = actions.find(item => item.href && item.urgency === 'today' &&
     (item.kind === 'semester' ? canUseOperations : item.kind === 'retreat' || item.kind === 'field' ? canAccessArea('retreat-admin', roles) || canAccessArea('retreat-field', roles) : false));
   if (scheduled?.href) return { href: scheduled.href, title: scheduled.title, description: '오늘 진행하는 사역입니다.', steps: ['날짜와 대상 확인', '담당 업무 처리', '처리 결과 확인'] };

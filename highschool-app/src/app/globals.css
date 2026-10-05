@@ -1612,7 +1612,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .portal-mobile-area {
     display: flex;
     min-width: 0;
-    min-height: 40px;
+    min-height: 44px;
     flex: 1 1 auto;
     align-items: center;
     justify-content: center;
@@ -1627,9 +1627,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .portal-mobile-area span { overflow: hidden; text-overflow: ellipsis; }
   .portal-header-tools { margin-left: 0; display: flex; align-items: center; gap: 6px; }
   .portal-search-trigger {
-    width: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
     justify-content: center;
     border-radius: 10px;
     padding: 0;
@@ -1638,9 +1638,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .portal-search-trigger kbd { display: none; }
   .portal-mobile-more {
     display: grid;
-    width: 40px;
-    min-width: 40px;
-    min-height: 40px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
     place-items: center;
     border: 1px solid rgba(255,255,255,.11);
     border-radius: 10px;

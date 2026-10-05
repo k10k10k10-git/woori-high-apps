@@ -167,6 +167,7 @@ export const UNIFIED_ROUTES = [
   "/operations/activity",
   "/library",
   "/library/guide",
+  "/library/help",
   "/help/feedback",
   "/ministry-guide",
   "/suggestions",
