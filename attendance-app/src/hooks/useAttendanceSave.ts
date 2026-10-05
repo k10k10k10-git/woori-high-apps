@@ -14,6 +14,7 @@ export function useAttendanceSave() {
   const [pending, setPending] = useState(false);
   const active = useRef(true);
   const running = useRef(false);
+  const lastSavedAt = useRef(state.lastAttendanceSavedAt ?? 0);
   const current = useRef(state);
   useEffect(() => { current.current = state; }, [state]);
   useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
@@ -38,7 +39,9 @@ export function useAttendanceSave() {
     try {
       await saveAttendanceCell({ year, target, value, expected }, () => valid(year, revision));
       if (!valid(year, revision)) return;
-      const savedAt = Date.now();
+      // 안내 식별 시각은 같은 밀리초에 저장해도 겹치지 않아야 이전 닫기 타이머와 구분된다.
+      const savedAt = Math.max(Date.now(), lastSavedAt.current + 1, ((getState ? getState() : current.current).lastAttendanceSavedAt ?? 0) + 1);
+      lastSavedAt.current = savedAt;
       if (active.current) setFeedback({ ...base, status: 'saved', savedAt });
       dispatch({ type: 'SET_SAVE_STATUS', payload: 'saved', savedAt, revision, feedback: { ...base, status: 'saved', savedAt } });
     } catch (error) {

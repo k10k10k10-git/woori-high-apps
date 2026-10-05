@@ -11,7 +11,7 @@ import { AttendanceSaveError } from '@/lib/attendanceSave';
 import { useAttendanceSave } from './useAttendanceSave';
 const target = { ck: '1-1-1', sid: 's', k: '8-0' };
 beforeEach(() => { vi.clearAllMocks(); m.dispatch.mockReset(); m.state = { ...initialState, curYear: 2026, attData: {}, classData: {} }; });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 it('실패 뒤 화면 값이 바뀌어도 재시도는 원래 사전값을 유지한다', async () => {
   m.save.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
   const { result, rerender } = renderHook(useAttendanceSave);
@@ -45,6 +45,7 @@ it('연도 전환 후 이전 요청의 응답과 재시도를 현재 화면에 �
 });
 
 it('연속 저장 중 이전 성공 안내를 닫아도 진행 상태는 유지한다', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
   m.save.mockResolvedValueOnce(undefined);
   const { result } = renderHook(useAttendanceSave);
   await act(async () => { await result.current.save(target, 'O'); });
@@ -59,6 +60,8 @@ it('연속 저장 중 이전 성공 안내를 닫아도 진행 상태는 유지�
   expect(result.current.pending).toBe(true);
   await act(async () => { finish(); await saving; });
   expect(result.current.feedback).toMatchObject({ status: 'saved', sid: 'second' });
+  const second = result.current.feedback!;
+  if (saved.status === 'saved' && second.status === 'saved') expect(second.savedAt).toBeGreaterThan(saved.savedAt);
 });
 it('결과 불명은 실패와 구분하고 재시도 시 사전값을 보존한다', async () => {
   m.save.mockRejectedValueOnce(new AttendanceSaveError('unknown', '결과 확인 필요')).mockResolvedValueOnce(undefined);

@@ -178,3 +178,22 @@
 }
 
 .as-sheet-label { display: grid; gap: 6px; margin-bottom: 6px; font-size: 12px; }
+.as-handoff { min-width: 0; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--as-line); }
+.as-handoff h3 > span { color: var(--as-muted); font-size: 12px; font-weight: 400; }
+.as-handoff-count { margin-bottom: 6px !important; }
+.as-handoff-count > span { margin-left: 8px; color: var(--as-muted); font-size: 12px; }
+.as-handoff-note { color: var(--as-muted); font-size: 12px; overflow-wrap: anywhere; }
+.as-handoff-preview { margin-top: 14px; }
+.as-handoff-preview > summary { width: fit-content; min-height: 44px; padding-block: 10px; cursor: pointer; color: var(--as-accent); font-weight: 500; }
+.as-handoff-table { max-height: 460px; overflow: auto; border: 1px solid var(--as-line); border-radius: 12px; }
+.as-handoff-table:focus-visible { outline: 2px solid var(--as-accent); outline-offset: 3px; }
+.as-handoff-table table { width: 100%; min-width: 1100px; border-collapse: collapse; font-size: 12px; text-align: left; }
+.as-handoff-table :is(th, td) { padding: 10px 12px; border-bottom: 1px solid var(--as-line); vertical-align: top; }
+.as-handoff-table thead th { position: sticky; top: 0; background: #f7f7f8; z-index: 1; white-space: nowrap; font-weight: 500; }
+.as-handoff-table tbody th { min-width: 140px; font-weight: 500; }
+.as-handoff-table small { display: block; color: var(--as-muted); font-size: 11px; font-weight: 400; }
+.as-handoff-table td { min-width: 110px; }
+.as-handoff-table td:nth-child(6) { min-width: 230px; overflow-wrap: anywhere; }
+.as-handoff-table td:nth-last-child(-n+2) { min-width: 76px; }
+.as-handoff-error { color: var(--as-danger); margin-top: 10px !important; }
+@media (max-width: 759px) { .as-handoff .as-section-heading > .as-button { width: 100%; } }
