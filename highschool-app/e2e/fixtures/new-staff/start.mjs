@@ -3,12 +3,16 @@ import { createServer } from "vite";
 import tailwind from "@tailwindcss/postcss";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const app = resolve(root, "../../..");
 const source = resolve(app, "src");
 const mock = resolve(root, "mocks.tsx");
 const dynamicMock = resolve(root, "dynamic.tsx");
+// 매 실행마다 테스트가 소유한 빈 캐시를 사용해 최초 dependency scan도 검증한다.
+const cacheDir = mkdtempSync(resolve(tmpdir(), "woori-new-staff-qa-"));
 const intercepted = new Set();
 const rejected = new Set();
 const boundaries = new Set([
@@ -19,13 +23,14 @@ const boundaries = new Set([
   "features/sundayMinistry/db",
   "features/suggestions/db",
   "features/portal/peopleSearchDb",
+  "features/activityLog/db",
 ]);
 
 const server = await createServer({
   root,
   configFile: false,
   envDir: false,
-  cacheDir: resolve(app, "../../tmp/new-staff-qa-20261005/.vite"),
+  cacheDir,
   plugins: [{
     name: "new-staff-qa-deny-production-services",
     enforce: "pre",
@@ -33,7 +38,7 @@ const server = await createServer({
       if (/^(?:@firebase\/|firebase(?:\/|$)|firebase-admin(?:\/|$))/.test(id)
         || /\/src\/lib\/(?:firebase|firebaseAdmin)(?:\.|$)/.test(id)) {
         rejected.add(id);
-        throw new Error(`합성 QA의 운영 SDK import 차단: ${id}`);
+        throw new Error(`합성 QA의 운영 SDK import 차단: ${id} ← ${importer ?? "entry"}`);
       }
       const absolute = id.startsWith("@/") ? resolve(source, id.slice(2))
         : id.startsWith(".") && importer ? resolve(dirname(importer), id) : id;
@@ -84,5 +89,9 @@ const server = await createServer({
 await server.listen();
 console.log("합성 신규 스탭 QA · 실제 인증/DB 연결 없음 · http://127.0.0.1:4179");
 for (const signal of ["SIGTERM", "SIGINT"]) {
-  process.once(signal, async () => { await server.close(); process.exit(0); });
+  process.once(signal, async () => {
+    await server.close();
+    rmSync(cacheDir, { recursive: true, force: true });
+    process.exit(0);
+  });
 }

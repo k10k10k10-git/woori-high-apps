@@ -4,6 +4,8 @@
 
 - 실제 `TeamWorkspace`, `TeamsHome`, `HomeStart`, `SiteHelp`, `PraiseAttendance`, `GlobalPortalHeader`, `RetreatAreaNav`, `OperationsHome`, `OperationsGate`, `OverlayShell`, `LoginButton`과 CSS를 렌더한다.
 - Auth·DB 서비스 경계만 테스트에서 교체하고 운영 Firebase SDK import를 거부한다.
+- 서버를 시작할 때마다 테스트가 소유한 새 임시 Vite 캐시를 만든다. 최초 dependency scan이 동적 패널의 서비스까지 탐색하도록 검증하며 기존 사용자 캐시는 삭제하거나 재사용하지 않는다. 정상 종료 시 이 실행이 만든 임시 캐시만 지운다.
+- `MyPageModal`의 지연 로딩 활동 로그도 최초 dependency scan에 포함되므로 `features/activityLog/db`를 서비스 경계에서 교체한다. 실제 활동 로그 조회 UI는 이 합성 fixture의 검증 범위가 아니다. SDK 차단이 발생하면 importer 경로를 포함해 실패하고 `proof.rejected`는 빈 배열이어야 한다.
 - Next의 Link·navigation·dynamic 렌더 primitive는 테스트용 anchor·router 기록·React.lazy로 대체한다. 실제 업무 UI와 권한 판정은 대체하지 않는다. Link의 `prefetch=false` 전달과 router prefetch 콜백을 검사하며, 실제 Next RSC 요청을 검증하는 것은 아니다.
 - 서버는 `127.0.0.1:4179`에만 바인딩한다. CSP와 브라우저 route가 외부 통신을 차단한다.
 - `/__qa__/proof.json`의 Firebase runtime module 목록이 비었는지 매 접근성 시나리오에서 확인한다.
