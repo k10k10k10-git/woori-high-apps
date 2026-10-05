@@ -4,7 +4,7 @@
 
 /** Download a CSV string as a file */
 export function downloadCSV(rows: string[][], filename: string) {
-  const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = csvContent(rows);
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -12,6 +12,14 @@ export function downloadCSV(rows: string[][], filename: string) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** CSV 따옴표만으로는 Excel의 수식 해석을 막지 못한다. 사용자 값은 문자로만 내보낸다. */
+export function csvContent(rows: string[][]): string {
+  return rows.map(row => row.map(value => {
+    const literal = /^(?:\s*[=+\-@]|[\t\r\n])/.test(value) ? `'${value}` : value;
+    return `"${literal.replace(/"/g, '""')}"`;
+  }).join(',')).join('\n');
 }
 
 /** Download an XLSX file from an array of arrays */

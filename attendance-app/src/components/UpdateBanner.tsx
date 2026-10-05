@@ -1,7 +1,7 @@
 'use client';
 export default function UpdateBanner({ onReload }: { onReload: () => void }) {
   return (
-    <div className="update-toast">
+    <div className="update-toast" role="status" aria-live="polite">
       <img src="/icon-192.png" alt="우리교회" className="update-toast-icon" />
       <div className="update-toast-body">
         <div className="update-toast-title">새 버전이 업데이트되었습니다</div>

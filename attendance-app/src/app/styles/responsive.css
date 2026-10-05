@@ -283,6 +283,7 @@
 
 /* ─── Toast ────────────────────────────────────────────────── */
 .toast-container {
+  width: min(520px, calc(100% - 32px));
   position: fixed;
   bottom: 80px;
   left: 50%;
@@ -295,6 +296,8 @@
   pointer-events: none;
 }
 .toast {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 10px 20px;
   border-radius: 24px;
   font-size: 13px;
@@ -305,9 +308,10 @@
   white-space: pre-line;
   text-align: center;
 }
-.toast-error   { background: #ef4444; }
-.toast-success { background: #10b981; }
-.toast-info    { background: #9B8DD4; }
+.toast-error   { background: var(--red); }
+.toast-success { background: var(--green); }
+.toast-info    { background: var(--primary); }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }

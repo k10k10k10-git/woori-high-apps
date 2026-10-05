@@ -1,11 +1,6 @@
 const CACHE_NAME = 'woori-att-20260813';
 const ASSETS = [
-  '/',
-  '/attendance',
-  '/manage',
-  '/stats',
-  '/overall',
-  '/admin',
+  '/offline.html',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
@@ -21,50 +16,39 @@ self.addEventListener('install', e => {
 
 // 활성화: 이전 캐시 삭제 + 업데이트 알림
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => {
-      const oldKeys = keys.filter(k => k !== CACHE_NAME);
-      const isUpdate = oldKeys.length > 0;
-      return Promise.all(oldKeys.map(k => caches.delete(k))).then(() => {
-        if (isUpdate) {
-          return self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
-            clients.forEach(c => c.postMessage({ type: 'NEW_VERSION' }));
-          });
-        }
-      });
-    })
-  );
-  self.clients.claim();
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    const oldKeys = keys.filter(k => k.startsWith('woori-att-') && k !== CACHE_NAME);
+    await Promise.all(oldKeys.map(k => caches.delete(k)));
+    await self.clients.claim();
+    if (oldKeys.length) {
+      const clients = await self.clients.matchAll({ includeUncontrolled: true });
+      clients.forEach(c => c.postMessage({ type: 'NEW_VERSION' }));
+    }
+  })());
 });
 
 // 요청 처리: 네트워크 우선, 실패 시 캐시
 self.addEventListener('fetch', e => {
   // Firebase / Google Fonts / CDN / Next.js 내부 요청은 그냥 통과
-  const url = e.request.url;
+  const url = new URL(e.request.url);
   if (
-    url.includes('firebase') ||
-    url.includes('googleapis') ||
-    url.includes('gstatic') ||
-    url.includes('/_next/') ||
-    url.includes('/__nextjs') ||
-    url.includes('__next.')   // Next.js RSC 페이로드 파일 (__next._full.txt 등)
+    e.request.method !== 'GET' || url.origin !== self.location.origin ||
+    url.pathname.includes('/_next/') || url.pathname.includes('/__nextjs') ||
+    url.pathname.includes('__next.') || e.request.headers.has('RSC')
   ) {
     return;
   }
-
-  e.respondWith(
-    fetch(e.request)
-      .then(res => {
-        // 성공 시 캐시 업데이트
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return res;
-      })
-      .catch(() =>
-        // 캐시 미스 시 undefined 반환 방지 → 오프라인 fallback
-        caches.match(e.request).then(cached => cached || caches.match('/attendance'))
-      )
-  );
+  const navigation = e.request.mode === 'navigate';
+  const staticAsset = !url.search && ASSETS.includes(url.pathname);
+  // 원장/API/임의 파일은 캐시에 넣지 않는다. 출석 저장을 오프라인 성공처럼 보여주지 않는다.
+  if (!navigation && !staticAsset) return;
+  const network = fetch(e.request);
+  if (staticAsset) e.waitUntil(network.then(res => res.ok
+    ? caches.open(CACHE_NAME).then(cache => cache.put(e.request, res.clone())) : undefined).catch(() => {}));
+  e.respondWith(network.catch(async () => {
+    const cache = await caches.open(CACHE_NAME);
+    const fallback = await cache.match(navigation ? '/offline.html' : e.request);
+    return fallback || new Response('인터넷 연결이 필요합니다.', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
+  }));
 });

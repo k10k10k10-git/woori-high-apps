@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { db, onValue, ref, update } from '@/lib/db';
+import { db, onValue, ref } from '@/lib/db';
+import { saveVisitRequestStatus } from '@/lib/visitRequestStatus';
 import { useApp } from '@/store/AppContext';
 import AdminIcon from '@/components/admin/AdminIcon';
 import HistoryModal from '@/components/modals/HistoryModal';
@@ -10,20 +11,23 @@ import { formatSuggestionDate } from '@/utils/suggestionDate';
 import { parseYearTeacherMessages, type TeacherMessage, type VisitRequestStatus } from '@/utils/teacherMessages';
 
 type VisitRow = TeacherMessage & { classKey: string };
-type VisitLoad = { year: number; rows: VisitRow[]; status: 'loading' | 'ready' | 'error' };
+type VisitLoad = { year: number; revision: number; rows: VisitRow[]; status: 'loading' | 'ready' | 'error' };
 
 type VisitFilter = { part?: string; grade?: string; classKey?: string; search?: string };
 
 export default function VisitRequestsSection({ initialView = 'open', filter, requestKey = '' }: { initialView?: 'open' | 'done'; filter?: VisitFilter; requestKey?: string }) {
-  const { state, dispatch } = useApp();
-  const { classData, curYear } = state;
-  const [load, setLoad] = useState<VisitLoad>({ year: curYear, rows: [], status: 'loading' });
+  const { state, dispatch, getState } = useApp();
+  const { classData, curYear, dataRevision } = state;
+  const [load, setLoad] = useState<VisitLoad>({ year: curYear, revision: dataRevision, rows: [], status: 'loading' });
+  const [saveError, setSaveError] = useState('');
   const [view, setView] = useState<'open' | 'done'>(initialView);
   const [retry, setRetry] = useState(0);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const targetRef = useRef<HTMLElement>(null);
   const focusedRequest = useRef('');
   const savingRef = useRef(false);
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
   const candidates = useMemo(() => Object.entries(classData).flatMap(([classKey, info]) =>
     info.students.map(student => ({ classKey, student }))), [classData]);
 
@@ -34,12 +38,12 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
       const rows = Object.entries(parseYearTeacherMessages(snap.val(), 'visit'))
         .flatMap(([classKey, items]) => items.map(item => ({ ...item, classKey })))
         .sort((a, b) => b.createdAt - a.createdAt);
-      setLoad({ year: curYear, rows, status: 'ready' });
-    }, () => { if (active) setLoad({ year: curYear, rows: [], status: 'error' }); });
+      setLoad({ year: curYear, revision: dataRevision, rows, status: 'ready' });
+    }, () => { if (active) setLoad({ year: curYear, revision: dataRevision, rows: [], status: 'error' }); });
     return () => { active = false; stop?.(); };
-  }, [curYear, retry]);
+  }, [curYear, dataRevision, retry]);
 
-  const current = load.year === curYear ? load : { year: curYear, rows: [], status: 'loading' as const };
+  const current = load.year === curYear && load.revision === dataRevision ? load : { year: curYear, rows: [], status: 'loading' as const };
   const query = (filter?.search ?? '').trim().normalize('NFC').toLocaleLowerCase('ko');
   const connectedRows = current.rows.map(row => ({ ...row, connection: resolveStudentConnection({
     id: row.studentId, name: row.studentName ?? '', personId: row.studentPersonId,
@@ -72,12 +76,12 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
     if (savingRef.current) return;
     savingRef.current = true;
     setSavingKey(key);
+    setSaveError('');
+    const isCurrent = () => active.current && getState().curYear === curYear && getState().dataRevision === dataRevision && getState().userRole?.role === 'admin';
     try {
-      await update(ref(db, `suggestions/${curYear}/${row.classKey}/${row.id}`), status === 'done'
-        ? { status, resolvedAt: Date.now() }
-        : { status, resolvedAt: null });
-      showToast(status === 'done' ? '심방 요청을 처리 완료로 표시했습니다.' : '심방 요청을 다시 열었습니다.');
-    } catch { showToast('처리 상태를 저장하지 못했습니다. 다시 시도해 주세요.'); }
+      await saveVisitRequestStatus(curYear, row.classKey, row, status, isCurrent);
+      if (isCurrent()) showToast(status === 'done' ? '심방 요청을 처리 완료로 표시했습니다.' : '심방 요청을 다시 열었습니다.', 'success');
+    } catch (error) { if (isCurrent()) setSaveError(error instanceof Error ? error.message : '처리 상태를 저장하지 못했습니다. 다시 불러와 주세요.'); }
     finally { savingRef.current = false; setSavingKey(null); }
   }
 
@@ -90,9 +94,10 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
       <button type="button" aria-pressed={view === 'open'} onClick={() => setView('open')}>확인 필요 <span>{openCount}</span></button>
       <button type="button" aria-pressed={view === 'done'} onClick={() => setView('done')}>처리 완료 <span>{doneCount}</span></button>
     </div>
+    {saveError && <div className="ao-error" role="alert"><span>{saveError}</span><button type="button" disabled={savingKey !== null} onClick={() => { setSaveError(''); setLoad({ year: curYear, revision: dataRevision, rows: [], status: 'loading' }); setRetry(value => value + 1); }}>목록 다시 불러오기</button></div>}
     {requestKey && current.status === 'ready' && !requestedRow && <p className="pr-empty" role="status">요청한 심방 건을 찾을 수 없습니다. 조회 연도를 확인해 주세요.</p>}
     {requestKey && current.status === 'ready' && requestedRow && !requestVisible && <p className="pr-empty" role="status">요청한 심방 건이 현재 필터에 보이지 않습니다. 필터를 초기화해 주세요.</p>}
-    {current.status === 'error' ? <div className="ao-error" role="alert"><span>심방 요청을 불러오지 못했습니다.</span><button type="button" onClick={() => { setLoad({ year: curYear, rows: [], status: 'loading' }); setRetry(value => value + 1); }}>다시 시도</button></div>
+    {current.status === 'error' ? <div className="ao-error" role="alert"><span>심방 요청을 불러오지 못했습니다.</span><button type="button" onClick={() => { setLoad({ year: curYear, revision: dataRevision, rows: [], status: 'loading' }); setRetry(value => value + 1); }}>다시 시도</button></div>
       : current.status === 'loading' ? <p className="ao-loading" role="status">심방 요청을 불러오고 있습니다.</p>
         : rows.length === 0 ? <div className="ad-empty"><AdminIcon name="book" size={26} /><h3>{view === 'open' ? '확인이 필요한 심방 요청이 없습니다.' : '처리 완료된 심방 요청이 없습니다.'}</h3><p>교사가 출석 입력 화면에서 요청하면 이곳에 표시됩니다.</p></div>
           : <div className="ao-visit-list">{rows.map(row => {
@@ -113,7 +118,7 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
                 })}<button type="button" onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: linked.student.id, ck: currentClass } })}>출석 이력 보기</button></div>}
               </div>
               <p>{row.text}</p>
-              <div className="ao-visit-action"><time dateTime={date.dateTime}>{date.label}</time><button type="button" disabled={savingKey === key}
+              <div className="ao-visit-action"><time dateTime={date.dateTime}>{date.label}</time><button type="button" disabled={savingKey !== null || state.userRole?.role !== 'admin'}
                 onClick={() => changeStatus(row, row.status === 'done' ? 'open' : 'done')}>{savingKey === key ? '저장 중' : row.status === 'done' ? '다시 열기' : '처리 완료'}</button></div>
             </article>;
           })}</div>}

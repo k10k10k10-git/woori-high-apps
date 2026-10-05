@@ -10,9 +10,8 @@ import { useEffect } from 'react';
  * 그대로 포기한다. 최소한 (1) 무슨 일인지, (2) 다시 시도, (3) 홈으로 가는 길
  * 셋을 항상 제공한다.
  *
- * error.tsx는 루트 레이아웃 아래에서 일어난 예외만 잡는다. 레이아웃 자체가
- * 터지는 경우는 global-error.tsx가 필요하지만, 그 경로는 AppProvider보다
- * 위라 지금은 다루지 않는다.
+ * error.tsx는 루트 레이아웃 아래에서 일어난 예외만 잡는다. 레이아웃 자체의
+ * 예외는 Context에 의존하지 않는 global-error.tsx가 별도로 복구 안내한다.
  */
 export default function Error({
   error,
