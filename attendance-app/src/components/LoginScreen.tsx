@@ -1,7 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { doLogin } from '@/hooks/useAuth';
 import AdminIcon from '@/components/admin/AdminIcon';
+import { loginErrorMessage, readLoginPreferences } from '@/utils/loginPreferences';
 
 export default function LoginScreen({ authError, onBackToDemo }: {
   authError?: string | null;
@@ -14,30 +15,30 @@ export default function LoginScreen({ authError, onBackToDemo }: {
   const [stayLogin, setStayLogin] = useState(false);
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const pending = useRef(false);
+
+  useEffect(() => { setErr(''); }, [authError]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('saveEmail') === '1';
-    const stay = localStorage.getItem('stayLogin') === '1';
-    setSaveEmail(saved);
-    setStayLogin(stay);
-    if (saved) setEmail(localStorage.getItem('savedEmail') ?? '');
+    const prefs = readLoginPreferences();
+    setSaveEmail(prefs.saveEmail);
+    setStayLogin(prefs.stayLogin);
+    setEmail(prefs.email);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending.current) return;
     if (!email || !pw) { setErr('이메일과 비밀번호를 입력하세요'); return; }
+    pending.current = true;
     setErr(''); setLoading(true);
     try {
       await doLogin(email, pw, stayLogin, saveEmail);
       // 화면 진입은 AppShell의 인증 구독이 사용자 역할 조회까지 마친 뒤 확정한다.
     } catch (e: unknown) {
-      const msg = (e as { code?: string })?.code;
-      if (msg?.includes('user-not-found') || msg?.includes('wrong-password') || msg?.includes('invalid-credential')) {
-        setErr('이메일 또는 비밀번호가 잘못되었습니다');
-      } else {
-        setErr('로그인 실패: ' + msg);
-      }
+      setErr(loginErrorMessage(e));
     } finally {
+      pending.current = false;
       setLoading(false);
     }
   };
@@ -104,8 +105,7 @@ export default function LoginScreen({ authError, onBackToDemo }: {
             <span className="entry-sr-only" role="status" aria-live="polite">
               {loading ? '로그인 정보를 확인하는 중입니다' : ''}
             </span>
-            {authError && <div className="entry-error" role="alert">{authError}</div>}
-            {!authError && err && <div className="entry-error" role="alert">{err}</div>}
+            {(err || authError) && <div className="entry-error" role="alert">{err || authError}</div>}
           </form>
           {onBackToDemo && (
             <button type="button" className="entry-back-action" onClick={onBackToDemo}>

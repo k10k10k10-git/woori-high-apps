@@ -4,7 +4,7 @@
 
 /** Download a CSV string as a file */
 export function downloadCSV(rows: string[][], filename: string) {
-  const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csv = csvContent(rows);
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -14,12 +14,38 @@ export function downloadCSV(rows: string[][], filename: string) {
   URL.revokeObjectURL(url);
 }
 
+/** CSV 따옴표만으로는 Excel의 수식 해석을 막지 못한다. 사용자 값은 문자로만 내보낸다. */
+export function csvContent(rows: string[][]): string {
+  return rows.map(row => row.map(value => {
+    const literal = /^(?:\s*[=+\-@]|[\t\r\n])/.test(value) ? `'${value}` : value;
+    return `"${literal.replace(/"/g, '""')}"`;
+  }).join(',')).join('\n');
+}
+
 /** Download an XLSX file from an array of arrays */
-export async function downloadXLSX(rows: string[][], sheetName: string, filename: string) {
+export type XLSXOptions = {
+  headerRow?: number;
+  columnWidths?: number[];
+  columnFormats?: Record<number, string>;
+  beforeDownload?: () => void;
+};
+
+export async function downloadXLSX(rows: (string | number | Date)[][], sheetName: string, filename: string, options: XLSXOptions = {}) {
   const { utils, writeFile } = await import('xlsx');
   const ws = utils.aoa_to_sheet(rows);
+  if (options.columnWidths) ws['!cols'] = options.columnWidths.map(wch => ({ wch }));
+  if (options.headerRow !== undefined && rows.length > options.headerRow) {
+    ws['!autofilter'] = { ref: utils.encode_range({ s: { r: options.headerRow, c: 0 }, e: { r: rows.length - 1, c: rows[options.headerRow].length - 1 } }) };
+    for (let row = options.headerRow + 1; row < rows.length; row++) {
+      for (const [column, format] of Object.entries(options.columnFormats ?? {})) {
+        const cell = ws[utils.encode_cell({ r: row, c: Number(column) })];
+        if (cell?.t === 'n') cell.z = format;
+      }
+    }
+  }
   const wb = utils.book_new();
   utils.book_append_sheet(wb, ws, sheetName);
+  options.beforeDownload?.();
   writeFile(wb, filename);
 }
 

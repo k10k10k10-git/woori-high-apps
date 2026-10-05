@@ -18,7 +18,14 @@ describe('교사·관리자 로그인 진입 화면', () => {
     localStorage.clear();
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+  it('브라우저 저장소가 차단돼도 로그인 폼을 연다', () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => { throw new DOMException('blocked', 'SecurityError'); });
+    render(<LoginScreen />);
+    expect(screen.getByRole('button', { name: /로그인$/ })).toHaveProperty('disabled', false);
+    expect(screen.getByLabelText('이메일')).toHaveProperty('value', '');
+  });
 
   it('명시적인 입력 이름과 기존 로그인 옵션을 그대로 전달한다', async () => {
     mocks.doLogin.mockResolvedValue(undefined);
@@ -85,5 +92,15 @@ describe('교사·관리자 로그인 진입 화면', () => {
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe('이메일 또는 비밀번호가 잘못되었습니다');
     expect(screen.getByRole('button', { name: /로그인$/ })).toHaveProperty('disabled', false);
+  });
+
+  it('이전 권한 오류가 재로그인 실패의 실제 원인을 가리지 않는다', async () => {
+    mocks.doLogin.mockRejectedValue({ code: 'auth/network-request-failed' });
+    render(<LoginScreen authError="이전 권한 조회 실패" />);
+    fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'admin@example.com' } });
+    fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'secret-password' } });
+    fireEvent.click(screen.getByRole('button', { name: /로그인$/ }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('인터넷'));
+    expect(screen.getByRole('alert').textContent).not.toContain('이전 권한 조회 실패');
   });
 });

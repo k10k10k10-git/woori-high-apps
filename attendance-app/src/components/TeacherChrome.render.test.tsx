@@ -52,6 +52,13 @@ describe('교사 공통 셀', () => {
   });
 
   afterEach(() => cleanup());
+  it('권한 확인 전에는 관리자 메뉴와 연도 필터를 표시하지 않는다', () => {
+    mocks.state.current = { ...teacherState(), userRole: null };
+    render(<><TopBar onLogout={mocks.onLogout} /><TabNav /></>);
+    expect(screen.queryByRole('link', { name: '설정 페이지' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '전체 페이지' })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: '연도 선택' })).toBeNull();
+  });
 
   it('하단 메뉴를 페이지 내비게이션으로 제공하고 현재 경로를 표시한다', () => {
     render(<TabNav />);

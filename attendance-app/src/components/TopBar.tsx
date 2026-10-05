@@ -9,7 +9,7 @@ type DemoActions = { onChangeClass: () => void; onAdminLogin: () => void };
 export default function TopBar({ onLogout, demo }: { onLogout: () => void; demo?: DemoActions }) {
   const { state, dispatch } = useApp();
   const { curYear, curPart, curGrade, userRole } = state;
-  const isAdmin = !userRole || userRole.role === 'admin';
+  const isAdmin = userRole?.role === 'admin';
   const isTeacher = userRole?.role === 'teacher';
 
   const windowYears = getWindowYears(state.curYear);

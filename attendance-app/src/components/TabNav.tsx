@@ -15,7 +15,7 @@ const TABS: Array<{ path: string; icon: AdminIconName; label: string; adminOnly?
 export default function TabNav() {
   const pathname = usePathname();
   const { state } = useApp();
-  const isAdmin = !state.userRole || state.userRole.role === 'admin';
+  const isAdmin = state.userRole?.role === 'admin';
 
   return (
     <nav className="tab-nav" aria-label="메인 메뉴">

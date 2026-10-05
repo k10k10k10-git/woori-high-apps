@@ -8,6 +8,7 @@ import { useApp } from '@/store/AppContext';
 import { emailToKey } from '@/utils/dates';
 import { showToast } from '@/utils/toast';
 import SheetSyncSection from './SheetSyncSection';
+import YouthHandoffSection from '../admin/YouthHandoffSection';
 import type { UserRole } from '@/types';
 import AdminIcon from '../admin/AdminIcon';
 import '../admin/admin-settings.css';
@@ -322,6 +323,7 @@ export default function AdminTab() {
 
       <section className="as-panel" id={`${settingsId}-panel-data`} role="tabpanel" aria-labelledby={`${settingsId}-tab-data`} hidden={section !== 'data'}>
         <div className="as-section-heading"><div><h2>데이터 관리 <span>{curYear}년</span></h2><p>명단 변경 내용을 미리 확인한 뒤 필요한 작업을 적용하세요.</p></div></div>
+        {section === 'data' && <YouthHandoffSection key={`${curYear}:${dataRevision}`} />}
         <div className="as-sheet-sync"><SheetSyncSection /></div>
         <details className="as-promotion-section">
           <summary><span><AdminIcon name="book" size={18} /><strong>새해 진급 처리</strong></span><span>{curYear - 1}년 → {curYear}년 <AdminIcon name="chevron" /></span></summary>

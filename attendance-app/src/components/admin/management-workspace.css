@@ -40,4 +40,4 @@
 .mw-class-tabs a[aria-current=page]{background:#f2eff8}
 .mw-class-tabs a[aria-current=page]::after{display:none}
 @media(max-width:1100px){.sd-detail{max-height:none}}
-@media(max-width:760px){.sd-overview-name{min-height:40px;width:100%}.sd-detail{margin-top:16px}.sd-table:not(.sd-detailed-table){min-width:0}.sd-result-bar .sd-view-options{margin-right:auto}}
+@media(max-width:760px){.sd-overview-name{min-height:44px;width:100%}.sd-detail{margin-top:16px}.sd-table:not(.sd-detailed-table){min-width:0}.sd-result-bar .sd-view-options{margin-right:auto}.sd-search input{min-height:44px}.sd-detailed-table a,.sd-detail dd a{display:inline-flex;align-items:center;min-height:44px}}
