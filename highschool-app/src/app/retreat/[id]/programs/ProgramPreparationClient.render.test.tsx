@@ -4,10 +4,11 @@ import { useState, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
 import type { RetreatProgram } from "@/lib/types";
+import type { ProgramSectionKey } from "@/lib/programPreparation";
 
 const mocks = vi.hoisted(() => ({
   retreat: vi.fn(), programs: vi.fn(), groups: vi.fn(), meetings: vi.fn(), mergeCache: vi.fn(), toast: vi.fn(),
-  save: vi.fn(), publish: vi.fn(), unpublish: vi.fn(),
+  save: vi.fn(), publish: vi.fn(), unpublish: vi.fn(), create: vi.fn(), createDefaults: vi.fn(), reorder: vi.fn(),
   router: { push: vi.fn() }, query: "workspace=programs&program=second&section=overview",
   auth: {
     user: { uid: "fixture-admin", email: "admin@example.test" }, loading: false, roleError: false,
@@ -24,35 +25,33 @@ vi.mock("@/lib/db", () => ({
   subscribeToRetreat: mocks.retreat, subscribeToRetreatPrograms: mocks.programs,
   subscribeToGroups: mocks.groups, subscribeToRetreatProgramMeetings: mocks.meetings,
   updateRetreatProgram: mocks.save, publishRetreatProgramRelease: mocks.publish, unpublishRetreatProgramRelease: mocks.unpublish,
+  createRetreatProgram: mocks.create, createDefaultRetreatPrograms: mocks.createDefaults, reorderRetreatPrograms: mocks.reorder,
 }));
 vi.mock("@/lib/retreatWorkspaceCache", () => ({ getRetreatWorkspaceSnapshot: () => null, mergeRetreatWorkspaceSnapshot: mocks.mergeCache }));
 vi.mock("./ProgramWorkspaceHeader", () => ({ default: ({ children }: { children: ReactNode }) => <header>{children}</header> }));
 vi.mock("../field/RetreatPinGate", () => ({ default: () => <p>PIN 입력</p> }));
-vi.mock("./ProgramList", () => ({ default: () => <p>프로그램 목록</p> }));
-vi.mock("./ProgramWorkspaceViews", () => ({
-  ProgramCatalog: () => <p>프로그램 목록</p>, ProgramCollaborationWorkspace: () => null,
-  ProgramResourcesWorkspace: () => null, ProgramScheduleWorkspace: () => null, ProgramSupplyWorkspace: () => null,
-}));
 // 편집기 내부 기능 대신 실제 부모의 mount·props 계약을 검증한다. local draft가 살아 있는지 관찰한다.
-vi.mock("./ProgramEditor", () => ({ default: function EditorFixture({ program, canEdit, meetingsAvailable, onSave, onPublish, onUnpublish }: {
+vi.mock("./ProgramEditor", () => ({ default: function EditorFixture({ program, section, canEdit, meetingsAvailable, onSave, onPublish, onUnpublish, onDirtyChange }: {
   program: RetreatProgram; canEdit: boolean; meetingsAvailable: boolean;
+  section: ProgramSectionKey; onDirtyChange: (dirty: boolean) => void;
   onSave: (program: RetreatProgram) => Promise<void>; onPublish: (updatedAt: number) => Promise<void>; onUnpublish: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState("");
   return <section>
     <h2>{program.title}</h2>
-    <label>작성 중인 초안<input value={draft} onChange={(event) => setDraft(event.target.value)} /></label>
+    <label>작성 중인 초안<input value={draft} onChange={(event) => { setDraft(event.target.value); onDirtyChange(Boolean(event.target.value)); }} /></label>
     <button disabled={!canEdit} onClick={() => void onSave(program).catch(() => {})}>초안 저장</button>
     <button disabled={!canEdit} onClick={() => void onPublish(program.updatedAt).catch(() => {})}>현장에 공유</button>
     <button disabled={!canEdit} onClick={() => void onUnpublish().catch(() => {})}>현장 공유 해제</button>
     <span data-testid="meeting-availability">{meetingsAvailable ? "회의 사용 가능" : "회의 사용 불가"}</span>
     <span data-testid="private-meetings">{Object.keys(program.meetings ?? {}).join(",")}</span>
+    <span data-testid="selected-section">{section}</span>
   </section>;
 } }));
 
 import ProgramPreparationClient from "./ProgramPreparationClient";
 
-const programs = [
+const programs: RetreatProgram[] = [
   { id: "first", title: "첫 프로그램", order: 1, kind: "main", status: "draft", createdAt: 1, updatedAt: 1 },
   { id: "second", title: "두 번째 프로그램", order: 2, kind: "post", status: "draft", createdAt: 1, updatedAt: 1 },
 ];
@@ -68,6 +67,7 @@ function deliverAll() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.query = "workspace=programs&program=second&section=overview";
   mocks.auth.user = { uid: "fixture-admin", email: "admin@example.test" };
   mocks.auth.roles = { semester: "superAdmin", retreat: "superAdmin" };
   mocks.auth.roleError = false;
@@ -77,13 +77,16 @@ beforeEach(() => {
   mocks.save.mockReset().mockResolvedValue(undefined);
   mocks.publish.mockReset().mockResolvedValue("fixture-release");
   mocks.unpublish.mockReset().mockResolvedValue(undefined);
+  mocks.create.mockReset().mockResolvedValue("created-program");
+  mocks.createDefaults.mockReset().mockResolvedValue(["created-first", "created-second"]);
+  mocks.reorder.mockReset().mockResolvedValue(undefined);
   for (const subscribe of [mocks.retreat, mocks.programs, mocks.groups, mocks.meetings]) subscribe.mockReturnValue(() => {});
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 it("첫 자료 조회 실패를 빈 프로그램과 구분하고 재시도 성공으로 업무를 연다", () => {
   render(<ProgramPreparationClient />);
-  expect(screen.queryByText("프로그램 목록")).not.toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "프로그램 준비" })).not.toBeInTheDocument();
   act(() => mocks.programs.mock.calls[0][2](new Error("PERMISSION_DENIED /private/node")));
   expect(screen.getByRole("alert")).toHaveTextContent("프로그램 준비 자료를 불러오지 못했습니다");
   expect(screen.queryByText(/PERMISSION_DENIED|private/)).not.toBeInTheDocument();
@@ -250,4 +253,81 @@ it("업무 저장 후 로그 실패는 다시 저장하라는 안내로 바꾸�
   await act(async () => fireEvent.click(screen.getByRole("button", { name: "현장에 공유" })));
   expect(mocks.toast).toHaveBeenCalledWith("업무는 저장됐으나 활동 로그 저장에 실패했습니다. 새로고침 후 확인해 주세요.", "error");
   expect(mocks.publish).toHaveBeenCalledOnce();
+});
+
+it("전체 준비에서 유일한 프로그램 목록을 열면 오래된 상세 선택만 지우고 다른 URL 조건은 유지한다", () => {
+  mocks.query = "workspace=overview&program=second&section=roles&from=fixture";
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(deliverAll);
+  expect(screen.getByRole("heading", { name: "지금 처리할 것" })).toBeInTheDocument();
+  expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "프로그램 준비 열기" }));
+  expect(push).toHaveBeenCalledExactlyOnceWith(null, "", "/events/fixture-retreat/programs?workspace=programs&from=fixture");
+  expect(mocks.router.push).not.toHaveBeenCalled();
+  expect(mocks.programs).toHaveBeenCalledOnce();
+});
+
+it("전체 준비의 할 일을 열면 이전 section 대신 해당 프로그램의 다음 행동으로 이동한다", () => {
+  mocks.query = "workspace=overview&section=roles";
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(() => {
+    deliverAll();
+    mocks.programs.mock.calls.at(-1)![1]([{ ...programs[0], lead: "가상 담당", tasks: {
+      draft: { id: "draft", title: "진행안 작성", done: false, createdAt: 1, updatedAt: 1 },
+    } }]);
+  });
+  fireEvent.click(screen.getByRole("button", { name: /진행안 작성/ }));
+  expect(push).toHaveBeenCalledExactlyOnceWith(null, "", "?workspace=programs&section=posts&program=first");
+  expect(mocks.router.push).not.toHaveBeenCalled();
+});
+
+it("시간·장소 바로가기에 명시된 기본 정보 section은 다음 행동보다 우선한다", () => {
+  mocks.query = "workspace=schedule&section=roles";
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(() => {
+    deliverAll();
+    mocks.programs.mock.calls.at(-1)![1]([{ ...programs[0], lead: "가상 담당" }]);
+  });
+  fireEvent.click(screen.getByRole("button", { name: /첫 프로그램/ }));
+  expect(push).toHaveBeenCalledExactlyOnceWith(null, "", "?workspace=programs&section=overview&program=first");
+});
+
+it("직접 공유한 URL의 명시 section을 기본 다음 행동으로 덮지 않는다", () => {
+  mocks.query = "workspace=programs&program=second&section=roles";
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(deliverAll);
+  expect(screen.getByTestId("selected-section")).toHaveTextContent("roles");
+  expect(push).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["직접 만들기", "created-program", "single"],
+  ["직접 작성할 프로그램 2개 만들기", "created-first", "defaults"],
+])("목록의 %s 생성은 기본 정보부터 열고 한 번만 저장 요청한다", async (label, id, kind) => {
+  mocks.query = "workspace=programs&section=posts";
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(() => { deliverAll(); mocks.programs.mock.calls.at(-1)![1]([]); });
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: new RegExp(`^${label}`) })));
+  expect(push).toHaveBeenCalledExactlyOnceWith(null, "", `?workspace=programs&section=overview&program=${id}`);
+  expect(kind === "single" ? mocks.create : mocks.createDefaults).toHaveBeenCalledOnce();
+  expect(kind === "single" ? mocks.createDefaults : mocks.create).not.toHaveBeenCalled();
+});
+
+it("편집 중 준비 메뉴를 바꿀 때 초안 보호를 유지하고 취소하면 URL과 초안이 그대로 남는다", () => {
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(deliverAll);
+  fireEvent.change(screen.getByRole("textbox", { name: "작성 중인 초안" }), { target: { value: "계속 작성할 초안" } });
+  fireEvent.click(screen.getByRole("tab", { name: /전체 준비/ }));
+  expect(screen.getByRole("dialog", { name: "저장하지 않은 변경" })).toBeInTheDocument();
+  expect(push).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("textbox", { name: "작성 중인 초안" })).toHaveValue("계속 작성할 초안");
+  expect(push).not.toHaveBeenCalled();
 });
