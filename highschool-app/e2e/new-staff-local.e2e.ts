@@ -3,18 +3,18 @@ import { expect, test, type Page } from "@playwright/test";
 
 // 이 파일은 playwright.new-staff.config.ts의 합성 loopback 환경에서만 실행한다.
 // 기본 운영 E2E에 섞이면 테스트를 실행하지 않으며 실제 인증을 우회하지 않는다.
-test.beforeEach(async ({ page, baseURL }) => {
+test.beforeEach(async ({ page, context, baseURL }) => {
   expect(baseURL, "합성 테스트는 loopback 전용 config가 필요합니다.").toBe("http://127.0.0.1:4179");
   await page.clock.install({ time: new Date("2026-10-05T01:00:00Z") });
-  await page.route("**/*", async (route) => {
+  await context.route("**/*", async (route) => {
     const url = new URL(route.request().url());
     if (url.protocol === "data:" || (url.hostname === "127.0.0.1" && url.port === "4179")) await route.continue();
     else await route.abort("blockedbyclient");
   });
 });
 
-async function open(page: Page, scenario: string, state = "ready", theme = "light") {
-  await page.goto(`/?scenario=${scenario}&state=${state}&theme=${theme}`);
+async function open(page: Page, scenario: string, state = "ready", theme = "light", options: Record<string, string> = {}) {
+  await page.goto(`/?${new URLSearchParams({ scenario, state, theme, ...options })}`);
   // 최초 Vite 모듈 변환 시간을 기다린다. 업무 상호작용 제한은 config의 8초를 유지한다.
   await expect(page.locator("main")).toBeVisible({ timeout: 15_000 });
 }
@@ -27,6 +27,306 @@ async function expectAccessible(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const violations = results.violations.filter((item) => item.impact === "serious" || item.impact === "critical");
   expect(violations, JSON.stringify(violations.map((item) => ({ id: item.id, nodes: item.nodes.map((node) => node.target) })), null, 2)).toEqual([]);
+}
+
+async function expectServiceIsolation(page: Page) {
+  const proof = await (await page.request.get("/__qa__/proof.json")).json();
+  expect(proof.synthetic).toBe(true);
+  expect(proof.ready).toBe(true);
+  expect(proof.firebaseRuntimeModules).toEqual([]);
+  expect(proof.rejected).toEqual([]);
+}
+
+async function programSection(page: Page, key: string) {
+  if ((page.viewportSize()?.width ?? 1280) <= 640) await page.locator(".program-mobile-section-nav select").selectOption(key);
+  else await page.locator(`#program-tab-${key}`).click();
+}
+
+async function programWorkspace(page: Page, key: string) {
+  if ((page.viewportSize()?.width ?? 1280) <= 640) await page.getByRole("combobox", { name: "수련회 프로그램 준비 메뉴" }).selectOption(key);
+  else await page.locator(`#program-workspace-tab-${key}`).click();
+}
+
+test("실제 프로그램 총괄 화면과 유일한 선택 목록을 구분하고 두 진행 형식을 보존한다", async ({ page }, info) => {
+  await open(page, "actualProgram", "programEditor");
+  await expect(page.getByRole("heading", { name: "수련회 준비 공간", exact: true })).toBeVisible();
+  await expect(page.locator(".program-catalog-row")).toHaveCount(0);
+  await programWorkspace(page, "programs");
+  await expect(page.getByRole("heading", { name: "프로그램 준비", exact: true })).toBeVisible();
+  await expect(page.locator(".program-catalog-row")).toHaveCount(2);
+  await page.screenshot({ path: info.outputPath("actual-program-catalog.png"), fullPage: true });
+  await page.getByRole("button", { name: /합성 전체 프로그램/ }).click();
+  await expect(page).toHaveURL(/program=program-main/);
+  await expect(page.getByRole("combobox", { name: "유형", exact: true })).toHaveValue("main");
+  await page.getByRole("button", { name: "프로그램 목록", exact: true }).click();
+  await page.getByRole("button", { name: /합성 조별 프로그램/ }).click();
+  await expect(page).toHaveURL(/program=program-post/);
+  await expect(page.getByRole("combobox", { name: "유형", exact: true })).toHaveValue("post");
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.filter((event) => event.active && event.name === "programs").length)).toBe(1);
+});
+
+test("실제 프로그램 수동 초안은 섹션·이동 취소·재연결을 거쳐 보존되고 계정 변경 때 폐기된다", async ({ page }, info) => {
+  await open(page, "actualProgram", "programEditor", "light", { workspace: "programs", program: "program-main", section: "posts" });
+  const draft = "합성 작성 중 진행안 — 자동 저장하지 않습니다";
+  await page.locator("#program-flow").fill(draft);
+  await expect(page.getByText("저장하지 않은 초안", { exact: true })).toBeVisible();
+  await programSection(page, "overview");
+  await programSection(page, "posts");
+  await expect(page.locator("#program-flow")).toHaveValue(draft);
+  const leave = page.getByRole("button", { name: "프로그램 목록", exact: true });
+  await leave.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "저장하지 않은 변경", exact: true });
+  await expect(dialog).toBeVisible();
+  await page.screenshot({ path: info.outputPath("actual-program-draft-cancel.png"), fullPage: true });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(leave).toBeFocused();
+  await expect(page.locator("#program-flow")).toHaveValue(draft);
+  await leave.click();
+  await dialog.getByRole("button", { name: "계속 작성", exact: true }).click();
+  await expect(page.locator("#program-flow")).toHaveValue(draft);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.fail("programs", "synthetic-retreat"));
+  await expect(page.getByRole("alert")).toContainText("준비 자료의 최신 내용을 확인하지 못했습니다.");
+  await expect(page.getByRole("alert")).not.toContainText("Synthetic private diagnostic path");
+  await page.getByRole("button", { name: "다시 불러오기", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator("#program-flow")).toHaveValue(draft);
+  await expect(page).toHaveURL(/program=program-main.*section=posts/);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("programEditor", "synthetic-staff-b"));
+  await expect(page.locator("#program-flow")).toHaveValue("합성 원본 진행안");
+  await expect(page.getByText("저장하지 않은 초안", { exact: true })).toHaveCount(0);
+  await expectNoOverflow(page);
+});
+
+test("실제 프로그램 조회자는 비공개 회의를 구독하지 않고 일반 스탭은 전체 자료 접근이 차단된다", async ({ page }) => {
+  await open(page, "actualProgram", "programViewer", "light", { workspace: "programs", program: "program-main", section: "posts" });
+  await expect(page.getByRole("heading", { name: "합성 전체 프로그램", exact: true })).toBeVisible();
+  await expect(page.getByText("프로그램 준비 자료", { exact: false }).first()).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).not.toContain("programMeetings");
+  await expect(page.getByRole("button", { name: "회의 시작", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "초안 저장", exact: true })).toHaveCount(0);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("ready"));
+  await expect(page.getByRole("heading", { name: "프로그램 준비 접근 권한이 필요합니다.", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.filter((event) => event.active))).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("실시간 프로그램 목록이 다섯 개에서 네 개로 줄어도 검색을 해제할 수 있다", async ({ page }, info) => {
+  await open(page, "actualProgram", "programEditor", "light", { workspace: "programs" });
+  await page.evaluate(() => {
+    const items = Array.from({ length: 5 }, (_, index) => ({ id: `live-${index + 1}`, title: index === 4 ? "찾을 프로그램" : `나머지 프로그램 ${index + 1}`, order: index + 1, kind: "main", status: "draft", createdAt: 1, updatedAt: 1 }));
+    window.__NEW_STAFF_QA__.emit("programs", "synthetic-retreat", items);
+  });
+  await expect(page.locator(".program-catalog-row")).toHaveCount(5);
+  const search = page.getByRole("textbox", { name: "프로그램 찾기", exact: true });
+  await search.fill("찾을 프로그램");
+  await expect(page.locator(".program-catalog-row")).toHaveCount(1);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.emit("programs", "synthetic-retreat", Array.from({ length: 4 }, (_, index) => ({ id: `live-${index + 1}`, title: `나머지 프로그램 ${index + 1}`, order: index + 1, kind: "main", status: "draft", createdAt: 1, updatedAt: 1 }))));
+  await expect(search).toBeVisible();
+  await expect(search).toHaveValue("찾을 프로그램");
+  await expect(page.locator(".program-catalog-row")).toHaveCount(0);
+  await expect(page.getByText("검색 결과가 없습니다", { exact: true })).toBeVisible();
+  await search.fill("");
+  await expect(page.locator(".program-catalog-row")).toHaveCount(4);
+  await page.screenshot({ path: info.outputPath("actual-program-live-search-recovery.png"), fullPage: true });
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+  await expectServiceIsolation(page);
+});
+
+test("실제 홈은 담당 업무 하나와 다음 일정 세 건을 먼저 보여주고 전체 달력을 접는다", async ({ page }, info) => {
+  await open(page, "actualHome", "viewer");
+  const ownWork = page.getByRole("region", { name: "내 업무", exact: true });
+  await expect(ownWork.getByRole("link", { name: "업무 열기" })).toHaveCount(1);
+  await expect(ownWork.getByRole("link", { name: "업무 열기" })).toHaveAttribute("href", "/teams/praise");
+  const upcoming = page.getByRole("region", { name: "다음 일정", exact: true });
+  await expect(upcoming.locator("li")).toHaveCount(3);
+  for (const day of [7, 8, 9]) await expect(upcoming).toContainText(`합성 준비 일정 ${day}`);
+  await expect(upcoming).not.toContainText("합성 휴강");
+  await expect(upcoming).not.toContainText("합성 준비 일정 11");
+  const calendar = page.locator("details").filter({ has: page.locator("summary", { hasText: "전체 일정 보기·관리" }) });
+  await expect(calendar).not.toHaveAttribute("open", "");
+  await expect(page.getByRole("heading", { name: "공유 사역 캘린더" })).not.toBeVisible();
+  await page.screenshot({ path: info.outputPath("actual-home-first-view.png"), fullPage: true });
+  await calendar.locator("summary").click();
+  await expect(page.getByRole("heading", { name: "공유 사역 캘린더" })).toBeVisible();
+  await expect(calendar).toContainText("합성 준비 일정 11");
+  await expect(page.getByRole("button", { name: "+ 일정 추가", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("팀 운영 학기 선택은 네 업무·현황을 함께 바꾸고 실시간 목록 갱신 뒤에도 유지한다", async ({ page }, info) => {
+  await open(page, "team", "ready", "light", { terms: "multi" });
+  const term = page.getByRole("combobox", { name: "운영 학기", exact: true });
+  await expect(term).toHaveCount(1);
+  await expect(term).toHaveValue("2026-2");
+  for (const sid of ["2026-1", "2027-1"]) {
+    await term.selectOption(sid);
+    await expect(page.getByRole("region", { name: "팀 전체 현황", exact: true })).toContainText(sid === "2026-1" ? "합성 2026년 1학기" : "합성 2027년 1학기");
+    for (const task of ["roster", "curriculum", "records"]) await expect(page.locator(`main a[href="/teams/praise/terms/${sid}/${task}"]`).first()).toBeVisible();
+    const attendanceLinks = await page.locator('main a[href^="/teams/praise/ongoing?"]').evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).href));
+    expect(attendanceLinks.some((href) => { const query = new URL(href).searchParams; return query.get("semester") === sid && query.get("tab") === "attendance"; })).toBe(true);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.filter((event) => event.active && ["applications", "sessions"].includes(event.name)).map((event) => ({ name: event.name, key: event.key })).sort((a, b) => a.name.localeCompare(b.name)))).toEqual([{ name: "applications", key: sid }, { name: "sessions", key: sid }]);
+  }
+  await page.evaluate(() => window.__NEW_STAFF_QA__.emit("semesters", "", [
+    { id: "2026-1", meta: { title: "합성 2026년 1학기 갱신", startDate: "2026-01-01", endDate: "2026-06-30", createdAt: "2026-01-01" } },
+    { id: "2026-2", meta: { title: "합성 2026년 2학기 갱신", startDate: "2026-08-29", endDate: "2026-11-21", createdAt: "2026-08-01" } },
+    { id: "2027-1", meta: { title: "합성 2027년 1학기 갱신", startDate: "2027-01-01", endDate: "2027-06-30", createdAt: "2027-01-01" } },
+  ]));
+  await expect(term).toHaveValue("2027-1");
+  await expect(page.getByRole("region", { name: "팀 전체 현황", exact: true })).toContainText("합성 2027년 1학기 갱신");
+  await page.screenshot({ path: info.outputPath("actual-team-selected-term.png"), fullPage: true });
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("ready", "synthetic-staff-b"));
+  await expect(term).toHaveValue("2026-2");
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("실제 홈은 인증 확인 중과 권한 오류 때 구독·자동 이동을 막고 재시도로 복구한다", async ({ page }) => {
+  await open(page, "actualHome", "loading");
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("roleErrorAssigned"));
+  await expect(page.getByRole("heading", { name: "담당 사역을 확인하지 못했습니다" })).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
+  await page.getByRole("button", { name: "다시 시도", exact: true }).click();
+  await expect(page.getByRole("region", { name: "내 업무", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.retries)).toBe(1);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual(["/teams/praise"]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual(expect.arrayContaining(["retreats", "semesters", "milestones", "sessions", "periods"]));
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("unapproved", "synthetic-staff-b"));
+  await expect(page.getByRole("heading", { name: "접근 승인이 필요합니다" })).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.filter((event) => event.active))).toEqual([]);
+});
+
+test("실제 홈은 계정 교체 뒤 이전 일정 응답을 무시하고 일정 편집 취소는 저장하지 않는다", async ({ page }) => {
+  await open(page, "actualHome", "admin");
+  await expect(page.getByRole("region", { name: "다음 일정", exact: true }).locator("li")).toHaveCount(3);
+  const previous = await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.find((event) => event.name === "milestones")!.id);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("admin", "synthetic-staff-b"));
+  await page.evaluate((id) => window.__NEW_STAFF_QA__.deliver(id, [{ id: "old", title: "이전 계정의 늦은 응답", targetDate: "2026-10-06", done: false }]), previous);
+  await expect(page.getByText("이전 계정의 늦은 응답", { exact: false })).toHaveCount(0);
+  await page.locator("summary", { hasText: "전체 일정 보기·관리" }).click();
+  const add = page.getByRole("button", { name: "+ 일정 추가", exact: true });
+  await add.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "공유 일정 추가" });
+  await dialog.getByRole("textbox", { name: "일정 내용" }).fill("저장하지 않을 합성 일정");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(add).toBeFocused();
+  await add.click();
+  await dialog.getByRole("textbox", { name: "일정 내용" }).fill("이전 관리 계정의 미저장 초안");
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("ready", "synthetic-staff-c"));
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "+ 일정 추가", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+});
+
+test("실제 마이페이지의 관리 세 탭은 일반 스탭에게 안내만 제공하고 제한 조회를 시작하지 않는다", async ({ page }) => {
+  await open(page, "actualMyPage", "ready", "light", { tab: "team" });
+  await page.getByRole("button", { name: "마이페이지 열기" }).focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog", { name: "마이페이지", exact: true });
+  await expect(dialog.getByRole("tab")).toHaveCount(6);
+  for (const [label, area] of [["팀원 관리", "팀원 관리"], ["요청사항", "요청 관리"], ["활동 로그", "활동 로그"]]) {
+    await dialog.getByRole("tab", { name: new RegExp(`^${label}`) }).click();
+    await expect(dialog.getByRole("tabpanel")).toContainText(`${area} 접근 권한이 필요합니다.`);
+    await expect(dialog.getByRole("tabpanel")).toContainText("synthetic-staff-a@example.invalid");
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  }
+  await dialog.getByRole("tab", { name: /^팀원 관리/ }).focus();
+  await page.keyboard.press("End");
+  await expect(dialog.getByRole("tab", { name: /^활동 로그/ })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "마이페이지 열기" })).toBeFocused();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+});
+
+test("실제 마이페이지 관리 동선은 운영센터 한 곳으로 연결되고 같은 주소에서도 닫힌다", async ({ page }, info) => {
+  const choices = [["팀원 관리", "team", "운영센터에서 계정·권한 열기", "/operations/accounts"], ["요청사항", "requests", "운영센터에서 요청 관리 열기", "/operations/requests"], ["활동 로그", "activity", "운영센터에서 활동 로그 열기", "/operations/activity"]];
+  for (const [label, tab, action, href] of choices) {
+    await page.goto(`${href}?scenario=actualMyPage&state=admin&tab=${tab}`);
+    await page.getByRole("button", { name: "마이페이지 열기" }).click();
+    const dialog = page.getByRole("dialog", { name: "마이페이지", exact: true });
+    await expect(dialog.getByRole("tab", { name: label, exact: true })).toHaveAttribute("aria-selected", "true");
+    const shortcut = dialog.getByRole("link", { name: action, exact: true });
+    await expect(shortcut).toHaveAttribute("href", href);
+    await page.screenshot({ path: info.outputPath(`actual-mypage-${tab}.png`), fullPage: true });
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+    await shortcut.click();
+    await expect(dialog).toHaveCount(0);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.closeCalls)).toBe(1);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([href]);
+  }
+  await expectNoOverflow(page);
+});
+
+test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 작업 창을 유지한다", async ({ page, context }) => {
+  await open(page, "actualMyPage", "admin", "light", { tab: "team" });
+  await page.getByRole("button", { name: "마이페이지 열기" }).click();
+  const dialog = page.getByRole("dialog", { name: "마이페이지", exact: true });
+  const nativeClicks: unknown[] = [];
+  page.on("console", (message) => {
+    if (message.text().startsWith("QA_NATIVE_SHORTCUT ")) nativeClicks.push(JSON.parse(message.text().slice("QA_NATIVE_SHORTCUT ".length)));
+  });
+  // 실제 trusted 입력을 읽기만 한다. event flag와 source handler를 수정하지 않는다.
+  await page.evaluate(() => document.addEventListener("click", (event) => {
+    const href = event.target instanceof Element ? event.target.closest("a[href]")?.getAttribute("href") : null;
+    if (href === "/operations/accounts") console.debug("QA_NATIVE_SHORTCUT " + JSON.stringify({ trusted: event.isTrusted, button: event.button, meta: event.metaKey, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey, prevented: event.defaultPrevented }));
+  }, { capture: true, passive: true }));
+  // native 수정 클릭의 새 탭은 opener가 없어 page.popup 대신 context.page로 관측한다.
+  const popupPromise = context.waitForEvent("page");
+  await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click({ modifiers: ["ControlOrMeta"] });
+  const popup = await popupPromise;
+  try {
+    await expect(popup).toHaveURL(/\/operations\/accounts$/);
+    await expect(dialog).toBeVisible();
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.closeCalls)).toBe(0);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
+    expect(nativeClicks).toEqual([{ trusted: true, button: 0, meta: process.platform === "darwin", ctrl: process.platform !== "darwin", shift: false, alt: false, prevented: false }]);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  } finally { await Promise.all(context.pages().filter((opened) => opened !== page).map((opened) => opened.close())); }
+});
+
+test("실제 마이페이지 개인 요청은 계정 변경 후 이전 응답을 표시하지 않는다", async ({ page }) => {
+  await open(page, "actualMyPage", "ready", "light", { tab: "myRequests" });
+  await page.getByRole("button", { name: "마이페이지 열기" }).click();
+  await expect(page.getByRole("dialog", { name: "마이페이지", exact: true }).getByRole("heading", { name: "내 요청", exact: true })).toHaveCount(2);
+  const previous = await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.find((event) => event.name === "myRequests")!.id);
+  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("ready", "synthetic-staff-b"));
+  await expect.poll(() => page.evaluate(() => window.__NEW_STAFF_QA__.subscriptionEvents.filter((event) => event.active && event.name === "myRequests").map((event) => event.key))).toEqual(["synthetic-staff-b"]);
+  await page.evaluate((id) => window.__NEW_STAFF_QA__.deliver(id, [{ id: "old-request", title: "이전 계정의 비공개 요청", kind: "suggestion", status: "pending", createdAt: 1, updatedAt: 1 }]), previous);
+  await expect(page.getByText("이전 계정의 비공개 요청", { exact: false })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+});
+
+for (const theme of ["light", "dark"]) {
+  const cases: Array<[string, string, Record<string, string>]> = [["actualHome", "viewer", {}], ["actualMyPage", "admin", { tab: "team" }], ["actualProgram", "programEditor", { workspace: "programs" }]];
+  for (const [scenario, state, options] of cases) {
+    test(`${theme} ${scenario} 실제 개편 화면의 접근성·넘침·서비스 격리를 검사한다`, async ({ page }, info) => {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      await open(page, scenario, state, theme, options);
+      if (scenario === "actualMyPage") await page.getByRole("button", { name: "마이페이지 열기" }).click();
+      if (scenario === "actualProgram") await expect(page.getByRole("heading", { name: "프로그램 준비", exact: true })).toBeVisible();
+      if (scenario === "actualHome") await expect(page.getByRole("region", { name: "다음 일정", exact: true }).locator("li")).toHaveCount(3);
+      await page.screenshot({ path: info.outputPath(`${scenario}-${theme}.png`), fullPage: true });
+      await expectNoOverflow(page);
+      await expectAccessible(page);
+      await expectServiceIsolation(page);
+      expect(errors).toEqual([]);
+    });
+  }
 }
 
 test("첫 방문 안내가 자동 열리고 닫기·재방문·다시 열기·계정 변경이 동작한다", async ({ page }) => {
@@ -59,7 +359,7 @@ test("팀 전체 현황과 명확한 업무 설명이 첫 화면에 제공된다
   await expect(page.getByRole("region", { name: "팀 전체 현황" })).toContainText("1명");
   await expect(page.getByRole("region", { name: "팀 전체 현황" })).toContainText("2026-10-10");
   await expect(page.getByRole("region", { name: "팀 전체 현황" })).not.toContainText("합성 휴강");
-  await expect(page.getByRole("link", { name: /명단.*누적 출석/ }).first()).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "선택 학기 업무" }).getByRole("link", { name: "선택 학기 명단·연락처 열기", exact: true })).toHaveAttribute("href", "/teams/praise/terms/2026-2/roster");
   await expect(page.getByRole("link", { name: /이번.*모임/ }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "사이트 사용법 보기" })).toBeVisible();
   await expect(page.getByRole("link", { name: "학기 개요 보기" })).toHaveCount(0);
@@ -349,9 +649,10 @@ for (const [query, answer] of [["출석 삭제", "attendance"], ["권한 오류"
 test("준비 중인 팀의 주요 업무는 사용 가능한 학기 기록으로 연결된다", async ({ page }) => {
   await page.goto("/?scenario=team&team=media");
   await expect(page.getByRole("heading", { name: "미디어팀", exact: true })).toBeVisible();
-  const primary = page.getByRole("region", { name: "주간 업무와 학기 기록" }).locator(".team-action-card.is-primary");
-  await expect(primary).toHaveCount(1);
-  await expect(primary).toHaveAttribute("href", /\/teams\/media\/terms\/2026-2\//);
+  const termActions = page.getByRole("navigation", { name: "선택 학기 업무", exact: true });
+  await expect(termActions.getByRole("link")).toHaveCount(4);
+  await expect(termActions.getByRole("link", { name: "선택 학기 명단·연락처 열기", exact: true })).toHaveAttribute("href", "/teams/media/terms/2026-2/roster");
+  await expect(page.locator('a[href^="/teams/media/ongoing"]')).toHaveCount(0);
   await expect(page.getByRole("region", { name: "주간 업무와 학기 기록" })).toContainText(/준비 중/);
   await expect(page.getByRole("region", { name: "미디어팀, 이렇게 시작해요" }).locator('a[href="/teams/media/terms/2026-2/roster"]')).toHaveCount(1);
   await expectNoOverflow(page);

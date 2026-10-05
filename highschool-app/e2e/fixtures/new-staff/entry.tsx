@@ -11,6 +11,9 @@ import { canEditTeam } from "@/features/teams/teamModel";
 import { canManageRolesOf } from "@/features/portal/accessPolicy";
 import { sundayTeamOf } from "@/features/portal/featureCatalog";
 import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
+import PortalHome from "@/features/portal/PortalHome";
+import MyPageModal, { type MyPageTab } from "@/features/portal/MyPageModal";
+import ProgramPreparationClient from "@/app/retreat/[id]/programs/ProgramPreparationClient";
 import RetreatAreaNav from "@/features/portal/RetreatAreaNav";
 import OperationsHome from "@/features/operations/OperationsHome";
 import OperationsGate from "@/features/operations/OperationsGate";
@@ -23,6 +26,9 @@ import "@/app/portal-surfaces.css";
 import "@/app/theme-compat.css";
 import "@/app/interaction-controls.css";
 import "@/app/team-first.css";
+import "@/app/program-preparation.css";
+import "@/app/operations-tables.css";
+import "@/app/my-page-workspace.css";
 import "@/features/praise/praise.css";
 
 declare global {
@@ -33,6 +39,8 @@ const params = new URLSearchParams(window.location.search);
 document.documentElement.dataset.theme = params.get("theme") ?? "light";
 document.documentElement.style.colorScheme = params.get("theme") ?? "light";
 window.__NEW_STAFF_QA__ = Object.assign(qa, { setAuth: setQaAuth });
+// Next primitive의 이동 기록만 대체한다. 모달 닫기와 권한 판정은 실제 구현이다.
+qa.recordLinkNavigation = params.get("scenario") === "actualMyPage";
 
 function Attendance() {
   const [view, setView] = useState<PraiseView>(() => {
@@ -66,17 +74,29 @@ function OperationsMountProbe() {
   return <OperationsGate allowed={canManageRolesOf(roles)}><RestrictedMountProbe /></OperationsGate>;
 }
 
+function MyPageFixture() {
+  const [opened, setOpened] = useState(false);
+  return <main className="team-first-page">
+    <h1>합성 마이페이지 검증</h1>
+    <button type="button" className="btn-primary" onClick={() => setOpened(true)}>마이페이지 열기</button>
+    {opened && <MyPageModal initialTab={(params.get("tab") ?? "dashboard") as MyPageTab} onClose={() => { qa.closeCalls += 1; setOpened(false); }} />}
+  </main>;
+}
+
 function Fixture() {
   const pathname = window.location.pathname;
   const teamMatch = /^\/teams\/([^/]+)$/.exec(pathname);
   const scenario = params.get("scenario") ?? (pathname === "/library/help" ? "help" : pathname === "/teams" ? "teams" : pathname === "/operations" ? "operations" : "team");
   const teamKey = sundayTeamOf(params.get("team") ?? teamMatch?.[1] ?? "praise")?.key ?? "praise";
-  const showHeader = scenario === "header" || pathname.startsWith("/teams") || pathname === "/operations";
+  const showHeader = scenario === "header" || scenario === "actualHome" || scenario === "actualProgram" || pathname.startsWith("/teams") || pathname === "/operations";
   const content = <>
     {showHeader && <GlobalPortalHeader />}
     <p className="sr-only" role="note">이 화면은 실제 인증과 운영 DB를 연결하지 않는 합성 UI 검증입니다.</p>
     {scenario === "attendance" ? <main className="team-first-page"><Attendance /></main>
       : scenario === "homeGuide" ? <HomeGuide />
+      : scenario === "actualHome" ? <PortalHome />
+      : scenario === "actualMyPage" ? <MyPageFixture />
+      : scenario === "actualProgram" ? <ProgramPreparationClient />
       : scenario === "help" ? <SiteHelp />
       : scenario === "operations" ? <OperationsHome />
       : scenario === "operationsGateProbe" ? <OperationsMountProbe />
