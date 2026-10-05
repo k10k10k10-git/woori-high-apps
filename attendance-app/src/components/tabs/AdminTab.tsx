@@ -11,6 +11,9 @@ import SheetSyncSection from './SheetSyncSection';
 import type { UserRole } from '@/types';
 import AdminIcon from '../admin/AdminIcon';
 import '../admin/admin-settings.css';
+import '../admin/admin-overview.css';
+import dynamic from 'next/dynamic';
+const TeacherManagement = dynamic(() => import('./overall/TeacherManagement'));
 
 type PromotionRow = {
   fromCk: string;
@@ -19,9 +22,10 @@ type PromotionRow = {
   hasConflict: boolean;
 };
 type GraduateRow = { ck: string; studentCount: number };
-type SettingsSection = 'accounts' | 'events' | 'data';
+type SettingsSection = 'accounts' | 'teachers' | 'events' | 'data';
 const SETTINGS_SECTIONS = [
-  { id: 'accounts', label: '이메일 역할', icon: 'users' },
+  { id: 'accounts', label: '계정 관리', icon: 'users' },
+  { id: 'teachers', label: '교사 명단', icon: 'book' },
   { id: 'events', label: '출석 제외 일정', icon: 'calendar' },
   { id: 'data', label: '데이터 관리', icon: 'layers' },
 ] as const;
@@ -256,7 +260,7 @@ export default function AdminTab() {
     <div className="admin-settings">
       <header className="as-heading">
         <h1>운영 설정</h1>
-        <p>이메일 역할, 출석 제외 일정, 명단 반영을 순서대로 관리하세요.</p>
+        <p>계정·교사·행사를 구분해 관리하세요. 명단 반영과 진급은 데이터 관리에 있습니다.</p>
       </header>
       <div className="as-section-tabs" role="tablist" aria-label="설정 메뉴">
         {SETTINGS_SECTIONS.map((item, index) => (
@@ -293,6 +297,10 @@ export default function AdminTab() {
               })}
             </div><p className="as-list-count" aria-live="polite">전체 {entries.length}개 계정 중 {visibleAccounts.length}개 표시</p>
           </> : <div className="as-empty"><AdminIcon name="users" size={24} /><h3>{entries.length === 0 ? '등록된 계정이 없습니다' : '검색 조건에 맞는 계정이 없습니다'}</h3><p>{entries.length === 0 ? '교사 이메일과 담당 반을 등록해 출석부를 시작하세요.' : '다른 이름이나 이메일로 검색하거나 역할 필터를 변경해 주세요.'}</p>{entries.length > 0 && <button type="button" className="as-button" onClick={() => { setAccountQuery(''); setAccountRoleFilter('all'); }}>검색 초기화</button>}</div>}
+      </section>
+
+      <section className="as-panel" id={`${settingsId}-panel-teachers`} role="tabpanel" aria-labelledby={`${settingsId}-tab-teachers`} hidden={section !== 'teachers'}>
+        {section === 'teachers' && <TeacherManagement />}
       </section>
 
       <section className="as-panel" id={`${settingsId}-panel-events`} role="tabpanel" aria-labelledby={`${settingsId}-tab-events`} hidden={section !== 'events'}>

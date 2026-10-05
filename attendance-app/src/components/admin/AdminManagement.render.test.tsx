@@ -11,6 +11,7 @@ vi.mock('@/store/AppContext', async original => ({
   useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }), useSearchParams: () => new URLSearchParams(mocks.params) }));
+vi.mock('@/components/modals/HistoryModal', () => ({ default: () => <div>학생 출석 이력</div> }));
 vi.mock('@/components/modals/StudentModal', () => ({ default: () => <div>학생 수정 창</div> }));
 vi.mock('@/components/modals/MoveStudentModal', () => ({ default: ({ target }: { target: { sid: string } }) => <div>학생 이동 창 {target.sid}</div> }));
 vi.mock('@/components/tabs/AttendanceTab', () => ({ default: () => <div>출석 입력 화면</div> }));
@@ -44,6 +45,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 it('개인 상세도 주소·생년월일·연간 출석률·등급을 같은 기준으로 표시한다', () => {
   render(<StudentDirectory onOpenClass={vi.fn()} />);
+  fireEvent.click(screen.getByText('보기 설정'));
   fireEvent.click(screen.getByRole('button', { name: '간편 목록' }));
   fireEvent.click(screen.getByRole('button', { name: '김하나' }));
   const detail = screen.getByRole('complementary');
@@ -54,6 +56,31 @@ it('개인 상세도 주소·생년월일·연간 출석률·등급을 같은 �
 });
 
 describe('관리자 명단·출석 접근 경로', () => {
+  it('모바일 간편 명단은 이름·소속만 보여 주고 상세 제목으로 스크롤한다', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    const scroll = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scroll;
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    expect(screen.getAllByRole('columnheader').map(cell => cell.textContent)).toEqual(['이름', '현재 소속']);
+    fireEvent.click(screen.getByRole('button', { name: '김하나' }));
+    expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    expect(document.activeElement).toBe(screen.getByRole('complementary'));
+  });
+  it.each(['table', 'compact', 'overview'])('%s 보기의 이름에서 같은 상세·이력·이동 경로를 제공한다', view => {
+    localStorage.setItem('woori-admin-directory-view', view);
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    const name = screen.getByRole('button', { name: '김하나' });
+    fireEvent.click(name);
+    const detail = screen.getByRole('complementary', { name: '김하나 학생 상세' });
+    expect(document.activeElement).toBe(detail);
+    expect(within(detail).getByText('100%')).toBeTruthy();
+    expect(within(detail).getByRole('button', { name: '정보 수정' })).toBeTruthy();
+    fireEvent.click(within(detail).getByRole('button', { name: '출석 이력' }));
+    expect(mocks.dispatch).toHaveBeenLastCalledWith({ type: 'OPEN_HISTORY_MODAL', payload: { sid: 'a', ck: '1-1-1' } });
+    fireEvent.click(within(detail).getByRole('button', { name: '닫기' }));
+    expect(screen.queryByRole('complementary')).toBeNull();
+    expect(document.activeElement).toBe(name);
+  });
   it.each(['CSV', 'Excel'])('%s 명단에는 상태 대신 연간 출석률·등급을 내보내고 장결 기록과 무기록을 구분한다', format => {
     render(<StudentDirectory onOpenClass={vi.fn()} />);
     fireEvent.click(screen.getByText('명단 내보내기'));
@@ -107,13 +134,14 @@ describe('관리자 명단·출석 접근 경로', () => {
     const table = screen.getByRole('table');
     expect(within(table).getByText('이세나')).toBeTruthy();
     expect(within(table).queryByText('김하나')).toBeNull();
-    fireEvent.click(within(table).getByRole('button', { name: '이동' }));
+    fireEvent.click(within(table).getByRole('button', { name: '이세나' }));
+    fireEvent.click(within(screen.getByRole('complementary')).getByRole('button', { name: '소속 이동' }));
     expect(screen.getByText('학생 이동 창 c')).toBeTruthy();
   });
 
   it('상세 표에서 연락처와 생년월일까지 한눈에 보여 준다', () => {
     render(<StudentDirectory onOpenClass={vi.fn()} />);
-    expect(screen.getByRole('button', { name: '상세 표' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '명단 표' }).getAttribute('aria-pressed')).toBe('true');
     const table = screen.getByRole('table', { name: '2026년 전체 학생 상세 표' });
     expect(within(table).getByRole('columnheader', { name: '학생 연락처' })).toBeTruthy();
     expect(within(table).getByRole('columnheader', { name: '보호자 연락처' })).toBeTruthy();
@@ -125,7 +153,7 @@ describe('관리자 명단·출석 접근 경로', () => {
     expect(within(table).getByRole('columnheader', { name: '출석률' })).toBeTruthy();
     expect(within(table).getByText('경기도 성남시 테스트로 12')).toBeTruthy();
     expect(within(table).getByText('100%')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '상세 표' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: '명단 표' }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('명단 출석률은 학기 선택과 무관한 연간 기록이며 행사·미입력은 결석으로 세지 않는다', () => {
@@ -148,7 +176,8 @@ describe('관리자 명단·출석 접근 경로', () => {
   it('바꾼 명단 보기를 저장하고 다시 열 때 복원한다', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
     render(<StudentDirectory onOpenClass={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '간편 목록' }));
+    fireEvent.click(screen.getByText('보기 설정'));
+  fireEvent.click(screen.getByRole('button', { name: '간편 목록' }));
     expect(localStorage.getItem('woori-admin-directory-view')).toBe('compact');
     cleanup();
     render(<StudentDirectory onOpenClass={vi.fn()} />);
@@ -159,6 +188,7 @@ describe('관리자 명단·출석 접근 경로', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
     render(<StudentDirectory onOpenClass={vi.fn()} />);
     expect(screen.getByRole('table', { name: '2026년 전체 학생 간편 목록' })).toBeTruthy();
+    fireEvent.click(screen.getByText('보기 설정'));
     fireEvent.click(screen.getByRole('button', { name: '상세 표' }));
     cleanup();
     render(<StudentDirectory onOpenClass={vi.fn()} />);
@@ -252,6 +282,6 @@ describe('관리자 명단·출석 접근 경로', () => {
     const week = screen.getByLabelText('조회 주일') as HTMLSelectElement;
     const target = [...week.options].map(option => option.value).find(value => value !== week.value)!;
     fireEvent.change(week, { target: { value: target } });
-    expect(screen.getByRole('link', { name: '출석 입력' }).getAttribute('href')).toContain(`week=${encodeURIComponent(target)}`);
+    expect(screen.getByRole('link', { name: '반 출석부' }).getAttribute('href')).toContain(`week=${encodeURIComponent(target)}`);
   });
 });
