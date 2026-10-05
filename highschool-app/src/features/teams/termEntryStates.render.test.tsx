@@ -44,9 +44,19 @@ it("팀 연결 응답을 기다리는 동안 '연결된 학기 없음'을 표시
   act(() => mocks.semesters.mock.calls[0][0]([past]));
   expect(screen.getByRole("status")).toHaveTextContent("학기 연결을 확인하는 중입니다");
   expect(screen.queryByText("연결된 학기가 없습니다")).not.toBeInTheDocument();
+  expect(screen.queryByRole("option", { name: "연결된 학기 없음" })).not.toBeInTheDocument();
+  expect(mocks.applications).not.toHaveBeenCalled();
+  expect(mocks.sessions).not.toHaveBeenCalled();
   act(() => mocks.teams.mock.calls[0][1]([{ id: "team", name: "찬양팀", teamKey: "praise" } as Team]));
-  expect(screen.getByText("지난 학기")).toBeInTheDocument();
-  expect(screen.getAllByRole("link", { name: /지난 훈련 학기/ })).toHaveLength(2);
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("combobox", { name: "운영 학기" })).toHaveLength(1);
+  expect(screen.getByRole("combobox", { name: "운영 학기" })).toHaveValue("past");
+  expect(within(screen.getByRole("region", { name: "팀 전체 현황" })).getByText("지난 학기 · 지난 훈련 학기")).toBeInTheDocument();
+  expect(within(screen.getByRole("navigation", { name: "선택 학기 업무" })).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+    "/teams/praise/terms/past/roster", "/teams/praise/ongoing?semester=past&tab=attendance",
+    "/teams/praise/terms/past/curriculum", "/teams/praise/terms/past/records",
+  ]);
+  expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.endsWith("/overview"))).toHaveLength(0);
 });
 
 it("훈련에 지난 학기만 있을 때 현재 학기로 잘못 표시하지 않는다", () => {
@@ -71,6 +81,7 @@ it("한 학기 조회 실패가 이번 주 업무를 막지 않으며 재시도�
   act(() => mocks.teams.mock.calls[0][2](new Error("권한 조회 실패")));
   expect(within(screen.getByRole("region", { name: "주간 업무와 학기 기록" })).getByRole("link", { name: /주간·주일 업무/ })).toHaveAttribute("href", "/teams/praise/ongoing");
   expect(screen.queryByText("연결된 학기가 없습니다")).not.toBeInTheDocument();
+  expect(screen.queryByRole("status")).not.toBeInTheDocument();
   act(() => mocks.semesters.mock.calls[0][0]([past]));
   expect(screen.getByRole("alert")).toHaveTextContent("팀 정보를 확인하지 못했습니다");
   expect(screen.getByRole("link", { name: "접속 문제 도움말" })).toHaveAttribute("href", "/library/help#connection");
@@ -79,5 +90,6 @@ it("한 학기 조회 실패가 이번 주 업무를 막지 않으며 재시도�
   act(() => mocks.semesters.mock.calls.at(-1)![0]([past]));
   act(() => mocks.teams.mock.calls.at(-1)![1]([{ id: "team", name: "찬양팀", teamKey: "praise" }]));
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-  expect(screen.getByText("지난 학기")).toBeInTheDocument();
+  expect(screen.getByRole("combobox", { name: "운영 학기" })).toHaveValue("past");
+  expect(within(screen.getByRole("region", { name: "팀 전체 현황" })).getByText("지난 학기 · 지난 훈련 학기")).toBeInTheDocument();
 });
