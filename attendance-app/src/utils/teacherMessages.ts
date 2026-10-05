@@ -9,6 +9,7 @@ export type TeacherMessage = {
   kind: TeacherMessageKind;
   studentId?: string;
   studentName?: string;
+  studentPersonId?: string;
   status?: VisitRequestStatus;
   resolvedAt?: number;
 };
@@ -36,6 +37,7 @@ export function parseTeacherMessages(value: unknown, kind: TeacherMessageKind): 
       kind: entryKind,
       studentId: typeof raw.studentId === 'string' ? raw.studentId : undefined,
       studentName: typeof raw.studentName === 'string' ? raw.studentName : undefined,
+      studentPersonId: typeof raw.studentPersonId === 'string' ? raw.studentPersonId : undefined,
       status: raw.status === 'done' ? 'done' : entryKind === 'visit' ? 'open' : undefined,
       resolvedAt: typeof raw.resolvedAt === 'number' ? raw.resolvedAt : undefined,
     });

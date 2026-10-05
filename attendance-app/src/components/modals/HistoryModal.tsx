@@ -1,18 +1,19 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { db, ref, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
-import { getSundaysForYear, buildHolidayRanges, buildEvents, evKey, getWindowYears } from '@/utils/dates';
-import { normalizeAttendanceValue } from '@/utils/attendanceValue';
+import { getSundaysForYear, buildHolidayRanges, buildEvents, getWindowYears } from '@/utils/dates';
+import { attendanceHistoryStats, attendanceGrade } from '@/utils/attendanceHistory';
+import { resolveStudentConnection, type StudentCandidate } from '@/utils/studentConnection';
 import { useModalFocus } from '@/hooks/useModalFocus';
-import type { Student } from '@/types';
+import type { Student, AttData, CustomEventData } from '@/types';
 
 interface MonthStat {
   month: number;
   p: number;
   a: number;
-  sc: number; // non-holiday sundays count
+  recorded: number;
 }
 
 interface YearStat {
@@ -24,39 +25,7 @@ interface YearStat {
   total: number;
   rate: number;
   monthly: MonthStat[];
-}
-
-function isSameStudent(ref_s: Student, candidate: Record<string, unknown>): boolean {
-  if (ref_s.name !== candidate.name) return false;
-  const fields: Array<keyof Student> = ['birth', 'phone', 'pphone', 'school'];
-  const refHasInfo  = fields.some(f => ref_s[f]);
-  const candHasInfo = fields.some(f => candidate[f]);
-  if (!refHasInfo || !candHasInfo) return true;
-  const matched = fields.filter(f => ref_s[f] && candidate[f] && ref_s[f] === candidate[f]);
-  return matched.length >= 1;
-}
-
-function computeMonthlyStats(
-  attRecord: Record<string, string>,
-  months: { month: number; sundays: number[] }[],
-  events: Record<string, string>
-) {
-  let present = 0, absent = 0;
-  const monthly: MonthStat[] = months.map(({ month, sundays }, mi) => {
-    let p = 0, a = 0, sc = 0;
-    sundays.forEach((_, di) => {
-      const k = evKey(mi, di);
-      if (events[k]) return;
-      sc++;
-      const v = normalizeAttendanceValue(attRecord[k]);
-      if (v === 'O') { p++; present++; }
-      else if (v === 'X') { a++; absent++; }
-    });
-    return { month, p, a, sc };
-  });
-  const checked = present + absent;
-  const rate = checked > 0 ? Math.round((present / checked) * 100) : 0;
-  return { present, absent, total: checked, rate, monthly };
+  status: 'matched' | 'review' | 'missing' | 'error' | 'future';
 }
 
 const EMPTY_STATS = {
@@ -69,16 +38,23 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
   const { curYear, classData, attData } = state;
   const isTeacher = state.userRole?.role === 'teacher';
 
-  const student =
-    (propCk ? classData[propCk]?.students.find(s => s.id === sid) : null)
-    ?? Object.values(classData).flatMap(c => c.students).find(s => s.id === sid);
-
-  const mountedYearRef    = useRef(curYear);
-  const mountedCkRef      = useRef(propCk);
-  const mountedAttDataRef = useRef(attData);
-
-  const [results, setResults] = useState<YearStat[]>([]);
-  const [loading, setLoading] = useState(true);
+  const currentMatches = Object.entries(classData).flatMap(([classKey, info]) =>
+    info.students.filter(s => s.id === sid && (!propCk || classKey === propCk)).map(student => ({ classKey, student })));
+  const currentStudent = currentMatches.length === 1 ? currentMatches[0] : null;
+  const student = currentStudent?.student;
+  const curCk = currentStudent?.classKey ?? propCk ?? null;
+  const gradeOneYear = curYear - (Number(curCk?.split('-')[1] ?? 1) - 1);
+  const name = student?.name, personId = student?.personId, birth = student?.birth, phone = student?.phone;
+  const reference = useMemo(() => name ? { id: sid, name, personId, birth, phone } : null, [sid, name, personId, birth, phone]);
+  const [retry, setRetry] = useState(0);
+  const scope = JSON.stringify([curYear, curCk, state.dataRevision, retry, reference]);
+  const [load, setLoad] = useState<{ scope: string; results: YearStat[] } | null>(null);
+  const loading = load?.scope !== scope;
+  const results = (load?.scope === scope ? load.results : []).map(result => {
+    if (result.year !== curYear || !curCk || !student) return result;
+    return { ...result, ck: curCk, status: 'matched' as const,
+      ...attendanceHistoryStats(attData, curCk, sid, state.months, state.events) };
+  });
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   // ─── 드래그 다운 닫기 ────────────────────────────────────────
@@ -153,121 +129,53 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
   }, [dismiss]); // dismiss는 이제 절대 바뀌지 않음
 
   useEffect(() => {
-    loadAllYears();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function loadAllYears() {
-    setLoading(true);
-
-    let curCk: string | null = propCk ?? null;
-    if (!curCk) {
-      for (const [ck, cls] of Object.entries(classData)) {
-        if (cls.students.find(s => s.id === sid)) { curCk = ck; break; }
-      }
-    }
-
-    const curGradeNum = curCk ? parseInt(curCk.split('-')[1]) : 1;
-    const curPartNum  = curCk ? curCk.split('-')[0] : null;
-    const gradeOneYear = mountedYearRef.current - (curGradeNum - 1);
+    let active = true;
     const allYears = [gradeOneYear, gradeOneYear + 1, gradeOneYear + 2].filter(y => y > 2020);
-
-    const found: YearStat[] = await Promise.all(allYears.map(async year => {
+    void Promise.all(allYears.map(async (year): Promise<YearStat> => {
       const grade = 1 + (year - gradeOneYear);
-      const isCurYear = year === mountedYearRef.current;
-
-      if (isCurYear && curCk) {
-        const yearMonths = getSundaysForYear(year);
-        const yearRanges = buildHolidayRanges(getWindowYears(year));
-        const yearEvents = buildEvents(year, yearMonths, yearRanges, {});
-        const attRecord = (mountedAttDataRef.current[curCk]?.[sid] ?? {}) as Record<string, string>;
-        const stats = computeMonthlyStats(attRecord, yearMonths, yearEvents);
-        return { year, grade, ck: curCk, ...stats };
-      }
-
+      const empty = { year, grade, ck: null, ...EMPTY_STATS };
+      if (year > curYear) return { ...empty, status: 'future' };
+      if (!reference) return { ...empty, status: 'review' };
+      if (year === curYear) return { ...empty, status: 'matched' };
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       try {
-        const [classSnap, attSnap] = await Promise.all([
-          get(ref(db, `classes/${year}`)),
-          get(ref(db, `attendance/${year}`)),
+        const [classSnap, attSnap, eventSnap] = await Promise.race([
+          Promise.all([get(ref(db, `classes/${year}`)), get(ref(db, `attendance/${year}`)), get(ref(db, `events/${year}`))]),
+          new Promise<never>((_, reject) => { timeout = setTimeout(() => reject(new Error('이력 조회 시간 초과')), 15000); }),
         ]);
-
-        if (!classSnap.exists()) return { year, grade, ck: null, ...EMPTY_STATS };
-
-        const fbClasses = classSnap.val() as Record<string, {
-          students?: Record<string, Record<string, unknown>>;
-        }>;
-        const fbAtt = attSnap.exists()
-          ? attSnap.val() as Record<string, Record<string, Record<string, string>>>
-          : {};
-
-        let foundCk: string | null = null;
-        let foundSid: string | null = null;
-        let attSid:   string | null = null;
-
-        const samePart = Object.keys(fbClasses).filter(
-          ck => ck.split('-')[1] === String(grade) && ck.split('-')[0] === curPartNum
-        );
-        const anyPart = Object.keys(fbClasses).filter(
-          ck => ck.split('-')[1] === String(grade) && ck.split('-')[0] !== curPartNum
-        );
-        const candidateCks = [...samePart, ...anyPart];
-
-        const storedIdOf = (s: Record<string, unknown>) => (s['id'] as string | undefined) ?? null;
-
-        // 1순위: Firebase key = 현재 sid
-        for (const ck of candidateCks) {
-          if (fbClasses[ck].students?.[sid]) {
-            foundCk = ck; foundSid = sid; attSid = sid; break;
-          }
+        const fbClasses = (classSnap.val() ?? {}) as Record<string, { students?: Record<string, Student> }>;
+        const fbAtt = (attSnap.val() ?? {}) as AttData;
+        const allCandidates: StudentCandidate[] = Object.entries(fbClasses)
+          .flatMap(([classKey, info]) => Object.entries(info.students ?? {}).map(([key, value]) => ({
+            classKey, storedId: value.id, student: { ...value, id: key },
+          })));
+        const candidates = reference.personId && allCandidates.some(({ student }) => student.personId === reference.personId)
+          ? allCandidates : allCandidates.filter(({ classKey }) => classKey.split('-')[1] === String(grade));
+        const connection = resolveStudentConnection(reference, candidates);
+        if (connection.status !== 'matched') return { ...empty, status: connection.status };
+        const { classKey, student: linked, storedId } = connection.candidate;
+        let attSid = linked.id;
+        // 오래된 내부 ID 출석도 다른 학생의 원장 키와 겹치지 않을 때만 읽는다.
+        if (!fbAtt[classKey]?.[attSid] && storedId && storedId !== attSid && fbAtt[classKey]?.[storedId]) {
+          if (allCandidates.some(candidate => candidate.classKey === classKey && candidate.student.id !== linked.id
+            && (candidate.student.id === storedId || candidate.storedId === storedId))) return { ...empty, status: 'review' };
+          attSid = storedId;
         }
-
-        // 2순위: 학생 객체 내부 id 필드 = 현재 sid
-        if (!foundCk) {
-          outer2: for (const ck of candidateCks) {
-            for (const [fkey, s] of Object.entries(fbClasses[ck].students ?? {})) {
-              if (storedIdOf(s) === sid) {
-                foundCk = ck; foundSid = fkey; attSid = sid; break outer2;
-              }
-            }
-          }
-        }
-
-        // 3순위: 이름 + 신상정보 매핑
-        if (!foundCk && student) {
-          outer3: for (const ck of candidateCks) {
-            for (const [id2, s] of Object.entries(fbClasses[ck].students ?? {})) {
-              if (isSameStudent(student, s)) {
-                foundCk = ck; foundSid = id2;
-                attSid = storedIdOf(s) ?? id2;
-                break outer3;
-              }
-            }
-          }
-        }
-
-        if (!foundCk || !foundSid || !attSid) return { year, grade, ck: null, ...EMPTY_STATS };
-
         const yearMonths = getSundaysForYear(year);
         const yearRanges = buildHolidayRanges(getWindowYears(year));
-        const yearEvents = buildEvents(year, yearMonths, yearRanges, {});
-
-        const attRecord = fbAtt[foundCk]?.[attSid] ?? {};
-        const stats = computeMonthlyStats(attRecord, yearMonths, yearEvents);
-        return { year, grade, ck: foundCk, ...stats };
+        const yearEvents = buildEvents(year, yearMonths, yearRanges, (eventSnap.val() ?? {}) as CustomEventData);
+        return { year, grade, ck: classKey, status: 'matched', ...attendanceHistoryStats(fbAtt, classKey, attSid, yearMonths, yearEvents) };
       } catch {
-        return { year, grade, ck: null, ...EMPTY_STATS };
+        return { ...empty, status: 'error' };
+      } finally {
+        clearTimeout(timeout);
       }
-    }));
-
-    found.sort((a, b) => a.year - b.year);
-    setResults(found);
-    setLoading(false);
-  }
+    })).then(results => { if (active) setLoad({ scope, results }); });
+    return () => { active = false; };
+  }, [curYear, gradeOneYear, reference, scope]);
 
   const gradeColor = (rate: number) =>
     rate >= 90 ? '#397052' : rate >= 80 ? '#6355a7' : rate >= 70 ? '#795a1c' : '#a53f3f';
-
-  void mountedCkRef;
 
   return createPortal(
     <div className={`modal-overlay${isTeacher ? ' teacher-attendance-modal' : ''}`} onClick={dismiss}
@@ -294,7 +202,7 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
           )}
           <div className="history-modal-copy">
             <div className="history-modal-name">{student?.name ?? '알 수 없음'}</div>
-            <div className="history-modal-subtitle">출석 이력 (3년)</div>
+            <div className="history-modal-subtitle">출석 이력 (3년) · 행사·미입력 제외</div>
           </div>
           <button
             ref={closeButtonRef}
@@ -307,25 +215,32 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
         </div>
 
         {loading ? (
-          <div className="history-modal-loading">불러오는 중...</div>
+          <div className="history-modal-loading" role="status">출석 이력을 불러오는 중...</div>
         ) : (
           <div className="history-year-list">
             {results.map(r => {
-              const isCur = r.year === mountedYearRef.current;
+              const isCur = r.year === curYear;
               const ckParts = r.ck ? r.ck.split('-') : null;
               const classLabel = ckParts ? `${ckParts[0]}부 ${ckParts[1]}학년 ${ckParts[2]}반` : `${r.grade}학년`;
               const gc = gradeColor(r.rate);
-              const gradeLabel = r.rate >= 90 ? 'A' : r.rate >= 80 ? 'B' : r.rate >= 70 ? 'C' : 'D';
+              const gradeLabel = attendanceGrade(r.rate);
               return (
                 <article key={r.year} className={`history-year-card${isCur ? ' is-current' : ''}`}>
                   <header className="history-year-heading">
-                    {r.year}년{isCur && <span style={{ fontSize: 10, fontWeight: 400, marginLeft: 4, opacity: .85 }}>(현재)</span>}
+                    {r.year}년{isCur && <span className="history-current-label"> (현재)</span>}
                   </header>
 
                   <div className="history-year-summary">
                     <div className="history-year-class">{classLabel}</div>
-                    {r.ck === null ? (
-                      <div className="history-year-empty">데이터 없음</div>
+                    {r.status !== 'matched' ? (
+                      <div className="history-year-empty" role={r.status === 'error' ? 'alert' : undefined}>
+                        {r.status === 'error' ? '이력을 불러오지 못했습니다. 기록이 없다는 뜻은 아닙니다.'
+                          : r.status === 'review' ? '동일 학생 연결 확인 필요'
+                            : r.status === 'future' ? '아직 해당 학년이 아닙니다.' : '연결된 학생 명단 없음'}
+                        {r.status === 'error' && <button className="history-retry" type="button" onClick={() => setRetry(value => value + 1)}>다시 불러오기</button>}
+                      </div>
+                    ) : r.total === 0 ? (
+                      <div className="history-year-empty">— · 입력된 출석 기록 없음</div>
                     ) : (
                       <>
                         <div className="history-year-grade">
@@ -335,21 +250,18 @@ export default function HistoryModal({ sid, curCk: propCk, onClose }: { sid: str
                           <span style={{ fontSize: 14, fontWeight: 700, color: gc }}>{r.rate}%</span>
                         </div>
                         <div className="history-year-totals">
-                          출석 {r.present} · 결석 {r.absent} / {r.total}주
+                          출석 {r.present} · 결석 {r.absent} / 입력 {r.total}회
                         </div>
                       </>
                     )}
                   </div>
 
                   <div className="history-month-list">
-                    {r.monthly.filter(m => m.sc > 0).map(m => {
-                      const color = r.ck === null || m.sc === 0
-                        ? 'var(--text3)'
-                        : m.p >= m.sc / 2 ? 'var(--green-text)' : 'var(--red-text)';
+                    {r.monthly.map(m => {
                       return (
-                        <div key={m.month} style={{ textAlign: 'center', minWidth: 28 }}>
-                          <div style={{ fontSize: 9, color: 'var(--text3)' }}>{m.month}월</div>
-                          <div style={{ fontSize: 10, fontWeight: 700, color }}>{m.p}/{m.sc}</div>
+                        <div key={m.month} className="history-month" aria-label={`${m.month}월 ${m.recorded ? `출석 ${m.p}회, 입력 ${m.recorded}회` : '입력 기록 없음'}`}>
+                          <div className="history-month-label">{m.month}월</div>
+                          <div className="history-month-value">{m.recorded ? `${m.p}/${m.recorded}` : '—'}</div>
                         </div>
                       );
                     })}

@@ -2,8 +2,10 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
+import type { AttValue } from '@/types';
 
-const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, dispatch: vi.fn(), push: vi.fn(), params: '' }));
+const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, dispatch: vi.fn(), push: vi.fn(), params: '', downloadCSV: vi.fn(), downloadXLSX: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/utils/export', () => ({ downloadCSV: mocks.downloadCSV, downloadXLSX: mocks.downloadXLSX }));
 vi.mock('@/store/AppContext', async original => ({
   ...await original<typeof import('@/store/AppContext')>(),
   useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),
@@ -21,6 +23,7 @@ import StudentDirectory from './StudentDirectory';
 
 beforeEach(() => {
   mocks.dispatch.mockClear(); mocks.push.mockClear(); mocks.params = '';
+  mocks.downloadCSV.mockClear(); mocks.downloadXLSX.mockClear();
   localStorage.clear();
   mocks.state = {
     ...initialState,
@@ -39,7 +42,64 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+it('개인 상세도 주소·생년월일·연간 출석률·등급을 같은 기준으로 표시한다', () => {
+  render(<StudentDirectory onOpenClass={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: '간편 목록' }));
+  fireEvent.click(screen.getByRole('button', { name: '김하나' }));
+  const detail = screen.getByRole('complementary');
+  expect(within(detail).getByText('경기도 성남시 테스트로 12')).toBeTruthy();
+  expect(within(detail).getByText('2010-03-14')).toBeTruthy();
+  expect(within(detail).getByText('100%')).toBeTruthy();
+  expect(within(detail).getByText('A')).toBeTruthy();
+});
+
 describe('관리자 명단·출석 접근 경로', () => {
+  it.each(['CSV', 'Excel'])('%s 명단에는 상태 대신 연간 출석률·등급을 내보내고 장결 기록과 무기록을 구분한다', format => {
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByText('명단 내보내기'));
+    fireEvent.click(screen.getByRole('button', { name: format }));
+    const download = format === 'CSV' ? mocks.downloadCSV : mocks.downloadXLSX;
+    const rows = download.mock.calls[0][0];
+    expect(rows[0]).toEqual(['이름', '부서', '학년', '반', '담임 교사', '학생 연락처', '보호자 연락처', '학교', '주소', '생년월일', '출석률', '등급']);
+    expect(rows[1].slice(8, 10)).toEqual(['경기도 성남시 테스트로 12', '2010-03-14']);
+    expect(rows.slice(1).map((row: string[]) => [row[0], ...row.slice(-2)]))
+      .toEqual([['김하나', '100%', 'A'], ['박두나', '0%', 'D'], ['이세나', '—', '—']]);
+    expect(JSON.stringify(rows)).not.toMatch(/장결|일반|정상/);
+  });
+
+  it('내보내기도 학기 선택과 무관하게 행사·미입력을 제외하고 이전 T를 출석으로 계산한다', () => {
+    mocks.state = { ...mocks.state, curView: 'first',
+      months: [{ month: 1, sundays: [4, 11, 18] }, { month: 9, sundays: [6, 13] }],
+      events: { '0-1': '행사' },
+      attData: { '1-1-1': { a: { '0-0': 'T' as unknown as AttValue, '0-1': 'X', '1-0': 'X' } } },
+    };
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByText('명단 내보내기'));
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }));
+    expect(mocks.downloadXLSX.mock.calls[0][0][1].slice(-2)).toEqual(['50%', 'D']);
+  });
+
+  it.each([[9, '90%', 'A'], [8, '80%', 'B'], [7, '70%', 'C'], [6, '60%', 'D']])('출석 %i/10회의 등급 경계를 기존 출석부와 맞춘다', (present, rate, grade) => {
+    mocks.state = { ...mocks.state,
+      months: [{ month: 1, sundays: [4, 11, 18, 25] }, { month: 2, sundays: [1, 8, 15, 22] }, { month: 3, sundays: [1, 8] }],
+      attData: { '1-1-1': { a: Object.fromEntries(['0-0', '0-1', '0-2', '0-3', '1-0', '1-1', '1-2', '1-3', '2-0', '2-1'].map((key, index) => [key, index < Number(present) ? 'O' : 'X'])) } },
+    };
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByText('명단 내보내기'));
+    fireEvent.click(screen.getByRole('button', { name: 'CSV' }));
+    expect(mocks.downloadCSV.mock.calls[0][0][1].slice(-2)).toEqual([rate, grade]);
+  });
+
+  it('명단 내보내기는 검색 결과만 포함하며 상태 대신 해당 학생의 출석률·등급을 유지한다', () => {
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '김하나' } });
+    fireEvent.click(screen.getByText('명단 내보내기'));
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }));
+    const rows = mocks.downloadXLSX.mock.calls[0][0];
+    expect(rows).toHaveLength(2);
+    expect(rows[1].slice(-2)).toEqual(['100%', 'A']);
+  });
+
   it('반을 먼저 선택하지 않고 전체 학생을 검색하고 이동을 시작한다', () => {
     render(<StudentDirectory onOpenClass={vi.fn()} />);
     expect(screen.getByRole('status').textContent).toContain('3명 / 전체 3명');

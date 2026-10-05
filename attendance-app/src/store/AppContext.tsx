@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import type {
   UserRole, ClassDataMap, AttData, CustomEventData, EventsMap,
   MonthEntry, HolidayRanges, ViewKey, AttEditTarget, MoveTarget, AttValue,
@@ -8,6 +8,7 @@ import { getKSTYear, getSundaysForYear, getWindowYears, buildHolidayRanges, buil
 import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 
 export type DataKey = 'classes' | 'attendance' | 'events';
+export type TeacherDraft = { studentId: string; text: string };
 
 // ─── State ────────────────────────────────────────────────────
 export interface AppState {
@@ -15,6 +16,9 @@ export interface AppState {
   fbReady: boolean;
   userRole: UserRole | null;
   allUserRoles: Record<string, UserRole & { email?: string; name?: string }>;
+  teacherDrafts: Record<string, TeacherDraft>;
+  teacherDraftSaves: Record<string, boolean>;
+  draftSession: number;
 
   // 뷰/반 선택
   curView: ViewKey;
@@ -60,6 +64,9 @@ export const initialState: AppState = {
   fbReady: false,
   userRole: null,
   allUserRoles: {},
+  teacherDrafts: {},
+  teacherDraftSaves: {},
+  draftSession: 0,
 
   curView: 'first',
   curYear: kstYear,
@@ -95,6 +102,9 @@ export const initialState: AppState = {
 type Action =
   | { type: 'SET_FB_READY' }
   | { type: 'SET_USER_ROLE'; payload: UserRole | null }
+  | { type: 'SET_TEACHER_DRAFT'; session: number; key: string; payload: TeacherDraft }
+  | { type: 'SET_TEACHER_DRAFT_SAVING'; session: number; key: string; payload: boolean }
+  | { type: 'CLEAR_TEACHER_DRAFT'; session: number; key: string; expected: TeacherDraft }
   | { type: 'SET_ALL_USER_ROLES'; revision: number; payload: Record<string, UserRole & { email?: string }> }
   | { type: 'SET_VIEW'; payload: ViewKey }
   | { type: 'SET_YEAR'; payload: number }
@@ -159,7 +169,20 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'SET_FB_READY':
       return { ...state, fbReady: true };
     case 'SET_USER_ROLE':
-      return resetData({ ...state, userRole: action.payload });
+      return resetData({ ...state, userRole: action.payload, teacherDrafts: {}, teacherDraftSaves: {}, draftSession: state.draftSession + 1 });
+    case 'SET_TEACHER_DRAFT_SAVING':
+      return action.session !== state.draftSession || !state.userRole ? state
+        : { ...state, teacherDraftSaves: { ...state.teacherDraftSaves, [action.key]: action.payload } };
+    case 'SET_TEACHER_DRAFT':
+      return action.session !== state.draftSession || !state.userRole ? state
+        : { ...state, teacherDrafts: { ...state.teacherDrafts, [action.key]: action.payload } };
+    case 'CLEAR_TEACHER_DRAFT': {
+      const current = state.teacherDrafts[action.key];
+      if (action.session !== state.draftSession || !current || current.studentId !== action.expected.studentId || current.text !== action.expected.text) return state;
+      const next = { ...state.teacherDrafts };
+      delete next[action.key];
+      return { ...state, teacherDrafts: next };
+    }
     case 'SET_ALL_USER_ROLES':
       return { ...state, allUserRoles: action.payload };
     case 'SET_VIEW':
@@ -255,6 +278,13 @@ const AppContext = createContext<{
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const hasDrafts = Object.values(state.teacherDrafts).some(draft => !!draft.text.trim());
+  useEffect(() => {
+    if (!hasDrafts) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [hasDrafts]);
   return (
     <AppContext.Provider value={{ state, dispatch }}>
       {children}
