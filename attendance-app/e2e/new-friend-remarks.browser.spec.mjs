@@ -59,7 +59,10 @@ test('저장 직전 삭제된 새친구의 비고를 다시 만들지 않는다'
     await route.continue();
   });
   await page.getByRole('button', { name: '합성 새친구 비고 수정' }).click();
-  await page.getByLabel('비고 내용').fill('재생성 금지'); await page.getByRole('button', { name: '비고 저장' }).click();
+  await page.getByLabel('비고 내용').fill('재생성 금지');
+  const rejected = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().includes('/teamMemo.json'));
+  await page.getByRole('button', { name: '비고 저장' }).click();
+  expect([401, 403, 412]).toContain((await rejected).status());
   await expect(page.getByText('접수된 새친구가 없습니다.')).toBeVisible();
   expect(await (await request.get(memoUrl, { headers: owner })).json()).toBeNull();
 });
