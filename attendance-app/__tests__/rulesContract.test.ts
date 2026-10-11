@@ -32,6 +32,21 @@ function ruleExpression(...segments: string[]): string {
 }
 
 describe('database.rules.json 권한 계약', () => {
+  it('비고 권한은 개인 관리자·데모 제외·등록 학생의 teamMemo leaf에만 추가한다', () => {
+    const segments = ['semestersPrivate', '$sid', 'newFriendsPrivate', '$friendId', 'teamMemo'];
+    for (const action of ['.read', '.write']) {
+      const expr = ruleExpression(...segments, action);
+      expect(expr).toContain("child('attendanceAdmins')");
+      expect(expr).toContain("child('blockedDemoUid').val() !== auth.uid");
+      expect(expr).toContain("child('role').val() === 'admin'");
+      expect(expr).toContain("child('email').val() === auth.token.email");
+      expect(expr).toContain("child('newFriends').child($friendId).exists()");
+      expect(refers(ruleExpression('semestersPrivate', '$sid', 'newFriendsPrivate', action), 'attendanceAdmins')).toBe(false);
+    }
+    expect(ruleExpression(...segments, '.write')).toContain('newData.isString()');
+    expect(ruleExpression(...segments, '.write')).toContain('newData.val().length <= 10000');
+    expect(ruleValue(...segments, '.validate')).toBeUndefined();
+  });
   it('출석부 관리자 목양 리포트는 데모 제외 설정을 확인한 공개 새친구 읽기로 제한한다', () => {
     const read = ruleExpression('semesters', '$sid', 'newFriends', '.read');
     expect(refers(read, 'attendanceAdmins')).toBe(true);

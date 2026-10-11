@@ -23,3 +23,21 @@
 .pr-subsections button[aria-pressed=true]{background:var(--primary-bg);color:var(--primary-text);border-color:var(--primary-light);font-weight:600}
 .pr-subsections button:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
 .pastoral-report .ao-sections .pr-secondary-link{margin-left:auto}
+.pr-registration-table .pr-remark-cell { min-width: 210px; max-width: 300px; white-space: normal; }
+.pr-remark-preview p { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.pr-remark-preview button, .pr-remark-editor button { min-height: 44px; padding: 8px 14px; border: 1px solid #dedce8; border-radius: 12px; background: #fff; color: #6355a7; font: inherit; cursor: pointer; }
+.pr-remark-preview button:disabled, .pr-remark-editor button:disabled { cursor: not-allowed; opacity: .5; }
+.pr-remark-editor { margin-bottom: 24px; padding: 20px; border: 1px solid #dedce8; border-radius: 16px; background: #faf9fd; }
+.pr-remark-editor-head, .pr-remark-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pr-remark-editor h3 { margin: 0; font-size: 18px; }
+.pr-remark-editor-head p, .pr-remark-help { margin: 8px 0 14px; color: #686576; font-size: 13px; }
+.pr-remark-editor label { display: block; margin-bottom: 8px; font-weight: 600; }
+.pr-remark-editor textarea { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #d7d3e3; border-radius: 12px; background: #fff; color: #292733; font: inherit; font-size: 16px; resize: vertical; }
+.pr-remark-editor textarea:focus-visible, .pr-remark-editor button:focus-visible, .pr-remark-preview button:focus-visible { outline: 2px solid #6355a7; outline-offset: 3px; }
+.pr-remark-conflict { margin: 16px 0; padding: 14px; border: 1px solid #dedce8; border-radius: 12px; background: #fff; }
+.pr-remark-conflict pre { font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto; }
+.pr-remark-error { color: #a33a36; }
+.pr-remark-editor .pr-remark-save { background: #6355a7; color: #fff; border-color: #6355a7; }
+.pr-registration-mobile-remark { margin-top: 14px; padding-top: 14px; border-top: 1px solid #ebe9f0; }
+.pr-registration-mobile-remark > strong { display: block; margin-bottom: 8px; font-size: 13px; color: #686576; }
+@media (max-width: 760px) { .pr-remark-editor { padding: 16px; } .pr-remark-editor-head { align-items: flex-start; } }
