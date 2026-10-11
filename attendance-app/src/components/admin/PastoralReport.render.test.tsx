@@ -3,12 +3,13 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
 import type { PublicReportFriend } from '@/lib/pastoralFriendProgress';
-const mocks = vi.hoisted(() => ({ query: '', state: {} as typeof initialState, demo: false, receive: (() => {}) as (friends: PublicReportFriend[]) => void, fail: (() => {}) as (error: Error) => void, stop: vi.fn(), subscribe: vi.fn() }));
+const mocks = vi.hoisted(() => ({ query: '', state: {} as typeof initialState, demo: false, receive: (() => {}) as (friends: PublicReportFriend[]) => void, fail: (() => {}) as (error: Error) => void, stop: vi.fn(), subscribe: vi.fn(), remarks: vi.fn() }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(mocks.query) }));
-vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: mocks.state }) }));
+vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: mocks.state, getState: () => mocks.state }) }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { email: 'synthetic@example.test' } } }));
 vi.mock('@/lib/demo', () => ({ isDemoAccount: () => mocks.demo }));
 vi.mock('@/lib/pastoralFriends', () => ({ subscribeReportFriends: (...args: unknown[]) => mocks.subscribe(...args) }));
+vi.mock('@/lib/newFriendRemarks', () => ({ REMARK_LIMIT: 10000, saveFriendRemark: vi.fn(), subscribeFriendRemark: (...args: unknown[]) => mocks.remarks(...args) }));
 vi.mock('@/components/tabs/overall/VisitRequestsSection', () => ({ default: ({ requestKey }: { requestKey?: string }) => <section data-testid="visit-section" data-request-key={requestKey}><h2>심방 요청</h2></section> }));
 vi.mock('@/components/tabs/overall/SuggestionsSection', () => ({ default: () => <section><h2>특이사항</h2></section> }));
 import PastoralReport from './PastoralReport';
@@ -16,6 +17,7 @@ beforeEach(() => {
   mocks.query = ''; mocks.demo = false; mocks.stop.mockClear(); mocks.subscribe.mockReset();
   mocks.state = { ...initialState, curYear: 2026, userRole: { role: 'admin' }, months: [{ month: 1, sundays: [4, 11, 18, 25] }], events: {}, classData: { '1-1-1': { students: [{ id: 'nf_one', name: '합성 학생', phone: '010-0000-0000' }] } }, attData: { '1-1-1': { nf_one: { '0-0': 'O', '0-1': 'X', '0-2': 'X', '0-3': 'X' } } } };
   mocks.subscribe.mockImplementation((_year, receive, fail) => { mocks.receive = receive; mocks.fail = fail; return mocks.stop; });
+  mocks.remarks.mockReset(); mocks.remarks.mockImplementation((_key, receive) => { receive({ status: 'ready', value: '합성 기존 비고' }); return mocks.stop; });
 });
 afterEach(cleanup);
 describe('목양 리포트 실제 화면', () => {
@@ -113,6 +115,9 @@ describe('목양 리포트 실제 화면', () => {
       { key: '2026-1/b', name: '등반 완료 학생', part: '1', grade: '1', decision: '등록', createdAt: '2026-01-11T00:00:00Z', rosterSync: { studentId: 'nf_one', classKey: '1-1-1', syncedAt: '2026-01-10T00:00:00Z' } },
     ]));
     const table = screen.getByRole('table', { name: /통합사이트 새친구 등록일/ });
+    expect(within(table).getByRole('columnheader', { name: '비고' })).toBeTruthy();
+    expect(within(table).getAllByText('합성 기존 비고')).toHaveLength(2);
+    expect(mocks.remarks).toHaveBeenCalledTimes(2); // PC·모바일 목록은 같은 구독 결과를 공유한다.
     expect(within(table).getByText('등록 대기 학생')).toBeTruthy();
     expect(within(table).getByText('등반 완료 학생')).toBeTruthy();
     expect(within(table).getByText('합성학교')).toBeTruthy();
@@ -216,6 +221,7 @@ describe('목양 리포트 실제 화면', () => {
     else mocks.demo = true;
     render(<PastoralReport />);
     expect(mocks.subscribe).not.toHaveBeenCalled();
+    expect(mocks.remarks).not.toHaveBeenCalled();
     expect(screen.queryByRole('link')).toBeNull();
   });
 });

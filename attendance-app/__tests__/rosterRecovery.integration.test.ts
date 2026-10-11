@@ -60,8 +60,8 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
       retreatsPrivate: { 'retreat-contract': { medicalLogs: { existing: { note: '합성 의료 기록' } } } },
       config: { pastoralReport: { blockedDemoUid: 'demo' } },
       semesters: { '2026-1': { newFriends: { f: { name: '합성 새친구' } }, applications: { privateScope: true } }, '2026-2': { newFriends: { f: { name: '합성 새친구' } } }, '2026-sunday': { newFriends: { f: { name: '합성 새친구' } } } },
-      semestersPrivate: { '2026-sunday': { newFriendsPrivate: { f: { pastoralNotes: '비공개 합성 메모' } } } },
-      userRoles: { teacher__at__example__dot__test: { email: 'teacher@example.test', role: 'teacher', part: '1', grade: '1', class: '1' } },
+      semestersPrivate: { '2026-sunday': { newFriendsPrivate: { f: { teamMemo: '기존 비고', phone: '합성 연락처', familyNotes: '합성 가족 메모', pastoralNotes: '비공개 합성 메모' } } } },
+      userRoles: { teacher__at__example__dot__test: { email: 'teacher@example.test', role: 'teacher', part: '1', grade: '1', class: '1' }, admin__at__example__dot__test: { email: 'admin@example.test', role: 'admin' }, admin2__at__example__dot__test: { email: 'admin2@example.test', role: 'admin' }, demo__at__example__dot__test: { email: 'demo@example.test', role: 'admin' } },
       classes: { 2026: { '1-1-1': { teacher: '합성 교사', students: { s: student } } } },
       attendance: { 2026: { '1-1-1': { s: { '0906': 'O' } } } },
       teacherStaff: { 2026: { t1: { name: '합성 스탭' } } },
@@ -70,6 +70,41 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     expect(response.ok).toBe(true);
   });
   afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; });
+  it('개인 출석부 관리자는 세 작업공간의 비고 leaf만 읽고 수정하며 다른 필드는 보존한다', async () => {
+    for (const workspace of ['2026-1', '2026-2', '2026-sunday']) {
+      const path = `semestersPrivate/${workspace}/newFriendsPrivate/f/teamMemo`;
+      await get(ref(admin, path));
+      await set(ref(admin, path), '수정 비고'); expect((await get(ref(second, path))).val()).toBe('수정 비고');
+      await set(ref(admin, path), null); expect((await get(ref(second, path))).val()).toBeNull();
+    }
+    const priv = 'semestersPrivate/2026-sunday/newFriendsPrivate/f';
+    for (const suffix of ['', '/phone', '/familyNotes', '/pastoralNotes']) {
+      await expect(get(ref(admin, `${priv}${suffix}`))).rejects.toThrow();
+      await expect(set(ref(admin, `${priv}${suffix}`), '금지')).rejects.toThrow();
+    }
+    expect((await get(ref(superAdmin, priv))).val()).toMatchObject({ phone: '합성 연락처', familyNotes: '합성 가족 메모', pastoralNotes: '비공개 합성 메모' });
+  });
+  it('비고는 데모·교사·미등록 계정에게 열리지 않는다', async () => {
+    const path = 'semestersPrivate/2026-sunday/newFriendsPrivate/f/teamMemo';
+    for (const client of [demo, teacher, stranger]) {
+      await expect(get(ref(client, path))).rejects.toThrow(); await expect(set(ref(client, path), '금지')).rejects.toThrow();
+    }
+    await set(ref(superAdmin, 'attendanceAdmins/teacher'), true);
+    await expect(get(ref(teacher, path))).rejects.toThrow(); await expect(set(ref(teacher, path), '금지')).rejects.toThrow();
+    await set(ref(superAdmin, 'config/pastoralReport/blockedDemoUid'), null);
+    await expect(get(ref(admin, path))).rejects.toThrow(); await expect(set(ref(admin, path), '금지')).rejects.toThrow();
+  });
+  it('삭제된 학생·잘못된 작업공간·객체·너무 긴 비고 쓰기를 거절한다', async () => {
+    const prefix = 'semestersPrivate/2026-sunday/newFriendsPrivate';
+    for (const value of [{ phone: '오류' }, '가'.repeat(10001)]) await expect(set(ref(admin, `${prefix}/f/teamMemo`), value)).rejects.toThrow();
+    await expect(set(ref(admin, `${prefix}/missing/teamMemo`), '금지')).rejects.toThrow();
+    await set(ref(superAdmin, 'semesters/2026-sunday/newFriends/f'), null);
+    await expect(set(ref(admin, `${prefix}/f/teamMemo`), '재생성 금지')).rejects.toThrow();
+    await expect(set(ref(admin, 'semestersPrivate/2026-other/newFriendsPrivate/f/teamMemo'), '금지')).rejects.toThrow();
+    // 기존 통합사이트 상위 권한과 비공개 메모 형태는 좁은 추가 권한 때문에 바뀌지 않는다.
+    await set(ref(superAdmin, `${prefix}/f/teamMemo`), '가'.repeat(10001));
+    expect((await get(ref(superAdmin, `${prefix}/f/teamMemo`))).val()).toHaveLength(10001);
+  });
   it('진급·시트 배치는 잠금 상실 후 지연 도착과 같은 요청 재생을 거절한다', async () => {
     const lockPath = 'config/studentMoveLocks/2026/1-1-1/admin/batch';
     const markerPath = 'config/rosterBatchCommits/2026/1-1-1/admin/batch';

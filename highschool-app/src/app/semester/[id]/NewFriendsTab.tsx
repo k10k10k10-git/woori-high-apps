@@ -299,7 +299,7 @@ function NewFriendEditor({
         </div>
 
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Field label="새친구팀 메모"><textarea className="input min-h-24" value={draft.teamMemo} onChange={(e) => set("teamMemo", e.target.value)} /></Field>
+          <Field label="비고"><textarea className="input min-h-24" value={draft.teamMemo} onChange={(e) => set("teamMemo", e.target.value)} /></Field>
           <Field label="가족사항"><textarea className="input min-h-24" value={draft.familyNotes} onChange={(e) => set("familyNotes", e.target.value)} /></Field>
           <div className="sm:col-span-2"><Field label="교역자 심방·특이사항"><textarea className="input min-h-24" value={draft.pastoralNotes} onChange={(e) => set("pastoralNotes", e.target.value)} /></Field></div>
         </div>
