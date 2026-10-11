@@ -32,7 +32,7 @@ test('기존 비고 조회·편집·실시간 반영과 다른 비공개 필드 
   await expect(page.locator('.pr-remark-actions')).toContainText('비고가 저장되었습니다');
   const saved = await (await request.get(`${base}/semestersPrivate/${workspace}/newFriendsPrivate/f.json?ns=${ns}`, { headers: owner })).json();
   expect(saved).toEqual({ teamMemo: '출석부에서 수정한 비고', phone: '보존 연락처', familyNotes: '보존 가족 메모', pastoralNotes: '보존 심방 메모' });
-  expect((await request.put(memoUrl, { headers: owner, data: '통합사이트에서 다시 수정' })).ok()).toBe(true);
+  expect((await request.put(memoUrl, { headers: { ...owner, 'Content-Type': 'application/json' }, data: JSON.stringify('통합사이트에서 다시 수정') })).ok()).toBe(true);
   await expect(page.locator('.pr-remark-preview:visible')).toContainText('통합사이트에서 다시 수정');
   await expect(page.getByLabel('비고 내용')).toHaveValue('출석부에서 수정한 비고');
   await page.getByRole('button', { name: '작성 내용 대신 최신 비고 사용' }).click();
@@ -41,7 +41,7 @@ test('기존 비고 조회·편집·실시간 반영과 다른 비공개 필드 
 test('GET 이후 발생한 동시 편집을 덮어쓰지 않는다', async ({ page, request }) => {
   await page.route('**/semestersPrivate/**/teamMemo.json?**', async route => {
     if (route.request().method() !== 'PUT') return route.continue();
-    expect((await request.put(memoUrl, { headers: owner, data: '다른 관리자의 최신 비고' })).ok()).toBe(true);
+    expect((await request.put(memoUrl, { headers: { ...owner, 'Content-Type': 'application/json' }, data: JSON.stringify('다른 관리자의 최신 비고') })).ok()).toBe(true);
     await route.continue();
   });
   await page.getByRole('button', { name: '합성 새친구 비고 수정' }).click();

@@ -511,4 +511,4 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 ### 타 앱 비공개 비고를 leaf 단위로 공유하기 (2026-10-11)
 - **접근법**: `DB_OWNERSHIP.md`로 `semestersPrivate/{workspace}/newFriendsPrivate/{friendId}/teamMemo` 소유권을 확인한다 → 명시 승인 후 운영 Rules를 백업·대조한다 → 개인 관리자·이메일 일치·데모 제외·공개 등록 존재 조건으로 해당 leaf만 허용한다 → `src/lib/newFriendRemarks.ts`의 개별 구독과 ETag 조건부 PUT으로 양 앱 원장을 공유한다 → 합성 Rules·브라우저 검사로 다른 비공개 필드 보존과 동시 편집 거절을 검증한다.
 - **판단 질문**: 비고를 공개 원장에 복사하거나 비공개 부모를 열지 않았다. PC·모바일 표시는 구독 결과를 공유하고 편집기는 하나만 열며, 실시간 변경·저장 실패가 작성 내용을 지우지 않는다. 기존 통합 앱의 비공개 권한과 저장 키는 유지하고 표시 이름만 비고로 바꾼다.
-- **재사용 규칙**: Rules는 필터가 아니다. 한 필드만 공유할 때 읽기·쓰기·구독·검증 모두 같은 leaf 경계에 맞추고, 오래된 화면의 저장을 조건부 요청으로 제한한다.
+- **재사용 규칙**: Rules는 필터가 아니다. 한 필드만 공유할 때 읽기·쓰기·구독·검증 모두 같은 leaf 경계에 맞추고, 오래된 화면의 저장을 조건부 요청으로 제한한다. Playwright `APIRequestContext`의 문자열 leaf PUT도 `JSON.stringify`와 JSON Content-Type을 명시한다. 객체 `data`만 자동 JSON 직렬화되므로 합성 외부 수정 요청의 400을 앱 저장 실패로 오인하지 않는다.
