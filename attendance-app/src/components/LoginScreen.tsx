@@ -16,6 +16,7 @@ export default function LoginScreen({ authError, onBackToDemo }: {
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const pending = useRef(false);
+  const emailEdited = useRef(false);
 
   useEffect(() => { setErr(''); }, [authError]);
 
@@ -23,7 +24,7 @@ export default function LoginScreen({ authError, onBackToDemo }: {
     const prefs = readLoginPreferences();
     setSaveEmail(prefs.saveEmail);
     setStayLogin(prefs.stayLogin);
-    setEmail(prefs.email);
+    if (!emailEdited.current) setEmail(prefs.email);
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -72,7 +73,7 @@ export default function LoginScreen({ authError, onBackToDemo }: {
                 type="email"
                 placeholder="이메일"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { emailEdited.current = true; setEmail(e.target.value); }}
                 autoComplete="email"
               />
             </div>
