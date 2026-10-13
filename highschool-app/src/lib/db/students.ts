@@ -154,7 +154,7 @@ export async function loadTeachersFromDB(year: number): Promise<LoadTeachersResu
 
   const result: LoadableTeacher[] = [];
   const extraData = extraSnap.exists()
-    ? extraSnap.val() as Record<string, Record<string, { title?: string; name?: string }>>
+    ? extraSnap.val() as Record<string, Record<string, { title?: string }>>
     : {};
 
   if (classSnap.exists()) {
@@ -165,7 +165,9 @@ export async function loadTeachersFromDB(year: number): Promise<LoadTeachersResu
       const { buNum, grade, classNum: cls } = parsed;
       const extraKey = classKey.replaceAll("-", "_");
       const extra = extraData[String(buNum)]?.[extraKey];
-      const teacherName = extra?.name?.trim() || cd.teacher?.trim();
+      // 담임 교체 후에도 teacherExtra에는 이전 교사 이름이 남을 수 있다.
+      // 새로 불러오는 명단의 이름은 현재 출석부 원장만 사용한다.
+      const teacherName = cd.teacher?.trim();
       if (!teacherName) return;
       result.push({
         name: teacherName,
