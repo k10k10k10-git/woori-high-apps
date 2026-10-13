@@ -33,7 +33,16 @@ test('전체 연락처 엑셀은 화면 필터·장결과 무관하고 원장을
   await expect(page.getByRole('button', { name: '연속 결석 전체 연락처 엑셀 내려받기' })).toBeEnabled();
   await page.getByRole('searchbox', { name: '학생 검색' }).fill('없는 학생');
   await expect(page.getByText('이 조건에 해당하는 연속 결석 학생이 없습니다.')).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const layout = await page.evaluate(() => ({
+    viewport: innerWidth, width: document.documentElement.scrollWidth,
+    overflowing: [...document.querySelectorAll('body *')].flatMap(element => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.right > innerWidth + 1 && getComputedStyle(element).visibility !== 'hidden'
+        ? [{ tag: element.tagName, class: element.className, left: bounds.left, right: bounds.right }] : [];
+    }).slice(0, 20),
+  }));
+  if (layout.width > layout.viewport) console.log('모바일 너비 진단', JSON.stringify(layout));
+  expect(layout.width <= layout.viewport).toBe(true);
   for (const [label, count] of [['연속 결석', 2], ['다시 출석', 1]]) {
     const pending = page.waitForEvent('download');
     await page.getByRole('button', { name: `${label} 전체 연락처 엑셀 내려받기` }).click();
