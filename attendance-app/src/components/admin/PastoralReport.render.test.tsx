@@ -51,7 +51,7 @@ describe('목양 리포트 실제 화면', () => {
   it('학생 직접 링크의 대상이 현재 명단에 없으면 이유를 안내한다', () => {
     mocks.query = 'view=absence&student=1-1-1%2Fmissing';
     render(<PastoralReport />);
-    expect(screen.getByRole('status').textContent).toContain('현재 연속 결석 명단에 없습니다');
+    expect(screen.getByText(/요청한 학생이 현재 연속 결석 명단에 없습니다/)).toBeTruthy();
   });
   it('주소가 바뀔 때만 주일·탭을 동기화하고, 수동 전환 뒤에는 이전 심방 강조를 지운다', () => {
     mocks.query = 'view=visits&request=1-1-1%2Fopen';
@@ -213,7 +213,7 @@ describe('목양 리포트 실제 화면', () => {
     mocks.state = { ...mocks.state, attData: { '1-1-1': { nf_one: { '0-0': 'X', '0-1': 'X', '0-2': 'X', '0-3': 'O' } } } };
     render(<PastoralReport />);
     fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
-    fireEvent.click(screen.getByRole('button', { name: /다시 출석/ }));
+    fireEvent.click(within(screen.getByRole('group', { name: '결석 상태' })).getByRole('button', { name: /다시 출석/ }));
     expect(screen.getByText('3회 이상 결석 후 출석')).toBeTruthy();
   });
   it.each(['teacher', 'demo'])('%s는 새친구를 구독하거나 연락처를 표시하지 않는다', mode => {
