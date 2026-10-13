@@ -13,6 +13,16 @@ beforeEach(() => {
   };
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
+it('공백이 있는 점 구분 생년월일을 미리보기와 내려받기에서 같은 날짜로 표시한다', async () => {
+  m.state!.classData = { '1-3-1': { students: [{ id: 'a', name: '가상 고3', birth: '2008. 01. 31', phone: '010-0000-0001', pphone: '010-0000-0002', school: '가상고', addr: '가상 주소' }] } };
+  render(<YouthHandoffSection />);
+  expect(screen.getByText('2008-01-31')).toBeTruthy();
+  expect(screen.queryByText('확인 필요 (2008. 01. 31)')).toBeNull();
+  expect(screen.getByText(/기본 정보 확인 필요 0명/)).toBeTruthy();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '전체 고3 엑셀 내려받기' })); });
+  expect(m.download.mock.calls[0][0][6][1]).toEqual(new Date(2008, 0, 31));
+  expect(m.state!.classData['1-3-1'].students[0].birth).toBe('2008. 01. 31');
+});
 it('미리보기에서 전체 고3를 확인하고 8개 항목 엑셀을 내려받는다', async () => {
   render(<YouthHandoffSection />);
   expect(screen.getByText('가상 장결')).toBeTruthy();

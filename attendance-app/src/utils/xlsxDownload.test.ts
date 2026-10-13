@@ -7,9 +7,9 @@ vi.mock('xlsx', async original => ({ ...await original<typeof import('xlsx')>(),
 import { read, write } from 'xlsx';
 import { downloadXLSX } from './export';
 beforeEach(() => m.writeFile.mockClear());
-it('실제 XLSX 직렬화 후에도 날짜·연락처·퍼센트·필터와 8개 열이 보존된다', async () => {
+it.each(['2008-02-29', '2008. 02. 29', '2008/2/29'])('생년월일 %s도 실제 XLSX 직렬화 후 날짜·연락처·퍼센트·필터와 8개 열이 보존된다', async birth => {
   const source = { ...initialState, curYear: 2026, months: getSundaysForYear(2026), events: {},
-    classData: { '1-3-1': { students: [{ id: 'a', name: '=가상학생', birth: '2008-02-29', phone: '01000000001', pphone: '01000000002', addr: '가상 주소' }] } },
+    classData: { '1-3-1': { students: [{ id: 'a', name: '=가상학생', birth, phone: '01000000001', pphone: '01000000002', addr: '가상 주소' }] } },
     attData: { '1-3-1': { a: { '0-0': 'O' as const } } },
   };
   await downloadXLSX(youthHandoffWorkbookRows(buildYouthHandoff(source, Date.parse('2026-11-01T00:00:00+09:00'))), '청년부 인계', '합성.xlsx', {

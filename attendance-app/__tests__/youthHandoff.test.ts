@@ -14,6 +14,32 @@ function source(): AppState {
   };
 }
 describe('전체 고3 청년부 인계', () => {
+  it.each([
+    ['2008. 01. 31', '2008-01-31'],
+    ['2008. 04. 01', '2008-04-01'],
+    ['2008. 08. 06', '2008-08-06'],
+    [' 2008. 1. 31. ', '2008-01-31'],
+    ['2008 / 4 / 1', '2008-04-01'],
+    ['2008-8-6', '2008-08-06'],
+    ['2008.\u00a002.\u00a029.', '2008-02-29'],
+    ['2008-01-21', '2008-01-21'],
+    ['20080229', '2008-02-29'],
+  ])('생년월일 %s의 구분자·공백을 변환해 %s로 표시한다', (input, expected) => {
+    expect(handoffBirth(input)).toBe(expected);
+  });
+  it.each(['2009. 02. 29', '2008. 04. 31', '2008. 13. 01', '2008. 00. 10', '2008. 01. 00', '08. 01. 31', '2008131', '2008년생', '2008. 01', '2008. 01. 31 메모'])('유효하지 않거나 불완전한 생년월일 %s는 추정하지 않는다', input => {
+    expect(handoffBirth(input)).toBe(`확인 필요 (${input})`);
+  });
+  it('표기만 다른 생년월일을 확인 필요로 집계하지 않고 원본을 보존해 엑셀 날짜로 내보낸다', () => {
+    const state = source();
+    state.classData = { '1-3-1': { students: [{ ...state.classData['1-3-1'].students[0], birth: '2008. 01. 31' }] } };
+    const before = structuredClone(state);
+    const report = buildYouthHandoff(state, now);
+    expect(report.reviewCount).toBe(0);
+    expect(report.rows[0].birth).toBe('2008-01-31');
+    expect(youthHandoffWorkbookRows(report)[6][1]).toEqual(new Date(2008, 0, 31));
+    expect(state).toEqual(before);
+  });
   it('부서·학기·반 화면 선택과 관계없이 1·2부 고3 장결·미입력·동명이인을 모두 포함한다', () => {
     const state = source(); const before = structuredClone(state);
     const report = buildYouthHandoff(state, now);

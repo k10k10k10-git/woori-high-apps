@@ -9,8 +9,9 @@ type HandoffSource = Pick<AppState, 'curYear' | 'classData' | 'attData' | 'month
 export function handoffBirth(value?: string): string {
   const raw = value?.trim() ?? '';
   if (!raw) return '미등록';
-  const match = /^(\d{4})[-./]?(\d{2})[-./]?(\d{2})\.?$/.exec(raw);
-  const normalized = match ? `${match[1]}-${match[2]}-${match[3]}` : raw;
+  const match = /^(\d{4})\s*[-./]\s*(\d{1,2})\s*[-./]\s*(\d{1,2})\s*\.?$/.exec(raw)
+    ?? /^(\d{4})(\d{2})(\d{2})\.?$/.exec(raw);
+  const normalized = match ? `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}` : raw;
   return reportDate(normalized) !== null ? normalized : `확인 필요 (${raw})`;
 }
 
