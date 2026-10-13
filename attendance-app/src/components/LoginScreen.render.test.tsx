@@ -57,7 +57,9 @@ describe('교사·관리자 로그인 진입 화면', () => {
     localStorage.setItem('savedEmail', 'old@example.com');
     function EarlyInput() {
       useLayoutEffect(() => {
-        fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'new@example.com' } });
+        const input = screen.getByLabelText('이메일');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'new@example.com');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
       }, []);
       return <LoginScreen />;
     }
