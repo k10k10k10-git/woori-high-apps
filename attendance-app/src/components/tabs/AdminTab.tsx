@@ -11,6 +11,7 @@ import SheetSyncSection from './SheetSyncSection';
 import YouthHandoffSection from '../admin/YouthHandoffSection';
 import type { UserRole } from '@/types';
 import AdminIcon from '../admin/AdminIcon';
+import AdminStatusBadge from '../admin/AdminStatusBadge';
 import '../admin/admin-settings.css';
 import '../admin/admin-overview.css';
 import dynamic from 'next/dynamic';
@@ -333,7 +334,7 @@ export default function AdminTab() {
               {promotionRows.length > 0 ? <><h4>진급 예정 <span>{promotionRows.reduce((sum, row) => sum + row.studentCount, 0)}명</span></h4><div className="as-promotion-list">{promotionRows.map(row => {
                 const [part, grade, cls] = row.fromCk.split('-');
                 const [, nextGrade] = row.toCk.split('-');
-                return <div className="as-promotion-row" key={row.fromCk}><span>{part}부 {grade}학년 {cls}반</span><AdminIcon name="arrow" /><strong>{part}부 {nextGrade}학년 {cls}반</strong><span>{row.studentCount}명</span>{row.hasConflict && <span className="as-badge as-badge-warning">이미 명단 있음</span>}</div>;
+                return <div className="as-promotion-row" key={row.fromCk}><span>{part}부 {grade}학년 {cls}반</span><AdminIcon name="arrow" /><strong>{part}부 {nextGrade}학년 {cls}반</strong><span>{row.studentCount}명</span>{row.hasConflict && <AdminStatusBadge label="이미 명단 있음" />}</div>;
               })}</div></> : <p className="as-empty-note">진급할 학생이 없습니다.</p>}
               {graduateRows.length > 0 && <div className="as-graduate-list"><h4>졸업 대상 <span>{graduateRows.reduce((sum, row) => sum + row.studentCount, 0)}명</span></h4><p>{curYear}년 명단에는 포함하지 않습니다.</p>{graduateRows.map(row => { const [part, , cls] = row.ck.split('-'); return <div key={row.ck}>{part}부 3학년 {cls}반 · {row.studentCount}명</div>; })}</div>}
               {promotionRows.some(row => row.hasConflict) && <label className="as-overwrite-option"><input type="checkbox" checked={overwrite} onChange={event => setOverwrite(event.target.checked)} /><span>이미 데이터가 있는 반도 덮어쓰기</span></label>}

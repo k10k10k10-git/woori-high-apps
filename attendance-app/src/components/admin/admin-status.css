@@ -1,0 +1,22 @@
+/* 선택/동작의 보라색과 업무 상태를 구분한다. 아이콘·문구로 색 외에도 의미를 전달한다. */
+[data-status-tone="danger"]{--status-ink:#9b303d;--status-surface:#fff0f1;--status-edge:#a96673}
+[data-status-tone="warning"]{--status-ink:#805018;--status-surface:#fff6e5;--status-edge:#a16e2c}
+[data-status-tone="info"]{--status-ink:#285c88;--status-surface:#edf5ff;--status-edge:#6186aa}
+[data-status-tone="success"]{--status-ink:#246447;--status-surface:#eaf5ee;--status-edge:#528366}
+[data-status-tone="neutral"]{--status-ink:#555966;--status-surface:#f1f2f5;--status-edge:#818697}
+.admin-status-badge.admin-status-badge{display:inline-flex;align-items:center;justify-content:center;gap:6px;width:fit-content;max-width:100%;min-height:28px;margin:0;padding:4px 9px;border:1px solid var(--status-edge);border-radius:10px;background:var(--status-surface);color:var(--status-ink);font:inherit;font-size:12px;font-weight:600;line-height:1.4;vertical-align:middle;text-align:left}
+.admin-status-badge>svg{flex:none}
+.admin-status-badge.admin-status-badge>span{display:inline;margin:0;color:inherit;font:inherit;overflow-wrap:anywhere}
+button.admin-status-badge.admin-status-badge{min-height:44px;cursor:pointer}
+button.admin-status-badge:hover{border-color:var(--status-ink);box-shadow:inset 0 0 0 1px var(--status-ink)}
+button.admin-status-badge:focus-visible{outline:2px solid #6355a7;outline-offset:3px}
+.admin-status-mark{display:inline-flex;align-items:center;gap:6px}
+.admin-status-mark>svg{flex:none;color:var(--status-ink)}
+.admin-workspace .ad-status-tabs button[data-status-tone]>span{color:var(--status-ink);background:var(--status-surface)}
+.ad-status-tabs button[data-status-tone]>svg{flex:none;color:var(--status-ink)}
+.pr-registration-summary button[data-status-tone] .admin-status-mark{color:var(--status-ink)}
+.ad-work-groups article[data-status-tone] .ad-work-icon{color:var(--status-ink);background:var(--status-surface)}
+.ad-work-groups article[data-status-tone] h3>b{color:var(--status-ink)}
+.ao-visit-action{flex-wrap:wrap;justify-content:flex-end}
+.ao-visit-action>.admin-status-badge{align-self:center}
+@media(max-width:760px){.ao-visit-action{justify-content:space-between}}

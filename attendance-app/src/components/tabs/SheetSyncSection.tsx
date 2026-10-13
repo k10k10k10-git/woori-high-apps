@@ -9,6 +9,7 @@ import {
   type SyncPlan, type ParsedClass, type AttendanceYear,
 } from '@/lib/sheetSync';
 import { commitSheetSync } from '@/lib/sheetSyncCommit';
+import AdminStatusBadge from '@/components/admin/AdminStatusBadge';
 import type { Student } from '@/types';
 import { adminActor, adminChangePath, buildAdminChangeEntry } from '@/utils/adminChange';
 
@@ -183,14 +184,14 @@ export default function SheetSyncSection() {
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, fontSize: 11 }}>
-            <span style={{ background: 'var(--green-bg, #dcfce7)', color: 'var(--green-text, #15803d)', borderRadius: 8, padding: '3px 8px' }}>신규 {plan.added.length}명</span>
-            <span style={{ background: 'var(--amber-bg)', color: 'var(--amber-text)', borderRadius: 8, padding: '3px 8px' }}>반 이동 {plan.moved.length}명</span>
-            <span style={{ background: 'var(--red-bg)', color: 'var(--red-text)', borderRadius: 8, padding: '3px 8px' }}>제외 {plan.removed.length}명</span>
-            <span style={{ background: 'var(--surface2)', color: 'var(--text2)', borderRadius: 8, padding: '3px 8px' }}>장결자 {plan.jangCount}명</span>
+            <AdminStatusBadge label={`신규 ${plan.added.length}명`} tone="info" />
+            <AdminStatusBadge label={`반 이동 ${plan.moved.length}명`} tone="warning" />
+            <AdminStatusBadge label={`제외 ${plan.removed.length}명`} tone="danger" />
+            <AdminStatusBadge label={`장결자 ${plan.jangCount}명`} tone="neutral" />
             {plan.ambiguous.length > 0 && (
-              <span style={{ background: 'var(--amber-bg)', color: 'var(--amber-text)', borderRadius: 8, padding: '3px 8px' }}>확인 필요 {plan.ambiguous.length}명</span>
+              <AdminStatusBadge label={`확인 필요 ${plan.ambiguous.length}명`} tone="warning" />
             )}
-            <span style={{ background: 'var(--primary-bg)', color: 'var(--primary-text, #1d4ed8)', borderRadius: 8, padding: '3px 8px' }}>출석 {plan.attendanceChanges}건</span>
+            <AdminStatusBadge label={`출석 ${plan.attendanceChanges}건`} tone="info" />
           </div>
 
           {plan.ambiguous.length > 0 && (

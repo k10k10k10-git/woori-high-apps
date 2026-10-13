@@ -9,6 +9,7 @@ import { buildPastoralReport } from '@/utils/pastoralReport';
 import { useOpenVisitRequests } from '@/hooks/useVisitRequests';
 import AdminIcon from './AdminIcon';
 import './admin-dashboard.css';
+import './admin-status.css';
 
 export default function AdminDashboard() {
   const { state, dispatch } = useApp();
@@ -70,15 +71,15 @@ export default function AdminDashboard() {
     <section className="ad-worklist" aria-labelledby="ad-worklist-title">
       <div className="ad-section-heading"><div><h2 id="ad-worklist-title">먼저 확인하세요</h2><p>심방은 {curYear}년 현재 미처리 요청 · 결석과 출석 입력은 {selectedWeek?.label ?? '조회 주일 없음'} 기준입니다. 미입력은 결석으로 계산하지 않습니다.</p></div></div>
       <div className="ad-work-groups">
-        <article className={visits.status === 'ready' && !visits.rows.length ? 'ad-work-idle' : undefined}>
+        <article data-status-tone={visits.status === 'error' ? 'danger' : visits.status === 'loading' ? 'info' : visits.rows.length ? 'warning' : 'neutral'} className={visits.status === 'ready' && !visits.rows.length ? 'ad-work-idle' : undefined}>
           <header><span className="ad-work-icon"><AdminIcon name="book" size={17} /></span><div><h3>심방 요청 <b>{visits.status === 'ready' ? visits.rows.length : '—'}</b></h3><p>{curYear}년 미처리 · 교사가 확인을 요청했습니다.</p></div><Link href="/pastoral?view=visits">전체 보기 <AdminIcon name="arrow" /></Link></header>
           {visits.status === 'ready' && visits.rows.length ? <ul>{visits.rows.slice(0, 3).map(row => { const [part, grade, cls] = row.classKey.split('-'); return <li key={`${row.classKey}/${row.id}`}><span><strong>{row.studentName}</strong><small>{part}부 {grade}학년 {cls}반 · {row.text}</small></span><Link aria-label={`${row.studentName} 심방 요청 보기`} href={`/pastoral?view=visits&request=${encodeURIComponent(`${row.classKey}/${row.id}`)}`}><AdminIcon name="arrow" /></Link></li>; })}</ul> : <p className="ad-work-empty">{visits.status === 'loading' ? '요청을 불러오는 중입니다.' : visits.status === 'error' ? '요청을 불러오지 못했습니다.' : '확인할 심방 요청이 없습니다.'}</p>}
         </article>
-        <article className={selectedWeek && !absences.length ? 'ad-work-idle' : undefined}>
+        <article data-status-tone={selectedWeek && absences.length ? 'danger' : 'neutral'} className={selectedWeek && !absences.length ? 'ad-work-idle' : undefined}>
           <header><span className="ad-work-icon"><AdminIcon name="users" size={17} /></span><div><h3>연속 결석 <b>{selectedWeek ? absences.length : '—'}</b></h3><p>확인된 결석이 3회 이상 이어졌습니다.</p></div><Link href={`/pastoral?view=absence${weekQuery}`}>전체 보기 <AdminIcon name="arrow" /></Link></header>
           {absences.length ? <ul>{absences.slice(0, 3).map(row => <li key={row.key}><span><strong>{row.student.name}</strong><small>{row.label} · {row.streak}회 연속 결석</small></span><Link aria-label={`${row.student.name} 연속 결석 보기`} href={`/pastoral?view=absence&student=${encodeURIComponent(row.key)}${weekQuery}`}><AdminIcon name="arrow" /></Link></li>)}</ul> : <p className="ad-work-empty">{selectedWeek ? '3회 이상 연속 결석한 학생이 없습니다.' : '조회할 주일이 없습니다.'}</p>}
         </article>
-        <article className={selectedWeek && !pending.length ? 'ad-work-idle' : undefined}>
+        <article data-status-tone={!selectedWeek || !inputClassCount ? 'neutral' : pending.length ? 'warning' : 'success'} className={selectedWeek && !pending.length ? 'ad-work-idle' : undefined}>
           <header><span className="ad-work-icon"><AdminIcon name={pending.length ? 'clock' : 'check'} size={17} /></span><div><h3>출석 미입력 <b>{selectedWeek ? pending.length : '—'}</b></h3><p>{inputClassCount}개 대상 반 중 입력이 덜 끝난 반입니다.</p></div><Link href={`/attendance?view=overview&status=pending${weekQuery}`}>전체 보기 <AdminIcon name="arrow" /></Link></header>
           {pending.length ? <ul>{pending.slice(0, 3).map(row => <li key={row.classKey}><span><strong>{row.label}</strong><small>{row.teacher || '담임 미등록'} · {row.unentered}명 미입력</small></span><button type="button" aria-label={`${row.label} 출석 입력 열기`} onClick={() => openClass(row)}><AdminIcon name="arrow" /></button></li>)}</ul> : <p className="ad-work-empty">{selectedWeek ? '모든 대상 반의 입력이 끝났습니다.' : '조회할 주일이 없습니다.'}</p>}
         </article>

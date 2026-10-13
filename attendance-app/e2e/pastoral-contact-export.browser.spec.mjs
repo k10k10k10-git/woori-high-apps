@@ -47,7 +47,7 @@ test('전체 연락처 엑셀은 화면 필터·장결과 무관하고 원장을
     const pending = page.waitForEvent('download');
     await page.getByRole('button', { name: `${label} 전체 연락처 엑셀 내려받기` }).click();
     const download = await pending;
-    expect(download.suggestedFilename()).toContain(`${label.replace(/ /g, '')}_전체연락처_${year}-01-`);
+    expect(download.suggestedFilename().normalize('NFC')).toContain(`${label.replace(/ /g, '')}_전체연락처_${year}-01-`);
     const workbook = XLSX.read(await readFile(await download.path()), { cellNF: true });
     const sheet = workbook.Sheets[label]; const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
     expect(rows.slice(6)).toHaveLength(count); expect(rows[2][0]).toContain('필터 미적용');

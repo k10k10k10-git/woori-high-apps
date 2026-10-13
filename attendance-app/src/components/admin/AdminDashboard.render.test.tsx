@@ -52,6 +52,7 @@ describe('관리자 오늘 업무', () => {
     expect(week.textContent).toContain('O·X 입력 3명 기준');
     expect(week.textContent).toContain('출석 체크 2/3명 완료(장결 제외)');
     expect(screen.getByText(/심방은 2026년 현재 미처리 요청/)).toBeTruthy();
+    expect([...document.querySelectorAll('.ad-work-groups > article')].map(card => card.getAttribute('data-status-tone'))).toEqual(['warning', 'danger', 'warning']);
   });
 
   it('학생별 화살표가 해당 결석 학생과 심방 요청을 직접 연다', () => {
@@ -77,6 +78,7 @@ describe('관리자 오늘 업무', () => {
     const cards = [...document.querySelectorAll('.ad-work-groups > article')];
     expect(cards.map(card => within(card as HTMLElement).getByRole('heading', { level: 3 }).textContent?.replace(/\s*0$/, ''))).toEqual(['심방 요청', '연속 결석', '출석 미입력']);
     expect(cards.every(card => card.classList.contains('ad-work-idle'))).toBe(true);
+    expect(cards.map(card => card.getAttribute('data-status-tone'))).toEqual(['neutral', 'neutral', 'success']);
   });
 
   it('조회할 주일이 없으면 입력 인원을 0명 완료로 오해시키지 않는다', () => {
@@ -85,5 +87,12 @@ describe('관리자 오늘 업무', () => {
     const week = screen.getByRole('group', { name: '조회 주일 없음 출석 현황' });
     expect(week.textContent).toContain('조회할 주일이 없어 입력 인원을 계산하지 않습니다.');
     expect(week.textContent).not.toContain('0/3명 완료');
+    expect(document.querySelector('.ad-work-groups > article:last-child')?.getAttribute('data-status-tone')).toBe('neutral');
+  });
+
+  it.each([false, true])('입력 대상이 없는 반은 완료의 초록색으로 표시하지 않는다 (장결만: %s)', onlyLong => {
+    mocks.state = { ...mocks.state, classData: onlyLong ? { '1-1-1': { students: [{ id: 'long', name: '합성 장결', jang: true }] } } : {} };
+    render(<AdminDashboard />);
+    expect(document.querySelector('.ad-work-groups > article:last-child')?.getAttribute('data-status-tone')).toBe('neutral');
   });
 });

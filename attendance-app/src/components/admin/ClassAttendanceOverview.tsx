@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/store/AppContext';
 import { buildAdminDashboard, type AdminDashboardRow, type AdminDashboardStatus } from '@/utils/adminDashboard';
 import AdminIcon from './AdminIcon';
+import AdminStatusBadge from './AdminStatusBadge';
 
 const STATUS_LABELS: Record<AdminDashboardStatus, string> = {
   complete: '입력 완료', partial: '입력 중', empty: '미입력',
@@ -56,7 +57,7 @@ export default function ClassAttendanceOverview({ weekKey = '', onWeekChange, in
     <div className="cao-toolbar">
       <div className="ad-status-tabs" role="group" aria-label="출석 입력 상태">
         {([['all', '전체', summary.classCount], ['pending', '확인 필요', summary.pendingClassCount], ['complete', '완료', summary.completeClassCount]] as const).map(([key, label, count]) =>
-          <button type="button" key={key} aria-pressed={status === key} onClick={() => setStatus(key)}>{label}<span>{count}</span></button>)}
+          <button type="button" key={key} data-status-tone={key === 'pending' ? 'warning' : key === 'complete' ? 'success' : 'neutral'} aria-pressed={status === key} onClick={() => setStatus(key)}>{key !== 'all' && <AdminIcon name={key === 'pending' ? 'clock' : 'check'} />}{label}<span>{count}</span></button>)}
       </div>
       <div className="cao-filters">
         <label className="ad-search"><AdminIcon name="search" /><span className="ad-sr-only">반, 담임 교사 또는 학생 검색</span><input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="반·담임·학생 검색" /></label>
@@ -71,7 +72,7 @@ export default function ClassAttendanceOverview({ weekKey = '', onWeekChange, in
       <thead><tr><th scope="col">반 / 담임 교사</th><th scope="col">미입력</th><th scope="col">입력 현황</th><th scope="col">출석 / 결석</th><th scope="col">출석률</th><th scope="col"><span className="ad-sr-only">작업</span></th></tr></thead>
       <tbody>{rows.map(row => <tr key={row.classKey}>
         <th scope="row"><button type="button" className="cao-class" onClick={() => openClass(row)}><strong>{row.label}</strong><span>{row.teacher || '담임 교사 미등록'}</span></button></th>
-        <td className={row.unentered ? 'cao-attention' : ''}><strong>{row.unentered}명</strong><small>{STATUS_LABELS[row.status]}</small></td>
+        <td className={row.unentered ? 'cao-attention' : ''}><strong>{row.unentered}명</strong><small><AdminStatusBadge label={STATUS_LABELS[row.status]} /></small></td>
         <td>{row.inputRecorded}/{row.inputStudentCount}명<small>입력률 {row.inputRate === null ? '—' : `${row.inputRate}%`}</small></td><td>{row.present}명 / {row.absent}명</td><td>{row.attendanceRate === null ? '—' : `${row.attendanceRate}%`}</td>
         <td><button type="button" className="cao-open" aria-label={`${row.label} 출석 입력 열기`} onClick={() => openClass(row)}>출석 입력 <AdminIcon name="arrow" /></button></td>
       </tr>)}</tbody>

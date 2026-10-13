@@ -4,6 +4,9 @@ import { auth } from '@/lib/firebase/client';
 import { canUseAdminWorkspace } from '@/lib/adminNavigation';
 import { isDemoAccount } from '@/lib/demo';
 import NewFriendRemarkEditor, { useFriendRemarks } from './NewFriendRemarkEditor';
+import AdminStatusBadge from './AdminStatusBadge';
+import AdminIcon from './AdminIcon';
+import { adminStatusTone } from '@/utils/adminStatus';
 import { deriveNewFriendRosterProgress, deriveNewFriendStage, type NewFriendStage, type PublicReportFriend } from '@/lib/pastoralFriendProgress';
 
 type Props = {
@@ -70,23 +73,23 @@ export default function NewFriendRegistrationSection({ year, friends, status, pa
     {status === 'ready' && <>
       {editing && selected && <NewFriendRemarkEditor key={editing.key} friendKey={editing.key} name={selected.name} opened={editing.opened} latest={loads[editing.key]} isCurrent={isCurrent} onClose={() => { setEditing(null); requestAnimationFrame(() => editButton.current?.focus()); }} onRetry={retry} />}
       <p className="pr-registration-hint">단계를 선택하면 해당 학생만 보입니다. 1주차부터 출석부 반영까지는 다음 확인 단계입니다.</p>
-      <div className="pr-registration-summary" role="group" aria-label="새친구 진행 단계별 학생 보기">{SUMMARY_STAGES.map(stage => <button type="button" key={stage} aria-pressed={activeStage === stage} onClick={() => onStageChange(activeStage === stage ? null : stage)}><span>{stage}</span><strong>{counts[stage]}<small>명</small></strong></button>)}</div>
+      <div className="pr-registration-summary" role="group" aria-label="새친구 진행 단계별 학생 보기">{SUMMARY_STAGES.map(stage => <button type="button" key={stage} data-status-tone={adminStatusTone(stage)} aria-pressed={activeStage === stage} onClick={() => onStageChange(activeStage === stage ? null : stage)}><span className="admin-status-mark"><AdminIcon name={stage === '완료' ? 'check' : stage === '보류' || stage === '종료' ? 'minus' : stage === '1주차' || stage === '2주차' ? 'info' : 'clock'} />{stage}</span><strong>{counts[stage]}<small>명</small></strong></button>)}</div>
       <div className="pr-registration-list-heading"><p className="pr-registration-count" role="status">{activeStage ? `${activeStage} ${visible.length}명 · 검색·필터 결과 ${filtered.length}명 / 전체 ${friends.length}명` : part || grade || terms.length ? `검색·필터 결과 ${filtered.length}명 / 전체 ${friends.length}명` : `전체 ${friends.length}명`}</p>{activeStage && <button type="button" onClick={() => onStageChange(null)}>전체 단계 보기</button>}</div>
       {!visible.length ? <p className="pr-empty">{!friends.length ? '접수된 새친구가 없습니다.' : !filtered.length ? '검색 조건에 맞는 새친구가 없습니다. 검색어나 필터를 바꿔 주세요.' : '선택한 단계에 해당하는 새친구가 없습니다. 다른 단계를 선택하거나 전체 단계 보기를 눌러 주세요.'}</p> : <>
         <div className="pr-registration-mobile" aria-label="새친구 진행 현황 모바일 목록">{visible.map(friend => {
           const progress = deriveNewFriendRosterProgress(friend);
           const stage = deriveNewFriendStage(friend);
           return <article key={friend.key}>
-            <div className="pr-registration-mobile-head"><div><small>등록일 {friend.registeredDate || '확인 필요'}</small><h3>{friend.name}</h3><p>{friend.school || '학교 미입력'}</p></div><span className="pr-registration-stage" data-stage={stage}>{stage}</span></div>
-            <dl><div><dt>부서 / 학년</dt><dd>{friend.part ? `${friend.part}부` : '부서 미입력'} / {friend.grade ? `${friend.grade}학년` : '학년 미입력'}</dd></div><div><dt>바나바 담당</dt><dd>{friend.owner || '미배정'}</dd></div><div><dt>1주차</dt><dd>{friend.week1Date || '-'}</dd></div><div><dt>2주차</dt><dd>{friend.week2Date || '-'}</dd></div><div><dt>등록 결정</dt><dd>{friend.decision || '미정'}</dd></div><div><dt>배정 반</dt><dd>{classLabel(friend.assignedClassKey)}</dd></div></dl>
-            <p className="pr-registration-mobile-foot"><span>진행 상태 {progress}</span><strong data-synced={Boolean(friend.rosterSync)}>출석부 {rosterLabel(friend)}</strong></p>
+            <div className="pr-registration-mobile-head"><div><small>등록일 {friend.registeredDate || '확인 필요'}</small><h3>{friend.name}</h3><p>{friend.school || '학교 미입력'}</p></div><AdminStatusBadge label={stage} /></div>
+            <dl><div><dt>부서 / 학년</dt><dd>{friend.part ? `${friend.part}부` : '부서 미입력'} / {friend.grade ? `${friend.grade}학년` : '학년 미입력'}</dd></div><div><dt>바나바 담당</dt><dd>{friend.owner || '미배정'}</dd></div><div><dt>1주차</dt><dd>{friend.week1Date || '-'}</dd></div><div><dt>2주차</dt><dd>{friend.week2Date || '-'}</dd></div><div><dt>등록 결정</dt><dd><AdminStatusBadge label={friend.decision || '미정'} /></dd></div><div><dt>배정 반</dt><dd>{classLabel(friend.assignedClassKey)}</dd></div></dl>
+            <p className="pr-registration-mobile-foot"><span>진행 상태 {progress}</span><AdminStatusBadge label={`출석부 ${rosterLabel(friend)}`} tone={adminStatusTone(rosterLabel(friend))} /></p>
             <div className="pr-registration-mobile-remark"><strong>비고</strong>{remark(friend)}</div>
           </article>;
         })}</div>
         <div className="pr-table-wrap pr-registration-table"><table className="pr-table"><caption>통합사이트 새친구 등록일과 이름, 진행 단계, 2주 과정, 등록 결정, 배정 반과 출석부 반영 현황, 비고</caption><thead><tr><th scope="col">이름</th><th scope="col">진행 단계</th><th scope="col">등록일</th><th scope="col">학교</th><th scope="col">부서 / 학년</th><th scope="col">바나바 담당</th><th scope="col">1주차</th><th scope="col">2주차</th><th scope="col">등록 결정</th><th scope="col">배정 반</th><th scope="col">출석부</th><th scope="col">비고</th></tr></thead><tbody>{visible.map(friend => {
           const progress = deriveNewFriendRosterProgress(friend);
           const stage = deriveNewFriendStage(friend);
-          return <tr key={friend.key}><th scope="row">{friend.name}</th><td><span className="pr-registration-stage" data-stage={stage}>{stage}</span><small>진행 상태 {progress}</small></td><td>{friend.registeredDate || '확인 필요'}</td><td>{friend.school || '-'}</td><td>{friend.part ? `${friend.part}부` : '-'} · {friend.grade ? `${friend.grade}학년` : '학년 미입력'}</td><td>{friend.owner || '미배정'}</td><td>{friend.week1Date || '-'}</td><td>{friend.week2Date || '-'}</td><td>{friend.decision || '미정'}</td><td>{classLabel(friend.assignedClassKey)}</td><td>{rosterLabel(friend)}</td><td className="pr-remark-cell">{remark(friend)}</td></tr>;
+          return <tr key={friend.key}><th scope="row">{friend.name}</th><td><AdminStatusBadge label={stage} /><small>진행 상태 {progress}</small></td><td>{friend.registeredDate || '확인 필요'}</td><td>{friend.school || '-'}</td><td>{friend.part ? `${friend.part}부` : '-'} · {friend.grade ? `${friend.grade}학년` : '학년 미입력'}</td><td>{friend.owner || '미배정'}</td><td>{friend.week1Date || '-'}</td><td>{friend.week2Date || '-'}</td><td><AdminStatusBadge label={friend.decision || '미정'} /></td><td>{classLabel(friend.assignedClassKey)}</td><td><AdminStatusBadge label={rosterLabel(friend)} /></td><td className="pr-remark-cell">{remark(friend)}</td></tr>;
         })}</tbody></table></div>
       </>}
       <p className="pr-registration-private-note">비고는 여기서 수정할 수 있습니다. 나머지 등록 정보의 수정과 비공개 연락처 확인은 고등부 통합사이트에서 진행해 주세요.</p>

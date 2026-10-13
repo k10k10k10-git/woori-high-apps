@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useLayoutEffect } from 'react';
 
 const mocks = vi.hoisted(() => ({
   doLogin: vi.fn(),
@@ -49,6 +50,22 @@ describe('교사·관리자 로그인 진입 화면', () => {
     expect(screen.getByLabelText('이메일').getAttribute('autocomplete')).toBe('email');
     expect(screen.getByLabelText('비밀번호').getAttribute('type')).toBe('password');
     expect(screen.getByLabelText('비밀번호').getAttribute('autocomplete')).toBe('current-password');
+  });
+
+  it('저장 옵션 복원보다 먼저 입력한 이메일을 지우거나 덮지 않는다', async () => {
+    localStorage.setItem('saveEmail', '1');
+    localStorage.setItem('savedEmail', 'old@example.com');
+    function EarlyInput() {
+      useLayoutEffect(() => {
+        const input = screen.getByLabelText('이메일');
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'new@example.com');
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      }, []);
+      return <LoginScreen />;
+    }
+    await act(async () => { render(<EarlyInput />); });
+    expect(screen.getByLabelText('이메일')).toHaveProperty('value', 'new@example.com');
+    expect(screen.getByRole('checkbox', { name: '이메일 저장' })).toHaveProperty('checked', true);
   });
 
   it('빈 입력과 인증 오류를 alert로 알리고 반 선택 복귀 동작을 유지한다', () => {
