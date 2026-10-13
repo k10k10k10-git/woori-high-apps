@@ -262,7 +262,6 @@ function ProgramBracket({
       <div className="program-subsection-heading">
         <div>
           <h4>대진표</h4>
-          <p>운동회·대진형 게임에서만 쓰면 됩니다. 라운드를 늘려 가며 경기를 추가하세요.</p>
         </div>
         <span className="program-count">{totalMatches}경기</span>
       </div>
@@ -490,7 +489,6 @@ export function ProgramPostsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-posts-heading">진행 블록</h3>
-          <p>게임, 묵상, 영상, 설명과 이동을 실제 순서대로 추가하고 활동마다 맞는 진행 방식을 정합니다.</p>
         </div>
         <span className="program-count">{posts.length}개</span>
       </div>
@@ -510,7 +508,7 @@ export function ProgramPostsSection({
         <details className="program-bulk-paste">
           <summary>스프레드시트에서 여러 활동 붙여넣기</summary>
           <div>
-            <p>열 순서: 활동명 · 종류 · 운영 방식 · 장소 · 시작 · 종료 · 담당. 최대 100행까지 미리 확인한 뒤 한 번에 추가합니다.</p>
+            <p>열 순서: 활동명 · 종류 · 운영 방식 · 장소 · 시작 · 종료 · 담당 (최대 100행)</p>
             <textarea className="input" rows={6} value={bulkText} onChange={(event) => setBulkText(event.target.value)} placeholder={"활동명\t종류\t운영 방식\t장소\t시작\t종료\t담당\n전체 오프닝\t브리핑·설명\t전체 진행\t본당\t14:00\t14:10\t홍길동"} />
             {bulkRows.length > 0 && <div className="program-bulk-paste__preview"><strong>{bulkRows.length}개 활동</strong><span>{bulkRows.slice(0, 3).map((row) => row.name).join(" · ")}{bulkRows.length > 3 ? ` 외 ${bulkRows.length - 3}개` : ""}</span></div>}
             <button type="button" className="btn-primary" disabled={adding || bulkRows.length === 0} onClick={() => void importBulk()}>{adding ? "추가 중…" : `${bulkRows.length}개 활동 추가`}</button>
@@ -528,7 +526,7 @@ export function ProgramPostsSection({
       />
 
       {posts.length === 0 ? (
-        <p className="program-task-empty">아직 진행 블록이 없습니다. 실제 진행 순서대로 활동을 추가해 주세요.</p>
+        <p className="program-task-empty">아직 진행 블록이 없습니다.</p>
       ) : (
         <ul className="program-card-list">
           {posts.map((post, index) => {
@@ -544,10 +542,6 @@ export function ProgramPostsSection({
                   <CaretDown className="program-card-caret" aria-hidden="true" size={17} weight="bold" />
                 </summary>
                 <fieldset disabled={!canEdit || busyId === post.id} className="program-card-body">
-                  <div className="program-save-mode program-save-mode--instant" role="status">
-                    <strong>입력 즉시 저장</strong>
-                    <span>각 칸에서 벗어나면 해당 블록만 안전하게 저장됩니다.</span>
-                  </div>
                   <div className="program-form-grid">
                     <label className="program-field program-field--wide"><span>블록 이름</span>
                       <ProgramAutosaveField
@@ -563,7 +557,6 @@ export function ProgramPostsSection({
                         onChange={(event) => void run(post.id, () => onUpdate(post.id, { activityType: event.target.value as RetreatProgramActivityType }), "활동 종류를 바꾸지 못했습니다.")}>
                         {Object.entries(PROGRAM_ACTIVITY_TYPE_META).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}
                       </select>
-                      <small className="program-field-help">{PROGRAM_ACTIVITY_TYPE_META[programActivityType(post)].help}</small>
                     </label>
                     <label className="program-field"><span>운영 방식</span>
                       <select className="input" value={programOperationMode(post)}
@@ -700,7 +693,6 @@ export function ProgramPostsSection({
                   )}
                   {canEdit && (
                     <div className="program-card-actions">
-                      <span className="program-autosave-hint">입력한 칸에서 벗어나면 바로 저장됩니다.</span>
                       <button type="button" className="btn-danger btn-sm" onClick={() => void run(post.id, async () => { await onDelete(post.id); undo.remember(post.name, () => onRestore(post)); }, "활동을 삭제하지 못했습니다.")}>
                         <Trash aria-hidden="true" size={15} /> 이 블록 삭제
                       </button>
@@ -743,7 +735,6 @@ export function ProgramRolesSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-roles-heading">역할·배치</h3>
-          <p>진행 블록별 역할은 프로그램 구성 탭의 카드 안에서 넣습니다. 여기서는 전체 역할을 확인하고 공통 역할을 추가합니다.</p>
         </div>
         <span className="program-count">{total}명</span>
       </div>
@@ -860,7 +851,6 @@ export function ProgramItemsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-items-heading">물품·예산</h3>
-          <p>진행 블록별 준비물은 프로그램 구성 탭의 카드 안에서 넣습니다. 여기서는 전체 물품과 구매 상태를 확인합니다.</p>
         </div>
         <span className="program-count">{all.length}건</span>
       </div>

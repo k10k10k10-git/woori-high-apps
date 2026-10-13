@@ -41,9 +41,6 @@ export default function MovementsView({ staff, schedule, posts, movements }: Pro
 
   return (
     <div>
-      <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
-        ℹ️ 동선 배정 현황 개요입니다. 배정은 <strong>스탭 전체 큐싯 탭</strong>의 각 블록에서 입력해주세요.
-      </div>
       <div className="flex gap-1 mb-4">
         {days.map(d => (
           <button key={d} onClick={() => setDay(d)}

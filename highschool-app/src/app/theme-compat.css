@@ -1,3 +1,8 @@
+/* 밝은 본문과 모달의 레거시 회색도 같은 읽기 대비를 사용한다. */
+:root :where(.text-slate-300, .text-slate-400) { color: var(--color-text-faint); }
+:root :where(.placeholder\:text-slate-300, .placeholder\:text-slate-400, .placeholder\:text-slate-500)::placeholder { color: var(--color-text-faint); opacity: 1; }
+[data-theme="dark"] .brainstorm-note :is(input, textarea)::placeholder { color: #53675b !important; }
+
 /* ════════════════════════════════════════════════════
    Dark theme
    밝기만 반전하지 않고 업무 화면의 표면 계층과 상태색 대비를 다시 맞춘다.
@@ -48,9 +53,9 @@
 [data-theme="dark"] :where(.border-violet-100, .border-violet-200, .border-violet-300, .border-violet-400, .border-purple-100, .border-purple-200, .border-purple-300, .border-purple-400, .border-pink-200, .border-pink-300, .border-pink-400) { border-color: #59477d !important; }
 
 /* 공통 구성요소 */
-[data-theme="dark"] .card { box-shadow: 0 0 0 1px rgba(255,255,255,.055), var(--shadow-sm); }
+[data-theme="dark"] .card { box-shadow: 0 0 0 1px var(--color-border), var(--shadow-sm); }
 [data-theme="dark"] .card:where([data-hover]):hover { box-shadow: 0 0 0 1px rgba(68,201,154,.22), var(--shadow-md); }
-[data-theme="dark"] .btn-secondary { border-color: var(--color-border); background: #202823; color: var(--color-text-secondary); }
+[data-theme="dark"] .btn-secondary { border-color: var(--color-control-border); background: #202823; color: var(--color-text-secondary); }
 [data-theme="dark"] .btn-secondary:hover { border-color: var(--color-border-hover); background: #29342e; }
 [data-theme="dark"] .btn-secondary:active { background: #324039; }
 [data-theme="dark"] .btn-danger:hover { background: #51232b; }
@@ -71,10 +76,10 @@
 }
 [data-theme="dark"] .card table tbody tr + tr { box-shadow: inset 0 1px var(--color-border); }
 [data-theme="dark"] .overflow-x-auto > table :where(td, th) { border-bottom-color: var(--color-border); }
-[data-theme="dark"] .surface-panel { background: rgba(23,29,26,.95); box-shadow: 0 0 0 1px rgba(255,255,255,.055), var(--shadow-sm); }
+[data-theme="dark"] .surface-panel { background: var(--color-surface); box-shadow: 0 0 0 1px var(--color-border), var(--shadow-sm); }
 [data-theme="dark"] .workspace-tabs { border-color: var(--color-border); background: rgba(19,25,22,.94); }
-[data-theme="dark"] .workspace-tab:hover { background: rgba(68,201,154,.08); }
-[data-theme="dark"] .workspace-group-tab[aria-selected="true"] { background: var(--color-surface); color: var(--color-text-primary); }
+[data-theme="dark"] .workspace-tab:not([aria-selected="true"]):hover { background: rgba(68,201,154,.08); }
+[data-theme="dark"] .workspace-group-tab[aria-selected="true"] { background: var(--color-selected-bg); color: var(--color-selected-text); }
 [data-theme="dark"] .global-portal-header { background: rgba(9,12,11,.97); }
 [data-theme="dark"] .portal-brand-mark { background: #087a57; }
 [data-theme="dark"] .portal-menu { background: #151b18; }
@@ -121,6 +126,7 @@
 [data-theme="dark"] .guide-form-grid input,
 [data-theme="dark"] .guide-question-list li { background: #202923; }
 [data-theme="dark"] .guide-month-tabs button:hover { background: #28382f; }
+[data-theme="dark"] .guide-month-tabs button[aria-selected="true"] { background: var(--color-selected-bg); color: var(--color-selected-text); }
 [data-theme="dark"] .guide-year-heading button { background: #202923; }
 [data-theme="dark"] .guide-year-heading button:hover { background: #28382f; }
 [data-theme="dark"] .guide-month-brief,
@@ -149,6 +155,11 @@
 [data-theme="dark"] .landing-hero {
   background: radial-gradient(circle at 76% 24%, rgba(68,201,154,.16), transparent 28rem), linear-gradient(180deg, #0d1210 0%, #101c17 100%);
 }
+
+/* 테마와 별개로 어두운 표면인 헤더·달력·검색 선택지는 밝은 보조 글자를 유지한다. */
+:is(.workspace-header, .global-portal-header, .portal-menu, .portal-preview-toolbar, .page-hero, .calendar-detail-panel, .field-tools-menu, .bg-slate-800, .bg-slate-900, .bg-slate-950)
+  :is(.text-slate-300, .text-slate-400, .text-slate-500) { color: var(--color-on-dark-muted) !important; }
+.calendar-detail-panel :is(input, textarea)::placeholder { color: var(--color-on-dark-muted) !important; opacity: 1; }
 [data-theme="dark"] .landing-hero::after { background: rgba(43,86,69,.15); }
 [data-theme="dark"] .landing-hero-description { color: var(--color-text-secondary); }
 [data-theme="dark"] .landing-secondary-button { background: var(--color-surface); color: var(--color-text-primary); }

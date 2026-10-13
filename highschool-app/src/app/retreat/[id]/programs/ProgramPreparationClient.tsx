@@ -529,7 +529,6 @@ function ProgramPreparationWorkspace() {
           <div className="program-page-intro">
             <div>
               <h2>수련회 준비 공간</h2>
-              <p>여러 프로그램의 일정, 물품, 회의와 현장 전달을 한곳에서 이어갑니다.</p>
             </div>
             <div className="program-page-summary" aria-label="프로그램 상태 요약">
               <span>전체 <strong>{programs.length}</strong></span>

@@ -331,9 +331,6 @@ export default function OnSiteRegistrationTab({ retreat }: { retreat: Retreat })
           )}
         </div>
 
-        <div className="ml-auto text-xs bg-blue-50 border border-blue-100 rounded-lg px-3 py-1.5 text-blue-600">
-          💡 전체 신청 학생과 교사를 표시합니다 · 스탭 제외
-        </div>
       </div>
 
       {rosterPeople.length === 0 && (

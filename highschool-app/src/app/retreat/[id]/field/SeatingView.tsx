@@ -109,9 +109,6 @@ export default function SeatingView({ retreatId, seating, groups, meals }: { ret
 
   return (
     <div>
-      <div className="mb-4 bg-violet-50 border border-violet-100 rounded-lg p-3 text-xs text-violet-700">
-        ℹ️ 집회/예배별 자리 배치(구역 → 조). 구역(예: 5층, 앞열)을 <strong>앞→뒤 순서</strong>로 만드세요(첫 구역=앞자리). 조 명단은 행정 데이터에서 옵니다.
-      </div>
       <div className="flex justify-end mb-3">
         <FairAssignButton retreatId={retreatId} groups={groups} meals={meals} seatings={seating} />
       </div>

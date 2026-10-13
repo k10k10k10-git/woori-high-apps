@@ -1,4 +1,10 @@
 /* Shared interaction primitives: keyboard, coarse pointers, and long mobile rosters. */
+/* 중립 테두리만 강화해 오류·성공 입력의 의미 있는 색은 유지한다. */
+:is(input, textarea, select):where(.border-slate-100, .border-slate-200, .border-slate-300, .border-slate-400),
+[data-theme="dark"] :is(input, textarea, select):where(.border-slate-100, .border-slate-200, .border-slate-300, .border-slate-400) {
+  border-color: var(--color-control-border) !important;
+}
+
 .export-action {
   align-items: center;
   gap: 6px;

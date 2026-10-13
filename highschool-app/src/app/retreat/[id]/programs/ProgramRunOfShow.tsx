@@ -34,7 +34,6 @@ export default function ProgramRunOfShow({ posts, itemsOf, rolesOf, canEdit, bus
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-run-sheet-heading">현장 진행 순서</h3>
-          <p>활동의 순서와 장소·시간·담당을 먼저 훑고, 필요한 블록을 바로 펼쳐 수정합니다.</p>
         </div>
         <span className="program-count">{posts.length}블록</span>
       </div>

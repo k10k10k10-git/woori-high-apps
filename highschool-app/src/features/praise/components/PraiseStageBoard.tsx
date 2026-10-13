@@ -272,12 +272,6 @@ export function PraiseStageBoard({
           </section>
         </aside>
       </div>
-      {canEdit && (
-        <p className="praise-note">
-          무대와 미등단 영역 사이로 끌어 놓거나 이름 아래 위치 메뉴로
-          이동하세요. 화살표로 같은 줄의 순서를 바꿀 수 있습니다.
-        </p>
-      )}
       <p className="praise-note" role="status">
         {notice}
       </p>

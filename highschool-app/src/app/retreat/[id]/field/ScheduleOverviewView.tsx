@@ -10,9 +10,6 @@ export default function ScheduleOverviewView({ schedule }: { schedule: IguardSch
   }
   return (
     <section>
-      <div className="mb-3 rounded-xl border border-sky-100 bg-sky-50 p-3 text-sm text-sky-800">
-        일정에서 자동 생성한 전체 개요입니다. 개요를 따로 저장하지 않아 큐싯 수정이 즉시 반영됩니다.
-      </div>
       <div className="card overflow-x-auto">
         <table className="min-w-[720px] w-full table-fixed border-collapse text-sm">
           <thead>

@@ -132,7 +132,7 @@
 .team-term-heading { padding-bottom: 20px; }
 .team-term-tabs { display: flex; gap: 2px; overflow-x: auto; }
 .team-term-tabs a { min-height: 44px; flex: none; border-bottom: 2px solid transparent; padding: 12px 13px 10px; color: var(--color-text-muted); font-size: 0.78rem; font-weight: 680; }
-.team-term-tabs a[aria-current="page"] { border-color: var(--color-primary); color: var(--color-primary); }
+.team-term-tabs a[aria-current="page"] { border-color: var(--color-primary); border-radius: 8px 8px 0 0; background: var(--color-selected-bg); color: var(--color-selected-text); font-weight: 750; }
 .team-term-content { min-height: 420px; }
 
 .team-overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -227,7 +227,7 @@
   .team-context-note { align-items: flex-start; flex-direction: column; }
   .portal-mobile-bottom-nav { position: fixed; z-index: 58; right: 0; bottom: 0; left: 0; display: flex; min-height: calc(58px + env(safe-area-inset-bottom)); align-items: flex-start; justify-content: space-around; border-top: 1px solid var(--color-border); background: color-mix(in srgb, var(--color-surface) 94%, transparent); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); backdrop-filter: blur(18px); }
   .portal-mobile-bottom-nav a { display: grid; min-width: 52px; min-height: 44px; place-items: center; border-radius: 10px; color: var(--color-text-muted); font-size: 0.68rem; font-weight: 700; }
-  .portal-mobile-bottom-nav a[aria-current="page"] { background: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); }
+  .portal-mobile-bottom-nav a[aria-current="page"] { background: var(--color-selected-bg); color: var(--color-selected-text); font-weight: 750; }
 }
 
 @media (min-width: 768px) and (max-width: 980px) { .team-directory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

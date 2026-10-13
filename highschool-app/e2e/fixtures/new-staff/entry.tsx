@@ -59,9 +59,9 @@ function Attendance() {
 }
 
 function HomeGuide() {
-  const { user, roles, teamMemberships } = useAuth();
+  const { roles, teamMemberships } = useAuth();
   const viewOnly = !canEditTeam("praise", roles, teamMemberships);
-  return <main className="team-first-page"><h1>합성 홈 업무 안내</h1><HomeStart userId={user?.uid ?? "guest"} roleLabel={viewOnly ? "찬양팀 조회자" : "찬양팀 스탭"} viewOnly={viewOnly} entry={{ href: "/teams/praise", title: "찬양팀 업무 시작", description: "합성 팀 업무를 시작합니다.", steps: ["팀 전체 현황 확인", "담당 업무 선택", "저장 결과 확인"] }} /></main>;
+  return <main className="team-first-page"><h1>합성 홈 업무 안내</h1><HomeStart roleLabel={viewOnly ? "찬양팀 조회자" : "찬양팀 스탭"} viewOnly={viewOnly} entry={{ href: "/teams/praise", title: "찬양팀 업무 시작", description: "합성 팀 업무를 시작합니다." }} /></main>;
 }
 
 function RestrictedMountProbe() {

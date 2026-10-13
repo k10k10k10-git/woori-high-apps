@@ -8,7 +8,6 @@ import {
   CheckCircle,
   FileText,
   MapPin,
-  Package,
   Plus,
   WarningCircle,
 } from "@phosphor-icons/react";
@@ -59,14 +58,14 @@ export function catalogNextAction(program: RetreatProgram): { label: string; sec
   return { label: "현장에 공유된 내용을 확인하세요", section: "tasks" };
 }
 
-function EmptyWorkspace({ title, description }: { title: string; description: string }) {
-  return <div className="program-workspace-empty"><strong>{title}</strong><p>{description}</p></div>;
+function EmptyWorkspace({ title }: { title: string }) {
+  return <div className="program-workspace-empty"><strong>{title}</strong></div>;
 }
 
-function SectionHeading({ title, description, aside }: { title: string; description: string; aside?: React.ReactNode }) {
+function SectionHeading({ title, aside }: { title: string; aside?: React.ReactNode }) {
   return (
     <header className="program-workspace-section-heading">
-      <div><h2>{title}</h2><p>{description}</p></div>
+      <div><h2>{title}</h2></div>
       {aside}
     </header>
   );
@@ -93,7 +92,6 @@ export function ProgramCatalog({
     <section className="program-workspace-surface">
       <SectionHeading
         title="프로그램 준비"
-        description="프로그램 하나를 열고 안내되는 다음 할 일부터 채워가세요."
         aside={canEdit && programs.length > 0 ? (
           <details className="program-add-menu">
             <summary><Plus aria-hidden="true" size={16} weight="bold" /> 새 프로그램 만들기</summary>
@@ -103,15 +101,6 @@ export function ProgramCatalog({
           </details>
         ) : undefined}
       />
-      <div className="program-start-guide">
-        <div><strong>처음 준비한다면</strong><span>아래 네 단계만 차례로 진행하면 됩니다.</span></div>
-        <ol aria-label="프로그램 준비 순서">
-          <li><b>1</b><span>이름·담당</span></li>
-          <li><b>2</b><span>진행 순서</span></li>
-          <li><b>3</b><span>준비물·역할</span></li>
-          <li><b>4</b><span>확인·공유</span></li>
-        </ol>
-      </div>
       {programs.length === 0 && canEdit && <div className="program-template-grid program-catalog-templates">
         {(Object.entries(PROGRAM_TEMPLATE_META) as Array<[ProgramTemplateKey, (typeof PROGRAM_TEMPLATE_META)[ProgramTemplateKey]]>).map(([key, meta]) => (
           <button key={key} type="button" className={key === "blank" ? "program-template-option program-template-option--quiet" : "program-template-option"} onClick={() => onAdd(key)} disabled={busy}>
@@ -121,7 +110,7 @@ export function ProgramCatalog({
         <button type="button" className="btn-secondary program-template-default" onClick={onCreateDefaults} disabled={busy}>직접 작성할 프로그램 2개 만들기</button>
       </div>}
       {(programs.length > 4 || query.trim().length > 0) && <label className="program-workspace-search"><span>프로그램 찾기</span><input className="input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름, 담당, 장소로 검색" /></label>}
-      {filtered.length === 0 ? <EmptyWorkspace title={query ? "검색 결과가 없습니다" : "프로그램이 없습니다"} description={query ? "검색어를 바꾸거나 전체 목록으로 돌아가세요." : "진행 형식에서 시작하면 기본 활동까지 함께 만들어집니다."} /> : (
+      {filtered.length === 0 ? <EmptyWorkspace title={query ? "검색 결과가 없습니다" : "프로그램이 없습니다"} /> : (
         <div className="program-catalog-list">
           {filtered.map(({ program, index }) => {
             const readiness = programReadiness(program);
@@ -161,9 +150,9 @@ export function ProgramScheduleWorkspace({ programs, onOpen }: { programs: Retre
 
   return (
     <section className="program-workspace-surface">
-      <SectionHeading title="시간·장소" description="모든 프로그램의 시간을 한곳에서 보고, 겹치는 장소나 담당을 확인합니다." aside={<div className="program-workspace-pulse"><span data-alert={conflicts.length > 0 || undefined}>{conflicts.length} 충돌</span><span>{incomplete} 미정</span></div>} />
+      <SectionHeading title="시간·장소" aside={<div className="program-workspace-pulse"><span data-alert={conflicts.length > 0 || undefined}>{conflicts.length} 충돌</span><span>{incomplete} 미정</span></div>} />
       {conflicts.length > 0 && <div className="program-workspace-alert" role="alert"><WarningCircle aria-hidden="true" size={18} weight="fill" /><span><strong>같은 장소에 시간이 겹치는 프로그램이 있습니다.</strong> 각 프로그램을 열어 확정 시간을 조정해 주세요.</span></div>}
-      {sorted.length === 0 ? <EmptyWorkspace title="배치할 프로그램이 없습니다" description="프로그램을 만든 뒤 날짜·시간·장소를 지정하세요." /> : (
+      {sorted.length === 0 ? <EmptyWorkspace title="배치할 프로그램이 없습니다" /> : (
         <div className="program-schedule-list">
           {sorted.map((program) => {
             const posts = programPosts(program);
@@ -226,14 +215,14 @@ export function ProgramSupplyWorkspace({
 
   return (
     <section className="program-workspace-surface">
-      <SectionHeading title="물품·비용" description="모든 프로그램의 요청을 모아 주문, 수령, 포장, 현장 도착과 실제 지출을 구분합니다." />
+      <SectionHeading title="물품·비용" />
       <div className="program-supply-summary" aria-label="물품과 비용 요약">
         <span><small>전체 요청</small><strong>{entries.length}건</strong></span>
         <span><small>현장 도착</small><strong>{onsite}건</strong></span>
         <span><small>예상 비용</small><strong>{budget.total.toLocaleString("ko-KR")}원</strong></span>
         <span><small>실제 지출</small><strong>{actual.toLocaleString("ko-KR")}원</strong></span>
       </div>
-      {entries.length === 0 ? <EmptyWorkspace title="등록된 준비물이 없습니다" description="프로그램의 3 준비물·담당에서 활동별 준비물을 넣으면 이곳에 자동으로 모입니다." /> : (
+      {entries.length === 0 ? <EmptyWorkspace title="등록된 준비물이 없습니다" /> : (
         <div className="program-table-scroll program-workspace-table-wrap"><table className="program-table program-workspace-table">
           <thead><tr><th>프로그램</th><th>물품</th><th>수량</th><th>준비 단계</th><th>담당</th><th>보관·배부</th><th>예상</th><th>실제</th><th>정산</th></tr></thead>
           <tbody>{entries.map(({ program, item }) => <tr key={`${program.id}-${item.id}`}>
@@ -279,13 +268,13 @@ export function ProgramCollaborationWorkspace({
 
   return (
     <section className="program-workspace-surface">
-      <SectionHeading title="담당자·할 일" description="누가 무엇을 해야 하는지 프로그램별로 모아 봅니다. 상세 회의록은 권한 있는 담당자만 열 수 있습니다." aside={<span className="program-workspace-count">회의 {meetingCount}회</span>} />
+      <SectionHeading title="담당자·할 일" aside={<span className="program-workspace-count">회의 {meetingCount}회</span>} />
       <div className="program-segmented" role="group" aria-label="할 일 필터">
         <button type="button" data-active={filter === "open" || undefined} onClick={() => setFilter("open")}>진행할 일</button>
         <button type="button" data-active={filter === "blocked" || undefined} onClick={() => setFilter("blocked")}>막힌 일</button>
         <button type="button" data-active={filter === "done" || undefined} onClick={() => setFilter("done")}>완료</button>
       </div>
-      {entries.length === 0 ? <EmptyWorkspace title="이 조건에 맞는 할 일이 없습니다" description="프로그램을 열어 회의를 시작하거나 첫 실행 업무를 추가하세요." /> : (
+      {entries.length === 0 ? <EmptyWorkspace title="이 조건에 맞는 할 일이 없습니다" /> : (
         <ul className="program-collaboration-list">{entries.map(({ program, task }) => <li key={`${program.id}-${task.id}`} data-status={programTaskStatus(task)}>
           <select className="input" aria-label={`${task.title} 상태`} disabled={!canEdit || busyId === `${program.id}-${task.id}`} value={programTaskStatus(task)} onChange={(event) => void changeTaskStatus(program.id, task.id, event.target.value as NonNullable<RetreatProgramTask["status"]>)}>{Object.entries(PROGRAM_TASK_STATUS_META).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
           <button type="button" onClick={() => onOpen(program.id, "overview")}><strong>{task.title}</strong><small>{program.title} · {task.assignee?.trim() || "담당 미정"}</small>{task.blocker?.trim() && <span>{task.blocker}</span>}</button>
@@ -298,10 +287,10 @@ export function ProgramCollaborationWorkspace({
 }
 
 export function ProgramResourcesWorkspace({ programs, onOpen }: { programs: RetreatProgram[]; onOpen: OpenProgram }) {
-  if (programs.length === 0) return <section className="program-workspace-surface"><SectionHeading title="현장 공유" description="현장에서 볼 프로그램을 확인하고 공유합니다." /><EmptyWorkspace title="확인할 프로그램이 없습니다" description="프로그램을 만든 뒤 현장 공유 상태를 관리하세요." /></section>;
+  if (programs.length === 0) return <section className="program-workspace-surface"><SectionHeading title="현장 공유" /><EmptyWorkspace title="확인할 프로그램이 없습니다" /></section>;
   return (
     <section className="program-workspace-surface">
-      <SectionHeading title="현장 공유" description="브리핑과 진행자 대본을 확인하고, 준비가 끝난 프로그램을 현장에 공유합니다." />
+      <SectionHeading title="현장 공유" />
       <div className="program-resource-list">{programs.map((program) => {
         const readiness = programReadiness(program);
         const releases = programReleases(program);
@@ -314,7 +303,6 @@ export function ProgramResourcesWorkspace({ programs, onOpen }: { programs: Retr
           <button type="button" className="btn-secondary btn-sm" onClick={() => onOpen(program.id, "tasks")}>자료·공유 확인 <ArrowRight aria-hidden="true" size={15} /></button>
         </article>;
       })}</div>
-      <div className="program-workspace-note"><Package aria-hidden="true" size={18} /><span><strong>현장 공유와 실제 준비 완료는 별도입니다.</strong> 브리핑을 먼저 공유해도 물품 도착·리허설 상태는 준비 현황에 계속 남습니다.</span></div>
     </section>
   );
 }

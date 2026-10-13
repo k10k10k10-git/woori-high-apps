@@ -62,9 +62,6 @@ export default function LeaderCueManageView({ retreatId, schedule }: {
 
   return (
     <div>
-      <div className="mb-4 rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs text-emerald-700">
-        조장에게 보여줄 시간대별 안내만 따로 관리합니다.
-      </div>
       {days.map(day => (
         <div key={day} className="mb-4">
           <div className="mb-2 text-sm font-semibold text-slate-700">{day}일차</div>

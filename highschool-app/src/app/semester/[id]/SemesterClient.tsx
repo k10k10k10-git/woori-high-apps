@@ -46,13 +46,13 @@ function mobileSectionOf(tab: TabName): MobileSection {
   return tab;
 }
 
-const TAB_INTRO: Record<TabName, { title: string; description: string }> = {
-  신청: { title: "훈련·사역팀 신청 및 삭제", description: "이름으로 찾아 신청을 접수하거나 삭제합니다." },
-  배치: { title: "사역팀 배치", description: "희망 팀을 확인하고 팀별 명단을 완성합니다." },
-  출석: { title: "출석부", description: "사역팀·훈련 출석을 따로 기록하고 두 수료 판정과 수료증·사진 작업을 한 표에서 관리합니다." },
-  커리큘럼: { title: "사역팀 커리큘럼", description: "각 팀의 주차별 모임 계획을 작성하고 공유합니다." },
-  아카이브: { title: "사역 자료 보관", description: "파일을 직접 업로드하거나 외부 문서·영상 링크를 연결합니다." },
-  설정: { title: "학기 운영 설정", description: "학기 제목, 사역팀, 훈련 반, 주차와 수료 기준을 관리합니다." },
+const TAB_TITLES: Record<TabName, string> = {
+  신청: "훈련·사역팀 신청 및 삭제",
+  배치: "사역팀 배치",
+  출석: "출석부",
+  커리큘럼: "사역팀 커리큘럼",
+  아카이브: "사역 자료 보관",
+  설정: "학기 운영 설정",
 };
 
 function tabLabel(tab: TabName): string {
@@ -231,9 +231,9 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
             <button role="tab" aria-selected={activeTab === "설정"} onClick={() => selectTab("설정")}>학기 설정{!canEdit ? " · 권한 필요" : ""}</button>
           </div>
         )}
-        {praiseHref && <aside className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }} aria-label="찬양팀 업무 연결"><div><strong className="text-sm">{teamById.get(requestedTeam)?.name ?? "찬양팀"} 학기 명단</strong><p className="mt-1 text-sm text-slate-500">여기서 학기 소속을 확인하고, 조편성·출결·등단은 같은 모임으로 돌아가 이어서 진행하세요.</p></div><Link className="btn-secondary" href={praiseHref}>찬양팀 이번 모임으로</Link></aside>}
+        {praiseHref && <aside className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }} aria-label="찬양팀 업무 연결"><strong className="text-sm">{teamById.get(requestedTeam)?.name ?? "찬양팀"} 학기 명단</strong><Link className="btn-secondary" href={praiseHref}>찬양팀 이번 모임으로</Link></aside>}
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="section-kicker">{tabLabel(activeTab)}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[activeTab].title}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[activeTab].description}</p></div>
+          <div><p className="section-kicker">{tabLabel(activeTab)}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_TITLES[activeTab]}</h2></div>
           <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 주차 {sessions.filter((session) => session.type !== "휴강").length}주{sessions.some((session) => session.type === "휴강") ? ` · 휴강 ${sessions.filter((session) => session.type === "휴강").length}일` : ""}</p>
         </div>
         <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">

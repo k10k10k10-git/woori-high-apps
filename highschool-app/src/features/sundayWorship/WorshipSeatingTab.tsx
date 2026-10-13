@@ -229,10 +229,7 @@ export default function WorshipSeatingTab({ canEdit }: { canEdit: boolean }) {
       </div>
 
       <p className="mt-3 text-xs text-slate-500">
-        {/* 몇 주가 실제로 쓰였는지 밝힌다. 수련회·방학으로 건너뛴 주가 있으면 3주가
-            아닐 수 있는데, 그냥 "지난 3주"라고 쓰면 숫자가 안 맞는 것으로 보인다. */}
-        줄 수는 <strong>출석이 있었던 최근 {cellKeys.length || 3}주 평균 + 담임 1명</strong>을 한 줄 의자 {SEATS_PER_ROW}개로 나눠 올립니다.
-        {" "}수련회·방학처럼 출석이 없던 주는 건너뜁니다. 위 {FRONT_ROWS}줄이 앞자리입니다. 사용 {totalRowsUsed(sections)}줄
+        출석 기준 {cellKeys.length || 3}주 · 앞자리 {FRONT_ROWS}줄 · 사용 {totalRowsUsed(sections)}줄
         {dirty && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-700">저장하지 않은 변경</span>}
       </p>
       {anyOver && <p className="mt-1 text-xs font-semibold text-red-600">줄 수가 분단 용량을 넘은 분단이 있습니다. 반을 옮기거나 분단 줄 수를 늘려주세요.</p>}

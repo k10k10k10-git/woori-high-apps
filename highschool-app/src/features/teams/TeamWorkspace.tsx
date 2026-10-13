@@ -14,7 +14,6 @@ import { sundayTeamOf, type SundayTeamKey } from "@/features/portal/featureCatal
 import { activeTeamKeys, canAccessTeam, canBrowseEveryTeam, canBrowseTeam, canEditTeam, membershipLabel, semesterTeamForKey } from "./teamModel";
 import { TeamAccessState } from "./TeamAccessState";
 import { useLoadErrors } from "@/lib/useLoadErrors";
-import { FirstVisitGuide } from "./FirstVisitGuide";
 import styles from "./TeamWorkspace.module.css";
 
 type TermTeams = Record<string, Team[]>;
@@ -116,8 +115,7 @@ function TeamWorkspaceContent({ teamKey, pickedSemesterId, onSelectSemester, onR
   return <TeamAccessState allowed={allowed}><main className="team-first-page">
     <header className="team-workspace-header">
       <div className="team-workspace-title"><Link href="/teams">팀</Link><span>/</span><span>{teamMeta.label}</span></div>
-      <div className="team-workspace-heading"><div><span className="team-directory-mark">{teamMeta.label.slice(0, 1)}</span><div><h1>{teamMeta.label}</h1><p>운영 학기를 선택하고 팀 현황과 업무를 확인합니다.</p></div></div><span className="team-role-badge">{roleLabel}</span></div>
-      <nav className={styles.quickLinks} aria-label="팀 화면 바로가기"><a className={styles.overviewLink} href="#team-first-guide">처음이라면 사용 안내로 이동</a><a className={styles.overviewLink} href="#team-work-actions">업무 바로가기</a></nav>
+      <div className="team-workspace-heading"><div><span className="team-directory-mark">{teamMeta.label.slice(0, 1)}</span><div><h1>{teamMeta.label}</h1></div></div><span className="team-role-badge">{roleLabel}</span></div>
       {viewOnly && <p className={styles.permissionNote}>선택한 학기 기록은 조회 권한으로 이용 중입니다. 기록 변경이 필요하면 담당 팀장에게 알려 주세요.</p>}
     </header>
 
@@ -132,11 +130,6 @@ function TeamWorkspaceContent({ teamKey, pickedSemesterId, onSelectSemester, onR
       </div>
       {selectedTerm && selectedTeam ? <TeamOverview key={`${selectedTerm.semester.id}:${selectedTeam.id}`} semester={selectedTerm.semester} team={selectedTeam} phase={selectedTerm.phase} onRetry={onRetry} /> : <div className={styles.overviewState} role={!error && (!loaded || !teamsReady) ? "status" : undefined}>{error ? "학기 현황을 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : !loaded || !teamsReady ? "학기 연결을 확인하는 중입니다…" : "연결된 학기가 없습니다. 담당자에게 학기 연결을 요청해 주세요."}</div>}
     </section>
-    {user && <FirstVisitGuide key={`${user.uid}:${teamKey}`} userId={user.uid} teamKey={teamKey} teamLabel={teamMeta.label} roleLabel={roleLabel} steps={[
-      { title: "운영 학기와 팀 현황 확인", description: "위에서 운영 학기를 선택하고 학생·스탭 수와 모임 일정, 팀 목표를 확인하세요." },
-      { title: planned ? "상시 업무 준비 상태 확인" : weeklyTitle, description: planned ? "상시 운영 화면은 준비 중입니다. 학기 명단·기록부터 확인하세요." : !weeklyAllowed ? "다른 팀의 학기 명단과 기록을 조회할 수 있습니다. 주간·주일 입력은 담당 팀에서 이용하세요." : weeklyPurpose, ...(weeklyAllowed && !planned ? { href: weeklyHref, action: `${weeklyTitle} 열기` } : !selectedTerm ? { href: "/help/feedback", action: "팀 기능 문의하기" } : {}) },
-      { title: "명단·출석·자료 열기", description: "아래 업무 바로가기에서 선택한 학기의 명단, 출석, 커리큘럼과 자료를 엽니다.", ...(selectedTerm ? { href: `${termBase}/roster`, action: "학기 명단·연락처 보기" } : {}) },
-    ]} />}
     <section id="team-work-actions" className={styles.workActions} aria-label="주간 업무와 학기 기록">
       {planned ? <div className={`team-action-card ${styles.weeklyWork}`}><div><span>상시 업무 준비 중</span><h2>주간·주일 운영 준비 중</h2><p>주간·주일 운영 화면은 준비 중입니다. 현재 사용할 수 있는 업무는 아래 학기 명단·기록에서 이어가세요.</p><Link href="/help/feedback" className={styles.overviewLink}>팀 기능 문의하기</Link></div></div> : weeklyAllowed ? <Link href={weeklyHref} className={`team-action-card is-primary ${styles.weeklyWork}`}><div><span>{weeklyViewOnly ? "주간·주일 조회" : "주간·주일 업무"}</span><h2>{weeklyTitle}</h2><p>{weeklyPurpose}</p></div><ArrowRight size={18} aria-hidden="true" /></Link> : <div className={`team-action-card ${styles.weeklyWork}`}><div><span>주간·주일 업무</span><h2>담당 팀 전용</h2><p>다른 팀의 주일 운영 기록은 담당 팀 계정만 엽니다.</p></div></div>}
       <nav className={styles.termLinks} aria-label="선택 학기 업무">{TERM_ACTIONS.map((item) => {

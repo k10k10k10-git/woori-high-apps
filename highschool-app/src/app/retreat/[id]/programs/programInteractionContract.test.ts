@@ -212,14 +212,15 @@ describe("program preparation interaction contract", () => {
     expect(views).toContain('onOpen(program.id, "roles")');
   });
 
-  it("처음 온 스탭에게 네 단계 순서와 각 프로그램의 다음 행동을 바로 안내한다", () => {
+  it("반복 사용 가이드 없이 프로그램별 다음 행동과 편집 진입을 유지한다", () => {
     const preparation = source("src/lib/programPreparation.ts");
     const views = source("src/app/retreat/[id]/programs/ProgramWorkspaceViews.tsx");
     for (const label of ["1 기획 시작", "2 진행 순서", "3 준비물·담당", "4 확인·현장 공유"]) {
       expect(preparation).toContain(`label: "${label}"`);
     }
-    expect(views).toContain("처음 준비한다면");
-    expect(views).toContain("아래 네 단계만 차례로 진행하면 됩니다.");
+    expect(views).not.toContain("program-start-guide");
+    expect(views).not.toContain("처음 준비한다면");
+    expect(views).not.toContain("program-workspace-note");
     expect(views).toContain("catalogNextAction");
     expect(views).toContain("다음 할 일");
     expect(views).not.toContain("활동 형식 미정");
@@ -227,6 +228,8 @@ describe("program preparation interaction contract", () => {
     expect(editor).toContain("needsProgramIdentity");
     expect(editor).toContain("프로그램 이름과 총괄 입력");
     expect(editor).toContain('id="program-title"');
+    expect(editor).not.toContain("program-save-mode");
+    expect(editor).not.toContain("program-section-hint");
   });
 
   it("현장은 활성 배포본만 읽고 편집 원본의 후속 변경을 노출하지 않는다", () => {

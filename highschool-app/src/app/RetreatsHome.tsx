@@ -12,7 +12,6 @@ import {
 } from "@/lib/db";
 import { Retreat } from "@/lib/types";
 import { selectRetreatForWork } from "@/lib/retreatSelection";
-import FormGuideModal from "./FormGuideModal";
 import { useUI } from "@/context/UIContext";
 import BrainstormPanel from "./BrainstormPanel";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
@@ -34,7 +33,6 @@ export default function HomePage() {
   const listScope = `${user?.uid ?? "guest"}:${subscriptionGeneration}`;
   const [listResult, setListResult] = useState<{ scope: string; error: string | null } | null>(null);
   const listReady = listResult?.scope === listScope;
-  const [showGuide, setShowGuide] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const deletingRef = useRef(false);
@@ -234,9 +232,6 @@ export default function HomePage() {
         </OverlayShell>
       )}
 
-      {/* ═══ 구글폼 가이드 모달 ══════════════════════════════════ */}
-      {showGuide && <FormGuideModal onClose={() => setShowGuide(false)} />}
-
       {/* 새 수련회 생성은 NewRetreatButton(행정·이가드 공용)이 담당한다 */}
 
       {/* 방학 중 사역 홈은 행정·이가드가 같은 화면(VacationHome)을 쓴다 — 다른 것은 입장 목적지뿐 */}
@@ -253,10 +248,6 @@ export default function HomePage() {
         headerActions={
           <>
             {retreatLoadError && <Link className="btn-secondary btn-sm" href="/library/help#connection">접속 문제 도움말</Link>}
-            <button
-              onClick={() => setShowGuide(true)}
-              className="btn-secondary btn-sm"
-            >폼 가이드</button>
             {/* 현장 화면과 같은 잠금 도구 — 여기서 잠가도 이가드까지 함께 잠긴다 */}
             {canManageLocks && (
               <button onClick={() => setShowLockAdmin(true)} aria-label="수련회 PIN 잠금 관리"

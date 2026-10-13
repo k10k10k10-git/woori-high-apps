@@ -20,7 +20,6 @@ vi.mock("@/lib/db", () => ({
   deleteRetreat: mocks.remove, requestRetreatAccess: mocks.request,
 }));
 vi.mock("@/features/iguard/lib/db", () => ({ subscribeToIguardAccessLocks: mocks.locks }));
-vi.mock("./FormGuideModal", () => ({ default: () => null }));
 vi.mock("./BrainstormPanel", () => ({ default: () => null }));
 vi.mock("./field/AdminModal", () => ({ default: () => null }));
 vi.mock("@/components/LoginButton", () => ({ default: () => null }));

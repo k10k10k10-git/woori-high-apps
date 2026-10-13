@@ -2,7 +2,6 @@
 import { useState } from "react";
 import type { PraiseCommand, PraiseMeeting, PraisePerson, PraiseStatus, PraiseView } from "../types";
 import OverlayShell from "@/components/OverlayShell";
-import Link from "next/link";
 import { canEditViewAttendance, canReadPraiseStudentAttendance } from "../permissions";
 import { PraiseAuditList } from "./PraiseAuditList";
 import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseMeetingWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
@@ -53,7 +52,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
         ? "공통 학기 사역팀 출석을 사용합니다. 학기 운영과 이 화면에서 같은 기록을 조회하며, 연결과 편집 권한이 확인된 학생만 수정할 수 있습니다."
         : "공통 학기 회차가 지정되어 있습니다. 학생별 학기 기록 연결 상태를 확인해 주세요."}</p>}
     {display === "meeting" && !groupVersion && <p className="praise-note">{unresolvedGroup ? "원본에 출석 당시 조편성이 연결되어 있지 않습니다. 출결은 원본대로 표시하며 과거 조는 확인이 필요합니다." : "확정된 조편성이 없습니다. 조 담당 스탭은 조가 확정된 뒤 담당 학생의 출결을 기록할 수 있습니다."}</p>}
-    {display === "meeting" && <p className="praise-note">출석·결석을 선택하면 바로 저장됩니다. 기존 기록을 미입력으로 되돌리려면 ‘기록 지우기’를 눌러 확인해 주세요. <Link href="/library/help#attendance">출결 입력 사용법</Link></p>}
+    {display === "meeting" && <p className="praise-note">출결 자동 저장</p>}
     <div className="praise-toolbar">
       <label className="praise-search"><span className="sr-only">출결 이름 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름으로 검색" /></label>
       <label className="praise-field"><span className="sr-only">출결 조 선택</span><select value={groupId} onChange={(event) => setGroupId(event.target.value)}><option value="">전체 조</option>{(display === "semester" ? semesterGroups : groupVersion?.groups)?.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select></label>
@@ -62,9 +61,8 @@ export function PraiseAttendance({ view, meeting, execute, busy, onSelectMeeting
       <span className="praise-count">{display === "semester" ? semesterRows.length : rows.length}명</span>
     </div>
     {display === "semester" ? <>
-      <p className="praise-note" id="praise-semester-attendance-help">회차나 기록을 누르면 모임별 입력으로 이동합니다. 표를 가로로 스크롤해 전체 회차를 확인하세요. {groupId && "선택한 조에 속한 회차만 표시합니다. "}휴강은 학생 모임에만 적용됩니다.</p>
       {!view.permissions.attendanceAll && kind === "STUDENT" && <p className="praise-note">담당했던 조의 기록만 표시합니다. ‘확인할 기록 없음’은 미입력 또는 이전 담당 조의 비공개 기록일 수 있어 출석·결석으로 판단하지 않습니다.</p>}
-      {semesterRows.length === 0 ? <Empty>{missingOnly ? "확인 가능한 미입력 기록이 없습니다." : "검색 조건에 맞는 출결 기록이 없습니다."}</Empty> : <div className="praise-table" role="region" aria-label="학기 전체 출결 표 가로 스크롤" aria-describedby="praise-semester-attendance-help" tabIndex={0}><table>
+      {semesterRows.length === 0 ? <Empty>{missingOnly ? "확인 가능한 미입력 기록이 없습니다." : "검색 조건에 맞는 출결 기록이 없습니다."}</Empty> : <div className="praise-table" role="region" aria-label="학기 전체 출결 표 가로 스크롤" tabIndex={0}><table>
         <caption className="sr-only">{kind === "STUDENT" ? "학생" : "스탭"} 학기 전체 출결 · 기록이 없는 셀은 미입력 또는 확인 제한으로 구분합니다.</caption>
         <thead><tr><th scope="col">이름</th>{meetings.map((item) => <th key={item.id} scope="col">{onSelectMeeting ? <button className="praise-text-button" type="button" disabled={busy} aria-label={`${kind === "STUDENT" ? item.date : item.worshipDate} ${item.title} 모임별 입력 열기`} onClick={() => openMeeting(item.id)}>{kind === "STUDENT" ? item.date : item.worshipDate}</button> : kind === "STUDENT" ? item.date : item.worshipDate}<br /><span>{item.title}{item.cancelled ? " · 학생 휴강" : ""}</span></th>)}</tr></thead>
         <tbody>{semesterRows.map(({ person, cells }) => <tr key={person.id}><th scope="row">{person.name}{!person.active && <small> · 비활성</small>}</th>{cells.map((cell, index) => <td key={meetings[index].id}>{cell.visible && cell.canOpen && person.active && onSelectMeeting ? <button className="praise-text-button" type="button" disabled={busy} title={cell.detail} aria-label={`${person.name} ${kind === "STUDENT" ? meetings[index].date : meetings[index].worshipDate} ${cell.label} · 모임별 입력 열기`} onClick={() => openMeeting(meetings[index].id, person.id)}>{cell.label}</button> : <span title={cell.detail}>{cell.label}</span>}{cell.groupName && <small className="praise-note"><br />{cell.groupName}</small>}</td>)}</tr>)}</tbody>

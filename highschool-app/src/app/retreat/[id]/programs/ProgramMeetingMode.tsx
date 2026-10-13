@@ -126,7 +126,6 @@ export default function ProgramMeetingMode({ program, posts, canEdit, onClose, o
           <div>
             <span>{program.title}</span>
             <h2>준비회의</h2>
-            <p>논의를 결정으로, 결정을 담당과 기한이 있는 실행으로 연결합니다.</p>
             <small>회의 기록은 관리자 전용입니다. 연락처나 건강 정보 같은 민감정보는 별도 관리 화면에 기록해 주세요.</small>
           </div>
           <button type="button" className="program-meeting-close" onClick={requestClose} aria-label="회의 모드 닫기"><X aria-hidden="true" size={20} /></button>
@@ -141,7 +140,7 @@ export default function ProgramMeetingMode({ program, posts, canEdit, onClose, o
         </aside>
         <div className="program-meeting-main" role="region" aria-label="선택한 준비회의">
           {!selected ? (
-            <div className="program-meeting-empty"><h3>첫 준비회의를 시작하세요</h3><p>오늘 결정할 안건을 적고, 결정된 내용은 바로 할 일로 보낼 수 있습니다.</p>{canEdit && <button type="button" className="btn-primary" disabled={creating} onClick={() => void startMeeting()}>회의 시작</button>}</div>
+            <div className="program-meeting-empty"><h3>아직 준비회의가 없습니다</h3>{canEdit && <button type="button" className="btn-primary" disabled={creating} onClick={() => void startMeeting()}>회의 시작</button>}</div>
           ) : (
             <>
               <div className="program-meeting-title">
@@ -165,7 +164,7 @@ export default function ProgramMeetingMode({ program, posts, canEdit, onClose, o
                 <label className="program-field"><span>다음 회의</span><input type="date" className="input" value={selected.nextMeetingDate ?? ""} disabled={!canEdit || selected.closed || busy} onChange={(event) => void updateMeeting({ nextMeetingDate: event.target.value || null }, "다음 회의 날짜를 저장하지 못했습니다.")} /></label>
               </section>
               <section className="program-decision-section" aria-labelledby="program-decision-heading">
-                <div className="program-subsection-heading"><div><h3 id="program-decision-heading">결정과 실행</h3><p>결정된 항목은 한 번에 실행 할 일로 보냅니다.</p></div><span className="program-count">{decisions.length}건</span></div>
+                <div className="program-subsection-heading"><div><h3 id="program-decision-heading">결정과 실행</h3></div><span className="program-count">{decisions.length}건</span></div>
                 {canEdit && !selected.closed && (
                   <div className="program-decision-form">
                     <label className="program-field program-field--wide"><span>논의·결정 항목</span><input className="input" value={decision.title} maxLength={120} placeholder="예: 메인 게임은 연합팀 경쟁으로 진행" onChange={(event) => setDecision((current) => ({ ...current, title: event.target.value }))} /></label>

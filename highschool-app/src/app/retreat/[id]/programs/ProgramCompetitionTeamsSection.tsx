@@ -133,7 +133,6 @@ export default function ProgramCompetitionTeamsSection({
       <div className="program-subsection-heading">
         <div>
           <h3 id="program-alliance-heading">연합팀 구성</h3>
-          <p>여러 수련회 조를 큰 팀으로 묶는 활동에서만 사용합니다. 기본 조, 숙소와 인원체크 명단은 바뀌지 않습니다.</p>
         </div>
         <span className="program-count">{teams.length}팀</span>
       </div>
@@ -141,7 +140,7 @@ export default function ProgramCompetitionTeamsSection({
       {teams.length === 0 ? (
         <div className="program-alliance-empty">
           <UsersThree aria-hidden="true" size={24} />
-          <div><strong>연합팀 경쟁이 있을 때만 만들어 주세요.</strong><p>예: 12개 조를 파랑, 빨강, 노랑, 초록 4개 팀으로 묶기</p></div>
+          <div><strong>연합팀이 없습니다.</strong></div>
           {canEdit && <button type="button" className="btn-secondary" disabled={busy} onClick={() => void createDefaults()}>4개 팀으로 시작</button>}
         </div>
       ) : (
@@ -180,7 +179,7 @@ export default function ProgramCompetitionTeamsSection({
       {teams.length > 0 && (
         <div className="program-group-assignment">
           <div className="program-subsection-heading">
-            <div><h4>기본 조 배정</h4><p>조를 쪼개지 않고 연합팀에 배정합니다. 균등 배치는 저장 전에 미리 확인할 수 있습니다.</p></div>
+            <div><h4>기본 조 배정</h4></div>
             {canEdit && <button type="button" className="btn-secondary btn-sm" disabled={busy} onClick={makePreview}><ArrowsClockwise aria-hidden="true" size={15} /> 균등 배치 미리보기</button>}
           </div>
 

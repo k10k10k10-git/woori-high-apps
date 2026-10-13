@@ -187,10 +187,7 @@ export default function GroupStaffView({ retreatId, groups, staff, students, adm
 
   return (
     <div>
-      <div className="mb-4 rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs text-sky-700">
-        ℹ️ 조에 <strong>조스탭</strong>을 배정합니다. <strong>조 카드를 먼저 누르고</strong> 아래 스탭을 누르면 그 조에 추가/해제됩니다(한 스탭은 한 조).
-        <div className="mt-1 text-sky-600">여기서 배정한 조스탭은 <strong>행정 사이트 조편성</strong>에도 공유 표시됩니다. {saving && "· 저장 중…"}</div>
-      </div>
+      {saving && <p role="status" className="mb-4 text-xs text-slate-500">저장 중…</p>}
 
       {/* 고아 배정 경고 — 행정이 조를 삭제/재편성(자동 조편성)하면 옛 조에 걸린 배정이 남는다 */}
       {orphanEntries.length > 0 && (

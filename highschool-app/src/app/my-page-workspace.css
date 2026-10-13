@@ -1,14 +1,14 @@
 /* 출석부와 같은 작업 구조. 색상과 서체는 통합사이트의 사역 화면을 따른다. */
 .mypage-workspace {
-  --mp-bg: #ffffff;
-  --mp-sidebar: #f7f8f8;
-  --mp-hover: #f1f3f2;
-  --mp-line: #e5e8e6;
-  --mp-ink: #252c29;
-  --mp-muted: #626e67;
-  --mp-accent: #24674a;
-  --mp-selected: #e8efeb;
-  --mp-danger: #b23b3b;
+  --mp-bg: var(--color-surface);
+  --mp-sidebar: var(--color-bg);
+  --mp-hover: var(--color-surface-hover);
+  --mp-line: var(--color-border);
+  --mp-ink: var(--color-text-primary);
+  --mp-muted: var(--color-text-muted);
+  --mp-accent: var(--color-primary);
+  --mp-selected: var(--color-selected-bg);
+  --mp-danger: var(--color-danger);
   --mp-radius: 8px;
   display: grid;
   grid-template-columns: 216px minmax(0, 1fr);
@@ -26,17 +26,6 @@
   letter-spacing: -.015em;
   box-shadow: 0 24px 80px rgb(0 0 0 / .16);
 }
-html[data-theme="dark"] .mypage-workspace {
-  --mp-bg: #191d1b;
-  --mp-sidebar: #151916;
-  --mp-hover: #252c27;
-  --mp-line: #343b36;
-  --mp-ink: #e9eee9;
-  --mp-muted: #a3afa7;
-  --mp-accent: #a3d6b8;
-  --mp-selected: #26392e;
-  --mp-danger: #f0a0a0;
-}
 .mypage-workspace-sidebar { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--mp-line); background: var(--mp-sidebar); }
 .mypage-workspace-brand { display: flex; min-height: 80px; align-items: center; gap: 10px; padding: 18px 20px; }
 .mypage-workspace-brand > span:last-child { display: grid; gap: 1px; }
@@ -49,7 +38,7 @@ html[data-theme="dark"] .mypage-workspace {
 .mypage-workspace-nav-item { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; color: var(--mp-muted); text-align: left; font-size: 13px; font-weight: 500; transition: background-color 120ms, color 120ms; }
 .mypage-workspace-nav-item > svg { flex-shrink: 0; }
 .mypage-workspace-nav-item:hover { background: var(--mp-hover); color: var(--mp-ink); }
-.mypage-workspace-nav-item[aria-selected="true"] { background: var(--mp-selected); color: var(--mp-accent); font-weight: 650; }
+.mypage-workspace-nav-item[aria-selected="true"] { background: var(--mp-selected); color: var(--color-selected-text); font-weight: 750; }
 .mypage-workspace-account { display: flex; min-width: 0; align-items: center; gap: 9px; margin-top: auto; padding: 16px; border-top: 1px solid var(--mp-line); }
 .mypage-workspace-avatar { display: grid; width: 30px; height: 30px; flex-shrink: 0; place-items: center; border: 1px solid var(--mp-line); border-radius: 50%; background: var(--mp-bg); color: var(--mp-muted); font-size: 12px; }
 .mypage-workspace-account > div { display: grid; min-width: 0; }
@@ -252,7 +241,7 @@ button.admin-overview-metric:hover { background: var(--mp-hover); }
 .activity-log-range { display: flex; min-width: 0; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding-bottom: 24px; border-bottom: 1px solid var(--mp-line); }
 .activity-log-date-fields { display: flex; min-width: 0; gap: 12px; }
 .activity-log-date-fields label { display: grid; min-width: 0; gap: 6px; color: var(--mp-muted); font-size: 12px; }
-.activity-log-date-fields input, .activity-log-select select { min-width: 0; min-height: 44px; padding: 8px 11px; border: 1px solid var(--mp-line); border-radius: 6px; background: var(--mp-bg); color: var(--mp-ink); font: inherit; font-size: 13px; }
+.activity-log-date-fields input, .activity-log-select select { min-width: 0; min-height: 44px; padding: 8px 11px; border: 1px solid var(--color-control-border); border-radius: 6px; background: var(--mp-bg); color: var(--mp-ink); font: inherit; font-size: 13px; }
 .activity-log-date-fields input { width: 160px; max-width: 100%; font-variant-numeric: tabular-nums; }
 .activity-log-range > p { padding-bottom: 12px; color: var(--mp-muted); font-size: 12px; }
 .activity-log-range > .activity-log-validation { width: 100%; padding: 0; color: var(--mp-danger); }
@@ -314,7 +303,7 @@ button.admin-overview-metric:hover { background: var(--mp-hover); }
 .activity-log-error > div { min-width: 0; flex: 1; }
 .activity-log-error strong { font-size: 14px; font-weight: 550; }
 .activity-log-error p { margin-top: 6px; overflow-wrap: anywhere; color: var(--mp-muted); font-size: 13px; }
-.activity-log-panel ::selection { background: var(--mp-selected); color: var(--mp-ink); }
+.activity-log-panel ::selection { background: var(--mp-selected); color: var(--color-selected-text); }
 @media (max-width: 1100px) {
   .activity-log-row { grid-template-columns: 116px minmax(0, 1fr) minmax(90px, .45fr) 40px 15px; gap: 12px; }
 }

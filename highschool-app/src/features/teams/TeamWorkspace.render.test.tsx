@@ -42,7 +42,9 @@ it("팀 현황을 업무보다 먼저 보여주며 대표 학기의 학생·스�
   render(<TeamWorkspace teamKey="praise" />);
   connectTerms();
   const summary = screen.getByRole("region", { name: "팀 전체 현황" });
-  expect(summary.compareDocumentPosition(screen.getByRole("region", { name: "찬양팀, 이렇게 시작해요" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(summary.compareDocumentPosition(screen.getByRole("region", { name: "주간 업무와 학기 기록" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "안내 닫기" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "처음이라면 사용 안내로 이동" })).not.toBeInTheDocument();
   expect(mocks.applications.mock.calls.map(([id]) => id)).toEqual(["current"]);
   expect(mocks.sessions.mock.calls.map(([id]) => id)).toEqual(["current"]);
   act(() => mocks.applications.mock.calls[0][1]([app("student"), app("staff", { bu: "스탭" }), app("cancelled", { status: "취소" }), app("training", { trainingOnly: true }), app("other", { teamId: "other-team" })]));
@@ -133,11 +135,11 @@ it("과거 학기를 선택해도 바나바 상시 업무를 그 학기 기록�
   expect(actions.queryByRole("heading", { name: "지난 학기 주간·주일 기록" })).not.toBeInTheDocument();
 });
 
-it("조회자의 팀 안내와 카드에서는 입력 대신 기록 조회를 설명한다", () => {
+it("조회자의 업무 카드에서는 입력 대신 기록 조회를 표시한다", () => {
   mocks.auth.teamMemberships = { praise: { role: "viewer", active: true } };
   render(<TeamWorkspace teamKey="praise" />);
   connectTerms();
-  expect(screen.getAllByText(/모임 출결·조 편성·등단 기록을 조회합니다/)).toHaveLength(2);
+  expect(screen.getAllByText(/모임 출결·조 편성·등단 기록을 조회합니다/)).toHaveLength(1);
   expect(screen.queryByText(/이번 모임 학생 출결·주일 스탭 참석.*입력/)).not.toBeInTheDocument();
 });
 
@@ -168,7 +170,6 @@ it.each([
   expect(actions.getByRole("link", { name: "선택 학기 커리큘럼 열기" })).toHaveAttribute("href", `/teams/praise/terms/${id}/curriculum`);
   expect(actions.getByRole("link", { name: "선택 학기 자료·기록 열기" })).toHaveAttribute("href", `/teams/praise/terms/${id}/records`);
   expect(screen.getAllByRole("link", { name: new RegExp(weeklyTitle) })[0]).toHaveAttribute("href", `/teams/praise/ongoing?semester=${id}`);
-  expect(screen.getByRole("link", { name: "학기 명단·연락처 보기" })).toHaveAttribute("href", `/teams/praise/terms/${id}/roster`);
   expect(mocks.applications.mock.calls.map(([sid]) => sid)).toEqual(["current", id]);
   expect(mocks.sessions.mock.calls.map(([sid]) => sid)).toEqual(["current", id]);
 });

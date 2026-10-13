@@ -92,6 +92,8 @@
 - 사이트 제목·계정·메뉴는 `GlobalPortalHeader` 하나, 방학 목록·캘린더는 `VacationHome` 하나를 씁니다. 공통 홈 데이터나 개인 담당을 새 집계 노드에 복사하지 않습니다.
 - `PortalViewportShell`/`ViewModeContext`의 선택 모드를 유지합니다. PC 모드는 같은 출처의 최소 1280px iframe, 모바일 미리보기는 430px iframe을 사용합니다. 프레임 경로 동기화·화면 내부 쿼리 변경으로 App Router와 인증을 다시 시작하지 않습니다. 브라우저 QA는 실제 앱 프레임을 찾아 검사합니다.
 - CSS는 `globals.css` 기반·토큰, `operations-tables.css` 운영 표, `portal-surfaces.css` 공통 화면, `program-preparation.css` 프로그램, `theme-compat.css` 다크 호환, `interaction-controls.css` 상호작용으로 나눕니다. `cssArchitecture.test.ts`의 예산을 올려 실패를 숨기지 않습니다.
+- 선택 탭은 공통 `--color-selected-bg`·`--color-selected-text`, 입력 경계는 `--color-control-border`를 사용하고 두 테마에서 본문 4.5:1·조작 경계 3:1 이상인지 실제 렌더로 확인합니다. 밝은 모달의 회색과 어두운 헤더의 보조 글자는 각각 맞는 토큰을 사용합니다.
+- 사용자의 2026-10-13 결정에 따라 홈·팀 자동 첫 방문 안내, 탭별 고정 조작 설명과 폼 가이드 팝업을 다시 넣지 않습니다. 선택적 사이트 사용법·실제 사역 자료·입력 라벨·저장/권한/오류·위험 확인은 보존합니다.
 - `.input`은 레이어 밖 규칙이라 Tailwind 폭·글꼴·여백 유틸리티보다 우선할 수 있습니다. 폭은 감싼 요소로, 필요한 입력 높이·글꼴은 기존 컴포넌트 패턴으로 조절하고 양 테마·작은 화면에서 확인합니다. 셀 자체가 액션인 표는 `cell-action-grid`를 씁니다.
 - 모달은 `OverlayShell`/`ModalScrollManager`를 통해 dialog 이름·포커스 트랩·ESC·스크롤 복구를 유지합니다. 토스트는 `aria-live`, 아이콘 버튼은 `aria-label`이 필요합니다. 렌더 계약은 `OverlayShell.render.test.tsx`가 검증합니다.
 - 선택 상태는 가능한 한 렌더 중 파생하고 자동 시계 갱신이 사용자 선택을 덮지 않게 합니다. effect 안 직접 `setState`를 새로 넣어 lint 계약을 우회하지 않습니다.

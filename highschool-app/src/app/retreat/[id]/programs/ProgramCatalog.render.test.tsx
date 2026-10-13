@@ -49,13 +49,16 @@ it("빈 프로그램 목록에서 진행 형식과 직접 만들기·기본 두 
   expect(props.onCreateDefaults).toHaveBeenCalledOnce();
 });
 
-it("선택 목록은 프로그램 형식과 작업·현장 진행률을 함께 보여 주고 안내한 다음 행동으로 연다", () => {
+it("선택 목록은 사용 가이드 없이 형식·진행률·다음 행동을 보여 주고 바로 연다", () => {
   const props = callbacks();
   const program: RetreatProgram = { ...base, lead: "가상 담당", tasks: {
     done: { id: "done", title: "완료", done: true, createdAt: 1, updatedAt: 1 },
     todo: { id: "todo", title: "준비", done: false, createdAt: 2, updatedAt: 2 },
   } };
   render(<ProgramCatalog programs={[program, { ...base, id: "post", title: "코스 프로그램", kind: "post", order: 2 }]} canEdit busy={false} {...props} />);
+  expect(screen.queryByText("처음 준비한다면")).not.toBeInTheDocument();
+  expect(screen.queryByRole("list", { name: "프로그램 준비 순서" })).not.toBeInTheDocument();
+  expect(screen.queryByText("프로그램 하나를 열고 안내되는 다음 할 일부터 채워가세요.")).not.toBeInTheDocument();
   const first = within(screen.getByRole("article", { name: "첫 프로그램" }));
   expect(first.getByText("집중형 · 초안")).toBeInTheDocument();
   expect(first.getByText("작업 완료").parentElement).toHaveTextContent("1/2작업 완료");

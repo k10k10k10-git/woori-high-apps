@@ -10,10 +10,7 @@ const dash = <span className="text-xs text-slate-300">-</span>;
 export default function StaffView({ staff }: { retreatId: string; staff: IguardStaff[] }) {
   return (
     <div>
-      <div className="mb-4 bg-sky-50 border border-sky-100 rounded-lg p-3 text-xs text-sky-700">
-        ℹ️ 스탭 명단과 속성(나이·역할·본대여부·프로그램팀 등)은 <strong>행정 사이트</strong>에서 관리됩니다.
-        <div className="mt-1">여기서는 <strong>읽기 전용</strong>으로 확인만 합니다. 수정은 행정 사이트의 교사·보조스탭에서 해주세요.</div>
-      </div>
+      <p className="mb-4 text-xs text-slate-500">조회 전용 · 교사·보조스탭에서 수정</p>
       {staff.length === 0 ? (
         <div className="card p-8 text-center text-slate-400"><div className="text-3xl mb-2">🧑‍🤝‍🧑</div><p>행정 사이트에 등록된 스탭이 없습니다.</p></div>
       ) : (

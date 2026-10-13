@@ -215,3 +215,8 @@
 - **접근법**: `rg`로 두 앱의 `classes`·`attendance`·`teacherStaff` 루트 구독을 모두 찾는다 → 학기 중앙 역할만 연간 원장을 직접 읽게 하고 팀·현장 화면은 서버의 인증·명단 범위 필터로 전환한다 → UI 게이트를 정규화된 역할만이 아니라 Rules가 보는 원시 팀 배정 존재 여부와 맞춘다 → 합성 역할의 RTDB 에뮬레이터 계약, PR CI, 통합 앱 운영 `api/version`을 확인한다 → `attendance-app/database.rules.json`의 운영 전후 Rules를 `firebase database:get /.settings/rules`로 백업·대조한다 → 가상 데모 Hosting을 브라우저에서 확인한 후 예전 데모 `attendanceAdmins/{uid}` 한 경로를 백업·회수하고 Auth 계정을 비활성화한다.
 - **판단 질문**: 화면에서 탭만 숨겨도 Firebase 루트 읽기 권한은 남는다. 공개 빌드에서 데모 이메일·비밀번호를 제거해도 과거 배포본의 자격정보는 사라지지 않으므로 실제 공유 Auth 계정과 관리자 역할까지 퇴역시켰다. 운영 학생 명단을 데모용으로 복사하거나 전체 DB를 다시 쓰지 않았다.
 - **재사용 규칙**: 공유 RTDB의 상위 `.read`·`.write`를 바꾸기 전에는 모든 구독과 역할 저장 버킷을 대조하고, 서버 필터·화면 게이트·실제 Rules를 함께 검증한다. 공개 데모를 합성 자료로 바꿀 때는 새 Hosting 확인, 이전 역할 단건 스냅샷·회수, Auth 비활성화, 운영 Rules·버전 재조회를 한 출시 절차로 묶는다.
+
+### 네이티브 새 탭 검사 실패와 실제 화면 회귀를 구분하기 (2026-10-13)
+- **접근법**: GitHub Actions의 Playwright `trace.zip`에서 trusted 수정 클릭·기존 모달·별도 페이지의 목적지 요청을 각각 대조한다 → `highschool-app/e2e/new-staff-local.e2e.ts`의 새 탭 검사만 `ControlOrMeta + Shift` 전면 새 탭 입력으로 바꾼다 → 목적지 URL·기존 모달 유지·닫힘 및 내부 이동 0회·trusted modifiers·DB 쓰기 0건을 유지한다 → 로컬 네 가지 화면 환경의 관련 16건과 `MyPageModal.render.test.tsx` 20건을 확인하고 최종 커밋의 전체 CI를 다시 실행한다.
+- **판단 질문**: 첫 CI에는 별도 페이지의 `/operations/accounts` 요청 200이 있었지만 `context.page` 이벤트가 오지 않았다. 이 관측만으로 제품 핸들러를 바꾸지 않았으며 정확한 Chromium 초기화 원인은 미확정이다. timeout 확대·skip·강제 `window.open`을 쓰지 않았고, `context.pages()` 역시 같은 초기화에 의존하므로 fallback으로 추가하지 않았다. 단독 Ctrl/Meta 처리는 기존 렌더 테스트로 별도 유지한다.
+- **재사용 규칙**: 새 탭의 전면·배경 여부가 제품 계약에 없다면 실제 native 전면 새 탭으로 관측을 안정화할 수 있으나, 원래 창 보존·목적지·trusted 입력·무쓰기 검증을 유지하고 최종 전체 CI 성공 전에는 해결 완료로 보고하지 않는다.

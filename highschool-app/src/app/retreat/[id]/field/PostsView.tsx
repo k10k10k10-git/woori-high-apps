@@ -46,11 +46,6 @@ export default function PostsView({ retreatId, posts }: { retreatId: string; pos
 
   return (
     <div>
-      <div className="mb-4 rounded-lg border border-violet-100 bg-violet-50 p-3 text-xs leading-relaxed text-violet-700">
-        ℹ️ 스프레드시트처럼 아래 표에 바로 적어 저장하세요. 큐싯의 <strong>담당·동선</strong> 칸에
-        <code className="mx-1 rounded bg-white px-1 py-0.5">강당 입구: 김민수, 이영희</code>
-        형식으로 적으면 포스트와 담당 동선도 자동 생성됩니다.
-      </div>
       <section className="card overflow-hidden">
         <div className="grid grid-cols-[minmax(120px,0.35fr)_minmax(220px,1fr)_auto] gap-2 border-b border-slate-200 bg-slate-900 px-3 py-2 text-xs font-semibold text-white">
           <span>구역</span><span>포스트</span><span className="w-14 text-center">관리</span>

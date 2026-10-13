@@ -366,10 +366,6 @@ export default function AssignTab({ initialTeamId = "", sid, teams, trainingClas
                     <h3 className="text-xl font-bold text-slate-900">{detailTeam.name}</h3>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${detailTeam.color}`}>{members.length}명</span>
                   </div>
-                  {/* 스탭에게는 지원 동기가 없다 — 학생이 없으면 이 안내는 사실과 다르다. */}
-                  {members.some((application) => !isStaffApplication(application)) && (
-                    <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 지원 동기와 하고 싶은 활동을 확인할 수 있습니다.</p>
-                  )}
                 </div>
                 <button onClick={() => setDetailTeamId(null)} aria-label="닫기" className="compact-icon-control rounded-lg text-slate-400 hover:bg-slate-100"><X aria-hidden="true" size={17} weight="bold" /></button>
               </div>
@@ -484,7 +480,6 @@ export default function AssignTab({ initialTeamId = "", sid, teams, trainingClas
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${trainingClass.color}`}>{members.length}명</span>
                     {trainingClass.teacher && <span className="text-xs text-slate-500">담당 {trainingClass.teacher}</span>}
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">학생 이름을 누르면 신청 내용과 연락처를 확인할 수 있습니다.</p>
                 </div>
                 <button onClick={() => setDetailTrainingClassId(null)} aria-label="닫기" className="compact-icon-control rounded-lg text-slate-400 hover:bg-slate-100"><X aria-hidden="true" size={17} weight="bold" /></button>
               </div>

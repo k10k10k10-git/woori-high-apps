@@ -90,7 +90,6 @@ export default function GbsPlacesView({ retreatId, groups, gbs }: Props) {
       <section className="card overflow-hidden" aria-labelledby="gbs-group-list-title">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 id="gbs-group-list-title" className="font-semibold text-slate-800">조별 장소</h2>
-          <p className="mt-0.5 text-xs text-slate-400">조를 누르면 위 편집기에 바로 불러옵니다.</p>
         </div>
         <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
           {sortedGroups.map(group => {

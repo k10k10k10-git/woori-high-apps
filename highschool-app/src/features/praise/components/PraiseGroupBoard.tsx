@@ -105,12 +105,6 @@ export function PraiseGroupBoard({
       </div>
       {canEdit && selectedStudents.length > 0 && <div className={styles.bulk} aria-label="선택 학생 함께 이동"><strong>{selectedStudents.length}명 선택</strong><label>이동할 조<select value={destination} onChange={event => setDestination(event.target.value)}><option value="">목적지 선택</option>{groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}<option value="unassigned">미배정</option></select></label><button type="button" className="praise-button praise-button--primary" disabled={!destination} onClick={bulkMove}>선택 학생 이동</button><button type="button" className="praise-button" onClick={() => setSelected(new Set())}>선택 해제</button></div>}
       {query && <p className="praise-note" role="status">전체 조에서 {students.filter(matches).length}명을 찾았습니다.</p>}
-      {canEdit && (
-        <p className="praise-note">
-          학생 카드를 다른 조로 끌어 놓거나 카드의 조 선택을 이용하세요. 담당
-          스탭은 각 조에서 추가·해제합니다.
-        </p>
-      )}
       <div
         className={`praise-group-board ${styles.board}`}
         role="region"
