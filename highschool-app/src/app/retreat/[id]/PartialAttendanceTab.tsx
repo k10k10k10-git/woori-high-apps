@@ -249,10 +249,6 @@ export default function PartialAttendanceTab({ retreat }: Props) {
         </div>
       </div>
 
-      <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-3 text-xs text-orange-700">
-        📋 <strong>반별 명단에서 부분참(주황)으로 칠한 학생</strong>만 아래에 나옵니다. 여기서 <strong>선복귀 / 후발대 / 당일참석</strong>을 지정하고 메모를 남기세요. 당일참석은 참석 일차를 함께 고릅니다. 대상을 추가·제외하려면 반별 명단에서 주황색을 켜고 끄면 됩니다.
-      </div>
-
       <div className="flex flex-wrap gap-2">
         {(["전체", "선복귀", "후발대", "당일참석", "미지정"] as Filter[]).map(f => {
           const count = f === "전체" ? poolStats.total
@@ -373,9 +369,8 @@ export default function PartialAttendanceTab({ retreat }: Props) {
           )}
         </div>
 
-        <div className="card p-4 h-fit">
+        {editingRow && <div className="card p-4 h-fit">
           <h3 className="text-sm font-bold text-slate-700 mb-3">예외 지정</h3>
-          {editingRow ? (
             <div className="space-y-3">
               <div>
                 <p className="font-semibold text-slate-800">{editingRow.name}</p>
@@ -441,12 +436,7 @@ export default function PartialAttendanceTab({ retreat }: Props) {
                 </button>
               )}
             </div>
-          ) : (
-            <div className="text-sm text-slate-400 leading-relaxed">
-              학생 행에서 <strong className="text-slate-500">선복귀</strong>, <strong className="text-slate-500">후발대</strong>, <strong className="text-slate-500">당일참석</strong>, 또는 <strong className="text-slate-500">메모</strong>를 누르면 여기서 세부 내용을 수정할 수 있습니다.
-            </div>
-          )}
-        </div>
+        </div>}
       </div>
 
       <div className="grid md:grid-cols-2 gap-3">

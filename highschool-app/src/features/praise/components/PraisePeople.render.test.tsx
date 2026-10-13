@@ -227,7 +227,7 @@ describe("찬양팀 기존 학기 명단 연결", () => {
     expect(await screen.findByRole("heading", { name: "합성학생가 수정" })).toHaveFocus();
     await loaded();
     expect(screen.getByText("통합 명단 기본 정보")).toBeInTheDocument();
-    expect(screen.getByText(/학생의 이름·구분·학년·예배 부서와 스탭의 이름·구분/)).toBeInTheDocument();
+    expect(screen.getByText("기본정보는 학기 배치 명단에서 수정합니다.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "찬양팀 세부 설정" })).toBeInTheDocument();
     expect(screen.getByLabelText("이름", { exact: true })).toHaveAttribute("readonly");
     expect(screen.getByLabelText("파트", { exact: true })).toBeEnabled();

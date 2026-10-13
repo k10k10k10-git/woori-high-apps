@@ -40,7 +40,7 @@ export default function ProgramList({ programs, busy, onSelect, onOpenPrograms }
     <div className="program-dashboard">
       <section className="program-attention" aria-labelledby="program-attention-heading">
         <div className="program-attention__heading">
-          <div><h2 id="program-attention-heading">지금 처리할 것</h2><p>프로그램을 열기 전에 막힌 준비부터 확인합니다.</p></div>
+          <div><h2 id="program-attention-heading">지금 처리할 것</h2></div>
           <button type="button" className="btn-primary" onClick={onOpenPrograms} disabled={busy}>프로그램 준비 열기<ArrowRight aria-hidden="true" size={16} /></button>
         </div>
         <div className="program-attention__signals">
@@ -52,8 +52,8 @@ export default function ProgramList({ programs, busy, onSelect, onOpenPrograms }
       </section>
 
       <section className="program-global-tasks" aria-labelledby="program-global-tasks-heading">
-        <div className="program-list-heading"><div><h2 id="program-global-tasks-heading">다가오는 할 일</h2><p>모든 프로그램의 미완료 작업을 기한순으로 모았습니다.</p></div></div>
-        {nextTasks.length === 0 ? <p className="program-task-empty">{programs.length === 0 ? "아직 프로그램이 없습니다. 프로그램 준비에서 진행 형식을 고르고 시작하세요." : "아직 할 일이 없습니다. 프로그램 준비에서 할 일을 등록해 주세요."}</p> : <ul>{nextTasks.map(({ program, task }) => (
+        <div className="program-list-heading"><div><h2 id="program-global-tasks-heading">다가오는 할 일</h2></div></div>
+        {nextTasks.length === 0 ? <p className="program-task-empty">{programs.length === 0 ? "아직 프로그램이 없습니다." : "아직 할 일이 없습니다."}</p> : <ul>{nextTasks.map(({ program, task }) => (
           <li key={`${program.id}-${task.id}`}><button type="button" disabled={busy} onClick={() => onSelect(program.id)}>
             <span data-status={programTaskStatus(task)}>{PROGRAM_TASK_STATUS_META[programTaskStatus(task)]}</span><strong>{task.title}</strong><small>{program.title}</small><em>{task.assignee?.trim() || "담당 없음"} · {dueLabel(task.dueDate)}</em><ArrowRight aria-hidden="true" size={16} />
           </button></li>

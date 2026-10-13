@@ -76,15 +76,9 @@ function sundayTabFromHref(team: SundayTeamKey, currentHref: string): SundayTab 
   return value && teamHasTab(team, value) ? value as SundayTab : undefined;
 }
 
-const TAB_INTRO: Partial<Record<SundayTab, { title: string; description: string }>> = {
-  "새친구": { title: "새친구 정착 관리", description: "학기 구분 없이 접수와 2주 과정, 등록 결정, 반배정과 학생 출석부 반영을 관리합니다." },
-  "등록 현황": { title: "등록 현황", description: "새친구 등록으로 학생 출석부 원장에 반영된 학생을 확인합니다." },
-  "처리 대기": { title: "처리 대기", description: "2주 과정부터 등록 결정·반배정·출석부 반영까지 남은 일을 모아봅니다." },
-  "출석부": { title: "출석부", description: "연도·학기·부·반을 선택해 학생 명단과 주차별 출석 기록을 실시간으로 확인합니다." },
-  "행정 변동 사항": { title: "행정 변동 사항", description: "학생 출석부 관리자 화면에서 수정된 등록·이동·삭제 내역을 최신순으로 확인합니다." },
-  "자리 배치": { title: "주일 자리 배치", description: "분단과 줄을 정하고 반을 앉힌 뒤 PDF로 인쇄합니다. 위에서 두 줄이 앞자리입니다." },
-  "예배 담당표": { title: "예배 담당표", description: "헌금위원·안내처럼 주차마다 정하는 담당을 적고 PDF로 인쇄합니다." },
-  "예배 자료": { title: "예배 자료", description: "헌금 기도문 양식처럼 자주 바뀌지 않는 문서를 글로 두고 복사·인쇄합니다." },
+const TAB_TITLES: Partial<Record<SundayTab, string>> = {
+  "새친구": "새친구 정착 관리",
+  "자리 배치": "주일 자리 배치",
 };
 
 export default function SundayMinistryClient(props: { team?: SundayTeamKey; initialTab?: string; workspaceId?: string }) {
@@ -253,7 +247,7 @@ function SundayMinistryClientContent({ team, initialTab, workspaceId }: { team?:
         ) : (
           <>
             <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <div><p className="section-kicker">{tab}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_INTRO[tab]?.title ?? tab}</h2><p className="mt-1 text-sm text-slate-500">{TAB_INTRO[tab]?.description}</p></div>
+              <div><p className="section-kicker">{tab}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_TITLES[tab] ?? tab}</h2></div>
               {needsFriends && <p className="mt-2 text-xs text-slate-400 sm:mt-0">새친구 {friends.length}명 · 처리 대기 {pendingCount}명</p>}
             </div>
             <div role="tabpanel" id="sunday-tab-panel" className="min-h-[360px]">

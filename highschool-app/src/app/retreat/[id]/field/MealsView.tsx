@@ -110,7 +110,6 @@ export default function MealsView({ retreatId, meals, groups, seatings }: { retr
                 </div>
                 {ordered.length === 0 ? <div className="p-6 text-center text-slate-300 text-xs">조편성 데이터가 없습니다. 행정 사이트에서 조편성이 완료되면 자동으로 나타납니다.</div> : (
                   <div className="p-4">
-                    <p className="mb-2 text-xs font-medium text-slate-400">순번 카드 전체를 한 화면에 표시합니다. 카드 안 화살표로 순서를 조정하세요.</p>
                     <ol className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-7 xl:grid-cols-11" aria-label={`${meal.label} 조별 식사 순서`}>
                         {ordered.map((item, i) => (
                           <li key={item.group.id} className="min-w-0">

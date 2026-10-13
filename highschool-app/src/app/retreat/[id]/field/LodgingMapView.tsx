@@ -131,12 +131,6 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs leading-relaxed text-emerald-700">
-        {mode === "manage"
-          ? "ℹ️ 숙소 PDF를 올리면 건물명과 호실 번호를 자동 분석합니다. 인식하지 못한 호실은 PDF 위에 직접 배치할 수 있습니다."
-          : "ℹ️ 행정사이트 방배정과 조편성을 실시간으로 표시합니다. 호실의 반·조 배지를 누르면 학생·교사 명단을 확인할 수 있습니다."}
-      </div>
-
       <CustomLodgingMap
         retreatId={retreatId}
         maps={maps}
@@ -275,7 +269,6 @@ export default function LodgingMapView({ retreatId, rooms, groups, students, par
               })}
             </div>
           </div>
-          <p className="mt-2 px-1 text-[11px] text-slate-400 sm:hidden">↔ 도면을 좌우로 밀어 전체 호실을 확인하세요.</p>
         </div>
       </details>
 

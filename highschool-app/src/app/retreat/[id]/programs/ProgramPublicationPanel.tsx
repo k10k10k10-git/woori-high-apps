@@ -53,7 +53,7 @@ export default function ProgramPublicationPanel({
               ? "저장하지 않은 초안이 있습니다. 먼저 초안을 저장한 뒤 새 배포본으로 공유해 주세요."
               : `${hasUnpublishedChanges ? "저장된 변경사항이 있습니다. " : ""}현장은 확정된 배포본을 보고 있습니다${releases.length > 0 ? ` · 배포본 ${releases.length}개 보관` : ""}.`
             : ready
-              ? "준비 항목을 모두 확인했습니다. 공유하면 현재 내용을 변경 불가 배포본으로 저장하고 이가드에 표시합니다."
+              ? "현장 공유 준비가 끝났습니다."
               : readiness.missingLabels.length > 0
                 ? `아직 ${readiness.missingLabels.length}개 현장 점검이 남았습니다: ${readiness.missingLabels.join(", ")}`
                 : `현장 점검은 끝났지만 실행 할 일 ${incompleteTasks}건이 남았습니다.`}
@@ -80,7 +80,7 @@ export default function ProgramPublicationPanel({
       <details className="program-publication-preview">
         <summary>
           <Eye aria-hidden="true" size={18} />
-          <span><strong>새 배포본 미리보기</strong><small>다시 공유할 때 현장에 전달될 현재 작업 내용을 확인합니다.</small></span>
+          <span><strong>새 배포본 미리보기</strong></span>
           <CaretDown aria-hidden="true" size={17} weight="bold" />
         </summary>
         <div className="program-publication-preview__body">

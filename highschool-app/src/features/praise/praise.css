@@ -13,7 +13,7 @@
 .praise-edit-fieldset{border:0;padding:0;margin:0;min-width:0;width:100%}
 
 .praise-workspace fieldset{min-width:0;max-width:100%}#praise-panel-settings>div>fieldset{border:0;padding:0;margin:20px 0 0}#praise-panel-settings fieldset>.praise-section+.praise-section{margin-top:20px}
-.praise-mobile-context-toggle,.praise-tabs-hint{display:none}
+.praise-mobile-context-toggle{display:none}
 
 .praise-people-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start}
 .praise-people-layout.is-editing{grid-template-columns:minmax(0,1fr) minmax(340px,.95fr)}
@@ -105,7 +105,7 @@
 .praise-overview+.praise-tabs{margin-top:18px}
 .praise-tabs{gap:6px;padding:4px;border:1px solid var(--praise-line);border-radius:11px;background:var(--color-surface);box-shadow:var(--shadow-xs)}
 .praise-tabs button{min-height:42px;padding:8px 14px 9px;border-bottom:0;border-radius:7px}
-.praise-tabs button[aria-selected=true]{border-bottom-color:transparent;background:var(--praise-soft);color:var(--color-primary)}
+.praise-tabs button[aria-selected=true]{border-bottom-color:transparent;background:var(--color-selected-bg);color:var(--color-selected-text);font-weight:750}
 .praise-workspace [role=tabpanel]{padding-top:14px}
 .praise-section{border-radius:16px;padding:26px;box-shadow:var(--shadow-xs)}
 .praise-section-heading{margin-bottom:18px}
@@ -200,7 +200,6 @@
   .praise-meeting-links{padding-bottom:0}
   .praise-meeting-bar .praise-context-controls.is-mobile-open{width:100%;align-items:flex-end}
   .praise-meeting-bar .praise-context-controls .praise-field{flex:1}
-  .praise-tabs-hint{display:block;margin:5px 0 0;color:var(--color-text-muted);font-size:12px}
 }
 [data-theme="dark"] .praise-badge--warning{color:#f3c16d}
 
@@ -290,3 +289,7 @@
 .praise-clear-dialog > div { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
 .praise-clear-dialog button { min-height: 44px; }
 .praise-clear-dialog :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+
+/* 입력 경계와 선택 상태는 다른 업무 화면과 같은 대비를 사용한다. */
+.praise-workspace :is(input,select,textarea),.praise-button:not(.praise-button--primary),.praise-icon-button { border-color:var(--color-control-border); }
+.praise-segment button[aria-pressed=true] { background:var(--color-selected-bg); color:var(--color-selected-text); font-weight:750; }

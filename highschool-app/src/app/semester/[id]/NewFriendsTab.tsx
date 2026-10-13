@@ -375,7 +375,7 @@ export default function NewFriendsTab({
   const canEdit = useSemesterCanEdit();
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchHelpId = useId();
+  const searchInputId = useId();
   const [editing, setEditing] = useState<NewFriend | "new" | null>(null);
   const [classesBySid, setClassesBySid] = useState<Record<string, ClassInfo[]>>({});
   const [classError, setClassError] = useState<string | null>(null);
@@ -471,7 +471,6 @@ export default function NewFriendsTab({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 id="assignment-needed-title" className="font-semibold text-slate-900">반 배정해야 하는 학생</h3>
-              <p className="mt-1 text-xs leading-5 text-slate-500">2주차 방문을 마치고 아직 반이 정해지지 않은 학생입니다. 복사 버튼을 누르면 카카오톡 전달용 전체 정보가 복사됩니다.</p>
             </div>
             <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{assignmentCandidates.length}명</span>
           </div>
@@ -497,28 +496,26 @@ export default function NewFriendsTab({
 
       <div className="card card-body">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div><h3 className="font-semibold text-slate-900">새친구 진행 현황</h3><p className="mt-1 text-xs text-slate-400">{canEdit ? "학생을 검색한 뒤 이름을 누르면 상세 기록을 수정할 수 있습니다." : "학생을 검색해 진행 현황을 확인할 수 있습니다."}</p></div>
+          <div><h3 className="font-semibold text-slate-900">새친구 진행 현황</h3></div>
           {canEdit && <button type="button" className="btn-primary" onClick={() => setEditing("new")}>+ 새친구 접수</button>}
         </div>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="w-full sm:max-w-xl">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor={searchHelpId + "-input"}>새친구 검색</label>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor={searchInputId}>새친구 검색</label>
             <div className="flex items-center gap-2">
               <input
                 ref={searchInputRef}
-                id={searchHelpId + "-input"}
+                id={searchInputId}
                 type="search"
                 className="input min-w-0"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder={canEdit ? "이름, 학교, 바나바 담당, 연락처" : "이름, 학교, 바나바 담당"}
-                aria-describedby={searchHelpId}
                 autoComplete="off"
               />
               {searchQuery && <button type="button" className="btn-secondary shrink-0" onClick={clearSearch} aria-label="새친구 검색 초기화">초기화</button>}
             </div>
-            <p id={searchHelpId} className="mt-1.5 text-xs leading-5 text-slate-400">이 목록에서 검색합니다. 띄어쓰기로 조건을 함께 찾을 수 있어요. 예: 2부 1학년</p>
           </div>
           <p role="status" className="shrink-0 text-xs tabular-nums text-slate-500">
             {isSearching ? <>검색 결과 <strong className="text-slate-900">{filteredRows.length}명</strong> / 전체 {friends.length}명</> : <>전체 <strong className="text-slate-900">{friends.length}명</strong></>}

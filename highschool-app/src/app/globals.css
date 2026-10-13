@@ -6,7 +6,7 @@
 ════════════════════════════════════════════════════ */
 :root {
   /* Brand — Naver의 쉬운 초록 + CHZZK의 명료한 다크 셸을 업무 도구에 맞게 절제 */
-  --color-primary:         #077451;
+  --color-primary:         #056747;
   --color-primary-hover:   #066c4d;
   --color-primary-active:  #055c42;
   --color-primary-light:   #9ce8cc;
@@ -48,17 +48,20 @@
   --color-screen-bg:       #101214;
 
   /* Surface */
-  --color-bg:              #f5f7f6;
+  --color-bg:              #eaf0ec;
   --color-surface:         #ffffff;
-  --color-surface-hover:   #f8faf9;
-  --color-border:          #e3e9e6;
-  --color-border-hover:    #c8d2cd;
+  --color-surface-hover:   #edf3ef;
+  --color-border:          #bac8c0;
+  --color-border-hover:    #6f8978;
+  --color-control-border:  #7f9387;
+  --color-selected-bg:     var(--color-primary);
+  --color-selected-text:   var(--color-primary-contrast);
 
   /* Text */
-  --color-text-primary:    #18201d;
-  --color-text-secondary:  #3f4c47;
-  --color-text-muted:      #57665f;
-  --color-text-faint:      #637169;
+  --color-text-primary:    #12211a;
+  --color-text-secondary:  #2e4237;
+  --color-text-muted:      #455a4d;
+  --color-text-faint:      #53675b;
   /* 어두운 헤더에 밝은 배경용 텍스트 토큰을 재사용하지 않는다. */
   --color-on-dark-primary:   #f8fafc;
   --color-on-dark-secondary: #cbd5d0;
@@ -66,13 +69,13 @@
   --color-on-dark-accent:    #7de2bc;
 
   /* Semantic */
-  --color-danger:          #c84655;
+  --color-danger:          #b33245;
   --color-danger-action:   #a92537;
   --color-danger-bg:       #fff0f2;
   --color-danger-border:   #f4b9c0;
   --color-success:         #077451;
   --color-success-bg:      #e8f8f2;
-  --color-warning:         #b97912;
+  --color-warning:         #835407;
   --color-warning-bg:      #fff6df;
 
   /* Typography scale — 정보 계층 10/10
@@ -165,13 +168,14 @@
   --color-bg:               #0d1210;
   --color-surface:          #171d1a;
   --color-surface-hover:    #1d2621;
-  --color-border:           #2b3731;
-  --color-border-hover:     #46574e;
+  --color-border:           #46584d;
+  --color-border-hover:     #718b7b;
+  --color-control-border:   #7a9486;
 
   --color-text-primary:     #eef5f1;
   --color-text-secondary:   #c4d1ca;
-  --color-text-muted:       #9dadA5;
-  --color-text-faint:       #82938a;
+  --color-text-muted:       #b7c9bd;
+  --color-text-faint:       #aabeb1;
 
   --color-danger:           #ff8d9a;
   --color-danger-action:    #ff9daa;
@@ -259,7 +263,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .card {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  box-shadow: 0 0 0 1px rgba(18, 28, 24, 0.04), var(--shadow-sm);
+  box-shadow: 0 0 0 1px var(--color-border), var(--shadow-sm);
   transition: box-shadow var(--duration-normal) var(--ease-out), transform var(--duration-normal) var(--ease-out);
 }
 .card:where([data-hover]) {
@@ -341,7 +345,7 @@ table th {
   font-weight: 500;
   font-size: var(--text-base);
   cursor: pointer;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   transition: background var(--duration-fast) var(--ease-out),
               border-color var(--duration-fast) var(--ease-out),
               transform var(--duration-fast) var(--ease-out);
@@ -422,7 +426,7 @@ table th {
   width: 100%;
   min-height: 44px;
   padding: 9px 12px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   outline: none;
@@ -434,8 +438,10 @@ table th {
 .input:hover:not(:focus) { border-color: var(--color-border-hover); }
 .input:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-ring);
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
+input::placeholder, textarea::placeholder { color: var(--color-text-faint); opacity: 1; }
 
 /* ════════════════════════════════════════════════════
    Drag handle
@@ -537,7 +543,7 @@ table th {
   box-shadow: inset 0 0 0 1px var(--color-border-hover);
   background: color-mix(in srgb, currentColor 5%, transparent);
 }
-.card table tbody tr + tr { box-shadow: inset 0 1px rgba(227,233,230,.82); }
+.card table tbody tr + tr { box-shadow: inset 0 1px var(--color-border); }
 
 /* ════════════════════════════════════════════════════
    Modal backdrop — 프리미엄 느낌
@@ -782,8 +788,8 @@ table th {
 
 .surface-panel {
   border-radius: var(--radius-xl);
-  background: rgba(255,255,255,0.94);
-  box-shadow: 0 0 0 1px rgba(18,28,24,0.04), var(--shadow-sm);
+  background: var(--color-surface);
+  box-shadow: 0 0 0 1px var(--color-border), var(--shadow-sm);
   backdrop-filter: blur(10px);
 }
 
@@ -854,8 +860,8 @@ table th {
 }
 
 .workspace-tabs {
-  border-bottom: 1px solid rgba(216,225,220,.88);
-  background: rgba(255,255,255,.92);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
   backdrop-filter: blur(14px);
 }
 
@@ -870,7 +876,7 @@ table th {
   transition: color var(--duration-fast), background var(--duration-fast);
 }
 .workspace-tab:hover { color: var(--color-text-primary); background: rgba(8,122,87,.045); }
-.workspace-tab[aria-selected="true"] { color: var(--color-primary); }
+.workspace-tab[aria-selected="true"] { background: var(--color-selected-bg); color: var(--color-selected-text); font-weight: 750; }
 .workspace-tab[aria-selected="true"]::after {
   content: "";
   position: absolute;
@@ -878,7 +884,7 @@ table th {
   bottom: 0;
   height: 3px;
   border-radius: 99px 99px 0 0;
-  background: var(--color-primary);
+  background: var(--color-selected-text);
 }
 
 /* CHZZK처럼 현재 영역은 명확히, Naver처럼 주변은 조용하게 보이는 상위 그룹 탭. */
@@ -893,7 +899,7 @@ table th {
   transition: color var(--duration-fast), background var(--duration-fast);
 }
 .workspace-group-tab:hover { color: white; background: rgba(255,255,255,.06); }
-.workspace-group-tab[aria-selected="true"] { color: var(--color-text-primary); background: white; }
+.workspace-group-tab[aria-selected="true"] { color: var(--color-selected-text); background: var(--color-selected-bg); font-weight: 750; }
 
 /* ── Global portal navigation ───────────────────────────── */
 .global-portal-header {
@@ -946,7 +952,7 @@ table th {
 .portal-nav-link:hover { color: white; background: rgba(255,255,255,.07); }
 .portal-nav-link[aria-current="page"],
 .portal-nav-link[aria-expanded="true"],
-.portal-nav-link[data-active="true"] { color: white; background: rgba(125,226,188,.13); }
+.portal-nav-link[data-active="true"] { color: var(--color-selected-text); background: var(--color-selected-bg); font-weight: 750; }
 .portal-action {
   display: inline-flex;
   min-height: 36px;
@@ -1105,14 +1111,14 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
    사실상 보이지 않았다. on-dark 토큰을 밝은 화면에 쓰면 안 되는 이유다. */
 .iguard-mobile-tabs button { color: var(--color-on-dark-secondary); }
 .iguard-mobile-tabs button[aria-selected="true"] {
-  background: rgba(125,226,188,.14);
-  color: var(--color-on-dark-primary);
+  background: var(--color-selected-bg);
+  color: var(--color-selected-text);
 }
 .mobile-workspace-tabs button { color: var(--color-text-muted); }
 .mobile-workspace-tabs button:hover { color: var(--color-text-primary); }
 .mobile-workspace-tabs button[aria-selected="true"] {
-  background: var(--color-badge-bg);
-  color: var(--color-badge-text);
+  background: var(--color-selected-bg);
+  color: var(--color-selected-text);
 }
 .mobile-subtabs {
   display: flex;
@@ -1133,7 +1139,7 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
   font-weight: 750;
   white-space: nowrap;
 }
-.mobile-subtabs button[aria-selected="true"] { border-color: var(--color-primary); color: var(--color-primary); }
+.mobile-subtabs button[aria-selected="true"] { border-color: var(--color-primary); border-radius: 8px 8px 0 0; background: var(--color-selected-bg); color: var(--color-selected-text); }
 .mobile-sticky-controls { position: sticky; top: 0; z-index: 12; backdrop-filter: blur(14px); }
 .mobile-save-state {
   position: sticky;
@@ -1340,9 +1346,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .form-control {
   width: 100%;
   min-height: 44px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-control-border);
   border-radius: 11px;
-  background: white;
+  background: var(--color-surface);
   padding: 10px 12px;
   color: var(--color-text-primary);
   font-size: 13px;
@@ -1350,7 +1356,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
 }
 .form-control:hover { border-color: var(--color-border-hover); }
-.form-control:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-ring); outline: none; }
+.form-control:focus { border-color: var(--color-primary); outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
 .connectivity-banner {
   position: fixed;
@@ -1683,8 +1689,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
     font-weight: 650;
   }
   .portal-mobile-link-disabled { color: var(--color-text-faint); opacity: .72; }
-  .portal-mobile-links a[aria-current="page"] { background: var(--color-success-bg); color: var(--color-primary); }
+  .portal-mobile-links a[aria-current="page"] { background: var(--color-selected-bg); color: var(--color-selected-text); font-weight: 750; }
   .portal-mobile-links small { color: var(--color-text-faint); font-size: 10px; font-weight: 500; }
+  .portal-mobile-links a[aria-current="page"] small { color: inherit; }
   .portal-mobile-account { display: grid; margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .portal-mobile-account > button {
     display: flex;
@@ -1790,7 +1797,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .guide-month-tabs { display: grid; margin-top: 22px; grid-template-columns: repeat(12, minmax(48px, 1fr)); gap: 6px; }
 .guide-month-tabs button { min-height: 40px; border: 0; border-radius: 10px; background: #f3f6f4; color: var(--color-text-muted); cursor: pointer; font-size: 12px; font-weight: 700; transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast); }
 .guide-month-tabs button:hover { background: #e4efe9; color: var(--color-primary); }
-.guide-month-tabs button[aria-selected="true"] { background: var(--color-primary); color: white; box-shadow: var(--shadow-primary); }
+.guide-month-tabs button[aria-selected="true"] { background: var(--color-primary); color: var(--color-primary-contrast); box-shadow: var(--shadow-primary); }
 .guide-month-brief { display: grid; margin-top: 14px; align-items: center; gap: 24px; border-radius: 17px; background: #edf7f3; padding: 22px 24px; grid-template-columns: 82px minmax(220px, .8fr) minmax(0, 1fr); }
 .guide-month-number { color: var(--color-primary); font-size: 13px; font-weight: 700; }
 .guide-month-number span { margin-right: 2px; font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
@@ -1884,7 +1891,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .sunday-attendance-class-select .form-control { min-width: 190px; }
 .sunday-attendance-segment { display: flex; min-height: 42px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface-hover); }
 .sunday-attendance-segment button { min-width: 62px; border: 0; background: transparent; padding: 0 12px; color: var(--color-text-muted); cursor: pointer; font-size: 12px; font-weight: 750; }
-.sunday-attendance-segment button[aria-pressed="true"] { background: var(--color-primary); color: white; box-shadow: var(--shadow-xs); }
+.sunday-attendance-segment button[aria-pressed="true"] { background: var(--color-primary); color: var(--color-primary-contrast); box-shadow: var(--shadow-xs); }
 .sunday-attendance-source-link { flex: 0 0 auto; white-space: nowrap; }
 .sunday-attendance-error { margin: 16px 22px 0; border: 1px solid #f3c5c5; border-radius: 12px; background: #fff0f0; padding: 11px 13px; color: #a33b3b; font-size: 12px; }
 .sunday-attendance-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 22px; }
@@ -1966,13 +1973,13 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 /* 표는 많은 정보를 읽는 도구다. 헤더와 행 구분을 조용하게 고정한다. */
 .overflow-x-auto > table thead th,
 .table-header th {
-  background: #f1f5f3;
-  color: #47564f;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
 }
 .overflow-x-auto > table tbody tr { transition: background var(--duration-fast); }
-.overflow-x-auto > table tbody tr:hover { background: #f7faf8; }
+.overflow-x-auto > table tbody tr:hover { background: var(--color-surface-hover); }
 .overflow-x-auto > table td,
-.overflow-x-auto > table th { border-bottom-color: #e7ece9; }
+.overflow-x-auto > table th { border-bottom-color: var(--color-border); }
 .retreat-roster-table { position: relative; border-radius: 18px; }
 .retreat-roster-table table { min-width: 980px; }
 .retreat-roster-table thead tr:last-child th { position: sticky; top: 0; z-index: 5; }
@@ -2217,8 +2224,8 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   white-space: nowrap;
   transition: color var(--duration-fast), background var(--duration-fast);
 }
-.field-bottom-nav-item[aria-selected="true"] { background: var(--color-success-bg); color: var(--color-primary); }
-.field-bottom-nav-item[aria-selected="true"]::before { content: ""; position: absolute; top: 0; width: 24px; height: 2px; border-radius: 0 0 4px 4px; background: var(--color-primary); }
+.field-bottom-nav-item[aria-selected="true"] { background: var(--color-selected-bg); color: var(--color-selected-text); }
+.field-bottom-nav-item[aria-selected="true"]::before { content: ""; position: absolute; top: 0; width: 24px; height: 2px; border-radius: 0 0 4px 4px; background: var(--color-selected-text); }
 
 @media (max-width: 640px) {
   .iguard-workspace-header .field-title-row { min-height: 50px; padding-block: 5px; }
@@ -2227,7 +2234,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   .iguard-workspace-header h1 { font-size: 14px; }
   .field-group-tabs { width: 100%; gap: 0; border-top: 1px solid rgba(255,255,255,.07); }
   .iguard-workspace-header .workspace-group-tab { position: relative; min-height: 42px; flex: 1 0 0; border-radius: 0; padding-inline: 8px; text-align: center; }
-  .iguard-workspace-header .workspace-group-tab[aria-selected="true"] { background: transparent; color: white; }
+  .iguard-workspace-header .workspace-group-tab[aria-selected="true"] { background: var(--color-selected-bg); color: var(--color-selected-text); }
   .iguard-workspace-header .workspace-group-tab[aria-selected="true"]::after { content: ""; position: absolute; right: 22%; bottom: 0; left: 22%; height: 2px; border-radius: 2px 2px 0 0; background: var(--color-primary-light); }
   .field-execution-main { padding-top: 12px; padding-bottom: 8px; }
   .field-execution-main .card { border-color: var(--color-border); box-shadow: none; }

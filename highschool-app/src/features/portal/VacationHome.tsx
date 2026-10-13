@@ -28,7 +28,7 @@ type Props = {
   onDelete?: (id: string, name: string) => void;
   /** 현장 모드에서만 — 수련회별 PIN 잠금 여부 */
   lockedIds?: Set<string>;
-  /** 화면 우측 상단의 전역 도구 슬롯 (폼 가이드 / 잠금 관리자 / 현장 관리자) */
+  /** 화면 우측 상단의 전역 도구 슬롯 (잠금 관리자 / 현장 관리자) */
   headerActions?: ReactNode;
   /** 캘린더 아래 슬롯 (행정 브레인스토밍) */
   footer?: ReactNode;

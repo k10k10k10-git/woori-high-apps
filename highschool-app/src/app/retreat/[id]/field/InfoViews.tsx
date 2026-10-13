@@ -24,7 +24,6 @@ export function GuideView({ retreatId, guide }: { retreatId: string; guide: stri
 
   return (
     <div>
-      <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">ℹ️ 조스탭이 숙지할 행동 수칙. 현장에서 폰으로 빠르게 확인합니다.</div>
       <div className="card divide-y divide-slate-100">
         {guide.map((g, i) => (
           <div key={i} className="flex items-start gap-3 px-4 py-3">

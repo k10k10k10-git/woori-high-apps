@@ -87,7 +87,7 @@ export default function ProgramTaskBoard({ tasks, posts, canEdit, onCreate, onUp
   return (
     <section className="program-task-board" aria-labelledby="program-task-board-heading">
       <div className="program-subsection-heading">
-        <div><h3 id="program-task-board-heading">실행 할 일</h3><p>결정한 내용을 담당과 기한이 있는 작업으로 움직입니다.</p></div>
+        <div><h3 id="program-task-board-heading">실행 할 일</h3></div>
         <span className="program-count">{done}/{tasks.length} 완료{blocked > 0 ? ` · 막힘 ${blocked}` : ""}</span>
       </div>
       {canEdit && (
@@ -99,7 +99,7 @@ export default function ProgramTaskBoard({ tasks, posts, canEdit, onCreate, onUp
           <button type="button" className="btn-primary" disabled={adding || !form.title.trim()} onClick={() => void addTask()}><Plus aria-hidden="true" size={16} /> 추가</button>
         </div>
       )}
-      {ordered.length === 0 ? <p className="program-task-empty">아직 할 일이 없습니다. 다음 회의 전까지 끝낼 작업부터 등록해 주세요.</p> : (
+      {ordered.length === 0 ? <p className="program-task-empty">아직 할 일이 없습니다.</p> : (
         <ul className="program-work-list">
           {ordered.map((task) => {
             const status = programTaskStatus(task);

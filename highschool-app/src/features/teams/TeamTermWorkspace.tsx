@@ -120,8 +120,8 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
   return <TeamAccessState allowed={allowed}><main className="team-term-page">
     <header className="team-term-header">
       <div className="team-workspace-title"><Link href="/teams">팀</Link><span>/</span><Link href={`/teams/${teamKey}`}>{teamMeta.label}</Link><span>/</span><span>{semesterId}</span></div>
-      <div className="team-term-heading"><div><h1>{teamMeta.label} · {meta?.title ?? semesterId}</h1><p>이 학기의 {teamMeta.label} 명단, 출석과 자료를 확인합니다.</p></div>{past && <span className="team-role-badge">지난 학기</span>}</div>
-      {weeklyAllowed && <div className="team-context-note"><strong>{teamKey === "praise" ? "모임 출결은 주간 업무에서 입력하며 같은 학기 출석 원장에 저장됩니다." : "학기 기록과 주간·주일 업무를 같은 팀 공간에서 이어갑니다."}</strong><Link className="btn-secondary" href={praiseBack ?? weeklyHref}>{praiseBack ? "같은 모임 업무로 돌아가기" : "주간·주일 업무 열기"}</Link></div>}
+      <div className="team-term-heading"><div><h1>{teamMeta.label} · {meta?.title ?? semesterId}</h1></div>{past && <span className="team-role-badge">지난 학기</span>}</div>
+      {weeklyAllowed && <div className="team-context-note"><Link className="btn-secondary" href={praiseBack ?? weeklyHref}>{praiseBack ? "같은 모임 업무로 돌아가기" : "주간·주일 업무 열기"}</Link></div>}
       <nav className="team-term-tabs" aria-label={`${teamMeta.label} ${semesterId} 메뉴`}>{SECTIONS.map((item) => <Link key={item.key} href={item.key === "attendance" && teamKey === "praise" && weeklyAllowed ? praiseAttendanceHref : `/teams/${teamKey}/terms/${encodeURIComponent(semesterId)}/${item.key}`} aria-current={section === item.key ? "page" : undefined}>{item.label}</Link>)}</nav>
     </header>
     <section className="team-term-content">
@@ -131,7 +131,7 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
         <SemesterEditProvider canEdit={editable}>
           {section === "overview" && <TeamTermOverview team={team} roster={roster} sessions={sessions} />}
           {section === "roster" && <TeamRoster team={team} roster={roster} applicationPrivates={privateAllowed ? applicationPrivates : {}} rosterContacts={rosterContacts} showContacts={contactAllowed} />}
-          {section === "attendance" && (teamKey === "praise" && weeklyAllowed ? <div className="team-first-empty"><h2>찬양팀 모임 출결</h2><p>조별 출결과 주일 준비를 같은 화면에서 이어갑니다. 기존 학기 출석 기록은 그대로 사용합니다.</p><Link className="btn-primary" href={praiseAttendanceHref}>이 학기 모임 출결 열기</Link></div> : <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedTeamId={team.id} />)}
+          {section === "attendance" && (teamKey === "praise" && weeklyAllowed ? <div className="team-first-empty"><h2>찬양팀 모임 출결</h2><Link className="btn-primary" href={praiseAttendanceHref}>이 학기 모임 출결 열기</Link></div> : <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedTeamId={team.id} />)}
           {section === "curriculum" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} lockedTeamId={team.id} />}
           {section === "records" && <div><div className="team-context-note"><strong>학기 공용 자료</strong><span>{broadEditor ? "교역자와 통합관리자는 이 화면에서 공용 자료를 추가·삭제할 수 있습니다." : "팀 화면에서는 공용 자료를 조회만 합니다. 추가와 삭제는 운영센터에서 진행합니다."}</span></div><SemesterEditProvider canEdit={broadEditor}><ArchiveTab sid={semesterId} /></SemesterEditProvider></div>}
         </SemesterEditProvider>

@@ -37,6 +37,70 @@ async function expectServiceIsolation(page: Page) {
   expect(proof.rejected).toEqual([]);
 }
 
+function contrastRatio(foreground: string, background: string, opacity = 1) {
+  const parse = (value: string) => {
+    const channels = value.match(/[\d.]+/g)?.map(Number);
+    if (!channels || channels.length < 3) throw new Error(`브라우저 색상을 해석할 수 없습니다: ${value}`);
+    return { rgb: channels.slice(0, 3), alpha: channels[3] ?? 1 };
+  };
+  const backdrop = parse(background), color = parse(foreground);
+  if (backdrop.alpha !== 1) throw new Error(`투명 배경은 실제 표면 색상 확인이 필요합니다: ${background}`);
+  const alpha = color.alpha * opacity;
+  const composited = color.rgb.map((channel, index) => channel * alpha + backdrop.rgb[index] * (1 - alpha));
+  const luminance = (channels: number[]) => {
+    const linear = channels.map((channel) => { const normalized = channel / 255; return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4; });
+    return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+  };
+  const first = luminance(composited), second = luminance(backdrop.rgb);
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+for (const theme of ["light", "dark"]) {
+  test(`${theme} 실제 입력과 선택 탭은 충분한 색상 대비를 제공하고 가이드를 반복하지 않는다`, async ({ page }, info) => {
+    await open(page, "actualProgram", "programEditor", theme, { workspace: "programs", program: "program-main", section: "overview" });
+    const input = page.locator("#program-place");
+    await expect(input).toBeVisible();
+    const inputColors = await input.evaluate((element) => {
+      const style = getComputedStyle(element), placeholder = getComputedStyle(element, "::placeholder");
+      return { border: style.borderTopColor, background: style.backgroundColor, placeholder: placeholder.color, placeholderOpacity: Number(placeholder.opacity) };
+    });
+    expect(contrastRatio(inputColors.border, inputColors.background), JSON.stringify(inputColors)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio(inputColors.placeholder, inputColors.background, inputColors.placeholderOpacity), JSON.stringify(inputColors)).toBeGreaterThanOrEqual(4.5);
+    if ((page.viewportSize()?.width ?? 1280) <= 640) {
+      const menu = page.locator(".program-mobile-section-nav select");
+      await expect(menu).toBeVisible();
+      const colors = await menu.evaluate((element) => { const style = getComputedStyle(element); return { text: style.color, background: style.backgroundColor, border: style.borderTopColor }; });
+      expect(contrastRatio(colors.text, colors.background), JSON.stringify(colors)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(colors.border, colors.background), JSON.stringify(colors)).toBeGreaterThanOrEqual(3);
+    } else {
+      const selected = page.locator("#program-tab-overview");
+      const unselected = page.locator("#program-tab-posts");
+      await expect(selected).toHaveAttribute("aria-selected", "true");
+      const colors = await selected.evaluate((element) => { const style = getComputedStyle(element); return { text: style.color, background: style.backgroundColor }; });
+      const unselectedBackground = await unselected.evaluate((element) => getComputedStyle(element).backgroundColor);
+      expect(contrastRatio(colors.text, colors.background), JSON.stringify(colors)).toBeGreaterThanOrEqual(4.5);
+      expect(colors.background).not.toBe(unselectedBackground);
+    }
+    await expect(page.locator(".program-start-guide, .program-section-hint, .program-workspace-note")).toHaveCount(0);
+    const width = page.viewportSize()?.width ?? 1280;
+    if (width < 768 || width > 900) {
+      if (width > 900) await page.getByRole("button", { name: "팀", exact: true }).click();
+      const currentMenu = page.locator(width < 768 ? '.portal-mobile-bottom-nav a[aria-current="page"]' : '.portal-nav-link[aria-expanded="true"]').first();
+      await expect(currentMenu).toBeVisible();
+      await expect.poll(() => currentMenu.evaluate((element) => getComputedStyle(element).backgroundColor.startsWith("rgb("))).toBe(true);
+      const currentMenuColors = await currentMenu.evaluate((element) => { const style = getComputedStyle(element); return { text: style.color, background: style.backgroundColor }; });
+      expect(contrastRatio(currentMenuColors.text, currentMenuColors.background), JSON.stringify(currentMenuColors)).toBeGreaterThanOrEqual(4.5);
+      expect(currentMenuColors.background).not.toBe("rgba(0, 0, 0, 0)");
+      if (width > 900) await page.keyboard.press("Escape");
+    }
+    await expectAccessible(page);
+    await expectNoOverflow(page);
+    await expectServiceIsolation(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+    await page.screenshot({ path: info.outputPath(`program-contrast-${theme}.png`), fullPage: true });
+  });
+}
+
 async function programSection(page: Page, key: string) {
   if ((page.viewportSize()?.width ?? 1280) <= 640) await page.locator(".program-mobile-section-nav select").selectOption(key);
   else await page.locator(`#program-tab-${key}`).click();
@@ -329,31 +393,24 @@ for (const theme of ["light", "dark"]) {
   }
 }
 
-test("첫 방문 안내가 자동 열리고 닫기·재방문·다시 열기·계정 변경이 동작한다", async ({ page }) => {
+test("첫 방문·재방문·계정 변경에도 팀 업무를 안내 없이 바로 보여준다", async ({ page }) => {
   await open(page, "team");
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeVisible();
-  const close = page.getByRole("button", { name: "안내 닫기" });
-  await expect(close).toHaveAttribute("aria-expanded", "true");
-  await close.click();
-  await expect(page.getByRole("button", { name: "사용 안내 열기" })).toHaveAttribute("aria-expanded", "false");
+  const title = page.getByRole("heading", { name: "찬양팀", exact: true });
+  await expect(title).toBeVisible();
+  await expect(page.locator("#team-first-guide")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /안내 닫기|사용 안내 열기/ })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole("button", { name: "사용 안내 열기" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toHaveCount(0);
-  await page.getByRole("button", { name: "사용 안내 열기" }).click();
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeVisible();
-  await page.getByRole("button", { name: "안내 닫기" }).click();
+  await expect(title).toBeVisible();
+  await expect(page.locator("#team-first-guide")).toHaveCount(0);
   await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("ready", "synthetic-staff-b"));
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeVisible();
+  await expect(title).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "선택 학기 업무" }).getByRole("link")).toHaveCount(4);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
   await expectNoOverflow(page);
 });
 
-test("팀 전체 현황과 명확한 업무 설명이 첫 화면에 제공된다", async ({ page }) => {
+test("팀 전체 현황에서 선택한 학기 업무로 바로 연결한다", async ({ page }) => {
   await open(page, "team");
-  const guideLink = page.getByRole("link", { name: "처음이라면 사용 안내로 이동" });
-  await expect(guideLink).toBeInViewport();
-  await expect(page.getByRole("link", { name: "업무 바로가기" })).toHaveAttribute("href", "#team-work-actions");
-  await guideLink.click();
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeInViewport();
   await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
   await expect(page.getByRole("region", { name: "팀 전체 현황" })).toContainText("2명");
   await expect(page.getByRole("region", { name: "팀 전체 현황" })).toContainText("1명");
@@ -361,48 +418,43 @@ test("팀 전체 현황과 명확한 업무 설명이 첫 화면에 제공된다
   await expect(page.getByRole("region", { name: "팀 전체 현황" })).not.toContainText("합성 휴강");
   await expect(page.getByRole("navigation", { name: "선택 학기 업무" }).getByRole("link", { name: "선택 학기 명단·연락처 열기", exact: true })).toHaveAttribute("href", "/teams/praise/terms/2026-2/roster");
   await expect(page.getByRole("link", { name: /이번.*모임/ }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "사이트 사용법 보기" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "처음이라면 사용 안내로 이동" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "사이트 사용법 보기" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "학기 개요 보기" })).toHaveCount(0);
   await expectNoOverflow(page);
 });
 
-test("브라우저 저장이 막혀도 첫 안내를 닫고 다시 열 수 있다", async ({ page }) => {
+test("브라우저 저장이 막혀도 팀 현황과 업무를 바로 이용한다", async ({ page }) => {
   await page.addInitScript(() => {
     Storage.prototype.getItem = () => { throw new DOMException("Synthetic blocked storage", "SecurityError"); };
     Storage.prototype.setItem = () => { throw new DOMException("Synthetic blocked storage", "SecurityError"); };
   });
   await open(page, "team");
-  await page.getByRole("button", { name: "안내 닫기" }).click();
-  await expect(page.getByRole("button", { name: "사용 안내 열기" })).toHaveAttribute("aria-expanded", "false");
-  await page.getByRole("button", { name: "사용 안내 열기" }).click();
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "선택 학기 업무" }).getByRole("link")).toHaveCount(4);
+  await expect(page.locator("#team-first-guide")).toHaveCount(0);
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes.length)).toBe(0);
 });
 
-test("홈의 첫 안내를 닫아도 팀 첫 사용 안내는 별도로 자동 열린다", async ({ page }) => {
+test("홈의 업무 링크와 팀 화면을 사용 안내 없이 바로 이용한다", async ({ page }) => {
   await open(page, "homeGuide");
-  const details = page.locator("details");
-  await expect(details).toHaveAttribute("open", "");
-  await details.locator("summary").click();
-  await expect(details).not.toHaveAttribute("open", "");
+  await expect(page.locator("details")).toHaveCount(0);
+  const entry = page.getByRole("link", { name: "업무 열기", exact: true });
+  await expect(entry).toHaveAttribute("href", "/teams/praise");
+  await entry.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/teams\/praise$/);
+  await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
+  await expect(page.locator("#team-first-guide")).toHaveCount(0);
   await page.reload();
-  await expect(details).not.toHaveAttribute("open", "");
-  await open(page, "team");
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeVisible();
-  await page.getByRole("button", { name: "안내 닫기" }).click();
-  await page.reload();
-  await expect(page.getByRole("button", { name: "사용 안내 열기" })).toBeVisible();
-  await page.evaluate(() => window.__NEW_STAFF_QA__.setAuth("ready", "synthetic-staff-b"));
-  await expect(page.getByRole("heading", { name: "찬양팀, 이렇게 시작해요" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
 });
 
-test("조회자에게는 입력·저장 대신 조회와 담당자 문의를 안내한다", async ({ page }) => {
+test("조회자는 반복 가이드 대신 조회 권한 상태를 확인한다", async ({ page }) => {
   await open(page, "homeGuide", "viewer");
-  const guide = page.locator("details");
-  await expect(guide).toHaveAttribute("open", "");
+  await expect(page.locator("details")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "내 업무 시작" })).toContainText("팀 기록 조회 전용");
-  await expect(guide).toContainText("학기 명단·연락처와 기존 기록 조회");
-  await expect(guide).not.toContainText("저장 결과 확인");
   await open(page, "team", "viewer");
   await expect(page.getByRole("region", { name: "주간 업무와 학기 기록" })).toContainText("조회");
   await expect(page.getByRole("region", { name: "주간 업무와 학기 기록" })).not.toContainText("주간·주일 입력");
@@ -432,7 +484,7 @@ test("권한 조회 실패는 승인 거절과 구분되고 재시도로 복구�
 
 test("도움말을 확인한 뒤 이전 팀 업무 화면으로 돌아갈 수 있다", async ({ page }) => {
   await open(page, "team");
-  await page.getByRole("link", { name: "사이트 사용법 보기" }).click();
+  await page.goto("/library/help");
   await expect(page).toHaveURL(/\/library\/help$/);
   await expect(page.getByRole("heading", { name: "사이트 사용법", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "이전 화면으로" }).click();

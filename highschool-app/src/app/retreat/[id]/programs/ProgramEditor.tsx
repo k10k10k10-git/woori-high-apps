@@ -281,7 +281,6 @@ export default function ProgramEditor({
         <div>
           <span>{programStatusMeta(draft.status).label}</span>
           <h2 id="program-editor-title">{draft.title || "이름 없는 프로그램"}</h2>
-          <p>{programStatusMeta(draft.status).description}</p>
         </div>
         <div className="program-editor-heading__actions">
           {canEdit && <button type="button" className="btn-primary program-meeting-launch" disabled={!meetingsAvailable} title={meetingsAvailable ? undefined : "준비회의 기록에 다시 연결한 뒤 사용할 수 있습니다."} onClick={() => setMeetingSession({ programId: program.id, version: meetingSessionVersion })}><UsersThree aria-hidden="true" size={18} /> 회의 시작</button>}
@@ -303,7 +302,7 @@ export default function ProgramEditor({
       {canEdit && dirty && (
         <div className="program-dirty-save-dock">
           <FloppyDisk aria-hidden="true" size={18} />
-          <div aria-live="polite"><strong>저장하지 않은 초안</strong><span>이 영역의 변경 사항을 안전하게 반영하세요.</span></div>
+          <div aria-live="polite"><strong>저장하지 않은 초안</strong></div>
           <button type="button" className="btn-primary btn-sm" disabled={saving} onClick={() => void save()}>
             {saving ? "저장 중…" : "초안 저장"}
           </button>
@@ -317,7 +316,7 @@ export default function ProgramEditor({
             <div>
               <span className="program-eyebrow">다음 준비</span>
               <h3 id="program-readiness-heading">{needsProgramIdentity ? "이름과 담당자를 먼저 정해 주세요" : readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : taskProgress.done < taskProgress.total ? "현장 점검은 끝났습니다" : "현장 공유 준비가 끝났습니다"}</h3>
-              <p>{needsProgramIdentity ? "프로그램을 구별할 이름과 전체 진행을 맡을 사람부터 입력합니다." : readiness.missingLabels.length > 0 ? "가장 먼저 채울 항목만 보여드립니다." : taskProgress.done < taskProgress.total ? `실행 할 일 ${taskProgress.total - taskProgress.done}건을 마치면 현장에 공유할 수 있습니다.` : "점검·현장 공유에서 최종 공개할 수 있습니다."}</p>
+              {taskProgress.done < taskProgress.total && <p>실행 할 일 {taskProgress.total - taskProgress.done}건 남음</p>}
             </div>
             <span>{readiness.percent}%</span>
           </div>
@@ -334,7 +333,7 @@ export default function ProgramEditor({
           ) : readiness.missingLabels.length === 0 ? (
             <button type="button" className="program-readiness-complete" onClick={() => onSelectSection("tasks")}>
               <CheckCircle aria-hidden="true" size={20} weight="fill" />
-              <span><strong>최종 점검과 현장 공유</strong><small>공유 대상을 확인한 뒤 공개합니다.</small></span>
+              <span><strong>최종 점검과 현장 공유</strong></span>
               <ArrowRight aria-hidden="true" size={16} />
             </button>
           ) : (
@@ -374,7 +373,6 @@ export default function ProgramEditor({
       {section === "overview" && (
         <>
         <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
-          <div className="program-save-mode program-save-mode--manual"><strong>초안 저장</strong><span>기본 정보와 목표를 수정하면 상단에 저장 버튼이 나타납니다.</span></div>
           <section className="program-form-section">
             <h3>기본 정보</h3>
             <div className="program-form-grid">
@@ -395,7 +393,6 @@ export default function ProgramEditor({
                     .filter(([value]) => value !== "published" || draft.status === "published")
                     .map(([value, meta]) => <option key={value} value={value} disabled={value === "published"}>{meta.label}</option>)}
                 </select>
-                <small className="program-field-help">현장 공유는 마지막 탭에서 별도로 관리합니다.</small>
               </label>
               <label className="program-field"><span>날짜</span><input id="program-date" type="date" className="input" value={draft.date ?? ""} onChange={(event) => setField("date", event.target.value)} /></label>
               <label className="program-field"><span>시작</span><input id="program-start-time" type="time" className="input" value={draft.startTime ?? ""} onChange={(event) => setField("startTime", event.target.value)} /></label>
@@ -421,12 +418,11 @@ export default function ProgramEditor({
         </fieldset>
         <ProgramTaskBoard tasks={tasks} posts={posts} canEdit={canEdit} onCreate={onCreateTask} onUpdate={onUpdateTask} onDelete={onDeleteTask} onRestore={onRestoreTask} />
         <details className="program-detail-document">
-          <summary><span><strong>상세 문서</strong><small>브리핑, 아이디어와 기록은 필요할 때만 펼쳐 작성합니다.</small></span><ArrowRight aria-hidden="true" size={17} /></summary>
+          <summary><span><strong>상세 문서</strong></span><ArrowRight aria-hidden="true" size={17} /></summary>
           <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
-            <div className="program-save-mode program-save-mode--manual"><strong>초안 저장</strong><span>상세 문서를 수정하면 상단에 저장 버튼이 나타납니다.</span></div>
             <div className="program-text-fields">
               {RECORD_FIELDS.map((field) => <label key={field.key} className="program-field"><span>{field.label}</span><textarea id={`program-${field.key}`} className="input" rows={field.rows} maxLength={6000} value={(draft[field.key] as string | undefined) ?? ""} onChange={(event) => setField(field.key, event.target.value)} placeholder={field.placeholder} /></label>)}
-              {draft.decisions?.trim() && <label className="program-field"><span>기존 회의 기록</span><textarea id="program-decisions" className="input" rows={6} maxLength={6000} value={draft.decisions} onChange={(event) => setField("decisions", event.target.value)} /><small className="program-field-help">기존 자료를 보존하는 칸입니다. 새 회의는 상단의 회의 시작에서 기록해 주세요.</small></label>}
+              {draft.decisions?.trim() && <label className="program-field"><span>기존 회의 기록</span><textarea id="program-decisions" className="input" rows={6} maxLength={6000} value={draft.decisions} onChange={(event) => setField("decisions", event.target.value)} /></label>}
             </div>
           </fieldset>
         </details>
@@ -447,10 +443,8 @@ export default function ProgramEditor({
       {section === "posts" && (
         <>
         <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
-          <div className="program-save-mode program-save-mode--manual"><strong>초안 저장</strong><span>전체 진행안·규칙·대본을 수정하면 상단에 저장 버튼이 나타납니다.</span></div>
           <section className="program-form-section">
             <h3>전체 흐름</h3>
-            <p className="program-section-hint">프로그램의 큰 순서를 적고, 아래에서 활동마다 운영 방식과 참가 단위를 지정합니다. 이가드 큐싯은 전체 수련회 시간표의 단일 원본입니다.</p>
             <div className="program-text-fields">
               {FLOW_FIELDS.map((field) => (
                 <label key={field.key} className="program-field">
@@ -488,7 +482,6 @@ export default function ProgramEditor({
           <ProgramRolesSection groups={groupRolesByPost(program)} canEdit={canEdit} onCreate={onCreateRole} onUpdate={onUpdateRole} onDelete={onDeleteRole} onRestore={onRestoreRole} />
           <ProgramItemsSection groups={groupItemsByPost(program)} canEdit={canEdit} onCreate={onCreateItem} onUpdate={onUpdateItem} onDelete={onDeleteItem} onRestore={onRestoreItem} />
           <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
-            <div className="program-save-mode program-save-mode--manual"><strong>초안 저장</strong><span>표에 담기 어려운 물품 메모를 수정하면 상단에 저장 버튼이 나타납니다.</span></div>
             <section className="program-form-section">
               <h3>물품 메모</h3>
               <label className="program-field">

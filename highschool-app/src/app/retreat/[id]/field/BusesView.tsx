@@ -270,12 +270,6 @@ export default function BusesView({ retreatId, buses, groups, students, particip
 
   return (
     <div>
-      <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
-        ℹ️ 인승은 호차별로 설정할 수 있고(기본 {DEFAULT_BUS_CAPACITY}인승), 자동배정은 각 호차의 인승에 맞춰 <strong>인원 균등(정원 비례)</strong>을 우선으로 잡고, 가능하면 스탭 좌석 {RESERVED_STAFF_SEATS}석을 남깁니다.
-        <span className="mt-1 block text-emerald-600"><strong>혼합</strong>은 기존처럼 조 전체를 유지하고, <strong>남녀 분리</strong>는 한 조의 같은 성별 학생을 한 묶음으로 유지해 성별 호차에 배정합니다.</span>
-        <span className="mt-1 block text-emerald-600">행정의 교사 불참·자차와 학생 부분참 당일참여는 단체 버스 인원에서 제외됩니다.</span>
-      </div>
-
       <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
           {([1, 3] as const).map(d => (

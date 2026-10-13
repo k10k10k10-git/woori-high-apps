@@ -113,10 +113,6 @@ export default function RoomsView({ groups, rooms, buses, meals, staff, groupSta
 
   return (
     <div>
-      <div className="mb-4 bg-emerald-50 border border-emerald-100 rounded-lg p-3 text-xs text-emerald-700">
-        ℹ️ 조별 교사·스탭·GBS·숙소입니다. 방·조 정보는 <strong>행정 사이트</strong>, GBS 장소는 <strong>이가드 기획 탭</strong> 값을 우선해 실시간 반영합니다.
-      </div>
-
       {mealSummaries.length > 0 && (
         <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white" aria-labelledby="meal-order-summary-title">
           <h2 id="meal-order-summary-title" className="sr-only">식사 순서</h2>

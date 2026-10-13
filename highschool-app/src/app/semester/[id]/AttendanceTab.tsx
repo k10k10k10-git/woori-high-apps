@@ -302,7 +302,6 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             </button>
           ))}
         </div>
-        {view === "grid" && <span className="text-xs text-slate-400">칸을 눌러 출석·결석을 고릅니다.</span>}
       </div>
 
       {view === "grid" ? (
