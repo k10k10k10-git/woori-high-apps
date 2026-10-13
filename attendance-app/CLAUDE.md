@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **이 앱** (`woori-attendance-next`) — 학생 출석부 (`classes/`, `attendance/`, `events/` 경로 소유)
 - **`highschool-app` 통합 플랫폼** — 학기·주일·수련회 행정·이가드 현장 기능. 학생 명단과 출석을 읽고, `canWriteStudentRoster`가 허용한 새친구 단건 등록·검증된 되돌리기만 제한적으로 쓴다.
 
+### 시트 동기화 사용 종료 (2026-10-13)
+
+- 사용자 요청으로 운영 설정의 구글 시트 주소 저장·조회, 시트 네트워크 조회, 동기화 미리보기·적용 화면과 전용 스타일을 제거했다. 이 문서 아래의 시트 동기화 설명은 과거 구현 기록이며 현재 사용 가능한 기능이 아니다.
+- 기존 `config/sheetSync` 설정·학생·출석·감사 이력과 Rules는 변경하지 않는다. 새친구 등록현황·비고의 통합사이트 실시간 연동, 장결 일반 명단 복귀, 명단 직접 입력, 엑셀 내려받기와 새해 진급은 유지한다.
+- `sheetSync.ts`의 명단 입력용 CSV 파서·진급 출석 타입 및 과거 순수 보존 회귀, 진급의 서버 잠금·스냅샷 검사에 쓰이는 `sheetSyncCommit.ts`는 공용 처리이므로 삭제하지 않는다. 설정 탭 전환의 시트 미노출·주소 무조회·DB 무쓰기를 렌더와 격리 PC·모바일 검사로 확인한다.
+
 ## 개발 명령어
 
 ```bash

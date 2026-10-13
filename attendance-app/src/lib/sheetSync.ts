@@ -11,8 +11,8 @@
 // ⚠️ classes/{year} + attendance/{year} = 4개 앱이 공유하는 가장 핵심 노드.
 //    반드시 미리보기(buildSyncPlan) 확인 후 적용한다.
 //
-// 페치는 가벼운 per-tab CSV(export?format=csv&gid=) 사용 — 32MB xlsx(사진 포함) 회피.
-// 탭 gid 목록은 htmlview에서 추출.
+// 2026-10-13: 시트 동기화 UI·네트워크 실행은 제거했다.
+// 명단 직접 입력용 CSV 파서·진급용 출석 타입과 과거 보존 계약의 순수 테스트만 유지한다.
 // ────────────────────────────────────────────────────────────────
 import { getSundaysForYear } from '@/utils/dates';
 import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
@@ -90,20 +90,6 @@ function splitOldAttendance(
   return { carry, superseded };
 }
 
-const csvUrl = (id: string, gid: string) =>
-  `https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}&t=${Date.now()}`;
-const htmlUrl = (id: string) =>
-  `https://docs.google.com/spreadsheets/d/${id}/htmlview?t=${Date.now()}`;
-
-export function extractSheetId(urlOrId: string): string | null {
-  const t = (urlOrId || '').trim();
-  if (!t) return null;
-  const m = t.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  if (m) return m[1];
-  if (/^[a-zA-Z0-9_-]{20,}$/.test(t)) return t;
-  return null;
-}
-
 /** CSV 파싱 — 따옴표 안 줄바꿈/쉼표 처리 (행사 셀의 세로 텍스트 대응) */
 export function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
@@ -126,13 +112,6 @@ export function parseCSV(text: string): string[][] {
   row.push(cur);
   if (row.some(c => c !== '')) rows.push(row);
   return rows;
-}
-
-/** htmlview HTML에서 모든 탭 gid 추출 (중복 제거) */
-export function extractGids(html: string): string[] {
-  const set = new Set<string>();
-  for (const m of html.matchAll(/gid=(\d+)/g)) set.add(m[1]);
-  return [...set];
 }
 
 function cell(rows: string[][], r: number, c: number): string {
@@ -238,36 +217,6 @@ export function parseClassCsv(rows: string[][], part: string, year: number): Par
   if (students.length === 0) return null;
 
   return { ck: `${part}-${grade}-${classNum}`, part, grade, classNum, teacher, students };
-}
-
-/**
- * 한 부(스프레드시트) 전체 반 파싱.
- * @param onProgress (done, total) 진행 콜백
- */
-export async function fetchClassTabs(
-  sheetId: string,
-  part: string,
-  year: number,
-  onProgress?: (done: number, total: number) => void
-): Promise<ParsedClass[]> {
-  const htmlRes = await fetch(htmlUrl(sheetId), { cache: 'no-store' });
-  if (!htmlRes.ok) throw new Error('시트 목록을 불러올 수 없습니다. 공유 설정(링크가 있는 모든 사용자 — 뷰어)을 확인해주세요.');
-  const gids = extractGids(await htmlRes.text());
-  if (gids.length === 0) throw new Error('시트 탭을 찾지 못했습니다.');
-
-  const out: ParsedClass[] = [];
-  let done = 0;
-  for (const gid of gids) {
-    try {
-      const res = await fetch(csvUrl(sheetId, gid), { cache: 'no-store' });
-      if (res.ok) {
-        const pc = parseClassCsv(parseCSV(await res.text()), part, year);
-        if (pc) out.push(pc);
-      }
-    } catch { /* 개별 탭 실패는 건너뜀 */ }
-    onProgress?.(++done, gids.length);
-  }
-  return out;
 }
 
 // ── 매칭 정규화 ──────────────────────────────────────────────

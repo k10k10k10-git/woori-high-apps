@@ -26,7 +26,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 | 관리자 셸·주간 현황 | `src/components/admin/`, `src/lib/adminNavigation.ts`, `src/utils/adminDashboard.ts` | 일반 관리자만 진입, 기존 구독 재사용, 입력 업무와 출석 통계의 분모 구분 |
 | 출석·통계 | `src/components/tabs/AttendanceTab.tsx`, `src/utils/attendanceEntry.ts`, `src/utils/attendanceWorkflow.ts`, `src/utils/dates.ts` | KST 주일·행사 제외·역할별 날짜 범위·장결 분리 |
 | 학생 명단 | `src/components/modals/`, `src/components/tabs/ManageTab.tsx` | 학생 단일 경로 쓰기·personId·행정 이력 |
-| 시트 동기화 | `src/lib/sheetSync.ts`, `src/components/tabs/SheetSyncSection.tsx` | 미리보기와 payload 분리, 출석·SID 보존 |
+| 진급·명단 입력 공용 처리 | `src/lib/promotion.ts`, `src/lib/sheetSyncCommit.ts`, `src/utils/rosterImport.ts` | 시트 동기화 UI·네트워크 실행은 2026-10-13 제거. 진급 잠금·최신 원장 검증과 CSV 입력은 유지 |
 | 계정·교사·전체 현황 | `src/components/tabs/AdminTab.tsx`, `src/components/tabs/overall/` | 출석부 권한과 플랫폼 권한 구분 |
 | 공용 처리 | `src/utils/personId.ts`, `adminChange.ts`, `export.ts`, `image.ts`, `chartSetup.ts`, `dbError.ts` | 기존 순수 함수 재사용·민감값 최소화 |
 | 스타일·PWA | `src/app/globals.css`, `src/components/admin/*.css`, `public/sw.js`, `public/manifest.json` | 관리자 스타일 범위·CSS 변수·모바일 화면·캐시 제외 목록 |
@@ -62,9 +62,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - 학생 수정·이동·삭제는 해당 학생 경로와 관련 경로를 루트 `update()`로 묶는다. `RosterModal`의 확인 후 명단 교체, 시트 동기화, 진급에는 현재 전체 `students` 교체 경로가 있으므로 일반 수정의 본보기로 복사하지 않는다. 전체 덮어쓰기를 추가·수정할 때는 백업·복구 범위를 먼저 검토한다.
 - `personId`는 영구 연결용 선택 필드다. 기존 sid·pid·출석 참조키를 대체하지 않는다. 생성 시 `person_student_*`·`person_teacher_*`·`person_staff_*`를 구분하고, 편집·이동·진급·동기화에서는 보존한다. 학생 과거 ID 재사용은 이름·생년월일·부서·정상 진급선·연도별 유일 후보 조건을 `personId.ts`에 위임한다. 같은 연도 다른 ID와 보호자 연락처만으로 합치지 않는다.
 - 관리자 학생 변경은 원본과 `classes/{year}/{ck}/adminChanges/{changeId}`를 같은 update에 기록한다. `adminChange.ts`의 `VALUE_FIELDS`에 있는 **이름·학교만** 실제 값을 남긴다. 연락처·주소·생년월일·사진은 값 없이 필드 이름과 입력/변경/삭제만 기록한다. 일반 교사 출석 입력은 이 행정 이력 대상이 아니다.
-- 시트 동기화는 1부·2부를 함께 미리보기하고 `buildSyncPlan` → `buildSyncPayload`로 적용한다. 같은 반 기존 SID·사진·personId를 유지하고, 평시 명단으로 복귀한 학생은 새 payload에서 `jang`을 생략해 해제한다.
-- 주일 당일 동기화는 오늘 열을 건드리지 않는다. `lastElapsedSundayUTC`와 토·일·월 회귀 테스트를 유지한다. 시트 반 이동은 기존 출석 스냅샷에서 **시트 값이 없는 칸만** 이관한 후 옛 출석 경로를 삭제한다. 스냅샷이 없으면 이관·삭제하지 않는다.
-- 시트 행정 이력은 `describeSheetSyncForClass()`가 변동 없는 반에 `null`을 반환하면 남기지 않는다. `removeMissing`으로 제외되는 학생의 출석은 이관 목적지가 없어 의도적으로 보존한다. 자동 정리되지 않는 `trash/{year}/attendance`를 새로 만들지 않는다.
+- 시트 동기화는 사용자 요청으로 2026-10-13 제거했다. 시트 주소 설정·Google 시트 요청·미리보기·적용 화면은 없다. `sheetSync.ts`의 공용 CSV 파서·출석 타입 및 과거 보존 계약의 순수 테스트, 진급에서 사용하는 `sheetSyncCommit.ts`는 유지한다. 기존 시트 설정·학생·출석·행정 이력을 삭제하거나 Rules를 바꾸지 않는다. 통합사이트 새친구·비고 실시간 연동과 엑셀 내려받기는 별개 기능으로 유지한다.
 - 사진은 `compressImage()`로 압축하고, 인쇄 HTML에 사용자 값을 넣을 때는 `escapeHTML()`을 거친다. 내보내기·차트는 기존 `export.ts`·`chartSetup.ts`의 동적 로딩을 재사용한다.
 - 계정 역할·연도·재조회가 바뀌면 `AppContext.resetData`가 원장·행사·계정 목록·편집 대상을 함께 비우고 `dataRevision`을 증가시킨다. 구독 성공·오류와 관리자 계정 목록 응답에는 요청 당시 revision을 붙인다. `DataLoadGate`의 세 원장 준비 조건을 우회해 이전 자료나 실패한 빈 자료로 편집 화면을 열지 않는다.
 - `watchCalendarYear`는 실제 KST 연도 변경만 알리고 최신 예약 타이머까지 종료한다. `CALENDAR_YEAR_CHANGED`는 직전 달력 연도 조회 중에만 새해로 넘기므로, 수동 과거 연도 선택을 화면 복귀 때 덮어쓰지 않는다.
