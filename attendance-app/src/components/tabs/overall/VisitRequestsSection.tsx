@@ -4,6 +4,7 @@ import { db, onValue, ref } from '@/lib/db';
 import { saveVisitRequestStatus } from '@/lib/visitRequestStatus';
 import { useApp } from '@/store/AppContext';
 import AdminIcon from '@/components/admin/AdminIcon';
+import AdminStatusBadge from '@/components/admin/AdminStatusBadge';
 import HistoryModal from '@/components/modals/HistoryModal';
 import { resolveStudentConnection } from '@/utils/studentConnection';
 import { showToast } from '@/utils/toast';
@@ -91,8 +92,8 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
         <p>현재 소속 기준으로 찾고, 연락처와 출석 이력을 확인하세요. 요청 당시 반은 그대로 보존됩니다.</p></div>
     </header>
     <div className="ad-status-tabs ao-visit-tabs" role="group" aria-label="심방 요청 상태">
-      <button type="button" aria-pressed={view === 'open'} onClick={() => setView('open')}>확인 필요 <span>{openCount}</span></button>
-      <button type="button" aria-pressed={view === 'done'} onClick={() => setView('done')}>처리 완료 <span>{doneCount}</span></button>
+      <button type="button" aria-pressed={view === 'open'} data-status-tone="warning" onClick={() => setView('open')}><AdminIcon name="clock" />확인 필요 <span>{openCount}</span></button>
+      <button type="button" aria-pressed={view === 'done'} data-status-tone="success" onClick={() => setView('done')}><AdminIcon name="check" />처리 완료 <span>{doneCount}</span></button>
     </div>
     {saveError && <div className="ao-error" role="alert"><span>{saveError}</span><button type="button" disabled={savingKey !== null} onClick={() => { setSaveError(''); setLoad({ year: curYear, revision: dataRevision, rows: [], status: 'loading' }); setRetry(value => value + 1); }}>목록 다시 불러오기</button></div>}
     {requestKey && current.status === 'ready' && !requestedRow && <p className="pr-empty" role="status">요청한 심방 건을 찾을 수 없습니다. 조회 연도를 확인해 주세요.</p>}
@@ -109,7 +110,7 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
             return <article key={key} ref={requestKey === key ? targetRef : undefined} tabIndex={requestKey === key ? -1 : undefined} aria-label={requestKey === key ? `${row.studentName} 심방 요청` : undefined} className="ao-visit-row" style={requestKey === key ? { background: '#faf9fc', outline: '1px solid #6355a7', outlineOffset: '-1px', scrollMarginTop: '24px' } : undefined}>
               <div className="ao-visit-person"><strong>{linked?.student.name ?? row.studentName}</strong><span>{linked ? '현재 ' : '요청 당시 '}{part}부 {grade}학년 {cls}반 · {classData[currentClass]?.teacher || row.author || '담임 미등록'}</span>
                 {linked && currentClass !== row.classKey && <span>요청 당시 {row.classKey.split('-').map((v, i) => `${v}${['부', '학년', '반'][i]}`).join(' ')}</span>}
-                {!linked && <span>학생 연결 확인 필요 · 다른 학생 연락처는 표시하지 않습니다.</span>}
+                {!linked && <span><AdminStatusBadge label="학생 연결 확인 필요" /> · 다른 학생 연락처는 표시하지 않습니다.</span>}
                 {linked && <div className="ao-visit-contacts">{(['phone', 'pphone'] as const).map((field, index) => {
                   const value = linked.student[field];
                   const number = value?.replace(/[^\d+]/g, '');
@@ -118,7 +119,7 @@ export default function VisitRequestsSection({ initialView = 'open', filter, req
                 })}<button type="button" onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: linked.student.id, ck: currentClass } })}>출석 이력 보기</button></div>}
               </div>
               <p>{row.text}</p>
-              <div className="ao-visit-action"><time dateTime={date.dateTime}>{date.label}</time><button type="button" disabled={savingKey !== null || state.userRole?.role !== 'admin'}
+              <div className="ao-visit-action"><AdminStatusBadge label={savingKey === key ? '저장 중' : row.status === 'done' ? '처리 완료' : '확인 필요'} /><time dateTime={date.dateTime}>{date.label}</time><button type="button" disabled={savingKey !== null || state.userRole?.role !== 'admin'}
                 onClick={() => changeStatus(row, row.status === 'done' ? 'open' : 'done')}>{savingKey === key ? '저장 중' : row.status === 'done' ? '다시 열기' : '처리 완료'}</button></div>
             </article>;
           })}</div>}

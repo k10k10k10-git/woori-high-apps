@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { isDataReady, useApp } from '@/store/AppContext';
 import { buildYouthHandoff, youthHandoffWorkbookRows, YOUTH_HANDOFF_COLUMNS } from '@/utils/youthHandoff';
 import { downloadXLSX } from '@/utils/export';
+import AdminStatusBadge from './AdminStatusBadge';
 
 /** Operate: 기존 설정의 흰 작업면·보라색 버튼을 이어, 전체 대상과 추출 기준을 다운로드 앞에 둔다. */
 export default function YouthHandoffSection() {
@@ -52,7 +53,7 @@ export default function YouthHandoffSection() {
       {report.rows.length ? <details className="as-handoff-preview"><summary>인계 명단 미리보기 · {report.rows.length}명</summary><div className="as-handoff-table" role="region" aria-label="청년부 인계 명단" tabIndex={0}>
         <table><thead><tr>{YOUTH_HANDOFF_COLUMNS.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{report.rows.map(row => <tr key={`${row.classKey}/${row.student.id}`}>
           <th scope="row">{row.student.name || '미등록'}<small>{row.classKey.replace(/^(\d)-3-(\d+)$/, '$1부 3학년 $2반')}</small></th>
-          <td>{row.birth}</td><td>{row.student.phone || '미등록'}</td><td>{row.student.pphone || '미등록'}</td><td>{row.student.school || '미등록'}</td><td>{row.student.addr || '미등록'}</td><td>{row.rate === null ? '산정 불가' : `${row.rate}%`}</td><td>{row.grade}</td>
+          <td>{row.birth}</td><td>{row.student.phone || '미등록'}</td><td>{row.student.pphone || '미등록'}</td><td>{row.student.school || '미등록'}</td><td>{row.student.addr || '미등록'}</td><td>{row.rate === null ? '산정 불가' : `${row.rate}%`}</td><td><AdminStatusBadge label={row.grade} /></td>
         </tr>)}</tbody></table>
       </div></details> : <p className="as-empty-note">선택한 연도에 등록된 고3 학생이 없습니다.</p>}
     </>}

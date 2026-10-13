@@ -61,7 +61,6 @@
 .as-account-assignment { display: flex; align-items: center; flex-wrap: wrap; gap: 7px 9px; font-size: 12px; color: var(--as-muted); }
 .as-badge { display: inline-flex; align-items: center; width: fit-content; padding: 2px 7px; font-size: 11px; font-weight: 500; border: 1px solid var(--as-line); border-radius: 8px; color: #595b67; background: #fafafb; white-space: nowrap; }
 .as-badge-accent { color: #584a97; border-color: #e6e0f2; background: var(--as-soft); }
-.as-badge-warning { color: #805f19; border-color: #ede1be; background: #fffaee; }
 .as-list-count { padding-top: 14px; color: var(--as-muted); font-size: 12px; }
 .as-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; min-height: 220px; padding: 32px 20px; border-block: 1px solid var(--as-line); color: var(--as-muted); text-align: center; }
 .as-empty h3 { color: var(--as-ink); font-size: 15px; font-weight: 550; }
@@ -98,7 +97,7 @@
 .as-promotion-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--as-line); font-size: 12px; }
 .as-promotion-row > span { color: var(--as-muted); }
 .as-promotion-row strong { font-weight: 550; }
-.as-promotion-row > .as-badge { margin-left: auto; color: #805f19; }
+.as-promotion-row > .admin-status-badge { margin-left: auto; }
 .as-graduate-list { margin-top: 20px; font-size: 12px; color: var(--as-muted); }
 .as-graduate-list h4 { color: var(--as-ink); }
 .as-graduate-list p { margin: 4px 0 8px; }
@@ -166,7 +165,7 @@
   .as-promotion-section > summary { gap: 10px; flex-wrap: wrap; }
   .as-promotion-section > summary > span:last-child { margin-left: auto; }
   .as-promotion-row { gap: 7px; }
-  .as-promotion-row > .as-badge { flex-basis: auto; margin-left: 0; }
+  .as-promotion-row > .admin-status-badge { flex-basis: auto; margin-left: 0; }
   .as-account-dialog { width: calc(100vw - 24px); max-height: calc(100dvh - 24px); }
   .as-dialog-header { padding: 16px; }
   .as-account-fields { padding: 20px 16px; }
