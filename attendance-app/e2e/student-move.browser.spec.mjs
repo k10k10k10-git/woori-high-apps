@@ -106,6 +106,26 @@ test('목적지에 같은 인물이 있으면 중복 이동을 차단한다', as
   expect(await read(request, `attendance/${year}/1-1-7/S17_05`)).toEqual({ '0-0': 'X' });
 });
 
+test('시트 동기화 제거 후 데이터 관리 조회는 원장을 보존하고 인계·진급을 유지한다', async ({ page, request }, testInfo) => {
+  await seed(request);
+  await request.put(url('config/sheetSync'), { headers, data: { bu1Url: 'legacy-synthetic-sheet', bu2Url: 'legacy-synthetic-sheet-2' } });
+  const before = await read(request, '');
+  const sheetRequests = [];
+  page.on('request', request => { if (request.url().includes('docs.google.com/spreadsheets')) sheetRequests.push(request.url()); });
+  await openMove(page);
+  await page.getByRole('dialog', { name: '학생 이동' }).getByRole('button', { name: '취소', exact: true }).click();
+  await page.goto('/admin');
+  await page.getByRole('tab', { name: '데이터 관리' }).click();
+  await expect(page.getByRole('heading', { name: /청년부 인계/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: '전체 고3 엑셀 내려받기' })).toBeVisible();
+  await expect(page.getByText('새해 진급 처리', { exact: true })).toBeVisible();
+  expect(await page.locator('.admin-settings').textContent()).not.toMatch(/구글 시트|동기화 미리보기|동기화 적용|시트 주소/);
+  await page.screenshot({ path: testInfo.outputPath('data-without-sheet-sync.png'), fullPage: true });
+  expect(sheetRequests).toEqual([]);
+  expect(await read(request, '')).toEqual(before);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
 for (const concurrent of [false, true]) test(`진급 ${concurrent ? '미리보기 이후 전입생 보호' : '정상 반영과 복구 사본 보존'}`, async ({ page, request }) => {
   await seed(request);
   await request.put(url(`classes/${year - 1}/1-1-1`), { headers, data: { students: { promoted: { id: 'promoted', name: '합성 진급생', personId: 'person_student_promoted' } } } });

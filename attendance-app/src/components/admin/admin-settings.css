@@ -77,10 +77,6 @@
 .as-event-row > strong { min-width: 0; overflow-wrap: anywhere; font-weight: 500; }
 .as-event-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; flex-shrink: 0; gap: 6px; margin-left: auto; }
 .as-delete-prompt { color: var(--as-danger); font-size: 12px; }
-.as-sheet-sync { --shadow: none; --radius-lg: 0; --surface: #fff; --text: var(--as-ink); --text2: var(--as-muted); --text3: var(--as-muted); --border: var(--as-line); --primary: var(--as-accent); border-block: 1px solid var(--as-line); }
-.as-sheet-sync .admin-section-title { font-size: 15px; font-weight: 600; }
-.admin-settings .as-sheet-sync :is(.btn-primary, .btn-secondary) { min-height: 44px; border-radius: 10px; box-shadow: none; }
-.as-sheet-sync .form-input { min-height: 44px; width: 100%; }
 .as-promotion-section { margin-top: 28px; border-bottom: 1px solid var(--as-line); }
 .as-promotion-section > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; cursor: pointer; padding: 10px 2px; list-style: none; }
 .as-promotion-section > summary::-webkit-details-marker { display: none; }
@@ -161,7 +157,6 @@
   .as-event-actions { flex-shrink: 1; gap: 8px; }
   .as-event-actions:has(.as-delete-prompt) { flex-basis: 100%; padding-top: 6px; }
   .as-delete-prompt { margin-right: auto; }
-  .as-sheet-sync { margin-inline: -8px; }
   .as-promotion-section > summary { gap: 10px; flex-wrap: wrap; }
   .as-promotion-section > summary > span:last-child { margin-left: auto; }
   .as-promotion-row { gap: 7px; }
@@ -176,7 +171,6 @@
   .as-account-delete-confirm > span { flex-basis: 100%; }
 }
 
-.as-sheet-label { display: grid; gap: 6px; margin-bottom: 6px; font-size: 12px; }
 .as-handoff { min-width: 0; margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--as-line); }
 .as-handoff h3 > span { color: var(--as-muted); font-size: 12px; font-weight: 400; }
 .as-handoff-count { margin-bottom: 6px !important; }
