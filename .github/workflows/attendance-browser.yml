@@ -29,7 +29,7 @@ jobs:
       - run: node highschool-app/node_modules/@playwright/test/cli.js install --with-deps chromium webkit
       - run: node scripts/run-attendance-browser.mjs
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: always()
         with:
           name: synthetic-attendance-browser-results
           path: tmp/attendance-browser-results

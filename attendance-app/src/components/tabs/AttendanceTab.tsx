@@ -15,6 +15,7 @@ import AttendanceSaveBanner from '@/components/AttendanceSaveBanner';
 import AdminIcon from '@/components/admin/AdminIcon';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
+import LongAbsentReturnDialog, { type LongAbsentReturnTarget } from '@/components/modals/LongAbsentReturnDialog';
 import type { AttEditTarget, AttValue, ViewKey } from '@/types';
 
 const ATTENDANCE_SUBVIEWS = [
@@ -37,6 +38,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
     [students],
   );
   const isTeacher = state.userRole?.role === 'teacher';
+  const [returnTarget, setReturnTarget] = useState<LongAbsentReturnTarget | null>(null);
   const [attSubView, setAttSubView] = useState<AttendanceSubView>(initialSubview);
 
   const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestSaveError, suggestRetrying, handleSuggestSubmit } =
@@ -697,18 +699,22 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
           </summary>
           <div className="long-absent-list">
             {longAbsentStudents.map(student => (
+              <div className="long-absent-row" key={student.id}>
               <button
                 type="button"
-                key={student.id}
                 onClick={() => dispatch({ type: 'OPEN_HISTORY_MODAL', payload: { sid: student.id, ck } })}
               >
                 <strong>{student.name}</strong>
-                <span>출석 이력 보기 →</span>
+                <span>출석 이력 보기 <AdminIcon name="arrow" size={13} /></span>
               </button>
+              {state.userRole?.role === 'admin' && <button type="button" className="long-absent-return" aria-label={`${student.name} 일반 명단 복귀`} onClick={() => setReturnTarget({ year: curYear, classKey: ck, revision: state.dataRevision, student: structuredClone(student) })}><AdminIcon name="arrow" size={15} />일반 명단 복귀</button>}
+              </div>
             ))}
           </div>
         </details>
       )}
+
+      {returnTarget && <LongAbsentReturnDialog target={returnTarget} onClose={() => setReturnTarget(null)} />}
 
       <AttendanceSaveBanner
         feedback={saveFeedback}
