@@ -65,7 +65,7 @@ firebase deploy --only database  # 보안 규칙만 배포
 - 2026-09-09 기준 보완: 통합 앱의 완료 계약과 동일하게 `rosterSync` 또는 과거 `giftDate`가 있는 학생만 정착현황·주간 새친구 집계에 포함한다. 첫 4회·8회는 유효한 기존 giftDate 또는 rosterSync.syncedAt의 KST 날짜부터 정상 주일을 계산하고 미입력 수를 함께 표시한다. 등반일이 없으면 접수일로 대체하지 않고 확인 필요로 표시한다. 기준 주일 이후 등반은 제외한다. rosterSync의 반·학생 ID 또는 현재 연도의 유일한 personId만 연결하고 이름으로 합치지 않는다. 등록 자료의 한 경로라도 실패하면 부분 집계를 전체로 표시하지 않는다.
 - 연락처는 기존 출석부 학생 phone/pphone만 전화 링크로 제공하며 원장 추가 저장·자동 연락은 없다. 인증 세대·연도 전환 시 원장 연결 상태를 폐기하고 이전 구독 응답을 무시한다.
 - 2026-10-13 추가: 연속 결석·다시 출석의 전체 연락처 Excel은 선택한 기준 주일의 전체 리포트를 내보낸다. 검색·부서·학년·반·장결 필터와 무관하며 장결·동명이인·본인 연락처 미등록 학생도 포함한다. 학생 이름·본인 연락처·소속 반·장결 구분·확인된 결석 횟수·마지막 출석일만 담고 보호자 연락처·주소는 제외한다. 복귀 학생의 횟수는 복귀 직전의 X 연속 기록이며 행사·미입력 계약을 공유한다. 파일에 기준 주일·총인원·미등록 인원·필터 미적용을 표시한다. 전화번호는 문자열, 횟수는 숫자, 출석일은 로컬 달력 날짜로 저장한다. 기존 동적 `downloadXLSX`와 `beforeDownload`로 계정·연도·주일·원장 준비·화면 이탈을 재확인하고 중복 클릭·실패 재시도를 처리한다. 운영 DB 쓰기는 없다.
-- 회귀 검사는 `pastoralReport.test.ts`, `PastoralReport.render.test.tsx`, `adminNavigation.test.ts`. 합성 브라우저 재현은 `outputs/pastoral-report-20260909/start-fixture.mjs`이며 환경값·운영 SDK를 차단한다.
+- 회귀 검사는 `pastoralReport.test.ts`, `PastoralReport.render.test.tsx`, `adminNavigation.test.ts`. 현재 인증·전체 연락처 다운로드 브라우저 검사는 `node scripts/run-attendance-browser.mjs`로 격리 에뮬레이터에서 실행한다. 과거 `outputs/pastoral-report-20260909/start-fixture.mjs`는 최신 화면의 SDK/탐색 API와 맞지 않아 현재 검증에 사용하지 않는다.
 
 ### 다른 앱의 원장으로 집계할 때 불완전 조회 구분 (2026-09-09)
 - **접근법**: `DB_OWNERSHIP.md`와 기존 Rules를 대조 → `pastoralFriends.ts`에서 세 공개 새친구 경로만 구독 → 모두 준비된 경우에만 집계 → 하나라도 실패하면 등록 자료를 비우고 제한·재시도 표시 → `PastoralReport`를 인증 revision·연도 키로 재생성해 이전 응답 폐기.
@@ -514,3 +514,8 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 - **접근법**: `DB_OWNERSHIP.md`로 `semestersPrivate/{workspace}/newFriendsPrivate/{friendId}/teamMemo` 소유권을 확인한다 → 명시 승인 후 운영 Rules를 백업·대조한다 → 개인 관리자·이메일 일치·데모 제외·공개 등록 존재 조건으로 해당 leaf만 허용한다 → `src/lib/newFriendRemarks.ts`의 개별 구독과 ETag 조건부 PUT으로 양 앱 원장을 공유한다 → 합성 Rules·브라우저 검사로 다른 비공개 필드 보존과 동시 편집 거절을 검증한다.
 - **판단 질문**: 비고를 공개 원장에 복사하거나 비공개 부모를 열지 않았다. PC·모바일 표시는 구독 결과를 공유하고 편집기는 하나만 열며, 실시간 변경·저장 실패가 작성 내용을 지우지 않는다. 기존 통합 앱의 비공개 권한과 저장 키는 유지하고 표시 이름만 비고로 바꾼다.
 - **재사용 규칙**: Rules는 필터가 아니다. 한 필드만 공유할 때 읽기·쓰기·구독·검증 모두 같은 leaf 경계에 맞추고, 오래된 화면의 저장을 조건부 요청으로 제한한다. Playwright `APIRequestContext`의 문자열 leaf PUT도 `JSON.stringify`와 JSON Content-Type을 명시한다. 객체 `data`만 자동 JSON 직렬화되므로 합성 외부 수정 요청의 400을 앱 저장 실패로 오인하지 않는다.
+
+### 모바일 표의 숨김 접근성 글자가 페이지 너비를 늘리지 않게 하기 (2026-10-13)
+- **접근법**: `pastoral-contact-export.browser.spec.mjs`의 실제 WebKit `scrollWidth` 검사 실패를 확인한다 → viewport 393px / 문서 667px와 `.ad-sr-only`의 오른쪽 좌표 666.86px를 대조한다 → `.pr-table-wrap`에 `position:relative`를 두어 절대 배치 글자의 containing block을 표 스크롤 영역 안으로 제한한다 → 문서 너비 검사와 두 실제 Excel 다운로드 검사를 그대로 재실행한다.
+- **판단 질문**: 표의 680px 최소 너비·내부 가로 스크롤은 의도된 동작이라 제거하지 않는다. 문서 전체 `overflow:hidden`이나 너비 검사 삭제로 숨기지 않고, 외부 containing block 때문에 클리핑을 벗어난 숨김 글자의 배치만 고친다.
+- **재사용 규칙**: 스크롤 컨테이너 안의 절대 배치 접근성 글자는 위치 기준도 해당 컨테이너 안에 둔다. Chromium 통과만으로 모바일 WebKit 레이아웃을 완료 처리하지 않는다.
