@@ -6,6 +6,7 @@ import type { AttValue } from '@/types';
 
 const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, dispatch: vi.fn(), push: vi.fn(), params: '', downloadCSV: vi.fn(), downloadXLSX: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/utils/export', () => ({ downloadCSV: mocks.downloadCSV, downloadXLSX: mocks.downloadXLSX }));
+vi.mock('@/lib/longAbsentReturn', () => ({ returnLongAbsentStudent: vi.fn() }));
 vi.mock('@/store/AppContext', async original => ({
   ...await original<typeof import('@/store/AppContext')>(),
   useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),
@@ -56,6 +57,14 @@ it('개인 상세도 주소·생년월일·연간 출석률·등급을 같은 �
 });
 
 describe('관리자 명단·출석 접근 경로', () => {
+  it('장결 학생 상세에서 동일 학생·반의 복귀 확인창을 제공한다', () => {
+    mocks.state.userRole = { role: 'admin' };
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^박두나\s*장결$/ }));
+    fireEvent.click(within(screen.getByRole('complementary')).getByRole('button', { name: '일반 명단 복귀' }));
+    expect(screen.getByRole('dialog', { name: '일반 명단 복귀' }).textContent).toContain('박두나');
+    expect(screen.getByRole('dialog').textContent).toContain('1부 1학년 1반');
+  });
   it('모바일 간편 명단은 이름·소속만 보여 주고 상세 제목으로 스크롤한다', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
     const scroll = vi.fn();

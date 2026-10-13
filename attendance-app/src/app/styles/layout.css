@@ -417,12 +417,19 @@
 }
 .long-absent-panel summary small { color: var(--text3); font-size: 11px; font-weight: 500; }
 .long-absent-list { border-top: 1px solid var(--border); }
+.long-absent-row { display: flex; align-items: center; gap: 10px; padding-inline-end: 14px; border-bottom: 1px solid var(--border); }
+.long-absent-row:last-child { border-bottom: 0; }
 .long-absent-list button {
-  width: 100%; padding: 11px 14px; display: flex; justify-content: space-between; gap: 10px;
-  border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
+  min-height: 44px; min-width: 0; width: 100%; padding: 11px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 0; background: var(--surface); color: var(--text); font: inherit; cursor: pointer;
 }
-.long-absent-list button:last-child { border-bottom: 0; }
 .long-absent-list button span { color: var(--text3); font-size: 11px; }
+.long-absent-list button strong { overflow-wrap: anywhere; }
+.long-absent-list button span { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.long-absent-list .long-absent-return { width: auto; flex-shrink: 0; border: 1px solid var(--border2); border-radius: 10px; color: #6355a7; font-size: 12px; }
+.long-absent-return:hover { background: var(--surface2); }
+.long-absent-list button:focus-visible { outline: 2px solid #6355a7; outline-offset: -2px; }
+@media(max-width:540px) { .long-absent-row { flex-wrap: wrap; padding: 0 12px 10px; gap: 4px; } .long-absent-row>button:first-child { padding-inline: 0; } .long-absent-list .long-absent-return { margin-left: auto; } }
 
 .history-modal-close,
 .att-modal-close {

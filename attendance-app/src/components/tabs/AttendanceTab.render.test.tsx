@@ -18,6 +18,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/attendanceSave', () => ({ saveAttendanceCell: mocks.set, AttendanceSaveError: class extends Error {} }));
+vi.mock('@/lib/longAbsentReturn', () => ({ returnLongAbsentStudent: vi.fn() }));
 vi.mock('@/lib/teacherMessageSave', () => ({ TeacherMessageSaveError: class extends Error {}, saveTeacherMessage: (year: number, ck: string, _id: string, payload: unknown) => mocks.push({ path: `suggestions/${year}/${ck}` }, payload) }));
 
 vi.mock('@/lib/db', () => ({
@@ -95,6 +96,16 @@ function teacherState(): AppState {
 }
 
 describe('AttendanceTab 교사 출석 입력', () => {
+  it.each(['admin', 'teacher'] as const)('%s의 장결 목록은 관리자만 복귀 확인창을 열 수 있다', role => {
+    mocks.state.current = { ...teacherState(), userRole: { role }, classData: { '1-1-1': { students: [{ id: 'long', name: '합성 장결 학생', jang: true }] } } };
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByText('장결자 1명'));
+    if (role === 'teacher') expect(screen.queryByRole('button', { name: '합성 장결 학생 일반 명단 복귀' })).toBeNull();
+    else {
+      fireEvent.click(screen.getByRole('button', { name: '합성 장결 학생 일반 명단 복귀' }));
+      expect(screen.getByRole('dialog', { name: '일반 명단 복귀' })).toBeTruthy();
+    }
+  });
   beforeEach(() => {
     mocks.state.current = teacherState();
     mocks.stats = null;
