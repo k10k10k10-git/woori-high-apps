@@ -348,16 +348,17 @@ test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 
     const href = event.target instanceof Element ? event.target.closest("a[href]")?.getAttribute("href") : null;
     if (href === "/operations/accounts") console.debug("QA_NATIVE_SHORTCUT " + JSON.stringify({ trusted: event.isTrusted, button: event.button, meta: event.metaKey, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey, prevented: event.defaultPrevented }));
   }, { capture: true, passive: true }));
-  // native 수정 클릭의 새 탭은 opener가 없어 page.popup 대신 context.page로 관측한다.
+  // 전면 새 탭을 native 수정 클릭으로 열고 context.page로 관측한다.
+  // 단독 Ctrl/Meta의 source handler 계약은 MyPageModal.render.test.tsx에서 별도로 검사한다.
   const popupPromise = context.waitForEvent("page");
-  await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click({ modifiers: ["ControlOrMeta"] });
+  await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click({ modifiers: ["ControlOrMeta", "Shift"] });
   const popup = await popupPromise;
   try {
     await expect(popup).toHaveURL(/\/operations\/accounts$/);
     await expect(dialog).toBeVisible();
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.closeCalls)).toBe(0);
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
-    expect(nativeClicks).toEqual([{ trusted: true, button: 0, meta: process.platform === "darwin", ctrl: process.platform !== "darwin", shift: false, alt: false, prevented: false }]);
+    expect(nativeClicks).toEqual([{ trusted: true, button: 0, meta: process.platform === "darwin", ctrl: process.platform !== "darwin", shift: true, alt: false, prevented: false }]);
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
   } finally { await Promise.all(context.pages().filter((opened) => opened !== page).map((opened) => opened.close())); }
 });
@@ -701,24 +702,55 @@ for (const [query, answer] of [["출석 삭제", "attendance"], ["권한 오류"
 test("준비 중인 팀의 주요 업무는 사용 가능한 학기 기록으로 연결된다", async ({ page }) => {
   await page.goto("/?scenario=team&team=media");
   await expect(page.getByRole("heading", { name: "미디어팀", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "팀 전체 현황", exact: true })).toContainText("현재 학기 · 합성 2026년 2학기");
+  await expect(page.getByRole("combobox", { name: "운영 학기", exact: true })).toHaveValue("2026-2");
   const termActions = page.getByRole("navigation", { name: "선택 학기 업무", exact: true });
   await expect(termActions.getByRole("link")).toHaveCount(4);
-  await expect(termActions.getByRole("link", { name: "선택 학기 명단·연락처 열기", exact: true })).toHaveAttribute("href", "/teams/media/terms/2026-2/roster");
+  for (const [label, section] of [["명단·연락처", "roster"], ["출석", "attendance"], ["커리큘럼", "curriculum"], ["자료·기록", "records"]]) {
+    const link = termActions.getByRole("link", { name: `선택 학기 ${label} 열기`, exact: true });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", `/teams/media/terms/2026-2/${section}`);
+  }
   await expect(page.locator('a[href^="/teams/media/ongoing"]')).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "주간 업무와 학기 기록" })).toContainText(/준비 중/);
-  await expect(page.getByRole("region", { name: "미디어팀, 이렇게 시작해요" }).locator('a[href="/teams/media/terms/2026-2/roster"]')).toHaveCount(1);
+  const work = page.getByRole("region", { name: "주간 업무와 학기 기록", exact: true });
+  await expect(work.getByRole("heading", { name: "주간·주일 운영 준비 중", exact: true })).toBeVisible();
+  await expect(work.getByRole("link", { name: "팀 기능 문의하기", exact: true })).toHaveAttribute("href", "/help/feedback");
+  await expect(page.locator("#team-first-guide")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /안내 닫기|사용 안내 열기/ })).toHaveCount(0);
   await expectNoOverflow(page);
+  await expectServiceIsolation(page);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
 });
 
 for (const [term, label] of [["past", "지난 학기"], ["upcoming", "예정 학기"]]) {
   test(`${label}만 연결돼 있을 때 현재 업무로 오해하게 안내하지 않는다`, async ({ page }) => {
     await page.goto(`/?scenario=team&term=${term}`);
     await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
+    const overview = page.getByRole("region", { name: "팀 전체 현황", exact: true });
+    await expect(overview).toContainText(`${label} · 합성 2026년 2학기`);
+    const selectedTerm = page.getByRole("combobox", { name: "운영 학기", exact: true });
+    await expect(selectedTerm).toHaveValue("2026-2");
+    await expect(selectedTerm.locator('option[value="2026-2"]')).toHaveText(`합성 2026년 2학기 · ${label}`);
     const work = page.getByRole("region", { name: "주간 업무와 학기 기록" });
     await expect(work).toContainText(label);
     await expect(work).not.toContainText("이번 주");
-    await expect(page.getByRole("region", { name: "찬양팀, 이렇게 시작해요" })).not.toContainText("이번 학기");
+    await expect(work).not.toContainText("이번 학기");
+    const weeklyTitle = term === "past" ? "지난 학기 주간·주일 기록" : "예정 학기 업무 준비";
+    await expect(work.getByRole("heading", { name: weeklyTitle, exact: true })).toBeVisible();
+    await expect(work.locator('a[href="/teams/praise/ongoing?semester=2026-2"]')).toBeVisible();
+    const termActions = work.getByRole("navigation", { name: "선택 학기 업무", exact: true });
+    await expect(termActions.getByRole("link")).toHaveCount(4);
+    for (const [name, section] of [["명단·연락처", "roster"], ["커리큘럼", "curriculum"], ["자료·기록", "records"]]) {
+      const link = termActions.getByRole("link", { name: `선택 학기 ${name} 열기`, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", `/teams/praise/terms/2026-2/${section}`);
+    }
+    await expect(termActions.getByRole("link", { name: "선택 학기 출석 열기", exact: true })).toHaveAttribute("href", "/teams/praise/ongoing?semester=2026-2&tab=attendance");
+    await expect(page.locator("#team-first-guide")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /안내 닫기|사용 안내 열기/ })).toHaveCount(0);
     await expectNoOverflow(page);
+    await expectServiceIsolation(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
   });
 }
 
