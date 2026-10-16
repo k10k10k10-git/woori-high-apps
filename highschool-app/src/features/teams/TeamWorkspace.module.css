@@ -4,7 +4,7 @@
 .overviewHeader p { margin-top: 4px; font-size: 0.85rem; line-height: 1.65; color: var(--color-text-secondary); }
 .termPicker { display: grid; flex: 1; min-width: min(100%, 240px); max-width: 420px; gap: 6px; color: var(--color-text-secondary); font-size: 0.85rem; font-weight: 650; }
 .termPicker select { width: 100%; min-height: 44px; font-size: 16px; }
-.workActions { display: grid; gap: 16px; }
+.workActions { display: grid; gap: 16px; margin-bottom: 24px; }
 .weeklyWork { min-height: 104px; }
 .termLinks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .termLink { display: flex; min-width: 0; min-height: 88px; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--color-border); border-radius: 14px; padding: 16px; background: var(--color-surface); color: var(--color-text-primary); }
@@ -29,7 +29,8 @@ a.termLink:focus-visible, .termPicker select:focus-visible { outline: 3px solid 
 .overviewLink:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
 @media (max-width: 767px) {
   .termPicker { max-width: none; }
-  .termLinks { grid-template-columns: minmax(0, 1fr); }
+  .termLink { min-height: 64px; padding: 12px; }
+  .termLink p { display: none; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stat:last-child { grid-column: 1 / -1; }
   .stat { padding: 14px 16px; }

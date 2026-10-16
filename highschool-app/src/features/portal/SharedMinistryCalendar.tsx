@@ -21,7 +21,7 @@ const KIND_LABEL: Record<SharedCalendarItem["kind"], string> = {
   semester: "훈련·사역팀",
   sunday: "팀·주일 운영",
   retreat: "수련회 행정",
-  field: "수련회 이가드",
+  field: "수련회 현장 업무(이가드)",
 };
 
 export const CALENDAR_KIND_STYLE: Record<SharedCalendarItem["kind"], { chip: string; detail: string; dot: string }> = {
@@ -41,7 +41,7 @@ export const SHARED_CALENDAR_KIND_OPTIONS: ReadonlyArray<{
   { value: "semester", label: "훈련·사역팀", sourceSite: "semester-calendar" },
   { value: "sunday", label: "팀·주일 운영", sourceSite: "sunday-calendar" },
   { value: "retreat", label: "수련회 행정", sourceSite: "retreat-admin" },
-  { value: "field", label: "수련회 이가드", sourceSite: "move-guide" },
+  { value: "field", label: "수련회 현장 업무(이가드)", sourceSite: "move-guide" },
 ];
 
 export function calendarSourceSiteForKind(kind: SharedCalendarItem["kind"]): string {

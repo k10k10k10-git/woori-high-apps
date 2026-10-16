@@ -9,6 +9,8 @@ import { sessionDisplayLabel, sessionWeekLabel } from "@/features/semester/sessi
 import { sessionDateLabel } from "@/features/semester/sessionDate";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { CurriculumEntry, Session, Team, TrainingClass } from "@/features/semester/types";
+import SaveFeedback from "@/components/SaveFeedback";
+import { useSaveFeedback } from "@/features/semester/useSaveFeedback";
 
 interface Props {
   sid: string;
@@ -37,12 +39,15 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
   }
   const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [goalDraft, setGoalDraft] = useState<string | null>(null);
+  const [goalDraft, setGoalDraft] = useState<{ key: string; value: string } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const groups = scope === "team"
     ? (lockedTeamId ? teams.filter((team) => team.id === lockedTeamId) : teams)
     : trainingClasses;
   const activeTeamId = groups.some((group) => group.id === teamId) ? teamId : groups[0]?.id ?? "";
+  const editorKey = `${sid}/${scope}/${activeTeamId}`;
+  const saveFeedback = useSaveFeedback(editorKey);
+  const activeGoalDraft = goalDraft?.key === editorKey ? goalDraft.value : null;
 
   useEffect(() => {
     if (!activeTeamId) return;
@@ -52,12 +57,16 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
   const activeTeam = groups.find((group) => group.id === activeTeamId);
 
   async function saveGoal() {
-    if (goalDraft === null || !activeTeam || scope !== "team") return;
-    const goal = goalDraft.trim();
-    setGoalDraft(null);
-    if (goal === (("goal" in activeTeam ? activeTeam.goal : "") ?? "")) return;
+    if (activeGoalDraft === null || !activeTeam || scope !== "team") return;
+    const goal = activeGoalDraft.trim();
+    if (goal === (("goal" in activeTeam ? activeTeam.goal : "") ?? "")) {
+      if (saveFeedback.stateFor("goal") !== "saving") setGoalDraft(null);
+      saveFeedback.reset("goal");
+      return;
+    }
     try {
-      await updateTeam(sid, activeTeam.id, { goal });
+      await saveFeedback.run("goal", () => updateTeam(sid, activeTeam.id, { goal }));
+      setGoalDraft((current) => current?.key === editorKey && current.value === activeGoalDraft ? null : current);
       toast("팀 목표를 저장했습니다", "success");
     } catch (e) {
       toast(`목표 저장 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -65,10 +74,13 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
   }
 
   async function save(sessId: string) {
-    const draft = drafts[sessId];
-    if (draft === undefined || draft === (entries[sessId]?.plan ?? "")) return;
+    const draft = drafts[`${editorKey}/${sessId}`];
+    if (draft === undefined || draft === (entries[sessId]?.plan ?? "")) {
+      saveFeedback.reset(sessId);
+      return;
+    }
     try {
-      await updateCurriculumEntry(sid, activeTeamId, sessId, { plan: draft });
+      await saveFeedback.run(sessId, () => updateCurriculumEntry(sid, activeTeamId, sessId, { plan: draft }));
       toast("저장됨", "success");
     } catch (e) {
       toast(`저장 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -103,6 +115,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
         </p>
       ) : (
       <>
+      {canEdit && <p className="save-feedback">입력 칸을 벗어나면 자동 저장</p>}
       {!lockedTeamId && <div role="tablist" aria-label={scope === "team" ? "사역팀 선택" : "훈련 반 선택"} className="flex gap-1 overflow-x-auto mb-4">
         {groups.map((t) => (
           <button
@@ -132,13 +145,14 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
           <textarea
             aria-label={`${activeTeam.name} 이번 학기 목표`}
             disabled={!canEdit}
-            value={goalDraft ?? ("goal" in activeTeam ? activeTeam.goal : "") ?? ""}
-            onChange={(e) => setGoalDraft(e.target.value)}
+            value={activeGoalDraft ?? ("goal" in activeTeam ? activeTeam.goal : "") ?? ""}
+            onChange={(e) => { setGoalDraft({ key: editorKey, value: e.target.value }); saveFeedback.markDirty("goal"); }}
             onBlur={() => void saveGoal()}
             rows={3}
             placeholder="예: 매주 예배 셋팅을 학생 스스로 준비할 수 있게 한다"
             className="input text-sm"
           />
+          {canEdit && saveFeedback.stateFor("goal") !== "idle" && <SaveFeedback state={saveFeedback.stateFor("goal")} idleLabel="" />}
         </section>
       )}
 
@@ -155,13 +169,14 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
             <textarea
               aria-label={`${sessionDateLabel(s)} 계획`}
               disabled={!canEdit}
-              value={drafts[s.id] ?? entries[s.id]?.plan ?? ""}
-              onChange={(e) => setDrafts((d) => ({ ...d, [s.id]: e.target.value }))}
+              value={drafts[`${editorKey}/${s.id}`] ?? entries[s.id]?.plan ?? ""}
+              onChange={(e) => { setDrafts((d) => ({ ...d, [`${editorKey}/${s.id}`]: e.target.value })); saveFeedback.markDirty(s.id); }}
               onBlur={() => void save(s.id)}
               rows={4}
               placeholder="모임 계획 (예: 아이스 브레이킹, 예배당 셋팅)"
               className="input text-sm"
             />
+            {canEdit && saveFeedback.stateFor(s.id) !== "idle" && <SaveFeedback state={saveFeedback.stateFor(s.id)} idleLabel="" />}
           </li>
         ))}
       </ul>

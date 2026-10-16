@@ -205,6 +205,8 @@ test("실시간 프로그램 목록이 다섯 개에서 네 개로 줄어도 검
 test("실제 홈은 담당 업무 하나와 다음 일정 세 건을 먼저 보여주고 전체 달력을 접는다", async ({ page }, info) => {
   await open(page, "actualHome", "viewer");
   const ownWork = page.getByRole("region", { name: "내 업무", exact: true });
+  await expect(ownWork).toContainText("학기 찬양팀 조회자");
+  await expect(ownWork).not.toContainText("사역팀(미지정)");
   await expect(ownWork.getByRole("link", { name: "업무 열기" })).toHaveCount(1);
   await expect(ownWork.getByRole("link", { name: "업무 열기" })).toHaveAttribute("href", "/teams/praise");
   const upcoming = page.getByRole("region", { name: "다음 일정", exact: true });
@@ -251,6 +253,39 @@ test("팀 운영 학기 선택은 네 업무·현황을 함께 바꾸고 실시�
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
   await expectNoOverflow(page);
 });
+
+for (const theme of ["light", "dark"]) {
+  test(`${theme} 팀 첫 화면에서 주간 업무와 명단·출석을 스크롤 없이 찾는다`, async ({ page }, info) => {
+    const viewport = page.viewportSize()!;
+    const mobile = viewport.width < 768;
+    if (mobile) await page.setViewportSize({ width: viewport.width, height: 605 });
+    for (const state of mobile ? ["ready", "viewer"] : ["ready"]) {
+      await page.goto(`/teams/praise?${new URLSearchParams({ scenario: "team", state, theme })}`);
+      const work = page.getByRole("region", { name: "주간 업무와 학기 기록", exact: true });
+      const weekly = work.locator('a[href="/teams/praise/ongoing?semester=2026-2"]');
+      const roster = work.getByRole("link", { name: "선택 학기 명단·연락처 열기", exact: true });
+      const attendance = work.getByRole("link", { name: "선택 학기 출석 열기", exact: true });
+      for (const action of [weekly, roster, attendance]) {
+        await expect(action).toBeInViewport({ ratio: 1 });
+        const position = await action.evaluate((element) => {
+          const fixedMenu = document.querySelector(".portal-mobile-bottom-nav");
+          const bottom = fixedMenu && getComputedStyle(fixedMenu).display !== "none" ? fixedMenu.getBoundingClientRect().top : innerHeight;
+          const rect = element.getBoundingClientRect();
+          return { top: rect.top, bottom: rect.bottom, availableBottom: bottom, scrollY };
+        });
+        expect(position.scrollY).toBe(0);
+        expect(position.top).toBeGreaterThanOrEqual(0);
+        expect(position.bottom, JSON.stringify({ state, ...position })).toBeLessThanOrEqual(position.availableBottom);
+      }
+      const overview = page.getByRole("region", { name: "팀 전체 현황", exact: true });
+      expect(await work.evaluate((element, other) => !!(element.compareDocumentPosition(other as Node) & Node.DOCUMENT_POSITION_FOLLOWING), await overview.elementHandle())).toBe(true);
+      await page.screenshot({ path: info.outputPath(`team-work-first-screen-${state}-${theme}.png`) });
+      await expectNoOverflow(page);
+      await expectServiceIsolation(page);
+      expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+    }
+  });
+}
 
 test("실제 홈은 인증 확인 중과 권한 오류 때 구독·자동 이동을 막고 재시도로 복구한다", async ({ page }) => {
   await open(page, "actualHome", "loading");
@@ -503,7 +538,11 @@ test("일반 스탭도 전체 상단 메뉴를 보고 모바일 메뉴를 키보
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: "사이트 메뉴" });
     await expect(dialog).toBeVisible();
+    const myPage = dialog.getByRole("button", { name: "마이페이지", exact: true });
+    await expect(myPage).toBeInViewport({ ratio: 1 });
+    expect(await dialog.evaluate((element) => element.scrollTop)).toBe(0);
     const nav = dialog.getByRole("navigation", { name: "모바일 통합 사역 메뉴" });
+    await expect(nav.getByRole("link")).toHaveCount(8);
     for (const [label, href] of [["팀", "/teams"], ["훈련", "/training"], ["행사", "/events"], ["운영센터", "/operations"], ["자료", "/library"]]) {
       await expect(nav.locator(`a[href="${href}"]`)).toContainText(label);
     }
@@ -516,14 +555,26 @@ test("일반 스탭도 전체 상단 메뉴를 보고 모바일 메뉴를 키보
     await page.keyboard.press("Escape");
     await expect(dialog).toHaveCount(0);
     await expect(trigger).toBeFocused();
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+    await page.keyboard.press("Enter");
+    await myPage.focus();
+    await page.keyboard.press("Enter");
+    await expect(dialog).toHaveCount(0);
+    const account = page.getByRole("dialog", { name: "마이페이지", exact: true });
+    await expect(account).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(account).toHaveCount(0);
+    await expect(trigger).toBeFocused();
   } else {
     const nav = page.getByRole("navigation", { name: "통합 사역 메뉴" });
     for (const href of ["/training", "/events", "/operations", "/library"]) await expect(nav.locator(`a[href="${href}"]`)).toBeVisible();
     await expect(nav.locator('a[href="/operations"]')).toHaveAttribute("data-qa-prefetch", "disabled");
     await page.screenshot({ path: info.outputPath("navigation-desktop.png") });
     await expectAccessible(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
   }
-  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectServiceIsolation(page);
   await expectNoOverflow(page);
 });
 
@@ -578,6 +629,7 @@ test("수련회 메뉴는 모두 보이지만 권한 없는 목적지는 미리 
   await open(page, "retreatNav");
   const nav = page.getByRole("navigation", { name: "수련회 업무 영역" });
   await expect(nav.getByRole("link")).toHaveCount(3);
+  await expect(nav.getByRole("link", { name: "현장 업무(이가드) 권한 필요", exact: true })).toBeInViewport({ ratio: 1 });
   for (const area of ["administration", "programs", "field"]) {
     const link = nav.locator(`a[href="/events/synthetic-retreat/${area}"]`);
     await expect(link).toHaveAttribute("data-qa-prefetch", "disabled");
@@ -585,6 +637,7 @@ test("수련회 메뉴는 모두 보이지만 권한 없는 목적지는 미리 
     await link.focus();
     await link.hover();
   }
+  await expectNoOverflow(page);
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.prefetches)).toEqual([]);
   await nav.locator('a[href="/events/synthetic-retreat/administration"]').click();
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toContain("/events/synthetic-retreat/administration");

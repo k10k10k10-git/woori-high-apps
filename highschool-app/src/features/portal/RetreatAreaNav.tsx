@@ -52,7 +52,7 @@ export default function RetreatAreaNav({
   const items = [
     { key: "admin" as const, label: "행정", Icon: UsersThree, href: adminHref, allowed: adminAllowed },
     { key: "programs" as const, label: "프로그램 준비", Icon: ClipboardText, href: programsHref, allowed: adminAllowed },
-    { key: "field" as const, label: "이가드", Icon: ShieldCheck, href: fieldHref, allowed: fieldAllowed },
+    { key: "field" as const, label: "현장 업무(이가드)", Icon: ShieldCheck, href: fieldHref, allowed: fieldAllowed },
   ];
 
   return (

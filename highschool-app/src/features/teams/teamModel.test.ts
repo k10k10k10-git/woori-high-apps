@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   accessibleTeamKeys,
+  describeTeamRoles,
   canAccessOperationsCenter,
   canAccessTeam,
   canBrowseTeam,
@@ -89,4 +90,21 @@ describe("teamModel", () => {
     expect(canReadTeamContacts("media", leader, memberships)).toBe(true);
     expect(canReadSemesterPrivate(member, memberships)).toBe(false);
   });
+});
+
+
+it("홈과 개인 화면은 활성 팀과 실제 소속 역할을 표시하고 방학 역할도 보존한다", () => {
+  const member = { semester: "staff", retreat: "fieldStaff" } as const;
+  expect(describeTeamRoles(member, { praise: { role: "staff", active: true }, media: { role: "viewer", active: false } })).toBe("학기 찬양팀 스탭 · 방학 현장 스탭");
+  expect(describeTeamRoles({ ...member, retreat: "none" }, { praise: { role: "viewer", active: true }, media: { role: "leader", active: true } })).toBe("학기 찬양팀 조회자 · 미디어팀 팀장");
+  expect(describeTeamRoles({ semester: "leader", retreat: "none" }, { praise: { role: "leader", active: true } })).toBe("학기 찬양팀 팀장");
+});
+
+it("중앙 운영 역할과 소속 없는 계정의 기존 역할 설명은 유지한다", () => {
+  for (const semester of ["superAdmin", "pastor", "adminTeam"] as const) {
+    const names = { superAdmin: "통합관리자", pastor: "교역자", adminTeam: "행정팀" };
+    expect(describeTeamRoles({ semester, retreat: "none" }, { praise: { role: "staff", active: true } })).toBe(`학기 ${names[semester]}`);
+  }
+  expect(describeTeamRoles({ semester: "staff", retreat: "none" }, { praise: { role: "staff", active: false } })).toBe("학기 사역팀(미지정)");
+  expect(describeTeamRoles({ semester: "praise", retreat: "none" })).toBe("학기 찬양팀");
 });

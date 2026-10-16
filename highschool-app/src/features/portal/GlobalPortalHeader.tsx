@@ -306,6 +306,21 @@ export default function GlobalPortalHeader() {
           panelClassName="portal-mobile-sheet"
         >
             <div className="portal-mobile-sheet-handle" aria-hidden="true" />
+            <p className="portal-mobile-sheet-title">내 계정</p>
+            <div className="portal-mobile-account">
+              <button onClick={() => {
+                setMobileMenuOpen(false);
+                openMyPage();
+              }}>
+                <UserCircle aria-hidden="true" size={18} />
+                <span>마이페이지</span>
+              </button>
+              <ThemeToggle showLabel />
+              <button onClick={() => void signOut()}>
+                <SignOut aria-hidden="true" size={18} />
+                <span>로그아웃</span>
+              </button>
+            </div>
             <p className="portal-mobile-sheet-title">사역 메뉴</p>
             <nav className="portal-mobile-links" aria-label="모바일 통합 사역 메뉴">
               <Link href="/" aria-current={currentArea === "home" ? "page" : undefined} onClick={() => setMobileMenuOpen(false)}>홈</Link>
@@ -321,20 +336,7 @@ export default function GlobalPortalHeader() {
             <nav className="portal-mobile-links" aria-label="모바일 팀 메뉴">
               {teamItems.map((item) => <Link key={item.href} href={item.href} prefetch={item.allowed ? undefined : false} onClick={() => setMobileMenuOpen(false)}>{item.label}{!item.allowed && <PermissionLabel />}</Link>)}
             </nav>
-            <div className="portal-mobile-account">
-              <ThemeToggle showLabel />
-              <button onClick={() => {
-                setMobileMenuOpen(false);
-                openMyPage();
-              }}>
-                <UserCircle aria-hidden="true" size={18} />
-                <span>마이페이지</span>
-              </button>
-              <button onClick={() => void signOut()}>
-                <SignOut aria-hidden="true" size={18} />
-                <span>로그아웃</span>
-              </button>
-            </div>
+
         </OverlayShell>
       )}
       {myPage && <MyPageModal initialTab={myPage.initialTab} onClose={() => setMyPage(null)} />}

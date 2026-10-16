@@ -29,7 +29,6 @@ import {
   ownSundayTeam,
   canEditArea,
   iguardScopeOf,
-  describeRoles,
   retreatEntryHref,
 } from "./accessPolicy";
 import SharedMinistryCalendar, { calendarKindForSourceSite, calendarSourceSiteForKind, SHARED_CALENDAR_KIND_OPTIONS, type SharedCalendarItem } from "./SharedMinistryCalendar";
@@ -42,7 +41,7 @@ import { dailyMinistryMessage, friendlyMinistryName, seoulDateKey } from "./dail
 
 import { SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 import { selectRetreatForWork } from "@/lib/retreatSelection";
-import { activeTeamKeys, canAccessOperationsCenter, canEditTeam } from "@/features/teams/teamModel";
+import { describeTeamRoles, activeTeamKeys, canAccessOperationsCenter, canEditTeam } from "@/features/teams/teamModel";
 import styles from "./PortalHome.module.css";
 
 export default function PortalHome() {
@@ -336,7 +335,7 @@ function PortalHomeWorkspace() {
         </section>
 
         <section aria-label="내 업무">
-          <HomeStart entry={homeEntry} roleLabel={describeRoles(roles)} viewOnly={!!assignedSundayTeam && !canEditTeam(assignedSundayTeam, roles, teamMemberships)} />
+          <HomeStart entry={homeEntry} roleLabel={describeTeamRoles(roles, teamMemberships)} viewOnly={!!assignedSundayTeam && !canEditTeam(assignedSundayTeam, roles, teamMemberships)} />
           {otherWork.length > 0 && <div className={styles.otherWork}><h2>다른 담당 업무</h2><div>{otherWork.map((item) => <Link key={item.href} href={item.href}><strong>{item.label}</strong><span>{item.context}</span><span aria-hidden="true">→</span></Link>)}</div></div>}
         </section>
 

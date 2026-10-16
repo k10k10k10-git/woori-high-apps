@@ -123,7 +123,7 @@ export function ministryModulesFor(roles: MinistryRoles, memberships?: TeamMembe
   if (canAccessArea("retreat-field", roles)) {
     modules.push({
       id: "retreat-field",
-      title: "수련회 이가드",
+      title: "수련회 현장 업무(이가드)",
       description: iguardScopeOf(roles) === "all" ? "실행·기획·정보" : "개인 큐카드·조별 정보·인원체크",
       href: "/events",
       accessLabel: iguardScopeOf(roles) === "all" ? "전체" : "실행",

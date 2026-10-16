@@ -39,6 +39,8 @@ import {
   TrainingClass,
 } from "@/features/semester/types";
 import { useViewMode } from "@/context/ViewModeContext";
+import SaveFeedback from "@/components/SaveFeedback";
+import { useSaveFeedback } from "@/features/semester/useSaveFeedback";
 
 interface Props {
   sid: string;
@@ -93,7 +95,6 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [attAllByScope, setAttAllByScope] = useState<AttendanceByScope>(EMPTY_ATTENDANCE_BY_SCOPE);
   const [completion, setCompletion] = useState<Record<string, CompletionEntry>>({});
   const [pickedView, setPickedView] = useState<"grid" | "session" | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
   const view = pickedView ?? (isMobileView ? "session" : "grid");
   const defaultSessId = useMemo(() => {
@@ -106,6 +107,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
     return candidate.id;
   }, [sessions]);
   const activeSessId = sessions.some((session) => session.id === sessId) ? sessId : defaultSessId;
+  const saveFeedback = useSaveFeedback(`${sid}/${scope}/${view === "session" ? activeSessId : "all"}`);
   const activeAttendanceKey = `${scope}/${activeSessId}`;
   const att = sessionAttendance.key === activeAttendanceKey ? sessionAttendance.values : {};
 
@@ -154,29 +156,23 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   }), [applications]);
 
   async function markAt(appKey: string, sessionId: string, status: EditableAttendanceStatus) {
-    setSaveState("saving");
     try {
-      await setAttendance(sid, scope, sessionId, appKey, status, user?.uid, {
+      await saveFeedback.run(`${sessionId}/${appKey}`, () => setAttendance(sid, scope, sessionId, appKey, status, user?.uid, {
         subjectName: applications.find((application) => application.id === appKey)?.name,
         date: sessions.find((item) => item.id === sessionId)?.date,
-      });
-      setSaveState("saved");
+      }));
     } catch (e) {
-      setSaveState("error");
       toast(`기록 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 
   async function clearAt(appKey: string, sessionId: string) {
-    setSaveState("saving");
     try {
-      await clearAttendance(sid, scope, sessionId, appKey, {
+      await saveFeedback.run(`${sessionId}/${appKey}`, () => clearAttendance(sid, scope, sessionId, appKey, {
         subjectName: applications.find((application) => application.id === appKey)?.name,
         date: sessions.find((item) => item.id === sessionId)?.date,
-      });
-      setSaveState("saved");
+      }));
     } catch (error) {
-      setSaveState("error");
       toast(`기록 삭제 실패: ${error instanceof Error ? error.message : String(error)}`, "error");
     }
   }
@@ -302,6 +298,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             </button>
           ))}
         </div>
+        {canEdit && <SaveFeedback state={saveFeedback.state} idleLabel="선택하면 자동 저장" />}
       </div>
 
       {view === "grid" ? (
@@ -382,11 +379,6 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         )}
       </ul>
       </>
-      )}
-      {isMobileView && canEdit && saveState !== "idle" && (
-        <div className={`mobile-save-state mobile-save-state--${saveState}`} role="status" aria-live="polite">
-          {saveState === "saving" ? "출석을 저장하고 있습니다" : saveState === "saved" ? "출석이 저장되었습니다" : "저장하지 못했습니다. 다시 선택해 주세요"}
-        </div>
       )}
     </div>
   );

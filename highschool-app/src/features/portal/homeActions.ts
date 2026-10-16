@@ -16,7 +16,7 @@ const KIND_META: Record<SharedCalendarItem["kind"], string> = {
   semester: "훈련·사역팀",
   sunday: "팀·주일 운영",
   retreat: "수련회 행정",
-  field: "수련회 이가드",
+  field: "수련회 현장 업무(이가드)",
 };
 
 function urgencyFor(item: SharedCalendarItem, today: string): HomeAction["urgency"] {

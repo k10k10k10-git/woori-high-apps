@@ -34,5 +34,6 @@
 .surface .permissionLabel { color: var(--color-text-primary); }
 
 @media (max-width: 767px) {
+  .nav { flex-wrap: wrap; overflow: visible; }
   .link { padding-inline: 8px; font-size: 11px; }
 }
