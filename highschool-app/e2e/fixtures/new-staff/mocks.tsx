@@ -1,8 +1,22 @@
 import { useSyncExternalStore, type AnchorHTMLAttributes } from "react";
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
 import type { TeamMemberships } from "@/features/teams/teamModel";
-import { connect, qa } from "./qaState";
+import type { Application, CurriculumEntry, Session, Team, TrainingClass } from "@/features/semester/types";
+import { connect, memoryWrite, qa } from "./qaState";
 export { qa } from "./qaState";
+export { addArchiveLink, markArchiveLinkDeleting, removeArchiveLink, subscribeArchiveLinks } from "./serviceMocks";
+
+let semesterTeams: Team[] = [
+  { id: "praise-semester-team", teamKey: "praise", name: "찬양팀", color: "bg-green-100", order: 1, room: "합성 연습실", goal: "합성 팀 목표" },
+  { id: "media-semester-team", teamKey: "media", name: "미디어팀", color: "bg-blue-100", order: 2, goal: "합성 미디어 목표" },
+];
+export const semesterFixture = {
+  trainingClasses: [{ id: "training-1", name: "합성 첫 반", color: "bg-green-100", order: 1 }, { id: "training-2", name: "합성 둘째 반", color: "bg-blue-100", order: 2 }] as TrainingClass[],
+  sessions: [{ id: "meeting-1", date: "2026-10-10", type: "정규" }, { id: "meeting-2", date: "2026-10-17", type: "정규" }] as Session[],
+  applications: [{ id: "1_student-1", studentId: "student-1", bu: "1부", grade: 1, class: 1, name: "합성학생가", status: "배치", teamId: "praise-semester-team", trainingClassId: "training-1", createdAt: "2026-08-01" }] as Application[],
+  meta: { title: "합성 2026년 2학기", startDate: "2026-08-29", endDate: "2026-11-21", createdAt: "2026-08-01", completionRule: { minRate: 0.7 } },
+};
+const curricula: Record<string, Record<string, CurriculumEntry>> = {};
 
 type QaAuth = {
   user: { uid: string; email: string; displayName: string } | null;
@@ -99,7 +113,7 @@ export function subscribeSemesters(callback: (items: unknown[]) => void, fail?: 
   return connect("semesters", "", callback, list, fail);
 }
 export function subscribeTeams(id: string, callback: (items: unknown[]) => void, fail?: (error: Error) => void) {
-  return connect("teams", id, callback, [{ id: "praise-semester-team", teamKey: "praise", name: "찬양팀", color: "bg-green-100", order: 1, room: "합성 연습실", goal: "합성 팀 목표" }, { id: "media-semester-team", teamKey: "media", name: "미디어팀", color: "bg-blue-100", order: 2 }], fail);
+  return connect("teams", id, callback, semesterTeams, fail);
 }
 export function subscribeApplications(id: string, callback: (items: unknown[]) => void, fail?: (error: Error) => void) {
   const common = { status: "배치", teamId: `${qaTeam}-semester-team`, createdAt: "2026-08-01" };
@@ -115,7 +129,30 @@ export function subscribeSessions(id: string, callback: (items: unknown[]) => vo
   return connect("sessions", id, callback, [{ id: "meeting-1", date, type: "정규", label: "합성 정규 모임" }, { id: "holiday-1", date: "2026-10-06", type: "휴강", label: "합성 휴강" }], fail);
 }
 export function subscribeTrainingClasses(id: string, callback: (items: unknown[]) => void, fail?: (error: Error) => void) { return connect("trainingClasses", id, callback, [], fail); }
-export function subscribeAllAttendance(id: string, _kind: string, callback: (items: Record<string, unknown>) => void, fail?: (error: Error) => void) { return connect("allAttendance", id, callback, {}, fail); }
+export function subscribeAllAttendance(id: string, kind: string, callback: (items: Record<string, unknown>) => void, fail?: (error: Error) => void) { return connect("allAttendance", `${id}/${kind}`, callback, {}, fail); }
+
+export function subscribeCurriculum(sid: string, group: string, callback: (items: Record<string, CurriculumEntry>) => void, fail?: (error: Error) => void) {
+  const key = `${sid}/${group}`;
+  curricula[key] ??= { "meeting-1": { plan: `${group} 합성 원본 계획` } };
+  return connect("curriculum", key, callback, curricula[key], fail);
+}
+export async function updateCurriculumEntry(sid: string, group: string, session: string, entry: CurriculumEntry) {
+  await memoryWrite("updateCurriculumEntry")(sid, group, session, entry);
+  const key = `${sid}/${group}`;
+  curricula[key] = { ...curricula[key], [session]: entry };
+  qa.emit("curriculum", key, curricula[key]);
+}
+export async function updateTeam(sid: string, id: string, partial: Partial<Team>) {
+  await memoryWrite("updateTeam")(sid, id, partial);
+  semesterTeams = semesterTeams.map((team) => team.id === id ? { ...team, ...partial } : team);
+  qa.emit("teams", sid, semesterTeams);
+}
+export function subscribeSessionAttendance(sid: string, scope: string, session: string, callback: (items: Record<string, unknown>) => void, fail?: (error: Error) => void) { return connect("sessionAttendance", `${sid}/${scope}/${session}`, callback, {}, fail); }
+export function subscribeCompletion(sid: string, callback: (items: Record<string, unknown>) => void, fail?: (error: Error) => void) { return connect("completion", sid, callback, {}, fail); }
+export const setAttendance = memoryWrite("setAttendance");
+export const clearAttendance = memoryWrite("clearAttendance");
+export const updateCompletionEntry = memoryWrite("updateCompletionEntry");
+export const describeApplicant = (application: Application) => `${application.bu} ${application.grade}학년 ${application.class}반`;
 
 export function subscribePeopleSearchData() {
   qa.subscriptions.push("peopleSearch");

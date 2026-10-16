@@ -33,7 +33,7 @@ vi.mock("@/features/semester/db", () => ({
   subscribeArchiveLinks: (id: string, cb: (links: unknown[]) => void) => {
     mocks.archiveCalls.push(id);
     cb(id === "2026-2"
-      ? [{ id: "guide", title: "찬양팀 안내", kind: "doc", url: "https://example.test/guide" }, { id: "sheet", title: "팀 일정표", kind: "sheet", url: "https://example.test/sheet" }]
+      ? [{ id: "guide", title: "찬양팀 안내", kind: "doc", url: "https://example.test/guide" }, { id: "sheet", title: "팀 일정표", kind: "sheet", url: "https://example.test/sheet" }, { id: "pending", title: "삭제 중인 자료", kind: "doc", url: "https://example.invalid/deleted", deletionPending: true }]
       : [{ id: "other", title: "다른 팀 비공개 자료", kind: "doc", url: "https://example.test/other" }]);
     return () => {};
   },
@@ -56,6 +56,7 @@ describe("자료 화면", () => {
     expect(await screen.findByRole("link", { name: "찬양팀 안내" })).toHaveAttribute("href", "https://example.test/guide");
     expect(mocks.archiveCalls).toEqual(["2026-2"]);
     expect(screen.queryByText("다른 팀 비공개 자료")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "삭제 중인 자료" })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "자료 검색" }), { target: { value: "일정" } });
     expect(screen.queryByRole("link", { name: "찬양팀 안내" })).not.toBeInTheDocument();

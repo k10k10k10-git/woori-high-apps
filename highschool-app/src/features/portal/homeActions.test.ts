@@ -9,7 +9,7 @@ describe("공유 캘린더 기반 홈 할 일", () => {
       { id: "future", title: "다음 모임", date: "2026-08-12", kind: "semester" },
     ], "2026-08-11");
     expect(actions.map((item) => item.title)).toEqual(["늦은 준비", "다음 모임"]);
-    expect(actions[0]).toMatchObject({ urgency: "overdue", meta: "수련회 행정 · 기한 지남" });
+    expect(actions[0]).toMatchObject({ urgency: "overdue", meta: "공유 준비 · 수련회 행정 · 기한 지남" });
     expect(actions.map((item) => item.dayLabel)).toEqual(["D+1", "D-1"]);
   });
 
@@ -18,6 +18,15 @@ describe("공유 캘린더 기반 홈 할 일", () => {
       { id: "overnight", date: "2026-10-23", endDate: "2026-10-24", title: "철야기도회", kind: "semester", href: "/semester/2026-2" },
     ], "2026-10-24");
     expect(actions[0]).toMatchObject({ title: "철야기도회", urgency: "today", dayLabel: "D-Day", href: "/semester/2026-2" });
+  });
+
+  it("공유 참고 항목과 실제 업무 링크를 구분하며 원래 날짜와 경로를 유지한다", () => {
+    const actions = buildHomeActions([
+      { id: "shared", date: "2026-10-16", title: "함께 확인할 준비", kind: "main", editable: true },
+      { id: "session", date: "2026-10-16", title: "학기 모임", kind: "semester", href: "/operations/semesters/2026-2/overview" },
+    ], "2026-10-16");
+    expect(actions.find((item) => item.id === "shared")).toMatchObject({ date: "2026-10-16", meta: "공유 준비 · 고등부 메인", href: undefined });
+    expect(actions.find((item) => item.id === "session")).toMatchObject({ date: "2026-10-16", meta: "공유 일정 · 훈련·사역팀", href: "/operations/semesters/2026-2/overview" });
   });
 
   it("예정·당일·지난 일정을 D-숫자, D-Day, D+숫자로 표시한다", () => {

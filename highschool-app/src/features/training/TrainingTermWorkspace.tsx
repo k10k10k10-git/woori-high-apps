@@ -35,6 +35,7 @@ function TrainingTermContent({ semesterId, section, onRetry }: { semesterId: str
   const allowed = canAccessArea("semester", roles);
   const privateAllowed = canReadSemesterPrivate(roles, teamMemberships);
   const editable = canAccessOperationsCenter(roles, teamMemberships) && canEditArea("semester", roles);
+  const operationsBaseHref = editable ? `/operations/semesters/${encodeURIComponent(semesterId)}` : undefined;
   const [meta, setMeta] = useState<SemesterMeta | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
   const [trainingClasses, setTrainingClasses] = useState<TrainingClass[]>([]);
@@ -82,8 +83,8 @@ function TrainingTermContent({ semesterId, section, onRetry }: { semesterId: str
       {!editable && <ReadOnlyBanner what={`${semesterId} 훈련 기록`} why="교역자와 행정팀이 운영센터 권한으로 수정할 수 있습니다." />}
       {section === "overview" && <div className="team-overview-grid"><section className="team-stat-card"><span>훈련반</span><strong>{trainingClasses.length}개</strong><p>{trainingClasses.map((item) => item.name).join(" · ") || "등록된 훈련반 없음"}</p></section><section className="team-stat-card"><span>훈련 명단</span><strong>{roster.length}명</strong><p>{upcoming ? `다음 모임 ${upcoming.date}` : "예정된 회차 없음"}</p></section></div>}
       {section === "roster" && <TrainingRoster roster={roster} classById={classById} teamById={teamById} privates={privates} rosterContacts={rosterContacts} showContacts={privateAllowed} />}
-      {section === "attendance" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedScope="training" />}
-      {section === "curriculum" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} lockedScope="training" />}
+      {section === "attendance" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedScope="training" operationsBaseHref={operationsBaseHref} />}
+      {section === "curriculum" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} lockedScope="training" operationsBaseHref={operationsBaseHref} />}
     </SemesterEditProvider></>}</section>
   </main></TrainingAccessState>;
 }

@@ -1,6 +1,7 @@
 import type { Group, Milestone, Retreat, RetreatProgram } from "@/lib/types";
 import type { IguardAccessLock } from "@/features/iguard/lib/types";
-import { connect, memoryWrite } from "./qaState";
+import type { ArchiveLink } from "@/features/semester/types";
+import { connect, memoryWrite, qa } from "./qaState";
 
 type Receive<T> = (value: T) => void;
 type Failure = (error: Error) => void;
@@ -11,6 +12,41 @@ const programs: RetreatProgram[] = [
   { id: "program-main", title: "합성 전체 프로그램", order: 1, kind: "main", status: "draft", date: "2026-10-16", summary: "모두 함께 참여합니다", flow: "합성 원본 진행안", createdAt: 1, updatedAt: 1 },
   { id: "program-post", title: "합성 조별 프로그램", order: 2, kind: "post", status: "draft", date: "2026-10-17", summary: "조별로 이동합니다", flow: "합성 두 번째 진행안", createdAt: 1, updatedAt: 1 },
 ];
+
+// QA 전용 브라우저 저장소만 사용해 삭제 중단 뒤 새로고침을 재현한다.
+const archiveStorageKey = "woori-new-staff-qa-archive-v1";
+let archives: ArchiveLink[] = JSON.parse(sessionStorage.getItem(archiveStorageKey) ?? "null") ?? [
+  { id: "archive-file", title: "합성 보관 파일", kind: "doc", url: "http://127.0.0.1:4179/__qa__/stored.pdf", filePath: "synthetic/2026-2/archive.pdf", fileName: "합성문서.pdf", fileSize: 2048 },
+  { id: "archive-pending", title: "합성 삭제 대기 자료", kind: "doc", url: "http://127.0.0.1:4179/__qa__/removed.pdf", deletionPending: true },
+];
+function publishArchives(sid: string) {
+  sessionStorage.setItem(archiveStorageKey, JSON.stringify(archives));
+  qa.emit("archiveLinks", sid, archives);
+}
+export function subscribeArchiveLinks(sid: string, cb: Receive<ArchiveLink[]>, fail?: Failure) { return connect("archiveLinks", sid, cb, archives, fail); }
+export async function markArchiveLinkDeleting(sid: string, id: string) {
+  await memoryWrite("markArchiveLinkDeleting")(sid, id);
+  if (!archives.some((link) => link.id === id)) return false;
+  archives = archives.map((link) => link.id === id ? { ...link, deletionPending: true } : link);
+  publishArchives(sid);
+  return true;
+}
+export async function removeArchiveLink(sid: string, id: string) {
+  await memoryWrite("removeArchiveLink")(sid, id);
+  archives = archives.filter((link) => link.id !== id);
+  publishArchives(sid);
+}
+export async function addArchiveLink(sid: string, link: Omit<ArchiveLink, "id">) {
+  const id = await memoryWrite("addArchiveLink")(sid, link);
+  archives = [...archives, { ...link, id }];
+  publishArchives(sid);
+}
+export const deleteSemesterArchiveFile = memoryWrite("deleteSemesterArchiveFile");
+export async function uploadSemesterArchiveFile(sid: string, file: File, onProgress?: (percent: number) => void) {
+  await memoryWrite("uploadSemesterArchiveFile")(sid, file.name);
+  onProgress?.(100);
+  return { filePath: `synthetic/${sid}/${file.name}`, fileUrl: "http://127.0.0.1:4179/__qa__/uploaded.pdf" };
+}
 
 export function subscribeToRetreats(cb: Receive<Retreat[]>, fail?: Failure) { return connect("retreats", "", cb, [retreat], fail); }
 export function subscribeToRetreat(id: string, cb: Receive<Retreat | null>, fail?: Failure) { return connect("retreat", id, cb, { ...retreat, id }, fail); }

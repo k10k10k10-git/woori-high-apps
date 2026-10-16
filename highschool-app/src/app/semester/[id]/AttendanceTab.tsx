@@ -5,6 +5,7 @@
 // 기록 취소는 별도 '지우기'로만.
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Backspace } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { useUI } from "@/context/UIContext";
@@ -41,6 +42,9 @@ import {
 import { useViewMode } from "@/context/ViewModeContext";
 import SaveFeedback from "@/components/SaveFeedback";
 import { useSaveFeedback } from "@/features/semester/useSaveFeedback";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
+import { useLoadErrors } from "@/lib/useLoadErrors";
+import { createSubscriptionReadinessGate } from "@/lib/subscriptionReadiness";
 
 interface Props {
   sid: string;
@@ -52,6 +56,7 @@ interface Props {
   meta: SemesterMeta | null;
   lockedTeamId?: string;
   lockedScope?: SemesterRosterScope;
+  operationsBaseHref?: string;
 }
 
 const STATUS_STYLE: Record<EditableAttendanceStatus, string> = {
@@ -69,7 +74,7 @@ function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId, lockedScope }: Props) {
+export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId, lockedScope, operationsBaseHref }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
   const { isMobileView } = useViewMode();
@@ -95,7 +100,9 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [attAllByScope, setAttAllByScope] = useState<AttendanceByScope>(EMPTY_ATTENDANCE_BY_SCOPE);
   const [completion, setCompletion] = useState<Record<string, CompletionEntry>>({});
   const [pickedView, setPickedView] = useState<"grid" | "session" | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [readySession, setReadySession] = useState("");
+  const [readyGrid, setReadyGrid] = useState("");
   const view = pickedView ?? (isMobileView ? "session" : "grid");
   const defaultSessId = useMemo(() => {
     if (sessions.length === 0) return "";
@@ -108,32 +115,45 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   }, [sessions]);
   const activeSessId = sessions.some((session) => session.id === sessId) ? sessId : defaultSessId;
   const saveFeedback = useSaveFeedback(`${sid}/${scope}/${view === "session" ? activeSessId : "all"}`);
-  const activeAttendanceKey = `${scope}/${activeSessId}`;
+  const activeAttendanceKey = `${sid}/${scope}/${activeSessId}`;
   const att = sessionAttendance.key === activeAttendanceKey ? sessionAttendance.values : {};
+  const selectionScope = `${sid}/${scope}/${activeSessId}/${view}/${retry}`;
+  const [readVersion, setReadVersion] = useState({ scope: selectionScope, value: 0 });
+  if (readVersion.scope !== selectionScope) setReadVersion({ scope: selectionScope, value: readVersion.value + 1 });
+  // 같은 주차로 돌아와도 해제 전의 준비 상태를 새 구독에 재사용하지 않는다.
+  const readScope = `${selectionScope}/${readVersion.value}`;
+  const { errors, fail, ok } = useLoadErrors(readScope);
+  const loadError = Object.keys(errors).length > 0;
+  const loading = !loadError && (view === "session" ? readySession !== readScope : readyGrid !== readScope);
+  const writable = canEdit && !loadError && !loading;
 
   useEffect(() => {
-    if (!activeSessId) return;
-    const key = `${scope}/${activeSessId}`;
-    return subscribeSessionAttendance(sid, scope, activeSessId, (values) => {
-      setSessionAttendance({ key, values });
-    }, (e) => setLoadError(e.message));
-  }, [sid, scope, activeSessId]);
+    if (view !== "session" || !activeSessId) return;
+    let active = true;
+    const key = `${sid}/${scope}/${activeSessId}`;
+    const unsubscribe = subscribeSessionAttendance(sid, scope, activeSessId, (values) => {
+      if (active) { setSessionAttendance({ key, values }); setReadySession(readScope); ok("session"); }
+    }, (error) => { if (active) fail("session")(error); });
+    return () => { active = false; unsubscribe(); };
+  }, [sid, scope, activeSessId, view, retry, readScope, fail, ok]);
 
   // 표 보기는 전 회차를 한 번에 본다 (수료 탭과 같은 경로를 재사용)
   useEffect(() => {
     if (view !== "grid") return;
-    const fail = (error: Error) => setLoadError(error.message);
+    let active = true;
+    const gate = createSubscriptionReadinessGate(["team", "training", "completion"], () => { if (active) setReadyGrid(readScope); });
+    const failed = (key: string) => (error: Error) => { if (active) { fail(key)(error); gate.markReady(key); } };
     const unsubs = [
       subscribeAllAttendance(sid, "team", (values) => {
-        setAttAllByScope((current) => ({ ...current, team: values }));
-      }, fail),
+        if (active) { setAttAllByScope((current) => ({ ...current, team: values })); ok("team"); gate.markReady("team"); }
+      }, failed("team")),
       subscribeAllAttendance(sid, "training", (values) => {
-        setAttAllByScope((current) => ({ ...current, training: values }));
-      }, fail),
-      subscribeCompletion(sid, setCompletion, fail),
+        if (active) { setAttAllByScope((current) => ({ ...current, training: values })); ok("training"); gate.markReady("training"); }
+      }, failed("training")),
+      subscribeCompletion(sid, (values) => { if (active) { setCompletion(values); ok("completion"); gate.markReady("completion"); } }, failed("completion")),
     ];
-    return () => unsubs.forEach((unsubscribe) => unsubscribe());
-  }, [sid, view]);
+    return () => { active = false; unsubs.forEach((unsubscribe) => unsubscribe()); };
+  }, [sid, view, retry, readScope, fail, ok]);
 
   const session = sessions.find((s) => s.id === activeSessId);
   const members = useMemo(
@@ -156,39 +176,42 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   }), [applications]);
 
   async function markAt(appKey: string, sessionId: string, status: EditableAttendanceStatus) {
+    if (!writable) return;
     try {
       await saveFeedback.run(`${sessionId}/${appKey}`, () => setAttendance(sid, scope, sessionId, appKey, status, user?.uid, {
         subjectName: applications.find((application) => application.id === appKey)?.name,
         date: sessions.find((item) => item.id === sessionId)?.date,
       }));
-    } catch (e) {
-      toast(`기록 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } catch {
+      toast("출석을 저장하지 못했습니다. 원하는 상태를 다시 선택해 주세요.", "error");
     }
   }
 
   async function clearAt(appKey: string, sessionId: string) {
+    if (!writable) return;
     try {
       await saveFeedback.run(`${sessionId}/${appKey}`, () => clearAttendance(sid, scope, sessionId, appKey, {
         subjectName: applications.find((application) => application.id === appKey)?.name,
         date: sessions.find((item) => item.id === sessionId)?.date,
       }));
-    } catch (error) {
-      toast(`기록 삭제 실패: ${error instanceof Error ? error.message : String(error)}`, "error");
+    } catch {
+      toast("출석 기록을 지우지 못했습니다. 기록을 확인한 뒤 지우기를 다시 눌러 주세요.", "error");
     }
   }
 
   const mark = (appKey: string, status: EditableAttendanceStatus) => markAt(appKey, activeSessId, status);
 
   async function toggleCompletion(appKey: string, field: "certPrinted" | "photoChecked", value: boolean) {
+    if (!writable) return;
     try {
       await updateCompletionEntry(sid, appKey, { [field]: value });
-    } catch (error) {
-      toast(`수료 후속 작업 저장 실패: ${error instanceof Error ? error.message : String(error)}`, "error");
+    } catch {
+      toast("수료 확인을 저장하지 못했습니다. 해당 항목을 다시 선택해 주세요.", "error");
     }
   }
 
   if (sessions.length === 0) {
-    return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차(모임 날짜)를 등록해주세요.</p>;
+    return <div className="team-first-empty is-compact"><p>등록된 회차(모임 날짜)가 없습니다. {operationsBaseHref ? "학기 운영 설정에서 회차를 등록해 주세요." : "담당 교역자 또는 행정팀에 이 학기의 회차 등록을 요청해 주세요."}</p>{operationsBaseHref && <Link className="btn-secondary mt-3" href={`${operationsBaseHref}/settings`}>학기 운영 설정 열기</Link>}</div>;
   }
 
   const counts = { 출석: 0, 지각: 0, 결석: 0, 미기록: 0 };
@@ -201,10 +224,9 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   return (
     <div>
       {loadError && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-          ⚠ 출석 로드 오류: {loadError}
-        </div>
+        <LoadFailureNotice title="출석 기록을 불러오지 못했습니다" description="표시된 기록은 유지됩니다. 다시 불러온 뒤 출석을 입력해 주세요." onRetry={() => setRetry((value) => value + 1)} />
       )}
+      {loading && <p className="save-feedback" aria-live="polite">출석 기록을 불러오는 중입니다…</p>}
 
       {!lockedTeamId && !lockedScope && <div className="mobile-sticky-controls mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="출석 명단 구분">
@@ -238,7 +260,6 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             aria-label="주차 선택"
             value={activeSessId}
             onChange={(e) => {
-              setLoadError(null);
               setSessId(e.target.value);
             }}
             className="input text-sm"
@@ -298,7 +319,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             </button>
           ))}
         </div>
-        {canEdit && <SaveFeedback state={saveFeedback.state} idleLabel="선택하면 자동 저장" />}
+        {canEdit && <SaveFeedback state={saveFeedback.state} idleLabel="선택하면 자동 저장" errorLabel="저장 실패 · 원하는 출석 상태나 지우기를 다시 선택해 주세요" />}
       </div>
 
       {view === "grid" ? (
@@ -308,7 +329,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           scope={scope}
           attendanceByScope={attAllByScope}
           completionEligibleByScope={completionEligibleByScope}
-          canEdit={canEdit}
+          canEdit={writable}
           completion={completion}
           completionMinRate={meta?.completionRule?.minRate ?? 0.7}
           onMark={(appKey, sessionId, status) => void markAt(appKey, sessionId, status)}
@@ -349,7 +370,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                   <button
                     key={s}
                     onClick={() => void mark(m.id, s)}
-                    disabled={!canEdit}
+                    disabled={!writable}
                     aria-label={`${m.name} ${s}`}
                     aria-pressed={entry ? normalizeAttendanceStatus(entry.s) === s : false}
                     className={`px-2.5 py-1.5 rounded-md text-xs border font-medium ${
@@ -362,6 +383,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                 {entry && canEdit && (
                   <button
                     onClick={() => void clearAt(m.id, activeSessId)}
+                    disabled={!writable}
                     aria-label={`${m.name} 기록 지우기`}
                     className="compact-icon-control text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                   >
@@ -373,9 +395,10 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           );
         })}
         {members.length === 0 && (
-          <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
-            {scope === "training" ? "훈련을 신청한 인원이 없습니다." : "배치된 인원이 없습니다. 배치 탭에서 먼저 배치해주세요."}
-          </p>
+          <li className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-600">
+            <p>{scope === "training" ? "선택한 조건에 맞는 훈련 명단이 없습니다." : "선택한 조건에 맞는 사역팀 명단이 없습니다."} {operationsBaseHref ? "검색 조건과 학기 배치를 확인해 주세요." : "필터를 확인하고, 명단이 계속 보이지 않으면 담당 교역자 또는 행정팀에 학기 배치를 확인해 달라고 요청하세요."}</p>
+            {operationsBaseHref && <Link className="btn-secondary mt-3" href={`${operationsBaseHref}/placements`}>학기 배치 확인하기</Link>}
+          </li>
         )}
       </ul>
       </>

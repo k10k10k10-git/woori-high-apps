@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ applications: vi.fn(), stopped: vi.fn(), auth: { user: { uid: "pastor" }, loading: false, roleError: null, roles: { semester: "pastor", retreat: "none" }, teamMemberships: {} } }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => mocks.auth }));
-vi.mock("@/app/semester/[id]/AttendanceTab", () => ({ default: () => null }));
-vi.mock("@/app/semester/[id]/CurriculumTab", () => ({ default: () => null }));
+vi.mock("@/app/semester/[id]/AttendanceTab", () => ({ default: ({ operationsBaseHref }: { operationsBaseHref?: string }) => <output data-testid="attendance-operations">{operationsBaseHref}</output> }));
+vi.mock("@/app/semester/[id]/CurriculumTab", () => ({ default: ({ operationsBaseHref }: { operationsBaseHref?: string }) => <output data-testid="curriculum-operations">{operationsBaseHref}</output> }));
 vi.mock("@/features/semester/db", () => ({
   subscribeSemesterMeta: (_id: string, cb: (v: unknown) => void) => { cb({ title: "훈련 학기" }); return () => {}; },
   subscribeTeams: (_id: string, cb: (v: unknown) => void) => { cb([]); return () => {}; },
@@ -16,7 +16,7 @@ vi.mock("@/features/semester/db", () => ({
   subscribeStaffByYear: (_id: string, cb: (v: unknown) => void) => { cb([]); return () => {}; },
 }));
 import TrainingTermWorkspace from "./TrainingTermWorkspace";
-afterEach(cleanup);
+afterEach(() => { cleanup(); mocks.auth.roles = { semester: "pastor", retreat: "none" }; });
 it("필수 명단 구독 실패를 빈 명단으로 보이지 않고 재시도 때 구독을 새로 연결한다", async () => {
   mocks.applications.mockImplementationOnce((_id, _cb, fail) => { fail(new Error("명단 연결 실패")); return mocks.stopped; })
     .mockImplementation((_id, cb) => { cb([{ id: "app", name: "가상 학생", trainingClassId: "class", status: "배치" }]); return () => {}; });
@@ -28,4 +28,13 @@ it("필수 명단 구독 실패를 빈 명단으로 보이지 않고 재시도 �
   expect(await screen.findAllByText("가상 학생")).toHaveLength(2);
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(mocks.stopped).toHaveBeenCalledOnce();
+});
+
+it.each(["attendance", "curriculum"] as const)("훈련 %s 화면은 운영 담당자에게만 설정·배치 경로를 전달한다", async (section) => {
+  mocks.applications.mockImplementation((_id, cb) => { cb([]); return () => {}; });
+  const view = render(<TrainingTermWorkspace semesterId="2026-2" section={section} />);
+  expect(await screen.findByTestId(`${section}-operations`)).toHaveTextContent("/operations/semesters/2026-2");
+  mocks.auth.roles = { semester: "staff", retreat: "none" };
+  view.rerender(<TrainingTermWorkspace semesterId="2026-2" section={section} />);
+  expect(await screen.findByTestId(`${section}-operations`)).toBeEmptyDOMElement();
 });

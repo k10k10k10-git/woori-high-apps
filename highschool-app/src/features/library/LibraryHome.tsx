@@ -81,7 +81,7 @@ function LibraryForUser({ roles, teamMemberships, onRetry }: { roles: MinistryRo
 
   const normalizedQuery = query.trim().toLocaleLowerCase("ko-KR");
   const records = visibleTerms.flatMap(({ semester, href }) => (linksByTerm[semester.id] ?? [])
-    .filter((link) => (kind === "all" || link.kind === kind)
+    .filter((link) => !link.deletionPending && (kind === "all" || link.kind === kind)
       && (!normalizedQuery || `${link.title ?? ""} ${semester.meta.title} ${KIND_LABEL[link.kind] ?? "기타"}`.toLocaleLowerCase("ko-KR").includes(normalizedQuery)))
     .map((link) => ({ link, semester, href })));
   const finished = ready && (central || eligibleTerms.every(({ id }) => readyTeams.has(id)))

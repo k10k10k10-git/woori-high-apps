@@ -2,7 +2,7 @@
 
 `npm run test:e2e:new-staff`는 별도 Playwright 설정으로 loopback Vite 서버를 시작하고 종료한다. 운영 앱 설정, Firebase 인증, 운영 DB와 Rules에 연결하지 않는다. 패키지는 앱에 이미 설치된 런타임을 사용한다.
 
-- 실제 `TeamWorkspace`, `TeamsHome`, `PortalHome`, `HomeStart`, `MyPageModal`, `ProgramPreparationClient`, `SiteHelp`, `PraiseAttendance`, `GlobalPortalHeader`, `RetreatAreaNav`, `OperationsHome`, `OperationsGate`, `OverlayShell`, `LoginButton`과 앱 CSS를 렌더한다.
+- 실제 `TeamWorkspace`, `TeamsHome`, `PortalHome`, `HomeStart`, `MyPageModal`, `ProgramPreparationClient`, `SiteHelp`, `LibraryHome`, 학기 `CurriculumTab`·`AttendanceTab`·`ArchiveTab`, `PraiseAttendance`, `GlobalPortalHeader`, `RetreatAreaNav`, `OperationsHome`, `OperationsGate`, `OverlayShell`, `LoginButton`과 앱 CSS를 렌더한다.
 - Auth·DB 서비스 경계만 테스트에서 교체하고 운영 Firebase SDK import를 거부한다.
 - 서버를 시작할 때마다 테스트가 소유한 새 임시 Vite 캐시를 만든다. 최초 dependency scan이 동적 패널의 서비스까지 탐색하도록 검증하며 기존 사용자 캐시는 삭제하거나 재사용하지 않는다. 정상 종료 시 이 실행이 만든 임시 캐시만 지운다.
 - 새 캐시의 entry와 정적 import 변환이 끝나기 전 준비 상태는 503이고 완료 후 200이다. 준비 중 SDK import가 거부되면 서버가 실패하며 이번 실행의 임시 캐시만 정리한다. 기존 서버 대기 30초·테스트 45초·expect 8초는 유지한다.
@@ -14,6 +14,9 @@
 - `/__qa__/proof.json`의 Firebase runtime module 목록이 비었는지 매 접근성 시나리오에서 확인한다.
 - 출결 입력의 `execute`는 메모리 배열에만 기록한다. 취소에는 호출이 없고 최종 확인에만 기존 command가 전달되는지 검사한다.
 - 다른 서비스 쓰기도 `serviceMocks.ts`에서 메모리 기록만 남긴다. `qaState.ts`는 구독의 시작·해제와 scope를 기록하며 해제 직전에 들어온 응답을 전달해 실제 화면의 계정·세대 차단을 확인한다. 운영 API/SDK 호출은 없다.
+- `heldSubscriptions`는 지정한 이름·key의 최초 응답만 보류하고 `deliver`는 해제된 구독의 늦은 응답을 전달한다. `writeFailures`는 지정한 합성 쓰기만 정해진 횟수만큼 실패시킨다. 학기 커리큘럼과 팀 목표는 합성 구독 echo로 반영한다. 실제 저장·구독 구현의 성공을 뜻하지 않는다.
+- 학기 Storage도 서비스 경계에서 교체한다. 자료 삭제는 실제 UI의 `markArchiveLinkDeleting` → 파일 정리 → 레코드 삭제 순서를 메모리 호출로 확인한다. QA 전용 `sessionStorage`에 합성 자료와 `deletionPending`만 보관해 중간 실패 뒤 새로고침·자료 목록의 링크 제외·삭제 재시도를 검사한다. 실제 Storage 파일이나 운영 RTDB transaction은 실행하지 않는다.
+- `보강 회귀` 접두사의 검사는 실제 학기 초안·느린 반 전환·읽기 재구독·삭제 중단 복구·마이페이지 팀 링크를 집중 확인한다. 전체 검사를 반복할 필요가 없는 영향 확인에는 `npm run test:e2e:new-staff -- --grep '보강 회귀' --project=mobile390 --project=mobile-webkit390 --project=wide1280`을 사용한다.
 - Chromium 390·768·1280px와 모바일 WebKit 390px에서 첫 방문·재방문·계정 전환·홈/팀 반복 안내 제거와 업무 바로 연결·조회 권한 표시·저장 차단·권한 오류 복구·준비 중 팀과 지난/예정 학기의 안내·일상 표현으로 도움말 검색·도움말에서 이전 팀 화면으로 돌아가기·로그인 오류의 친절한 안내·삭제 확인/키보드 취소·light/dark 접근성과 가로 넘침을 검사한다.
 - 일반 스탭에게 전체 영역·팀·운영센터 메뉴가 보이는지, 타팀 실제 컴포넌트에서 구독이 시작되지 않는지, 권한 확인 중·오류 상태에서 이전 권한으로 구독하지 않는지 검사한다. `roleErrorAssigned`는 오류와 이전 역할이 동시에 남은 합성 경계 조건이며 운영 Auth 구현을 변경하지 않는다.
 - 실제 OperationsGate에는 구독·마운트 횟수를 세는 합성 자녀를 넣는다. 이 결과는 실제 Accounts 화면이나 서버 데이터 조회 성공을 뜻하지 않는다.

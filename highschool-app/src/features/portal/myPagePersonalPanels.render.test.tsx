@@ -49,6 +49,19 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("개인 대시보드의 미확인 상태", () => {
+  it("활성 팀 소속의 바로가기와 사용 가능 영역 수를 표시하고 소속 해제 시 갱신한다", () => {
+    mocks.data = { ...mocks.data, roles: { semester: "staff", retreat: "none" }, teamMemberships: { praise: { role: "staff", active: true } } };
+    const { rerender } = render(<RoleDashboardPanel />);
+    const shortcuts = screen.getByRole("region", { name: "내 사역 바로가기" });
+    expect(within(shortcuts).getByRole("link", { name: /찬양팀/ })).toHaveAttribute("href", "/teams/praise");
+    const areaMetric = screen.getByText("사용 가능 영역").parentElement!;
+    expect(areaMetric).toHaveTextContent("2건");
+    mocks.data = { ...mocks.data, teamMemberships: {} };
+    rerender(<RoleDashboardPanel />);
+    expect(within(shortcuts).queryByRole("link", { name: /찬양팀/ })).not.toBeInTheDocument();
+    expect(areaMetric).toHaveTextContent("1건");
+  });
+
   it("첫 응답 대기와 오류를 일정 없음·0건·현재 학기 없음으로 표시하지 않는다", () => {
     const { rerender } = render(<RoleDashboardPanel />);
     expect(screen.queryByText("예정된 일정 없음")).toBeNull();

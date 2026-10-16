@@ -13,11 +13,25 @@ vi.mock("@/features/activityLog/write", () => ({
 
 import { toggleOnSiteCheckIn } from "./retreatOps";
 import { updateIguardAttendance } from "@/features/iguard/lib/db";
+import { markArchiveLinkDeleting } from "@/features/semester/db";
 
 beforeEach(() => { vi.clearAllMocks(); });
 afterEach(() => { vi.restoreAllMocks(); });
 
 describe("로그 연결 후 원장 트랜잭션 계약", () => {
+  it("자료 삭제 표식은 기존 필드를 보존하고 삭제된 자료를 다시 만들지 않는다", async () => {
+    const link = { title: "합성 자료", url: "https://example.invalid", filePath: "semesters/2026-2/archive/file", kind: "doc" };
+    mocks.transaction.mockImplementation(async (_path, transform) => {
+      expect(transform(link)).toEqual({ ...link, deletionPending: true });
+      expect(transform(null)).toBeNull();
+      return { committed: true, snapshot: { exists: () => true } };
+    });
+    await expect(markArchiveLinkDeleting("2026-2", "link")).resolves.toBe(true);
+    expect(mocks.transaction).toHaveBeenCalledWith("semesters/2026-2/archiveLinks/link", expect.any(Function));
+    mocks.transaction.mockResolvedValueOnce({ committed: true, snapshot: { exists: () => false } });
+    await expect(markArchiveLinkDeleting("2026-2", "link")).resolves.toBe(false);
+  });
+
   it("현장 추가자는 보존하고 일반 체크인은 서버 확정 상태를 반환한다", async () => {
     const walkIn = { isOnSite: true, name: "가상현장학생" } as OnSiteEntry;
     const entry = { isOnSite: false, name: "가상신청학생" } as OnSiteEntry;

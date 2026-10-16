@@ -5,7 +5,6 @@ import type { SiteRequest } from "@/features/suggestions/siteRequest";
 import {
   canAccessArea,
   canEditArea,
-  canAccessSundayTeam,
   describeRoles,
   iguardScopeOf,
   ownSundayTeam,
@@ -13,7 +12,7 @@ import {
 } from "./accessPolicy";
 import { sundayTeamOf, type SundayTeamKey } from "./featureCatalog";
 import type { SharedCalendarItem } from "./SharedMinistryCalendar";
-import { activeTeamKeys, canAccessOperationsCenter, type TeamMemberships } from "@/features/teams/teamModel";
+import { accessibleTeamKeys, canAccessOperationsCenter, canEditTeam, ownTeamKey, type TeamMemberships } from "@/features/teams/teamModel";
 
 export type MinistryModuleTone = "semester" | "sunday" | "retreat" | "field" | "guide";
 
@@ -72,9 +71,9 @@ export function roleDashboardTitle(roles: MinistryRoles): string {
 }
 
 function sundayModule(roles: MinistryRoles, memberships?: TeamMemberships): MinistryModule | null {
-  if (!canAccessArea("sunday", roles)) return null;
-  const assignedTeamKeys = memberships === undefined ? undefined : activeTeamKeys(memberships);
-  const ownTeam = ownSundayTeam(roles, assignedTeamKeys);
+  const teamKeys = memberships === undefined ? undefined : accessibleTeamKeys(roles, memberships);
+  if (teamKeys ? teamKeys.length === 0 : !canAccessArea("sunday", roles)) return null;
+  const ownTeam = memberships === undefined ? ownSundayTeam(roles) : ownTeamKey(roles, memberships);
   if (ownTeam) {
     const team = sundayTeamOf(ownTeam);
     return {
@@ -82,16 +81,16 @@ function sundayModule(roles: MinistryRoles, memberships?: TeamMemberships): Mini
       title: team?.label ?? "담당 사역팀",
       description: team?.tabs.length ? team.tabs.join(" · ") : "팀 기능 준비 중",
       href: `/teams/${ownTeam}`,
-      accessLabel: canAccessSundayTeam(ownTeam, roles, assignedTeamKeys) ? "담당" : "조회",
+      accessLabel: memberships === undefined || canEditTeam(ownTeam, roles, memberships) ? "담당" : "조회",
       tone: "sunday",
     };
   }
   return {
     id: "sunday-all",
-    title: "팀·주일 운영 전체",
-    description: "행정·바나바·예배·찬양팀 운영",
-    href: "/sunday-ministry",
-    accessLabel: canEditArea("sunday", roles) ? "운영" : "조회",
+    title: "팀·주일 운영",
+    description: "팀별 학기 기록·주간 업무",
+    href: "/teams",
+    accessLabel: (teamKeys === undefined ? canEditArea("sunday", roles) : teamKeys.some((key) => canEditTeam(key, roles, memberships))) ? "운영" : "조회",
     tone: "sunday",
   };
 }

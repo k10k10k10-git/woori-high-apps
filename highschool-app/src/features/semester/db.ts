@@ -2,7 +2,7 @@
 // 쓰기는 전부 경로 지정 update/set(단일 문서) — 노드 전체 덮어쓰기 함수를 만들지 말 것.
 
 import { ref, get, onValue } from "firebase/database";
-import { auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
+import { auditedUpdate as update, auditedRemove as remove, auditedRunTransaction } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
 import { refreshSemesterList } from "./semesterList";
@@ -358,6 +358,12 @@ export async function addArchiveLink(sid: string, link: Omit<ArchiveLink, "id">)
 
 export async function removeArchiveLink(sid: string, linkId: string): Promise<void> {
   await remove(ref(db, paths.archiveLink(sid, linkId)));
+}
+
+export async function markArchiveLinkDeleting(sid: string, linkId: string): Promise<boolean> {
+  const result = await auditedRunTransaction(ref(db, paths.archiveLink(sid, linkId)), (current) =>
+    current ? { ...current, deletionPending: true } : current);
+  return result.committed && result.snapshot.exists();
 }
 
 // ── 학생 원장 조회 (classes — 학생 출석부 앱 소유) ──

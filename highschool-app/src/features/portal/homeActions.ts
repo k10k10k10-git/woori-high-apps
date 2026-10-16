@@ -37,18 +37,19 @@ export function homeActionDayLabel(item: Pick<SharedCalendarItem, "date" | "endD
   return `D+${utcDay(today) - utcDay(item.endDate ?? item.date)}`;
 }
 
-/** 홈 할 일은 공유 사역 캘린더와 같은 항목을 그대로 쓴다. 과거 일정은 미완료 공유 준비만 남긴다. */
+/** 홈 공유 일정은 사역 캘린더와 같은 항목을 그대로 쓴다. 과거 일정은 미완료 공유 준비만 남긴다. */
 export function buildHomeActions(items: SharedCalendarItem[], today: string, limit = 6): HomeAction[] {
   const priority: Record<HomeAction["urgency"], number> = { overdue: 0, today: 1, upcoming: 2 };
   return items
     .filter((item) => !item.noticeOnly && !item.done && ((item.endDate ?? item.date) >= today || item.editable))
     .map((item) => {
       const urgency = urgencyFor(item, today);
+      const meta = `${item.editable ? "공유 준비" : "공유 일정"} · ${KIND_META[item.kind]}`;
       return {
         id: item.id,
         date: item.date,
         title: item.title,
-        meta: urgency === "overdue" ? `${KIND_META[item.kind]} · 기한 지남` : KIND_META[item.kind],
+        meta: urgency === "overdue" ? `${meta} · 기한 지남` : meta,
         kind: item.kind,
         href: item.href,
         urgency,

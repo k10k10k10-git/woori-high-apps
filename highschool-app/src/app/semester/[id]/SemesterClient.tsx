@@ -100,6 +100,7 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
   const { isMobileView } = useViewMode();
   const allowed = canAccessOperationsCenter(roles, teamMemberships);
   const canEdit = allowed && canEditArea("semester", roles);
+  const operationsBaseHref = canEdit ? `/operations/semesters/${encodeURIComponent(semesterId)}` : undefined;
   const assignedTeam = ownTeamKey(roles, teamMemberships);
   const assignedTeams = activeTeamKeys(teamMemberships);
   const tabSource = `${semesterId}\u0000${initialTab ?? ""}`;
@@ -241,9 +242,9 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
             {activeTab === "배치" && <AssignTab initialTeamId={requestedTeam} sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
-            {activeTab === "출석" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} />}
-            {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} />}
-            {activeTab === "아카이브" && <ArchiveTab sid={semesterId} />}
+            {activeTab === "출석" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} operationsBaseHref={operationsBaseHref} />}
+            {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} operationsBaseHref={operationsBaseHref} />}
+            {activeTab === "아카이브" && <ArchiveTab sid={semesterId} operationsBaseHref={operationsBaseHref} />}
             {activeTab === "설정" && <WorkspaceAccessGate allowed={canEdit} area="학기 설정" embedded backHref="/operations" backLabel="운영센터 메뉴로"><SettingsTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} /></WorkspaceAccessGate>}
           </SemesterEditProvider>
         </div>
