@@ -104,6 +104,8 @@ export interface ArchiveLink {
   filePath?: string;
   fileName?: string;
   fileSize?: number;
+  /** 삭제 중단 후에도 같은 자료에서 파일 정리·목록 삭제를 이어간다. */
+  deletionPending?: boolean;
 }
 
 export interface CurriculumEntry {

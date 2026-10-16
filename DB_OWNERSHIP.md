@@ -125,6 +125,7 @@
 | 경로 | 소유 사이트 | 읽는 사이트 | 쓰는 사이트 | 삭제/변경 시 영향 |
 |------|-----------|-----------|-----------|----------------|
 | `semesters/{sid}` (meta·teams·trainingClasses·sessions·applications·attendance·praiseOperationReceipts·completion·curriculum·archiveLinks) | highschool-app 학기 모듈 | - | highschool-app | - |
+| `semesters/{sid}/archiveLinks/{linkId}/deletionPending` | highschool-app 학기 모듈 | - | highschool-app 기존 자료 편집 권한자 | 선택적 삭제 진행 표식. 기존 레코드에 트랜잭션으로 먼저 기록하고 파일 정리 후 레코드를 삭제한다. 중단 후에도 열기 링크를 숨기고 같은 항목의 삭제를 재시도한다. 자료 검색은 진행 항목을 제외하며 과거 레코드에는 필드가 없어도 된다. |
 | `semesters/{sid}/sessions/{sessionId}/endDate` | highschool-app 학기 모듈 | - | highschool-app | 선택 종료일. 없으면 기존 단일 날짜 회차, 있으면 `date`~`endDate` 다일 회차이며 출석은 sessionId 하나로 집계 |
 | `semesters/{sid}/trainingClasses/{id}` | highschool-app 학기 모듈 | - | highschool-app | 훈련 반. 삭제 시 `applications/*/trainingClassId`를 같은 루트 update로 함께 비운다(`trainingClass.ts`) |
 | `semesters/{sid}/teams/{id}/goal` | highschool-app 학기 모듈 | - | highschool-app | 팀별 이번 학기 목표 (커리큘럼 탭 상단) |

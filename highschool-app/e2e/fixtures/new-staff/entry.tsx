@@ -6,8 +6,14 @@ import { ViewModeProvider } from "@/context/ViewModeContext";
 import TeamWorkspace from "@/features/teams/TeamWorkspace";
 import TeamsHome from "@/features/teams/TeamsHome";
 import SiteHelp from "@/features/library/SiteHelp";
+import LibraryHome from "@/features/library/LibraryHome";
+import CurriculumTab from "@/app/semester/[id]/CurriculumTab";
+import AttendanceTab from "@/app/semester/[id]/AttendanceTab";
+import ArchiveTab from "@/app/semester/[id]/ArchiveTab";
+import { SemesterEditProvider } from "@/features/semester/EditContext";
+import type { Team } from "@/features/semester/types";
 import { HomeStart } from "@/features/portal/HomeStart";
-import { canEditTeam } from "@/features/teams/teamModel";
+import { canAccessOperationsCenter, canEditTeam } from "@/features/teams/teamModel";
 import { canManageRolesOf } from "@/features/portal/accessPolicy";
 import { sundayTeamOf } from "@/features/portal/featureCatalog";
 import GlobalPortalHeader from "@/features/portal/GlobalPortalHeader";
@@ -20,7 +26,7 @@ import OperationsGate from "@/features/operations/OperationsGate";
 import { PraiseAttendance } from "@/features/praise/components/PraiseAttendance";
 import { praiseFixture } from "@/features/praise/components/praiseTestFixtures";
 import type { PraiseCommand, PraiseView } from "@/features/praise/types";
-import { qa, setQaAuth, useAuth } from "./mocks";
+import { qa, setQaAuth, useAuth, subscribeTeams, semesterFixture } from "./mocks";
 import "@/app/globals.css";
 import "@/app/portal-surfaces.css";
 import "@/app/theme-compat.css";
@@ -83,6 +89,24 @@ function MyPageFixture() {
   </main>;
 }
 
+function SemesterFixture({ tab }: { tab: string }) {
+  const { roles, teamMemberships } = useAuth();
+  const [teams, setTeams] = useState<Team[]>([]);
+  useEffect(() => subscribeTeams("2026-2", (items) => setTeams(items as Team[])), []);
+  const props = { ...semesterFixture, sid: "2026-2", teams,
+    operationsBaseHref: canAccessOperationsCenter(roles, teamMemberships) ? "/operations/semesters/2026-2" : undefined,
+    sessions: params.get("empty") === "sessions" ? [] : semesterFixture.sessions,
+    applications: params.get("empty") === "applications" ? [] : semesterFixture.applications,
+  };
+  return <SemesterEditProvider canEdit={roles.semester === "superAdmin"}>
+    <main className="team-first-page"><h1>합성 학기 업무 검증</h1>
+      {tab === "actualCurriculum" ? <CurriculumTab {...props} />
+        : tab === "actualAttendance" ? <AttendanceTab {...props} teamById={new Map(teams.map((team) => [team.id, team]))} />
+          : <ArchiveTab sid="2026-2" />}
+    </main>
+  </SemesterEditProvider>;
+}
+
 function Fixture() {
   const pathname = window.location.pathname;
   const teamMatch = /^\/teams\/([^/]+)$/.exec(pathname);
@@ -97,6 +121,8 @@ function Fixture() {
       : scenario === "actualHome" ? <PortalHome />
       : scenario === "actualMyPage" ? <MyPageFixture />
       : scenario === "actualProgram" ? <ProgramPreparationClient />
+      : scenario === "actualCurriculum" || scenario === "actualAttendance" || scenario === "actualArchive" ? <SemesterFixture tab={scenario} />
+      : scenario === "actualLibrary" ? <LibraryHome />
       : scenario === "help" ? <SiteHelp />
       : scenario === "operations" ? <OperationsHome />
       : scenario === "operationsGateProbe" ? <OperationsMountProbe />
@@ -105,7 +131,7 @@ function Fixture() {
       : scenario === "teams" || scenario === "header" ? <TeamsHome /> : <TeamWorkspace teamKey={teamKey} />}
   </>;
   return <UIProvider>
-    {showHeader ? <ThemeProvider><ViewModeProvider>{content}</ViewModeProvider></ThemeProvider> : content}
+    {showHeader || scenario.startsWith("actual") ? <ThemeProvider><ViewModeProvider>{content}</ViewModeProvider></ThemeProvider> : content}
   </UIProvider>;
 }
 

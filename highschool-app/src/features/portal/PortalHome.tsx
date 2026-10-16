@@ -341,12 +341,12 @@ function PortalHomeWorkspace() {
 
         <div className={styles.agenda}>
           <section className={styles.attention} aria-labelledby="home-attention-title">
-            <div className={styles.sectionHeading}><h2 id="home-attention-title">오늘 확인할 일</h2><span>{calendarFailed ? "일부 조회 실패" : calendarPending ? "확인 중" : `${attentionActions.length}건`}</span></div>
-            <p>오늘 진행하는 일정과 기한이 지난 준비를 확인합니다.</p>
+            <div className={styles.sectionHeading}><h2 id="home-attention-title">오늘의 공유 일정</h2><span>{calendarFailed ? "일부 조회 실패" : calendarPending ? "확인 중" : `${attentionActions.length}건`}</span></div>
+            <p>고등부가 함께 보는 일정과 미완료 준비입니다.</p>
             <div className={styles.actionList}>{attentionActions.length > 0 ? attentionActions.map((item) => {
               const content = <><span className={`home-action-date home-action-date--${item.urgency}`}>{item.dayLabel}</span><span className={styles.actionText}><strong>{item.title}</strong><small>{item.meta}</small></span>{item.href && <span aria-hidden="true">→</span>}</>;
               return item.href ? <Link key={item.id} href={item.href} className="home-action-row">{content}</Link> : <div key={item.id} className="home-action-row">{content}</div>;
-            }) : <p role={calendarFailed ? "alert" : calendarPending ? "status" : undefined} className={styles.empty}>{calendarFailed ? "일부 업무를 확인하지 못했습니다." : calendarPending ? "이번 주 업무를 확인하는 중입니다…" : "오늘 확인할 일정이나 기한이 지난 준비가 없습니다."}</p>}</div>
+            }) : <p role={calendarFailed ? "alert" : calendarPending ? "status" : undefined} className={styles.empty}>{calendarFailed ? "일부 공유 일정을 확인하지 못했습니다." : calendarPending ? "공유 일정을 확인하는 중입니다…" : "오늘의 공유 일정이나 기한이 지난 준비가 없습니다."}</p>}</div>
           </section>
           <section className={styles.upcoming} aria-label="다음 일정">{upcomingActions.length > 0 || (!calendarPending && !calendarFailed) ? <HomeAgendaSummary actions={upcomingActions} /> : <><h2>다음 공유 일정</h2><p role={calendarFailed ? "alert" : "status"}>{calendarFailed ? "일부 일정을 확인하지 못했습니다." : "일정을 확인하는 중입니다…"}</p></>}</section>
         </div>

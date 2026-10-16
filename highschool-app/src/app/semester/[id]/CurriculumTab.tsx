@@ -3,6 +3,7 @@
 // 팀별 커리큘럼 — 회차 × 계획. "00팀" Docs 템플릿의 웹 버전 (blur 시 저장).
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useUI } from "@/context/UIContext";
 import { subscribeCurriculum, updateCurriculumEntry, updateTeam } from "@/features/semester/db";
 import { sessionDisplayLabel, sessionWeekLabel } from "@/features/semester/sessionKind";
@@ -11,6 +12,7 @@ import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { CurriculumEntry, Session, Team, TrainingClass } from "@/features/semester/types";
 import SaveFeedback from "@/components/SaveFeedback";
 import { useSaveFeedback } from "@/features/semester/useSaveFeedback";
+import LoadFailureNotice from "@/components/LoadFailureNotice";
 
 interface Props {
   sid: string;
@@ -19,9 +21,10 @@ interface Props {
   sessions: Session[];
   lockedTeamId?: string;
   lockedScope?: "team" | "training";
+  operationsBaseHref?: string;
 }
 
-export default function CurriculumTab({ sid, teams, trainingClasses, sessions, lockedTeamId, lockedScope }: Props) {
+export default function CurriculumTab({ sid, teams, trainingClasses, sessions, lockedTeamId, lockedScope, operationsBaseHref }: Props) {
   const { toast } = useUI();
   const canEdit = useSemesterCanEdit();
   // 사역팀과 훈련 반은 같은 curriculum/{id} 맵을 쓴다 (id가 서로 겹치지 않는다)
@@ -37,43 +40,57 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
     setTeamSource(lockedTeamId);
     setTeamId(lockedTeamId ?? "");
   }
-  const [entries, setEntries] = useState<Record<string, CurriculumEntry>>({});
+  const [curriculum, setCurriculum] = useState<{ key: string; entries: Record<string, CurriculumEntry>; error: boolean } | null>(null);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [goalDraft, setGoalDraft] = useState<{ key: string; value: string } | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [goalDrafts, setGoalDrafts] = useState<Record<string, string>>({});
+  const [retry, setRetry] = useState(0);
   const groups = scope === "team"
     ? (lockedTeamId ? teams.filter((team) => team.id === lockedTeamId) : teams)
     : trainingClasses;
   const activeTeamId = groups.some((group) => group.id === teamId) ? teamId : groups[0]?.id ?? "";
   const editorKey = `${sid}/${scope}/${activeTeamId}`;
   const saveFeedback = useSaveFeedback(editorKey);
-  const activeGoalDraft = goalDraft?.key === editorKey ? goalDraft.value : null;
+  const activeGoalDraft = goalDrafts[editorKey] ?? null;
+  const entries = curriculum?.key === editorKey ? curriculum.entries : {};
+  const loadError = curriculum?.key === editorKey && curriculum.error;
+  const loaded = curriculum?.key === editorKey && !curriculum.error;
 
   useEffect(() => {
     if (!activeTeamId) return;
-    return subscribeCurriculum(sid, activeTeamId, setEntries, (e) => setLoadError(e.message));
-  }, [sid, activeTeamId]);
+    let active = true;
+    const unsubscribe = subscribeCurriculum(sid, activeTeamId, (next) => {
+      if (!active) return;
+      setCurriculum({ key: editorKey, entries: next, error: false });
+    }, () => {
+      if (active) setCurriculum((current) => ({ key: editorKey, entries: current?.key === editorKey ? current.entries : {}, error: true }));
+    });
+    return () => { active = false; unsubscribe(); };
+  }, [sid, activeTeamId, editorKey, retry]);
 
   const activeTeam = groups.find((group) => group.id === activeTeamId);
 
   async function saveGoal() {
-    if (activeGoalDraft === null || !activeTeam || scope !== "team") return;
+    if (!loaded || !canEdit || saveFeedback.stateFor("goal") === "saving" || activeGoalDraft === null || !activeTeam || scope !== "team") return;
     const goal = activeGoalDraft.trim();
     if (goal === (("goal" in activeTeam ? activeTeam.goal : "") ?? "")) {
-      if (saveFeedback.stateFor("goal") !== "saving") setGoalDraft(null);
+      setGoalDrafts((current) => { const next = { ...current }; delete next[editorKey]; return next; });
       saveFeedback.reset("goal");
       return;
     }
     try {
       await saveFeedback.run("goal", () => updateTeam(sid, activeTeam.id, { goal }));
-      setGoalDraft((current) => current?.key === editorKey && current.value === activeGoalDraft ? null : current);
+      setGoalDrafts((current) => {
+        if (current[editorKey] !== activeGoalDraft) return current;
+        const next = { ...current }; delete next[editorKey]; return next;
+      });
       toast("팀 목표를 저장했습니다", "success");
-    } catch (e) {
-      toast(`목표 저장 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } catch {
+      toast("팀 목표를 저장하지 못했습니다. 입력은 유지되어 있으니 다시 저장해 주세요.", "error");
     }
   }
 
   async function save(sessId: string) {
+    if (!loaded || !canEdit || saveFeedback.stateFor(sessId) === "saving") return;
     const draft = drafts[`${editorKey}/${sessId}`];
     if (draft === undefined || draft === (entries[sessId]?.plan ?? "")) {
       saveFeedback.reset(sessId);
@@ -81,28 +98,32 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
     }
     try {
       await saveFeedback.run(sessId, () => updateCurriculumEntry(sid, activeTeamId, sessId, { plan: draft }));
+      // 구독의 낙관적 응답은 서버 확정이 아니다. 저장 성공 뒤 같은 초안만 정리한다.
+      setDrafts((current) => {
+        const key = `${editorKey}/${sessId}`;
+        if (current[key] !== draft) return current;
+        const next = { ...current }; delete next[key]; return next;
+      });
       toast("저장됨", "success");
-    } catch (e) {
-      toast(`저장 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } catch {
+      toast("계획을 저장하지 못했습니다. 입력은 유지되어 있으니 다시 저장해 주세요.", "error");
     }
   }
 
-  if (sessions.length === 0) return <p className="text-sm text-slate-400">먼저 설정 탭에서 회차를 등록해주세요.</p>;
+  if (sessions.length === 0) return <div className="team-first-empty is-compact"><p>등록된 회차(모임 날짜)가 없습니다. {operationsBaseHref ? "학기 운영 설정에서 회차를 등록해 주세요." : "담당 교역자 또는 행정팀에 이 학기의 회차 등록을 요청해 주세요."}</p>{operationsBaseHref && <Link className="btn-secondary mt-3" href={`${operationsBaseHref}/settings`}>학기 운영 설정 열기</Link>}</div>;
 
   return (
     <div>
       {loadError && (
-        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-          ⚠ 로드 오류: {loadError}
-        </div>
+        <LoadFailureNotice title="커리큘럼을 불러오지 못했습니다" description="작성 중인 입력은 유지됩니다. 다시 불러온 뒤 이어서 저장해 주세요." onRetry={() => setRetry((value) => value + 1)} />
       )}
 
       {!lockedTeamId && !lockedScope && <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-2">
         <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="커리큘럼 구분">
           {([["team", `사역팀 ${teams.length}개`], ["training", `훈련 ${trainingClasses.length}개`]] as const).map(([key, label]) => (
             <button key={key} role="tab" aria-selected={scope === key}
-              onClick={() => { setScope(key); setTeamId(""); setDrafts({}); setGoalDraft(null); }}
-              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === key ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700/70"}`}>
+              onClick={() => { setScope(key); setTeamId(""); }}
+              className={`rounded-xl px-3 py-2.5 text-sm font-semibold transition ${scope === key ? "bg-white text-emerald-800 shadow-sm" : "text-emerald-700"}`}>
               {label}
             </button>
           ))}
@@ -110,9 +131,10 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
       </div>}
 
       {groups.length === 0 ? (
-        <p className="text-sm text-slate-400">
-          {scope === "team" ? "먼저 설정 탭에서 사역팀을 만들어주세요." : "먼저 설정 탭의 훈련 관리에서 반을 만들어주세요."}
-        </p>
+        <div className="team-first-empty is-compact">
+          <p>{scope === "team" ? "이 학기에 등록된 사역팀이 없습니다." : "이 학기에 등록된 훈련반이 없습니다."} {operationsBaseHref ? "학기 운영 설정에서 등록해 주세요." : "담당 교역자 또는 행정팀에 학기 설정을 확인해 달라고 요청하세요."}</p>
+          {operationsBaseHref && <Link className="btn-secondary mt-3" href={`${operationsBaseHref}/settings`}>학기 운영 설정 열기</Link>}
+        </div>
       ) : (
       <>
       {canEdit && <p className="save-feedback">입력 칸을 벗어나면 자동 저장</p>}
@@ -123,8 +145,6 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
             role="tab"
             aria-selected={activeTeamId === t.id}
             onClick={() => {
-              setDrafts({});
-              setGoalDraft(null);
               setTeamId(t.id);
             }}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap ${
@@ -136,6 +156,8 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
         ))}
       </div>}
 
+      {!loaded && !loadError && <p role="status" className="save-feedback">커리큘럼을 불러오는 중입니다…</p>}
+
       {activeTeam && scope === "team" && (
         <section className="card card-body mb-4">
           <div>
@@ -144,15 +166,16 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
           </div>
           <textarea
             aria-label={`${activeTeam.name} 이번 학기 목표`}
-            disabled={!canEdit}
+            disabled={!canEdit || !loaded || saveFeedback.stateFor("goal") === "saving"}
             value={activeGoalDraft ?? ("goal" in activeTeam ? activeTeam.goal : "") ?? ""}
-            onChange={(e) => { setGoalDraft({ key: editorKey, value: e.target.value }); saveFeedback.markDirty("goal"); }}
+            onChange={(e) => { setGoalDrafts((current) => ({ ...current, [editorKey]: e.target.value })); saveFeedback.markDirty("goal"); }}
             onBlur={() => void saveGoal()}
             rows={3}
             placeholder="예: 매주 예배 셋팅을 학생 스스로 준비할 수 있게 한다"
             className="input text-sm"
           />
           {canEdit && saveFeedback.stateFor("goal") !== "idle" && <SaveFeedback state={saveFeedback.stateFor("goal")} idleLabel="" />}
+          {canEdit && saveFeedback.stateFor("goal") === "error" && <button type="button" disabled={!loaded} className="btn-secondary" onClick={() => void saveGoal()}>팀 목표 다시 저장</button>}
         </section>
       )}
 
@@ -168,7 +191,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
             </div>
             <textarea
               aria-label={`${sessionDateLabel(s)} 계획`}
-              disabled={!canEdit}
+              disabled={!canEdit || !loaded || saveFeedback.stateFor(s.id) === "saving"}
               value={drafts[`${editorKey}/${s.id}`] ?? entries[s.id]?.plan ?? ""}
               onChange={(e) => { setDrafts((d) => ({ ...d, [`${editorKey}/${s.id}`]: e.target.value })); saveFeedback.markDirty(s.id); }}
               onBlur={() => void save(s.id)}
@@ -177,6 +200,7 @@ export default function CurriculumTab({ sid, teams, trainingClasses, sessions, l
               className="input text-sm"
             />
             {canEdit && saveFeedback.stateFor(s.id) !== "idle" && <SaveFeedback state={saveFeedback.stateFor(s.id)} idleLabel="" />}
+            {canEdit && saveFeedback.stateFor(s.id) === "error" && <button type="button" disabled={!loaded} className="btn-secondary" onClick={() => void save(s.id)} aria-label={`${sessionDateLabel(s)} 계획 다시 저장`}>계획 다시 저장</button>}
           </li>
         ))}
       </ul>

@@ -166,7 +166,7 @@ it("홈은 내 업무 진입을 한 번만 제공하고 전체 일정 관리는 
   expect(screen.queryByRole("heading", { name: "내 담당 사역" })).not.toBeInTheDocument();
 });
 
-it("오늘 할 일과 다음 일정을 나누며 미래 일정은 한 번만 표시한다", async () => {
+it("오늘의 공유 일정과 다음 일정을 나누며 미래 일정은 한 번만 표시한다", async () => {
   const { seoulDateKey } = await import("./dailyMinistryMessage");
   const today = seoulDateKey();
   const tomorrow = seoulDateKey(new Date(Date.now() + 86_400_000));
@@ -178,9 +178,29 @@ it("오늘 할 일과 다음 일정을 나누며 미래 일정은 한 번만 표
     { id: "today", title: "오늘 합성 준비", targetDate: today, sourceSite: "highschool-main", done: false },
     { id: "next", title: "다음 합성 준비", targetDate: tomorrow, sourceSite: "highschool-main", done: false },
   ]));
-  expect(within(screen.getByRole("region", { name: "오늘 확인할 일" })).getByText("오늘 합성 준비")).toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "오늘의 공유 일정" })).getByText("오늘 합성 준비")).toBeInTheDocument();
   expect(within(screen.getByRole("region", { name: "다음 일정" })).getByText("다음 합성 준비")).toBeInTheDocument();
-  expect(within(screen.getByRole("region", { name: "오늘 확인할 일" })).queryByText("다음 합성 준비")).not.toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "오늘의 공유 일정" })).queryByText("다음 합성 준비")).not.toBeInTheDocument();
+});
+
+it("개인 업무와 공유 일정을 구분하고 제공된 실제 업무 링크만 표시한다", async () => {
+  const { seoulDateKey } = await import("./dailyMinistryMessage");
+  const today = seoulDateKey();
+  render(<PortalHome />);
+  act(() => {
+    mocks.retreats.mock.calls[0][0]([]);
+    mocks.periods.mock.calls[0][1]([]);
+    mocks.semesters.mock.calls[0][0]([{ id: "2026-2", meta: { title: "합성 학기", startDate: today, endDate: today } }]);
+    mocks.milestones.mock.calls[0][0]([{ id: "shared", title: "공유 참고 준비", targetDate: today, sourceSite: "portal-main", done: false }]);
+  });
+  act(() => mocks.sessions.mock.calls.at(-1)![1]([{ id: "meeting", date: today, type: "정규", label: "실제 업무가 있는 학기 모임" }]));
+  expect(screen.getByRole("region", { name: "내 업무" })).toBeInTheDocument();
+  const shared = within(screen.getByRole("region", { name: "오늘의 공유 일정" }));
+  expect(shared.getByText("고등부가 함께 보는 일정과 미완료 준비입니다.")).toBeInTheDocument();
+  expect(shared.getByText("공유 참고 준비").closest("a")).toBeNull();
+  expect(shared.getByText("공유 준비 · 고등부 메인")).toBeInTheDocument();
+  expect(shared.getByRole("link", { name: /실제 업무가 있는 학기 모임/ })).toHaveAttribute("href", "/operations/semesters/2026-2/overview");
+  expect(shared.getByText("공유 일정 · 훈련·사역팀")).toBeInTheDocument();
 });
 
 it("다시 불러오기를 누른 뒤 해제된 목록 응답은 최신 목록과 오류를 덮지 않는다", () => {

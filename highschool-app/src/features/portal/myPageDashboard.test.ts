@@ -9,6 +9,7 @@ import {
   summarizeNewFriends,
 } from "./myPageDashboard";
 import type { Application, NewFriend, Session } from "@/features/semester/types";
+import type { TeamMemberships } from "@/features/teams/teamModel";
 
 const roles = (semester: MinistryRoles["semester"], retreat: MinistryRoles["retreat"]): MinistryRoles => ({ semester, retreat });
 
@@ -21,6 +22,51 @@ describe("역할별 마이페이지 읽기 모델", () => {
     [roles("none", "none"), ["guide"]],
   ])("권한 조합 %o에 허용된 모듈만 제공한다", (input, ids) => {
     expect(ministryModulesFor(input as MinistryRoles).map((item) => item.id)).toEqual(ids);
+  });
+
+  it.each(["staff", "viewer"] as const)("일반 학기 역할도 활성 팀의 %s 소속으로 바로 이동한다", (role) => {
+    const modules = ministryModulesFor(roles("staff", "none"), { praise: { role, active: true } });
+    expect(modules.map((item) => item.id)).toEqual(["sunday-praise", "guide"]);
+    expect(modules[0]).toMatchObject({ title: "찬양팀", href: "/teams/praise", accessLabel: role === "viewer" ? "조회" : "담당" });
+  });
+
+  it("여러 팀 소속은 팀 목록으로 연결하고 비활성 소속은 제외한다", () => {
+    const memberships: TeamMemberships = {
+      praise: { role: "viewer", active: true },
+      media: { role: "viewer", active: true },
+      design: { role: "leader", active: false },
+    };
+    expect(ministryModulesFor(roles("staff", "none"), memberships)).toMatchObject([
+      { id: "sunday-all", href: "/teams", accessLabel: "조회" }, { id: "guide" },
+    ]);
+    expect(ministryModulesFor(roles("staff", "none"), { ...memberships, media: { role: "staff", active: true } })[0].accessLabel).toBe("운영");
+    expect(ministryModulesFor(roles("staff", "none"), { ...memberships, media: { role: "viewer", active: false } })[0].id).toBe("sunday-praise");
+  });
+
+  it("명시 소속이 비었거나 비활성이면 이전 팀 역할만으로 팀 접근을 표시하지 않는다", () => {
+    expect(ministryModulesFor(roles("staff", "none"), {}).map((item) => item.id)).toEqual(["guide"]);
+    expect(ministryModulesFor(roles("praise", "none"), { praise: { role: "staff", active: false } }).map((item) => item.id)).toEqual(["guide"]);
+  });
+
+  it("활성 상태인 과거 학기 소속도 팀에서 허용된 기록을 찾을 수 있게 유지한다", () => {
+    expect(ministryModulesFor(roles("staff", "none"), {
+      praise: { role: "staff", active: true, semesters: { "2025-1": true } },
+    })[0]).toMatchObject({ id: "sunday-praise", href: "/teams/praise" });
+  });
+
+  it("중앙 역할의 운영센터·전체 팀 조회와 팀장 소속의 집중 동선을 보존한다", () => {
+    const memberships: TeamMemberships = { praise: { role: "staff", active: true } };
+    for (const semester of ["superAdmin", "pastor"] as const) {
+      for (const assigned of [{}, memberships]) {
+        expect(ministryModulesFor(roles(semester, "none"), assigned)).toMatchObject([
+          { id: "semester" }, { id: "sunday-all", href: "/teams" }, { id: "guide" },
+        ]);
+      }
+    }
+    expect(ministryModulesFor(roles("leader", "none"), {}).map((item) => item.id)).toEqual(["semester", "sunday-all", "guide"]);
+    expect(ministryModulesFor(roles("leader", "none"), memberships).map((item) => item.id)).toEqual(["sunday-praise", "guide"]);
+    expect(ministryModulesFor(roles("adminTeam", "none"), {}).map((item) => item.id)).toEqual(["semester", "guide"]);
+    expect(ministryModulesFor(roles("adminTeam", "none"), memberships).map((item) => item.id)).toEqual(["semester", "sunday-praise", "guide"]);
   });
 
   it("역할에 맞는 대시보드 문구를 선택한다", () => {

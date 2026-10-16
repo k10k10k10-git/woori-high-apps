@@ -21,6 +21,7 @@ let ready = false;
 const boundaries = new Set([
   "context/AuthContext",
   "features/semester/db",
+  "features/semester/archiveStorage",
   "lib/db",
   "features/iguard/lib/db",
   "features/sundayMinistry/db",

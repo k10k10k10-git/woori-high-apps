@@ -6,6 +6,7 @@ export const qa = {
   writes: [] as unknown[], retries: 0, signInCalls: 0, navigation: [] as string[],
   prefetches: [] as string[], subscriptions: [] as string[], childMounts: 0,
   closeCalls: 0, recordLinkNavigation: false,
+  heldSubscriptions: [] as string[], writeFailures: {} as Record<string, number>,
   subscriptionEvents: [] as { id: number; name: string; key: string; active: boolean }[],
   emit(name: string, key: string, value: unknown) {
     qa.subscriptionEvents.filter((event) => event.active && event.name === name && event.key === key)
@@ -24,13 +25,17 @@ export function connect<T>(name: string, key: string, receive: (value: T) => voi
   const event = { id: qa.subscriptionEvents.length + 1, name, key, active: true };
   qa.subscriptionEvents.push(event);
   listeners.set(event.id, { receive: (next) => receive(next as T), fail });
-  receive(value);
+  if (!qa.heldSubscriptions.includes(`${name}:${key}`)) receive(value);
   return () => { event.active = false; };
 }
 
 export function memoryWrite(name: string) {
   return async (...args: unknown[]) => {
     qa.writes.push({ name, args });
+    if (qa.writeFailures[name] > 0) {
+      qa.writeFailures[name] -= 1;
+      throw new Error("Synthetic private write diagnostic path");
+    }
     return `synthetic-${name}-${qa.writes.length}`;
   };
 }
