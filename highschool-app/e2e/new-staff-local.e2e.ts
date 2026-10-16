@@ -370,12 +370,21 @@ test("실제 마이페이지 관리 동선은 운영센터 한 곳으로 연결�
   await expectNoOverflow(page);
 });
 
-test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 작업 창을 유지한다", async ({ page, context, browserName }) => {
+test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 작업 창을 유지한다", async ({ page, context, browser, browserName }) => {
   await open(page, "actualMyPage", "admin", "light", { tab: "team" });
   await page.getByRole("button", { name: "마이페이지 열기" }).click();
   const dialog = page.getByRole("dialog", { name: "마이페이지", exact: true });
+  const originalUrl = page.url();
+  const destination = new URL("/operations/accounts", originalUrl).href;
+  await expect(page.locator("iframe")).toHaveCount(0);
   const nativeClicks: unknown[] = [];
   const middle = browserName === "chromium";
+  const cdp = middle ? await browser.newBrowserCDPSession() : null;
+  const previousTargets = cdp ? (await cdp.send("Target.getTargets")).targetInfos : [];
+  const previousTargetIds = new Set(previousTargets.map((target) => target.targetId));
+  const contextId = previousTargets.find((target) => target.type === "page" && target.url === originalUrl)?.browserContextId;
+  if (cdp) expect(contextId).toBeTruthy();
+  let destinationTargetId: string | undefined;
   page.on("console", (message) => {
     if (message.text().startsWith("QA_NATIVE_SHORTCUT ")) nativeClicks.push(JSON.parse(message.text().slice("QA_NATIVE_SHORTCUT ".length)));
   });
@@ -386,17 +395,42 @@ test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 
   }, { capture: true, passive: true }), middle);
   // 새 탭의 native 입력은 Chromium에서 Shift+가운데 버튼, 모바일 WebKit에서 Ctrl/Meta+Shift를 사용한다.
   // 단독 Ctrl/Meta의 source handler 계약은 MyPageModal.render.test.tsx에서 별도로 검사한다.
-  const popupPromise = context.waitForEvent("page");
-  await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click(middle ? { button: "middle", modifiers: ["Shift"] } : { modifiers: ["ControlOrMeta", "Shift"] });
-  const popup = await popupPromise;
+  const responsePromise = context.waitForEvent("response", (response) => {
+    const request = response.request();
+    return response.url() === destination && request.method() === "GET"
+      && request.resourceType() === "document" && request.isNavigationRequest();
+  });
+  const popupPromise = cdp ? null : context.waitForEvent("page");
   try {
-    await expect(popup).toHaveURL(/\/operations\/accounts$/);
+    await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click(middle ? { button: "middle", modifiers: ["Shift"] } : { modifiers: ["ControlOrMeta", "Shift"] });
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    expect(await response.finished()).toBeNull();
+    if (cdp) {
+      // Page 초기화 대기에 의존하지 않고 같은 context의 새 최상위 문서를 필수로 확인한다.
+      await expect.poll(async () => {
+        const targets = (await cdp.send("Target.getTargets")).targetInfos;
+        destinationTargetId = targets.find((target) => target.type === "page" && target.subtype !== "prerender"
+          && target.browserContextId === contextId && !previousTargetIds.has(target.targetId) && target.url === destination)?.targetId;
+        return destinationTargetId;
+      }).toBeTruthy();
+    } else {
+      await expect(await popupPromise!).toHaveURL(destination);
+    }
+    await expect(page).toHaveURL(originalUrl);
+    await expect(page.locator("iframe")).toHaveCount(0);
     await expect(dialog).toBeVisible();
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.closeCalls)).toBe(0);
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
     expect(nativeClicks).toEqual([{ trusted: true, button: middle ? 1 : 0, meta: !middle && process.platform === "darwin", ctrl: !middle && process.platform !== "darwin", shift: true, alt: false, prevented: false }]);
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
-  } finally { await Promise.all(context.pages().filter((opened) => opened !== page).map((opened) => opened.close())); }
+  } finally {
+    if (cdp) {
+      try { if (destinationTargetId) await cdp.send("Target.closeTarget", { targetId: destinationTargetId }); }
+      finally { await cdp.detach(); }
+    }
+    await Promise.all(context.pages().filter((opened) => opened !== page).map((opened) => opened.close()));
+  }
 });
 
 test("실제 마이페이지 개인 요청은 계정 변경 후 이전 응답을 표시하지 않는다", async ({ page }) => {
