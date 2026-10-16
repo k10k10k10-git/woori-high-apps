@@ -31,7 +31,10 @@ async function login(page, path) {
   await expect(page.getByRole('navigation', { name: '관리자 메뉴', exact: true })).toBeVisible();
 }
 
-test.beforeEach(async ({ request }) => seed(request));
+test.beforeEach(async ({ request, page }) => {
+  await seed(request);
+  await page.clock.setFixedTime(new Date(`${year}-03-01T12:00:00+09:00`));
+});
 
 test('다섯 모바일 메뉴와 명단·목양 조건이 메뉴 왕복과 새로고침 후에도 유지된다', async ({ page, request }, testInfo) => {
   const before = await (await request.get(database, { headers: owner })).json();
