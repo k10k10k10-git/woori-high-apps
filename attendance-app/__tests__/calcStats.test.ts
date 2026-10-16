@@ -10,6 +10,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
     teacherDrafts: {},
     teacherDraftSaves: {},
     teacherSubmissions: {},
+    teacherReceipts: {},
     draftSession: 0,
     curView: 'all',
     curYear: 2025,

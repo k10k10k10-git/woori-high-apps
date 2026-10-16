@@ -96,6 +96,25 @@ function teacherState(): AppState {
 }
 
 describe('AttendanceTab 교사 출석 입력', () => {
+  it('교사는 같은 로그인에서 확인된 마지막 접수 대상·시각을 본문 없이 확인한다', () => {
+    mocks.state.current = { ...teacherState(), teacherReceipts: { '2026/1-1-1/note': { id: 'confirmed', studentName: '홍길동', receivedAt: 1792141200000 } } };
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '특이사항' }));
+    const receipt = screen.getByRole('status', { name: '특이사항 접수 확인' });
+    expect(receipt.textContent).toContain('마지막으로 접수된 특이사항');
+    expect(receipt.textContent).toContain('홍길동'); expect(receipt.textContent).toContain('접수 확인 시각');
+    expect(receipt.textContent).toContain('새로고침하면 사라집니다');
+    expect(mocks.onValue).not.toHaveBeenCalled();
+  });
+  it('이전 접수 기록과 현재 작성 중인 초안은 별개로 표시한다', () => {
+    mocks.state.current = { ...teacherState(), teacherReceipts: { '2026/1-1-1/note': { id: 'previous', studentName: '이전학생', receivedAt: 1792141200000 } } };
+    render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('tab', { name: '특이사항' }));
+    fireEvent.change(screen.getByRole('textbox', { name: '특이사항' }), { target: { value: '아직 접수하지 않은 새 내용' } });
+    const receipt = screen.getByRole('status', { name: '특이사항 접수 확인' });
+    expect(receipt.textContent).toContain('현재 작성 중인 내용과는 별개');
+    expect(receipt.textContent).not.toContain('아직 접수하지 않은 새 내용');
+  });
   it.each(['admin', 'teacher'] as const)('%s의 장결 목록은 관리자만 복귀 확인창을 열 수 있다', role => {
     mocks.state.current = { ...teacherState(), userRole: { role }, classData: { '1-1-1': { students: [{ id: 'long', name: '합성 장결 학생', jang: true }] } } };
     render(<AttendanceTab />);

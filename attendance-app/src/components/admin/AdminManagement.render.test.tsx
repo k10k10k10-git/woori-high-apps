@@ -7,6 +7,7 @@ import type { AttValue } from '@/types';
 const mocks = vi.hoisted(() => ({ state: {} as typeof initialState, dispatch: vi.fn(), push: vi.fn(), params: '', downloadCSV: vi.fn(), downloadXLSX: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@/utils/export', () => ({ downloadCSV: mocks.downloadCSV, downloadXLSX: mocks.downloadXLSX }));
 vi.mock('@/lib/longAbsentReturn', () => ({ returnLongAbsentStudent: vi.fn() }));
+vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: null } }));
 vi.mock('@/store/AppContext', async original => ({
   ...await original<typeof import('@/store/AppContext')>(),
   useApp: () => ({ state: mocks.state, dispatch: mocks.dispatch }),

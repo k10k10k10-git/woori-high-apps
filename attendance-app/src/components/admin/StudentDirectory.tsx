@@ -11,6 +11,7 @@ import AdminStatusBadge from './AdminStatusBadge';
 import HistoryModal from '@/components/modals/HistoryModal';
 import LongAbsentReturnDialog, { type LongAbsentReturnTarget } from '@/components/modals/LongAbsentReturnDialog';
 import type { MoveTarget, Student } from '@/types';
+import { useAdminViewState } from '@/hooks/useAdminViewState';
 
 type DirectoryRow = { classKey: string; part: string; grade: string; classNumber: string; teacher: string; student: Student };
 type DirectoryView = 'overview' | 'compact' | 'table';
@@ -20,16 +21,18 @@ function phoneHref(value: string) { return `tel:${value.replace(/[^\d+]/g, '')}`
 
 export default function StudentDirectory({ onOpenClass }: { onOpenClass: (classKey?: string) => void }) {
   const { state, dispatch } = useApp();
-  const [query, setQuery] = useState('');
+  const [viewState, setViewState] = useAdminViewState('directory', { query: '', part: 'all', grade: 'all', classKey: 'all', studentStatus: 'all', selectedKey: '' }, ['query']);
+  const { query, part, grade, classKey, studentStatus, selectedKey } = viewState;
+  const setQuery = (query: string) => setViewState({ query });
+  const setPart = (part: string) => setViewState({ part });
+  const setGrade = (grade: string) => setViewState({ grade });
+  const setClassKey = (classKey: string) => setViewState({ classKey });
+  const setStudentStatus = (studentStatus: string) => setViewState({ studentStatus });
+  const setSelectedKey = (selectedKey: string) => setViewState({ selectedKey });
   const search = useDeferredValue(query);
-  const [part, setPart] = useState('all');
-  const [grade, setGrade] = useState('all');
-  const [classKey, setClassKey] = useState('all');
-  const [studentStatus, setStudentStatus] = useState<'all' | 'active' | 'long'>('all');
   const [directoryView, setDirectoryView] = useState<DirectoryView>('table');
   const [moveTarget, setMoveTarget] = useState<MoveTarget | null>(null);
   const [returnTarget, setReturnTarget] = useState<LongAbsentReturnTarget | null>(null);
-  const [selectedKey, setSelectedKey] = useState('');
   const [addClassKey, setAddClassKey] = useState('');
   const detailRef = useRef<HTMLElement>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
