@@ -395,18 +395,18 @@ test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 
   }, { capture: true, passive: true }), middle);
   // 새 탭의 native 입력은 Chromium에서 Shift+가운데 버튼, 모바일 WebKit에서 Ctrl/Meta+Shift를 사용한다.
   // 단독 Ctrl/Meta의 source handler 계약은 MyPageModal.render.test.tsx에서 별도로 검사한다.
-  const responsePromise = context.waitForEvent("response", (response) => {
+  const responsePromise = cdp ? context.waitForEvent("response", (response) => {
     const request = response.request();
     return response.url() === destination && request.method() === "GET"
       && request.resourceType() === "document" && request.isNavigationRequest();
-  });
+  }) : null;
   const popupPromise = cdp ? null : context.waitForEvent("page");
   try {
     await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click(middle ? { button: "middle", modifiers: ["Shift"] } : { modifiers: ["ControlOrMeta", "Shift"] });
-    const response = await responsePromise;
-    expect(response.status()).toBe(200);
-    expect(await response.finished()).toBeNull();
     if (cdp) {
+      const response = await responsePromise!;
+      expect(response.status()).toBe(200);
+      expect(await response.finished()).toBeNull();
       // Page 초기화 대기에 의존하지 않고 같은 context의 새 최상위 문서를 필수로 확인한다.
       await expect.poll(async () => {
         const targets = (await cdp.send("Target.getTargets")).targetInfos;
