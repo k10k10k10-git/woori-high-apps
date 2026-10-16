@@ -380,10 +380,10 @@ test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 
     if (message.text().startsWith("QA_NATIVE_SHORTCUT ")) nativeClicks.push(JSON.parse(message.text().slice("QA_NATIVE_SHORTCUT ".length)));
   });
   // 실제 trusted 입력을 읽기만 한다. event flag와 source handler를 수정하지 않는다.
-  await page.evaluate((eventName: "click" | "auxclick") => document.addEventListener(eventName, (event) => {
+  await page.evaluate((isMiddle) => document.addEventListener(isMiddle ? "auxclick" : "click", (event) => {
     const href = event.target instanceof Element ? event.target.closest("a[href]")?.getAttribute("href") : null;
     if (href === "/operations/accounts") console.debug("QA_NATIVE_SHORTCUT " + JSON.stringify({ trusted: event.isTrusted, button: event.button, meta: event.metaKey, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey, prevented: event.defaultPrevented }));
-  }, { capture: true, passive: true }), middle ? "auxclick" : "click");
+  }, { capture: true, passive: true }), middle);
   // 새 탭의 native 입력은 Chromium에서 Shift+가운데 버튼, 모바일 WebKit에서 Ctrl/Meta+Shift를 사용한다.
   // 단독 Ctrl/Meta의 source handler 계약은 MyPageModal.render.test.tsx에서 별도로 검사한다.
   const popupPromise = context.waitForEvent("page");
