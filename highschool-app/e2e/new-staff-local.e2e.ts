@@ -1086,7 +1086,10 @@ for (const theme of ["light", "dark"]) {
   test(`보강 회귀: ${theme} 실제 학기 오류 복구 화면의 접근성·모바일 배치를 확인한다`, async ({ page }, info) => {
     for (const [scenario, subscription, key] of [["actualCurriculum", "curriculum", "2026-2/praise-semester-team"], ["actualAttendance", "sessionAttendance", "2026-2/team/meeting-1"], ["actualArchive", "archiveLinks", "2026-2"]]) {
       await open(page, scenario, "admin", theme);
-      await page.evaluate(({ subscription, key }) => window.__NEW_STAFF_QA__.fail(subscription, key), { subscription, key });
+      const target = scenario === "actualAttendance" && (page.viewportSize()?.width ?? 1280) > 900
+        ? { subscription: "allAttendance", key: "2026-2/team" } : { subscription, key };
+      await expect.poll(() => page.evaluate(({ subscription, key }) => window.__NEW_STAFF_QA__.subscriptionEvents.some((event) => event.active && event.name === subscription && event.key === key), target)).toBe(true);
+      await page.evaluate(({ subscription, key }) => window.__NEW_STAFF_QA__.fail(subscription, key), target);
       await expect(page.getByRole("alert").first()).toBeVisible();
       await expectAccessible(page);
       await expectNoOverflow(page);
