@@ -12,6 +12,7 @@ import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
 export type DataKey = 'classes' | 'attendance' | 'events';
 export type TeacherDraft = { studentId: string; text: string };
 export type TeacherSubmission = { id: string; draft: TeacherDraft; payload: TeacherMessageWrite; error?: string; uncertain?: boolean };
+export type TeacherReceipt = { id: string; studentName?: string; receivedAt: number };
 
 // ─── State ────────────────────────────────────────────────────
 export interface AppState {
@@ -22,6 +23,7 @@ export interface AppState {
   teacherDrafts: Record<string, TeacherDraft>;
   teacherDraftSaves: Record<string, boolean>;
   teacherSubmissions: Record<string, TeacherSubmission>;
+  teacherReceipts: Record<string, TeacherReceipt>;
   draftSession: number;
 
   // 뷰/반 선택
@@ -72,6 +74,7 @@ export const initialState: AppState = {
   teacherDrafts: {},
   teacherDraftSaves: {},
   teacherSubmissions: {},
+  teacherReceipts: {},
   draftSession: 0,
 
   curView: 'first',
@@ -113,6 +116,7 @@ type Action =
   | { type: 'SET_TEACHER_DRAFT_SAVING'; session: number; key: string; payload: boolean }
   | { type: 'CLEAR_TEACHER_DRAFT'; session: number; key: string; expected: TeacherDraft }
   | { type: 'SET_TEACHER_SUBMISSION'; session: number; key: string; payload: TeacherSubmission | null }
+  | { type: 'SET_TEACHER_RECEIPT'; session: number; year: number; key: string; payload: TeacherReceipt }
   | { type: 'SET_ALL_USER_ROLES'; revision: number; payload: Record<string, UserRole & { email?: string }> }
   | { type: 'SET_VIEW'; payload: ViewKey }
   | { type: 'SET_YEAR'; payload: number }
@@ -178,7 +182,10 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'SET_FB_READY':
       return { ...state, fbReady: true };
     case 'SET_USER_ROLE':
-      return resetData({ ...state, userRole: action.payload, teacherDrafts: {}, teacherDraftSaves: {}, teacherSubmissions: {}, draftSession: state.draftSession + 1 });
+      return resetData({ ...state, userRole: action.payload, teacherDrafts: {}, teacherDraftSaves: {}, teacherSubmissions: {}, teacherReceipts: {}, draftSession: state.draftSession + 1 });
+    case 'SET_TEACHER_RECEIPT':
+      return action.session !== state.draftSession || action.year !== state.curYear || !state.userRole ? state
+        : { ...state, teacherReceipts: { ...state.teacherReceipts, [action.key]: action.payload } };
     case 'SET_TEACHER_SUBMISSION': {
       if (action.session !== state.draftSession || !state.userRole) return state;
       const next = { ...state.teacherSubmissions };
@@ -214,6 +221,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return resetData({
         ...state,
         curYear: newYear,
+        teacherReceipts: {},
         months: newMonths,
         holidayRanges: newRanges,
       });

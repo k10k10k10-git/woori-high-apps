@@ -17,6 +17,7 @@ import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
 import LongAbsentReturnDialog, { type LongAbsentReturnTarget } from '@/components/modals/LongAbsentReturnDialog';
 import type { AttEditTarget, AttValue, ViewKey } from '@/types';
+import './teacher-ux.css';
 
 const ATTENDANCE_SUBVIEWS = [
   { key: 'check', label: '출석 체크' },
@@ -41,7 +42,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
   const [returnTarget, setReturnTarget] = useState<LongAbsentReturnTarget | null>(null);
   const [attSubView, setAttSubView] = useState<AttendanceSubView>(initialSubview);
 
-  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestSaveError, suggestRetrying, handleSuggestSubmit } =
+  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestSaveError, suggestRetrying, suggestReceipt, handleSuggestSubmit } =
     useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
   const suggestStudent = students.find(student => student.id === suggestStudentId);
   const {
@@ -415,6 +416,13 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
           )}
           {isTeacher && (
             <div className="suggest-form-card">
+              {suggestReceipt && <div className="teacher-note-receipt" role="status" aria-label="특이사항 접수 확인">
+                <AdminIcon name="check" size={20} />
+                <div><strong>마지막으로 접수된 특이사항</strong>
+                  <p>{suggestReceipt.studentName ?? '반 전체·운영 관련'} · 접수 확인 시각 {new Date(suggestReceipt.receivedAt).toLocaleString('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  <p>현재 작성 중인 내용과는 별개의 접수 기록입니다. 이 로그인 중에만 확인할 수 있으며 새로고침하면 사라집니다.</p>
+                </div>
+              </div>}
               <h2 className="suggest-form-title">특이사항 작성</h2>
               <p id="suggest-help" className="suggest-form-help">학생 돌봄이나 반 운영에 참고할 내용을 남겨 주세요. 민감한 개인정보는 필요한 만큼만 적어 주세요.</p>
               <p className="suggest-form-help">작성 중 내용은 화면을 이동해도 유지됩니다. 새로고침·로그아웃하면 지워집니다.</p>

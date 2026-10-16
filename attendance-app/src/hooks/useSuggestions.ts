@@ -8,7 +8,7 @@ import { useTeacherMessageSave } from './useTeacherMessageSave';
 export function useSuggestions(year: number, classKey: string, listEnabled: boolean, teacher: string) {
   const scope = `${year}/${classKey}`;
   const [list, setList] = useState<{ scope: string; items: TeacherMessage[]; error: boolean } | null>(null);
-  const { current, setStudentId, setText, saving, submit: save, saveError, retrying } = useTeacherMessageSave(year, classKey, 'note');
+  const { current, setStudentId, setText, saving, submit: save, receipt, saveError, retrying } = useTeacherMessageSave(year, classKey, 'note');
   useEffect(() => {
     if (!listEnabled) return;
     let active = true;
@@ -37,5 +37,6 @@ export function useSuggestions(year: number, classKey: string, listEnabled: bool
     setSuggestStudentId: setStudentId,
     suggestText: current.text,
     setSuggestText: setText,
+    suggestReceipt: receipt,
     suggestSaving: saving, suggestSaveError: saveError, suggestRetrying: retrying, handleSuggestSubmit: submit };
 }

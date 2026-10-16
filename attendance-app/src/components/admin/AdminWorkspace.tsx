@@ -6,6 +6,7 @@ import { useApp } from '@/store/AppContext';
 import { getWindowYears, getKSTYear } from '@/utils/dates';
 import { ADMIN_NAVIGATION, adminNavigationItem, hasClassFilters } from '@/lib/adminNavigation';
 import AttendanceSaveStatus from '@/components/AttendanceSaveStatus';
+import { clearAdminViewState } from '@/hooks/useAdminViewState';
 import AdminIcon from './AdminIcon';
 import './admin-workspace.css';
 
@@ -17,7 +18,7 @@ export default function AdminWorkspace({ children, onLogout, isOnline }: { child
   const activeItem = adminNavigationItem(pathname);
   const navigationRef = useRef<HTMLElement>(null);
   useEffect(() => {
-    navigationRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (window.matchMedia?.('(min-width: 760px)').matches) navigationRef.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   }, [pathname]);
   const currentYear = getKSTYear();
   const userName = state.userRole?.name?.trim() || '관리자';
@@ -26,7 +27,7 @@ export default function AdminWorkspace({ children, onLogout, isOnline }: { child
     if (loggingOut) return;
     setLogoutError(false);
     setLoggingOut(true);
-    try { await onLogout(); }
+    try { await onLogout(); clearAdminViewState(); }
     catch { setLogoutError(true); setLoggingOut(false); }
   }
 

@@ -9,7 +9,7 @@ import type { TeacherMessageKind } from '@/utils/teacherMessages';
 /** 결과 불명인 요청은 반·종류별 로그인 세션에 보관하고 화면 재진입 후에도 같은 키로 확인한다. */
 export function useTeacherMessageSave(year: number, classKey: string, kind: TeacherMessageKind) {
   const draft = useTeacherDraft(`${year}/${classKey}`, kind);
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const latest = useRef(state);
   latest.current = state;
   const active = useRef(true);
@@ -38,6 +38,9 @@ export function useTeacherMessageSave(year: number, classKey: string, kind: Teac
           && (!attempt.payload.studentPersonId || student.personId === attempt.payload.studentPersonId);
       });
       if (!isCurrent()) return false;
+      // 본문은 복제하지 않고 서버 저장이 확인된 마지막 접수만 현재 로그인 세션에 남긴다.
+      dispatch({ type: 'SET_TEACHER_RECEIPT', session, year, key: `${year}/${classKey}/${kind}`,
+        payload: { id: attempt.id, receivedAt: Date.now(), ...(attempt.payload.studentName ? { studentName: attempt.payload.studentName } : {}) } });
       draft.clearSaved(attempt.draft);
       draft.setSubmission(null);
       return true;
@@ -50,5 +53,5 @@ export function useTeacherMessageSave(year: number, classKey: string, kind: Teac
       return false;
     } finally { inFlight.current = false; draft.setSaving(false); }
   }
-  return { ...draft, submit, saveError: draft.submission?.error, retrying: !!retry };
+  return { ...draft, submit, receipt: state.teacherReceipts[`${year}/${classKey}/${kind}`], saveError: draft.submission?.error, retrying: !!retry };
 }

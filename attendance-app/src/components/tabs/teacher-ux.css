@@ -1,0 +1,11 @@
+.manage-contact-details { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 14px; line-height: 1.6; }
+.manage-contact-details th { padding: 3px 10px 3px 0; color: var(--text2); font-weight: 400; text-align: left; vertical-align: middle; white-space: nowrap; }
+.manage-contact-details td { padding: 3px 0; color: var(--text); overflow-wrap: anywhere; }
+.student-contact-link { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 44px; color: var(--primary-text); font-size: 16px; font-variant-numeric: tabular-nums; text-decoration: underline; text-underline-offset: 3px; }
+.student-contact-link span { font-size: 14px; }
+.student-contact-link:hover { color: var(--text); }
+.student-contact-link:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 3px; border-radius: 4px; }
+.teacher-note-receipt { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 20px; padding: 14px; border: 1px solid var(--green-text); border-radius: 14px; background: var(--green-bg); color: var(--green-text); font-size: 14px; line-height: 1.6; }
+.teacher-note-receipt > svg { flex: 0 0 auto; margin-top: 2px; }
+.teacher-note-receipt strong { font-size: 16px; }
+.teacher-note-receipt p { margin: 4px 0 0; overflow-wrap: anywhere; }
