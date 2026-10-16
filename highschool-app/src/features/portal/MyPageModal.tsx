@@ -7,7 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import OverlayShell from "@/components/OverlayShell";
-import { canManageRolesOf, canManageSiteRequests, canViewActivityLogs, describeRoles } from "./accessPolicy";
+import { canManageRolesOf, canManageSiteRequests, canViewActivityLogs } from "./accessPolicy";
+import { describeTeamRoles } from "@/features/teams/teamModel";
 import { friendlyMinistryName } from "./dailyMinistryMessage";
 
 const AdminDashboard = lazy(() => import("./AdminDashboardPanel"));
@@ -39,7 +40,7 @@ export default function MyPageModal(props: Props) {
 }
 
 function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
-  const { user, roles, memberName } = useAuth();
+  const { user, roles, memberName, teamMemberships } = useAuth();
   const canManageTeam = canManageRolesOf(roles);
   const canManageRequests = canManageSiteRequests(roles);
   const canViewActivity = canViewActivityLogs(roles);
@@ -112,7 +113,7 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
         </div>
         <div className="mypage-workspace-account">
           <span className="mypage-workspace-avatar" aria-hidden="true">{Array.from(displayName)[0]}</span>
-          <div><strong title={displayName}>{displayName}</strong><small title={describeRoles(roles)}>{describeRoles(roles)}</small></div>
+          <div><strong title={displayName}>{displayName}</strong><small title={describeTeamRoles(roles, teamMemberships)}>{describeTeamRoles(roles, teamMemberships)}</small></div>
         </div>
       </aside>
       <div className="mypage-workspace-main">

@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { ArrowRight, CalendarBlank, CheckCircle, MapPin, UsersThree } from "@phosphor-icons/react";
-import { canAccessArea, canAccessSundayTeam, describeRoles, iguardScopeOf, ownSundayTeam } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, iguardScopeOf, ownSundayTeam } from "./accessPolicy";
 import { ministryModulesFor } from "./myPageDashboard";
 import { MINISTRY_AREA_LABELS, SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 import { useMyPageData } from "./useMyPageData";
-import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
+import { describeTeamRoles, activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
 
 export default function MyMinistryPanel() {
   const data = useMyPageData();
@@ -32,7 +32,7 @@ export default function MyMinistryPanel() {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xs font-bold text-emerald-700">{describeRoles(data.roles)}</p>
+        <p className="text-xs font-bold text-emerald-700">{describeTeamRoles(data.roles, data.teamMemberships)}</p>
         <h3 className="mt-1 text-lg font-bold text-slate-950">내 사역</h3>
         <p className="mt-1 text-xs leading-5 text-slate-500">담당 사역과 배정, 출석 기록을 확인하세요.</p>
       </div>

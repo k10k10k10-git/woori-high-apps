@@ -117,7 +117,7 @@ export function buildPortalSearchItems({ roles, semesters, retreats }: BuildSear
     );
     items.push({
       id: "field-home",
-      label: "수련회 이가드",
+      label: "수련회 현장 업무(이가드)",
       description: "개인 큐카드, 포스트, 조별 정보와 인원체크",
       href: "/events",
       keywords: visibleGroups.flatMap((group) => group.views.map((view) => view.label)).join(" "),

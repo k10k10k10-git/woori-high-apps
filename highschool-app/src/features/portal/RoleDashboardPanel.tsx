@@ -11,10 +11,10 @@ import {
   WifiHigh,
   WifiSlash,
 } from "@phosphor-icons/react";
-import { canAccessArea, canAccessSundayTeam, describeRoles, iguardScopeOf } from "./accessPolicy";
+import { canAccessArea, canAccessSundayTeam, iguardScopeOf } from "./accessPolicy";
 import { ministryModulesFor, roleDashboardTitle } from "./myPageDashboard";
 import { useMyPageData } from "./useMyPageData";
-import { activeTeamKeys } from "@/features/teams/teamModel";
+import { describeTeamRoles, activeTeamKeys } from "@/features/teams/teamModel";
 import { TERM_PHASE_LABEL } from "@/features/semester/termPhase";
 
 export default function RoleDashboardPanel() {
@@ -39,7 +39,7 @@ export default function RoleDashboardPanel() {
     <div className="mypage-dashboard space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold text-emerald-700">{describeRoles(data.roles)}</p>
+          <p className="text-xs font-bold text-emerald-700">{describeTeamRoles(data.roles, data.teamMemberships)}</p>
           <h3 className="mt-1 text-lg font-bold text-slate-950">{roleDashboardTitle(data.roles)}</h3>
           <p className="mt-1 text-xs leading-5 text-slate-500">내 사역의 일정과 배정, 요청 상태를 한곳에서 확인하세요.</p>
         </div>

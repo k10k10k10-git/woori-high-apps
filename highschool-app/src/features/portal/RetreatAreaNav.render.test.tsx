@@ -14,6 +14,8 @@ afterEach(cleanup);
 it("현장 역할도 세 영역을 모두 보지만 행정·준비 화면은 prefetch하지 않는다", () => {
   render(<RetreatAreaNav retreatId="fixture/id" current="field" adminAllowed={false} fieldAllowed />);
   expect(screen.getAllByRole("link")).toHaveLength(3);
+  expect(screen.getByRole("link", { name: "현장 업무(이가드)" })).toHaveAttribute("href", "/events/fixture%2Fid/field");
+  expect(screen.getByRole("link", { name: "현장 업무(이가드)" })).toHaveAttribute("aria-current", "page");
   const admin = screen.getByRole("link", { name: "행정 권한 필요" });
   const programs = screen.getByRole("link", { name: "프로그램 준비 권한 필요" });
   fireEvent.pointerEnter(admin);

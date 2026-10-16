@@ -38,11 +38,13 @@ function connectTerms(terms = [term, oldTerm], connectedTeam = team) {
   for (const semester of terms) act(() => mocks.teams.mock.calls.filter(([id]) => id === semester.id).at(-1)![1]([connectedTeam]));
 }
 
-it("팀 현황을 업무보다 먼저 보여주며 대표 학기의 학생·스탭과 다음 모임을 요약한다", () => {
+it("운영 학기 다음에 업무를 먼저 보여주고 선택 학기의 현황도 유지한다", () => {
   render(<TeamWorkspace teamKey="praise" />);
   connectTerms();
   const summary = screen.getByRole("region", { name: "팀 전체 현황" });
-  expect(summary.compareDocumentPosition(screen.getByRole("region", { name: "주간 업무와 학기 기록" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const actions = screen.getByRole("region", { name: "주간 업무와 학기 기록" });
+  expect(screen.getByRole("combobox", { name: "운영 학기" }).compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(actions.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.queryByRole("button", { name: "안내 닫기" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "처음이라면 사용 안내로 이동" })).not.toBeInTheDocument();
   expect(mocks.applications.mock.calls.map(([id]) => id)).toEqual(["current"]);

@@ -8,6 +8,9 @@ import { addArchiveLink, removeArchiveLink, subscribeArchiveLinks } from "@/feat
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import { ArchiveLink } from "@/features/semester/types";
 import { deleteSemesterArchiveFile, uploadSemesterArchiveFile } from "@/features/semester/archiveStorage";
+import SaveFeedback from "@/components/SaveFeedback";
+import { useSaveFeedback } from "@/features/semester/useSaveFeedback";
+import { useSubmitLock } from "@/lib/useSubmitLock";
 
 const KIND_LABEL: Record<ArchiveLink["kind"], string> = {
   doc: "📄 문서",
@@ -18,6 +21,10 @@ const KIND_LABEL: Record<ArchiveLink["kind"], string> = {
 };
 
 export default function ArchiveTab({ sid }: { sid: string }) {
+  return <ArchiveEditor key={sid} sid={sid} />;
+}
+
+function ArchiveEditor({ sid }: { sid: string }) {
   const { toast, uiConfirm } = useUI();
   const canEdit = useSemesterCanEdit();
   const [links, setLinks] = useState<ArchiveLink[]>([]);
@@ -27,7 +34,8 @@ export default function ArchiveTab({ sid }: { sid: string }) {
   const [kind, setKind] = useState<ArchiveLink["kind"]>("doc");
   const [mode, setMode] = useState<"file" | "link">("file");
   const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+  const { busy: uploading, run } = useSubmitLock();
+  const saveFeedback = useSaveFeedback(sid);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => subscribeArchiveLinks(sid, setLinks, (e) => setLoadError(e.message)), [sid]);
@@ -39,21 +47,23 @@ export default function ArchiveTab({ sid }: { sid: string }) {
       return;
     }
     if (mode === "file" && !file) return;
-    setUploading(true);
+    setProgress(0);
     try {
-      if (mode === "file" && file) {
-        const uploaded = await uploadSemesterArchiveFile(sid, file, setProgress);
-        await addArchiveLink(sid, {
-          title: title.trim(),
-          url: uploaded.fileUrl,
-          kind,
-          filePath: uploaded.filePath,
-          fileName: file.name,
-          fileSize: file.size,
-        });
-      } else {
-        await addArchiveLink(sid, { title: title.trim(), url: url.trim(), kind });
-      }
+      await saveFeedback.run("add", async () => {
+        if (mode === "file" && file) {
+          const uploaded = await uploadSemesterArchiveFile(sid, file, setProgress);
+          await addArchiveLink(sid, {
+            title: title.trim(),
+            url: uploaded.fileUrl,
+            kind,
+            filePath: uploaded.filePath,
+            fileName: file.name,
+            fileSize: file.size,
+          });
+        } else {
+          await addArchiveLink(sid, { title: title.trim(), url: url.trim(), kind });
+        }
+      });
       setTitle("");
       setUrl("");
       setFile(null);
@@ -61,8 +71,6 @@ export default function ArchiveTab({ sid }: { sid: string }) {
       toast(mode === "file" ? "파일이 업로드되었습니다" : "링크가 추가되었습니다", "success");
     } catch (e) {
       toast(`추가 실패: ${e instanceof Error ? e.message : String(e)}`, "error");
-    } finally {
-      setUploading(false);
     }
   }
 
@@ -81,15 +89,15 @@ export default function ArchiveTab({ sid }: { sid: string }) {
             <p className="mt-0.5 text-xs text-slate-400">파일을 직접 올리거나 기존 드라이브·문서 링크를 연결합니다.</p>
           </div>
           <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
-            <button onClick={() => setMode("file")} className={`rounded-lg px-3 py-1.5 ${mode === "file" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>파일 업로드</button>
-            <button onClick={() => setMode("link")} className={`rounded-lg px-3 py-1.5 ${mode === "link" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>링크 연결</button>
+            <button disabled={uploading} onClick={() => { setMode("file"); saveFeedback.reset("add"); }} className={`rounded-lg px-3 py-1.5 ${mode === "file" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>파일 업로드</button>
+            <button disabled={uploading} onClick={() => { setMode("link"); saveFeedback.reset("add"); }} className={`rounded-lg px-3 py-1.5 ${mode === "link" ? "bg-white text-emerald-700 shadow-sm" : "text-slate-500"}`}>링크 연결</button>
           </div>
         </div>
-        <div className="grid gap-2 sm:grid-cols-[auto_1fr_1.2fr_auto]">
+        <fieldset disabled={uploading} className="grid gap-2 sm:grid-cols-[auto_1fr_1.2fr_auto]">
           <select
             aria-label="자료 종류"
             value={kind}
-            onChange={(e) => setKind(e.target.value as ArchiveLink["kind"])}
+            onChange={(e) => { setKind(e.target.value as ArchiveLink["kind"]); saveFeedback.markDirty("add"); }}
             className="input w-auto text-sm"
           >
             {Object.entries(KIND_LABEL).map(([k, label]) => (
@@ -97,14 +105,16 @@ export default function ArchiveTab({ sid }: { sid: string }) {
             ))}
           </select>
           <input
+            aria-label="자료 제목"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => { setTitle(e.target.value); saveFeedback.markDirty("add"); }}
             placeholder="자료 제목"
             className="input flex-1 text-sm"
           />
           {mode === "link" ? <input
+            aria-label="자료 링크"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => { setUrl(e.target.value); saveFeedback.markDirty("add"); }}
             placeholder="https://…"
             className="input flex-1 text-sm"
           /> : <label className="input flex cursor-pointer items-center text-sm text-slate-500">
@@ -114,19 +124,21 @@ export default function ArchiveTab({ sid }: { sid: string }) {
               onChange={(event) => {
                 const nextFile = event.target.files?.[0] ?? null;
                 setFile(nextFile);
+                saveFeedback.markDirty("add");
                 if (nextFile && !title.trim()) setTitle(nextFile.name.replace(/\.[^.]+$/, ""));
               }}
             />
             <span className="truncate">{file?.name ?? "파일 선택 (최대 30MB)"}</span>
           </label>}
           <button
-            onClick={() => void add()}
+            onClick={() => void run(add)}
             disabled={uploading || !title.trim() || (mode === "file" ? !file : !url.trim())}
             className="btn-primary justify-center"
           >
-            {uploading ? `${progress}%` : mode === "file" ? "업로드" : "추가"}
+            {uploading ? mode === "file" && progress < 100 ? `업로드 중 ${progress}%` : "저장 중…" : mode === "file" ? "파일 저장" : "링크 저장"}
           </button>
-        </div>
+        </fieldset>
+        <SaveFeedback state={saveFeedback.state} idleLabel={mode === "file" ? "파일 저장을 누르면 업로드됩니다" : "링크 저장을 누르면 저장됩니다"} dirtyLabel={mode === "file" ? "미저장 · 파일 저장을 눌러 주세요" : "미저장 · 링크 저장을 눌러 주세요"} />
       </div>}
 
       <ul className="grid sm:grid-cols-2 gap-2">

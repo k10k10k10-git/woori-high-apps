@@ -193,3 +193,19 @@ it.each(["pastor", "adminTeam"] as const)("%s 계정에 훈련과 운영센터�
   expect(screen.getAllByRole("link", { name: "훈련" }).some((link) => link.getAttribute("href") === "/training")).toBe(true);
   expect(screen.getAllByRole("link", { name: "운영센터" }).some((link) => link.getAttribute("href") === "/operations")).toBe(true);
 });
+
+
+it("모바일 메뉴에서 내 계정을 먼저 보여주고 마이페이지를 열 때 메뉴를 닫는다", async () => {
+  state.view.mode = "mobile";
+  state.view.isViewportMobile = true;
+  render(<GlobalPortalHeader />);
+  fireEvent.click(screen.getByRole("button", { name: "사이트 메뉴 열기" }));
+  const menu = screen.getByRole("dialog", { name: "사이트 메뉴" });
+  const account = within(menu).getByRole("button", { name: "마이페이지" });
+  const ministry = within(menu).getByRole("navigation", { name: "모바일 통합 사역 메뉴" });
+  expect(account.compareDocumentPosition(ministry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(menu).getByRole("navigation", { name: "모바일 팀 메뉴" }).querySelectorAll("a")).toHaveLength(6);
+  fireEvent.click(account);
+  expect(screen.queryByRole("dialog", { name: "사이트 메뉴" })).not.toBeInTheDocument();
+  expect(await screen.findByRole("dialog", { name: "마이페이지" })).toBeInTheDocument();
+});

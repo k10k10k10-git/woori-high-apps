@@ -45,7 +45,7 @@ it.each([false, true])("현장 역할의 모바일=%s에서도 행정·준비 �
   const nav = within(screen.getByRole("navigation", { name: "수련회 업무 영역" }));
   expect(nav.getByRole("link", { name: "행정 권한 필요" })).toBeInTheDocument();
   expect(nav.getByRole("link", { name: "프로그램 준비 권한 필요" })).toBeInTheDocument();
-  expect(nav.getByRole("link", { name: "이가드" })).toBeInTheDocument();
+  expect(nav.getByRole("link", { name: "현장 업무(이가드)" })).toBeInTheDocument();
   expect(state.prefetch.mock.calls).toEqual([["/events/fixture%2Fid/field"]]);
   if (mobile) {
     expect(screen.getByRole("button", { name: "개인 큐카드 열기" })).toBeInTheDocument();

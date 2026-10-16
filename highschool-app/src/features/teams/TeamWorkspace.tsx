@@ -120,22 +120,22 @@ function TeamWorkspaceContent({ teamKey, pickedSemesterId, onSelectSemester, onR
     </header>
 
     {error && <div className="team-first-alert" role="alert">팀 정보를 확인하지 못했습니다. 다시 불러오거나 접속 문제 도움말을 확인해 주세요.<button className="btn-secondary" onClick={onRetry}>다시 불러오기</button><Link className="btn-secondary" href="/library/help#connection">접속 문제 도움말</Link></div>}
-    <section className={styles.overview} aria-label="팀 전체 현황">
-      <div className={styles.overviewHeader}>
-        <div><h2>팀 전체 현황</h2><p>{selectedTerm ? `${periodLabel} · ${selectedTerm.semester.meta.title}` : "이 팀에 연결된 학기를 확인합니다."}</p></div>
+    <div className={styles.overviewHeader}>
         <label className={styles.termPicker}><span>운영 학기</span><select className="input" value={selectedTerm?.semester.id ?? ""} disabled={!loaded || !teamsReady || connectedTerms.length === 0} onChange={(event) => onSelectSemester(event.target.value)}>
           {!selectedTerm && <option value="">{error ? "학기 연결 확인 필요" : !loaded || !teamsReady ? "학기를 확인하는 중…" : "연결된 학기 없음"}</option>}
           {connectedTerms.map((semester) => <option key={semester.id} value={semester.id}>{semester.meta.title} · {TERM_PHASE_LABEL[featuredTerm([semester], today)!.phase]}</option>)}
         </select></label>
-      </div>
-      {selectedTerm && selectedTeam ? <TeamOverview key={`${selectedTerm.semester.id}:${selectedTeam.id}`} semester={selectedTerm.semester} team={selectedTeam} phase={selectedTerm.phase} onRetry={onRetry} /> : <div className={styles.overviewState} role={!error && (!loaded || !teamsReady) ? "status" : undefined}>{error ? "학기 현황을 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : !loaded || !teamsReady ? "학기 연결을 확인하는 중입니다…" : "연결된 학기가 없습니다. 담당자에게 학기 연결을 요청해 주세요."}</div>}
-    </section>
+    </div>
     <section id="team-work-actions" className={styles.workActions} aria-label="주간 업무와 학기 기록">
       {planned ? <div className={`team-action-card ${styles.weeklyWork}`}><div><span>상시 업무 준비 중</span><h2>주간·주일 운영 준비 중</h2><p>주간·주일 운영 화면은 준비 중입니다. 현재 사용할 수 있는 업무는 아래 학기 명단·기록에서 이어가세요.</p><Link href="/help/feedback" className={styles.overviewLink}>팀 기능 문의하기</Link></div></div> : weeklyAllowed ? <Link href={weeklyHref} className={`team-action-card is-primary ${styles.weeklyWork}`}><div><span>{weeklyViewOnly ? "주간·주일 조회" : "주간·주일 업무"}</span><h2>{weeklyTitle}</h2><p>{weeklyPurpose}</p></div><ArrowRight size={18} aria-hidden="true" /></Link> : <div className={`team-action-card ${styles.weeklyWork}`}><div><span>주간·주일 업무</span><h2>담당 팀 전용</h2><p>다른 팀의 주일 운영 기록은 담당 팀 계정만 엽니다.</p></div></div>}
       <nav className={styles.termLinks} aria-label="선택 학기 업무">{TERM_ACTIONS.map((item) => {
         const content = <><div><h2>{item.label}</h2>{selectedTerm && <p>{item.description}</p>}</div>{selectedTerm && <ArrowRight size={18} aria-hidden="true" />}</>;
         return selectedTerm ? <Link key={item.section} href={item.section === "attendance" ? attendanceHref : `${termBase}/${item.section}`} className={styles.termLink} aria-label={`선택 학기 ${item.label} 열기`}>{content}</Link> : <div key={item.section} className={styles.termLink} aria-disabled="true">{content}<span>{error ? "학기 확인 필요" : !loaded || !teamsReady ? "학기 확인 중" : "학기 연결 필요"}</span></div>;
       })}</nav>
+    </section>
+    <section className={styles.overview} aria-label="팀 전체 현황">
+      <div className={styles.overviewHeader}><div><h2>팀 전체 현황</h2><p>{selectedTerm ? `${periodLabel} · ${selectedTerm.semester.meta.title}` : "이 팀에 연결된 학기를 확인합니다."}</p></div></div>
+      {selectedTerm && selectedTeam ? <TeamOverview key={`${selectedTerm.semester.id}:${selectedTeam.id}`} semester={selectedTerm.semester} team={selectedTeam} phase={selectedTerm.phase} onRetry={onRetry} /> : <div className={styles.overviewState} role={!error && (!loaded || !teamsReady) ? "status" : undefined}>{error ? "학기 현황을 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : !loaded || !teamsReady ? "학기 연결을 확인하는 중입니다…" : "연결된 학기가 없습니다. 담당자에게 학기 연결을 요청해 주세요."}</div>}
     </section>
   </main></TeamAccessState>;
 }

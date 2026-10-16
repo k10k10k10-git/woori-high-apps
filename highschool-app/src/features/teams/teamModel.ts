@@ -1,8 +1,9 @@
 import {
   SUNDAY_MINISTRY_TEAMS,
+  sundayTeamOf,
   type SundayTeamKey,
 } from "@/features/portal/featureCatalog";
-import type { MinistryRoles } from "@/features/portal/accessPolicy";
+import { describeRoles, RETREAT_ROLE_LABELS, type MinistryRoles } from "@/features/portal/accessPolicy";
 import type { Team } from "@/features/semester/types";
 
 export type TeamMembershipRole = "leader" | "operator" | "staff" | "viewer";
@@ -134,4 +135,12 @@ export function semesterTeamForKey(teams: readonly Team[], teamKey: SundayTeamKe
 
 export function membershipLabel(membership: TeamMembership | undefined): string {
   return membership ? TEAM_MEMBERSHIP_ROLE_LABELS[membership.role] : "전체 운영";
+}
+
+/** 표시만 소속에 맞춘다. 접근·편집 권한은 기존 capability 판정을 사용한다. */
+export function describeTeamRoles(roles: MinistryRoles, memberships: TeamMemberships = {}): string {
+  const keys = activeTeamKeys(memberships);
+  if (!keys.length || ["superAdmin", "pastor", "adminTeam"].includes(roles.semester)) return describeRoles(roles);
+  const teams = keys.map((key) => `${sundayTeamOf(key)!.label} ${membershipLabel(memberships[key])}`).join(" · ");
+  return `학기 ${teams}${roles.retreat === "none" ? "" : ` · 방학 ${RETREAT_ROLE_LABELS[roles.retreat]}`}`;
 }
