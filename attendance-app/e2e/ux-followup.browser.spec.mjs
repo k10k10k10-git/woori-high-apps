@@ -66,20 +66,32 @@ test('다섯 모바일 메뉴와 명단·목양 조건이 메뉴 왕복과 새�
   await expect(page.getByLabel('학생 명단 검색', { exact: true })).toHaveValue('');
   await navigation.getByRole('link', { name: '목양 관리', exact: true }).click();
   await page.getByRole('button', { name: '연속 결석', exact: true }).click();
-  await page.getByLabel('기준 주일', { exact: true }).selectOption('0-3');
-  await page.getByLabel('정렬', { exact: true }).selectOption('latest');
+  await page.getByRole('combobox', { name: '기준 주일', exact: true }).selectOption('0-3');
+  await page.getByRole('combobox', { name: '정렬', exact: true }).selectOption('latest');
   await page.getByRole('button', { name: '합성 학생 상세 보기' }).click();
   await navigation.getByRole('link', { name: '운영 설정', exact: true }).click();
   await expect(page.getByRole('tab', { name: '출석 제외 일정', exact: true })).toHaveAttribute('aria-selected', 'true');
   await navigation.getByRole('link', { name: '목양 관리', exact: true }).click();
-  await expect(page.getByLabel('기준 주일', { exact: true })).toHaveValue('0-3');
-  await expect(page.getByLabel('정렬', { exact: true })).toHaveValue('latest');
+  await expect(page.getByRole('combobox', { name: '기준 주일', exact: true })).toHaveValue('0-3');
+  await expect(page.getByRole('combobox', { name: '정렬', exact: true })).toHaveValue('latest');
   await expect(page.getByRole('complementary', { name: '합성 학생 상세', exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('정렬', { exact: true })).toHaveValue('latest');
+  await expect(page.getByRole('combobox', { name: '정렬', exact: true })).toHaveValue('latest');
   await expect(page.getByRole('complementary', { name: '합성 학생 상세', exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('admin-mobile-context.png') });
+  if (testInfo.project.name === 'mobile-webkit') {
+    await page.setViewportSize({ width: 320, height: 844 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    expect(await navigation.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      return [...element.querySelectorAll('a')].every(link => {
+        const item = link.getBoundingClientRect();
+        return item.left >= box.left - 1 && item.right <= box.right + 1 && item.height >= 44;
+      });
+    })).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('admin-320px-menu.png') });
+  }
   expect(await (await request.get(database, { headers: owner })).json()).toEqual(before);
 });
 
