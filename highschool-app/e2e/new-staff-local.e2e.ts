@@ -370,30 +370,31 @@ test("실제 마이페이지 관리 동선은 운영센터 한 곳으로 연결�
   await expectNoOverflow(page);
 });
 
-test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 작업 창을 유지한다", async ({ page, context }) => {
+test("실제 마이페이지 운영센터 링크를 새 탭으로 열면 현재 작업 창을 유지한다", async ({ page, context, browserName }) => {
   await open(page, "actualMyPage", "admin", "light", { tab: "team" });
   await page.getByRole("button", { name: "마이페이지 열기" }).click();
   const dialog = page.getByRole("dialog", { name: "마이페이지", exact: true });
   const nativeClicks: unknown[] = [];
+  const middle = browserName === "chromium";
   page.on("console", (message) => {
     if (message.text().startsWith("QA_NATIVE_SHORTCUT ")) nativeClicks.push(JSON.parse(message.text().slice("QA_NATIVE_SHORTCUT ".length)));
   });
   // 실제 trusted 입력을 읽기만 한다. event flag와 source handler를 수정하지 않는다.
-  await page.evaluate(() => document.addEventListener("click", (event) => {
+  await page.evaluate((eventName: "click" | "auxclick") => document.addEventListener(eventName, (event) => {
     const href = event.target instanceof Element ? event.target.closest("a[href]")?.getAttribute("href") : null;
     if (href === "/operations/accounts") console.debug("QA_NATIVE_SHORTCUT " + JSON.stringify({ trusted: event.isTrusted, button: event.button, meta: event.metaKey, ctrl: event.ctrlKey, shift: event.shiftKey, alt: event.altKey, prevented: event.defaultPrevented }));
-  }, { capture: true, passive: true }));
-  // 전면 새 탭을 native 수정 클릭으로 열고 context.page로 관측한다.
+  }, { capture: true, passive: true }), middle ? "auxclick" : "click");
+  // 새 탭의 native 입력은 Chromium에서 Shift+가운데 버튼, 모바일 WebKit에서 Ctrl/Meta+Shift를 사용한다.
   // 단독 Ctrl/Meta의 source handler 계약은 MyPageModal.render.test.tsx에서 별도로 검사한다.
   const popupPromise = context.waitForEvent("page");
-  await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click({ modifiers: ["ControlOrMeta", "Shift"] });
+  await dialog.getByRole("link", { name: "운영센터에서 계정·권한 열기", exact: true }).click(middle ? { button: "middle", modifiers: ["Shift"] } : { modifiers: ["ControlOrMeta", "Shift"] });
   const popup = await popupPromise;
   try {
     await expect(popup).toHaveURL(/\/operations\/accounts$/);
     await expect(dialog).toBeVisible();
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.closeCalls)).toBe(0);
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
-    expect(nativeClicks).toEqual([{ trusted: true, button: 0, meta: process.platform === "darwin", ctrl: process.platform !== "darwin", shift: true, alt: false, prevented: false }]);
+    expect(nativeClicks).toEqual([{ trusted: true, button: middle ? 1 : 0, meta: !middle && process.platform === "darwin", ctrl: !middle && process.platform !== "darwin", shift: true, alt: false, prevented: false }]);
     expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
   } finally { await Promise.all(context.pages().filter((opened) => opened !== page).map((opened) => opened.close())); }
 });
@@ -734,6 +735,10 @@ test("사용법 검색·업무 필터·검색 초기화·문의 링크가 동작
   await expect(page.getByText(/선택하면 바로 저장|선택하면.*저장|선택하면 즉시 저장/, { exact: false }).first()).toBeVisible();
   await expect(page.locator("details[open]")).not.toHaveCount(0);
   await page.getByRole("combobox", { name: "업무 종류" }).selectOption("접속·권한");
+  await expect(page.locator("details#save")).toHaveAttribute("open", "");
+  await expect(page.getByRole("button", { name: "검색 초기화" })).toHaveCount(0);
+  await search.fill("없는사용법XYZ");
+  await expect(page.getByText("검색 결과가 없습니다.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "검색 초기화" })).toBeVisible();
   await page.getByRole("button", { name: "검색 초기화" }).click();
   await expect(search).toHaveValue("");

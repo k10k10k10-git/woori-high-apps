@@ -15,12 +15,15 @@ const programs: RetreatProgram[] = [
 
 // QA 전용 브라우저 저장소만 사용해 삭제 중단 뒤 새로고침을 재현한다.
 const archiveStorageKey = "woori-new-staff-qa-archive-v1";
-let archives: ArchiveLink[] = JSON.parse(sessionStorage.getItem(archiveStorageKey) ?? "null") ?? [
+let archives: ArchiveLink[] = [
   { id: "archive-file", title: "합성 보관 파일", kind: "doc", url: "http://127.0.0.1:4179/__qa__/stored.pdf", filePath: "synthetic/2026-2/archive.pdf", fileName: "합성문서.pdf", fileSize: 2048 },
   { id: "archive-pending", title: "합성 삭제 대기 자료", kind: "doc", url: "http://127.0.0.1:4179/__qa__/removed.pdf", deletionPending: true },
 ];
+try { archives = JSON.parse(sessionStorage.getItem(archiveStorageKey) ?? "null") ?? archives; }
+catch { /* 브라우저 저장이 차단되면 합성 메모리 자료로 계속 검증한다. */ }
 function publishArchives(sid: string) {
-  sessionStorage.setItem(archiveStorageKey, JSON.stringify(archives));
+  try { sessionStorage.setItem(archiveStorageKey, JSON.stringify(archives)); }
+  catch { /* 새로고침 보존만 생략하고 합성 구독 echo는 유지한다. */ }
   qa.emit("archiveLinks", sid, archives);
 }
 export function subscribeArchiveLinks(sid: string, cb: Receive<ArchiveLink[]>, fail?: Failure) { return connect("archiveLinks", sid, cb, archives, fail); }
