@@ -1,11 +1,14 @@
 'use client';
 import { useState, useEffect, useCallback, useRef, useId, type ReactNode, type KeyboardEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { db, ref, set, get } from '@/lib/db';
 import { buildPromotionPayload, type PromotionSnapshot } from '@/lib/promotion';
 import { commitSheetSync } from '@/lib/sheetSyncCommit';
 import { adminActor } from '@/utils/adminChange';
-import { useApp } from '@/store/AppContext';
+import { isDataReady, useApp } from '@/store/AppContext';
 import { emailToKey } from '@/utils/dates';
+import { attendanceEventDate } from '@/utils/attendanceEventDate';
+import { useAdminViewState } from '@/hooks/useAdminViewState';
 import { showToast } from '@/utils/toast';
 import YouthHandoffSection from '../admin/YouthHandoffSection';
 import type { UserRole } from '@/types';
@@ -33,12 +36,27 @@ const SETTINGS_SECTIONS = [
 
 
 export default function AdminTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, getState } = useApp();
   const { allUserRoles, curYear, dataRevision } = state;
 
-  const [section, setSection] = useState<SettingsSection>('accounts');
-  const [accountQuery, setAccountQuery] = useState('');
-  const [accountRoleFilter, setAccountRoleFilter] = useState<'all' | 'admin' | 'teacher'>('all');
+  const router = useRouter();
+  const params = useSearchParams();
+  const requestedSection = SETTINGS_SECTIONS.find(item => item.id === params.get('section'))?.id;
+  const [settingsView, setSettingsView] = useAdminViewState('settings', { section: 'accounts', accountQuery: '', accountRoleFilter: 'all' }, ['accountQuery']);
+  const section = requestedSection ?? SETTINGS_SECTIONS.find(item => item.id === settingsView.section)?.id ?? 'accounts';
+  useEffect(() => {
+    if (requestedSection) setSettingsView({ section: requestedSection });
+  }, [requestedSection, setSettingsView]);
+  function setSection(next: SettingsSection) {
+    setSettingsView({ section: next });
+    const query = new URLSearchParams(params.toString());
+    query.set('section', next);
+    router.replace(`/admin?${query}`, { scroll: false });
+  }
+  const accountQuery = settingsView.accountQuery;
+  const setAccountQuery = (accountQuery: string) => setSettingsView({ accountQuery });
+  const accountRoleFilter = ['admin', 'teacher'].includes(settingsView.accountRoleFilter) ? settingsView.accountRoleFilter : 'all';
+  const setAccountRoleFilter = (accountRoleFilter: 'all' | 'admin' | 'teacher') => setSettingsView({ accountRoleFilter });
   const [accountsRefresh, setAccountsRefresh] = useState(0);
   const [accountsRead, setAccountsRead] = useState<{ scope: string; status: 'ready' | 'error' } | null>(null);
   const accountScope = `${dataRevision}:${accountsRefresh}`;
@@ -56,9 +74,17 @@ export default function AdminTab() {
   const [saving, setSaving] = useState(false);
 
   // 이벤트
-  const [evMonth, setEvMonth] = useState('');
-  const [evDay, setEvDay]     = useState('');
-  const [evLabel, setEvLabel] = useState('');
+  const [eventDraft, setEventDraft] = useState({ year: curYear, date: '', label: '' });
+  const { date: evDate, label: evLabel } = eventDraft.year === curYear ? eventDraft : { date: '', label: '' };
+  const eventDate = attendanceEventDate(evDate, curYear);
+  const eventBusy = useRef(false);
+  const eventActive = useRef(true);
+  useEffect(() => { eventActive.current = true; return () => { eventActive.current = false; }; }, []);
+  const [eventSaving, setEventSaving] = useState(false);
+  const eventScope = `${state.draftSession}:${dataRevision}:${curYear}`;
+  const [eventResult, setEventResult] = useState<{ scope: string; error?: string; success?: string } | null>(null);
+  const result = eventResult?.scope === eventScope ? eventResult : null;
+  const eventReady = state.userRole?.role === 'admin' && isDataReady(state);
   const customEvents = state.customEventsData;
 
   // 진급 처리
@@ -132,13 +158,33 @@ export default function AdminTab() {
   }
 
   async function addEvent() {
-    if (!evMonth || !evDay || !evLabel) { showToast('월, 일, 이름을 모두 입력하세요.'); return; }
+    if (eventBusy.current) return;
+    const current = getState();
+    if (current.curYear !== curYear || current.dataRevision !== dataRevision || current.draftSession !== state.draftSession
+      || current.userRole?.role !== 'admin' || !isDataReady(current)) return;
+    const date = attendanceEventDate(evDate, curYear);
+    if (!date) { setEventResult({ scope: eventScope, error: `${curYear}년의 올바른 날짜를 선택해 주세요.` }); return; }
+    if (!date.sunday) { setEventResult({ scope: eventScope, error: '주일이 아닌 날짜는 출석 집계에 적용되지 않습니다. 일요일을 선택해 주세요.' }); return; }
+    if (!evLabel.trim()) { setEventResult({ scope: eventScope, error: '일정 이름을 입력해 주세요.' }); return; }
+    const isCurrent = () => {
+      const latest = getState();
+      return eventActive.current && latest.curYear === curYear && latest.dataRevision === dataRevision && latest.draftSession === state.draftSession
+        && latest.userRole?.role === 'admin' && isDataReady(latest);
+    };
+    eventBusy.current = true;
+    setEventSaving(true);
+    setEventResult(null);
     try {
       const key = `ev_${Date.now()}`;
-      await set(ref(db, `events/${curYear}/${key}`), { month: evMonth, day: evDay, label: evLabel });
-      setEvMonth(''); setEvDay(''); setEvLabel('');
+      await set(ref(db, `events/${curYear}/${key}`), { month: date.month, day: date.day, label: evLabel.trim() });
+      if (!isCurrent()) return;
+      setEventDraft({ year: curYear, date: '', label: '' });
+      setEventResult({ scope: eventScope, success: `${date.month}월 ${date.day}일 출석 제외 일정이 추가되었습니다.` });
     } catch {
-      showToast('이벤트 추가에 실패했습니다.');
+      if (isCurrent()) setEventResult({ scope: eventScope, error: '일정을 저장하지 못했습니다. 입력한 내용은 남아 있으니 연결을 확인한 뒤 다시 시도해 주세요.' });
+    } finally {
+      eventBusy.current = false;
+      setEventSaving(false);
     }
   }
 
@@ -306,12 +352,22 @@ export default function AdminTab() {
 
       <section className="as-panel" id={`${settingsId}-panel-events`} role="tabpanel" aria-labelledby={`${settingsId}-tab-events`} hidden={section !== 'events'}>
         <div className="as-section-heading"><div><h2>출석 제외 일정 <span>{curYear}년</span></h2><p>수련회 등 일반 주일이 아닌 날을 등록하면 주일 선택 목록과 출석 집계에서 제외됩니다.</p></div></div>
-        <form className="as-event-form" onSubmit={event => { event.preventDefault(); void addEvent(); }}>
-          <label><span>월</span><input type="number" min="1" max="12" required value={evMonth} onChange={event => setEvMonth(event.target.value)} placeholder="예: 8" /></label>
-          <label><span>일</span><input type="number" min="1" max="31" required value={evDay} onChange={event => setEvDay(event.target.value)} placeholder="예: 15" /></label>
-          <label className="as-event-name"><span>일정 이름</span><input required value={evLabel} onChange={event => setEvLabel(event.target.value)} placeholder="예: 여름 수련회" /></label>
-          <button type="submit" className="as-button as-button-primary">일정 추가</button>
+        <form className="as-event-form" onSubmit={event => { event.preventDefault(); void addEvent(); }} aria-busy={eventSaving}>
+          <label><span>날짜</span><input type="date" min={`${curYear}-01-01`} max={`${curYear}-12-31`} required value={evDate} disabled={eventSaving}
+            aria-describedby={`${settingsId}-event-preview`} onChange={event => { setEventDraft({ year: curYear, date: event.target.value, label: evLabel }); setEventResult(null); }} /></label>
+          <label className="as-event-name"><span>일정 이름</span><input required value={evLabel} disabled={eventSaving}
+            onChange={event => { setEventDraft({ year: curYear, date: evDate, label: event.target.value }); setEventResult(null); }} placeholder="예: 여름 수련회" /></label>
+          <button type="submit" className="as-button as-button-primary" disabled={!eventReady || eventSaving || !eventDate?.sunday || !evLabel.trim()}>{eventSaving ? '추가 중…' : '일정 추가'}</button>
+          <p id={`${settingsId}-event-preview`} className={`as-event-preview${evDate && !eventDate?.sunday ? ' as-event-error' : ''}`} role="status">
+            {!evDate ? `${curYear}년 일요일을 선택하면 제외되는 출석 날짜를 미리 확인할 수 있습니다.`
+              : !eventDate ? `${curYear}년의 올바른 날짜를 선택해 주세요.`
+              : !eventDate.sunday ? '주일이 아닌 날짜는 출석 집계에 적용되지 않습니다. 일요일을 선택해 주세요.'
+              : `${eventDate.month}월 ${eventDate.day}일(일) 주일 선택 목록과 출석 집계에서 제외됩니다.`}
+          </p>
         </form>
+        {!eventReady && <p className="as-event-error" role="alert">명단·출석·행사 자료를 모두 불러온 뒤 일정을 추가할 수 있습니다. 연결 상태를 확인해 주세요.</p>}
+        {result?.error && <p className="as-event-error" role="alert">{result.error}</p>}
+        {result?.success && <p className="as-event-result" role="status">{result.success}</p>}
         <div className="as-event-list">
           {eventEntries.map(([key, ev]) => <article className="as-event-row" key={key}>
             <span className="as-event-date"><AdminIcon name="calendar" />{ev.month}월 {ev.day}일</span><strong>{ev.label}</strong>

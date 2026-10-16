@@ -6,14 +6,16 @@ import type { PublicReportFriend } from '@/lib/pastoralFriendProgress';
 const mocks = vi.hoisted(() => ({ query: '', state: {} as typeof initialState, demo: false, receive: (() => {}) as (friends: PublicReportFriend[]) => void, fail: (() => {}) as (error: Error) => void, stop: vi.fn(), subscribe: vi.fn(), remarks: vi.fn() }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(mocks.query) }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: mocks.state, getState: () => mocks.state }) }));
-vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { email: 'synthetic@example.test' } } }));
+vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { uid: 'synthetic-admin', email: 'synthetic@example.test' } } }));
 vi.mock('@/lib/demo', () => ({ isDemoAccount: () => mocks.demo }));
 vi.mock('@/lib/pastoralFriends', () => ({ subscribeReportFriends: (...args: unknown[]) => mocks.subscribe(...args) }));
 vi.mock('@/lib/newFriendRemarks', () => ({ REMARK_LIMIT: 10000, saveFriendRemark: vi.fn(), subscribeFriendRemark: (...args: unknown[]) => mocks.remarks(...args) }));
 vi.mock('@/components/tabs/overall/VisitRequestsSection', () => ({ default: ({ requestKey }: { requestKey?: string }) => <section data-testid="visit-section" data-request-key={requestKey}><h2>심방 요청</h2></section> }));
 vi.mock('@/components/tabs/overall/SuggestionsSection', () => ({ default: () => <section><h2>특이사항</h2></section> }));
 import PastoralReport from './PastoralReport';
+import { clearAdminViewState } from '@/hooks/useAdminViewState';
 beforeEach(() => {
+  clearAdminViewState();
   mocks.query = ''; mocks.demo = false; mocks.stop.mockClear(); mocks.subscribe.mockReset();
   mocks.state = { ...initialState, curYear: 2026, userRole: { role: 'admin' }, months: [{ month: 1, sundays: [4, 11, 18, 25] }], events: {}, classData: { '1-1-1': { students: [{ id: 'nf_one', name: '합성 학생', phone: '010-0000-0000' }] } }, attData: { '1-1-1': { nf_one: { '0-0': 'O', '0-1': 'X', '0-2': 'X', '0-3': 'X' } } } };
   mocks.subscribe.mockImplementation((_year, receive, fail) => { mocks.receive = receive; mocks.fail = fail; return mocks.stop; });
@@ -72,6 +74,57 @@ describe('목양 리포트 실제 화면', () => {
     mocks.query = 'view=absence&week=0-3&student=1-1-1%2Fnf_one';
     rerender(<PastoralReport />);
     expect(screen.getByRole('complementary', { name: '합성 학생 상세' })).toBeTruthy();
+  });
+  it('목양 탭·정렬·검색·학생 상세를 메뉴 왕복에서 복원하고 새 직접 링크를 우선한다', () => {
+    const first = render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: /^연속 결석$/ }));
+    fireEvent.change(screen.getByLabelText('정렬'), { target: { value: 'latest' } });
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '합성' } });
+    fireEvent.click(screen.getByRole('button', { name: '합성 학생 상세 보기' }));
+    first.unmount();
+    const next = render(<PastoralReport />);
+    expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('합성');
+    expect((screen.getByLabelText('정렬') as HTMLSelectElement).value).toBe('latest');
+    expect(screen.getByRole('complementary', { name: '합성 학생 상세' })).toBeTruthy();
+    mocks.query = 'view=visits&request=1-1-1%2Fnew';
+    next.rerender(<PastoralReport />);
+    expect(screen.getByTestId('visit-section').getAttribute('data-request-key')).toBe('1-1-1/new');
+  });
+  it('새 심방 직접 링크는 복원된 다른 부서·학년·검색 필터에 가리지 않는다', () => {
+    mocks.state = { ...mocks.state, classData: { ...mocks.state.classData, '2-3-1': { students: [] } } };
+    const { rerender } = render(<PastoralReport />);
+    fireEvent.change(screen.getByLabelText('부서'), { target: { value: '2' } });
+    fireEvent.change(screen.getByLabelText('학년'), { target: { value: '3' } });
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: '다른 학생' } });
+    mocks.query = 'view=visits&request=1-1-1%2Fopen';
+    rerender(<PastoralReport />);
+    expect((screen.getByLabelText('부서') as HTMLSelectElement).value).toBe('');
+    expect((screen.getByLabelText('학년') as HTMLSelectElement).value).toBe('');
+    expect((screen.getByRole('searchbox') as HTMLInputElement).value).toBe('');
+    expect(screen.getByTestId('visit-section').getAttribute('data-request-key')).toBe('1-1-1/open');
+  });
+  it('일반 학생 직접 링크는 이전 장결 필터 때문에 숨지 않는다', () => {
+    const { rerender } = render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: /^연속 결석$/ }));
+    fireEvent.change(screen.getByLabelText('장결'), { target: { value: 'long' } });
+    mocks.query = 'view=absence&week=0-3&student=1-1-1%2Fnf_one';
+    rerender(<PastoralReport />);
+    expect((screen.getByLabelText('장결') as HTMLSelectElement).value).toBe('all');
+    expect(screen.getByRole('complementary', { name: '합성 학생 상세' })).toBeTruthy();
+  });
+  it('직접 링크 뒤 수동 탭 선택을 URL에 반영해 새로고침에서도 되돌리지 않는다', () => {
+    window.history.replaceState({}, '', '/pastoral?view=visits&request=1-1-1%2Fopen');
+    mocks.query = window.location.search.slice(1);
+    const first = render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: /^연속 결석$/ }));
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('absence');
+    expect(new URLSearchParams(window.location.search).has('request')).toBe(false);
+    first.unmount();
+    mocks.query = window.location.search.slice(1);
+    render(<PastoralReport />);
+    expect(screen.getByRole('button', { name: /^연속 결석$/ }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByText(/요청한 학생이 현재 연속 결석 명단에 없습니다/)).toBeNull();
+    window.history.replaceState({}, '', '/');
   });
   it('권한 오류를 0명으로 숨기지 않고 재시도하며 해제된 응답을 무시한다', () => {
     const { rerender } = render(<PastoralReport />);

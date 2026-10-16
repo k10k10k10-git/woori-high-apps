@@ -91,8 +91,8 @@
   .admin-workspace .aw-brand { grid-column: 1; grid-row: 1; padding: 2px 4px; }
   .admin-workspace .aw-brand-copy { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 3px 8px; }
   .admin-workspace .aw-brand-copy > span { font-size: 12px; }
-  .admin-workspace .aw-navigation { grid-column: 1 / -1; grid-row: 2; flex-direction: row; gap: 3px; min-width: 0; margin-top: 8px; padding: 2px 2px 8px; overflow-x: auto; overflow-y: hidden; }
-  .admin-workspace .aw-nav-link { flex-shrink: 0; gap: 7px; padding: 10px 11px; }
+  .admin-workspace .aw-navigation { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-column: 1 / -1; grid-row: 2; gap: 3px; min-width: 0; margin-top: 8px; padding: 2px 2px 8px; overflow: visible; }
+  .admin-workspace .aw-nav-link { justify-content: center; min-width: 0; gap: 5px; padding: 10px 3px; font-size: 12px; white-space: normal; text-align: center; overflow-wrap: anywhere; }
   .admin-workspace .aw-account { grid-column: 2; grid-row: 1; justify-content: flex-end; padding: 0; margin: 0; border: 0; max-width: 160px; }
   .admin-workspace .aw-account-person { display: none; }
   .admin-workspace .aw-logout-error { max-width: 145px; }

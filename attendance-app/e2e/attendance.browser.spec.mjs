@@ -16,7 +16,7 @@ async function seed(request) {
   const { year } = week();
   const result = await request.put(database, { headers: { Authorization: 'Bearer owner' }, data: {
     userRoles: { teacher__at__example__dot__test: { email, role: 'teacher', part: '1', grade: '1', class: '1', name: '합성 교사' } },
-    classes: { [year]: { '1-1-1': { teacher: '합성 교사', students: { s: { name: '검증 학생', num: 1, personId: 'synthetic-student' } } } } },
+    classes: { [year]: { '1-1-1': { teacher: '합성 교사', students: { s: { name: '검증 학생', num: 1, personId: 'synthetic-student', phone: '010-0000-0001', pphone: '010-0000-0002' } } } } },
   } });
   expect(result.ok()).toBe(true);
 }
@@ -115,7 +115,7 @@ test('내부 id가 겹쳐도 실제 학생 키에만 출석을 저장한다', as
   expect(await (await request.get(`http://127.0.0.1:19017/attendance/${year}/1-1-1/other/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } })).json()).toBeNull();
 });
 
-for (const kind of ['note', 'visit']) test(`${kind} 응답 유실 재시도는 한 건만 등록하고 처리 완료를 보존한다`, async ({ page, request }) => {
+for (const kind of ['note', 'visit']) test(`${kind} 응답 유실 재시도는 한 건만 등록하고 처리 완료를 보존한다`, async ({ page, request }, testInfo) => {
   await login(page);
   const visit = kind === 'visit';
   await page.getByRole('tab', { name: visit ? '심방 요청' : '특이사항' }).click();
@@ -135,10 +135,28 @@ for (const kind of ['note', 'visit']) test(`${kind} 응답 유실 재시도는 �
   });
   await page.getByRole('button', { name: visit ? '심방 요청하기' : '등록하기', exact: true }).click();
   await expect(page.getByRole('button', { name: '저장 결과 확인·재시도' })).toBeEnabled();
+  if (!visit) await expect(page.locator('.teacher-note-receipt')).toHaveCount(0);
   await page.getByRole('tab', { name: '출석 체크' }).click();
   await page.getByRole('tab', { name: visit ? '심방 요청' : '특이사항' }).click();
   await page.getByRole('button', { name: '저장 결과 확인·재시도' }).click();
   await expect(page.locator(visit ? '#visit-reason' : '#teacher-suggestion')).toHaveValue('');
+  if (!visit) {
+    await expect(page.getByRole('status', { name: '특이사항 접수 확인' })).toContainText('마지막으로 접수된 특이사항');
+    await page.getByRole('link', { name: '관리 페이지', exact: true }).click();
+    const contact = page.locator('.student-contact-link[href="tel:01000000001"]');
+    await expect(contact).toBeVisible();
+    expect(await contact.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('.student-contact-link[href="tel:01000000002"]')).toBeVisible();
+    await contact.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('teacher-contact-actions.png') });
+    await page.getByRole('link', { name: '출석 페이지', exact: true }).click();
+    await page.getByRole('tab', { name: '특이사항' }).click();
+    await expect(page.getByRole('status', { name: '특이사항 접수 확인' })).toContainText('검증 학생');
+    // 접수 확인에는 상담 본문을 반복해서 노출하지 않는다.
+    await expect(page.locator('.teacher-note-receipt')).not.toContainText('격리 합성 상담 요청');
+    await page.locator('.teacher-note-receipt').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: testInfo.outputPath('teacher-note-receipt.png') });
+  }
   expect(puts).toBe(1);
   const { year } = week();
   const records = await (await request.get(`http://127.0.0.1:19017/suggestions/${year}/1-1-1.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } })).json();

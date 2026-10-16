@@ -11,6 +11,7 @@ import TrashModal from '@/components/modals/TrashModal';
 import { archiveRoster } from '@/lib/rosterRecovery';
 import { adminActor } from '@/utils/adminChange';
 import type { MoveTarget } from '@/types';
+import './teacher-ux.css';
 
 export default function ManageTab() {
   const { state, dispatch } = useApp();
@@ -154,18 +155,22 @@ export default function ManageTab() {
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="student-name">{student.name}</div>
-                <table style={{ borderCollapse: 'collapse', marginTop: 4 }}>
+                <table className="manage-contact-details">
                   <tbody>
                     {([
                       ['생년월일',   student.birth],
                       ['학생 연락처', student.phone],
-                      ['부모 연락처', student.pphone],
+                      ['보호자 연락처', student.pphone],
                       ['학교',       student.school],
                       ['주소',       student.addr],
                     ] as [string, string | undefined][]).map(([label, val]) => (
                       <tr key={label}>
-                        <td style={{ fontSize: 11, color: 'var(--text3)', paddingRight: 10, whiteSpace: 'nowrap', verticalAlign: 'top', lineHeight: '1.7' }}>{label}</td>
-                        <td style={{ fontSize: 11, color: val ? 'var(--text2)' : 'var(--text3)', lineHeight: '1.7' }}>{val || '-'}</td>
+                        <th scope="row">{label}</th>
+                        <td>{label.includes('연락처') && val && /\d/.test(val) ? <a
+                          className="student-contact-link"
+                          href={`tel:${val.replace(/[^\d+]/g, '')}`}
+                          aria-label={`${student.name} ${label === '학생 연락처' ? '학생' : '보호자'}에게 전화 ${val}`}
+                        >{val}<span>전화</span></a> : val || '미등록'}</td>
                       </tr>
                     ))}
                   </tbody>
