@@ -39,6 +39,8 @@ test('파일화에서 부서별·반별·목양 연락처 파일을 내려받고
   await page.locator('button[type=submit]').click();
   await expect(page.getByRole('heading', { name: '파일화', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: '관리자 메뉴', exact: true }).getByRole('link', { name: '파일화', exact: true })).toHaveAttribute('aria-current', 'page');
+  // 내려받기 클릭은 내부 본문을 스크롤한다. 첫 화면 증거는 조작 전에 따로 남긴다.
+  await page.screenshot({ path: testInfo.outputPath('files-entry.png'), fullPage: true });
 
   async function download(button, artifact) {
     const pending = page.waitForEvent('download');
