@@ -36,13 +36,13 @@ test.beforeEach(async ({ request, page }) => {
   await page.clock.setFixedTime(new Date(`${year}-03-01T12:00:00+09:00`));
 });
 
-test('다섯 모바일 메뉴와 명단·목양 조건이 메뉴 왕복과 새로고침 후에도 유지된다', async ({ page, request }, testInfo) => {
+test('여섯 모바일 메뉴와 명단·목양 조건이 메뉴 왕복과 새로고침 후에도 유지된다', async ({ page, request }, testInfo) => {
   const before = await (await request.get(database, { headers: owner })).json();
   await login(page, '/manage?view=directory');
   // 화면 폭과 무관하게 모든 메뉴가 내비게이션의 가시 영역 안에 있다.
   const navigation = page.getByRole('navigation', { name: '관리자 메뉴', exact: true });
   const links = navigation.getByRole('link');
-  await expect(links).toHaveCount(5);
+  await expect(links).toHaveCount(6);
   expect(await navigation.evaluate(element => {
     const box = element.getBoundingClientRect();
     return [...element.querySelectorAll('a')].every(link => {
