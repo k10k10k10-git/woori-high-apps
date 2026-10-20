@@ -11,21 +11,30 @@ import { initialState, reducer } from '@/store/AppContext';
 import { AttendanceSaveError } from '@/lib/attendanceSave';
 import { useAttendanceSave } from './useAttendanceSave';
 const target = { ck: '1-1-1', sid: 's', k: '8-0' };
-beforeEach(() => { vi.clearAllMocks(); m.dispatch.mockReset(); m.state = { ...initialState, curYear: 2026, attData: {}, classData: {} }; });
+beforeEach(() => { vi.clearAllMocks(); m.dispatch.mockReset(); m.state = { ...initialState, curYear: 2026, attData: {},
+  classData: { '1-1-1': { students: [{ id: 's', name: '합성 학생', personId: 'person-original' }, { id: 'second', name: '두번째 합성 학생', personId: 'person-second' }] } } }; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
-it('실패 뒤 같은 SID의 학생이 바뀌어도 재시도는 최초 학생 신원을 바꾸지 않는다', async () => {
-  const next = { ...target, k: '10-0' };
+it.each(['8-0', '10-0'])('%s 실패 뒤 같은 SID의 학생이 바뀌어도 재시도는 최초 학생 신원을 바꾸지 않는다', async key => {
+  const next = { ...target, k: key };
   const original = { id: 's', name: '원래 학생', personId: 'person-original' };
   m.state = { ...m.state!, classData: { '1-1-1': { students: [original] } } };
-  m.check.mockRejectedValueOnce(new AttendanceSaveError('unknown', '확인 필요')).mockResolvedValueOnce(undefined);
+  const save = key === '10-0' ? m.check : m.save;
+  save.mockRejectedValueOnce(new AttendanceSaveError('unknown', '확인 필요')).mockResolvedValueOnce(undefined);
   const { result, rerender } = renderHook(useAttendanceSave);
   await act(async () => { await result.current.save(next, 'O'); });
   const failure = result.current.feedback!;
   m.state = { ...m.state!, classData: { '1-1-1': { students: [{ id: 's', name: '다른 학생', personId: 'person-replaced' }] } } };
   rerender();
   await act(async () => { await result.current.save(next, 'O', failure); });
-  expect(m.check.mock.calls[1][0].student).toEqual(original);
+  expect(save.mock.calls[1][0].student).toEqual(original);
   expect(failure.student?.personId).toBe('person-original');
+});
+it('이전 주일의 학생 snapshot이 없으면 저장 API를 호출하지 않고 명단 재선택을 안내한다', async () => {
+  m.state = { ...m.state!, classData: {} };
+  const { result } = renderHook(useAttendanceSave);
+  await act(async () => { await result.current.save(target, 'O'); });
+  expect(m.save).not.toHaveBeenCalled();
+  expect(result.current.feedback).toMatchObject({ status: 'error', retryable: false, message: expect.stringContaining('학생이 이동·삭제') });
 });
 it('새 주일의 출석과 전원 결석은 동일한 체크 저장 경로로 처리하고 재시도 의도를 유지한다', async () => {
   const next = { ...target, k: '10-0' };

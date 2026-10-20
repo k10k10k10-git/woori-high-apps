@@ -7,13 +7,13 @@ import { archiveRoster } from '@/lib/rosterRecovery';
 import { runTransaction } from '@/lib/db';
 import { restoreMissingClass, restoreMissingStudent } from '@/utils/studentPersistence';
 import { buildAttendanceCheckPatch } from '@/lib/attendanceCheckSave';
-import type { AttendanceCheck } from '@/utils/attendanceChecks';
+import { attendanceStudentToken, type AttendanceCheck } from '@/utils/attendanceChecks';
 import type { AttValue } from '@/types';
 const suite = process.env.ATTENDANCE_CONTRACTS === '1' ? describe : describe.skip;
 const base = 'http://127.0.0.1:19017';
 const ns = 'demo-attendance-recovery-default-rtdb';
 const student = { id: 's', personId: 'person-s', name: '합성 학생' };
-const input = { year: 2026, classKey: '1-1-1', studentId: 's', personId: 'person-s', actor: '합성 관리자' };
+const input = { year: 2026, classKey: '1-1-1', studentId: 's', openedStudent: student, actor: '합성 관리자' };
 let apps: FirebaseApp[] = [], admin: Database, teacher: Database, second: Database, demo: Database, stranger: Database;
 let superAdmin: Database, retreatPastor: Database, retreatAdmin: Database, retreatLeader: Database;
 let legacyRetreatAdmin: Database, legacyRetreatPastor: Database, legacyRetreatLeader: Database, iguard: Database, member: Database, field: Database, iguardCentral: Database;
@@ -83,10 +83,113 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
       uid, crypto.randomUUID(), Date.UTC(2026, 10, 1))!;
   }
   async function rawSnapshot() { return (await fetch(`${base}/.json?ns=${ns}`, { headers: { Authorization: 'Bearer owner' } })).json(); }
+  function cellPatch(uid = 'teacher', sid = 's', expected: AttValue = '', value: AttValue = 'O', revision = 1, token = 'person-s') {
+    return {
+      [`attendance/2026/1-1-1/${sid}/8-1`]: value || null,
+      [`attendanceCellWrites/2026/1-1-1/${sid}/8-1`]: {
+        revision, studentToken: token, expected, value, operationId: crypto.randomUUID(), updatedBy: uid, updatedAt: { '.sv': 'timestamp' },
+      },
+    };
+  }
   async function addCheckStudents() {
     await set(ref(admin, 'classes/2026/1-1-1/students/other'), { id: 'other', name: '합성 다른 학생' });
     await set(ref(admin, 'classes/2026/1-1-1/students/long'), { id: 'long', name: '합성 장결', jang: true });
   }
+  it('구방식 개별 출석도 영수증과 원자 저장·해제하고 기존 명단과 과거 기록을 보존한다', async () => {
+    const before = await rawSnapshot();
+    await update(ref(teacher), cellPatch());
+    const receiptPath = 'attendanceCellWrites/2026/1-1-1/s/8-1';
+    const receipt = (await get(ref(teacher, receiptPath))).val();
+    expect(receipt).toMatchObject({ revision: 1, studentToken: 'person-s', expected: '', value: 'O', updatedBy: 'teacher' });
+    expect(receipt.updatedAt).toBeGreaterThan(0);
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s'))).val()).toEqual({ '0906': 'O', '8-1': 'O' });
+    await update(ref(teacher), cellPatch('teacher', 's', 'O', '', 2));
+    expect((await get(ref(admin, receiptPath))).val()).toMatchObject({ revision: 2, expected: 'O', value: '' });
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s'))).val()).toEqual({ '0906': 'O' });
+    expect((await rawSnapshot()).classes).toEqual(before.classes);
+  });
+  it('구방식 출석은 위조 토큰·UID·revision·사전값·최종 셀 불일치를 전체 거절한다', async () => {
+    const receiptPath = 'attendanceCellWrites/2026/1-1-1/s/8-1';
+    const original = cellPatch();
+    const receipt = original[receiptPath] as Record<string, unknown>;
+    const before = await rawSnapshot();
+    for (const changed of [{ studentToken: 'forged-person' }, { updatedBy: 'admin' }, { revision: 2 }, { expected: 'X' }, { value: 'X' }, { updatedAt: 1 }]) {
+      await expect(update(ref(teacher), { ...original, [receiptPath]: { ...receipt, ...changed } })).rejects.toThrow();
+      expect(await rawSnapshot()).toEqual(before);
+    }
+  });
+  it('구방식 출석 해제 뒤 같은 SID를 다른 인물로 바꾸면 옛 영수증으로 재기록하지 못한다', async () => {
+    const legacy = { id: 's', name: '레거시 합성 학생', birth: '2010.01.01' };
+    await set(ref(admin, 'classes/2026/1-1-1/students/s'), legacy);
+    const token = attendanceStudentToken(legacy);
+    await update(ref(teacher), cellPatch('teacher', 's', '', 'O', 1, token));
+    await update(ref(teacher), cellPatch('teacher', 's', 'O', '', 2, token));
+    const stale = cellPatch('teacher', 's', '', 'O', 3, token);
+    await set(ref(admin, 'classes/2026/1-1-1/students/s'), { ...legacy, birth: '2010.02.02' });
+    const before = await rawSnapshot();
+    await expect(update(ref(teacher), stale)).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+    expect((await get(ref(admin, 'attendanceCellWrites/2026/1-1-1/s/8-1'))).val()).toMatchObject({ revision: 2, value: '' });
+  });
+  it('구방식 영수증은 교사 본인 반만 허용하며 내부 id와 무관하게 실제 SID의 인물을 검증한다', async () => {
+    await set(ref(admin, 'classes/2026/1-1-1/students/s/id'), 'other');
+    await set(ref(admin, 'classes/2026/1-1-1/students/other'), { id: 'other', name: '다른 합성 학생', personId: 'other-person' });
+    await update(ref(teacher), cellPatch());
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s/8-1'))).val()).toBe('O');
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/other/8-1'))).exists()).toBe(false);
+    const receipt = 'attendanceCellWrites/2026/1-1-1/s/8-1';
+    for (const database of [stranger, retreatAdmin]) await expect(get(ref(database, receipt))).rejects.toThrow();
+    await expect(get(ref(teacher, 'attendanceCellWrites/2026/2-1-1/s/8-1'))).rejects.toThrow();
+    const before = await rawSnapshot();
+    await expect(update(ref(teacher), cellPatch('teacher', 'other'))).rejects.toThrow();
+    const wrongClass = Object.fromEntries(Object.entries(cellPatch()).map(([path, value]) => [path.replaceAll('1-1-1', '2-1-1'), value]));
+    await expect(update(ref(teacher), wrongClass)).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+  });
+  it('구방식 장결 학생의 T 출석 해제와 저장된 빈 문자열도 기존 의미대로 처리한다', async () => {
+    await set(ref(admin, 'classes/2026/1-1-1/students/s/jang'), true);
+    await set(ref(admin, 'attendance/2026/1-1-1/s/8-1'), 'T');
+    const before = await rawSnapshot();
+    await update(ref(teacher), cellPatch('teacher', 's', 'O', ''));
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s'))).val()).toEqual({ '0906': 'O' });
+    await set(ref(admin, 'attendance/2026/1-1-1/s/8-1'), '');
+    await update(ref(teacher), cellPatch('teacher', 's', '', 'O', 2));
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s'))).val()).toEqual({ '0906': 'O', '8-1': 'O' });
+    expect((await rawSnapshot()).classes).toEqual(before.classes);
+    expect((await get(ref(admin, 'attendanceCellWrites/2026/1-1-1/s/8-1'))).val()).toMatchObject({ revision: 2, expected: '', value: 'O' });
+  });
+  it('구방식 영수증의 삭제·추가 필드·재생·동시 revision은 원자 거절한다', async () => {
+    const receiptPath = 'attendanceCellWrites/2026/1-1-1/s/8-1';
+    const first = cellPatch();
+    await update(ref(teacher), first);
+    let before = await rawSnapshot();
+    for (const database of [teacher, admin]) {
+      await expect(set(ref(database, receiptPath), null)).rejects.toThrow();
+      expect(await rawSnapshot()).toEqual(before);
+    }
+    const next = cellPatch('teacher', 's', 'O', 'X', 2);
+    const receipt = next[receiptPath] as Record<string, unknown>;
+    await expect(update(ref(teacher), { ...next, [receiptPath]: { ...receipt, unexpected: true } })).rejects.toThrow();
+    await expect(update(ref(teacher), { ...next, [receiptPath]: { ...receipt, operationId: (first[receiptPath] as Record<string, unknown>).operationId } })).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+    const stale = cellPatch('admin2', 's', 'O', 'X', 2);
+    await update(ref(teacher), cellPatch('teacher', 's', 'O', 'O', 2));
+    expect((await get(ref(admin, 'attendance/2026/1-1-1/s/8-1'))).val()).toBe('O');
+    before = await rawSnapshot();
+    await expect(update(ref(second), stale)).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+  });
+  it('구방식 출석은 관리자도 명단 없는 학생 또는 이동 잠금 중이면 전체 거절한다', async () => {
+    await set(ref(admin, 'classes/2026/1-1-1/students/s'), null);
+    let before = await rawSnapshot();
+    await expect(update(ref(admin), cellPatch('admin'))).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+    await set(ref(admin, 'classes/2026/1-1-1/students/s'), student);
+    await set(ref(admin, 'config/studentMoveLocks/2026/1-1-1/admin/legacy-lock'), { phase: 'preparing', startedAt: Date.now(), fromCk: '1-1-1', toCk: '1-1-2', sid: 's' });
+    before = await rawSnapshot();
+    for (const [database, uid] of [[teacher, 'teacher'], [admin, 'admin']] as const) await expect(update(ref(database), cellPatch(uid))).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+  });
   it('서버의 주일 키 검사는 한·두 자리 월을 허용하고 잘못된 월·주차 키는 원자 거절한다', async () => {
     const original = await checkPatch();
     const forKey = (key: string) => Object.fromEntries(Object.entries(original).map(([path, value]) => [path.replaceAll('/9-3', `/${key}`), value]));
@@ -370,7 +473,7 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
   });
   it('반 삭제·복원은 보관 출석을 덮지 않고 같은 반이 생기면 복원을 거절한다', async () => {
     await set(ref(teacher, 'attendance/2026/1-1-1/s/0906'), 'O');
-    await archiveRoster({ ...input, studentId: undefined, personId: undefined });
+    await archiveRoster({ year: input.year, classKey: input.classKey, actor: input.actor });
     const copies = (await get(ref(admin, 'trash/2026/classes'))).val();
     const copy = Object.values(copies)[0] as Record<string, unknown>;
     delete copy.ck; delete copy.deletedAt;

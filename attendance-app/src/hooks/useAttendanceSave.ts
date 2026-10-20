@@ -47,7 +47,8 @@ export function useAttendanceSave() {
         await saveAttendanceCheck({ year, target, value, expected, student, none }, () => valid(year, revision));
       } else {
         if (none) throw new AttendanceSaveError('unavailable', '이전 주일은 기존 출석 입력 방식을 유지합니다.');
-        await saveAttendanceCell({ year, target, value, expected }, () => valid(year, revision));
+        if (!student || student.id !== target.sid) throw new AttendanceSaveError('conflict', '학생이 이동·삭제되었거나 명단이 변경되었습니다. 최신 명단에서 다시 선택해 주세요.');
+        await saveAttendanceCell({ year, target, value, expected, student }, () => valid(year, revision));
       }
       if (!valid(year, revision)) return;
       // 안내 식별 시각은 같은 밀리초에 저장해도 겹치지 않아야 이전 닫기 타이머와 구분된다.

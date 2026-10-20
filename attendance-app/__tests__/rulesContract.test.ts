@@ -32,6 +32,55 @@ function ruleExpression(...segments: string[]): string {
 }
 
 describe('database.rules.json 권한 계약', () => {
+  describe('과거 개별 출석의 신원·사전값 영수증', () => {
+    const cell = ['attendanceCellWrites', '$year', '$classKey', '$studentId', '$weekKey'];
+    it('상위 쓰기 없이 관리자와 이메일 일치 교사 본인 반·현존 학생·무잠금 셀만 쓴다', () => {
+      for (const segments of [[], ['$year'], ['$year', '$classKey'], ['$year', '$classKey', '$studentId']]) {
+        expect(ruleValue('attendanceCellWrites', ...segments, '.write')).toBeUndefined();
+      }
+      const read = ruleExpression('attendanceCellWrites', '.read');
+      expect(refers(read, 'admins')).toBe(true); expect(refers(read, 'attendanceAdmins')).toBe(true);
+      expect(refers(read, 'retreatAdmins')).toBe(false); expect(refers(read, 'iguardMembers')).toBe(false);
+      const ownRead = ruleExpression('attendanceCellWrites', '$year', '$classKey', '.read');
+      const write = ruleExpression(...cell, '.write');
+      for (const expression of [ownRead, write]) {
+        expect(expression).toContain("child('email').val() === auth.token.email");
+        expect(expression).toContain("child('role').val() === 'teacher'");
+        expect(expression).toContain("child('class').val() === $classKey");
+        expect(refers(expression, 'teacherClasses')).toBe(false);
+      }
+      expect(write).toContain('newData.exists()');
+      expect(write).toContain("child('students').child($studentId).exists()");
+      expect(write).toContain("!root.child('config').child('studentMoveLocks').child($year).child($classKey).exists()");
+      expect(write).not.toContain("child('jang')");
+    });
+    it('신원·revision·서버 시각·UID·새 작업 ID·사전값·최종 셀을 같은 요청에서 검증한다', () => {
+      const validate = ruleExpression(...cell, '.validate');
+      expect(validate).toContain('$year.matches(/^[0-9]{4}$/)');
+      expect(validate).toContain('$weekKey.matches(/^([0-9]|1[01])-[0-4]$/)');
+      expect(validate).toContain("data.child('revision').val() + 1 : 1");
+      expect(validate).toContain("newData.child('revision').val() % 1 === 0");
+      expect(validate).toContain('9007199254740991');
+      expect(validate).toContain("child('personId').val()");
+      expect(validate).toContain("'legacy:' +");
+      expect(validate).toContain("newData.child('expected').val() === ''");
+      expect(validate).toContain("child($weekKey).val() === 'T'");
+      expect(validate).toContain("newData.child('value').val() === '' ?");
+      expect(validate).toContain("newData.parent().parent().parent().parent().parent().child('attendance')");
+      expect(validate).toContain("newData.child('operationId').val() !== data.child('operationId').val()");
+      expect(validate).toContain("newData.child('updatedBy').val() === auth.uid");
+      expect(validate).toContain("newData.child('updatedAt').val() === now");
+    });
+    it('필수 일곱 필드 외 정보 저장을 거절하며 지운 출석의 영수증 삭제도 허용하지 않는다', () => {
+      const validate = ruleExpression(...cell, '.validate');
+      for (const name of ['revision', 'studentToken', 'expected', 'value', 'operationId', 'updatedBy', 'updatedAt']) {
+        expect(ruleValue(...cell, name, '.validate')).toBeTypeOf('string');
+        expect(validate).toContain(`'${name}'`);
+      }
+      expect(ruleValue(...cell, '$other', '.validate')).toBe(false);
+      expect(ruleExpression(...cell, '.write')).toContain('newData.exists()');
+    });
+  });
   describe('한 번 누르는 출석의 반·주일 체크 상태', () => {
     const week = ['attendanceChecks', '$year', '$classKey', '$weekKey'];
     it('개인 출석부 관리자 전체와 이메일 일치 교사 본인 반만 읽으며 통합 앱 권한을 추가하지 않는다', () => {

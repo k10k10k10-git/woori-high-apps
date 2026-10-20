@@ -2,9 +2,10 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AppState } from '@/store/AppContext';
-const m = vi.hoisted(() => ({ state: null as unknown, get: vi.fn(), set: vi.fn(), transaction: vi.fn(), update: vi.fn(), dispatch: vi.fn() }));
+const m = vi.hoisted(() => ({ state: null as unknown, get: vi.fn(), set: vi.fn(), transaction: vi.fn(), update: vi.fn(), dispatch: vi.fn(), restore: vi.fn(), removeCopy: vi.fn() }));
 vi.mock('@/lib/db', () => ({ db: {}, ref: (_db: unknown, path: string) => path, get: m.get, runTransaction: m.transaction, update: m.update, set: m.set, push: () => ({ key: 'operation' }) }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state as AppState, dispatch: m.dispatch }) }));
+vi.mock('@/lib/rosterRestore', () => ({ restoreRoster: m.restore, permanentDeleteRosterCopy: m.removeCopy }));
 import { initialState } from '@/store/AppContext';
 import ManagementDialog from './ManagementDialog';
 import AddClassModal from './AddClassModal';
@@ -18,6 +19,7 @@ beforeEach(() => {
   m.state = { ...initialState, curYear: 2026, curPart: '1', curGrade: '1', curClass: '1', userRole: { role: 'admin' }, classData: { '1-1-1': { teacher: '시험 교사', students: [student] } } };
   m.get.mockResolvedValue({ val: () => ({}), exists: () => true });
   m.transaction.mockResolvedValue({ committed: true });
+  m.restore.mockResolvedValue(undefined); m.removeCopy.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 it('수정창이 열린 뒤 같은 SID의 인물이 교체되면 저장을 중단한다', async () => {
@@ -81,13 +83,12 @@ it('같은 학생 ID의 삭제본 두 개 중 선택한 실제 키만 영구 삭
   const first = { ...student, ck: '1-1-1', deletedAt: 1 };
   const second = { ...student, ck: '1-1-2', deletedAt: 2 };
   m.get.mockResolvedValue({ val: () => ({ students: { oldKey: first, newKey: second } }), exists: () => true });
-  m.transaction.mockImplementation(async (_path, change) => ({ committed: change(second) === null }));
   render(<TrashModal onClose={() => {}} />);
   const buttons = await screen.findAllByRole('button', { name: '영구 삭제' });
   fireEvent.click(buttons[0]);
   fireEvent.click(screen.getByRole('button', { name: '영구 삭제 확인' }));
-  await waitFor(() => expect(m.transaction).toHaveBeenCalled());
-  expect(m.transaction.mock.calls[0][0]).toBe('trash/2026/students/newKey');
+  await waitFor(() => expect(m.removeCopy).toHaveBeenCalledOnce());
+  expect(m.removeCopy.mock.calls[0][0]).toMatchObject({ year: 2026, kind: 'students', key: 'newKey', value: second });
   await waitFor(() => expect(screen.getAllByRole('button', { name: '영구 삭제' })).toHaveLength(1));
 });
 it('삭제 목록 조회 실패는 빈 목록으로 표시하지 않고 재시도를 제공한다', async () => {
@@ -134,27 +135,35 @@ it('명단 교체 백업에 실패하면 원장 저장을 시작하지 않고 �
   expect(onClose).not.toHaveBeenCalled();
   expect((screen.getByLabelText('학생 명단') as HTMLTextAreaElement).value).toContain('신규');
 });
-it('복원 후 사본 정리 실패는 복원을 반복하지 않고 정리만 재시도한다', async () => {
+it('복원 결과 불명은 성공·사본 정리로 표시하지 않고 같은 사본을 유지한다', async () => {
   const item = { ...student, ck: '1-1-1', deletedAt: 1 };
   m.get.mockResolvedValue({ val: () => ({ students: { old: item } }) });
-  m.transaction.mockResolvedValueOnce({ committed: true }).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ committed: true });
+  m.restore.mockRejectedValueOnce(new Error('복원 결과를 확인하지 못했습니다. 목록을 다시 확인해 주세요.'));
   render(<TrashModal onClose={() => {}} />);
   fireEvent.click(await screen.findByRole('button', { name: '복원' }));
-  await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('명단 복원은 완료'));
-  fireEvent.click(screen.getByRole('button', { name: '삭제 목록 정리' }));
+  await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('복원 결과를 확인하지 못했습니다'));
+  expect(screen.queryByText('명단 복원과 삭제 목록 정리가 함께 완료되었습니다.')).toBeNull();
+  expect(screen.queryByRole('button', { name: '삭제 목록 정리' })).toBeNull();
+  expect(m.removeCopy).not.toHaveBeenCalled();
+  expect(m.transaction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: '복원' }));
   await screen.findByText('최근 삭제된 항목이 없습니다.');
-  expect(m.transaction.mock.calls.map(call => call[0])).toEqual(['classes/2026/1-1-1', 'trash/2026/students/old', 'trash/2026/students/old']);
+  expect(m.restore).toHaveBeenCalledTimes(2);
+  expect(m.restore.mock.calls.map(([input]) => input.value)).toEqual([item, item]);
 });
-it('복원 후 새로고침한 레거시 사본 내용이 다르면 이전 복원으로 간주하지 않는다', async () => {
+it('실패 후 새로고침한 사본 내용이 바뀌면 최신 확인 대상으로 다시 검증한다', async () => {
   const item = { ...student, ck: '1-1-1', deletedAt: 1 };
   m.get.mockResolvedValue({ val: () => ({ students: { old: item } }) });
-  m.transaction.mockResolvedValueOnce({ committed: true }).mockRejectedValueOnce(new Error('offline'));
+  m.restore.mockRejectedValueOnce(new Error('확인 필요'));
   render(<TrashModal onClose={() => {}} />);
   fireEvent.click(await screen.findByRole('button', { name: '복원' }));
-  await screen.findByRole('button', { name: '삭제 목록 정리' });
+  await screen.findByRole('alert');
   await waitFor(() => expect((screen.getByRole('button', { name: '목록 새로고침' }) as HTMLButtonElement).disabled).toBe(false));
   m.get.mockResolvedValue({ val: () => ({ students: { old: { ...item, deletedAt: 2 } } }) });
   fireEvent.click(screen.getByRole('button', { name: '목록 새로고침' }));
   await screen.findByRole('button', { name: '복원' });
   expect(screen.queryByRole('button', { name: '삭제 목록 정리' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '복원' }));
+  await screen.findByText('최근 삭제된 항목이 없습니다.');
+  expect(m.restore.mock.calls[1][0].value.deletedAt).toBe(2);
 });

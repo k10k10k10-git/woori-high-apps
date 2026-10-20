@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { db, ref, get, push, runTransaction } from '@/lib/db';
+import { db, ref, get } from '@/lib/db';
 import { useApp } from '@/store/AppContext';
-import { adminActor, buildAdminChangeEntry } from '@/utils/adminChange';
-import { restoreMissingClass, restoreMissingStudent, sameStoredValue } from '@/utils/studentPersistence';
+import { adminActor } from '@/utils/adminChange';
+import { restoreRoster, permanentDeleteRosterCopy } from '@/lib/rosterRestore';
 import { trashEntries, type TrashEntry } from '@/utils/trash';
 import { normalizeAttendanceRecord } from '@/utils/attendanceValue';
 import ManagementDialog from './ManagementDialog';
@@ -13,8 +13,17 @@ type TrashStudent = Student & { ck: string; deletedAt: number };
 type TrashClass = { ck: string; teacher: string; teacherPhoto?: string | null; students: Record<string, Student>; adminChanges?: Record<string, unknown>; deletedAt: number };
 
 export default function TrashModal({ onClose }: { onClose: () => void }) {
-  const { state } = useApp();
+  const { state, getState } = useApp();
   const [curYear] = useState(state.curYear);
+  const [revision] = useState(state.dataRevision);
+  const current = useRef(state);
+  current.current = state;
+  const active = useRef(true);
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const isCurrent = () => {
+    const latest = getState ? getState() : current.current;
+    return active.current && latest.curYear === curYear && latest.dataRevision === revision && latest.userRole?.role === 'admin';
+  };
   const [students, setStudents] = useState<TrashEntry<TrashStudent>[]>([]);
   const [classes, setClasses] = useState<TrashEntry<TrashClass>[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +34,6 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const [restored, setRestored] = useState<Map<string, unknown>>(() => new Map());
   const [retainedAttendance, setRetainedAttendance] = useState<Record<string, Record<string, Record<string, unknown>>>>({});
 
   useEffect(() => {
@@ -41,85 +49,49 @@ export default function TrashModal({ onClose }: { onClose: () => void }) {
   }, [curYear, reload]);
 
   async function perform(key: string, task: () => Promise<void>) {
-    if (busyRef.current) return;
+    if (busyRef.current || !isCurrent()) return;
     busyRef.current = true; setWorking(key); setError(null); setMessage('');
     try { await task(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.'); }
-    finally { busyRef.current = false; setWorking(null); setConfirmKey(null); }
-  }
-  async function removeCopy(path: string, expected: unknown) {
-    const target = ref(db, path);
-    await get(target);
-    const result = await runTransaction(target, current => sameStoredValue(current, expected) ? null : undefined, { applyLocally: false });
-    if (!result.committed) throw new Error('삭제 목록이 변경되었습니다. 목록을 다시 불러온 뒤 확인해 주세요.');
+    catch (cause) { if (isCurrent()) setError(cause instanceof Error ? cause.message : '처리하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.'); }
+    finally { busyRef.current = false; if (active.current) { setWorking(null); setConfirmKey(null); } }
   }
   function removeRow(kind: 'students' | 'classes', key: string) {
     if (kind === 'students') setStudents(rows => rows.filter(row => row.key !== key));
     else setClasses(rows => rows.filter(row => row.key !== key));
   }
-  async function finishRestore(kind: 'students' | 'classes', key: string, value: unknown) {
-    setRestored(previous => new Map(previous).set(`${kind}:${key}`, value));
-    try { await removeCopy(`trash/${curYear}/${kind}/${key}`, value); }
-    catch { throw new Error('명단 복원은 완료했습니다. 삭제 목록 정리는 끝나지 않았습니다. 해당 항목의 ‘삭제 목록 정리’를 눌러 주세요.'); }
-    removeRow(kind, key); setMessage('명단 복원과 삭제 목록 정리가 완료되었습니다.');
-  }
   function restoreStudent(entry: TrashEntry<TrashStudent>) {
     const { key, value: item } = entry;
     return perform(`students:${key}`, async () => {
-      if (!sameStoredValue(restored.get(`students:${key}`), item)) {
-        const student: Student = { ...item };
-        delete (student as Partial<TrashStudent>).ck;
-        delete (student as Partial<TrashStudent>).deletedAt;
-        const target = ref(db, `classes/${curYear}/${item.ck}`);
-        await get(target);
-        const changeId = push(ref(db, `classes/${curYear}/${item.ck}/adminChanges`)).key!;
-        const change = buildAdminChangeEntry({ classKey: item.ck, teacher: state.classData[item.ck]?.teacher, student,
-          action: '학생 복원', changeSummary: '최근 삭제 목록에서 학생 명단 복원', actor: adminActor(state.userRole) });
-        const result = await runTransaction(target, current => restoreMissingStudent(current, student, changeId, change), { applyLocally: false });
-        if (!result.committed) throw new Error('반이 없거나 같은 학생 ID가 이미 존재합니다. 현재 명단을 확인해 주세요.');
-      }
-      await finishRestore('students', key, item);
+      await restoreRoster({ year: curYear, kind: 'students', key, value: item, actor: adminActor(state.userRole) }, isCurrent);
+      if (!isCurrent()) return;
+      removeRow('students', key); setMessage('명단 복원과 삭제 목록 정리가 함께 완료되었습니다.');
     });
   }
   function restoreClass(entry: TrashEntry<TrashClass>) {
     const { key, value: item } = entry;
     return perform(`classes:${key}`, async () => {
-      if (!sameStoredValue(restored.get(`classes:${key}`), item)) {
-        const target = ref(db, `classes/${curYear}/${item.ck}`);
-        await get(target);
-        const changeId = push(ref(db, `classes/${curYear}/${item.ck}/adminChanges`)).key!;
-        const change = buildAdminChangeEntry({ classKey: item.ck, teacher: item.teacher,
-          studentName: `반 전체 (${Object.keys(item.students ?? {}).length}명)`, action: '학생 복원',
-          changeSummary: '최근 삭제 목록에서 반과 학생 명단 복원', actor: adminActor(state.userRole) });
-        const classValue = { ...item };
-        delete (classValue as Partial<TrashClass>).ck;
-        delete (classValue as Partial<TrashClass>).deletedAt;
-        const result = await runTransaction(target, current => restoreMissingClass(current, {
-          ...classValue, teacher: item.teacher, ...(item.teacherPhoto ? { teacherPhoto: item.teacherPhoto } : {}),
-          students: item.students ?? {}, adminChanges: { ...item.adminChanges, [changeId]: change },
-        }), { applyLocally: false });
-        if (!result.committed) throw new Error('같은 반이 이미 존재합니다. 현재 명단을 보호하기 위해 복원을 중단했습니다.');
-      }
-      await finishRestore('classes', key, item);
+      await restoreRoster({ year: curYear, kind: 'classes', key, value: item, actor: adminActor(state.userRole) }, isCurrent);
+      if (!isCurrent()) return;
+      removeRow('classes', key); setMessage('반 명단 복원과 삭제 목록 정리가 함께 완료되었습니다.');
     });
   }
   function permanentDelete(kind: 'students' | 'classes', entry: TrashEntry<TrashStudent | TrashClass>) {
     return perform(`${kind}:${entry.key}`, async () => {
-      await removeCopy(`trash/${curYear}/${kind}/${entry.key}`, entry.value);
+      await permanentDeleteRosterCopy({ year: curYear, kind, key: entry.key, value: entry.value, actor: adminActor(state.userRole) }, isCurrent);
+      if (!isCurrent()) return;
       removeRow(kind, entry.key); setMessage('선택한 삭제본을 영구 삭제했습니다.');
     });
   }
   function actions(kind: 'students' | 'classes', entry: TrashEntry<TrashStudent> | TrashEntry<TrashClass>, restore: () => void) {
     const key = `${kind}:${entry.key}`;
-    const alreadyRestored = sameStoredValue(restored.get(key), entry.value);
     return <div className="management-actions">
       {confirmKey === key ? <>
         <span className="management-hint">이 사본으로 명단을 복원할 수 없게 됩니다. 보관 출석은 자동 삭제하지 않습니다.</span>
         <button className="btn-danger" disabled={working !== null} onClick={() => { void permanentDelete(kind, entry); }}>영구 삭제 확인</button>
         <button className="btn-secondary" disabled={working !== null} onClick={() => setConfirmKey(null)}>취소</button>
       </> : <>
-        <button className="btn-primary" disabled={working !== null} onClick={restore}>{working === key ? '처리 중…' : alreadyRestored ? '삭제 목록 정리' : '복원'}</button>
-        {!alreadyRestored && <button className="btn-secondary" disabled={working !== null} onClick={() => setConfirmKey(key)}>영구 삭제</button>}
+        <button className="btn-primary" disabled={working !== null} onClick={restore}>{working === key ? '처리 중…' : '복원'}</button>
+        <button className="btn-secondary" disabled={working !== null} onClick={() => setConfirmKey(key)}>영구 삭제</button>
       </>}
     </div>;
   }
