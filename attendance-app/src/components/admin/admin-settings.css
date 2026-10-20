@@ -190,7 +190,7 @@
 .as-handoff-table tbody th { min-width: 140px; font-weight: 500; }
 .as-handoff-table small { display: block; color: var(--as-muted); font-size: 11px; font-weight: 400; }
 .as-handoff-table td { min-width: 110px; }
-.as-handoff-table td:nth-child(6) { min-width: 230px; overflow-wrap: anywhere; }
+.as-handoff-table td:nth-child(7) { min-width: 230px; overflow-wrap: anywhere; }
 .as-handoff-table td:nth-last-child(-n+2) { min-width: 76px; }
 .as-handoff-error { color: var(--as-danger); margin-top: 10px !important; }
 @media (max-width: 759px) { .as-handoff .as-section-heading > .as-button { width: 100%; } }

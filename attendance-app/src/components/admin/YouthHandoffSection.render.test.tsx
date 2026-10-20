@@ -20,19 +20,24 @@ it('공백이 있는 점 구분 생년월일을 미리보기와 내려받기에�
   expect(screen.queryByText('확인 필요 (2008. 01. 31)')).toBeNull();
   expect(screen.getByText(/기본 정보 확인 필요 0명/)).toBeTruthy();
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '전체 고3 엑셀 내려받기' })); });
-  expect(m.download.mock.calls[0][0][6][1]).toEqual(new Date(2008, 0, 31));
+  expect(m.download.mock.calls[0][0][6][2]).toEqual(new Date(2008, 0, 31));
   expect(m.state!.classData['1-3-1'].students[0].birth).toBe('2008. 01. 31');
 });
-it('미리보기에서 전체 고3를 확인하고 8개 항목 엑셀을 내려받는다', async () => {
+it('미리보기와 엑셀에서 이름·부서학년반·생년월일 순서의 9개 항목을 확인한다', async () => {
   render(<YouthHandoffSection />);
   expect(screen.getByText('가상 장결')).toBeTruthy();
-  expect(screen.getAllByRole('columnheader', { hidden: true })).toHaveLength(8);
+  expect(screen.getAllByRole('columnheader', { hidden: true })).toHaveLength(9);
+  const previewRows = screen.getAllByRole('row', { hidden: true });
+  expect(Array.from(previewRows[1].children).slice(0, 3).map(cell => cell.textContent)).toEqual(['가상 고3', '1부 3학년 1반', '미등록']);
+  expect(Array.from(previewRows[2].children).slice(0, 3).map(cell => cell.textContent)).toEqual(['가상 장결', '2부 3학년 1반', '미등록']);
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '전체 고3 엑셀 내려받기' })); });
   expect(m.download).toHaveBeenCalledOnce();
   const [rows, sheet, filename, options] = m.download.mock.calls[0];
   expect(rows.slice(6)).toHaveLength(2); expect(sheet).toBe('청년부 인계');
   expect(filename).toBe('청년부인계_고3_2026_2026-11-01.xlsx');
-  expect(options).toMatchObject({ headerRow: 5, columnFormats: { 1: 'yyyy-mm-dd', 6: '0%' } });
+  expect(rows[5].slice(0, 3)).toEqual(['학생 이름', '부서·학년·반', '생년월일']);
+  expect(rows.slice(6).map((row: unknown[]) => row[1])).toEqual(['1부 3학년 1반', '2부 3학년 1반']);
+  expect(options).toMatchObject({ headerRow: 5, columnFormats: { 2: 'yyyy-mm-dd', 7: '0%' } });
   expect(options.beforeDownload()).toBeUndefined();
 });
 it.each(['classes', 'attendance', 'events'] as const)('%s 원장이 준비되지 않으면 빈 명단으로 내려받지 않는다', key => {

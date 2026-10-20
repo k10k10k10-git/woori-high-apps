@@ -34,7 +34,7 @@ export default function YouthHandoffSection() {
       if (snapshot.futureYear || !snapshot.rows.length) throw new Error('현재 연도에 내려받을 고3 명단이 없습니다. 조회 연도와 명단을 확인해 주세요.');
       setNowMs(now);
       await downloadXLSX(youthHandoffWorkbookRows(snapshot), '청년부 인계', `청년부인계_고3_${year}_${snapshot.extractedOn}.xlsx`, {
-        headerRow: 5, columnWidths: [18, 24, 22, 22, 24, 60, 14, 14], columnFormats: { 1: 'yyyy-mm-dd', 6: '0%' }, beforeDownload: assertScope,
+        headerRow: 5, columnWidths: [18, 24, 24, 22, 22, 24, 60, 14, 14], columnFormats: { 2: 'yyyy-mm-dd', 7: '0%' }, beforeDownload: assertScope,
       });
       setStatus({ success: `전체 고3 ${snapshot.rows.length}명의 엑셀 내려받기를 시작했습니다.` });
     } catch (error) {
@@ -52,7 +52,7 @@ export default function YouthHandoffSection() {
       <p className="as-handoff-note">출석률은 행사·미입력을 제외한 기록 기준입니다. 기본 정보 확인 필요 {report.reviewCount}명 · 출석 산정 불가 {report.unratedCount}명. 누락된 학생도 모두 포함합니다.</p>
       {report.rows.length ? <details className="as-handoff-preview"><summary>인계 명단 미리보기 · {report.rows.length}명</summary><div className="as-handoff-table" role="region" aria-label="청년부 인계 명단" tabIndex={0}>
         <table><thead><tr>{YOUTH_HANDOFF_COLUMNS.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead><tbody>{report.rows.map(row => <tr key={`${row.classKey}/${row.student.id}`}>
-          <th scope="row">{row.student.name || '미등록'}<small>{row.classKey.replace(/^(\d)-3-(\d+)$/, '$1부 3학년 $2반')}</small></th>
+          <th scope="row">{row.student.name || '미등록'}</th><td>{row.classLabel}</td>
           <td>{row.birth}</td><td>{row.student.phone || '미등록'}</td><td>{row.student.pphone || '미등록'}</td><td>{row.student.school || '미등록'}</td><td>{row.student.addr || '미등록'}</td><td>{row.rate === null ? '산정 불가' : `${row.rate}%`}</td><td><AdminStatusBadge label={row.grade} /></td>
         </tr>)}</tbody></table>
       </div></details> : <p className="as-empty-note">선택한 연도에 등록된 고3 학생이 없습니다.</p>}

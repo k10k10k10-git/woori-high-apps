@@ -1,4 +1,6 @@
 import { test, expect } from '../../highschool-app/node_modules/@playwright/test/index.mjs';
+import { readFile } from 'node:fs/promises';
+import XLSX from '../node_modules/xlsx/xlsx.js';
 
 const namespace = 'demo-attendance-recovery-default-rtdb';
 const base = 'http://127.0.0.1:19017';
@@ -109,6 +111,14 @@ test('목적지에 같은 인물이 있으면 중복 이동을 차단한다', as
 test('시트 동기화 제거 후 데이터 관리 조회는 원장을 보존하고 인계·진급을 유지한다', async ({ page, request }, testInfo) => {
   await seed(request);
   await request.put(url('config/sheetSync'), { headers, data: { bu1Url: 'legacy-synthetic-sheet', bu2Url: 'legacy-synthetic-sheet-2' } });
+  for (const [classKey, student, attendance] of [
+    ['1-3-1', { name: '가상 인계생', birth: '2008. 01. 31', phone: '01000000001', pphone: '01000000002', addr: '합성시 합성구 검증로 123 가상 아파트 101동 202호' }, { '0-0': 'O', '0-1': 'X' }],
+    ['2-3-11', { name: '나상 인계생', jang: true }, { '0-0': 'X' }],
+  ]) {
+    expect((await request.put(url(`classes/${year}/${classKey}/students/handoff`), { headers, data: student })).ok()).toBe(true);
+    expect((await request.put(url(`attendance/${year}/${classKey}/handoff`), { headers, data: attendance })).ok()).toBe(true);
+  }
+  await page.clock.setFixedTime(new Date(`${year}-11-01T12:00:00+09:00`));
   const before = await read(request, '');
   const sheetRequests = [];
   page.on('request', request => { if (request.url().includes('docs.google.com/spreadsheets')) sheetRequests.push(request.url()); });
@@ -118,6 +128,29 @@ test('시트 동기화 제거 후 데이터 관리 조회는 원장을 보존하
   await page.getByRole('tab', { name: '데이터 관리' }).click();
   await expect(page.getByRole('heading', { name: /청년부 인계/ })).toBeVisible();
   await expect(page.getByRole('button', { name: '전체 고3 엑셀 내려받기' })).toBeVisible();
+  await page.locator('.as-handoff-preview summary').click();
+  const preview = page.getByRole('region', { name: '청년부 인계 명단' });
+  await expect(preview.getByRole('columnheader')).toHaveText(['학생 이름', '부서·학년·반', '생년월일', '본인 전화번호', '학부모 연락처', '학교', '주소', '출석률', '출석등급']);
+  await expect(preview.getByRole('cell', { name: '2부 3학년 11반', exact: true })).toBeVisible();
+  const address = preview.getByRole('cell', { name: '합성시 합성구 검증로 123 가상 아파트 101동 202호', exact: true });
+  await expect(address).toHaveCSS('min-width', '230px');
+  await expect(address).toHaveCSS('overflow-wrap', 'anywhere');
+  const pendingDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '전체 고3 엑셀 내려받기' }).click();
+  const download = await pendingDownload;
+  expect(download.suggestedFilename().normalize('NFC')).toBe(`청년부인계_고3_${year}_${year}-11-01.xlsx`);
+  const file = testInfo.outputPath('youth-handoff.xlsx');
+  await download.saveAs(file);
+  const sheet = XLSX.read(await readFile(file), { cellNF: true }).Sheets['청년부 인계'];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  expect(rows[5]).toEqual(['학생 이름', '부서·학년·반', '생년월일', '본인 전화번호', '학부모 연락처', '학교', '주소', '출석률', '출석등급']);
+  expect(rows.slice(6).map(row => row.slice(0, 2))).toEqual([['가상 인계생', '1부 3학년 1반'], ['나상 인계생', '2부 3학년 11반']]);
+  expect(sheet.C7).toMatchObject({ t: 'n', z: 'yyyy-mm-dd', w: '2008-01-31' });
+  expect(sheet.D7).toMatchObject({ t: 's', v: '01000000001' });
+  expect(sheet.E7).toMatchObject({ t: 's', v: '01000000002' });
+  expect(sheet.H7).toMatchObject({ t: 'n', v: .5, z: '0%', w: '50%' });
+  expect(sheet.I7.v).toBe('D');
+  expect(sheet['!autofilter'].ref).toBe('A6:I8');
   await expect(page.getByText('새해 진급 처리', { exact: true })).toBeVisible();
   expect(await page.locator('.admin-settings').textContent()).not.toMatch(/구글 시트|동기화 미리보기|동기화 적용|시트 주소/);
   await page.screenshot({ path: testInfo.outputPath('data-without-sheet-sync.png'), fullPage: true });

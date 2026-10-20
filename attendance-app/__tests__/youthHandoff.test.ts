@@ -37,7 +37,7 @@ describe('전체 고3 청년부 인계', () => {
     const report = buildYouthHandoff(state, now);
     expect(report.reviewCount).toBe(0);
     expect(report.rows[0].birth).toBe('2008-01-31');
-    expect(youthHandoffWorkbookRows(report)[6][1]).toEqual(new Date(2008, 0, 31));
+    expect(youthHandoffWorkbookRows(report)[6][2]).toEqual(new Date(2008, 0, 31));
     expect(state).toEqual(before);
   });
   it('부서·학기·반 화면 선택과 관계없이 1·2부 고3 장결·미입력·동명이인을 모두 포함한다', () => {
@@ -56,6 +56,11 @@ describe('전체 고3 청년부 인계', () => {
     expect(report.rows[2]).toMatchObject({ rate: null, grade: '산정 불가' });
     expect(report.unratedCount).toBe(1);
   });
+  it('두 자리 반 번호도 부서·학년·반을 빠짐없이 내보낸다', () => {
+    const state = source(); state.classData = { '2-3-11': { students: [{ id: 'a', name: '가학생' }] } };
+    const report = buildYouthHandoff(state, now);
+    expect(youthHandoffCells(report.rows[0]).slice(0, 3)).toEqual(['가학생', '2부 3학년 11반', '미등록']);
+  });
   it('과거 연도는 연말까지, 미래 연도는 아직 시작 전으로 표시한다', () => {
     expect(buildYouthHandoff(source(), Date.parse('2027-01-01T00:00:00+09:00')).endsOn).toBe('2026-12-31');
     const future = buildYouthHandoff({ ...source(), curYear: 2027, months: getSundaysForYear(2027) }, now);
@@ -70,16 +75,17 @@ describe('전체 고3 청년부 인계', () => {
     expect(handoffBirth('2008')).toBe('확인 필요 (2008)');
     const report = buildYouthHandoff(source(), now);
     expect(report.reviewCount).toBe(2);
-    expect(youthHandoffCells(report.rows[2])).toEqual(['나학생', '미등록', '미등록', '미등록', '미등록', '미등록', '산정 불가', '산정 불가']);
+    expect(youthHandoffCells(report.rows[2])).toEqual(['나학생', '2부 3학년 2반', '미등록', '미등록', '미등록', '미등록', '미등록', '산정 불가', '산정 불가']);
   });
-  it('8개 열·기간·추출일·총인원을 담고 생년월일·출석률은 실제 날짜·숫자로 내보낸다', () => {
+  it('이름·부서학년반·생년월일 순서의 9개 열을 담고 날짜·출석률 타입을 보존한다', () => {
     const report = buildYouthHandoff(source(), now); const cells = youthHandoffWorkbookRows(report);
     expect(cells[5]).toEqual(YOUTH_HANDOFF_COLUMNS);
+    expect(cells[5]).toEqual(['학생 이름', '부서·학년·반', '생년월일', '본인 전화번호', '학부모 연락처', '학교', '주소', '출석률', '출석등급']);
     expect(cells[1][0]).toContain('추출일: 2026-11-01');
     expect(cells[2][0]).toContain('전체 3명');
-    expect(cells.slice(6).every(row => row.length === 8)).toBe(true);
-    expect(cells[6]).toEqual(['가학생', new Date(2008, 1, 29), '010-0000-0001', '010-0000-0002', '가상고', '가상 주소', .75, 'C']);
-    expect(cells[7][6]).toBe(0);
+    expect(cells.slice(6).every(row => row.length === 9)).toBe(true);
+    expect(cells[6]).toEqual(['가학생', '1부 3학년 1반', new Date(2008, 1, 29), '010-0000-0001', '010-0000-0002', '가상고', '가상 주소', .75, 'C']);
+    expect(cells[7][7]).toBe(0);
   });
   it.each([[90, 'A'], [80, 'B'], [70, 'C'], [60, 'D']] as const)('등급 경계 %i%%는 %s', (rate, grade) => {
     const state = source(); state.months = [{ month: 1, sundays: Array.from({ length: 10 }, (_, i) => i + 1) }]; state.events = {};
