@@ -29,6 +29,10 @@ async function login(page, email) {
   await page.getByLabel('이메일', { exact: true }).fill(email);
   await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
+  if (email === 'return-admin@example.test') {
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await page.goto('/attendance?view=check');
+  }
   await expect(page.getByRole('button', { name: '합성 일반 학생 출석으로 기록' })).toBeVisible();
   await page.locator('.long-absent-panel summary').click();
 }
