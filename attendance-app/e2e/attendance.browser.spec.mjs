@@ -4,10 +4,9 @@ const database = `http://127.0.0.1:19017/.json?ns=${namespace}`;
 const authUrl = 'http://127.0.0.1:19099/identitytoolkit.googleapis.com/v1';
 const password = 'synthetic-password-123';
 const email = 'teacher@example.test';
+const legacyTime = new Date('2026-09-13T12:00:00+09:00');
 function week() {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  now.setDate(now.getDate() - now.getDay());
-  return { year: now.getFullYear(), key: `${now.getMonth()}-${Math.floor((now.getDate() - 1) / 7)}` };
+  return { year: 2026, key: '8-1' };
 }
 async function seed(request) {
   if (process.env.ATTENDANCE_BROWSER_CONTRACTS !== '1' || process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('격리 에뮬레이터 실행이 필요합니다.');
@@ -32,7 +31,10 @@ async function stored(request) {
   const result = await request.get(`http://127.0.0.1:19017/attendance/${year}/1-1-1/s/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } });
   return result.json();
 }
-test.beforeEach(async ({ request }) => seed(request));
+test.beforeEach(async ({ request, page }) => {
+  await seed(request);
+  await page.clock.setFixedTime(legacyTime);
+});
 test('실제 로그인·역할 조회·출석 저장·재접속', async ({ page, request }) => {
   await login(page);
   await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();

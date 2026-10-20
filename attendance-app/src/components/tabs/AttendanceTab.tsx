@@ -7,6 +7,7 @@ import { attendanceExport } from '@/utils/attendanceExport';
 import { activeAndLongAbsentStudents } from '@/utils/attendanceWorkflow';
 import { buildAttendanceEntry } from '@/utils/attendanceEntry';
 import { ATTENDANCE_OPTIONS } from '@/utils/attendanceValue';
+import { attendanceCheckFor, usesOneTap } from '@/utils/attendanceChecks';
 import { useSuggestions } from '@/hooks/useSuggestions';
 import { useVisitRequests } from '@/hooks/useVisitRequests';
 import { useAttendanceSave } from '@/hooks/useAttendanceSave';
@@ -16,6 +17,7 @@ import AdminIcon from '@/components/admin/AdminIcon';
 import AttModal from '@/components/modals/AttModal';
 import HistoryModal from '@/components/modals/HistoryModal';
 import LongAbsentReturnDialog, { type LongAbsentReturnTarget } from '@/components/modals/LongAbsentReturnDialog';
+import ManagementDialog from '@/components/modals/ManagementDialog';
 import type { AttEditTarget, AttValue, ViewKey } from '@/types';
 import './teacher-ux.css';
 
@@ -41,6 +43,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
   const isTeacher = state.userRole?.role === 'teacher';
   const [returnTarget, setReturnTarget] = useState<LongAbsentReturnTarget | null>(null);
   const [attSubView, setAttSubView] = useState<AttendanceSubView>(initialSubview);
+  const [noneConfirm, setNoneConfirm] = useState<{ year: number; ck: string; k: string; revision: number } | null>(null);
 
   const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestSaveError, suggestRetrying, suggestReceipt, handleSuggestSubmit } =
     useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
@@ -86,8 +89,10 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
     [curYear, months, events, state.userRole, requestedWeekKey, pickedWeekKey],
   );
   const selectedWeekKey = selectedWeek?.key ?? null;
+  const oneTap = !!selectedWeekKey && usesOneTap(curYear, months, selectedWeekKey);
+  const attendanceCheck = selectedWeekKey ? attendanceCheckFor(state, ck, selectedWeekKey) : undefined;
 
-  const { feedback: saveFeedback, save: saveAttendance, dismissSaved: dismissSavedFeedback, pending: attendanceSaving } = useAttendanceSave();
+  const { feedback: saveFeedback, save: saveAttendance, saveNone, dismissSaved: dismissSavedFeedback, pending: attendanceSaving } = useAttendanceSave();
 
   const displayStudents = sortByName
     ? [...activeStudents].sort((a, b) => a.name.localeCompare(b.name, 'ko'))
@@ -141,13 +146,17 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
   }, [displayStudents, selectedWeekKey, attData, ck]);
 
   function onCellClick(sid: string, k: string) {
+    if (usesOneTap(curYear, months, k)) {
+      void saveAttendance({ ck, sid, k }, attData[ck]?.[sid]?.[k] === 'O' ? 'X' : 'O');
+      return;
+    }
     dispatch({ type: 'OPEN_ATT_MODAL', payload: { ck, sid, k } });
   }
 
   async function handleQuickCheck(sid: string, val: Exclude<AttValue, ''>) {
     if (!selectedWeekKey) return;
     const current = attData[ck]?.[sid]?.[selectedWeekKey] ?? '';
-    const newVal = current === val ? '' : val;
+    const newVal = oneTap ? current === 'O' ? 'X' : 'O' : current === val ? '' : val;
     await saveAttendance({ ck, sid, k: selectedWeekKey }, newVal);
   }
 
@@ -314,6 +323,17 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               : '선택한 연도의 모든 정상 주일을 수정할 수 있습니다.'}</span>
           </div>
 
+          {selectedWeekKey && <div className="attendance-check-guide">
+            <p>{oneTap
+              ? '출석한 학생만 한 번 눌러 주세요. 즉시 저장되며, 체크를 시작한 반의 미체크 학생은 결석으로 집계됩니다.'
+              : '이 날짜는 이전 입력 방식입니다. 출석·결석을 각각 선택하며, 미입력은 결석으로 계산하지 않습니다.'}</p>
+            {oneTap && <p className="attendance-check-state" role="status">
+              <strong>{attendanceCheck ? attendanceCheck.allAbsent && selectedWeekStats.O === 0 ? '출석 0명 확인' : '입력 있음' : checkedCount ? '기존 입력 있음' : '미시작'}</strong>
+              {attendanceCheck && <span>마지막 저장 {new Date(attendanceCheck.updatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' })}</span>}
+              {!attendanceCheck && !checkedCount && <span>화면을 여는 것만으로 결석 처리되지 않습니다.</span>}
+            </p>}
+          </div>}
+
           {/* 이번 주 입력 요약 */}
           {selectedWeekKey && activeStudents.length > 0 && (
             <dl className="week-summary-row" aria-label={`${selectedWeek?.label ?? ''} 출석 입력 현황`}>
@@ -321,13 +341,13 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
                 <dt className="week-summary-label">출석</dt>
                 <dd className="week-summary-count">{selectedWeekStats.O}<span>명</span></dd>
               </div>
-              <div className="week-summary-card red">
-                <dt className="week-summary-label">결석</dt>
-                <dd className="week-summary-count">{selectedWeekStats.X}<span>명</span></dd>
+              <div className={`week-summary-card ${oneTap ? 'gray' : 'red'}`}>
+                <dt className="week-summary-label">{oneTap ? '미체크' : '결석'}</dt>
+                <dd className="week-summary-count">{oneTap ? selectedWeekStats.X + selectedWeekStats.empty : selectedWeekStats.X}<span>명</span></dd>
               </div>
               <div className="week-summary-card gray">
-                <dt className="week-summary-label">미입력</dt>
-                <dd className="week-summary-count">{selectedWeekStats.empty}<span>명</span></dd>
+                <dt className="week-summary-label">{oneTap ? '결석 집계' : '미입력'}</dt>
+                <dd className="week-summary-count">{oneTap && !attendanceCheck && !checkedCount ? '—' : oneTap ? selectedWeekStats.X : selectedWeekStats.empty}<span>명</span></dd>
               </div>
             </dl>
           )}
@@ -338,7 +358,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               {selectedWeekKey ? (
                 <>
                   <span className="check-week-label">학생 명단</span>
-                  <span className="check-progress"><strong>{checkedCount}</strong> / {displayStudents.length}명 입력</span>
+                  <span className="check-progress"><strong>{oneTap ? selectedWeekStats.O : checkedCount}</strong> / {displayStudents.length}명 {oneTap ? '출석 체크' : '입력'}</span>
                 </>
               ) : (
                 <span className="check-week-label" style={{ color: 'var(--text3)' }}>
@@ -354,7 +374,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               <div className="check-list">
                 {displayStudents.map(student => {
                   const val = selectedWeekKey ? (attData[ck]?.[student.id]?.[selectedWeekKey] ?? '') : '';
-                  const rowCls = val === 'O' ? ' row-o' : val === 'X' ? ' row-x' : '';
+                  const rowCls = val === 'O' ? ' row-o' : !oneTap && val === 'X' ? ' row-x' : '';
                   return (
                     <div key={student.id} className={`check-row${rowCls}`}>
                       <button
@@ -376,7 +396,12 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
                         )}
                       </button>
                       <div className="check-btns">
-                        {ATTENDANCE_OPTIONS.map(v => (
+                        {oneTap ? <button type="button" className={`check-btn one-tap${val === 'O' ? ' O active' : ''}`}
+                          aria-label={`${student.name} ${val === 'O' ? '출석 현재 선택됨, 다시 누르면 출석 취소' : '출석으로 기록'}`}
+                          aria-pressed={val === 'O'} onClick={() => void handleQuickCheck(student.id, 'O')} disabled={!selectedWeekKey || attendanceSaving}>
+                          {val === 'O' && <AdminIcon name="check" size={15} className="check-btn-selected-icon" />}
+                          {val === 'O' ? '출석' : '출석 체크'}
+                        </button> : ATTENDANCE_OPTIONS.map(v => (
                           <button
                             type="button"
                             key={v}
@@ -397,6 +422,12 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               </div>
             )}
           </div>
+
+          {oneTap && selectedWeekKey && activeStudents.length > 0 && <div className="attendance-none-action">
+            <button type="button" className="btn-secondary" disabled={attendanceSaving || selectedWeekStats.O > 0}
+              onClick={() => setNoneConfirm({ year: curYear, ck, k: selectedWeekKey, revision: state.dataRevision })}>오늘 출석 학생 없음</button>
+            <p>{selectedWeekStats.O > 0 ? '출석한 학생이 있으면 사용할 수 없습니다.' : '전원 결석인 날에만 눌러 주세요. 미시작 반과 구분됩니다.'}</p>
+          </div>}
 
         </section>
       )}
@@ -723,6 +754,14 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
       )}
 
       {returnTarget && <LongAbsentReturnDialog target={returnTarget} onClose={() => setReturnTarget(null)} />}
+
+      {noneConfirm && noneConfirm.year === curYear && noneConfirm.ck === ck && noneConfirm.k === selectedWeekKey && noneConfirm.revision === state.dataRevision && <ManagementDialog
+        title="오늘 출석 학생 없음" description={`${selectedWeek?.label ?? ''} · 출석 대상 ${activeStudents.length}명`} onClose={() => setNoneConfirm(null)}>{dismiss => <>
+          <p className="management-hint">이 반의 일반 학생 전원을 결석으로 저장합니다. 출석체크를 하지 않은 반과 구분되며, 장결자와 다른 날짜의 기록은 바꾸지 않습니다.</p>
+          <div className="btn-row"><button type="button" className="btn-primary" disabled={attendanceSaving || selectedWeekStats.O > 0} onClick={() => {
+            setNoneConfirm(null); void saveNone({ ck: noneConfirm.ck, k: noneConfirm.k });
+          }}>출석 0명으로 기록</button><button type="button" className="btn-secondary" onClick={dismiss}>취소</button></div>
+        </>}</ManagementDialog>}
 
       <AttendanceSaveBanner
         feedback={saveFeedback}

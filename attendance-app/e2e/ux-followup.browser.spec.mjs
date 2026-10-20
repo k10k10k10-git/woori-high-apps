@@ -4,7 +4,7 @@ const ns = 'demo-attendance-recovery-default-rtdb';
 const database = `http://127.0.0.1:19017/.json?ns=${ns}`;
 const owner = { Authorization: 'Bearer owner' };
 const email = 'ux-admin@example.test', password = 'synthetic-password-123';
-const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(new Date()));
+const year = 2026;
 
 async function seed(request) {
   if (process.env.ATTENDANCE_BROWSER_CONTRACTS !== '1' || process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('격리 에뮬레이터가 필요합니다.');

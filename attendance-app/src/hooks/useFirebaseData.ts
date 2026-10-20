@@ -5,6 +5,7 @@ import { useApp, type Action, type DataKey } from '@/store/AppContext';
 import { sortAndRenumber, emailToKey } from '@/utils/dates';
 import { dataLoadMessage } from '@/utils/dbError';
 import { normalizeAttendanceData } from '@/utils/attendanceValue';
+import { normalizeAttendanceChecks, attendanceChecksPath } from '@/utils/attendanceChecks';
 import type { ClassDataMap, CustomEventData, UserRole, Student } from '@/types';
 
 type FbClass = {
@@ -32,23 +33,25 @@ export function subscribeFirebaseData(
   dispatch: (action: Action) => void,
 ): () => void {
   let active = true;
+  let attendanceFailed = false;
   const unsubs: (() => void)[] = [];
   const subscribe = (
     key: DataKey,
     path: string,
     label: string,
-    onData: (value: unknown) => Action,
+    onData: (value: unknown) => Action | null,
   ) => {
     let failed = false;
     const fail = (error: unknown) => {
       if (!active || failed) return;
       failed = true;
+      if (key === 'attendance') attendanceFailed = true;
       dispatch({ type: 'SET_DATA_ERROR', revision, payload: { key, message: dataLoadMessage(label, error) } });
     };
     try {
       unsubs.push(onValue(ref(db, path), snap => {
         if (!active || failed) return;
-        try { dispatch(onData(snap.exists() ? snap.val() : null)); }
+        try { const action = onData(snap.exists() ? snap.val() : null); if (action) dispatch(action); }
         catch (error) { fail(error); }
       }, fail));
     } catch (error) { fail(error); }
@@ -64,13 +67,20 @@ export function subscribeFirebaseData(
     }
     return { type: 'SET_CLASS_DATA', revision, payload };
   });
-  subscribe('attendance', attendancePath, '출석', value => ({
+  let attendance: unknown, checks: unknown;
+  let hasAttendance = false, hasChecks = false;
+  const attendanceAction = (): Action | null => !attendanceFailed && hasAttendance && hasChecks ? {
     type: 'SET_ATT_DATA', revision,
-    payload: value ? normalizeAttendanceData(teacherCk ? { [teacherCk]: value } : value) : {},
-  }));
+    payload: attendance ? normalizeAttendanceData(teacherCk ? { [teacherCk]: attendance } : attendance) : {},
+    checks: normalizeAttendanceChecks(teacherCk ? { [teacherCk]: checks ?? {} } : checks),
+  } : null;
+  subscribe('attendance', attendancePath, '출석', value => { attendance = value; hasAttendance = true; return attendanceAction(); });
   subscribe('events', `events/${curYear}`, '이벤트', value => ({
     type: 'SET_CUSTOM_EVENTS', revision, payload: (value ?? {}) as CustomEventData,
   }));
+  subscribe('attendance', attendanceChecksPath(curYear, teacherCk ?? undefined), '반별 체크 상태', value => {
+    checks = value; hasChecks = true; return attendanceAction();
+  });
 
   return () => {
     active = false;

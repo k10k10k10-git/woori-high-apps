@@ -131,29 +131,33 @@ describe('원장 초기화와 구독 세대', () => {
     const failed = state;
     subscriptions[1].receive(snapshot({ '1-1-1': { old: { '0-0': 'O' } } }));
     expect(state).toBe(failed);
-    expect(database.onValue).toHaveBeenCalledTimes(3);
+    expect(database.onValue).toHaveBeenCalledTimes(4);
     stop();
 
     state = reducer(state, { type: 'RETRY_DATA_LOAD' });
     expect(state.dataErrors.attendance).toBeNull();
     const stopRetry = subscribeFirebaseData(state.curYear, null, state.dataRevision, action => { state = reducer(state, action); });
-    const retry = subscriptions.slice(3);
+    const retry = subscriptions.slice(4);
     retry[0].receive(snapshot(null));
     retry[1].receive(snapshot(null));
     expect(isDataReady(state)).toBe(false);
     retry[2].receive(snapshot(null));
+    expect(isDataReady(state)).toBe(false);
+    retry[3].receive(snapshot(null));
     expect(isDataReady(state)).toBe(true);
     expect(state.classData).toEqual({});
     expect(state.attData).toEqual({});
     stopRetry();
   });
 
-  it('교사 구독은 본인 반 2개와 공용 행사 경로만 사용하고 Firebase 학생 키를 보존한다', () => {
+  it('교사는 본인 반 명단·출석·체크 상태와 공용 행사만 구독하고 Firebase 학생 키를 보존한다', () => {
     let state = reducer(loadedState(), { type: 'SET_USER_ROLE', payload: { role: 'teacher', part: '2', grade: '3', class: '4' } });
     const stop = subscribeFirebaseData(2026, '2-3-4', state.dataRevision, action => { state = reducer(state, action); });
-    expect(subscriptions.map(subscription => subscription.path)).toEqual(['classes/2026/2-3-4', 'attendance/2026/2-3-4', 'events/2026']);
+    expect(subscriptions.map(subscription => subscription.path)).toEqual(['classes/2026/2-3-4', 'attendance/2026/2-3-4', 'events/2026', 'attendanceChecks/2026/2-3-4']);
     subscriptions[0].receive(snapshot({ teacher: '담임', students: { original: { name: '학생', jang: true, personId: 'person_student_fixture' } } }));
     subscriptions[1].receive(snapshot({ original: { '0-0': 'T' } }));
+    expect(state.attData).toEqual({});
+    subscriptions[3].receive(snapshot(null));
     expect(state.classData['2-3-4'].students[0]).toMatchObject({ id: 'original', name: '학생', jang: true, personId: 'person_student_fixture' });
     expect(state.attData).toEqual({ '2-3-4': { original: { '0-0': 'O' } } });
     stop();
@@ -177,8 +181,23 @@ describe('원장 초기화와 구독 세대', () => {
     const stop = subscribeFirebaseData(2025, null, state.dataRevision, action => { state = reducer(state, action); });
     expect(state.dataErrors.classes).toContain('불러오지 못했습니다');
     expect(state.classData).toEqual({});
-    expect(database.onValue).toHaveBeenCalledTimes(3);
-    expect(subscriptions.map(subscription => subscription.path)).toEqual(['attendance/2025', 'events/2025']);
+    expect(database.onValue).toHaveBeenCalledTimes(4);
+    expect(subscriptions.map(subscription => subscription.path)).toEqual(['attendance/2025', 'events/2025', 'attendanceChecks/2025']);
+    stop();
+  });
+
+  it('체크 상태 조회 실패는 출석 준비를 막고 다른 스트림 갱신으로 오류를 숨기지 않는다', () => {
+    let state = loadedState();
+    const stop = subscribeFirebaseData(2025, null, state.dataRevision, action => { state = reducer(state, action); });
+    subscriptions[1].receive(snapshot({ '1-1-1': { old: { '0-0': 'O' } } }));
+    subscriptions[3].receive(snapshot(null));
+    subscriptions[3].fail({ code: 'PERMISSION_DENIED' });
+    expect(state.attData).toEqual({});
+    expect(state.attendanceChecks).toEqual({});
+    expect(state.dataErrors.attendance).toContain('반별 체크 상태');
+    const failed = state;
+    subscriptions[1].receive(snapshot({ '1-1-1': { old: { '0-0': 'X' } } }));
+    expect(state).toBe(failed);
     stop();
   });
 });

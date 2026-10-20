@@ -6,6 +6,9 @@ vi.mock('@/lib/firebase/client', () => ({ get db() { return holder.database; } }
 import { archiveRoster } from '@/lib/rosterRecovery';
 import { runTransaction } from '@/lib/db';
 import { restoreMissingClass, restoreMissingStudent } from '@/utils/studentPersistence';
+import { buildAttendanceCheckPatch } from '@/lib/attendanceCheckSave';
+import type { AttendanceCheck } from '@/utils/attendanceChecks';
+import type { AttValue } from '@/types';
 const suite = process.env.ATTENDANCE_CONTRACTS === '1' ? describe : describe.skip;
 const base = 'http://127.0.0.1:19017';
 const ns = 'demo-attendance-recovery-default-rtdb';
@@ -70,6 +73,154 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     expect(response.ok).toBe(true);
   });
   afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; });
+  const checkPath = 'attendanceChecks/2026/1-1-1/9-3';
+  const attendancePath = 'attendance/2026/1-1-1';
+  async function checkPatch(uid = 'teacher', sid = 's', expected: AttValue = '', value: AttValue = 'O', none = false) {
+    const current = (await get(ref(admin, 'classes/2026/1-1-1'))).val();
+    return buildAttendanceCheckPatch({ year: 2026, target: { ck: '1-1-1', sid, k: '9-3' }, expected, value,
+      student: current?.students?.[sid] ? { ...current.students[sid], id: sid } : undefined, none }, current,
+      (await get(ref(admin, attendancePath))).val(), (await get(ref(admin, checkPath))).val() as AttendanceCheck | null,
+      uid, crypto.randomUUID(), Date.UTC(2026, 10, 1))!;
+  }
+  async function rawSnapshot() { return (await fetch(`${base}/.json?ns=${ns}`, { headers: { Authorization: 'Bearer owner' } })).json(); }
+  async function addCheckStudents() {
+    await set(ref(admin, 'classes/2026/1-1-1/students/other'), { id: 'other', name: '합성 다른 학생' });
+    await set(ref(admin, 'classes/2026/1-1-1/students/long'), { id: 'long', name: '합성 장결', jang: true });
+  }
+  it('서버의 주일 키 검사는 한·두 자리 월을 허용하고 잘못된 월·주차 키는 원자 거절한다', async () => {
+    const original = await checkPatch();
+    const forKey = (key: string) => Object.fromEntries(Object.entries(original).map(([path, value]) => [path.replaceAll('/9-3', `/${key}`), value]));
+    for (const key of ['9-3', '10-0']) {
+      await update(ref(teacher), forKey(key));
+      expect((await get(ref(admin, `attendanceChecks/2026/1-1-1/${key}`))).val()).toMatchObject({ revision: 1, targetSid: 's' });
+      expect((await get(ref(admin, `${attendancePath}/s/${key}`))).val()).toBe('O');
+    }
+    for (const key of ['12-0', '01-0', '9-5', '9x-3']) {
+      const before = await rawSnapshot();
+      await expect(update(ref(teacher), forKey(key))).rejects.toThrow();
+      expect(await rawSnapshot()).toEqual(before);
+    }
+  });
+  it('새 출석 체크는 본인 반 O·다른 일반 학생 빈칸 X·시작 상태를 원자 저장하며 명단·옛 출석을 보존한다', async () => {
+    await addCheckStudents(); const before = await rawSnapshot();
+    await update(ref(teacher), await checkPatch());
+    const after = await rawSnapshot();
+    expect(after.classes).toEqual(before.classes);
+    expect(after.attendance[2026]['1-1-1']).toEqual({ s: { '0906': 'O', '9-3': 'O' }, other: { '9-3': 'X' } });
+    const record = (await get(ref(admin, checkPath))).val();
+    expect(record).toMatchObject({ revision: 1, updatedBy: 'teacher', allAbsent: false, roster: { s: 'person-s', other: 'legacy:합성 다른 학생|' }, targetSid: 's', targetToken: 'person-s', expected: '', value: 'O' });
+    expect(record.startedAt).toBe(record.updatedAt); expect(record.updatedAt).toBeGreaterThan(0);
+    expect((await get(ref(teacher, checkPath))).val()).toEqual(record);
+    const startedAt = record.startedAt;
+    await update(ref(second), await checkPatch('admin2', 'other', 'X', 'O'));
+    expect((await get(ref(teacher, checkPath))).val()).toMatchObject({ revision: 2, startedAt, updatedBy: 'admin2', roster: record.roster });
+    expect((await get(ref(teacher, `${attendancePath}/s/9-3`))).val()).toBe('O');
+  });
+  it('새 체크 상태의 미인증·미등록·타반·위조 이메일·레거시 teacherClasses·통합 앱 조회는 거절한다', async () => {
+    const patch = await checkPatch('stranger');
+    const anonymous = await fetch(`${base}/${checkPath}.json?ns=${ns}`);
+    expect([401, 403]).toContain(anonymous.status);
+    for (const database of [stranger, retreatAdmin, iguardCentral]) await expect(get(ref(database, checkPath))).rejects.toThrow();
+    await expect(update(ref(stranger), patch)).rejects.toThrow();
+    await expect(get(ref(teacher, 'attendanceChecks/2026/2-1-1'))).rejects.toThrow();
+    const otherClass = Object.fromEntries(Object.entries(await checkPatch()).map(([key, value]) => [key.replaceAll('1-1-1', '2-1-1'), value]));
+    await expect(update(ref(teacher), otherClass)).rejects.toThrow();
+    await set(ref(admin, 'teacherClasses/stranger'), '1-1-1');
+    await expect(update(ref(stranger), patch)).rejects.toThrow();
+    await set(ref(admin, 'userRoles/stranger__at__example__dot__test'), { email: 'different@example.test', role: 'teacher', part: '1', grade: '1', class: '1' });
+    await expect(update(ref(stranger), patch)).rejects.toThrow();
+    await expect(update(ref(teacher), { ...await checkPatch(), 'classes/2026/1-1-1/students/s/addr': '변경 금지' })).rejects.toThrow();
+    expect((await get(ref(admin, checkPath))).exists()).toBe(false);
+  });
+  it('같은 체크 revision으로 경합하면 한 번만 반영하고 다른 학생의 최신 출석을 덮지 않는다', async () => {
+    await addCheckStudents();
+    const first = await checkPatch(), stale = await checkPatch('admin2', 'other');
+    await update(ref(teacher), first);
+    await expect(update(ref(second), stale)).rejects.toThrow();
+    expect((await get(ref(admin, checkPath))).val()).toMatchObject({ revision: 1, targetSid: 's' });
+    expect((await get(ref(admin, `${attendancePath}/other/9-3`))).val()).toBe('X');
+    const next = await checkPatch('admin2', 'other', 'X', 'O');
+    await expect(update(ref(second), { ...next, [`${checkPath}/revision`]: 1 })).rejects.toThrow();
+    await update(ref(second), next);
+    expect((await get(ref(admin, checkPath))).val()).toMatchObject({ revision: 2, targetSid: 'other' });
+  });
+  it('빈칸을 읽은 뒤 다른 학생이 O로 바뀌면 자동 X와 체크 상태도 함께 거절한다', async () => {
+    await addCheckStudents(); const stale = await checkPatch();
+    await set(ref(second, `${attendancePath}/other/9-3`), 'O'); const before = await rawSnapshot();
+    await expect(update(ref(teacher), stale)).rejects.toThrow(); expect(await rawSnapshot()).toEqual(before);
+    expect((await get(ref(admin, checkPath))).exists()).toBe(false);
+  });
+  it.each([false, true])('기존 체크가 있어도 대상 SID의 인물이 GET 뒤 교체되면 O/X가 같아도 거절한다(새 전입=%s)', async newlyArrived => {
+    await update(ref(teacher), await checkPatch('teacher', 's', '', '', true));
+    const sid = newlyArrived ? 'new' : 's';
+    if (newlyArrived) await set(ref(admin, 'classes/2026/1-1-1/students/new'), { id: 'new', personId: 'person-new', name: '합성 전입' });
+    const patch = await checkPatch('teacher', sid, newlyArrived ? '' : 'X', 'O');
+    expect(patch[`${checkPath}/targetToken`]).toBe(newlyArrived ? 'person-new' : 'person-s');
+    await set(ref(admin, `classes/2026/1-1-1/students/${sid}/personId`), '다른 인물로 교체');
+    const before = await rawSnapshot();
+    await expect(update(ref(teacher), patch)).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+    expect((await get(ref(admin, checkPath))).val()).toMatchObject({ revision: 1, allAbsent: true });
+  });
+  it('전체 결석 확인도 실제 O를 지우지 않고 기존 빈칸만 X로 기록한다', async () => {
+    await addCheckStudents(); await update(ref(teacher), await checkPatch('teacher', 's', '', '', true));
+    expect((await get(ref(admin, checkPath))).val()).toMatchObject({ allAbsent: true, targetSid: '', targetToken: '', expected: '', value: '' });
+    expect((await get(ref(admin, `${attendancePath}/s/9-3`))).val()).toBe('X');
+    expect((await get(ref(admin, `${attendancePath}/other/9-3`))).val()).toBe('X');
+  });
+  it('전체 결석 명시 확인은 첫 스냅샷 뒤 새로 온 일반 학생도 확인하되 스냅샷은 유지한다', async () => {
+    await update(ref(teacher), await checkPatch('teacher', 's', '', '', true));
+    const original = (await get(ref(admin, checkPath))).val();
+    await set(ref(admin, 'classes/2026/1-1-1/students/new'), { id: 'new', name: '합성 전입' });
+    await update(ref(teacher), await checkPatch('teacher', 's', 'X', '', true));
+    expect((await get(ref(admin, `${attendancePath}/new/9-3`))).val()).toBe('X');
+    expect((await get(ref(admin, checkPath))).val()).toMatchObject({ revision: 2, allAbsent: true, roster: original.roster });
+  });
+  it('이전 T 출석 사전값을 O로 확인하며 새 체크와 무관한 기존 셀 편집도 유지한다', async () => {
+    await set(ref(admin, `${attendancePath}/s/9-3`), 'T');
+    await update(ref(teacher), await checkPatch('teacher', 's', 'O', 'X'));
+    expect((await get(ref(admin, checkPath))).val()).toMatchObject({ expected: 'O', value: 'X' });
+    await set(ref(teacher, `${attendancePath}/s/9-3`), 'O');
+    await set(ref(teacher, `${attendancePath}/s/0906`), 'X');
+    expect((await get(ref(admin, `${attendancePath}/s`))).val()).toEqual({ '9-3': 'O', '0906': 'X' });
+  });
+  it('스냅샷 학생이 이동·삭제·장결 전환되거나 반 이동 잠금이 생기면 체크 요청 전체를 거절한다', async () => {
+    const patch = await checkPatch();
+    await set(ref(admin, 'classes/2026/1-1-1/students/s/jang'), true); let before = await rawSnapshot();
+    await expect(update(ref(teacher), patch)).rejects.toThrow(); expect(await rawSnapshot()).toEqual(before);
+    await set(ref(admin, 'classes/2026/1-1-1/students/s'), null); before = await rawSnapshot();
+    await expect(update(ref(teacher), patch)).rejects.toThrow(); expect(await rawSnapshot()).toEqual(before);
+    await set(ref(admin, 'classes/2026/1-1-1/students/s'), student);
+    await set(ref(admin, 'config/studentMoveLocks/2026/1-1-1/admin/check-lock'), { phase: 'preparing', startedAt: Date.now(), fromCk: '1-1-1', toCk: '1-1-2', sid: 's' });
+    before = await rawSnapshot();
+    for (const database of [teacher, admin]) await expect(update(ref(database), patch)).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+  });
+  it('체크 상태는 필수 필드·서버 시각·UID·정수 revision·새 operationId·동일 학생 사전값을 검증한다', async () => {
+    const patch = await checkPatch(); const before = await rawSnapshot();
+    for (const [field, value] of [['revision', 2], ['revision', 1.5], ['updatedBy', 'admin'], ['updatedAt', 1], ['startedAt', 1], ['operationId', ''], ['targetToken', '다른 인물'], ['expected', 'O'], ['value', '임의 값'], ['allAbsent', 'true'], ['unknown', '금지']] as const) {
+      await expect(update(ref(teacher), { ...patch, [`${checkPath}/${field}`]: value })).rejects.toThrow();
+      expect(await rawSnapshot()).toEqual(before);
+    }
+    const missing = { ...patch }; delete missing[`${checkPath}/startedAt`];
+    await expect(update(ref(teacher), missing)).rejects.toThrow();
+    for (const [id, token] of [['s', '다른 인물'], ['missing', 'missing']]) {
+      await expect(update(ref(teacher), { ...patch, [`${checkPath}/roster/${id}`]: token })).rejects.toThrow();
+    }
+    expect(await rawSnapshot()).toEqual(before);
+  });
+  it('최초 반 학생 스냅샷은 이후 추가·교체·삭제·부모 덮어쓰기를 허용하지 않는다', async () => {
+    await update(ref(teacher), await checkPatch());
+    const before = await rawSnapshot();
+    await expect(set(ref(teacher, checkPath), { ...(await get(ref(admin, checkPath))).val(), revision: 2 })).rejects.toThrow();
+    await expect(set(ref(teacher, checkPath), null)).rejects.toThrow();
+    await expect(set(ref(admin, checkPath), null)).rejects.toThrow();
+    await expect(set(ref(teacher, `${checkPath}/updatedBy`), null)).rejects.toThrow();
+    for (const value of [null, '다른 인물']) await expect(set(ref(teacher, `${checkPath}/roster/s`), value)).rejects.toThrow();
+    await expect(set(ref(teacher, `${checkPath}/roster/new`), 'new')).rejects.toThrow();
+    await expect(set(ref(teacher, `${checkPath}/roster`), { s: 'person-s' })).rejects.toThrow();
+    expect(await rawSnapshot()).toEqual(before);
+  });
   it('개인 출석부 관리자는 세 작업공간의 비고 leaf만 읽고 수정하며 다른 필드는 보존한다', async () => {
     for (const workspace of ['2026-1', '2026-2', '2026-sunday']) {
       const path = `semestersPrivate/${workspace}/newFriendsPrivate/f/teamMemo`;

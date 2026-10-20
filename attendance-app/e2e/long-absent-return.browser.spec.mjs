@@ -33,6 +33,12 @@ async function login(page, email) {
   await page.locator('.long-absent-panel summary').click();
 }
 async function openReturn(page) { await page.getByRole('button', { name: '합성 복귀 학생 일반 명단 복귀' }).click(); return page.getByRole('dialog', { name: '일반 명단 복귀' }); }
+async function openDesignation(page) {
+  await page.goto('/manage?view=directory');
+  await page.getByRole('button', { name: '합성 일반 학생', exact: true }).click();
+  await page.locator('.sd-detail').getByRole('button', { name: '장결자로 지정', exact: true }).click();
+  return page.getByRole('dialog', { name: '장결자로 지정', exact: true });
+}
 async function snapshot(request) { return (await request.get(root, { headers: owner })).json(); }
 test('관리자 복귀·취소·재접속은 기존 학생과 출석을 보존한다', async ({ page, request }, testInfo) => {
   const { email } = await seed(request); const before = await snapshot(request);
@@ -85,11 +91,66 @@ test('전체 명단의 학생 상세에서도 일반 명단으로 복귀할 수 
   await expect(page.locator('.sd-detail').getByText('일반 학생', { exact: true })).toBeVisible();
   expect((await (await request.get(classUrl, { headers: owner })).json()).students.long.jang).toBe(false);
 });
+test('일반 학생 장결 지정·취소·재접속·복귀는 같은 학생 정보와 전체 출석을 보존한다', async ({ page, request }, testInfo) => {
+  const { email } = await seed(request); const before = await snapshot(request);
+  await login(page, email); let dialog = await openDesignation(page);
+  await expect(dialog).toContainText('기존 출석 이력');
+  await page.screenshot({ path: testInfo.outputPath('long-absent-designation.png') });
+  await dialog.getByRole('button', { name: '취소', exact: true }).click();
+  expect(await snapshot(request)).toEqual(before);
+  await page.locator('.sd-detail').getByRole('button', { name: '장결자로 지정', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: '장결자로 지정', exact: true });
+  await dialog.getByRole('button', { name: '장결자로 지정', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.sd-detail').getByText('장결 학생', { exact: true })).toBeVisible();
+  const designated = await snapshot(request); const info = designated.classes[year]['1-1-1'];
+  expect(info.students.active).toEqual({ ...before.classes[year]['1-1-1'].students.active, jang: true });
+  const changes = Object.entries(info.adminChanges).filter(([key]) => key !== 'old');
+  expect(changes).toHaveLength(1);
+  expect(changes[0][1]).toMatchObject({ studentId: 'active', personId: 'person-active', changeSummary: '일반 학생 → 장결자로 지정 · 기존 출석 이력 유지' });
+  delete info.adminChanges[changes[0][0]]; delete info.students.active.jang;
+  expect(designated).toEqual(before);
+  await page.reload();
+  await page.getByRole('button', { name: /^합성 일반 학생\s*장결$/ }).click();
+  await page.locator('.sd-detail').getByRole('button', { name: '일반 명단 복귀', exact: true }).click();
+  dialog = page.getByRole('dialog', { name: '일반 명단 복귀', exact: true });
+  await dialog.getByRole('button', { name: '일반 명단으로 복귀', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.sd-detail').getByText('일반 학생', { exact: true })).toBeVisible();
+  const returned = await snapshot(request);
+  expect(returned.classes[year]['1-1-1'].students.active).toEqual({ ...before.classes[year]['1-1-1'].students.active, jang: false });
+  expect(returned.attendance).toEqual(before.attendance);
+  expect(Object.keys(returned.classes[year]['1-1-1'].adminChanges)).toHaveLength(3);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+test('장결 지정 직전 다른 작업이 반을 바꾸면 최신 변경을 덮지 않는다', async ({ page, request }) => {
+  const { email } = await seed(request); await login(page, email); const dialog = await openDesignation(page);
+  await page.route(`**/classes/${year}/1-1-1.json?**`, async route => {
+    if (route.request().method() !== 'PUT') return route.continue();
+    expect((await request.patch(classUrl, { headers: owner, data: { extra: '장결 지정 중 원격 변경' } })).ok()).toBe(true);
+    await route.continue();
+  });
+  await dialog.getByRole('button', { name: '장결자로 지정', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('다른 작업');
+  const current = await (await request.get(classUrl, { headers: owner })).json();
+  expect(current.extra).toBe('장결 지정 중 원격 변경');
+  expect(current.students.active.jang).toBeUndefined(); expect(Object.keys(current.adminChanges)).toEqual(['old']);
+});
+test('장결 지정 창을 연 뒤 사라진 학생을 다시 만들지 않는다', async ({ page, request }) => {
+  const { email } = await seed(request); await login(page, email); const dialog = await openDesignation(page);
+  await request.delete(`http://127.0.0.1:19017/classes/${year}/1-1-1/students/active.json?ns=${ns}`, { headers: owner });
+  const before = await snapshot(request);
+  await dialog.getByRole('button', { name: '장결자로 지정', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('삭제·이동'); expect(await snapshot(request)).toEqual(before);
+});
 test('교사에게 복귀 동작을 노출하지 않고 Rules도 명단 변경을 거절한다', async ({ page, request }) => {
   const { email, idToken } = await seed(request, true); await login(page, email);
   await expect(page.getByRole('button', { name: '합성 복귀 학생 일반 명단 복귀' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /합성 복귀 학생 출석 이력 보기/ })).toBeVisible();
   const before = await snapshot(request);
-  const denied = await request.put(`http://127.0.0.1:19017/classes/${year}/1-1-1/students/long/jang.json?ns=${ns}&auth=${idToken}`, { data: false });
-  expect([401, 403]).toContain(denied.status()); expect(await snapshot(request)).toEqual(before);
+  for (const [id, jang] of [['long', false], ['active', true]]) {
+    const denied = await request.put(`http://127.0.0.1:19017/classes/${year}/1-1-1/students/${id}/jang.json?ns=${ns}&auth=${idToken}`, { data: jang });
+    expect([401, 403]).toContain(denied.status());
+  }
+  expect(await snapshot(request)).toEqual(before);
 });

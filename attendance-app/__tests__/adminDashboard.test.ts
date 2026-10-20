@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildAdminDashboard, type AdminDashboardSource } from '@/utils/adminDashboard';
 import { getSundaysForYear } from '@/utils/dates';
+import type { AttendanceCheck } from '@/utils/attendanceChecks';
 
 const nowMs = Date.parse('2026-09-05T03:00:00.000Z');
 
@@ -84,6 +85,46 @@ describe('관리자 주간 현황의 조회 주일', () => {
     const result = buildAdminDashboard(source({ months: [] }), { nowMs });
     expect(result.selectedWeek).toBeNull();
     expect(result.summary).toMatchObject({ classCount: 0, attendanceRate: null, inputRate: null });
+  });
+});
+
+describe('한 번 누르는 출석 체크의 반별 상태', () => {
+  const check = (allAbsent = false): AttendanceCheck => ({ revision: 1, startedAt: 100, updatedAt: 200, updatedBy: '교사', operationId: 'check-1',
+    allAbsent, targetSid: 'a', targetToken: '학생A', expected: '', value: 'O', roster: { a: '학생A', b: '학생B' } });
+  const students = [{ id: 'a', name: '학생A' }, { id: 'b', name: '학생B' }];
+  const now = Date.parse('2026-10-26T00:00:00+09:00');
+
+  it('미시작·입력 있음·일반 학생 출석 0명 확인과 기존 입력을 구분하며 완료로 오해시키지 않는다', () => {
+    const result = buildAdminDashboard(source({ months: [{ month: 10, sundays: [25] }],
+      classData: { '1-1-1': { students }, '1-1-2': { students: [...students, { id: 'long', name: '장결', jang: true }] }, '1-1-3': { students }, '1-1-4': { students } },
+      attData: { '1-1-1': { a: { '0-0': 'O' }, b: { '0-0': 'X' } }, '1-1-2': { a: { '0-0': 'X' }, b: { '0-0': 'X' }, long: { '0-0': 'O' } },
+        '1-1-4': { a: { '0-0': 'O' }, b: { '0-0': 'X' } } },
+      attendanceChecks: { '1-1-1': { '0-0': check() }, '1-1-2': { '0-0': check(true) } },
+    }), { nowMs: now });
+    expect(result.oneTap).toBe(true);
+    expect(result.rows.map(row => row.status)).toEqual(['started', 'all-absent', 'empty', 'complete']);
+    expect(result.rows[0]).toMatchObject({ inputPresent: 1, inputRecorded: 2, lastSavedAt: 200 });
+    expect(result.rows[1]).toMatchObject({ inputPresent: 0, present: 1, status: 'all-absent' });
+    expect(result.rows[2]).toMatchObject({ present: 0, absent: 0, recorded: 0, attendanceRate: null, lastSavedAt: null });
+    expect(result.summary).toMatchObject({ startedClassCount: 1, allAbsentClassCount: 1, completeClassCount: 1, emptyClassCount: 1, pendingClassCount: 1, recorded: 7 });
+  });
+
+  it('체크 이후 새로 추가된 학생의 빈칸은 소급 결석으로 만들지 않고 확인 대상으로 남긴다', () => {
+    const result = buildAdminDashboard(source({ months: [{ month: 10, sundays: [25] }],
+      classData: { '1-1-1': { students } }, attData: { '1-1-1': { a: { '0-0': 'O' } } }, attendanceChecks: { '1-1-1': { '0-0': check() } },
+    }), { nowMs: now });
+    expect(result.rows[0]).toMatchObject({ status: 'started', present: 1, absent: 0, unentered: 1, inputRecorded: 1 });
+    expect(result.summary.pendingClassCount).toBe(1);
+  });
+
+  it('전원 결석 확인 뒤 일반 학생의 O가 있으면 입력 있음이며 이전 날짜는 기존 상태로 계산한다', () => {
+    const data = source({ months: [{ month: 10, sundays: [18, 25] }], classData: { '1-1-1': { students } },
+      attData: { '1-1-1': { a: { '0-0': 'O', '0-1': 'O' }, b: { '0-0': 'X', '0-1': 'X' } } },
+      attendanceChecks: { '1-1-1': { '0-0': check(true), '0-1': check(true) } },
+    });
+    expect(buildAdminDashboard(data, { nowMs: now }).rows[0].status).toBe('started');
+    const before = buildAdminDashboard(data, { nowMs: now, weekKey: '0-0' });
+    expect(before.oneTap).toBe(false); expect(before.rows[0]).toMatchObject({ status: 'complete', lastSavedAt: null });
   });
 });
 

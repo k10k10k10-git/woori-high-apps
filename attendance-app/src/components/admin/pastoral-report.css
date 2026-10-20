@@ -21,7 +21,6 @@
 .pr-subsections button{min-height:44px;padding:8px 15px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text2);font:inherit;cursor:pointer}
 .pr-subsections button[aria-pressed=true]{background:var(--primary-bg);color:var(--primary-text);border-color:var(--primary-light);font-weight:600}
 .pr-subsections button:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
-.pastoral-report .ao-sections .pr-secondary-link{margin-left:auto}
 .pr-registration-table .pr-remark-cell { min-width: 210px; max-width: 300px; white-space: normal; }
 .pr-remark-preview p { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 .pr-remark-preview button, .pr-remark-editor button { min-height: 44px; padding: 8px 14px; border: 1px solid #dedce8; border-radius: 12px; background: #fff; color: #6355a7; font: inherit; cursor: pointer; }

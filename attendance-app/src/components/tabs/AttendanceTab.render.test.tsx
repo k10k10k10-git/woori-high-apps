@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   ref: vi.fn((_db: unknown, path: string) => ({ path })),
   set: vi.fn(),
+  saveCheck: vi.fn(),
+  oneTap: false,
   push: vi.fn(),
   onValue: vi.fn(),
   state: { current: null as unknown },
@@ -18,6 +20,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/lib/attendanceSave', () => ({ saveAttendanceCell: mocks.set, AttendanceSaveError: class extends Error {} }));
+vi.mock('@/lib/attendanceCheckSave', () => ({ saveAttendanceCheck: mocks.saveCheck }));
 vi.mock('@/lib/longAbsentReturn', () => ({ returnLongAbsentStudent: vi.fn() }));
 vi.mock('@/lib/teacherMessageSave', () => ({ TeacherMessageSaveError: class extends Error {}, saveTeacherMessage: (year: number, ck: string, _id: string, payload: unknown) => mocks.push({ path: `suggestions/${year}/${ck}` }, payload) }));
 
@@ -41,7 +44,7 @@ vi.mock('@/store/AppContext', async importOriginal => {
 
 vi.mock('@/utils/attendanceEntry', () => ({
   buildAttendanceEntry: ({ userRole }: { userRole?: { role?: string } }, { pickedWeekKey }: { pickedWeekKey?: string }) => {
-    const currentWeek = { key: '8-0', label: '9월 6일' };
+    const currentWeek = mocks.oneTap ? { key: '0-0', label: '10월 25일' } : { key: '8-0', label: '9월 6일' };
     return {
       editableWeeks: userRole?.role === 'admin'
         ? [{ key: '7-0', label: '8월 30일' }, currentWeek]
@@ -128,6 +131,8 @@ describe('AttendanceTab 교사 출석 입력', () => {
   beforeEach(() => {
     mocks.state.current = teacherState();
     mocks.stats = null;
+    mocks.oneTap = false;
+    mocks.saveCheck.mockReset(); mocks.saveCheck.mockResolvedValue(undefined);
     mocks.dispatch.mockReset();
     mocks.ref.mockClear();
     mocks.set.mockReset();
@@ -192,6 +197,55 @@ describe('AttendanceTab 교사 출석 입력', () => {
         expect.any(Function),
       );
     });
+  });
+
+  it('새 주일은 처음에 미시작·중립 버튼이고 한 번 누르면 출석을 즉시 저장한다', async () => {
+    mocks.oneTap = true;
+    mocks.state.current = { ...teacherState(), months: [{ month: 10, sundays: [25] }], attData: {} };
+    const { container } = render(<AttendanceTab />);
+    expect(screen.getByText('미시작')).toBeTruthy();
+    expect(container.querySelector('.week-summary-card.red')).toBeNull();
+    expect(container.querySelector('.row-x')).toBeNull();
+    expect(screen.queryByRole('button', { name: /홍길동 결석/ })).toBeNull();
+    const button = screen.getByRole('button', { name: '홍길동 출석으로 기록' });
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(button);
+    await waitFor(() => expect(mocks.saveCheck).toHaveBeenCalledWith(expect.objectContaining({
+      year: 2026, target: { ck: '1-1-1', sid: 'student-1', k: '0-0' }, expected: '', value: 'O', none: false,
+    }), expect.any(Function)));
+    expect(mocks.set).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /^완료$/ })).toBeNull();
+  });
+
+  it('새 주일의 X는 미체크 중립으로 표시하고 출석 취소도 X로 저장한다', async () => {
+    mocks.oneTap = true;
+    const source = { ...teacherState(), months: [{ month: 10, sundays: [25] }], attData: { '1-1-1': { 'student-1': { '0-0': 'X' as const } } } };
+    mocks.state.current = source;
+    const { container, rerender } = render(<AttendanceTab />);
+    expect(screen.getByRole('button', { name: '홍길동 출석으로 기록' }).getAttribute('aria-pressed')).toBe('false');
+    expect(container.querySelector('.row-x')).toBeNull();
+    expect(screen.getByText('미체크')).toBeTruthy();
+    mocks.state.current = { ...source, attData: { '1-1-1': { 'student-1': { '0-0': 'O' } } } };
+    rerender(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('button', { name: '홍길동 출석 현재 선택됨, 다시 누르면 출석 취소' }));
+    await waitFor(() => expect(mocks.saveCheck).toHaveBeenCalledWith(expect.objectContaining({ expected: 'O', value: 'X' }), expect.any(Function)));
+  });
+
+  it('전원 결석은 확인창에서만 기록하고 출석 학생이 있으면 버튼을 막는다', async () => {
+    mocks.oneTap = true;
+    const source = { ...teacherState(), months: [{ month: 10, sundays: [25] }], attData: {} };
+    mocks.state.current = source;
+    const { rerender } = render(<AttendanceTab />);
+    fireEvent.click(screen.getByRole('button', { name: '오늘 출석 학생 없음' }));
+    expect(screen.getByRole('dialog', { name: '오늘 출석 학생 없음' })).toBeTruthy();
+    expect(mocks.saveCheck).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '출석 0명으로 기록' }));
+    await waitFor(() => expect(mocks.saveCheck).toHaveBeenCalledWith(expect.objectContaining({
+      target: { ck: '1-1-1', sid: '', k: '0-0' }, none: true,
+    }), expect.any(Function)));
+    mocks.state.current = { ...source, attData: { '1-1-1': { 'student-1': { '0-0': 'O' } } } };
+    rerender(<AttendanceTab />);
+    expect((screen.getByRole('button', { name: '오늘 출석 학생 없음' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('출석부의 이름과 수정 가능 날짜도 실제 버튼으로 제공한다', () => {

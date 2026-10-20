@@ -8,6 +8,7 @@ import { getKSTYear, getSundaysForYear, getWindowYears, buildHolidayRanges, buil
 import { normalizeAttendanceValue } from '@/utils/attendanceValue';
 import type { TeacherMessageWrite } from '@/lib/teacherMessageSave';
 import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
+import type { AttendanceChecks } from '@/utils/attendanceChecks';
 
 export type DataKey = 'classes' | 'attendance' | 'events';
 export type TeacherDraft = { studentId: string; text: string };
@@ -36,6 +37,7 @@ export interface AppState {
   // Firebase 데이터
   classData: ClassDataMap;
   attData: AttData;
+  attendanceChecks: AttendanceChecks;
   customEventsData: CustomEventData;
   dataRevision: number;
   dataLoaded: Record<DataKey, boolean>;
@@ -85,6 +87,7 @@ export const initialState: AppState = {
 
   classData: {},
   attData: {},
+  attendanceChecks: {},
   customEventsData: {},
   dataRevision: 0,
   dataLoaded: { classes: false, attendance: false, events: false },
@@ -125,7 +128,7 @@ type Action =
   | { type: 'SET_GRADE'; payload: string }
   | { type: 'SET_CLASS'; payload: string }
   | { type: 'SET_CLASS_DATA'; revision: number; payload: ClassDataMap }
-  | { type: 'SET_ATT_DATA'; revision: number; payload: AttData }
+  | { type: 'SET_ATT_DATA'; revision: number; payload: AttData; checks?: AttendanceChecks }
   | { type: 'SET_CUSTOM_EVENTS'; revision: number; payload: CustomEventData }
   | { type: 'SET_DATA_ERROR'; revision: number; payload: { key: DataKey; message: string } }
   | { type: 'RETRY_DATA_LOAD' }
@@ -165,7 +168,7 @@ function resetData(state: AppState): AppState {
   return {
     ...state,
     ...closeModals(),
-    classData: {}, attData: {}, customEventsData: {}, allUserRoles: {},
+    classData: {}, attData: {}, attendanceChecks: {}, customEventsData: {}, allUserRoles: {},
     events: buildEvents(state.curYear, state.months, state.holidayRanges, {}),
     dataRevision: state.dataRevision + 1,
     dataLoaded: { classes: false, attendance: false, events: false },
@@ -235,14 +238,14 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'SET_CLASS_DATA':
       return { ...state, classData: action.payload, dataLoaded: { ...state.dataLoaded, classes: true }, dataErrors: { ...state.dataErrors, classes: null } };
     case 'SET_ATT_DATA':
-      return { ...state, attData: action.payload, dataLoaded: { ...state.dataLoaded, attendance: true }, dataErrors: { ...state.dataErrors, attendance: null } };
+      return { ...state, attData: action.payload, attendanceChecks: action.checks ?? {}, dataLoaded: { ...state.dataLoaded, attendance: true }, dataErrors: { ...state.dataErrors, attendance: null } };
     case 'SET_CUSTOM_EVENTS': {
       const newEvents = buildEvents(state.curYear, state.months, state.holidayRanges, action.payload);
       return { ...state, customEventsData: action.payload, events: newEvents, dataLoaded: { ...state.dataLoaded, events: true }, dataErrors: { ...state.dataErrors, events: null } };
     }
     case 'SET_DATA_ERROR': {
       const { key, message } = action.payload;
-      const cleared = key === 'classes' ? { classData: {} } : key === 'attendance' ? { attData: {} } : {
+      const cleared = key === 'classes' ? { classData: {} } : key === 'attendance' ? { attData: {}, attendanceChecks: {} } : {
         customEventsData: {}, events: buildEvents(state.curYear, state.months, state.holidayRanges, {}),
       };
       return {

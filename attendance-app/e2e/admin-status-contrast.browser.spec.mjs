@@ -4,7 +4,7 @@ const ns = 'demo-attendance-recovery-default-rtdb';
 const database = `http://127.0.0.1:19017/.json?ns=${ns}`;
 const owner = { Authorization: 'Bearer owner' };
 const email = 'status-admin@example.test', password = 'synthetic-password-123';
-const year = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Seoul', year: 'numeric' }).format(new Date()));
+const year = 2026; // 기존 O/X 입력 상태 대비 회귀는 새 방식 적용 이전 달력으로 고정한다.
 
 async function checkBadge(badge, tone, interactive = false) {
   await expect(badge).toBeVisible();
