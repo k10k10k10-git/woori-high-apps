@@ -21,8 +21,8 @@ export type FileSheet = {
 };
 export type FileWorkbook = { filename: string; label: string; count: number; sheets: FileSheet[] };
 
-const RULE = '출석률 = O / 입력된 O·X 기록. 행사·미입력 제외. 등급 A ≥ 90%, B ≥ 80%, C ≥ 70%, D < 70%. 기록 없음은 —.';
-const LEGEND = 'O 출석 · X 결석 · 빈칸 미입력/미래 날짜 · 행사 출석 산정 제외. 장결은 구분하여 포함합니다.';
+const RULE = '출석률 = O / 파일의 O·X 집계. 행사·일반 학생 미입력 제외. 등급 A ≥ 90%, B ≥ 80%, C ≥ 70%, D < 70%. 기록 없음은 —.';
+const LEGEND = 'O 출석 · X 결석 · 행사 산정 제외. 장결자의 지난 정상 주일 빈칸은 파일에서만 X로 표시·집계합니다. 기존 O·미래 날짜·DB 원본은 유지합니다.';
 
 /** 월·주일 인덱스를 유지하며 미래 기록을 통계에 섞지 않는다. 원본 원장은 변경하지 않는다. */
 export function buildFileWorkbook(source: Source, selection: FileExportSelection, nowMs = Date.now()): FileWorkbook {
@@ -32,7 +32,7 @@ export function buildFileWorkbook(source: Source, selection: FileExportSelection
     const report = buildPastoralReport(source, [], nowMs, selection.weekKey);
     if (selection.weekKey && report.selectedWeek?.key !== selection.weekKey) throw new Error('조회할 기준 주일이 변경되었습니다. 다시 선택해 주세요.');
     const file = pastoralContactWorkbook(report, source.curYear, selection.kind, selection.sort ?? 'absence');
-    return { ...file, sheets: [{ name: file.label, rows: file.rows, headerRow: 5, widths: [20, 24, 26, 12, 26, 20, 24], freezeColumns: 1, dateColumns: [5] }] };
+    return { ...file, sheets: [{ name: file.label, rows: file.rows, headerRow: 5, widths: [20, 24, 24, 26, 12, 26, 20], freezeColumns: 1, dateColumns: [6] }] };
   }
   const classKeys = Object.keys(source.classData).filter(key => /^[12]-[1-3]-[1-9]\d*$/.test(key)
     && (selection.kind === 'roster' ? key.startsWith(`${selection.part}-`) : key === selection.classKey))
@@ -47,7 +47,15 @@ export function buildFileWorkbook(source: Source, selection: FileExportSelection
   const rows = classKeys.flatMap(classKey => [...source.classData[classKey].students]
     .sort((a, b) => Number(a.jang === true) - Number(b.jang === true) || (a.num ?? Infinity) - (b.num ?? Infinity)
       || a.name.localeCompare(b.name, 'ko') || a.id.localeCompare(b.id))
-    .map(student => ({ classKey, student, stats: calcStats(statsSource, classKey, student.id) })));
+    .map(student => {
+      // 장결 미입력 보완은 Excel용 사본에만 적용한다. 실제 목양·출석 원장을 바꾸지 않는다.
+      const attendance = { ...source.attData[classKey]?.[student.id] };
+      if (student.jang === true) for (const week of weeks) {
+        if (!week.event && week.date <= endsOn && !normalizeAttendanceValue(attendance[week.key])) attendance[week.key] = 'X';
+      }
+      const stats = calcStats({ ...statsSource, attData: { [classKey]: { [student.id]: attendance } } }, classKey, student.id);
+      return { classKey, student, stats, attendance };
+    }));
   const label = selection.kind === 'roster' ? `${selection.part}부 전체 명단` : `${classLabel(selection.classKey)} 출석부`;
   const intro = (title: string, count: number) => [
     [`${source.curYear}년 ${title}`],
@@ -58,11 +66,11 @@ export function buildFileWorkbook(source: Source, selection: FileExportSelection
     const fixed = wholePart ? ['번호', '소속 반', '학생 이름', '구분', '출석/기록', '출석률', '등급'] : ['번호', '학생 이름', '구분', '출석/기록', '출석률', '등급'];
     const start = fixed.length;
     const info = ['학교', '생년월일', '본인 연락처', '보호자 연락처', '주소'];
-    const data = selectedRows.map(({ classKey, student, stats }, index) => {
+    const data = selectedRows.map(({ classKey, student, stats, attendance }, index) => {
       const recorded = stats.present + stats.absent;
       return [index + 1, ...(wholePart ? [classLabel(classKey)] : []), student.name.trim() || '미등록', student.jang ? '장결' : '일반',
         recorded ? `${stats.present}/${recorded}` : '—', recorded ? stats.rate / 100 : '—', recorded ? attendanceGrade(stats.rate) : '—',
-        ...weeks.map(week => week.event ? '행사' : week.date > endsOn ? '' : normalizeAttendanceValue(source.attData[classKey]?.[student.id]?.[week.key])),
+        ...weeks.map(week => week.event ? '행사' : week.date > endsOn ? '' : normalizeAttendanceValue(attendance[week.key])),
         student.school?.trim() || '미등록', birthCell(student), student.phone?.trim() || '미등록', student.pphone?.trim() || '미등록', student.addr?.trim() || '미등록'];
     });
     const grouped: (string | number | Date)[] = Array(start + weeks.length + info.length).fill('');
@@ -85,7 +93,7 @@ export function buildFileWorkbook(source: Source, selection: FileExportSelection
   }
   const sheets: FileSheet[] = [];
   if (selection.kind === 'roster') {
-    sheets.push({ name: '반별 요약', rows: [...intro(label, rows.length), [], ['소속 반', '담임 교사', '전체 인원', '일반', '장결', '출석 기록', '입력 기록', '출석률'],
+    sheets.push({ name: '반별 요약', rows: [...intro(label, rows.length), [], ['소속 반', '담임 교사', '전체 인원', '일반', '장결', '출석 기록', '집계 기록(O·X)', '출석률'],
       ...classKeys.map(classKey => {
         const selected = rows.filter(row => row.classKey === classKey);
         const present = selected.reduce((sum, row) => sum + row.stats.present, 0);

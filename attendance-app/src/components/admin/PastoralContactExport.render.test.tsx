@@ -25,7 +25,7 @@ it.each(['연속 결석', '다시 출석'])('%s 전체 연락처를 별도 파�
   expect(m.download).toHaveBeenCalledOnce();
   const [rows, sheet, filename, options] = m.download.mock.calls[0];
   expect(sheet).toBe(label); expect(rows.slice(6)).toHaveLength(1); expect(filename).toBe(`${label.replace(/ /g, '')}_전체연락처_2026-01-25.xlsx`);
-  expect(options).toMatchObject({ headerRow: 5, columnFormats: { 5: 'yyyy-mm-dd' } }); expect(options.beforeDownload()).toBeUndefined();
+  expect(options).toMatchObject({ headerRow: 5, columnWidths: [20, 24, 24, 24, 12, 24, 20], columnFormats: { 6: 'yyyy-mm-dd' } }); expect(options.beforeDownload()).toBeUndefined();
   expect(screen.getByRole('status').textContent).toContain('전체 1명');
 });
 it('자료 미준비 또는 대상이 없으면 파일을 만들지 않는다', () => {

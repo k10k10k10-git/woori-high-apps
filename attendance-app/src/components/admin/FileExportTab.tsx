@@ -127,7 +127,7 @@ export default function FileExportTab() {
       </>}
 
       <div className="fe-contents"><h4>파일에 담기는 내용</h4>{kind === 'roster' ? <><p>반별 요약 → 학생 명단 → 전체 학생·연간 출석 → 반별 출석부 순으로 시트를 구성합니다.</p><ul><li>이름·본인 연락처·보호자 연락처</li><li>생년월일·학교·주소</li><li>전체 날짜별 O·X · 출석률·등급</li></ul></> : kind === 'class' ? <><p>선택한 반의 1월부터 12월까지 출석을 한 파일에서 확인합니다.</p><ul><li>이름·장결 구분</li><li>월별로 묶은 전체 날짜·O·X</li><li>출석 횟수·출석률·등급</li></ul></> : <><p>기존 연락처 명단 구성에 보호자 연락처를 함께 넣습니다.</p><ul><li>이름·본인 연락처·보호자 연락처</li><li>소속 반·장결 구분</li><li>{kind === 'recovered' ? '복귀 전 ' : ''}연속 결석 횟수·마지막 출석일</li></ul></>}
-        <p className="fe-calculation">출석률·등급은 입력된 기록 기준입니다. 행사·미입력·미래 날짜는 결석으로 계산하지 않습니다.</p>
+        <p className="fe-calculation">{pastoral ? '연속 결석·다시 출석 명단은 실제 입력된 출석·결석 기록으로 판정합니다.' : '장결자의 지난 정상 주일 빈칸은 엑셀에서만 X로 표시·집계합니다. 기존 출석 기록·행사·미래 날짜와 DB 원본은 유지합니다.'}</p>
       </div>
     </section>
     {status.error && <p className="fe-message fe-error" role="alert">{status.error}</p>}

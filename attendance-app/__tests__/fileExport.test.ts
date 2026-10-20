@@ -29,7 +29,7 @@ it('화면 필터와 무관하게 부서를 나누고 장결·빈 반·동명이
   expect(state).toEqual(before);
 });
 
-it('52개 실제 주일을 빈 슬롯 없이 포함하며 행사·미래·미입력은 결석으로 바꾸지 않는다', () => {
+it('52개 실제 주일을 포함하며 장결의 지난 빈칸만 결석으로 보완한다', () => {
   const state = fixture();
   const file = buildFileWorkbook(state, { kind: 'class', classKey: '1-1-10' }, now);
   const sheet = file.sheets[0]; const row = sheet.rows[6];
@@ -40,8 +40,41 @@ it('52개 실제 주일을 빈 슬롯 없이 포함하며 행사·미래·미입
   expect(row[9]).toBe('');
   expect(row[sheet.attendanceColumns![48]]).toBe('');
   const longAbsent = sheet.rows.find(row => row[1] === '나학생')!;
-  expect(longAbsent.slice(2, 6)).toEqual(['장결', '0/1', 0, 'D']);
+  expect(longAbsent.slice(2, 6)).toEqual(['장결', '0/41', 0, 'D']);
+  expect(longAbsent[9]).toBe('X');
+  expect(longAbsent[7]).toBe('행사');
+  expect(longAbsent[sheet.attendanceColumns![48]]).toBe('');
   expect(sheet.rows.find(row => row[1] === '다학생')!.slice(3, 6)).toEqual(['—', '—', '—']);
+});
+
+it('장결 보완은 원장·목양 판정·기존 출석을 보존하고 모든 연간 시트의 집계를 일치시킨다', () => {
+  const state = fixture();
+  state.attData['1-1-10'].b = { '0-0': 'O', '0-1': 'O', '9-3': 'O' };
+  const before = structuredClone(state);
+  const file = buildFileWorkbook(state, { kind: 'roster', part: '1' }, now);
+  const compact = file.sheets[1].rows.find(row => row[1] === '나학생')!;
+  const annualSheet = file.sheets[2];
+  const annual = annualSheet.rows.find(row => row[2] === '나학생')!;
+  const classSheet = file.sheets[4];
+  const row = classSheet.rows.find(row => row[1] === '나학생')!;
+  expect(compact.slice(7, 9)).toEqual([.02, 'D']);
+  expect(annual.slice(4, 7)).toEqual(['1/41', .02, 'D']);
+  expect(row.slice(3, 6)).toEqual(['1/41', .02, 'D']);
+  expect(row[6]).toBe('O'); expect(row[7]).toBe('행사'); expect(row[8]).toBe('X');
+  const future = classSheet.rows[5].indexOf('10/25');
+  expect(row[future]).toBe('');
+  expect(file.sheets[0].rows.find(row => row[0] === '1부 1학년 10반')!.slice(5, 8)).toEqual([2, 43, .05]);
+  expect(file.sheets[0].rows[3][0]).toContain('파일에서만 X');
+  expect(buildFileWorkbook(state, { kind: 'absent', weekKey: '0-3' }, now).count).toBe(0);
+  expect(state).toEqual(before);
+});
+
+it('장결 빈칸 보완도 KST 주일 경계와 과거 연도 범위만 적용한다', () => {
+  const state = fixture(); state.events = {};
+  const row = (time: string) => buildFileWorkbook(state, { kind: 'class', classKey: '1-1-10' }, Date.parse(time)).sheets[0].rows.find(row => row[1] === '나학생')!;
+  expect(row('2026-01-10T23:59:59+09:00')[3]).toBe('0/1');
+  expect(row('2026-01-11T00:00:00+09:00')[3]).toBe('0/2');
+  expect(row('2027-01-01T00:00:00+09:00')[3]).toBe('0/52');
 });
 
 it('과거 연도는 연말까지 계산하고 미래 연도·없는 반·잘못된 기준 주일은 거절한다', () => {
@@ -58,16 +91,17 @@ it('레거시 출석 정규화와 등급 경계를 공용 계산으로 유지한
   expect(buildFileWorkbook(state, { kind: 'class', classKey: '1-1-10' }, now).sheets[0].rows[6].slice(3, 6)).toEqual(['1/2', .5, 'D']);
 });
 
-it('연속 결석·다시 출석은 기존 6열을 유지하고 보호자 연락처를 마지막 열에 추가한다', () => {
+it('연속 결석·다시 출석은 본인·보호자 연락처를 이름 다음 열에 모은다', () => {
   const state = fixture(); state.events = {};
   state.attData['1-1-10'].a = { '0-0': 'X', '0-1': 'X', '0-2': 'X', '0-3': 'O' };
   state.attData['2-2-7'].a = { '0-0': 'X', '0-1': 'X', '0-2': 'X', '0-3': 'X' };
   const absent = buildFileWorkbook(state, { kind: 'absent', weekKey: '0-3' }, now);
   const recovered = buildFileWorkbook(state, { kind: 'recovered', weekKey: '0-3' }, now);
   expect(absent.count).toBe(1); expect(recovered.count).toBe(1);
-  expect(absent.sheets[0].rows[5][6]).toBe('보호자 연락처');
-  expect(absent.sheets[0].rows[6][6]).toBe('+821000000004');
-  expect(recovered.sheets[0].rows[6]).toEqual(['가학생', '01000000001', '1부 1학년 10반', '일반', 3, new Date(2026, 0, 25), '01000000002']);
+  expect(absent.sheets[0].rows[5]).toEqual(['학생 이름', '본인 연락처', '보호자 연락처', '소속 반', '장결 구분', '연속 결석 횟수', '마지막 출석일']);
+  expect(absent.sheets[0].rows[6][2]).toBe('+821000000004');
+  expect(recovered.sheets[0].rows[6]).toEqual(['가학생', '01000000001', '01000000002', '1부 1학년 10반', '일반', 3, new Date(2026, 0, 25)]);
+  expect(recovered.sheets[0].dateColumns).toEqual([6]);
 });
 
 it('실제 XLSX 재읽기에서 날짜·숫자 퍼센트·전화번호 문자열·고정창·상태 서식을 유지한다', async () => {
