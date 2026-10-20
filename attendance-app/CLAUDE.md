@@ -405,6 +405,11 @@ CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/global
 - **판단 질문**: 부서 없는 시트 SID가 같아도 같은 학생이 아니다. 명단이 없어도 출석이 남은 슬롯은 재사용하지 않는다. Rules 필드는 변경하지 않으며 구버전 작업 복구를 유지한다. 영구 ID 없는 충돌 학생은 자동 이동하지 않는다. 과거 피해 복구·구버전 쓰기·같은 UID의 직접 쓰기 차단은 별도 경계다.
 - **재사용 규칙**: `studentMove*.test.ts`와 `e2e/student-move.browser.spec.mjs`에서 기존 명단·출석 불변, 새 ID 이관, 단발 요청·응답 유실을 검사한다. 통합 앱의 과거 신청 키를 바꾸지 말고 personId로 현재 원장을 확인한다.
 
+#### 학생 이동의 서버 확인과 SDK 캐시 분리 (2026-10-21)
+- **접근법**: CI 응답 유실 trace에서 PATCH 200·불변 commit=true와 늦은 명단 구독 순서를 확인 → `MoveStudentModal.tsx`의 만료 잠금 증거 3건·잠금 후 원장 4건·응답 유실 증거 3건을 `studentMoveRequest.ts`의 인증된 `readStudentMoveValue`로 조회 → 각 경로 키 인코딩·`cache: no-store`·15초 제한·현재 계정/연도/revision 확인 적용 → WebSocket 명단·출석 구독만 지연한 실제 PC·모바일 회귀로 서버 성공 확정과 기존 학생·출석 보존을 확인한다.
+- **판단 질문**: SDK `get()`은 활성 구독의 오래된 캐시를 즉시 반환할 수 있어 안전 판정용 서버 최신 조회로 쓰지 않는다. commit 표식만으로 성공을 확정하지 않고 원본 없음·목적지 동일인 확인을 유지한다. 조회 실패를 null/부재로 바꾸거나 PATCH를 자동 재전송하지 않으며 기존 잠금 트랜잭션·원자 payload·Rules·인물 키는 변경하지 않는다. 늦은 응답의 UI 이동·닫기·안내도 현재 세대에서만 실행한다.
+- **재사용 규칙**: 저장 응답 유실 복구는 서버 증거와 실시간 화면 캐시를 분리하고, 네트워크 실패를 데이터 없음으로 취급하지 않는다. 테스트 시간 증가 대신 구독 지연을 고정해 실제 파일/원장 값·요청 횟수를 검증한다.
+
 Firebase Realtime Database SDK와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다.
 
 `StudentModal`(저장/삭제), `MoveStudentModal`(이동)은 반 전체 명단(`classes/{year}/{ck}/students`)을 통째로 `set()`하지 않고, 항상 **해당 학생 1명의 경로만** 갱신한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 충돌 학생은 사전에 새 목적지 SID를 선택하고, 잠금 안에서 선택한 SID의 명단·출석이 비었는지 재검사한다. 다른 학생의 출석과 병합하지 않는다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:

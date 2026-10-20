@@ -10,6 +10,32 @@ type FetchOnce = (
   init: RequestInit,
 ) => Promise<Pick<Response, 'ok' | 'status'>>;
 
+/** 안전 판정은 활성 SDK 구독의 오래된 캐시가 아닌 인증된 서버 응답만 사용한다. */
+export async function readStudentMoveValue(input: {
+  databaseUrl: string | undefined;
+  idToken: string;
+  path: string;
+  isCurrent: () => boolean;
+  fetchOnce?: (url: string, init: RequestInit) => Promise<Pick<Response, 'ok' | 'json'>>;
+  timeoutMs?: number;
+}): Promise<unknown> {
+  const controller = new AbortController();
+  const timeoutId = globalThis.setTimeout(() => controller.abort(), input.timeoutMs ?? 15_000);
+  try {
+    if (!input.databaseUrl || !input.idToken || !input.isCurrent()) throw new Error('invalid scope');
+    const url = new URL(input.databaseUrl);
+    url.pathname = `/${input.path.split('/').map(encodeURIComponent).join('/')}.json`;
+    url.searchParams.set('auth', input.idToken);
+    const response = await (input.fetchOnce ?? globalThis.fetch)(url.toString(), { method: 'GET', cache: 'no-store', signal: controller.signal });
+    if (!response.ok) throw new Error('read rejected');
+    const value: unknown = await response.json();
+    if (controller.signal.aborted || !input.isCurrent()) throw new Error('stale scope');
+    return value;
+  } catch {
+    throw new Error('학생 이동 자료를 서버에서 확인하지 못했습니다. 연결과 권한을 확인한 뒤 다시 시도해 주세요.');
+  } finally { globalThis.clearTimeout(timeoutId); }
+}
+
 type StudentMoveCommitEvidence = {
   commitMarkerIsTrue: boolean;
   sourceStudentExists: boolean;

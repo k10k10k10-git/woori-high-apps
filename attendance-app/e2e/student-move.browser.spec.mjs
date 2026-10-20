@@ -52,8 +52,32 @@ async function confirmMove(page) {
 }
 for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '기존 학생 ID'} 충돌을 새 ID로 분리하고 응답 유실도 확인한다`, async ({ page, request }) => {
   await seed(request, orphan);
+  let holdSubscriptions = false;
+  const heldUpdates = [];
+  await page.routeWebSocket(socketUrl => socketUrl.hostname === '127.0.0.1' && socketUrl.port === '19017', socket => {
+    const server = socket.connectToServer();
+    server.onMessage(message => {
+      let frame;
+      try { frame = JSON.parse(message.toString()); } catch { /* 분할 프레임은 그대로 전달한다. */ }
+      // 인증·잠금·GET 응답은 통과시키고 PATCH 이후 명단·출석 구독만 지연한다.
+      if (holdSubscriptions && frame?.t === 'd' && ['d', 'm'].includes(frame.d?.a)
+        && /^\/?(?:classes|attendance)\//.test(frame.d?.b?.p ?? '')) {
+        heldUpdates.push(() => socket.send(message));
+      } else socket.send(message);
+    });
+  });
   await openMove(page);
   let patches = 0;
+  let resultPaths = [];
+  const resultReads = [];
+  page.on('response', response => {
+    const responseUrl = new URL(response.url());
+    if (holdSubscriptions && response.request().method() === 'GET'
+      && responseUrl.hostname === '127.0.0.1' && responseUrl.port === '19017'
+      && responseUrl.pathname.endsWith('.json')) {
+      resultReads.push({ path: decodeURIComponent(responseUrl.pathname.slice(1, -5)), status: response.status() });
+    }
+  });
   await page.route('**/.json?**', async route => {
     if (route.request().method() !== 'PATCH') return route.continue();
     patches++;
@@ -68,12 +92,28 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
     expect(await concurrent.json()).toMatchObject({ error: 'Permission denied' });
     const edit = await request.patch(`${url(`classes/${year}/2-1-7/students/S17_05`)}&auth=${encodeURIComponent(token)}`, { data: { school: '경쟁 수정' } });
     expect(edit.status()).toBe(401);
+    const payload = route.request().postDataJSON();
+    resultPaths = [
+      Object.keys(payload).find(path => path.startsWith(`config/studentMoveCommits/${year}/`)),
+      `classes/${year}/2-1-7/students/S17_05`,
+      Object.keys(payload).find(path => path.startsWith(`classes/${year}/1-1-7/students/`)),
+    ];
+    expect(resultPaths.every(Boolean)).toBe(true);
+    holdSubscriptions = true;
     const response = await route.fetch();
     expect(response.ok()).toBe(true);
     await route.abort();
   });
   await confirmMove(page);
   await expect(page.getByRole('dialog', { name: '학생 이동' })).toHaveCount(0);
+  await expect.poll(() => heldUpdates.length).toBeGreaterThan(0);
+  expect(resultReads).toEqual(expect.arrayContaining(resultPaths.map(path => ({ path, status: 200 }))));
+  expect(resultReads.filter(result => resultPaths.includes(result.path))).toHaveLength(3);
+  // 목적지의 SDK 명단은 아직 이동 전이지만 서버 확인으로 모달은 정상 종료돼야 한다.
+  await expect(page.locator('.student-card').filter({ hasText: source.name })).toHaveCount(0);
+  holdSubscriptions = false;
+  for (const deliver of heldUpdates) deliver();
+  await expect(page.locator('.student-card').filter({ hasText: source.name })).toHaveCount(1);
   const students = await read(request, `classes/${year}/1-1-7/students`);
   expect(Object.keys(students)).toHaveLength(2);
   const [newId, moved] = Object.entries(students).find(([, student]) => student.personId === source.personId);

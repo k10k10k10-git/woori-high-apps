@@ -3,7 +3,57 @@ import {
   STUDENT_MOVE_PATCH_TIMEOUT_MS,
   isStudentMoveCommitted,
   patchStudentMoveOnce,
+  readStudentMoveValue,
 } from '@/utils/studentMoveRequest';
+
+describe('readStudentMoveValue', () => {
+  const connection = { databaseUrl: 'https://example.firebaseio.com/?ns=synthetic', idToken: 'secret-token', isCurrent: () => true };
+  it('SDK 캐시 대신 각 키를 인코딩한 인증 no-store GET으로 서버 값을 한 번 읽는다', async () => {
+    const fetchOnce = vi.fn(async () => ({ ok: true, json: async () => ({ name: '최신 학생' }) }));
+    await expect(readStudentMoveValue({ ...connection, path: 'config/studentMoveCommits/operation%7Eid', fetchOnce })).resolves.toEqual({ name: '최신 학생' });
+    const [address, init] = fetchOnce.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new URL(address).pathname).toBe('/config/studentMoveCommits/operation%257Eid.json');
+    expect(new URL(address).searchParams.get('ns')).toBe('synthetic');
+    expect(new URL(address).searchParams.get('auth')).toBe('secret-token');
+    expect(init).toMatchObject({ method: 'GET', cache: 'no-store' });
+    expect(fetchOnce).toHaveBeenCalledTimes(1);
+  });
+  it.each([null, true, { name: '이동 학생' }])('정상 응답 %j만 실제 서버 값으로 반환한다', async value => {
+    await expect(readStudentMoveValue({ ...connection, path: 'classes/2026/1-1-1/students/a', fetchOnce: async () => ({ ok: true, json: async () => value }) })).resolves.toEqual(value);
+  });
+  it.each(['http', 'network', 'json'])('%s 조회 실패를 데이터 없음으로 바꾸거나 토큰을 노출하지 않는다', async failure => {
+    const fetchOnce = vi.fn(async () => {
+      if (failure === 'network') throw new Error('secret-token');
+      return { ok: failure !== 'http', json: async () => { if (failure === 'json') throw new Error('secret-token'); return null; } };
+    });
+    await expect(readStudentMoveValue({ ...connection, path: 'classes/2026/1-1-1', fetchOnce })).rejects.toThrow('학생 이동 자료를 서버에서 확인하지 못했습니다.');
+    expect(fetchOnce).toHaveBeenCalledTimes(1);
+  });
+  it('계정·조회 세대가 바뀌면 이전 서버 값을 사용하지 않는다', async () => {
+    let current = true;
+    const fetchOnce = vi.fn(async () => ({ ok: true, json: async () => { current = false; return true; } }));
+    await expect(readStudentMoveValue({ ...connection, path: 'config/studentMoveCommits/a', isCurrent: () => current, fetchOnce })).rejects.toThrow('학생 이동 자료를 서버에서 확인하지 못했습니다.');
+  });
+  it('인증이 없거나 이미 조회 세대가 바뀌면 요청하지 않는다', async () => {
+    const fetchOnce = vi.fn();
+    for (const scope of [{ idToken: '' }, { isCurrent: () => false }]) {
+      await expect(readStudentMoveValue({ ...connection, ...scope, path: 'classes/2026', fetchOnce })).rejects.toThrow();
+    }
+    expect(fetchOnce).not.toHaveBeenCalled();
+  });
+  it('조회 제한 시간이 지나면 중단하고 없음으로 판정하지 않는다', async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchOnce = vi.fn((_url: string, init: RequestInit) => new Promise<never>((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () => reject(new Error('secret-token')), { once: true });
+      }));
+      const result = expect(readStudentMoveValue({ ...connection, path: 'classes/2026', fetchOnce, timeoutMs: 100 })).rejects.toThrow('학생 이동 자료를 서버에서 확인하지 못했습니다.');
+      await vi.advanceTimersByTimeAsync(100);
+      await result;
+      expect(fetchOnce).toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+});
 
 describe('patchStudentMoveOnce', () => {
   it('루트 multipath PATCH를 정확히 한 번만 전송한다', async () => {
