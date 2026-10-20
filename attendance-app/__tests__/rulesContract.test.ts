@@ -68,6 +68,12 @@ describe('database.rules.json 권한 계약', () => {
       expect(validate).toContain("newData.parent().parent().parent().parent().child('attendance')");
       expect(validate).not.toContain('numChildren');
     });
+    it('주일 키는 실제 RTDB 정규식과 호환되는 캡처 그룹으로 0~11월·0~4주를 제한한다', () => {
+      const validate = ruleExpression(...week, '.validate');
+      // RTDB Emulator에서는 비캡처 그룹의 한 자리 월 분기가 거절됐다. JS 정규식 검사만으로 대체하지 않는다.
+      expect(validate).toContain('$weekKey.matches(/^([0-9]|1[01])-[0-4]$/)');
+      expect(validate).not.toContain('(?:');
+    });
     it('첫 체크의 학생 스냅샷은 현재 일반 학생의 영구 ID 또는 SID만 저장하고 이후 수정하지 못한다', () => {
       const write = ruleExpression(...week, 'roster', '$studentId', '.write');
       expect(write).toContain("!root.child('attendanceChecks').child($year).child($classKey).child($weekKey).exists()");

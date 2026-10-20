@@ -87,6 +87,20 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     await set(ref(admin, 'classes/2026/1-1-1/students/other'), { id: 'other', name: '합성 다른 학생' });
     await set(ref(admin, 'classes/2026/1-1-1/students/long'), { id: 'long', name: '합성 장결', jang: true });
   }
+  it('서버의 주일 키 검사는 한·두 자리 월을 허용하고 잘못된 월·주차 키는 원자 거절한다', async () => {
+    const original = await checkPatch();
+    const forKey = (key: string) => Object.fromEntries(Object.entries(original).map(([path, value]) => [path.replaceAll('/9-3', `/${key}`), value]));
+    for (const key of ['9-3', '10-0']) {
+      await update(ref(teacher), forKey(key));
+      expect((await get(ref(admin, `attendanceChecks/2026/1-1-1/${key}`))).val()).toMatchObject({ revision: 1, targetSid: 's' });
+      expect((await get(ref(admin, `${attendancePath}/s/${key}`))).val()).toBe('O');
+    }
+    for (const key of ['12-0', '01-0', '9-5', '9x-3']) {
+      const before = await rawSnapshot();
+      await expect(update(ref(teacher), forKey(key))).rejects.toThrow();
+      expect(await rawSnapshot()).toEqual(before);
+    }
+  });
   it('새 출석 체크는 본인 반 O·다른 일반 학생 빈칸 X·시작 상태를 원자 저장하며 명단·옛 출석을 보존한다', async () => {
     await addCheckStudents(); const before = await rawSnapshot();
     await update(ref(teacher), await checkPatch());
