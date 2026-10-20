@@ -1,6 +1,6 @@
 'use client';
 import { useRef, useState } from 'react';
-import { db, get, onDisconnect, onValue, push, ref, runTransaction } from '@/lib/db';
+import { db, onDisconnect, onValue, push, ref, runTransaction } from '@/lib/db';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
 import { useModalFocus } from '@/hooks/useModalFocus';
@@ -30,11 +30,11 @@ import {
   type StudentMoveLockIdentity,
   type StudentMoveLockTransaction,
 } from '@/utils/studentMoveLock';
-import { isStudentMoveCommitted, patchStudentMoveOnce } from '@/utils/studentMoveRequest';
+import { isStudentMoveCommitted, patchStudentMoveOnce, readStudentMoveValue } from '@/utils/studentMoveRequest';
 import type { MoveTarget, Student } from '@/types';
 
 export default function MoveStudentModal({ target, onClose }: { target: MoveTarget; onClose: () => void }) {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, getState } = useApp();
   const { classData, curYear } = state;
   const student = classData[target.fromCk]?.students.find(s => s.id === target.sid);
 
@@ -73,6 +73,11 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
       showToast('로그인 사용자를 확인할 수 없습니다. 다시 로그인해 주세요.');
       return;
     }
+    const isCurrent = () => {
+      const current = getState();
+      return auth.currentUser === currentUser && current.curYear === curYear
+        && current.dataRevision === state.dataRevision && current.userRole?.role === 'admin';
+    };
     const startedAt = Date.now();
     // 화면 스냅샷은 ID 선택에만 사용한다. 쓰기 직전 두 반 잠금 안에서 다시 검사한다.
     const collision = classData[toCk]?.students.some(s => s.id === target.sid)
@@ -146,11 +151,16 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
     };
 
     try {
+      const idToken = await currentUser.getIdToken();
+      const readValue = (path: string) => readStudentMoveValue({
+        databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken, path, isCurrent,
+      });
       const recoveryNow = await readServerNow();
       if (recoveryNow === null) {
         showToast('서버 시간을 확인할 수 없어 학생 이동을 시작하지 않았습니다. 연결을 확인해 주세요.');
         return;
       }
+      if (!isCurrent()) return;
 
       // 두 반의 자기 작업 leaf만 한 연결 종료 update로 지워 부분 잠금을 남기지 않는다.
       disconnectCleanup = onDisconnect(lockYearRef);
@@ -166,23 +176,24 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           now: recoveryNow,
           readEvidence: async (staleLock) => {
             const staleCommitPath = studentMoveCommitPath(curYear, staleLock);
-            const [commitSnap, sourceSnap, destinationSnap] = await Promise.all([
-              get(ref(db, staleCommitPath)),
-              get(ref(db, `classes/${curYear}/${staleLock.record.fromCk}/students/${staleLock.record.sid}`)),
-              get(ref(db, `classes/${curYear}/${staleLock.record.toCk}/students/${studentMoveDestinationId(staleLock)}`)),
+            const [commitValue, sourceValue, destinationValue] = await Promise.all([
+              readValue(staleCommitPath),
+              readValue(`classes/${curYear}/${staleLock.record.fromCk}/students/${staleLock.record.sid}`),
+              readValue(`classes/${curYear}/${staleLock.record.toCk}/students/${studentMoveDestinationId(staleLock)}`),
             ]);
             return {
-              commitMarkerState: !commitSnap.exists()
+              commitMarkerState: commitValue == null
                 ? 'absent'
-                : commitSnap.val() === true ? 'committed' : 'invalid',
-              sourceStudentExists: sourceSnap.exists(),
-              destinationStudentExists: destinationSnap.exists(),
+                : commitValue === true ? 'committed' : 'invalid',
+              sourceStudentExists: sourceValue != null,
+              destinationStudentExists: destinationValue != null,
             };
           },
           release: (staleLock) => releaseStudentMoveLocks(staleLock, transactLock),
         });
 
         if (recovery.status === 'completed') {
+          if (!isCurrent()) return;
           selectClass(recovery.lock.record.toCk);
           showToast('이전 학생 이동이 완료된 것을 확인하고 남은 잠금을 정리했습니다.', 'success');
           operationCompleted = true;
@@ -213,42 +224,38 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         await disconnectCleanup.update(disconnectPayload);
 
         // 두 반을 잠근 뒤 최신값을 읽어 학생 수정·출석 입력·목적지 SID 생성을 함께 차단한다.
-        const [sourceStudentSnap, destinationClassSnap, sourceAttendanceSnap, destinationAttendanceSnap] = await Promise.all([
-          get(ref(db, `classes/${curYear}/${target.fromCk}/students/${target.sid}`)),
-          get(ref(db, `classes/${curYear}/${toCk}`)),
-          get(ref(db, `attendance/${curYear}/${target.fromCk}/${target.sid}`)),
-          get(ref(db, `attendance/${curYear}/${toCk}/${destinationId}`)),
+        const [sourceStudentValue, destinationClassValue, sourceAttendanceValue, destinationAttendanceValue] = await Promise.all([
+          readValue(`classes/${curYear}/${target.fromCk}/students/${target.sid}`),
+          readValue(`classes/${curYear}/${toCk}`),
+          readValue(`attendance/${curYear}/${target.fromCk}/${target.sid}`),
+          readValue(`attendance/${curYear}/${toCk}/${destinationId}`),
         ]);
 
-        if (!sourceStudentSnap.exists()) {
+        if (sourceStudentValue == null) {
           showToast('원래 반에서 학생을 찾을 수 없습니다. 명단을 새로 확인해 주세요.');
           return;
         }
-        if (!destinationClassSnap.exists()) {
+        if (destinationClassValue == null) {
           showToast('이동할 반이 더 이상 존재하지 않습니다. 명단을 새로 확인해 주세요.');
           return;
         }
-        if (destinationClassSnap.child(`students/${destinationId}`).exists() || destinationAttendanceSnap.exists()) {
+        const destinationStudents = (destinationClassValue as { students?: Record<string, Student> }).students ?? {};
+        if (destinationStudents[destinationId] != null || destinationAttendanceValue != null) {
           showToast('이동할 반의 명단 또는 출석이 변경되었습니다. 기존 기록은 유지했습니다. 명단을 확인하고 다시 이동해 주세요.');
           return;
         }
 
-        const latestStudent = { ...(sourceStudentSnap.val() as Student), id: target.sid };
+        const latestStudent = { ...(sourceStudentValue as Student), id: target.sid };
         if (latestStudent.personId !== student.personId || latestStudent.name !== student.name) {
           showToast('원래 반의 학생 정보가 변경되었습니다. 명단을 새로 확인해 주세요.');
           return;
         }
-        const destinationStudents = (destinationClassSnap.child('students').val() ?? {}) as Record<string, Student>;
         if (latestStudent.personId && Object.values(destinationStudents).some(s => s.personId === latestStudent.personId)) {
           showToast('같은 인물의 학생이 목적지에 이미 있습니다. 중복 명단을 먼저 확인해 주세요.');
           return;
         }
-        const sourceAttendance = sourceAttendanceSnap.exists()
-          ? sourceAttendanceSnap.val() as AttendanceRecord
-          : undefined;
-        const destinationAttendance = destinationAttendanceSnap.exists()
-          ? destinationAttendanceSnap.val() as AttendanceRecord
-          : undefined;
+        const sourceAttendance = (sourceAttendanceValue ?? undefined) as AttendanceRecord | undefined;
+        const destinationAttendance = (destinationAttendanceValue ?? undefined) as AttendanceRecord | undefined;
         const changePath = adminChangePath(curYear, toCk, operationId);
         const commitPath = studentMoveCommitPath(curYear, lock);
         const payload = buildStudentMovePayload({
@@ -257,7 +264,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           toCk,
           student: latestStudent,
           destinationId,
-          destinationStudent: destinationClassSnap.child(`students/${destinationId}`).val(),
+          destinationStudent: destinationStudents[destinationId],
           sourceAttendance,
           destinationAttendance,
           lockPaths,
@@ -272,8 +279,6 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
             actor: adminActor(state.userRole),
           }),
         });
-        const idToken = await currentUser.getIdToken();
-
         const pendingStartedAt = await readServerNow();
         if (pendingStartedAt === null) {
           throw new Error('학생 이동에 필요한 서버 시간을 확인할 수 없습니다.');
@@ -294,6 +299,8 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           throw new Error('학생 이동 잠금 소유권을 확인할 수 없습니다.');
         }
 
+        if (!isCurrent()) throw new Error('로그인 또는 조회 상태가 변경되었습니다.');
+
         const patchResult = await patchStudentMoveOnce({
           databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
           idToken,
@@ -305,34 +312,36 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         if (patchResult.status === 'unknown') {
           let committed = false;
           try {
-            const [commitSnap, latestSourceSnap, latestDestinationSnap] = await Promise.all([
-              get(ref(db, commitPath)),
-              get(ref(db, `classes/${curYear}/${target.fromCk}/students/${target.sid}`)),
-              get(ref(db, `classes/${curYear}/${toCk}/students/${destinationId}`)),
+            const [commitValue, latestSourceValue, latestDestinationValue] = await Promise.all([
+              readValue(commitPath),
+              readValue(`classes/${curYear}/${target.fromCk}/students/${target.sid}`),
+              readValue(`classes/${curYear}/${toCk}/students/${destinationId}`),
             ]);
+            const latestDestination = latestDestinationValue as Student | null;
             committed = isStudentMoveCommitted({
-              commitMarkerIsTrue: commitSnap.val() === true,
-              sourceStudentExists: latestSourceSnap.exists(),
-              destinationStudentExists: latestDestinationSnap.exists()
-                && latestDestinationSnap.val().personId === latestStudent.personId
-                && latestDestinationSnap.val().name === latestStudent.name,
+              commitMarkerIsTrue: commitValue === true,
+              sourceStudentExists: latestSourceValue != null,
+              destinationStudentExists: latestDestination != null
+                && latestDestination.personId === latestStudent.personId
+                && latestDestination.name === latestStudent.name,
             });
           } catch {
             // 네트워크가 끊긴 경우 성공과 실패를 추측하지 않는다.
           }
           if (!committed) {
             preserveUncertainLock = true;
-            showToast('이동 결과가 불명확해 두 반의 잠금을 유지했습니다. 새로고침 후 학생 상태를 확인해 주세요.');
+            if (isCurrent()) showToast('이동 결과가 불명확해 두 반의 잠금을 유지했습니다. 새로고침 후 학생 상태를 확인해 주세요.');
             return;
           }
         }
         ownLockState = 'none';
+        if (!isCurrent()) return;
         selectClass(toCk);
         showToast('기존 명단을 보존하고 학생과 출석 기록을 함께 이동했습니다.', 'success');
         operationCompleted = true;
       }
     } catch {
-      showToast('학생 이동에 실패했습니다. 다시 시도해 주세요.');
+      if (isCurrent()) showToast('학생 이동에 실패했습니다. 다시 시도해 주세요.');
       return; // 실패 시 모달 유지
     } finally {
       if (!preserveUncertainLock && (ownLockState === 'owned' || ownLockState === 'unknown')) {
@@ -353,7 +362,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
       setSaving(false);
       inFlight.current = false;
     }
-    if (operationCompleted) onClose();
+    if (operationCompleted && isCurrent()) onClose();
   }
 
   return (

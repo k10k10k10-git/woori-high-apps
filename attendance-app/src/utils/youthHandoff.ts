@@ -3,7 +3,7 @@ import { attendanceGrade } from './attendanceHistory';
 import { reportDate } from './pastoralReport';
 import type { Student } from '@/types';
 
-export const YOUTH_HANDOFF_COLUMNS = ['학생 이름', '생년월일', '본인 전화번호', '학부모 연락처', '학교', '주소', '출석률', '출석등급'];
+export const YOUTH_HANDOFF_COLUMNS = ['학생 이름', '부서·학년·반', '생년월일', '본인 전화번호', '학부모 연락처', '학교', '주소', '출석률', '출석등급'];
 type HandoffSource = Pick<AppState, 'curYear' | 'classData' | 'attData' | 'months' | 'events'>;
 
 export function handoffBirth(value?: string): string {
@@ -29,7 +29,7 @@ export function buildYouthHandoff(source: HandoffSource, nowMs = Date.now()) {
     return info.students.map(student => {
       const { present, absent, rate } = calcStats(annualSource, classKey, student.id);
       const recorded = present + absent;
-      return { classKey, student, birth: handoffBirth(student.birth), rate: recorded ? rate : null, grade: recorded ? attendanceGrade(rate) : '산정 불가' };
+      return { classKey, classLabel: classKey.replace(/^(\d)-3-(\d+)$/, '$1부 3학년 $2반'), student, birth: handoffBirth(student.birth), rate: recorded ? rate : null, grade: recorded ? attendanceGrade(rate) : '산정 불가' };
     });
   }).sort((a, b) => a.student.name.localeCompare(b.student.name, 'ko') || a.classKey.localeCompare(b.classKey, 'ko', { numeric: true }) || a.student.id.localeCompare(b.student.id));
   const missingFields = (student: Student) => [student.name, student.birth, student.phone, student.pphone, student.school, student.addr].some(value => !value?.trim());
@@ -45,7 +45,7 @@ export type YouthHandoff = ReturnType<typeof buildYouthHandoff>;
 export function youthHandoffCells(row: YouthHandoff['rows'][number]): (string | number | Date)[] {
   const [year, month, day] = row.birth.split('-').map(Number);
   // Excel의 날짜 직렬화는 로컬 달력일을 사용하므로 UTC 자정으로 만들지 않는다.
-  return [row.student.name.trim() || '미등록', reportDate(row.birth) !== null ? new Date(year, month - 1, day) : row.birth,
+  return [row.student.name.trim() || '미등록', row.classLabel, reportDate(row.birth) !== null ? new Date(year, month - 1, day) : row.birth,
     row.student.phone?.trim() || '미등록', row.student.pphone?.trim() || '미등록', row.student.school?.trim() || '미등록', row.student.addr?.trim() || '미등록',
     row.rate === null ? '산정 불가' : row.rate / 100, row.grade];
 }
