@@ -290,6 +290,55 @@ describe("인물 통합검색", () => {
     expect(searchPeople(buildPeopleProfiles(data), "전화변경")).toHaveLength(1);
   });
 
+  it("과거 생년월일이 없어도 같은 영구 personId로 연결하고 원본 참조와 최신 학적을 유지한다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2025: { "1-1-4": { students: { old: { name: "가상학생", personId: "person_student_fixed" } } } },
+        2026: { "1-2-6": { students: { current: { name: "가상학생", personId: "person_student_fixed", birth: "2010-01-02" } } } },
+      },
+      attendance: {}, semestersPrivate: {}, retreatsPrivate: {},
+      semesters: {
+        "2026-1": {
+          meta: { title: "2026년 1학기" },
+          applications: { "1_current": { name: "가상학생", studentId: "current", bu: "1부", grade: 2, class: 6 } },
+        },
+      },
+      retreats: {
+        summer: {
+          name: "2026 여름수련회", year: 2026,
+          participants: { participantOriginal: { name: "가상학생", studentId: "current", bu: "1부", grade: 2, class: 6 } },
+        },
+      },
+    };
+
+    const results = searchPeople(buildPeopleProfiles(data), "가상학생");
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ id: "person_student_fixed", name: "가상학생", latestClass: "2026년 2학년 6반", years: ["2026", "2025"], ambiguous: false });
+    expect(results[0].records.map((record) => record.id).sort()).toEqual([
+      "class:2025:1-1-4:old",
+      "class:2026:1-2-6:current",
+      "retreat:summer:participant:participantOriginal",
+      "semester:2026-1:1_current",
+    ]);
+    expect(groupPersonRecordsByYear(results[0].records).map((group) => [group.label, group.records.length])).toEqual([["2026년", 3], ["2025년", 1]]);
+  });
+
+  it("과거 생년월일이 없고 영구 personId가 다르면 본인·보호자 연락처가 같아도 자동 연결하지 않는다", () => {
+    const data: PeopleSearchData = {
+      classes: {
+        2025: { "1-1-4": { students: { old: { name: "가상학생", personId: "person_student_old", phone: "010-0000-1234", pphone: "010-0000-5678" } } } },
+        2026: { "1-2-6": { students: { current: { name: "가상학생", personId: "person_student_current", birth: "2010-01-02", phone: "010-0000-1234", pphone: "010-0000-5678" } } } },
+      },
+      attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    };
+
+    const results = searchPeople(buildPeopleProfiles(data), "가상학생");
+
+    expect(results).toHaveLength(2);
+    expect(results.every((profile) => profile.ambiguous && profile.records.length === 1)).toBe(true);
+  });
+
   it("대표 이름은 최신 출석부 이름을 우선하고 수련회 순번 접두어는 표시에서 제거한다", () => {
     const data: PeopleSearchData = {
       classes: {

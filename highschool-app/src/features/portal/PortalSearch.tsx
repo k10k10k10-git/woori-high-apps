@@ -132,7 +132,7 @@ export default function PortalSearch() {
                           <span className="flex flex-wrap items-center gap-2">
                             <strong className="text-[15px] text-slate-900">{profile.name}</strong>
                             {profile.kinds.map((kind) => <span key={kind} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{PERSON_KIND_LABEL[kind]}</span>)}
-                            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">동명이인 구분</span>}
+                            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">동일인 확인 필요</span>}
                           </span>
                           <span className="mt-1 block text-xs text-slate-500">
                             {profile.latestClass ?? "학적 기록 없음"} · 관련 기록 {profile.records.length}건
@@ -144,7 +144,7 @@ export default function PortalSearch() {
                     )) : <SearchState title="일치하는 인물이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
                 </div>
                 <footer className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">
-                  유형이 다르거나 같은 연도에 후보가 여럿이면 분리합니다. 학생은 이름·생년·부서·진급 흐름이 유일할 때만 연도별 기록을 묶습니다.
+                  학생 기록은 확인된 동일인 정보나 이름·생년월일·부서·진급 이력을 기준으로 연결합니다. 연결 근거가 부족하면 같은 사람의 기록도 따로 표시될 수 있습니다.
                 </footer>
               </>
             )}
@@ -176,7 +176,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{profile.name}</h2>
             {profile.kinds.map((kind) => <span key={kind} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">{PERSON_KIND_LABEL[kind]}</span>)}
-            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">동명이인 후보</span>}
+            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">동일인 확인 필요</span>}
           </div>
           <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"} · 연결된 기록 {profile.records.length}건</p>
         </div>
@@ -185,7 +185,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
       <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
         {profile.ambiguous && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-            같은 이름의 서로 다른 식별자가 있어 별도 인물로 나눴습니다. 학년·반과 연락처를 확인해 주세요.
+            같은 이름의 기록이 여러 묶음으로 표시됩니다. 학년·반과 연락처를 대조해 동일인 여부를 확인해 주세요.
           </div>
         )}
         {yearGroups.length > 0 && activeGroup ? (
