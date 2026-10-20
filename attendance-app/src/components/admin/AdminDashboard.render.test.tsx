@@ -43,6 +43,21 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('관리자 오늘 업무', () => {
+  it('새 주일은 미시작 반과 입력 있는 반을 구분하고 완료라고 표시하지 않는다', () => {
+    mocks.state = { ...mocks.state, months: [{ month: 10, sundays: [25] }],
+      classData: { '1-1-1': { teacher: '담임', students: [{ id: 'a', name: '학생A' }] },
+        '1-1-2': { teacher: '다른담임', students: [{ id: 'b', name: '학생B' }] } },
+      attData: { '1-1-1': { a: { '0-0': 'O' } } },
+      attendanceChecks: { '1-1-1': { '0-0': { revision: 1, startedAt: 1, updatedAt: 2, updatedBy: 'teacher', operationId: 'test-check',
+        allAbsent: false, targetSid: 'a', targetToken: 'a', expected: '', value: 'O', roster: { a: 'a' } } } },
+    };
+    render(<AdminDashboard />);
+    const week = screen.getByRole('group', { name: '10월 25일 출석 현황' });
+    expect(week.textContent).toContain('입력 있음 1개 반');
+    expect(week.textContent).not.toContain('명 완료');
+    expect(screen.getByRole('heading', { name: '출석 미시작·확인 1' })).toBeTruthy();
+    expect(screen.getByText('다른담임 · 체크 미시작')).toBeTruthy();
+  });
   it('출석률의 입력 분모와 일반 학생 입력 완료를 구분하고 연간 심방과 주간 현황을 나눈다', () => {
     render(<AdminDashboard />);
     expect(screen.getByRole('heading', { level: 1, name: '오늘 업무' })).toBeTruthy();

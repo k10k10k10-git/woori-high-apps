@@ -2,9 +2,10 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AppState } from '@/store/AppContext';
-const m = vi.hoisted(() => ({ save: vi.fn(), state: null as AppState | null, dispatch: vi.fn() }));
+const m = vi.hoisted(() => ({ save: vi.fn(), check: vi.fn(), state: null as AppState | null, dispatch: vi.fn() }));
 vi.mock('@/lib/firebase/client', () => ({ auth: {} }));
 vi.mock('@/lib/attendanceSave', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/attendanceSave')>(), saveAttendanceCell: m.save }));
+vi.mock('@/lib/attendanceCheckSave', () => ({ saveAttendanceCheck: m.check }));
 vi.mock('@/store/AppContext', async importOriginal => ({ ...await importOriginal<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state, dispatch: m.dispatch, getState: () => m.state }) }));
 import { initialState, reducer } from '@/store/AppContext';
 import { AttendanceSaveError } from '@/lib/attendanceSave';
@@ -12,6 +13,33 @@ import { useAttendanceSave } from './useAttendanceSave';
 const target = { ck: '1-1-1', sid: 's', k: '8-0' };
 beforeEach(() => { vi.clearAllMocks(); m.dispatch.mockReset(); m.state = { ...initialState, curYear: 2026, attData: {}, classData: {} }; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+it('실패 뒤 같은 SID의 학생이 바뀌어도 재시도는 최초 학생 신원을 바꾸지 않는다', async () => {
+  const next = { ...target, k: '10-0' };
+  const original = { id: 's', name: '원래 학생', personId: 'person-original' };
+  m.state = { ...m.state!, classData: { '1-1-1': { students: [original] } } };
+  m.check.mockRejectedValueOnce(new AttendanceSaveError('unknown', '확인 필요')).mockResolvedValueOnce(undefined);
+  const { result, rerender } = renderHook(useAttendanceSave);
+  await act(async () => { await result.current.save(next, 'O'); });
+  const failure = result.current.feedback!;
+  m.state = { ...m.state!, classData: { '1-1-1': { students: [{ id: 's', name: '다른 학생', personId: 'person-replaced' }] } } };
+  rerender();
+  await act(async () => { await result.current.save(next, 'O', failure); });
+  expect(m.check.mock.calls[1][0].student).toEqual(original);
+  expect(failure.student?.personId).toBe('person-original');
+});
+it('새 주일의 출석과 전원 결석은 동일한 체크 저장 경로로 처리하고 재시도 의도를 유지한다', async () => {
+  const next = { ...target, k: '10-0' };
+  m.check.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new AttendanceSaveError('unknown', '확인 필요')).mockResolvedValueOnce(undefined);
+  const { result } = renderHook(useAttendanceSave);
+  await act(async () => { await result.current.save(next, 'O'); });
+  expect(m.save).not.toHaveBeenCalled();
+  expect(m.check.mock.calls[0][0]).toMatchObject({ expected: '', value: 'O', none: false });
+  await act(async () => { await result.current.saveNone({ ck: next.ck, k: next.k }); });
+  const unknown = result.current.feedback!;
+  expect(unknown).toMatchObject({ target: { ...next, sid: '' }, status: 'unknown' });
+  await act(async () => { await result.current.save(unknown.target, unknown.value, unknown); });
+  expect(m.check.mock.calls[2][0]).toMatchObject({ none: true, target: { ...next, sid: '' } });
+});
 it('실패 뒤 화면 값이 바뀌어도 재시도는 원래 사전값을 유지한다', async () => {
   m.save.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
   const { result, rerender } = renderHook(useAttendanceSave);

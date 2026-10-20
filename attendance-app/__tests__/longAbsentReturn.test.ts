@@ -32,6 +32,40 @@ it('이미 일반 명단이면 추가 감사 기록 없이 멱등 완료한다',
   await compareAndReturnLongAbsent(input, connection(fetch));
   expect(fetch).toHaveBeenCalledTimes(1);
 });
+it('일반 학생도 최신 원본의 장결 상태만 지정하고 ID·번호·정보·기존 이력을 보존한다', async () => {
+  const opened = { ...student, jang: false };
+  const active = { ...current, students: { ...current.students, long: { ...current.students.long, jang: false } } };
+  const before = structuredClone(active);
+  const next = buildLongAbsentReturn(active, opened, '1-1-1', 'change', '관리자', new Date(0), true)!;
+  expect(next.students!.long).toEqual({ ...active.students.long, jang: true });
+  expect(next.students!.other).toEqual(active.students.other);
+  expect(next).toMatchObject({ teacher: active.teacher, extra: active.extra, adminChanges: { old: active.adminChanges.old, change: { studentId: student.id, personId: student.personId, changeSummary: '일반 학생 → 장결자로 지정 · 기존 출석 이력 유지' } } });
+  expect(active).toEqual(before);
+  const fetch = vi.fn().mockResolvedValueOnce(response(active)).mockResolvedValueOnce(response(null));
+  await compareAndReturnLongAbsent({ ...input, student: opened, nextJang: true }, connection(fetch));
+  expect(fetch).toHaveBeenCalledTimes(2);
+  expect(new URL(fetch.mock.calls[1][0]).pathname).toBe('/classes/2026/1-1-1.json');
+  expect(fetch.mock.calls[1][1]).toMatchObject({ method: 'PUT', headers: { 'If-Match': '"class-current"' } });
+  expect(JSON.parse(fetch.mock.calls[1][1].body).students.long).toEqual({ ...active.students.long, jang: true });
+});
+it('이미 장결로 지정되었으면 추가 쓰기·이력 없이 완료한다', async () => {
+  const fetch = vi.fn().mockResolvedValue(response(current));
+  await compareAndReturnLongAbsent({ ...input, student: { ...student, jang: false }, nextJang: true }, connection(fetch));
+  expect(fetch).toHaveBeenCalledTimes(1);
+});
+it.each([null, { ...current, students: {} }, { ...current, students: { long: { ...student, personId: 'another-person' } } }] as Array<Parameters<typeof buildLongAbsentReturn>[0]>)('장결 지정도 삭제·이동·다른 인물 대체를 거절한다', value => {
+  expect(buildLongAbsentReturn(value, { ...student, jang: false }, '1-1-1', 'change', '관리자', new Date(), true)).toBeUndefined();
+});
+it('영구 ID 없는 일반 학생의 정보가 바뀌면 장결 지정도 중단한다', () => {
+  const legacy = { ...student, personId: undefined, jang: false };
+  expect(buildLongAbsentReturn({ students: { long: { ...legacy, phone: '다른 값' } } }, legacy, '1-1-1', 'change', '관리자', new Date(), true)).toBeUndefined();
+});
+it.each([412, 403, 500])('장결 지정의 충돌·권한·서버 실패(%s)는 자동 재전송하지 않는다', async status => {
+  const active = { ...current, students: { ...current.students, long: { ...current.students.long, jang: false } } };
+  const fetch = vi.fn().mockResolvedValueOnce(response(active)).mockResolvedValueOnce(response(null, status));
+  await expect(compareAndReturnLongAbsent({ ...input, student: { ...student, jang: false }, nextJang: true }, connection(fetch))).rejects.toThrow(/장결 지정/);
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
 it('최신 반의 ETag로 상태와 이력을 한 번만 원자 저장하며 출석 경로는 쓰지 않는다', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(response(current)).mockResolvedValueOnce(response(null));
   await compareAndReturnLongAbsent(input, connection(fetch));

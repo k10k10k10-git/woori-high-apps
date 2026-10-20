@@ -19,6 +19,7 @@ function makeState(overrides: Partial<AppState> = {}): AppState {
     curClass: '1',
     classData: {},
     attData: {},
+    attendanceChecks: {},
     customEventsData: {},
     dataRevision: 0,
     dataLoaded: { classes: false, attendance: false, events: false },

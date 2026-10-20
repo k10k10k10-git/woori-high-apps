@@ -9,3 +9,13 @@
 .teacher-note-receipt > svg { flex: 0 0 auto; margin-top: 2px; }
 .teacher-note-receipt strong { font-size: 16px; }
 .teacher-note-receipt p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.attendance-check-guide { margin: 8px 0 18px; color: var(--text2); font-size: 13px; line-height: 1.7; }
+.attendance-check-guide p { margin: 0; }
+.attendance-check-state { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; margin-top: 8px !important; font-variant-numeric: tabular-nums; }
+.attendance-check-state strong { color: var(--text); font-weight: 600; }
+.check-btn.one-tap { min-width: 110px; min-height: 44px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text2); }
+.check-btn.one-tap.active { border-color: var(--green-text); background: var(--green-text); color: #fff; }
+.check-btn.one-tap:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 3px; }
+.attendance-none-action { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 18px; }
+.attendance-none-action > button { min-height: 44px; font: inherit; }
+.attendance-none-action > p { margin: 0; color: var(--text2); font-size: 12px; line-height: 1.6; }

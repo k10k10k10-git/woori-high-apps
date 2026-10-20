@@ -58,6 +58,23 @@ it('개인 상세도 주소·생년월일·연간 출석률·등급을 같은 �
 });
 
 describe('관리자 명단·출석 접근 경로', () => {
+  it('관리자는 일반 학생 상세에서 동일 학생·반을 장결자로 지정할 수 있다', () => {
+    mocks.state.userRole = { role: 'admin' };
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '김하나' }));
+    const detail = screen.getByRole('complementary');
+    expect(within(detail).queryByRole('button', { name: '일반 명단 복귀' })).toBeNull();
+    fireEvent.click(within(detail).getByRole('button', { name: '장결자로 지정' }));
+    const dialog = screen.getByRole('dialog', { name: '장결자로 지정' });
+    expect(dialog.textContent).toContain('김하나');
+    expect(dialog.textContent).toContain('1부 1학년 1반');
+  });
+  it('교사에게는 학생 상세의 장결 지정·복귀 기능을 노출하지 않는다', () => {
+    mocks.state.userRole = { role: 'teacher' };
+    render(<StudentDirectory onOpenClass={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '김하나' }));
+    expect(within(screen.getByRole('complementary')).queryByRole('button', { name: '장결자로 지정' })).toBeNull();
+  });
   it('장결 학생 상세에서 동일 학생·반의 복귀 확인창을 제공한다', () => {
     mocks.state.userRole = { role: 'admin' };
     render(<StudentDirectory onOpenClass={vi.fn()} />);

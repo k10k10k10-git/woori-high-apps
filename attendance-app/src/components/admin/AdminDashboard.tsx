@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/store/AppContext';
-import { buildAdminDashboard, type AdminDashboardRow } from '@/utils/adminDashboard';
+import { buildAdminDashboard, isAttendancePending, type AdminDashboardRow } from '@/utils/adminDashboard';
 import { buildPastoralReport } from '@/utils/pastoralReport';
 import { useOpenVisitRequests } from '@/hooks/useVisitRequests';
 import AdminIcon from './AdminIcon';
@@ -15,16 +15,16 @@ export default function AdminDashboard() {
   const { state, dispatch } = useApp();
   const router = useRouter();
   const [pickedWeek, setPickedWeek] = useState<{ year: number; key: string } | null>(null);
-  const { classData, attData, months, events, curYear } = state;
-  const model = useMemo(() => buildAdminDashboard({ classData, attData, months, events, curYear }, {
+  const { classData, attData, months, events, curYear, attendanceChecks } = state;
+  const model = useMemo(() => buildAdminDashboard({ classData, attData, months, events, curYear, attendanceChecks }, {
     weekKey: pickedWeek?.year === curYear ? pickedWeek.key : undefined,
-  }), [classData, attData, months, events, curYear, pickedWeek]);
+  }), [classData, attData, months, events, curYear, attendanceChecks, pickedWeek]);
   const report = useMemo(() => buildPastoralReport({ classData, attData, months, events, curYear }, [], Date.now(), model.selectedWeek?.key),
     [classData, attData, months, events, curYear, model.selectedWeek?.key]);
   const visits = useOpenVisitRequests(curYear);
   const absences = report.absent.filter(row => row.student.jang !== true);
   const pending = [...model.allRows]
-    .filter(row => row.status === 'empty' || row.status === 'partial')
+    .filter(isAttendancePending)
     .sort((a, b) => b.unentered - a.unentered || a.label.localeCompare(b.label, 'ko', { numeric: true }));
   const { weeks, selectedWeek, overallSummary: totals } = model;
   const selectedIndex = weeks.findIndex(week => week.key === selectedWeek?.key);
@@ -63,13 +63,15 @@ export default function AdminDashboard() {
         <div>
           <span><b>{selectedWeek ? totals.pendingClassCount : '—'}</b>개 반 입력 확인</span>
           <span><b>{selectedWeek ? absences.length : '—'}</b>명 연속 결석</span>
-          <span className="ad-glance-attendance">출석 <b>{selectedWeek ? totals.present : '—'}</b>명 · 출석률 <b>{totals.attendanceRate === null ? '—' : `${totals.attendanceRate}%`}</b><small>{selectedWeek ? `O·X 입력 ${totals.recorded}명 기준 · 출석 체크 ${totals.inputRecorded}/${totals.inputStudentCount}명 완료(장결 제외)` : '조회할 주일이 없어 입력 인원을 계산하지 않습니다.'}</small></span>
+          <span className="ad-glance-attendance">출석 <b>{selectedWeek ? totals.present : '—'}</b>명 · 출석률 <b>{totals.attendanceRate === null ? '—' : `${totals.attendanceRate}%`}</b><small>{!selectedWeek ? '조회할 주일이 없어 입력 인원을 계산하지 않습니다.' : model.oneTap
+            ? `O·X 집계 ${totals.recorded}명 기준 · 입력 있음 ${totals.startedClassCount}개 반 · 출석 0명 확인 ${totals.allAbsentClassCount}개 반`
+            : `O·X 입력 ${totals.recorded}명 기준 · 출석 체크 ${totals.inputRecorded}/${totals.inputStudentCount}명 완료(장결 제외)`}</small></span>
         </div>
       </div>
     </div>
 
     <section className="ad-worklist" aria-labelledby="ad-worklist-title">
-      <div className="ad-section-heading"><div><h2 id="ad-worklist-title">먼저 확인하세요</h2><p>심방은 {curYear}년 현재 미처리 요청 · 결석과 출석 입력은 {selectedWeek?.label ?? '조회 주일 없음'} 기준입니다. 미입력은 결석으로 계산하지 않습니다.</p></div></div>
+      <div className="ad-section-heading"><div><h2 id="ad-worklist-title">먼저 확인하세요</h2><p>심방은 {curYear}년 현재 미처리 요청 · 결석과 출석 입력은 {selectedWeek?.label ?? '조회 주일 없음'} 기준입니다. {model.oneTap ? '체크를 시작한 반의 미체크는 결석으로 집계하며, 미시작 반은 별도로 확인합니다. 입력 있음은 완료를 뜻하지 않습니다.' : '미입력은 결석으로 계산하지 않습니다.'}</p></div></div>
       <div className="ad-work-groups">
         <article data-status-tone={visits.status === 'error' ? 'danger' : visits.status === 'loading' ? 'info' : visits.rows.length ? 'warning' : 'neutral'} className={visits.status === 'ready' && !visits.rows.length ? 'ad-work-idle' : undefined}>
           <header><span className="ad-work-icon"><AdminIcon name="book" size={17} /></span><div><h3>심방 요청 <b>{visits.status === 'ready' ? visits.rows.length : '—'}</b></h3><p>{curYear}년 미처리 · 교사가 확인을 요청했습니다.</p></div><Link href="/pastoral?view=visits">전체 보기 <AdminIcon name="arrow" /></Link></header>
@@ -80,8 +82,8 @@ export default function AdminDashboard() {
           {absences.length ? <ul>{absences.slice(0, 3).map(row => <li key={row.key}><span><strong>{row.student.name}</strong><small>{row.label} · {row.streak}회 연속 결석</small></span><Link aria-label={`${row.student.name} 연속 결석 보기`} href={`/pastoral?view=absence&student=${encodeURIComponent(row.key)}${weekQuery}`}><AdminIcon name="arrow" /></Link></li>)}</ul> : <p className="ad-work-empty">{selectedWeek ? '3회 이상 연속 결석한 학생이 없습니다.' : '조회할 주일이 없습니다.'}</p>}
         </article>
         <article data-status-tone={!selectedWeek || !inputClassCount ? 'neutral' : pending.length ? 'warning' : 'success'} className={selectedWeek && !pending.length ? 'ad-work-idle' : undefined}>
-          <header><span className="ad-work-icon"><AdminIcon name={pending.length ? 'clock' : 'check'} size={17} /></span><div><h3>출석 미입력 <b>{selectedWeek ? pending.length : '—'}</b></h3><p>{inputClassCount}개 대상 반 중 입력이 덜 끝난 반입니다.</p></div><Link href={`/attendance?view=overview&status=pending${weekQuery}`}>전체 보기 <AdminIcon name="arrow" /></Link></header>
-          {pending.length ? <ul>{pending.slice(0, 3).map(row => <li key={row.classKey}><span><strong>{row.label}</strong><small>{row.teacher || '담임 미등록'} · {row.unentered}명 미입력</small></span><button type="button" aria-label={`${row.label} 출석 입력 열기`} onClick={() => openClass(row)}><AdminIcon name="arrow" /></button></li>)}</ul> : <p className="ad-work-empty">{selectedWeek ? '모든 대상 반의 입력이 끝났습니다.' : '조회할 주일이 없습니다.'}</p>}
+          <header><span className="ad-work-icon"><AdminIcon name={pending.length ? 'clock' : 'check'} size={17} /></span><div><h3>{model.oneTap ? '출석 미시작·확인' : '출석 미입력'} <b>{selectedWeek ? pending.length : '—'}</b></h3><p>{inputClassCount}개 대상 반 중 {model.oneTap ? '미시작·기록 확인이 필요한 반입니다.' : '입력이 덜 끝난 반입니다.'}</p></div><Link href={`/attendance?view=overview&status=pending${weekQuery}`}>전체 보기 <AdminIcon name="arrow" /></Link></header>
+          {pending.length ? <ul>{pending.slice(0, 3).map(row => <li key={row.classKey}><span><strong>{row.label}</strong><small>{row.teacher || '담임 미등록'} · {model.oneTap && row.status === 'empty' ? '체크 미시작' : `${row.unentered}명 미입력`}</small></span><button type="button" aria-label={`${row.label} 출석 입력 열기`} onClick={() => openClass(row)}><AdminIcon name="arrow" /></button></li>)}</ul> : <p className="ad-work-empty">{!selectedWeek ? '조회할 주일이 없습니다.' : model.oneTap ? '미시작·기록 확인이 필요한 반이 없습니다.' : '모든 대상 반의 입력이 끝났습니다.'}</p>}
         </article>
       </div>
     </section>

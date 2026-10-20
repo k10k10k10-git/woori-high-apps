@@ -21,10 +21,10 @@ import './pastoral-report.css';
 
 const SECTIONS = [
   { key: 'visits', label: '심방 요청' },
+  { key: 'notes', label: '특이사항' },
   { key: 'absence', label: '연속 결석' },
   { key: 'registration', label: '새친구 등록현황' },
   { key: 'friends', label: '새친구 부서정착' },
-  { key: 'notes', label: '특이사항' },
 ] as const;
 type Section = typeof SECTIONS[number];
 type FriendLoad = { status: 'loading' | 'ready' | 'error'; friends: PublicReportFriend[] };
@@ -135,11 +135,10 @@ function ReportContent() {
   return <div className="admin-overview pastoral-report">
     <header className="ao-heading"><h1>목양 관리</h1><p>학생 이름을 먼저 보고, 필요한 연락과 후속 조치를 바로 확인하세요.</p></header>
     <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">
-      {SECTIONS.slice(0, 2).map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => chooseSection(item)}>{item.label}</button>)}
-      <button type="button" aria-pressed={isNewFriends} aria-controls="pr-content" onClick={() => chooseSection(isNewFriends ? section : SECTIONS[2])}>새친구</button>
-      <button type="button" className="pr-secondary-link" aria-pressed={section.key === 'notes'} aria-controls="pr-content" onClick={() => chooseSection(SECTIONS[4])}>특이사항</button>
+      {SECTIONS.slice(0, 3).map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => chooseSection(item)}>{item.label}</button>)}
+      <button type="button" aria-pressed={isNewFriends} aria-controls="pr-content" onClick={() => chooseSection(isNewFriends ? section : SECTIONS[3])}>새친구</button>
     </div>
-    {isNewFriends && <div className="pr-subsections" role="group" aria-label="새친구 보기 선택">{SECTIONS.slice(2, 4).map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => chooseSection(item)}>{item.label}</button>)}</div>}
+    {isNewFriends && <div className="pr-subsections" role="group" aria-label="새친구 보기 선택">{SECTIONS.slice(3).map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => chooseSection(item)}>{item.label}</button>)}</div>}
 
     {showFilters && <div className={`pr-filters${filtersOpen ? ' pr-filters-open' : ''}`}>
       {(section.key === 'absence' || section.key === 'friends') && <label>기준 주일<select value={report.selectedWeek?.key ?? ''} onChange={e => setWeekKey(e.target.value)}>{!report.weeks.length && <option value="">조회할 주일 없음</option>}{report.weeks.map(week => <option key={week.key} value={week.key}>{week.label}</option>)}</select></label>}

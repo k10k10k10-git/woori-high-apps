@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '@/store/AppContext';
 import { AttendanceSaveError, saveAttendanceCell } from '@/lib/attendanceSave';
+import { saveAttendanceCheck } from '@/lib/attendanceCheckSave';
+import { usesOneTap } from '@/utils/attendanceChecks';
 import { BrowserWriteLockError } from '@/utils/browserWriteLock';
 import type { AttendanceSaveFeedback } from '@/components/AttendanceSaveBanner';
 import type { AttEditTarget, AttValue } from '@/types';
@@ -28,16 +30,25 @@ export function useAttendanceSave() {
     if (running.current || (getState && getState().saveStatus === 'saving') || (retry && retry.scope !== scope)) return;
     const year = state.curYear, revision = state.dataRevision;
     const expected = retry?.expected ?? state.attData[target.ck]?.[target.sid]?.[target.k] ?? '';
-    const studentName = state.classData[target.ck]?.students.find(student => student.id === target.sid)?.name ?? '학생';
+    const student = retry ? retry.student : state.classData[target.ck]?.students.find(student => student.id === target.sid);
+    const none = target.sid === '';
+    const studentName = none ? '반 전체' : student?.name ?? '학생';
     const [mi, di] = target.k.split('-').map(Number);
     const [part, grade, cls] = target.ck.split('-');
     const targetLabel = `${year}년 ${part}부 ${grade}학년 ${cls}반 · ${state.months[mi]?.month}월 ${state.months[mi]?.sundays[di]}일`;
-    const base = { sid: target.sid, studentName, target, value, expected, scope, targetLabel };
+    const base = { sid: target.sid, studentName, student, target, value, expected, scope, targetLabel };
     running.current = true; setPending(true);
     setFeedback({ ...base, status: 'saving' });
     dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving', revision, feedback: { ...base, status: 'saving' } });
     try {
-      await saveAttendanceCell({ year, target, value, expected }, () => valid(year, revision));
+      const fresh = getState ? getState() : current.current;
+      if (fresh.events[target.k]) throw new AttendanceSaveError('unavailable', '행사 주일은 출석을 입력하지 않습니다. 다른 주일을 선택해 주세요.');
+      if (usesOneTap(year, state.months, target.k)) {
+        await saveAttendanceCheck({ year, target, value, expected, student, none }, () => valid(year, revision));
+      } else {
+        if (none) throw new AttendanceSaveError('unavailable', '이전 주일은 기존 출석 입력 방식을 유지합니다.');
+        await saveAttendanceCell({ year, target, value, expected }, () => valid(year, revision));
+      }
       if (!valid(year, revision)) return;
       // 안내 식별 시각은 같은 밀리초에 저장해도 겹치지 않아야 이전 닫기 타이머와 구분된다.
       const savedAt = Math.max(Date.now(), lastSavedAt.current + 1, ((getState ? getState() : current.current).lastAttendanceSavedAt ?? 0) + 1);
@@ -59,5 +70,5 @@ export function useAttendanceSave() {
   }, []);
   const visible = state.attendanceFeedback ?? feedback;
   const dismissed = visible?.status === 'saved' && visible.savedAt === dismissedSavedAt;
-  return { feedback: visible?.scope === scope && !dismissed ? visible : null, save, dismissSaved, pending: pending || state.saveStatus === 'saving' };
+  return { feedback: visible?.scope === scope && !dismissed ? visible : null, save, saveNone: (target: { ck: string; k: string }) => save({ ...target, sid: '' }, 'X'), dismissSaved, pending: pending || state.saveStatus === 'saving' };
 }

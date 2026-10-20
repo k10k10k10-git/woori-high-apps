@@ -32,6 +32,61 @@ function ruleExpression(...segments: string[]): string {
 }
 
 describe('database.rules.json 권한 계약', () => {
+  describe('한 번 누르는 출석의 반·주일 체크 상태', () => {
+    const week = ['attendanceChecks', '$year', '$classKey', '$weekKey'];
+    it('개인 출석부 관리자 전체와 이메일 일치 교사 본인 반만 읽으며 통합 앱 권한을 추가하지 않는다', () => {
+      const read = ruleExpression('attendanceChecks', '.read');
+      expect(refers(read, 'admins')).toBe(true); expect(refers(read, 'attendanceAdmins')).toBe(true);
+      expect(refers(read, 'retreatAdmins')).toBe(false); expect(refers(read, 'iguardMembers')).toBe(false);
+      const ownRead = ruleExpression('attendanceChecks', '$year', '$classKey', '.read');
+      expect(ownRead).toContain("child('email').val() === auth.token.email");
+      expect(ownRead).toContain("child('role').val() === 'teacher'");
+      expect(ownRead).not.toContain("child('teacherClasses')");
+    });
+    it('상위 쓰기를 열지 않고 알려진 메타 필드의 무삭제·본인 반·무잠금 쓰기만 허용한다', () => {
+      for (const path of [[], ['$year'], ['$year', '$classKey'], ['$year', '$classKey', '$weekKey']]) expect(ruleValue('attendanceChecks', ...path, '.write')).toBeUndefined();
+      const write = ruleExpression(...week, '$field', '.write');
+      expect(write).toContain('newData.exists()');
+      expect(write).toContain("child('role').val() === 'teacher'");
+      expect(write).toContain("!root.child('config').child('studentMoveLocks').child($year).child($classKey).exists()");
+      expect(write).toContain('revision|startedAt|updatedAt|updatedBy|operationId|allAbsent|targetSid|targetToken|expected|value');
+      expect(ruleExpression(...week, '$field', '.validate')).toContain('$field.matches(');
+    });
+    it('revision CAS·서버 시각·UID·필수 필드·사전값·최종 출석을 한 원자 요청에서 검증한다', () => {
+      const validate = ruleExpression(...week, '.validate');
+      expect(validate).toContain("data.child('revision').val() + 1 : 1");
+      expect(validate).toContain("newData.child('updatedAt').val() === now");
+      expect(validate).toContain("newData.child('updatedBy').val() === auth.uid");
+      expect(validate).toContain("data.child('startedAt').val() : now");
+      expect(validate).toContain("newData.child('operationId').val() !== data.child('operationId').val()");
+      expect(validate).toContain("newData.child('targetToken').isString()");
+      expect(validate).toContain("newData.child('targetToken').val() ===");
+      expect(validate).toContain("'legacy:' +");
+      expect(validate).toContain("child('allAbsent').val() === true");
+      expect(validate).toContain("newData.child('expected').val() === 'O'");
+      expect(validate).toContain("child($weekKey).val() === 'T'");
+      expect(validate).toContain("newData.parent().parent().parent().parent().child('attendance')");
+      expect(validate).not.toContain('numChildren');
+    });
+    it('첫 체크의 학생 스냅샷은 현재 일반 학생의 영구 ID 또는 SID만 저장하고 이후 수정하지 못한다', () => {
+      const write = ruleExpression(...week, 'roster', '$studentId', '.write');
+      expect(write).toContain("!root.child('attendanceChecks').child($year).child($classKey).child($weekKey).exists()");
+      expect(write).toContain('newData.exists()');
+      expect(write).toContain("child('students').child($studentId).exists()");
+      expect(write).toContain("child('jang').val() !== true");
+      const validate = ruleExpression(...week, 'roster', '$studentId', '.validate');
+      expect(validate).toContain("child('personId').val()");
+      expect(validate).toContain("'legacy:' +"); expect(validate).toContain("child('birth').isString()");
+      expect(ruleValue(...week, 'roster', '.write')).toBeUndefined();
+    });
+    it('새 체크 operationId를 함께 바꾸는 요청은 다른 학생의 실제 기록을 X로 덮지 못한다', () => {
+      const validate = ruleExpression('attendance', '$year', '$classKey', '$studentId', '$weekKey', '.validate');
+      expect(validate).toContain("child('operationId').val() === root.child('attendanceChecks')");
+      expect(validate).toContain("child('targetSid').val() === $studentId");
+      expect(validate).toContain("(data.val() === null || data.val() === '') && newData.val() === 'X'");
+      expect(validate).toContain("child('jang').val() !== true");
+    });
+  });
   it('비고 권한은 개인 관리자·데모 제외·등록 학생의 teamMemo leaf에만 추가한다', () => {
     const segments = ['semestersPrivate', '$sid', 'newFriendsPrivate', '$friendId', 'teamMemo'];
     for (const action of ['.read', '.write']) {

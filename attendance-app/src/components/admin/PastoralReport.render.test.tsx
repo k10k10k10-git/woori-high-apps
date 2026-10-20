@@ -23,6 +23,19 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 describe('목양 리포트 실제 화면', () => {
+  it('심방 요청·특이사항·연속 결석·새친구를 같은 탭 그룹의 순서대로 제공한다', () => {
+    render(<PastoralReport />);
+    const navigation = screen.getByRole('group', { name: '목양 관리 보기 선택' });
+    const tabs = within(navigation).getAllByRole('button');
+    expect(tabs.map(tab => tab.textContent)).toEqual(['심방 요청', '특이사항', '연속 결석', '새친구']);
+    expect(navigation.querySelector('.pr-secondary-link')).toBeNull();
+    fireEvent.click(tabs[1]);
+    expect(tabs[1].getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('heading', { name: '특이사항' })).toBeTruthy();
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    fireEvent.click(tabs[3]);
+    expect(within(screen.getByRole('group', { name: '새친구 보기 선택' })).getAllByRole('button').map(tab => tab.textContent)).toEqual(['새친구 등록현황', '새친구 부서정착']);
+  });
   it('세부 탭을 전환하고 연락처 연결과 검색을 제공한다', () => {
     render(<PastoralReport />);
     fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));

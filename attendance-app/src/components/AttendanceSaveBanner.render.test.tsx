@@ -39,6 +39,11 @@ describe('AttendanceSaveBanner', () => {
     vi.useRealTimers();
   });
 
+  it('전원 결석 저장을 출석 저장으로 잘못 안내하지 않는다', () => {
+    render(<AttendanceSaveBanner feedback={{ status: 'saved', target: { ...target, sid: '' }, sid: '', studentName: '반 전체', value: 'X', savedAt: 1 }} visible onDismissSaved={() => {}} onRetry={() => {}} />);
+    expect(screen.getByRole('status').textContent).toBe('일반 학생 전원 결석이 저장되었습니다.');
+  });
+
   it('저장 성공을 알린 뒤 2초 후 화면에서 없앤다', () => {
     render(<SavedFeedbackHarness />);
     expect(screen.getByRole('status').textContent).toContain('저장되었습니다');

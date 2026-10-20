@@ -2,8 +2,9 @@ import type { AppState } from '@/store/AppContext';
 import { recentEditableWeeks, type EditableWeek } from './attendanceWorkflow';
 import { evKey } from './dates';
 import { normalizeAttendanceValue } from './attendanceValue';
+import { attendanceCheckFor, usesOneTap } from './attendanceChecks';
 
-export type AdminDashboardSource = Pick<AppState, 'classData' | 'attData' | 'months' | 'events' | 'curYear'>;
+export type AdminDashboardSource = Pick<AppState, 'classData' | 'attData' | 'months' | 'events' | 'curYear'> & Partial<Pick<AppState, 'attendanceChecks'>>;
 
 export type AdminDashboardFilters = {
   weekKey?: string | null;
@@ -13,7 +14,7 @@ export type AdminDashboardFilters = {
   nowMs?: number;
 };
 
-export type AdminDashboardStatus = 'complete' | 'partial' | 'empty' | 'no-students' | 'no-targets' | 'no-week';
+export type AdminDashboardStatus = 'complete' | 'partial' | 'empty' | 'started' | 'all-absent' | 'no-students' | 'no-targets' | 'no-week';
 
 export type AdminDashboardCounts = {
   studentCount: number;
@@ -22,6 +23,8 @@ export type AdminDashboardCounts = {
   inputStudentCount: number;
   /** 일반 학생 중 O·X가 입력된 인원. */
   inputRecorded: number;
+  /** 장결을 제외한 출석 체크 인원. */
+  inputPresent: number;
   recorded: number;
   present: number;
   absent: number;
@@ -40,6 +43,7 @@ export type AdminDashboardRow = AdminDashboardCounts & {
   label: string;
   teacher: string;
   status: AdminDashboardStatus;
+  lastSavedAt: number | null;
 };
 
 export type AdminDashboardSummary = AdminDashboardCounts & {
@@ -47,6 +51,8 @@ export type AdminDashboardSummary = AdminDashboardCounts & {
   completeClassCount: number;
   partialClassCount: number;
   emptyClassCount: number;
+  startedClassCount: number;
+  allAbsentClassCount: number;
   noStudentClassCount: number;
   noTargetClassCount: number;
   /** 일반 학생이 있고 입력이 덜 끝난 반. 조회할 정상 주일이 없으면 0이다. */
@@ -64,6 +70,7 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
     longAbsentCount: 0,
     inputStudentCount: 0,
     inputRecorded: 0,
+    inputPresent: 0,
     recorded: 0,
     present: 0,
     absent: 0,
@@ -73,6 +80,8 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
     completeClassCount: 0,
     partialClassCount: 0,
     emptyClassCount: 0,
+    startedClassCount: 0,
+    allAbsentClassCount: 0,
     noStudentClassCount: 0,
     noTargetClassCount: 0,
     pendingClassCount: 0,
@@ -83,6 +92,7 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
     summary.longAbsentCount += row.longAbsentCount;
     summary.inputStudentCount += row.inputStudentCount;
     summary.inputRecorded += row.inputRecorded;
+    summary.inputPresent += row.inputPresent;
     summary.recorded += row.recorded;
     summary.present += row.present;
     summary.absent += row.absent;
@@ -90,6 +100,8 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
     if (row.status === 'complete') summary.completeClassCount++;
     if (row.status === 'partial') summary.partialClassCount++;
     if (row.status === 'empty') summary.emptyClassCount++;
+    if (row.status === 'started') summary.startedClassCount++;
+    if (row.status === 'all-absent') summary.allAbsentClassCount++;
     if (row.status === 'no-students') summary.noStudentClassCount++;
     if (row.status === 'no-targets') summary.noTargetClassCount++;
   }
@@ -97,8 +109,13 @@ function summarize(rows: AdminDashboardRow[], hasWeek: boolean): AdminDashboardS
   // 반별 비율을 평균 내지 않고 실제 인원으로 다시 계산한다.
   summary.attendanceRate = percentage(summary.present, summary.recorded);
   summary.inputRate = hasWeek ? percentage(summary.inputRecorded, summary.inputStudentCount) : null;
-  summary.pendingClassCount = summary.partialClassCount + summary.emptyClassCount;
+  summary.pendingClassCount = rows.filter(isAttendancePending).length;
   return summary;
+}
+
+export function isAttendancePending(row: AdminDashboardRow) {
+  return row.status === 'empty' || row.status === 'partial'
+    || ((row.status === 'started' || row.status === 'all-absent') && row.unentered > 0);
 }
 
 function searchable(value: string): string {
@@ -120,6 +137,7 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
     ?? latestElapsedWeek
     ?? weeks[0]
     ?? null;
+  const oneTap = usesOneTap(curYear, months, selectedWeek?.key ?? null);
 
   const allRows: AdminDashboardRow[] = Object.entries(classData).map(([classKey, info]) => {
     const [part = '', grade = '', classNumber = ''] = classKey.split('-');
@@ -128,20 +146,24 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
     let absent = 0;
     let longAbsentCount = 0;
     let inputRecorded = 0;
+    let inputPresent = 0;
     for (const student of students) {
       if (student.jang === true) longAbsentCount++;
       const value = normalizeAttendanceValue(selectedWeek ? attData[classKey]?.[student.id]?.[selectedWeek.key] : undefined);
       if (value === 'O') present++;
       else if (value === 'X') absent++;
       if (student.jang !== true && (value === 'O' || value === 'X')) inputRecorded++;
+      if (student.jang !== true && value === 'O') inputPresent++;
     }
 
     const studentCount = students.length;
     const recorded = present + absent;
     const inputStudentCount = studentCount - longAbsentCount;
+    const check = oneTap ? attendanceCheckFor(source, classKey, selectedWeek?.key ?? null) : undefined;
     const status: AdminDashboardStatus = studentCount === 0 ? 'no-students'
       : !selectedWeek ? 'no-week'
       : inputStudentCount === 0 ? 'no-targets'
+      : check ? check.allAbsent && inputPresent === 0 ? 'all-absent' : 'started'
       : inputRecorded === inputStudentCount ? 'complete'
       : inputRecorded > 0 ? 'partial'
       : 'empty';
@@ -156,6 +178,7 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
       longAbsentCount,
       inputStudentCount,
       inputRecorded,
+      inputPresent,
       recorded,
       present,
       absent,
@@ -163,6 +186,7 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
       attendanceRate: percentage(present, recorded),
       inputRate: selectedWeek ? percentage(inputRecorded, inputStudentCount) : null,
       status,
+      lastSavedAt: check?.updatedAt ?? null,
     };
   }).sort((a, b) => a.part.localeCompare(b.part, 'ko', { numeric: true })
     || a.grade.localeCompare(b.grade, 'ko', { numeric: true })
@@ -181,6 +205,7 @@ export function buildAdminDashboard(source: AdminDashboardSource, filters: Admin
   return {
     weeks,
     selectedWeek,
+    oneTap,
     rows,
     allRows,
     summary: summarize(rows, !!selectedWeek),

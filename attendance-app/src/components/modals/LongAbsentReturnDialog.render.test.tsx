@@ -29,6 +29,23 @@ it('확인한 대상만 복귀하고 완료 후 창을 닫는다', async () => {
   expect(m.save.mock.calls[0][0]).toMatchObject({ ...target, actor: '합성 관리자' });
   expect(m.toast).toHaveBeenCalledOnce();
 });
+it('일반 학생의 장결 지정은 같은 확인창에서 영향과 복귀 방법을 알리고 저장한다', async () => {
+  const active = { ...target, student: { ...target.student, jang: false }, nextJang: true };
+  render(<LongAbsentReturnDialog target={active} onClose={m.close} />);
+  const dialog = screen.getByRole('dialog', { name: '장결자로 지정' });
+  expect(dialog.textContent).toContain('일반 출석 체크 명단에서 빠지고');
+  expect(dialog.textContent).toContain('다시 일반 명단으로 복귀');
+  expect(dialog.textContent).toContain('과거 출석을 자동으로 수정하지 않습니다.');
+  fireEvent.click(screen.getByRole('button', { name: '장결자로 지정' }));
+  await waitFor(() => expect(m.close).toHaveBeenCalledOnce());
+  expect(m.save.mock.calls[0][0]).toMatchObject({ ...active, actor: '합성 관리자' });
+  expect(m.toast).toHaveBeenCalledWith('장결자로 지정했습니다. 기존 출석 이력은 유지됩니다.', 'success');
+});
+it('장결 지정을 취소하면 원장 변경을 요청하지 않는다', () => {
+  render(<LongAbsentReturnDialog target={{ ...target, student: { ...target.student, jang: false }, nextJang: true }} onClose={m.close} />);
+  fireEvent.click(screen.getByRole('button', { name: '취소' }));
+  expect(m.close).toHaveBeenCalledOnce(); expect(m.save).not.toHaveBeenCalled();
+});
 it('저장 중 중복 클릭·취소·ESC를 막고 실패 시 오류와 재시도를 유지한다', async () => {
   let reject!: (error: Error) => void;
   m.save.mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));
@@ -41,13 +58,13 @@ it('저장 중 중복 클릭·취소·ESC를 막고 실패 시 오류와 재시�
   expect(screen.getByRole('button', { name: '일반 명단으로 복귀' })).toHaveProperty('disabled', false);
   expect(m.toast).not.toHaveBeenCalled();
 });
-it.each(['teacher', 'year', 'revision', 'data'])('대화창을 연 뒤 %s 상태가 바뀌면 복귀를 막는다', async change => {
-  render(<LongAbsentReturnDialog target={target} onClose={m.close} />);
+it.each([false, true].flatMap(nextJang => ['teacher', 'year', 'revision', 'data'].map(change => ({ nextJang, change }))))('대화창을 연 뒤 $change 상태가 바뀌면 장결 상태 변경($nextJang)을 막는다', async ({ nextJang, change }) => {
+  render(<LongAbsentReturnDialog target={{ ...target, student: { ...target.student, jang: !nextJang }, nextJang }} onClose={m.close} />);
   const state = m.state as AppState;
   if (change === 'teacher') state.userRole = { role: 'teacher' };
   if (change === 'year') state.curYear = 2027;
   if (change === 'revision') state.dataRevision++;
   if (change === 'data') state.dataLoaded.classes = false;
-  fireEvent.click(screen.getByRole('button', { name: '일반 명단으로 복귀' }));
+  fireEvent.click(screen.getByRole('button', { name: nextJang ? '장결자로 지정' : '일반 명단으로 복귀' }));
   await screen.findByRole('alert'); expect(m.close).not.toHaveBeenCalled(); expect(m.toast).not.toHaveBeenCalled();
 });
