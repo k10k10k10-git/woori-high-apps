@@ -70,6 +70,14 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
   let patches = 0;
   let resultPaths = [];
   const resultReads = [];
+  const lockReads = [];
+  const lockWrites = [];
+  page.on('request', request => {
+    const requestUrl = new URL(request.url());
+    if (requestUrl.origin !== base || requestUrl.pathname !== `/config/studentMoveLocks/${year}.json`) return;
+    if (request.method() === 'GET') lockReads.push(request.headers()['x-firebase-etag']);
+    if (request.method() === 'PUT') lockWrites.push(request.headers()['if-match']);
+  });
   page.on('response', response => {
     const responseUrl = new URL(response.url());
     if (holdSubscriptions && response.request().method() === 'GET'
@@ -109,6 +117,10 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
   await expect.poll(() => heldUpdates.length).toBeGreaterThan(0);
   expect(resultReads).toEqual(expect.arrayContaining(resultPaths.map(path => ({ path, status: 200 }))));
   expect(resultReads.filter(result => resultPaths.includes(result.path))).toHaveLength(3);
+  expect(lockReads.length).toBeGreaterThanOrEqual(2);
+  expect(lockReads.every(value => value === 'true')).toBe(true);
+  expect(lockWrites.length).toBeGreaterThanOrEqual(2);
+  expect(lockWrites.every(value => typeof value === 'string' && value.length > 0 && value !== '*')).toBe(true);
   // 목적지의 SDK 명단은 아직 이동 전이지만 서버 확인으로 모달은 정상 종료돼야 한다.
   await expect(page.locator('.student-card').filter({ hasText: source.name })).toHaveCount(0);
   holdSubscriptions = false;
@@ -131,11 +143,45 @@ for (const orphan of [false, true]) test(`${orphan ? '출석만 남은 ID' : '�
 test('충돌이 없으면 기존 학생 ID를 유지한다', async ({ page, request }) => {
   await seed(request, true);
   expect((await request.delete(url(`attendance/${year}/1-1-7/S17_05`), { headers })).ok()).toBe(true);
+  const unrelatedRecord = { phase: 'preparing', startedAt: Date.now(), fromCk: '1-2-1', toCk: '1-2-2', sid: 'unrelated-student' };
+  const unrelatedLocks = Object.fromEntries(['1-2-1', '1-2-2'].map(classKey => [classKey, { 'unrelated-owner': { 'unrelated-operation': unrelatedRecord } }]));
+  const lockStatuses = [];
+  let changed = false;
+  await page.route(`**/config/studentMoveLocks/${year}.json?**`, async route => {
+    if (route.request().method() === 'PUT' && !changed) {
+      changed = true;
+      // 최초 ETag 조회 직후 다른 두 반의 잠금이 생겨도 이를 덮지 않고 다시 비교한다.
+      expect((await request.put(url(`config/studentMoveLocks/${year}`), { headers, data: unrelatedLocks })).ok()).toBe(true);
+    }
+    const response = await route.fetch();
+    if (route.request().method() === 'PUT') lockStatuses.push(response.status());
+    await route.fulfill({ response });
+  });
   await openMove(page);
   await confirmMove(page);
   await expect(page.getByRole('dialog', { name: '학생 이동' })).toHaveCount(0);
+  expect(changed).toBe(true);
+  expect(lockStatuses[0]).toBe(412);
+  expect(lockStatuses.slice(1).every(status => status === 200)).toBe(true);
+  expect(await read(request, `config/studentMoveLocks/${year}`)).toEqual(unrelatedLocks);
   expect(await read(request, `classes/${year}/1-1-7/students/S17_05`)).toMatchObject({ ...source, id: 'S17_05' });
   expect(await read(request, `classes/${year}/1-1-7/students/other`)).toEqual(resident);
+});
+
+test('오프라인에서 이동을 확정해도 잠금·명단·출석을 변경하지 않는다', async ({ page, request, context }) => {
+  await seed(request);
+  await openMove(page);
+  const before = await read(request, '');
+  await context.setOffline(true);
+  try {
+    await confirmMove(page);
+    await expect(page.getByRole('dialog', { name: '학생 이동' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '이동 확정', exact: true })).toBeEnabled();
+    expect(await read(request, '')).toEqual(before);
+  } finally { await context.setOffline(false); }
+  await page.reload();
+  await expect(page.locator('.aw-account')).toBeVisible();
+  expect(await read(request, '')).toEqual(before);
 });
 
 test('목적지에 같은 인물이 있으면 중복 이동을 차단한다', async ({ page, request }) => {

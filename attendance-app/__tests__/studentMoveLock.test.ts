@@ -200,14 +200,14 @@ describe('studentMoveLock pending 복구', () => {
     )).toBe(false);
   });
 
-  it('preparing과 10분 미만 pending은 증거를 읽거나 자동 정리하지 않는다', async () => {
+  it('10분 미만 preparing과 pending은 증거를 읽거나 자동 정리하지 않는다', async () => {
     const readEvidence = vi.fn();
     const release = vi.fn();
 
     await expect(recoverStaleStudentMoveLock({
       currentValue: dualLockValue(preparingLock),
       requestedClassKeys: ['1-1-1', '1-1-2'],
-      now: preparingLock.record.startedAt + STUDENT_MOVE_PENDING_STALE_MS * 2,
+      now: preparingLock.record.startedAt + STUDENT_MOVE_PENDING_STALE_MS - 1,
       readEvidence,
       release,
     })).resolves.toEqual({ status: 'blocked', reason: 'preparing' });
@@ -222,6 +222,42 @@ describe('studentMoveLock pending 복구', () => {
     })).resolves.toEqual({ status: 'blocked', reason: 'pending' });
     expect(readEvidence).not.toHaveBeenCalled();
     expect(release).not.toHaveBeenCalled();
+  });
+
+  it('늦게 남은 preparing은 10분 후 세 서버 증거와 exact 양쪽 해제로만 복구한다', async () => {
+    const store = memoryTransaction(dualLockValue(preparingLock));
+    const result = await recoverStaleStudentMoveLock({
+      currentValue: store.value(), requestedClassKeys: ['1-1-1', '1-1-2'],
+      now: preparingLock.record.startedAt + STUDENT_MOVE_PENDING_STALE_MS,
+      readEvidence: async () => ({ commitMarkerState: 'absent', sourceStudentExists: true, destinationStudentExists: false }),
+      release: identity => releaseStudentMoveLocks(identity, store.transact),
+    });
+    expect(result).toEqual({ status: 'retry', lock: preparingLock });
+    expect(store.value()).toBeNull();
+    // 만료된 작업의 지연 phase 전환은 다시 선점하거나 원장을 쓸 수 없다.
+    expect(await transitionStudentMoveLocksToPending(preparingLock, 999, store.transact)).toBeNull();
+    expect(store.value()).toBeNull();
+  });
+
+  it('만료 preparing도 증거 오류·혼합 상태·잠금 교체 시 정리하지 않는다', async () => {
+    for (const evidence of [null, { commitMarkerState: 'absent' as const, sourceStudentExists: true, destinationStudentExists: true }]) {
+      const release = vi.fn();
+      expect(await recoverStaleStudentMoveLock({
+        currentValue: dualLockValue(preparingLock), requestedClassKeys: ['1-1-1', '1-1-2'],
+        now: preparingLock.record.startedAt + STUDENT_MOVE_PENDING_STALE_MS,
+        readEvidence: async () => { if (!evidence) throw new Error('연결 실패'); return evidence; }, release,
+      })).toEqual({ status: 'manual' });
+      expect(release).not.toHaveBeenCalled();
+    }
+    const changed = pendingStudentMoveLock(preparingLock, 500);
+    const store = memoryTransaction(dualLockValue(changed));
+    expect(await recoverStaleStudentMoveLock({
+      currentValue: dualLockValue(preparingLock), requestedClassKeys: ['1-1-1', '1-1-2'],
+      now: preparingLock.record.startedAt + STUDENT_MOVE_PENDING_STALE_MS,
+      readEvidence: async () => ({ commitMarkerState: 'absent', sourceStudentExists: true, destinationStudentExists: false }),
+      release: identity => releaseStudentMoveLocks(identity, store.transact),
+    })).toEqual({ status: 'blocked', reason: 'changed' });
+    expect(store.value()).toEqual(dualLockValue(changed));
   });
 
   it('미반영이 정확히 확인된 오래된 pending만 정리해 한 번 재선점할 수 있게 한다', async () => {

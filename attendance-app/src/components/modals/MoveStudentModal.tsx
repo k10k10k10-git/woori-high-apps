@@ -1,6 +1,6 @@
 'use client';
-import { useRef, useState } from 'react';
-import { db, onDisconnect, onValue, push, ref, runTransaction } from '@/lib/db';
+import { useEffect, useRef, useState } from 'react';
+import { db, onDisconnect, onValue, push, ref } from '@/lib/db';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
 import { useModalFocus } from '@/hooks/useModalFocus';
@@ -31,12 +31,19 @@ import {
   type StudentMoveLockTransaction,
 } from '@/utils/studentMoveLock';
 import { isStudentMoveCommitted, patchStudentMoveOnce, readStudentMoveValue } from '@/utils/studentMoveRequest';
+import { createStudentMoveLockTransaction } from '@/utils/studentMoveLockRequest';
+import { awaitStudentMoveStep } from '@/utils/studentMoveStep';
+import { mergeStudentEdit } from '@/utils/studentPersistence';
 import type { MoveTarget, Student } from '@/types';
 
 export default function MoveStudentModal({ target, onClose }: { target: MoveTarget; onClose: () => void }) {
   const { state, dispatch, getState } = useApp();
   const { classData, curYear } = state;
-  const student = classData[target.fromCk]?.students.find(s => s.id === target.sid);
+  const [opened] = useState(() => ({
+    target: { ...target }, year: curYear, revision: state.dataRevision, user: auth.currentUser,
+    student: structuredClone(classData[target.fromCk]?.students.find(s => s.id === target.sid)),
+  }));
+  const student = opened.student;
 
   const [toPart, setToPart]   = useState(target.fromCk.split('-')[0]);
   const [toGrade, setToGrade] = useState(target.fromCk.split('-')[1]);
@@ -44,6 +51,12 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
   const [reviewing, setReviewing] = useState(false);
   const [saving, setSaving] = useState(false);
   const inFlight = useRef(false);
+  const active = useRef(true);
+  const operation = useRef<AbortController | null>(null);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; operation.current?.abort(); };
+  }, []);
   const dialogRef = useRef<HTMLDivElement>(null);
   const close = () => { if (!inFlight.current) onClose(); };
   useModalFocus({ containerRef: dialogRef, onDismiss: close });
@@ -73,11 +86,25 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
       showToast('로그인 사용자를 확인할 수 없습니다. 다시 로그인해 주세요.');
       return;
     }
-    const isCurrent = () => {
+    const isScreenCurrent = () => {
       const current = getState();
-      return auth.currentUser === currentUser && current.curYear === curYear
-        && current.dataRevision === state.dataRevision && current.userRole?.role === 'admin';
+      return active.current && currentUser === opened.user && auth.currentUser === currentUser
+        && current.curYear === opened.year && current.dataRevision === opened.revision
+        && target.sid === opened.target.sid && target.fromCk === opened.target.fromCk
+        && current.userRole?.role === 'admin';
     };
+    if (!isScreenCurrent()) return;
+    const visibleStudent = getState().classData[target.fromCk]?.students.find(s => s.id === target.sid);
+    if (!visibleStudent || !mergeStudentEdit(visibleStudent, student, student)) {
+      showToast('선택한 학생 정보가 변경되었습니다. 창을 닫고 명단에서 다시 선택해 주세요.');
+      return;
+    }
+    const controller = new AbortController();
+    operation.current = controller;
+    const isCurrent = () => isScreenCurrent() && !controller.signal.aborted;
+    const wait = <T,>(work: Promise<T>) => awaitStudentMoveStep(work, {
+      signal: controller.signal, onTimeout: () => controller.abort(),
+    });
     const startedAt = Date.now();
     // 화면 스냅샷은 ID 선택에만 사용한다. 쓰기 직전 두 반 잠금 안에서 다시 검사한다.
     const collision = classData[toCk]?.students.some(s => s.id === target.sid)
@@ -111,15 +138,23 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
     const lockYearRef = ref(db, studentMoveLockYearPath(curYear));
     const lockPaths = studentMoveLockPaths(curYear, lock);
     const disconnectPayload = studentMoveLockDisconnectPayload(lock);
-    const transactLock: StudentMoveLockTransaction = async (updateValue) => {
-      const result = await runTransaction(lockYearRef, updateValue, { applyLocally: false });
-      return { committed: result.committed, value: result.snapshot.val() };
-    };
+    let transactLock: StudentMoveLockTransaction;
+    let cleanupTransact: StudentMoveLockTransaction;
     let ownLockState: 'none' | 'owned' | 'unknown' = 'none';
     let pendingCleanupLock: StudentMoveLockIdentity | null = null;
     let preserveUncertainLock = false;
     let operationCompleted = false;
     let disconnectCleanup: ReturnType<typeof onDisconnect> | null = null;
+    // 늦은 취소가 새 이동 작업의 예약을 지우지 않도록 작업 leaf만 취소한다.
+    const cancelDisconnect = () => Promise.all(lockPaths.map(path => onDisconnect(ref(db, path)).cancel()));
+    const registerDisconnect = async () => {
+      const registration = disconnectCleanup!.update(disconnectPayload);
+      void registration.then(() => {
+        if (!isCurrent()) void awaitStudentMoveStep(cancelDisconnect(), { timeoutMs: 5000 }).catch(() => {});
+      }, () => {});
+      await wait(registration);
+      if (!isCurrent()) throw new Error('이동 화면이 변경되었습니다.');
+    };
     // .info는 서버 GET 경로가 아니라 SDK의 로컬 연결 정보 구독이다.
     const readInfo = async (path: string): Promise<unknown> => {
       let unsubscribe: (() => void) | undefined;
@@ -151,23 +186,32 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
     };
 
     try {
-      const idToken = await currentUser.getIdToken();
+      const idToken = await wait(currentUser.getIdToken());
+      if (!isCurrent()) return;
+      const transactionInput = { databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+        idToken, path: studentMoveLockYearPath(curYear) };
+      transactLock = createStudentMoveLockTransaction({ ...transactionInput, isCurrent });
+      // 화면 해제 뒤에도 정확히 이 작업의 잠금만 정리할 수 있다. 새 잠금 선점에는 쓰지 않는다.
+      cleanupTransact = createStudentMoveLockTransaction({ ...transactionInput,
+        isCurrent: () => auth.currentUser === currentUser, timeoutMs: 5000 });
       const readValue = (path: string) => readStudentMoveValue({
         databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken, path, isCurrent,
       });
       const recoveryNow = await readServerNow();
+      if (!isCurrent()) return;
       if (recoveryNow === null) {
         showToast('서버 시간을 확인할 수 없어 학생 이동을 시작하지 않았습니다. 연결을 확인해 주세요.');
         return;
       }
-      if (!isCurrent()) return;
-
+      // 준비 잠금도 서버 보정 시각으로 기록해야 잘못된 기기 시계로 조기 만료되지 않는다.
+      lock = { ...lock, record: { ...lock.record, startedAt: recoveryNow } };
       // 두 반의 자기 작업 leaf만 한 연결 종료 update로 지워 부분 잠금을 남기지 않는다.
       disconnectCleanup = onDisconnect(lockYearRef);
-      await disconnectCleanup.update(disconnectPayload);
+      await registerDisconnect();
 
       ownLockState = 'unknown';
       let acquisition = await acquireStudentMoveLocks(lock, transactLock);
+      if (!isCurrent()) return;
       ownLockState = acquisition.acquired ? 'owned' : 'none';
       if (!acquisition.acquired) {
         const recovery = await recoverStaleStudentMoveLock({
@@ -191,6 +235,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           },
           release: (staleLock) => releaseStudentMoveLocks(staleLock, transactLock),
         });
+        if (!isCurrent()) return;
 
         if (recovery.status === 'completed') {
           if (!isCurrent()) return;
@@ -201,6 +246,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           // 안전하게 중단된 pending을 정확히 지운 경우에만 한 번 다시 선점한다.
           ownLockState = 'unknown';
           acquisition = await acquireStudentMoveLocks(lock, transactLock);
+          if (!isCurrent()) return;
           ownLockState = acquisition.acquired ? 'owned' : 'none';
           if (!acquisition.acquired) {
             showToast('잠금이 다시 사용 중입니다. 잠시 후 다시 시도해 주세요.');
@@ -221,7 +267,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
 
       if (!operationCompleted) {
         // 재연결 뒤 선점됐을 수 있으므로 현재 연결에 두 leaf 정리를 다시 등록한다.
-        await disconnectCleanup.update(disconnectPayload);
+        await registerDisconnect();
 
         // 두 반을 잠근 뒤 최신값을 읽어 학생 수정·출석 입력·목적지 SID 생성을 함께 차단한다.
         const [sourceStudentValue, destinationClassValue, sourceAttendanceValue, destinationAttendanceValue] = await Promise.all([
@@ -230,6 +276,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           readValue(`attendance/${curYear}/${target.fromCk}/${target.sid}`),
           readValue(`attendance/${curYear}/${toCk}/${destinationId}`),
         ]);
+        if (!isCurrent()) return;
 
         if (sourceStudentValue == null) {
           showToast('원래 반에서 학생을 찾을 수 없습니다. 명단을 새로 확인해 주세요.');
@@ -246,7 +293,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         }
 
         const latestStudent = { ...(sourceStudentValue as Student), id: target.sid };
-        if (latestStudent.personId !== student.personId || latestStudent.name !== student.name) {
+        if (!mergeStudentEdit(latestStudent, student, student)) {
           showToast('원래 반의 학생 정보가 변경되었습니다. 명단을 새로 확인해 주세요.');
           return;
         }
@@ -293,7 +340,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         lock = pendingLock;
 
         // pending은 자동 복구 대상으로 남겨야 하므로 종료 예약 취소가 확인된 뒤에만 PATCH한다.
-        await disconnectCleanup.cancel();
+        await wait(cancelDisconnect());
         disconnectCleanup = null;
         if (!await confirmStudentMoveLockOwnership(lock, transactLock)) {
           throw new Error('학생 이동 잠금 소유권을 확인할 수 없습니다.');
@@ -301,12 +348,15 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
 
         if (!isCurrent()) throw new Error('로그인 또는 조회 상태가 변경되었습니다.');
 
+        // 전송 뒤 예외·화면 해제는 실패가 아니다. 명시 거절/성공 외에는 pending을 보존한다.
+        preserveUncertainLock = true;
         const patchResult = await patchStudentMoveOnce({
           databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
           idToken,
           payload,
         });
         if (patchResult.status === 'rejected') {
+          preserveUncertainLock = false;
           throw new Error('학생 이동 요청이 거절되었습니다.');
         }
         if (patchResult.status === 'unknown') {
@@ -335,34 +385,38 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           }
         }
         ownLockState = 'none';
+        preserveUncertainLock = false;
         if (!isCurrent()) return;
         selectClass(toCk);
         showToast('기존 명단을 보존하고 학생과 출석 기록을 함께 이동했습니다.', 'success');
         operationCompleted = true;
       }
     } catch {
-      if (isCurrent()) showToast('학생 이동에 실패했습니다. 다시 시도해 주세요.');
+      if (isScreenCurrent()) showToast('학생 이동을 완료하지 못했습니다. 연결을 확인한 뒤 창을 닫고 명단을 다시 확인해 주세요.');
       return; // 실패 시 모달 유지
     } finally {
       if (!preserveUncertainLock && (ownLockState === 'owned' || ownLockState === 'unknown')) {
         // 단계 응답이 불명확하면 두 phase를 각각 정확히 대조하고 자기 dual lock만 정리한다.
-        let removed = await releaseStudentMoveLocks(lock, transactLock).catch(() => false);
-        if (!removed && pendingCleanupLock) {
-          removed = await releaseStudentMoveLocks(pendingCleanupLock, transactLock).catch(() => false);
-        }
-        if (removed && disconnectCleanup) {
-          await disconnectCleanup.cancel().catch(() => {});
-          disconnectCleanup = null;
-        }
+        const cleanup = async () => {
+          let removed = await releaseStudentMoveLocks(lock, cleanupTransact).catch(() => false);
+          if (!removed && pendingCleanupLock) {
+            removed = await releaseStudentMoveLocks(pendingCleanupLock, cleanupTransact).catch(() => false);
+          }
+          // 해제 확인 전에는 연결 종료 예약을 남겨 서버의 자기 잠금을 정리한다.
+          if (removed && disconnectCleanup) await cancelDisconnect();
+        };
+        await awaitStudentMoveStep(cleanup(), { timeoutMs: 5000 }).catch(() => {});
       } else if (!preserveUncertainLock && disconnectCleanup) {
         // 선점하지 못했거나 성공한 작업은 존재하지 않는 자기 leaf 예약만 취소한다.
-        await disconnectCleanup.cancel().catch(() => {});
+        await awaitStudentMoveStep(cancelDisconnect(), { timeoutMs: 5000 }).catch(() => {});
         disconnectCleanup = null;
       }
-      setSaving(false);
+      controller.abort();
+      if (active.current) setSaving(false);
       inFlight.current = false;
+      if (operation.current === controller) operation.current = null;
     }
-    if (operationCompleted && isCurrent()) onClose();
+    if (operationCompleted && isScreenCurrent()) onClose();
   }
 
   return (
