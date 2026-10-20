@@ -146,6 +146,13 @@ test('전원 결석은 명시 확인하고 관리자는 미시작·입력 있음
   await expect(classRow(page, 1)).toContainText('출석 0명 확인');
   await expect(classRow(page, 3)).toContainText('미시작');
   await expect(classRow(page, 3)).toContainText('0명 / —');
+  // 2반은 체크 메타 없이 기존 X만 있다. 오늘 업무도 같은 1개 반을 포함해야 한다.
+  await expect(page.getByRole('button', { name: /^입력 있음/ })).toHaveText('입력 있음1');
+  await page.goto('/dashboard');
+  await expect(page.getByRole('group', { name: '11월 1일 출석 현황' })).toContainText('입력 있음 1개 반');
+  await page.screenshot({ path: testInfo.outputPath('input-count-matches-dashboard.png') });
+  expect(await read(request)).toEqual(absent);
+  await page.goto(`/attendance?view=overview&week=${key}`);
   await classRow(page, 2).getByRole('button', { name: '1부 1학년 2반 출석 입력 열기', exact: true }).click();
   await studentButton(page, '다른 반 학생').click();
   await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');

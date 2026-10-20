@@ -64,7 +64,7 @@ export default function AdminDashboard() {
           <span><b>{selectedWeek ? totals.pendingClassCount : '—'}</b>개 반 입력 확인</span>
           <span><b>{selectedWeek ? absences.length : '—'}</b>명 연속 결석</span>
           <span className="ad-glance-attendance">출석 <b>{selectedWeek ? totals.present : '—'}</b>명 · 출석률 <b>{totals.attendanceRate === null ? '—' : `${totals.attendanceRate}%`}</b><small>{!selectedWeek ? '조회할 주일이 없어 입력 인원을 계산하지 않습니다.' : model.oneTap
-            ? `O·X 집계 ${totals.recorded}명 기준 · 입력 있음 ${totals.startedClassCount}개 반 · 출석 0명 확인 ${totals.allAbsentClassCount}개 반`
+            ? `O·X 집계 ${totals.recorded}명 기준 · 입력 있음 ${totals.startedClassCount + totals.completeClassCount + totals.partialClassCount}개 반 · 출석 0명 확인 ${totals.allAbsentClassCount}개 반`
             : `O·X 입력 ${totals.recorded}명 기준 · 출석 체크 ${totals.inputRecorded}/${totals.inputStudentCount}명 완료(장결 제외)`}</small></span>
         </div>
       </div>

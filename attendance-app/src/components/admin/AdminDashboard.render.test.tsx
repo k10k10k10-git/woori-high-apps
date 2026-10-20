@@ -3,6 +3,8 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initialState } from '@/store/AppContext';
 import type { OpenVisitRequest } from '@/hooks/useVisitRequests';
+import { getSundaysForYear } from '@/utils/dates';
+import type { AttendanceCheck } from '@/utils/attendanceChecks';
 
 const mocks = vi.hoisted(() => ({
   state: null as unknown as typeof initialState,
@@ -18,6 +20,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('@/hooks/useVisitRequests', () => ({ useOpenVisitRequests: () => mocks.visits }));
 
 import AdminDashboard from './AdminDashboard';
+import ClassAttendanceOverview from './ClassAttendanceOverview';
 
 beforeEach(() => {
   mocks.dispatch.mockClear(); mocks.push.mockClear();
@@ -40,9 +43,44 @@ beforeEach(() => {
     } },
   };
 });
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('관리자 오늘 업무', () => {
+  it.each(['완료', '일부', '혼합'])('기존 O/X %s 입력도 반별 현황과 같은 입력 있음 숫자로 표시하며 원장을 보존한다', mode => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-26T00:00:00+09:00'));
+    const students = [{ id: 'a', name: '합성 A' }, { id: 'b', name: '합성 B' }];
+    const check = (allAbsent = false): AttendanceCheck => ({ revision: 1, startedAt: 1, updatedAt: 2,
+      updatedBy: 'teacher', operationId: 'count-check', allAbsent, targetSid: 'a', targetToken: 'a',
+      expected: '', value: 'O', roster: { a: 'a', b: 'b' } });
+    mocks.state = { ...mocks.state, months: getSundaysForYear(2026),
+      classData: { '1-1-1': { students } },
+      attData: { '1-1-1': { a: { '9-3': 'O' }, ...(mode === '일부' ? {} : { b: { '9-3': 'X' } }) } },
+      attendanceChecks: {},
+    };
+    if (mode === '혼합') {
+      mocks.state.classData = { ...mocks.state.classData,
+        '1-1-2': { students }, '1-1-3': { students }, '1-1-4': { students }, '1-1-5': { students },
+        '1-1-6': { students: [] }, '1-1-7': { students: [{ id: 'long', name: '합성 장결', jang: true }] },
+      };
+      mocks.state.attData = { ...mocks.state.attData,
+        '1-1-2': { a: { '9-3': 'O' } },
+        '1-1-3': { a: { '9-3': 'O' }, b: { '9-3': 'X' } },
+        '1-1-5': { a: { '9-3': 'X' }, b: { '9-3': 'X' } },
+      };
+      mocks.state.attendanceChecks = { '1-1-3': { '9-3': check() }, '1-1-5': { '9-3': check(true) } };
+    }
+    const expected = mode === '혼합' ? 3 : 1;
+    const before = structuredClone({ classData: mocks.state.classData, attData: mocks.state.attData, attendanceChecks: mocks.state.attendanceChecks });
+    render(<AdminDashboard />);
+    const week = screen.getByRole('group', { name: '10월 25일 출석 현황' });
+    expect(week.textContent).toContain(`입력 있음 ${expected}개 반`);
+    expect(week.textContent).toContain(`출석 0명 확인 ${mode === '혼합' ? 1 : 0}개 반`);
+    cleanup();
+    render(<ClassAttendanceOverview weekKey="9-3" />);
+    expect(screen.getByRole('button', { name: /^입력 있음/ }).textContent).toBe(`입력 있음${expected}`);
+    expect({ classData: mocks.state.classData, attData: mocks.state.attData, attendanceChecks: mocks.state.attendanceChecks }).toEqual(before);
+  });
+
   it('새 주일은 미시작 반과 입력 있는 반을 구분하고 완료라고 표시하지 않는다', () => {
     mocks.state = { ...mocks.state, months: [{ month: 10, sundays: [25] }],
       classData: { '1-1-1': { teacher: '담임', students: [{ id: 'a', name: '학생A' }] },
