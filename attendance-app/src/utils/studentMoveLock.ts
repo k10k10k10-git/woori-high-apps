@@ -401,9 +401,10 @@ export async function recoverStaleStudentMoveLock(input: {
   if (conflict.status === 'manual') return { status: 'manual' };
 
   const { lock } = conflict;
-  if (lock.record.phase === 'preparing') return { status: 'blocked', reason: 'preparing' };
-  if (!isStalePendingStudentMoveLock(lock.record, input.now)) {
-    return { status: 'blocked', reason: 'pending' };
+  // 응답이 유실된 조건부 선점도 늦게 preparing을 남길 수 있다. 어느 단계든 서버 시각
+  // 10분 경과 + 세 증거 + exact dual lock 해제 없이는 정리하지 않는다.
+  if (!Number.isFinite(input.now) || input.now - lock.record.startedAt < STUDENT_MOVE_PENDING_STALE_MS) {
+    return { status: 'blocked', reason: lock.record.phase };
   }
 
   let evidence: StudentMoveRecoveryEvidence;

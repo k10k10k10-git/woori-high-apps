@@ -410,6 +410,11 @@ CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/global
 - **판단 질문**: SDK `get()`은 활성 구독의 오래된 캐시를 즉시 반환할 수 있어 안전 판정용 서버 최신 조회로 쓰지 않는다. commit 표식만으로 성공을 확정하지 않고 원본 없음·목적지 동일인 확인을 유지한다. 조회 실패를 null/부재로 바꾸거나 PATCH를 자동 재전송하지 않으며 기존 잠금 트랜잭션·원자 payload·Rules·인물 키는 변경하지 않는다. 늦은 응답의 UI 이동·닫기·안내도 현재 세대에서만 실행한다.
 - **재사용 규칙**: 저장 응답 유실 복구는 서버 증거와 실시간 화면 캐시를 분리하고, 네트워크 실패를 데이터 없음으로 취급하지 않는다. 테스트 시간 증가 대신 구독 지연을 고정해 실제 파일/원장 값·요청 횟수를 검증한다.
 
+#### 학생 이동의 원대상·오프라인 대기·화면 수명 보호 (2026-10-21)
+- **접근법**: `MoveStudentModal.tsx`가 열린 학생·연도·revision·인증 사용자를 고정한다 → `mergeStudentEdit`로 화면/서버 동일인을 다시 대조한다 → `studentMoveLockRequest.ts`에서 인증 ETag GET/If-Match PUT·412 최대 3회·전체 15초 제한으로 잠금만 갱신한다 → 토큰·종료 예약/취소를 `studentMoveStep.ts`로 제한하고 해제된 화면의 후속 PATCH/UI를 막는다 → 렌더 회귀와 실제 Auth/RTDB의 PC·모바일 응답 유실·412 경합·원장 보존을 확인한다.
+- **판단 질문**: SDK Promise에 타이머만 붙이면 지연 쓰기 큐는 남으므로 이동의 잠금 요청만 REST로 바꾸고 공용 `db.ts`는 건드리지 않았다. REST abort도 서버 반영 취소가 아니므로 불명확한 PATCH는 재전송하지 않는다. 늦은 준비 선점은 서버 시각 10분·세 증거·exact dual lock 조건으로 복구한다. 예약 취소는 연도 부모가 아닌 작업 leaf 두 개만 대상으로 해 이전 작업의 늦은 취소가 새 작업을 침범하지 못하게 한다.
+- **재사용 규칙**: 제한시간과 화면 해제는 서버 작업의 실패 증거가 아니다. 원대상 고정·전송 직전 수명 확인·불명확한 결과 보존·조건부 자기 잠금 정리를 함께 검증한다.
+
 Firebase Realtime Database SDK와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다.
 
 `StudentModal`(저장/삭제), `MoveStudentModal`(이동)은 반 전체 명단(`classes/{year}/{ck}/students`)을 통째로 `set()`하지 않고, 항상 **해당 학생 1명의 경로만** 갱신한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 충돌 학생은 사전에 새 목적지 SID를 선택하고, 잠금 안에서 선택한 SID의 명단·출석이 비었는지 재검사한다. 다른 학생의 출석과 병합하지 않는다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:
@@ -420,7 +425,7 @@ await update(ref(db), { [`classes/${year}/${ck}/students/${id}`]: newStudent });
 // ❌ 금지 — 반 전체를 덮어씀, 동시 편집 시 다른 사람의 변경이 사라짐
 await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 ```
-2xx만 즉시 성공이고 4xx 거절은 exact lock을 정리한다. 예외·30초 중단·5xx는 서버 반영 여부가 불명확하므로 pending 잠금을 유지한다. 다음 이동은 서버 보정 시각으로 10분 이상 지난 pending에 한해 commit marker와 원본·목적지 학생 상태가 정확히 미반영 또는 완료 상태일 때만 조건부 정리한다. 혼합 상태와 `preparing`, Firebase 연결 또는 서버 시간 오프셋 미확인은 자동 정리하지 않는다. 프로세스 종료로 남은 pending도 같은 절차를 따른다. 실제 네트워크 단절 통합 시험은 운영 DB 무쓰기 검증에서 실행하지 않았다. 같은 UID의 다른 탭은 Rules에서 owner로 판정되므로 해당 탭의 일반 명단·출석 쓰기까지 차단하지 못한다. 잠금 전에 SDK 오프라인 큐에 들어간 관리자 쓰기가 잠금 해제 후 재생되는 경우까지 막으려면 모든 관리자 쓰기에 별도 버전 계약이 필요하다.
+2xx만 즉시 성공이고 4xx 거절은 exact lock을 정리한다. 예외·30초 중단·5xx는 서버 반영 여부가 불명확하므로 pending 잠금을 유지한다. 다음 이동은 서버 보정 시각으로 10분 이상 지난 pending 또는 preparing에 한해 commit marker와 원본·목적지 학생 상태가 정확히 미반영 또는 완료 상태일 때만 조건부 정리한다. 혼합 상태·10분 미만 잠금·Firebase 연결 또는 서버 시간 오프셋 미확인은 자동 정리하지 않는다. 준비 시각도 서버 오프셋을 반영한다. 잠금 선점/전환/확인/해제는 이동 전용 ETag 조건부 REST로 실행하며 다른 반 잠금은 보존한다. 프로세스 종료로 남은 pending도 같은 절차를 따른다. 실제 운영 학생 이동·네트워크 단절 쓰기 시험은 하지 않고 합성 Auth/RTDB와 렌더 회귀로 검증한다. 같은 UID의 직접 쓰기 및 잠금 전에 SDK 오프라인 큐에 들어간 일반 관리자 쓰기가 잠금 해제 후 재생되는 경우까지 막으려면 모든 관리자 쓰기에 별도 버전 계약이 필요하다.
 
 관리자 명단 변경은 이동의 단발 루트 REST PATCH 또는 기존 루트 `update()` payload에 `classes/{year}/{ck}/adminChanges/{changeId}`도 함께 넣는다. 원본 변경만 성공하고 행정 이력이 빠지는 상태를 만들지 않는다.
 
