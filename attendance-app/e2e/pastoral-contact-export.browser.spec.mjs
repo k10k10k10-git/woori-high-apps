@@ -19,8 +19,8 @@ test('전체 연락처 엑셀은 화면 필터·장결과 무관하고 원장을
   const records = {
     attendanceAdmins: { [localId]: true }, userRoles: { 'contact-export-admin__at__example__dot__test': { email, role: 'admin' } },
     classes: { [year]: {
-      '1-1-1': { students: { a: { name: '결석 학생', phone: '01000000001', pphone: '보호자 비공개' } } },
-      '2-3-7': { students: { b: { name: '장결 학생', jang: true }, c: { name: '복귀 학생', phone: '01000000002' } } },
+      '1-1-1': { students: { a: { name: '결석 학생', phone: '01000000001', pphone: '01000000011' } } },
+      '2-3-7': { students: { b: { name: '장결 학생', jang: true }, c: { name: '복귀 학생', phone: '01000000002', pphone: '01000000012' } } },
     } }, attendance: { [year]: { '1-1-1': { a: absent }, '2-3-7': { b: absent, c: recovered } } },
   };
   const url = `${base}/.json?ns=${ns}`;
@@ -51,13 +51,15 @@ test('전체 연락처 엑셀은 화면 필터·장결과 무관하고 원장을
     const workbook = XLSX.read(await readFile(await download.path()), { cellNF: true });
     const sheet = workbook.Sheets[label]; const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
     expect(rows.slice(6)).toHaveLength(count); expect(rows[2][0]).toContain('필터 미적용');
-    expect(JSON.stringify(rows)).not.toContain('보호자 비공개');
+    expect(rows[5][6]).toBe('보호자 연락처');
     if (label === '연속 결석') {
       expect(rows.slice(6).map(row => row[0])).toContain('장결 학생');
       expect(rows.slice(6).find(row => row[0] === '결석 학생')[1]).toBe('01000000001');
+      expect(rows.slice(6).find(row => row[0] === '결석 학생')[6]).toBe('01000000011');
       expect(rows.slice(6).find(row => row[0] === '장결 학생')[1]).toBe('미등록');
     } else {
       expect(rows[6][1]).toBe('01000000002'); expect(rows[6][4]).toBe(3); expect(sheet.F7.z).toBe('yyyy-mm-dd');
+      expect(sheet.G7).toMatchObject({ t: 's', v: '01000000012' });
     }
   }
   expect(await (await request.get(url, { headers: owner })).json()).toEqual(before);

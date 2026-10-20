@@ -22,14 +22,16 @@ it('모든 부서·학년·장결·동명이인과 연락처 누락 학생도 �
   expect(file.count).toBe(3); expect(file.rows.slice(6)).toHaveLength(3);
   expect(file.rows[2][0]).toContain('본인 연락처 미등록 1명'); expect(file.rows[2][0]).toContain('필터 미적용');
   expect(file.rows.slice(6).filter(row => row[0] === '같은 이름')).toHaveLength(2);
-  expect(file.rows.slice(6).find(row => row[0] === '장결 학생')).toEqual(['장결 학생', '미등록', '1부 1학년 1반', '장결', 4, '기록 없음']);
-  expect(JSON.stringify(file.rows)).not.toContain('보호자 비공개'); expect(JSON.stringify(file.rows)).not.toContain('주소 비공개'); expect(state).toEqual(before);
+  expect(file.rows.slice(6).find(row => row[0] === '장결 학생')).toEqual(['장결 학생', '미등록', '1부 1학년 1반', '장결', 4, '기록 없음', '미등록']);
+  expect(file.rows[5][6]).toBe('보호자 연락처');
+  expect(file.rows.slice(6).find(row => row[1] === '01000000001')?.[6]).toBe('보호자 비공개');
+  expect(JSON.stringify(file.rows)).not.toContain('주소 비공개'); expect(state).toEqual(before);
 });
 it('다시 출석 대상만 복귀 직전 결석 횟수와 함께 내보낸다', () => {
   const file = pastoralContactWorkbook(fixture().report, 2026, 'recovered', 'latest');
   expect(file.count).toBe(1); expect(file.filename).toBe('다시출석_전체연락처_2026-01-25.xlsx');
   expect(file.rows[5][4]).toBe('복귀 전 연속 결석 횟수');
-  expect(file.rows[6]).toEqual(['복귀 학생', '010-0000-0003', '2부 3학년 7반', '일반', 3, new Date(2026, 0, 25)]);
+  expect(file.rows[6]).toEqual(['복귀 학생', '010-0000-0003', '2부 3학년 7반', '일반', 3, new Date(2026, 0, 25), '미등록']);
 });
 it('조회 주일·행사·미입력 기준을 기존 리포트와 공유한다', () => {
   const { state } = fixture(); state.events = { '0-1': '행사' }; delete state.attData['1-1-1'].b['0-2'];

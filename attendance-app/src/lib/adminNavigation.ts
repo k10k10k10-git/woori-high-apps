@@ -5,10 +5,11 @@ export const ADMIN_NAVIGATION = [
   { path: '/pastoral', label: '목양 관리', icon: 'book' },
   { path: '/attendance', label: '출석 관리', icon: 'calendar' },
   { path: '/manage', label: '학생·반 관리', icon: 'users' },
+  { path: '/files', label: '파일화', icon: 'download' },
   { path: '/admin', label: '운영 설정', icon: 'settings' },
 ] as const;
 
-const ADMIN_ONLY_PATHS = ['/dashboard', '/overall', '/admin', '/pastoral'];
+const ADMIN_ONLY_PATHS = ['/dashboard', '/overall', '/admin', '/pastoral', '/files'];
 const CLASS_FILTER_PATHS: string[] = [];
 const ENTRY_STORAGE_KEY = 'attendance-admin-entry-uid';
 

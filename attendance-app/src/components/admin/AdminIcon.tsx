@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-export type AdminIconName = 'dashboard' | 'calendar' | 'users' | 'chart' | 'layers' | 'settings' | 'chevron' | 'search' | 'arrow' | 'check' | 'clock' | 'logout' | 'book' | 'signal' | 'alert' | 'info' | 'minus';
+export type AdminIconName = 'dashboard' | 'calendar' | 'users' | 'chart' | 'layers' | 'settings' | 'chevron' | 'search' | 'arrow' | 'check' | 'clock' | 'logout' | 'book' | 'signal' | 'alert' | 'info' | 'minus' | 'download';
 
 const shapes: Record<AdminIconName, ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1.4" /><rect x="14" y="3" width="7" height="7" rx="1.4" /><rect x="3" y="14" width="7" height="7" rx="1.4" /><rect x="14" y="14" width="7" height="7" rx="1.4" /></>,
@@ -20,6 +20,7 @@ const shapes: Record<AdminIconName, ReactNode> = {
   alert: <><path d="m12 3 10 18H2L12 3ZM12 9v5" /><circle cx="12" cy="17" r=".8" fill="currentColor" stroke="none" /></>,
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6" /><circle cx="12" cy="7" r=".8" fill="currentColor" stroke="none" /></>,
   minus: <><circle cx="12" cy="12" r="9" /><path d="M8 12h8" /></>,
+  download: <><path d="M12 3v12m-4-4 4 4 4-4M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5" /></>,
 };
 
 export default function AdminIcon({ name, size = 16, className }: { name: AdminIconName; size?: number; className?: string }) {

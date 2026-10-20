@@ -39,7 +39,7 @@ export default function PastoralContactExport({ report, order }: { report: Pasto
       assertScope();
       const file = pastoralContactWorkbook(report, year, kind, order);
       await downloadXLSX(file.rows, file.label, file.filename, {
-        headerRow: 5, columnWidths: [20, 24, 24, 12, 24, 20], columnFormats: { 5: 'yyyy-mm-dd' }, beforeDownload: assertScope,
+        headerRow: 5, columnWidths: [20, 24, 24, 12, 24, 20, 24], columnFormats: { 5: 'yyyy-mm-dd' }, beforeDownload: assertScope,
       });
       if (active.current) setStatus({ success: `${file.label} 전체 ${file.count}명의 연락처 엑셀 내려받기를 시작했습니다.` });
     } catch (error) {
@@ -59,7 +59,7 @@ export default function PastoralContactExport({ report, order }: { report: Pasto
         {busy === kind ? '엑셀 만드는 중…' : `${label} 연락처 엑셀`} <span>전체 {count}명</span>
       </button>;
     })}</div>
-    <p className="pr-note">선택한 기준 주일의 전체 학생을 내려받습니다. 장결 포함 · 검색·부서·학년·반 필터 미적용 · 보호자 연락처 제외.</p>
+    <p className="pr-note">선택한 기준 주일의 전체 학생을 내려받습니다. 장결 포함 · 검색·부서·학년·반 필터 미적용 · 본인·보호자 연락처 포함.</p>
     {!ready && <p role="status">명단·출석·행사 자료를 모두 불러온 뒤 내려받을 수 있습니다.</p>}
     {status.error && <p role="alert">{status.error}</p>}
     {status.success && <p role="status">{status.success}</p>}
