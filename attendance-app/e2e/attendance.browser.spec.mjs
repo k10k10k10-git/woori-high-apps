@@ -71,10 +71,12 @@ test('요청 실패 후 재시도는 최신 값을 확인하고 저장한다', a
   expect(await stored(request)).toBe('O');
 });
 
-test('조회 후 저장 직전의 다른 기기 쓰기도 ETag로 보호한다', async ({ page, request }) => {
+test('조회 후 저장 직전의 다른 기기 쓰기도 원자 비교로 보호한다', async ({ page, request }) => {
   await login(page);
-  await page.route('**/attendance/**/*.json?**', async route => {
-    if (route.request().method() !== 'PUT') return route.continue();
+  let patches = 0;
+  await page.route('**/.json?**', async route => {
+    if (route.request().method() !== 'PATCH' || !Object.hasOwn(route.request().postDataJSON(), `attendance/${week().year}/1-1-1/s/${week().key}`)) return route.continue();
+    patches++;
     const { year, key } = week();
     const changed = await request.put(`http://127.0.0.1:19017/attendance/${year}/1-1-1/s/${key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' }, data: JSON.stringify('X') });
     expect(changed.ok()).toBe(true);
@@ -83,13 +85,15 @@ test('조회 후 저장 직전의 다른 기기 쓰기도 ETag로 보호한다',
   await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
   await expect(page.locator('.attendance-save-banner')).toContainText('다른 담당자가 먼저 저장');
   expect(await stored(request)).toBe('X');
+  expect(patches).toBe(1);
+  expect(await (await request.get(`http://127.0.0.1:19017/attendanceCellWrites/${week().year}/1-1-1/s/${week().key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } })).json()).toBeNull();
 });
 test('서버 저장 후 응답을 잃어도 재시도에서 중복 쓰기를 하지 않는다', async ({ page, request }) => {
   await login(page);
-  let puts = 0;
-  await page.route('**/attendance/**/*.json?**', async route => {
-    if (route.request().method() !== 'PUT') return route.continue();
-    puts++;
+  let patches = 0;
+  await page.route('**/.json?**', async route => {
+    if (route.request().method() !== 'PATCH' || !Object.hasOwn(route.request().postDataJSON(), `attendance/${week().year}/1-1-1/s/${week().key}`)) return route.continue();
+    patches++;
     const response = await route.fetch();
     expect(response.ok()).toBe(true);
     await route.abort();
@@ -99,7 +103,33 @@ test('서버 저장 후 응답을 잃어도 재시도에서 중복 쓰기를 하
   expect(await stored(request)).toBe('O');
   await page.getByRole('button', { name: '재시도', exact: true }).click();
   await expect(page.locator('.attendance-save-banner')).toContainText('저장되었습니다');
-  expect(puts).toBe(1);
+  expect(patches).toBe(1);
+  const receipt = await (await request.get(`http://127.0.0.1:19017/attendanceCellWrites/${week().year}/1-1-1/s/${week().key}.json?ns=${namespace}`, { headers: { Authorization: 'Bearer owner' } })).json();
+  expect(receipt).toMatchObject({ revision: 1, studentToken: 'synthetic-student', expected: '', value: 'O' });
+  expect(receipt.updatedAt).toBeGreaterThan(0);
+});
+
+test('저장 직전 같은 SID의 레거시 학생이 교체되면 출석과 영수증을 함께 거절한다', async ({ page, request }) => {
+  const { year, key } = week();
+  const studentUrl = `http://127.0.0.1:19017/classes/${year}/1-1-1/students/s.json?ns=${namespace}`;
+  expect((await request.put(studentUrl, { headers: { Authorization: 'Bearer owner' }, data: { name: '검증 학생', birth: '2010.01.01', phone: '010-0000-0001' } })).ok()).toBe(true);
+  await login(page);
+  let before, patches = 0;
+  await page.route('**/.json?**', async route => {
+    if (route.request().method() !== 'PATCH' || !Object.hasOwn(route.request().postDataJSON(), `attendance/${year}/1-1-1/s/${key}`)) return route.continue();
+    patches++;
+    expect((await request.put(studentUrl, { headers: { Authorization: 'Bearer owner' }, data: { name: '검증 학생', birth: '2010.02.02', phone: '010-0000-0009' } })).ok()).toBe(true);
+    before = await (await request.get(database, { headers: { Authorization: 'Bearer owner' } })).json();
+    const response = await route.fetch();
+    expect([401, 403]).toContain(response.status());
+    await route.fulfill({ response });
+  });
+  await page.getByRole('button', { name: '검증 학생 출석으로 기록' }).click();
+  await expect(page.locator('.attendance-save-banner')).toContainText('다른 담당자가 먼저 저장');
+  expect(patches).toBe(1);
+  expect(before).toBeTruthy();
+  expect(await (await request.get(database, { headers: { Authorization: 'Bearer owner' } })).json()).toEqual(before);
+  expect(await stored(request)).toBeNull();
 });
 
 test('내부 id가 겹쳐도 실제 학생 키에만 출석을 저장한다', async ({ page, request }) => {

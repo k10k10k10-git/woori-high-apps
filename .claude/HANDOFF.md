@@ -1,3 +1,12 @@
+## 2026-10-21 출석부 신원·삭제·복원 보호
+
+- 사용자 요청은 후속 리뷰 세 항목(과거 출석 동일 SID 오연결, 영구 ID 없는 학생 삭제 오대상, 삭제본 재복원 중복)의 보완·배포다. 작업 브랜치는 `codex/attendance-review-fixes-20261021`, 기준 main은 PR #112의 `6a9f038921bd761ae0e552c3e451843165f10b39`다. 기존 `.impeccable/`는 사용자 작업이므로 보존한다.
+- `rosterRecovery.ts`의 학생 삭제 입력은 `openedStudent`를 필수로 받는다. 최초 서버 조회부터 `mergeStudentEdit`로 열린 학생과 대조하고, 같은 SID의 다른 학생 또는 변경된 legacy 명단은 사본 저장 전 중단한다. 반 전체 삭제와 학생 삭제의 입력 타입을 구분하며 출석 원장은 쓰지 않는다.
+- `rosterRestore.ts`가 기존 이동 잠금·불변 commit marker를 재사용한다. 복원/영구 삭제는 연도별 `__roster_restore__`와 대상 반의 dual pending lock으로 직렬화하고, 원본 삭제본·연도 전체의 현재 PID·대상 SID를 확인한 뒤 명단/감사/삭제본 소비/marker/잠금 해제를 단발 원자 PATCH한다. legacy 동명 후보는 자동 연결하지 않는다. 출석 원장은 읽거나 쓰지 않는다. UI 메모리의 복원 완료 Map과 별도 사본 정리 단계를 제거했다.
+- 과거 단일 출석 저장은 열린 학생 snapshot과 최신 신원을 비교하고 `attendanceCellWrites/{year}/{ck}/{sid}/{weekKey}`의 revision·신원 토큰·사전값을 출석과 함께 PATCH한다. 직전 최소 저장 정보·Rules 수정/검증/배포 승인 질문에 사용자가 `배포해`로 답해 승인 대기를 해소했다. `database.rules.json`은 이 새 노드만 추가했고 기존 attendance/classes/attendanceChecks/공유 권한은 그대로다. 운영 Rules 백업이 기준 main과 일치함을 확인했으며 Rules를 Hosting보다 먼저 배포한다.
+- 최종 순차 lint는 오류 0/기존 경고 16, typecheck 통과, 단위·화면 테스트 953개 통과(에뮬레이터 조건부 33개는 별도 실행), 프로덕션 빌드·합성 인증 혼입 검사 통과. 실제 RTDB 계약 33개와 Auth/RTDB 브라우저 전체 92개(PC46·모바일46, skip/flaky/failure 0)도 통과했다. 신원 교체·고아 학생·위조 receipt·지우기·T/장결 호환·동시 revision·원자 복원 응답 유실·늦은 PATCH 거절·두 관리자 경합·명단/출석 exact 보존을 검사했다. 앱/Rules/E2E 해시를 보존했고 순수 revision 경쟁 분리를 위한 테스트 한 줄 보강 후 계약도 33/33 재검증했다. 합성 검사이며 운영 학생 저장·실기기 검증은 아니다.
+- 운영 DB 직접 쓰기·명단/출석 자동 보정·계정/권한 변경은 없다. 기존 `attendance` 직접 쓰기 권한은 이동·진급·구버전 호환을 위해 유지하므로 모든 구버전의 receipt 강제나 과거 오염 자동 복구를 보장하지 않는다. 결과·최종 계약/CI/PR/운영 Rules·Hosting 영수증은 `outputs/attendance-review-fixes-20261021/RESULT.md`와 `LOCAL_QA.md`에서 확인한다. PR 검증/병합 후 Rules 사전 재대조·선배포→Hosting→공개 산출물 SHA 대조 순서를 따른다.
+
 ## 2026-10-21 학생 이동 신원·대기·화면 수명 보호
 
 - 사용자가 상세 리뷰의 세 항목을 모두 보완하고 배포하도록 승인했다. 이동 창을 연 학생·연도·revision·인증 사용자를 고정하고 화면/서버의 최신 학생을 기존 `mergeStudentEdit` 동일인 계약으로 대조한다. 같은 SID·이름이라도 다른 personId 학생은 이동하지 않으며 영구 ID가 없는 기록도 기본 정보 변경 시 중단한다.

@@ -109,13 +109,14 @@ export default function StudentModal({
 
   async function handleDelete() {
     if (!editId || busyRef.current || photoBusy) return;
+    if (!opened) { setError('학생 연결을 확인하지 못했습니다. 현재 명단에서 다시 열어 주세요.'); return; }
     busyRef.current = true;
     setError(null);
     setDeleteConfirm(false);
     setSaving(true);
     try {
       await archiveRoster({ year: state.curYear, classKey: ck, studentId: editId,
-        personId: opened?.personId, actor: adminActor(state.userRole) });
+        openedStudent: opened, actor: adminActor(state.userRole) });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
       return;

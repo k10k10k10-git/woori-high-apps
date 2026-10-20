@@ -1,21 +1,26 @@
 import { db, get, ref, runTransaction, set } from '@/lib/db';
-import { sameStoredValue } from '@/utils/studentPersistence';
+import { mergeStudentEdit, sameStoredValue } from '@/utils/studentPersistence';
 import { trashRecordKey } from '@/utils/trash';
 import { buildAdminChangeEntry } from '@/utils/adminChange';
 import type { Student } from '@/types';
 
-/** 사본을 먼저 확정한 뒤 최신 명단이 그대로일 때만 제거한다. 출석 원장은 쓰지 않는다. */
-export async function archiveRoster(input: {
-  year: number; classKey: string; studentId?: string; personId?: string;
+type ArchiveRosterInput = {
+  year: number; classKey: string;
   actor: ReturnType<typeof import('@/utils/adminChange').adminActor>;
-}) {
+} & ({ studentId: string; openedStudent: Student } | { studentId?: undefined; openedStudent?: undefined });
+
+/** 확인한 학생의 사본을 먼저 확정한 뒤 최신 명단이 그대로일 때만 제거한다. 출석 원장은 쓰지 않는다. */
+export async function archiveRoster(input: ArchiveRosterInput) {
   const { year, classKey, studentId } = input;
   const target = ref(db, `classes/${year}/${classKey}`);
   const snapshot = await get(target);
   const opened = snapshot.val();
   const value = studentId ? opened?.students?.[studentId] : opened;
   if (!value) throw new Error('명단이 이미 변경되었습니다. 현재 반을 다시 확인해 주세요.');
-  if (input.personId && value.personId !== input.personId) throw new Error('학생 연결이 변경되었습니다. 현재 명단을 다시 확인해 주세요.');
+  if (studentId !== undefined && (!studentId || !input.openedStudent || input.openedStudent.id !== studentId
+    || !mergeStudentEdit({ ...value, id: studentId }, input.openedStudent, input.openedStudent))) {
+    throw new Error('학생 연결이 변경되었습니다. 현재 명단을 다시 확인해 주세요.');
+  }
   const operation = crypto.randomUUID();
   const copy = { ...value, ...(studentId ? { id: studentId } : {}), ck: classKey, deletedAt: Date.now() };
   const backup = ref(db, `trash/${year}/${studentId ? 'students' : 'classes'}/${trashRecordKey(classKey, studentId ?? 'class', operation)}`);

@@ -56,6 +56,28 @@
         }
       }
     },
+    "attendanceCellWrites": {
+      ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
+      "$year": {
+        "$classKey": {
+          ".read": "auth != null && (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey)",
+          "$studentId": {
+            "$weekKey": {
+              ".write": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true || (auth.token.email != null && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('email').val() === auth.token.email && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('role').val() === 'teacher' && root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('part').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('grade').val() + '-' + root.child('userRoles').child(auth.token.email.replace('.', '__dot__').replace('@', '__at__')).child('class').val() === $classKey)) && newData.exists() && root.child('classes').child($year).child($classKey).child('students').child($studentId).exists() && !root.child('config').child('studentMoveLocks').child($year).child($classKey).exists()",
+              ".validate": "$year.matches(/^[0-9]{4}$/) && $weekKey.matches(/^([0-9]|1[01])-[0-4]$/) && newData.hasChildren(['revision', 'studentToken', 'expected', 'value', 'operationId', 'updatedBy', 'updatedAt']) && newData.child('revision').isNumber() && newData.child('revision').val() % 1 === 0 && newData.child('revision').val() > 0 && newData.child('revision').val() <= 9007199254740991 && newData.child('revision').val() === (data.exists() ? data.child('revision').val() + 1 : 1) && newData.child('studentToken').isString() && newData.child('studentToken').val() === ((root.child('classes').child($year).child($classKey).child('students').child($studentId).child('personId').isString() && root.child('classes').child($year).child($classKey).child('students').child($studentId).child('personId').val().length > 0) ? root.child('classes').child($year).child($classKey).child('students').child($studentId).child('personId').val() : ('legacy:' + root.child('classes').child($year).child($classKey).child('students').child($studentId).child('name').val() + '|' + (root.child('classes').child($year).child($classKey).child('students').child($studentId).child('birth').isString() ? root.child('classes').child($year).child($classKey).child('students').child($studentId).child('birth').val() : ''))) && newData.child('expected').isString() && ((root.child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === null || root.child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === '') ? newData.child('expected').val() === '' : ((root.child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === 'O' || root.child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === 'T') ? newData.child('expected').val() === 'O' : (root.child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === 'X' && newData.child('expected').val() === 'X'))) && newData.child('value').isString() && (newData.child('value').val() === '' || newData.child('value').val() === 'O' || newData.child('value').val() === 'X') && (newData.child('value').val() === '' ? newData.parent().parent().parent().parent().parent().child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === null : newData.parent().parent().parent().parent().parent().child('attendance').child($year).child($classKey).child($studentId).child($weekKey).val() === newData.child('value').val()) && newData.child('operationId').isString() && newData.child('operationId').val().length > 0 && newData.child('operationId').val() !== data.child('operationId').val() && newData.child('updatedBy').val() === auth.uid && newData.child('updatedAt').val() === now",
+              "revision": { ".validate": "newData.isNumber()" },
+              "studentToken": { ".validate": "newData.isString()" },
+              "expected": { ".validate": "newData.isString()" },
+              "value": { ".validate": "newData.isString()" },
+              "operationId": { ".validate": "newData.isString()" },
+              "updatedBy": { ".validate": "newData.isString()" },
+              "updatedAt": { ".validate": "newData.isNumber()" },
+              "$other": { ".validate": false }
+            }
+          }
+        }
+      }
+    },
     "attendanceChecks": {
       ".read": "auth != null && (root.child('admins').child(auth.uid).val() === true || root.child('attendanceAdmins').child(auth.uid).val() === true)",
       "$year": {

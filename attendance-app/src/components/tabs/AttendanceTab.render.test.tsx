@@ -193,7 +193,7 @@ describe('AttendanceTab 교사 출석 입력', () => {
 
     await waitFor(() => {
       expect(mocks.set).toHaveBeenCalledWith(
-        { year: 2026, target: { ck: '1-1-1', sid: 'student-1', k: '8-0' }, expected: 'O', value: '' },
+        { year: 2026, target: { ck: '1-1-1', sid: 'student-1', k: '8-0' }, expected: 'O', value: '', student: { id: 'student-1', name: '홍길동', num: 1 } },
         expect.any(Function),
       );
     });
