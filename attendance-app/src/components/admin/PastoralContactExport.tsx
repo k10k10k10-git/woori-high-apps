@@ -39,7 +39,7 @@ export default function PastoralContactExport({ report, order }: { report: Pasto
       assertScope();
       const file = pastoralContactWorkbook(report, year, kind, order);
       await downloadXLSX(file.rows, file.label, file.filename, {
-        headerRow: 5, columnWidths: [20, 24, 24, 12, 24, 20, 24], columnFormats: { 5: 'yyyy-mm-dd' }, beforeDownload: assertScope,
+        headerRow: 5, columnWidths: [20, 24, 24, 24, 12, 24, 20], columnFormats: { 6: 'yyyy-mm-dd' }, beforeDownload: assertScope,
       });
       if (active.current) setStatus({ success: `${file.label} 전체 ${file.count}명의 연락처 엑셀 내려받기를 시작했습니다.` });
     } catch (error) {

@@ -61,6 +61,15 @@ test('파일화에서 부서별·반별·목양 연락처 파일을 내려받고
   expect(first.text).toContain('출석률'); expect(first.text).toContain('등급');
   const second = await download('2부 전체 명단 엑셀 내려받기', 'part-2.xlsx');
   expect(second.text).toContain('다른 부서 학생'); expect(second.text).not.toContain('결석 학생');
+  const annual = second.contents[2];
+  const longAbsent = annual.slice(6).find(row => row[2] === '다른 부서 학생');
+  const february = annual[5].findIndex(value => /^2\//.test(value));
+  const december = annual[5].findIndex(value => /^12\//.test(value));
+  expect(longAbsent[7]).toBe('O');
+  expect(longAbsent[february]).toBe('X');
+  expect(longAbsent[december] ?? '').toBe('');
+  const general = first.contents[2].slice(6).find(row => row[2] === '결석 학생');
+  expect(general[first.contents[2][5].findIndex(value => /^2\//.test(value))] ?? '').toBe('');
   await page.screenshot({ path: testInfo.outputPath('files-roster.png'), fullPage: true });
 
   await page.getByRole('button', { name: '반별 출석부', exact: true }).click();
@@ -77,9 +86,9 @@ test('파일화에서 부서별·반별·목양 연락처 파일을 내려받고
     await page.getByRole('combobox', { name: '기준 주일', exact: true }).selectOption('0-3');
     const file = await download(`${kind} 명단 엑셀 내려받기`, kind === '연속 결석' ? 'absent.xlsx' : 'recovered.xlsx');
     const rows = file.contents[0];
-    expect(rows[5][6]).toBe('보호자 연락처');
+    expect(rows[5]).toEqual(['학생 이름', '본인 연락처', '보호자 연락처', '소속 반', '장결 구분', kind === '연속 결석' ? '연속 결석 횟수' : '복귀 전 연속 결석 횟수', '마지막 출석일']);
     const person = rows.slice(6).find(row => row[0] === name);
-    expect(person[6]).toBe(phone);
+    expect(person[2]).toBe(phone);
     expect(rows.slice(6)).toHaveLength(kind === '연속 결석' ? 2 : 1);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
