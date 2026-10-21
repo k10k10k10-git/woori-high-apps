@@ -63,6 +63,15 @@ describe('목양 리포트 실제 화면', () => {
     expect(detail).toBe(document.activeElement);
     expect(detail.textContent).toContain('010-0000-0000');
   });
+  it('연속 결석 상세를 닫으면 열었던 학생 버튼으로 초점을 돌린다', () => {
+    render(<PastoralReport />);
+    fireEvent.click(screen.getByRole('button', { name: '연속 결석' }));
+    const trigger = screen.getByRole('button', { name: '합성 학생 상세 보기' });
+    trigger.focus(); fireEvent.click(trigger);
+    expect(screen.getByRole('complementary', { name: '합성 학생 상세' })).toBe(document.activeElement);
+    fireEvent.click(screen.getByRole('button', { name: '상세 닫기' }));
+    expect(document.activeElement).toBe(trigger);
+  });
   it('학생 직접 링크의 대상이 현재 명단에 없으면 이유를 안내한다', () => {
     mocks.query = 'view=absence&student=1-1-1%2Fmissing';
     render(<PastoralReport />);
@@ -169,6 +178,10 @@ describe('목양 리포트 실제 화면', () => {
     expect(screen.getByText('2026-01-10')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '등반 완료 학생' }));
     expect(screen.getByText('기록 없음')).toBeTruthy();
+    const trigger = screen.getByRole('button', { name: '등반 완료 학생' });
+    expect(document.activeElement?.textContent).toBe('닫기');
+    fireEvent.click(screen.getByRole('button', { name: '닫기' }));
+    expect(document.activeElement).toBe(trigger);
   });
   it('등록현황은 통합사이트 공개 진행 기록을 실시간 갱신하고 부서정착과 구분한다', () => {
     render(<PastoralReport />);

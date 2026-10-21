@@ -1,6 +1,6 @@
 'use client';
-import { useRef, useState } from 'react';
-import { useApp, useClassKeys, useClassKey } from '@/store/AppContext';
+import { useEffect, useRef, useState } from 'react';
+import { isDataReady, useApp, useClassKeys, useClassKey } from '@/store/AppContext';
 import ClassTabBar from '@/components/ClassTabBar';
 import StudentModal from '@/components/modals/StudentModal';
 import TeacherModal from '@/components/modals/TeacherModal';
@@ -14,7 +14,7 @@ import type { MoveTarget } from '@/types';
 import './teacher-ux.css';
 
 export default function ManageTab() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, getState } = useApp();
   const { curPart, curGrade, curClass, curYear, classData, userRole } = state;
   const classKeys = useClassKeys(state);
   const ck = useClassKey(state);
@@ -28,20 +28,29 @@ export default function ManageTab() {
   const [deleting, setDeleting] = useState(false);
   const deleteBusy = useRef(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const active = useRef(true);
+  const current = useRef(state);
+  current.current = state;
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
 
   async function deleteClass() {
     if (!isAdmin || deleteBusy.current) return;
     deleteBusy.current = true; setDeleting(true); setDeleteError(null);
     setDeleteConfirm(false);
     const keys = classKeys.filter(k => k !== ck);
+    const isCurrent = () => {
+      const latest = getState ? getState() : current.current;
+      return active.current && latest.curYear === curYear && latest.dataRevision === state.dataRevision
+        && latest.userRole?.role === 'admin' && `${latest.curPart}-${latest.curGrade}-${latest.curClass}` === ck && isDataReady(latest);
+    };
     try {
-      await archiveRoster({ year: curYear, classKey: ck, actor: adminActor(userRole) });
-      if (keys.length > 0) {
+      await archiveRoster({ year: curYear, classKey: ck, actor: adminActor(userRole) }, isCurrent);
+      if (isCurrent() && keys.length > 0) {
         dispatch({ type: 'SET_CLASS', payload: keys[0].split('-')[2] });
       }
     } catch (cause) {
-      setDeleteError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
-    } finally { deleteBusy.current = false; setDeleting(false); }
+      if (isCurrent()) setDeleteError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
+    } finally { deleteBusy.current = false; if (active.current) setDeleting(false); }
   }
 
   return (

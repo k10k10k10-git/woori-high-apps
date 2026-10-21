@@ -1,10 +1,12 @@
 'use client';
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { db, ref, get, set, runTransaction } from '@/lib/db';
+import { db, ref, get } from '@/lib/db';
+import { ManagementSaveError, runManagementSave, type ManagementSaveSession } from '@/lib/managementSave';
 import { useApp } from '@/store/AppContext';
 import { showToast } from '@/utils/toast';
 import { createPersonId, findHistoricalPersonId } from '@/utils/personId';
 import { mergeTeacherEdit, type TeacherFields } from '@/utils/teacherPersistence';
+import { createTeacherRecord, deleteTeacherRecord } from '@/utils/adminPersistence';
 import TeacherModal from '@/components/modals/TeacherModal';
 import '../../admin/admin-teacher-dialog.css';
 
@@ -31,8 +33,8 @@ function sortClassKeys(keys: string[]): string[] {
 const tdCell: React.CSSProperties = { padding: '7px 10px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' };
 
 export default function TeacherManagement() {
-  const { state, dispatch } = useApp();
-  const { classData, curYear } = state;
+  const { state, dispatch, getState } = useApp();
+  const { classData, curYear, dataRevision, draftSession } = state;
 
   const [teacherPart, setTeacherPart] = useState<'1' | '2' | 'staff'>('1');
   const [specialTeachers, setSpecialTeachers] = useState<SpecialTeacher[]>(DEFAULT_SPECIALS);
@@ -55,7 +57,17 @@ export default function TeacherManagement() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const openedTeacher = useRef<TeacherFields>({});
+  const draftRecordKey = useRef('');
+  const draftPersonId = useRef('');
+  const active = useRef(true);
   const teacherFormId = useId();
+
+  useEffect(() => { active.current = true; return () => { active.current = false; }; }, []);
+  const isCurrent = () => {
+    const latest = getState?.() ?? state;
+    return active.current && latest.curYear === curYear && latest.dataRevision === dataRevision
+      && latest.draftSession === draftSession && latest.userRole?.role === 'admin';
+  };
 
   const loadTeacherData = useCallback(async () => {
     const request = ++loadRequest.version;
@@ -128,8 +140,13 @@ export default function TeacherManagement() {
     setSaveError('');
     if (key && staffList[key]) {
       const s = staffList[key];
+      openedTeacher.current = { ...s };
+      draftPersonId.current = '';
       setTeacherForm({ title: s.title, name: s.name, phone: s.phone, birth: s.birth ?? '' });
     } else {
+      openedTeacher.current = {};
+      draftRecordKey.current = `staff_${Date.now()}`;
+      draftPersonId.current = '';
       setTeacherForm({ title: '', name: '', phone: '', birth: '' });
     }
     setDeleteStaffConfirm(false);
@@ -140,21 +157,26 @@ export default function TeacherManagement() {
     setSaveError('');
     if (key && additionalTeachers[key]) {
       const s = additionalTeachers[key];
+      openedTeacher.current = { ...s };
+      draftPersonId.current = '';
       setTeacherForm({ title: s.title, name: s.name, phone: s.phone, birth: s.birth ?? '' });
     } else {
+      openedTeacher.current = {};
+      draftRecordKey.current = `add_${Date.now()}`;
+      draftPersonId.current = '';
       setTeacherForm({ title: '', name: '', phone: '', birth: '' });
     }
     setDeleteStaffConfirm(false);
     setEditingTeacher({ kind: 'additional', key });
   }
 
-  async function resolveWorkerPersonId(kind: 'teacher' | 'staff', current?: TeacherExtra | StaffMember | SpecialTeacher) {
+  async function resolveWorkerPersonId(session: ManagementSaveSession, kind: 'teacher' | 'staff', current?: TeacherExtra | StaffMember | SpecialTeacher) {
     if (current?.personId?.startsWith(`person_${kind}_`)) return current.personId;
     const rootNames = kind === 'staff'
       ? ['teacherStaff']
       : ['teacherSpecial', 'teacherExtra', 'teacherAdditional'];
-    const snapshots = await Promise.all(rootNames.map((path) => get(ref(db, path))));
-    const historical = findHistoricalPersonId(kind, teacherForm, snapshots.map((snapshot) => snapshot.exists() ? snapshot.val() : {}));
+    const snapshots = await Promise.all(rootNames.map((path) => session.read(path)));
+    const historical = findHistoricalPersonId(kind, teacherForm, snapshots.map((snapshot) => snapshot.value ?? {}));
     return historical ?? createPersonId(kind);
   }
 
@@ -164,38 +186,74 @@ export default function TeacherManagement() {
     try {
       if (editingTeacher.kind === 'special') {
         const index = editingTeacher.idx;
-        const current = specialTeachers[index];
-        const personId = await resolveWorkerPersonId('teacher', current);
-        const target = ref(db, `teacherSpecial/${curYear}/${teacherPart}/${editingTeacher.idx}`);
-        const result = await runTransaction(target, latest => mergeTeacherEdit(latest, openedTeacher.current, teacherForm, personId), { applyLocally: false });
-        if (!result.committed) { setSaveError('다른 관리자가 교사 정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.'); return; }
-        setSpecialTeachers(previous => previous.map((value, position) => position === index ? result.snapshot.val() : value));
+        const path = `teacherSpecial/${curYear}/${teacherPart}/${editingTeacher.idx}`;
+        const value = await runManagementSave(isCurrent, async session => {
+          const latest = await session.read<TeacherFields | null>(path);
+          const personId = await resolveWorkerPersonId(session, 'teacher', latest.value ?? specialTeachers[index]);
+          const next = mergeTeacherEdit(latest.value, openedTeacher.current, teacherForm, personId);
+          if (!next) throw new ManagementSaveError('conflict', '다른 관리자가 교사 정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.');
+          await session.write(path, latest.etag, next);
+          return next as SpecialTeacher;
+        });
+        setSpecialTeachers(previous => previous.map((current, position) => position === index ? value : current));
       } else if (editingTeacher.kind === 'staff') {
-        const staffKey = editingTeacher.key ?? `staff_${Date.now()}`;
+        const staffKey = editingTeacher.key ?? draftRecordKey.current;
         if (!teacherForm.name.trim()) { showToast('이름을 입력하세요.'); setSaving(false); return; }
-        const personId = await resolveWorkerPersonId('staff', editingTeacher.key ? staffList[editingTeacher.key] : undefined);
-        const value = { ...teacherForm, personId };
-        await set(ref(db, `teacherStaff/${curYear}/${staffKey}`), value);
+        const path = `teacherStaff/${curYear}/${staffKey}`;
+        const value = await runManagementSave(isCurrent, async session => {
+          const latest = await session.read<TeacherFields | null>(path);
+          const personId = editingTeacher.key
+            ? await resolveWorkerPersonId(session, 'staff', latest.value ?? staffList[editingTeacher.key])
+            : draftPersonId.current || await resolveWorkerPersonId(session, 'staff');
+          if (!editingTeacher.key) draftPersonId.current = personId;
+          const next = editingTeacher.key
+            ? mergeTeacherEdit(latest.value, openedTeacher.current, teacherForm, personId)
+            : createTeacherRecord(latest.value, teacherForm, personId);
+          if (!next) throw new ManagementSaveError('conflict', editingTeacher.key
+            ? '다른 관리자가 스탭 정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.'
+            : '같은 스탭 키에 이미 자료가 있습니다. 명단을 다시 불러와 주세요.');
+          await session.write(path, latest.etag, next);
+          return next as StaffMember;
+        });
         setStaffList(prev => ({ ...prev, [staffKey]: value }));
       } else if (editingTeacher.kind === 'additional') {
-        const addKey = editingTeacher.key ?? `add_${Date.now()}`;
+        const addKey = editingTeacher.key ?? draftRecordKey.current;
         if (!teacherForm.name.trim()) { showToast('이름을 입력하세요.'); setSaving(false); return; }
-        const personId = await resolveWorkerPersonId('teacher', editingTeacher.key ? additionalTeachers[editingTeacher.key] : undefined);
-        const value = { ...teacherForm, personId };
-        await set(ref(db, `teacherAdditional/${curYear}/${teacherPart}/${addKey}`), value);
+        const path = `teacherAdditional/${curYear}/${teacherPart}/${addKey}`;
+        const value = await runManagementSave(isCurrent, async session => {
+          const latest = await session.read<TeacherFields | null>(path);
+          const personId = editingTeacher.key
+            ? await resolveWorkerPersonId(session, 'teacher', latest.value ?? additionalTeachers[editingTeacher.key])
+            : draftPersonId.current || await resolveWorkerPersonId(session, 'teacher');
+          if (!editingTeacher.key) draftPersonId.current = personId;
+          const next = editingTeacher.key
+            ? mergeTeacherEdit(latest.value, openedTeacher.current, teacherForm, personId)
+            : createTeacherRecord(latest.value, teacherForm, personId);
+          if (!next) throw new ManagementSaveError('conflict', editingTeacher.key
+            ? '다른 관리자가 교사 정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.'
+            : '같은 교사 키에 이미 자료가 있습니다. 명단을 다시 불러와 주세요.');
+          await session.write(path, latest.etag, next);
+          return next as StaffMember;
+        });
         setAdditionalTeachers(prev => ({ ...prev, [addKey]: value }));
       } else {
         const part = editingTeacher.ck.split('-')[0];
         const key = editingTeacher.ck.replace(/-/g, '_');
-        const personId = await resolveWorkerPersonId('teacher', teacherExtra[key]);
-        const result = await runTransaction(ref(db, `teacherExtra/${curYear}/${part}/${key}`), latest =>
-          mergeTeacherEdit(latest, openedTeacher.current, { title: teacherForm.title, phone: teacherForm.phone, birth: teacherForm.birth }, personId), { applyLocally: false });
-        if (!result.committed) { setSaveError('다른 관리자가 추가정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.'); return; }
-        setTeacherExtra(prev => ({ ...prev, [key]: result.snapshot.val() }));
+        const path = `teacherExtra/${curYear}/${part}/${key}`;
+        const value = await runManagementSave(isCurrent, async session => {
+          const latest = await session.read<TeacherFields | null>(path);
+          const personId = await resolveWorkerPersonId(session, 'teacher', latest.value ?? teacherExtra[key]);
+          const next = mergeTeacherEdit(latest.value, openedTeacher.current,
+            { title: teacherForm.title, phone: teacherForm.phone, birth: teacherForm.birth }, personId);
+          if (!next) throw new ManagementSaveError('conflict', '다른 관리자가 추가정보를 변경했습니다. 입력은 유지했으니 최신 명단을 확인해 주세요.');
+          await session.write(path, latest.etag, next);
+          return next as TeacherExtra;
+        });
+        setTeacherExtra(prev => ({ ...prev, [key]: value }));
       }
       setEditingTeacher(null);
-    } catch {
-      setSaveError('저장하지 못했습니다. 입력은 유지했으니 연결을 확인하고 다시 시도해 주세요.');
+    } catch (error) {
+      setSaveError(error instanceof ManagementSaveError ? error.message : '저장하지 못했습니다. 입력은 유지했으니 연결을 확인하고 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
@@ -210,15 +268,27 @@ export default function TeacherManagement() {
     setSaving(true);
     try {
       if (isStaff) {
-        await set(ref(db, `teacherStaff/${curYear}/${editingTeacher.key}`), null);
+        const path = `teacherStaff/${curYear}/${editingTeacher.key}`;
+        await runManagementSave(isCurrent, async session => {
+          const latest = await session.read<TeacherFields | null>(path);
+          const deletion = deleteTeacherRecord(latest.value, openedTeacher.current);
+          if (!deletion) throw new ManagementSaveError('conflict', '다른 관리자가 스탭 정보를 변경했습니다. 삭제하지 않았으니 최신 명단을 확인해 주세요.');
+          if (!deletion.alreadyDeleted) await session.write(path, latest.etag, null);
+        });
         setStaffList(prev => { const next = { ...prev }; delete next[editingTeacher.key!]; return next; });
       } else {
-        await set(ref(db, `teacherAdditional/${curYear}/${teacherPart}/${editingTeacher.key}`), null);
+        const path = `teacherAdditional/${curYear}/${teacherPart}/${editingTeacher.key}`;
+        await runManagementSave(isCurrent, async session => {
+          const latest = await session.read<TeacherFields | null>(path);
+          const deletion = deleteTeacherRecord(latest.value, openedTeacher.current);
+          if (!deletion) throw new ManagementSaveError('conflict', '다른 관리자가 교사 정보를 변경했습니다. 삭제하지 않았으니 최신 명단을 확인해 주세요.');
+          if (!deletion.alreadyDeleted) await session.write(path, latest.etag, null);
+        });
         setAdditionalTeachers(prev => { const next = { ...prev }; delete next[editingTeacher.key!]; return next; });
       }
       setEditingTeacher(null);
-    } catch {
-      showToast('삭제에 실패했습니다.');
+    } catch (error) {
+      setSaveError(error instanceof ManagementSaveError ? error.message : '삭제하지 못했습니다. 명단을 다시 확인한 뒤 재시도해 주세요.');
     } finally {
       setSaving(false);
     }

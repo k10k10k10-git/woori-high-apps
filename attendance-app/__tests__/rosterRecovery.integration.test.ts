@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { initializeApp, deleteApp, type FirebaseApp } from 'firebase/app';
 import { connectDatabaseEmulator, getDatabase, get, ref, set, update, type Database } from 'firebase/database';
-const holder = vi.hoisted(() => ({ database: null as Database | null }));
-vi.mock('@/lib/firebase/client', () => ({ get db() { return holder.database; } }));
+import { createMockUserToken } from '@firebase/util';
+const holder = vi.hoisted(() => ({ database: null as Database | null, user: null as { uid: string; getIdToken: () => Promise<string> } | null }));
+vi.mock('@/lib/firebase/client', () => ({ get db() { return holder.database; }, auth: { get currentUser() { return holder.user; } } }));
 import { archiveRoster } from '@/lib/rosterRecovery';
 import { runTransaction } from '@/lib/db';
 import { restoreMissingClass, restoreMissingStudent } from '@/utils/studentPersistence';
@@ -21,6 +22,8 @@ let mixedIguard: Database, mixedField: Database, retreatOnlyPastor: Database, le
 suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약', () => {
   beforeAll(() => {
     if (process.env.FIREBASE_DATABASE_EMULATOR_HOST !== '127.0.0.1:19017') throw new Error('합성 에뮬레이터 주소가 아닙니다.');
+    vi.stubEnv('NEXT_PUBLIC_FIREBASE_DATABASE_URL', `${base}?ns=${ns}`);
+    holder.user = { uid: 'admin', getIdToken: async () => createMockUserToken({ sub: 'admin', email: 'admin@example.test' }, 'demo-attendance-recovery') };
     const client = (uid: string) => {
       const app = initializeApp({ projectId: 'demo-attendance-recovery', databaseURL: `https://${ns}.firebaseio.com` }, uid);
       apps.push(app);
@@ -72,7 +75,7 @@ suite('운영 Rules 사본을 사용하는 실제 Firebase 삭제·복원 계약
     }) });
     expect(response.ok).toBe(true);
   });
-  afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; });
+  afterAll(async () => { await Promise.all(apps.map(app => deleteApp(app))); apps = []; holder.user = null; vi.unstubAllEnvs(); });
   const checkPath = 'attendanceChecks/2026/1-1-1/9-3';
   const attendancePath = 'attendance/2026/1-1-1';
   async function checkPatch(uid = 'teacher', sid = 's', expected: AttValue = '', value: AttValue = 'O', none = false) {

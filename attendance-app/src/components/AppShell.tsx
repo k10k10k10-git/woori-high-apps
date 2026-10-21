@@ -27,13 +27,20 @@ import { canAccessAttendancePath, canUseAdminWorkspace, createAdminEntryTracker 
 type AuthState = 'loading' | 'demo-pick' | 'login' | 'role-error' | 'app';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, getState } = useApp();
   const pathname = usePathname();
   const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>('loading');
   const [authError, setAuthError] = useState<string | null>(null);
   const [demoError, setDemoError] = useState<string | null>(null);
   const [showUpdate, setShowUpdate] = useState(false);
+  const updateSaving = state.saveStatus === 'saving' || Object.values(state.teacherDraftSaves ?? {}).some(Boolean);
+  function reloadForUpdate() {
+    const current = getState?.() ?? state;
+    if (current.saveStatus === 'saving' || Object.values(current.teacherDraftSaves ?? {}).some(Boolean)) return;
+    // AppProvider의 beforeunload 확인으로 미저장 초안·결과 불명 출석을 보호한다.
+    window.location.reload();
+  }
   const [isOnline, setIsOnline] = useState(true);
   const [loadTimedOut, setLoadTimedOut] = useState(false);
   const demoTriedRef = useRef(false);
@@ -287,7 +294,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return (
       <>
         <Toast />
-        {showUpdate && <UpdateBanner onReload={() => window.location.reload()} />}
+        {showUpdate && <UpdateBanner saving={updateSaving} onReload={reloadForUpdate} onDismiss={() => setShowUpdate(false)} />}
         <AdminWorkspace onLogout={doLogout} isOnline={isOnline}>
           <FirebaseDataLoader />
           <DataLoadGate>{children}</DataLoadGate>
@@ -308,7 +315,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
       {showUpdate && (
-        <UpdateBanner onReload={() => window.location.reload()} />
+        <UpdateBanner saving={updateSaving} onReload={reloadForUpdate} onDismiss={() => setShowUpdate(false)} />
       )}
       <TopBar
         onLogout={doLogout}

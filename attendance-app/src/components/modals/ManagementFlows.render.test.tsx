@@ -2,10 +2,17 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AppState } from '@/store/AppContext';
-const m = vi.hoisted(() => ({ state: null as unknown, get: vi.fn(), set: vi.fn(), transaction: vi.fn(), update: vi.fn(), dispatch: vi.fn(), restore: vi.fn(), removeCopy: vi.fn() }));
+const m = vi.hoisted(() => ({ state: null as unknown, get: vi.fn(), set: vi.fn(), transaction: vi.fn(), update: vi.fn(), dispatch: vi.fn(), restore: vi.fn(), removeCopy: vi.fn(), read: vi.fn(), write: vi.fn() }));
 vi.mock('@/lib/db', () => ({ db: {}, ref: (_db: unknown, path: string) => path, get: m.get, runTransaction: m.transaction, update: m.update, set: m.set, push: () => ({ key: 'operation' }) }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state as AppState, dispatch: m.dispatch }) }));
 vi.mock('@/lib/rosterRestore', () => ({ restoreRoster: m.restore, permanentDeleteRosterCopy: m.removeCopy }));
+vi.mock('@/lib/firebase/client', () => ({ db: {}, auth: { currentUser: { uid: 'synthetic-admin', getIdToken: async () => 'synthetic-token' } } }));
+vi.mock('@/lib/managementSave', async original => ({ ...await original<typeof import('@/lib/managementSave')>(),
+  runManagementSave: async (check: () => boolean, task: (session: { read: typeof m.read; write: typeof m.write; check: () => void }) => Promise<unknown>) => {
+    if (!check()) throw new Error('조회 상태가 변경되었습니다.');
+    return task({ read: m.read, write: m.write, check: () => { if (!check()) throw new Error('조회 상태가 변경되었습니다.'); } });
+  },
+}));
 import { initialState } from '@/store/AppContext';
 import ManagementDialog from './ManagementDialog';
 import AddClassModal from './AddClassModal';
@@ -16,17 +23,19 @@ import RosterModal from './RosterModal';
 const student = { id: 's', name: '시험 학생', phone: 'old', personId: 'person', jang: true };
 beforeEach(() => {
   vi.clearAllMocks();
-  m.state = { ...initialState, curYear: 2026, curPart: '1', curGrade: '1', curClass: '1', userRole: { role: 'admin' }, classData: { '1-1-1': { teacher: '시험 교사', students: [student] } } };
+  m.state = { ...initialState, curYear: 2026, curPart: '1', curGrade: '1', curClass: '1', userRole: { role: 'admin' }, dataLoaded: { classes: true, attendance: true, events: true }, classData: { '1-1-1': { teacher: '시험 교사', students: [student] } } };
   m.get.mockResolvedValue({ val: () => ({}), exists: () => true });
   m.transaction.mockResolvedValue({ committed: true });
   m.restore.mockResolvedValue(undefined); m.removeCopy.mockResolvedValue(undefined);
+  m.read.mockResolvedValue({ value: { teacher: '시험 교사', students: { s: student } }, etag: 'fresh' });
+  m.write.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 it('수정창이 열린 뒤 같은 SID의 인물이 교체되면 저장을 중단한다', async () => {
   const onClose = vi.fn();
-  m.transaction.mockImplementation(async (_path, change) => ({ committed: change({ students: { s: {
+  m.read.mockResolvedValue({ value: { students: { s: {
     ...student, personId: 'person_other', name: '다른 학생',
-  } } }) !== undefined }));
+  } } }, etag: 'fresh' });
   render(<StudentModal editId="s" onClose={onClose} />);
   fireEvent.change(screen.getByLabelText('학교'), { target: { value: '새 학교' } });
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
@@ -47,7 +56,7 @@ it('작성 중 닫기는 확인을 거치며 저장 중 ESC·배경 클릭은 �
 });
 it('교사 저장 실패는 입력을 보존하고 같은 창에서 다시 저장할 수 있다', async () => {
   const onClose = vi.fn();
-  m.transaction.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ committed: true });
+  m.write.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined);
   render(<TeacherModal onClose={onClose} />);
   fireEvent.change(screen.getByLabelText('교사 이름'), { target: { value: '수정 교사' } });
   fireEvent.click(screen.getByRole('button', { name: '교사 정보 저장' }));
@@ -62,22 +71,23 @@ it('반 추가는 올바른 정수만 받고 동시 생성 충돌 시 창을 유
   render(<AddClassModal onClose={onClose} />);
   fireEvent.change(screen.getByLabelText('반 번호 *'), { target: { value: '1.5' } });
   fireEvent.click(screen.getByRole('button', { name: '반 추가' }));
-  expect(m.transaction).not.toHaveBeenCalled();
+  expect(m.write).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText('반 번호 *'), { target: { value: '02' } });
-  m.transaction.mockImplementation(async (_path, change) => ({ committed: change({ teacher: '다른 교사' }) !== undefined }));
+  m.read.mockResolvedValue({ value: { teacher: '다른 교사' }, etag: 'fresh' });
   fireEvent.click(screen.getByRole('button', { name: '반 추가' }));
   await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('같은 반'));
-  expect(m.transaction.mock.calls[0][0]).toBe('classes/2026/1-1-2');
+  expect(m.read.mock.calls[0][0]).toBe('classes/2026/1-1-2');
+  expect(m.write).not.toHaveBeenCalled();
   expect(onClose).not.toHaveBeenCalled();
 });
 it('학생 편집은 변경하지 않은 원격 연락처를 보존한다', async () => {
-  const onClose = vi.fn(); let saved: unknown;
-  m.transaction.mockImplementation(async (_path, change) => { saved = change({ teacher: '교사', students: { s: { ...student, phone: 'remote', num: 7 } } }); return { committed: Boolean(saved) }; });
+  const onClose = vi.fn();
+  m.read.mockResolvedValue({ value: { teacher: '교사', students: { s: { ...student, phone: 'remote', num: 7 } } }, etag: 'fresh' });
   render(<StudentModal editId="s" onClose={onClose} />);
   fireEvent.change(screen.getByLabelText('학교'), { target: { value: '수정 학교' } });
   fireEvent.click(screen.getByRole('button', { name: '저장' }));
   await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
-  expect(saved).toMatchObject({ students: { s: { phone: 'remote', school: '수정 학교', jang: true, num: 7 } } });
+  expect(m.write.mock.calls[0][2]).toMatchObject({ students: { s: { phone: 'remote', school: '수정 학교', jang: true, num: 7 } } });
 });
 it('같은 학생 ID의 삭제본 두 개 중 선택한 실제 키만 영구 삭제한다', async () => {
   const first = { ...student, ck: '1-1-1', deletedAt: 1 };

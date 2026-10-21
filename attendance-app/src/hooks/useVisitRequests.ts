@@ -9,6 +9,8 @@ export type OpenVisitRequest = TeacherMessage & { classKey: string };
 
 export function useVisitRequests(year: number, classKey: string, enabled: boolean, teacher: string) {
   const scope = `${year}/${classKey}`;
+  const [revision, setRevision] = useState(0);
+  const listScope = `${scope}/${revision}`;
   const [list, setList] = useState<{ scope: string; items: TeacherMessage[]; error: boolean } | null>(null);
   const { current, setStudentId, setText, saving, submit: save, saveError, retrying } = useTeacherMessageSave(year, classKey, 'visit');
 
@@ -16,10 +18,10 @@ export function useVisitRequests(year: number, classKey: string, enabled: boolea
     if (!enabled) return;
     let active = true;
     const stop = onValue(ref(db, `suggestions/${scope}`), snap => {
-      if (active) setList({ scope, items: parseTeacherMessages(snap.val(), 'visit'), error: false });
-    }, () => { if (active) setList({ scope, items: [], error: true }); });
+      if (active) setList({ scope: listScope, items: parseTeacherMessages(snap.val(), 'visit'), error: false });
+    }, () => { if (active) setList({ scope: listScope, items: [], error: true }); });
     return () => { active = false; stop?.(); };
-  }, [enabled, scope]);
+  }, [enabled, scope, listScope]);
 
   async function submit(studentName: string, studentPersonId?: string) {
     const saved = await save(() => {
@@ -34,8 +36,10 @@ export function useVisitRequests(year: number, classKey: string, enabled: boolea
   }
 
   return {
-    visitRequests: list?.scope === scope ? list.items : [],
-    visitLoadError: list?.scope === scope && list.error,
+    visitRequests: list?.scope === listScope ? list.items : [],
+    visitLoadError: list?.scope === listScope && list.error,
+    visitLoading: enabled && list?.scope !== listScope,
+    retryVisitRequests: () => setRevision(value => value + 1),
     visitStudentId: current.studentId,
     setVisitStudentId: setStudentId,
     visitText: current.text,

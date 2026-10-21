@@ -1,13 +1,13 @@
 'use client';
 import { useRef, useState } from 'react';
-import { db, ref, get, runTransaction } from '@/lib/db';
-import { useApp } from '@/store/AppContext';
+import { runManagementSave, ManagementSaveError } from '@/lib/managementSave';
+import { useManagementScope } from '@/hooks/useManagementScope';
 import { restoreMissingClass } from '@/utils/studentPersistence';
 import ManagementDialog from './ManagementDialog';
 
 export default function AddClassModal({ onClose }: { onClose: () => void }) {
-  const { state, dispatch } = useApp();
-  const { curPart, curGrade, curYear } = state;
+  const { state, dispatch, year: curYear, classKey, isCurrent, active } = useManagementScope();
+  const [curPart, curGrade] = classKey.split('-');
   const [classNum, setClassNum] = useState('');
   const [teacherName, setTeacherName] = useState('');
   const [saving, setSaving] = useState(false);
@@ -25,16 +25,16 @@ export default function AddClassModal({ onClose }: { onClose: () => void }) {
     if (state.classData[ck]) { setError('이미 존재하는 반입니다. 다른 반 번호를 입력해 주세요.'); return; }
     busyRef.current = true; setSaving(true); setError(null);
     try {
-      const target = ref(db, `classes/${curYear}/${ck}`);
-      await get(target);
-      const result = await runTransaction(target, current => restoreMissingClass(current, {
-        teacher: teacherName.trim() || '', students: {},
-      }), { applyLocally: false });
-      if (!result.committed) { setError('다른 작업에서 같은 반을 추가했습니다. 다른 번호를 입력해 주세요.'); return; }
-      dispatch({ type: 'SET_CLASS', payload: num });
-      onClose();
-    } catch { setError('반을 추가하지 못했습니다. 입력 내용은 유지됩니다. 연결을 확인하고 다시 시도해 주세요.'); }
-    finally { busyRef.current = false; setSaving(false); }
+      await runManagementSave(isCurrent, async session => {
+        const path = `classes/${curYear}/${ck}`;
+        const snapshot = await session.read(path);
+        const next = restoreMissingClass(snapshot.value, { teacher: teacherName.trim() || '', students: {} });
+        if (!next) throw new ManagementSaveError('conflict', '다른 작업에서 같은 반을 추가했습니다. 현재 반을 확인한 뒤 다시 열어 주세요.');
+        await session.write(path, snapshot.etag, next);
+      });
+      if (isCurrent()) { dispatch({ type: 'SET_CLASS', payload: num }); onClose(); }
+    } catch (cause) { if (active.current) setError(cause instanceof Error ? cause.message : '반 추가 결과를 확인하지 못했습니다. 현재 명단을 확인해 주세요.'); }
+    finally { busyRef.current = false; if (active.current) setSaving(false); }
   }
   return <ManagementDialog title="반 추가" description={`${curYear}년 ${curPart}부 ${curGrade}학년에 새 반을 추가합니다.`}
     busy={saving} dirty={Boolean(classNum || teacherName)} onClose={onClose}>{dismiss => <>

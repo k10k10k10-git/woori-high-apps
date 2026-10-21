@@ -76,12 +76,16 @@ function ReportContent() {
   const setLongAbsent = (longAbsent: string) => setViewState({ longAbsent });
   const setAbsenceView = (absenceView: 'absent' | 'recovered') => setViewState({ absenceView });
   const setSortOrder = (sortOrder: ReportSort) => setViewState({ sortOrder });
-  const setSelectedStudentKey = (selectedStudentKey: string) => setViewState({ selectedStudentKey });
-  const setSelectedFriendKey = (selectedFriendKey: string) => setViewState({ selectedFriendKey });
+  const setSelectedStudentKey = (selectedStudentKey: string) => { setViewState({ selectedStudentKey }); if (!selectedStudentKey) restoreDetailFocus(); };
+  const setSelectedFriendKey = (selectedFriendKey: string) => { setViewState({ selectedFriendKey }); if (!selectedFriendKey) restoreDetailFocus(); };
   const [load, setLoad] = useState<FriendLoad>({ status: 'loading', friends: [] });
   const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(Date.now);
   const detailRef = useRef<HTMLElement>(null);
+  const detailTriggerRef = useRef<HTMLButtonElement | null>(null);
+  function restoreDetailFocus() {
+    if (detailTriggerRef.current?.isConnected) detailTriggerRef.current.focus({ preventScroll: true });
+  }
 
   useEffect(() => {
     if (!requested && !requestedStudentKey && !requestedVisitKey && !requestedWeekKey) return;
@@ -132,7 +136,10 @@ function ReportContent() {
   }
   const isNewFriends = section.key === 'registration' || section.key === 'friends';
 
-  return <div className="admin-overview pastoral-report">
+  return <div className="admin-overview pastoral-report" onClickCapture={event => {
+    const trigger = (event.target as HTMLElement).closest<HTMLButtonElement>('.pr-table button');
+    if (trigger) detailTriggerRef.current = trigger;
+  }}>
     <header className="ao-heading"><h1>목양 관리</h1><p>학생 이름을 먼저 보고, 필요한 연락과 후속 조치를 바로 확인하세요.</p></header>
     <div className="ao-sections" role="group" aria-label="목양 관리 보기 선택">
       {SECTIONS.slice(0, 3).map(item => <button type="button" key={item.key} aria-pressed={section.key === item.key} aria-controls="pr-content" onClick={() => chooseSection(item)}>{item.label}</button>)}

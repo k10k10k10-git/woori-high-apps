@@ -7,6 +7,8 @@ import { useTeacherMessageSave } from './useTeacherMessageSave';
 
 export function useSuggestions(year: number, classKey: string, listEnabled: boolean, teacher: string) {
   const scope = `${year}/${classKey}`;
+  const [revision, setRevision] = useState(0);
+  const listScope = `${scope}/${revision}`;
   const [list, setList] = useState<{ scope: string; items: TeacherMessage[]; error: boolean } | null>(null);
   const { current, setStudentId, setText, saving, submit: save, receipt, saveError, retrying } = useTeacherMessageSave(year, classKey, 'note');
   useEffect(() => {
@@ -14,10 +16,10 @@ export function useSuggestions(year: number, classKey: string, listEnabled: bool
     let active = true;
     const stop = onValue(ref(db, `suggestions/${scope}`), snap => {
       if (!active) return;
-      setList({ scope, items: parseTeacherMessages(snap.val(), 'note'), error: false });
-    }, () => { if (active) setList({ scope, items: [], error: true }); });
+      setList({ scope: listScope, items: parseTeacherMessages(snap.val(), 'note'), error: false });
+    }, () => { if (active) setList({ scope: listScope, items: [], error: true }); });
     return () => { active = false; stop?.(); };
-  }, [scope, listEnabled]);
+  }, [scope, listScope, listEnabled]);
   async function submit(studentName?: string) {
     const saved = await save(() => {
       if (!current.text.trim()) return null;
@@ -32,7 +34,8 @@ export function useSuggestions(year: number, classKey: string, listEnabled: bool
     });
     if (saved) showToast('특이사항이 등록되었습니다.');
   }
-  return { suggestions: list?.scope === scope ? list.items : [], suggestLoadError: list?.scope === scope && list.error,
+  return { suggestions: list?.scope === listScope ? list.items : [], suggestLoadError: list?.scope === listScope && list.error,
+    suggestLoading: listEnabled && list?.scope !== listScope, retrySuggestions: () => setRevision(value => value + 1),
     suggestStudentId: current.studentId,
     setSuggestStudentId: setStudentId,
     suggestText: current.text,

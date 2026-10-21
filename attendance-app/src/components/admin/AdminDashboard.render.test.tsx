@@ -46,6 +46,11 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('관리자 오늘 업무', () => {
+  it('한 학생의 요청이 여러 건이면 인원으로 오인하지 않게 건수로 표시한다', () => {
+    mocks.visits.rows.push({ ...mocks.visits.rows[0], id: 'visit-2' });
+    render(<AdminDashboard />);
+    expect(screen.getByRole('group', { name: '2026년 현재 미처리 심방 요청' }).textContent).toContain('2건 심방 요청');
+  });
   it.each(['완료', '일부', '혼합'])('기존 O/X %s 입력도 반별 현황과 같은 입력 있음 숫자로 표시하며 원장을 보존한다', mode => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-26T00:00:00+09:00'));
     const students = [{ id: 'a', name: '합성 A' }, { id: 'b', name: '합성 B' }];
@@ -99,7 +104,7 @@ describe('관리자 오늘 업무', () => {
   it('출석률의 입력 분모와 일반 학생 입력 완료를 구분하고 연간 심방과 주간 현황을 나눈다', () => {
     render(<AdminDashboard />);
     expect(screen.getByRole('heading', { level: 1, name: '오늘 업무' })).toBeTruthy();
-    expect(screen.getByRole('group', { name: '2026년 현재 미처리 심방 요청' }).textContent).toContain('1명 심방 요청');
+    expect(screen.getByRole('group', { name: '2026년 현재 미처리 심방 요청' }).textContent).toContain('1건 심방 요청');
     const week = screen.getByRole('group', { name: '1월 25일 출석 현황' });
     expect(week.textContent).toContain('출석률 67%');
     expect(week.textContent).toContain('O·X 입력 3명 기준');

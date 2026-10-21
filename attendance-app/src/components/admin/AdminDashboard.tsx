@@ -56,7 +56,7 @@ export default function AdminDashboard() {
     <div className="ad-glance" aria-label="업무 현황">
       <div className="ad-glance-current" role="group" aria-label={`${curYear}년 현재 미처리 심방 요청`}>
         <small className="ad-glance-period">{curYear}년 현재 미처리</small>
-        <span><b>{visits.status === 'ready' ? visits.rows.length : '—'}</b>명 심방 요청</span>
+        <span><b>{visits.status === 'ready' ? visits.rows.length : '—'}</b>건 심방 요청</span>
       </div>
       <div className="ad-glance-week" role="group" aria-label={`${selectedWeek?.label ?? '조회 주일 없음'} 출석 현황`}>
         <small className="ad-glance-period">{selectedWeek?.label ?? '조회 주일 없음'} 기준</small>
