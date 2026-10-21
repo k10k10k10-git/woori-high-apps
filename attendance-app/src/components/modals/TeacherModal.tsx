@@ -1,13 +1,13 @@
 'use client';
 import { useRef, useState } from 'react';
-import { db, ref, get, runTransaction } from '@/lib/db';
-import { useApp, useClassKey } from '@/store/AppContext';
+import { runManagementSave, ManagementSaveError } from '@/lib/managementSave';
+import { useManagementScope } from '@/hooks/useManagementScope';
+import { sameStoredValue } from '@/utils/studentPersistence';
 import { compressImage } from '@/utils/image';
 import ManagementDialog from './ManagementDialog';
 
 export default function TeacherModal({ onClose }: { onClose: () => void }) {
-  const { state } = useApp();
-  const ck = useClassKey(state);
+  const { state, year, classKey: ck, isCurrent, active } = useManagementScope();
   const [opened] = useState(() => ({ name: state.classData[ck]?.teacher ?? '', photo: state.classData[ck]?.teacherPhoto ?? '' }));
   const [name, setName] = useState(opened.name);
   const [photo, setPhoto] = useState(opened.photo);
@@ -29,22 +29,22 @@ export default function TeacherModal({ onClose }: { onClose: () => void }) {
     busyRef.current = true;
     setSaving(true); setError(null);
     try {
-      const classRef = ref(db, `classes/${state.curYear}/${ck}`);
-      await get(classRef);
-      const result = await runTransaction(classRef, current => {
-        if (!current) return undefined;
+      await runManagementSave(isCurrent, async session => {
+        const path = `classes/${year}/${ck}`;
+        const snapshot = await session.read<Record<string, unknown> | null>(path);
+        const current = snapshot.value;
+        if (!current) throw new ManagementSaveError('conflict', '반이 삭제·변경되었습니다. 현재 명단에서 다시 열어 주세요.');
         const next = { ...current };
         for (const [key, before, value] of [['teacher', opened.name, name.trim()], ['teacherPhoto', opened.photo, photo]]) {
           if (before === value) continue;
-          if ((current[key] ?? '') !== before && (current[key] ?? '') !== value) return undefined;
+          if ((current[key] ?? '') !== before && (current[key] ?? '') !== value) throw new ManagementSaveError('conflict', '반 또는 교사 정보가 다른 작업에서 변경되었습니다. 입력 내용은 유지됩니다. 현재 명단을 확인해 주세요.');
           next[key] = value || null;
         }
-        return next;
-      }, { applyLocally: false });
-      if (!result.committed) { setError('반 또는 교사 정보가 다른 작업에서 변경되었습니다. 입력 내용은 유지됩니다. 현재 명단을 확인해 주세요.'); return; }
-      onClose();
-    } catch { setError('저장하지 못했습니다. 입력 내용은 유지됩니다. 연결을 확인하고 다시 저장해 주세요.'); }
-    finally { busyRef.current = false; setSaving(false); }
+        if (!sameStoredValue(current, next)) await session.write(path, snapshot.etag, next);
+      });
+      if (isCurrent()) onClose();
+    } catch (cause) { if (active.current) setError(cause instanceof Error ? cause.message : '저장 결과를 확인하지 못했습니다. 현재 반을 확인해 주세요.'); }
+    finally { busyRef.current = false; if (active.current) setSaving(false); }
   }
   return <ManagementDialog title="교사 정보 수정" description={`${state.curPart}부 ${state.curGrade}학년 ${state.curClass}반 담당 교사`}
     busy={saving || photoBusy} dirty={name !== opened.name || photo !== opened.photo} onClose={onClose}>{dismiss => <>

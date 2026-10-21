@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState } from 'react';
-import { db, ref, get, push, runTransaction } from '@/lib/db';
-import { useApp, useClassKey } from '@/store/AppContext';
+import { runManagementSave, ManagementSaveError } from '@/lib/managementSave';
+import { useManagementScope } from '@/hooks/useManagementScope';
 import { compressImage } from '@/utils/image';
 import { createPersonId, findHistoricalStudentPersonId } from '@/utils/personId';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/utils/adminChange';
 import ManagementDialog from './ManagementDialog';
 import { archiveRoster } from '@/lib/rosterRecovery';
-import { editStudent, mergeStudentEdit } from '@/utils/studentPersistence';
+import { editStudent, mergeStudentEdit, sameStoredValue } from '@/utils/studentPersistence';
 import type { Student } from '@/types';
 
 export default function StudentModal({
@@ -21,12 +21,15 @@ export default function StudentModal({
   editId: string | null;
   onClose: () => void;
 }) {
-  const { state } = useApp();
-  const ck = useClassKey(state);
+  const { state, year, classKey: ck, isCurrent, active } = useManagementScope();
   const students = state.classData[ck]?.students ?? [];
   const student = editId ? students.find(s => s.id === editId) : null;
 
   const [opened] = useState(() => student ? structuredClone(student) : null);
+  const [id] = useState(() => editId ?? `s_${crypto.randomUUID()}`);
+  const [changeId] = useState(() => crypto.randomUUID());
+  const personIdRef = useRef(opened?.personId ?? '');
+  const submitted = useRef<{ values: string; student: Student } | null>(null);
   const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -57,54 +60,49 @@ export default function StudentModal({
     busyRef.current = true;
     setError(null);
     setSaving(true);
-    const id = editId ?? `s_${crypto.randomUUID()}`;
 
     // 최신 반을 기준으로 대상 학생과 감사 기록을 함께 갱신한다.
     // 다른 학생 및 장결·번호 등 편집 폼 밖 필드는 트랜잭션 재시도에서도 보존한다.
     try {
-      let personId = student?.personId;
-      if (!personId) {
-        const allClassesSnap = await get(ref(db, 'classes'));
-        personId = findHistoricalStudentPersonId(
-          { name, birth, phone },
-          [allClassesSnap.exists() ? allClassesSnap.val() : {}],
-          { year: state.curYear, classKey: ck },
-        )
-          ?? createPersonId('student');
-      }
-      const classRef = ref(db, `classes/${state.curYear}/${ck}`);
-      await get(classRef);
-      const changeId = push(ref(db, `classes/${state.curYear}/${ck}/adminChanges`)).key!;
-      const changedAt = new Date();
-      const result = await runTransaction(classRef, current => {
-        if (!current) return undefined;
+      await runManagementSave(isCurrent, async session => {
+        if (!personIdRef.current) {
+          const history = await session.read('classes');
+          personIdRef.current = findHistoricalStudentPersonId({ name, birth, phone }, [history.value ?? {}], { year, classKey: ck }) ?? createPersonId('student');
+        }
+        const path = `classes/${year}/${ck}`;
+        const snapshot = await session.read<{ students?: Record<string, Student>; teacher?: string; adminChanges?: Record<string, unknown> } | null>(path);
+        const current = snapshot.value;
+        if (!current) throw new ManagementSaveError('conflict', '반이 삭제·변경되었습니다. 현재 명단에서 다시 열어 주세요.');
         const raw = current.students?.[id] as Student | undefined;
         const latest = raw ? { ...raw, id } : undefined;
-        if ((editId && !latest) || (!editId && latest)) return undefined;
         const values = { name, birth, phone, pphone, school, addr, photo };
-        const next = latest && opened ? mergeStudentEdit(latest, opened, values) : editStudent(latest, id, personId!, values);
-        if (!next) return undefined;
-        next.personId ||= personId!;
+        const valuesKey = JSON.stringify(values);
+        if (submitted.current?.values === valuesKey && current.adminChanges?.[changeId] && latest
+          && mergeStudentEdit(latest, submitted.current.student, submitted.current.student)) return;
+        if ((editId && !latest) || (!editId && latest)) throw new ManagementSaveError('conflict', '명단이 변경되었습니다. 현재 명단에서 학생을 확인한 뒤 다시 열어 주세요.');
+        const next = latest && opened ? mergeStudentEdit(latest, opened, values) : editStudent(latest, id, personIdRef.current, values);
+        if (!next) throw new ManagementSaveError('conflict', '다른 작업에서 같은 정보를 수정했습니다. 입력은 유지됩니다. 현재 명단을 확인한 뒤 다시 열어 주세요.');
+        next.personId ||= personIdRef.current;
+        if (raw && sameStoredValue(raw, next)) return;
         const changedFields = latest ? describeStudentFieldChanges(latest, next) : [];
-        return {
+        const result = {
           ...current,
           students: { ...current.students, [id]: next },
-          ...(!latest || changedFields.length ? {
-            adminChanges: { ...current.adminChanges, [changeId]: buildAdminChangeEntry({
+          adminChanges: { ...current.adminChanges, [changeId]: buildAdminChangeEntry({
               classKey: ck, teacher: current.teacher, student: next,
               action: latest ? '학생 정보 수정' : '학생 등록',
-              changeSummary: latest ? changedFields.join(' · ') : '출석부에 학생 신규 등록',
-              actor: adminActor(state.userRole), now: changedAt,
+              changeSummary: latest ? changedFields.join(' · ') || '학생 연결 정보 보완' : '출석부에 학생 신규 등록',
+              actor: adminActor(state.userRole), now: new Date(),
             }) },
-          } : {}),
         };
-      }, { applyLocally: false });
-      if (!result.committed) throw new Error('명단이 변경되었습니다. 다시 확인해 주세요.');
+        submitted.current = { values: valuesKey, student: structuredClone(next) };
+        await session.write(path, snapshot.etag, result);
+      });
     } catch (cause) {
-      setError(cause instanceof Error && cause.message.startsWith('명단이') ? '다른 작업에서 같은 정보를 수정했습니다. 입력 내용은 유지됩니다. 현재 명단을 확인한 뒤 다시 열어 주세요.' : '저장하지 못했습니다. 입력 내용은 유지됩니다. 연결을 확인하고 다시 저장해 주세요.');
+      if (active.current) setError(cause instanceof Error ? cause.message : '저장 결과를 확인하지 못했습니다. 현재 명단을 확인해 주세요.');
       return;
-    } finally { busyRef.current = false; setSaving(false); }
-    onClose();
+    } finally { busyRef.current = false; if (active.current) setSaving(false); }
+    if (isCurrent()) onClose();
   }
 
   async function handleDelete() {
@@ -115,13 +113,13 @@ export default function StudentModal({
     setDeleteConfirm(false);
     setSaving(true);
     try {
-      await archiveRoster({ year: state.curYear, classKey: ck, studentId: editId,
-        openedStudent: opened, actor: adminActor(state.userRole) });
+      await archiveRoster({ year, classKey: ck, studentId: editId,
+        openedStudent: opened, actor: adminActor(state.userRole) }, isCurrent);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
+      if (active.current) setError(cause instanceof Error ? cause.message : '삭제 결과를 확인하지 못했습니다. 현재 명단과 복구 사본을 확인해 주세요.');
       return;
-    } finally { busyRef.current = false; setSaving(false); }
-    onClose();
+    } finally { busyRef.current = false; if (active.current) setSaving(false); }
+    if (isCurrent()) onClose();
   }
 
   const values = { name, birth, phone, pphone, school, addr, photo };

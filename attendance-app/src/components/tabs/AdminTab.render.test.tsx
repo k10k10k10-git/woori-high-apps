@@ -1,11 +1,23 @@
 /** @vitest-environment jsdom */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { initialState, type AppState } from '@/store/AppContext';
-const m = vi.hoisted(() => ({ state: null as AppState | null, dispatch: vi.fn(), get: vi.fn<(path: string) => Promise<{ exists: () => boolean; val: () => null }>>(async () => ({ exists: () => false, val: () => null })), set: vi.fn() }));
+const m = vi.hoisted(() => ({ state: null as AppState | null, dispatch: vi.fn(), get: vi.fn<(path: string) => Promise<{ exists: () => boolean; val: () => null }>>(async () => ({ exists: () => false, val: () => null })), set: vi.fn(),
+  managementData: {} as Record<string, unknown>, managementWrites: vi.fn(), toast: vi.fn() }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state!, getState: () => m.state!, dispatch: m.dispatch }) }));
 vi.mock('@/lib/db', () => ({ db: {}, ref: (_db: unknown, path: string) => path, get: m.get, set: m.set, update: vi.fn(), runTransaction: vi.fn() }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { uid: 'settings-test-admin' } }, db: {} }));
+vi.mock('@/utils/toast', () => ({ showToast: m.toast }));
+vi.mock('@/lib/managementSave', () => {
+  class ManagementSaveError extends Error { constructor(public kind: string, message: string) { super(message); } }
+  return { ManagementSaveError, runManagementSave: async (isCurrent: () => boolean, task: (session: unknown) => Promise<unknown>) => {
+    if (!isCurrent()) throw new ManagementSaveError('session', '현재 화면이 아닙니다.');
+    return task({ check: () => {},
+      read: async (path: string) => ({ value: structuredClone(m.managementData[path] ?? null), etag: 'etag' }),
+      write: async (path: string, _etag: string, value: unknown) => { m.managementWrites(path, value); m.managementData[path] = structuredClone(value); },
+    });
+  } };
+});
 vi.mock('next/navigation', async () => {
   const { useSyncExternalStore } = await import('react');
   const subscribe = (listener: () => void) => { window.addEventListener('popstate', listener); return () => window.removeEventListener('popstate', listener); };
@@ -22,7 +34,10 @@ beforeEach(() => {
   clearAdminViewState();
   history.replaceState(null, '', '/admin');
   vi.clearAllMocks();
+  m.managementData = {};
   m.set.mockResolvedValue(undefined);
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
 afterEach(cleanup);
 it('설정을 계정·교사·행사·데이터로 구분하고 교사 화면은 선택할 때만 연다', async () => {
@@ -161,4 +176,43 @@ it('원장 미준비·현재 연도·역할 변경 직후에는 렌더 전 폼 �
     expect(m.set).not.toHaveBeenCalled();
   }
   await act(async () => {});
+});
+
+it('계정 수정은 폼 밖 필드와 동시 미수정 필드를 보존한다', async () => {
+  const key = 'teacher_example_com';
+  const role = { email: 'teacher@example.com', role: 'teacher' as const, part: '1', grade: '1', class: '1', name: '합성 교사', memo: '보존' };
+  m.state = { ...m.state!, allUserRoles: { [key]: role } };
+  m.managementData[`userRoles/${key}`] = { ...role, memo: '원격 변경' };
+  render(<AdminTab />);
+  fireEvent.click(await screen.findByRole('button', { name: 'teacher@example.com 계정 수정' }));
+  fireEvent.change(screen.getByLabelText('반'), { target: { value: '2' } });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await waitFor(() => expect(m.managementWrites).toHaveBeenCalledWith(`userRoles/${key}`, expect.objectContaining({ class: '2', name: '합성 교사', memo: '원격 변경' })));
+});
+
+it('이미 등록된 이메일 키는 신규 등록으로 덮어쓰지 않는다', async () => {
+  m.managementData['userRoles/teacher__at__example__dot__com'] = { email: 'teacher@example.com', role: 'teacher', name: '기존 계정' };
+  render(<AdminTab />);
+  await screen.findByText('등록된 계정이 없습니다');
+  fireEvent.click(screen.getByRole('button', { name: /이메일 역할 등록/ }));
+  const dialog = screen.getByRole('dialog');
+  fireEvent.change(within(dialog).getByLabelText(/^이메일/), { target: { value: 'teacher@example.com' } });
+  fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+  await waitFor(() => expect(m.toast).toHaveBeenCalledWith(expect.stringContaining('이미 등록된 이메일')));
+  expect(m.managementWrites).not.toHaveBeenCalled();
+});
+
+it('계정을 연 뒤 다른 관리자가 변경했으면 삭제하지 않는다', async () => {
+  const key = 'teacher_example_com';
+  const role = { email: 'teacher@example.com', role: 'teacher' as const, part: '1', grade: '1', class: '1', name: '합성 교사' };
+  m.state = { ...m.state!, allUserRoles: { [key]: role } };
+  m.managementData[`userRoles/${key}`] = { ...role };
+  render(<AdminTab />);
+  fireEvent.click(await screen.findByRole('button', { name: 'teacher@example.com 계정 수정' }));
+  m.managementData[`userRoles/${key}`] = { ...role, class: '2' };
+  const dialog = screen.getByRole('dialog');
+  fireEvent.click(within(dialog).getByRole('button', { name: '계정 삭제' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: '삭제 확인' }));
+  await waitFor(() => expect(m.toast).toHaveBeenCalledWith(expect.stringContaining('삭제하지 않았으니')));
+  expect(m.managementWrites).not.toHaveBeenCalledWith(`userRoles/${key}`, null);
 });

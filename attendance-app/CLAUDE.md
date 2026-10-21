@@ -417,7 +417,7 @@ CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/global
 
 Firebase Realtime Database SDK와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다.
 
-`StudentModal`(저장/삭제), `MoveStudentModal`(이동)은 반 전체 명단(`classes/{year}/{ck}/students`)을 통째로 `set()`하지 않고, 항상 **해당 학생 1명의 경로만** 갱신한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 충돌 학생은 사전에 새 목적지 SID를 선택하고, 잠금 안에서 선택한 SID의 명단·출석이 비었는지 재검사한다. 다른 학생의 출석과 병합하지 않는다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:
+학생 단건 편집·삭제는 `managementSave.ts`에서 최신 반 ETag를 대조한 조건부 반 PUT으로 대상 학생·감사를 함께 갱신하며 다른 학생과 출석을 보존한다. 삭제는 사본을 먼저 확정한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 충돌 학생은 사전에 새 목적지 SID를 선택하고, 잠금 안에서 선택한 SID의 명단·출석이 비었는지 재검사한다. 다른 학생의 출석과 병합하지 않는다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:
 ```typescript
 // ✅ 올바른 방법 — 단일 학생 경로만 갱신
 await update(ref(db), { [`classes/${year}/${ck}/students/${id}`]: newStudent });
@@ -490,10 +490,15 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 - **판단 질문**: 전체 학생에게 새 ID를 부여하면 출석·장결·personId 연결을 잃는다. 이름만으로 기존 학생을 합치지 않는다. 일괄 입력은 기존 학생의 개인정보 수정 통로로 사용하지 않는다. 교체에서 제외된 학생의 출석은 삭제하지 않으며, 반 사본은 같은 반이 없는 경우에만 복원된다.
 - **재사용 규칙**: 입력·모드 변경 시 미리보기를 폐기하고, 백업 실패나 최신 원장 충돌에서는 창과 입력을 유지한다. `__tests__/rosterImport.test.ts`와 관리 폼 렌더 테스트가 이 계약을 지킨다.
 
-### 출석을 보존하는 삭제·복원과 SDK 트랜잭션 캐시 (2026-09-08)
-- **접근법**: `lib/rosterRecovery.ts`에서 기존 형태의 복구 사본을 먼저 저장한다 → `classes/{year}/{classKey}` 트랜잭션에서 대상 학생 또는 반 전체가 사전값과 같은지 검증한다 → 명단만 제거하고 `attendance`는 유지한다 → 기존 ID로 명단 복원 시 남아 있는 출석을 다시 연결한다. 사본 저장 이후 명시적 충돌은 이번 사본만 정리하고, 응답 불명확은 사본을 보존한다.
-- **판단 질문**: 이미 삭제된 과거 출석을 재생성하거나 공유 trash 형태를 확장하지 않는다. 남은 출석을 과거 사본으로 덮지 않는다. `get()` 직후라도 활성 구독이 없으면 SDK 트랜잭션 첫 콜백이 null일 수 있어 기존 학생을 없다고 오판했다. `lib/db.ts`의 공통 runTransaction은 onValue 최초 응답부터 완료까지 구독을 유지한다.
+### 출석을 보존하는 삭제·복원과 SDK 트랜잭션 캐시 (2026-09-08, 2026-10-21 보강)
+- **접근법**: `lib/rosterRecovery.ts`에서 최신 대상과 열린 학생 snapshot을 대조한다 → 기존 형식 사본을 빈 경로에 ETag 조건부 저장한다 → 최신 반을 재조회해 대상이 그대로일 때 조건부 제거한다 → `attendance`는 쓰지 않고 사본은 실패·충돌·결과 불명 때도 보존한다 → 복원은 `rosterRestore.ts`의 원자 사본 소비 계약을 사용한다.
+- **판단 질문**: 이미 삭제된 과거 출석을 재생성하거나 공유 trash 형태를 확장하지 않는다. 남은 출석을 과거 사본으로 덮지 않는다. 과거 콜드 SDK 캐시는 null 오판이 있었고 연결 단절은 트랜잭션 대기를 끝내지 않았다. 새 삭제는 `managementSave.ts`의 인증 REST GET/If-Match PUT 전체 15초 한도를 사용하며 공통 `lib/db.ts`는 변경하지 않는다.
 - **재사용 규칙**: 콜드 캐시·삭제 후 교사 쓰기 거절·학생/반 복원·두 관리자 동시 복원을 `node scripts/run-attendance-contracts.mjs`로 검증한다. Java 21과 Firebase CLI가 필요하며 demo-attendance-recovery/127.0.0.1:19017 외 주소는 거절한다. 새 삭제는 출석을 보관하지만 과거 삭제본의 출석 존재는 별도 확인한다.
+
+### 관리 폼의 한정된 조건부 저장과 실패 복구 (2026-10-21)
+- **접근법**: 폼을 열 때 원본 snapshot·ID·화면 범위를 고정한다 → `managementSave.ts`의 한 세션 안에서 인증 토큰과 최신 ETag를 조회한다 → 사용자가 바꾼 필드만 최신값에 병합한다 → 충돌은 자동 재시도하지 않고 If-Match PUT을 한 번 보낸다 → 15초 경과 시 전송 전 실패와 전송 후 결과 불명을 구분해 입력을 유지한다. 토큰/응답이 늦게 끝나도 다음 쓰기를 시작하지 않는다.
+- **판단 질문**: SDK 요청에 Promise.race만 씌우면 SDK 큐가 재연결 후 쓰기를 계속할 수 있다. 이미 보낸 HTTP 요청의 서버 반영 취소까지 보장하지 않으므로 결과 불명은 성공·미반영으로 단정하지 않는다. 별도 범용 저장 프레임워크·Rules·새 저장 경로는 추가하지 않는다.
+- **재사용 규칙**: 학생/교사/반·계정 폼은 같은 단발 조건부 저장 도우미를 사용하고 미수정 필드/장결/PID/출석을 보존한다. 토큰 지연·412·PUT 응답 유실·화면/계정 변경을 단위/렌더와 격리 Auth/RTDB로 검사한다. 구독 재시도는 초안을 초기화하지 않고 로딩/오류를 빈 명단과 구분한다.
 
 ### 같은 브라우저 탭의 시트 동기화와 일반 저장 분리 (2026-09-08)
 - **접근법**: `utils/browserWriteLock.ts`에서 동일 출처 Web Locks를 사용한다 → 일반 set/update/remove/runTransaction은 공유 잠금, commitSheetSync 전체는 배타 잠금으로 감싼다 → 이미 배타 잠금을 잡은 프로토콜의 내부 트랜잭션만 syncProtocolDb를 사용한다 → ifAvailable로 지연 저장을 큐에 쌓지 않고 명시 재시도를 안내한다.

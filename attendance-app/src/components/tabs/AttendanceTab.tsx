@@ -45,12 +45,12 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
   const [attSubView, setAttSubView] = useState<AttendanceSubView>(initialSubview);
   const [noneConfirm, setNoneConfirm] = useState<{ year: number; ck: string; k: string; revision: number } | null>(null);
 
-  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestSaveError, suggestRetrying, suggestReceipt, handleSuggestSubmit } =
+  const { suggestions, suggestStudentId, setSuggestStudentId, suggestText, setSuggestText, suggestSaving, suggestLoadError, suggestLoading, retrySuggestions, suggestSaveError, suggestRetrying, suggestReceipt, handleSuggestSubmit } =
     useSuggestions(curYear, ck, attSubView === 'suggest' && !isTeacher, classData[ck]?.teacher ?? '');
   const suggestStudent = students.find(student => student.id === suggestStudentId);
   const {
     visitRequests, visitStudentId, setVisitStudentId, visitText, setVisitText,
-    visitSaving, visitLoadError, visitSaveError, visitRetrying, handleVisitSubmit,
+    visitSaving, visitLoadError, visitLoading, retryVisitRequests, visitSaveError, visitRetrying, handleVisitSubmit,
   } = useVisitRequests(curYear, ck, attSubView === 'visit', classData[ck]?.teacher ?? '');
   const visitStudent = students.find(student => student.id === visitStudentId);
 
@@ -442,7 +442,8 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
         >
           {suggestLoadError && (
             <div className="suggest-load-error" role="alert">
-              특이사항을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.
+              특이사항을 불러오지 못했습니다. 작성 중인 내용은 유지됩니다.
+              <button type="button" className="btn-outline" onClick={retrySuggestions}>특이사항 다시 불러오기</button>
             </div>
           )}
           {isTeacher && (
@@ -487,7 +488,8 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
             </div>
           )}
           {/* 관리자만 목록 표시 */}
-          {!isTeacher && !suggestLoadError && (
+          {suggestLoading && <p role="status">특이사항을 불러오는 중입니다.</p>}
+          {!isTeacher && !suggestLoadError && !suggestLoading && (
             <>
               <div className="suggest-list-header">
                 {classData[ck]?.teacher || ''} 교사 특이사항
@@ -527,7 +529,7 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
           aria-labelledby="attendance-tab-visit"
           className="attendance-tab-panel attendance-suggest-panel"
         >
-          {visitLoadError && <div className="suggest-load-error" role="alert">심방 요청을 불러오지 못했습니다. 잠시 후 다시 열어 주세요.</div>}
+          {visitLoadError && <div className="suggest-load-error" role="alert">심방 요청을 불러오지 못했습니다. 작성 중인 내용은 유지됩니다. <button type="button" className="btn-outline" onClick={retryVisitRequests}>심방 요청 다시 불러오기</button></div>}
           {isTeacher && (
             <div className="suggest-form-card visit-form-card">
               <h2 className="suggest-form-title">학생 심방 요청</h2>
@@ -549,7 +551,8 @@ export default function AttendanceTab({ initialSubview = 'check', hideAdminSubta
               {visitRetrying && !visitSaving && <p className="suggest-form-help">이전에 요청한 내용부터 확인합니다. 이후에 추가로 작성한 내용은 지우지 않습니다.</p>}
             </div>
           )}
-          {!visitLoadError && (
+          {visitLoading && <p role="status">심방 요청을 불러오는 중입니다.</p>}
+          {!visitLoadError && !visitLoading && (
             <>
               <div className="suggest-list-header">이 반의 심방 요청 <span className="suggest-count">{visitRequests.length}건</span></div>
               {visitRequests.length === 0 ? <div className="visit-empty">등록된 심방 요청이 없습니다.</div>

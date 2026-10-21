@@ -2,9 +2,11 @@
 import { useState, useEffect, useCallback, useRef, useId, type ReactNode, type KeyboardEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { db, ref, set, get } from '@/lib/db';
+import { ManagementSaveError, runManagementSave } from '@/lib/managementSave';
 import { buildPromotionPayload, type PromotionSnapshot } from '@/lib/promotion';
 import { commitSheetSync } from '@/lib/sheetSyncCommit';
 import { adminActor } from '@/utils/adminChange';
+import { createAccountRecord, deleteAccountRecord, mergeAccountEdit, type EditableAccount } from '@/utils/adminPersistence';
 import { isDataReady, useApp } from '@/store/AppContext';
 import { emailToKey } from '@/utils/dates';
 import { attendanceEventDate } from '@/utils/attendanceEventDate';
@@ -72,6 +74,7 @@ export default function AdminTab() {
   const [formGrade, setFormGrade]   = useState('1');
   const [formClass, setFormClass]   = useState('1');
   const [saving, setSaving] = useState(false);
+  const openedAccount = useRef<EditableAccount | null>(null);
 
   // 이벤트
   const [eventDraft, setEventDraft] = useState({ year: curYear, date: '', label: '' });
@@ -100,6 +103,7 @@ export default function AdminTab() {
 
   function openAddAccount() {
     setDeleteAccountConfirm(false);
+    openedAccount.current = null;
     setFormEmail(''); setFormRole('teacher');
     setFormPart('1'); setFormGrade('1'); setFormClass('1');
     setAccountModal({ open: true, editKey: null });
@@ -109,6 +113,7 @@ export default function AdminTab() {
     setDeleteAccountConfirm(false);
     const r = allUserRoles[key];
     if (!r) return;
+    openedAccount.current = structuredClone(r) as EditableAccount;
     setFormEmail((r as { email?: string }).email ?? key);
     setFormRole(r.role);
     setFormPart(r.part ?? '1');
@@ -128,30 +133,59 @@ export default function AdminTab() {
     setSaving(true);
     try {
       const key = accountModal.editKey || emailToKey(email);
-      const data: Record<string, string> = { email, role: formRole };
-      if (formRole === 'teacher') {
-        data.part = formPart; data.grade = formGrade; data.class = formClass;
-      }
-      await set(ref(db, `userRoles/${key}`), data);
-      await loadAllRoles();
+      const path = `userRoles/${key}`;
+      const form = { email, role: formRole, part: formPart, grade: formGrade, class: formClass };
+      const opened = openedAccount.current;
+      const isCurrent = () => {
+        const latest = getState();
+        return eventActive.current && latest.curYear === curYear && latest.dataRevision === dataRevision
+          && latest.draftSession === state.draftSession && latest.userRole?.role === 'admin' && isDataReady(latest);
+      };
+      const saved = await runManagementSave(isCurrent, async session => {
+        const latest = await session.read<EditableAccount | null>(path);
+        const next = accountModal.editKey && opened
+          ? mergeAccountEdit(latest.value, opened, form)
+          : createAccountRecord(latest.value, form);
+        if (!next) throw new ManagementSaveError('conflict', accountModal.editKey
+          ? '다른 관리자가 이 계정 역할을 변경했습니다. 입력은 유지했으니 목록을 다시 불러와 확인해 주세요.'
+          : '이미 등록된 이메일입니다. 기존 계정을 수정해 주세요.');
+        await session.write(path, latest.etag, next);
+        return next;
+      });
+      dispatch({ type: 'SET_ALL_USER_ROLES', revision: dataRevision, payload: { ...allUserRoles, [key]: saved } });
       setAccountModal({ open: false, editKey: null });
-    } catch {
-      showToast('저장에 실패했습니다. 다시 시도해 주세요.');
+    } catch (error) {
+      showToast(error instanceof ManagementSaveError ? error.message : '저장에 실패했습니다. 입력은 유지했으니 다시 시도해 주세요.');
     } finally {
       setSaving(false);
     }
   }
 
   async function deleteAccount() {
-    if (!accountModal.editKey) return;
+    if (!accountModal.editKey || !openedAccount.current) return;
     setDeleteAccountConfirm(false);
     setSaving(true);
     try {
-      await set(ref(db, `userRoles/${accountModal.editKey}`), null);
-      await loadAllRoles();
+      const key = accountModal.editKey;
+      const path = `userRoles/${key}`;
+      const opened = openedAccount.current;
+      const isCurrent = () => {
+        const latest = getState();
+        return eventActive.current && latest.curYear === curYear && latest.dataRevision === dataRevision
+          && latest.draftSession === state.draftSession && latest.userRole?.role === 'admin' && isDataReady(latest);
+      };
+      await runManagementSave(isCurrent, async session => {
+        const latest = await session.read<EditableAccount | null>(path);
+        const deletion = deleteAccountRecord(latest.value, opened);
+        if (!deletion) throw new ManagementSaveError('conflict', '다른 관리자가 이 계정을 변경했습니다. 삭제하지 않았으니 목록을 다시 불러와 확인해 주세요.');
+        if (!deletion.alreadyDeleted) await session.write(path, latest.etag, null);
+      });
+      const nextRoles = { ...allUserRoles };
+      delete nextRoles[key];
+      dispatch({ type: 'SET_ALL_USER_ROLES', revision: dataRevision, payload: nextRoles });
       setAccountModal({ open: false, editKey: null });
-    } catch {
-      showToast('삭제에 실패했습니다. 다시 시도해 주세요.');
+    } catch (error) {
+      showToast(error instanceof ManagementSaveError ? error.message : '삭제에 실패했습니다. 목록을 다시 확인한 뒤 재시도해 주세요.');
     } finally {
       setSaving(false);
     }
