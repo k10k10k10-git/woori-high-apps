@@ -80,9 +80,9 @@
 [data-theme="dark"] .workspace-tabs { border-color: var(--color-border); background: rgba(19,25,22,.94); }
 [data-theme="dark"] .workspace-tab:not([aria-selected="true"]):hover { background: rgba(68,201,154,.08); }
 [data-theme="dark"] .workspace-group-tab[aria-selected="true"] { background: var(--color-selected-bg); color: var(--color-selected-text); }
-[data-theme="dark"] .global-portal-header { background: rgba(9,12,11,.97); }
-[data-theme="dark"] .portal-brand-mark { background: #087a57; }
-[data-theme="dark"] .portal-menu { background: #151b18; }
+
+
+
 [data-theme="dark"] .home-workspace-card,
 [data-theme="dark"] .home-action-row { background: #151c18; }
 [data-theme="dark"] .home-workspace-card:hover,
@@ -157,7 +157,7 @@
 }
 
 /* 테마와 별개로 어두운 표면인 헤더·달력·검색 선택지는 밝은 보조 글자를 유지한다. */
-:is(.workspace-header, .global-portal-header, .portal-menu, .portal-preview-toolbar, .page-hero, .calendar-detail-panel, .field-tools-menu, .bg-slate-800, .bg-slate-900, .bg-slate-950)
+:is(.calendar-detail-panel, .bg-slate-800, .bg-slate-900, .bg-slate-950)
   :is(.text-slate-300, .text-slate-400, .text-slate-500) { color: var(--color-on-dark-muted) !important; }
 .calendar-detail-panel :is(input, textarea)::placeholder { color: var(--color-on-dark-muted) !important; opacity: 1; }
 [data-theme="dark"] .landing-hero::after { background: rgba(43,86,69,.15); }

@@ -8,16 +8,16 @@
   gap: 6px;
   border-radius: 8px;
   padding: 0 10px;
-  color: var(--color-on-dark-secondary);
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-weight: 650;
   white-space: nowrap;
 }
 
-.link:hover,
-.link[aria-current="page"] { background: rgba(255, 255, 255, .1); color: var(--color-on-dark-primary); }
-.link[aria-current="page"] svg { color: var(--color-on-dark-accent); }
-.permissionLabel { color: var(--color-on-dark-primary); font-size: 11px; font-weight: 600; }
+.link:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.link[aria-current="page"] { background: var(--color-selected-bg); color: var(--color-selected-text); }
+.link[aria-current="page"] svg { color: inherit; }
+.permissionLabel { color: inherit; font-size: 11px; font-weight: 600; }
 
 .surface { flex-wrap: wrap; gap: 6px; overflow: visible; }
 .surface .link {
@@ -36,4 +36,23 @@
 @media (max-width: 767px) {
   .nav { flex-wrap: wrap; overflow: visible; }
   .link { padding-inline: 8px; font-size: 11px; }
+}
+
+.nav.choices { display: grid; width: 100%; gap: 0; padding: 8px 24px; }
+.choices .link { justify-content: flex-start; gap: 16px; padding: 22px 4px; border: 0; border-radius: 0; background: transparent; white-space: normal; }
+.choices .link + .link { border-top: 1px solid var(--color-border); }
+.choices .link:hover { background: var(--color-surface-hover); }
+.choices .link > svg:first-child { flex: none; width: 26px; height: 26px; color: var(--color-primary); }
+.linkText { min-width: 0; }
+.choices .linkText { display: grid; gap: 6px; }
+.choices .linkText > span { color: var(--color-text-primary); font-size: 17px; font-weight: 750; }
+.choices .linkText small { color: var(--color-text-secondary); font-size: 13px; font-weight: 400; line-height: 1.5; }
+.arrow { flex: none; margin-left: auto; color: var(--color-text-secondary); }
+.choices .permissionLabel { margin-left: auto; white-space: nowrap; }
+.choices .permissionLabel + .arrow { margin-left: 0; }
+@media (max-width: 767px) {
+  .nav.choices { padding-inline: 20px; }
+  .choices .link { gap: 12px; padding-block: 20px; }
+  .choices .linkText > span { font-size: 16px; }
+  .choices .linkText small { font-size: 12px; }
 }

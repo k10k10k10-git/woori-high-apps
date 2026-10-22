@@ -13,6 +13,7 @@ type Props = {
   program: RetreatProgram;
   posts: RetreatProgramPost[];
   canEdit: boolean;
+  initialMeetingId?: string;
   onClose: () => void;
   onCreateMeeting: (data: Omit<RetreatProgramMeeting, "id" | "createdAt" | "updatedAt" | "decisions">) => Promise<string>;
   onUpdateMeeting: (meetingId: string, data: Partial<RetreatProgramMeeting>) => Promise<void>;
@@ -21,15 +22,16 @@ type Props = {
   onConvertDecision: (meetingId: string, decision: RetreatProgramDecision) => Promise<string>;
 };
 
-export default function ProgramMeetingMode({ program, posts, canEdit, onClose, onCreateMeeting, onUpdateMeeting, onCreateDecision, onUpdateDecision, onConvertDecision }: Props) {
+export default function ProgramMeetingMode({ program, posts, canEdit, initialMeetingId, onClose, onCreateMeeting, onUpdateMeeting, onCreateDecision, onUpdateDecision, onConvertDecision }: Props) {
   const { toast } = useUI();
   const meetings = useMemo(() => programMeetings(program), [program]);
-  const [selectedId, setSelectedId] = useState<string | null>(() => meetings.find((meeting) => !meeting.closed)?.id ?? meetings[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => initialMeetingId ?? meetings.find((meeting) => !meeting.closed)?.id ?? meetings[0]?.id ?? null);
   const [creating, setCreating] = useState(false);
   const [decision, setDecision] = useState({ title: "", assignee: "", dueDate: "", postId: "" });
   const [busy, setBusy] = useState(false);
   const [closeConfirm, setCloseConfirm] = useState(false);
-  const selected = meetings.find((meeting) => meeting.id === selectedId) ?? meetings[0] ?? null;
+  const requestedMeetingMissing = selectedId === initialMeetingId && Boolean(initialMeetingId) && !meetings.some((meeting) => meeting.id === initialMeetingId);
+  const selected = requestedMeetingMissing ? null : meetings.find((meeting) => meeting.id === selectedId) ?? meetings[0] ?? null;
 
   useEffect(() => setCloseConfirm(false), [selected?.id]);
 
@@ -139,7 +141,9 @@ export default function ProgramMeetingMode({ program, posts, canEdit, onClose, o
           ))}
         </aside>
         <div className="program-meeting-main" role="region" aria-label="선택한 준비회의">
-          {!selected ? (
+          {requestedMeetingMissing ? (
+            <div className="program-meeting-empty" role="status"><h3>연결된 회의를 찾을 수 없습니다</h3><p>회의 목록에서 다른 기록을 선택해 주세요.</p></div>
+          ) : !selected ? (
             <div className="program-meeting-empty"><h3>아직 준비회의가 없습니다</h3>{canEdit && <button type="button" className="btn-primary" disabled={creating} onClick={() => void startMeeting()}>회의 시작</button>}</div>
           ) : (
             <>

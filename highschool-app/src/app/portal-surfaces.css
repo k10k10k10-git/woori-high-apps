@@ -312,19 +312,22 @@ a.mypage-row:hover { background: var(--color-surface-hover); }
    나머지이며, 전부 특정 화면의 표면 규칙이라 여기가 제 자리다.
    이로써 globals.css에서 "지층" 섹션은 사라졌다 — 다음 리디자인도 새 지층을 쌓지 말고
    해당 표면 파일을 고칠 것. */
-.home-hero {
-  min-height: 220px;
-  align-items: center;
-  background:
-    radial-gradient(circle at 88% 10%, rgba(125,226,188,.18), transparent 23rem),
-    linear-gradient(125deg, #17191c 0%, #1c2521 60%, #14392e 100%);
+.home-hero { min-height: 0; padding: 8px 0 28px; }
+.home-hero .page-title { margin-top: 0; max-width: 34ch; font-size: 30px; word-break: keep-all; }
+.home-hero .page-description { margin-top: 14px; }
+
+/* 동일한 업무 헤더는 밝은 테마면을 사용한다. 현장 지도·무대 같은 어두운 콘텐츠는 별도 유지한다. */
+.workspace-header {
+  --color-on-dark-primary: var(--color-text-primary);
+  --color-on-dark-secondary: var(--color-text-secondary);
+  --color-on-dark-muted: var(--color-text-muted);
 }
-.home-hero .page-title {
-  margin-top: 0;
-  max-width: none;
-  font-size: clamp(27px, 3vw, 38px);
-  word-break: keep-all;
-}
+.workspace-header :where(h1, h2, .text-white:not([class*="bg-"])) { color: var(--color-text-primary); }
+.workspace-header :where(.text-slate-200, .text-slate-300, .text-slate-400, .text-slate-500) { color: var(--color-text-muted); }
+.workspace-header .workspace-group-tab { color: var(--color-text-secondary); }
+.workspace-header .workspace-group-tab:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
+.workspace-header .workspace-group-tab[aria-selected="true"] { color: var(--color-selected-text); }
+@media (max-width: 640px) { .home-hero .page-title { font-size: 25px; } }
 .team-member-search { width: min(100%, 280px); }
 .team-member-card { display: grid; align-items: end; grid-template-columns: minmax(220px, 1fr) minmax(360px, .8fr); gap: 16px; }
 .team-member-card .team-member-roles { margin-top: 0; }

@@ -73,7 +73,7 @@ function FieldHomeContent({ onRetry, selectedId, setSelectedId }: {
     const stop = subscribeToRetreats((list) => {
       if (!active) return;
       setRetreatRecords(list);
-      setSelectedId((previous) => previous && list.some((item) => item.id === previous) ? previous : list[0]?.id ?? null);
+      setSelectedId((previous) => previous && list.some((item) => item.id === previous) ? previous : null);
       ok("retreats");
       setLoaded(true);
     }, (error) => { if (active) { fail("retreats")(error); setLoaded(true); } });
@@ -190,6 +190,7 @@ function FieldHomeContent({ onRetry, selectedId, setSelectedId }: {
           roles={roles}
           retreats={retreats as unknown as PortalRetreat[]}
           selectedId={selectedId}
+          periods={periods}
           onSelect={setSelectedId}
           loadError={Object.keys(errors).length > 0 ? "수련회 일정 또는 입장 잠금 상태를 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null}
           onRetry={onRetry}

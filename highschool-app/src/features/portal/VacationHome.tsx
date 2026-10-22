@@ -1,258 +1,138 @@
 "use client";
 
-// 방학 중 사역 홈 — 행정(/retreats)·프로그램(/programs)·이가드(/field)가 **같은 화면**을 쓴다.
-// 다른 것은 카드에서 들어가는 곳뿐이다.
-// 데이터 로딩·권한 게이트는 각 라우트가 담당하고, 여기서는 화면만 그린다.
-
-import Link from "next/link";
+// 행정·프로그램·현장은 같은 수련회를 먼저 선택하고, 해당 수련회의 업무로 이동한다.
+// 데이터 로딩·권한 게이트·저장은 기존 라우트가 담당한다.
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { ArrowRight, LockKey, X } from "@phosphor-icons/react";
+import { useEffect, type ReactNode } from "react";
+import { ArrowRight, CalendarBlank, CaretDown, Check, LockKey, X } from "@phosphor-icons/react";
 import RetreatCalendarPanel from "@/app/RetreatCalendarPanel";
 import type { Retreat } from "@/lib/types";
 import { canAccessArea, canCreateRetreat, canEditArea, type MinistryRoles } from "./accessPolicy";
 import NewRetreatButton from "./NewRetreatButton";
 import RetreatAreaNav from "./RetreatAreaNav";
 import { useViewMode } from "@/context/ViewModeContext";
+import styles from "./VacationHome.module.css";
 
 export type VacationMode = "admin" | "program" | "field";
-
+type Period = { retreatId: string; startDate: string; endDate?: string };
 type Props = {
   mode: VacationMode;
   roles: MinistryRoles;
   retreats: Retreat[];
+  periods?: Period[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   onCreated?: () => void | Promise<void>;
-  /** 행정 모드에서만 — 수련회 삭제 */
   onDelete?: (id: string, name: string) => void;
-  /** 현장 모드에서만 — 수련회별 PIN 잠금 여부 */
   lockedIds?: Set<string>;
-  /** 화면 우측 상단의 전역 도구 슬롯 (잠금 관리자 / 현장 관리자) */
   headerActions?: ReactNode;
-  /** 캘린더 아래 슬롯 (행정 브레인스토밍) */
   footer?: ReactNode;
   loadError?: string | null;
   onRetry?: () => void;
   emptyLogo?: ReactNode;
 };
 
+function periodLabel(id: string, periods: Period[]) {
+  const matching = periods.filter((period) => period.retreatId === id).sort((a, b) => a.startDate.localeCompare(b.startDate));
+  if (matching.length === 0) return "기간 미등록";
+  return matching.map(({ startDate, endDate }) => `${startDate.replaceAll("-", ".")}${endDate && endDate !== startDate ? ` – ${endDate.replaceAll("-", ".")}` : ""}`).join(" · ");
+}
+
 export default function VacationHome({
-  mode, roles, retreats, selectedId, onSelect, onCreated, onDelete,
+  mode, roles, retreats, periods = [], selectedId, onSelect, onCreated, onDelete,
   lockedIds, headerActions, footer, loadError, onRetry, emptyLogo,
 }: Props) {
   const router = useRouter();
   const { isMobileView } = useViewMode();
-  // 수련회 생성은 행정·현장 어느 홈에서도 가능해야 한다(앱 CLAUDE.md 공용 NewRetreatButton 계약).
-  // 프로그램 준비 홈만 목록 선택에 집중하도록 감춘다.
   const canCreate = mode !== "program" && canCreateRetreat(roles);
-  const entryHref = (id: string) => mode === "admin"
-    ? `/events/${id}/administration`
-    : mode === "program"
-      ? `/events/${id}/programs`
-      : `/events/${id}/field`;
-  const entryLabel = mode === "admin" ? "행정 화면" : mode === "program" ? "프로그램 준비" : "현장 화면";
   const selected = retreats.find((retreat) => retreat.id === selectedId);
-  const selectedAreaNav = selected && <RetreatAreaNav retreatId={selected.id} adminAllowed={canAccessArea("retreat-admin", roles)} fieldAllowed={canAccessArea("retreat-field", roles)} tone="surface" />;
+  // 상세 화면에서 돌아오는 명시적 수련회 링크만 복원한다. 첫 방문의 임의 선택은 하지 않는다.
+  useEffect(() => {
+    if (selectedId) return;
+    const requestedId = new URLSearchParams(window.location.search).get("retreat");
+    if (requestedId && retreats.some((retreat) => retreat.id === requestedId)) onSelect(requestedId);
+  }, [onSelect, retreats, selectedId]);
+  const entryHref = (id: string) => `/events/${encodeURIComponent(id)}/${mode === "admin" ? "administration" : mode === "program" ? "programs" : "field"}`;
 
   return (
-    <main className="page-container max-w-7xl">
-      {headerActions && (
-        <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+    <main className={`page-container max-w-7xl ${styles.page}`}>
+      <header className={styles.heading}>
+        <div><h1>수련회</h1><p>수련회를 선택하고 맡은 업무를 시작하세요.</p></div>
+        <div className={styles.tools}>
           {headerActions}
-        </div>
-      )}
-
-      {loadError && (
-        <div role="alert" className="mb-4 flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
-          <span>⚠ {loadError}</span>
-          {onRetry && <button onClick={onRetry} className="btn-secondary btn-sm justify-center">다시 불러오기</button>}
-        </div>
-      )}
-
-      {isMobileView && retreats.length > 0 && selected ? (
-        <div className="vacation-mobile-home">
-          <label className="vacation-mobile-select">
-            <span>수련회 선택</span>
-            <select className="input" value={selected.id} onChange={(event) => onSelect(event.target.value)}>
-              {retreats.map((retreat) => <option key={retreat.id} value={retreat.id}>{retreat.year}년 {retreat.name}</option>)}
-            </select>
-          </label>
-
-          <section className="vacation-mobile-primary">
-            <p>{selected.year}년 수련회</p>
-            <h1>{selected.name}</h1>
-            {mode === "field" ? (
-              <>
-                <span>지금 해야 할 일은 개인 큐카드에서 바로 확인합니다.</span>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=cue`)} className="btn-primary">개인 큐카드 열기</button>
-              </>
-            ) : mode === "program" ? (
-              <>
-                <span>기획·진행안·브리핑·할 일을 프로그램별로 정리합니다.</span>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/programs`)} className="btn-primary">프로그램 준비 열기</button>
-              </>
-            ) : (
-              <>
-                <span>신청 명단과 편성, 물품, 비용을 관리합니다.</span>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/administration`)} className="btn-primary">수련회 행정 열기</button>
-              </>
-            )}
-          </section>
-
-          {selectedAreaNav}
-
-          {mode === "field" && (
-            <section className="vacation-mobile-actions" aria-label="현장 바로가기">
-              <h2>현장 바로가기</h2>
-              <div>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=board`)}><strong>포스트 현황</strong><span>배치와 현재 위치</span></button>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=check`)}><strong>인원체크</strong><span>조·버스·전체 확인</span></button>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=rooms`)}><strong>조별 정보</strong><span>조원과 담당 스탭</span></button>
-                <button type="button" onClick={() => router.push(`/events/${selected.id}/field?view=lodging`)}><strong>숙소 안내</strong><span>호실과 배치 확인</span></button>
-              </div>
-            </section>
-          )}
-
-          <details className="vacation-mobile-calendar">
-            <summary>공유 준비 일정 보기</summary>
-            <RetreatCalendarPanel retreat={selected} retreats={retreats} canEditPeriods={canEditArea("retreat-admin", roles)} />
-          </details>
-        </div>
-      ) : retreats.length === 0 ? (
-        <div className="card mx-auto max-w-md p-16 text-center">
-          {emptyLogo && <div className="mb-4 flex justify-center">{emptyLogo}</div>}
-          <p className="font-medium text-slate-500">아직 수련회가 없습니다</p>
-          <p className="mb-5 mt-1 text-sm text-slate-400">
-            {canCreate ? "'새 수련회' 버튼으로 시작하세요!" : "수련회 행정에서 수련회를 만든 뒤 이용할 수 있습니다."}
-          </p>
           {canCreate && <NewRetreatButton hrefAfterCreate={entryHref} onCreated={onCreated} />}
         </div>
-      ) : (
-        <div className="flex flex-col items-stretch gap-7 md:flex-row md:items-start">
-          {/* 왼쪽: 수련회 목록 */}
-          <div className="w-full md:w-72 md:shrink-0">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div><p className="section-kicker">RETREATS</p><h2 className="mt-1 text-lg font-bold text-slate-800">수련회 목록</h2></div>
-              {canCreate && (
-                <NewRetreatButton
-                  hrefAfterCreate={entryHref}
-                  onCreated={onCreated}
-                  className="btn-primary px-2 py-1 text-xs"
-                />
-              )}
-            </div>
+      </header>
 
-            {/* 모바일: 선택 상자 + 선택된 수련회 카드 */}
-            <div className="md:hidden">
-              <select
-                aria-label="수련회 선택"
-                className="input h-11 w-full bg-white text-sm font-semibold text-slate-800"
-                value={selectedId ?? ""}
-                onChange={(event) => onSelect(event.target.value)}
-              >
-                {retreats.map((retreat) => (
-                  <option key={retreat.id} value={retreat.id}>{retreat.year}년 {retreat.name}</option>
-                ))}
-              </select>
-              {selected && (
-                <div className="mt-3 rounded-lg p-3"
-                  style={{ background: "var(--color-primary-glow)", border: "1px solid var(--color-primary-ring)" }}>
-                  <div className="mb-1 flex items-start justify-between gap-2">
-                    <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
-                      style={{ background: "var(--color-badge-bg)", color: "var(--color-primary)", border: "1px solid var(--color-badge-border)" }}>
-                      {selected.year}년
-                    </span>
-                    {mode === "admin" && onDelete && (
-                      <button onClick={() => onDelete(selected.id, selected.name)}
-                        className="compact-icon-control -m-2 text-slate-400 transition-colors hover:text-red-500" aria-label={`${selected.name} 삭제`}><X aria-hidden="true" size={18} weight="bold" /></button>
-                    )}
-                  </div>
-                  <div className="font-bold leading-snug text-slate-800">{selected.name}</div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <button onClick={() => router.push(entryHref(selected.id))}
-                      className="text-xs font-semibold" style={{ color: "var(--color-primary)" }}>
-                      {entryLabel} <ArrowRight aria-hidden="true" className="inline" size={13} weight="bold" />
-                    </button>
-                    {mode === "field" && lockedIds?.has(selected.id) && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"><LockKey aria-hidden="true" size={12} weight="bold" />PIN</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+      {loadError && <div role="alert" className={styles.error}>
+        <span>{loadError}</span>
+        {onRetry && <button onClick={onRetry} className="btn-secondary btn-sm">다시 불러오기</button>}
+      </div>}
 
-            {/* 데스크톱: 카드 목록 */}
-            <div className="hidden space-y-2 md:block">
-              {retreats.map((retreat) => {
-                const isSelected = selectedId === retreat.id;
-                return (
-                  <article
-                    key={retreat.id}
-                    className="card group relative transition-[border-color,box-shadow,transform] duration-150"
-                    data-hover
-                    style={{
-                      borderColor: isSelected ? "var(--color-primary)" : "var(--color-border)",
-                      boxShadow: isSelected ? "0 4px 16px var(--color-primary-glow)" : "",
-                    }}
-                  >
-                    <Link
-                      href={entryHref(retreat.id)}
-                      onMouseEnter={() => onSelect(retreat.id)}
-                      className="block rounded-[inherit] p-[18px] focus-visible:outline-offset-[-3px]"
-                    >
-                      <div className="mb-1.5 flex items-start justify-between gap-2 pr-8">
-                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                          style={{ background: "var(--color-primary-glow)", color: "var(--color-primary)", border: "1px solid var(--color-primary-ring)" }}>
-                          {retreat.year}년
-                        </span>
-                        {mode === "field" && lockedIds?.has(retreat.id) && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700"><LockKey aria-hidden="true" size={11} weight="bold" />PIN</span>
-                        )}
-                      </div>
-                      <h3 className="mb-2 truncate text-sm font-bold leading-tight text-slate-800">{retreat.name}</h3>
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs text-slate-400">
-                          {retreat.createdAt ? `${new Date(retreat.createdAt).toLocaleDateString("ko-KR")} 생성` : ""}
-                        </p>
-                        <span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: "var(--color-primary)" }}>{entryLabel}<ArrowRight aria-hidden="true" size={13} weight="bold" /></span>
-                      </div>
-                    </Link>
-                    {mode === "admin" && onDelete && (
-                      <button
-                        type="button"
-                        onClick={() => onDelete(retreat.id, retreat.name)}
-                        className="compact-icon-control absolute right-2 top-2 text-slate-300 opacity-0 transition-[color,opacity,background-color] hover:bg-red-50 hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100"
-                        aria-label={`${retreat.name} 삭제`}
-                      ><X aria-hidden="true" size={17} weight="bold" /></button>
-                    )}
-                  </article>
-                );
-              })}
-            </div>
-          </div>
+      {retreats.length === 0 ? (
+        <section className={styles.empty}>
+          {emptyLogo}
+          <h2>아직 수련회가 없습니다</h2>
+          <p>{canCreate ? "새 수련회를 만들면 행정·프로그램·현장 업무를 함께 준비할 수 있습니다." : "수련회가 등록되면 이곳에서 선택할 수 있습니다."}</p>
+        </section>
+      ) : <>
+        <ol className={styles.steps} aria-label="수련회 업무 시작 순서">
+          <li aria-current={!selected ? "step" : undefined}><span>{selected ? <Check size={14} weight="bold" aria-hidden="true" /> : "1"}</span>수련회 선택</li>
+          <li className={styles.stepArrow} aria-hidden="true"><ArrowRight size={16} /></li>
+          <li aria-current={selected ? "step" : undefined}><span>2</span>업무 선택</li>
+        </ol>
 
-          {/* 오른쪽: 준비 일정 — 행정·이가드가 공유하는 전역 캘린더 */}
-          <div className="w-full min-w-0 flex-1">
-            {selectedAreaNav && <div className="mb-4">{selectedAreaNav}</div>}
-            <div className="mb-3">
-              <h2 className="text-lg font-bold text-slate-800">
-                준비 일정 <span className="text-xs font-normal text-slate-400">(공유)</span>
-              </h2>
-              <p className="mt-0.5 text-xs text-slate-400">
-                날짜를 클릭해 일정을 추가하세요 - 모든 수련회·행정·이가드와 공유됩니다.
-                {selected ? ` 새 기간 추가 대상: ${selected.name}` : ""}
-              </p>
-            </div>
-            <RetreatCalendarPanel
-              retreat={selected}
-              retreats={retreats}
-              canEditPeriods={canEditArea("retreat-admin", roles)}
-            />
+        <div className={`${styles.workspace}${selected ? ` ${styles.hasSelection}` : ""}`}>
+          <section className={styles.retreats} aria-label="수련회 목록">
+            {selected && isMobileView ? <label className={styles.selector}>
+              <span>선택한 수련회</span>
+              <span className={styles.selectControl}>
+                <select className="input" value={selected.id} onChange={(event) => onSelect(event.target.value)}>
+                  {retreats.map((retreat) => <option key={retreat.id} value={retreat.id}>{retreat.year}년 {retreat.name}</option>)}
+                </select>
+                <CaretDown size={18} aria-hidden="true" />
+              </span>
+            </label> : <div className={styles.list}>
+              {retreats.map((retreat) => <article key={retreat.id} className={styles.retreatRow} data-selected={selected?.id === retreat.id}>
+                <button className={styles.retreatButton} type="button" aria-pressed={selected?.id === retreat.id} onClick={() => onSelect(retreat.id)}>
+                  <div className={styles.retreatMeta}><span>{retreat.year}년</span>{lockedIds?.has(retreat.id) && <span><LockKey size={13} aria-hidden="true" />PIN 잠금</span>}</div>
+                  <span className={styles.retreatName}>{retreat.name}</span>
+                  <p>{periodLabel(retreat.id, periods)}</p>
+                  <span className={styles.choose}>{selected?.id === retreat.id ? "선택한 수련회" : "업무 선택"}<ArrowRight size={17} aria-hidden="true" /></span>
+                </button>
+                {mode === "admin" && onDelete && <button type="button" className={styles.deleteButton} onClick={() => onDelete(retreat.id, retreat.name)} aria-label={`${retreat.name} 삭제`}><X aria-hidden="true" size={17} /></button>}
+              </article>)}
+            </div>}
+          </section>
+
+          {selected && <section className={styles.selected} aria-label={`${selected.name} 업무 선택`}>
+            <header className={styles.selectedHeader}>
+              <h2>{selected.name}</h2>
+              <p><CalendarBlank size={17} aria-hidden="true" />{periodLabel(selected.id, periods)}</p>
+              {lockedIds?.has(selected.id) && <span className={styles.pin}><LockKey size={14} aria-hidden="true" />현장 입장 시 PIN 확인</span>}
+            </header>
+            <RetreatAreaNav retreatId={selected.id} adminAllowed={canAccessArea("retreat-admin", roles)} fieldAllowed={canAccessArea("retreat-field", roles)} tone="surface" variant="choices" />
+            {isMobileView && mode === "field" && <section className={styles.fieldActions} aria-label="현장 바로가기">
+              <button type="button" onClick={() => router.push(`/events/${encodeURIComponent(selected.id)}/field?view=cue`)} className="btn-primary">개인 큐카드 열기</button>
+              <div>
+                <button type="button" onClick={() => router.push(`/events/${encodeURIComponent(selected.id)}/field?view=board`)}>포스트 현황</button>
+                <button type="button" onClick={() => router.push(`/events/${encodeURIComponent(selected.id)}/field?view=check`)}>인원체크</button>
+                <button type="button" onClick={() => router.push(`/events/${encodeURIComponent(selected.id)}/field?view=rooms`)}>조별 정보</button>
+                <button type="button" onClick={() => router.push(`/events/${encodeURIComponent(selected.id)}/field?view=lodging`)}>숙소 안내</button>
+              </div>
+            </section>}
+          </section>}
+        </div>
+
+        <details className={styles.sharedCalendar}>
+          <summary><div><CalendarBlank size={21} aria-hidden="true" /><span>전체 수련회 준비 일정<small>모든 수련회에서 함께 쓰는 일정</small></span></div><CaretDown size={18} aria-hidden="true" /></summary>
+          <div className={styles.calendarContent}>
+            <p className={styles.calendarContext}>{selected ? <>새 수련회 기간 추가 대상: <strong>{selected.name}</strong>. 준비 일정은 전체 공용입니다.</> : "수련회를 먼저 선택하면 해당 수련회의 기간을 추가할 수 있습니다. 준비 일정은 전체 공용입니다."}</p>
+            <RetreatCalendarPanel retreat={selected} retreats={retreats} canEditPeriods={canEditArea("retreat-admin", roles)} />
             {footer}
           </div>
-        </div>
-      )}
+        </details>
+      </>}
     </main>
   );
 }

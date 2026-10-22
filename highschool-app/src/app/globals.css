@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 /* ════════════════════════════════════════════════════
-   디자인 토큰 — 색상 일관성 10/10
+   디자인 토큰 — 공통 색상·상태
    모든 컴포넌트는 이 변수를 참조
 ════════════════════════════════════════════════════ */
 :root {
-  /* Brand — Naver의 쉬운 초록 + CHZZK의 명료한 다크 셸을 업무 도구에 맞게 절제 */
+  /* Brand — 고등부의 초록을 행동·선택에 집중하고 읽기 면은 중립색으로 분리 */
   --color-primary:         #056747;
   --color-primary-hover:   #066c4d;
   --color-primary-active:  #055c42;
@@ -48,20 +48,20 @@
   --color-screen-bg:       #101214;
 
   /* Surface */
-  --color-bg:              #eaf0ec;
+  --color-bg:              #f5f6f8;
   --color-surface:         #ffffff;
-  --color-surface-hover:   #edf3ef;
-  --color-border:          #bac8c0;
-  --color-border-hover:    #6f8978;
-  --color-control-border:  #7f9387;
+  --color-surface-hover:   #f1f3f5;
+  --color-border:          #dce1e7;
+  --color-border-hover:    #8a96a3;
+  --color-control-border:  #8793a2;
   --color-selected-bg:     var(--color-primary);
   --color-selected-text:   var(--color-primary-contrast);
 
   /* Text */
-  --color-text-primary:    #12211a;
-  --color-text-secondary:  #2e4237;
-  --color-text-muted:      #455a4d;
-  --color-text-faint:      #53675b;
+  --color-text-primary:    #191f28;
+  --color-text-secondary:  #333d4b;
+  --color-text-muted:      #4e5968;
+  --color-text-faint:      #5f6b7a;
   /* 어두운 헤더에 밝은 배경용 텍스트 토큰을 재사용하지 않는다. */
   --color-on-dark-primary:   #f8fafc;
   --color-on-dark-secondary: #cbd5d0;
@@ -78,7 +78,7 @@
   --color-warning:         #835407;
   --color-warning-bg:      #fff6df;
 
-  /* Typography scale — 정보 계층 10/10
+  /* Typography scale — 정보 계층
      실사용자에 50~60대 부장·교역자가 포함된다. 본문 14px는 일반 웹(16px)보다 2px 작아
      확대 없이 읽기 어렵다는 지적이 반복됐다. 계단 간격은 그대로 두고 한 칸씩 올린다.
      xs(12px)는 배지·메타 전용이라 유지 — 여기까지 키우면 표가 넘친다. */
@@ -109,7 +109,7 @@
   --card-gap:     var(--space-3);
   --table-cell-y: 10px;
 
-  /* Shadow scale — 프리미엄 느낌 10/10 */
+  /* Shadow scale — 표면 깊이 */
   --shadow-xs:  0 1px 2px rgba(18,28,24,0.035);
   --shadow-sm:  0 1px 3px rgba(18,28,24,0.055), 0 1px 2px rgba(18,28,24,0.025);
   --shadow-md:  0 10px 26px rgba(18,28,24,0.075), 0 2px 6px rgba(18,28,24,0.035);
@@ -117,12 +117,12 @@
   --shadow-primary: 0 4px 14px var(--color-primary-glow);
 
   /* Radius */
-  --radius-sm:  7px;
-  --radius-md:  10px;
+  --radius-sm:  8px;
+  --radius-md:  12px;
   --radius-lg:  16px;
   --radius-xl:  24px;
 
-  /* Transition — 인터랙션 품질 10/10 */
+  /* Transition — 상태 전환 */
   --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in:    cubic-bezier(0.4, 0, 1, 1);
   --duration-fast:   120ms;
@@ -165,17 +165,17 @@
 
   --color-header-bg:        #090c0b;
   --color-screen-bg:        #080a09;
-  --color-bg:               #0d1210;
-  --color-surface:          #171d1a;
-  --color-surface-hover:    #1d2621;
-  --color-border:           #46584d;
-  --color-border-hover:     #718b7b;
-  --color-control-border:   #7a9486;
+  --color-bg:               #111419;
+  --color-surface:          #1b2027;
+  --color-surface-hover:    #252c35;
+  --color-border:           #3d4855;
+  --color-border-hover:     #8191a3;
+  --color-control-border:   #8191a3;
 
-  --color-text-primary:     #eef5f1;
-  --color-text-secondary:   #c4d1ca;
-  --color-text-muted:       #b7c9bd;
-  --color-text-faint:       #aabeb1;
+  --color-text-primary:     #f2f4f6;
+  --color-text-secondary:   #d1d6dc;
+  --color-text-muted:       #b0bac6;
+  --color-text-faint:       #a3afbd;
 
   --color-danger:           #ff8d9a;
   --color-danger-action:    #ff9daa;
@@ -311,7 +311,7 @@ table th {
 }
 
 /* ════════════════════════════════════════════════════
-   Buttons — 인터랙션 품질 10/10
+   Buttons — 상태 전환
    active: 눌리는 느낌 (scale + shadow 축소)
 ════════════════════════════════════════════════════ */
 .btn-primary {
@@ -434,6 +434,15 @@ table th {
               box-shadow var(--duration-fast) var(--ease-out);
   background: var(--color-surface);
   color: var(--color-text-primary);
+}
+/* Safari의 네이티브 select도 입력창 높이와 테두리를 일관되게 그린다. */
+select.input:not([multiple]):not([size]) {
+  appearance: none;
+  padding-right: 36px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%), linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
+  background-position: calc(100% - 18px) center, calc(100% - 13px) center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
 }
 .input:hover:not(:focus) { border-color: var(--color-border-hover); }
 .input:focus {
@@ -776,14 +785,14 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
 
 .workspace-sticky-header {
   position: sticky;
-  top: 70px;
+  top: 112px;
   z-index: 20;
 }
 
 .page-container {
-  width: min(calc(100% - 40px), 1520px);
+  width: min(calc(100% - 64px), 1240px);
   margin-inline: auto;
-  padding-block: 32px 56px;
+  padding-block: 40px 64px;
 }
 
 .surface-panel {
@@ -795,19 +804,12 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
 
 .page-hero {
   position: relative;
-  overflow: hidden;
-  border-radius: 24px;
-  padding: clamp(24px, 4vw, 40px);
-  color: white;
-  background:
-    radial-gradient(circle at 88% 12%, rgba(35,196,139,0.25), transparent 24rem),
-    radial-gradient(circle at 60% 120%, rgba(37,99,235,0.16), transparent 30rem),
-    linear-gradient(135deg, #17191c 0%, #202824 64%, #17372e 100%);
-  box-shadow: 0 20px 46px rgba(18,28,24,0.17);
+  padding: 8px 0 28px;
+  color: var(--color-text-primary);
 }
 
 .page-eyebrow {
-  color: var(--color-on-dark-accent);
+  color: var(--color-primary);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: .16em;
@@ -815,18 +817,19 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
 }
 
 .page-title {
-  margin-top: 8px;
-  font-size: clamp(24px, 3vw, 34px);
+  margin-top: 0;
+  font-size: 32px;
   font-weight: 750;
-  line-height: 1.2;
+  line-height: 1.35;
   letter-spacing: -.03em;
+  word-break: keep-all;
 }
 
 .page-description {
-  margin-top: 10px;
+  margin-top: 12px;
   max-width: 720px;
-  color: var(--color-on-dark-secondary);
-  font-size: 14px;
+  color: var(--color-text-muted);
+  font-size: 15px;
   line-height: 1.7;
 }
 
@@ -854,9 +857,9 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
 }
 
 .workspace-header {
-  background: linear-gradient(115deg, #17191c, #202723 72%, #173b30);
-  color: white;
-  box-shadow: 0 8px 26px rgba(18,28,24,.14);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .workspace-tabs {
@@ -906,53 +909,67 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
   position: sticky;
   top: 0;
   z-index: 60;
-  height: 80px;
-  color: white;
-  background: rgba(23,25,28,.96);
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  box-shadow: 0 6px 22px rgba(15,20,18,.14);
-  backdrop-filter: blur(18px);
+  height: 112px;
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
 .global-portal-inner {
-  width: min(calc(100% - 32px), 1760px);
+  width: min(calc(100% - 48px), 1360px);
   height: 100%;
   margin-inline: auto;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  grid-template-rows: 56px 56px;
   align-items: center;
-  gap: 16px;
+  column-gap: 24px;
 }
-.portal-brand { display: inline-flex; min-width: 40px; min-height: 40px; flex: 0 0 auto; align-items: center; gap: 10px; }
+.portal-brand { grid-column: 1; grid-row: 1; width: fit-content; z-index: 1; display: inline-flex; min-width: 40px; min-height: 40px; flex: 0 0 auto; align-items: center; gap: 10px; }
 .portal-brand-mark {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 12px;
   background: var(--color-primary);
-  color: white;
-  font-size: 13px;
-  font-weight: 850;
-  letter-spacing: -.04em;
-  box-shadow: 0 8px 18px rgba(8,122,87,.25);
+  color: var(--color-primary-contrast);
+  font-size: 18px;
+  font-weight: 800;
 }
-.portal-brand-name { color: #f4f7f5; font-size: 13px; font-weight: 720; letter-spacing: -.01em; }
-.portal-nav { display: flex; min-width: 0; flex: 1; align-items: center; gap: 4px; }
+.portal-brand-name {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+.portal-nav {
+  display: flex;
+  min-width: 0;
+  grid-column: 1;
+  grid-row: 2;
+  align-items: center;
+  gap: 4px;
+}
 .portal-nav-link {
   display: inline-flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
-  gap: 6px;
-  border-radius: 10px;
-  padding: 0 13px;
-  color: var(--color-on-dark-secondary);
-  font-size: 13px;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 0 14px;
+  color: var(--color-text-muted);
+  font-size: 15px;
   font-weight: 650;
+  white-space: nowrap;
   transition: color var(--duration-fast), background var(--duration-fast);
 }
-.portal-nav-link:hover { color: white; background: rgba(255,255,255,.07); }
+.portal-nav-link:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-hover);
+}
 .portal-nav-link[aria-current="page"],
 .portal-nav-link[aria-expanded="true"],
-.portal-nav-link[data-active="true"] { color: var(--color-selected-text); background: var(--color-selected-bg); font-weight: 750; }
+.portal-nav-link[data-active="true"] { color: var(--color-primary); background: var(--domain-retreat-soft); font-weight: 750; }
 .portal-action {
   display: inline-flex;
   min-height: 36px;
@@ -968,32 +985,53 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
   transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
 }
 .portal-action:hover { color: white; border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); }
-.portal-header-tools { margin-left: auto; display: grid; flex: 0 0 auto; gap: 0; justify-items: stretch; }
-.portal-account-row { display: flex; min-height: 40px; align-items: center; justify-content: flex-end; gap: 7px; }
+.portal-header-tools {
+  display: contents;
+}
+.portal-account-row {
+  display: flex;
+  min-height: 40px;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
 .portal-compact-action {
   display: inline-flex;
   min-height: 40px;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid rgba(255,255,255,.11);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   padding: 0 9px;
-  color: var(--color-on-dark-secondary);
+  color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 600;
   transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
 }
-.portal-compact-action:hover { color: white; border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); }
+.portal-compact-action:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
 /* 계정 진입점(마이페이지)이 보기·테마 토글과 같은 무게로 읽히지 않게 한다. */
-.portal-compact-action--account { border-color: rgba(255,255,255,.2); color: var(--color-on-dark-primary); font-weight: 700; }
-.portal-compact-action--quiet { border-color: transparent; color: var(--color-on-dark-muted); }
-.portal-compact-action--quiet:hover { border-color: rgba(255,255,255,.14); }
+.portal-compact-action--account {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+.portal-compact-action--quiet {
+  border-color: transparent;
+  color: var(--color-text-muted);
+}
+.portal-compact-action--quiet:hover { border-color: var(--color-border); }
 .view-mode-toggle {
   display: inline-flex;
   min-height: 40px;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,.11);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 .view-mode-toggle button {
@@ -1002,23 +1040,31 @@ input::placeholder, textarea::placeholder { color: var(--color-text-faint); opac
   align-items: center;
   gap: 4px;
   padding: 0 8px;
-  color: var(--color-on-dark-muted);
+  color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
   white-space: nowrap;
 }
-.view-mode-toggle button + button { border-left: 1px solid rgba(255,255,255,.1); }
-.view-mode-toggle button[aria-pressed="true"] { background: rgba(125,226,188,.14); color: var(--color-on-dark-primary); }
-.view-mode-toggle button:hover { background: rgba(255,255,255,.07); color: white; }
+.view-mode-toggle button + button {
+  border-left: 1px solid var(--color-border);
+}
+.view-mode-toggle button[aria-pressed="true"] {
+  background: var(--color-badge-bg);
+  color: var(--color-primary);
+}
+.view-mode-toggle button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
 .portal-content-frame { min-width: 0; }
 html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
 [data-theme="dark"][data-view-preview="true"] body { background: #070c09; }
 
 .portal-preview-toolbar {
   height: 52px;
-  border-bottom: 1px solid rgba(255,255,255,.09);
-  background: #202423;
-  color: var(--color-on-dark-primary);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
 }
 .portal-preview-toolbar__inner {
   display: flex;
@@ -1034,7 +1080,7 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
   min-width: 0;
   align-items: center;
   gap: 10px;
-  color: var(--color-on-dark-primary);
+  color: var(--color-text-primary);
   font-size: 13px;
   font-weight: 750;
   white-space: nowrap;
@@ -1104,12 +1150,8 @@ html[data-view-preview="true"] body { overflow: hidden; background: #dfe5e2; }
   font-weight: 750;
   white-space: nowrap;
 }
-/* 두 탭 바는 배치가 같지만 놓이는 배경이 정반대다 — 색은 반드시 따로 준다.
-   이가드는 .workspace-header(어두운 그라디언트) 위라 on-dark 토큰이 맞고,
-   학기는 .workspace-tabs(거의 흰 배경) 위다. 예전에는 둘이 색까지 공유해
-   학기 탭이 흰 배경에 #cbd5d0(대비 1.50:1), 선택 탭은 #f8fafc(1.05:1)로
-   사실상 보이지 않았다. on-dark 토큰을 밝은 화면에 쓰면 안 되는 이유다. */
-.iguard-mobile-tabs button { color: var(--color-on-dark-secondary); }
+/* 현장·학기 탭은 공통 표면과 명확한 선택 대비를 사용한다. */
+.iguard-mobile-tabs button { color: var(--color-text-secondary); }
 .iguard-mobile-tabs button[aria-selected="true"] {
   background: var(--color-selected-bg);
   color: var(--color-selected-text);
@@ -1232,7 +1274,7 @@ html[data-view-preview="true"] .overlay-shell--fullscreen-mobile .overlay-shell_
   border-radius: 22px;
 }
 html[data-view-preview="true"] .overlay-shell--bottom-sheet .overlay-shell__panel { width: min(430px, calc(100vw - 32px)); }
-.portal-account-name { max-width: 152px; overflow: hidden; color: var(--color-on-dark-primary); font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.portal-account-name { max-width: 152px; overflow: hidden; color: var(--color-text-primary); font-size: 13px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .theme-toggle {
   display: inline-flex;
   min-width: 28px;
@@ -1241,15 +1283,19 @@ html[data-view-preview="true"] .overlay-shell--bottom-sheet .overlay-shell__pane
   align-items: center;
   justify-content: center;
   gap: 7px;
-  border: 1px solid rgba(255,255,255,.12);
+  border: 1px solid var(--color-border);
   border-radius: 8px;
   background: transparent;
   padding: 0 7px;
-  color: var(--color-on-dark-secondary);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
 }
-.theme-toggle:hover { border-color: rgba(255,255,255,.2); background: rgba(255,255,255,.07); color: white; }
+.theme-toggle:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
 .theme-toggle__glyph {
   width: 15px;
   height: 15px;
@@ -1267,28 +1313,34 @@ html[data-view-preview="true"] .overlay-shell--bottom-sheet .overlay-shell__pane
 .landing-header .theme-toggle:hover { border-color: var(--color-border-hover); background: var(--color-surface-hover); color: var(--color-text-primary); }
 .portal-search-trigger {
   display: inline-flex;
+  grid-column: 2;
+  grid-row: 2;
   min-height: 40px;
-  min-width: 154px;
+  width: 230px;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  border: 1px solid rgba(255,255,255,.11);
-  border-radius: 8px;
-  padding: 0 9px;
-  color: var(--color-on-dark-secondary);
-  font-size: 13px;
-  font-weight: 600;
-  transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
+  justify-content: flex-start;
+  gap: 9px;
+  border: 1px solid var(--color-control-border);
+  border-radius: 12px;
+  padding: 0 12px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-hover);
+  font-size: 14px;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
 }
-.portal-search-trigger:hover { color: white; border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.07); }
+.portal-search-trigger:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+}
 .portal-mobile-area,
 .portal-mobile-more,
 .portal-mobile-backdrop { display: none; }
 .portal-menu {
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,.09);
+  border: 1px solid var(--color-border);
   border-radius: 16px;
-  background: #202421;
+  background: var(--color-surface);
   padding: 6px;
   box-shadow: 0 22px 48px rgba(0,0,0,.28);
 }
@@ -1603,8 +1655,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   }
   .iguard-route-active .global-portal-header { position: relative; top: auto; }
   .iguard-route-active .iguard-workspace-header { position: sticky; top: 0; }
-  .global-portal-inner { width: calc(100% - 24px); flex-wrap: nowrap; gap: 8px; }
+  .global-portal-inner { display: flex; width: calc(100% - 32px); flex-wrap: nowrap; gap: 8px; }
   .portal-brand { flex: 0 0 auto; }
+  .portal-brand-name { display: none; }
   .portal-nav,
   .portal-account-row--desktop { display: none; }
   .portal-mobile-area {
@@ -1617,7 +1670,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
     gap: 5px;
     overflow: hidden;
     border-radius: 10px;
-    color: var(--color-on-dark-primary);
+    color: var(--color-text-primary);
     font-size: 13px;
     font-weight: 700;
     white-space: nowrap;
@@ -1640,9 +1693,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
     min-width: 44px;
     min-height: 44px;
     place-items: center;
-    border: 1px solid rgba(255,255,255,.11);
+    border: 1px solid var(--color-border);
     border-radius: 10px;
-    color: var(--color-on-dark-secondary);
+    color: var(--color-text-secondary);
   }
   .portal-mobile-backdrop {
     position: fixed;
@@ -1736,11 +1789,11 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 
 @media (max-width: 640px) {
   .page-container { width: min(calc(100% - 24px), 1520px); padding-block: 18px 32px; }
-  .page-hero { border-radius: 18px; padding: 24px 20px; }
+  .page-hero { padding: 8px 0 20px; }
   .surface-panel { border-radius: 16px; }
   .workspace-tab { min-height: 44px; padding-inline: 12px; }
   .portal-brand-mark { width: 32px; height: 32px; border-radius: 10px; }
-  .portal-nav-link { min-height: 34px; padding-inline: 10px; font-size: 12px; }
+  .portal-nav-link { min-height: 44px; padding-inline: 10px; font-size: 14px; }
   .portal-action { min-width: 36px; padding-inline: 9px; }
   .portal-search-trigger { min-width: 40px; font-size: 12px; }
   .portal-compact-action { font-size: 12px; }
@@ -1979,7 +2032,7 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
 .retreat-roster-table thead tr:last-child th:nth-child(2) { z-index: 25; }
 
 /* 업무 화면의 두 번째 헤더는 전역 내비게이션과 경쟁하지 않게 낮춘다. */
-.workspace-header { background: #202522; box-shadow: 0 5px 16px rgba(18,28,24,.11); }
+
 .workspace-header :where(h1, h2) { letter-spacing: -.02em; }
 .workspace-tabs { box-shadow: 0 1px 0 rgba(18,28,24,.04); }
 
@@ -2156,9 +2209,9 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   min-height: 40px;
   place-items: center;
   border-radius: 10px;
-  color: var(--color-on-dark-secondary);
+  color: var(--color-text-secondary);
 }
-.field-header-more:hover { background: rgba(255,255,255,.08); color: white; }
+.field-header-more:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .field-tools-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -2166,15 +2219,15 @@ a.home-action-row:hover { background: #eef5f2; transform: translateX(2px); }
   z-index: 40;
   width: min(260px, calc(100vw - 24px));
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,.09);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
-  background: #202421;
+  background: var(--color-surface);
   padding: 6px;
   box-shadow: 0 18px 44px rgba(0,0,0,.32);
 }
-.field-tools-menu p { padding: 8px 10px 6px; color: var(--color-on-dark-muted); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
-.field-tools-menu button { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 9px; border-radius: 9px; padding: 0 10px; color: var(--color-on-dark-secondary); font-size: 13px; font-weight: 650; text-align: left; }
-.field-tools-menu button:hover { background: rgba(255,255,255,.07); color: white; }
+.field-tools-menu p { padding: 8px 10px 6px; color: var(--color-text-muted); font-size: 10px; font-weight: 700; letter-spacing: .06em; }
+.field-tools-menu button { display: flex; width: 100%; min-height: 44px; align-items: center; gap: 9px; border-radius: 9px; padding: 0 10px; color: var(--color-text-secondary); font-size: 13px; font-weight: 650; text-align: left; }
+.field-tools-menu button:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .field-tools-menu button:disabled { opacity: .45; }
 
 .cue-gbs-summary { border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }

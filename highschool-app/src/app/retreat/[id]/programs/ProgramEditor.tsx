@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CheckCircle, Circle, FloppyDisk, UsersThree, Trash, WarningCircle } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, CaretDown, CheckCircle, Circle, FloppyDisk, UsersThree, Trash, WarningCircle } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useUI } from "@/context/UIContext";
 import {
@@ -45,6 +45,10 @@ import type {
 type EditableProgram = Omit<RetreatProgram, "tasks" | "meetings" | "posts" | "items" | "roles" | "competitionTeams" | "releases" | "activeReleaseId">;
 
 type Props = {
+  navigation?: ReactNode;
+  requestedMeeting?: boolean;
+  requestedMeetingId?: string;
+  onCloseRequestedMeeting?: () => void;
   program: RetreatProgram;
   canEdit: boolean;
   meetingsAvailable: boolean;
@@ -113,6 +117,7 @@ const RECORD_FIELDS = [
 ] as const;
 
 export default function ProgramEditor({
+  navigation, requestedMeeting = false, requestedMeetingId, onCloseRequestedMeeting,
   program,
   canEdit,
   meetingsAvailable,
@@ -155,9 +160,9 @@ export default function ProgramEditor({
   const syncedRef = useRef({ id: program.id, resetVersion });
   const [remoteUpdated, setRemoteUpdated] = useState(false);
   const [meetingSession, setMeetingSession] = useState<{ programId: string; version: number } | null>(null);
-  const meetingOpen = meetingsAvailable
-    && meetingSession?.programId === program.id
-    && meetingSession.version === meetingSessionVersion;
+  const meetingOpen = canEdit && meetingsAvailable && (requestedMeeting || (
+    meetingSession?.programId === program.id && meetingSession.version === meetingSessionVersion
+  ));
   const [publicationAction, setPublicationAction] = useState<"publish" | "unpublish" | null>(null);
   const [pendingTarget, setPendingTarget] = useState<{ section: ProgramSectionKey; targetId: string } | null>(null);
 
@@ -201,6 +206,9 @@ export default function ProgramEditor({
   const posts = useMemo(() => programPosts(program), [program]);
   const competitionTeams = useMemo(() => programCompetitionTeams(program), [program]);
   const taskProgress = useMemo(() => programTaskProgress(program), [program]);
+  const stepIndex = PROGRAM_SECTIONS.findIndex((entry) => entry.key === section);
+  const previousStep = PROGRAM_SECTIONS[stepIndex - 1];
+  const nextStep = PROGRAM_SECTIONS[stepIndex + 1];
   const needsProgramIdentity = !draft.title.trim() || /^프로그램\s*\d+$/u.test(draft.title.trim()) || !draft.lead?.trim();
 
   useEffect(() => {
@@ -257,6 +265,11 @@ export default function ProgramEditor({
       setPublicationAction(null);
       return;
     }
+    if (dirty) {
+      toast("작성 중인 본문을 먼저 저장한 뒤 공유 상태를 변경해 주세요.", "warning");
+      setPublicationAction(null);
+      return;
+    }
     if (publicationAction === "publish" && !canPublishProgram({ ...program, ...draft })) {
       toast("준비 항목을 모두 완료한 뒤 현장에 공유할 수 있습니다.", "warning");
       setPublicationAction(null);
@@ -279,8 +292,8 @@ export default function ProgramEditor({
     <section className="program-editor" aria-labelledby="program-editor-title">
       <div className="program-editor-heading">
         <div>
-          <span>{programStatusMeta(draft.status).label}</span>
           <h2 id="program-editor-title">{draft.title || "이름 없는 프로그램"}</h2>
+          <div className="program-editor-meta"><span>{programStatusMeta(draft.status).label}</span><span>{draft.lead?.trim() || "총괄 미정"}</span><span aria-live="polite">{saving ? "저장 중…" : dirty ? "본문 초안 변경됨" : "본문 저장됨"}</span></div>
         </div>
         <div className="program-editor-heading__actions">
           {canEdit && <button type="button" className="btn-primary program-meeting-launch" disabled={!meetingsAvailable} title={meetingsAvailable ? undefined : "준비회의 기록에 다시 연결한 뒤 사용할 수 있습니다."} onClick={() => setMeetingSession({ programId: program.id, version: meetingSessionVersion })}><UsersThree aria-hidden="true" size={18} /> 회의 시작</button>}
@@ -290,6 +303,8 @@ export default function ProgramEditor({
           </div>
         </div>
       </div>
+
+      {navigation}
 
       {remoteUpdated && (
         <div className="program-remote-updated" role="status">
@@ -311,10 +326,10 @@ export default function ProgramEditor({
 
       {section === "overview" && (
         <>
-        <section className="program-readiness-checklist" aria-labelledby="program-readiness-heading">
+        <details className="program-readiness-checklist">
+          <summary className="program-readiness-summary"><span>준비 점검 <strong>{readiness.ready}/{readiness.total}</strong></span><span>{needsProgramIdentity ? "이름과 담당자부터 정해 주세요" : readiness.missingLabels.length > 0 ? "남은 준비 확인" : "현장 점검 완료"}</span><CaretDown aria-hidden="true" size={18} /></summary>
           <div className="program-readiness-checklist__heading">
             <div>
-              <span className="program-eyebrow">다음 준비</span>
               <h3 id="program-readiness-heading">{needsProgramIdentity ? "이름과 담당자를 먼저 정해 주세요" : readiness.missingLabels.length > 0 ? "다음 준비부터 이어가세요" : taskProgress.done < taskProgress.total ? "현장 점검은 끝났습니다" : "현장 공유 준비가 끝났습니다"}</h3>
               {taskProgress.done < taskProgress.total && <p>실행 할 일 {taskProgress.total - taskProgress.done}건 남음</p>}
             </div>
@@ -366,7 +381,7 @@ export default function ProgramEditor({
               ))}
             </ul>
           </details>
-        </section>
+        </details>
         </>
       )}
 
@@ -442,6 +457,14 @@ export default function ProgramEditor({
 
       {section === "posts" && (
         <>
+        <ProgramPostsSection posts={posts} canEdit={canEdit} onCreate={onCreatePost} onCreateBulk={onCreatePosts} onUpdate={onUpdatePost} onDelete={onDeletePost}
+          onReorder={onReorderPosts}
+          onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
+          itemsOf={(postId) => itemsOfPost(program, postId)} rolesOf={(postId) => rolesOfPost(program, postId)}
+          onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
+          onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
+          onRestore={onRestorePost} onRestoreItem={onRestoreItem} onRestoreRole={onRestoreRole} onRestoreMatch={onRestoreMatch} />
+        <details className="program-detail-document program-flow-notes"><summary><strong>전체 진행안·대본</strong><CaretDown aria-hidden="true" size={17} /></summary>
         <fieldset disabled={!canEdit || saving} className="program-form program-form--manual">
           <section className="program-form-section">
             <h3>전체 흐름</h3>
@@ -455,6 +478,8 @@ export default function ProgramEditor({
             </div>
           </section>
         </fieldset>
+        </details>
+        <details className="program-detail-document program-competition-setup"><summary><span><strong>연합팀 편성</strong><small>{competitionTeams.length > 0 ? `${competitionTeams.length}개 연합팀` : "여러 조를 하나의 팀으로 묶을 때"}</small></span><CaretDown aria-hidden="true" size={17} /></summary>
         <ProgramCompetitionTeamsSection
           teams={competitionTeams}
           groups={groups}
@@ -467,13 +492,7 @@ export default function ProgramEditor({
           onAssignGroup={onAssignCompetitionGroup}
           onApplyBalanced={onApplyBalancedCompetitionTeams}
         />
-        <ProgramPostsSection posts={posts} canEdit={canEdit} onCreate={onCreatePost} onCreateBulk={onCreatePosts} onUpdate={onUpdatePost} onDelete={onDeletePost}
-          onReorder={onReorderPosts}
-          onCreateMatch={onCreateMatch} onUpdateMatch={onUpdateMatch} onDeleteMatch={onDeleteMatch}
-          itemsOf={(postId) => itemsOfPost(program, postId)} rolesOf={(postId) => rolesOfPost(program, postId)}
-          onCreateItem={onCreateItem} onUpdateItem={onUpdateItem} onDeleteItem={onDeleteItem}
-          onCreateRole={onCreateRole} onUpdateRole={onUpdateRole} onDeleteRole={onDeleteRole}
-          onRestore={onRestorePost} onRestoreItem={onRestoreItem} onRestoreRole={onRestoreRole} onRestoreMatch={onRestoreMatch} />
+        </details>
         </>
       )}
 
@@ -497,7 +516,21 @@ export default function ProgramEditor({
         <ProgramPublicationPanel program={{ ...program, ...draft }} groups={groups} readiness={readiness} canEdit={canEdit} busy={saving || remoteUpdated} hasUnsavedChanges={dirty} onRequestPublish={() => setPublicationAction("publish")} onRequestUnpublish={() => setPublicationAction("unpublish")} />
       )}
 
-      {meetingOpen && <ProgramMeetingMode program={program} posts={posts} canEdit={canEdit} onClose={() => setMeetingSession(null)} onCreateMeeting={onCreateMeeting} onUpdateMeeting={onUpdateMeeting} onCreateDecision={onCreateDecision} onUpdateDecision={onUpdateDecision} onConvertDecision={onConvertDecision} />}
+      <nav className="program-step-actions" aria-label="프로그램 준비 단계 이동">
+        <span>{stepIndex + 1} / {PROGRAM_SECTIONS.length} 단계</span>
+        <div>
+          {previousStep && <button type="button" className="btn-secondary" onClick={() => {
+            onSelectSection(previousStep.key);
+            requestAnimationFrame(() => document.getElementById("program-editor-title")?.scrollIntoView({ block: "start" }));
+          }}><ArrowLeft aria-hidden="true" size={17} />{previousStep.label.slice(2)}</button>}
+          {nextStep && <button type="button" className="btn-primary" onClick={() => {
+            onSelectSection(nextStep.key);
+            requestAnimationFrame(() => document.getElementById("program-editor-title")?.scrollIntoView({ block: "start" }));
+          }}>{nextStep.label.slice(2)}<ArrowRight aria-hidden="true" size={17} /></button>}
+        </div>
+      </nav>
+
+      {meetingOpen && <ProgramMeetingMode program={program} initialMeetingId={requestedMeetingId} posts={posts} canEdit={canEdit} onClose={() => { setMeetingSession(null); onCloseRequestedMeeting?.(); }} onCreateMeeting={onCreateMeeting} onUpdateMeeting={onUpdateMeeting} onCreateDecision={onCreateDecision} onUpdateDecision={onUpdateDecision} onConvertDecision={onConvertDecision} />}
 
       {publicationAction && (
         <OverlayShell

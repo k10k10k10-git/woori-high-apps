@@ -128,7 +128,7 @@ export default function ProgramPreparationClient() {
   const allowed = canAccessArea("retreat-admin", auth.roles);
   // 계정·수련회·회의 조회 범위가 바뀌면 이전 작업 상태를 버린다. 연결 재시도는 이 키를 바꾸지 않는다.
   const scope = `${auth.user?.uid ?? "guest"}:${route.id}:${canEditArea("retreat-admin", auth.roles)}`;
-  return <WorkspaceAccessGate allowed={allowed} area="프로그램 준비" backHref="/events" backLabel="행사 목록으로">
+  return <WorkspaceAccessGate allowed={allowed} area="프로그램 준비" backHref="/events" backLabel="수련회 목록으로">
     <ProgramPreparationWorkspace key={scope} />
   </WorkspaceAccessGate>;
 }
@@ -150,6 +150,8 @@ function ProgramPreparationWorkspace() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("workspace", "programs");
     params.set("program", programId);
+    params.delete("meeting");
+    params.delete("meetingId");
     const program = programs.find((item) => item.id === programId);
     params.set("section", nextSection ?? (program ? catalogNextAction(program).section : "overview"));
     // 프로그램·섹션은 같은 작업 화면 안의 상태다. Next 라우터 탐색을 쓰면
@@ -161,6 +163,8 @@ function ProgramPreparationWorkspace() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("program");
     params.delete("section");
+    params.delete("meeting");
+    params.delete("meetingId");
     params.set("workspace", "programs");
     const query = params.toString();
     const pathname = `/events/${encodeURIComponent(retreatId)}/programs`;
@@ -173,14 +177,10 @@ function ProgramPreparationWorkspace() {
     window.history.replaceState(null, "", `?${params.toString()}`);
   }
 
-  function selectWorkspace(next: ProgramWorkspaceSectionKey, focusIndex?: number) {
-    if (next === workspace) {
-      if (focusIndex !== undefined) workspaceTabRefs.current[focusIndex]?.focus();
-      return;
-    }
+  function selectWorkspace(next: ProgramWorkspaceSectionKey) {
+    if (next === workspace && !selectedId) return;
     discardGuard.requestAction("다른 준비 화면으로 이동", () => {
       applyWorkspace(next);
-      if (focusIndex !== undefined) queueMicrotask(() => workspaceTabRefs.current[focusIndex]?.focus());
     });
   }
 
@@ -190,6 +190,8 @@ function ProgramPreparationWorkspace() {
     if (next !== "programs") {
       params.delete("program");
       params.delete("section");
+      params.delete("meeting");
+      params.delete("meetingId");
     }
     window.history.pushState(null, "", `?${params.toString()}`);
   }
@@ -231,7 +233,6 @@ function ProgramPreparationWorkspace() {
   const [deleteTarget, setDeleteTarget] = useState<RetreatProgram | null>(null);
   const discardGuard = useProgramDiscardGuard();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const workspaceTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -246,16 +247,6 @@ function ProgramPreparationWorkspace() {
     tabRefs.current[nextIndex]?.focus();
   }
 
-  function handleWorkspaceTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const nextIndex = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? PROGRAM_WORKSPACE_SECTIONS.length - 1
-        : (index + (event.key === "ArrowRight" ? 1 : -1) + PROGRAM_WORKSPACE_SECTIONS.length) % PROGRAM_WORKSPACE_SECTIONS.length;
-    selectWorkspace(PROGRAM_WORKSPACE_SECTIONS[nextIndex].key, nextIndex);
-  }
 
   useEffect(() => {
     if (authLoading) return;
@@ -456,7 +447,7 @@ function ProgramPreparationWorkspace() {
     </div>
   );
 
-  if (lock && !unlocked) return <RetreatPinGate retreatId={retreatId} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/events")} />;
+  if (lock && !unlocked) return <RetreatPinGate retreatId={retreatId} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/events?retreat=${encodeURIComponent(retreatId)}`)} />;
   if (!retreat) return (
     <div className="program-access-state"><h1>수련회를 찾을 수 없습니다</h1><button type="button" className="btn-secondary" onClick={() => router.push("/events")}>목록으로</button></div>
   );
@@ -467,64 +458,36 @@ function ProgramPreparationWorkspace() {
         retreat={retreat}
         fieldAllowed={fieldAllowed}
         onNavigate={(href) => discardGuard.requestAction("다른 화면으로 이동", () => router.push(href))}
-      >
-        <div className="workspace-tabs program-workspace-tabs">
-          <div className="mx-auto flex max-w-6xl gap-0 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label="수련회 프로그램 준비">
-            {PROGRAM_WORKSPACE_SECTIONS.map((entry, index) => (
-              <button
-                key={entry.key}
-                ref={(node) => { workspaceTabRefs.current[index] = node; }}
-                type="button"
-                role="tab"
-                id={`program-workspace-tab-${entry.key}`}
-                aria-controls="program-workspace-panel"
-                aria-selected={entry.key === workspace}
-                tabIndex={entry.key === workspace ? 0 : -1}
-                className="workspace-tab shrink-0"
-                onClick={() => selectWorkspace(entry.key)}
-                onKeyDown={(event) => handleWorkspaceTabKeyDown(event, index)}
-              >
-                {entry.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <label className="program-mobile-workspace-nav">
-          <span>준비 메뉴</span>
-          <select value={workspace} onChange={(event) => selectWorkspace(event.target.value as ProgramWorkspaceSectionKey)} aria-label="수련회 프로그램 준비 메뉴">
-            {PROGRAM_WORKSPACE_SECTIONS.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}
-          </select>
-        </label>
-        {workspace === "programs" && selectedProgram && (
-          <div className="program-editor-tabs">
-            <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 scrollbar-hide sm:px-4" role="tablist" aria-label={`${selectedProgram.title} 편집 항목`}>
-              {PROGRAM_SECTIONS.map((entry, index) => (
-                <button
-                  key={entry.key}
-                  ref={(node) => { tabRefs.current[index] = node; }}
-                  type="button"
-                  role="tab"
-                  id={`program-tab-${entry.key}`}
-                  aria-controls={`program-panel-${entry.key}`}
-                  aria-selected={entry.key === section}
-                  tabIndex={entry.key === section ? 0 : -1}
-                  onClick={() => selectSection(entry.key)}
-                  onKeyDown={(event) => handleTabKeyDown(event, index)}
-                >
-                  {entry.label}
-                </button>
-              ))}
-            </div>
-            <label className="program-mobile-section-nav"><span>{selectedProgram.title} 편집 항목</span><select value={section} onChange={(event) => selectSection(event.target.value as ProgramSectionKey)}>{PROGRAM_SECTIONS.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}</select></label>
-          </div>
-        )}
-      </ProgramWorkspaceHeader>
+      />
       <main
         className="program-preparation-main"
         id="program-workspace-panel"
-        role="tabpanel"
-        aria-labelledby={`program-workspace-tab-${workspace}`}
+        aria-label="프로그램 준비"
       >
+        <div className="program-context-toolbar">
+          <button type="button" className="program-back-to-list" aria-label="프로그램 목록" aria-current={workspace === "programs" && !selectedProgram ? "page" : undefined}
+            onClick={() => discardGuard.requestAction("프로그램 목록으로 이동", goToList)}>
+            {selectedProgram || workspace !== "programs" ? <ArrowLeft aria-hidden="true" size={16} weight="bold" /> : null}
+            프로그램 목록 <span>{programs.length}</span>
+          </button>
+          {workspace === "programs" && selectedProgram && <label className="program-current-selector">
+            <span>준비할 프로그램</span>
+            <select aria-label="준비할 프로그램" value={selectedProgram.id} disabled={busy || saving}
+              onChange={(event) => {
+                const id = event.target.value;
+                discardGuard.requestAction("다른 프로그램으로 이동", () => goToProgram(id));
+              }}>
+              {programs.map((program) => <option key={program.id} value={program.id}>{program.title}</option>)}
+            </select>
+          </label>}
+          <label className="program-collection-selector">
+            <span>이 수련회 전체 도구</span>
+            <select value={workspace} onChange={(event) => selectWorkspace(event.target.value as ProgramWorkspaceSectionKey)} aria-label="수련회 프로그램 준비 메뉴">
+              {PROGRAM_WORKSPACE_SECTIONS.map((entry) => <option key={entry.key} value={entry.key}>{entry.key === "programs" ? "프로그램별 준비" : entry.label}</option>)}
+            </select>
+          </label>
+        </div>
+
         {workspace === "overview" && (
           <div className="program-page-intro">
             <div>
@@ -565,12 +528,38 @@ function ProgramPreparationWorkspace() {
             aria-labelledby={`program-tab-${section}`}
             tabIndex={0}
           >
-            <button type="button" className="program-back-to-list"
-              onClick={() => discardGuard.requestAction("프로그램 목록으로 이동", goToList)}>
-              <ArrowLeft aria-hidden="true" size={15} weight="bold" />
-              프로그램 목록
-            </button>
             <ProgramEditor
+                requestedMeeting={searchParams.get("meeting") === "1"}
+                requestedMeetingId={searchParams.get("meetingId") ?? undefined}
+                onCloseRequestedMeeting={() => {
+                  const next = new URLSearchParams(searchParams.toString());
+                  next.delete("meeting");
+                  next.delete("meetingId");
+                  window.history.replaceState(null, "", `?${next.toString()}`);
+                }}
+                navigation={
+                  <div className="program-editor-tabs">
+                    <div className="program-step-list" role="tablist" aria-label={`${selectedProgram.title} 편집 항목`}>
+                      {PROGRAM_SECTIONS.map((entry, index) => (
+                        <button
+                          key={entry.key}
+                          ref={(node) => { tabRefs.current[index] = node; }}
+                          type="button"
+                          role="tab"
+                          id={`program-tab-${entry.key}`}
+                          aria-controls={`program-panel-${entry.key}`}
+                          aria-selected={entry.key === section}
+                          tabIndex={entry.key === section ? 0 : -1}
+                          onClick={() => selectSection(entry.key)}
+                          onKeyDown={(event) => handleTabKeyDown(event, index)}
+                        >
+                          {entry.label}
+                        </button>
+                      ))}
+                    </div>
+                    <label className="program-mobile-section-nav"><span>{selectedProgram.title} 편집 항목</span><select value={section} onChange={(event) => selectSection(event.target.value as ProgramSectionKey)}>{PROGRAM_SECTIONS.map((entry) => <option key={entry.key} value={entry.key}>{entry.label}</option>)}</select></label>
+                  </div>
+                }
                 program={selectedProgram}
                 canEdit={editingAllowed}
                 meetingsAvailable={!meetingLoadError}

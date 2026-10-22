@@ -2,6 +2,7 @@ import { useSyncExternalStore, type AnchorHTMLAttributes } from "react";
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
 import type { TeamMemberships } from "@/features/teams/teamModel";
 import type { Application, CurriculumEntry, Session, Team, TrainingClass } from "@/features/semester/types";
+import type { PeopleSearchData } from "@/features/portal/peopleSearch";
 import { connect, memoryWrite, qa } from "./qaState";
 export { qa } from "./qaState";
 export { addArchiveLink, markArchiveLinkDeleting, removeArchiveLink, subscribeArchiveLinks } from "./serviceMocks";
@@ -82,7 +83,7 @@ export default function Link({ href, prefetch, ...props }: Omit<AnchorHTMLAttrib
   return <a href={href} {...props} data-qa-link="true" data-qa-prefetch={prefetch === false ? "disabled" : "default"} />;
 }
 
-const router = { replace: (href: string) => { qa.navigation.push(href); }, push: (href: string) => { qa.navigation.push(href); }, prefetch: (href: string) => { qa.prefetches.push(href); }, back: () => { window.history.back(); }, refresh: () => {} };
+const router = { replace: (href: string) => { qa.navigation.push(href); if (params.get("scenario") === "actualMeetings") window.history.replaceState(null, "", href); }, push: (href: string) => { qa.navigation.push(href); }, prefetch: (href: string) => { qa.prefetches.push(href); }, back: () => { window.history.back(); }, refresh: () => {} };
 const urlListeners = new Set<() => void>();
 const notifyUrl = () => urlListeners.forEach((listener) => listener());
 for (const method of ["pushState", "replaceState"] as const) {
@@ -154,7 +155,12 @@ export const clearAttendance = memoryWrite("clearAttendance");
 export const updateCompletionEntry = memoryWrite("updateCompletionEntry");
 export const describeApplicant = (application: Application) => `${application.bu} ${application.grade}학년 ${application.class}반`;
 
-export function subscribePeopleSearchData() {
-  qa.subscriptions.push("peopleSearch");
-  return () => {};
+export function subscribePeopleSearchData(_options: unknown, callback: (data: PeopleSearchData) => void, fail?: (source: keyof PeopleSearchData, error: Error) => void) {
+  return connect("peopleSearch", "", callback, {
+    classes: {
+      2025: { "1-1-4": { students: { old: { name: "합성학생가", personId: "person_student_synthetic_fixed" } } } },
+      2026: { "1-2-6": { students: { current: { name: "합성학생가", personId: "person_student_synthetic_fixed" } } } },
+    },
+    attendance: {}, semesters: {}, retreats: {}, retreatsPrivate: {}, semestersPrivate: {},
+  }, (error) => fail?.("classes", error));
 }

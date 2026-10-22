@@ -128,9 +128,9 @@ it("담당 팀이 없는 일반 스탭도 전체 메뉴를 보고 제한된 목�
   render(<GlobalPortalHeader />);
   const nav = within(screen.getByRole("navigation", { name: "통합 사역 메뉴" }));
   expect(nav.getByRole("link", { name: "운영센터 권한 필요" })).toHaveAttribute("data-prefetch", "false");
-  expect(nav.getByRole("link", { name: "행사 권한 필요" })).toHaveAttribute("href", "/events");
+  expect(nav.getByRole("link", { name: "수련회 권한 필요" })).toHaveAttribute("href", "/events");
   expect(nav.getByRole("link", { name: /훈련/ })).toHaveAttribute("href", "/training");
-  fireEvent.click(nav.getByRole("button", { name: "팀" }));
+  fireEvent.click(nav.getByRole("button", { name: "사역팀" }));
   const teams = nav.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/teams/"));
   expect(teams).toHaveLength(6);
   for (const team of teams) {
@@ -142,7 +142,7 @@ it("찬양팀 사용자는 자기 팀을 바로 열고 나머지 다섯 팀도 �
   state.auth.roles = { semester: "praise", retreat: "none" };
   state.auth.teamMemberships = { praise: { role: "staff", active: true } };
   render(<GlobalPortalHeader />);
-  fireEvent.click(screen.getByRole("button", { name: "팀" }));
+  fireEvent.click(screen.getByRole("button", { name: "사역팀" }));
   expect(screen.getByRole("link", { name: /찬양팀 모임/ })).toHaveAttribute("href", "/teams/praise");
   expect(screen.getByRole("link", { name: /찬양팀 모임/ })).not.toHaveTextContent("권한 필요");
   expect(screen.getByRole("link", { name: /바나바팀/ })).toHaveTextContent("권한 필요");
@@ -151,7 +151,7 @@ it("찬양팀 사용자는 자기 팀을 바로 열고 나머지 다섯 팀도 �
 
 it("팀 메뉴 링크에서 Escape를 누르면 닫힌 메뉴 대신 열기 버튼에 포커스를 돌린다", () => {
   render(<GlobalPortalHeader />);
-  const trigger = screen.getByRole("button", { name: "팀" });
+  const trigger = screen.getByRole("button", { name: "사역팀" });
   fireEvent.click(trigger);
   screen.getByRole("link", { name: /바나바팀/ }).focus();
   fireEvent.keyDown(document, { key: "Escape" });
@@ -161,7 +161,7 @@ it("팀 메뉴 링크에서 Escape를 누르면 닫힌 메뉴 대신 열기 버�
 
 it("마이페이지에서 Escape를 누를 때 남아 있던 팀 메뉴가 포커스를 가져가지 않는다", async () => {
   render(<GlobalPortalHeader />);
-  fireEvent.click(screen.getByRole("button", { name: "팀" }));
+  fireEvent.click(screen.getByRole("button", { name: "사역팀" }));
   await openMyPage();
   const close = screen.getByRole("button", { name: "마이페이지 닫기" });
   close.focus();
@@ -180,17 +180,17 @@ it("모바일 주요 메뉴와 펼친 메뉴에도 모든 영역과 여섯 팀�
   expect(teams).toHaveLength(6);
   for (const team of teams) expect(team).toHaveAttribute("data-prefetch", "false");
   const main = within(dialog.getByRole("navigation", { name: "모바일 통합 사역 메뉴" }));
-  for (const label of ["훈련", "행사", "운영센터"]) {
+  for (const label of ["신앙훈련", "수련회", "회의록", "운영센터"]) {
     expect(main.getByRole("link", { name: `${label} 권한 필요` })).toHaveAttribute("data-prefetch", "false");
   }
-  fireEvent.click(main.getByRole("link", { name: "행사 권한 필요" }));
+  fireEvent.click(main.getByRole("link", { name: "수련회 권한 필요" }));
   expect(screen.queryByRole("dialog", { name: "사이트 메뉴" })).not.toBeInTheDocument();
 });
 
 it.each(["pastor", "adminTeam"] as const)("%s 계정에 훈련과 운영센터를 연다", (semester) => {
   state.auth.roles = { semester, retreat: "none" };
   render(<GlobalPortalHeader />);
-  expect(screen.getAllByRole("link", { name: "훈련" }).some((link) => link.getAttribute("href") === "/training")).toBe(true);
+  expect(screen.getAllByRole("link", { name: "신앙훈련" }).some((link) => link.getAttribute("href") === "/training")).toBe(true);
   expect(screen.getAllByRole("link", { name: "운영센터" }).some((link) => link.getAttribute("href") === "/operations")).toBe(true);
 });
 

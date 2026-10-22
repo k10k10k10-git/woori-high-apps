@@ -1,4 +1,9 @@
-.areaLink { flex-direction: column; justify-content: center; gap: 1px; }
+.areaLink { justify-content: center; }
+.brandSubtitle { display: inline; margin-left: 12px; font-size: 12px; font-weight: 500; color: var(--color-text-muted); }
+.menuItem { display: block; border-radius: 10px; padding: 12px 14px; font-size: 14px; font-weight: 650; color: var(--color-text-primary); }
+.menuItem:hover { background: var(--color-surface-hover); }
+.menuHint { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--color-text-muted); line-height: 1.5; }
+@media (max-width: 1180px) { .brandSubtitle { display: none; } .areaLink > svg { display: none; } .areaLink .permissionLabel { display: none; } }
 .areaLink .permissionLabel { margin-left: 0; }
 
 .permissionLabel {

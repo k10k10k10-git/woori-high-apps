@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { StrictMode } from "react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
 
@@ -15,10 +15,12 @@ vi.mock("./applyRole", () => ({ applyRoleSteps: mocks.applyRoles }));
 vi.mock("@/lib/db", () => ({
   subscribeToRetreatAdmins: mocks.admins, subscribeToPendingRequests: mocks.adminPending, subscribeToMainAdmins: mocks.mainAdmins,
   denyRetreatRequest: mocks.write, updateRetreatAdminMemberName: mocks.write,
+  updateRetreatAdminTeamMemberships: mocks.write,
 }));
 vi.mock("@/features/iguard/lib/db", () => ({
   subscribeToIguardMembers: mocks.iguardMembers, subscribeToIguardPending: mocks.iguardPending, subscribeToIguardRoles: mocks.iguardRoles,
   denyIguardPending: mocks.write, updateIguardMemberName: mocks.write,
+  updateIguardTeamMemberships: mocks.write,
 }));
 
 import TeamModal from "./TeamModal";
@@ -45,6 +47,48 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("팀원 관리 — 전체 역할 정보 준비", () => {
+  it("기본 바나바 역할과 실제 담당 팀 미연결을 구분하며 권한을 자동 저장하지 않는다", () => {
+    render(<TeamModal embedded />);
+    act(() => {
+      receiveAll();
+      mocks.admins.mock.calls[0][0]({ "member-user": { ...member, semesterRole: "barnabas", retreatRole: "fieldStaff" } });
+    });
+    const account = within(screen.getByRole("article", { name: "테스트 팀원 계정 권한" }));
+    expect(account.getByRole("combobox", { name: "테스트 팀원 학기 역할" })).toHaveValue("barnabas");
+    expect(account.getByRole("combobox", { name: "테스트 팀원 방학 역할" })).toHaveValue("fieldStaff");
+    expect(account.getByRole("combobox", { name: "테스트 팀원 바나바팀 담당" })).toHaveValue("");
+    expect(account.getByText(/담당 팀 연결이 필요합니다/)).toBeInTheDocument();
+    expect(account.getByText("현장 실행탭만")).toBeInTheDocument();
+    expect(mocks.write).not.toHaveBeenCalled();
+    expect(mocks.applyRoles).not.toHaveBeenCalled();
+  });
+
+  it("실제 조회자 연결을 조회·수정으로 과장하지 않는다", () => {
+    render(<TeamModal embedded />);
+    act(() => {
+      receiveAll();
+      mocks.admins.mock.calls[0][0]({ "member-user": { ...member, semesterRole: "barnabas", teamMemberships: { barnabas: { role: "viewer", active: true, semesters: { "2026-2": true } } } } });
+    });
+    const account = within(screen.getByRole("article", { name: "테스트 팀원 계정 권한" }));
+    expect(account.getByText("바나바팀 · 조회 (지정 학기)")).toBeInTheDocument();
+    expect(account.queryByText(/담당 팀 연결이 필요합니다/)).not.toBeInTheDocument();
+  });
+
+  it("팀 내 역할을 바꿔도 기존 학기 제한과 다른 팀 연결을 보존한다", async () => {
+    render(<TeamModal embedded />);
+    act(() => {
+      receiveAll();
+      mocks.admins.mock.calls[0][0]({ "member-user": { ...member, semesterRole: "barnabas", teamMemberships: {
+        barnabas: { role: "viewer", active: true, semesters: { "2026-2": true } },
+        media: { role: "staff", active: true },
+      } } });
+    });
+    await act(async () => { fireEvent.change(screen.getByRole("combobox", { name: "테스트 팀원 바나바팀 담당" }), { target: { value: "staff" } }); });
+    expect(mocks.write).toHaveBeenCalledWith("member-user", {
+      barnabas: { role: "staff", active: true, semesters: { "2026-2": true } },
+      media: { role: "staff", active: true },
+    });
+  });
   it("첫 응답 전에는 빈 명단과 0명 집계를 표시하지 않는다", () => {
     render(<TeamModal embedded />);
     expect(screen.getByRole("status")).toHaveTextContent("팀원과 역할 정보를 불러오는 중");

@@ -52,7 +52,9 @@ export default function ProgramPublicationPanel({
             ? hasUnsavedChanges
               ? "저장하지 않은 초안이 있습니다. 먼저 초안을 저장한 뒤 새 배포본으로 공유해 주세요."
               : `${hasUnpublishedChanges ? "저장된 변경사항이 있습니다. " : ""}현장은 확정된 배포본을 보고 있습니다${releases.length > 0 ? ` · 배포본 ${releases.length}개 보관` : ""}.`
-            : ready
+            : hasUnsavedChanges
+              ? "저장하지 않은 초안이 있습니다. 먼저 초안을 저장한 뒤 현장에 공유해 주세요."
+              : ready
               ? "현장 공유 준비가 끝났습니다."
               : readiness.missingLabels.length > 0
                 ? `아직 ${readiness.missingLabels.length}개 현장 점검이 남았습니다: ${readiness.missingLabels.join(", ")}`
@@ -68,11 +70,11 @@ export default function ProgramPublicationPanel({
               <Eye aria-hidden="true" size={16} /> 변경사항 다시 공유
             </button>
           )}
-          <button type="button" className="btn-secondary" disabled={busy} onClick={onRequestUnpublish}>
+          <button type="button" className="btn-secondary" disabled={busy || hasUnsavedChanges} onClick={onRequestUnpublish}>
             <WarningCircle aria-hidden="true" size={16} /> 공유 해제
           </button>
         </div> : (
-          <button type="button" className="btn-primary" disabled={busy || !ready} onClick={onRequestPublish}>
+          <button type="button" className="btn-primary" disabled={busy || hasUnsavedChanges || !ready} onClick={onRequestPublish}>
             <Eye aria-hidden="true" size={16} /> 현장에 공유
           </button>
         ))}

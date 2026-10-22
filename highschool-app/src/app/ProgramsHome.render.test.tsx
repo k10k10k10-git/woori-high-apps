@@ -107,3 +107,10 @@ it("계정 교체에는 이전 수련회 목록과 선택을 다시 사용하지
   expect(screen.getByRole("status")).toBeInTheDocument();
   expect(screen.queryByText("이전 계정 수련회")).not.toBeInTheDocument();
 });
+
+
+it("프로그램 홈도 수련회부터 직접 선택하며 마지막 등록 항목을 임의로 고르지 않는다", () => {
+  render(<ProgramsHome />);
+  act(() => mocks.retreats.mock.calls[0][0]([{ id: "first", name: "첫 수련회", year: 2026, createdAt: 1 }]));
+  expect(screen.getByTestId("selection")).toBeEmptyDOMElement();
+});

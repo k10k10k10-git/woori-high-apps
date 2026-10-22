@@ -13,7 +13,7 @@ vi.mock("./NewRetreatButton", () => ({ default: () => <button type="button">새 
 import VacationHome from "./VacationHome";
 
 const retreats = [{ id: "fixture/id", name: "합성 수련회", year: 2026 }, { id: "other", name: "다른 합성 수련회", year: 2027 }] as Retreat[];
-beforeEach(() => { vi.clearAllMocks(); state.isMobileView = false; });
+beforeEach(() => { vi.clearAllMocks(); state.isMobileView = false; window.history.replaceState(null, "", "/events"); });
 afterEach(cleanup);
 
 it.each([
@@ -63,4 +63,39 @@ it("수련회를 바꾸면 세 업무 링크도 새 선택으로 바뀐다", () 
   const nav = within(screen.getByRole("navigation", { name: "수련회 업무 영역" }));
   expect(nav.getByRole("link", { name: "프로그램 준비 권한 필요" })).toHaveAttribute("href", "/events/other/programs");
   expect(screen.getByTestId("calendar")).toHaveAttribute("data-retreat", "other");
+});
+
+
+it("수련회 선택 전에는 업무를 임의로 연결하지 않으며 hover는 선택을 바꾸지 않는다", () => {
+  render(<VacationHome mode="admin" roles={{ semester: "superAdmin", retreat: "superAdmin" }} retreats={retreats} selectedId={null} onSelect={state.onSelect} />);
+  expect(screen.queryByRole("navigation", { name: "수련회 업무 영역" })).not.toBeInTheDocument();
+  expect(screen.getByTestId("calendar")).not.toHaveAttribute("data-retreat");
+  const choose = screen.getByRole("button", { name: /2026년 합성 수련회/ });
+  fireEvent.mouseEnter(choose);
+  expect(state.onSelect).not.toHaveBeenCalled();
+  fireEvent.click(choose);
+  expect(state.onSelect).toHaveBeenCalledWith("fixture/id");
+  expect(state.push).not.toHaveBeenCalled();
+});
+
+it("선택 수련회의 실제 기간과 공유 일정의 저장 대상을 구분한다", () => {
+  render(<VacationHome mode="admin" roles={{ semester: "superAdmin", retreat: "superAdmin" }} retreats={retreats} periods={[{ retreatId: "fixture/id", startDate: "2026-07-24", endDate: "2026-07-26" }]} selectedId="fixture/id" onSelect={state.onSelect} />);
+  const region = screen.getByRole("region", { name: "합성 수련회 업무 선택" });
+  expect(within(region).getByRole("heading")).toHaveTextContent("합성 수련회");
+  expect(region).toHaveTextContent("2026.07.24 – 2026.07.26");
+  expect(screen.getByText(/새 수련회 기간 추가 대상:/)).toHaveTextContent("합성 수련회");
+  expect(screen.getByText("전체 수련회 준비 일정").closest("details")).not.toHaveAttribute("open");
+});
+
+it("상세 화면의 명시적 복귀 링크만 복원하고 없는 수련회는 고르지 않는다", () => {
+  window.history.replaceState(null, "", "/events?retreat=fixture%2Fid");
+  const props = { mode: "admin" as const, roles: { semester: "superAdmin" as const, retreat: "superAdmin" as const }, selectedId: null, onSelect: state.onSelect };
+  const view = render(<VacationHome {...props} retreats={[]} />);
+  expect(state.onSelect).not.toHaveBeenCalled();
+  view.rerender(<VacationHome {...props} retreats={retreats} />);
+  expect(state.onSelect).toHaveBeenCalledWith("fixture/id");
+  state.onSelect.mockClear();
+  window.history.replaceState(null, "", "/events?retreat=missing");
+  view.rerender(<VacationHome {...props} retreats={[...retreats]} />);
+  expect(state.onSelect).not.toHaveBeenCalled();
 });

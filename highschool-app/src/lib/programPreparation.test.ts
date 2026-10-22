@@ -513,9 +513,11 @@ describe("수련회 전체 프로그램 작업공간", () => {
     expect(programActualSpend(items)).toBe(2000);
   });
 
-  it("알 수 없는 작업공간 주소는 준비 현황으로 돌아온다", () => {
+  it("기본 진입과 알 수 없는 작업공간 주소는 프로그램 선택부터 시작한다", () => {
     expect(programWorkspaceSectionFromParam("schedule")).toBe("schedule");
-    expect(programWorkspaceSectionFromParam("unknown")).toBe("overview");
+    expect(programWorkspaceSectionFromParam("unknown")).toBe("programs");
+    expect(programWorkspaceSectionFromParam(null)).toBe("programs");
+    expect(programWorkspaceSectionFromParam("overview")).toBe("overview");
   });
 
   it("현장은 활성 배포본을 읽어 이후 편집 원본 변경의 영향을 받지 않는다", () => {

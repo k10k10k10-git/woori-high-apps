@@ -111,7 +111,7 @@ function TeamWorkspaceContent({ teamKey, pickedSemesterId, onSelectSemester, onR
   const periodLabel = selectedTerm ? TERM_PHASE_LABEL[selectedTerm.phase] : "학기";
   const weeklyTitle = teamKey === "admin" ? "행정 업무" : teamKey !== "praise" ? "주간·주일 업무" : selectedTerm?.phase === "past" ? "지난 학기 주간·주일 기록" : selectedTerm?.phase === "upcoming" ? "예정 학기 업무 준비" : selectedTerm?.phase === "current" ? "이번 주 업무" : "주간·주일 업무";
   const weeklyDescription = teamKey !== "praise" ? WEEKLY_TASKS[teamKey] : selectedTerm?.phase === "past" ? `지난 학기의 ${teamMeta.hint} 기록을 확인합니다.` : selectedTerm?.phase === "upcoming" ? `예정 학기의 ${teamMeta.hint} 준비와 기록을 확인합니다.` : selectedTerm?.phase === "unscheduled" ? `운영 기간이 미등록된 학기의 ${teamMeta.hint} 업무입니다. 학기와 모임 날짜를 먼저 확인하세요.` : WEEKLY_TASKS[teamKey];
-  const weeklyPurpose = weeklyViewOnly ? `${teamKey === "praise" && selectedTerm ? `${periodLabel}의 ` : ""}${teamMeta.hint} 기록을 조회합니다. 변경은 담당 팀장에게 문의해 주세요.` : weeklyDescription;
+  const weeklyPurpose = weeklyViewOnly ? `${teamKey === "praise" && selectedTerm ? `${periodLabel}의 ` : ""}${teamMeta.hint} 기록을 조회합니다.` : weeklyDescription;
 
   return <TeamAccessState allowed={allowed}><main className="team-first-page">
     <header className="team-workspace-header">

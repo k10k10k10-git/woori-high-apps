@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, MagnifyingGlass } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, MagnifyingGlass, X } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, searchScope } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
 import { subscribePeopleSearchData } from "./peopleSearchDb";
+import styles from "./portalSearch.module.css";
 
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
   "학적·출석": "bg-blue-50 text-blue-700",
@@ -16,6 +17,12 @@ const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
 };
 
 export default function PortalSearch() {
+  const { user, roles, canSearchOfficialRoster } = useAuth();
+  // 계정·권한이 달라지면 이전 계정의 검색 결과와 선택을 즉시 폐기한다.
+  return <PortalSearchContent key={`${user?.uid ?? "anonymous"}:${roles.semester}:${roles.retreat}:${canSearchOfficialRoster}`} />;
+}
+
+function PortalSearchContent() {
   const { roles, canSearchOfficialRoster } = useAuth();
   // 인물검색은 연간 학생·출석·교사 원장 전체를 구독한다. 팀별 권한은
   // 서버에서 범위를 제한하는 검색을 갖추기 전까지 여기서 열지 않는다.
@@ -26,6 +33,7 @@ export default function PortalSearch() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const includeSemester = canAccessArea("semester", roles);
@@ -33,32 +41,34 @@ export default function PortalSearch() {
   // 역할 관리 권한과 인물검색 범위는 별개다. 교역자는 팀원을 배정하지 않아도
   // 기존처럼 출석부 연락처를 포함한 통합검색을 사용할 수 있다.
   const includeAttendancePrivate = searchScope(roles) === "write";
-  const loadKey = `${roles}:${includeSemester}:${includePrivate}:${includeAttendancePrivate}`;
-
   const beginOpen = useCallback(() => {
+    if (open) return;
     setOpen(true);
     setLoading(true);
     setError("");
-  }, []);
+  }, [open]);
 
   useEffect(() => {
     if (!open || !canSearch) return;
-    return subscribePeopleSearchData(
+    let active = true;
+    const unsubscribe = subscribePeopleSearchData(
       { includeSemester, includePrivate, includeAttendancePrivate },
-      (data) => { setProfiles(buildPeopleProfiles(data)); setLoading(false); },
+      (data) => { if (active) { setProfiles(buildPeopleProfiles(data)); setLoading(false); } },
       (source, cause) => {
+        if (!active) return;
         console.error(`people search subscription failed: ${source}`, cause);
-        setError("인물 데이터를 실시간으로 불러오지 못했습니다. 잠시 후 다시 열어 주세요.");
+        setError("인물 기록을 불러오지 못했습니다.");
         setLoading(false);
       },
     );
-  }, [canSearch, includeAttendancePrivate, includePrivate, includeSemester, loadKey, open]);
+    return () => { active = false; unsubscribe(); };
+  }, [canSearch, includeAttendancePrivate, includePrivate, includeSemester, open, retry]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || selectedId) return;
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
-  }, [open]);
+  }, [open, selectedId]);
 
   useEffect(() => {
     if (!canSearch) return;
@@ -71,14 +81,11 @@ export default function PortalSearch() {
       } else if (event.key === "/" && !typing) {
         event.preventDefault();
         beginOpen();
-      } else if (event.key === "Escape") {
-        if (selectedId) setSelectedId(null);
-        else setOpen(false);
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [beginOpen, canSearch, selectedId]);
+  }, [beginOpen, canSearch]);
 
   const results = useMemo(() => searchPeople(profiles, query), [profiles, query]);
   const selected = useMemo(() => profiles.find((profile) => profile.id === selectedId) ?? null, [profiles, selectedId]);
@@ -96,37 +103,41 @@ export default function PortalSearch() {
       <button type="button" onClick={beginOpen} className="portal-search-trigger" aria-label="인물 통합검색 열기">
         <MagnifyingGlass aria-hidden="true" size={15} weight="regular" />
         <span className="portal-search-label">인물 통합검색</span>
-        <kbd className="hidden rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-on-dark-muted)] xl:inline">⌘K</kbd>
+        <kbd className="hidden rounded bg-[var(--color-bg)] px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-text-muted)] xl:inline">⌘K</kbd>
       </button>
       {open && (
         <OverlayShell
           label="인물 통합검색"
-          onClose={close}
+          onClose={selected ? () => setSelectedId(null) : close}
           variant="fullscreen-mobile"
-          panelClassName={`portal-search-dialog flex w-full flex-col overflow-hidden ${selected ? "max-w-5xl" : "max-w-2xl"}`}
+          panelClassName={`portal-search-dialog ${styles.dialog} ${selected ? styles.detailDialog : ""}`}
         >
             {selected ? (
               <PersonDetail profile={selected} onBack={() => setSelectedId(null)} onClose={close} />
             ) : (
               <>
-                <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5">
-                  <MagnifyingGlass aria-hidden="true" className="text-slate-400" size={20} weight="regular" />
+                <header className={styles.searchHeader}>
+                  <div className={styles.headingRow}><h2>인물 검색</h2><button type="button" onClick={close} className={styles.closeButton} aria-label="인물 검색 닫기"><X aria-hidden="true" size={20} /></button></div>
+                  <div className={styles.searchField}>
+                  <MagnifyingGlass aria-hidden="true" size={22} weight="regular" />
                   <input
                     ref={inputRef}
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="학생·교사·스탭 이름을 입력하세요"
+                    placeholder="학생·교사·스탭 이름 검색"
                     aria-label="인물 이름"
-                    className="min-h-11 flex-1 bg-transparent text-base text-slate-900 outline-none placeholder:text-slate-400"
+                    autoComplete="off"
+                    className={styles.searchInput}
                   />
-                  <button type="button" onClick={close} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100">ESC</button>
-                </div>
-                <div className="min-h-52 flex-1 overflow-y-auto p-2.5">
+                  {query && <button type="button" className={styles.clearButton} onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label="검색어 지우기"><X aria-hidden="true" size={17} /></button>}
+                  </div>
+                </header>
+                <div className={styles.results} aria-busy={loading}>
                   {loading ? <SearchState title="고등부 인물 기록을 모으고 있습니다…" description="학적·출석, 학기 사역, 새친구, 수련회 데이터를 연결합니다." />
-                    : error ? <SearchState title={error} description="창을 닫았다가 다시 열어 재시도할 수 있습니다." />
-                    : query.trim().length < 2 ? <SearchState title="인물 이름으로 검색하세요." description="학생·교사·스탭 이름을 두 글자 이상 입력하면 현재 DB 기록에서 찾습니다." />
+                    : error ? <SearchState title={error} description="연결 상태를 확인한 뒤 다시 불러와 주세요."><button type="button" className="btn-secondary" onClick={() => { setError(""); setLoading(true); setRetry((value) => value + 1); }}>다시 불러오기</button></SearchState>
+                    : query.trim().length < 2 ? <SearchState title="찾고 싶은 사람의 이름을 입력하세요" description="두 글자 이상 입력하면 학생·교사·스탭의 기록을 찾습니다." />
                     : results.length > 0 ? results.map((profile) => (
-                      <button key={profile.id} type="button" onClick={() => setSelectedId(profile.id)} className="group flex w-full items-start gap-3 rounded-xl px-3.5 py-3 text-left transition hover:bg-slate-50 focus-visible:bg-slate-50">
+                      <button key={profile.id} type="button" onClick={() => setSelectedId(profile.id)} className={`${styles.resultRow} group`}>
                         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-sm font-extrabold text-emerald-700">{profile.name.slice(0, 1)}</span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
@@ -143,8 +154,9 @@ export default function PortalSearch() {
                       </button>
                     )) : <SearchState title="일치하는 인물이 없습니다." description="띄어쓰기 없이 이름 전체 또는 일부를 다시 입력해 보세요." />}
                 </div>
-                <footer className="border-t border-slate-100 bg-slate-50 px-5 py-3 text-[11px] text-slate-500">
-                  학생 기록은 확인된 동일인 정보나 이름·생년월일·부서·진급 이력을 기준으로 연결합니다. 연결 근거가 부족하면 같은 사람의 기록도 따로 표시될 수 있습니다.
+                <footer className={styles.footer}>
+                  <span>이름을 선택하면 연도별 기록을 볼 수 있어요.</span>
+                  <details><summary>기록 연결 기준</summary><p>학생 기록은 확인된 동일인 정보나 이름·생년월일·부서·진급 이력을 기준으로 연결합니다. 연결 근거가 부족하면 같은 사람의 기록도 따로 표시될 수 있습니다.</p></details>
                 </footer>
               </>
             )}
@@ -154,11 +166,12 @@ export default function PortalSearch() {
   );
 }
 
-function SearchState({ title, description }: { title: string; description: string }) {
+function SearchState({ title, description, children }: { title: string; description: string; children?: React.ReactNode }) {
   return (
-    <div className="px-5 py-14 text-center">
-      <p className="text-sm font-semibold text-slate-700">{title}</p>
-      <p className="mt-1.5 text-xs text-slate-400">{description}</p>
+    <div className={styles.emptyState} role="status">
+      <p>{title}</p>
+      <span>{description}</span>
+      {children}
     </div>
   );
 }
@@ -170,7 +183,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
 
   return (
     <>
-      <header className="flex items-start gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+      <header className={`${styles.detailHeader} flex items-start gap-3`}>
         <button type="button" onClick={onBack} className="compact-icon-control mt-0.5 shrink-0 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" aria-label="검색 결과로 돌아가기"><ArrowLeft aria-hidden="true" size={17} weight="bold" /></button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -180,7 +193,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
           </div>
           <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"} · 연결된 기록 {profile.records.length}건</p>
         </div>
-        <button type="button" onClick={onClose} className="min-h-10 rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100">ESC</button>
+        <button type="button" onClick={onClose} className={styles.closeButton} aria-label="인물 검색 닫기"><X aria-hidden="true" size={20} /></button>
       </header>
       <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
         {profile.ambiguous && (
@@ -224,7 +237,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
           <p className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-xs text-slate-400">표시할 연도별 기록이 없습니다.</p>
         )}
       </div>
-      <footer className="border-t border-slate-100 bg-white px-5 py-3 text-[11px] text-slate-500">
+      <footer className={styles.footer}>
         표시 내용은 검색 창을 열 때 현재 DB를 조회해 묶은 결과이며, 이 화면에서 데이터는 수정되지 않습니다.
       </footer>
     </>

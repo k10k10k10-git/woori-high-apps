@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
 import type { SharedCalendarItem } from "./SharedMinistryCalendar";
 
-const mocks = vi.hoisted(() => ({ uid: "home-user", loading: false, router: { replace: vi.fn() }, semesters: vi.fn(), sessions: vi.fn(), milestones: vi.fn(), retreats: vi.fn(), periods: vi.fn(), unsubscribe: vi.fn(), retryRoles: vi.fn(), roleError: false, roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles }));
+const mocks = vi.hoisted(() => ({ saveMilestone: vi.fn(), uid: "home-user", loading: false, router: { replace: vi.fn() }, semesters: vi.fn(), sessions: vi.fn(), milestones: vi.fn(), retreats: vi.fn(), periods: vi.fn(), unsubscribe: vi.fn(), retryRoles: vi.fn(), roleError: false, roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router }));
 vi.mock("@/context/AuthContext", () => {
   const user = { get uid() { return mocks.uid; } };
@@ -17,7 +17,7 @@ vi.mock("@/features/semester/db", () => ({
 vi.mock("@/lib/db", () => ({
   subscribeToRetreats: mocks.retreats, subscribeToAllRetreatPeriods: mocks.periods,
   subscribeToMilestones: mocks.milestones,
-  deleteMilestone: vi.fn(), saveMilestone: vi.fn(), updateMilestone: vi.fn(),
+  deleteMilestone: vi.fn(), saveMilestone: mocks.saveMilestone, updateMilestone: vi.fn(),
 }));
 vi.mock("./SharedMinistryCalendar", async (importOriginal) => ({
   ...await importOriginal<typeof import("./SharedMinistryCalendar")>(),
@@ -215,4 +215,36 @@ it("다시 불러오기를 누른 뒤 해제된 목록 응답은 최신 목록�
   expect(screen.getByText("2026년 최신 합성 행사")).toBeInTheDocument();
   expect(screen.queryByText("2026년 이전 합성 행사")).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "다시 불러오기" })).not.toBeInTheDocument();
+});
+
+
+it("공유 일정 저장 연타는 한 번만 기록하고 실패하면 입력과 재시도를 유지한다", async () => {
+  let rejectSave!: (error: Error) => void;
+  mocks.saveMilestone.mockImplementationOnce(() => new Promise((_, reject) => { rejectSave = reject; }));
+  render(<PortalHome />);
+  act(() => {
+    mocks.milestones.mock.calls[0][0]([]);
+    mocks.retreats.mock.calls[0][0]([]);
+    mocks.semesters.mock.calls[0][0]([]);
+    mocks.periods.mock.calls.at(-1)![1]([]);
+  });
+  fireEvent.click(screen.getByText("전체 일정 보기·관리"));
+  fireEvent.click(screen.getByRole("button", { name: "합성 일정 추가" }));
+  const input = screen.getByPlaceholderText("예: 사역팀 모임 준비");
+  fireEvent.change(input, { target: { value: "한 번만 저장" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(mocks.saveMilestone).toHaveBeenCalledTimes(1);
+  const dialog = screen.getByRole("dialog", { name: "공유 일정 추가" });
+  expect(within(dialog).getByRole("button", { name: "저장 중…" })).toBeDisabled();
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(dialog).toBeInTheDocument();
+  await act(async () => rejectSave(new Error("sensitive service error")));
+  expect(input).toHaveValue("한 번만 저장");
+  expect(within(dialog).getByRole("alert")).toHaveTextContent("입력한 내용은 유지됩니다");
+  expect(dialog).not.toHaveTextContent("sensitive service error");
+  mocks.saveMilestone.mockResolvedValueOnce("saved");
+  await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "저장" })));
+  expect(mocks.saveMilestone).toHaveBeenCalledTimes(2);
+  expect(screen.queryByRole("dialog", { name: "공유 일정 추가" })).not.toBeInTheDocument();
 });

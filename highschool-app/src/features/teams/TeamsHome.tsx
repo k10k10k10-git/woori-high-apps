@@ -20,7 +20,7 @@ export default function TeamsHome() {
 
   return <main className="team-first-page">
     <header className="team-first-page-header">
-      <div><h1>팀</h1><p>학기가 바뀌어도 같은 팀 공간에서 명단, 출석, 자료와 주간 업무를 이어갑니다. 모든 팀 메뉴가 보이며, 내용은 담당 권한에 따라 열립니다.</p></div>
+      <div><h1>사역팀</h1><p>팀을 선택해 학기 명단과 출석, 주일 업무를 이어가세요.</p></div>
       <span className="team-first-count">{SUNDAY_MINISTRY_TEAMS.length}개 팀</span>
     </header>
     {keys.length === 0 && <section className="team-first-empty is-compact"><UsersThree size={24} aria-hidden="true" /><h2>{hasApprovedRole ? "담당 팀 연결이 필요합니다" : "접근 승인이 필요합니다"}</h2><p>{hasApprovedRole ? "사용할 수 있는 역할은 확인됐지만 이 계정에 담당 팀이 연결되지 않았습니다." : "로그인은 완료됐지만 사용할 역할과 담당 팀이 아직 연결되지 않았습니다."}</p><p>교역자 또는 통합관리자에게 로그인 이메일과 담당 팀 이름을 알려 주세요. 담당자가 운영센터의 계정·권한에서 확인할 수 있습니다.</p><Link className="btn-secondary" href="/library/help#access">승인·팀 연결 방법 보기</Link><Link className="btn-secondary" href="/help/feedback">연결 문제 문의하기</Link></section>}

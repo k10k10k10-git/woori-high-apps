@@ -115,6 +115,6 @@ function LibraryForUser({ roles, teamMemberships, onRetry }: { roles: MinistryRo
       })}</ul>}
     </section>
 
-    <section className={styles.events} aria-labelledby="library-events-heading"><CalendarBlank size={21} aria-hidden="true" /><div><h2 id="library-events-heading">수련회 자료</h2><p>행사를 선택하면 해당 수련회의 준비·프로그램·현장 기록을 볼 수 있습니다.</p></div><Link href="/events">행사 선택 <ArrowRight size={16} aria-hidden="true" /></Link></section>
+    <section className={styles.events} aria-labelledby="library-events-heading"><CalendarBlank size={21} aria-hidden="true" /><div><h2 id="library-events-heading">수련회 자료</h2><p>수련회를 선택하면 해당 수련회의 준비·프로그램·현장 기록을 볼 수 있습니다.</p></div><Link href="/events">수련회 선택 <ArrowRight size={16} aria-hidden="true" /></Link></section>
   </main>;
 }

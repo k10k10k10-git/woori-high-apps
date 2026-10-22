@@ -213,10 +213,10 @@ describe("현장 데이터 다시 불러오기", () => {
     view.rerender(<FieldHomeClient />);
     expect(screen.queryByTestId("selected-retreat")).not.toBeInTheDocument();
     act(() => mocks.retreats.mock.calls.at(-1)![0](list));
-    expect(screen.getByTestId("selected-retreat")).toHaveTextContent("first");
+    expect(screen.getByTestId("selected-retreat")).toBeEmptyDOMElement();
   });
 
-  it("재시도 뒤 선택 수련회가 목록에서 사라졌으면 유효한 첫 수련회를 선택한다", () => {
+  it("재시도 뒤 선택 수련회가 사라졌으면 다른 수련회를 임의로 선택하지 않는다", () => {
     const list = [{ id: "first", name: "첫 수련회", year: 2026 }, { id: "second", name: "두 번째 수련회", year: 2026 }];
     render(<FieldHomeClient />);
     act(() => mocks.retreats.mock.calls[0][0](list));
@@ -224,7 +224,7 @@ describe("현장 데이터 다시 불러오기", () => {
     act(() => mocks.locks.mock.calls.at(-1)![2](new Error("연결 실패")));
     fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
     act(() => mocks.retreats.mock.calls.at(-1)![0]([list[0]]));
-    expect(screen.getByTestId("selected-retreat")).toHaveTextContent("first");
+    expect(screen.getByTestId("selected-retreat")).toBeEmptyDOMElement();
   });
 });
 

@@ -95,6 +95,20 @@ function PostSubEntries({
   const [itemName, setItemName] = useState("");
   const [roleName, setRoleName] = useState("");
   const budget = programBudget(items);
+  const addItem = () => {
+    if (!itemName.trim() || busyId) return;
+    void run("create-item", async () => {
+      await onCreateItem(itemName.trim(), items.length + 1, post.id);
+      setItemName("");
+    }, "준비물을 추가하지 못했습니다.");
+  };
+  const addRole = () => {
+    if (!roleName.trim() || busyId) return;
+    void run("create-role", async () => {
+      await onCreateRole(roleName.trim(), roles.length + 1, post.id);
+      setRoleName("");
+    }, "역할을 추가하지 못했습니다.");
+  };
 
   return (
     <div className="program-post-subs">
@@ -105,11 +119,11 @@ function PostSubEntries({
         </div>
         {canEdit && (
           <div className="program-inline-form">
-            <input id={`program-item-add-${post.id}`} className="input" value={itemName} maxLength={80} placeholder="예: 줄자"
+            <input id={`program-item-add-${post.id}`} className="input" aria-label="활동 준비물 이름" disabled={busyId !== null} value={itemName} maxLength={80} placeholder="예: 줄자"
               onChange={(event) => setItemName(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (itemName.trim()) { void onCreateItem(itemName.trim(), items.length + 1, post.id); setItemName(""); } } }} />
-            <button type="button" className="btn-secondary btn-sm" disabled={!itemName.trim()}
-              onClick={() => { void onCreateItem(itemName.trim(), items.length + 1, post.id); setItemName(""); }}>
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} />
+            <button type="button" className="btn-secondary btn-sm" disabled={busyId !== null || !itemName.trim()}
+              onClick={addItem}>
               <Plus aria-hidden="true" size={15} /> 추가
             </button>
           </div>
@@ -171,11 +185,11 @@ function PostSubEntries({
         </div>
         {canEdit && (
           <div className="program-inline-form">
-            <input id={`program-role-add-${post.id}`} className="input" value={roleName} maxLength={80} placeholder="예: 진행 / 점수 기록"
+            <input id={`program-role-add-${post.id}`} className="input" aria-label="활동 역할 이름" disabled={busyId !== null} value={roleName} maxLength={80} placeholder="예: 진행 / 점수 기록"
               onChange={(event) => setRoleName(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); if (roleName.trim()) { void onCreateRole(roleName.trim(), roles.length + 1, post.id); setRoleName(""); } } }} />
-            <button type="button" className="btn-secondary btn-sm" disabled={!roleName.trim()}
-              onClick={() => { void onCreateRole(roleName.trim(), roles.length + 1, post.id); setRoleName(""); }}>
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addRole(); } }} />
+            <button type="button" className="btn-secondary btn-sm" disabled={busyId !== null || !roleName.trim()}
+              onClick={addRole}>
               <Plus aria-hidden="true" size={15} /> 추가
             </button>
           </div>
@@ -440,11 +454,13 @@ export function ProgramPostsSection({
 
   async function add() {
     const trimmed = name.trim();
-    if (!trimmed) return;
+    if (!trimmed || adding) return;
     setAdding(true);
     try {
       await onCreate(trimmed, posts.length + 1);
       setName("");
+    } catch {
+      toast("활동을 추가하지 못했습니다. 입력한 이름은 유지됩니다. 다시 시도해 주세요.", "error");
     } finally {
       setAdding(false);
     }
@@ -497,7 +513,7 @@ export function ProgramPostsSection({
         <><div className="program-inline-form">
           <label className="program-field program-field--wide">
             <span>활동 이름</span>
-            <input id="program-new-block-name" className="input" value={name} maxLength={80} placeholder="예: 전체 오프닝 / 물코기 / 코스 이동"
+            <input id="program-new-block-name" className="input" disabled={adding} value={name} maxLength={80} placeholder="예: 전체 오프닝 / 물코기 / 코스 이동"
               onChange={(event) => setName(event.target.value)}
               onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void add(); } }} />
           </label>
@@ -729,6 +745,10 @@ export function ProgramRolesSection({
   const { busyId, run } = useRowBusy();
   const undo = useProgramUndo();
   const total = groups.reduce((sum, group) => sum + group.entries.length, 0);
+  const addRole = () => {
+    if (!role.trim() || busyId) return;
+    void run("create-role", async () => { await onCreate(role.trim(), total + 1); setRole(""); }, "역할을 추가하지 못했습니다.");
+  };
 
   return (
     <section className="program-form-section" aria-labelledby="program-roles-heading">
@@ -743,12 +763,12 @@ export function ProgramRolesSection({
         <div className="program-inline-form">
           <label className="program-field program-field--wide">
             <span>프로그램 전체 역할</span>
-            <input className="input" value={role} maxLength={80} placeholder="예: 총괄 / 타임키퍼"
+            <input className="input" disabled={busyId !== null} value={role} maxLength={80} placeholder="예: 총괄 / 타임키퍼"
               onChange={(event) => setRole(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter" && role.trim()) { event.preventDefault(); void onCreate(role.trim(), total + 1); setRole(""); } }} />
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addRole(); } }} />
           </label>
-          <button type="button" className="btn-secondary" disabled={!role.trim()}
-            onClick={() => { void onCreate(role.trim(), total + 1); setRole(""); }}>
+          <button type="button" className="btn-secondary" disabled={busyId !== null || !role.trim()}
+            onClick={addRole}>
             <Plus aria-hidden="true" size={16} /> 추가
           </button>
         </div>
@@ -845,6 +865,10 @@ export function ProgramItemsSection({
   const undo = useProgramUndo();
   const all = groups.flatMap((group) => group.entries);
   const budget = programBudget(all);
+  const addItem = () => {
+    if (!name.trim() || busyId) return;
+    void run("create-item", async () => { await onCreate(name.trim(), all.length + 1); setName(""); }, "준비물을 추가하지 못했습니다.");
+  };
 
   return (
     <section className="program-form-section" aria-labelledby="program-items-heading">
@@ -865,12 +889,12 @@ export function ProgramItemsSection({
         <div className="program-inline-form">
           <label className="program-field program-field--wide">
             <span>프로그램 공통 물품</span>
-            <input className="input" value={name} maxLength={80} placeholder="예: 현수막"
+            <input className="input" disabled={busyId !== null} value={name} maxLength={80} placeholder="예: 현수막"
               onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Enter" && name.trim()) { event.preventDefault(); void onCreate(name.trim(), all.length + 1); setName(""); } }} />
+              onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addItem(); } }} />
           </label>
-          <button type="button" className="btn-secondary" disabled={!name.trim()}
-            onClick={() => { void onCreate(name.trim(), all.length + 1); setName(""); }}>
+          <button type="button" className="btn-secondary" disabled={busyId !== null || !name.trim()}
+            onClick={addItem}>
             <Plus aria-hidden="true" size={16} /> 추가
           </button>
         </div>

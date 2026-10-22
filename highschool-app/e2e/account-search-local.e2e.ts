@@ -1,0 +1,52 @@
+import { expect, test } from "@playwright/test";
+
+for (const theme of ["light", "dark"]) {
+  test(`${theme}: 계정 역할·담당 연결과 검색창의 여백·연도별 기록`, async ({ page }, info) => {
+    const external: string[] = [];
+    const pageErrors: string[] = [];
+    page.on("request", request => { if (!request.url().startsWith("http://127.0.0.1:4179") && !request.url().startsWith("data:")) external.push(request.url()); });
+    page.on("pageerror", error => pageErrors.push(error.message));
+    await page.goto(`/?scenario=actualAccounts&state=admin&theme=${theme}`);
+    await expect(page.getByRole("heading", { name: "계정·권한" })).toBeVisible();
+    const unlinked = page.getByRole("article", { name: "합성 미연결 스탭 계정 권한" });
+    await expect(unlinked.getByText(/담당 팀 연결이 필요합니다/)).toBeVisible();
+    await expect(unlinked.getByRole("combobox", { name: "합성 미연결 스탭 학기 역할" })).toHaveValue("barnabas");
+    await expect(unlinked.getByRole("combobox", { name: "합성 미연결 스탭 바나바팀 담당" })).toHaveValue("");
+    expect((await unlinked.getByRole("combobox", { name: "합성 미연결 스탭 바나바팀 담당" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByText("바나바팀 · 조회 (지정 학기)", { exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`accounts-${theme}.png`), fullPage: true });
+    await page.getByRole("button", { name: "인물 통합검색 열기" }).click();
+    const dialog = page.getByRole("dialog", { name: "인물 통합검색" });
+    const input = dialog.getByRole("textbox", { name: "인물 이름" });
+    await expect(input).toBeFocused();
+    const box = await input.boundingBox();
+    const panel = await dialog.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.y - panel!.y).toBeGreaterThanOrEqual(60);
+    await expect(dialog.getByText("찾고 싶은 사람의 이름을 입력하세요")).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`search-empty-${theme}.png`) });
+    await input.fill("합성학생");
+    await expect(dialog.getByRole("button", { name: /합성학생가 학생/ })).toHaveCount(1);
+    await page.keyboard.press("Control+k");
+    await expect(dialog.getByRole("button", { name: /합성학생가 학생/ })).toBeVisible();
+    await dialog.getByRole("button", { name: /합성학생가 학생/ }).click();
+    await expect(dialog.getByRole("tab", { name: /2026년\s*1건/ })).toHaveAttribute("aria-selected", "true");
+    await dialog.getByRole("tab", { name: /2025년\s*1건/ }).click();
+    await expect(dialog.getByRole("tabpanel", { name: "2025년 기록" })).toContainText("1학년 4반");
+    await page.screenshot({ path: info.outputPath(`search-detail-${theme}.png`) });
+    await page.keyboard.press("Escape");
+    await expect(input).toHaveValue("합성학생");
+    await expect(input).toBeFocused();
+    await dialog.getByRole("button", { name: "검색어 지우기" }).click();
+    await expect(input).toHaveValue("");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+    const proof = await (await page.request.get("/__qa__/proof.json")).json();
+    expect(proof.firebaseRuntimeModules).toEqual([]);
+    expect(proof.rejected).toEqual([]);
+    expect(external).toEqual([]);
+    expect(pageErrors).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}

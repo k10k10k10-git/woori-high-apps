@@ -31,6 +31,7 @@ import {
   ASSIGNABLE_RETREAT_ROLES,
   ASSIGNABLE_SEMESTER_ROLES,
   canManageRolesOf,
+  canManageAnnualFinance,
   hasAnyMinistryRole,
   isRetreatDowngrade,
   isRetreatUpgrade,
@@ -55,9 +56,14 @@ import { SUNDAY_MINISTRY_TEAMS, type SundayTeamKey } from "./featureCatalog";
 import {
   TEAM_MEMBERSHIP_ROLE_LABELS,
   mergeTeamMemberships,
+  activeTeamKeys,
+  canAccessEveryTeam,
+  canAccessTeam,
+  canEditTeam,
   type TeamMembershipRole,
   type TeamMemberships,
 } from "@/features/teams/teamModel";
+import styles from "./teamAccounts.module.css";
 
 type TeamMember = {
   uid: string;
@@ -97,6 +103,14 @@ const RETREAT_CHIP: Record<RetreatRole, string> = {
 
 function memberLabel(member: { name: string; email: string }) {
   return member.name || member.email || "이름 미설정";
+}
+
+/** 표시 안내도 현재 팀 연결 판정에 맞춘다. 저장된 기본 역할을 팀 연결로 추정하지 않는다. */
+function semesterAccessHint(role: SemesterRole) {
+  if (role === "leader") return "담당 팀을 연결하면 해당 팀을 운영합니다. 다른 팀의 학기 기록은 조회할 수 있습니다.";
+  if (role === "adminTeam") return "행정 업무를 운영합니다. 다른 팀 업무는 별도 담당 연결이 필요합니다.";
+  if (["barnabas", "worship", "praise", "media", "design", "staff"].includes(role)) return "실제 팀 업무는 아래 담당 사역팀 연결과 팀 내 역할에 따라 열립니다.";
+  return SEMESTER_ROLE_HINTS[role];
 }
 
 type TeamModalProps = { onClose?: () => void; embedded?: boolean };
@@ -305,7 +319,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
 
   async function changeTeamMembership(member: TeamMember, teamKey: SundayTeamKey, role: TeamMembershipRole | null) {
     const next: TeamMemberships = { ...member.teamMemberships };
-    if (role) next[teamKey] = { role, active: true };
+    if (role) next[teamKey] = { ...next[teamKey], role, active: true };
     else delete next[teamKey];
     await run(member.uid, async () => {
       const writes: Promise<void>[] = [];
@@ -399,7 +413,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
         {!embedded && <header className="sticky top-0 z-10 flex items-start justify-between border-b border-slate-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div>
             <h2 className="text-xl font-bold text-slate-900">팀원 관리</h2>
-            <p className="mt-1 text-xs text-slate-500">학기 역할은 학기·주일 화면에, 방학 역할은 수련회 행정·현장 화면에 적용됩니다.</p>
+            <p className="mt-1 text-xs text-slate-500">기본 권한과 담당 사역팀을 확인하고 배정합니다.</p>
           </div>
           <button onClick={onClose} className="compact-icon-control rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200" aria-label="닫기"><X aria-hidden="true" size={18} weight="bold" /></button>
         </header>}
@@ -427,7 +441,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
               {ASSIGNABLE_SEMESTER_ROLES.filter((role) => role !== "none").map((role) => (
                 <div key={role} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2">
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold leading-none ${SEMESTER_CHIP[role]}`}>{SEMESTER_ROLE_LABELS[role]}</span>
-                  <span className="text-[11px] leading-snug text-slate-500">{SEMESTER_ROLE_HINTS[role]}</span>
+                  <span className="text-[11px] leading-snug text-slate-500">{semesterAccessHint(role)}</span>
                   <span className="ml-auto shrink-0 text-xs font-bold text-slate-400">{semesterCounts.get(role) ?? 0}명</span>
                 </div>
               ))}
@@ -536,7 +550,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="font-bold text-slate-800">승인된 팀원</h3>
-                <p className="mt-1 text-xs text-slate-400">학기 역할군 순으로 묶어 보여줍니다. 역할을 바꾸면 이전 권한은 자동으로 정리됩니다.</p>
+                <p className="mt-1 text-xs text-slate-500">기본 권한은 사이트 이용 범위, 담당 사역팀은 실제로 맡은 팀입니다.</p>
               </div>
               <label className="team-member-search">
                 <span className="sr-only">팀원 검색</span>
@@ -560,9 +574,12 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                   </div>
                   {group.list.map((member) => {
                     const isMe = member.uid === user?.uid;
+                    const linkedTeams = activeTeamKeys(member.teamMemberships);
+                    const allTeams = canAccessEveryTeam(member.roles);
+                    const availableTeams = SUNDAY_MINISTRY_TEAMS.filter((team) => canAccessTeam(team.key, member.roles, member.teamMemberships));
                     return (
-                      <div key={member.uid} className="team-member-card rounded-xl border border-slate-200 p-3">
-                        <div className="min-w-0">
+                      <article key={member.uid} className={styles.memberCard} aria-label={`${memberLabel(member)} 계정 권한`}>
+                        <div className={styles.identity}>
                           {editingUid === member.uid ? (
                             <div className="flex gap-2">
                               <input className="input min-w-0 flex-1 text-sm" value={draftName} onChange={(event) => setDraftName(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void saveName(member)} autoFocus aria-label="표시 이름" />
@@ -574,9 +591,6 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <p className="truncate font-semibold leading-6 text-slate-800">{memberLabel(member)}</p>
                                 {isMe && <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[11px] leading-none text-slate-500">나</span>}
-                                <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold leading-none ${member.roles.semester === "none" ? RETREAT_CHIP[member.roles.retreat] : SEMESTER_CHIP[member.roles.semester]}`}>
-                                  {roleBadgeLabel(member.roles)}
-                                </span>
                                 {(member.admin || member.iguard) && (
                                   <button onClick={() => { setEditingUid(member.uid); setDraftName(member.name); }} className="text-[11px] text-slate-400 underline">이름 수정</button>
                                 )}
@@ -584,20 +598,20 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                                   <button
                                     onClick={() => void removeMember(member)}
                                     disabled={busyUid === member.uid}
-                                    className="text-[11px] text-slate-400 underline hover:text-red-500 disabled:opacity-50"
+                                    className="text-xs text-slate-500 underline hover:text-red-500 disabled:opacity-50"
                                   >
                                     팀원 삭제
                                   </button>
                                 )}
                               </div>
                               {/* admins 노드에는 이메일이 없다 — 본인 계정이면 로그인 정보로 보완한다 */}
-                              <p className="truncate text-xs text-slate-400">{member.email || (isMe ? user?.email ?? member.uid : member.uid)}</p>
+                              <p className={styles.email}>{member.email || (isMe ? user?.email ?? "이메일 정보 없음" : "이메일 정보 없음")}</p>
                             </>
                           )}
                         </div>
-                        <div className="team-member-roles mt-3 flex flex-wrap gap-2">
-                          <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
-                            학기 역할
+                        <div className={styles.baseRoles}>
+                          <label className={styles.roleField}>
+                            학기 기본 권한
                             <select
                               className="input text-xs"
                               aria-label={`${memberLabel(member)} 학기 역할`}
@@ -609,9 +623,10 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                                 <option key={role} value={role}>{SEMESTER_ROLE_LABELS[role]}</option>
                               ))}
                             </select>
+                            <span className={styles.fieldHint}>{semesterAccessHint(member.roles.semester)}</span>
                           </label>
-                          <label className="min-w-0 flex-1 text-[11px] font-semibold text-slate-500">
-                            방학 역할
+                          <label className={styles.roleField}>
+                            수련회 기본 권한
                             <select
                               className="input text-xs"
                               aria-label={`${memberLabel(member)} 방학 역할`}
@@ -623,24 +638,32 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
                                 <option key={role} value={role}>{RETREAT_ROLE_LABELS[role]}</option>
                               ))}
                             </select>
+                            <span className={styles.fieldHint}>{RETREAT_ROLE_HINTS[member.roles.retreat]}</span>
                           </label>
                         </div>
-                        <fieldset className="mt-3 border-t border-slate-100 pt-3">
-                          <legend className="mb-2 text-[11px] font-semibold text-slate-500">담당 팀과 팀 내 역할</legend>
-                          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        <section className={styles.accessSummary} aria-label="현재 사역팀 접근 범위">
+                          <strong>현재 이용할 수 있는 사역팀</strong>
+                          {allTeams ? <p>전체 사역팀 조회·수정</p>
+                            : availableTeams.length > 0 ? <ul>{availableTeams.map((team) => <li key={team.key}>{team.label} · {canEditTeam(team.key, member.roles, member.teamMemberships) || (team.key === "admin" && canManageAnnualFinance(member.roles)) ? "조회·수정" : "조회"}{member.teamMemberships[team.key]?.semesters ? " (지정 학기)" : ""}</li>)}</ul>
+                            : <p className={styles.needsLink}>담당 팀 연결이 필요합니다. 기본 권한만으로는 사역팀 업무가 열리지 않습니다.</p>}
+                        </section>
+                        <fieldset className={styles.memberships}>
+                          <legend>담당 사역팀 <span>{linkedTeams.length > 0 ? `${linkedTeams.length}개 연결` : "연결된 팀 없음"}</span></legend>
+                          <p className={styles.membershipHint}>{allTeams ? "전체 운영 권한은 담당 팀 연결과 관계없이 유지됩니다." : "맡은 팀에서 팀장·운영자·스탭·조회자 중 하나를 지정합니다."}</p>
+                          <div className={styles.membershipGrid}>
                             {SUNDAY_MINISTRY_TEAMS.map((team) => {
                               const membership = member.teamMemberships[team.key];
-                              return <label key={team.key} className="team-membership-editor">
+                              return <label key={team.key} className={`${styles.membershipEditor} ${membership ? styles.connected : ""}`}>
                                 <span>{team.label}</span>
-                                <select aria-label={`${memberLabel(member)} ${team.label} 담당`} value={membership?.role ?? ""} disabled={!canManage || isMe || busyUid === member.uid || member.mainAdmin} onChange={(event) => void changeTeamMembership(member, team.key, (event.target.value || null) as TeamMembershipRole | null)}>
-                                  <option value="">미연결</option>
+                                <select className="input" aria-label={`${memberLabel(member)} ${team.label} 담당`} value={membership?.role ?? ""} disabled={!canManage || isMe || busyUid === member.uid || member.mainAdmin} onChange={(event) => void changeTeamMembership(member, team.key, (event.target.value || null) as TeamMembershipRole | null)}>
+                                  <option value="">담당 아님</option>
                                   {Object.entries(TEAM_MEMBERSHIP_ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                                 </select>
                               </label>;
                             })}
                           </div>
                         </fieldset>
-                      </div>
+                      </article>
                     );
                   })}
                 </div>

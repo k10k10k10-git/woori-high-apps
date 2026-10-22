@@ -323,11 +323,35 @@ it("편집 중 준비 메뉴를 바꿀 때 초안 보호를 유지하고 취소�
   render(<ProgramPreparationClient />);
   act(deliverAll);
   fireEvent.change(screen.getByRole("textbox", { name: "작성 중인 초안" }), { target: { value: "계속 작성할 초안" } });
-  fireEvent.click(screen.getByRole("tab", { name: /전체 준비/ }));
+  fireEvent.change(screen.getByRole("combobox", { name: "수련회 프로그램 준비 메뉴" }), { target: { value: "overview" } });
   expect(screen.getByRole("dialog", { name: "저장하지 않은 변경" })).toBeInTheDocument();
   expect(push).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.getByRole("textbox", { name: "작성 중인 초안" })).toHaveValue("계속 작성할 초안");
   expect(push).not.toHaveBeenCalled();
+});
+
+it("수련회를 고른 다음에는 프로그램 목록부터 열고 전체 수련회 도구는 별도 선택한다", () => {
+  mocks.query = "from=events";
+  render(<ProgramPreparationClient />);
+  act(deliverAll);
+  expect(screen.getByRole("heading", { name: "프로그램 준비" })).toBeInTheDocument();
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  expect(screen.getByRole("combobox", { name: "수련회 프로그램 준비 메뉴" })).toHaveValue("programs");
+  expect(screen.queryByRole("tab", { name: "전체 준비" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "작성 중인 초안" })).not.toBeInTheDocument();
+});
+
+it("다른 프로그램 선택은 작성 중인 본문을 버리기 전에 확인하고 취소하면 선택도 유지한다", () => {
+  const push = vi.spyOn(window.history, "pushState");
+  render(<ProgramPreparationClient />);
+  act(deliverAll);
+  fireEvent.change(screen.getByRole("textbox", { name: "작성 중인 초안" }), { target: { value: "두 번째 프로그램 초안" } });
+  fireEvent.change(screen.getByRole("combobox", { name: "준비할 프로그램" }), { target: { value: "first" } });
+  expect(screen.getByRole("dialog", { name: "저장하지 않은 변경" })).toBeInTheDocument();
+  expect(push).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "계속 작성" }));
+  expect(screen.getByRole("combobox", { name: "준비할 프로그램" })).toHaveValue("second");
+  expect(screen.getByRole("textbox", { name: "작성 중인 초안" })).toHaveValue("두 번째 프로그램 초안");
 });
