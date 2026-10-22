@@ -190,3 +190,11 @@ it("중앙 행정 역할은 별도 팀 배정이 없어도 행정 회계를 열 
   expect(screen.getByTestId("finance")).toBeInTheDocument();
   expect(state.changes).not.toHaveBeenCalled();
 });
+
+it("별도 배정 없는 중앙 행정 계정의 기존 주일 업무 주소는 행정팀으로 바로 연다", () => {
+  state.roles = { semester: "adminTeam", retreat: "none" };
+  state.teamMemberships = {};
+  render(<SundayMinistryClient />);
+  expect(screen.getByLabelText("현재 팀·팀 변경")).toHaveValue("admin");
+  expect(screen.getByRole("tab", { name: "출석부" })).toHaveAttribute("aria-selected", "true");
+});

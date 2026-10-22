@@ -99,7 +99,7 @@ function SundayMinistryClientContent({ team, initialTab, workspaceId }: { team?:
     && (item.key !== "admin" || canSearchOfficialRoster));
   const matchingTeams = accessibleTeams.filter((item) => teamHasTab(item.key, initialTab));
   const tabTeam = matchingTeams.length === 1 ? matchingTeams[0] : undefined;
-  const landingTeam = ownSundayTeam(roles, assignedTeamKeys) ?? SUNDAY_MINISTRY_DEFAULT_TEAM;
+  const landingTeam = ownSundayTeam(roles, assignedTeamKeys) ?? (accessibleTeams.length === 1 ? accessibleTeams[0].key : SUNDAY_MINISTRY_DEFAULT_TEAM);
   const teamMeta = sundayTeamOf(team) ?? tabTeam ?? sundayTeamOf(landingTeam)!;
   const teamChooser = team === undefined && !tabTeam && ownSundayTeam(roles, assignedTeamKeys) === null && accessibleTeams.length > 1;
   // 행정팀 주일 화면은 연간 학생·출석 원장과 새친구 비공개 원장을 읽는다.
