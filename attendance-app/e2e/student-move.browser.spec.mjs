@@ -189,7 +189,7 @@ test('목적지에 같은 인물이 있으면 중복 이동을 차단한다', as
   expect((await request.put(url(`classes/${year}/1-1-7/students/S17_05`), { headers, data: source })).ok()).toBe(true);
   await openMove(page);
   await confirmMove(page);
-  await expect(page.getByText('같은 인물의 학생이 목적지에 이미 있습니다. 중복 명단을 먼저 확인해 주세요.')).toBeVisible();
+  await expect(page.getByText('같은 학생으로 확인되는 명단이 목적지에 이미 있습니다. 기존 명단과 출석은 유지했으니 중복 여부를 먼저 확인해 주세요.')).toBeVisible();
   expect(await read(request, `classes/${year}/2-1-7/students/S17_05`)).toEqual(source);
   expect(await read(request, `attendance/${year}/1-1-7/S17_05`)).toEqual({ '0-0': 'X' });
 });

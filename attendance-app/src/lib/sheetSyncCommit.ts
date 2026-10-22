@@ -2,7 +2,7 @@ import { auth } from '@/lib/firebase/client';
 import { db, get, ref, syncProtocolDb, onDisconnect } from '@/lib/db';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 import { sameStoredValue } from '@/utils/studentPersistence';
-import { patchStudentMoveOnce } from '@/utils/studentMoveRequest';
+import { patchStudentMoveOnce, readStudentMoveValue } from '@/utils/studentMoveRequest';
 
 /** 기존 반 이동 잠금 계약을 재사용한다. 소유 UID의 일반 쓰기도 Rules에서 차단한다. */
 export function claimSyncLocks(current: Record<string, unknown> | null, keys: string[], uid: string, operation: string, startedAt: number) {
@@ -35,11 +35,15 @@ async function commitLockedSheetSync(input: {
   const disconnect = onDisconnect(lockRef);
   let acquired = false, uncertain = false;
   async function checkFresh() {
+    const read = (path: string) => readStudentMoveValue({
+      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken: token,
+      path, isCurrent: () => auth.currentUser === user,
+    });
     const [classes, attendance] = await Promise.all([
-      get(ref(db, 'classes')), get(ref(db, `attendance/${input.year}`)),
+      read('classes'), read(`attendance/${input.year}`),
     ]);
-    if (!sameStoredValue(classes.val() ?? {}, input.classes)
-      || !sameStoredValue(attendance.val() ?? {}, input.attendance)) {
+    if (!sameStoredValue(classes ?? {}, input.classes)
+      || !sameStoredValue(attendance ?? {}, input.attendance)) {
       throw new Error('미리보기 이후 명단·출석이 변경되었습니다. 다시 미리보기해 주세요.');
     }
   }

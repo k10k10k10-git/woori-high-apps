@@ -118,6 +118,42 @@ it('확인한 원래 학생과 출석만 한 번 이동하고 목적지 반을 �
   expect(m.toast).toHaveBeenCalledWith(expect.any(String), 'success');
 });
 
+it.each([
+  { personId: source.personId, name: '합성 학생', birth: undefined },
+  { personId: 'person_student_B', name: '합성 학생', birth: '2008. 1. 1' },
+  { personId: 'person_student_B', name: '합성 학생', phone: '010-1234-5678' },
+])('목적지의 동일인이 %j이면 ID가 달라도 이동하지 않고 명단·출석을 보존한다', async duplicate => {
+  const state = m.state as AppState;
+  m.source = { ...source, phone: '01012345678' };
+  m.state = { ...state, classData: { ...state.classData, '1-3-1': { teacher: '출발 담임', students: [m.source as Student] } } };
+  const originalRead = m.read.getMockImplementation()!;
+  const destination = { teacher: '도착 담임', students: { other: { id: 'other', ...duplicate } } };
+  m.read.mockImplementation((input: { path: string }) => input.path === 'classes/2026/1-3-2' ? destination : originalRead(input));
+  const before = structuredClone({ state: m.state, source: m.source, destination });
+  render(<MoveStudentModal target={target} onClose={m.close} />);
+  reviewMove();
+  await act(async () => { confirmMove(); });
+  expect(m.patch).not.toHaveBeenCalled();
+  expect({ state: m.state, source: m.source, destination }).toEqual(before);
+  expect(m.lock).toBeNull();
+  expect(m.dispatch).not.toHaveBeenCalled();
+  expect(m.close).not.toHaveBeenCalled();
+  expect(m.toast).toHaveBeenCalledWith(expect.stringContaining('중복 여부'));
+});
+
+it('이름만 같은 별도 학생은 이동할 수 있고 목적지의 기존 학생을 쓰지 않는다', async () => {
+  const originalRead = m.read.getMockImplementation()!;
+  const other = { id: 'other', name: source.name, personId: 'person_student_B', birth: '2008-02-02' };
+  m.read.mockImplementation((input: { path: string }) => input.path === 'classes/2026/1-3-2'
+    ? { teacher: '도착 담임', students: { other } } : originalRead(input));
+  render(<MoveStudentModal target={target} onClose={m.close} />);
+  reviewMove(); confirmMove();
+  await waitFor(() => expect(m.close).toHaveBeenCalledOnce());
+  expect(m.patch).toHaveBeenCalledOnce();
+  expect(m.patch.mock.calls[0][0].payload['classes/2026/1-3-2/students/other']).toBeUndefined();
+  expect(other).toEqual({ id: 'other', name: source.name, personId: 'person_student_B', birth: '2008-02-02' });
+});
+
 it('이동 내용을 확인한 뒤 같은 SID·이름의 다른 인물로 바뀌어도 그 학생을 이동하지 않는다', async () => {
   const view = render(<MoveStudentModal target={target} onClose={m.close} />);
   reviewMove();

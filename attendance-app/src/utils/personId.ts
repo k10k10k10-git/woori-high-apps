@@ -6,7 +6,7 @@ export function createPersonId(kind: PersonKind, randomUUID = () => globalThis.c
 
 const text = (value: unknown) => typeof value === 'string' ? value.trim() : '';
 const digits = (value: unknown) => text(value).replace(/\D/g, '');
-const normalizeName = (value: unknown) => text(value).replace(/^\d+/, '').replace(/\s+/g, '').replace(/^(.+[가-힣])[A-Z]$/, '$1');
+export const normalizeName = (value: unknown) => text(value).replace(/^\d+/, '').replace(/\s+/g, '').replace(/^(.+[가-힣])[A-Z]$/, '$1');
 
 type HistoricalRecord = { name?: unknown; birth?: unknown; phone?: unknown; personId?: unknown };
 type HistoricalStudentRecord = HistoricalRecord & { year: number; classKey: string; bu: number; grade: number };

@@ -2,6 +2,7 @@ import { db, onValue, ref } from '@/lib/db';
 import { auth } from '@/lib/firebase/client';
 import { buildAdminChangeEntry } from '@/utils/adminChange';
 import { sameStoredValue } from '@/utils/studentPersistence';
+import { findStudentDuplicates, type DuplicateRoster } from '@/utils/studentDuplicates';
 import { createStudentMoveLockTransaction } from '@/utils/studentMoveLockRequest';
 import { patchStudentMoveOnce, readStudentMoveValue } from '@/utils/studentMoveRequest';
 import { awaitStudentMoveStep } from '@/utils/studentMoveStep';
@@ -61,17 +62,23 @@ function restoredValue(input: RosterRestoreInput, permanentDelete: boolean): { c
 }
 
 function rejectDuplicateStudents(students: Student[], yearValue: Record<string, unknown>) {
-  const existing = Object.values(yearValue).flatMap(value => object(value) && object(value.students) ? Object.values(value.students).filter(object) : []);
-  const seen = new Set<string>();
-  for (const student of students) {
-    if (student.personId) {
-      if (seen.has(student.personId) || existing.some(value => value.personId === student.personId)) {
-        throw new Error('같은 학생이 현재 명단에 이미 있습니다. 다른 반으로 이동했는지 확인해 주세요.');
-      }
-      seen.add(student.personId);
-    } else if (existing.some(value => typeof value.name === 'string' && value.name.trim() === student.name.trim())) {
+  const roster: DuplicateRoster = Object.fromEntries(Object.entries(yearValue).map(([classKey, value]) => [classKey, {
+    students: object(value) && object(value.students)
+      ? Object.fromEntries(Object.entries(value.students).filter(([, student]) => object(student))) as Record<string, Student> : {},
+  }]));
+  // 서버 명단뿐 아니라 같은 반 삭제본 안의 후보끼리도 순서대로 검사한다. 원본은 변경하지 않는다.
+  const pending: Record<string, Student> = {};
+  roster[RESTORE_LOCK] = { students: pending };
+  for (const [index, student] of students.entries()) {
+    const duplicates = findStudentDuplicates(student, roster);
+    if (duplicates.some(match => match.strong)) {
+      throw new Error('같은 학생이 현재 명단에 이미 있습니다. 복원 묶음의 중복 또는 다른 반으로 이동했는지 확인해 주세요.');
+    }
+    // 영구 ID 없는 삭제본의 기존 보수적 복원 계약은 유지한다. 신규 등록·이동의 동명이인은 막지 않는다.
+    if (!student.personId && duplicates.some(match => typeof match.student.name === 'string' && match.student.name.trim() === student.name.trim())) {
       throw new Error('영구 인물 ID가 없는 동명 학생이 현재 명단에 있습니다. 동일인 여부를 먼저 확인해 주세요.');
     }
+    pending[String(index)] = student;
   }
 }
 

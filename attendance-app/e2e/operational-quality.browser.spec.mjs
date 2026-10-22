@@ -265,7 +265,8 @@ test('업데이트 안내는 미접수 초안을 유지하고 실제 접수 저�
     await expect(banner.getByRole('button', { name: '저장 중', exact: true })).toBeDisabled();
     await expect(banner).toContainText('저장 중입니다.');
     const later = banner.getByRole('button', { name: '나중에', exact: true });
-    expect((await later.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    // WebKit의 이동 애니메이션 좌표는 44px를 43.999992px로 돌려줄 수 있다. 0.001px 단위로 비교하되 44px 기준은 유지한다.
+    expect(Math.round((await later.boundingBox()).height * 1000) / 1000).toBeGreaterThanOrEqual(44);
     await contained(banner, (await page.viewportSize()).width);
     await page.screenshot({ path: testInfo.outputPath('update-during-teacher-save.png') });
     await later.click(); await expect(banner).toHaveCount(0);
