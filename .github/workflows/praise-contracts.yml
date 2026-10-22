@@ -1,7 +1,10 @@
-name: 찬양팀 저장 계약
+name: 찬양팀·회계 저장 계약
 on:
   pull_request:
     paths:
+      - "highschool-app/src/features/finance/**"
+      - "highschool-app/src/app/api/finance/**"
+      - "highschool-app/src/features/portal/accessPolicy.ts"
       - "highschool-app/src/features/praise/**"
       - "highschool-app/src/app/api/praise/**"
       - "highschool-app/package*.json"
@@ -11,6 +14,9 @@ on:
   push:
     branches: [main]
     paths:
+      - "highschool-app/src/features/finance/**"
+      - "highschool-app/src/app/api/finance/**"
+      - "highschool-app/src/features/portal/accessPolicy.ts"
       - "highschool-app/src/features/praise/**"
       - "highschool-app/src/app/api/praise/**"
       - "highschool-app/package*.json"
@@ -36,3 +42,4 @@ jobs:
       - run: npm ci --prefix highschool-app
       - run: npm install --global firebase-tools@15.10.0
       - run: node scripts/run-praise-contracts.mjs
+      - run: node scripts/run-praise-contracts.mjs --finance

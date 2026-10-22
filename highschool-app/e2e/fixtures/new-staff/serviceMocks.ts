@@ -124,3 +124,15 @@ export const assignRetreatGroupToProgramCompetitionTeam = memoryWrite("assignRet
 export const replaceRetreatProgramCompetitionAssignments = memoryWrite("replaceRetreatProgramCompetitionAssignments");
 export const publishRetreatProgramRelease = memoryWrite("publishRetreatProgramRelease");
 export const unpublishRetreatProgramRelease = memoryWrite("unpublishRetreatProgramRelease");
+
+
+// 행정 화면 QA는 아래 합성 원장만 읽는다. 운영 SDK·API 접근은 start.mjs에서 차단한다.
+export function subscribeSundayNewFriendsPrivate(cb: Receive<unknown>, fail?: Failure) { return connect("friendsPrivate", "", cb, {}, fail); }
+export function subscribeSundayAdminChanges(cb: Receive<unknown[]>, fail?: Failure, year = 2026) {
+  return connect("adminChanges", String(year), cb, [{ id: "synthetic-change", year: String(year), classKey: "1-1-1", action: "수정", changeSummary: "연락처 항목 변경", changedAt: `${year}-10-01T09:00:00+09:00`, changedAtMs: Date.parse(`${year}-10-01T09:00:00+09:00`), actor: "합성 행정", studentName: "합성학생가", teacher: "합성교사", result: "완료" }], fail);
+}
+export function subscribeToClassesByYear(year: number, cb: Receive<unknown>, fail?: Failure) {
+  return connect("classes", String(year), cb, { "1-1-1": { teacher: "합성교사", students: { s1: { name: "합성학생가", num: 1 }, s2: { name: "합성학생나", num: 2 }, s3: { name: "합성학생다", num: 3, jang: true } } } }, fail);
+}
+export function subscribeToAttendanceByYear(year: number, cb: Receive<unknown>, fail?: Failure) { return connect("attendance", String(year), cb, { "1-1-1": { s1: { "9-3": "O" }, s2: { "9-3": "X" } } }, fail); }
+export function subscribeToAttendanceEventsByYear(year: number, cb: Receive<unknown>, fail?: Failure) { return connect("attendanceEvents", String(year), cb, [], fail); }

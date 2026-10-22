@@ -1,0 +1,57 @@
+import { expect, test } from "@playwright/test";
+
+for (const theme of ["light", "dark"]) {
+  test(`${theme}: 행정 조회와 연간 회계의 등록·정산·이력·취소를 보존한다`, async ({ page }) => {
+    const external: string[] = [];
+    page.on("request", request => { if (!request.url().startsWith("http://127.0.0.1:4179") && !request.url().startsWith("data:")) external.push(request.url()); });
+    await page.goto(`/?scenario=actualAdmin&auth=admin&theme=${theme}`);
+    await expect(page.getByRole("heading", { name: "1부 1학년 1반" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /원본 출석부에서 수정/ })).toHaveAttribute("href", "https://woori-high.web.app/attendance");
+    await expect(page.getByText("합성학생가", { exact: true })).toBeVisible();
+    await page.getByRole("searchbox", { name: "학생 이름 검색" }).fill("없는 학생");
+    await expect(page.getByText("검색 결과가 없습니다.")).toBeVisible();
+    await page.getByRole("tab", { name: "행정 변동 사항" }).click();
+    await expect(page.getByText("연락처 항목 변경", { exact: true }).filter({ visible: true })).toBeVisible();
+    await page.getByRole("tab", { name: "연간 회계" }).click();
+    await expect(page.getByText("등록된 거래가 없습니다.")).toBeVisible();
+    await page.getByRole("button", { name: "이월금 수정" }).click();
+    await page.getByRole("dialog").getByRole("spinbutton").fill("100000");
+    await page.getByRole("button", { name: "이월금 저장" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("button", { name: "거래 등록", exact: true }).click();
+    const editor = page.getByRole("dialog", { name: "거래 등록" });
+    await editor.getByLabel("거래 내용", { exact: true }).fill("합성 성경 교재");
+    await editor.getByLabel("금액 (원)", { exact: true }).fill("12000");
+    await editor.getByLabel("분류", { exact: true }).fill("교재");
+    await editor.getByLabel("정산 상태").selectOption("settled");
+    await editor.getByRole("button", { name: "거래 저장" }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(page.locator("dt", { hasText: "장부 잔액" }).locator("..").getByText("88,000원")).toBeVisible();
+    await page.screenshot({ path: `test-results/admin-finance-${theme}-${test.info().project.name}.png`, fullPage: true });
+    await page.getByRole("button", { name: /합성 성경 교재/ }).filter({ visible: true }).first().click();
+    const detail = page.getByRole("dialog");
+    await expect(detail.getByText("내용: 합성 성경 교재", { exact: true })).toBeVisible();
+    await detail.getByLabel(/영수증 첨부/).setInputFiles({ name: "합성증빙.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\nsynthetic receipt\n%%EOF") });
+    await expect(detail.getByRole("button", { name: /합성증빙.pdf/ })).toBeVisible();
+    await expect(detail.getByText("첨부: 합성증빙.pdf", { exact: true })).toBeVisible();
+    await detail.getByRole("button", { name: "거래 취소", exact: true }).click();
+    await detail.getByLabel("취소 사유", { exact: true }).fill("합성 중복 확인");
+    await detail.getByRole("button", { name: "취소 사유를 남기고 거래 취소" }).click();
+    await page.getByRole("button", { name: "확인", exact: true }).click();
+    await expect(detail.getByText("취소됨", { exact: true })).toBeVisible();
+    await detail.getByRole("button", { name: "닫기" }).click();
+    await expect(page.locator("dt", { hasText: "장부 잔액" }).locator("..").getByText("100,000원")).toBeVisible();
+    await page.getByRole("combobox", { name: "상태", exact: true }).selectOption("cancelled");
+    await expect(page.getByRole("button", { name: /합성 성경 교재/ }).filter({ visible: true }).first()).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "엑셀 내보내기" }).click();
+    expect((await download).suggestedFilename().normalize("NFC")).toBe("2026년_고등부_회계.xlsx");
+    await page.getByLabel("행정 업무 연도").selectOption("2025");
+    await expect(page.getByText("등록된 거래가 없습니다.")).toBeVisible();
+    const proof = await (await page.request.get("/__qa__/proof.json")).json();
+    expect(proof.firebaseRuntimeModules).toEqual([]);
+    expect(proof.rejected).toEqual([]);
+    expect(external).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}

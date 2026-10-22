@@ -12,6 +12,7 @@ const source = resolve(app, "src");
 const mock = resolve(root, "mocks.tsx");
 const serviceMock = resolve(root, "serviceMocks.ts");
 const dynamicMock = resolve(root, "dynamic.tsx");
+const financeMock = resolve(root, "financeMock.ts");
 const imageMock = resolve(root, "image.tsx");
 // 매 실행마다 테스트가 소유한 빈 캐시를 사용해 최초 dependency scan도 검증한다.
 const cacheDir = mkdtempSync(resolve(tmpdir(), "woori-new-staff-qa-"));
@@ -23,6 +24,8 @@ const boundaries = new Set([
   "features/semester/db",
   "features/semester/archiveStorage",
   "lib/db",
+  "lib/db/students",
+  "features/finance/client",
   "features/iguard/lib/db",
   "features/sundayMinistry/db",
   "features/suggestions/db",
@@ -49,6 +52,7 @@ const server = await createServer({
       const relative = absolute.replace(`${source}/`, "").replace(/\.(?:tsx?|jsx?)$/, "");
       if (boundaries.has(relative)) {
         intercepted.add(relative);
+        if (relative === "features/finance/client") return financeMock;
         return relative === "context/AuthContext" || relative === "features/semester/db" || relative === "features/portal/peopleSearchDb" ? mock : serviceMock;
       }
       if (id === "next/link" || id === "next/navigation") return mock;

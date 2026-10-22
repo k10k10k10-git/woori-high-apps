@@ -117,6 +117,11 @@ export type AreaPermission = "none" | "read" | "write";
 /** execution은 이가드 "실행" 탭만 허용하는 부분 접근이다. */
 export type IguardScope = "none" | "execution" | "all";
 
+/** 연간 회계는 중앙 학기 행정 역할만 접근한다. 방학 역할이나 팀 배정으로 확대하지 않는다. */
+export function canManageAnnualFinance(roles: MinistryRoles): boolean {
+  return roles.semester === "superAdmin" || roles.semester === "pastor" || roles.semester === "adminTeam";
+}
+
 type SemesterCapability = {
   semester: AreaPermission;
   /**

@@ -6,11 +6,13 @@ import type { TeamMemberships } from "@/features/teams/teamModel";
 
 const state = vi.hoisted(() => ({ roles: { semester: "superAdmin", retreat: "superAdmin" } as MinistryRoles, teamMemberships: {} as TeamMemberships, canSearchOfficialRoster: true, push: vi.fn(), friends: vi.fn(), friendsPrivate: vi.fn(), changes: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: state.push }) }));
-vi.mock("next/dynamic", () => ({ default: () => function PraiseFixture({ workspaceId, initialTab, embedded }: { workspaceId?: string; initialTab?: string; embedded?: boolean }) { return <div data-testid="praise-workspace">{workspaceId} {initialTab} {embedded ? "공통 팀 헤더 사용" : "독립 헤더"}</div>; } }));
+vi.mock("next/dynamic", () => ({ default: (loader: () => unknown) => loader.toString().includes("AnnualFinanceTab")
+  ? function FinanceFixture({ year, onBusyChange }: { year: number; onBusyChange: (value: boolean) => void }) { return <div data-testid="finance">{year}<button onClick={() => onBusyChange(true)}>합성 회계 처리</button></div>; }
+  : function PraiseFixture({ workspaceId, initialTab, embedded }: { workspaceId?: string; initialTab?: string; embedded?: boolean }) { return <div data-testid="praise-workspace">{workspaceId} {initialTab} {embedded ? "공통 팀 헤더 사용" : "독립 헤더"}</div>; } }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "synthetic-user" }, loading: false, roles: state.roles, teamMemberships: state.teamMemberships, canSearchOfficialRoster: state.canSearchOfficialRoster, signIn: vi.fn() }) }));
 vi.mock("@/features/sundayMinistry/db", () => ({ subscribeSundayAdminChanges: state.changes, subscribeSundayNewFriends: state.friends, subscribeSundayNewFriendsPrivate: state.friendsPrivate }));
-vi.mock("@/features/sundayMinistry/SundayMinistryTabs", () => ({ AdminChangesTab: () => null, PendingTab: () => null, RegistrationStatusTab: () => null }));
-vi.mock("@/features/sundayMinistry/AttendanceBookTab", () => ({ default: () => null }));
+vi.mock("@/features/sundayMinistry/SundayMinistryTabs", () => ({ AdminChangesTab: ({ year }: { year: number }) => <p>행정 이력 {year}</p>, PendingTab: () => null, RegistrationStatusTab: () => null }));
+vi.mock("@/features/sundayMinistry/AttendanceBookTab", () => ({ default: ({ year }: { year: number }) => <p>출석 조회 {year}</p> }));
 vi.mock("@/features/sundayWorship/WorshipDocsTab", () => ({ default: () => null }));
 vi.mock("@/features/sundayWorship/WorshipDutyTab", () => ({ default: () => null }));
 vi.mock("@/features/sundayWorship/WorshipSeatingTab", () => ({ default: () => null }));
@@ -142,5 +144,49 @@ it("행정팀 배정만 있고 연간 원장 권한이 없으면 출석부와 �
   expect(screen.getByRole("heading", { name: "행정팀 주간·주일 업무 접근 권한이 필요합니다." })).toBeInTheDocument();
   expect(state.friends).not.toHaveBeenCalled();
   expect(state.friendsPrivate).not.toHaveBeenCalled();
+  expect(state.changes).not.toHaveBeenCalled();
+});
+
+it("공통 연도를 출석 조회와 회계에 전달하고 필요 없는 행정 이력 구독은 열지 않는다", () => {
+  render(<SundayMinistryClient team="admin" initialTab="출석부" />);
+  expect(screen.getAllByRole("tab").map(tab => tab.textContent)).toEqual(["출석부", "행정 변동 사항", "연간 회계"]);
+  const year = screen.getByLabelText("행정 업무 연도");
+  const previousYear = Number((year as HTMLSelectElement).value) - 1;
+  fireEvent.change(year, { target: { value: String(previousYear) } });
+  expect(screen.getByText(`출석 조회 ${previousYear}`)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "연간 회계" }));
+  expect(screen.getByTestId("finance")).toHaveTextContent(String(previousYear));
+  expect(state.changes).not.toHaveBeenCalled();
+  expect(state.friends).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "합성 회계 처리" }));
+  expect(year).toBeDisabled();
+  expect(screen.getByRole("tab", { name: "출석부" })).toBeDisabled();
+  expect(screen.getByLabelText("현재 팀·팀 변경")).toBeDisabled();
+});
+
+it("행정 이력은 선택한 연도만 구독하고 완료 전에는 빈 목록으로 표시하지 않는다", () => {
+  render(<SundayMinistryClient team="admin" initialTab="행정 변동 사항" />);
+  const year = Number((screen.getByLabelText("행정 업무 연도") as HTMLSelectElement).value);
+  expect(state.changes).toHaveBeenLastCalledWith(expect.any(Function), expect.any(Function), year);
+  expect(screen.getByRole("status")).toHaveTextContent("불러오는");
+  act(() => state.changes.mock.calls.at(-1)![0]([]));
+  expect(screen.getByText(`행정 이력 ${year}`)).toBeInTheDocument();
+});
+
+it("스탭팀장에게 회계 메뉴는 보이지만 회계 컴포넌트는 열지 않는다", () => {
+  state.roles = { semester: "leader", retreat: "adminTeam" };
+  state.teamMemberships = { admin: { role: "viewer", active: true } };
+  render(<SundayMinistryClient team="admin" initialTab="연간 회계" />);
+  expect(screen.getByRole("tab", { name: "연간 회계" })).toBeInTheDocument();
+  expect(screen.queryByTestId("finance")).not.toBeInTheDocument();
+  expect(screen.getByText("연간 회계 접근 권한이 필요합니다.")).toBeInTheDocument();
+  expect(state.changes).not.toHaveBeenCalled();
+});
+
+it("중앙 행정 역할은 별도 팀 배정이 없어도 행정 회계를 열 수 있다", () => {
+  state.roles = { semester: "adminTeam", retreat: "none" };
+  state.teamMemberships = {};
+  render(<SundayMinistryClient team="admin" initialTab="연간 회계" />);
+  expect(screen.getByTestId("finance")).toBeInTheDocument();
   expect(state.changes).not.toHaveBeenCalled();
 });

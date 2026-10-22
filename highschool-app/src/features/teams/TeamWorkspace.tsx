@@ -10,6 +10,7 @@ import type { Application, Semester, Session, Team } from "@/features/semester/t
 import { semesterRoster, splitStudentsAndStaff } from "@/features/semester/roster";
 import { sessionDateLabel } from "@/features/semester/sessionDate";
 import { sessionDisplayLabel } from "@/features/semester/sessionKind";
+import { canManageAnnualFinance } from "@/features/portal/accessPolicy";
 import { sundayTeamOf, type SundayTeamKey } from "@/features/portal/featureCatalog";
 import { activeTeamKeys, canAccessTeam, canBrowseEveryTeam, canBrowseTeam, canEditTeam, membershipLabel, semesterTeamForKey } from "./teamModel";
 import { TeamAccessState } from "./TeamAccessState";
@@ -24,7 +25,7 @@ const TERM_ACTIONS = [
   { section: "records", label: "자료·기록", description: "팀에서 사용하는 학기 공용 자료 확인" },
 ] as const;
 const WEEKLY_TASKS: Record<SundayTeamKey, string> = {
-  admin: "학생 주일 출석부 확인·행정 변동 사항 기록",
+  admin: "학생 출석 현황·행정 변동 사항 확인·연간 수입·지출과 정산",
   barnabas: "새친구 접수·등록 현황 확인·처리 대기 건 관리",
   worship: "주일 자리 배치·예배 담당표·예배 자료 준비",
   praise: "이번 모임 학생 출결·주일 스탭 참석·조편성·등단표 입력",
@@ -101,14 +102,14 @@ function TeamWorkspaceContent({ teamKey, pickedSemesterId, onSelectSemester, onR
   const termBase = selectedTerm ? `/teams/${teamKey}/terms/${encodeURIComponent(selectedTerm.semester.id)}` : undefined;
   const weeklySemesterId = teamKey === "praise" ? selectedTerm?.semester.id : undefined;
   const weeklyAllowed = canAccessTeam(teamKey, roles, teamMemberships, weeklySemesterId);
-  const weeklyViewOnly = !canEditTeam(teamKey, roles, teamMemberships, weeklySemesterId);
+  const weeklyViewOnly = !(teamKey === "admin" && canManageAnnualFinance(roles)) && !canEditTeam(teamKey, roles, teamMemberships, weeklySemesterId);
   const weeklyHref = `/teams/${teamKey}/ongoing${selectedTerm && teamKey === "praise" ? `?semester=${encodeURIComponent(selectedTerm.semester.id)}` : ""}`;
   const attendanceHref = teamKey === "praise" && weeklyAllowed && selectedTerm ? `${weeklyHref}&tab=attendance` : `${termBase}/attendance`;
   const roleLabel = teamMemberships[teamKey] ? membershipLabel(teamMemberships[teamKey]) : assigned ? "전체 운영" : "학기 기록 조회";
   const viewOnly = !canEditTeam(teamKey, roles, teamMemberships, selectedTerm?.semester.id);
   const planned = teamMeta.status === "planned";
   const periodLabel = selectedTerm ? TERM_PHASE_LABEL[selectedTerm.phase] : "학기";
-  const weeklyTitle = teamKey !== "praise" ? "주간·주일 업무" : selectedTerm?.phase === "past" ? "지난 학기 주간·주일 기록" : selectedTerm?.phase === "upcoming" ? "예정 학기 업무 준비" : selectedTerm?.phase === "current" ? "이번 주 업무" : "주간·주일 업무";
+  const weeklyTitle = teamKey === "admin" ? "행정 업무" : teamKey !== "praise" ? "주간·주일 업무" : selectedTerm?.phase === "past" ? "지난 학기 주간·주일 기록" : selectedTerm?.phase === "upcoming" ? "예정 학기 업무 준비" : selectedTerm?.phase === "current" ? "이번 주 업무" : "주간·주일 업무";
   const weeklyDescription = teamKey !== "praise" ? WEEKLY_TASKS[teamKey] : selectedTerm?.phase === "past" ? `지난 학기의 ${teamMeta.hint} 기록을 확인합니다.` : selectedTerm?.phase === "upcoming" ? `예정 학기의 ${teamMeta.hint} 준비와 기록을 확인합니다.` : selectedTerm?.phase === "unscheduled" ? `운영 기간이 미등록된 학기의 ${teamMeta.hint} 업무입니다. 학기와 모임 날짜를 먼저 확인하세요.` : WEEKLY_TASKS[teamKey];
   const weeklyPurpose = weeklyViewOnly ? `${teamKey === "praise" && selectedTerm ? `${periodLabel}의 ` : ""}${teamMeta.hint} 기록을 조회합니다. 변경은 담당 팀장에게 문의해 주세요.` : weeklyDescription;
 

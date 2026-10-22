@@ -1,0 +1,33 @@
+.notice { padding: 16px; }
+.empty { margin: 0; padding: 36px 20px; text-align: center; color: var(--color-text-muted); }
+.rosterHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 22px; }
+.rosterHeader h3 { margin: 0; color: var(--color-text-primary); font-size: 18px; font-weight: 750; }
+.rosterHeader p { margin-top: 5px; color: var(--color-text-muted); font-size: 13px; }
+.rosterHeader input { width: 220px; }
+.weekSummary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 20px; padding: 14px 22px; border-block: 1px solid var(--color-border); background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: 13px; }
+.weekSummary strong { color: var(--color-text-primary); }
+.weekSummary small { margin-left: auto; color: var(--color-text-muted); font-size: 12px; }
+.weekRoster { list-style: none; margin: 0; padding: 0 22px 12px; }
+.weekRoster li { display: flex; align-items: center; justify-content: space-between; min-height: 52px; gap: 16px; border-bottom: 1px solid var(--color-border); color: var(--color-text-primary); font-size: 14px; }
+.weekRoster li > span { display: flex; align-items: center; gap: 8px; }
+.weekRoster small { color: var(--color-text-muted); font-size: 12px; }
+.present { color: var(--color-primary); font-weight: 700; }
+.absent { color: var(--color-text-secondary); font-weight: 700; }
+.pending { color: var(--color-text-muted); font-weight: 650; }
+.filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 16px 0; }
+.filters label { display: grid; min-width: 120px; flex: 1 1 120px; gap: 6px; color: var(--color-text-secondary); font-size: 12px; }
+.filters label:first-child { flex-basis: 200px; }
+.filters input, .filters select { min-height: 44px; width: 100%; }
+.changesHeader { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--color-text-primary); }
+.changesHeader h3 { font-weight: 750; }
+.changesHeader span { color: var(--color-text-muted); font-size: 13px; }
+@media (max-width: 640px) {
+  .rosterHeader { padding: 18px 16px; }
+  .rosterHeader label, .rosterHeader input { width: 100%; }
+  .weekSummary { padding: 14px 16px; gap: 8px 14px; }
+  .weekSummary small { flex-basis: 100%; margin-left: 0; }
+  .weekRoster { padding-inline: 16px; }
+  .filters label { flex-basis: calc(50% - 12px); min-width: 0; }
+  .filters label:first-child { flex-basis: 100%; }
+}
+.attendanceBook :global(.sunday-attendance-table-wrap):focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }

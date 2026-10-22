@@ -2,6 +2,8 @@ import { useState } from "react";
 import { deriveNewFriendStage, formatClassLabel, formatNewFriendGrade } from "@/features/semester/newFriend";
 import type { NewFriendPrivate } from "@/features/semester/types";
 import { sundayFriendKey, type SundayAdminChange, type SundayNewFriend } from "./model";
+import { parseClassKey } from "@/lib/classKey";
+import styles from "./sundayAdmin.module.css";
 
 type Props = {
   friends: SundayNewFriend[];
@@ -127,15 +129,46 @@ function ChangeSummary({ action, summary }: { action: string; summary: string })
   );
 }
 
-export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
+export function AdminChangesTab({ changes, year = new Date().getFullYear() }: { changes: SundayAdminChange[]; year?: number }) {
+  return <AdminChangesYear key={year} changes={changes} year={year} />;
+}
+
+function AdminChangesYear({ changes, year }: { changes: SundayAdminChange[]; year: number }) {
+  const [query, setQuery] = useState("");
+  const [part, setPart] = useState("");
+  const [action, setAction] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const yearChanges = changes.filter((change) => change.year === String(year));
+  const actions = [...new Set(yearChanges.map((change) => change.action))].sort((a, b) => a.localeCompare(b, "ko"));
+  const search = query.normalize("NFC").replace(/\s+/g, "").toLocaleLowerCase("ko");
+  const invalidRange = !!from && !!to && from > to;
+  const filteredChanges = invalidRange ? [] : yearChanges.filter((change) => {
+    const timestamp = new Date(change.changedAt).getTime();
+    return (!part || parseClassKey(change.classKey)?.buNum === Number(part))
+      && (!action || change.action === action)
+      && (!from || timestamp >= new Date(`${from}T00:00:00+09:00`).getTime())
+      && (!to || timestamp < new Date(`${to}T00:00:00+09:00`).getTime() + 24 * 60 * 60 * 1000)
+      && (!search || [change.studentName, change.teacher, change.actor, change.changeSummary].join(" ").normalize("NFC").replace(/\s+/g, "").toLocaleLowerCase("ko").includes(search));
+  });
+  const emptyText = yearChanges.length ? "조건에 맞는 변경 기록이 없습니다." : `${year}년 출석부 관리자 수정 기록이 없습니다.`;
   return (
     <section className="card card-body">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><h3 className="font-semibold text-slate-900">행정 변동 사항</h3><p className="mt-1 text-xs leading-5 text-slate-500">학생 출석부 관리자 화면에서 반영한 학생 등록·수정·삭제·이동 내역이 자동으로 기록됩니다.</p></div>
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">총 {changes.length}건</span>
+      <div className={styles.changesHeader}>
+        <h3>행정 변동 사항</h3>
+        <span role="status">{year}년 {filteredChanges.length}건 / 전체 {yearChanges.length}건</span>
       </div>
+      <div className={styles.filters}>
+        <label><span>학생·담당자 검색</span><input className="form-control" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름 또는 변경 내용" /></label>
+        <label><span>부</span><select className="form-control" value={part} onChange={(event) => setPart(event.target.value)}><option value="">전체 부</option><option value="1">1부</option><option value="2">2부</option></select></label>
+        <label><span>변동 유형</span><select className="form-control" value={action} onChange={(event) => setAction(event.target.value)}><option value="">전체 유형</option>{actions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+        <label><span>수정일 시작</span><input className="form-control" type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label>
+        <label><span>수정일 종료</span><input className="form-control" type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label>
+        {(query || part || action || from || to) && <button type="button" className="btn-secondary" onClick={() => { setQuery(""); setPart(""); setAction(""); setFrom(""); setTo(""); }}>조건 초기화</button>}
+      </div>
+      {invalidRange && <p className="text-sm text-red-700" role="alert">종료일을 시작일 이후로 선택해 주세요.</p>}
       <div className="mt-4 space-y-3 sm:hidden" aria-label="행정 변동 사항 모바일 목록">
-        {changes.map((change) => (
+        {filteredChanges.map((change) => (
           <article key={`mobile:${change.year}:${change.classKey}:${change.id}`} className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -150,7 +183,7 @@ export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
             </div>
           </article>
         ))}
-        {changes.length === 0 && <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center text-sm text-slate-400">출석부 관리자 수정 기록이 없습니다.</div>}
+        {filteredChanges.length === 0 && <p className={styles.empty}>{emptyText}</p>}
       </div>
       <div className="mt-4 hidden max-h-[68vh] overflow-auto rounded-xl border border-slate-200 sm:block">
         <table className="w-full min-w-[1040px] border-collapse text-left text-xs">
@@ -159,7 +192,7 @@ export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
             <tr><th className="min-w-36 px-3 py-3">수정 날짜</th><th className="min-w-32 px-3 py-3">반</th><th className="min-w-28 px-3 py-3">반담당 교사</th><th className="min-w-28 px-3 py-3">학생</th><th className="min-w-72 px-3 py-3">변경내용</th><th className="min-w-36 px-3 py-3">반영결과 / 담당</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {changes.map((change) => (
+            {filteredChanges.map((change) => (
               <tr key={`${change.year}:${change.classKey}:${change.id}`} className="hover:bg-slate-50/80">
                 <td className="whitespace-nowrap px-3 py-3 tabular-nums text-slate-500">{formatDate(change.changedAt)}</td>
                 <td className="whitespace-nowrap px-3 py-3 font-medium text-slate-700">{change.year}년 · {formatClassLabel(change.classKey)}</td>
@@ -169,7 +202,7 @@ export function AdminChangesTab({ changes }: { changes: SundayAdminChange[] }) {
                 <td className="px-3 py-3"><span className="font-semibold text-emerald-700">{change.result}</span><span className="mt-1 block text-[11px] text-slate-400">{change.actor}</span></td>
               </tr>
             ))}
-            {changes.length === 0 && <tr><td colSpan={6} className="py-14 text-center text-sm text-slate-400">출석부 관리자 수정 기록이 없습니다.</td></tr>}
+            {filteredChanges.length === 0 && <tr><td colSpan={6} className={styles.empty}>{emptyText}</td></tr>}
           </tbody>
         </table>
       </div>

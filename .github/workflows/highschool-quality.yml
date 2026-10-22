@@ -72,6 +72,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e:new-staff
+      - run: npx playwright test --config=playwright.admin-finance.config.ts
       - uses: actions/upload-artifact@v7
         if: failure()
         with:

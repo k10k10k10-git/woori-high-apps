@@ -47,7 +47,7 @@ export function setQaAuth(state: string, uid = "synthetic-staff-a") {
       ? {} : { [qaTeam]: { active: true, role: state === "viewer" ? "viewer" : "staff" } },
     loading: state === "loading",
     roleError: state === "roleError" || state === "roleErrorAssigned",
-    canSearchOfficialRoster: false,
+    canSearchOfficialRoster: state === "admin",
     memberName: "합성 스탭",
     signIn: async () => {
       qa.signInCalls += 1;

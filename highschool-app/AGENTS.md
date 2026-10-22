@@ -476,3 +476,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **접근법**: `praiseOps`의 기존 인물 `id`·`sourceId`·`kind`를 보존한다 → 배치된 `semesters/{sid}/applications`만 팀으로 조회하고 각 후보의 정확한 `classes/{year}/{classKey}/students/{studentId}` 또는 `teacherStaff/{year}/{staffId}`를 제한 병렬로 읽어 `personId`·유형·이름을 검증한다 → 요청의 기존 인물 본문을 현재 revision·fingerprint와 대조한 뒤 확인된 `rosterLink`만 `transactWorkspaceChecked`에서 다시 검증해 operation·한국어 감사와 함께 저장한다 → ETag 재시도에서는 최신 모드·중복 연결을 다시 거절한다. 대조 중 학기 신청·학생·스탭 원장은 읽기만 하며, 손상된 신청 행은 경로 세그먼트와 숫자 형태를 확인해 그 행만 제외한다.
 - **판단 질문**: 이름이 같거나 공식 원장 후보가 한 명이라는 사실만으로 동일인으로 확정하지 않는다. 학기 배치가 없거나 강한 식별자가 충돌하는 활성 인물은 연결 보류 상태로 남긴다. 전체 `classes/{year}`·`teacherStaff/{year}`를 편의상 내려받으면 명단 연결에 불필요한 개인정보가 서버 메모리에 들어온다. 일괄 요청의 인물 본문을 그대로 덮어쓰거나 기존 연결·원본 ID를 삭제·교체하면 동시 수정과 과거 출결·조·등단 참조를 손상시킨다.
 - **재사용 규칙**: shadow의 예외 쓰기는 관리자 `person.reconcile`과 기존 인물에만 좁히고, 일괄 연결은 `기존 본문 동결 → 공식 레코드 단건 검증 → transaction 직전 재검증 → 링크 필드만 추가 → 대상 수와 제한된 이름 요약 감사` 순서로 처리한다. 출결·등단·조·가져오기·새 인물 등록과 모드 전환은 기존 잠금을 유지하고, 명단 대조를 이유로 `classes`·`teacherStaff`·학기 신청에 역방향 쓰기를 추가하지 않는다.
+
+
+## 행정 업무 연간 회계 (2026-10-22)
+
+행정팀은 `출석부 / 행정 변동 사항 / 연간 회계`를 공통 연도로 조회한다. 출석부는 읽기와 기존 출석부 링크만 유지한다. 회계는 `features/finance`의 서버 API를 사용하며 `financePrivate/{year}` 외의 원장·Rules를 쓰지 않는다. 중앙 학기 역할만 `canManageAnnualFinance`로 허용하고 증빙 다운로드도 거래 연결을 재검증한다. 기존 기록 삭제 대신 취소와 전후 이력을 사용한다. 세부 계약은 `CLAUDE.md`의 “행정 업무와 연간 회계 경계”와 루트 `DB_OWNERSHIP.md`를 따른다.
