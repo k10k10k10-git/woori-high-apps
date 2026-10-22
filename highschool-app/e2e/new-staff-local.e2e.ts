@@ -722,6 +722,8 @@ test("보완 검증: 다크 메뉴의 접근성과 데스크톱 팀 메뉴 키�
     await page.screenshot({ path: info.outputPath("navigation-dark.png") });
     await expectAccessible(page);
     await page.keyboard.press("Tab");
+    await expect(page.locator('.portal-dropdown-panel a[href="/teams"]')).toBeFocused();
+    await page.keyboard.press("Tab");
     await expect(links.first()).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(links).toHaveCount(0);
