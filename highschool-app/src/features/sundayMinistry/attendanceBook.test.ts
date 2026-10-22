@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attendanceSummary, attendanceWeeks, classKeysForPart, classLabel, normalizeAttendanceMark, sortedRoster } from "./attendanceBook";
+import { attendanceSummary, attendanceWeeks, classKeysForPart, classLabel, latestAttendanceWeek, normalizeAttendanceMark, sortedRoster, weeklyAttendanceCounts } from "./attendanceBook";
 
 describe("주일 사역 출석부 조회 모델", () => {
   it("출석부 원본과 같은 0기반 월·주차 키를 만든다", () => {
@@ -40,5 +40,20 @@ describe("주일 사역 출석부 조회 모델", () => {
       rate: 67,
     });
     expect(normalizeAttendanceMark("T")).toBe("O");
+  });
+
+  it("한국 일요일 자정부터 해당 주일을 고르고 행사 주일은 건너뛴다", () => {
+    const weeks = attendanceWeeks(2026, "all", { holiday: { month: 1, day: 11, label: "행사" } });
+    expect(latestAttendanceWeek(2026, weeks, new Date("2026-01-03T15:00:00Z"))?.cellKey).toBe("0-0");
+    expect(latestAttendanceWeek(2026, weeks, new Date("2026-01-11T08:00:00+09:00"))?.cellKey).toBe("0-0");
+    expect(latestAttendanceWeek(2026, weeks, new Date("2026-01-18T00:00:00+09:00"))?.cellKey).toBe("0-2");
+    expect(latestAttendanceWeek(2026, weeks.map((week) => ({ ...week, label: "휴일" })))).toBeUndefined();
+  });
+
+  it("미입력을 결석으로 추정하지 않고 장결을 주간 입력 수에서 제외한다", () => {
+    const students = { present: {}, late: {}, absent: {}, unknown: {}, empty: {}, long: { jang: true } };
+    const records = { present: { week: "O" }, late: { week: "T" }, absent: { week: "X" }, unknown: { week: "?" }, long: { week: "X" } };
+    expect(weeklyAttendanceCounts(students, records, "week")).toEqual({ target: 5, present: 2, absent: 1, recorded: 3, unentered: 2 });
+    expect(weeklyAttendanceCounts(undefined, undefined, "week")).toEqual({ target: 0, present: 0, absent: 0, recorded: 0, unentered: 0 });
   });
 });

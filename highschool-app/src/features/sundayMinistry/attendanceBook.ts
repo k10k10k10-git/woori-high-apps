@@ -11,6 +11,27 @@ export type AttendanceWeek = {
   label?: string;
 };
 
+/** 한국 날짜 기준으로 지난 정상 주일을 고른다. 미래 연도는 첫 정상 주일부터 조회한다. */
+export function latestAttendanceWeek(year: number, weeks: AttendanceWeek[], now = new Date()) {
+  const korea = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const today = Date.UTC(korea.getUTCFullYear(), korea.getUTCMonth(), korea.getUTCDate());
+  const normalWeeks = weeks.filter((week) => !week.label);
+  return normalWeeks.filter((week) => Date.UTC(year, week.month - 1, week.day) <= today).at(-1) ?? normalWeeks[0];
+}
+
+/** 제출 완료 판정이 아닌 기록 수다. 장결자는 주간 입력 대상에서 제외한다. */
+export function weeklyAttendanceCounts(
+  students: Record<string, { jang?: boolean }> | undefined,
+  records: Record<string, Record<string, string>> | undefined,
+  cellKey: string,
+) {
+  const targets = Object.entries(students ?? {}).filter(([, student]) => student.jang !== true);
+  const marks = targets.map(([studentId]) => normalizeAttendanceMark(records?.[studentId]?.[cellKey]));
+  const present = marks.filter((mark) => mark === "O").length;
+  const absent = marks.filter((mark) => mark === "X").length;
+  return { target: targets.length, present, absent, recorded: present + absent, unentered: targets.length - present - absent };
+}
+
 export function attendanceWeeks(
   year: number,
   semester: AttendanceSemester,

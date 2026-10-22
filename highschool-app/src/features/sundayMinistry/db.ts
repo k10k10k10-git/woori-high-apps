@@ -15,8 +15,10 @@ import type { NewFriendPrivate } from "@/features/semester/types";
 export function subscribeSundayAdminChanges(
   cb: (changes: SundayAdminChange[]) => void,
   onError?: (error: Error) => void,
+  year?: number,
 ) {
-  return onValue(ref(db, paths.classes()), (snapshot) => cb(collectSundayAdminChanges(snapshot.val())), onError);
+  const location = year === undefined ? paths.classes() : `${paths.classes()}/${year}`;
+  return onValue(ref(db, location), (snapshot) => cb(collectSundayAdminChanges(year === undefined ? snapshot.val() : { [year]: snapshot.val() })), onError);
 }
 
 export function subscribeSundayNewFriends(

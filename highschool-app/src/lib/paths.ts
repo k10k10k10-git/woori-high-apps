@@ -164,3 +164,7 @@ export const paths = {
   teacherExtraRoot: () => "teacherExtra",
   teacherAdditionalRoot: () => "teacherAdditional",
 } as const;
+
+/** 회계 서버 전용 경로. 클라이언트 직접 접근은 기본 Rules에서 거부된다. */
+export const financeLedgerPath = (year: number) => `financePrivate/${year}/ledger`;
+export const financeFilePath = (year: number, receiptId: string) => `financePrivate/${year}/files/${receiptId}`;

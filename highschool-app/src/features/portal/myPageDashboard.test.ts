@@ -65,7 +65,7 @@ describe("역할별 마이페이지 읽기 모델", () => {
     }
     expect(ministryModulesFor(roles("leader", "none"), {}).map((item) => item.id)).toEqual(["semester", "sunday-all", "guide"]);
     expect(ministryModulesFor(roles("leader", "none"), memberships).map((item) => item.id)).toEqual(["sunday-praise", "guide"]);
-    expect(ministryModulesFor(roles("adminTeam", "none"), {}).map((item) => item.id)).toEqual(["semester", "guide"]);
+    expect(ministryModulesFor(roles("adminTeam", "none"), {}).map((item) => item.id)).toEqual(["semester", "sunday-all", "guide"]);
     expect(ministryModulesFor(roles("adminTeam", "none"), memberships).map((item) => item.id)).toEqual(["semester", "sunday-praise", "guide"]);
   });
 

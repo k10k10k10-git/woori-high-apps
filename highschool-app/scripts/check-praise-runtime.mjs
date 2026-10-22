@@ -39,14 +39,14 @@ try {
     await delay(200);
   }
   assert.ok(ready, "production 서버의 버전 조회가 준비되지 않았습니다.");
-  for (const path of ["/api/praise", "/api/semester-ids"]) {
+  for (const path of ["/api/praise", "/api/semester-ids", "/api/finance/2026", "/api/finance/2026/receipts/entry_11111111-1111-4111-8111-111111111111/receipt_22222222-2222-4222-8222-222222222222"]) {
     const response = await fetch(`${baseUrl}${path}`, { redirect: "manual", signal: AbortSignal.timeout(10_000) });
     assert.equal(response.status, 401, `${path}는 비로그인 GET에 JSON 401을 반환해야 합니다.`);
     assert.match(response.headers.get("content-type") ?? "", /application\/json/);
     const body = await response.json();
     assert.equal(body.code, "unauthorized");
   }
-  console.log("찬양팀·학기 ID production API: require(ESM) 비활성 환경에서 비로그인 401 확인, 인증정보·DB 쓰기 없음.");
+  console.log("찬양팀·학기 ID·회계·증빙 production API: require(ESM) 비활성 환경에서 비로그인 401 확인, 인증정보·DB 쓰기 없음.");
 } catch (error) {
   console.error(recentOutput);
   throw error;

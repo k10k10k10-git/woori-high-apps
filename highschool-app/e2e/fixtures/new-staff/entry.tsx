@@ -3,6 +3,11 @@ import { createRoot } from "react-dom/client";
 import { UIProvider } from "@/context/UIContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { ViewModeProvider } from "@/context/ViewModeContext";
+import AnnualFinanceTab from "@/features/finance/AnnualFinanceTab";
+import AttendanceBookTab from "@/features/sundayMinistry/AttendanceBookTab";
+import { AdminChangesTab } from "@/features/sundayMinistry/SundayMinistryTabs";
+import { subscribeSundayAdminChanges } from "./serviceMocks";
+import type { SundayAdminChange } from "@/features/sundayMinistry/model";
 import TeamWorkspace from "@/features/teams/TeamWorkspace";
 import TeamsHome from "@/features/teams/TeamsHome";
 import SiteHelp from "@/features/library/SiteHelp";
@@ -107,6 +112,15 @@ function SemesterFixture({ tab }: { tab: string }) {
   </SemesterEditProvider>;
 }
 
+function AdminFixture() {
+  const [year, setYear] = useState(2026);
+  const [tab, setTab] = useState(params.get("tab") ?? "출석부");
+  const [busy, setBusy] = useState(false);
+  const [changes, setChanges] = useState<SundayAdminChange[]>([]);
+  useEffect(() => subscribeSundayAdminChanges(items => setChanges(items as SundayAdminChange[]), undefined, year), [year]);
+  return <main className="team-first-page"><h1>행정팀 합성 화면 검증</h1><nav className="workspace-tabs" role="tablist" aria-label="행정 업무 탭">{["출석부", "행정 변동 사항", "연간 회계"].map(name => <button className="workspace-tab" role="tab" aria-selected={tab === name} key={name} disabled={busy} onClick={() => setTab(name)}>{name}</button>)}</nav><label>업무 연도<select aria-label="행정 업무 연도" className="form-control w-auto my-4" disabled={busy} value={year} onChange={e => setYear(Number(e.target.value))}><option value={2025}>2025년</option><option value={2026}>2026년</option></select></label>{tab === "출석부" ? <AttendanceBookTab year={year} /> : tab === "행정 변동 사항" ? <AdminChangesTab changes={changes} year={year} /> : <AnnualFinanceTab year={year} onBusyChange={setBusy} />}</main>;
+}
+
 function Fixture() {
   const pathname = window.location.pathname;
   const teamMatch = /^\/teams\/([^/]+)$/.exec(pathname);
@@ -118,6 +132,7 @@ function Fixture() {
     <p className="sr-only" role="note">이 화면은 실제 인증과 운영 DB를 연결하지 않는 합성 UI 검증입니다.</p>
     {scenario === "attendance" ? <main className="team-first-page"><Attendance /></main>
       : scenario === "homeGuide" ? <HomeGuide />
+      : scenario === "actualAdmin" ? <AdminFixture />
       : scenario === "actualHome" ? <PortalHome />
       : scenario === "actualMyPage" ? <MyPageFixture />
       : scenario === "actualProgram" ? <ProgramPreparationClient />

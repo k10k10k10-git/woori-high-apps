@@ -17,6 +17,7 @@ export const SUNDAY_MINISTRY_TABS = [
   "처리 대기",
   "출석부",
   "행정 변동 사항",
+  "연간 회계",
   "자리 배치",
   "예배 담당표",
   "예배 자료",
@@ -34,7 +35,7 @@ export const SUNDAY_MINISTRY_TABS = [
  * 보이게 두는 것이 운영 의도다. 지우려면 사용자에게 다시 확인한다.
  */
 export const SUNDAY_MINISTRY_TEAMS = [
-  { key: "admin", label: "행정팀", hint: "출석부·행정 변동", status: "ready", tabs: ["출석부", "행정 변동 사항"] },
+  { key: "admin", label: "행정팀", hint: "출석부·행정 변동·연간 회계", status: "ready", tabs: ["출석부", "행정 변동 사항", "연간 회계"] },
   { key: "barnabas", label: "바나바팀", hint: "새친구·등록·처리", status: "ready", tabs: ["새친구", "등록 현황", "처리 대기"] },
   { key: "worship", label: "예배팀", hint: "자리 배치·담당표", status: "ready", tabs: ["자리 배치", "예배 담당표", "예배 자료"] },
   { key: "praise", label: "찬양팀", hint: "모임 출결·조 편성·등단", status: "ready", tabs: PRAISE_TABS },
