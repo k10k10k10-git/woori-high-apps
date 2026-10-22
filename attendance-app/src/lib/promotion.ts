@@ -2,6 +2,7 @@ import type { Student } from '@/types';
 import type { AttendanceYear } from './sheetSync';
 import { trashRecordKey } from '@/utils/trash';
 import { buildAdminChangeEntry } from '@/utils/adminChange';
+import { assertNoNewStudentDuplicates, type DuplicateRoster } from '@/utils/studentDuplicates';
 
 type RosterClass = { students?: Record<string, Student>; [key: string]: unknown };
 export type PromotionSnapshot = {
@@ -15,6 +16,8 @@ export function buildPromotionPayload(snapshot: PromotionSnapshot, overwrite: bo
   const { year, classes, attendance } = snapshot;
   const payload: Record<string, unknown> = {};
   const classKeys: string[] = [];
+  const currentRoster = classes[year] ?? {};
+  const proposed: DuplicateRoster = { ...currentRoster };
   let count = 0;
   for (const [fromCk, source] of Object.entries(classes[year - 1] ?? {})) {
     const match = /^(1|2)-([12])-(\d+)$/.exec(fromCk);
@@ -28,11 +31,15 @@ export function buildPromotionPayload(snapshot: PromotionSnapshot, overwrite: bo
         && (!existing?.personId || existing.personId !== student.personId)) {
         throw new Error(`${toCk}반의 학생 ID 또는 보관 출석이 다른 인물과 겹칩니다. 기존 기록을 보호하기 위해 진급을 중단했습니다.`);
       }
+      // 교체로 사라질 기존 명단도 대조해 같은 학생을 새 SID로 다시 만들지 않는다.
+      assertNoNewStudentDuplicates(student, currentRoster, { classKey: toCk, studentId: sid }, existing);
     }
     if (target) payload[`trash/${year}/classes/${trashRecordKey(toCk, 'roster', operation)}`] = {
       ...target, teacher: typeof target.teacher === 'string' ? target.teacher : '', ck: toCk, deletedAt: Date.now(),
     };
-    payload[`classes/${year}/${toCk}/students`] = Object.fromEntries(Object.entries(source.students!).map(([id, student]) => [id, { ...student, id }]));
+    const students = Object.fromEntries(Object.entries(source.students!).map(([id, student]) => [id, { ...student, id }]));
+    payload[`classes/${year}/${toCk}/students`] = students;
+    proposed[toCk] = { students };
     payload[`classes/${year}/${toCk}/adminChanges/${operation}`] = buildAdminChangeEntry({
       classKey: toCk, teacher: typeof target?.teacher === 'string' ? target.teacher : '', actor,
       action: '명단 일괄 반영', studentName: `진급 ${Object.keys(source.students!).length}명`,
@@ -42,5 +49,11 @@ export function buildPromotionPayload(snapshot: PromotionSnapshot, overwrite: bo
     count += Object.keys(source.students!).length;
   }
   if (!classKeys.length) throw new Error('진급할 빈 반이 없습니다. 기존 명단 교체가 필요한지 확인해 주세요.');
+  // 서로 다른 진급 반끼리도 같은 인물을 새로 만들지 않는다. 기존의 무관한 중복은 건드리지 않는다.
+  for (const classKey of classKeys) {
+    for (const [studentId, student] of Object.entries(proposed[classKey].students ?? {})) {
+      assertNoNewStudentDuplicates(student, proposed, { classKey, studentId }, currentRoster[classKey]?.students?.[studentId]);
+    }
+  }
   return { payload, classKeys, count };
 }

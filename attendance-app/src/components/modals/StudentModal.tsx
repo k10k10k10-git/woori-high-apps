@@ -12,6 +12,7 @@ import {
 import ManagementDialog from './ManagementDialog';
 import { archiveRoster } from '@/lib/rosterRecovery';
 import { editStudent, mergeStudentEdit, sameStoredValue } from '@/utils/studentPersistence';
+import { assertNoNewStudentDuplicates, type DuplicateRoster } from '@/utils/studentDuplicates';
 import type { Student } from '@/types';
 
 export default function StudentModal({
@@ -84,6 +85,9 @@ export default function StudentModal({
         if (!next) throw new ManagementSaveError('conflict', '다른 작업에서 같은 정보를 수정했습니다. 입력은 유지됩니다. 현재 명단을 확인한 뒤 다시 열어 주세요.');
         next.personId ||= personIdRef.current;
         if (raw && sameStoredValue(raw, next)) return;
+        const roster = await session.read<DuplicateRoster | null>(`classes/${year}`);
+        try { assertNoNewStudentDuplicates(next, roster.value ?? {}, { classKey: ck, studentId: id }, latest); }
+        catch (cause) { throw new ManagementSaveError('conflict', cause instanceof Error ? cause.message : '같은 학생의 기존 등록을 확인해 주세요.'); }
         const changedFields = latest ? describeStudentFieldChanges(latest, next) : [];
         const result = {
           ...current,

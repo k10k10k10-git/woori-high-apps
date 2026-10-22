@@ -34,6 +34,7 @@ import { isStudentMoveCommitted, patchStudentMoveOnce, readStudentMoveValue } fr
 import { createStudentMoveLockTransaction } from '@/utils/studentMoveLockRequest';
 import { awaitStudentMoveStep } from '@/utils/studentMoveStep';
 import { mergeStudentEdit } from '@/utils/studentPersistence';
+import { findStudentDuplicates } from '@/utils/studentDuplicates';
 import type { MoveTarget, Student } from '@/types';
 
 export default function MoveStudentModal({ target, onClose }: { target: MoveTarget; onClose: () => void }) {
@@ -297,8 +298,8 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
           showToast('원래 반의 학생 정보가 변경되었습니다. 명단을 새로 확인해 주세요.');
           return;
         }
-        if (latestStudent.personId && Object.values(destinationStudents).some(s => s.personId === latestStudent.personId)) {
-          showToast('같은 인물의 학생이 목적지에 이미 있습니다. 중복 명단을 먼저 확인해 주세요.');
+        if (findStudentDuplicates(latestStudent, { [toCk]: { students: destinationStudents } }).some(match => match.strong)) {
+          showToast('같은 학생으로 확인되는 명단이 목적지에 이미 있습니다. 기존 명단과 출석은 유지했으니 중복 여부를 먼저 확인해 주세요.');
           return;
         }
         const sourceAttendance = (sourceAttendanceValue ?? undefined) as AttendanceRecord | undefined;
