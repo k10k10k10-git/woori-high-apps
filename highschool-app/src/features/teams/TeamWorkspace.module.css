@@ -29,6 +29,7 @@ a.termLink:focus-visible, .termPicker select:focus-visible { outline: 3px solid 
 .overviewLink:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
 @media (max-width: 767px) {
   .termPicker { max-width: none; }
+  .workActions .weeklyWork { min-height: 104px; padding: 16px; }
   .termLink { min-height: 64px; padding: 12px; }
   .termLink p { display: none; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
