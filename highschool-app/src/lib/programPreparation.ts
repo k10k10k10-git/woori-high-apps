@@ -261,7 +261,7 @@ export function programTaskProgress(program: RetreatProgram, today = seoulDateKe
   };
 }
 
-export function programMeetings(program: RetreatProgram): RetreatProgramMeeting[] {
+export function programMeetings(program: Pick<RetreatProgram, "meetings">): RetreatProgramMeeting[] {
   return Object.entries(program.meetings ?? {})
     .map(([id, meeting]) => ({ ...meeting, id: meeting.id || id }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt || a.id.localeCompare(b.id));
@@ -691,7 +691,7 @@ export type ProgramWorkspaceSectionKey = (typeof PROGRAM_WORKSPACE_SECTIONS)[num
 export function programWorkspaceSectionFromParam(value: string | null | undefined): ProgramWorkspaceSectionKey {
   return PROGRAM_WORKSPACE_SECTIONS.some((section) => section.key === value)
     ? value as ProgramWorkspaceSectionKey
-    : "overview";
+    : "programs";
 }
 
 /** 편집기 상단 내비게이션 — 각 탭이 서로 다른 일을 맡는다. */

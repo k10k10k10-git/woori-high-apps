@@ -11,7 +11,6 @@ import {
   deleteRetreat, requestRetreatAccess, subscribeToAllRetreatPeriods, subscribeToRetreats,
 } from "@/lib/db";
 import { Retreat } from "@/lib/types";
-import { selectRetreatForWork } from "@/lib/retreatSelection";
 import { useUI } from "@/context/UIContext";
 import BrainstormPanel from "./BrainstormPanel";
 import { canAccessArea, canEditArea } from "@/features/portal/accessPolicy";
@@ -22,6 +21,11 @@ import type { IguardAccessLock, Retreat as IguardRetreat } from "@/features/igua
 
 
 export default function HomePage() {
+  const { user } = useAuth();
+  return <RetreatsWorkspace key={user?.uid ?? "guest"} />;
+}
+
+function RetreatsWorkspace() {
   const { user, loading, roles, roleError, signIn, signOut } = useAuth();
   const canUseAdmin = canAccessArea("retreat-admin", roles);
   const { toast } = useUI();
@@ -239,7 +243,8 @@ export default function HomePage() {
         mode="admin"
         roles={roles}
         retreats={retreats}
-        selectedId={selectedRetreatId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null}
+        selectedId={selectedRetreatId}
+        periods={periods}
         onSelect={setSelectedRetreatId}
         onDelete={handleDelete}
         loadError={retreatLoadError ? "수련회 일정 또는 입장 잠금 상태를 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null}

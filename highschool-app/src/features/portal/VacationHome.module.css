@@ -1,0 +1,71 @@
+.page { padding-block: 36px 64px; color: var(--color-text-primary); }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.heading h1 { margin: 0; font-size: clamp(27px, 4vw, 36px); font-weight: 800; letter-spacing: -.025em; line-height: 1.25; }
+.heading p { margin: 10px 0 0; font-size: 15px; color: var(--color-text-secondary); }
+.tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.error { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 24px; padding: 16px; border-radius: 12px; background: var(--color-danger-bg); color: var(--color-danger, #b42318); }
+.steps { display: flex; align-items: center; gap: 12px; padding: 0; margin: 0 0 20px; list-style: none; color: var(--color-text-secondary); font-size: 14px; font-weight: 650; }
+.steps li { display: flex; align-items: center; gap: 8px; }
+.steps li > span { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; background: var(--color-surface-hover); font-size: 12px; }
+.steps li[aria-current="step"] { color: var(--color-primary); }
+.steps li[aria-current="step"] > span { background: var(--color-primary); color: var(--color-primary-contrast); }
+.stepArrow { opacity: .55; }
+.workspace { display: grid; gap: 24px; align-items: start; }
+.workspace.hasSelection { grid-template-columns: minmax(240px, .8fr) minmax(0, 1.5fr); }
+.retreats { min-width: 0; }
+.list { overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
+.retreatRow { position: relative; }
+.retreatRow + .retreatRow { border-top: 1px solid var(--color-border); }
+.retreatButton { position: relative; display: grid; width: 100%; gap: 8px; padding: 24px 64px 24px 24px; text-align: left; background: transparent; transition: background-color 160ms ease; }
+.retreatButton:hover { background: var(--color-surface-hover); }
+.retreatRow[data-selected="true"] { background: var(--domain-retreat-soft); }
+.retreatName { font-size: 19px; font-weight: 750; letter-spacing: -.02em; line-height: 1.5; overflow-wrap: anywhere; }
+.retreatButton p { font-size: 13px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; line-height: 1.6; }
+.retreatMeta { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; color: var(--color-text-secondary); font-size: 12px; font-weight: 650; }
+.retreatMeta span { display: inline-flex; align-items: center; gap: 4px; }
+.choose { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--color-primary); }
+.deleteButton { position: absolute; right: 12px; top: 12px; display: grid; width: 44px; height: 44px; place-items: center; border-radius: 10px; color: var(--color-text-secondary); }
+.deleteButton:hover { color: var(--color-danger, #b42318); background: var(--color-danger-bg); }
+.selected { min-width: 0; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); overflow: hidden; }
+.selectedHeader { padding: 28px; border-bottom: 1px solid var(--color-border); }
+.selectedHeader h2 { font-size: clamp(22px, 3vw, 28px); font-weight: 800; letter-spacing: -.025em; line-height: 1.4; overflow-wrap: anywhere; }
+.selectedHeader p { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 14px; color: var(--color-text-secondary); line-height: 1.7; font-variant-numeric: tabular-nums; }
+.selectedHeader svg { flex: none; }
+.pin { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--color-text-secondary); font-size: 12px; }
+.selector { display: grid; gap: 8px; font-size: 13px; font-weight: 650; }
+.selectControl { position: relative; }
+.selectControl select { appearance: none; width: 100%; min-height: 48px; height: 48px; padding-right: 40px; }
+.selectControl select:global(.input):not([multiple]):not([size]) { background-image: none; }
+.selectControl > svg { position: absolute; right: 14px; top: 15px; pointer-events: none; color: var(--color-text-secondary); }
+.fieldActions { padding: 20px; border-top: 1px solid var(--color-border); }
+.fieldActions > button { width: 100%; justify-content: center; }
+.fieldActions > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.fieldActions > div button { min-height: 44px; padding: 8px; border-radius: 8px; background: var(--color-surface-hover); font-size: 13px; font-weight: 650; }
+.sharedCalendar { margin-top: 36px; border-block: 1px solid var(--color-border); }
+.sharedCalendar > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 88px; padding: 20px 4px; cursor: pointer; list-style: none; }
+.sharedCalendar > summary::-webkit-details-marker { display: none; }
+.sharedCalendar > summary > div { display: flex; align-items: center; gap: 14px; }
+.sharedCalendar > summary span { font-size: 16px; font-weight: 700; }
+.sharedCalendar small { display: block; margin-top: 5px; color: var(--color-text-secondary); font-size: 13px; font-weight: 400; }
+.sharedCalendar[open] > summary > svg { transform: rotate(180deg); }
+.calendarContent { padding-block: 0 24px; }
+.calendarContext { padding: 14px 16px; margin-bottom: 16px; border-radius: 10px; background: var(--color-surface-hover); font-size: 13px; color: var(--color-text-secondary); line-height: 1.7; }
+.calendarContext strong { color: var(--color-text-primary); }
+.empty { padding: 64px 24px; text-align: center; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
+.empty h2 { font-size: 20px; font-weight: 750; }
+.empty p { margin-top: 12px; color: var(--color-text-secondary); line-height: 1.7; }
+.page :is(button, summary):focus-visible { outline: 3px solid var(--color-primary); outline-offset: -3px; }
+@media (max-width: 767px) {
+  .page { padding-block: 24px 40px; }
+  .heading { gap: 16px; flex-direction: column; margin-bottom: 24px; }
+  .heading p { font-size: 14px; }
+  .tools { width: 100%; justify-content: flex-start; }
+  .workspace.hasSelection { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .retreatButton { padding: 20px 56px 20px 20px; }
+  .selectedHeader { padding: 24px 20px; }
+  .sharedCalendar { margin-top: 28px; }
+  .error { align-items: stretch; flex-direction: column; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .retreatButton { transition: none; }
+}

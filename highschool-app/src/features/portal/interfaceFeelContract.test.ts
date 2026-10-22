@@ -9,11 +9,11 @@ describe("인터페이스 촉감·접근성 계약", () => {
     const css = source("src/app/globals.css");
     expect(css).toContain(".btn-sm {");
     expect(css).toContain("min-height: 40px;");
-    expect(css).toContain(".portal-account-row { display: flex; min-height: 40px;");
+    expect(css).toMatch(/\.portal-account-row\s*\{[^}]*display:\s*flex;[^}]*min-height:\s*40px;/);
     expect(css).toContain(".portal-compact-action {\n  display: inline-flex;\n  min-height: 40px;");
     expect(css).toContain(".view-mode-toggle button {\n  display: inline-flex;\n  min-height: 40px;");
-    expect(css).toContain(".portal-search-trigger {\n  display: inline-flex;\n  min-height: 40px;");
-    expect(css).toContain(".portal-brand { display: inline-flex; min-width: 40px; min-height: 40px;");
+    expect(css).toMatch(/\.portal-search-trigger\s*\{[^}]*display:\s*inline-flex;[^}]*min-height:\s*40px;/);
+    expect(css).toMatch(/\.portal-brand\s*\{[^}]*display:\s*inline-flex;[^}]*min-width:\s*40px;[^}]*min-height:\s*40px;/);
   });
 
   it("아이콘 버튼과 출석 상태는 키보드·터치 표적 계약을 공유한다", () => {
@@ -30,7 +30,8 @@ describe("인터페이스 촉감·접근성 계약", () => {
   it("카드 선택과 배정 해제는 div·span 클릭이 아닌 링크·버튼이다", () => {
     const vacation = source("src/features/portal/VacationHome.tsx");
     const groupStaff = source("src/app/retreat/[id]/field/GroupStaffView.tsx");
-    expect(vacation).toContain("<Link\n                      href={entryHref(retreat.id)}");
+    expect(vacation).toMatch(/<button[^>]*aria-pressed=\{selected\?\.id === retreat.id\}[^>]*onClick=\{\(\) => onSelect\(retreat.id\)\}/);
+    expect(vacation).toContain("<RetreatAreaNav");
     expect(vacation).not.toMatch(/<div[^>]*onClick=/);
     expect(groupStaff).toContain('aria-label={`${staffById.get(sid)?.name ?? "미상"} 조스탭 배정 해제`}');
     expect(groupStaff).not.toMatch(/<span[^>]*onClick=/);

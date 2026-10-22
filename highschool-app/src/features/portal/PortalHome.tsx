@@ -7,6 +7,7 @@ import { X } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import LandingPage from "@/features/landing/LandingPage";
+import { useSubmitLock } from "@/lib/useSubmitLock";
 import { useLoadErrors } from "@/lib/useLoadErrors";
 import {
   deleteMilestone,
@@ -65,6 +66,7 @@ function PortalHomeWorkspace() {
   // 로드 실패는 경로별로 모으고(마지막 하나만 보이던 문제), 저장·삭제 실패는 따로 둔다.
   const { fail, ok, message: dataError } = useLoadErrors(user?.uid ?? "");
   const [subscriptionGeneration, setSubscriptionGeneration] = useState(0);
+  const { busy: savingSchedule, run: runScheduleSave } = useSubmitLock();
   const [actionError, setActionError] = useState<string | null>(null);
   const loadError = dataError ?? actionError;
   // 공유 일정(prepMilestones) — 행정·이가드가 함께 쓰는 전역 노드. 스탭은 Rules상 쓰기 불가.
@@ -247,33 +249,35 @@ function PortalHomeWorkspace() {
   const otherWork = [
     ...(operationsAllowed ? [{ href: semesterCalendarHref, label: "학기 운영", context: semesterListStatus === "error" ? "학기를 확인할 수 없습니다" : !semesterListStatus ? "학기를 확인하는 중입니다…" : currentSemester?.meta.title ?? "등록된 학기가 없습니다" }] : []),
     ...(sundayTeams.length > 0 ? [{ href: sundayHref, label: sundayTitle, context: sundayDescription }] : []),
-    ...(retreatAdminAllowed || fieldAllowed ? [{ href: currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/events", label: "행사 업무", context: retreatContext }] : []),
+    ...(retreatAdminAllowed || fieldAllowed ? [{ href: currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/events", label: "수련회 업무", context: retreatContext }] : []),
   ].filter((item, index, list) => item.href.split("?")[0] !== homeEntry?.href.split("?")[0] && list.findIndex((other) => other.href === item.href) === index);
 
   async function submitSchedule() {
     if (!scheduleDraft || !authReady || !canEditSchedule) return;
     const title = scheduleDraft.title.trim();
-    if (!title) return;
-    setActionError(null);
-    try {
-      if (scheduleDraft.id) {
-        await updateMilestone(scheduleDraft.id, {
-          title,
-          targetDate: scheduleDraft.date,
-          sourceSite: calendarSourceSiteForKind(scheduleDraft.kind),
-        });
-      } else {
-        await saveMilestone({
-          title,
-          targetDate: scheduleDraft.date,
-          done: false,
-          sourceSite: calendarSourceSiteForKind(scheduleDraft.kind),
-        });
+    if (!title || !scheduleDraft.date) return;
+    await runScheduleSave(async () => {
+      setActionError(null);
+      try {
+        if (scheduleDraft.id) {
+          await updateMilestone(scheduleDraft.id, {
+            title,
+            targetDate: scheduleDraft.date,
+            sourceSite: calendarSourceSiteForKind(scheduleDraft.kind),
+          });
+        } else {
+          await saveMilestone({
+            title,
+            targetDate: scheduleDraft.date,
+            done: false,
+            sourceSite: calendarSourceSiteForKind(scheduleDraft.kind),
+          });
+        }
+        setScheduleDraft(null);
+      } catch {
+        setActionError("일정을 저장하지 못했습니다. 입력한 내용은 유지됩니다. 다시 시도해 주세요.");
       }
-      setScheduleDraft(null);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : String(error));
-    }
+    });
   }
 
   if (loading) {
@@ -363,19 +367,20 @@ function PortalHomeWorkspace() {
         {authReady && canEditSchedule && scheduleDraft && (
           <OverlayShell
             label={scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}
-            onClose={() => setScheduleDraft(null)}
+            onClose={() => { if (!savingSchedule) setScheduleDraft(null); }}
             panelClassName="w-full max-w-sm"
           >
             <div className="modal-card w-full rounded-2xl bg-white p-5 shadow-2xl">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-bold text-slate-900">{scheduleDraft.id ? "공유 일정 수정" : "공유 일정 추가"}</h3>
-                <button type="button" onClick={() => setScheduleDraft(null)} className="compact-icon-control -mr-1 -mt-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="공유 일정 창 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
+                <button type="button" disabled={savingSchedule} onClick={() => setScheduleDraft(null)} className="compact-icon-control -mr-1 -mt-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="공유 일정 창 닫기"><X aria-hidden="true" size={17} weight="bold" /></button>
               </div>
               <p className="mt-1 text-xs text-slate-500">고등부 전체가 함께 보는 일정입니다. 일정이 속한 사역 영역을 선택해 주세요.</p>
               <label className="mt-4 block text-sm">
                 <span className="text-xs text-slate-500">날짜</span>
                 <input
                   type="date"
+                  disabled={savingSchedule}
                   value={scheduleDraft.date}
                   onChange={(event) => setScheduleDraft({ ...scheduleDraft, date: event.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
@@ -384,6 +389,7 @@ function PortalHomeWorkspace() {
               <label className="mt-3 block text-sm">
                 <span className="text-xs text-slate-500">일정 분류</span>
                 <select
+                  disabled={savingSchedule}
                   value={scheduleDraft.kind}
                   onChange={(event) => setScheduleDraft({ ...scheduleDraft, kind: event.target.value as SharedCalendarItem["kind"] })}
                   className="input mt-1 text-sm"
@@ -397,21 +403,23 @@ function PortalHomeWorkspace() {
                 <span className="text-xs text-slate-500">일정 내용</span>
                 <input
                   data-autofocus
+                  disabled={savingSchedule}
                   value={scheduleDraft.title}
                   onChange={(event) => setScheduleDraft({ ...scheduleDraft, title: event.target.value })}
-                  onKeyDown={(event) => event.key === "Enter" && void submitSchedule()}
+                  onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); void submitSchedule(); } }}
                   placeholder="예: 사역팀 모임 준비"
                   className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
               </label>
+              {actionError && <p role="alert" className="mt-3 text-sm text-red-600">{actionError}</p>}
               <div className="mt-5 flex justify-end gap-2">
-                <button onClick={() => setScheduleDraft(null)} className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100">취소</button>
+                <button disabled={savingSchedule} onClick={() => setScheduleDraft(null)} className="rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-100">취소</button>
                 <button
                   onClick={() => void submitSchedule()}
-                  disabled={!scheduleDraft.title.trim() || !scheduleDraft.date}
+                  disabled={savingSchedule || !scheduleDraft.title.trim() || !scheduleDraft.date}
                   className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
-                  저장
+                  {savingSchedule ? "저장 중…" : "저장"}
                 </button>
               </div>
             </div>

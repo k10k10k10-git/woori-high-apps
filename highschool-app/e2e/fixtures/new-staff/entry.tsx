@@ -26,7 +26,11 @@ import PortalHome from "@/features/portal/PortalHome";
 import MyPageModal, { type MyPageTab } from "@/features/portal/MyPageModal";
 import ProgramPreparationClient from "@/app/retreat/[id]/programs/ProgramPreparationClient";
 import RetreatAreaNav from "@/features/portal/RetreatAreaNav";
+import VacationHome from "@/features/portal/VacationHome";
+import type { Retreat } from "@/lib/types";
 import OperationsHome from "@/features/operations/OperationsHome";
+import AccountsPage from "@/features/operations/AccountsPage";
+import MeetingsHome from "@/features/meetings/MeetingsHome";
 import OperationsGate from "@/features/operations/OperationsGate";
 import { PraiseAttendance } from "@/features/praise/components/PraiseAttendance";
 import { praiseFixture } from "@/features/praise/components/praiseTestFixtures";
@@ -121,19 +125,32 @@ function AdminFixture() {
   return <main className="team-first-page"><h1>행정팀 합성 화면 검증</h1><nav className="workspace-tabs" role="tablist" aria-label="행정 업무 탭">{["출석부", "행정 변동 사항", "연간 회계"].map(name => <button className="workspace-tab" role="tab" aria-selected={tab === name} key={name} disabled={busy} onClick={() => setTab(name)}>{name}</button>)}</nav><label>업무 연도<select aria-label="행정 업무 연도" className="form-control w-auto my-4" disabled={busy} value={year} onChange={e => setYear(Number(e.target.value))}><option value={2025}>2025년</option><option value={2026}>2026년</option></select></label>{tab === "출석부" ? <AttendanceBookTab year={year} /> : tab === "행정 변동 사항" ? <AdminChangesTab changes={changes} year={year} /> : <AnnualFinanceTab year={year} onBusyChange={setBusy} />}</main>;
 }
 
+function VacationFixture() {
+  const { roles } = useAuth();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const retreats: Retreat[] = [
+    { id: "synthetic-retreat", name: "합성 가을 수련회", year: 2026, createdAt: 2, sheetId: "", sheetGid: "", groupCount: 1 },
+    { id: "synthetic-winter", name: "합성 겨울 수련회", year: 2026, createdAt: 1, sheetId: "", sheetGid: "", groupCount: 1 },
+  ];
+  return <VacationHome mode="admin" roles={roles} retreats={retreats} periods={[{ retreatId: "synthetic-retreat", startDate: "2026-10-16", endDate: "2026-10-18" }, { retreatId: "synthetic-winter", startDate: "2026-01-23", endDate: "2026-01-25" }]} selectedId={selectedId} onSelect={setSelectedId} lockedIds={new Set(["synthetic-retreat"])} />;
+}
+
 function Fixture() {
   const pathname = window.location.pathname;
   const teamMatch = /^\/teams\/([^/]+)$/.exec(pathname);
   const scenario = params.get("scenario") ?? (pathname === "/library/help" ? "help" : pathname === "/teams" ? "teams" : pathname === "/operations" ? "operations" : "team");
   const teamKey = sundayTeamOf(params.get("team") ?? teamMatch?.[1] ?? "praise")?.key ?? "praise";
-  const showHeader = scenario === "header" || scenario === "actualHome" || scenario === "actualProgram" || pathname.startsWith("/teams") || pathname === "/operations";
+  const showHeader = scenario === "header" || scenario === "actualHome" || scenario === "actualProgram" || scenario === "actualVacation" || scenario === "actualAccounts" || scenario === "actualMeetings" || pathname.startsWith("/teams") || pathname === "/operations";
   const content = <>
     {showHeader && <GlobalPortalHeader />}
     <p className="sr-only" role="note">이 화면은 실제 인증과 운영 DB를 연결하지 않는 합성 UI 검증입니다.</p>
     {scenario === "attendance" ? <main className="team-first-page"><Attendance /></main>
       : scenario === "homeGuide" ? <HomeGuide />
       : scenario === "actualAdmin" ? <AdminFixture />
+      : scenario === "actualAccounts" ? <AccountsPage />
+      : scenario === "actualMeetings" ? <MeetingsHome />
       : scenario === "actualHome" ? <PortalHome />
+      : scenario === "actualVacation" ? <VacationFixture />
       : scenario === "actualMyPage" ? <MyPageFixture />
       : scenario === "actualProgram" ? <ProgramPreparationClient />
       : scenario === "actualCurriculum" || scenario === "actualAttendance" || scenario === "actualArchive" ? <SemesterFixture tab={scenario} />

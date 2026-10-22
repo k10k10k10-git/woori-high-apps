@@ -68,10 +68,17 @@ export function subscribeToMySiteRequests(uid: string, cb: Receive<unknown[]>, f
 export function subscribeToAdminSiteRequests(cb: Receive<unknown[]>, fail?: Failure) { return connect("adminRequests", "", cb, [], fail); }
 export function subscribeSundayNewFriends(cb: Receive<unknown[]>, fail?: Failure) { return connect("newFriends", "", cb, [], fail); }
 export function subscribeToMainAdmins(cb: Receive<Record<string, unknown>>, fail?: Failure) { return connect("mainAdmins", "", cb, {}, fail); }
-export function subscribeToRetreatAdmins(cb: Receive<Record<string, unknown>>, fail?: Failure) { return connect("retreatAdmins", "", cb, {}, fail); }
+export function subscribeToRetreatAdmins(cb: Receive<Record<string, unknown>>, fail?: Failure) {
+  const accounts = new URLSearchParams(window.location.search).get("scenario") === "actualAccounts" ? {
+    "synthetic-unlinked": { name: "합성 미연결 스탭", email: "synthetic-unlinked@example.invalid", semesterRole: "barnabas", retreatRole: "fieldStaff" },
+    "synthetic-linked": { name: "합성 조회 스탭", email: "synthetic-linked@example.invalid", semesterRole: "barnabas", retreatRole: "fieldStaff", teamMemberships: { barnabas: { role: "viewer", active: true, semesters: { "2026-2": true } } } },
+  } : {};
+  return connect("retreatAdmins", "", cb, accounts, fail);
+}
 export function subscribeToPendingRequests(cb: Receive<Record<string, unknown>>, fail?: Failure) { return connect("pendingRequests", "", cb, {}, fail); }
 export function subscribeToIguardMembers(cb: Receive<Record<string, unknown>>, fail?: Failure) { return connect("iguardMembers", "", cb, {}, fail); }
-export function subscribeToIguardPending(cb: Receive<Record<string, unknown>>, fail?: Failure) { return connect("iguardPending", "", cb, {}, fail); }
+export function subscribeToIguardPending(cb: Receive<unknown[]>, fail?: Failure) { return connect("iguardPending", "", cb, [], fail); }
+export function subscribeToIguardRoles(cb: Receive<Record<string, unknown>>, fail?: Failure) { return connect("iguardRoles", "", cb, {}, fail); }
 export function subscribeToIguardGroupStaff(id: string, cb: Receive<Record<string, string[]>>, fail?: Failure) { return connect("groupStaff", id, cb, {}, fail); }
 export function subscribeToTeacherAttendances(id: string, cb: Receive<unknown[]>, fail?: Failure) { return connect("teacherAttendance", id, cb, [], fail); }
 export function subscribeToIguardSchedule(id: string, cb: Receive<unknown[]>, fail?: Failure) { return connect("iguardSchedule", id, cb, [], fail); }
@@ -80,6 +87,17 @@ export function subscribeToIguardMovements(id: string, cb: Receive<unknown[]>, f
 export function subscribeToIguardPosts(id: string, cb: Receive<unknown[]>, fail?: Failure) { return connect("iguardPosts", id, cb, [], fail); }
 
 // 모든 쓰기는 메모리 기록뿐이다. 공유·삭제도 운영 DB/API에 연결하지 않는다.
+export const denyRetreatRequest = memoryWrite("denyRetreatRequest");
+export const denyIguardPending = memoryWrite("denyIguardPending");
+export const updateRetreatAdminMemberName = memoryWrite("updateRetreatAdminMemberName");
+export const updateRetreatAdminTeamMemberships = memoryWrite("updateRetreatAdminTeamMemberships");
+export const updateIguardMemberName = memoryWrite("updateIguardMemberName");
+export const updateIguardTeamMemberships = memoryWrite("updateIguardTeamMemberships");
+export const addRetreatAdmin = memoryWrite("addRetreatAdmin");
+export const removeRetreatAdmin = memoryWrite("removeRetreatAdmin");
+export const setMainAdmin = memoryWrite("setMainAdmin");
+export const approveIguardMember = memoryWrite("approveIguardMember");
+export const removeIguardMember = memoryWrite("removeIguardMember");
 export const saveMilestone = memoryWrite("saveMilestone");
 export const updateMilestone = memoryWrite("updateMilestone");
 export const deleteMilestone = memoryWrite("deleteMilestone");
@@ -136,3 +154,9 @@ export function subscribeToClassesByYear(year: number, cb: Receive<unknown>, fai
 }
 export function subscribeToAttendanceByYear(year: number, cb: Receive<unknown>, fail?: Failure) { return connect("attendance", String(year), cb, { "1-1-1": { s1: { "9-3": "O" }, s2: { "9-3": "X" } } }, fail); }
 export function subscribeToAttendanceEventsByYear(year: number, cb: Receive<unknown>, fail?: Failure) { return connect("attendanceEvents", String(year), cb, [], fail); }
+
+// 수련회 선택·공유 일정 합성 검증. 실제 DB로 전달하지 않는다.
+export const createRetreat = memoryWrite("createRetreat");
+export const saveRetreatPeriod = memoryWrite("saveRetreatPeriod");
+export const updateRetreatPeriod = memoryWrite("updateRetreatPeriod");
+export const deleteRetreatPeriod = memoryWrite("deleteRetreatPeriod");

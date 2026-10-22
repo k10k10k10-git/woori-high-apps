@@ -41,6 +41,7 @@ import RetreatsHome from "./RetreatsHome";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.auth.user = { uid: "fixture-admin", email: "admin@example.test", displayName: "가상 관리자" };
   mocks.auth.roleError = false;
   mocks.auth.roles = { semester: "superAdmin", retreat: "superAdmin" };
   mocks.retreats.mockReturnValue(() => {});
@@ -153,4 +154,19 @@ it("삭제 중에는 중복 삭제·취소·배경·ESC 이탈을 막고 실패�
   expect(within(dialog).getByRole("button", { name: "취소" })).not.toBeDisabled();
   expect(mocks.toast).toHaveBeenCalledWith("수련회를 삭제하지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.", "error");
   expect(mocks.toast.mock.calls.flat().join(" ")).not.toContain("PERMISSION_DENIED");
+});
+
+
+it("목록을 읽어도 수련회를 자동 선택하지 않고 계정이 바뀌면 선택을 비운다", () => {
+  const list = [{ id: "first", name: "첫 수련회", year: 2026, createdAt: 2 }];
+  const view = render(<RetreatsHome />);
+  act(() => mocks.retreats.mock.calls[0][0](list));
+  expect(screen.getByTestId("selected-retreat")).toBeEmptyDOMElement();
+  fireEvent.click(screen.getByRole("button", { name: "첫 수련회" }));
+  expect(screen.getByTestId("selected-retreat")).toHaveTextContent("first");
+  mocks.auth.user = { uid: "other-admin", email: "other@example.test", displayName: "다른 관리자" };
+  view.rerender(<RetreatsHome />);
+  expect(screen.getByRole("status")).toBeInTheDocument();
+  act(() => mocks.retreats.mock.calls.at(-1)![0](list));
+  expect(screen.getByTestId("selected-retreat")).toBeEmptyDOMElement();
 });

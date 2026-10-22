@@ -36,7 +36,7 @@ function TrainingHomeContent({ onRetry }: { onRetry: () => void }) {
   const featured = featuredTerm(semesters, today);
 
   return <TrainingAccessState allowed={allowed}><main className="team-first-page">
-    <header className="team-first-page-header"><div><p className="section-kicker">TRAINING</p><h1>훈련</h1></div><span className="team-first-count">{semesters.length}개 학기</span></header>
+    <header className="team-first-page-header"><div><h1>신앙훈련</h1><p>학기를 선택해 훈련 명단과 출석을 확인하세요.</p></div><span className="team-first-count">{semesters.length}개 학기</span></header>
     {error && <div className="team-first-alert" role="alert"><span>훈련 정보를 불러오지 못했습니다. 다시 불러오기를 눌러 주세요.</span><button className="btn-secondary" onClick={onRetry}>다시 불러오기</button><Link className="btn-secondary" href="/library/help#connection">접속 문제 도움말</Link></div>}
     {!loaded ? <div className="team-first-state" role="status">훈련 학기를 불러오는 중입니다…</div> : error ? null : semesters.length === 0 ? <section className="team-first-empty"><h2>등록된 학기가 없습니다</h2><p>교역자 또는 행정팀이 운영센터에서 학기를 먼저 만들어 주세요.</p></section> : <>
       {featured && <section className="team-action-grid training-current-card"><Link href={`/training/terms/${encodeURIComponent(featured.semester.id)}/overview`} className="team-action-card is-primary"><div><span>{TERM_PHASE_LABEL[featured.phase]}</span><h2>{featured.semester.meta.title}</h2></div><ArrowRight size={18} aria-hidden="true" /></Link></section>}

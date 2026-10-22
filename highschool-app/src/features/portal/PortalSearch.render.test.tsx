@@ -1,11 +1,12 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
 import type { subscribePeopleSearchData } from "./peopleSearchDb";
 
 const state = vi.hoisted(() => ({
   auth: {
+    user: { uid: "synthetic-admin" },
     roles: { semester: "leader", retreat: "none" } as MinistryRoles,
     canSearchOfficialRoster: true,
   },
@@ -18,6 +19,7 @@ vi.mock("./peopleSearchDb", () => ({ subscribePeopleSearchData: state.subscribe 
 import PortalSearch from "./PortalSearch";
 
 beforeEach(() => {
+  state.auth.user = { uid: "synthetic-admin" };
   state.auth.roles = { semester: "leader", retreat: "none" };
   state.auth.canSearchOfficialRoster = true;
   vi.clearAllMocks();
@@ -25,6 +27,51 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("인물 통합검색 권한", () => {
+  it("같은 권한의 다른 계정으로 바뀌어도 이전 검색창과 결과를 폐기한다", () => {
+    const unsubscribe = vi.fn();
+    state.subscribe.mockReturnValue(unsubscribe);
+    const view = render(<PortalSearch />);
+    fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
+    const previousCallback = state.subscribe.mock.calls[0][1];
+    state.auth.user = { uid: "another-synthetic-admin" };
+    view.rerender(<PortalSearch />);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
+    act(() => previousCallback({ classes: {}, attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {} }));
+    expect(screen.getByRole("status")).toHaveTextContent("고등부 인물 기록을 모으고 있습니다");
+  });
+
+  it("열린 검색창에서 단축키를 다시 눌러도 불러오는 상태로 돌아가지 않는다", () => {
+    state.subscribe.mockImplementationOnce((_options, callback) => {
+      callback({ classes: {}, attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {} });
+      return vi.fn();
+    });
+    render(<PortalSearch />);
+    fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    expect(state.subscribe).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status")).toHaveTextContent("찾고 싶은 사람의 이름");
+    expect(screen.queryByText(/고등부 인물 기록을 모으고/)).not.toBeInTheDocument();
+  });
+
+  it("실패한 검색을 창 안에서 다시 불러오고 해제된 구독의 응답은 무시한다", () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const unsubscribe = vi.fn();
+    state.subscribe.mockReturnValue(unsubscribe);
+    render(<PortalSearch />);
+    fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
+    const previousCallback = state.subscribe.mock.calls[0][1];
+    act(() => state.subscribe.mock.calls[0][2]?.("classes", new Error("offline")));
+    fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    expect(unsubscribe).toHaveBeenCalledOnce();
+    expect(state.subscribe).toHaveBeenCalledTimes(2);
+    act(() => previousCallback({ classes: {}, attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {} }));
+    expect(screen.getByRole("status")).toHaveTextContent("고등부 인물 기록을 모으고 있습니다");
+    act(() => state.subscribe.mock.calls[1][1]({ classes: {}, attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {} }));
+    expect(screen.getByRole("status")).toHaveTextContent("찾고 싶은 사람의 이름");
+    log.mockRestore();
+  });
   it("운영센터 팀장과 교역자·행정팀은 검색할 수 있다", () => {
     for (const semester of ["leader", "pastor", "adminTeam"] as const) {
       state.auth.roles = { semester, retreat: "none" };
@@ -80,6 +127,11 @@ describe("인물 통합검색 기록 표시", () => {
     expect(screen.getByRole("tabpanel", { name: "2026년 기록" })).toHaveTextContent("2학년 6반");
     fireEvent.click(screen.getByRole("tab", { name: "2025년 1건" }));
     expect(screen.getByRole("tabpanel", { name: "2025년 기록" })).toHaveTextContent("1학년 4반");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.getByRole("dialog", { name: "인물 통합검색" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "인물 이름" })).toHaveValue("가상학생");
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("분리된 검색 결과와 상세에서 동일인 확인이 필요함을 표시한다", () => {

@@ -14,7 +14,8 @@ test.beforeEach(async ({ page, context, baseURL }) => {
 });
 
 async function open(page: Page, scenario: string, state = "ready", theme = "light", options: Record<string, string> = {}) {
-  await page.goto(`/?${new URLSearchParams({ scenario, state, theme, ...options })}`);
+  const path = scenario === "actualProgram" ? "/events/synthetic-retreat/programs" : "/";
+  await page.goto(`${path}?${new URLSearchParams({ scenario, state, theme, ...options })}`);
   // 최초 Vite 모듈 변환 시간을 기다린다. 업무 상호작용 제한은 config의 8초를 유지한다.
   await expect(page.locator("main")).toBeVisible({ timeout: 15_000 });
 }
@@ -84,7 +85,7 @@ for (const theme of ["light", "dark"]) {
     await expect(page.locator(".program-start-guide, .program-section-hint, .program-workspace-note")).toHaveCount(0);
     const width = page.viewportSize()?.width ?? 1280;
     if (width < 768 || width > 900) {
-      if (width > 900) await page.getByRole("button", { name: "팀", exact: true }).click();
+      if (width > 900) await page.getByRole("button", { name: "사역팀", exact: true }).click();
       const currentMenu = page.locator(width < 768 ? '.portal-mobile-bottom-nav a[aria-current="page"]' : '.portal-nav-link[aria-expanded="true"]').first();
       await expect(currentMenu).toBeVisible();
       await expect.poll(() => currentMenu.evaluate((element) => getComputedStyle(element).backgroundColor.startsWith("rgb("))).toBe(true);
@@ -107,12 +108,13 @@ async function programSection(page: Page, key: string) {
 }
 
 async function programWorkspace(page: Page, key: string) {
-  if ((page.viewportSize()?.width ?? 1280) <= 640) await page.getByRole("combobox", { name: "수련회 프로그램 준비 메뉴" }).selectOption(key);
-  else await page.locator(`#program-workspace-tab-${key}`).click();
+  await page.getByRole("combobox", { name: "수련회 프로그램 준비 메뉴" }).selectOption(key);
 }
 
 test("실제 프로그램 총괄 화면과 유일한 선택 목록을 구분하고 두 진행 형식을 보존한다", async ({ page }, info) => {
   await open(page, "actualProgram", "programEditor");
+  await expect(page.locator(".program-catalog-row")).toHaveCount(2);
+  await programWorkspace(page, "overview");
   await expect(page.getByRole("heading", { name: "수련회 준비 공간", exact: true })).toBeVisible();
   await expect(page.locator(".program-catalog-row")).toHaveCount(0);
   await programWorkspace(page, "programs");
@@ -133,6 +135,7 @@ test("실제 프로그램 총괄 화면과 유일한 선택 목록을 구분하�
 test("실제 프로그램 수동 초안은 섹션·이동 취소·재연결을 거쳐 보존되고 계정 변경 때 폐기된다", async ({ page }, info) => {
   await open(page, "actualProgram", "programEditor", "light", { workspace: "programs", program: "program-main", section: "posts" });
   const draft = "합성 작성 중 진행안 — 자동 저장하지 않습니다";
+  await page.locator(".program-flow-notes > summary").click();
   await page.locator("#program-flow").fill(draft);
   await expect(page.getByText("저장하지 않은 초안", { exact: true })).toBeVisible();
   await programSection(page, "overview");
@@ -197,6 +200,23 @@ test("실시간 프로그램 목록이 다섯 개에서 네 개로 줄어도 검
   await search.fill("");
   await expect(page.locator(".program-catalog-row")).toHaveCount(4);
   await page.screenshot({ path: info.outputPath("actual-program-live-search-recovery.png"), fullPage: true });
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+  await expectServiceIsolation(page);
+});
+
+test("실제 프로그램 회의록 링크는 기존 비공개 회의를 열고 닫은 뒤에도 프로그램 선택을 유지한다", async ({ page }) => {
+  await open(page, "actualProgram", "programEditor", "light", { workspace: "programs", program: "program-main", section: "overview", meeting: "1", meetingId: "meeting-private" });
+  const dialog = page.getByRole("dialog", { name: "프로그램 준비회의", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText("합성 비공개 회의");
+  await dialog.getByRole("button", { name: "회의 모드 닫기", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).not.toHaveURL(/meeting(?:Id)?=/);
+  await expect(page.getByRole("combobox", { name: "준비할 프로그램", exact: true })).toHaveValue("program-main");
+  await page.getByRole("combobox", { name: "준비할 프로그램", exact: true }).selectOption("program-post");
+  await expect(page.getByRole("heading", { name: "합성 조별 프로그램", exact: true })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
   await expectNoOverflow(page);
   await expectServiceIsolation(page);
@@ -577,8 +597,8 @@ test("일반 스탭도 전체 상단 메뉴를 보고 모바일 메뉴를 키보
     await expect(myPage).toBeInViewport({ ratio: 1 });
     expect(await dialog.evaluate((element) => element.scrollTop)).toBe(0);
     const nav = dialog.getByRole("navigation", { name: "모바일 통합 사역 메뉴" });
-    await expect(nav.getByRole("link")).toHaveCount(8);
-    for (const [label, href] of [["팀", "/teams"], ["훈련", "/training"], ["행사", "/events"], ["운영센터", "/operations"], ["자료", "/library"]]) {
+    await expect(nav.getByRole("link")).toHaveCount(9);
+    for (const [label, href] of [["사역팀", "/teams"], ["신앙훈련", "/training"], ["수련회", "/events"], ["회의록", "/meetings"], ["운영센터", "/operations"], ["자료", "/library"]]) {
       await expect(nav.locator(`a[href="${href}"]`)).toContainText(label);
     }
     await expect(dialog.getByRole("navigation", { name: "모바일 팀 메뉴" }).getByRole("link")).toHaveCount(6);
@@ -602,7 +622,7 @@ test("일반 스탭도 전체 상단 메뉴를 보고 모바일 메뉴를 키보
     await expect(trigger).toBeFocused();
   } else {
     const nav = page.getByRole("navigation", { name: "통합 사역 메뉴" });
-    for (const href of ["/training", "/events", "/operations", "/library"]) await expect(nav.locator(`a[href="${href}"]`)).toBeVisible();
+    for (const href of ["/training", "/events", "/meetings", "/operations", "/library"]) await expect(nav.locator(`a[href="${href}"]`)).toBeVisible();
     await expect(nav.locator('a[href="/operations"]')).toHaveAttribute("data-qa-prefetch", "disabled");
     await page.screenshot({ path: info.outputPath("navigation-desktop.png") });
     await expectAccessible(page);
@@ -694,7 +714,7 @@ test("보완 검증: 다크 메뉴의 접근성과 데스크톱 팀 메뉴 키�
     await page.keyboard.press("Escape");
     await expect(trigger).toBeFocused();
   } else {
-    const trigger = page.getByRole("navigation", { name: "통합 사역 메뉴" }).getByRole("button", { name: "팀", exact: true });
+    const trigger = page.getByRole("navigation", { name: "통합 사역 메뉴" }).getByRole("button", { name: "사역팀", exact: true });
     await trigger.focus();
     await page.keyboard.press("Enter");
     const links = page.locator('.portal-dropdown-panel a[href^="/teams/"]');

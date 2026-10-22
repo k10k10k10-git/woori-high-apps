@@ -1,0 +1,43 @@
+.page { color: var(--color-text-primary); }
+.heading, .workspaceHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; }
+.heading { margin-bottom: 28px; }
+.heading h1 { margin: 0; font-size: 1.8rem; font-weight: 750; letter-spacing: -.03em; }
+.heading p, .workspaceHeading p { margin: 8px 0 0; color: var(--color-text-secondary); font-size: .9rem; line-height: 1.6; }
+.retreatSelector { display: flex; flex-direction: column; gap: 10px; max-width: 600px; margin-bottom: 28px; font-size: .85rem; font-weight: 650; }
+.retreatSelector select { min-height: 48px; }
+.workspace { min-width: 0; }
+.workspaceHeading { padding-block: 8px 24px; }
+.workspaceHeading h2 { margin: 0; font-size: 1.3rem; font-weight: 700; letter-spacing: -.02em; }
+.workspaceHeading p { font-size: .8rem; }
+.filters { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.search { display: flex; min-height: 48px; min-width: 0; flex: 1; align-items: center; gap: 10px; border: 1px solid var(--color-control-border); border-radius: 12px; padding: 0 14px; background: var(--color-surface); color: var(--color-text-muted); }
+.search:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.search input { width: 100%; min-width: 0; min-height: 46px; border: 0; outline: none; background: transparent; font: inherit; font-size: 1rem; color: var(--color-text-primary); }
+.search input:focus-visible { outline: none; }
+.search input::placeholder { color: var(--color-text-muted); opacity: 1; }
+.statusFilter { flex-shrink: 0; }
+.statusFilter select { min-height: 48px; }
+.resultCount { margin: 0 0 12px; color: var(--color-text-secondary); font-size: .8rem; }
+.meetingList { border: 1px solid var(--color-border); border-radius: 16px; overflow: hidden; background: var(--color-surface); }
+.meeting { padding: 24px; }
+.meeting + .meeting { border-top: 1px solid var(--color-border); }
+.meetingMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; color: var(--color-text-secondary); font-size: .8rem; }
+.badge { border-radius: 6px; background: var(--color-surface-hover); padding: 4px 8px; font-size: .75rem; font-weight: 600; }
+.meeting h3 { margin: 12px 0 0; font-size: 1.1rem; font-weight: 700; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.agenda { display: -webkit-box; max-width: 70ch; margin: 8px 0 0; overflow: hidden; color: var(--color-text-secondary); font-size: .85rem; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.meetingFooter { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.counts { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--color-text-muted); font-size: .75rem; }
+.openLink { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; gap: 8px; border-radius: 8px; padding: 8px 12px; color: var(--color-primary); font-size: .85rem; font-weight: 650; }
+.openLink:hover { background: var(--color-surface-hover); }
+.orphanNote { color: var(--color-text-secondary); font-size: .8rem; }
+.empty { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 32px 20px; border-radius: 16px; background: var(--color-surface); text-align: center; }
+.empty h2, .empty h3 { margin: 0; color: var(--color-text-primary); font-size: 1.1rem; font-weight: 700; }
+.empty p { max-width: 55ch; margin: 0; color: var(--color-text-secondary); font-size: .85rem; line-height: 1.7; word-break: keep-all; }
+@media (max-width: 639px) {
+  .heading { align-items: flex-start; }
+  .heading h1 { font-size: 1.6rem; }
+  .filters { align-items: stretch; flex-direction: column; }
+  .statusFilter { align-self: flex-start; }
+  .meeting { padding: 20px; }
+  .meetingFooter { align-items: flex-start; flex-direction: column; }
+}

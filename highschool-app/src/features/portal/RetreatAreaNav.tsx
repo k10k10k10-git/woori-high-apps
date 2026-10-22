@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardText, ShieldCheck, UsersThree } from "@phosphor-icons/react";
+import { ArrowRight, ClipboardText, ShieldCheck, UsersThree } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -22,6 +22,7 @@ export default function RetreatAreaNav({
   fieldAllowed,
   onNavigate,
   tone = "header",
+  variant = "tabs",
 }: {
   retreatId: string;
   current?: RetreatAreaKey;
@@ -29,6 +30,7 @@ export default function RetreatAreaNav({
   fieldAllowed: boolean;
   /** 목록의 밝은/어두운 표면에서는 해당 테마의 본문 색상을 쓴다. */
   tone?: "header" | "surface";
+  variant?: "tabs" | "choices";
   /** 미저장 초안 가드가 있는 화면은 여기로 가로채 확인창을 띄운다. */
   onNavigate?: (href: string) => void;
 }) {
@@ -50,14 +52,14 @@ export default function RetreatAreaNav({
   }, [adminAllowed, adminHref, fieldAllowed, fieldHref, programsHref, router]);
 
   const items = [
-    { key: "admin" as const, label: "행정", Icon: UsersThree, href: adminHref, allowed: adminAllowed },
-    { key: "programs" as const, label: "프로그램 준비", Icon: ClipboardText, href: programsHref, allowed: adminAllowed },
-    { key: "field" as const, label: "현장 업무(이가드)", Icon: ShieldCheck, href: fieldHref, allowed: fieldAllowed },
+    { key: "admin" as const, label: "행정", description: "신청 명단 · 조편성 · 물품 · 비용", Icon: UsersThree, href: adminHref, allowed: adminAllowed },
+    { key: "programs" as const, label: "프로그램 준비", description: "기획 · 진행안 · 역할 · 준비물", Icon: ClipboardText, href: programsHref, allowed: adminAllowed },
+    { key: "field" as const, label: "현장 업무(이가드)", description: "큐카드 · 인원체크 · 동선 · 숙소", Icon: ShieldCheck, href: fieldHref, allowed: fieldAllowed },
   ];
 
   return (
-    <nav className={`retreat-area-nav ${styles.nav}${tone === "surface" ? ` ${styles.surface}` : ""}`} aria-label="수련회 업무 영역">
-      {items.map(({ key, label, Icon, href, allowed }) => {
+    <nav className={`retreat-area-nav ${styles.nav}${tone === "surface" ? ` ${styles.surface}` : ""}${variant === "choices" ? ` ${styles.choices}` : ""}`} aria-label="수련회 업무 영역">
+      {items.map(({ key, label, description, Icon, href, allowed }) => {
         const isCurrent = key === current;
         return (
           <Link
@@ -65,6 +67,7 @@ export default function RetreatAreaNav({
             href={href}
             prefetch={false}
             className={styles.link}
+            aria-label={`${label}${allowed ? "" : " 권한 필요"}`}
             aria-current={isCurrent ? "page" : undefined}
             onPointerEnter={() => { if (allowed) router.prefetch(href); }}
             onFocus={() => { if (allowed) router.prefetch(href); }}
@@ -75,8 +78,9 @@ export default function RetreatAreaNav({
             }}
           >
             <Icon aria-hidden="true" size={17} weight={isCurrent ? "fill" : "regular"} />
-            <span>{label}</span>
+            <span className={styles.linkText}><span>{label}</span>{variant === "choices" && <small>{description}</small>}</span>
             {!allowed && <small className={styles.permissionLabel}>권한 필요</small>}
+            {variant === "choices" && <ArrowRight className={styles.arrow} aria-hidden="true" size={19} />}
           </Link>
         );
       })}

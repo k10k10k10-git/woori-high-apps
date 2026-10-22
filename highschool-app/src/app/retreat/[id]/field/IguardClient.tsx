@@ -107,11 +107,11 @@ export default function IguardClient() {
     roles,
   });
 
-  if (authLoading || !user || roleError || !fieldAllowed) return <WorkspaceAccessGate allowed={fieldAllowed} area="수련회 현장" backHref="/events" backLabel="행사 목록으로">{null}</WorkspaceAccessGate>;
+  if (authLoading || !user || roleError || !fieldAllowed) return <WorkspaceAccessGate allowed={fieldAllowed} area="수련회 현장" backHref={`/events?retreat=${encodeURIComponent(id)}`} backLabel="수련회 업무 선택으로">{null}</WorkspaceAccessGate>;
   if (lockError) return <main className="team-first-page"><LoadFailureNotice title="PIN 잠금 상태를 확인하지 못했습니다." onRetry={retryLock} /></main>;
   if (lock === undefined) return <CenterSpinner />;
   if (lock && !unlocked) return (
-    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/events/${id}/administration`)} />
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/events?retreat=${encodeURIComponent(id)}`)} />
   );
   // 같은 현장 탭에서는 상태를 유지하고, 다른 수련회에서는 해당 ID의 캐시·구독으로 시작한다.
   return <IguardWorkspace key={`${id}:${user.uid}:${roles.semester}:${roles.retreat}`} id={id} />;
@@ -250,8 +250,8 @@ function IguardWorkspace({ id }: { id: string }) {
       <header ref={headerRef} className="workspace-sticky-header workspace-header iguard-workspace-header">
         <div className={`${shellWidth} mx-auto px-3 sm:px-4`}>
           <div className="field-title-row pt-2.5 pb-2 flex items-center gap-2 sm:gap-3">
-            <button onClick={() => router.push("/")} className="field-header-back min-h-10 shrink-0 rounded-lg px-2 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white" aria-label="수련회 목록으로 돌아가기">
-              <ArrowLeft aria-hidden="true" size={17} weight="bold" /><span>목록</span>
+            <button onClick={() => router.push(`/events?retreat=${encodeURIComponent(id)}`)} className="field-header-back min-h-10 shrink-0 rounded-lg px-2 text-xs text-slate-300 transition hover:bg-white/10 hover:text-white" aria-label="수련회 업무 선택으로 돌아가기">
+              <ArrowLeft aria-hidden="true" size={17} weight="bold" /><span>업무 선택</span>
             </button>
             <span className="hidden text-slate-600 sm:inline">|</span>
             <span className="hidden px-2 py-0.5 rounded-full text-xs font-semibold shrink-0 sm:inline-flex" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>{retreat.year}년</span>

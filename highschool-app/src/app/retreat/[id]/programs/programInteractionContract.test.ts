@@ -192,7 +192,7 @@ describe("program preparation interaction contract", () => {
     expect(editor).toContain('.filter(([value]) => value !== "published"');
     expect(editor).toContain('publicationAction === "publish" && !canPublishProgram');
     expect(editor).toContain("이가드 현장에 공유할까요?");
-    expect(publication).toContain('disabled={busy || !ready}');
+    expect(publication).toContain('disabled={busy || hasUnsavedChanges || !ready}');
     expect(publication).toContain("변경사항 다시 공유");
     expect(publication).toContain("hasUnsavedChanges");
     expect(publication).toContain("새 배포본 미리보기");

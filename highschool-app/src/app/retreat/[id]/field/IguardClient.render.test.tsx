@@ -208,3 +208,11 @@ it("수련회 조회 오류의 재시도는 실제 리스너를 다시 연결한
   expect(screen.getByText("a 행사")).toBeInTheDocument();
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
+
+
+it("현장 화면에서 홈이 아닌 같은 수련회의 업무 선택으로 돌아간다", () => {
+  render(<IguardClient />);
+  loadMeta("a", 2026); loadData("a");
+  fireEvent.click(screen.getByRole("button", { name: "수련회 업무 선택으로 돌아가기" }));
+  expect(mocks.router.push).toHaveBeenCalledWith("/events?retreat=a");
+});

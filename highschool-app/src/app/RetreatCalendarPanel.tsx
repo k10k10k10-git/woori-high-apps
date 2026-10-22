@@ -301,7 +301,7 @@ export default function RetreatCalendarPanel({
               const d = diffDays(p.startDate);
               const ownerName = retreats.find(r => r.id === p.retreatId)?.name;
               return (
-                <div key={p.id} className={`rounded-lg border p-3 ${c.bg} ${c.border}`}>
+                <div key={`${p.retreatId}:${p.id}`} className={`rounded-lg border p-3 ${c.bg} ${c.border}`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -436,7 +436,7 @@ export default function RetreatCalendarPanel({
                       {dayPeriods.filter(dp => dp.isStart).slice(0, 1).map(dp => {
                         const c = periodColor(dp.idx);
                         const title = dp.period.theme || retreats.find(r => r.id === dp.period.retreatId)?.name || "수련회 기간";
-                        return <span key={`period-${dp.period.id}`} className={`truncate rounded px-1.5 py-1 text-[9px] font-medium ${c.bg} ${c.text}`}>📌 {title}</span>;
+                        return <span key={`period-${dp.period.retreatId}-${dp.period.id}`} className={`truncate rounded px-1.5 py-1 text-[9px] font-medium ${c.bg} ${c.text}`}>📌 {title}</span>;
                       })}
                       {dayMilestones.slice(0, dayPeriods.some(dp => dp.isStart) ? 1 : 2).map(m => {
                         const c = getMilestoneColor(m);
@@ -460,7 +460,7 @@ export default function RetreatCalendarPanel({
               {selectedPeriods.map(({ period }) => {
                 const ownerName = retreats.find(r => r.id === period.retreatId)?.name ?? "수련회";
                 return (
-                  <div key={`selected-period-${period.id}`} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div key={`selected-period-${period.retreatId}-${period.id}`} className="rounded-xl border border-white/10 bg-white/5 p-3">
                     <span className="text-[9px] font-bold text-violet-300">수련회 기간</span>
                     <p className="mt-1 text-xs font-semibold leading-snug">{ownerName}{period.label ? ` · ${period.label}` : ""}</p>
                     {period.theme && <p className="mt-1 text-[10px] text-slate-400">📌 {period.theme}</p>}

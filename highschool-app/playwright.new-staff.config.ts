@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // 합성 테스트는 운영 기본 config와 인증 storageState를 사용하지 않는다.
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "new-staff-local.e2e.ts",
+  testMatch: ["new-staff-local.e2e.ts", "account-search-local.e2e.ts", "retreat-flow-local.e2e.ts", "meetings-local.e2e.ts"],
   timeout: 45_000,
   expect: { timeout: 8_000 },
   fullyParallel: false,

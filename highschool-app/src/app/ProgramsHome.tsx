@@ -8,7 +8,6 @@ import { canAccessArea } from "@/features/portal/accessPolicy";
 import VacationHome from "@/features/portal/VacationHome";
 import { subscribeToAllRetreatPeriods, subscribeToRetreats } from "@/lib/db";
 import type { Retreat } from "@/lib/types";
-import { selectRetreatForWork } from "@/lib/retreatSelection";
 
 export default function ProgramsHome() {
   const { user, roles } = useAuth();
@@ -81,7 +80,7 @@ function ProgramsWorkspace() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <VacationHome mode="program" roles={roles} retreats={retreats} selectedId={selectedId ?? selectRetreatForWork(retreats, periods, new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }))?.id ?? null} onSelect={setSelectedId} loadError={periodError ? "수련회 일정을 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null} onRetry={retryPrograms} />
+      <VacationHome mode="program" roles={roles} retreats={retreats} selectedId={selectedId} periods={periods} onSelect={setSelectedId} loadError={periodError ? "수련회 일정을 확인하지 못했습니다. 다시 불러오기를 눌러 주세요." : null} onRetry={retryPrograms} />
     </div>
   );
 }

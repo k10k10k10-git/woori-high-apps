@@ -62,3 +62,11 @@ it("조회 역할에도 민감 탭을 표시하지만 선택해도 민감 화면
   expect(screen.getByRole("heading", { name: "민감 행정 기록 접근 권한이 필요합니다." })).toBeInTheDocument();
   expect(mocks.mounted.some(name => /CancellationTab|InsuranceTab|MedicalLogTab|UnmatchedPaymentsTab/.test(name))).toBe(false);
 });
+
+
+it("행정 화면에서 해당 수련회의 업무 선택으로 돌아간다", () => {
+  render(<RetreatPageClient />);
+  act(() => mocks.subscribe.mock.calls[0][1]({ id: "retreat-fixture", name: "가상 수련회", year: 2026 }));
+  fireEvent.click(screen.getByRole("button", { name: "수련회 업무 선택으로 돌아가기" }));
+  expect(mocks.router.push).toHaveBeenCalledWith("/events?retreat=retreat-fixture");
+});

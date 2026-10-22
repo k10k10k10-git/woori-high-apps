@@ -199,7 +199,7 @@ function RetreatPageContent() {
   // 주소를 직접 입력해 민감 탭으로 들어오는 경로도 막는다.
   const effectiveTab = tab;
 
-  if (authLoading || !user || roleError || !adminAllowed) return <WorkspaceAccessGate allowed={adminAllowed} area="수련회 행정" backHref="/events" backLabel="행사 목록으로">{null}</WorkspaceAccessGate>;
+  if (authLoading || !user || roleError || !adminAllowed) return <WorkspaceAccessGate allowed={adminAllowed} area="수련회 행정" backHref={`/events?retreat=${encodeURIComponent(id)}`} backLabel="수련회 업무 선택으로">{null}</WorkspaceAccessGate>;
   if (loading) return <div className="team-first-page"><WorkspaceSkeleton label="수련회 행정 화면을 불러오는 중입니다." rows={7} variant="page" /></div>;
 
   if (loadError) return (
@@ -209,7 +209,7 @@ function RetreatPageContent() {
         <p className="mt-2 text-sm text-slate-500">{loadError === "permission" ? "현재 계정으로 이 수련회 기록을 읽을 수 없습니다. 담당자에게 권한을 확인해 주세요." : "일시적인 연결 문제일 수 있습니다. 다시 시도해 주세요."}</p>
         <div className="mt-5 flex justify-center gap-2">
           <button onClick={() => { setLoadError(null); setLoading(true); setRetryKey((key) => key + 1); }} className="btn-primary">다시 시도</button>
-          <button onClick={() => router.push("/events")} className="btn-secondary">행사 목록으로</button>
+          <button onClick={() => router.push(`/events?retreat=${encodeURIComponent(id)}`)} className="btn-secondary">행사 목록으로</button>
         </div>
       </div>
     </div>
@@ -223,7 +223,7 @@ function RetreatPageContent() {
     </div>
   );
   if (lock && !unlocked) return (
-    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push("/events")} />
+    <RetreatPinGate retreatId={id} lock={lock} onUnlocked={markUnlocked} onBack={() => router.push(`/events?retreat=${encodeURIComponent(id)}`)} />
   );
 
   if (!retreat) return (
@@ -250,11 +250,11 @@ function RetreatPageContent() {
             {/* 타이틀 */}
             <div className="pt-2 sm:pt-3 pb-1.5 sm:pb-2 flex items-center gap-1.5 sm:gap-3 min-w-0">
               <button
-                onClick={() => router.push("/events")}
+                onClick={() => router.push(`/events?retreat=${encodeURIComponent(id)}`)}
                 className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white sm:text-xs"
-                aria-label="수련회 목록으로 돌아가기"
+                aria-label="수련회 업무 선택으로 돌아가기"
               >
-                <ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={14} /> 목록
+                <ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={14} /> 업무 선택
               </button>
               <span className="px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0"
                 style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>
@@ -424,7 +424,7 @@ function RetreatPageContent() {
               display:contents라 레이아웃에는 영향이 없다. 드래그처럼 폼 요소가 아닌 조작은
               각 탭이 useRetreatCanEdit()으로 따로 잠근다. */}
           {!canEditAdmin && <ReadOnlyBanner what="수련회 행정 자료" why="편집은 행정팀·교역자·통합관리자만 가능합니다." />}
-          {sensitiveTabs.includes(tab) && <WorkspaceAccessGate allowed={false} area="민감 행정 기록" embedded backHref="/events" backLabel="행사 목록으로">{null}</WorkspaceAccessGate>}
+          {sensitiveTabs.includes(tab) && <WorkspaceAccessGate allowed={false} area="민감 행정 기록" embedded backHref={`/events?retreat=${encodeURIComponent(id)}`} backLabel="수련회 업무 선택으로">{null}</WorkspaceAccessGate>}
           <fieldset disabled={!canEditAdmin} className="contents">
           <RetreatEditProvider canEdit={canEditAdmin}>
           {/* 방문한 탭은 모두 마운트 후 유지한다. 첫 방문에만 준비하고 재방문은 즉시 복귀한다. */}
