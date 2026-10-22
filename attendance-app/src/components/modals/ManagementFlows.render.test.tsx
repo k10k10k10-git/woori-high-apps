@@ -110,7 +110,7 @@ it('삭제 목록 조회 실패는 빈 목록으로 표시하지 않고 재시�
 });
 
 it('명단 미리보기 후 입력이 바뀌면 오래된 계획을 적용하지 않는다', async () => {
-  m.get.mockResolvedValue({ val: () => ({ 2026: { '1-1-1': { teacher: '교사', students: { s: student } } } }), exists: () => true });
+  m.read.mockResolvedValue({ value: { '1-1-1': { teacher: '교사', students: { s: student } } }, etag: 'fresh' });
   render(<RosterModal onClose={() => {}} />);
   fireEvent.change(screen.getByLabelText('학생 명단'), { target: { value: '신규,2010-01-01,01011112222' } });
   fireEvent.click(screen.getByRole('button', { name: '최신 명단과 비교하기' }));
@@ -132,8 +132,10 @@ it('대화상자가 닫히면 배경 잠금과 열기 버튼 초점이 복구된
 
 it('명단 교체 백업에 실패하면 원장 저장을 시작하지 않고 입력을 보존한다', async () => {
   const onClose = vi.fn();
-  m.get.mockResolvedValue({ val: () => ({ 2026: { '1-1-1': { teacher: '교사', students: { s: student } } } }) });
-  m.set.mockRejectedValueOnce(new Error('백업 실패'));
+  const snapshot = { teacher: '교사', students: { s: student } };
+  m.read.mockImplementation(async (path: string) => ({ value: path === 'classes' ? { 2026: { '1-1-1': snapshot } }
+    : path === 'classes/2026' ? { '1-1-1': snapshot } : path.startsWith('trash/') ? null : snapshot, etag: 'fresh' }));
+  m.write.mockRejectedValueOnce(new Error('백업 실패'));
   render(<RosterModal onClose={onClose} />);
   fireEvent.change(screen.getByLabelText('학생 명단'), { target: { value: '신규,2010-01-01,01011112222' } });
   fireEvent.change(screen.getByLabelText('반영 방식'), { target: { value: 'replace' } });
@@ -141,6 +143,8 @@ it('명단 교체 백업에 실패하면 원장 저장을 시작하지 않고 �
   fireEvent.click(await screen.findByRole('checkbox'));
   fireEvent.click(screen.getByRole('button', { name: '확인한 명단 반영' }));
   await screen.findByText('백업 실패');
+  expect(m.write.mock.calls[0][0]).toMatch(/^trash\/2026\/classes\//);
+  expect(m.write.mock.calls.some(([path]) => path.startsWith('classes/'))).toBe(false);
   expect(m.transaction).not.toHaveBeenCalled();
   expect(onClose).not.toHaveBeenCalled();
   expect((screen.getByLabelText('학생 명단') as HTMLTextAreaElement).value).toContain('신규');

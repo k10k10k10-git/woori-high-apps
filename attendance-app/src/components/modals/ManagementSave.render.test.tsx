@@ -22,14 +22,16 @@ beforeEach(() => {
   m.token.mockResolvedValue('synthetic-token');
   vi.stubEnv('NEXT_PUBLIC_FIREBASE_DATABASE_URL', 'https://synthetic.firebaseio.test'); vi.stubGlobal('fetch', m.request);
   m.request.mockImplementation(async (url, init = {}) => {
-    const path = pathOf(url), value = server.get(path) ?? null;
+    const path = pathOf(url), value = path === 'classes/2026'
+      ? Object.fromEntries([...server].filter(([key]) => key.startsWith('classes/2026/')).map(([key, record]) => [key.split('/')[2], record]))
+      : server.get(path) ?? null;
     const etag = JSON.stringify(encodeURIComponent(JSON.stringify(value)));
     if (init.method === 'PUT') {
       if ((init.headers as Record<string, string>)['If-Match'] !== etag) return new Response('null', { status: 412 });
       server.set(path, JSON.parse(init.body as string));
       if (loseResponse) { loseResponse = false; throw new TypeError('response lost'); }
     }
-    return new Response(JSON.stringify(server.get(path) ?? null), { headers: { etag } });
+    return new Response(JSON.stringify(init.method === 'PUT' ? server.get(path) : value), { headers: { etag } });
   });
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });

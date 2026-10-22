@@ -97,7 +97,7 @@ describe('삭제본 원자 복원', () => {
   it('과거 사본 정리 실패 뒤 재시작한 경우에도 다른 반의 동일 PID를 발견하면 복원하지 않는다', async () => {
     put('classes/2026/1-1-2/students/moved-id', { ...student, id: 'moved-id' });
     const original = structuredClone(m.data);
-    await expect(restoreRoster(input, current)).rejects.toThrow('다른 반으로 이동');
+    await expect(restoreRoster(input, current)).rejects.toThrow('같은 학생이 현재 명단에 이미 있습니다');
     expect(get('classes')).toEqual(original.classes);
     expect(get('trash')).toEqual(original.trash);
     expect(get('attendance')).toEqual(original.attendance);
@@ -105,8 +105,34 @@ describe('삭제본 원자 복원', () => {
     expect(get('config/studentMoveLocks/2026')).toBeNull();
   });
 
-  it('같은 인물의 서로 다른 반 사본을 동시에 복원해도 한 명만 복원한다', async () => {
-    const otherCopy = { ...copy, ck: '1-1-2', id: 'other-id' };
+  it.each([
+    { birth: '2008. 1. 1' },
+    { birth: undefined, phone: '010-1234-5678' },
+  ])('서로 다른 영구 ID라도 %j로 동일인이 확인되면 삭제본·현재 명단·출석을 모두 보존한다', async identity => {
+    const savedCopy = { ...copy, phone: '01012345678' };
+    put('trash/2026/students/copy-a', savedCopy);
+    put('classes/2026/1-1-2/students/current-id', { id: 'current-id', name: student.name, personId: 'person_student_B', ...identity });
+    const original = structuredClone(m.data);
+    await expect(restoreRoster({ ...input, value: savedCopy }, current)).rejects.toThrow('이미 있습니다');
+    expect(get('classes')).toEqual(original.classes);
+    expect(get('trash')).toEqual(original.trash);
+    expect(get('attendance')).toEqual(original.attendance);
+    expect(m.patch).not.toHaveBeenCalled();
+    expect(get('config/studentMoveLocks/2026')).toBeNull();
+  });
+
+  it('영구 ID가 있는 동명이인만으로 복원을 막지 않고 출석도 변경하지 않는다', async () => {
+    put('classes/2026/1-1-2/students/other', { id: 'other', name: student.name, personId: 'person_student_B', birth: '2008-02-02' });
+    const otherClass = structuredClone(get('classes/2026/1-1-2'));
+    const attendance = structuredClone(get('attendance'));
+    await restoreRoster(input, current);
+    expect(get(`classes/2026/1-1-1/students/${student.id}`)).toEqual(student);
+    expect(get('classes/2026/1-1-2')).toEqual(otherClass);
+    expect(get('attendance')).toEqual(attendance);
+  });
+
+  it.each([student.personId, 'person_student_B'])('같은 인물의 서로 다른 반 사본(PID %s)을 동시에 복원해도 한 명만 복원한다', async personId => {
+    const otherCopy = { ...copy, personId, ck: '1-1-2', id: 'other-id' };
     put('trash/2026/students/copy-b', otherCopy);
     const outcomes = await Promise.allSettled([restoreRoster(input, current), restoreRoster({ ...input, key: 'copy-b', value: otherCopy }, current)]);
     expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1);
@@ -173,6 +199,20 @@ describe('삭제본 원자 복원', () => {
     await expect(restoreRoster({ ...input, kind: 'classes', key: 'class-a', value: classCopy }, current)).rejects.toThrow('이미 있습니다');
     expect(get('classes/2026/2-1-1')).toBeNull();
     expect(get('trash/2026/classes/class-a')).toEqual(classCopy);
+    expect(m.patch).not.toHaveBeenCalled();
+  });
+
+  it('반 삭제본 안의 서로 다른 PID도 같은 이름·생일이면 일부만 복원하지 않는다', async () => {
+    const classCopy = { ck: '2-1-1', deletedAt: 2345, students: {
+      first: student,
+      second: { ...student, id: 'second', personId: 'person_student_B', birth: '2008. 1. 1' },
+    } };
+    put('trash/2026/classes/class-a', classCopy);
+    const original = structuredClone(m.data);
+    await expect(restoreRoster({ ...input, kind: 'classes', key: 'class-a', value: classCopy }, current)).rejects.toThrow('이미 있습니다');
+    expect(get('classes')).toEqual(original.classes);
+    expect(get('attendance')).toEqual(original.attendance);
+    expect(get('trash')).toEqual(original.trash);
     expect(m.patch).not.toHaveBeenCalled();
   });
 
