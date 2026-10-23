@@ -222,6 +222,52 @@ test("실제 프로그램 회의록 링크는 기존 비공개 회의를 열고 
   await expectServiceIsolation(page);
 });
 
+for (const theme of ["light", "dark"]) {
+  test(`${theme} 홈의 인사말·우선 업무·다른 업무가 구분되고 키보드와 동작 줄이기를 지원한다`, async ({ page, browserName }, info) => {
+    await open(page, "actualHome", "admin", theme);
+    const hero = page.locator(".home-hero");
+    const priority = page.getByRole("region", { name: "내 업무 시작", exact: true });
+    const otherWork = page.getByRole("region", { name: "다른 담당 업무", exact: true });
+    const surfaceColors = [];
+    for (const surface of [hero, priority, otherWork.locator(":scope > div")]) {
+      const colors = await surface.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, border: style.borderTopColor, borderWidth: style.borderTopWidth };
+      });
+      expect(colors.background).not.toBe("rgba(0, 0, 0, 0)");
+      expect(colors.borderWidth).toBe("1px");
+      expect(contrastRatio(colors.border, colors.background)).toBeGreaterThanOrEqual(3);
+      surfaceColors.push(colors.background);
+    }
+    expect(surfaceColors[1]).not.toBe(surfaceColors[0]);
+    const description = await priority.locator("p").evaluate((element) => ({ text: getComputedStyle(element).color, background: getComputedStyle(element.closest("section")!).backgroundColor }));
+    expect(contrastRatio(description.text, description.background)).toBeGreaterThanOrEqual(4.5);
+    const action = priority.getByRole("link", { name: "업무 열기" });
+    const workLink = otherWork.getByRole("link").first();
+    await expect(workLink.locator('svg[aria-hidden="true"]')).toHaveCount(2);
+    for (const link of [action, workLink]) {
+      await link.focus();
+      await expect(link).toBeFocused();
+      await expect(link).toHaveCSS("outline-style", "solid");
+      await expect(link).toHaveCSS("outline-width", "3px");
+    }
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    for (const link of [action, workLink]) {
+      await link.focus();
+      await expect(link.locator("svg").last()).toHaveCSS("transform", "none");
+    }
+    // macOS WebKit의 기본 링크 탐색 키는 Option+Tab이다.
+    await page.keyboard.press(browserName === "webkit" && process.platform === "darwin" ? "Alt+Tab" : "Tab");
+    await expect(otherWork.getByRole("link").nth(1)).toBeFocused();
+    await expectAccessible(page);
+    await expectNoOverflow(page);
+    await expectServiceIsolation(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+    await hero.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath(`home-hierarchy-${theme}.png`), fullPage: true });
+  });
+}
+
 test("실제 홈은 담당 업무 하나와 다음 일정 세 건을 먼저 보여주고 전체 달력을 접는다", async ({ page }, info) => {
   await open(page, "actualHome", "viewer");
   const ownWork = page.getByRole("region", { name: "내 업무", exact: true });

@@ -312,7 +312,7 @@ a.mypage-row:hover { background: var(--color-surface-hover); }
    나머지이며, 전부 특정 화면의 표면 규칙이라 여기가 제 자리다.
    이로써 globals.css에서 "지층" 섹션은 사라졌다 — 다음 리디자인도 새 지층을 쌓지 말고
    해당 표면 파일을 고칠 것. */
-.home-hero { min-height: 0; padding: 8px 0 28px; }
+.page-hero.home-hero { min-height: 0; padding: 28px; border: 1px solid var(--color-control-border); border-radius: 16px; background: var(--color-surface); }
 .home-hero .page-title { margin-top: 0; max-width: 34ch; font-size: 30px; word-break: keep-all; }
 .home-hero .page-description { margin-top: 14px; }
 
@@ -327,7 +327,7 @@ a.mypage-row:hover { background: var(--color-surface-hover); }
 .workspace-header .workspace-group-tab { color: var(--color-text-secondary); }
 .workspace-header .workspace-group-tab:hover { background: var(--color-surface-hover); color: var(--color-text-primary); }
 .workspace-header .workspace-group-tab[aria-selected="true"] { color: var(--color-selected-text); }
-@media (max-width: 640px) { .home-hero .page-title { font-size: 25px; } }
+@media (max-width: 640px) { .page-hero.home-hero { padding: 24px 20px; } .home-hero .page-title { font-size: 25px; } }
 .team-member-search { width: min(100%, 280px); }
 .team-member-card { display: grid; align-items: end; grid-template-columns: minmax(220px, 1fr) minmax(360px, .8fr); gap: 16px; }
 .team-member-card .team-member-roles { margin-top: 0; }

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "@phosphor-icons/react";
+import { ArrowRight, X } from "@phosphor-icons/react";
 import OverlayShell from "@/components/OverlayShell";
+import MinistryIcon from "@/components/MinistryIcon";
 import { useAuth } from "@/context/AuthContext";
 import LandingPage from "@/features/landing/LandingPage";
 import { useSubmitLock } from "@/lib/useSubmitLock";
@@ -247,9 +248,9 @@ function PortalHomeWorkspace() {
     : !retreatListStatus || !retreatPeriodStatus ? "수련회를 확인하는 중입니다…"
     : currentRetreat ? `${currentRetreat.year}년 ${currentRetreat.name}` : "등록된 수련회가 없습니다";
   const otherWork = [
-    ...(operationsAllowed ? [{ href: semesterCalendarHref, label: "학기 운영", context: semesterListStatus === "error" ? "학기를 확인할 수 없습니다" : !semesterListStatus ? "학기를 확인하는 중입니다…" : currentSemester?.meta.title ?? "등록된 학기가 없습니다" }] : []),
-    ...(sundayTeams.length > 0 ? [{ href: sundayHref, label: sundayTitle, context: sundayDescription }] : []),
-    ...(retreatAdminAllowed || fieldAllowed ? [{ href: currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/events", label: "수련회 업무", context: retreatContext }] : []),
+    ...(operationsAllowed ? [{ href: semesterCalendarHref, icon: "operations" as const, label: "학기 운영", context: semesterListStatus === "error" ? "학기를 확인할 수 없습니다" : !semesterListStatus ? "학기를 확인하는 중입니다…" : currentSemester?.meta.title ?? "등록된 학기가 없습니다" }] : []),
+    ...(sundayTeams.length > 0 ? [{ href: sundayHref, icon: "teams" as const, label: sundayTitle, context: sundayDescription }] : []),
+    ...(retreatAdminAllowed || fieldAllowed ? [{ href: currentRetreat ? retreatEntryHref(currentRetreat.id, roles) : "/events", icon: "retreats" as const, label: "수련회 업무", context: retreatContext }] : []),
   ].filter((item, index, list) => item.href.split("?")[0] !== homeEntry?.href.split("?")[0] && list.findIndex((other) => other.href === item.href) === index);
 
   async function submitSchedule() {
@@ -340,7 +341,19 @@ function PortalHomeWorkspace() {
 
         <section aria-label="내 업무">
           <HomeStart entry={homeEntry} roleLabel={describeTeamRoles(roles, teamMemberships)} viewOnly={!!assignedSundayTeam && !canEditTeam(assignedSundayTeam, roles, teamMemberships)} />
-          {otherWork.length > 0 && <div className={styles.otherWork}><h2>다른 담당 업무</h2><div>{otherWork.map((item) => <Link key={item.href} href={item.href}><strong>{item.label}</strong><span>{item.context}</span><span aria-hidden="true">→</span></Link>)}</div></div>}
+          {otherWork.length > 0 && (
+            <section className={styles.otherWork} aria-labelledby="home-other-work-title">
+              <h2 id="home-other-work-title">다른 담당 업무</h2>
+              <div className={styles.workList}>{otherWork.map((item) => (
+                <Link key={item.href} href={item.href}>
+                  <MinistryIcon name={item.icon} className={styles.workIcon} />
+                  <strong>{item.label}</strong>
+                  <span className={styles.workContext}>{item.context}</span>
+                  <ArrowRight size={20} className={styles.workArrow} aria-hidden="true" />
+                </Link>
+              ))}</div>
+            </section>
+          )}
         </section>
 
         <div className={styles.agenda}>

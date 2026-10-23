@@ -10,6 +10,7 @@
 - 프로그램 목록에서 하나를 고른 뒤 4단계로 준비한다. 전체 프로그램 집계와 개별 프로그램 편집의 범위를 혼동하지 않게 한다. 기존 초안·자동저장·현장 배포본 상태를 명시한다.
 - 계정의 기본 권한과 담당 팀 연결은 서로 다른 입력이다. 실제 적용된 접근 범위를 보여주되 역할·권한 데이터는 자동 변경하지 않는다.
 - Lucian Icons v2.0.13 정적 SVG 여섯 개를 로컬 React 컴포넌트로 적용한다. 라이선스는 public/notices/lucian-icons.txt에 보존한다. 작은 선택·호버·펼침 전환만 쓰고 prefers-reduced-motion을 존중한다.
+- 홈은 인사말의 흰 면, 우선 업무의 초록 면, 아이콘을 갖춘 다른 업무 목록을 구분한다. 각 면에 1px 테두리와 20–28px 안쪽 여백을 두고 공유 일정과 전체 달력에도 같은 구획을 적용한다. Lucian UXUI #002의 방향 피드백을 참고해 업무 링크의 화살표만 160ms·3px 이동하며, 동작 줄이기에서는 이동을 없앤다. 새 효과 라이브러리나 커서 추적은 사용하지 않는다.
 - 기존 Firebase 경로, 인물 ID, 역할 원천, PIN, 공유본, 경로별 저장·동시 편집 가드는 보존한다. 회의록 허브도 기존 비공개 회의 기록을 참조하고 새 원장을 복제하지 않는다.
 
 참고: https://tossmini-docs.toss.im/tds-mobile/foundation/colors/ · https://lucianlabs.dev/icons/ · https://lucianlabs.dev/uxui-prompt/
