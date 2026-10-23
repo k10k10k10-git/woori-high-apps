@@ -1,11 +1,19 @@
 .otherWork { margin-bottom: 28px; color: var(--color-text-primary); }
 .otherWork h2, .sectionHeading h2, .upcoming h2 { font-size: 20px; font-weight: 750; line-height: 1.4; }
-.otherWork > div { margin-top: 12px; }
-.otherWork a { display: grid; grid-template-columns: 140px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding-block: 12px; border-bottom: 1px solid var(--color-border); font-size: 16px; }
-.otherWork a > span:first-of-type { color: var(--color-text-secondary); }
+.workList { margin-top: 12px; border: 1px solid var(--color-control-border); border-radius: 16px; background: var(--color-surface); }
+.workList a { display: grid; grid-template-columns: 24px 140px minmax(0, 1fr) 20px; align-items: center; gap: 16px; min-height: 72px; padding: 18px 24px; font-size: 16px; transition: background-color 160ms ease-out; }
+.workList a + a { border-top: 1px solid var(--color-border); }
+.workList a:first-child { border-start-start-radius: 15px; border-start-end-radius: 15px; }
+.workList a:last-child { border-end-start-radius: 15px; border-end-end-radius: 15px; }
+.workList a:is(:hover, :focus-visible) { background: var(--color-surface-hover); }
+.workIcon { color: var(--color-primary); }
+.workContext { color: var(--color-text-secondary); line-height: 1.6; overflow-wrap: anywhere; }
+.workArrow { color: var(--color-text-secondary); transition: transform 160ms ease-out; }
+.workList a:is(:hover, :focus-visible) .workArrow { transform: translateX(3px); }
 .otherWork a:hover strong, .guide a:hover { color: var(--color-primary); }
 .otherWork a:focus-visible, .guide a:focus-visible, .calendar summary:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
-.agenda { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; margin-block: 32px; color: var(--color-text-primary); }
+.agenda { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; margin-block: 32px; color: var(--color-text-primary); }
+.attention, .upcoming { min-width: 0; padding: 24px; border: 1px solid var(--color-control-border); border-radius: 16px; background: var(--color-surface); }
 .attention > p, .upcoming > p { margin-top: 8px; font-size: 16px; line-height: 1.6; color: var(--color-text-secondary); }
 .sectionHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .sectionHeading > span { font-size: 14px; color: var(--color-text-secondary); }
@@ -14,7 +22,7 @@
 .actionText strong { display: block; overflow-wrap: anywhere; font-size: 16px; }
 .actionText small { display: block; margin-top: 4px; font-size: 14px; color: var(--color-text-secondary); }
 .empty { padding-block: 20px; font-size: 16px; color: var(--color-text-secondary); line-height: 1.6; }
-.calendar { margin-top: 28px; border-block: 1px solid var(--color-border); padding-block: 8px; }
+.calendar { margin-top: 28px; border: 1px solid var(--color-control-border); border-radius: 16px; padding: 8px 24px; background: var(--color-surface); }
 .calendar summary { min-height: 48px; align-content: center; cursor: pointer; font-size: 16px; font-weight: 650; color: var(--color-text-primary); }
 .calendar[open] summary { margin-bottom: 16px; }
 .guide { display: flex; align-items: start; justify-content: space-between; gap: 24px; margin-block: 24px; font-size: 16px; color: var(--color-text-secondary); }
@@ -22,4 +30,5 @@
 .guide strong, .guide span, .guide small { display: block; overflow-wrap: anywhere; }
 .guide strong { color: var(--color-text-primary); }
 .guide small { margin-top: 4px; font-size: 14px; }
-@media (max-width: 700px) { .agenda { grid-template-columns: minmax(0, 1fr); gap: 28px; } .otherWork a { grid-template-columns: minmax(0, 1fr) auto; } .otherWork a > span:first-of-type { grid-column: 1; grid-row: 2; } .otherWork a > span:last-child { grid-column: 2; grid-row: 1 / 3; } .guide { flex-direction: column; gap: 12px; } }
+@media (max-width: 700px) { .agenda { grid-template-columns: minmax(0, 1fr); gap: 20px; } .workList a { grid-template-columns: 24px minmax(0, 1fr) 20px; gap: 6px 12px; padding: 18px 20px; } .workIcon { grid-column: 1; grid-row: 1; } .workContext { grid-column: 2; grid-row: 2; } .workArrow { grid-column: 3; grid-row: 1 / 3; } .attention, .upcoming { padding: 20px; } .calendar { padding-inline: 20px; } .guide { flex-direction: column; gap: 12px; } }
+@media (prefers-reduced-motion: reduce) { .workList a, .workArrow { transition: none; } .workList a:is(:hover, :focus-visible) .workArrow { transform: none; } }
