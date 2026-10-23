@@ -213,7 +213,7 @@ function SundayMinistryClientContent({ team, initialTab, workspaceId }: { team?:
     <div className="mx-auto max-w-6xl px-4">
       <div className="flex min-w-0 flex-wrap items-center gap-2 py-3 sm:gap-3">
         <button disabled={financeSaving} onClick={() => router.push(`/teams/${teamMeta.key}`)} className="shrink-0 rounded-lg px-2 py-1.5 text-[11px] text-slate-400 hover:bg-white/10 hover:text-white disabled:opacity-50" aria-label="팀 공간으로 돌아가기"><ArrowLeft aria-hidden="true" className="inline align-[-2px]" size={13} /> 팀</button>
-        <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold text-amber-200 sm:text-xs">{teamMeta.key === "admin" ? "행정 업무" : "주간·주일 업무"}</span>
+        <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-xs" style={{ background: "var(--color-badge-bg)", color: "var(--color-badge-text)", border: "1px solid var(--color-badge-border)" }}>{teamMeta.key === "admin" ? "행정 업무" : "주간·주일 업무"}</span>
         <h1 className="min-w-0 flex-1 truncate text-sm font-bold text-white sm:text-base">{teamMeta.label}</h1>
         <label className="flex min-w-0 items-center gap-2 text-xs text-slate-300"><span className="shrink-0">팀 변경</span><select disabled={financeSaving} aria-label="현재 팀·팀 변경" className="max-w-36 rounded-lg border border-white/20 bg-slate-800 px-2 py-1.5 text-xs text-white" value={teamMeta.key} onChange={(event) => router.push(teamHrefWithTab(event.target.value as SundayTeamKey, initialTab))}>
           {SUNDAY_MINISTRY_TEAMS.map((item) => <option key={item.key} value={item.key}>{item.label}{item.status === "planned" ? " · 기획 중" : ""}{!accessibleTeams.includes(item) ? " · 권한 필요" : ""}</option>)}
