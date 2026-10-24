@@ -340,7 +340,7 @@ function PortalHomeWorkspace() {
         </section>
 
         <section aria-label="내 업무">
-          <HomeStart entry={homeEntry} roleLabel={describeTeamRoles(roles, teamMemberships)} viewOnly={!!assignedSundayTeam && !canEditTeam(assignedSundayTeam, roles, teamMemberships)} />
+          <HomeStart entry={homeEntry} accountEmail={user.email} roleLabel={describeTeamRoles(roles, teamMemberships)} viewOnly={!!assignedSundayTeam && !canEditTeam(assignedSundayTeam, roles, teamMemberships)} />
           {otherWork.length > 0 && (
             <section className={styles.otherWork} aria-labelledby="home-other-work-title">
               <h2 id="home-other-work-title">다른 담당 업무</h2>

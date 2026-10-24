@@ -23,7 +23,10 @@ it("홈 조회자는 권한 상태를 짧게 표시하고 같은 담당 업무�
   expect(screen.getByRole("link", { name: "업무 열기" })).toHaveAttribute("href", "/teams/praise");
 });
 
-it("담당 업무가 없으면 빈 시작 카드를 표시하지 않는다", () => {
-  const { container } = render(<HomeStart roleLabel="미배정" entry={null} />);
-  expect(container).toBeEmptyDOMElement();
+it("담당 업무가 없으면 로그인 계정과 팀 연결 문의 경로를 제공한다", () => {
+  render(<HomeStart roleLabel="스탭" entry={null} accountEmail="staff@example.test" />);
+  expect(screen.getByRole("heading", { name: "담당 팀 연결이 필요합니다" })).toBeInTheDocument();
+  expect(screen.getByText("로그인 계정 · staff@example.test")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "팀 연결 문의하기" })).toHaveAttribute("href", "/help/feedback");
+  expect(screen.queryByRole("link", { name: "업무 열기" })).not.toBeInTheDocument();
 });

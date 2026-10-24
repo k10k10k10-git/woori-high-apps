@@ -4,7 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CaretDown, DotsThree, SignOut, UserCircle } from "@phosphor-icons/react";
+import { CaretDown, DotsThree, LockKey, SignOut, UserCircle } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import type { MyPageTab } from "./MyPageModal";
 import PortalSearch from "./PortalSearch";
@@ -282,7 +282,7 @@ export default function GlobalPortalHeader() {
       </header>
       <nav className="portal-mobile-bottom-nav" aria-label="주요 메뉴">
         {areaItems.map((item) => <Link key={item.area} href={item.href} prefetch={item.allowed ? undefined : false} aria-current={currentArea === item.area ? "page" : undefined}>
-          <MinistryIcon name={item.icon} size={22} /><span>{item.label}</span>{!item.allowed && <span className="sr-only">권한 필요</span>}
+          <span className={styles.mobileNavIcon}><MinistryIcon name={item.icon} size={22} />{!item.allowed && <LockKey className={styles.mobileLock} size={13} weight="bold" aria-hidden="true" data-permission-indicator />}</span><span>{item.label}</span>{!item.allowed && <span className="sr-only">권한 필요</span>}
         </Link>)}
       </nav>
       {mobileMenuOpen && (
