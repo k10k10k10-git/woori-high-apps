@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
 
+const ciScope = spawnSync(process.execPath, ["--test", "scripts/ci-scope.test.mjs"], {
+  cwd: new URL("../", import.meta.url),
+  stdio: "inherit",
+});
+if (ciScope.status !== 0) process.exit(ciScope.status ?? 1);
+
 // 운영 앱 2개. semester-app·교사·스탭 출석부는 2026-08-12 제거됐다.
 const apps = [
   "highschool-app",
