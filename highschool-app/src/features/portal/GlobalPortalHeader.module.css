@@ -5,6 +5,8 @@
 .menuHint { display: block; margin-top: 4px; font-size: 12px; font-weight: 400; color: var(--color-text-muted); line-height: 1.5; }
 @media (max-width: 1180px) { .brandSubtitle { display: none; } .areaLink > svg { display: none; } .areaLink .permissionLabel { display: none; } }
 .areaLink .permissionLabel { margin-left: 0; }
+.mobileNavIcon { position: relative; display: inline-flex; }
+.mobileLock { position: absolute; right: -8px; bottom: -1px; border-radius: 3px; background: var(--color-surface); color: var(--color-text-secondary); }
 
 .permissionLabel {
   display: inline-block;

@@ -58,7 +58,8 @@ jobs:
 
   # 합성 데이터로 UI를 확인하며 운영 인증 상태와 DB를 사용하지 않는다.
   new-staff-ui:
-    runs-on: ubuntu-latest
+    # ubuntu-latest의 OS 전환으로 브라우저 의존성과 설치 시간이 흔들리지 않게 고정한다.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: highschool-app

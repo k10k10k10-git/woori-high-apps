@@ -57,7 +57,7 @@ export default function VacationHome({
   return (
     <main className={`page-container max-w-7xl ${styles.page}`}>
       <header className={styles.heading}>
-        <div><h1>수련회</h1><p>수련회를 선택하고 맡은 업무를 시작하세요.</p></div>
+        <div><h1>수련회</h1>{(!selected || !isMobileView) && <p>수련회를 선택하고 맡은 업무를 시작하세요.</p>}</div>
         <div className={styles.tools}>
           {headerActions}
           {canCreate && <NewRetreatButton hrefAfterCreate={entryHref} onCreated={onCreated} />}
@@ -76,23 +76,15 @@ export default function VacationHome({
           <p>{canCreate ? "새 수련회를 만들면 행정·프로그램·현장 업무를 함께 준비할 수 있습니다." : "수련회가 등록되면 이곳에서 선택할 수 있습니다."}</p>
         </section>
       ) : <>
-        <ol className={styles.steps} aria-label="수련회 업무 시작 순서">
+        {(!selected || !isMobileView) && <ol className={styles.steps} aria-label="수련회 업무 시작 순서">
           <li aria-current={!selected ? "step" : undefined}><span>{selected ? <Check size={14} weight="bold" aria-hidden="true" /> : "1"}</span>수련회 선택</li>
           <li className={styles.stepArrow} aria-hidden="true"><ArrowRight size={16} /></li>
           <li aria-current={selected ? "step" : undefined}><span>2</span>업무 선택</li>
-        </ol>
+        </ol>}
 
-        <div className={`${styles.workspace}${selected ? ` ${styles.hasSelection}` : ""}`}>
-          <section className={styles.retreats} aria-label="수련회 목록">
-            {selected && isMobileView ? <label className={styles.selector}>
-              <span>선택한 수련회</span>
-              <span className={styles.selectControl}>
-                <select className="input" value={selected.id} onChange={(event) => onSelect(event.target.value)}>
-                  {retreats.map((retreat) => <option key={retreat.id} value={retreat.id}>{retreat.year}년 {retreat.name}</option>)}
-                </select>
-                <CaretDown size={18} aria-hidden="true" />
-              </span>
-            </label> : <div className={styles.list}>
+        <div className={`${styles.workspace}${selected ? ` ${styles.hasSelection}` : ""}${selected && isMobileView ? ` ${styles.mobileSelection}` : ""}`}>
+          {!(selected && isMobileView) && <section className={styles.retreats} aria-label="수련회 목록">
+            <div className={styles.list}>
               {retreats.map((retreat) => <article key={retreat.id} className={styles.retreatRow} data-selected={selected?.id === retreat.id}>
                 <button className={styles.retreatButton} type="button" aria-pressed={selected?.id === retreat.id} onClick={() => onSelect(retreat.id)}>
                   <div className={styles.retreatMeta}><span>{retreat.year}년</span>{lockedIds?.has(retreat.id) && <span><LockKey size={13} aria-hidden="true" />PIN 잠금</span>}</div>
@@ -102,12 +94,20 @@ export default function VacationHome({
                 </button>
                 {mode === "admin" && onDelete && <button type="button" className={styles.deleteButton} onClick={() => onDelete(retreat.id, retreat.name)} aria-label={`${retreat.name} 삭제`}><X aria-hidden="true" size={17} /></button>}
               </article>)}
-            </div>}
-          </section>
+            </div>
+          </section>}
 
           {selected && <section className={styles.selected} aria-label={`${selected.name} 업무 선택`}>
             <header className={styles.selectedHeader}>
-              <h2>{selected.name}</h2>
+              {isMobileView ? <label className={styles.selector}>
+                <span>선택한 수련회</span>
+                <span className={styles.selectControl}>
+                  <select className="input" value={selected.id} onChange={(event) => onSelect(event.target.value)}>
+                    {retreats.map((retreat) => <option key={retreat.id} value={retreat.id}>{retreat.year}년 {retreat.name}</option>)}
+                  </select>
+                  <CaretDown size={18} aria-hidden="true" />
+                </span>
+              </label> : <h2>{selected.name}</h2>}
               <p><CalendarBlank size={17} aria-hidden="true" />{periodLabel(selected.id, periods)}</p>
               {lockedIds?.has(selected.id) && <span className={styles.pin}><LockKey size={14} aria-hidden="true" />현장 입장 시 PIN 확인</span>}
             </header>

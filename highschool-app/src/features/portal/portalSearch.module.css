@@ -29,7 +29,8 @@
 .emptyState button { margin-top: 8px; }
 .footer { flex-shrink: 0; border-top: 1px solid var(--color-border); padding: 16px 24px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: .75rem; line-height: 1.7; }
 .footer details { margin-top: 6px; }
-.footer summary { width: fit-content; cursor: pointer; color: var(--color-text-muted); }
+.footer summary { width: fit-content; min-width: 44px; min-height: 44px; padding: 10px 8px; border-radius: 6px; cursor: pointer; color: var(--color-text-secondary); }
+.footer summary:focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
 .footer p { max-width: 70ch; margin: 8px 0 0; }
 .detailHeader { flex-shrink: 0; border-bottom: 1px solid var(--color-border); padding: 24px; }
 

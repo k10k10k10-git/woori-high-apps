@@ -12,6 +12,7 @@
 .stepArrow { opacity: .55; }
 .workspace { display: grid; gap: 24px; align-items: start; }
 .workspace.hasSelection { grid-template-columns: minmax(240px, .8fr) minmax(0, 1.5fr); }
+.workspace.mobileSelection { grid-template-columns: minmax(0, 1fr); }
 .retreats { min-width: 0; }
 .list { overflow: hidden; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-surface); }
 .retreatRow { position: relative; }
@@ -34,7 +35,7 @@
 .pin { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; color: var(--color-text-secondary); font-size: 12px; }
 .selector { display: grid; gap: 8px; font-size: 13px; font-weight: 650; }
 .selectControl { position: relative; }
-.selectControl select { appearance: none; width: 100%; min-height: 48px; height: 48px; padding-right: 40px; }
+.selectControl select { appearance: none; width: 100%; min-width: 0; min-height: 48px; height: 48px; padding-right: 40px; font-size: 16px; }
 .selectControl select:global(.input):not([multiple]):not([size]) { background-image: none; }
 .selectControl > svg { position: absolute; right: 14px; top: 15px; pointer-events: none; color: var(--color-text-secondary); }
 .fieldActions { padding: 20px; border-top: 1px solid var(--color-border); }
@@ -57,12 +58,14 @@
 .page :is(button, summary):focus-visible { outline: 3px solid var(--color-primary); outline-offset: -3px; }
 @media (max-width: 767px) {
   .page { padding-block: 24px 40px; }
-  .heading { gap: 16px; flex-direction: column; margin-bottom: 24px; }
+  .heading { gap: 12px; flex-direction: column; margin-bottom: 16px; }
   .heading p { font-size: 14px; }
   .tools { width: 100%; justify-content: flex-start; }
   .workspace.hasSelection { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .retreatButton { padding: 20px 56px 20px 20px; }
-  .selectedHeader { padding: 24px 20px; }
+  .selectedHeader { padding: 16px; }
+  .selectedHeader p { margin-top: 8px; font-size: 13px; }
+  .pin { margin-top: 6px; }
   .sharedCalendar { margin-top: 28px; }
   .error { align-items: stretch; flex-direction: column; }
 }

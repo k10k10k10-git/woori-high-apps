@@ -24,6 +24,32 @@ async function expectNoOverflow(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
 }
 
+async function expectReadableMobileMenu(page: Page) {
+  const nav = page.getByRole("navigation", { name: "주요 메뉴", exact: true });
+  const links = nav.getByRole("link");
+  await expect(links).toHaveCount(6);
+  for (const link of await links.all()) {
+    await expect(link).toBeInViewport({ ratio: 1 });
+    const metrics = await link.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height, fontSize: parseFloat(getComputedStyle(element).fontSize), scrollWidth: element.scrollWidth, clientWidth: element.clientWidth };
+    });
+    expect(metrics.width).toBeGreaterThanOrEqual(44);
+    expect(metrics.height).toBeGreaterThanOrEqual(44);
+    expect(metrics.fontSize).toBeGreaterThanOrEqual(12);
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  }
+  const restricted = nav.locator('a[href="/operations"]');
+  await expect(restricted).toContainText("권한 필요");
+  await expect(restricted).toHaveAttribute("data-qa-prefetch", "disabled");
+  const marker = restricted.locator("[data-permission-indicator]");
+  await expect(marker).toBeVisible();
+  const markerBox = (await marker.boundingBox())!;
+  expect(markerBox.width).toBeGreaterThanOrEqual(12);
+  expect(markerBox.height).toBeGreaterThanOrEqual(12);
+  await expect(nav.locator('a[href="/library"] [data-permission-indicator]')).toHaveCount(0);
+}
+
 async function expectAccessible(page: Page) {
   const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   const violations = results.violations.filter((item) => item.impact === "serious" || item.impact === "critical");
@@ -634,6 +660,7 @@ test("도움말을 확인한 뒤 이전 팀 업무 화면으로 돌아갈 수 �
 test("일반 스탭도 전체 상단 메뉴를 보고 모바일 메뉴를 키보드로 닫을 수 있다", async ({ page }, info) => {
   await open(page, "header");
   if ((page.viewportSize()?.width ?? 1280) <= 900) {
+    if ((page.viewportSize()?.width ?? 1280) < 768) await expectReadableMobileMenu(page);
     const trigger = page.getByRole("button", { name: "사이트 메뉴 열기" });
     await trigger.focus();
     await page.keyboard.press("Enter");
@@ -828,6 +855,25 @@ test("승인 전 계정과 팀 미배정 계정에 다른 안내와 해결 경�
   await expect(page.getByText(/담당 팀.*연결|담당 팀.*지정/, { exact: false }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /문의|문제 제보/ }).first()).toBeVisible();
   await expectNoOverflow(page);
+
+  await open(page, "actualHome", "unassigned");
+  const connection = page.getByRole("region", { name: "담당 팀 연결 안내", exact: true });
+  await expect(connection.getByRole("heading", { name: "담당 팀 연결이 필요합니다", exact: true })).toBeVisible();
+  await expect(connection).toContainText("synthetic-staff-a@example.invalid");
+  await expect(connection.getByRole("link", { name: "팀 연결 문의하기", exact: true })).toHaveAttribute("href", "/help/feedback");
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.navigation)).toEqual([]);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await expectNoOverflow(page);
+  await open(page, "actualHome", "unapproved");
+  await expect(page.getByRole("heading", { name: "접근 승인이 필요합니다", exact: true })).toBeVisible();
+  await expect(connection).toHaveCount(0);
+  for (const state of ["ready", "viewer"]) {
+    await open(page, "actualHome", state);
+    await expect(page.getByRole("region", { name: "내 업무 시작", exact: true })).toBeVisible();
+    await expect(connection).toHaveCount(0);
+  }
+  await expectServiceIsolation(page);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
 });
 
 test("사용법 검색·업무 필터·검색 초기화·문의 링크가 동작한다", async ({ page }) => {
@@ -874,12 +920,62 @@ test("준비 중인 팀의 주요 업무는 사용 가능한 학기 기록으로
   await expect(page.locator('a[href^="/teams/media/ongoing"]')).toHaveCount(0);
   const work = page.getByRole("region", { name: "주간 업무와 학기 기록", exact: true });
   await expect(work.getByRole("heading", { name: "주간·주일 운영 준비 중", exact: true })).toBeVisible();
+  const plannedCard = work.locator(".team-action-card").filter({ has: page.getByRole("heading", { name: "주간·주일 운영 준비 중", exact: true }) });
+  expect(await termActions.evaluate((element, other) => !!(element.compareDocumentPosition(other as Node) & Node.DOCUMENT_POSITION_FOLLOWING), await plannedCard.elementHandle())).toBe(true);
+  if ((page.viewportSize()?.width ?? 1280) < 768) {
+    const actionsBox = (await termActions.boundingBox())!;
+    expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual((await plannedCard.boundingBox())!.y + 1);
+  }
   await expect(work.getByRole("link", { name: "팀 기능 문의하기", exact: true })).toHaveAttribute("href", "/help/feedback");
+  const back = page.locator('.team-workspace-title a[href="/teams"]');
+  const backBox = (await back.boundingBox())!;
+  expect(backBox.width).toBeGreaterThanOrEqual(44);
+  expect(backBox.height).toBeGreaterThanOrEqual(44);
   await expect(page.locator("#team-first-guide")).toHaveCount(0);
   await expect(page.getByRole("button", { name: /안내 닫기|사용 안내 열기/ })).toHaveCount(0);
   await expectNoOverflow(page);
   await expectServiceIsolation(page);
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+});
+
+test("UX 보완: 320·360px에서도 홈 안내·메뉴·팀 복귀·검색 설명을 읽고 누른다", async ({ page }, info) => {
+  test.skip(info.project.name !== "mobile390", "작은 너비는 Chromium 한 프로젝트에서만 검사합니다.");
+  for (const width of [320, 360]) {
+    await page.setViewportSize({ width, height: 844 });
+    await open(page, "actualHome", "unassigned");
+    const connection = page.getByRole("region", { name: "담당 팀 연결 안내", exact: true });
+    await expect(connection.getByRole("link", { name: "팀 연결 문의하기", exact: true })).toBeVisible();
+    await expectReadableMobileMenu(page);
+    // 문서 폭만으로는 overflow:hidden 안의 글자 잘림을 발견할 수 없다.
+    const clippedText = await page.locator('.home-hero .page-title, [aria-label="담당 팀 연결 안내"] h2, [aria-label="담당 팀 연결 안내"] p, [aria-label="담당 팀 연결 안내"] span').evaluateAll((elements) => elements.flatMap((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const box = element.getBoundingClientRect();
+      return [...range.getClientRects()].filter(rect => rect.left < box.left - 1 || rect.right > box.right + 1).map(() => element.textContent);
+    }));
+    expect(clippedText).toEqual([]);
+    await expectNoOverflow(page);
+    await page.screenshot({ path: info.outputPath(`unassigned-${width}.png`) });
+
+    await page.goto("/teams/media?scenario=team&team=media");
+    const back = page.locator('.team-workspace-title a[href="/teams"]');
+    await expect(back).toBeVisible();
+    const backBox = (await back.boundingBox())!;
+    expect(backBox.width).toBeGreaterThanOrEqual(44);
+    expect(backBox.height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByRole("navigation", { name: "선택 학기 업무", exact: true }).getByRole("link")).toHaveCount(4);
+    await expectNoOverflow(page);
+
+    await open(page, "actualAccounts", "admin");
+    await page.getByRole("button", { name: "인물 통합검색 열기" }).click();
+    const dialog = page.getByRole("dialog", { name: "인물 통합검색", exact: true });
+    const criteria = dialog.locator("summary").filter({ hasText: "기록 연결 기준" });
+    await expect(criteria).toBeVisible();
+    expect((await criteria.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await expectNoOverflow(page);
+    await expectServiceIsolation(page);
+    expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  }
 });
 
 for (const [term, label] of [["past", "지난 학기"], ["upcoming", "예정 학기"]]) {

@@ -24,6 +24,15 @@ for (const theme of ["light", "dark"]) {
     expect(box!.height).toBeGreaterThanOrEqual(44);
     expect(box!.y - panel!.y).toBeGreaterThanOrEqual(60);
     await expect(dialog.getByText("찾고 싶은 사람의 이름을 입력하세요")).toBeVisible();
+    const criteria = dialog.locator("summary").filter({ hasText: "기록 연결 기준" });
+    const criteriaDetails = dialog.locator("details").filter({ hasText: "기록 연결 기준" });
+    expect((await criteria.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await criteria.focus();
+    await criteria.press("Enter");
+    await expect(criteriaDetails).toHaveAttribute("open", "");
+    await expect(criteriaDetails.locator("p")).toBeVisible();
+    await criteria.press("Enter");
+    await expect(criteriaDetails).not.toHaveAttribute("open", "");
     await page.screenshot({ path: info.outputPath(`search-empty-${theme}.png`) });
     await input.fill("합성학생");
     await expect(dialog.getByRole("button", { name: /합성학생가 학생/ })).toHaveCount(1);

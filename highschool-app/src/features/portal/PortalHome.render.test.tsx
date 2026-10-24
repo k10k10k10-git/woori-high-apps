@@ -131,6 +131,15 @@ it("찬양팀 홈은 맡은 팀의 업무와 직접 진입 경로를 안내한�
   expect(screen.getByRole("heading", { name: "찬양팀 업무 시작" })).toBeInTheDocument();
   expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/teams")).every((link) => link.getAttribute("href") === "/teams/praise")).toBe(true);
   expect(screen.queryByRole("heading", { name: "행정·바나바" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "담당 팀 연결 안내" })).not.toBeInTheDocument();
+});
+
+it("승인된 스탭도 담당 업무가 없으면 팀 연결 안내를 받는다", () => {
+  mocks.roles = { semester: "staff", retreat: "none" };
+  render(<PortalHome />);
+  expect(screen.getByRole("region", { name: "담당 팀 연결 안내" })).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "팀 연결 문의하기" })).toHaveAttribute("href", "/help/feedback");
+  expect(screen.queryByRole("heading", { name: "접근 승인이 필요합니다" })).not.toBeInTheDocument();
 });
 
 it("홈 데이터 재시도는 거부된 구독을 해제하고 성공한 경로의 오류를 지운다", () => {
