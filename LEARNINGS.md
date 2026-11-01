@@ -220,7 +220,12 @@
 - **접근법**: GitHub Actions의 Playwright `trace.zip`에서 trusted 수정 클릭·기존 모달·별도 페이지의 목적지 요청을 각각 대조한다 → `highschool-app/e2e/new-staff-local.e2e.ts`의 새 탭 검사만 `ControlOrMeta + Shift` 전면 새 탭 입력으로 바꾼다 → 목적지 URL·기존 모달 유지·닫힘 및 내부 이동 0회·trusted modifiers·DB 쓰기 0건을 유지한다 → 로컬 네 가지 화면 환경의 관련 16건과 `MyPageModal.render.test.tsx` 20건을 확인하고 최종 커밋의 전체 CI를 다시 실행한다.
 - **판단 질문**: 첫 CI에는 별도 페이지의 `/operations/accounts` 요청 200이 있었지만 `context.page` 이벤트가 오지 않았다. 이 관측만으로 제품 핸들러를 바꾸지 않았으며 정확한 Chromium 초기화 원인은 미확정이다. timeout 확대·skip·강제 `window.open`을 쓰지 않았고, `context.pages()` 역시 같은 초기화에 의존하므로 fallback으로 추가하지 않았다. 단독 Ctrl/Meta 처리는 기존 렌더 테스트로 별도 유지한다.
 - **재사용 규칙**: 새 탭의 전면·배경 여부가 제품 계약에 없다면 실제 native 전면 새 탭으로 관측을 안정화할 수 있으나, 원래 창 보존·목적지·trusted 입력·무쓰기 검증을 유지하고 최종 전체 CI 성공 전에는 해결 완료로 보고하지 않는다.
-### 필수 검사 이름을 보존하며 Actions 검사 범위를 줄이기 (2026-10-24)
-- **접근법**: 1→ 완료된 Actions run의 job·step 시간을 읽어 중복 비용을 분리한다. 2→ `scripts/ci-scope.mjs`에서 PR merge-base→head와 push before→after를 `git diff --no-renames -z`로 비교한다. 3→ 문서·기존 테스트·CSS Module만 좁게 허용하고 미분류·비교 실패는 전체 검사한다. 4→ `.github/workflows/highschool-quality.yml`의 기존 `verify`·`new-staff-ui` 이름은 유지하고 `always()`와 명시 실패로 분류 오류를 전파한다. 5→ 실제 Git rename·300개 초과 diff·whitespace 오류·PR/main 조건을 `npm run test:ci-scope`로 확인한다.
-- **판단 질문**: workflow path 필터로 필수 검사를 통째로 생략하면 Pending으로 남을 수 있다. job 의존 실패를 조건부 skip으로만 처리하면 필수 검사가 성공처럼 보일 수 있어 명시 실패가 필요하다. 일반 TSX도 저장·권한을 호출할 수 있으므로 UI라는 이유로 검사를 줄이지 않는다. 보호 규칙 조회의 HTTP 403은 설정이 없다는 증거가 아니다.
+### 필수 검사 이름을 보존하며 Actions 검사 범위를 줄이기 (2026-10-24, 2026-11-01 보강)
+- **접근법**: 1→ 완료된 Actions run의 job·step 시간을 읽어 중복 비용을 분리한다. 2→ `scripts/ci-scope.mjs`에서 PR merge-base→head와 push before→after를 `git diff --no-renames -z`로 비교한다. 3→ 문서·기존 테스트·CSS Module만 좁게 허용하고 미분류·비교 실패는 전체 검사한다. 4→ `.github/workflows/highschool-quality.yml`의 기존 `verify`·`new-staff-ui` 이름은 유지하고 `always()`와 명시 실패로 분류 오류를 전파한다. 5→ 실제 Git rename·300개 초과 diff·whitespace 오류·PR/main 조건을 `npm run test:ci-scope`로 확인한다. 6→ 월이 바뀌면 당월 계정 사용량을 읽고, 저장소 실행 건수·계정 잔여량·예산 확인을 구분한다.
+- **판단 질문**: workflow path 필터로 필수 검사를 통째로 생략하면 Pending으로 남을 수 있다. job 의존 실패를 조건부 skip으로만 처리하면 필수 검사가 성공처럼 보일 수 있어 명시 실패가 필요하다. 일반 TSX도 저장·권한을 호출할 수 있으므로 UI라는 이유로 검사를 줄이지 않는다. 보호 규칙 조회의 HTTP 403은 설정이 없다는 증거가 아니다. 계정 사용량 API의 404와 `user` scope 필요 안내, 저장소 실행 0건도 잔여량이나 초과 사용 허용 여부를 증명하지 않는다.
 - **재사용 규칙**: CI 비용 절감은 `실측 시간 → 좁은 허용 목록 → 기존 check 이름·실패 전파 보존 → 전체 diff 회귀 → 로컬 검증` 순서로 처리하고, 게시 제한이 있으면 원격 CI로 검증하지 않는다.
+
+### Xcode 라이브러리 오류와 설치된 Command Line Tools Git 구분하기 (2026-11-01)
+- **접근법**: 1→ `/usr/bin/git`의 오류에서 Xcode `CoreDevice`/`Mercury`의 `_XPCTypeBool` 불일치를 확인한다. 2→ 이미 설치된 `/Library/Developer/CommandLineTools/usr/bin/git --version`을 실행한다. 3→ 정상일 때 해당 작업 명령에만 `PATH=/Library/Developer/CommandLineTools/usr/bin:$PATH`를 지정해 Git과 Git을 사용하는 회귀 검사를 실행한다.
+- **판단 질문**: 시스템 `xcode-select` 변경·재설치가 현재 CI 문서 작업에 필요하지 않았다. 설치된 정상 바이너리를 명령 단위로 사용해 사용자 환경과 다른 작업을 보존했다. 이 방법은 도구 로딩 오류에만 적용하며 권한 거부나 게시 제한을 우회하는 수단이 아니다.
+- **재사용 규칙**: Git 실행 실패는 도구 로딩 오류·접근 거부·저장소 오류를 구분하고, 로딩 오류에는 설치된 정상 도구를 작업 명령에만 지정한다.

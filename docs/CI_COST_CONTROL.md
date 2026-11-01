@@ -2,12 +2,16 @@
 
 기준: main `10ff2cf518aa8f9b065b5f9e4bc7ff83272b5a3b` (PR120). 기존 `ubuntu-24.04` 고정과 `cancel-in-progress`를 유지한다. 이 문서의 변경은 통합 앱 워크플로와 로컬 작업 순서에 한정하며, 학생 앱·Rules·찬양/회계 에뮬레이터·Agent OS의 기존 검사를 제거하지 않는다.
 
+2026-11-01 읽기 전용 재확인에서도 원격 main은 같은 SHA였다. 이전 로컬 `f426fa5`와 충돌이 없어 CI 구현을 유지한다. 아직 원격에는 적용하지 않았다.
+
 ## 로컬에서 묶어서 검증하기
 
 1. `git status --short`로 기존 변경을 확인하고 작업 브랜치에서 같은 목적의 수정을 묶는다. 작은 수정마다 push하지 않는다.
 2. 루트 `npm run test:ci-scope`를 실행한다. 대상 앱에서 `npm run lint` → `npm run typecheck` → `npm test` → `npm run build`를 순서대로 실행한다. 전체 감사는 루트 `npm run verify`를 사용한다. 같은 앱의 typecheck와 build를 병렬 실행하지 않는다.
 3. 통합 앱 게시 전에는 `npm run test:coverage`, 빌드 후 `node scripts/check-praise-runtime.mjs`, `npm run quality:lighthouse`도 확인한다. UI 변경은 `npm run test:e2e:new-staff`와 `npx playwright test --config=playwright.admin-finance.config.ts`로 격리된 합성 데이터를 검증한다. 실제 운영 인증/DB 저장 검증을 뜻하지 않는다.
 4. 실패를 해결하고 같은 목적의 변경을 한 번 게시한다. 사용자 지시가 로컬 전용이면 검증 결과까지만 보고하며 push·PR·병합·배포를 실행하지 않는다. `[skip ci]`나 테스트 삭제·실패 무시로 사용량을 줄이지 않는다.
+
+위 순서는 이 저장소의 기본 작업 방식이다. 일반 코드·로그인·저장·권한 검사는 그대로 유지한다. 수정 중에는 관련 로컬 검사로 피드백을 받고, 같은 목적의 변경을 묶은 뒤 게시 전 전체 기준을 검증한다. 이 작업만으로 다른 저장소나 전역 설정을 변경하지 않는다.
 
 ## 통합 앱의 검사 분류
 
@@ -45,4 +49,17 @@ main의 `production-version`은 품질·합성 UI 성공 후 배포 SHA를 확�
 - CSS Module만 변경: 두 UI 묶음은 모두 유지하므로 main의 coverage 계측 차이와 Lighthouse 정도만 줄인다.
 - 로그인·저장·권한·일반 TSX·공통/미분류 변경은 기존 전체 검사와 동일하고 분류 job 비용이 추가된다. **PR120과 같은 일반 UI TSX 변경을 자동으로 반값으로 줄이는 설계는 아니다.**
 
-이 수치는 과거 한 실행을 적용한 추정치다. 새 원격 CI를 실행하지 않았으므로 실제 절감률·월 총절감액은 미측정이다. 워크플로 자체 변경인 이번 게시에는 보수적 전체 검사가 실행된다. 기존 월 포함량이 소진된 상태라 게시 전 비용 결정을 별도로 해야 한다. main 보호 규칙 조회는 GitHub API HTTP 403(비공개 저장소 기능의 요금제 제한)으로 확인하지 못했다. 기존 job 이름은 그대로 보존한다.
+이 수치는 과거 한 실행을 적용한 추정치다. 새 원격 CI를 실행하지 않았으므로 실제 절감률·월 총절감액은 미측정이다. 워크플로 자체 변경인 이번 게시에는 보수적 전체 검사가 실행된다. 기존 job 이름은 그대로 보존한다. 이 브랜치 전체를 PR로 게시하면 통합 앱 전체 검사와 `scripts/verify-all.mjs` 변경에 따른 Agent OS 검사가 대상이며 main 병합 후에도 전체 검사한다. 앱 폴더 밖만 변경하므로 기존 Vercel 변경 감지가 유지되면 새 앱 배포는 생략한다.
+
+## 당월 비용 확인과 게시 제한
+
+- 2026-10-24의 월 포함량 소진은 당시 기록이며 11월 잔여량을 뜻하지 않는다. 월이 바뀌면 당월 계정 사용량·예산·초과 사용 허용 상태를 새로 읽기 전용으로 확인한다.
+- 2026-11-01 조회: 이 저장소의 당일/당월 Actions 실행은 0건이었다. 이것만으로 계정 전체의 남은 포함량을 산출할 수 없다. 다른 저장소 사용량, 플랜·청구 기간·반올림·추가 청구 상태는 별도 정보다.
+- `GET /users/k10k10k10-git/settings/billing/usage/summary?year=2026&month=11`은 HTTP 404였고 `gh`가 `user` scope 필요를 안내했다. 계정 플랜 필드도 제공되지 않았다. 따라서 현재 Actions 잔여량·예산·초과 사용 허용 여부는 **미확인**이다. 인증 scope를 늘리거나 다른 토큰으로 재시도하지 않았다. [사용량 API의 읽기 권한 안내](https://docs.github.com/en/rest/billing/usage#get-billing-usage-summary-for-a-user)를 참고한다.
+- 소유자가 개인 계정이므로 조직 전용 예산 API로 개인 예산을 추정하지 않는다. [예산 API](https://docs.github.com/en/rest/billing/budgets)는 조직/기업 대상을 문서화하며, 개인 예산·초과 사용 상태는 로그인한 개인 Billing 화면에서 별도 읽기 확인이 필요하다. 설정을 변경하지 않는다.
+- 기존 main 보호 규칙 조회의 HTTP 403은 미확인 상태로 유지하며 새 권한 증거 없이 재시도하지 않았다. 필수 검사 이름·실패 전파·검사 기준·보호 설정을 약화하지 않는다.
+- 이번 범위는 로컬 적용·검증과 원격 읽기다. push·PR 생성 제안은 상위 대화에서 자동 검토에 거부돼 별도 확인 중이며 실행하지 않는다. 우회 게시·원격 검사 실행·merge·deploy·결제/예산/권한 변경도 하지 않는다.
+
+## 로컬 Git 환경
+
+2026-11-01 Mac의 `/usr/bin/git`은 Xcode `CoreDevice`/`Mercury` 라이브러리의 `_XPCTypeBool` 불일치로 실행에 실패했다. 설치된 `/Library/Developer/CommandLineTools/usr/bin/git`은 정상 실행됐다. 이 환경에서는 명령 단위로 `PATH=/Library/Developer/CommandLineTools/usr/bin:$PATH npm run test:ci-scope`처럼 사용한다. 시스템 `xcode-select`나 설치 상태는 변경하지 않는다. 기존 비교·형식 검사와 실패 전파는 유지한다.
