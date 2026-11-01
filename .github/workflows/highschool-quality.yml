@@ -1,23 +1,43 @@
 name: highschool-app quality gate
 
 on:
+  # 필수 검사 이름이 누락되지 않게 워크플로는 항상 시작하고 단계 안에서 범위를 줄인다.
   pull_request:
-    paths:
-      - "highschool-app/**"
-      - ".github/workflows/highschool-quality.yml"
   push:
     branches: [main]
-    paths:
-      - "highschool-app/**"
-      - ".github/workflows/highschool-quality.yml"
+  merge_group:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: highschool-quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      quality: ${{ steps.scope.outputs.quality }}
+      staff: ${{ steps.scope.outputs.staff }}
+      finance: ${{ steps.scope.outputs.finance }}
+      deploy: ${{ steps.scope.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node --test scripts/ci-scope.test.mjs
+      - id: scope
+        run: node scripts/ci-scope.mjs
+
   verify:
+    # 분류 실패·취소를 성공으로 숨기지 않는다. 기존 필수 검사 이름을 유지한다.
+    needs: changes
+    if: always()
     runs-on: ubuntu-latest
     env:
       # Build-time only Firebase shape. The verification job never connects to
@@ -34,21 +54,34 @@ jobs:
       run:
         working-directory: highschool-app
     steps:
+      - name: Require successful classification
+        if: needs.changes.result != 'success'
+        run: exit 1
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
+        if: needs.changes.outputs.quality != 'none'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: highschool-app/package-lock.json
       - run: npm ci
+        if: needs.changes.outputs.quality != 'none'
       - run: npm run lint
+        if: needs.changes.outputs.quality != 'none'
       - run: npm run typecheck
+        if: needs.changes.outputs.quality != 'none'
       - run: npm run test:coverage
+        if: needs.changes.outputs.quality != 'none' && (github.event_name != 'push' || needs.changes.outputs.quality == 'full')
+      - run: npm test
+        if: github.event_name == 'push' && needs.changes.outputs.quality == 'core'
       - run: npm run build
+        if: needs.changes.outputs.quality != 'none'
       - run: node scripts/check-praise-runtime.mjs
+        if: needs.changes.outputs.quality != 'none'
       - run: npm run quality:lighthouse
+        if: needs.changes.outputs.quality != 'none' && (github.event_name != 'push' || needs.changes.outputs.quality == 'full')
       - uses: actions/upload-artifact@v7
-        if: always()
+        if: always() && needs.changes.outputs.quality != 'none'
         with:
           name: highschool-quality-reports
           path: |
@@ -56,30 +89,50 @@ jobs:
             highschool-app/.lighthouseci
           if-no-files-found: ignore
 
+      - name: Documentation or independent tool change
+        if: needs.changes.outputs.quality == 'none'
+        run: echo "통합 앱 실행 코드 변경 없음. 분류 회귀 검사와 diff 검사를 통과했습니다."
+
   # 합성 데이터로 UI를 확인하며 운영 인증 상태와 DB를 사용하지 않는다.
   new-staff-ui:
+    needs: changes
+    if: always()
     # ubuntu-latest의 OS 전환으로 브라우저 의존성과 설치 시간이 흔들리지 않게 고정한다.
     runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: highschool-app
     steps:
+      - name: Require successful classification
+        if: needs.changes.result != 'success'
+        run: exit 1
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
+        if: needs.changes.outputs.staff == 'true' || needs.changes.outputs.finance == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: highschool-app/package-lock.json
       - run: npm ci
+        if: needs.changes.outputs.staff == 'true' || needs.changes.outputs.finance == 'true'
       - run: npx playwright install --with-deps chromium webkit
+        if: needs.changes.outputs.staff == 'true' || needs.changes.outputs.finance == 'true'
       - run: npm run test:e2e:new-staff
+        if: needs.changes.outputs.staff == 'true'
       - run: npx playwright test --config=playwright.admin-finance.config.ts
+        if: needs.changes.outputs.finance == 'true'
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: new-staff-ui-report
-          path: highschool-app/test-results/new-staff-local
+          path: |
+            highschool-app/test-results/new-staff-local
+            highschool-app/test-results/admin-finance-local
           if-no-files-found: ignore
+
+      - name: No synthetic UI changes
+        if: needs.changes.outputs.staff == 'false' && needs.changes.outputs.finance == 'false'
+        run: echo "합성 UI 대상 변경 없음. 분류 회귀 검사를 통과했습니다."
 
   # 운영 인증 상태는 PR 코드에 제공하지 않는다. 수동 main 실행은 기존 인증 가드를 유지한다.
   authenticated-e2e:
@@ -124,25 +177,15 @@ jobs:
   production-version:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [changes, verify, new-staff-ui]
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 2
-      - name: Detect highschool app changes
-        id: app_changes
-        run: |
-          if git diff --quiet HEAD^ HEAD -- highschool-app; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
       - uses: actions/setup-node@v7
-        if: steps.app_changes.outputs.changed == 'true'
+        if: needs.changes.outputs.deploy == 'true'
         with:
           node-version: 22
       - name: Verify deployed commit without authentication
-        if: steps.app_changes.outputs.changed == 'true'
+        if: needs.changes.outputs.deploy == 'true'
         env:
           E2E_BASE_URL: https://woorihigh-app.vercel.app
           E2E_EXPECTED_BUILD_ID: ${{ github.sha }}

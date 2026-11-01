@@ -2,6 +2,7 @@
   "name": "woori-highschool-apps",
   "private": true,
   "scripts": {
+    "test:ci-scope": "node --test scripts/ci-scope.test.mjs",
     "verify": "node scripts/verify-all.mjs",
     "test:activity-log-rules": "node scripts/run-activity-log-rules.mjs"
   }
