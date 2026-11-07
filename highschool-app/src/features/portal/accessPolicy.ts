@@ -90,7 +90,7 @@ export const SEMESTER_ROLE_HINTS: Record<SemesterRole, string> = {
   superAdmin: "학기·주일 전체 + 출석부 반영",
   pastor: "학기·주일 전체 (출석부 반영 제외)",
   leader: "학기·주일 수정 (학기 삭제 제외)",
-  adminTeam: "학기·주일 행정팀 수정, 다른 주일팀 조회",
+  adminTeam: "행정·바나바 새친구 처리 및 출석부 반영",
   barnabas: "주일 바나바팀 수정, 학기는 조회",
   worship: "주일 예배팀 수정, 학기는 조회",
   praise: "찬양팀 출결·등단은 담당 권한에 따라 이용, 학기는 조회",
@@ -163,8 +163,7 @@ const SEMESTER_CAPS: Record<SemesterRole, SemesterCapability> = {
   // 행정팀의 출석부 반영은 2026-08-12 Rules 보강으로 열렸다 —
   // classes/attendance/trash의 **학생 1명 경로**만 `semesterRole === "adminTeam"`에게 허용된다.
   // 반 노드 전체(students 통째·teacher)는 여전히 통합관리자·담임만 쓴다.
-  // 주일은 모든 팀을 조회하되 행정팀 화면만 수정한다. 다른 팀의 실무 데이터까지
-  // 행정팀이 바꾸는 권한은 운영상 필요하지 않으므로 최소 권한으로 닫는다.
+  // 바나바 새친구 처리는 기존 원장 반영 권한으로 열고, 다른 팀의 편집 권한은 유지한다.
   adminTeam:  { semester: "write", sunday: "read", sundayTeam: "admin", settings: true, destructive: false, rosterWrite: true, search: "read", manageRoles: false },
   // ── 사역팀 계열: 주일은 자기 팀 하나만 쓰고, 옆 팀은 보이지도 않는다 ──
   // 팀마다 저장 노드가 달라 Rules 근거도 다르다.
@@ -224,6 +223,7 @@ export function canEditArea(area: PortalArea, roles: MinistryRoles): boolean {
  * 사역팀은 자기 팀 하나만 참이다 — 옆 팀은 메뉴에서도 빠지고 주소를 직접 쳐도 막힌다.
  */
 export function canAccessSundayTeam(team: SundayTeamKey, roles: MinistryRoles, assignedTeamKeys?: readonly SundayTeamKey[]): boolean {
+  if (team === "barnabas" && canWriteStudentRoster(roles)) return true;
   if (roles.semester === "superAdmin" || roles.semester === "pastor") return true;
   if (assignedTeamKeys) return assignedTeamKeys.includes(team);
   const sem = SEMESTER_CAPS[roles.semester];
@@ -232,6 +232,7 @@ export function canAccessSundayTeam(team: SundayTeamKey, roles: MinistryRoles, a
 
 /** 그 팀 화면을 저장까지 할 수 있는가. */
 export function canEditSundayTeam(team: SundayTeamKey, roles: MinistryRoles, assignedTeamKeys?: readonly SundayTeamKey[]): boolean {
+  if (team === "barnabas" && canWriteStudentRoster(roles)) return true;
   if (roles.semester === "superAdmin" || roles.semester === "pastor") return true;
   if (assignedTeamKeys) return assignedTeamKeys.includes(team);
   const sem = SEMESTER_CAPS[roles.semester];
@@ -240,6 +241,7 @@ export function canEditSundayTeam(team: SundayTeamKey, roles: MinistryRoles, ass
 
 /** 자기 팀 하나만 여는 역할이면 그 팀 키, 전체 권한이거나 접근 불가면 null. */
 export function ownSundayTeam(roles: MinistryRoles, assignedTeamKeys?: readonly SundayTeamKey[]): SundayTeamKey | null {
+  if (roles.semester === "adminTeam" && assignedTeamKeys?.length === 0) return "admin";
   if (roles.semester === "superAdmin" || roles.semester === "pastor") return null;
   if (assignedTeamKeys) return assignedTeamKeys.length === 1 ? assignedTeamKeys[0] : null;
   return SEMESTER_CAPS[roles.semester].sundayTeam;

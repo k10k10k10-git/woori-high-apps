@@ -3,9 +3,9 @@ import { accessibleTeamKeys, canAccessTeam, canBrowseTeam } from "@/features/tea
 import { canManageAnnualFinance, type MinistryRoles, type SemesterRole } from "./accessPolicy";
 
 describe("연간 회계 접근 범위", () => {
-  it("중앙 행정 계정의 행정 업무 진입은 별도 membership이 필요 없고 옆 팀은 열지 않는다", () => {
+  it("중앙 행정 계정은 행정·바나바 업무에 진입하고 찬양팀은 별도 배정이 필요하다", () => {
     const roles: MinistryRoles = { semester: "adminTeam", retreat: "none" };
-    expect(accessibleTeamKeys(roles, {})).toEqual(["admin"]);
+    expect(accessibleTeamKeys(roles, {})).toEqual(["admin", "barnabas"]);
     expect(canBrowseTeam("admin", roles, {})).toBe(true);
     expect(canAccessTeam("admin", roles, {})).toBe(true);
     expect(canAccessTeam("praise", roles, {})).toBe(false);
