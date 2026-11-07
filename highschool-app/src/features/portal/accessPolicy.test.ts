@@ -341,13 +341,13 @@ describe("주일 사역 - 팀 경계", () => {
     expect(canEditSundayTeam("praise", leader, ["media"])).toBe(false);
   });
 
-  it("행정팀은 모든 주일팀을 조회하되 행정팀만 수정한다", () => {
+  it("행정팀은 행정·바나바 업무를 수정하고 다른 주일팀은 기존 범위를 유지한다", () => {
     const admin = semester("adminTeam");
     expect(canAccessArea("sunday", admin)).toBe(true);
     expect(canEditArea("sunday", admin)).toBe(false);
     for (const team of ["admin", "barnabas", "worship", "praise", "media", "design"] as const) {
       expect(canAccessSundayTeam(team, admin)).toBe(true);
-      expect(canEditSundayTeam(team, admin)).toBe(team === "admin");
+      expect(canEditSundayTeam(team, admin)).toBe(team === "admin" || team === "barnabas");
     }
   });
 
@@ -394,4 +394,14 @@ describe("역할 변경 방향", () => {
     expect(isRetreatUpgrade("iguardTeam", "iguardTeam")).toBe(false);
     expect(isRetreatDowngrade("iguardTeam", "iguardTeam")).toBe(false);
   });
+});
+
+it("명시된 행정팀 소속에도 바나바 처리 경로와 원장 반영 권한을 유지한다", () => {
+  const admin = { semester: "adminTeam", retreat: "none" } as const;
+  for (const teams of [[], ["admin"]] as const) {
+    expect(canAccessSundayTeam("barnabas", admin, teams)).toBe(true);
+    expect(canEditSundayTeam("barnabas", admin, teams)).toBe(true);
+    expect(canWriteStudentRoster(admin)).toBe(true);
+    expect(canEditSundayTeam("worship", admin, teams)).toBe(false);
+  }
 });

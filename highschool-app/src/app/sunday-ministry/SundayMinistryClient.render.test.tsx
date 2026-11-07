@@ -16,7 +16,11 @@ vi.mock("@/features/sundayMinistry/AttendanceBookTab", () => ({ default: ({ year
 vi.mock("@/features/sundayWorship/WorshipDocsTab", () => ({ default: () => null }));
 vi.mock("@/features/sundayWorship/WorshipDutyTab", () => ({ default: () => null }));
 vi.mock("@/features/sundayWorship/WorshipSeatingTab", () => ({ default: () => null }));
-vi.mock("../semester/[id]/NewFriendsTab", () => ({ default: () => null }));
+vi.mock("../semester/[id]/NewFriendsTab", () => ({ default: function NewFriendsFixture({ canSyncRoster }: { canSyncRoster: boolean }) {
+  const canEdit = useSemesterCanEdit();
+  return canEdit && canSyncRoster ? <button>합성 출석부 반영</button> : null;
+} }));
+import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import SundayMinistryClient, { sundayTabHref } from "./SundayMinistryClient";
 
 beforeEach(() => { state.roles = { semester: "superAdmin", retreat: "superAdmin" }; state.teamMemberships = {}; state.canSearchOfficialRoster = true; vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry"); state.friends.mockReturnValue(() => {}); state.friendsPrivate.mockReturnValue(() => {}); state.changes.mockReturnValue(() => {}); });
@@ -197,4 +201,14 @@ it("별도 배정 없는 중앙 행정 계정의 기존 주일 업무 주소는 
   render(<SundayMinistryClient />);
   expect(screen.getByLabelText("현재 팀·팀 변경")).toHaveValue("admin");
   expect(screen.getByRole("tab", { name: "출석부" })).toHaveAttribute("aria-selected", "true");
+});
+
+it("행정팀 소속 계정은 바나바 업무에서 비공개 정보를 구독하고 원장 반영을 연다", () => {
+  state.roles = { semester: "adminTeam", retreat: "none" };
+  state.teamMemberships = { admin: { active: true, role: "staff" } };
+  render(<SundayMinistryClient team="barnabas" initialTab="새친구" />);
+  expect(screen.getByRole("heading", { name: "바나바팀" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "합성 출석부 반영" })).toBeEnabled();
+  expect(state.friends).toHaveBeenCalled();
+  expect(state.friendsPrivate).toHaveBeenCalled();
 });

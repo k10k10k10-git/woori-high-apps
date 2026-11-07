@@ -3,7 +3,7 @@ import {
   sundayTeamOf,
   type SundayTeamKey,
 } from "@/features/portal/featureCatalog";
-import { canManageAnnualFinance, describeRoles, RETREAT_ROLE_LABELS, type MinistryRoles } from "@/features/portal/accessPolicy";
+import { canManageAnnualFinance, canWriteStudentRoster, describeRoles, RETREAT_ROLE_LABELS, type MinistryRoles } from "@/features/portal/accessPolicy";
 import type { Team } from "@/features/semester/types";
 
 export type TeamMembershipRole = "leader" | "operator" | "staff" | "viewer";
@@ -87,11 +87,11 @@ export function canReadSemesterPrivate(roles: MinistryRoles, memberships?: TeamM
 export function accessibleTeamKeys(roles: MinistryRoles, memberships: TeamMemberships = {}): SundayTeamKey[] {
   if (canBrowseEveryTeam(roles)) return SUNDAY_MINISTRY_TEAMS.map((team) => team.key);
   const keys = activeTeamKeys(memberships);
-  return canManageAnnualFinance(roles) ? [...new Set<SundayTeamKey>(["admin", ...keys])] : keys;
+  return canManageAnnualFinance(roles) ? [...new Set<SundayTeamKey>(["admin", "barnabas", ...keys])] : keys;
 }
 
 export function canBrowseTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
-  return canBrowseEveryTeam(roles) || (teamKey === "admin" && canManageAnnualFinance(roles)) || activeTeamKeys(memberships, semesterId).includes(teamKey);
+  return (teamKey === "barnabas" && canWriteStudentRoster(roles)) || canBrowseEveryTeam(roles) || (teamKey === "admin" && canManageAnnualFinance(roles)) || activeTeamKeys(memberships, semesterId).includes(teamKey);
 }
 
 /** 팀 명단의 공식 원장 연락처는 그 팀을 조회할 수 있는 구성원에게만 연다. */
@@ -100,10 +100,11 @@ export function canReadTeamContacts(teamKey: SundayTeamKey, roles: MinistryRoles
 }
 
 export function canAccessTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
-  return canAccessEveryTeam(roles) || (teamKey === "admin" && canManageAnnualFinance(roles)) || activeTeamKeys(memberships, semesterId).includes(teamKey);
+  return (teamKey === "barnabas" && canWriteStudentRoster(roles)) || canAccessEveryTeam(roles) || (teamKey === "admin" && canManageAnnualFinance(roles)) || activeTeamKeys(memberships, semesterId).includes(teamKey);
 }
 
 export function canEditTeam(teamKey: SundayTeamKey, roles: MinistryRoles, memberships: TeamMemberships = {}, semesterId?: string): boolean {
+  if (teamKey === "barnabas" && canWriteStudentRoster(roles)) return true;
   if (roles.semester === "superAdmin" || roles.semester === "pastor") return true;
   if (roles.semester === "leader" && activeTeamKeys(memberships).length === 0) return true;
   const membership = memberships[teamKey];

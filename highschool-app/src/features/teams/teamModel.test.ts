@@ -108,3 +108,16 @@ it("중앙 운영 역할과 소속 없는 계정의 기존 역할 설명은 유�
   expect(describeTeamRoles({ semester: "staff", retreat: "none" }, { praise: { role: "staff", active: false } })).toBe("학기 사역팀(미지정)");
   expect(describeTeamRoles({ semester: "praise", retreat: "none" })).toBe("학기 찬양팀");
 });
+
+it("행정팀은 별도 바나바 소속 없이 새친구 업무에 접근·수정한다", () => {
+  const roles = { semester: "adminTeam", retreat: "none" } as const;
+  for (const memberships of [{}, { admin: { active: true, role: "staff" as const } }, { barnabas: { active: true, role: "viewer" as const } }]) {
+    expect(accessibleTeamKeys(roles, memberships)).toEqual(["admin", "barnabas"]);
+    expect(canBrowseTeam("barnabas", roles, memberships)).toBe(true);
+    expect(canAccessTeam("barnabas", roles, memberships)).toBe(true);
+    expect(canEditTeam("barnabas", roles, memberships)).toBe(true);
+    expect(canEditTeam("worship", roles, memberships)).toBe(false);
+    expect(canAccessTeam("praise", roles, memberships)).toBe(false);
+  }
+  expect(canEditTeam("barnabas", { semester: "staff", retreat: "adminTeam" })).toBe(false);
+});
