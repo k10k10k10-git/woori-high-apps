@@ -333,7 +333,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
 
   /**
    * 팀원 삭제 — 세 노드(admins·retreatAdmins·iguardMembers+iguardRoles)의 권한을 모두 회수한다.
-   * 구글 계정 자체는 지우지 않는다(그건 Firebase 콘솔의 몫). 다시 승인하면 복구된다.
+   * 로그인 계정 자체는 지우지 않는다(그건 Supabase 인증 관리의 몫). 다시 승인하면 복구된다.
    */
   async function removeMember(member: TeamMember) {
     const steps = planRoleAssignment(NO_ROLES, {
@@ -349,7 +349,7 @@ function TeamContent({ onClose, embedded = false, onRetry }: TeamModalProps & { 
       `${memberLabel(member)}님을 팀원에서 삭제할까요?\n`
       + `현재 역할: ${roleBadgeLabel(member.roles)}\n\n`
       + `모든 접근 권한이 회수되어 로그인해도 화면에 들어오지 못합니다.\n`
-      + `구글 계정 자체는 삭제되지 않으며, 다시 승인하면 복구됩니다.`,
+      + `로그인 계정 자체는 삭제되지 않으며, 다시 승인하면 복구됩니다.`,
     );
     if (!confirmed) return;
     await run(

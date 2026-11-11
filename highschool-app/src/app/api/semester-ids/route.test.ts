@@ -3,7 +3,7 @@ vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({ authenticate: vi.fn(), ids: vi.fn() }));
 vi.mock("@/features/praise/server/httpAuth", () => ({ authenticatePraiseRequest: mocks.authenticate }));
 vi.mock("@/features/praise/server/references", () => ({ listSemesterIds: mocks.ids }));
-import { PraiseRequestError } from "@/features/praise/server/firebaseAdmin";
+import { PraiseRequestError } from "@/features/praise/server/supabaseAdmin";
 import { GET } from "./route";
 beforeEach(() => { vi.clearAllMocks(); mocks.ids.mockResolvedValue(["2026-2"]); });
 

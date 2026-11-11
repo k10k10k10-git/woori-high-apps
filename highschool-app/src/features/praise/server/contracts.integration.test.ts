@@ -3,8 +3,10 @@ import { initializeApp, deleteApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getDatabase, type Database } from "firebase-admin/database";
 vi.mock("server-only", () => ({}));
-const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null, app: null as App | null }));
-vi.mock("./firebaseAdmin", async importOriginal => ({ ...await importOriginal<typeof import("./firebaseAdmin")>(), getPraiseFirebaseAdmin:()=>({database:holder.database,auth:holder.auth,app:holder.app}) }));
+const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null, app: null as App | null, admin: null as PraiseAdmin | null }));
+vi.mock("./supabaseAdmin", async importOriginal => ({ ...await importOriginal<typeof import("./supabaseAdmin")>(), getPraiseAdmin:()=>holder.admin }));
+import type { PraiseAdmin } from "./supabaseAdmin";
+import { firebaseEmulatorAdmin } from "./firebaseEmulatorAdmin.testkit";
 import { GET as semesterIds } from "@/app/api/semester-ids/route";
 import { authenticatePraiseRequest } from "./httpAuth";
 import { readWorkspace, transactWorkspace } from "./repository";
@@ -33,7 +35,7 @@ function state(id:string):PraiseState {
 suite("실제 RTDB 직렬화·동시 저장·직접 Rules 접근",()=>{
  beforeAll(async()=>{
   if(process.env.FIREBASE_DATABASE_EMULATOR_HOST!=="127.0.0.1:19016" || process.env.FIREBASE_AUTH_EMULATOR_HOST!=="127.0.0.1:19098")throw new Error("합성 에뮬레이터 주소가 아닙니다.");
-  app=initializeApp({projectId:"demo-praise",databaseURL:`${base}/?ns=demo-praise-default-rtdb`,credential:{getAccessToken:async()=>({access_token:"owner",expires_in:3600})}},"praise-contracts");holder.database=getDatabase(app);holder.auth=getAuth(app);holder.app=app;
+  app=initializeApp({projectId:"demo-praise",databaseURL:`${base}/?ns=demo-praise-default-rtdb`,credential:{getAccessToken:async()=>({access_token:"owner",expires_in:3600})}},"praise-contracts");holder.database=getDatabase(app);holder.auth=getAuth(app);holder.app=app;holder.admin=firebaseEmulatorAdmin(app);
   await holder.database.ref().set({admins:{test_admin:true}});
  });
  afterAll(async()=>{if(app)await deleteApp(app);});

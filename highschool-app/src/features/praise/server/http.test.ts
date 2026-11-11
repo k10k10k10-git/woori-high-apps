@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import { praiseHttp, praiseJson } from "./http";
 import { PraiseDomainError } from "./validation";
-import { PraiseRequestError } from "./firebaseAdmin";
+import { PraiseRequestError } from "./supabaseAdmin";
 
 const request = (body = "{}", headers: Record<string,string> = {}) => new Request("https://ministry.example/api/praise", { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body });
 describe("찬양팀 HTTP 저장 경계", () => {

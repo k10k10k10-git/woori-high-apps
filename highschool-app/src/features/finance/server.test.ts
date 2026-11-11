@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ admin: vi.fn(), verify: vi.fn(), ref: vi.fn(), transaction: vi.fn(), on: vi.fn(), off: vi.fn(), values: new Map<string, unknown>(), primed: new Set<string>() }));
+const mocks = vi.hoisted(() => ({ admin: vi.fn(), verify: vi.fn(), get: vi.fn(), transaction: vi.fn(), values: new Map<string, unknown>() }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/features/praise/server/firebaseAdmin", async (original) => ({ ...await original<typeof import("@/features/praise/server/firebaseAdmin")>(), getPraiseFirebaseAdmin: mocks.admin }));
+vi.mock("@/features/praise/server/supabaseAdmin", async (original) => ({ ...await original<typeof import("@/features/praise/server/supabaseAdmin")>(), getPraiseAdmin: mocks.admin }));
 import { authenticateFinanceRequest, executeFinance, financeHttp, financeJson, getFinance, getFinanceHistory, getFinanceReceipt } from "./server";
 import { GET, POST } from "@/app/api/finance/[year]/route";
 import { GET as RECEIPT } from "@/app/api/finance/[year]/receipts/[entryId]/[receiptId]/route";
@@ -21,34 +21,28 @@ function request(body?: unknown, headers: Record<string, string> = {}) {
   return new Request("https://example.test/api/finance/2026", { method: body === undefined ? "GET" : "POST", headers: { Authorization: "Bearer synthetic-token", "Content-Type": "application/json", ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
 const context = { params: Promise.resolve({ year: "2026" }) };
-const snapshot = (path: string) => ({ val: () => structuredClone(mocks.values.get(path) ?? null) });
+const read = (path: string) => structuredClone(mocks.values.get(path) ?? null);
 beforeEach(() => {
-  vi.resetAllMocks(); mocks.values.clear(); mocks.primed.clear();
-  mocks.verify.mockResolvedValue({ uid: actor.uid, name: actor.name, firebase: { sign_in_provider: "google.com" } });
+  vi.resetAllMocks(); mocks.values.clear();
+  mocks.verify.mockResolvedValue({ uid: actor.uid, name: actor.name, email: null, supabaseId: "sb-admin", anonymous: false, disabled: false });
   mocks.values.set(`retreatAdmins/${actor.uid}`, { semesterRole: "adminTeam", retreatRole: "none" });
-  mocks.on.mockImplementation((path: string, listener: () => void) => { mocks.primed.add(path); queueMicrotask(listener); });
+  mocks.get.mockImplementation(async (path: string) => read(path));
   mocks.transaction.mockImplementation(async (path: string, updater: (value: unknown) => unknown) => {
-    const value = updater(mocks.primed.has(path) ? structuredClone(mocks.values.get(path) ?? null) : null);
+    const value = updater(read(path));
     if (value !== undefined) mocks.values.set(path, structuredClone(value));
-    return { committed: value !== undefined, snapshot: snapshot(path) };
+    return { committed: value !== undefined, value: read(path) };
   });
-  mocks.ref.mockImplementation((path: string) => ({
-    get: async () => snapshot(path),
-    on: (_event: string, listener: () => void) => mocks.on(path, listener),
-    off: (_event: string, listener: () => void) => mocks.off(path, listener),
-    transaction: (updater: (value: unknown) => unknown, callback: unknown, applyLocally: boolean) => mocks.transaction(path, updater, callback, applyLocally),
-  }));
-  mocks.admin.mockReturnValue({ auth: { verifyIdToken: mocks.verify }, database: { ref: mocks.ref } });
+  mocks.admin.mockReturnValue({ auth: { verifyAccessToken: mocks.verify }, database: { get: mocks.get, transaction: mocks.transaction } });
 });
 afterEach(() => vi.useRealTimers());
 describe("회계 서버의 권한·조회 경계", () => {
   it("로그인하지 않은 요청과 폐기된 토큰을 원장 조회 전에 거절한다", async () => {
     const denied = await GET(new Request("https://example.test/api/finance/2026"), context);
-    expect(denied.status).toBe(401); expect(mocks.ref).not.toHaveBeenCalled();
-    mocks.verify.mockRejectedValue({ code: "auth/id-token-revoked" });
+    expect(denied.status).toBe(401); expect(mocks.get).not.toHaveBeenCalled();
+    mocks.verify.mockRejectedValue({ code: "invalid_token" });
     expect((await POST(request(save()), context)).status).toBe(401);
     expect(mocks.transaction).not.toHaveBeenCalled();
-    expect(mocks.verify).toHaveBeenCalledWith("synthetic-token", true);
+    expect(mocks.verify).toHaveBeenCalledWith("synthetic-token");
   });
   it.each(["staff", "leader", "barnabas", "worship", "praise", "media", "design", "none"])("중앙 학기 권한이 아닌 %s는 조회·수정·증빙을 모두 거절한다", async (role) => {
     mocks.values.set(`retreatAdmins/${actor.uid}`, { semesterRole: role, retreatRole: "adminTeam" });
@@ -56,7 +50,7 @@ describe("회계 서버의 권한·조회 경계", () => {
     expect((await POST(request(save()), context)).status).toBe(403);
     expect((await RECEIPT(request(), { params: Promise.resolve({ year: "2026", entryId, receiptId }) })).status).toBe(403);
     expect(mocks.transaction).not.toHaveBeenCalled();
-    expect(mocks.ref.mock.calls.some(([path]) => path.startsWith("financePrivate/"))).toBe(false);
+    expect(mocks.get.mock.calls.some(([path]) => path.startsWith("financePrivate/"))).toBe(false);
   });
   it.each(["superAdmin", "pastor", "adminTeam"])("현재 학기 %s만 빈 연도를 조회하며 조회로 기록을 만들지 않는다", async (role) => {
     if (role === "superAdmin") mocks.values.set(`admins/${actor.uid}`, true);
@@ -72,7 +66,7 @@ describe("회계 서버의 권한·조회 경계", () => {
     expect((await GET(request(), context)).status).toBe(403);
   });
   it("역할 조회·DB 장애는 빈 장부 성공으로 바꾸거나 내부 정보를 노출하지 않는다", async () => {
-    mocks.ref.mockImplementation(() => ({ get: async () => { throw new Error("synthetic-private-credential"); } }));
+    mocks.get.mockRejectedValue(new Error("synthetic-private-credential"));
     const response = await GET(request(), context);
     expect(response.status).toBe(503); expect(await response.text()).not.toContain("synthetic-private");
   });
@@ -89,8 +83,7 @@ describe("회계 원장 저장·보존", () => {
     const ledger = mocks.values.get(ledgerPath) as { operations: Record<string, unknown>; history: Record<string, Record<string, unknown>> };
     expect(ledger.operations[first]).toBeDefined(); expect(ledger.history[entryId][first]).toMatchObject({ before: null, after: { amount: 12000 } });
     expect(mocks.transaction).toHaveBeenCalledTimes(1); expect(mocks.transaction.mock.calls[0][0]).toBe(ledgerPath);
-    expect(mocks.on).toHaveBeenCalledBefore(mocks.transaction); expect(mocks.off).toHaveBeenCalledTimes(1);
-    expect(mocks.ref.mock.calls.every(([path]) => path.startsWith("financePrivate/"))).toBe(true);
+    expect([...mocks.get.mock.calls, ...mocks.transaction.mock.calls].every(([path]) => path.startsWith("financePrivate/"))).toBe(true);
   });
   it("재전송은 추가 쓰기 없이 같은 거래를 반환하고 작업 번호 재사용은 거절한다", async () => {
     await executeFinance(actor, 2026, save()); mocks.transaction.mockClear();
@@ -106,7 +99,7 @@ describe("회계 원장 저장·보존", () => {
       mocks.values.set(path, concurrent);
       const result = updater(concurrent);
       expect(result).toBeUndefined();
-      return { committed: false, snapshot: snapshot(path) };
+      return { committed: false, value: read(path) };
     });
     await expect(executeFinance(actor, 2026, { kind: "entry.cancel", operationId: second, entryId, expectedRevision: 1, reason: "중복" })).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
     expect((await getFinance(actor, 2026)).entries[0]).toMatchObject({ amount: 15000, cancelledAt: null });
@@ -172,20 +165,27 @@ describe("비공개 증빙", () => {
     expect(mocks.transaction).toHaveBeenCalledTimes(before);
     expect((await getFinance(actor, 2026)).entries[0].receipts).toHaveLength(3);
   });
-  it("최초 연결 실패에서도 listener를 해제하며 저장하지 않는다", async () => {
-    mocks.on.mockImplementationOnce(() => { throw new Error("synthetic connection failure"); });
+  it("최초 연결 실패는 저장하지 않고 그대로 알린다", async () => {
+    mocks.transaction.mockRejectedValueOnce(new Error("synthetic connection failure"));
     await expect(executeFinance(actor, 2026, save())).rejects.toThrow("synthetic connection failure");
-    expect(mocks.transaction).not.toHaveBeenCalled(); expect(mocks.off).toHaveBeenCalledOnce();
+    expect(mocks.values.has(ledgerPath)).toBe(false);
+  });
+  it("응답 없는 저장은 10초 뒤 연결 오류로 끝내고 성공으로 표시하지 않는다", async () => {
+    vi.useFakeTimers();
+    mocks.transaction.mockImplementationOnce(() => new Promise(() => {}));
+    const pending = expect(executeFinance(actor, 2026, save())).rejects.toMatchObject({ status: 503, code: "unavailable" });
+    await vi.advanceTimersByTimeAsync(10_000);
+    await pending;
   });
   it("파일 저장 뒤 원장 충돌은 원장을 보존하고 안전한 미연결 파일만 남긴다", async () => {
     await executeFinance(actor, 2026, save());
     const standardTransaction = mocks.transaction.getMockImplementation()!;
-    mocks.transaction.mockImplementation(async (path, updater, callback, applyLocally) => {
+    mocks.transaction.mockImplementation(async (path, updater) => {
       if (path === ledgerPath) {
         const concurrent = structuredClone(mocks.values.get(path)) as { entries: Record<string, { revision: number }> };
         concurrent.entries[entryId].revision = 2; mocks.values.set(path, concurrent);
       }
-      return standardTransaction(path, updater, callback, applyLocally);
+      return standardTransaction(path, updater);
     });
     await expect(executeFinance(actor, 2026, upload())).rejects.toMatchObject({ code: "revision_conflict" });
     expect(mocks.values.has(`financePrivate/2026/files/${receiptId}`)).toBe(true);

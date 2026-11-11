@@ -9,8 +9,8 @@ vi.mock("@/features/praise/server/httpAuth", () => ({ authenticatePraiseRequest:
   roles: { semester: "barnabas", retreat: "none" },
   teamMemberships: { barnabas: { role: "staff", active: true, semesters: { "2026-2": true } } },
 }) }));
-vi.mock("@/features/praise/server/firebaseAdmin", () => ({
-  getPraiseFirebaseAdmin: () => ({ database: { ref: (path: string) => ({ get: async () => { mocks.reads.push(path); return { val: () => mocks.data[path] ?? null }; } }) } }),
+vi.mock("@/features/praise/server/supabaseAdmin", () => ({
+  getPraiseAdmin: () => ({ database: { get: async (path: string) => { mocks.reads.push(path); return mocks.data[path] ?? null; } } }),
   PraiseRequestError: class PraiseRequestError extends Error {},
   praiseUnavailable: () => new Error("조회 오류"),
 }));

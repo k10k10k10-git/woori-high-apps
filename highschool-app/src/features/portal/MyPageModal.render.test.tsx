@@ -124,6 +124,15 @@ describe("마이페이지 작업 화면", () => {
     expect(menu().getByRole("tab", { selected: true })).toHaveTextContent("팀원 관리");
   });
 
+  it("팀원 관리의 비밀번호 정하기 도구는 통합관리자에게만 보인다", async () => {
+    const { rerender } = render(<MyPageModal onClose={vi.fn()} initialTab="team" />);
+    expect(await screen.findByRole("heading", { name: "로그인 비밀번호 정하기" })).toBeInTheDocument();
+    auth.roles = { semester: "pastor", retreat: "pastor" };
+    rerender(<MyPageModal onClose={vi.fn()} initialTab="team" />);
+    expect(await screen.findByRole("heading", { name: "팀원 관리 접근 권한이 필요합니다." })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "로그인 비밀번호 정하기" })).not.toBeInTheDocument();
+  });
+
   it("다른 계정에는 이전 패널 입력 상태를 넘기지 않는다", async () => {
     const { rerender } = render(<MyPageModal onClose={vi.fn()} initialTab="myRequests" />);
     fireEvent.change(await screen.findByLabelText("내 요청 검색"), { target: { value: "이전 계정 메모" } });

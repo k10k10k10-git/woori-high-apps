@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PraiseAuditEvent, PraiseState } from "../types";
 import { createPraiseState } from "./commands";
-const mocks = vi.hoisted(() => ({ ref: vi.fn(), transaction: vi.fn(), workspace: vi.fn(), values: new Map<string, unknown>() }));
+const mocks = vi.hoisted(() => ({ transaction: vi.fn(), workspace: vi.fn(), values: new Map<string, unknown>() }));
 vi.mock("server-only", () => ({}));
-vi.mock("./firebaseAdmin", () => ({ getPraiseFirebaseAdmin: () => ({ database: { ref: mocks.ref } }) }));
+vi.mock("./supabaseAdmin", () => ({ getPraiseAdmin: () => ({ database: { transaction: async (path: string, updater: (value: unknown) => unknown) => {
+  mocks.transaction(path); const before = mocks.values.get(path) ?? null; const next = updater(before);
+  if (next !== undefined) mocks.values.set(path, next);
+  return { committed: next !== undefined, value: mocks.values.get(path) ?? null };
+} } }) }));
 vi.mock("./repository", () => ({ transactWorkspace: mocks.workspace }));
 import { praiseActivityRecord, projectPraiseAudit } from "./projection";
 function state(): PraiseState {
@@ -13,11 +17,6 @@ function state(): PraiseState {
 }
 beforeEach(() => {
   vi.resetAllMocks(); mocks.values = new Map();
-  mocks.ref.mockImplementation((path: string) => ({ transaction: async (updater: (value: unknown) => unknown) => {
-    mocks.transaction(path); const before = mocks.values.get(path) ?? null; const next = updater(before);
-    if (next !== undefined) mocks.values.set(path, next);
-    return { committed: next !== undefined, snapshot: { val: () => mocks.values.get(path) ?? null } };
-  } }));
   mocks.workspace.mockImplementation(async (_id, updater) => updater(state()));
 });
 
@@ -43,6 +42,6 @@ describe("감사 투영의 충돌·실패 후 재시도", () => {
   });
   it("과거 원본 감사는 재시도 대상에서도 제외한다", async () => {
     const current = state(); current.audit.event = { ...current.audit.event, historical: true, actor: { uid: "supabase:source-user" } } as PraiseAuditEvent;
-    expect(await projectPraiseAudit(current)).toBe(false); expect(mocks.ref).not.toHaveBeenCalled(); expect(mocks.workspace).not.toHaveBeenCalled();
+    expect(await projectPraiseAudit(current)).toBe(false); expect(mocks.transaction).not.toHaveBeenCalled(); expect(mocks.workspace).not.toHaveBeenCalled();
   });
 });

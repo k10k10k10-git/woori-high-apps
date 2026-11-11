@@ -1,5 +1,5 @@
 import "server-only";
-import { PraiseRequestError } from "./firebaseAdmin";
+import { PraiseRequestError } from "./supabaseAdmin";
 import { PraiseDomainError, requireValue } from "./validation";
 
 const MAX_BYTES = 1_500_000;

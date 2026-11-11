@@ -1,5 +1,5 @@
 import { auth } from "@/lib/firebase";
-import type { User } from "firebase/auth";
+import type { User } from "@/lib/supabaseAuth";
 import type { ClassInfo } from "./types";
 
 export async function fetchClassOptions(user: Pick<User, "uid" | "getIdToken">, semesterId: string, signal?: AbortSignal): Promise<ClassInfo[]> {

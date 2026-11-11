@@ -7,7 +7,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useIsDesktop } from "@/lib/useIsDesktop";
 import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import OverlayShell from "@/components/OverlayShell";
-import { canManageRolesOf, canManageSiteRequests, canViewActivityLogs } from "./accessPolicy";
+import { canManageRolesOf, canManageSiteRequests, canResetAccountPassword, canViewActivityLogs } from "./accessPolicy";
+import AccountPasswordTool from "@/features/accounts/AccountPasswordTool";
 import { describeTeamRoles } from "@/features/teams/teamModel";
 import { friendlyMinistryName } from "./dailyMinistryMessage";
 
@@ -126,7 +127,7 @@ function MyPageWorkspace({ onClose, initialTab = "dashboard" }: Props) {
             {tab.id === "dashboard" && (canManageRequests ? <AdminDashboard onNavigate={setTab} /> : <RoleDashboardPanel />)}
             {tab.id === "ministry" && <MyMinistryPanel />}
             {tab.id === "myRequests" && <MyRequestsPanel />}
-            {tab.id === "team" && <WorkspaceAccessGate allowed={canManageTeam} area="팀원 관리" embedded><OperationsShortcut title="계정·권한" description="팀원의 사이트 권한과 담당 팀을 관리합니다." href="/operations/accounts" /></WorkspaceAccessGate>}
+            {tab.id === "team" && <WorkspaceAccessGate allowed={canManageTeam} area="팀원 관리" embedded><OperationsShortcut title="계정·권한" description="팀원의 사이트 권한과 담당 팀을 관리합니다." href="/operations/accounts" />{canResetAccountPassword(roles) && <AccountPasswordTool />}</WorkspaceAccessGate>}
             {tab.id === "requests" && <WorkspaceAccessGate allowed={canManageRequests} area="요청 관리" embedded><OperationsShortcut title="요청 관리" description="접수된 문제 제보를 확인하고 처리 결과를 남깁니다." href="/operations/requests" /></WorkspaceAccessGate>}
             {tab.id === "activity" && <WorkspaceAccessGate allowed={canViewActivity} area="활동 로그" embedded><OperationsShortcut title="활동 로그" description="누가 어떤 업무를 변경했는지 확인합니다." href="/operations/activity" /></WorkspaceAccessGate>}
           </Suspense></WorkspaceAccessGate>

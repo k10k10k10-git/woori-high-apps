@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ admin: vi.fn(), verify: vi.fn(), ref: vi.fn(), values: {} as Record<string, unknown> }));
+const mocks = vi.hoisted(() => ({ admin: vi.fn(), verify: vi.fn(), get: vi.fn(), values: {} as Record<string, unknown> }));
 vi.mock("server-only", () => ({}));
-vi.mock("./firebaseAdmin", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./firebaseAdmin")>();
-  return { ...original, getPraiseFirebaseAdmin: mocks.admin };
+vi.mock("./supabaseAdmin", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./supabaseAdmin")>();
+  return { ...original, getPraiseAdmin: mocks.admin };
 });
 import { authenticatePraiseRequest } from "./httpAuth";
 const request = (token: string | null = "Bearer signed-token") => new Request("https://example.test/api/praise", { headers: token ? { authorization: token } : {} });
 beforeEach(() => {
   vi.resetAllMocks(); mocks.values = {};
-  mocks.verify.mockResolvedValue({ uid: "test-user", name: "테스트", firebase: { sign_in_provider: "google.com" }, roles: { semester: "superAdmin" } });
-  mocks.ref.mockImplementation((path: string) => ({ get: async () => ({ val: () => mocks.values[path] ?? null }) }));
-  mocks.admin.mockReturnValue({ auth: { verifyIdToken: mocks.verify }, database: { ref: mocks.ref } });
+  mocks.verify.mockResolvedValue({ uid: "test-user", name: "테스트", email: "t@example.test", supabaseId: "sb-1", anonymous: false, disabled: false, roles: { semester: "superAdmin" } });
+  mocks.get.mockImplementation(async (path: string) => mocks.values[path] ?? null);
+  mocks.admin.mockReturnValue({ auth: { verifyAccessToken: mocks.verify }, database: { get: mocks.get } });
 });
 
 describe("찬양팀 요청 인증", () => {
@@ -19,11 +19,11 @@ describe("찬양팀 요청 인증", () => {
     await expect(authenticatePraiseRequest(request(header))).rejects.toMatchObject({ status: 401 });
     expect(mocks.admin).not.toHaveBeenCalled();
   });
-  it("폐기 확인을 요청하고 토큰의 역할 주장을 무시한다", async () => {
+  it("인증 서버 확인을 요청하고 토큰의 역할 주장을 무시한다", async () => {
     const actor = await authenticatePraiseRequest(request());
-    expect(mocks.verify).toHaveBeenCalledWith("signed-token", true);
+    expect(mocks.verify).toHaveBeenCalledWith("signed-token");
     expect(actor).toEqual({ uid: "test-user", name: "테스트", roles: { semester: "none", retreat: "none" }, teamMemberships: {} });
-    expect(mocks.ref).toHaveBeenCalledTimes(4);
+    expect(mocks.get).toHaveBeenCalledTimes(4);
   });
   it("현재 admins의 true만 통합관리자로 인정한다", async () => {
     mocks.values["admins/test-user"] = true;
@@ -51,26 +51,26 @@ describe("찬양팀 요청 인증", () => {
       praise: { role: "staff", active: true },
     });
   });
-  it.each(["auth/id-token-revoked", "auth/id-token-expired", "auth/user-disabled"])("폐기·만료·정지된 계정은 원장 조회 전에 거절한다", async (code) => {
-    mocks.verify.mockRejectedValue({ code, message: "비공개 내부 오류" });
+  it("폐기·만료·삭제된 토큰은 원장 조회 전에 거절한다", async () => {
+    mocks.verify.mockRejectedValue({ code: "invalid_token", message: "비공개 내부 오류" });
     await expect(authenticatePraiseRequest(request())).rejects.toMatchObject({ status: 401 });
-    expect(mocks.ref).not.toHaveBeenCalled();
+    expect(mocks.get).not.toHaveBeenCalled();
   });
-  it("익명 Firebase 로그인도 거절한다", async () => {
-    mocks.verify.mockResolvedValue({ uid: "test-user", firebase: { sign_in_provider: "anonymous" } });
+  it.each([["익명", { anonymous: true }], ["정지", { disabled: true }]])("%s 계정도 원장 조회 전에 거절한다", async (_label, flags) => {
+    mocks.verify.mockResolvedValue({ uid: "test-user", name: null, email: null, supabaseId: "sb-1", anonymous: false, disabled: false, ...flags });
     await expect(authenticatePraiseRequest(request())).rejects.toMatchObject({ status: 401 });
-    expect(mocks.ref).not.toHaveBeenCalled();
+    expect(mocks.get).not.toHaveBeenCalled();
   });
   it.each(["bad/path", "bad.uid", "", "a".repeat(129)])("원장 경로로 사용할 수 없는 UID를 거절한다", async (uid) => {
-    mocks.verify.mockResolvedValue({ uid });
+    mocks.verify.mockResolvedValue({ uid, anonymous: false, disabled: false });
     await expect(authenticatePraiseRequest(request())).rejects.toMatchObject({ status: 401 });
   });
   it("인증 서비스 장애를 로그인 오류로 숨기지 않는다", async () => {
-    mocks.verify.mockRejectedValue({ code: "auth/internal-error", message: "credential details" });
+    mocks.verify.mockRejectedValue({ code: "auth_unavailable", message: "credential details" });
     await expect(authenticatePraiseRequest(request())).rejects.toMatchObject({ status: 503, code: "auth_unavailable" });
   });
   it("역할 조회 실패 시 기본 권한으로 저장을 계속하지 않는다", async () => {
-    mocks.ref.mockImplementation(() => ({ get: async () => { throw new Error("network details"); } }));
+    mocks.get.mockRejectedValue(new Error("network details"));
     await expect(authenticatePraiseRequest(request())).rejects.toMatchObject({ status: 503, code: "roles_unavailable" });
   });
 });

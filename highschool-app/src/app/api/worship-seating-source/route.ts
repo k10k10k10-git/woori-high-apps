@@ -1,7 +1,7 @@
 import { canAccessArea, canAccessSundayTeam } from "@/features/portal/accessPolicy";
 import { activeTeamKeys } from "@/features/teams/teamModel";
 import { authenticatePraiseRequest } from "@/features/praise/server/httpAuth";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "@/features/praise/server/firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "@/features/praise/server/supabaseAdmin";
 import { praiseHttp } from "@/features/praise/server/http";
 import { date, requireValue } from "@/features/praise/server/validation";
 import { sundayOf, worshipSeatingSource, type ClassAttendance, type WorshipService } from "@/features/sundayWorship/worshipSeating";
@@ -23,13 +23,13 @@ export async function GET(request: Request) {
     const service = query.get("service");
     requireValue(service === "1" || service === "2", "예배 부를 확인해 주세요.");
     const year = week.slice(0, 4);
-    const database = getPraiseFirebaseAdmin().database;
+    const database = getPraiseAdmin().database;
     let rawClasses: unknown;
     let rawAttendance: unknown;
     try {
       [rawClasses, rawAttendance] = await Promise.all([
-        database.ref(`classes/${year}`).get().then((snapshot) => snapshot.val()),
-        database.ref(`attendance/${year}`).get().then((snapshot) => snapshot.val()),
+        database.get(`classes/${year}`),
+        database.get(`attendance/${year}`),
       ]);
     } catch {
       throw praiseUnavailable("worship_seating_unavailable");
