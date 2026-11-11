@@ -1,4 +1,4 @@
-import { ref, get, onValue } from "firebase/database";
+import { ref, get, onValue } from "@/lib/rtdb";
 import { auditedSet as set, auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { Participant, SyncDuplicateGroup } from "../types";

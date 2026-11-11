@@ -1,4 +1,4 @@
-import { get, onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type Unsubscribe } from "firebase/database";
+import { get, onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type Unsubscribe } from "@/lib/rtdb";
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { paths as semesterPaths } from "@/features/semester/paths";

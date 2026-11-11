@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
-vi.mock("firebase/database", () => ({ ...mocks, onValue: vi.fn() }));
+vi.mock("@/lib/rtdb", () => ({ ...mocks, onValue: vi.fn() }));
 vi.mock("../firebase", () => ({ db: {} }));
 vi.mock("./retreatRoster", () => ({ getRetreatRoster: vi.fn(), subscribeRetreatRoster: vi.fn() }));
 

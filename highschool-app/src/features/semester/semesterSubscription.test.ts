@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { DataSnapshot } from "firebase/database";
+import type { DataSnapshot } from "@/lib/rtdb";
 
 const mocks = vi.hoisted(() => ({
   onValue: vi.fn(), get: vi.fn(), fetch: vi.fn(),
   user: { uid: "approved", getIdToken: vi.fn(async () => "test-id-token") } as { uid: string; getIdToken: () => Promise<string> } | null,
 }));
-vi.mock("firebase/database", () => ({ ref: (_db: unknown, path: string) => path, onValue: mocks.onValue, get: mocks.get }));
+vi.mock("@/lib/rtdb", () => ({ ref: (_db: unknown, path: string) => path, onValue: mocks.onValue, get: mocks.get }));
 vi.mock("@/lib/firebase", () => ({ db: {}, auth: { get currentUser() { return mocks.user; } } }));
 import { getSemesters, refreshSemesterList, subscribeSemesters } from "./semesterList";
 

@@ -2,7 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { NewFriend } from '@/features/semester/types';
 
 const mocks = vi.hoisted(() => ({ update: vi.fn(), get: vi.fn(), seq: 0 }));
-vi.mock('firebase/database', () => ({
+vi.mock('@/lib/rtdb', () => ({
   ref: (_db: unknown, path = '') => path, get: mocks.get, onValue: vi.fn(),
   push: () => ({ key: `generated-${++mocks.seq}` }),
 }));

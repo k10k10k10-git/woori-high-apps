@@ -206,6 +206,18 @@
 - `retreatsPrivate/*`, `semestersPrivate/*` 데이터가 현장 화면이나 일반 사용자에게 노출되지 않게 합니다.
 - Firebase Rules는 이 앱에서 배포하지 않습니다.
 
+## RTDB 데이터 계층 `@/lib/rtdb` — 2026-11-12 Supabase 이관
+
+- 앱 코드는 `firebase/database` 대신 **`@/lib/rtdb`**를 import 합니다(함수·타입 이름과 인자는 같음). 계약은 `../docs/SUPABASE_PLATFORM_CONTRACT.md`, Supabase 클라이언트는 `src/lib/supabase.ts`의 `getSupabase()` 하나뿐입니다. `activityLogWriteContract.test.ts`는 두 모듈명 모두에서 직접 쓰기를 막습니다.
+- 구독은 경로 값을 `api.rtdb_get(_many)`로 읽고, Realtime `rtdb.changes` 알림이 오면 겹치는 위치만(뿌리 아래면 바뀐 경로만) 다시 읽습니다. 쓰기는 즉시 화면에 보이고 서버 확인 때 Promise가 끝나며, 끊기면 메모리 대기열에서 순서대로 다시 보냅니다(트랜잭션도 같은 줄에 섭니다).
+- ⚠ **query는 서버 색인이 아니라 클라이언트 거르기**입니다. `limitToLast(1)`이어도 그 위치 전체를 받습니다(활동 로그 등 커지는 노드 주의). 구독 콜백은 등록 직후가 아니라 한 박자(microtask) 뒤에 처음 불립니다.
+- 시험은 업무 모듈이면 `vi.mock("@/lib/rtdb")`, 모듈 자체는 `src/lib/rtdb/testing/fakeSupabase.ts`(가짜 RPC·Realtime)를 씁니다.
+
+### Firebase 동작을 다시 구현할 때 실제 SDK를 오프라인 기준값으로 대조하기 (2026-11-12)
+- **접근법**: 임시 vitest 파일에서 실제 `firebase/database`를 `initializeApp({ databaseURL: "https://demo-x.firebaseio.com" })` → `goOffline(db)`로 연다 → 같은 무작위 자료를 양쪽에 로컬 `set`·`update`·`remove` 한다(오프라인 SDK도 로컬 쓰기로 구독 이벤트를 낸다) → `forEach` 순서·`val()`·이벤트 순서와 인자를 비교한다. 이관 때 query 480건·이벤트 2,784건이 일치했고, value 콜백의 둘째 인자가 `null`인 차이를 이것으로 찾았다.
+- **판단 질문**: 문서만 보고 순서 규칙을 짐작하지 않았다(정수 키·배열 변환·`endBefore(값, 키)` 경계는 틀리기 쉽다). 대조 파일은 저장소에 남기지 않았다 — Firebase SDK는 이관 뒤 지울 의존성이다.
+- **재사용 규칙**: SDK 시각을 흉내 낼 때 `Date.now`만 바꾸면 안 된다 — Firebase 푸시 ID는 `new Date().getTime()`을 쓰므로 `Date.prototype.getTime`도 바꿔야 같은 시각 접두어(1700000000000ms → `-NjEtLV-`)가 나온다.
+
 ## 운영 원칙
 
 ### 반복 안내 없이 실제 업무와 상태를 먼저 보여주기 (2026-10-13)

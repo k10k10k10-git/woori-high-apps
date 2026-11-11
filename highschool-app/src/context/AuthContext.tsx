@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup } from "firebase/auth";
-import { get, ref } from "firebase/database";
+import { get, ref } from "@/lib/rtdb";
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";

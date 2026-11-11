@@ -15,7 +15,7 @@ vi.mock("firebase/auth", () => ({
   signInWithPopup: vi.fn(),
   signOut: vi.fn(),
 }));
-vi.mock("firebase/database", () => ({
+vi.mock("@/lib/rtdb", () => ({
   get: mocks.get,
   ref: (_db: unknown, path: string) => path,
 }));

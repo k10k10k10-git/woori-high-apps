@@ -1,4 +1,4 @@
-import { endAt, endBefore, get, limitToFirst, limitToLast, onValue, orderByChild, query, ref, startAt } from "firebase/database";
+import { endAt, endBefore, get, limitToFirst, limitToLast, onValue, orderByChild, query, ref, startAt } from "@/lib/rtdb";
 import { auth, db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { snapToList } from "@/lib/db/snapToList";

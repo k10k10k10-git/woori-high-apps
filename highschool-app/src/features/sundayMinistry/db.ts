@@ -1,7 +1,7 @@
 import { subscribeSemesters, subscribeNewFriends, subscribeNewFriendsPrivate } from "@/features/semester/db";
 import { paths } from "@/features/semester/paths";
 import { db } from "@/lib/firebase";
-import { onValue, ref } from "firebase/database";
+import { onValue, ref } from "@/lib/rtdb";
 import {
   collectSundayAdminChanges,
   collectSundayNewFriends,

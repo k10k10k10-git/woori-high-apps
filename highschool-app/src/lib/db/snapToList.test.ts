@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DataSnapshot } from "firebase/database";
+import type { DataSnapshot } from "@/lib/rtdb";
 import { snapToList } from "./snapToList";
 
 /** 실제 DataSnapshot 대신 exists()/val()만 흉내 내는 최소 스텁. */

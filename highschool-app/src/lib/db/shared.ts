@@ -1,4 +1,4 @@
-import { ref, get, push, onValue } from "firebase/database";
+import { ref, get, push, onValue } from "@/lib/rtdb";
 import { auditedSet as set, auditedUpdate as update, auditedRemove as remove } from "@/features/activityLog/write";
 import { db } from "../firebase";
 import { BrainstormNote, BrainstormComment, Milestone, RetreatPeriod } from "../types";

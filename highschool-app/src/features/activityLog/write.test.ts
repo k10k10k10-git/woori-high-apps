@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DatabaseReference, TransactionResult } from "firebase/database";
+import type { DatabaseReference, TransactionResult } from "@/lib/rtdb";
 
 const mocks = vi.hoisted(() => ({
   auth: { currentUser: null as null | { uid: string; getIdTokenResult: () => Promise<{ claims: { name?: unknown } }> } },
@@ -18,7 +18,7 @@ function reference(path = "", root?: DatabaseReference): DatabaseReference {
 }
 
 vi.mock("@/lib/firebase", () => ({ auth: mocks.auth }));
-vi.mock("firebase/database", () => ({
+vi.mock("@/lib/rtdb", () => ({
   child: (ref: DatabaseReference, path: string) => reference(path, ref.root),
   push: (...args: unknown[]) => mocks.push(...args),
   update: (...args: unknown[]) => mocks.update(...args),
