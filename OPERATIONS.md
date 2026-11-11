@@ -15,7 +15,7 @@
 | 읽기·쓰기 | `api.rtdb_get`·`rtdb_update`·`rtdb_cas` 등(로그인한 사람, 규칙 검사) / `api.rtdb_admin_*`(service role 전용, 규칙 없음) | 계약: `docs/SUPABASE_PLATFORM_CONTRACT.md` |
 | 실시간 | 쓰기마다 `rtdb.changes`에 바뀐 경로 한 줄 → Supabase Realtime → 겹치는 구독만 다시 읽음 | 고등부 역할이 있는 계정만 알림을 읽는다(`rtdb.is_member()`) |
 | 로그인 | Supabase Auth(이메일+비밀번호, 이메일 6자리 코드) | `rtdb.uid_map`이 옛 Firebase UID를 이어 줘 `admins/{uid}` 등 기존 권한 그대로 |
-| 파일 | Supabase Storage 버킷 `highschool`(경로 그대로) | 정책: `docs/SUPABASE_STORAGE_POLICY.sql` |
+| 파일 | 새 파일은 Supabase Storage 버킷 `highschool`(경로 그대로) | 정책: `docs/SUPABASE_STORAGE_POLICY.sql`. 이관 전 첨부·숙소 지도·학기 자료는 Firebase Storage에 그대로 있고, 자료에 저장된 옛 다운로드 주소로 계속 보인다(`storageUrl.ts`가 허용). 그 파일을 지우면 자료 줄만 지워지고 Firebase 파일은 남는다. Firebase 프로젝트를 닫으려면 그 전에 파일을 `storageObjectKey()` 키로 옮겨야 한다 |
 | 권한 규칙 | 원천 `attendance-app/database.rules.json` → wooriteens-web `scripts/rtdb/compile-rules.cjs` → SQL(마이그레이션 0070) | 규칙을 바꾸면 **새 마이그레이션**으로 스테이징→운영 적용. `firebase deploy --only database`는 운영 앱에 아무 영향이 없다(Firebase 사본만 바뀜) |
 | Firebase `woori-high` DB | 전환 시점 사본 | 앱이 쓰지 않는다. 지우지 말 것(되돌림 대비) |
 
