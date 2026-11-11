@@ -8,34 +8,21 @@ import {
 import { canAccessTeam, mergeTeamMemberships, teamKeyFromName } from "@/features/teams/teamModel";
 import type { PraiseActor } from "../types";
 import { assertPraiseId } from "../paths";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "./supabaseAdmin";
 import { requireValue } from "./validation";
 
 const record = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 async function read(path: string) {
   try {
-    return (
-      await getPraiseFirebaseAdmin().database.ref(path).get()
-    ).val() as unknown;
+    return await getPraiseAdmin().database.get(path);
   } catch {
     throw praiseUnavailable("reference_unavailable");
   }
 }
 async function shallow(path: string): Promise<string[]> {
-  const { app } = getPraiseFirebaseAdmin();
   try {
-    const token = await app.options.credential!.getAccessToken();
-    const url = new URL(app.options.databaseURL!);
-    url.pathname = `/${path}.json`;
-    url.searchParams.set("shallow", "true");
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token.access_token}` },
-      cache: "no-store",
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!response.ok) throw new Error();
-    const value = await response.json();
+    const value = await getPraiseAdmin().database.shallow(path);
     if (value === null) return [];
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     return Object.entries(record(value)).map(([key, exists]) => {

@@ -1,3 +1,4 @@
+import { RTDB_REST_URL } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { db, get, ref, syncProtocolDb, onDisconnect } from '@/lib/db';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
@@ -36,7 +37,7 @@ async function commitLockedSheetSync(input: {
   let acquired = false, uncertain = false;
   async function checkFresh() {
     const read = (path: string) => readStudentMoveValue({
-      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken: token,
+      databaseUrl: RTDB_REST_URL, idToken: token,
       path, isCurrent: () => auth.currentUser === user,
     });
     const [classes, attendance] = await Promise.all([
@@ -61,7 +62,7 @@ async function commitLockedSheetSync(input: {
     await checkFresh();
     if (auth.currentUser !== user) throw new Error('로그인 계정이 변경되었습니다. 다시 시도해 주세요.');
     const resultPatch = await patchStudentMoveOnce({
-      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken: token,
+      databaseUrl: RTDB_REST_URL, idToken: token,
       payload: { ...input.payload, ...Object.fromEntries(Object.entries(cleanup)
         .map(([path, value]) => [`config/studentMoveLocks/${input.year}/${path}`, value])),
         ...Object.fromEntries(keys.map(key => [`config/rosterBatchCommits/${input.year}/${key}/${user.uid}/${operation}`, true])),

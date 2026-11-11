@@ -1,3 +1,4 @@
+import { RTDB_REST_URL, rtdbRestFetch } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 import type { TeacherMessage } from '@/utils/teacherMessages';
@@ -28,7 +29,7 @@ export async function compareAndCreateTeacherMessage(
     const url = new URL(connection.databaseUrl);
     url.pathname = `/suggestions/${year}/${encodeURIComponent(classKey)}/${encodeURIComponent(id)}.json`;
     url.searchParams.set('auth', token);
-    const request = connection.fetch ?? globalThis.fetch;
+    const request = connection.fetch ?? rtdbRestFetch;
     const options = { cache: 'no-store' as const, signal: controller.signal };
     const current = await request(url.toString(), { ...options, headers: { 'X-Firebase-ETag': 'true' } });
     if (!current.ok) throw new TeacherMessageSaveError('저장 결과를 확인하지 못했습니다. 연결과 권한을 확인한 뒤 다시 시도해 주세요.');
@@ -66,7 +67,7 @@ export function saveTeacherMessage(year: number, classKey: string, id: string, p
     const user = auth.currentUser;
     if (!user) throw new TeacherMessageSaveError('다시 로그인한 뒤 등록해 주세요.');
     return compareAndCreateTeacherMessage(year, classKey, id, payload, {
-      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', getToken: () => user.getIdToken(),
+      databaseUrl: RTDB_REST_URL, getToken: () => user.getIdToken(),
       isCurrent: () => auth.currentUser === user && isCurrent(), canCreate,
     });
   });

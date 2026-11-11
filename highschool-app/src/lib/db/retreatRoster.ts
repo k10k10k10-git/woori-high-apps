@@ -1,4 +1,4 @@
-import { onValue, ref } from "firebase/database";
+import { onValue, ref } from "@/lib/rtdb";
 import { auth, db } from "@/lib/firebase";
 import type { Student } from "@/lib/types";
 

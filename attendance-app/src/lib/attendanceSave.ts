@@ -1,3 +1,4 @@
+import { RTDB_REST_URL, rtdbRestFetch } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 import { normalizeAttendanceValue } from '@/utils/attendanceValue';
@@ -54,7 +55,7 @@ export async function compareAndSaveAttendance(input: AttendanceWrite, connectio
     if (!token || !connection.uid) throw new AttendanceSaveError('session', '다시 로그인한 뒤 출석을 선택해 주세요.');
     const endpoint = new URL(connection.databaseUrl);
     endpoint.searchParams.set('auth', token);
-    const request = connection.fetch ?? globalThis.fetch;
+    const request = connection.fetch ?? rtdbRestFetch;
     const options = { cache: 'no-store' as const, signal: controller.signal };
     const read = async (path: string): Promise<unknown> => {
       const url = new URL(endpoint);
@@ -108,7 +109,7 @@ export function saveAttendanceCell(input: AttendanceWrite, isCurrent: () => bool
     const user = auth.currentUser;
     if (!user) throw new AttendanceSaveError('session', '다시 로그인한 뒤 출석을 선택해 주세요.');
     return compareAndSaveAttendance(input, {
-      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', uid: user.uid, getToken: () => user.getIdToken(),
+      databaseUrl: RTDB_REST_URL, uid: user.uid, getToken: () => user.getIdToken(),
       isCurrent: () => auth.currentUser === user && isCurrent(),
     });
   });

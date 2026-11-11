@@ -1,4 +1,4 @@
-import { onValue, ref } from "firebase/database";
+import { onValue, ref } from "@/lib/rtdb";
 import { auditedUpdate as update } from "@/features/activityLog/write";
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";

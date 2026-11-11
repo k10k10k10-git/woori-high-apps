@@ -1,3 +1,4 @@
+import { RTDB_REST_URL } from '@/lib/rtdbRest';
 import { db, onValue, ref } from '@/lib/db';
 import { auth } from '@/lib/firebase/client';
 import { buildAdminChangeEntry } from '@/utils/adminChange';
@@ -98,7 +99,7 @@ async function applyRosterCopy(input: RosterRestoreInput, isCurrent: () => boole
   const current = () => auth.currentUser === user && isCurrent();
   const idToken = await awaitStudentMoveStep(user.getIdToken());
   if (!current()) throw new Error('로그인 또는 조회 상태가 변경되었습니다.');
-  const connection = { databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken };
+  const connection = { databaseUrl: RTDB_REST_URL, idToken };
   const read = (path: string) => readStudentMoveValue({ ...connection, path, isCurrent: current });
   const transaction = createStudentMoveLockTransaction({ ...connection, path: studentMoveLockYearPath(input.year), isCurrent: current });
   const cleanup = createStudentMoveLockTransaction({ ...connection, path: studentMoveLockYearPath(input.year),

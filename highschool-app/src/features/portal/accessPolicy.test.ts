@@ -13,6 +13,7 @@ import {
   canManageRetreatPin,
   canManageSiteRequests,
   canViewActivityLogs,
+  canResetAccountPassword,
   canSeeSensitiveRetreat,
   hasAnyMinistryRole,
   isRetreatDowngrade,
@@ -35,6 +36,18 @@ import { SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
 function roles(semester: SemesterRole, retreat: RetreatRole): MinistryRoles {
   return { semester, retreat };
 }
+
+describe("로그인 비밀번호 정하기 권한", () => {
+  it("두 축 중 통합관리자 역할만 다른 계정의 비밀번호를 정할 수 있다", () => {
+    expect(canResetAccountPassword(roles("superAdmin", "none"))).toBe(true);
+    expect(canResetAccountPassword(roles("none", "superAdmin"))).toBe(true);
+    for (const semester of ASSIGNABLE_SEMESTER_ROLES.filter((role) => role !== "superAdmin")) {
+      for (const retreat of ASSIGNABLE_RETREAT_ROLES.filter((role) => role !== "superAdmin")) {
+        expect(canResetAccountPassword(roles(semester, retreat))).toBe(false);
+      }
+    }
+  });
+});
 
 describe("활동 로그 조회 권한", () => {
   it("두 축 중 통합관리자 역할만 다른 계정의 기록을 열 수 있다", () => {

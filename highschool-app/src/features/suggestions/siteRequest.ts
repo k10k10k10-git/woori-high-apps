@@ -1,3 +1,5 @@
+import { isTrustedFileUrl } from "@/lib/storageUrl";
+
 export type SiteRequestStatus = "received" | "resolved";
 
 export interface SiteRequestAttachment {
@@ -76,7 +78,7 @@ function attachment(ownerUid: string, requestId: string, value: unknown): SiteRe
     typeof item.filePath === "string"
     && item.filePath.startsWith(expectedPrefix)
     && typeof item.fileUrl === "string"
-    && item.fileUrl.startsWith("https://firebasestorage.googleapis.com/")
+    && isTrustedFileUrl(item.fileUrl, item.filePath)
   ) {
     return { ...base, filePath: item.filePath, fileUrl: item.fileUrl };
   }

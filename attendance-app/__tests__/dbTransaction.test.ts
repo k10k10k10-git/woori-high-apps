@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ listen: vi.fn(), stop: vi.fn(), transaction: vi.fn(), set: vi.fn() }));
 vi.mock('@/lib/firebase/client', () => ({ db: {} }));
-vi.mock('firebase/database', () => ({ get: vi.fn(), off: vi.fn(), onDisconnect: vi.fn(), onValue: m.listen,
+// db.ts 는 firebase/database 대신 Supabase 기반 @/lib/rtdb 를 감싼다(같은 이름·인자).
+vi.mock('@/lib/rtdb', () => ({ get: vi.fn(), onDisconnect: vi.fn(), onValue: m.listen,
   push: vi.fn(), ref: vi.fn(), remove: vi.fn(), runTransaction: m.transaction, set: m.set, update: vi.fn() }));
 import { runTransaction, set } from '@/lib/db';
 beforeEach(() => {

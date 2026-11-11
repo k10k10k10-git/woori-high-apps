@@ -3,8 +3,10 @@ import { initializeApp, deleteApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
 import { getDatabase, type Database } from "firebase-admin/database";
 vi.mock("server-only", () => ({}));
-const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null, app: null as App | null }));
-vi.mock("@/features/praise/server/firebaseAdmin", async (original) => ({ ...await original<typeof import("@/features/praise/server/firebaseAdmin")>(), getPraiseFirebaseAdmin: () => ({ database: holder.database, auth: holder.auth, app: holder.app }) }));
+const holder = vi.hoisted(() => ({ database: null as Database | null, auth: null as Auth | null, app: null as App | null, admin: null as PraiseAdmin | null }));
+vi.mock("@/features/praise/server/supabaseAdmin", async (original) => ({ ...await original<typeof import("@/features/praise/server/supabaseAdmin")>(), getPraiseAdmin: () => holder.admin }));
+import type { PraiseAdmin } from "@/features/praise/server/supabaseAdmin";
+import { firebaseEmulatorAdmin } from "@/features/praise/server/firebaseEmulatorAdmin.testkit";
 import { GET, POST } from "@/app/api/finance/[year]/route";
 import { GET as RECEIPT } from "@/app/api/finance/[year]/receipts/[entryId]/[receiptId]/route";
 import type { FinanceEntryInput, FinanceView } from "./types";
@@ -33,7 +35,7 @@ suite("회계 실제 Auth·RTDB 원장 보존·Rules 계약", () => {
   beforeAll(async () => {
     if (process.env.FIREBASE_DATABASE_EMULATOR_HOST !== "127.0.0.1:19016" || process.env.FIREBASE_AUTH_EMULATOR_HOST !== "127.0.0.1:19098") throw new Error("합성 에뮬레이터 주소가 아닙니다.");
     app = initializeApp({ projectId: "demo-praise", databaseURL: "http://127.0.0.1:19016/?ns=demo-praise-default-rtdb", credential: { getAccessToken: async () => ({ access_token: "owner", expires_in: 3600 }) } }, "finance-contracts");
-    holder.database = getDatabase(app); holder.auth = getAuth(app); holder.app = app;
+    holder.database = getDatabase(app); holder.auth = getAuth(app); holder.app = app; holder.admin = firebaseEmulatorAdmin(app);
     account = await signup("finance-contract@example.test");
     await holder.database.ref().set({ retreatAdmins: { [account.localId]: { semesterRole: "adminTeam", retreatRole: "none" } }, classes: { preserve: { value: "학적 보존" } }, attendance: { preserve: { value: "출석 보존" } }, retreats: { preserve: { value: "수련회 보존" } } });
   });

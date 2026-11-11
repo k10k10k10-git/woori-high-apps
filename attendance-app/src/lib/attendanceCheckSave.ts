@@ -1,3 +1,4 @@
+import { RTDB_REST_URL, rtdbRestFetch } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { AttendanceSaveError } from './attendanceSave';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
@@ -75,7 +76,7 @@ export async function compareAndSaveAttendanceCheck(input: CheckWrite, connectio
     check(); const token = await connection.getToken(); check();
     if (!token) throw new AttendanceSaveError('session', '다시 로그인해 주세요.');
     const url = new URL(connection.databaseUrl); url.searchParams.set('auth', token);
-    const request = connection.fetch ?? globalThis.fetch;
+    const request = connection.fetch ?? rtdbRestFetch;
     const options = { cache: 'no-store' as const, signal: controller.signal };
     const read = async (path: string) => {
       const endpoint = new URL(url); endpoint.pathname = `/${path}.json`;
@@ -109,7 +110,7 @@ export function saveAttendanceCheck(input: CheckWrite, isCurrent: () => boolean)
   return withBrowserWriteLock('shared', async () => {
     const user = auth.currentUser;
     if (!user) throw new AttendanceSaveError('session', '다시 로그인해 주세요.');
-    return compareAndSaveAttendanceCheck(input, { databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', uid: user.uid,
+    return compareAndSaveAttendanceCheck(input, { databaseUrl: RTDB_REST_URL, uid: user.uid,
       getToken: () => user.getIdToken(), isCurrent: () => auth.currentUser === user && isCurrent() });
   });
 }

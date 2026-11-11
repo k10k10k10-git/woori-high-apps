@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   ref: vi.fn((_db: unknown, path: string) => path),
 }));
 
-vi.mock("firebase/database", () => ({
+vi.mock("@/lib/rtdb", () => ({
   ref: mocks.ref,
   get: mocks.get,
   set: mocks.set,

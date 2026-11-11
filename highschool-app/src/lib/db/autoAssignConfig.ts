@@ -1,4 +1,4 @@
-import { get, onValue, ref } from "firebase/database";
+import { get, onValue, ref } from "@/lib/rtdb";
 import { auditedSet as set } from "@/features/activityLog/write";
 import { AutoAssignConfigData, normalizeAutoAssignConfig } from "../autoAssignConfig";
 import { db } from "../firebase";

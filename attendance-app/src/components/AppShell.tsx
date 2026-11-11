@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged } from '@/lib/supabaseAuth';
 import { auth } from '@/lib/firebase/client';
 import { useApp } from '@/store/AppContext';
 import { loadUserRole } from '@/hooks/useFirebaseData';
@@ -64,7 +64,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return true;
   }, [dispatch]);
 
-  // Firebase Auth 감지
+  // 로그인 상태 감지(Supabase — supabaseAuth 가 Firebase onAuthStateChanged 와 같은 모양으로 알린다)
   useEffect(() => {
     dispatch({ type: 'SET_FB_READY' });
     let active = true;
@@ -123,6 +123,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }
         setAuthState('login');
       }
+    }, () => {
+      // 로그인은 됐지만 규칙용 계정 확인(api.rtdb_whoami)이 끝내 실패했다. 무한 대기 대신 역할 조회 실패와 같게 안내한다.
+      if (!active) return;
+      request++;
+      dispatch({ type: 'SET_USER_ROLE', payload: null });
+      setAuthError('계정 권한 정보를 불러오지 못했습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');
+      setAuthState('role-error');
     });
     return () => { active = false; request++; unsub(); };
   }, [dispatch, applyDemoSelection]);

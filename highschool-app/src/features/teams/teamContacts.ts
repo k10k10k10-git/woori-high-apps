@@ -1,5 +1,5 @@
 import { auth } from "@/lib/firebase";
-import type { User } from "firebase/auth";
+import type { User } from "@/lib/supabaseAuth";
 import type { SundayTeamKey } from "@/features/portal/featureCatalog";
 import type { RosterContact } from "@/features/semester/rosterContact";
 

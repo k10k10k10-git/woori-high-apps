@@ -1,4 +1,4 @@
-import { get, onValue, ref } from "firebase/database";
+import { get, onValue, ref } from "@/lib/rtdb";
 import { auth, db } from "@/lib/firebase";
 import { paths } from "./paths";
 import { semesterSummaryMeta } from "./termPhase";

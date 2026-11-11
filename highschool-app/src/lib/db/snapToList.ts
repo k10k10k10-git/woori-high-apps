@@ -1,4 +1,4 @@
-import type { DataSnapshot } from "firebase/database";
+import type { DataSnapshot } from "@/lib/rtdb";
 
 // Helper: DataSnapshot → typed list (injects id from Firebase key)
 /** RTDB 스냅샷을 `{ id, ...값 }` 배열로. 이 저장소의 유일한 변환 경로다

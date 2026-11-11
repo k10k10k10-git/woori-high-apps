@@ -3,7 +3,7 @@ import { paths as semesterPaths } from "@/features/semester/paths";
 import { assertPraiseId, praisePaths } from "../paths";
 import type { PraiseState } from "../types";
 import { PraiseDomainError } from "./validation";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable, type AdminTransactionResult } from "./supabaseAdmin";
 
 type JsonRecord = Record<string, unknown>;
 function object(value: unknown): JsonRecord {
@@ -77,15 +77,10 @@ function storageValue(value: unknown): unknown {
 }
 
 export async function listWorkspaceIds(): Promise<string[]> {
-  const { app } = getPraiseFirebaseAdmin();
+  const { database } = getPraiseAdmin();
   try {
-    // 전체 원장 다운로드를 피한다. 서버 토큰을 URL·응답·로그에 넣지 않는다.
-    const token = await app.options.credential!.getAccessToken();
-    const url = new URL(`${praisePaths.root()}.json`, `${app.options.databaseURL}/`);
-    url.searchParams.set("shallow", "true");
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${token.access_token}` }, cache: "no-store", signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error();
-    const value: unknown = await response.json();
+    // 키 목록만 쓴다. 서버 키를 응답·로그에 넣지 않는다.
+    const value: unknown = await database.shallow(praisePaths.root());
     if (value === null) return [];
     const entries = Object.entries(object(value));
     if (entries.some(([, present]) => present !== true)) throw new Error();
@@ -97,9 +92,9 @@ export async function listWorkspaceIds(): Promise<string[]> {
 
 export async function readWorkspace(id: string): Promise<PraiseState | null> {
   const path = praisePaths.workspace(id);
-  const { database } = getPraiseFirebaseAdmin();
+  const { database } = getPraiseAdmin();
   let value: unknown;
-  try { value = (await database.ref(path).get()).val(); }
+  try { value = await database.get(path); }
   catch { throw praiseUnavailable("workspace_read_unavailable"); }
   return workspace(value, id);
 }
@@ -107,20 +102,13 @@ export async function readWorkspace(id: string): Promise<PraiseState | null> {
 /** 업무·감사·operationId를 한 workspace 트랜잭션으로 저장한다. updater는 재시도 가능 순수 함수다. */
 export async function transactWorkspace(id: string, updater: (current: PraiseState | null) => PraiseState | undefined): Promise<PraiseState | null> {
   const path = praisePaths.workspace(id);
-  const { database } = getPraiseFirebaseAdmin();
+  const { database } = getPraiseAdmin();
   let callbackFailed = false;
   let callbackError: unknown;
-  let result;
-  const reference = database.ref(path);
-  let stopListening = () => {};
+  let result: AdminTransactionResult;
   try {
-    // transaction의 최초 null은 미조회 캐시일 수 있다. 실제 첫 스냅샷을 유지한 채 시작한다.
-    await new Promise<void>((resolve, reject) => {
-      const listener = () => resolve();
-      stopListening = () => reference.off("value", listener);
-      reference.on("value", listener, reject);
-    });
-    result = await reference.transaction((current: unknown) => {
+    // 서버 transaction 은 항상 실제 저장값(hash)에서 시작한다(Firebase 의 미조회 캐시 null 이 없다).
+    result = await database.transaction(path, (current: unknown) => {
       try {
         const next = updater(workspace(current, id));
         if (next === undefined) return undefined;
@@ -132,15 +120,13 @@ export async function transactWorkspace(id: string, updater: (current: PraiseSta
         callbackError = error;
         return undefined;
       }
-    }, undefined, false);
+    });
   } catch {
     if (callbackFailed) throw callbackError;
     throw praiseUnavailable("workspace_write_unavailable");
-  } finally {
-    stopListening();
   }
   if (callbackFailed) throw callbackError;
-  return workspace(result.snapshot.val(), id);
+  return workspace(result.value, id);
 }
 
 export type PraiseSemesterReference = {
@@ -163,11 +149,11 @@ function referenceMap(value: unknown, fields: string[]) {
 /** 기존 학기는 참조만 읽는다. 비공개 원장·연락처·메모·출석 데이터는 조회하지 않는다. */
 export async function readSemesterReference(sid: string): Promise<PraiseSemesterReference | null> {
   assertPraiseId(sid);
-  const { database } = getPraiseFirebaseAdmin();
+  const { database } = getPraiseAdmin();
   let values: unknown[];
   try {
     values = await Promise.all([semesterPaths.semesterMeta(sid), semesterPaths.teams(sid), semesterPaths.sessions(sid), semesterPaths.applications(sid)]
-      .map(async (path) => (await database.ref(path).get()).val()));
+      .map((path) => database.get(path)));
   } catch { throw praiseUnavailable("semester_reference_unavailable"); }
   const [meta, teams, sessions, applications] = values;
   if (meta === null || meta === undefined) return null;
@@ -181,7 +167,7 @@ export async function readSemesterReference(sid: string): Promise<PraiseSemester
 
 /**
  * 등단 전용 CAS: 외부 공통 출석을 저장 직전에 await 검증하며 workspace 충돌 때도 다시 검증한다.
- * RTDB SDK의 동기 transaction callback에는 비동기 외부 검증을 넣을 수 없어 ETag 조건부 PUT을 사용한다.
+ * transaction callback 은 동기라 비동기 외부 검증을 넣을 수 없어 hash 조건부 저장(rtdb_admin_cas)을 쓴다.
  * 두 원장 사이의 분산 transaction은 아니므로 마지막 검증 이후의 새 출석 변경은 다음 조회에서 다시 반영된다.
  */
 export async function transactWorkspaceChecked(
@@ -189,27 +175,20 @@ export async function transactWorkspaceChecked(
   updater: (current: PraiseState | null) => PraiseState | undefined,
   verifyBeforeCommit: (current: PraiseState | null) => Promise<void>,
 ): Promise<PraiseState | null> {
-  const path = praisePaths.workspace(id), { app } = getPraiseFirebaseAdmin();
-  const token = await app.options.credential!.getAccessToken().catch(() => { throw praiseUnavailable("workspace_write_unavailable"); });
-  const url = new URL(`${path}.json`, `${app.options.databaseURL}/`);
-  const request = async (init: RequestInit) => {
-    try { return await fetch(url, { ...init, cache: "no-store", signal: AbortSignal.timeout(10000), headers: { Authorization: `Bearer ${token.access_token}`, ...init.headers } }); }
-    catch { throw praiseUnavailable("workspace_write_unavailable"); }
-  };
+  const path = praisePaths.workspace(id), { database } = getPraiseAdmin();
+  const unavailable = () => praiseUnavailable("workspace_write_unavailable");
+  let snapshot = await database.readHashed(path).catch(() => { throw unavailable(); });
   for (let attempt = 0; attempt < 4; attempt++) {
-    const response = await request({ headers: { "X-Firebase-ETag": "true" } });
-    if (!response.ok || !response.headers.get("etag")) throw praiseUnavailable("workspace_write_unavailable");
     let current: PraiseState | null;
-    try { current = workspace(await response.json(), id); } catch { throw praiseUnavailable("invalid_workspace_data"); }
+    try { current = workspace(snapshot.value, id); } catch { throw praiseUnavailable("invalid_workspace_data"); }
     const next = updater(current);
     if (next === undefined || next === current) return current;
     if (workspace(next, id) === null) throw praiseUnavailable("invalid_workspace_data");
-    const body = JSON.stringify(storageValue(next));
+    const value = storageValue(next);
     await verifyBeforeCommit(current);
-    const committed = await request({ method: "PUT", headers: { "Content-Type": "application/json", "If-Match": response.headers.get("etag")! }, body });
-    if (committed.status === 412) continue;
-    if (!committed.ok) throw praiseUnavailable("workspace_write_unavailable");
-    try { return workspace(await committed.json(), id); } catch { throw praiseUnavailable("workspace_write_unavailable"); }
+    const committed = await database.compareAndSet(path, snapshot.hash, value).catch(() => { throw unavailable(); });
+    if (!committed.committed) { snapshot = committed; continue; }
+    try { return workspace(committed.value, id); } catch { throw unavailable(); }
   }
   throw new PraiseDomainError(409, "다른 기록이 계속 변경되고 있습니다. 최신 화면에서 다시 시도해 주세요.", "revision_conflict");
 }

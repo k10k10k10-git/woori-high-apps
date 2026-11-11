@@ -10,7 +10,7 @@ import type {
 } from "../types";
 import { praisePaths } from "../paths";
 import { applyPraiseCommand, createPraiseState } from "./commands";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "./supabaseAdmin";
 import {
   listWorkspaceIds,
   readWorkspace,
@@ -56,11 +56,7 @@ export async function listPraise(actor: PraiseActor) {
   for (const id of ids) {
     let meta;
     try {
-      meta = (
-        await getPraiseFirebaseAdmin()
-          .database.ref(praisePaths.metadata(id))
-          .get()
-      ).val() as PraiseMeta | null;
+      meta = await getPraiseAdmin().database.get(praisePaths.metadata(id)) as PraiseMeta | null;
     } catch {
       throw praiseUnavailable("workspace_list_unavailable");
     }
@@ -198,11 +194,12 @@ export async function executePraise(
         accounts.some((account) => account.uid === command.access.uid),
         "찬양팀을 이용할 수 있는 승인 계정을 선택해 주세요.",
       );
-      const user = await getPraiseFirebaseAdmin()
-        .auth.getUser(command.access.uid)
-        .catch(() => null);
+      // 옛 Firebase UID 계정은 첫 로그인 때 Supabase 계정이 생기므로 승인 목록 확인으로 갈음한다.
+      const status = await getPraiseAdmin()
+        .auth.accountStatus(command.access.uid)
+        .catch(() => "missing" as const);
       requireValue(
-        user && !user.disabled,
+        status === "active" || status === "unverifiable",
         "연결할 로그인 계정이 없거나 사용 중지 상태입니다.",
       );
     }

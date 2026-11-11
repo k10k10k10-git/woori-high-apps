@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { paths } from "@/lib/paths";
 import { parseActivityLogRecord } from "@/features/activityLog/model";
 import type { PraiseAuditEvent, PraiseState } from "../types";
-import { getPraiseFirebaseAdmin } from "./firebaseAdmin";
+import { getPraiseAdmin } from "./supabaseAdmin";
 import { fingerprint } from "./stageModel";
 import { transactWorkspace } from "./repository";
 
@@ -52,10 +52,9 @@ export async function projectPraiseAudit(state: PraiseState): Promise<boolean> {
       const value = praiseActivityRecord(state.meta.id, event);
       if (!value) throw new Error("invalid_audit");
       const clean = JSON.parse(JSON.stringify(value));
-      const receipt = await getPraiseFirebaseAdmin()
-        .database.ref(`${paths.activityLogEvents()}/${value.id}`)
-        .transaction((current) => current ?? clean, undefined, false);
-      const stored = parseActivityLogRecord(receipt.snapshot.val());
+      const receipt = await getPraiseAdmin()
+        .database.transaction(`${paths.activityLogEvents()}/${value.id}`, (current) => current ?? clean);
+      const stored = parseActivityLogRecord(receipt.value);
       // 선점된 다른 내용은 성공 영수증이 아니다. 원본 감사와 재시도 대기를 유지한다.
       if (!stored || fingerprint(stored) !== fingerprint(value))
         throw new Error("audit_collision");

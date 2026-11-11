@@ -1,7 +1,7 @@
 import {
   child, push, runTransaction as nativeRunTransaction, serverTimestamp, update as nativeUpdate,
   type DatabaseReference, type TransactionResult,
-} from "firebase/database";
+} from "@/lib/rtdb";
 import { auth } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { rootPatchForUpdate, summarizeWrite, validateWritePath, type ActivityWriteContext, type RootWritePatch } from "./writeModel";

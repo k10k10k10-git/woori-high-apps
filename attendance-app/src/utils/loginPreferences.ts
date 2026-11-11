@@ -23,5 +23,12 @@ export function loginErrorMessage(error: unknown): string {
   if (code.includes('too-many-requests')) return '로그인 시도가 많아 잠시 제한되었습니다. 잠시 후 다시 시도해 주세요.';
   if (code.includes('user-disabled')) return '사용이 중지된 계정입니다. 관리자에게 문의해 주세요.';
   if (/web-storage|unsupported-persistence/.test(code)) return '브라우저의 저장소 설정을 확인한 뒤 다시 로그인해 주세요.';
+  // Supabase 로그인(이메일 코드·비밀번호)에서 새로 생긴 경우. supabaseAuth 가 Firebase 식 코드로 바꿔 준다.
+  if (code.includes('invalid-code')) return '코드가 맞지 않거나 시간이 지났습니다. 새 코드를 받아 다시 입력해 주세요.';
+  if (code.includes('email-not-confirmed')) return '아직 확인되지 않은 계정입니다. 이메일 코드로 로그인해 주세요.';
+  if (code.includes('mailboxless-email')) return '@woorihigh.com 계정은 코드를 받을 수 없습니다. 비밀번호로 로그인해 주세요.';
+  if (code.includes('signup-disabled')) return '이 이메일로는 새 계정을 만들 수 없습니다. 관리자에게 문의해 주세요.';
+  if (code.includes('operation-not-allowed')) return '이 로그인 방법은 지금 쓸 수 없습니다. 다른 방법으로 로그인해 주세요.';
+  if (code.includes('not-configured')) return '로그인 설정이 아직 끝나지 않았습니다. 관리자에게 알려 주세요.';
   return '로그인하지 못했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.';
 }

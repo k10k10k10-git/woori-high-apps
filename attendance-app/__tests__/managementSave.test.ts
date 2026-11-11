@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({ user: null as { uid: string; getIdToken: () => Promise<string> } | null }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { get currentUser() { return m.user; } } }));
+// Firebase REST 를 흉내 내는 fetch 는 그대로 두고, 앱의 REST 출구(rtdbRest → Supabase)만 그 fetch 로 잇는다.
+vi.mock('@/lib/rtdbRest', () => ({ RTDB_REST_URL: 'https://synthetic.firebaseio.test', rtdbRestFetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init) }));
 import { compareManagementSave, runManagementSave } from '@/lib/managementSave';
 
 const request = vi.fn<typeof fetch>();
@@ -81,7 +83,7 @@ it('멈춘 PUT은 unknown으로 풀고 늦은 응답 뒤 다음 쓰기를 시작
 it('토큰 대기 중 계정이 바뀌면 현재 UI가 유지되어도 요청을 시작하지 않는다', async () => {
   let deliver!: (token: string) => void;
   m.user = { uid: 'first-admin', getIdToken: () => new Promise<string>(resolve => { deliver = resolve; }) };
-  vi.stubGlobal('fetch', request); vi.stubEnv('NEXT_PUBLIC_FIREBASE_DATABASE_URL', 'https://synthetic.firebaseio.test');
+  vi.stubGlobal('fetch', request);
   const result = runManagementSave(() => true, session => session.write('classes/2026/1-1-1', 'etag', {}));
   m.user = { uid: 'second-admin', getIdToken: async () => 'another-token' }; deliver('old-token');
   await expect(result).rejects.toMatchObject({ kind: 'session' }); expect(request).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { RTDB_REST_URL, rtdbRestFetch } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 
@@ -26,7 +27,7 @@ export async function compareManagementSave<T>(connection: Connection, task: (se
     const token = await connection.getToken();
     check();
     if (!token || !connection.databaseUrl) throw new ManagementSaveError('unavailable', '서버 연결을 확인하지 못했습니다. 연결 후 다시 시도해 주세요.');
-    const request = connection.fetch ?? globalThis.fetch;
+    const request = connection.fetch ?? rtdbRestFetch;
     const endpoint = (path: string) => {
       if (!path || path.split('/').some(key => !key || /[.#$\[\]\u0000-\u001f\u007f]/.test(key))) throw new ManagementSaveError('unavailable', '저장 경로를 확인해 주세요.');
       const url = new URL(connection.databaseUrl);
@@ -79,7 +80,7 @@ export function runManagementSave<T>(isCurrent: () => boolean, task: (session: M
   return withBrowserWriteLock('shared', () => {
     const user = auth.currentUser;
     if (!user) throw new ManagementSaveError('session', '관리자 계정으로 다시 로그인해 주세요.');
-    return compareManagementSave({ databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', getToken: () => user.getIdToken(),
+    return compareManagementSave({ databaseUrl: RTDB_REST_URL, getToken: () => user.getIdToken(),
       isCurrent: () => auth.currentUser === user && isCurrent() }, task);
   });
 }

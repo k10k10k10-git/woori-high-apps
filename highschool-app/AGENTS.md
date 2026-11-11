@@ -110,7 +110,7 @@ npm test
 npm run build
 ```
 
-- `typecheck`는 `tsc --noEmit`, build는 `next build --webpack`입니다. `npm run quality:ci`는 lint → typecheck → coverage → build를 묶습니다. Firebase 빌드 설정은 `src/lib/firebase.ts`와 CI의 `NEXT_PUBLIC_FIREBASE_*` 키를 확인하고 실제 값은 출력하지 않습니다. 환경변수 누락 실패와 소스 회귀를 구분합니다.
+- `typecheck`는 `tsc --noEmit`, build는 `next build --webpack`입니다. `npm run quality:ci`는 lint → typecheck → coverage → build를 묶습니다. 공개 설정은 `src/lib/supabase.ts`의 `NEXT_PUBLIC_SUPABASE_URL`·`NEXT_PUBLIC_SUPABASE_ANON_KEY`(선택 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`), 서버 설정은 `SUPABASE_SERVICE_ROLE_KEY`이며 없어도 빌드는 됩니다(연결 때 설정 오류). 실제 값은 출력하지 않습니다. 환경변수 누락 실패와 소스 회귀를 구분합니다.
 - 같은 앱에서 타입 검사와 build를 병렬 실행하지 않습니다. ESLint 전역 ignore의 `.auth/**`를 유지해 `npm run lint` 자체가 앱 소스를 검사하게 합니다. 인증 프로필을 삭제하거나 추가 ignore 명령으로 검사 범위를 줄여 통과시키지 않습니다.
 - Vitest는 기본 node 환경이며 렌더 테스트 첫 줄에 `/** @vitest-environment jsdom */`을 둡니다. jsdom은 레이아웃 계산이 없어 필요할 때 `getClientRects` 등을 스텁합니다. 커버리지 하한은 `vitest.config.mts`, 성능·접근성 예산은 `lighthouserc.cjs`가 원천입니다.
 - `../.github/workflows/highschool-quality.yml`은 Node 22에서 검증·Lighthouse를 실행한 뒤 별도 `authenticated-e2e` job으로 **운영 URL** smoke·axe를 실행합니다. PR 코드를 검증한 것과 운영 화면을 검사한 것을 구분해 보고합니다. `quality:ci`만으로 Lighthouse·E2E까지 통과했다고 말하지 않습니다.

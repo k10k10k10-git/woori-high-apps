@@ -1,3 +1,4 @@
+import { rtdbRestFetch } from '@/lib/rtdbRest';
 import type { StudentMoveLockTransaction } from '@/utils/studentMoveLock';
 
 export const STUDENT_MOVE_LOCK_TIMEOUT_MS = 15_000;
@@ -32,7 +33,7 @@ export function createStudentMoveLockTransaction(input: StudentMoveLockConnectio
       const url = new URL(input.databaseUrl);
       url.pathname = `/${input.path.split('/').map(encodeURIComponent).join('/')}.json`;
       url.searchParams.set('auth', input.idToken);
-      const request = input.fetchOnce ?? globalThis.fetch;
+      const request = input.fetchOnce ?? rtdbRestFetch;
       const options = { cache: 'no-store' as const, signal: controller.signal };
 
       for (let attempt = 0; attempt < MAX_COMPARE_ATTEMPTS; attempt++) {

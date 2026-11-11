@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(), onValue: vi.fn(), unsubscribe: vi.fn(), auth: { currentUser: { uid: "admin-1" } as { uid: string } | null },
 }));
 vi.mock("@/lib/firebase", () => ({ auth: mocks.auth, db: {} }));
-vi.mock("firebase/database", () => ({
+vi.mock("@/lib/rtdb", () => ({
   get: mocks.get, onValue: mocks.onValue,
   ref: (_db: unknown, path: string) => path,
   query: (...constraints: unknown[]) => constraints,

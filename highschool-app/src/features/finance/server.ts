@@ -1,9 +1,8 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import type { Reference } from "firebase-admin/database";
 import { canManageAnnualFinance } from "@/features/portal/accessPolicy";
 import type { PraiseActor } from "@/features/praise/types";
-import { getPraiseFirebaseAdmin, PraiseRequestError } from "@/features/praise/server/firebaseAdmin";
+import { getPraiseAdmin, PraiseRequestError } from "@/features/praise/server/supabaseAdmin";
 import { authenticatePraiseRequest } from "@/features/praise/server/httpAuth";
 import { praiseJson, praiseResponse } from "@/features/praise/server/http";
 import { PraiseDomainError } from "@/features/praise/server/validation";
@@ -28,32 +27,29 @@ export async function financeHttp(action: () => Promise<unknown>): Promise<Respo
 export async function financeJson(request: Request, year: number): Promise<FinanceCommand> {
   return parseFinanceCommand(await praiseJson(request), year);
 }
-function database() { return getPraiseFirebaseAdmin().database; }
-/** transaction의 첫 null을 미조회 캐시와 혼동하지 않도록 실제 값을 유지한다. */
-async function transact(reference: Reference, update: (value: unknown) => unknown) {
-  let stop = () => {};
+function database() { return getPraiseAdmin().database; }
+/** 서버 transaction 은 실제 저장값(hash)에서 시작한다. 응답이 늦으면 10초 뒤 연결 오류로 끝낸다. */
+async function transact(path: string, update: (value: unknown) => unknown) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new FinanceError(503, "회계 연결을 확인해 주세요.", "unavailable")), 10_000);
-      const listener = () => { clearTimeout(timer); resolve(); };
-      stop = () => { clearTimeout(timer); reference.off("value", listener); };
-      reference.on("value", listener, (error) => { clearTimeout(timer); reject(error); });
-    });
-    return await reference.transaction(update, undefined, false);
-  } finally { stop(); }
+    return await Promise.race([
+      database().transaction(path, update),
+      new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new FinanceError(503, "회계 연결을 확인해 주세요.", "unavailable")), 10_000); }),
+    ]);
+  } finally { clearTimeout(timer); }
 }
 function assertActor(actor: PraiseActor) {
   if (!canManageAnnualFinance(actor.roles)) throw new FinanceError(403, "연간 회계 이용 권한이 없습니다.", "forbidden");
 }
 export async function getFinance(actor: PraiseActor, year: number) {
   assertActor(actor); financeYear(year);
-  const ledger = readFinanceLedger((await database().ref(financeLedgerPath(year)).get()).val(), year);
+  const ledger = readFinanceLedger(await database().get(financeLedgerPath(year)), year);
   return financeView(ledger);
 }
 export async function getFinanceHistory(actor: PraiseActor, year: number, target: string): Promise<FinanceHistoryItem[]> {
   assertActor(actor); financeYear(year);
   if (target !== "opening") financeEntryId(target);
-  const ledger = readFinanceLedger((await database().ref(financeLedgerPath(year)).get()).val(), year);
+  const ledger = readFinanceLedger(await database().get(financeLedgerPath(year)), year);
   return Object.values(ledger.history[target] ?? {}).sort((a, b) => b.at.localeCompare(a.at));
 }
 interface StoredReceipt extends FinanceReceipt { schemaVersion: 1; sha256: string; base64: string }
@@ -77,14 +73,14 @@ export async function executeFinance(actor: PraiseActor, year: number, value: un
   const file = command.kind === "receipt.add" ? prepareReceipt(command, at) : undefined;
   const receipt: FinanceReceipt | undefined = file ? { id: file.id, name: file.name, mimeType: file.mimeType, size: file.size, createdAt: file.createdAt } : undefined;
   const db = database();
-  const ledgerRef = db.ref(financeLedgerPath(year));
+  const ledgerPath = financeLedgerPath(year);
   // 파일을 만들기 전에 원장 형태·버전·기존 멱등 작업을 확인한다.
-  const current = readFinanceLedger((await ledgerRef.get()).val(), year);
+  const current = readFinanceLedger(await db.get(ledgerPath), year);
   const preview = applyFinanceCommand(current, command, actor, at, digest, receipt);
   if (preview === current) return financeView(current);
   if (file) {
     let conflict = false;
-    const stored = await transact(db.ref(financeFilePath(year, file.id)), (value) => {
+    const stored = await transact(financeFilePath(year, file.id), (value) => {
       const existing = value as StoredReceipt | null;
       if (existing === null) return file;
       if (existing?.schemaVersion === 1 && existing.id === file.id && existing.sha256 === file.sha256 && existing.base64 === file.base64 && existing.name === file.name && existing.mimeType === file.mimeType && existing.size === file.size && typeof existing.createdAt === "string" && Number.isFinite(Date.parse(existing.createdAt))) return existing;
@@ -92,10 +88,10 @@ export async function executeFinance(actor: PraiseActor, year: number, value: un
     });
     if (conflict || !stored.committed) throw new FinanceError(409, "이미 사용된 증빙 작업 번호입니다. 다시 파일을 선택해 주세요.", "operation_conflict");
     // 재시도의 증빙 생성 시각은 최초 저장본을 유지한다.
-    if (receipt) receipt.createdAt = (stored.snapshot.val() as StoredReceipt).createdAt;
+    if (receipt) receipt.createdAt = (stored.value as StoredReceipt).createdAt;
   }
   let domainError: FinanceError | undefined;
-  const result = await transact(ledgerRef, (raw) => {
+  const result = await transact(ledgerPath, (raw) => {
     try { return applyFinanceCommand(readFinanceLedger(raw, year), command, actor, at, digest, receipt); }
     catch (error) {
       if (error instanceof FinanceError) { domainError = error; return undefined; }
@@ -103,15 +99,15 @@ export async function executeFinance(actor: PraiseActor, year: number, value: un
     }
   });
   if (!result.committed) throw domainError ?? new FinanceError(409, "장부가 변경되었습니다. 다시 불러온 뒤 확인해 주세요.", "revision_conflict");
-  return financeView(readFinanceLedger(result.snapshot.val(), year));
+  return financeView(readFinanceLedger(result.value, year));
 }
 export async function getFinanceReceipt(actor: PraiseActor, year: number, entryId: string, receiptId: string): Promise<Response> {
   assertActor(actor); financeYear(year); financeEntryId(entryId); financeReceiptId(receiptId);
   const db = database();
-  const ledger = readFinanceLedger((await db.ref(financeLedgerPath(year)).get()).val(), year);
+  const ledger = readFinanceLedger(await db.get(financeLedgerPath(year)), year);
   const expected = ledger.entries[entryId]?.receipts.find((receipt) => receipt.id === receiptId);
   if (!expected) throw new FinanceError(404, "이 거래에 연결된 증빙이 없습니다.", "not_found");
-  const file = (await db.ref(financeFilePath(year, receiptId)).get()).val() as StoredReceipt | null;
+  const file = await db.get(financeFilePath(year, receiptId)) as StoredReceipt | null;
   if (!file || file.schemaVersion !== 1 || file.id !== expected.id || file.mimeType !== expected.mimeType || file.size !== expected.size || typeof file.base64 !== "string" || file.base64.length > Math.ceil(MAX_RECEIPT_BYTES / 3) * 4) throw new FinanceError(503, "증빙 파일을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.", "receipt_unavailable");
   const bytes = Buffer.from(file.base64, "base64");
   if (bytes.length !== expected.size || sha256(bytes) !== file.sha256 || bytes.toString("base64") !== file.base64 || !validFileMagic(bytes, expected.mimeType)) throw new FinanceError(503, "증빙 파일을 확인하지 못했습니다.", "receipt_unavailable");

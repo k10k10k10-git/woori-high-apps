@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { canSendSiteRequest, normalizeSiteRequestsRoot, siteRequestAttachmentUrl, unnotifiedResolvedRequests } from "./siteRequest";
 
 describe("사이트 요청함 모델", () => {
@@ -102,5 +102,15 @@ describe("사이트 요청함 모델", () => {
     });
 
     expect(request.attachment).toBeUndefined();
+  });
+
+  it("Supabase 저장소로 옮긴 뒤의 첨부는 같은 파일의 서명 주소일 때만 보여 준다", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abcdefghijklmnopqrst.supabase.co");
+    const signed = (path: string) => `https://abcdefghijklmnopqrst.supabase.co/storage/v1/object/sign/highschool/${path}?token=t`;
+    const attachment = (fileUrl: string) => ({ name: "a.jpg", type: "image/jpeg", size: 10, filePath: "site-requests/userA/requestA/attachment.jpg", fileUrl });
+    const read = (fileUrl: string) => normalizeSiteRequestsRoot({ userA: { siteRequests: { requestA: { title: "첨부", description: "설명", createdAt: 1, attachment: attachment(fileUrl) } } } })[0].attachment;
+    expect(read(signed("site-requests/userA/requestA/attachment.jpg"))?.fileUrl).toContain("/sign/highschool/");
+    expect(read(signed("site-requests/other/requestA/attachment.jpg"))).toBeUndefined();
+    vi.unstubAllEnvs();
   });
 });

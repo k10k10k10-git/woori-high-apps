@@ -1,4 +1,4 @@
-import { get, onValue, ref } from "firebase/database";
+import { get, onValue, ref } from "@/lib/rtdb";
 import { auditedSet as set } from "@/features/activityLog/write";
 import type { RoomAutoAssignConfigData, RoomAutoAssignSettings } from "../roomAutoAssignConfig";
 import { normalizeRoomAutoAssignConfig } from "../roomAutoAssignConfig";

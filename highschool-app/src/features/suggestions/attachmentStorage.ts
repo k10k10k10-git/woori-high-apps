@@ -1,4 +1,4 @@
-import { deleteObject, getDownloadURL, ref, uploadString } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadString } from "@/lib/supabaseStorage";
 import { storage } from "@/lib/firebase";
 import type { PreparedSiteRequestAttachment, SiteRequestAttachment } from "./siteRequest";
 import { siteRequestAttachmentPath } from "./attachmentPath";

@@ -1,18 +1,8 @@
 'use client';
-import { initializeApp } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
-import { getAuth } from 'firebase/auth';
+// Firebase 에서 Supabase 로 플랫폼만 바꿨다(docs/SUPABASE_PLATFORM_CONTRACT.md).
+// 화면·업무 코드가 쓰던 이름(db, auth)은 그대로 두고 새 모듈의 값을 내보낸다.
+// 이 파일은 공개 환경 변수를 읽지 않으므로 설정이 없어도 빌드·화면이 뜬다(실제 연결 때 설정 오류가 난다).
+import { getDatabase } from '@/lib/rtdb';
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-};
-
-const app = initializeApp(firebaseConfig);
-export const db = getDatabase(app);
-export const auth = getAuth(app);
+export { auth } from '@/lib/supabaseAuth';
+export const db = getDatabase();

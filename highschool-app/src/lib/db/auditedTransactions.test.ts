@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OnSiteEntry } from "@/lib/types";
 
 const mocks = vi.hoisted(() => ({ transaction: vi.fn() }));
-vi.mock("firebase/database", () => ({
+vi.mock("@/lib/rtdb", () => ({
   ref: (_db: unknown, nodePath?: string) => nodePath,
   get: vi.fn(), push: vi.fn(), onValue: vi.fn(), onChildAdded: vi.fn(), onChildRemoved: vi.fn(),
 }));

@@ -4,7 +4,7 @@ import { paths } from "@/features/semester/paths";
 import { canWritePraiseAttendance, groupVersionForMeeting, praisePermissions } from "../permissions";
 import type { PraiseActor, PraiseCommand, PraisePendingAttendanceReview, PraiseSharedAttendanceOperation, PraiseState } from "../types";
 import { applyPraiseCommand } from "./commands";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "./supabaseAdmin";
 import { transactWorkspace } from "./repository";
 import { asRecord, assertSharedSemesterMapping, overlaySharedAttendance, readSharedPath, sharedRevision, sharedStatus, type SharedAttendanceSnapshot } from "./sharedAttendance";
 import { fingerprint } from "./stageModel";
@@ -57,22 +57,20 @@ export function sharedSemesterUpdate(raw: unknown, receipt: PraiseSharedAttendan
   return next;
 }
 async function writeEntry(receipt: PraiseSharedAttendanceOperation, actorUid: string, at: number, key: string, signature: string) {
-  const reference = getPraiseFirebaseAdmin().database.ref(paths.semester(receipt.semesterId));
+  const database = getPraiseAdmin().database;
   let callbackError: unknown;
-  let stopListening = () => {};
   try {
-    await new Promise<void>((resolve, reject) => { const listener = () => resolve(); stopListening = () => reference.off("value", listener); reference.on("value", listener, reject); });
-    const result = await reference.transaction(raw => {
+    const result = await database.transaction(paths.semester(receipt.semesterId), raw => {
       try { return sharedSemesterUpdate(raw, receipt, actorUid, at, key, signature); }
       catch (error) { callbackError = error; return undefined; }
-    }, undefined, false);
+    });
     if (callbackError) throw callbackError;
-    requireValue(result.committed && sharedAppliedProof(asRecord(asRecord(result.snapshot.val()).praiseOperationReceipts)[key], signature, at), pendingMessage, "shared_write_pending", 409);
+    requireValue(result.committed && sharedAppliedProof(asRecord(asRecord(result.value).praiseOperationReceipts)[key], signature, at), pendingMessage, "shared_write_pending", 409);
   } catch (error) {
     if (callbackError) throw callbackError;
     if (error instanceof PraiseDomainError) throw error;
     throw praiseUnavailable("shared_write_pending");
-  } finally { stopListening(); }
+  }
 }
 function assertReceiptActor(state: PraiseState, operationId: string, actor: PraiseActor, signature: string) {
   const operation = state.operations[operationId];
@@ -203,20 +201,18 @@ export function closeSharedSemester(raw: unknown, receipt: PraiseSharedAttendanc
   return { ...root, praiseOperationReceipts: { ...asRecord(root.praiseOperationReceipts), [key]: { phase: "closed", fingerprint: signature, at } } };
 }
 async function closeEntry(receipt: PraiseSharedAttendanceOperation, key: string, signature: string, expectedRevision: string, at: number) {
-  const reference = getPraiseFirebaseAdmin().database.ref(paths.semester(receipt.semesterId));
+  const database = getPraiseAdmin().database;
   let callbackError: unknown;
-  let stopListening = () => {};
   try {
-    await new Promise<void>((resolve, reject) => { const listener = () => resolve(); stopListening = () => reference.off("value", listener); reference.on("value", listener, reject); });
-    const result = await reference.transaction(raw => { try { return closeSharedSemester(raw, receipt, key, signature, expectedRevision, at); } catch (error) { callbackError = error; return undefined; } }, undefined, false);
+    const result = await database.transaction(paths.semester(receipt.semesterId), raw => { try { return closeSharedSemester(raw, receipt, key, signature, expectedRevision, at); } catch (error) { callbackError = error; return undefined; } });
     if (callbackError) throw callbackError;
-    const marker = asRecord(asRecord(asRecord(result.snapshot.val()).praiseOperationReceipts)[key]);
+    const marker = asRecord(asRecord(asRecord(result.value).praiseOperationReceipts)[key]);
     requireValue(result.committed && marker.phase === "closed" && marker.fingerprint === signature, pendingMessage, "shared_write_pending", 409);
   } catch (error) {
     if (callbackError) throw callbackError;
     if (error instanceof PraiseDomainError) throw error;
     throw praiseUnavailable("shared_write_pending");
-  } finally { stopListening(); }
+  }
 }
 export async function resolveSharedAttendance(actor: PraiseActor, before: PraiseState, command: Extract<PraiseCommand, {type: "attendance.resolve"}>, operationId: string): Promise<PraiseState> {
   requireValue(praisePermissions(actor, before).read, "찬양팀 접근 권한이 없습니다.", "forbidden", 403);

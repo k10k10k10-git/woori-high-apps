@@ -1,9 +1,9 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, ReactNode } from "react";
-import { User, onAuthStateChanged, signOut as firebaseSignOut, signInWithPopup } from "firebase/auth";
-import { get, ref } from "firebase/database";
-import { auth, googleProvider, db } from "@/lib/firebase";
+import { AuthIdentityError, onAuthStateChanged, retryAuthIdentity, signInWithGoogle, signOut as authSignOut, type User } from "@/lib/supabaseAuth";
+import { get, ref } from "@/lib/rtdb";
+import { auth, db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { NO_ROLES, resolveMinistryRoles, type MinistryRoles } from "@/features/portal/accessPolicy";
 import { mergeTeamMemberships, type TeamMemberships } from "@/features/teams/teamModel";
@@ -18,6 +18,7 @@ interface AuthContextValue {
   /** 원시 역할 원장의 학적·출석 전체 조회 권한. 비활성 팀 연결도 Rules처럼 계산한다. */
   canSearchOfficialRoster: boolean;
   memberName: string | null;
+  /** Google 로그인(켜졌을 때만). 이메일 로그인은 LoginButton 의 로그인 창이 맡는다. */
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   retryRoles: () => void;
@@ -46,9 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [memberName, setMemberName] = useState<string | null>(null);
   const [roleError, setRoleError] = useState(false);
   const authRequest = useRef(0);
+  // 로그인은 됐지만 규칙용 uid(whoami)를 확인하지 못한 상태. "다시 시도"가 신원부터 다시 묻는다.
+  const identityPending = useRef(false);
 
   const loadRoles = useCallback(async (u: User | null) => {
       const request = ++authRequest.current;
+      identityPending.current = false;
       setUser(u);
       setLoading(true);
       setRoleError(false);
@@ -111,24 +115,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
   }, []);
 
+  const identityFailed = useCallback((error: Error) => {
+    authRequest.current += 1;
+    identityPending.current = true;
+    // 로그인 화면으로 튀지 않게 확인 대기 계정을 두고 "권한 확인 실패 + 다시 시도"를 보인다.
+    // 이 계정은 토큰을 내주지 않고 auth.currentUser 도 비어 있어 저장에 쓰이지 않는다.
+    setUser(error instanceof AuthIdentityError ? error.pendingUser : null);
+    setRoles(NO_ROLES);
+    setTeamMemberships({});
+    setCanSearchOfficialRoster(false);
+    setMemberName(null);
+    setRoleError(true);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, loadRoles);
+    const unsub = onAuthStateChanged(auth, loadRoles, identityFailed);
     return () => {
       authRequest.current += 1;
       unsub();
     };
-  }, [loadRoles]);
+  }, [loadRoles, identityFailed]);
 
   function retryRoles() {
+    if (identityPending.current) {
+      identityPending.current = false;
+      if (retryAuthIdentity()) {
+        setRoleError(false);
+        setLoading(true);
+      } else {
+        void loadRoles(null);
+      }
+      return;
+    }
     if (user) void loadRoles(user);
   }
 
   async function signIn() {
-    await signInWithPopup(auth, googleProvider);
+    await signInWithGoogle();
   }
 
   async function signOut() {
-    await firebaseSignOut(auth);
+    await authSignOut(auth);
     setRoles(NO_ROLES);
     setTeamMemberships({});
     setCanSearchOfficialRoster(false);
