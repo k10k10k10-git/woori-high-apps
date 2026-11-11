@@ -12,6 +12,9 @@ import { validateData, validateUpdateValues } from "./values";
 export { getDatabase, DataSnapshot, TransactionResult };
 export type { Database, DatabaseReference, Query, ThenableReference };
 export type { IteratedDataSnapshot } from "./snapshot";
+// 출석부 복사본에만 있는 부분: 연결 끊김 예약(페이지가 닫힐 때 보내는 최선 노력). onDisconnect.ts 참고.
+export { onDisconnect } from "./onDisconnect";
+export type { OnDisconnect } from "./onDisconnect";
 
 export type Unsubscribe = () => void;
 export type EventType = "value" | "child_added" | "child_changed" | "child_moved" | "child_removed";

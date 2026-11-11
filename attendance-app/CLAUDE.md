@@ -10,6 +10,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **이 앱** (`woori-attendance-next`) — 학생 출석부 (`classes/`, `attendance/`, `events/` 경로 소유)
 - **`highschool-app` 통합 플랫폼** — 학기·주일·수련회 행정·이가드 현장 기능. 학생 명단과 출석을 읽고, `canWriteStudentRoster`가 허용한 새친구 단건 등록·검증된 되돌리기만 제한적으로 쓴다.
 
+### Supabase 플랫폼 이관 (2026-11-12, 브랜치 `feat/supabase-attendance` — 아직 배포 전)
+
+계약은 저장소 루트 `docs/SUPABASE_PLATFORM_CONTRACT.md`. 경로·데이터 모양·Rules 뜻은 그대로이고 Firebase SDK 자리만 바꿨다. 아래 "Firebase" 서술은 이관 전 기록이며 경로·규칙 설명은 그대로 유효하다.
+
+- **데이터**: `src/lib/rtdb/`는 고등부 앱 `highschool-app/src/lib/rtdb/`의 복사본(시험 포함)이다. 출석부에만 더한 것은 `onDisconnect.ts`(아래)와 그 `index.ts` 내보내기 한 줄. `src/lib/db.ts`가 이 모듈을 감싸 `set/update/remove/runTransaction`(브라우저 쓰기 잠금 포함)·`get/onValue/push/ref/onDisconnect`를 내보낸다. Firebase 의 `off`는 쓰는 곳이 없어 내보내지 않는다. `set`은 루트가 아닌 경로에서 Firebase 와 같다(`src/lib/rtdb/set.test.ts`). 루트 `set`은 막혀 있다.
+- **REST 단발 저장**: 출석 셀·체크 PATCH, 관리 ETag 조건부 PUT, 학생 이동 잠금·PATCH, 특이사항·심방·장결·새친구 비고 모듈은 업무 코드를 그대로 두고 `src/lib/rtdbRest.ts`(`RTDB_REST_URL` + fetch 모양의 `rtdbRestFetch`)가 요청을 `api.rtdb_get / rtdb_get_hashed / rtdb_cas / rtdb_update`로 옮긴다. ETag = 서버 hash, If-Match 불일치 = 412, 규칙 거부·검증 실패 = 401, 끊김 = fetch 처럼 예외(결과 불명). 쿼리 파라미터·루트 PUT·POST는 거절한다. 새 REST 호출을 만들 때도 `RTDB_REST_URL`·`rtdbRestFetch`를 쓴다(`__tests__/rtdbRest.test.ts`). REST 를 흉내 내던 시험은 `vi.mock('@/lib/rtdbRest', …)`로 같은 가짜 fetch 에 잇는다.
+- **onDisconnect**: Supabase 는 연결 끊김을 서버가 모르므로 등록한 쓰기를 탭 메모리에 두었다가 `pagehide` 때 keepalive POST(`/rest/v1/rpc/rtdb_update`) 한 번으로 보내는 최선 노력이다. `beforeunload`는 "저장하지 않은 내용" 확인창에서 머무를 수 있어 쓰지 않는다. 탭 강제 종료·충돌·먼저 끊긴 네트워크에서는 잠금이 남는다 → 학생 이동은 다음 이동 시도가 10분 지난 잠금을 증거 3건으로 정리한다(진급용 `__sheet_sync__` 잠금은 증거가 맞지 않아 수동). 잠금이 남은 두 반은 Rules 상 그동안 일반 명단·출석 쓰기가 거부된다.
+- **서버 시각**: `.info/serverTimeOffset`은 항상 0이다(Supabase 에 시계 보정 신호가 없다). 이동·복원 잠금의 "서버 보정 시각"은 실제로는 기기 시계다.
+- **로그인**: `src/lib/supabaseAuth.ts`(고등부 앱 복사본, uid = `api.rtdb_whoami`). 화면은 고등부 `LoginDialog`와 같은 갈래 — 이메일 6자리 코드(기본) 또는 비밀번호, `@woorihigh.com`은 비밀번호만, Google 단추는 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`일 때만. Firebase 비밀번호는 옮겨지지 않으므로 기존 계정은 이메일 코드로 들어오거나 관리자가 비밀번호를 다시 정한다. whoami 실패는 무한 대기 대신 역할 조회 실패 화면(다시 불러오기·다른 계정)으로 간다.
+- **로그인 유지**: `src/lib/authStorage.ts`가 Supabase 세션 저장소를 바꿔 끼워 Firebase 의 session/local persistence 와 같게 한다(체크 해제 = 이 탭만). `src/lib/supabase.ts`가 고등부 복사본과 다른 유일한 점이다.
+- **환경 변수**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(선택 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`). Next 정적 내보내기라 **빌드 시점에** 넣어야 한다(예: `attendance-app/.env.production.local`). 없어도 빌드·화면은 뜨고 로그인·저장이 설정 오류로 끝난다. `NEXT_PUBLIC_FIREBASE_*`는 더 이상 읽지 않는다. 데모 3종(`NEXT_PUBLIC_DEMO_*`)은 그대로이며 데모 계정이 Supabase 에 있어야 한다.
+- **남은 Firebase**: `firebase.json`·`database.rules.json`(Rules 원본, Supabase 규칙 변환의 입력)과 Hosting 배포 흐름은 그대로다. `firebase` 패키지는 에뮬레이터 계약 시험(`rosterRecovery.integration.test.ts`, 앱 REST 출구를 에뮬레이터로 돌려 잇도록 수정)과 `e2e/`(Firebase 에뮬레이터 기반 — Supabase 판으로 다시 만들어야 함)만 쓴다. 운영 번들에는 Firebase SDK가 없다.
+
 ### 시트 동기화 사용 종료 (2026-10-13)
 
 - 사용자 요청으로 운영 설정의 구글 시트 주소 저장·조회, 시트 네트워크 조회, 동기화 미리보기·적용 화면과 전용 스타일을 제거했다. 이 문서 아래의 시트 동기화 설명은 과거 구현 기록이며 현재 사용 가능한 기능이 아니다.
@@ -415,7 +428,7 @@ CSS 모듈은 사용하지 않는다. 기존 공통 스타일은 `src/app/global
 - **판단 질문**: SDK Promise에 타이머만 붙이면 지연 쓰기 큐는 남으므로 이동의 잠금 요청만 REST로 바꾸고 공용 `db.ts`는 건드리지 않았다. REST abort도 서버 반영 취소가 아니므로 불명확한 PATCH는 재전송하지 않는다. 늦은 준비 선점은 서버 시각 10분·세 증거·exact dual lock 조건으로 복구한다. 예약 취소는 연도 부모가 아닌 작업 leaf 두 개만 대상으로 해 이전 작업의 늦은 취소가 새 작업을 침범하지 못하게 한다.
 - **재사용 규칙**: 제한시간과 화면 해제는 서버 작업의 실패 증거가 아니다. 원대상 고정·전송 직전 수명 확인·불명확한 결과 보존·조건부 자기 잠금 정리를 함께 검증한다.
 
-Firebase Realtime Database SDK와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다.
+실시간 트리 저장소(이관 전 Firebase SDK, 지금은 `@/lib/rtdb`)와 초기화 객체는 `src/lib/db.ts`에서만 노출한다. 컴포넌트와 데이터 훅은 `@/lib/rtdb`·`firebase/database` 또는 `src/lib/firebase/client.ts`의 `db`를 직접 import하지 않고 `@/lib/db`를 사용한다. 인증의 `auth`만 `src/lib/firebase/client.ts`에서 직접 가져올 수 있다. REST 단발 저장은 `@/lib/rtdbRest`만 쓴다.
 
 학생 단건 편집·삭제는 `managementSave.ts`에서 최신 반 ETag를 대조한 조건부 반 PUT으로 대상 학생·감사를 함께 갱신하며 다른 학생과 출석을 보존한다. 삭제는 사본을 먼저 확정한다. 이동은 원본·목적지 반의 `config/studentMoveLocks/{year}/{classKey}/{ownerUid}/{operationId}` leaf 두 개를 연도 트랜잭션으로 함께 선점한다. 연결 종료 시 두 leaf만 지우는 단일 예약을 선점 전과 직후에 등록한 다음 원본 학생·목적지 반·양쪽 출석을 다시 읽는다. 충돌 학생은 사전에 새 목적지 SID를 선택하고, 잠금 안에서 선택한 SID의 명단·출석이 비었는지 재검사한다. 다른 학생의 출석과 병합하지 않는다. 서버 보정 시각으로 두 잠금을 `pending` 전환하고 종료 예약 취소와 pending 소유권 재확인을 마친 뒤, Firebase SDK 재연결 쓰기 큐가 없는 루트 REST PATCH를 30초 제한으로 정확히 한 번만 보낸다. 이 payload에는 학생·출석·감사기록·두 잠금 해제와 `config/studentMoveCommits/{year}/{fromCk}/{toCk}/{sid}/{ownerUid}/{operationId}: true`를 함께 넣는다. commit marker는 오래된 요청이 잠금 정리 후 늦게 도착해 재실행되는 것을 Rules에서 거절하기 위한 불변 기록이므로 자동 삭제하지 않는다:
 ```typescript
@@ -441,7 +454,7 @@ await set(ref(db, `classes/${year}/${ck}/students`), allStudentsObj);
 
 ### 로딩 게이트 타임아웃 (`AppShell.tsx`)
 
-Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워크 문제 등) 무한 스피너 상태가 될 수 있다. `authState === 'loading'`이 12초 넘게 지속되면 스피너 대신 "새로고침" 버튼을 보여준다.
+`onAuthStateChanged`(이관 후 `@/lib/supabaseAuth`) 콜백이 끝내 오지 않으면(캐시/네트워크 문제 등) 무한 스피너 상태가 될 수 있다. `authState === 'loading'`이 12초 넘게 지속되면 스피너 대신 "새로고침" 버튼을 보여준다. 규칙용 계정 확인(whoami) 실패는 오류 콜백으로 받아 역할 조회 실패 화면으로 보낸다.
 
 인증 후 원장 대기는 `DataLoadGate`가 별도로 담당한다. 12초 이상 응답이 없으면 지연 안내와 `다시 불러오기`를 표시하고, 명시적인 구독 실패는 즉시 지속 오류로 표시한다. 단순 네트워크 단절을 권한 거부와 동일하게 처리하지 않는다.
 
@@ -452,7 +465,7 @@ Firebase `onAuthStateChanged` 콜백이 끝내 오지 않으면(캐시/네트워
 ### PWA / 서비스 워커 (`public/sw.js`)
 
 - 캐시 전략: 네트워크 우선, 실패 시 캐시 폴백
-- 다음 URL은 SW를 통하지 않고 통과시킨다: `firebase`, `googleapis`, `gstatic`, `/_next/`, `/__nextjs`, `__next.` (RSC 페이로드 파일)
+- 다음 URL은 SW를 통하지 않고 통과시킨다: `firebase`, `googleapis`, `gstatic`, `/_next/`, `/__nextjs`, `__next.` (RSC 페이로드 파일). SW는 같은 출처 GET만 다루므로 Supabase(다른 출처·RPC POST·Realtime)는 SW를 거치지 않는다.
 - 새 버전 감지: activate 이벤트에서 이전 캐시 삭제 후 모든 클라이언트에 `{ type: 'NEW_VERSION' }` 메시지 전송 → `AppShell`이 수신해 `UpdateBanner` 표시
 
 ### 구글 시트 동기화 (`src/lib/sheetSync.ts`) — 장결자(장기결석) 처리

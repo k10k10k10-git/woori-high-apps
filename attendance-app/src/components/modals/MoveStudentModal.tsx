@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { db, onDisconnect, onValue, push, ref } from '@/lib/db';
 import { auth } from '@/lib/firebase/client';
+import { RTDB_REST_URL } from '@/lib/rtdbRest';
 import { useApp } from '@/store/AppContext';
 import { useModalFocus } from '@/hooks/useModalFocus';
 import { showToast } from '@/utils/toast';
@@ -189,14 +190,14 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
     try {
       const idToken = await wait(currentUser.getIdToken());
       if (!isCurrent()) return;
-      const transactionInput = { databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+      const transactionInput = { databaseUrl: RTDB_REST_URL,
         idToken, path: studentMoveLockYearPath(curYear) };
       transactLock = createStudentMoveLockTransaction({ ...transactionInput, isCurrent });
       // 화면 해제 뒤에도 정확히 이 작업의 잠금만 정리할 수 있다. 새 잠금 선점에는 쓰지 않는다.
       cleanupTransact = createStudentMoveLockTransaction({ ...transactionInput,
         isCurrent: () => auth.currentUser === currentUser, timeoutMs: 5000 });
       const readValue = (path: string) => readStudentMoveValue({
-        databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL, idToken, path, isCurrent,
+        databaseUrl: RTDB_REST_URL, idToken, path, isCurrent,
       });
       const recoveryNow = await readServerNow();
       if (!isCurrent()) return;
@@ -352,7 +353,7 @@ export default function MoveStudentModal({ target, onClose }: { target: MoveTarg
         // 전송 뒤 예외·화면 해제는 실패가 아니다. 명시 거절/성공 외에는 pending을 보존한다.
         preserveUncertainLock = true;
         const patchResult = await patchStudentMoveOnce({
-          databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+          databaseUrl: RTDB_REST_URL,
           idToken,
           payload,
         });

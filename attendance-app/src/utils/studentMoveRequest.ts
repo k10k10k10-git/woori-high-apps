@@ -1,3 +1,4 @@
+import { rtdbRestFetch } from '@/lib/rtdbRest';
 export type StudentMovePatchResult =
   | { status: 'committed' }
   | { status: 'rejected'; httpStatus?: number }
@@ -26,7 +27,7 @@ export async function readStudentMoveValue(input: {
     const url = new URL(input.databaseUrl);
     url.pathname = `/${input.path.split('/').map(encodeURIComponent).join('/')}.json`;
     url.searchParams.set('auth', input.idToken);
-    const response = await (input.fetchOnce ?? globalThis.fetch)(url.toString(), { method: 'GET', cache: 'no-store', signal: controller.signal });
+    const response = await (input.fetchOnce ?? rtdbRestFetch)(url.toString(), { method: 'GET', cache: 'no-store', signal: controller.signal });
     if (!response.ok) throw new Error('read rejected');
     const value: unknown = await response.json();
     if (controller.signal.aborted || !input.isCurrent()) throw new Error('stale scope');
@@ -56,7 +57,7 @@ export async function patchStudentMoveOnce(input: {
   const databaseUrl = input.databaseUrl?.trim().replace(/\/+$/, '');
   if (!databaseUrl || !input.idToken) return { status: 'rejected' };
 
-  const fetchOnce = input.fetchOnce ?? globalThis.fetch;
+  const fetchOnce = input.fetchOnce ?? rtdbRestFetch;
   const controller = new AbortController();
   const timeoutId = globalThis.setTimeout(
     () => controller.abort(),

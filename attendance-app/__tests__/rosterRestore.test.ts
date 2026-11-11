@@ -3,6 +3,8 @@ import { studentMoveCommitPath, type StudentMoveLockIdentity } from '@/utils/stu
 
 const m = vi.hoisted(() => ({ data: {} as Record<string, unknown>, connected: true, read: vi.fn(), patch: vi.fn(), token: vi.fn(), fetch: vi.fn() }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { uid: 'synthetic-admin', getIdToken: m.token } } }));
+// Firebase REST 를 흉내 내는 fetch 는 그대로 두고, 앱의 REST 출구(rtdbRest → Supabase)만 그 fetch 로 잇는다.
+vi.mock('@/lib/rtdbRest', () => ({ RTDB_REST_URL: 'https://synthetic.firebaseio.test', rtdbRestFetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init) }));
 vi.mock('@/lib/db', () => ({ db: {}, ref: (_db: unknown, path: string) => path,
   onValue: (path: string, callback: (snapshot: { val: () => unknown }) => void) => {
     callback({ val: () => path === '.info/connected' ? m.connected : 0 }); return () => {};
@@ -47,7 +49,6 @@ function installLock(lock: StudentMoveLockIdentity) {
 beforeEach(() => {
   vi.clearAllMocks();
   m.connected = true;
-  vi.stubEnv('NEXT_PUBLIC_FIREBASE_DATABASE_URL', 'https://synthetic.firebaseio.test');
   m.data = { classes: { 2026: { '1-1-1': { teacher: '원래 담임' }, '1-1-2': { teacher: '다른 담임' } } },
     trash: { 2026: { students: { 'copy-a': structuredClone(copy) } } },
     attendance: { 2026: { '1-1-1': { [student.id]: { '0-0': 'O', '0-1': 'X' } } } } };

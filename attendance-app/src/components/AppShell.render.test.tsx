@@ -7,6 +7,7 @@ type AuthUser = { uid: string; email: string | null };
 const mocks = vi.hoisted(() => ({
   auth: { currentUser: null as AuthUser | null },
   listener: null as ((user: AuthUser | null) => void | Promise<void>) | null,
+  identityError: null as ((error: Error) => void) | null,
   onAuthStateChanged: vi.fn(),
   loadUserRole: vi.fn(),
   doDemoLogin: vi.fn(),
@@ -16,7 +17,8 @@ const mocks = vi.hoisted(() => ({
   state: { userRole: null, saveStatus: 'idle' },
 }));
 
-vi.mock('firebase/auth', () => ({ onAuthStateChanged: mocks.onAuthStateChanged }));
+// 로그인 상태 구독은 Firebase Auth 대신 Supabase 기반 supabaseAuth 가 같은 모양으로 알린다.
+vi.mock('@/lib/supabaseAuth', () => ({ onAuthStateChanged: mocks.onAuthStateChanged, isGoogleLoginEnabled: () => false }));
 vi.mock('@/lib/firebase/client', () => ({ auth: mocks.auth }));
 vi.mock('@/hooks/useFirebaseData', () => ({ loadUserRole: mocks.loadUserRole }));
 vi.mock('@/hooks/useAuth', () => ({ doLogout: mocks.doLogout, doDemoLogin: mocks.doDemoLogin, doLogin: vi.fn() }));
@@ -68,8 +70,9 @@ describe('실제 출석부 진입과 권한 조회 실패', () => {
     sessionStorage.clear();
     mocks.auth.currentUser = null;
     mocks.listener = null;
-    mocks.onAuthStateChanged.mockReset().mockImplementation((_auth, listener) => {
+    mocks.onAuthStateChanged.mockReset().mockImplementation((_auth, listener, onError) => {
       mocks.listener = listener;
+      mocks.identityError = onError ?? null;
       return vi.fn();
     });
     mocks.loadUserRole.mockReset();
@@ -172,6 +175,18 @@ describe('실제 출석부 진입과 권한 조회 실패', () => {
     } finally {
       if (storage) Object.defineProperty(window, 'sessionStorage', storage);
     }
+  });
+
+  it('로그인 뒤 규칙용 계정 확인(whoami)이 끝내 실패하면 무한 대기 대신 재시도·다른 계정 안내를 보여 준다', async () => {
+    render(<AppShell><div>실제 원장 화면</div></AppShell>);
+    if (!mocks.identityError) throw new Error('오류 콜백이 등록되지 않았습니다.');
+    await act(async () => { mocks.identityError!(new Error('auth/identity-unavailable')); });
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('권한 정보를 불러오지 못했습니다');
+    expect(screen.getByRole('button', { name: '다시 불러오기' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: '다른 계정으로 로그인' })).not.toBeNull();
+    expect(mocks.loadUserRole).not.toHaveBeenCalled();
+    expect(mocks.doDemoLogin).not.toHaveBeenCalled();
   });
 
   it('다른 계정 전환에 실패하면 인증 오류 화면을 유지한다', async () => {

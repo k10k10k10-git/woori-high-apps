@@ -4,6 +4,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { AppState } from '@/store/AppContext';
 const m = vi.hoisted(() => ({ state: null as unknown, request: vi.fn<typeof fetch>(), token: vi.fn(), dispatch: vi.fn(), close: vi.fn() }));
 vi.mock('@/lib/firebase/client', () => ({ auth: { currentUser: { uid: 'synthetic-admin', getIdToken: m.token } } }));
+// Firebase REST 를 흉내 내는 fetch 는 그대로 두고, 앱의 REST 출구(rtdbRest → Supabase)만 그 fetch 로 잇는다.
+vi.mock('@/lib/rtdbRest', () => ({ RTDB_REST_URL: 'https://synthetic.firebaseio.test', rtdbRestFetch: (input: RequestInfo | URL, init?: RequestInit) => globalThis.fetch(input, init) }));
 vi.mock('@/store/AppContext', async original => ({ ...await original<typeof import('@/store/AppContext')>(), useApp: () => ({ state: m.state as AppState, getState: () => m.state as AppState, dispatch: m.dispatch }) }));
 import { initialState } from '@/store/AppContext';
 import StudentModal from './StudentModal';
@@ -20,7 +22,7 @@ beforeEach(() => {
     classData: { '1-1-1': { teacher: '원래 교사', students: [{ ...student }] } } };
   server = new Map([['classes/2026/1-1-1', { teacher: '원래 교사', students: { s: { ...student } } }]]);
   m.token.mockResolvedValue('synthetic-token');
-  vi.stubEnv('NEXT_PUBLIC_FIREBASE_DATABASE_URL', 'https://synthetic.firebaseio.test'); vi.stubGlobal('fetch', m.request);
+  vi.stubGlobal('fetch', m.request);
   m.request.mockImplementation(async (url, init = {}) => {
     const path = pathOf(url), value = path === 'classes/2026'
       ? Object.fromEntries([...server].filter(([key]) => key.startsWith('classes/2026/')).map(([key, record]) => [key.split('/')[2], record]))

@@ -1,3 +1,4 @@
+import { RTDB_REST_URL, rtdbRestFetch } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { isDemoAccount } from '@/lib/demo';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
@@ -43,7 +44,7 @@ export async function compareAndReturnLongAbsent(input: ReturnInput, connection:
     const url = new URL(connection.databaseUrl);
     url.pathname = `/classes/${input.year}/${encodeURIComponent(input.classKey)}.json`;
     url.searchParams.set('auth', token);
-    const request = connection.fetch ?? globalThis.fetch;
+    const request = connection.fetch ?? rtdbRestFetch;
     const options = { cache: 'no-store' as const, signal: controller.signal };
     const response = await request(url.toString(), { ...options, headers: { 'X-Firebase-ETag': 'true' } });
     if (!response.ok) throw new Error('명단을 확인하지 못했습니다. 연결과 관리자 권한을 확인해 주세요.');
@@ -77,7 +78,7 @@ export function returnLongAbsentStudent(input: ReturnInput, isCurrent: () => boo
   return withBrowserWriteLock('shared', async () => {
     const user = auth.currentUser;
     if (!user || isDemoAccount(user.email)) throw new Error('관리자 계정으로 로그인해 주세요.');
-    return compareAndReturnLongAbsent(input, { databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '',
+    return compareAndReturnLongAbsent(input, { databaseUrl: RTDB_REST_URL,
       getToken: () => user.getIdToken(), isCurrent: () => auth.currentUser === user && isCurrent() });
   });
 }

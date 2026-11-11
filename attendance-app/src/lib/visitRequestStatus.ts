@@ -1,3 +1,4 @@
+import { RTDB_REST_URL, rtdbRestFetch } from '@/lib/rtdbRest';
 import { auth } from '@/lib/firebase/client';
 import { withBrowserWriteLock } from '@/utils/browserWriteLock';
 import { parseTeacherMessages, type TeacherMessage, type VisitRequestStatus } from '@/utils/teacherMessages';
@@ -21,7 +22,7 @@ export async function compareAndSetVisitStatus(year: number, classKey: string, e
     const url = new URL(connection.databaseUrl);
     url.pathname = `/suggestions/${year}/${encodeURIComponent(classKey)}/${encodeURIComponent(expected.id)}.json`;
     url.searchParams.set('auth', token);
-    const request = connection.fetch ?? globalThis.fetch;
+    const request = connection.fetch ?? rtdbRestFetch;
     const options = { cache: 'no-store' as const, signal: controller.signal };
     const response = await request(url.toString(), { ...options, headers: { 'X-Firebase-ETag': 'true' } });
     if (!response.ok) throw new Error('심방 요청을 확인하지 못했습니다. 연결과 권한을 확인한 뒤 다시 불러와 주세요.');
@@ -63,7 +64,7 @@ export function saveVisitRequestStatus(year: number, classKey: string, expected:
     const user = auth.currentUser;
     if (!user) throw new Error('다시 로그인한 뒤 처리해 주세요.');
     return compareAndSetVisitStatus(year, classKey, expected, status, {
-      databaseUrl: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? '', getToken: () => user.getIdToken(),
+      databaseUrl: RTDB_REST_URL, getToken: () => user.getIdToken(),
       isCurrent: () => auth.currentUser === user && isCurrent(),
     });
   });
