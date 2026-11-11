@@ -91,6 +91,13 @@ const server = await createServer({
     { find: /^react(?=\/|$)/, replacement: resolve(app, "node_modules/react") },
     { find: "@phosphor-icons/react", replacement: resolve(app, "node_modules/@phosphor-icons/react/dist/index.es.js") },
   ] },
+  // Next.js 는 빌드 때 `process.env.NEXT_PUBLIC_*` 를 값으로 바꾼다. 합성 화면도 같은 자리를 채워야 브라우저에서
+  // `process` 를 찾다 멈추지 않는다. Supabase 주소·키는 비워 실제 연결을 막고, Google 로그인은 켜서 합성 signIn 을 검사한다.
+  define: {
+    "process.env.NEXT_PUBLIC_SUPABASE_GOOGLE": JSON.stringify("1"),
+    "process.env.NEXT_PUBLIC_SUPABASE_URL": JSON.stringify(""),
+    "process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY": JSON.stringify(""),
+  },
   css: { postcss: { plugins: [tailwind({ base: app })] } },
   esbuild: { jsx: "automatic" },
   optimizeDeps: { include: ["react", "react-dom/client", "react/jsx-runtime"] },
