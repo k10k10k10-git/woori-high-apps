@@ -1,6 +1,8 @@
 # 워크스페이스 운영 매뉴얼 (통합 플랫폼 모노레포)
 
 이 저장소는 분당우리교회 고등부의 Firebase 프로젝트 `woori-high`를 공유하는 통합 플랫폼과 관련 앱을 담는다. 독립 `retreat-app`·`iguard-app`은 2026-08-05에 `highschool-app`으로 통합 후 제거했고, `교사·스탭 출석부`는 2026-08-12에 사용 중단으로 제거했다(복구 태그 `pre-staff-app-removal-2026-08-12`). `semester-app`도 같은 날 제거했다 — 학기 기능은 이미 `highschool-app` 학기 모듈로 통합돼 있었고, 옛 배포 주소 3개를 먼저 끊은 뒤 코드를 지웠다(복구 태그 `pre-semester-app-removal-2026-08-12`).
+
+> ⚠ **2026-11-12부터 운영 자료는 Supabase에 있다(플랫폼만 교체).** `highschool-app`·학생 출석부 모두 Firebase SDK 대신 같은 이름의 `@/lib/rtdb`·`supabaseAuth`·`supabaseStorage` 모듈을 쓰고, 자료는 Supabase 운영 `iqfgekpubbgjcsvsyyno`의 `rtdb` 스키마에 **같은 경로·같은 모양**으로 있다. 권한 규칙의 원천은 여전히 `attendance-app/database.rules.json`이지만, 운영에 반영하려면 `firebase deploy`가 아니라 wooriteens-web 저장소의 변환기(`scripts/rtdb/compile-rules.cjs`)로 SQL을 만들어 새 마이그레이션으로 적용한다. Firebase `woori-high` DB는 전환 시점 사본으로 남아 있을 뿐 앱이 더는 쓰지 않는다. 절차·주의는 `OPERATIONS.md` 0장, 계약은 `docs/SUPABASE_PLATFORM_CONTRACT.md`.
 **이 문서는 "이 저장소에서 일하는 방법" 전체를 규정한다.** 개별 앱의 코드 패턴은 각 앱의 CLAUDE.md가 원천이며, 충돌 시 이 문서의 안전 규칙이 우선한다.
 
 작업 전 읽는 순서: ① 이 문서 → ② 대상 앱의 `CLAUDE.md` → ③ 경로를 만질 거면 `DB_OWNERSHIP.md` → ④ 배포·복구는 `OPERATIONS.md` → ⑤ 도구·환경 함정과 검증 요령은 `LEARNINGS.md` → ⑥ "왜 이런 구조인가"가 궁금하면 `docs/HISTORY.md`.
