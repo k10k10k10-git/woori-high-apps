@@ -23,6 +23,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **환경 변수**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(선택 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`). Next 정적 내보내기라 **빌드 시점에** 넣어야 한다(예: `attendance-app/.env.production.local`). 없어도 빌드·화면은 뜨고 로그인·저장이 설정 오류로 끝난다. `NEXT_PUBLIC_FIREBASE_*`는 더 이상 읽지 않는다. 데모 3종(`NEXT_PUBLIC_DEMO_*`)은 그대로이며 데모 계정이 Supabase 에 있어야 한다.
 - **남은 Firebase**: `firebase.json`·`database.rules.json`(Rules 원본, Supabase 규칙 변환의 입력)과 Hosting 배포 흐름은 그대로다. `firebase` 패키지는 에뮬레이터 계약 시험(`rosterRecovery.integration.test.ts`, 앱 REST 출구를 에뮬레이터로 돌려 잇도록 수정)과 `e2e/`(Firebase 에뮬레이터 기반 — Supabase 판으로 다시 만들어야 함)만 쓴다. 운영 번들에는 Firebase SDK가 없다.
 
+### SDK 자리 바꾸기 이관에서 숨은 REST 의존 찾기 (2026-11-12)
+- **접근법**: `grep -rn "firebase/\|NEXT_PUBLIC_FIREBASE\|getIdToken\|X-Firebase-ETag\|If-Match\|globalThis.fetch" src`로 SDK 밖 Firebase 의존을 모두 센다 → REST 모듈의 요청 모양(GET·ETag GET·If-Match PUT·루트 PATCH)을 표로 만든다 → 업무 코드는 두고 fetch 모양 어댑터(`src/lib/rtdbRest.ts`) 하나로 서버 함수에 옮긴다 → 기본 fetch 와 주소만 바꾸고, REST 를 흉내 내던 시험은 어댑터 모듈을 가짜 fetch 로 잇는다 → 어댑터는 가짜 Supabase 로 업무 모듈과 함께 시험한다.
+- **판단 질문**: 13곳 업무 코드를 rtdb SDK 호출로 다시 쓰지 않았다 — 오프라인 대기열을 일부러 피한 단발·조건부 저장 계약(응답 불명 시 재전송 금지, 412 경합)을 깨기 쉽다. 연결 끊김 예약을 beforeunload 로 보내지 않았다 — 미저장 확인창에서 머무르면 살아 있는 잠금이 풀린다.
+- **재사용 규칙**: "SDK만 바꾼다"는 이관은 SDK import 뿐 아니라 토큰을 직접 쓰는 REST·서버 시각·연결 상태(`.info`)·onDisconnect 까지 의존 목록을 먼저 만들고 시작한다.
+
 ### 시트 동기화 사용 종료 (2026-10-13)
 
 - 사용자 요청으로 운영 설정의 구글 시트 주소 저장·조회, 시트 네트워크 조회, 동기화 미리보기·적용 화면과 전용 스타일을 제거했다. 이 문서 아래의 시트 동기화 설명은 과거 구현 기록이며 현재 사용 가능한 기능이 아니다.
