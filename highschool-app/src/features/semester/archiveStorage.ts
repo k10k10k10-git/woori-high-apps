@@ -1,4 +1,4 @@
-import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytesResumable } from "@/lib/supabaseStorage";
 import { storage } from "@/lib/firebase";
 import { safeArchiveFileName } from "./archiveFile";
 

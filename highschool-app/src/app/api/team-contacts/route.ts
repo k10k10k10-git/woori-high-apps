@@ -1,5 +1,5 @@
 import { authenticatePraiseRequest } from "@/features/praise/server/httpAuth";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "@/features/praise/server/firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "@/features/praise/server/supabaseAdmin";
 import { praiseHttp } from "@/features/praise/server/http";
 import { buildRosterContactMap } from "@/features/semester/rosterContact";
 import type { Application, ClassInfo, StaffPerson, Team } from "@/features/semester/types";
@@ -21,14 +21,14 @@ export async function GET(request: Request) {
       return { contacts: {} };
     }
 
-    const database = getPraiseFirebaseAdmin().database;
+    const database = getPraiseAdmin().database;
     const year = semesterId.slice(0, 4);
     let values: unknown[];
     try {
       values = await Promise.all([
         `semesters/${semesterId}/teams`, `semesters/${semesterId}/applications`,
         `classes/${year}`, `teacherStaff/${year}`,
-      ].map(async (path) => (await database.ref(path).get()).val()));
+      ].map((path) => database.get(path)));
     } catch {
       throw praiseUnavailable("contacts_unavailable");
     }

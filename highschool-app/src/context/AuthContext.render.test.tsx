@@ -1,31 +1,38 @@
 /** @vitest-environment jsdom */
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { User } from "firebase/auth";
+import type { User } from "@/lib/supabaseAuth";
 import { NO_ROLES } from "@/features/portal/accessPolicy";
 
 const mocks = vi.hoisted(() => ({
   onAuthStateChanged: vi.fn(),
+  retryAuthIdentity: vi.fn(),
   get: vi.fn(),
   unsubscribe: vi.fn(),
+  AuthIdentityError: class extends Error {
+    constructor(public pendingUser: { uid: string }) { super("identity"); }
+  },
 }));
 
-vi.mock("firebase/auth", () => ({
+vi.mock("@/lib/supabaseAuth", () => ({
   onAuthStateChanged: mocks.onAuthStateChanged,
-  signInWithPopup: vi.fn(),
+  retryAuthIdentity: mocks.retryAuthIdentity,
+  AuthIdentityError: mocks.AuthIdentityError,
+  signInWithGoogle: vi.fn(),
   signOut: vi.fn(),
 }));
 vi.mock("firebase/database", () => ({
   get: mocks.get,
   ref: (_db: unknown, path: string) => path,
 }));
-vi.mock("@/lib/firebase", () => ({ auth: {}, db: {}, googleProvider: {} }));
+vi.mock("@/lib/firebase", () => ({ auth: {}, db: {} }));
 
 import { AuthProvider, useAuth } from "./AuthContext";
 
 type Snapshot = { val: () => unknown };
 type PendingRead = { resolve: (snapshot: Snapshot) => void; reject: (error: Error) => void };
 let onAuth: (user: User | null) => Promise<void>;
+let onAuthError: (error: Error) => void;
 let reads: Map<string, PendingRead>;
 
 function AuthState() {
@@ -66,8 +73,9 @@ async function settle(uid: string, values: Record<string, unknown>, request: Pro
 beforeEach(() => {
   vi.clearAllMocks();
   reads = new Map();
-  mocks.onAuthStateChanged.mockImplementation((_auth: unknown, callback: typeof onAuth) => {
+  mocks.onAuthStateChanged.mockImplementation((_auth: unknown, callback: typeof onAuth, error: typeof onAuthError) => {
     onAuth = callback;
+    onAuthError = error;
     return mocks.unsubscribe;
   });
   mocks.get.mockImplementation((path: string) => new Promise<Snapshot>((resolve, reject) => {
@@ -199,6 +207,21 @@ describe("AuthProvider — 최신 인증 요청만 화면에 반영", () => {
       retreatAdmins: { role: "leader", teamMemberships: { praise: { active: false, role: "leader" } } },
     }, pending);
     expect(screen.getByTestId("roster-search")).toHaveTextContent("false");
+  });
+
+  it("로그인 뒤 규칙용 uid 확인이 실패하면 로그인 화면 대신 다시 시도 상태를 보이고 신원부터 다시 묻는다", async () => {
+    render(<AuthProvider><AuthState /></AuthProvider>);
+    act(() => onAuthError(new mocks.AuthIdentityError({ uid: "supabase-id" })));
+    expect(state()).toEqual({ uid: "supabase-id", loading: false, roleError: true, roles: NO_ROLES, memberName: null });
+    expect(reads.size).toBe(0);
+    mocks.retryAuthIdentity.mockReturnValue(true);
+    act(() => screen.getByRole("button", { name: "역할 다시 시도" }).click());
+    expect(mocks.retryAuthIdentity).toHaveBeenCalledOnce();
+    expect(state()).toMatchObject({ loading: true, roleError: false });
+    let pending!: Promise<void>;
+    act(() => { pending = onAuth(user("legacy-uid")); });
+    await settle("legacy-uid", { iguardMembers: { name: "현장 담당" }, iguardRoles: "staff" }, pending);
+    expect(state()).toMatchObject({ uid: "legacy-uid", loading: false, roleError: false, memberName: "현장 담당" });
   });
 
   it("Provider 해제 시 인증 구독을 해제하고 미완료 조회를 마무리할 수 있다", async () => {

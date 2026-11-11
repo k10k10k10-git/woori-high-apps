@@ -1,5 +1,5 @@
 import { authenticatePraiseRequest } from "@/features/praise/server/httpAuth";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "@/features/praise/server/firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "@/features/praise/server/supabaseAdmin";
 import { praiseHttp } from "@/features/praise/server/http";
 import { resolveStudentKey } from "@/lib/studentMatcher";
 import type { Participant, Student } from "@/lib/types";
@@ -13,10 +13,10 @@ export async function GET(request: Request) {
     const retreatId = new URL(request.url).searchParams.get("retreatId") ?? "";
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(retreatId)
       || actor.roles.retreat === "none") return { students: {} };
-    const database = getPraiseFirebaseAdmin().database;
+    const database = getPraiseAdmin().database;
     let yearValue: unknown;
     try {
-      yearValue = (await database.ref(`retreats/${retreatId}/year`).get()).val();
+      yearValue = await database.get(`retreats/${retreatId}/year`);
     } catch {
       throw praiseUnavailable("retreat_roster_unavailable");
     }
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     try {
       const fields = ["participants", "groups", "rooms", "cellColors", "partialAttendances"];
       const values = await Promise.all([`classes/${year}`, ...fields.map((field) => `retreats/${retreatId}/${field}`)]
-        .map(async (path) => (await database.ref(path).get()).val()));
+        .map((path) => database.get(path)));
       [classes] = values;
       retreat = Object.fromEntries(fields.map((field, index) => [field, values[index + 1]]));
     } catch {

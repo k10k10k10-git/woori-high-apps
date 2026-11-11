@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import LoginButton from "@/components/LoginButton";
 import { canAccessArea, describeRoles } from "@/features/portal/accessPolicy";
 import { prepareSiteRequestAttachment } from "@/features/suggestions/attachment";
 import { createSiteRequest } from "@/features/suggestions/db";
@@ -68,7 +69,7 @@ export default function SuggestionClient() {
 
   if (loading) return <main className="min-h-screen grid place-items-center text-slate-500">불러오는 중…</main>;
   if (!user) {
-    return <main className="min-h-screen grid place-items-center px-6 text-center"><div><h1 className="text-xl font-bold">로그인이 필요합니다</h1><button onClick={() => void signIn()} className="btn-primary mt-5">Google로 로그인</button></div></main>;
+    return <main className="min-h-screen grid place-items-center px-6 text-center"><div><h1 className="text-xl font-bold">로그인이 필요합니다</h1><div className="mt-5"><LoginButton signIn={signIn} /></div></div></main>;
   }
   if (!canAccessArea("home", roles)) {
     return <main className="min-h-screen grid place-items-center px-6 text-center"><div><h1 className="text-xl font-bold">접근 승인이 필요합니다</h1><Link href="/" className="btn-secondary mt-5">홈으로</Link></div></main>;

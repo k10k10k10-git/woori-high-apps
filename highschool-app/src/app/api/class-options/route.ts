@@ -1,5 +1,5 @@
 import { authenticatePraiseRequest } from "@/features/praise/server/httpAuth";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "@/features/praise/server/firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "@/features/praise/server/supabaseAdmin";
 import { praiseHttp } from "@/features/praise/server/http";
 import { activeTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
 
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const year = semesterId.slice(0, 4);
     let value: unknown;
     try {
-      value = (await getPraiseFirebaseAdmin().database.ref(`classes/${year}`).get()).val();
+      value = await getPraiseAdmin().database.get(`classes/${year}`);
     } catch {
       throw praiseUnavailable("class_options_unavailable");
     }

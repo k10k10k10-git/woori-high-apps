@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PraiseState } from "../types";
 import { defaultPraisePolicy } from "../defaults";
-const mocks = vi.hoisted(() => ({ admin: vi.fn(), ref: vi.fn(), get: vi.fn(), on: vi.fn(), off: vi.fn(), transaction: vi.fn(), token: vi.fn(), fetch: vi.fn(), current: null as unknown, primed: false }));
+const mocks = vi.hoisted(() => ({ admin: vi.fn(), get: vi.fn(), shallow: vi.fn(), transaction: vi.fn(), readHashed: vi.fn(), compareAndSet: vi.fn(), current: null as unknown, version: 1 }));
 vi.mock("server-only", () => ({}));
-vi.mock("./firebaseAdmin", async (importOriginal) => {
-  const original = await importOriginal<typeof import("./firebaseAdmin")>();
-  return { ...original, getPraiseFirebaseAdmin: mocks.admin };
+vi.mock("./supabaseAdmin", async (importOriginal) => {
+  const original = await importOriginal<typeof import("./supabaseAdmin")>();
+  return { ...original, getPraiseAdmin: mocks.admin };
 });
 import { listWorkspaceIds, readSemesterReference, readWorkspace, transactWorkspace, transactWorkspaceChecked } from "./repository";
 
@@ -16,25 +16,26 @@ function state(): PraiseState {
   };
 }
 beforeEach(() => {
-  vi.resetAllMocks(); mocks.current = null; mocks.primed = false;
-  mocks.get.mockImplementation(async () => ({ val: () => mocks.current }));
-  mocks.on.mockImplementation((_event, listener) => { mocks.primed = true; queueMicrotask(listener); return listener; });
-  mocks.transaction.mockImplementation(async (updater) => {
-    const next = updater(mocks.primed ? structuredClone(mocks.current) : null);
+  vi.resetAllMocks(); mocks.current = null; mocks.version = 1;
+  mocks.get.mockImplementation(async () => structuredClone(mocks.current));
+  mocks.transaction.mockImplementation(async (_path: string, updater: (value: unknown) => unknown) => {
+    const next = updater(structuredClone(mocks.current));
     if (next !== undefined) mocks.current = next;
-    return { committed: next !== undefined, snapshot: { val: () => mocks.current } };
+    return { committed: next !== undefined, value: structuredClone(mocks.current) };
   });
-  mocks.ref.mockReturnValue({ get: mocks.get, on: mocks.on, off: mocks.off, transaction: mocks.transaction });
-  mocks.token.mockResolvedValue({ access_token: "test-only-token" });
-  mocks.admin.mockReturnValue({ database: { ref: mocks.ref }, app: { options: { databaseURL: "https://test-project.firebaseio.com", credential: { getAccessToken: mocks.token } } } });
-  vi.stubGlobal("fetch", mocks.fetch);
+  mocks.readHashed.mockImplementation(async () => ({ value: structuredClone(mocks.current), hash: `v${mocks.version}` }));
+  mocks.compareAndSet.mockImplementation(async (_path: string, hash: string, value: unknown) => {
+    if (hash !== `v${mocks.version}`) return { committed: false, value: structuredClone(mocks.current), hash: `v${mocks.version}` };
+    mocks.current = value; mocks.version += 1;
+    return { committed: true, value: structuredClone(value), hash: `v${mocks.version}` };
+  });
+  mocks.admin.mockReturnValue({ database: { get: mocks.get, shallow: mocks.shallow, transaction: mocks.transaction, readHashed: mocks.readHashed, compareAndSet: mocks.compareAndSet } });
 });
-afterEach(() => vi.unstubAllGlobals());
 
 describe("찬양팀 단일 workspace 저장소", () => {
   it("없는 workspace는 null이고 다른 원장을 읽지 않는다", async () => {
     expect(await readWorkspace("workspace-a")).toBeNull();
-    expect(mocks.ref).toHaveBeenCalledWith("praiseOps/workspace-a");
+    expect(mocks.get).toHaveBeenCalledWith("praiseOps/workspace-a");
   });
   it.each(["../semesters", "bad/id", "__proto__", "constructor"])("경로 이탈 ID를 SDK 호출 전에 거절한다", async (id) => {
     await expect(readWorkspace(id)).rejects.toThrow(); expect(mocks.admin).not.toHaveBeenCalled();
@@ -77,30 +78,29 @@ describe("찬양팀 단일 workspace 저장소", () => {
     mocks.current = current;
     await expect(readWorkspace("workspace-a")).rejects.toMatchObject({ status: 503, code: "invalid_workspace_data" });
   });
-  it("cold start에서 첫 서버값을 확보하고 업무와 audit·operation을 같은 커밋에 저장한다", async () => {
+  it("업무와 audit·operation을 같은 workspace transaction 커밋에 저장한다", async () => {
     mocks.current = state();
     const result = await transactWorkspace("workspace-a", (current) => {
       if (!current) throw new Error("기존 workspace 누락");
       return { ...current, meta: { ...current.meta, revision: 2 }, audit: { event1: { id: "event1", at: 2000, actor: { uid: "user-a" }, action: "test", label: "테스트", changes: [] } }, operations: { op1: { at: 2000, actorUid: "user-a", fingerprint: "request" } } };
     });
     expect(result?.meta.revision).toBe(2); expect(result?.audit.event1).toBeDefined(); expect(result?.operations.op1).toBeDefined();
-    expect(mocks.transaction).toHaveBeenCalledTimes(1); expect(mocks.transaction.mock.calls[0].slice(1)).toEqual([undefined, false]);
-    expect(mocks.on).toHaveBeenCalledBefore(mocks.transaction); expect(mocks.off).toHaveBeenCalledOnce();
-    expect(mocks.ref).toHaveBeenCalledTimes(1);
+    expect(mocks.transaction).toHaveBeenCalledTimes(1); expect(mocks.transaction.mock.calls[0][0]).toBe("praiseOps/workspace-a");
+    expect(mocks.get).not.toHaveBeenCalled();
   });
   it("동시 수정 재시도에서 마지막 원장으로 updater를 다시 평가한다", async () => {
     mocks.current = state();
-    mocks.transaction.mockImplementationOnce(async (updater) => {
+    mocks.transaction.mockImplementationOnce(async (_path: string, updater: (value: unknown) => unknown) => {
       updater(state()); const concurrent = state(); concurrent.meta.revision = 3;
       const next = updater(concurrent); mocks.current = next;
-      return { committed: true, snapshot: { val: () => next } };
+      return { committed: true, value: next };
     });
     expect((await transactWorkspace("workspace-a", (current) => ({ ...current!, meta: { ...current!.meta, revision: current!.meta.revision + 1 } })))?.meta.revision).toBe(4);
   });
-  it("도메인 거절을 그대로 전달하고 listener를 해제하며 원장은 보존한다", async () => {
+  it("도메인 거절을 그대로 전달하고 원장은 보존한다", async () => {
     mocks.current = state(); const denied = Object.assign(new Error("수정 권한이 없습니다."), { status: 403 });
     await expect(transactWorkspace("workspace-a", () => { throw denied; })).rejects.toBe(denied);
-    expect(mocks.current).toEqual(state()); expect(mocks.off).toHaveBeenCalledOnce();
+    expect(mocks.current).toEqual(state());
   });
   it("undefined abort는 기존 원장으로 돌아오며 optional undefined는 저장에서 제외한다", async () => {
     mocks.current = state(); expect(await transactWorkspace("workspace-a", () => undefined)).toEqual(state());
@@ -116,27 +116,26 @@ describe("찬양팀 단일 workspace 저장소", () => {
   it("SDK 장애의 민감한 내부 오류는 전달하지 않는다", async () => {
     mocks.transaction.mockRejectedValueOnce(new Error("private credential"));
     await expect(transactWorkspace("workspace-a", () => state())).rejects.toMatchObject({ status: 503, code: "workspace_write_unavailable" });
-    expect(mocks.off).toHaveBeenCalledOnce();
   });
 });
 
 describe("최소 공개 참조 및 목록 읽기", () => {
-  it("workspace 목록은 shallow REST로 ID만 읽고 서버 토큰은 헤더에만 둔다", async () => {
-    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ "workspace-b": true, "workspace-a": true })));
+  it("workspace 목록은 얕은 키 목록으로 ID만 읽는다", async () => {
+    mocks.shallow.mockResolvedValue({ "workspace-b": true, "workspace-a": true });
     expect(await listWorkspaceIds()).toEqual(["workspace-a", "workspace-b"]);
-    const [url, options] = mocks.fetch.mock.calls[0];
-    expect(url.toString()).toBe("https://test-project.firebaseio.com/praiseOps.json?shallow=true");
-    expect(options.headers).toEqual({ Authorization: "Bearer test-only-token" }); expect(options.cache).toBe("no-store");
-    expect(mocks.ref).not.toHaveBeenCalled();
+    expect(mocks.shallow).toHaveBeenCalledWith("praiseOps");
+    expect(mocks.get).not.toHaveBeenCalled();
   });
   it("workspace 목록이 비어 있으면 빈 배열을 반환한다", async () => {
-    mocks.fetch.mockResolvedValue(new Response("null")); expect(await listWorkspaceIds()).toEqual([]);
+    mocks.shallow.mockResolvedValue(null); expect(await listWorkspaceIds()).toEqual([]);
   });
-  it("shallow 대신 원문이 반환되거나 잘못된 키가 있으면 반환하지 않는다", async () => {
-    mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ "workspace-a": { private: "fixture" } })));
+  it("얕은 목록 대신 원문이 오거나 잘못된 키가 있으면 반환하지 않는다", async () => {
+    mocks.shallow.mockResolvedValue({ "workspace-a": { private: "fixture" } });
     await expect(listWorkspaceIds()).rejects.toMatchObject({ status: 503 });
-    mocks.fetch.mockResolvedValue(new Response('{"__proto__":true}'));
+    mocks.shallow.mockResolvedValue(JSON.parse('{"__proto__":true}'));
     await expect(listWorkspaceIds()).rejects.toMatchObject({ status: 503 });
+    mocks.shallow.mockRejectedValue(new Error("private credential"));
+    await expect(listWorkspaceIds()).rejects.toMatchObject({ status: 503, code: "workspace_list_unavailable" });
   });
   it("학기 링크에는 공개 최소 필드만 남기고 private·출석 경로를 읽지 않는다", async () => {
     const values: Record<string, unknown> = {
@@ -145,42 +144,49 @@ describe("최소 공개 참조 및 목록 읽기", () => {
       "semesters/2026-2/sessions": { session1: { date: "2026-09-05", memo: "excluded" } },
       "semesters/2026-2/applications": { app1: { id: "wrong-key", name: "테스트", teamId: "team1", phone: "excluded", parentPhone: "excluded", motive: "excluded", createdBy: "excluded" } },
     };
-    mocks.ref.mockImplementation((path: string) => ({ get: async () => ({ val: () => values[path] }) }));
+    mocks.get.mockImplementation(async (path: string) => values[path]);
     expect(await readSemesterReference("2026-2")).toEqual({ id: "2026-2", meta: { title: "테스트 학기" }, teams: { team1: { id: "team1", name: "찬양팀" } }, sessions: { session1: { id: "session1", date: "2026-09-05" } }, applications: { app1: { id: "app1", name: "테스트", teamId: "team1" } } });
-    expect(mocks.ref.mock.calls.map(([path]) => path)).toEqual(Object.keys(values));
+    expect(mocks.get.mock.calls.map(([path]) => path)).toEqual(Object.keys(values));
   });
 });
 
 
-describe("등단 저장 직전 외부 원장 검증을 포함한 ETag CAS", () => {
-  it("workspace 읽기·계산·외부 재검증 이후에만 If-Match 저장한다", async () => {
+describe("등단 저장 직전 외부 원장 검증을 포함한 hash CAS", () => {
+  it("workspace 읽기·계산·외부 재검증 이후에만 읽은 hash 조건으로 저장한다", async () => {
+    mocks.current = state();
     const order: string[] = [];
-    mocks.fetch.mockImplementation(async (_url, init) => {
-      if (init.method === "PUT") { order.push("put"); expect(init.headers["If-Match"]).toBe('"v1"'); return new Response(init.body); }
-      order.push("get"); expect(init.headers["X-Firebase-ETag"]).toBe("true"); return new Response(JSON.stringify(state()), { headers: { ETag: '"v1"' } });
-    });
+    mocks.readHashed.mockImplementationOnce(async () => { order.push("get"); return { value: state(), hash: "v1" }; });
+    const write = mocks.compareAndSet.getMockImplementation()!;
+    mocks.compareAndSet.mockImplementationOnce(async (path: string, hash: string, value: unknown) => { order.push("put"); expect(hash).toBe("v1"); return write(path, hash, value); });
     const result = await transactWorkspaceChecked("workspace-a", current => { order.push("compute"); return { ...current!, meta: { ...current!.meta, revision: 2 } }; }, async () => { order.push("verify"); });
     expect(result?.meta.revision).toBe(2); expect(order).toEqual(["get", "compute", "verify", "put"]);
-    expect(mocks.fetch.mock.calls[0][0].toString()).not.toContain("test-only-token");
+    expect(mocks.readHashed).toHaveBeenCalledWith("praiseOps/workspace-a");
   });
-  it("최종 외부 출석 검사가 실패하면 PUT·감사 저장을 하지 않는다", async () => {
-    mocks.fetch.mockResolvedValue(new Response(JSON.stringify(state()), { headers: { ETag: '"v1"' } }));
+  it("최종 외부 출석 검사가 실패하면 저장·감사 저장을 하지 않는다", async () => {
+    mocks.current = state();
     const conflict = Object.assign(new Error("synthetic conflict"), { status: 409, code: "input_conflict" });
     await expect(transactWorkspaceChecked("workspace-a", current => ({ ...current!, meta: { ...current!.meta, revision: 2 } }), async () => { throw conflict; })).rejects.toBe(conflict);
-    expect(mocks.fetch).toHaveBeenCalledOnce();
+    expect(mocks.compareAndSet).not.toHaveBeenCalled(); expect(mocks.current).toEqual(state());
   });
-  it("412 충돌 뒤 최신 workspace로 재계산하며 외부 출석도 다시 검사한다", async () => {
-    let reads = 0, puts = 0; const verify = vi.fn(async () => {});
-    mocks.fetch.mockImplementation(async (_url, init) => {
-      if (init.method === "PUT") { puts++; return puts === 1 ? new Response("{}", { status: 412 }) : new Response(init.body); }
-      reads++; const current = state(); current.meta.revision = reads === 1 ? 1 : 3;
-      return new Response(JSON.stringify(current), { headers: { ETag: `"v${reads}"` } });
+  it("hash 충돌 뒤 최신 workspace로 재계산하며 외부 출석도 다시 검사한다", async () => {
+    mocks.current = state(); const verify = vi.fn(async () => {});
+    let first = true;
+    verify.mockImplementation(async () => {
+      // 첫 검증과 저장 사이에 다른 저장이 끼어든다.
+      if (first) { first = false; const concurrent = state(); concurrent.meta.revision = 3; mocks.current = concurrent; mocks.version += 1; }
     });
     const result = await transactWorkspaceChecked("workspace-a", current => ({ ...current!, meta: { ...current!.meta, revision: current!.meta.revision + 1 } }), verify);
-    expect(result?.meta.revision).toBe(4); expect(verify).toHaveBeenCalledTimes(2); expect(puts).toBe(2);
+    expect(result?.meta.revision).toBe(4); expect(verify).toHaveBeenCalledTimes(2); expect(mocks.compareAndSet).toHaveBeenCalledTimes(2);
+    expect(mocks.readHashed).toHaveBeenCalledOnce();
+  });
+  it("계속 충돌하면 덮어쓰지 않고 409로 멈춘다", async () => {
+    mocks.current = state();
+    mocks.compareAndSet.mockImplementation(async () => ({ committed: false, value: state(), hash: "other" }));
+    await expect(transactWorkspaceChecked("workspace-a", current => ({ ...current!, meta: { ...current!.meta, revision: 9 } }), async () => {})).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+    expect(mocks.compareAndSet).toHaveBeenCalledTimes(4);
   });
   it("이미 완료한 동일 작업은 다시 저장하거나 외부 검증을 반복하지 않는다", async () => {
-    mocks.fetch.mockResolvedValue(new Response(JSON.stringify(state()), { headers: { ETag: '"v1"' } }));
-    const verify = vi.fn(); expect(await transactWorkspaceChecked("workspace-a", current => current!, verify)).toEqual(state()); expect(verify).not.toHaveBeenCalled(); expect(mocks.fetch).toHaveBeenCalledOnce();
+    mocks.current = state();
+    const verify = vi.fn(); expect(await transactWorkspaceChecked("workspace-a", current => current!, verify)).toEqual(state()); expect(verify).not.toHaveBeenCalled(); expect(mocks.compareAndSet).not.toHaveBeenCalled();
   });
 });

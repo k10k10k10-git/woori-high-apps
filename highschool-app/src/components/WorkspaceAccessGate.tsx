@@ -19,7 +19,7 @@ export default function WorkspaceAccessGate({ allowed, area, children, backHref 
   if (loading) return <Container className={`team-first-state workspace-access-state${embedded ? " is-embedded" : ""}`} role="status">{area} 권한을 확인하고 있습니다…</Container>;
   if (!user) return <Container className={`team-first-state workspace-access-state${embedded ? " is-embedded" : ""}`}>
     <Heading className="page-title">{area} 화면을 보려면 로그인해 주세요.</Heading>
-    <p>고등부에 등록한 Google 계정으로 로그인해 주세요.</p>
+    <p>고등부에 등록한 이메일 계정으로 로그인해 주세요.</p>
     <LoginButton signIn={signIn} />
     <Link className="btn-secondary" href="/library/help#access">로그인·권한 안내</Link>
   </Container>;

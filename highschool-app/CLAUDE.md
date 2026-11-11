@@ -60,7 +60,7 @@
 - **예배 담당표**(`sourceSite=sunday-worship-duty`)는 역할 한 줄 = 레코드 하나이고, **학생 명단을 구독하지 않습니다** — 이름은 직접 입력합니다. 명단을 끌어오면 이 화면 하나 때문에 개인정보 공개 범위를 새로 정해야 하므로, 편의를 위해 명단 연동을 추가하지 마세요.
 - **예배 자료**(`sourceSite=sunday-worship-doc`)는 본문이 500자를 넘으므로 320자 조각으로 나눠 저장하고 읽을 때 합칩니다. **조각이 하나라도 비면 그 문서는 기본값을 씁니다** — 반쪽 문서를 만들지 않기 위한 계약이고 `worshipContent.test.ts`가 지킵니다. 기본 문서는 `DEFAULT_WORSHIP_DOCS`이고 저장된 수정본이 그 위를 덮습니다.
 - 팀 라우트를 오갈 때 클라이언트가 재사용될 수 있으므로 **선택 탭은 렌더 중 파생으로 보정**합니다(`tabs.find(...) ?? tabs[0]`). effect에서 setState로 맞추면 실수 13(시계·자동 선택이 사용자 선택을 덮음)과 같은 부류의 회귀가 납니다.
-- 우측 계정 메뉴의 **마이페이지**는 모든 로그인 사용자에게 열고 `대시보드`·`내 사역`·`내 요청`을 공통 제공한다. 관리 3탭(`팀원 관리`·`요청사항`·`활동 로그`)도 모든 계정에 표시하되 접근 capability가 없으면 안내만 보여준다. 허용된 관리 탭은 각각 `/operations/accounts`·`/operations/requests`·`/operations/activity`로 연결하며 중복 관리 편집기를 마이페이지에 마운트하지 않는다. 링크는 prefetch를 끄고, 일반 내부 클릭은 같은 경로여도 모달을 닫으며 수정키 클릭은 유지한다. 역할별 대시보드는 `accessPolicy.ts`의 capability로 일정과 바로가기를 필터링하며 역할 문자열을 컴포넌트에서 직접 비교하지 않는다. 학기 신청과 현장 스탭 연결은 현재 계정 이름 후보가 유일할 때만 표시하고 동명이면 미연결 상태를 유지한다. 별도 집계 노드를 만들지 않고 기존 `semesters`·`retreats`·`prepMilestones`·`iguard`·본인 `siteRequests`를 활성 탭에서 실시간 구독한다. 사이트 건의사항은 공유가 아니라 `iguardPending/{uid}/siteRequests/{requestId}`로 전송한다. 이 경로는 기존 Rules의 사용자 자기 읽기·쓰기와 통합관리자 전체 읽기·쓰기를 재사용하며, 접근 승인 필드(`email`·`name`·`requestedAt`)와 반드시 분리해 정규화한다. 승인·거절 시 사용자 노드 전체를 지우지 말고 접근 필드만 지워 요청을 보존한다. 첨부는 JPEG로 재인코딩·축소한 뒤 Firebase Storage의 `site-requests/{uid}/{requestId}/attachment.jpg`에 두고, RTDB 요청에는 이름·크기·Storage 경로·다운로드 주소만 저장한다. 분리 전 `dataUrl` 첨부는 읽기 호환만 유지한다. 요청 삭제 시 Storage 파일을 먼저 지우고 요청 레코드를 지운다. 해결 시 `resolvedAt`을 기록하고 작성자는 다음 로그인 때 한 번 알림을 받은 뒤 `notifiedAt`을 남긴다.
+- 우측 계정 메뉴의 **마이페이지**는 모든 로그인 사용자에게 열고 `대시보드`·`내 사역`·`내 요청`을 공통 제공한다. 관리 3탭(`팀원 관리`·`요청사항`·`활동 로그`)도 모든 계정에 표시하되 접근 capability가 없으면 안내만 보여준다. 허용된 관리 탭은 각각 `/operations/accounts`·`/operations/requests`·`/operations/activity`로 연결하며 중복 관리 편집기를 마이페이지에 마운트하지 않는다. 링크는 prefetch를 끄고, 일반 내부 클릭은 같은 경로여도 모달을 닫으며 수정키 클릭은 유지한다. 역할별 대시보드는 `accessPolicy.ts`의 capability로 일정과 바로가기를 필터링하며 역할 문자열을 컴포넌트에서 직접 비교하지 않는다. 학기 신청과 현장 스탭 연결은 현재 계정 이름 후보가 유일할 때만 표시하고 동명이면 미연결 상태를 유지한다. 별도 집계 노드를 만들지 않고 기존 `semesters`·`retreats`·`prepMilestones`·`iguard`·본인 `siteRequests`를 활성 탭에서 실시간 구독한다. 사이트 건의사항은 공유가 아니라 `iguardPending/{uid}/siteRequests/{requestId}`로 전송한다. 이 경로는 기존 Rules의 사용자 자기 읽기·쓰기와 통합관리자 전체 읽기·쓰기를 재사용하며, 접근 승인 필드(`email`·`name`·`requestedAt`)와 반드시 분리해 정규화한다. 승인·거절 시 사용자 노드 전체를 지우지 말고 접근 필드만 지워 요청을 보존한다. 첨부는 JPEG로 재인코딩·축소한 뒤 파일 저장소(`@/lib/supabaseStorage`, 버킷 `highschool`)의 `site-requests/{uid}/{requestId}/attachment.jpg`에 두고, RTDB 요청에는 이름·크기·Storage 경로·다운로드 주소만 저장한다. 분리 전 `dataUrl` 첨부는 읽기 호환만 유지한다. 요청 삭제 시 Storage 파일을 먼저 지우고 요청 레코드를 지운다. 해결 시 `resolvedAt`을 기록하고 작성자는 다음 로그인 때 한 번 알림을 받은 뒤 `notifiedAt`을 남긴다.
 - **방학 중 사역 홈은 화면 하나**입니다. 세 경로 모두 `features/portal/VacationHome.tsx`를 렌더하고, `mode`("admin"/"program"/"field")로 **수련회에 들어갔을 때의 목적지만** 달라집니다(행정 화면 / 프로그램 준비 / 현장 화면). 목록·수련회 기간·준비 일정 캘린더는 완전히 같은 컴포넌트를 씁니다. 각 라우트는 로그인·권한 게이트와 도메인 전용 요소(행정: 폼 가이드·삭제·브레인스토밍 / 프로그램: 프로그램별 편집 / 현장: PIN 배지·현장 관리자)만 슬롯으로 넘깁니다.
 - **프로그램 준비의 공개 원본은 `retreats/{id}/programs/{programId}`**입니다. 한 수련회 안에 프로그램을 여러 개 두고, 각 프로그램의 `posts`에는 게임·묵상·영상·브리핑·이동·세팅·예배·정리처럼 서로 다른 `activityType`을 섞습니다. 기존 게임 데이터는 `activityType`이 없어도 그대로 게임으로 읽습니다. `tasks`는 `todo / doing / blocked / done` 실행 상태를 쓰되 구버전 `done` boolean도 계속 읽습니다. 준비회의 원문과 결정은 현장 역할에 노출하지 않고 **`retreatsPrivate/{id}/programMeetings/{programId}/{meetingId}/decisions/{decisionId}`**에 둡니다. private 구독은 편집 권한자에게만 열고 공개 프로그램 캐시에 넣지 않으며, 결정→할 일 전환은 결정적 작업 ID와 최신값 사전 확인 후 public 작업·private 링크를 root multi-location update 한 번으로 반영해 재시도에도 기존 작업을 덮지 않습니다. `competitionTeams`는 프로그램 안에서만 여러 기본 조를 묶는 연합팀이며, **행정 `groups`를 절대 수정하지 않고 groupIds로 참조만** 합니다. 화면 방문만으로 초안·회의·팀을 만들지 않고 사용자가 만들기·추가·적용을 눌렀을 때만 씁니다. **현장의 구독은 `features/iguard/lib/db.ts`의 읽기 전용 영역을 거칩니다** — 훅이 `@/lib/db` 배럴을 직접 쓰면 삭제·수정 함수까지 사정권에 들어옵니다. 편집기는 작성 중 들어온 원격 갱신으로 초안을 덮지 않으며, 상태·종류·활동 라벨은 메타 함수로 읽어 모르는 과거 값에도 화면이 죽지 않게 합니다.
 - **수련회 프로그램 준비는 프로그램 목록으로 시작**하며, 수련회 전체 도구 선택 메뉴에 기존 6개 업무를 유지합니다 — `한눈에 보기 / 프로그램 준비 / 시간·장소 / 준비물·비용 / 담당자·할 일 / 현장 공유`. 단일 원천은 `PROGRAM_WORKSPACE_SECTIONS`이고 현재 화면은 URL 쿼리 `?workspace=`에 둡니다. 프로그램 선택·형식별 생성·검색·순서 변경은 `ProgramCatalog` 한 곳에서 제공하고, 한눈에 보기는 막힌 준비·기한·다가오는 할 일을 집계합니다. 목록 이동은 초안 취소 보호를 거쳐 이전 프로그램·섹션 선택을 지우며, 검색 중에도 전체 목록의 순번과 이동 경계를 사용합니다. 작업 완료와 현장 점검 진행률은 모바일에서도 둘 다 보여줍니다. 여러 프로그램을 가로지르는 일정·물품·업무 화면은 집계와 빠른 상태 변경을 제공하되, 이름·규칙·진행안 같은 상세 수정은 프로그램 원본으로 연결합니다. 프로그램 상세 안의 4개 섹션은 처음 온 스탭도 순서를 알 수 있게 `1 기획 시작 / 2 진행 순서 / 3 준비물·담당 / 4 확인·현장 공유`이며 `PROGRAM_SECTIONS`와 `?section=`을 씁니다. 목록 행과 섹션을 지정하지 않은 프로그램 열기는 같은 `catalogNextAction`으로 다음 입력을 안내합니다. 명시한 섹션과 공유 URL은 유지하며 생성 직후는 기본 정보에서 시작합니다. 상세 준비 단계는 방향키·Home·End 이동을 지원하고, 전체 도구는 native select의 키보드 조작을 사용합니다. 본문 fieldset은 수동 초안 저장, 활동·역할·물품·할 일·회의는 하위 경로에 즉시 저장합니다. 진행 블록 일괄 붙여넣기는 TSV 미리보기를 거쳐 한 번의 root multi-location update로 추가하고, 행 순서는 `posts/{postId}/order`만 바꿉니다. ⚠ **본문 저장 payload에서 `tasks`·`meetings`·`posts`·`items`·`roles`·`competitionTeams`·`releases`·`activeReleaseId`를 반드시 제거**하세요 — 하나라도 남으면 다른 사람이 추가한 하위 항목이나 현장 배포본을 덮을 수 있습니다.
@@ -75,6 +75,18 @@
 - **수련회 PIN 잠금은 `useRetreatPinGate` 하나로만 판정합니다**(`src/features/portal/useRetreatPinGate.ts`). 잠금은 `retreats/{id}/iguard/accessLock` 한 노드에만 있으므로 **행정·이가드 어느 쪽에서 잠가도 양쪽이 잠깁니다**. 화면마다 구독을 새로 짜면 한쪽만 잠기는 사고가 납니다. 설정 UI는 공용 `AdminModal`(현장·행정 홈이 함께 씀), PIN 우회는 통합관리자만.
 - **모달은 `aria-modal="true"`가 있어야 배경 스크롤이 잠깁니다.** `ModalScrollManager`(`providers.tsx`)가 OverlayShell이 아니라 **`[aria-modal="true"]` 존재 여부**를 MutationObserver로 보고 `body`를 고정합니다. 새 모달을 만들 때는 공용 `OverlayShell`을 쓰고(ESC·포커스 트랩·백드롭까지 함께 옵니다), 기존 모달을 손댈 수 없으면 최소한 `role="dialog" aria-modal="true" aria-label`을 붙이세요. 2026-08-16에 수련회 행정·이가드 모달 14곳에 이 속성이 없어 모바일에서 배경이 밀리던 것을 일괄 보강했습니다.
 - **로드 실패 배너는 `useLoadErrors(scope)` 하나만 씁니다**(`src/lib/useLoadErrors.ts`). 실패를 경로별로 모아 **전부** 나열하고, `scope`(학기 id·계정 uid)가 바뀌면 렌더 중 파생으로 초기화합니다. 단일 `loadError` 문자열로 되돌리지 마세요 — 5개 구독이 동시에 거부돼도 마지막 하나만 보여 2026-08-08에 권한 공백의 원인을 두 번 잘못 짚었습니다. 저장·삭제 실패는 `actionError`로 분리합니다. ⚠ Firebase RTDB는 **한 번 거부된 리스너를 규칙이 바뀌어도 재시도하지 않습니다** — 권한을 열어도 그 탭은 새로고침(재구독) 전까지 실패 상태로 남습니다.
+
+## 로그인·파일 (2026-11-12 Supabase 이관)
+
+- 로그인은 `@/lib/supabaseAuth`가 Firebase `firebase/auth` 자리를 맡는다. `auth.currentUser.uid`는 **`api.rtdb_whoami()`가 돌려준 규칙 uid**(옛 Firebase UID 또는 Supabase id)이고 Supabase 계정 id 는 `supabaseId`에 따로 둔다. 세션 복원과 whoami 가 끝나기 전에는 관찰자에게 알리지 않으며(로그인 화면 깜빡임 방지), whoami 가 계속 실패하면 오류 관찰자에 확인 대기 계정을 넘겨 "권한 확인 실패 + 다시 시도"를 보인다. 확인 대기 계정은 토큰을 내주지 않는다.
+- 로그인 화면은 `LoginButton` → `LoginDialog`(이메일 6자리 코드, 비밀번호, `NEXT_PUBLIC_SUPABASE_GOOGLE=1`일 때만 Google). 메일함이 없는 `@woorihigh.com` 계정은 렌더 중 파생으로 비밀번호 단계만 보인다. 실패는 코드별 쉬운 안내로 바꾸고 원문을 보이지 않는다.
+- 통합관리자는 마이페이지 `팀원 관리`의 `AccountPasswordTool`로 `@woorihigh.com` 계정 비밀번호를 정한다(없으면 이메일 확인된 계정으로 만든다). 서버 `/api/accounts/password`가 토큰·`admins/{uid}`를 다시 확인한다. Supabase 프로젝트를 주일학교 플랫폼과 함께 쓰므로 다른 도메인 계정은 다루지 않는다.
+- 파일은 `@/lib/supabaseStorage`(버킷 `highschool`, 경로 그대로)가 `firebase/storage` 자리를 맡는다. 한글 파일 이름 때문에 객체 키는 `storageObjectKey`로 적고, 다운로드 주소는 10년 서명 주소다. 버킷·정책 원문은 `../docs/SUPABASE_STORAGE_POLICY.sql`.
+
+### Supabase Storage 는 한글 객체 키를 받지 않는다 (2026-11-12)
+- **접근법**: 숙소 배치도·학기 자료 경로의 파일 이름은 `safeFileName`/`safeArchiveFileName`이 한글을 남긴다 → Supabase Storage 키는 ASCII 일부(`\w`, `/`, `!-.*'()`, 공백 등)만 받는다 → 앱 경로(`fullPath`, DB 저장값)는 그대로 두고 저장소에 보낼 때만 `storageUrl.ts`의 `storageObjectKey`로 `[A-Za-z0-9/_.-]` 밖 글자를 UTF-8 바이트별 `!XX`로 적는다(`!`도 `!21`) → 서명 주소 검증(`isTrustedFileUrl`)도 같은 키로 비교한다.
+- **판단 질문**: 파일 이름 정리 규칙을 ASCII 로 바꾸면 기존 DB 의 `filePath`와 새 파일 이름이 달라지고 사용자에게 보이는 이름도 깨져서 하지 않았다. `encodeURIComponent`는 `%`가 허용 글자가 아니라 쓰지 않았다. 공개 버킷 + 공개 주소는 Firebase 토큰 주소와 달리 경로만 알면 열려서 쓰지 않았다.
+- **재사용 규칙**: 저장소 키가 필요한 곳(업로드·삭제·서명·Firebase 파일 이관)은 직접 경로를 쓰지 말고 `storageObjectKey(path)`만 거친다. `supabaseStorage.test.ts`가 한글·`!` 키를 지킨다.
 
 ## 권한 — 두 축 역할 (단일 원천: `src/features/portal/accessPolicy.ts`)
 
@@ -242,9 +254,9 @@
 
 ## 찬양팀 서버 업무 경계 — 2026-09-06
 
-`/sunday-ministry/praise`는 `src/features/praise`의 다섯 업무 탭을 사용한다. `src/app/api/praise`의 Node 서버가 Firebase ID 토큰의 폐기 여부와 현재 두 축 역할을 확인하고, 조 담당 권한·revision·작업 ID를 검사한 뒤 `praiseOps/{workspaceId}`를 갱신한다. 새 별도 Firebase 로그인 구독을 만들지 않는다. 운영 기간·탭·회차는 `workspace`·`tab`·`meeting` 쿼리로 보존한다.
+`/sunday-ministry/praise`는 `src/features/praise`의 다섯 업무 탭을 사용한다. `src/app/api/praise`의 Node 서버가 Supabase 접근 토큰을 인증 서버에서 확인(만료·로그아웃·삭제 거절)하고 whoami 의 규칙 uid 로 현재 두 축 역할을 확인하고, 조 담당 권한·revision·작업 ID를 검사한 뒤 `praiseOps/{workspaceId}`를 갱신한다. 새 별도 Firebase 로그인 구독을 만들지 않는다. 운영 기간·탭·회차는 `workspace`·`tab`·`meeting` 쿼리로 보존한다.
 
-- `server/firebaseAdmin.ts`는 명시된 서버 전용 `FIREBASE_ADMIN_SERVICE_ACCOUNT_JSON`만 받는다. 공개 환경변수·브라우저 번들·원본 export 도구에 키를 넣지 않는다. 서버 자격정보가 없으면 503으로 닫으며 권한 우회 fallback을 만들지 않는다.
+- `server/supabaseAdmin.ts`는 서버 전용 `SUPABASE_SERVICE_ROLE_KEY`(같은 프로젝트의 service_role 또는 `sb_secret_`)와 `https://<ref>.supabase.co` 주소만 받는다. DB 는 `api.rtdb_admin_get/cas`(규칙 없음, Firebase Admin 과 같은 뜻)로, transaction 은 hash CAS 반복으로 한다. 공개 환경변수·브라우저 번들·원본 export 도구에 키를 넣지 않는다. 서버 자격정보가 없으면 503으로 닫으며 권한 우회 fallback을 만들지 않는다. 얕은 목록(`shallow`)은 지금 전체 읽기 뒤 키만 남기므로 DB 에 얕은 조회 함수가 생기면 그 함수만 바꾼다.
 - 찬양 운영 개설은 공통 학기·사역팀 선택을 기본으로 하고 학기에 속하지 않는 별도 기간만 명시 예외로 둔다. 새 운영 공간의 토요 모임은 날짜가 정확히 같고 유일한 학기 회차만 자동 연결한다. 사람은 `rosterLink.applicationKey`를 명시 선택해야 하며 이름·날짜 유사도로 기존 이관본을 자동 연결하지 않는다. 찬양 인물의 기존 `id`·`sourceId`·`kind`는 과거 출결·조·등단 참조이므로 유지한다.
 - `rosterLink`는 배치된 학기 신청과 공식 `classes/{year}` 또는 `teacherStaff/{year}`의 같은 `personId`가 확인된 경우만 저장한다. 이 대조에서 `semesters/{sid}/applications`·`classes`·`teacherStaff`는 읽기 전용이며, 찬양 화면이 명단을 맞추기 위해 해당 원장을 생성·수정하지 않는다. 기존 연결은 해제·교체하지 않고 누락된 동일인 필드만 보완한다.
 - 차단 항목이 남은 `shadow`에서는 관리자의 기존 팀원 `person.reconcile`만 허용한다. 출결·등단·조편성·가져오기·새 팀원 등록과 차단 항목/모드 변경은 계속 잠그며, 일반 `person.save`로 우회하지 못하게 서버가 기존 인물·shadow 상태를 재검증한다. 여러 확정 연결은 한 workspace transaction으로 인물 revision·작업 영수증·한국어 감사를 함께 저장한다.
@@ -289,8 +301,8 @@
 - 운영 책임자 전용 `accounts` API는 승인 계정의 이름·등록 이메일·역할 설명만 추가 제공한다. 계정·권한 원장에 쓰지 않으며 실제 `access.save`는 기존 명시 선택·권한 검증을 유지한다. 구체 계정 권한 적용은 배포와 별도 승인이다.
 
 ### 실제 인증 토큰과 역할 회수 계약을 운영 자격 없이 검사하기 (2026-09-09)
-- **접근법**: `scripts/run-praise-contracts.mjs`에서 demo-praise의 Auth(19098)·DB(19016) 에뮬레이터를 함께 실행한다 → 테스트에서만 Firebase Admin 연결을 주입한다 → 실제 Auth 토큰으로 `authenticatePraiseRequest`를 호출한다 → 역할 원장 회수·계정 비활성·익명 토큰 거절을 확인한다.
-- **판단 질문**: 운영 `firebaseAdmin.ts`의 에뮬레이터 거부와 명시 자격 검사는 완화하지 않았다. 이 테스트는 서버 인증·현재 역할 판정의 계약이며 운영 로그인 브라우저 E2E나 공유 Rules의 세부 역할 제한을 의미하지 않는다.
+- **접근법**: `scripts/run-praise-contracts.mjs`에서 demo-praise의 Auth(19098)·DB(19016) 에뮬레이터를 함께 실행한다 → 테스트에서만 `firebaseEmulatorAdmin.testkit.ts`로 에뮬레이터를 새 서버 어댑터 모양으로 감싸 주입한다 → 실제 Auth 토큰으로 `authenticatePraiseRequest`를 호출한다 → 역할 원장 회수·계정 비활성·익명 토큰 거절을 확인한다.
+- **판단 질문**: 운영 `supabaseAdmin.ts`의 주소·키 검사는 완화하지 않았다. 이 테스트는 서버 인증·현재 역할 판정의 계약이며 운영 로그인 브라우저 E2E나 공유 Rules의 세부 역할 제한을 의미하지 않는다.
 - **재사용 규칙**: 인증 경계 검사는 SDK 자체를 모의 함수로 바꾸기보다 격리된 에뮬레이터 토큰을 사용하고, 고정 프로젝트·loopback 포트 검사를 실행 전에 통과시킨다.
 
 
@@ -331,7 +343,7 @@
 ### 행정 업무와 연간 회계 경계 (2026-10-22)
 
 - 행정팀 `ongoing`은 공통 업무 연도 아래 출석부·행정 변동 사항·연간 회계를 제공한다. 출석부와 학생 앱의 `adminChanges`는 조회 전용이며 수정은 기존 학생 출석부로 연결한다. 행정 이력 구독은 해당 탭의 선택 연도로 한정한다.
-- 연간 회계는 `features/finance`와 `/api/finance/[year]`가 담당한다. `canManageAnnualFinance`의 현재 학기 역할을 서버가 재검증하고 기존 Firebase Admin 연결로 `financePrivate/{year}`만 쓴다. 이 원장은 클라이언트 Rules 기본 거부를 유지한다.
+- 연간 회계는 `features/finance`와 `/api/finance/[year]`가 담당한다. `canManageAnnualFinance`의 현재 학기 역할을 서버가 재검증하고 서버 관리자 연결(`supabaseAdmin.ts`)로 `financePrivate/{year}`만 쓴다. 이 원장은 클라이언트 Rules 기본 거부를 유지한다.
 - 빈 연도 조회는 쓰지 않는다. 거래 수정·취소·이월금·증빙 연결은 연도 원장 transaction에서 revision과 작업 ID를 검증하고 전후 이력을 함께 보존한다. 취소는 삭제가 아니며 취소 항목만 현금 합계에서 제외한다. 정산 상태는 증빙 처리 상태로 잔액 계산과 분리한다.
 - 증빙은 JPEG·PNG·PDF 512 KiB 이하, 거래당 최대 3개이며 불변 파일을 원장 밖에 저장한다. 다운로드는 매 요청 역할과 해당 거래의 증빙 연결을 검증한다. 네트워크 실패 시 같은 요청은 같은 작업 ID로 재시도하고 저장 실패에 초안을 지우지 않는다.
 - 운영자 입력 전에는 이전 회계나 수련회 비용을 자동 복사하지 않는다. 기존 학생·출석·연락처·학기·수련회 기록 및 Rules를 변경하지 않는다.

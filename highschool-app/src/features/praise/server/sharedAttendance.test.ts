@@ -26,26 +26,21 @@ const store = vi.hoisted(() => {
   };
   return {get, set};
 });
-vi.mock("./firebaseAdmin", () => ({
+vi.mock("./supabaseAdmin", () => ({
   praiseUnavailable: (code: string) => Object.assign(new Error(code), { code }),
-  getPraiseFirebaseAdmin: () => ({ database: { ref: (path: string) => {
-    const reference = {
-      get: async () => { memory.reads.push(path); return { val: () => store.get(path) }; },
-      orderByChild: () => ({ equalTo: () => reference }),
-      on: (_event: string, listener: () => void) => listener(), off: () => {},
-      transaction: async (update: (raw: unknown) => unknown) => {
-        if (memory.failBeforeCommit) { memory.failBeforeCommit = false; throw new Error("network"); }
-        if (memory.concurrentEntry !== undefined) { store.set("semesters/2026-2/attendance/team/session/1_student", memory.concurrentEntry); memory.concurrentEntry = undefined; }
-        memory.mutateBeforeTransaction?.(); memory.mutateBeforeTransaction = undefined;
-        let next = update(store.get(path));
-        if (memory.replayWith !== undefined) { store.set(path, memory.replayWith); memory.replayWith = undefined; next = update(store.get(path)); }
-        if (next !== undefined) { memory.writes++; memory.writePaths.push(path); store.set(path, next); }
-        if (memory.failEntryAfterCommit) { memory.failEntryAfterCommit = false; throw new Error("lost response"); }
-        return { committed: next !== undefined, snapshot: { val: () => store.get(path) } };
-      },
-    };
-    return reference;
-  } } }),
+  getPraiseAdmin: () => ({ database: {
+    get: async (path: string) => { memory.reads.push(path); return store.get(path); },
+    transaction: async (path: string, update: (raw: unknown) => unknown) => {
+      if (memory.failBeforeCommit) { memory.failBeforeCommit = false; throw new Error("network"); }
+      if (memory.concurrentEntry !== undefined) { store.set("semesters/2026-2/attendance/team/session/1_student", memory.concurrentEntry); memory.concurrentEntry = undefined; }
+      memory.mutateBeforeTransaction?.(); memory.mutateBeforeTransaction = undefined;
+      let next = update(store.get(path));
+      if (memory.replayWith !== undefined) { store.set(path, memory.replayWith); memory.replayWith = undefined; next = update(store.get(path)); }
+      if (next !== undefined) { memory.writes++; memory.writePaths.push(path); store.set(path, next); }
+      if (memory.failEntryAfterCommit) { memory.failEntryAfterCommit = false; throw new Error("lost response"); }
+      return { committed: next !== undefined, value: store.get(path) };
+    },
+  } }),
 }));
 vi.mock("./repository", () => ({ transactWorkspaceChecked: async (_id: string, update: (current: PraiseState | null) => PraiseState | undefined, verify: (current: PraiseState | null) => Promise<void>) => {
   let current = structuredClone(memory.state), next = update(current);

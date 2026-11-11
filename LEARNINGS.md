@@ -9,6 +9,7 @@
 ### 별도 작업 트리의 Next 빌드는 의존성 외부 연결을 거부할 수 있다 (2026-09-06)
 - **접근법**: 두 앱 검증에서 학생 앱 lint·typecheck·277개 테스트는 통과했지만 Turbopack이 `node_modules`의 외부 작업 트리 심볼릭 링크를 거부했다. 현재 작업에서 만든 링크인지 확인해 링크만 제거하고, 학생 앱 lockfile로 `npm ci`한 뒤 실패했던 build를 다시 실행해 통과했다.
 - **재사용 규칙**: 작업 트리 격리 시 각 앱의 의존성도 그 작업 트리 안에 설치한다. 기존 설치 대상이나 lockfile을 바꾸지 않으며, 환경 설치 문제를 앱 코드 실패로 보고하거나 빌드 경계를 넓혀 우회하지 않는다.
+- **보강 (2026-11-12)**: 다른 작업 트리의 `node_modules`를 심볼릭 링크로 빌려 쓴 고등부 앱에서 `next dev`(Turbopack)가 `Symlink [project]/node_modules is invalid`로 바로 끝났다. 화면만 잠깐 확인할 때는 `npx next dev --webpack -p <포트>`와 `npm run build`(이미 `--webpack`)가 링크를 그대로 받아 통과했다. 링크를 지우거나 `npm ci`로 남의 설치를 바꾸지 않았다.
 
 ### 소스 전수 감사는 import 스캔 후 필요한 AST만 만든다 (2026-09-06)
 - **접근법**: 찬양팀 소스 추가 후 기존 Firebase 쓰기 감사 테스트가 전체 파일 AST 생성으로 5초 제한을 넘었다. 전체 파일 열거는 유지하고 TypeScript `preProcessFile`로 import를 먼저 읽어 Firebase Database를 참조하는 파일만 기존 AST 검사에 전달했다. 좁은 검사 실행은 531ms로 통과했다.

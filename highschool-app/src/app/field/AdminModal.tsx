@@ -61,7 +61,7 @@ export default function AdminModal({ onClose, retreats, locks, adminId }: AdminM
         </div>
 
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
-          Google 로그인과 팀원 승인 뒤에 적용되는 추가 잠금입니다. 관리자는 PIN 없이 입장합니다.
+          로그인과 팀원 승인 뒤에 적용되는 추가 잠금입니다. 관리자는 PIN 없이 입장합니다.
           PIN은 평문으로 저장하지 않으며, <strong>6자리 이상</strong> 사용을 권장합니다.
         </div>
 

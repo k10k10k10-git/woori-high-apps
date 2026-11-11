@@ -6,8 +6,8 @@ const mocks = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
 }));
 vi.mock("@/features/praise/server/httpAuth", () => ({ authenticatePraiseRequest: async () => mocks.actor }));
-vi.mock("@/features/praise/server/firebaseAdmin", () => ({
-  getPraiseFirebaseAdmin: () => ({ database: { ref: (path: string) => ({ get: async () => ({ val: () => mocks.data[path] ?? null }) }) } }),
+vi.mock("@/features/praise/server/supabaseAdmin", () => ({
+  getPraiseAdmin: () => ({ database: { get: async (path: string) => mocks.data[path] ?? null } }),
   PraiseRequestError: class PraiseRequestError extends Error {},
   praiseUnavailable: () => new Error("조회 오류"),
 }));

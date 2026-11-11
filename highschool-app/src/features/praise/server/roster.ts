@@ -10,7 +10,7 @@ import type {
   PraiseRosterLink,
   PraiseState,
 } from "../types";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable, type PraiseAdminDatabase } from "./supabaseAdmin";
 import { requireValue } from "./validation";
 import { fingerprint } from "./stageModel";
 
@@ -146,13 +146,13 @@ function officialPath(candidate: PraiseRosterCandidate, year: string) {
 }
 
 /** 정상 연결은 단건만 조회한다. 이동한 후보가 있을 때만 연도 원장을 한 번 읽어 동일인을 확인한다. */
-function officialRosterReader(database: ReturnType<typeof getPraiseFirebaseAdmin>['database'], year: string) {
+function officialRosterReader(database: PraiseAdminDatabase, year: string) {
   let movedRoster: Promise<Record<string, { students?: Record<string, MainRosterIdentity> }> | null> | undefined;
   return async (candidate: PraiseRosterCandidate): Promise<MainRosterIdentity | null> => {
-    const official = (await database.ref(officialPath(candidate, year)).get()).val() as MainRosterIdentity | null;
+    const official = await database.get(officialPath(candidate, year)) as MainRosterIdentity | null;
     if (candidate.kind === 'STAFF' || !candidate.rosterLink.personId
       || official?.personId === candidate.rosterLink.personId) return official;
-    movedRoster ??= database.ref(semesterPaths.classesByYear(year)).get().then(snapshot => snapshot.val());
+    movedRoster ??= database.get(semesterPaths.classesByYear(year)) as Promise<Record<string, { students?: Record<string, MainRosterIdentity> }> | null>;
     return uniqueRosterStudent(await movedRoster, candidate.rosterLink.personId);
   };
 }
@@ -162,11 +162,11 @@ export async function praiseRoster(state: PraiseState) {
   const year = semesterId.match(/^\d{4}/)?.[0];
   if (!year) return { people: [], semesterHref: null };
   let raw: Record<string, Application> | null;
-  const database = getPraiseFirebaseAdmin().database;
+  const database = getPraiseAdmin().database;
   try {
     // 운영 Rules에는 teamId 인덱스가 없다. 해당 학기의 공개 신청만 읽고 아래에서
     // 팀·배치·인물키를 검증한다. 다른 학기와 비공개 신청 정보는 조회하지 않는다.
-    raw = await database.ref(semesterPaths.applications(semesterId)).get().then((snapshot) => snapshot.val());
+    raw = await database.get(semesterPaths.applications(semesterId)) as Record<string, Application> | null;
   } catch {
     throw praiseUnavailable("roster_unavailable");
   }
@@ -218,13 +218,13 @@ export async function validatePraiseRosterLink(
   let source: Application | null;
   let official: MainRosterIdentity | null;
   try {
-    const database = getPraiseFirebaseAdmin().database;
-    source = (await database.ref(
+    const database = getPraiseAdmin().database;
+    source = await database.get(
           semesterPaths.application(
             semesterId,
             person.rosterLink.applicationKey,
           ),
-        ).get()).val();
+        ) as Application | null;
     const year = semesterId.match(/^\d{4}/)?.[0] ?? "";
     if (!source || !year) official = null;
     else {

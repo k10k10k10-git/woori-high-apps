@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  admin: vi.fn(), verify: vi.fn(), ref: vi.fn(), values: {} as Record<string, unknown>,
+  admin: vi.fn(), verify: vi.fn(), get: vi.fn(), values: {} as Record<string, unknown>,
 }));
 vi.mock("server-only", () => ({}));
-vi.mock("@/features/praise/server/firebaseAdmin", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/features/praise/server/firebaseAdmin")>();
-  return { ...original, getPraiseFirebaseAdmin: mocks.admin };
+vi.mock("@/features/praise/server/supabaseAdmin", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/features/praise/server/supabaseAdmin")>();
+  return { ...original, getPraiseAdmin: mocks.admin };
 });
 
 import { GET } from "./route";
@@ -18,17 +18,17 @@ const request = () => new Request("https://example.test/api/worship-seating-sour
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.values = {};
-  mocks.verify.mockResolvedValue({ uid: "member", firebase: { sign_in_provider: "google.com" } });
-  mocks.ref.mockImplementation((path: string) => ({ get: async () => ({ val: () => mocks.values[path] ?? null }) }));
-  mocks.admin.mockReturnValue({ auth: { verifyIdToken: mocks.verify }, database: { ref: mocks.ref } });
+  mocks.verify.mockResolvedValue({ uid: "member", name: null, email: null, supabaseId: "sb-member", anonymous: false, disabled: false });
+  mocks.get.mockImplementation(async (path: string) => mocks.values[path] ?? null);
+  mocks.admin.mockReturnValue({ auth: { verifyAccessToken: mocks.verify }, database: { get: mocks.get } });
 });
 
 describe("예배 자리 배치용 집계 API", () => {
   it("예배팀 권한이 없으면 원장 내용을 읽기 전에 거절한다", async () => {
     const response = await GET(request());
     expect(response.status).toBe(403);
-    expect(mocks.ref).not.toHaveBeenCalledWith("classes/2026");
-    expect(mocks.ref).not.toHaveBeenCalledWith("attendance/2026");
+    expect(mocks.get).not.toHaveBeenCalledWith("classes/2026");
+    expect(mocks.get).not.toHaveBeenCalledWith("attendance/2026");
   });
 
   it("예배팀에는 반별 평균만 돌려주고 이름·연락처·개별 출결은 감춘다", async () => {

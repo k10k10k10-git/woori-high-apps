@@ -265,6 +265,11 @@ export function canManageSiteRequests(roles: MinistryRoles): boolean {
   return roles.semester === "superAdmin" || roles.retreat === "superAdmin";
 }
 
+/** 다른 계정의 로그인 비밀번호 정하기는 통합관리자(admins/{uid})만. 서버 라우트도 같은 판정을 다시 한다. */
+export function canResetAccountPassword(roles: MinistryRoles): boolean {
+  return roles.semester === "superAdmin" || roles.retreat === "superAdmin";
+}
+
 /** 타 사용자의 변경 이력은 통합관리자만 조회한다. 실제 읽기는 Rules도 검사한다. */
 export function canViewActivityLogs(roles: MinistryRoles): boolean {
   return roles.semester === "superAdmin" || roles.retreat === "superAdmin";

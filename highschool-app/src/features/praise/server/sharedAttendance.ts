@@ -5,7 +5,7 @@ import type { Application } from "@/features/semester/types";
 import { assertPraiseId } from "../paths";
 import { groupVersionForMeeting } from "../permissions";
 import type { PraiseAttendance, PraiseAttendanceSources, PraiseSharedAttendanceOperation, PraiseState } from "../types";
-import { getPraiseFirebaseAdmin, praiseUnavailable } from "./firebaseAdmin";
+import { getPraiseAdmin, praiseUnavailable } from "./supabaseAdmin";
 import { rosterCandidate } from "./roster";
 import { fingerprint } from "./stageModel";
 import { requireValue } from "./validation";
@@ -19,7 +19,7 @@ export function sharedStatus(value: unknown): PraiseAttendance["status"] {
 export function sharedRevision(value: unknown) { return fingerprint(value ?? null); }
 export function sharedNumericRevision(value: unknown) { return value == null ? 0 : Number.parseInt(sharedRevision(value).slice(0, 13), 16); }
 export async function readSharedPath(path: string): Promise<unknown> {
-  try { return (await getPraiseFirebaseAdmin().database.ref(path).get()).val(); }
+  try { return await getPraiseAdmin().database.get(path); }
   catch { throw praiseUnavailable("shared_attendance_unavailable"); }
 }
 /** 연결 변경과 원본 조 변경은 사전에 읽은 외부 스냅샷에 끼워 넣을 수 없다. */
@@ -82,8 +82,8 @@ export async function loadSharedAttendance(state: PraiseState): Promise<SharedAt
   assertPraiseId(sid); assertPraiseId(teamId);
   const [team, applicationValue, sessionValue, meta] = await Promise.all([
     readSharedPath(paths.team(sid, teamId)),
-    getPraiseFirebaseAdmin().database.ref(paths.applications(sid)).get()
-      .then(s => s.val() as unknown).catch(() => { throw praiseUnavailable("shared_attendance_unavailable"); }),
+    getPraiseAdmin().database.get(paths.applications(sid))
+      .catch(() => { throw praiseUnavailable("shared_attendance_unavailable"); }),
     readSharedPath(paths.sessions(sid)),
     readSharedPath(paths.semesterMeta(sid)),
   ]);

@@ -71,7 +71,7 @@ export async function expectAuthenticatedAppFrame(page: Page, route: Authenticat
     .toBe(true);
 
   const resolvedFrame = appFrame ?? page.mainFrame();
-  await expect(resolvedFrame.getByRole("button", { name: "Google로 로그인" })).toHaveCount(0);
+  await expect(resolvedFrame.getByRole("button", { name: "로그인", exact: true })).toHaveCount(0);
   await expect(resolvedFrame.getByRole("heading", { name: /접근 (?:승인이 필요합니다|권한이 없습니다)/ })).toHaveCount(0);
   return resolvedFrame;
 }

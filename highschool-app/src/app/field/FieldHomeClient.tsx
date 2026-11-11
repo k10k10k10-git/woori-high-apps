@@ -140,7 +140,7 @@ function FieldHomeContent({ onRetry, selectedId, setSelectedId }: {
   if (!user) return (
     <main className="team-first-state">
       <h1 className="page-title">수련회 현장 업무를 보려면 로그인해 주세요.</h1>
-      <p>고등부에 등록한 Google 계정으로 로그인해 주세요. 현장 담당이 처음이라면 로그인 후 접근 요청을 보낼 수 있습니다.</p>
+      <p>고등부에 등록한 이메일 계정으로 로그인해 주세요. 현장 담당이 처음이라면 로그인 후 접근 요청을 보낼 수 있습니다.</p>
       <LoginButton signIn={signIn} />
       <Link className="btn-secondary" href="/library/help#access">로그인·권한 안내</Link>
     </main>
