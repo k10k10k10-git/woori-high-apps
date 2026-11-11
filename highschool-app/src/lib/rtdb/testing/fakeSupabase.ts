@@ -222,4 +222,3 @@ export class FakeSupabase implements SupabaseLike {
     }
   }
 }
-

@@ -23,7 +23,9 @@ function loadSource(url) {
   const compiled = new Module(filename);
   compiledModules.set(filename, compiled);
   compiled.require = (specifier) => {
-    if (specifier === "firebase/database") return require(specifier);
+    // 2026-11-12 Supabase 이관 뒤 앱은 Firebase 와 같은 이름의 `@/lib/rtdb` 를 쓴다. 이 계약은 원천 Rules
+    // (운영 SQL 로 변환되는 database.rules.json)를 에뮬레이터로 검사하므로 같은 자리에 Firebase SDK 를 넣는다.
+    if (specifier === "firebase/database" || specifier === "@/lib/rtdb") return require("firebase/database");
     if (specifier === "@/lib/firebase") return { auth: globalThis.__activityLogTestAuth };
     if (specifier === "@/lib/paths") return loadSource(new URL("../highschool-app/src/lib/paths.ts", import.meta.url));
     if (specifier === "./writeModel") return loadSource(new URL("./writeModel.ts", url));
