@@ -2,9 +2,9 @@
 
 - 사용자 지시(2026-11-12): "기존 firebase 처럼 supabase로 플랫폼만 바꿨다고 생각하고 다 옮겨줘" — 다음 수련회 전에 `highschool-app`(woorihigh-app.vercel.app)을 Supabase 위에서 그대로 돌린다.
 - 원칙: **데이터 경로·모양·권한 규칙은 그대로.** 화면·업무 코드는 거의 건드리지 않고, Firebase SDK 자리에 같은 이름의 Supabase 기반 모듈을 끼운다.
-- Supabase 운영 `iqfgekpubbgjcsvsyyno`, 스테이징 `mpddehdatmnhomsxugcl`(주일학교 플랫폼과 같은 프로젝트). 마이그레이션은 `wooriteens-web/supabase/migrations/0068_rtdb_store.sql`.
+- Supabase 운영 `iqfgekpubbgjcsvsyyno`, 스테이징 `mpddehdatmnhomsxugcl`(주일학교 플랫폼과 같은 프로젝트). 마이그레이션은 `wooriteens-web/supabase/migrations/0070_rtdb_store.sql`(알림 읽기 판정 속도는 `0071_rtdb_member_speed.sql`). 가입 개편이 0067~0069를 먼저 써서 번호가 0068 → 0070으로 바뀌었다.
 
-## 1. DB: 트리 저장소 (`rtdb` 스키마, 0068)
+## 1. DB: 트리 저장소 (`rtdb` 스키마, 0070)
 
 - `rtdb.nodes(path text collate "C" primary key, value jsonb not null)` — **잎(원시값)만** 저장한다. 경로는 `/` 로 이은 Firebase 키(앞뒤 `/` 없음). 배열은 인덱스 키(`"0"`, `"1"`…)로 펼친다. 하위 트리 조회는 `path = p or (path >= p || '/' and path < p || '0')`.
 - `rtdb.uid_map(email text primary key, legacy_uid text unique not null)` — Firebase 계정 이메일 → 옛 UID. 규칙의 `auth.uid` 는 이 표에 이메일이 있으면 옛 UID, 없으면 Supabase `auth.uid()::text`.
@@ -50,4 +50,4 @@
 
 - Firebase 전체(지금 약 4.1MB, 잎 약 20.5만 개)를 내려받아 잎으로 펼쳐 `rtdb.nodes` 에 넣는다. 옮긴 뒤 노드별 잎 개수·해시를 Firebase 와 대조한다.
 - `rtdb.uid_map` 은 Firebase 인증 내보내기(이메일 → UID, 109명)로 채운다.
-- 전환 순서: 스테이징에 0068 → 운영 0068 → 자료 넣기 → 앱 배포 → Firebase 를 다시 내려받아 그 사이 바뀐 것이 있는지 대조.
+- 전환 순서: 스테이징에 0070 → 운영 0070 → 자료 넣기 → 앱 배포 → Firebase 를 다시 내려받아 그 사이 바뀐 것이 있는지 대조.

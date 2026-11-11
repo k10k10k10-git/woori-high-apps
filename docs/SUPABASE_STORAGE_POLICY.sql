@@ -2,7 +2,7 @@
 -- 적용은 통합 담당이 한다(스테이징 → 운영). 이 파일은 실행 기록이 아니라 적용할 원문이다.
 --
 -- 전제
---   * 0068_rtdb_store.sql 이 먼저 적용돼 있다(rtdb.nodes, api.rtdb_whoami).
+--   * 0070_rtdb_store.sql(wooriteens-web) 이 먼저 적용돼 있다(rtdb.nodes, api.rtdb_whoami).
 --   * 앱은 버킷 `highschool` 에 Firebase 때와 같은 경로를 쓴다. 다만 Supabase 는 한글 키를 받지 않아
 --     객체 키는 highschool-app/src/lib/storageUrl.ts 의 storageObjectKey() 로 적는다
 --     ([A-Za-z0-9/_.-] 밖의 글자는 UTF-8 바이트마다 `!XX`). 폴더(앞 조각)는 ASCII 그대로라 아래 정책이 읽는다.

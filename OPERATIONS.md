@@ -1,7 +1,32 @@
 # 운영 절차서
 
-> Firebase 프로젝트: `woori-high`
-> 작성일: 2026-06-23 · 현재 구조 대조: 2026-09-05
+> 운영 DB: **Supabase `iqfgekpubbgjcsvsyyno`(2026-11-12부터)** · 스테이징 `mpddehdatmnhomsxugcl` · 학생 앱 호스팅은 그대로 Firebase `woori-high`
+> 작성일: 2026-06-23 · 현재 구조 대조: 2026-09-05 · Supabase 이관 반영: 2026-11-12
+
+---
+
+## 0. Supabase 플랫폼 이관 뒤 운영 (2026-11-12)
+
+다음 수련회에 바로 쓰기 위해 "Firebase 처럼, 플랫폼만 Supabase로" 옮겼다(사용자 지시 2026-11-12). 화면·업무 코드와 자료 경로·모양·권한 규칙은 그대로다.
+
+| 무엇 | 지금 | 비고 |
+|---|---|---|
+| 자료 | Supabase 운영 `rtdb.nodes`(잎 하나가 한 줄, 경로는 Firebase 키 그대로) | 전환 때 잎 204,837개를 옮기고 최상위 27개 노드의 잎 개수·해시가 Firebase와 같음을 확인 |
+| 읽기·쓰기 | `api.rtdb_get`·`rtdb_update`·`rtdb_cas` 등(로그인한 사람, 규칙 검사) / `api.rtdb_admin_*`(service role 전용, 규칙 없음) | 계약: `docs/SUPABASE_PLATFORM_CONTRACT.md` |
+| 실시간 | 쓰기마다 `rtdb.changes`에 바뀐 경로 한 줄 → Supabase Realtime → 겹치는 구독만 다시 읽음 | 고등부 역할이 있는 계정만 알림을 읽는다(`rtdb.is_member()`) |
+| 로그인 | Supabase Auth(이메일+비밀번호, 이메일 6자리 코드) | `rtdb.uid_map`이 옛 Firebase UID를 이어 줘 `admins/{uid}` 등 기존 권한 그대로 |
+| 파일 | 새 파일은 Supabase Storage 버킷 `highschool`(경로 그대로) | 정책: `docs/SUPABASE_STORAGE_POLICY.sql`. 이관 전 첨부·숙소 지도·학기 자료는 Firebase Storage에 그대로 있고, 자료에 저장된 옛 다운로드 주소로 계속 보인다(`storageUrl.ts`가 허용). 그 파일을 지우면 자료 줄만 지워지고 Firebase 파일은 남는다. Firebase 프로젝트를 닫으려면 그 전에 파일을 `storageObjectKey()` 키로 옮겨야 한다 |
+| 권한 규칙 | 원천 `attendance-app/database.rules.json` → wooriteens-web `scripts/rtdb/compile-rules.cjs` → SQL(마이그레이션 0070) | 규칙을 바꾸면 **새 마이그레이션**으로 스테이징→운영 적용. `firebase deploy --only database`는 운영 앱에 아무 영향이 없다(Firebase 사본만 바뀜) |
+| Firebase `woori-high` DB | 전환 시점 사본 | 앱이 쓰지 않는다. 지우지 말 것(되돌림 대비) |
+
+환경 변수:
+- `highschool-app`(Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(공개 키). 찬양팀·관리자 비밀번호 재설정 같은 서버 기능은 `SUPABASE_SERVICE_ROLE_KEY`가 필요하다 — **사용자가 직접 넣는다**(에이전트가 비밀 키를 입력하지 않는다).
+- 학생 앱: `attendance-app/.env.production.local`의 같은 두 공개 값(정적 빌드에 들어감).
+
+백업·복구(이관 뒤):
+- 전체 백업: Supabase 대시보드 SQL에서 `select path, value from rtdb.nodes order by path`를 내려받거나, service role로 `api.rtdb_admin_get('')`. 개인정보가 평문으로 남으므로 작업 직후 지운다.
+- 노드 복구: `api.rtdb_admin_update('{"경로": 값}'::jsonb)`(값 `null`은 지우기). 운영 DB 쓰기이므로 사용자 승인 + 사전 백업 규칙 그대로.
+- 아래 1~4장의 Firebase 콘솔·`firebase deploy --only database` 절차는 **이관 전 기록**이다. 학생 앱 Hosting 배포(`firebase deploy --only hosting`)만 그대로 쓴다.
 
 ---
 

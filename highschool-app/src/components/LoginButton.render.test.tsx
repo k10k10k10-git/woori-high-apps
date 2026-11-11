@@ -88,3 +88,16 @@ it("Google 로그인 단추와 앱 안 브라우저 안내는 Google 로그인�
   fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
   expect(mocks.signInWithGoogle).toHaveBeenCalledOnce();
 });
+
+it("허용되지 않은 주소의 Google 로그인 실패는 주소를 알려 달라고 안내하고 다시 시도할 수 있다", async () => {
+  mocks.google = true;
+  mocks.signInWithGoogle.mockRejectedValueOnce({ code: "auth/unauthorized-domain", message: "Synthetic provider detail" }).mockResolvedValueOnce(undefined);
+  render(<LoginButton signIn={mocks.signInWithGoogle} />);
+  fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+  fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("사이트 주소를 담당자에게 알려 주세요.");
+  expect(screen.queryByText(/Synthetic provider/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
+  expect(await screen.findByText("로그인했습니다. 화면을 여는 중…")).toBeInTheDocument();
+  expect(mocks.signInWithGoogle).toHaveBeenCalledTimes(2);
+});

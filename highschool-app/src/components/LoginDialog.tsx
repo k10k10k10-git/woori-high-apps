@@ -22,6 +22,8 @@ const FRIENDLY: Record<string, string> = {
   "auth/operation-not-allowed": "이 로그인 방법은 지금 쓸 수 없습니다. 다른 방법으로 로그인해 주세요.",
   "auth/network-request-failed": "네트워크 오류입니다. 연결 확인 후 다시 시도해주세요.",
   "auth/not-configured": "로그인 설정이 아직 끝나지 않았습니다. 담당자에게 알려 주세요.",
+  // 2026-07-10 실사고: 허용되지 않은 주소에서 Google 로그인이 막히면 사람이 할 일(주소 알리기)을 안내한다.
+  "auth/unauthorized-domain": "이 주소에서는 로그인을 시작할 수 없습니다. 사이트 주소를 담당자에게 알려 주세요.",
 };
 const FALLBACK = "로그인을 완료하지 못했습니다. 다시 시도하고, 계속되면 담당자에게 화면 주소와 발생 시간을 알려 주세요.";
 
