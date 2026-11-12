@@ -13,6 +13,7 @@ import {
   DESKTOP_FRAME_QUERY_VALUE,
   shouldUseDesktopFrame,
   shouldUseMobilePreview,
+  stripAuthCallbackSearch,
   stripDesktopFrameSearch,
 } from "@/context/viewMode";
 
@@ -73,7 +74,9 @@ export default function PortalViewportShell({ children }: { children: React.Reac
   const isFramedView = isMobilePreview || isDesktopFrame;
   const framedUrl = new URL(framedLocation, "https://woori-high.local");
   const currentDesktopFrameSrc = `${buildDesktopFrameSrc(framedUrl.pathname, framedUrl.search)}${framedUrl.hash}`;
-  const currentMobileFrameSrc = framedLocation;
+  // 로그인 콜백(?code=)은 바깥 창만 교환한다. 콜백 값이 없으면 지금까지와 같은 주소를 그대로 쓴다.
+  const mobileFrameSearch = stripAuthCallbackSearch(framedUrl.search);
+  const currentMobileFrameSrc = mobileFrameSearch === framedUrl.search ? framedLocation : `${framedUrl.pathname}${mobileFrameSearch}${framedUrl.hash}`;
   const frameKey = isDesktopFrame ? "desktop" : `mobile:${framedLocation}`;
   const frameReady = loadedFrameKey === frameKey;
 

@@ -5,6 +5,7 @@ import {
   resolveInitialViewMode,
   shouldUseDesktopFrame,
   shouldUseMobilePreview,
+  stripAuthCallbackSearch,
   stripDesktopFrameSearch,
 } from "./viewMode";
 
@@ -32,5 +33,14 @@ describe("화면 보기 모드", () => {
     );
     expect(stripDesktopFrameSearch("?tab=attendance&__portalFrame=desktop")).toBe("?tab=attendance");
     expect(stripDesktopFrameSearch("?__portalFrame=desktop")).toBe("");
+  });
+});
+
+describe("로그인 콜백 값은 틀 주소로 넘기지 않는다(바깥 창만 교환)", () => {
+  it("code·error 값을 빼고 나머지는 그대로 둔다", () => {
+    expect(stripAuthCallbackSearch("?tab=a&code=abc&error=x&error_code=y&error_description=z")).toBe("?tab=a");
+    expect(stripAuthCallbackSearch("?code=abc")).toBe("");
+    expect(buildDesktopFrameSrc("/", "code=abc&tab=a")).toBe("/?tab=a&__portalFrame=desktop");
+    expect(stripAuthCallbackSearch("?q=%ED%95%9C+a")).toBe("?q=%ED%95%9C+a");
   });
 });

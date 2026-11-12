@@ -230,6 +230,13 @@
 - **판단 질문**: 문서만 보고 순서 규칙을 짐작하지 않았다(정수 키·배열 변환·`endBefore(값, 키)` 경계는 틀리기 쉽다). 대조 파일은 저장소에 남기지 않았다 — Firebase SDK는 이관 뒤 지울 의존성이다.
 - **재사용 규칙**: SDK 시각을 흉내 낼 때 `Date.now`만 바꾸면 안 된다 — Firebase 푸시 ID는 `new Date().getTime()`을 쓰므로 `Date.prototype.getTime`도 바꿔야 같은 시각 접두어(1700000000000ms → `-NjEtLV-`)가 나온다.
 
+## 소셜 로그인은 바깥 창에서 — 2026-11-12 Google 403 사고
+
+- 데스크톱 화면은 사이트 전체를 같은 출처 틀(`?__portalFrame=desktop`, `PortalViewportShell`) 안에 띄운다. 틀 자체를 Google 로그인 주소로 보내면 Google 이 **403(페이지에 액세스할 수 없음)** 으로 막는다. 좁은 화면·자동화 브라우저는 틀이 없어 재현되지 않았다(Firebase 는 팝업이라 문제 없었음).
+- 규칙: OAuth 는 `signInWithOAuth({ skipBrowserRedirect: true })` 로 주소만 받고 `oauthTargetWindow(window)`(같은 출처면 `window.top`)로 연다. 돌아올 주소는 `oauthReturnUrl` — 틀 표시를 뺀 바깥 주소. `src/lib/oauthWindow.test.ts`·`supabaseAuth.test.ts` 가 지킨다.
+- 돌아온 `?code=` 는 바깥 창만 교환한다: 틀 주소를 만들 때 `stripAuthCallbackSearch` 로 콜백 값을 뺀다(`viewMode.test.ts`).
+- 확인은 1400px 이상 화면에서 틀 안 단추를 눌러 **탭 전체가** accounts.google.com 으로 가는지 본다.
+
 ## 운영 원칙
 
 ### 반복 안내 없이 실제 업무와 상태를 먼저 보여주기 (2026-10-13)
