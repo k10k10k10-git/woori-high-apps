@@ -280,6 +280,14 @@ export function canWriteStudentRoster(roles: MinistryRoles): boolean {
   return SEMESTER_CAPS[roles.semester].rosterWrite;
 }
 
+/**
+ * 우리틴즈 원장 해(2027~)의 새친구 "교적에 접수"·접수 취소. 서버(wooriteens-web 0074 api.hs_newcomer_submit)와 같은 판정:
+ * 통합관리자·행정팀·교역자. 옛 출석부 반영(canWriteStudentRoster)과 달리 교역자도 된다 — 교적에 접수 대기만 만들고 명단에는 쓰지 않는다.
+ */
+export function canSubmitNewFriendToRegistry(roles: MinistryRoles): boolean {
+  return roles.semester === "superAdmin" || roles.semester === "adminTeam" || roles.semester === "pastor";
+}
+
 /** 팀·훈련 반·회차 등 학기 설정 */
 export function canEditSemesterSettings(roles: MinistryRoles): boolean {
   return SEMESTER_CAPS[roles.semester].settings;

@@ -235,3 +235,18 @@
 - **접근법**: push 가 `Permission … denied to <다른 계정>` 403이면 `gh auth status`로 활성 계정을 본다 → 다른 세션이 쓰는 활성 계정을 바꾸지 않고 명령 단위 토큰으로 보낸다: `git -c credential.helper= -c 'credential.helper=!f() { echo username=k10k10k10-git; echo "password=$(gh auth token --user k10k10k10-git)"; }; f' push -u origin HEAD`, `GH_TOKEN=$(gh auth token --user k10k10k10-git) gh pr create …` → 앱의 Auto-fix 는 "gh 활성 계정이 연 PR"에만 켜지므로, 켤 때는 사용자 승인 뒤 `gh auth switch --hostname github.com --user k10k10k10-git` 하고 다른 세션에 되돌리는 명령을 알린다. 이 맥의 워크트리 경로는 NFD(분해형 한글)라 Write/Edit 도구가 NFC로 입력한 `…/고등부/…` 경로를 거부한다 → 셸에서 상대 경로로 파일을 쓰거나 `pwd`가 돌려준 경로를 그대로 쓴다.
 - **판단 질문**: `gh auth switch`를 먼저 하지 않았다 — 같은 맥의 다른 저장소 세션(wooriteens-web)이 그 계정으로 push 중이면 403으로 깨진다. 원격 주소나 git 전역 설정을 바꾸지 않았다. 경로 문제를 피하려고 다른 폴더에서 작업하지 않았다.
 - **재사용 규칙**: 여러 GitHub 계정이 로그인된 맥에서는 활성 계정을 공유 자원으로 보고 명령 단위 토큰을 쓰며, 전환은 사용자 승인 뒤에만 하고 되돌리는 명령을 남긴다.
+
+### 우리틴즈 DB 안에서 도는 사본(pg_cron)의 질의가 느릴 때 — 플래너 오추정과 OR 조건 (2026-11-12)
+- **접근법**: 1→ 같은 해·같은 크기의 가상 자료(학생 650명·출석 28,600행)로 함수만 따로 재서 느린 단계를 찾는다(`\timing` 으로 내보내기와 계획을 나눠 잼). 2→ 느린 질의를 변수만 상수로 바꿔 `explain (analyze)` 한다. 0055 내보내기는 여러 번 쓰는 CTE(`stu`)를 플래너가 1행으로 짐작해 학생 × 출석을 중첩 반복(1,850만 번 비교, 6.4초)했다. 3→ 질의 글은 원본(`api.platform_export_high_legacy`)과 똑같이 두고 내부 함수 정의에만 `set enable_nestloop = off` 를 붙였다(0.3초, 결과는 시험으로 원본과 대조). 4→ `exists (... where path = p or (path >= p||'/' and path < p||'0'))` 처럼 같은 칸의 같음·범위를 OR 로 묶으면 색인을 못 탄다 → `exists(같음) or exists(범위)` 로 나눈다. 접두사 묶기는 `starts_with` 조인 대신 노드 키를 계산해 같음으로 묶는다(첫 쓰기 15초 → 3초).
+- **판단 질문**: 0055 원본 함수를 고치지 않았다(운영에서 쓰는 공개 함수의 본문·지문이 바뀌고 되돌리기가 커진다). CTE 를 임시 표로 바꾸는 재작성도 하지 않았다 — 원본과 글자가 달라지면 "같은 질의"라는 보장을 시험으로만 지켜야 한다.
+- **재사용 규칙**: plpgsql 함수가 크기에 비해 느리면 먼저 변수만 상수로 바꾼 `explain (analyze)` 에서 `rows=1` 짐작과 `Rows Removed by Join Filter` 를 본다. 같은 칸의 같음·범위 OR 는 두 exists 로 나눈다.
+
+### Supabase SQL 편집기 자동화로 마이그레이션 리허설·적용할 때의 함정 보강 (2026-11-12)
+- **접근법**: 1→ 리허설은 `begin; 적용 본문(begin/commit 줄 뺌); 점검을 임시 표에 모음; 되돌리기 본문; 점검; do $$ raise exception 'REHEARSAL %', (모은 json) $$;` 한 덩어리로 보낸다 — 같은 파일을 먼저 로컬 같은 번호 DB(pg_cron 은 가짜 `cron` 스키마)에서 돌려 본다. 2→ 임시 표를 만들면 확인창이 "Run without RLS / Run and enable RLS" 두 단추로 뜬다 → 본문을 바꾸지 않는 "Run without RLS" 를 누른다. 3→ Run 단추를 눌러도 결과 창이 7초 넘게 "Click Run to execute" 면 한 번 더 누른다. 4→ 끝나면 따로 상태 조회(번호·함수 수·잎 수)로 아무것도 남지 않았음을 확인한다.
+- **판단 질문**: 막힌 계획의 `updates` 는 SQL NULL 이 아니라 JSON null(`'null'::jsonb`)로 오므로 `coalesce(p->'updates', '{}')` 가 막지 못한다(리허설이 `jsonb_object_keys on a scalar` 로 멈췄다) → `jsonb_typeof(...) = 'object'` 로 가린다. ego-browser 작업 공간이 라운드 사이에 사용자 소유로 넘어가 있으면(`EGO_TASK_SPACE_NAME_IN_USE`) 가져오지 않고 새 이름으로 만들었다.
+- **재사용 규칙**: 운영 리허설 SQL 은 항상 로컬 같은 번호 DB 에서 먼저 끝까지 돌려 `REHEARSAL` 결과가 나오는지 확인한 뒤 보낸다.
+
+### 여러 세션이 같은 로컬 시험 Postgres 와 마이그레이션 번호를 함께 쓸 때 (2026-11-12)
+- **접근법**: 1→ `npm run test:platform-db` 가 실패하면 같은 시험 파일을 `origin/main` 작업 폴더에서 돌려 실패 목록을 `comm` 으로 견준다(0073 뒤 main 자체에서 15건이 이미 실패). 2→ 내 변경으로만 생긴 실패는 메시지를 읽는다: 새 keep 함수는 `platform-dbsafety-db.test.cjs` 의 `KEEP_ADDED`, 학생을 참조하는 새 표는 0053 합치기의 `core.student_reference_counts` 가 알아야 한다(모르면 외래 키를 두지 않고 `core.student_merges` 로 따라가게 했다). 3→ 시간 한도(20초) 초과는 다른 세션이 같은 서버를 쓸 때 생긴다 → 큰 가상 자료 넣기는 주일별로 나눠 넣고, 성능 단언은 넉넉한 회귀 신호로 둔다. 4→ 번호는 형제 메모에 먼저 적고 시작한다(이번에 다른 세션이 0077~0081 을 먼저 운영에 적용 → 0074 는 그 뒤 적용, 되돌리기는 뒤 번호부터).
+- **판단 질문**: main 에서도 깨지는 시험을 이 작업에서 고치지 않았다(0073 의 권한 통합 결정에 맞춰 기대값을 바꾸는 일은 그 담당의 범위). 한 번 실패한 무관 시험(attundo, 고등부 앱 렌더 4개)은 따로 다시 돌려 통과를 확인했다.
+- **재사용 규칙**: DB 시험 실패는 "main 에서도 깨지나"부터 가른다. 같은 서버를 쓰는 시험의 큰 자료는 한 문장 수천 행 이하로 나눠 넣는다.

@@ -21,6 +21,7 @@ import {
   isSemesterDowngrade,
   isSemesterUpgrade,
   ownSundayTeam,
+  canSubmitNewFriendToRegistry,
   canWriteStudentRoster,
   describeRoles,
   iguardScopeOf,
@@ -113,6 +114,12 @@ describe("학기 역할 — 학기·주일 화면", () => {
   it("출석부 원장 반영은 통합관리자와 행정팀만 가능하다 (2026-08-12 Rules 보강)", () => {
     const allowed = ASSIGNABLE_SEMESTER_ROLES.filter((role) => canWriteStudentRoster(roles(role, "none")));
     expect(allowed).toEqual(["superAdmin", "adminTeam"]);
+  });
+
+  it("우리틴즈 교적 새친구 접수는 통합관리자·교역자·행정팀만 (서버 api.hs_newcomer_submit 와 같은 판정)", () => {
+    const allowed = ASSIGNABLE_SEMESTER_ROLES.filter((role) => canSubmitNewFriendToRegistry(roles(role, "none")));
+    expect(allowed).toEqual(["superAdmin", "pastor", "adminTeam"]);
+    expect(canSubmitNewFriendToRegistry(roles("barnabas", "superAdmin"))).toBe(false);
   });
 
   it("교역자·스탭팀장·바나바팀은 출석부 원장을 쓰지 못한다", () => {
