@@ -1,3 +1,4 @@
+import { oauthReturnUrl, oauthTargetWindow } from "@/lib/oauthWindow";
 import type { Session, SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
 import { isMailboxlessEmail, normalizeEmail } from "./accountEmail";
@@ -310,10 +311,10 @@ export function createSupabaseAuth({
     return supabase;
   }
 
+  /** 로그인 뒤 돌아올 주소. 틀(iframe) 안이면 바깥 창 주소(틀 표시 제외)를 쓴다. */
   function redirectUrl(): string | undefined {
     if (typeof window === "undefined") return undefined;
-    const { origin, pathname, search } = window.location;
-    return `${origin}${pathname}${search}`;
+    return oauthReturnUrl(window);
   }
 
   async function signInWithEmailPassword(email: string, password: string): Promise<void> {
@@ -337,8 +338,15 @@ export function createSupabaseAuth({
 
   async function signInWithGoogle(): Promise<void> {
     if (!isGoogleLoginEnabled()) throw new AuthError("auth/operation-not-allowed", "Google 로그인이 켜져 있지 않습니다.");
-    const { error } = await requireClient().auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectUrl() } });
+    // 틀(iframe) 안에서 누르면 바깥 창을 Google 로 보낸다(oauthWindow.ts 참조). 주소는 받아서 직접 연다.
+    const target = typeof window === "undefined" ? null : oauthTargetWindow(window);
+    const { data, error } = await requireClient().auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: redirectUrl(), skipBrowserRedirect: true },
+    });
     if (error) throw toAuthError(error);
+    if (!data?.url) throw new AuthError("auth/internal-error", "로그인 주소를 받지 못했습니다.");
+    target?.location.assign(data.url);
   }
 
   return { auth, onAuthStateChanged, signOut, retryIdentity, signInWithEmailPassword, sendEmailCode, verifyEmailCode, signInWithGoogle };

@@ -184,6 +184,26 @@ describe("이메일 로그인", () => {
     expect(client.auth.signInWithOtp).not.toHaveBeenCalled();
   });
 
+  it("Google 로그인은 주소를 받아 직접 연다: 데스크톱 틀 안이면 바깥 창을 보낸다(2026-11-12 403 회귀)", async () => {
+    const { instance, client } = setup();
+    const signInWithOAuth = vi.fn(async (_input: unknown) => ({ data: { provider: "google", url: "https://example.supabase.co/auth/v1/authorize?provider=google" }, error: null }));
+    (client.auth as Record<string, unknown>).signInWithOAuth = signInWithOAuth;
+    const top = { location: { origin: "https://woorihigh-app.vercel.app", pathname: "/teams", search: "?tab=a", assign: vi.fn() } } as Record<string, unknown>;
+    top.top = top;
+    const frame = { location: { origin: "https://woorihigh-app.vercel.app", pathname: "/teams", search: "?tab=a&__portalFrame=desktop", assign: vi.fn() }, top };
+    vi.stubGlobal("window", frame);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_GOOGLE", "1");
+    try {
+      await instance.signInWithGoogle();
+      expect(signInWithOAuth).toHaveBeenCalledWith({ provider: "google", options: { redirectTo: "https://woorihigh-app.vercel.app/teams?tab=a", skipBrowserRedirect: true } });
+      expect((top.location as { assign: ReturnType<typeof vi.fn> }).assign).toHaveBeenCalledWith("https://example.supabase.co/auth/v1/authorize?provider=google");
+      expect(frame.location.assign).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("Google 로그인은 환경 변수로 켰을 때만 시작한다", async () => {
     const { instance } = setup();
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_GOOGLE", "");
