@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -74,7 +74,7 @@ it("@woorihigh.com 계정은 코드를 보내지 않고 비밀번호로만 로�
   expect(mocks.signInWithEmailPassword).toHaveBeenCalledWith("team01@woorihigh.com", "secret-1234");
 });
 
-it("Google 로그인 단추와 앱 안 브라우저 안내는 Google 로그인을 켰을 때만 보인다", async () => {
+it("Google 로그인이 꺼져 있으면 이메일 로그인 창만, 켜져 있으면 창 없이 Google 단추 하나만 보인다", async () => {
   render(<LoginButton signIn={mocks.signInWithGoogle} />);
   expect(screen.queryByText("앱 안 브라우저 안내")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "로그인" }));
@@ -84,8 +84,11 @@ it("Google 로그인 단추와 앱 안 브라우저 안내는 Google 로그인�
   mocks.signInWithGoogle.mockReturnValue(new Promise(() => {}));
   render(<LoginButton signIn={mocks.signInWithGoogle} />);
   expect(screen.getByText("앱 안 브라우저 안내")).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "로그인" }));
+  expect(screen.queryByRole("button", { name: "로그인" })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("이메일")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "로그인 중…" })).toBeDisabled();
   expect(mocks.signInWithGoogle).toHaveBeenCalledOnce();
 });
 
@@ -93,11 +96,11 @@ it("허용되지 않은 주소의 Google 로그인 실패는 주소를 알려 �
   mocks.google = true;
   mocks.signInWithGoogle.mockRejectedValueOnce({ code: "auth/unauthorized-domain", message: "Synthetic provider detail" }).mockResolvedValueOnce(undefined);
   render(<LoginButton signIn={mocks.signInWithGoogle} />);
-  fireEvent.click(screen.getByRole("button", { name: "로그인" }));
   fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("사이트 주소를 담당자에게 알려 주세요.");
   expect(screen.queryByText(/Synthetic provider/)).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "로그인 문제 해결 방법" })).toHaveAttribute("href", "/library/help#connection");
   fireEvent.click(screen.getByRole("button", { name: "Google로 로그인" }));
-  expect(await screen.findByText("로그인했습니다. 화면을 여는 중…")).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   expect(mocks.signInWithGoogle).toHaveBeenCalledTimes(2);
 });
