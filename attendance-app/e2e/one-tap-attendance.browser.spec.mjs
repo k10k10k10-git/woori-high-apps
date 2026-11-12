@@ -53,7 +53,7 @@ async function seed(request) {
 async function login(page, email = teacher, path = `/attendance?week=${key}`) {
   await page.goto(path);
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   if (email === teacher) await expect(page.getByRole('button', { name: '합성 첫 학생 출석으로 기록', exact: true })).toBeVisible();
   else await expect(page.getByRole('navigation', { name: '관리자 메뉴', exact: true })).toBeVisible();

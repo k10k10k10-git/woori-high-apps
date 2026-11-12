@@ -10,8 +10,9 @@ permissions:
 jobs:
   authenticated-workflow:
     runs-on: ubuntu-latest
-    # 2026-11-12 Supabase 이관 뒤 이 하네스(attendance-app/e2e)는 아직 Firebase 에뮬레이터에 묶여 있어 끝나지 않는다.
-    # 새 플랫폼용으로 다시 짤 때까지 실행 시간을 묶어 Actions 시간을 지킨다(성공한 실행은 20~25분).
+    # 성공한 실행: 2026-10-22 19~25분, 2026-11-12 하네스 복구 뒤 7분(시험 116개 3.9분). 하네스가 화면을 못 띄우면
+    # (예: 이관 뒤 별칭 누락, 2026-11-11 실행 5건이 27~43분 돌다 취소) 시험마다 시간 초과만 반복하므로 상한을 둔다.
+    # 별칭 이름 누락은 attendance-app/e2e/aliasParity.ts 를 tsc 가 먼저 잡는다.
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7

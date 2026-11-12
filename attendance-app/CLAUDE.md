@@ -21,12 +21,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **로그인**: `src/lib/supabaseAuth.ts`(고등부 앱 복사본, uid = `api.rtdb_whoami`). 화면은 고등부 `LoginDialog`와 같은 갈래 — 이메일 6자리 코드(기본) 또는 비밀번호, `@woorihigh.com`은 비밀번호만, Google 단추는 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`일 때만. Firebase 비밀번호는 옮겨지지 않으므로 기존 계정은 이메일 코드로 들어오거나 관리자가 비밀번호를 다시 정한다. whoami 실패는 무한 대기 대신 역할 조회 실패 화면(다시 불러오기·다른 계정)으로 간다.
 - **로그인 유지**: `src/lib/authStorage.ts`가 Supabase 세션 저장소를 바꿔 끼워 Firebase 의 session/local persistence 와 같게 한다(체크 해제 = 이 탭만). `src/lib/supabase.ts`가 고등부 복사본과 다른 유일한 점이다.
 - **환경 변수**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(선택 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`). Next 정적 내보내기라 **빌드 시점에** 넣어야 한다(예: `attendance-app/.env.production.local`). 없어도 빌드·화면은 뜨고 로그인·저장이 설정 오류로 끝난다. `NEXT_PUBLIC_FIREBASE_*`는 더 이상 읽지 않는다. 데모 3종(`NEXT_PUBLIC_DEMO_*`)은 그대로이며 데모 계정이 Supabase 에 있어야 한다.
-- **남은 Firebase**: `firebase.json`·`database.rules.json`(Rules 원본, Supabase 규칙 변환의 입력)과 Hosting 배포 흐름은 그대로다. `firebase` 패키지는 에뮬레이터 계약 시험(`rosterRecovery.integration.test.ts`, 앱 REST 출구를 에뮬레이터로 돌려 잇도록 수정)과 `e2e/`(Firebase 에뮬레이터 기반 — Supabase 판으로 다시 만들어야 함)만 쓴다. 운영 번들에는 Firebase SDK가 없다.
+- **남은 Firebase**: `firebase.json`·`database.rules.json`(Rules 원본, Supabase 규칙 변환의 입력)과 Hosting 배포 흐름은 그대로다. `firebase` 패키지는 에뮬레이터 계약 시험(`rosterRecovery.integration.test.ts`, 앱 REST 출구를 에뮬레이터로 돌려 잇도록 수정)과 `e2e/`만 쓴다. 운영 번들에는 Firebase SDK가 없다.
+- **브라우저 시험 하네스(`e2e/`)**: 원천 Rules와 화면 흐름을 함께 검사하려고 Firebase 에뮬레이터를 그대로 쓴다. `e2e/server.mjs`의 Vite 별칭이 `@/lib/rtdb`→`e2e/rtdb.ts`(firebase/database), `@/lib/rtdbRest`→`e2e/rtdbRest.ts`(에뮬레이터 REST 주소 + `globalThis.fetch`), `@/lib/supabaseAuth`→`e2e/supabaseAuth.ts`(에뮬레이터 Auth, 비밀번호 로그인만), `@/lib/firebase/client`→`e2e/firebase.ts`로 바꾼다. 운영 소스에는 에뮬레이터 분기가 없다. 운영 모듈이 내보내는 이름을 시험 모듈이 빠뜨리면 화면 전체가 로드에 실패해 시험이 시간 초과만 반복하므로, `e2e/aliasParity.ts`를 `tsc`가 검사한다(별칭 모듈에 새 이름을 더하면 시험 모듈에도 더한다). 로그인 창은 이메일 코드가 기본이라 시험은 `비밀번호` 단추를 먼저 누른다. 운영 어댑터(`rtdbRest`·`rtdb`·`supabaseAuth`) 자체는 가짜 Supabase 단위 시험이 지킨다.
 
 ### SDK 자리 바꾸기 이관에서 숨은 REST 의존 찾기 (2026-11-12)
 - **접근법**: `grep -rn "firebase/\|NEXT_PUBLIC_FIREBASE\|getIdToken\|X-Firebase-ETag\|If-Match\|globalThis.fetch" src`로 SDK 밖 Firebase 의존을 모두 센다 → REST 모듈의 요청 모양(GET·ETag GET·If-Match PUT·루트 PATCH)을 표로 만든다 → 업무 코드는 두고 fetch 모양 어댑터(`src/lib/rtdbRest.ts`) 하나로 서버 함수에 옮긴다 → 기본 fetch 와 주소만 바꾸고, REST 를 흉내 내던 시험은 어댑터 모듈을 가짜 fetch 로 잇는다 → 어댑터는 가짜 Supabase 로 업무 모듈과 함께 시험한다.
 - **판단 질문**: 13곳 업무 코드를 rtdb SDK 호출로 다시 쓰지 않았다 — 오프라인 대기열을 일부러 피한 단발·조건부 저장 계약(응답 불명 시 재전송 금지, 412 경합)을 깨기 쉽다. 연결 끊김 예약을 beforeunload 로 보내지 않았다 — 미저장 확인창에서 머무르면 살아 있는 잠금이 풀린다.
 - **재사용 규칙**: "SDK만 바꾼다"는 이관은 SDK import 뿐 아니라 토큰을 직접 쓰는 REST·서버 시각·연결 상태(`.info`)·onDisconnect 까지 의존 목록을 먼저 만들고 시작한다.
+
+### 이관 뒤 브라우저 시험이 실패 대신 시간 초과로만 끝날 때 (2026-11-12)
+- **접근법**: 실패 시험의 화면이 로그인 단계에서 멈췄는지 본다 → `grep -rnE "from ['\"]@/lib/(rtdb|rtdbRest|supabase|supabaseAuth|firebase/client)['\"]" src`로 앱이 실제로 쓰는 입구 모듈을 센다 → `e2e/server.mjs` 별칭 목록과 대조한다 → 빠진 입구마다 같은 이름을 내보내는 시험 모듈(`e2e/rtdb.ts`·`e2e/rtdbRest.ts`·`e2e/supabaseAuth.ts`)을 에뮬레이터에 연결해 정확한 이름(정규식 `^@\/lib\/rtdb$`)으로만 별칭한다 → `e2e/aliasParity.ts`의 `tsc` 검사로 이름 누락을 막는다 → Java 없는 맥에서는 `node e2e/server.mjs` 화면을 Playwright로 열어 모듈 로드·요청 주소(127.0.0.1:19099)만 확인하고 전체 실행은 PR Actions에 맡긴다.
+- **판단 질문**: 운영 모듈에 에뮬레이터 분기를 넣지 않았다(운영 번들 경계). 시험 하네스를 Supabase 로컬 판으로 다시 짜지 않았다 — 원천 Rules(`database.rules.json`)를 에뮬레이터로 화면과 함께 검사하는 기존 계약을 잃는다. `@/lib/supabase`는 별칭하지 않았다 — 위 세 입구를 바꾸면 화면이 불러오는 코드 어디에서도 로드되지 않는다. 시험의 대기 시간을 늘리거나 시험을 건너뛰지 않았고, 로그인 창이 이메일 코드 기본으로 바뀐 것만 시험에서 `비밀번호` 단추를 누르게 맞췄다.
+- **재사용 규칙**: SDK 자리 바꾸기 뒤 시험 하네스 별칭은 "앱이 실제로 import 하는 입구 모듈 목록"과 같아야 한다. ESM 이름 하나만 빠져도 화면 전체가 링크 단계에서 죽고 시험은 실패가 아니라 시간 초과로만 보이므로, 이름 동등성을 `tsc`로 검사해 둔다.
 
 ### 시트 동기화 사용 종료 (2026-10-13)
 

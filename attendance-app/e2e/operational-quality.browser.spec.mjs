@@ -32,7 +32,7 @@ async function seed(request) {
 async function login(page) {
   await page.goto('/manage?view=directory');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await expect(page.getByRole('heading', { name: '전체 학생 명단', exact: true })).toBeVisible();
 }
@@ -150,7 +150,7 @@ for (const kind of ['note', 'visit']) test(`${kind} 목록 구독 실패는 빈 
   if (visit) {
     await page.goto('/attendance');
     await page.getByLabel('이메일', { exact: true }).fill(teacherEmail);
-    await page.getByLabel('비밀번호', { exact: true }).fill(password);
+    await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
     await page.locator('button[type=submit]').click();
     await expect(page.getByRole('button', { name: `${studentName} 출석으로 기록`, exact: true })).toBeVisible();
   } else { await login(page); await page.goto('/attendance?view=check'); }
@@ -236,7 +236,7 @@ test('학생 수정 조회가 지연되면 15초 제한 후 입력을 보존하�
 test('업데이트 안내는 미접수 초안을 유지하고 실제 접수 저장 중에는 새로고침을 막는다', async ({ page, request }, testInfo) => {
   await page.goto('/attendance');
   await page.getByLabel('이메일', { exact: true }).fill(teacherEmail);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await page.getByRole('tab', { name: '특이사항', exact: true }).click();
   const field = page.locator('#teacher-suggestion');

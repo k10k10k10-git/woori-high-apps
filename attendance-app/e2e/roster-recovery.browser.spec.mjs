@@ -34,7 +34,7 @@ async function seed(request) {
 async function login(page, address = email) {
   await page.goto('/manage');
   await page.getByLabel('이메일', { exact: true }).fill(address);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type="submit"]').click();
   await expect(page.locator('.aw-account')).toBeVisible();
   await page.goto('/manage?view=class');
