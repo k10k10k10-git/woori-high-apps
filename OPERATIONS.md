@@ -21,7 +21,7 @@
 
 환경 변수:
 - `highschool-app`(Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`(공개 키). 찬양팀·관리자 비밀번호 재설정 같은 서버 기능은 `SUPABASE_SERVICE_ROLE_KEY`가 필요하다 — **사용자가 직접 넣는다**(에이전트가 비밀 키를 입력하지 않는다).
-- 학생 앱: `attendance-app/.env.production.local`의 같은 두 공개 값과 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`(정적 빌드에 들어감 — 이 파일은 git에 없으므로 **배포하는 사람이 매번 만들어야 한다**. 빠뜨리면 Supabase 연결이 끊기거나 Google 단추가 사라진다).
+- 학생 앱: `attendance-app/.env.production.local`의 같은 두 공개 값, `NEXT_PUBLIC_SUPABASE_GOOGLE=1`, **`NEXT_PUBLIC_TURNSTILE_SITE_KEY`(로그인 로봇 확인 공개 키, 우리틴즈와 같은 위젯 "wooriteens 로그인" — Cloudflare 위젯 허용 주소에 `woori-high.web.app` 등록, 2026-11-12. 위젯 주소 한도 10개를 다 씀)**, 반 바로 선택(데모 방식)을 쓰면 `NEXT_PUBLIC_DEMO_MODE=1`·`NEXT_PUBLIC_DEMO_EMAIL`·`NEXT_PUBLIC_DEMO_PASSWORD`(메인 작업 폴더의 `attendance-app/.env.local`에서 그대로 가져옴 — 공개 번들에 들어가는 공용 계정이라는 위험은 그대로)(정적 빌드에 들어감 — 이 파일은 git에 없으므로 **배포하는 사람이 매번 만들어야 한다**. 빠뜨리면 Supabase 연결이 끊기거나 Google 단추가 사라진다).
 - 고등부 앱 Google 단추: Vercel `highschool-app` Production의 `NEXT_PUBLIC_SUPABASE_GOOGLE=1`(Config 종류, 2026-11-12). 바꾸면 재배포해야 반영된다.
 
 백업·복구(이관 뒤):

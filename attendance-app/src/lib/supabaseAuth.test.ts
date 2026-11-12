@@ -10,7 +10,7 @@ const session = (id: string, extra: Record<string, unknown> = {}): Session => ({
   user: { id, email: `${id.toUpperCase()}@Example.test`, user_metadata: { full_name: "메타 이름" } },
 });
 
-function setup(options: { configured?: boolean } = {}) {
+function setup(options: { configured?: boolean; captcha?: () => Promise<string | undefined> } = {}) {
   let listener: ((event: string, value: Session | null) => void) | undefined;
   const state = { session: null as Session | null };
   const rpc = vi.fn<(name: string) => Promise<{ data: unknown; error: unknown }>>(async () => ({ data: [{ uid: "legacy-uid", email: "a@example.test", name: "홍길동" }], error: null }));
@@ -30,6 +30,7 @@ function setup(options: { configured?: boolean } = {}) {
     client: () => (options.configured === false ? null : client as unknown as SupabaseClient),
     isBrowser: () => true,
     retryDelays: [100, 200],
+    captcha: options.captcha,
   });
   const next = vi.fn<(user: User | null) => void>();
   const error = vi.fn<(error: Error) => void>();
@@ -176,6 +177,19 @@ describe("이메일 로그인", () => {
     });
     await instance.verifyEmailCode("Staff@Example.test", " 123456 ");
     expect(client.auth.verifyOtp).toHaveBeenCalledWith({ email: "staff@example.test", token: "123456", type: "email" });
+  });
+
+  it("운영 로봇 확인: 비밀번호·코드 로그인마다 새 토큰을 받아 붙이고, 거절은 captcha-failed 로 알린다(2026-11-12 회귀)", async () => {
+    let n = 0;
+    const captcha = vi.fn(async () => `token-${++n}`);
+    const { instance, client } = setup({ captcha });
+    await instance.signInWithEmailPassword("Team01@WooriHigh.com", "pw");
+    expect(client.auth.signInWithPassword).toHaveBeenCalledWith({ email: "team01@woorihigh.com", password: "pw", options: { captchaToken: "token-1" } });
+    await instance.sendEmailCode("staff@example.test");
+    expect(client.auth.signInWithOtp).toHaveBeenCalledWith({ email: "staff@example.test", options: expect.objectContaining({ captchaToken: "token-2" }) });
+    client.auth.signInWithPassword.mockResolvedValueOnce({ error: { code: "captcha_failed", status: 400 } });
+    await expect(instance.signInWithEmailPassword("team01@woorihigh.com", "pw")).rejects.toMatchObject({ code: "auth/captcha-failed" });
+    expect(captcha).toHaveBeenCalledTimes(3);
   });
 
   it("메일함이 없는 @woorihigh.com 계정에는 코드를 보내지 않는다", async () => {
