@@ -13,6 +13,19 @@ import {
   saveNewFriend,
 } from "@/features/semester/db";
 import { fetchClassOptions } from "@/features/semester/classOptions";
+import {
+  buildRegistrySubmission,
+  canSendToRegistry,
+  cancelNewFriendRegistry,
+  defaultLedger,
+  deriveRegistryProgress,
+  fetchRegistryStates,
+  fetchYearLedger,
+  submitNewFriendToRegistry,
+  type RegistryStage,
+  type RegistryState,
+  type YearLedger,
+} from "@/features/semester/registryBridge";
 import { useSemesterCanEdit } from "@/features/semester/EditContext";
 import {
   deriveNewFriendRosterProgress,
@@ -41,6 +54,8 @@ interface Props {
   friends: NewFriend[];
   privateMap: Record<string, NewFriendPrivate>;
   canSyncRoster: boolean;
+  /** 우리틴즈 원장 해(2027~)의 "교적에 접수" 권한 — 통합관리자·행정팀·교역자(accessPolicy.canSubmitNewFriendToRegistry). */
+  canSubmitRegistry?: boolean;
   getStorageSid?: (friend: NewFriend) => string;
   getPrivateValue?: (friend: NewFriend) => NewFriendPrivate | undefined;
   getRecordKey?: (friend: NewFriend) => string;
@@ -133,6 +148,7 @@ function NewFriendEditor({
   priv,
   classes,
   canSyncRoster,
+  registryStage,
   onClose,
 }: {
   sid: string;
@@ -140,6 +156,8 @@ function NewFriendEditor({
   priv?: NewFriendPrivate;
   classes: ClassInfo[];
   canSyncRoster: boolean;
+  /** 우리틴즈 원장 해의 교적 단계. 접수·등록된 새친구는 이 화면에서 지우거나 배정을 풀지 않는다. */
+  registryStage?: RegistryStage;
   onClose: () => void;
 }) {
   const { user } = useAuth();
@@ -150,6 +168,10 @@ function NewFriendEditor({
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const rosterLocked = Boolean(friend?.rosterSync);
+  const registryLocked = registryStage === "submitted" || registryStage === "registered";
+  const registryLockText = registryStage === "registered"
+    ? "교적에 등록된 새친구입니다. 학생 정보·반 변경과 삭제는 우리틴즈 교적에서 해 주세요."
+    : "교적 접수 대기 중인 새친구입니다. 먼저 목록에서 교적 접수를 취소해 주세요.";
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setDraft((current) => ({ ...current, [key]: value }));
   const classOptions = useMemo(() => classes
     .filter((item) => item.classKey.startsWith(`${draft.part === "1부" ? "1" : "2"}-${draft.grade}-`))
@@ -206,6 +228,7 @@ function NewFriendEditor({
   async function handleDelete() {
     if (!friend) return;
     if (deleteInput.trim() !== friend.name) return toast("삭제할 학생의 이름을 정확히 입력해 주세요.", "error");
+    if (registryLocked) return toast(registryLockText, "error");
     if (friend.rosterSync && !canSyncRoster) return toast("출석부 연동 삭제는 통합관리자만 할 수 있습니다.", "error");
     setSaving(true);
     try {
@@ -231,6 +254,7 @@ function NewFriendEditor({
 
   async function handleCancelPlacement() {
     if (!friend || (!friend.assignedClassKey && !friend.rosterSync)) return;
+    if (registryLocked) return toast(registryLockText, "error");
     if (friend.rosterSync && !canSyncRoster) return toast("출석부 연동 배정 취소는 통합관리자만 할 수 있습니다.", "error");
     const confirmed = await uiConfirm(
       friend.rosterSync
@@ -271,6 +295,7 @@ function NewFriendEditor({
         </div>
 
         <div className="overlay-panel-body">
+        {registryLocked && <div className="mb-3 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800">{registryLockText}</div>}
         {rosterLocked && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
             출석부 반영이 완료되어 이름·부서·학년·연락처·배정 반은 잠겼습니다. 학생 정보 변경은 학생 출석부에서 처리하고, 여기서는 등록일·담당·목양 메모를 갱신해 주세요. 명단 삭제는 통합관리자가 새친구 기록과 출석부를 함께 정리할 수 있습니다.
@@ -366,6 +391,7 @@ export default function NewFriendsTab({
   friends,
   privateMap,
   canSyncRoster,
+  canSubmitRegistry = false,
   getStorageSid,
   getPrivateValue,
   getRecordKey,
@@ -380,6 +406,11 @@ export default function NewFriendsTab({
   const [classesBySid, setClassesBySid] = useState<Record<string, ClassInfo[]>>({});
   const [classError, setClassError] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [ledgers, setLedgers] = useState<Record<string, YearLedger>>({});
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [registryStates, setRegistryStates] = useState<Record<string, RegistryState>>({});
+  const [registryError, setRegistryError] = useState<string | null>(null);
+  const [registryAttempt, setRegistryAttempt] = useState(0);
   const storageSidFor = (friend: NewFriend) => getStorageSid?.(friend) ?? sid;
   const privateValueFor = (friend: NewFriend) => getPrivateValue?.(friend) ?? privateMap[friend.id];
   const recordKeyFor = (friend: NewFriend) => getRecordKey?.(friend) ?? friend.id;
@@ -387,6 +418,46 @@ export default function NewFriendsTab({
     sid,
     ...friends.map((friend) => getStorageSid?.(friend) ?? sid),
   ])].sort(), [friends, getStorageSid, sid]);
+  const years = useMemo(() => [...new Set(storageSids.map(yearForStorageSid))].sort(), [storageSids]);
+  /** 그 새친구 학기 연도의 원장. 2026 이하는 불러오기 전에도 legacy(지금 화면 그대로), 2027 이후는 모르면 undefined(단추 숨김). */
+  const ledgerFor = (friend: NewFriend): YearLedger | undefined => {
+    const year = yearForStorageSid(storageSidFor(friend));
+    return ledgers[year] ?? (defaultLedger(Number(year)) === "legacy" ? "legacy" : undefined);
+  };
+  const registryIds = useMemo(() => friends
+    .filter((friend) => ledgers[yearForStorageSid(getStorageSid?.(friend) ?? sid)] === "wooriteens")
+    .map((friend) => friend.id).sort(), [friends, ledgers, getStorageSid, sid]);
+  const registryKey = registryIds.join("|");
+
+  useEffect(() => {
+    let active = true;
+    setLedgerError(null);
+    years.forEach((year) => {
+      fetchYearLedger(Number(year)).then((ledger) => {
+        if (active) setLedgers((current) => current[year] === ledger ? current : { ...current, [year]: ledger });
+      }).catch((error: Error) => {
+        if (active) setLedgerError((current) => [current, `${year}: ${error.message}`].filter(Boolean).join(" / "));
+      });
+    });
+    return () => { active = false; };
+  }, [years]);
+
+  useEffect(() => {
+    if (!registryKey) return;
+    let active = true;
+    setRegistryError(null);
+    fetchRegistryStates(registryKey.split("|")).then((states) => {
+      if (active) setRegistryStates(states);
+    }).catch((error: Error) => {
+      if (active) setRegistryError(error.message);
+    });
+    return () => { active = false; };
+  }, [registryKey, registryAttempt]);
+
+  const registryStateFor = (friend: NewFriend) => ledgerFor(friend) === "wooriteens" ? registryStates[friend.id] : undefined;
+  const progressFor = (friend: NewFriend) => ledgerFor(friend) === "wooriteens"
+    ? deriveRegistryProgress(friend, registryStates[friend.id])
+    : deriveNewFriendRosterProgress(friend);
 
   useEffect(() => {
     setClassError(null);
@@ -404,10 +475,11 @@ export default function NewFriendsTab({
   }, [user, storageSids]);
 
   const stageCounts = useMemo(() => friends.reduce<Record<string, number>>((acc, friend) => {
-    const stage = deriveNewFriendStage(friend);
+    const ledger = ledgers[yearForStorageSid(getStorageSid?.(friend) ?? sid)];
+    const stage = ledger === "wooriteens" && registryStates[friend.id]?.stage === "registered" ? "완료" : deriveNewFriendStage(friend);
     acc[stage] = (acc[stage] ?? 0) + 1;
     return acc;
-  }, {}), [friends]);
+  }, {}), [friends, ledgers, registryStates, getStorageSid, sid]);
   const assignmentCandidates = useMemo(
     () => friends.filter(needsClassAssignment),
     [friends],
@@ -457,9 +529,77 @@ export default function NewFriendsTab({
     }
   }
 
+  async function handleRegistrySubmit(friend: NewFriend) {
+    const year = Number(yearForStorageSid(storageSidFor(friend)));
+    const submission = buildRegistrySubmission(friend, privateValueFor(friend) ?? {}, year, koreaDateInputValue());
+    if ("error" in submission) return toast(submission.error, "error");
+    const confirmed = await uiConfirm([
+      `${friend.name}님을 우리틴즈 교적의 새친구 접수 대기에 보냅니다(${formatClassLabel(submission.classKey)}).`,
+      "교적 행정팀이 중복 확인 뒤 등록과 반 배정을 하고, 등록되면 이 표에 반과 첫 출석이 보입니다.",
+      `출생연도 ${submission.birthYear}${submission.birthYearEstimated ? "(학년으로 짐작한 값)" : ""} · 첫 방문 ${submission.firstVisitDate}${submission.firstVisitClamped ? "(교적은 그 해 날짜만 받아 고친 값)" : ""}.`,
+    ].join(" "));
+    if (!confirmed) return;
+    setSyncingId(friend.id);
+    try {
+      const state = await submitNewFriendToRegistry(submission);
+      setRegistryStates((current) => ({ ...current, [friend.id]: state }));
+      toast(state.existing ? "이미 교적에 접수된 새친구입니다." : "교적 새친구 접수 대기에 보냈습니다.", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "교적 접수에 실패했습니다.", "error");
+    } finally {
+      setSyncingId(null);
+      setRegistryAttempt((value) => value + 1);
+    }
+  }
+
+  async function handleRegistryCancel(friend: NewFriend) {
+    const confirmed = await uiConfirm(`${friend.name}님의 교적 접수를 취소할까요? 교적의 접수 대기에서 빠지고, 다시 보낼 수 있습니다.`);
+    if (!confirmed) return;
+    setSyncingId(friend.id);
+    try {
+      const state = await cancelNewFriendRegistry(friend.id);
+      setRegistryStates((current) => ({ ...current, [friend.id]: state }));
+      toast("교적 접수를 취소했습니다.", "success");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "교적 접수 취소에 실패했습니다.", "error");
+    } finally {
+      setSyncingId(null);
+      setRegistryAttempt((value) => value + 1);
+    }
+  }
+
+  /** 우리틴즈 원장 해의 "출석부" 칸: 교적 단계와 접수·취소 단추. */
+  function registryCell(friend: NewFriend, mobile: boolean) {
+    const state = registryStates[friend.id];
+    const busy = syncingId === friend.id;
+    const ready = !validateNewFriendRosterRegistration(friend);
+    if (!state && !registryError) return <span className="text-[11px] text-slate-400">교적 확인 중…</span>;
+    if (state?.stage === "registered") {
+      return <div>
+        <span className="inline-flex whitespace-nowrap rounded-md bg-teal-100 px-2 py-1 text-[11px] font-medium text-teal-700">교적 등록</span>
+        <span className="mt-1 block text-[11px] text-slate-500">{state.classLabel ?? formatClassLabel(state.submittedClassKey)} · {state.firstAttended ? `첫 출석 ${state.firstAttended}` : "첫 출석 전"}</span>
+      </div>;
+    }
+    if (state?.stage === "submitted") {
+      return <div className={mobile ? "flex w-full items-center justify-between gap-2" : ""}>
+        <span className="inline-flex whitespace-nowrap rounded-md bg-sky-100 px-2 py-1 text-[11px] font-medium text-sky-700">교적 접수됨</span>
+        {canSubmitRegistry && <button type="button" className={`btn-secondary whitespace-nowrap px-2 py-1 text-[11px] ${mobile ? "" : "mt-1 block"}`} onClick={() => handleRegistryCancel(friend)} disabled={busy}>{busy ? "취소 중…" : "접수 취소"}</button>}
+      </div>;
+    }
+    if (!ready) return <span className="text-[11px] text-slate-400">{mobile ? "교적 접수 준비 필요" : "준비 필요"}</span>;
+    if (!canSendToRegistry(state)) return <span className="text-[11px] text-slate-400">확인 필요</span>;
+    return <div className={mobile ? "w-full" : ""}>
+      {state?.stage === "dismissed" && <span className="mb-1 block text-[10px] text-slate-500">교적에서 정리됨</span>}
+      {canSubmitRegistry
+        ? <button type="button" className={`btn-primary whitespace-nowrap px-2.5 py-1.5 text-[11px] ${mobile ? "w-full justify-center" : ""}`} onClick={() => handleRegistrySubmit(friend)} disabled={busy || Boolean(registryError)}>{busy ? "보내는 중…" : "교적에 접수"}</button>
+        : <span className="inline-flex rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-700">관리자 확인 대기</span>}
+    </div>;
+  }
+
   return (
     <div>
       {classError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 학생 원장 로드 오류: {classError}</div>}
+      {(ledgerError || registryError) && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 우리틴즈 교적 연동 확인 오류: {[ledgerError, registryError].filter(Boolean).join(" / ")} <button type="button" className="ml-2 underline" onClick={() => setRegistryAttempt((value) => value + 1)}>다시 확인</button></div>}
       {!canEdit && <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500">조회 전용 역할입니다. 민감정보는 표시되지 않으며 새친구 기록을 수정할 수 없습니다.</div>}
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -532,7 +672,7 @@ export default function NewFriendsTab({
         {(!isSearching || filteredRows.length > 0) && <>
         <div className="mt-4 space-y-3 sm:hidden" aria-label="새친구 진행 현황 모바일 목록">
           {filteredRows.map(({ friend, number }) => {
-            const progress = deriveNewFriendRosterProgress(friend);
+            const progress = progressFor(friend);
             const priv = privateValueFor(friend);
             const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
             return (
@@ -562,7 +702,7 @@ export default function NewFriendsTab({
                   </div>
                 )}
                 <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
-                  {friend.rosterSync ? (
+                  {ledgerFor(friend) === "wooriteens" ? registryCell(friend, true) : ledgerFor(friend) === undefined ? <span className="text-xs text-slate-400">원장 확인 중…</span> : friend.rosterSync ? (
                     <span className="text-xs font-semibold text-emerald-700">출석부 반영 완료</span>
                   ) : syncReady ? (
                     canSyncRoster ? <button type="button" className="btn-primary w-full justify-center text-xs" onClick={() => handleSync(friend)} disabled={syncingId === friend.id}>{syncingId === friend.id ? "반영 중…" : "출석부 반영"}</button>
@@ -597,7 +737,7 @@ export default function NewFriendsTab({
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
           {filteredRows.map(({ friend, number }) => {
-            const progress = deriveNewFriendRosterProgress(friend);
+            const progress = progressFor(friend);
             const priv = privateValueFor(friend);
             const syncReady = !validateNewFriendRosterRegistration(friend) && !friend.rosterSync;
             return (
@@ -619,7 +759,7 @@ export default function NewFriendsTab({
                 {canEdit && <td className="px-3 py-3 leading-5 text-slate-600"><span className="block">본인 {formatKoreanPhone(priv?.phone) || "-"}</span><span className="block text-slate-400">보호자 {formatKoreanPhone(priv?.parentPhone) || "-"}</span></td>}
                 <td className="px-3 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${PROGRESS_STYLE[progress]}`}>{progress}</span></td>
                 <td className="px-3 py-3">
-                  {friend.rosterSync ? <div>
+                  {ledgerFor(friend) === "wooriteens" ? registryCell(friend, false) : ledgerFor(friend) === undefined ? <span className="text-[11px] text-slate-400">원장 확인 중…</span> : friend.rosterSync ? <div>
                     <span className="inline-flex rounded-md bg-emerald-50 px-2 py-1 font-medium text-emerald-700">반영 완료</span>
                     <span className="mt-1 block max-w-32 truncate text-[10px] text-emerald-700/70">{friend.rosterSync.studentId}</span>
                   </div> : syncReady ? <>
@@ -646,6 +786,7 @@ export default function NewFriendsTab({
           priv={friend ? privateValueFor(friend) : undefined}
           classes={classesBySid[editorSid] ?? []}
           canSyncRoster={canSyncRoster}
+          registryStage={friend ? registryStateFor(friend)?.stage : undefined}
           onClose={() => setEditing(null)}
         />;
       })()}

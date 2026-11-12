@@ -2,6 +2,11 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/features/semester/classOptions", () => ({ fetchClassOptions: async () => [] }));
+vi.mock("@/features/semester/registryBridge", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/semester/registryBridge")>()),
+  fetchYearLedger: async () => "legacy",
+  fetchRegistryStates: async () => ({}),
+}));
 import NewFriendsTab from "./NewFriendsTab";
 import { SemesterEditProvider } from "@/features/semester/EditContext";
 import type { NewFriend } from "@/features/semester/types";

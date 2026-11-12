@@ -7,7 +7,7 @@ import dynamic from "next/dynamic";
 import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import LoadFailureNotice from "@/components/LoadFailureNotice";
 import { useAuth } from "@/context/AuthContext";
-import { canAccessArea, canAccessSundayTeam, canManageAnnualFinance, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
+import { canAccessArea, canAccessSundayTeam, canManageAnnualFinance, canSubmitNewFriendToRegistry, canWriteStudentRoster, ownSundayTeam } from "@/features/portal/accessPolicy";
 import {
   MINISTRY_AREA_LABELS,
   SUNDAY_MINISTRY_DEFAULT_TEAM,
@@ -260,7 +260,7 @@ function SundayMinistryClientContent({ team, initialTab, workspaceId }: { team?:
             </div>}
             <div role="tabpanel" id="sunday-tab-panel" className="min-h-[360px]">
               <SemesterEditProvider canEdit={canEdit}>
-                {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(roles)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
+                {tab === "새친구" && <NewFriendsTab sid={storageSid} friends={friends} privateMap={{}} canSyncRoster={canWriteStudentRoster(roles)} canSubmitRegistry={canSubmitNewFriendToRegistry(roles)} getStorageSid={storageSidFor} getPrivateValue={privateValueFor} getRecordKey={recordKeyFor} />}
                 {tab === "등록 현황" && <RegistrationStatusTab friends={friends} />}
                 {tab === "처리 대기" && <PendingTab friends={friends} privateValueFor={scopedPrivateValueFor} showPrivate={canEdit} onOpenNewFriends={() => selectTab("새친구")} />}
                 {tab === "출석부" && <AttendanceBookTab key={`attendance:${adminYear}`} year={adminYear} />}
