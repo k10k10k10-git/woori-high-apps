@@ -1,5 +1,6 @@
 import type { Session, SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
 import { getSupabase, isSupabaseConfigured } from "./supabase";
+import { getCaptchaToken } from "./captcha";
 import { isMailboxlessEmail, normalizeEmail } from "./accountEmail";
 
 // Firebase `firebase/auth` 자리(작업 약속 2장). 화면·업무 코드는 `auth.currentUser`,
@@ -91,6 +92,7 @@ export function toAuthError(error: unknown): AuthError {
     otp_disabled: "auth/operation-not-allowed",
     email_provider_disabled: "auth/operation-not-allowed",
     provider_disabled: "auth/operation-not-allowed",
+    captcha_failed: "auth/captcha-failed",
   };
   if (mapped[code]) return new AuthError(mapped[code], "로그인을 완료하지 못했습니다.");
   if (source.name === "AuthRetryableFetchError" || status === 0) return new AuthError("auth/network-request-failed", "네트워크 오류입니다.");
@@ -150,6 +152,8 @@ type Options = {
   schedule?: (task: () => void, ms: number) => unknown;
   /** whoami 실패 시 다시 묻기 전 기다리는 시간. 다 쓰면 오류 관찰자에게 알린다. */
   retryDelays?: number[];
+  /** 로그인 로봇 확인 토큰(운영은 Turnstile). 없으면 토큰 없이 로그인한다. */
+  captcha?: () => Promise<string | undefined>;
 };
 
 export function createSupabaseAuth({
@@ -157,6 +161,7 @@ export function createSupabaseAuth({
   isBrowser = () => typeof window !== "undefined",
   schedule = (task, ms) => setTimeout(task, ms),
   retryDelays = [500, 1500],
+  captcha = async () => undefined,
 }: Options) {
   const entries = new Set<Entry>();
   let started = false;
@@ -317,15 +322,19 @@ export function createSupabaseAuth({
   }
 
   async function signInWithEmailPassword(email: string, password: string): Promise<void> {
-    const { error } = await requireClient().auth.signInWithPassword({ email: normalizeEmail(email), password });
+    const supabase = requireClient();
+    const captchaToken = await captcha();
+    const { error } = await supabase.auth.signInWithPassword({ email: normalizeEmail(email), password, options: captchaToken ? { captchaToken } : undefined });
     if (error) throw toAuthError(error);
   }
 
   async function sendEmailCode(email: string): Promise<void> {
     if (isMailboxlessEmail(email)) throw new AuthError("auth/mailboxless-email", "이 계정은 이메일 코드를 받을 수 없습니다.");
-    const { error } = await requireClient().auth.signInWithOtp({
+    const supabase = requireClient();
+    const captchaToken = await captcha();
+    const { error } = await supabase.auth.signInWithOtp({
       email: normalizeEmail(email),
-      options: { shouldCreateUser: true, emailRedirectTo: redirectUrl() },
+      options: { shouldCreateUser: true, emailRedirectTo: redirectUrl(), ...(captchaToken ? { captchaToken } : {}) },
     });
     if (error) throw toAuthError(error);
   }
@@ -349,7 +358,7 @@ export function isGoogleLoginEnabled(): boolean {
   return process.env.NEXT_PUBLIC_SUPABASE_GOOGLE === "1";
 }
 
-const instance = createSupabaseAuth({ client: () => (isSupabaseConfigured() ? getSupabase() : null) });
+const instance = createSupabaseAuth({ client: () => (isSupabaseConfigured() ? getSupabase() : null), captcha: () => getCaptchaToken() });
 
 export const auth = instance.auth;
 export const onAuthStateChanged = instance.onAuthStateChanged;

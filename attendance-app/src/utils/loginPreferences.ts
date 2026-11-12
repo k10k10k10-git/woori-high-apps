@@ -30,5 +30,6 @@ export function loginErrorMessage(error: unknown): string {
   if (code.includes('signup-disabled')) return '이 이메일로는 새 계정을 만들 수 없습니다. 관리자에게 문의해 주세요.';
   if (code.includes('operation-not-allowed')) return '이 로그인 방법은 지금 쓸 수 없습니다. 다른 방법으로 로그인해 주세요.';
   if (code.includes('not-configured')) return '로그인 설정이 아직 끝나지 않았습니다. 관리자에게 알려 주세요.';
+  if (code.includes('captcha-failed')) return '로봇 확인을 마치지 못했습니다. 새로고침한 뒤 다시 시도해 주세요.';
   return '로그인하지 못했습니다. 잠시 후 다시 시도하거나 관리자에게 문의해 주세요.';
 }
