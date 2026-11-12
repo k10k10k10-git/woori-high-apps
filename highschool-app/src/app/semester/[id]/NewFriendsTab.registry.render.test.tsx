@@ -100,5 +100,9 @@ describe("우리틴즈 원장 해(2027~)의 새친구", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("우리틴즈 교적 연동 확인 오류");
     expect(within(row("접수할친구")).getByText("원장 확인 중…")).toBeInTheDocument();
     expect(within(row("작년친구")).getByRole("button", { name: "출석부 반영" })).toBeInTheDocument();
+    mocks.ledger.mockImplementation(async (year: number) => year >= 2027 ? "wooriteens" : "legacy");
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "다시 확인" }));
+    expect(await within(row("접수할친구")).findByRole("button", { name: "교적에 접수" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 });

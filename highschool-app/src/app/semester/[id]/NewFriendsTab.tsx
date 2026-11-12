@@ -411,6 +411,7 @@ export default function NewFriendsTab({
   const [registryStates, setRegistryStates] = useState<Record<string, RegistryState>>({});
   const [registryError, setRegistryError] = useState<string | null>(null);
   const [registryAttempt, setRegistryAttempt] = useState(0);
+  const [ledgerAttempt, setLedgerAttempt] = useState(0);
   const storageSidFor = (friend: NewFriend) => getStorageSid?.(friend) ?? sid;
   const privateValueFor = (friend: NewFriend) => getPrivateValue?.(friend) ?? privateMap[friend.id];
   const recordKeyFor = (friend: NewFriend) => getRecordKey?.(friend) ?? friend.id;
@@ -440,7 +441,7 @@ export default function NewFriendsTab({
       });
     });
     return () => { active = false; };
-  }, [years]);
+  }, [years, ledgerAttempt]);
 
   useEffect(() => {
     if (!registryKey) return;
@@ -599,7 +600,7 @@ export default function NewFriendsTab({
   return (
     <div>
       {classError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 학생 원장 로드 오류: {classError}</div>}
-      {(ledgerError || registryError) && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 우리틴즈 교적 연동 확인 오류: {[ledgerError, registryError].filter(Boolean).join(" / ")} <button type="button" className="ml-2 underline" onClick={() => setRegistryAttempt((value) => value + 1)}>다시 확인</button></div>}
+      {(ledgerError || registryError) && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 우리틴즈 교적 연동 확인 오류: {[ledgerError, registryError].filter(Boolean).join(" / ")} <button type="button" className="ml-2 underline" onClick={() => { setLedgerAttempt((value) => value + 1); setRegistryAttempt((value) => value + 1); }}>다시 확인</button></div>}
       {!canEdit && <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500">조회 전용 역할입니다. 민감정보는 표시되지 않으며 새친구 기록을 수정할 수 없습니다.</div>}
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
