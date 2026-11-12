@@ -1012,9 +1012,9 @@ for (const [term, label] of [["past", "지난 학기"], ["upcoming", "예정 학
 
 test("로그인 실패는 사람에게 필요한 해결 방법을 표시하고 다시 시도할 수 있다", async ({ page }) => {
   await open(page, "teams", "loginError");
-  // 2026-11-12 Supabase 이관 뒤: "로그인" 단추가 로그인 창을 열고, Google 로그인은 창 안의 단추다.
-  await page.getByRole("button", { name: "로그인", exact: true }).click();
-  await page.getByRole("dialog", { name: "로그인" }).getByRole("button", { name: "Google로 로그인" }).click();
+  // 2026-11-12: Google 로그인이 켜지면 창 없이 "Google로 로그인" 단추 하나만 보인다(사용자 결정).
+  await expect(page.getByRole("button", { name: "로그인", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Google로 로그인" }).click();
   const alert = page.getByRole("alert");
   await expect(alert).toContainText("사이트 주소를 담당자에게 알려 주세요.");
   await expect(alert).not.toContainText(/Firebase|Authentication|Settings|Authorized domains|Synthetic|auth\//);

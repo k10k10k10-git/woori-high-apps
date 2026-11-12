@@ -27,6 +27,12 @@ const FRIENDLY: Record<string, string> = {
 };
 const FALLBACK = "로그인을 완료하지 못했습니다. 다시 시도하고, 계속되면 담당자에게 화면 주소와 발생 시간을 알려 주세요.";
 
+/** 로그인 실패 코드를 사람이 할 일로 바꾼다. 원문(기술 오류)은 보이지 않는다. */
+export function friendlyLoginError(cause: unknown): string {
+  const key = (cause as { code?: string })?.code ?? "";
+  return FRIENDLY[key] ?? FALLBACK;
+}
+
 type Mode = "code" | "password";
 
 export default function LoginDialog({ onClose, signInWithGoogle: google = signInWithGoogle }: {
@@ -55,8 +61,7 @@ export default function LoginDialog({ onClose, signInWithGoogle: google = signIn
       await action();
       onSuccess();
     } catch (cause) {
-      const key = (cause as { code?: string })?.code ?? "";
-      setError(FRIENDLY[key] ?? FALLBACK);
+      setError(friendlyLoginError(cause));
     } finally {
       setBusy(false);
     }
