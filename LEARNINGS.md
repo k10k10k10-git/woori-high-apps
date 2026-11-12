@@ -230,3 +230,8 @@
 - **접근법**: 1→ `/usr/bin/git`의 오류에서 Xcode `CoreDevice`/`Mercury`의 `_XPCTypeBool` 불일치를 확인한다. 2→ 이미 설치된 `/Library/Developer/CommandLineTools/usr/bin/git --version`을 실행한다. 3→ 정상일 때 해당 작업 명령에만 `PATH=/Library/Developer/CommandLineTools/usr/bin:$PATH`를 지정해 Git과 Git을 사용하는 회귀 검사를 실행한다.
 - **판단 질문**: 시스템 `xcode-select` 변경·재설치가 현재 CI 문서 작업에 필요하지 않았다. 설치된 정상 바이너리를 명령 단위로 사용해 사용자 환경과 다른 작업을 보존했다. 이 방법은 도구 로딩 오류에만 적용하며 권한 거부나 게시 제한을 우회하는 수단이 아니다.
 - **재사용 규칙**: Git 실행 실패는 도구 로딩 오류·접근 거부·저장소 오류를 구분하고, 로딩 오류에는 설치된 정상 도구를 작업 명령에만 지정한다.
+
+### gh 다중 계정과 분해형(NFD) 한글 경로에서 PR 올리기 (2026-11-12)
+- **접근법**: push 가 `Permission … denied to <다른 계정>` 403이면 `gh auth status`로 활성 계정을 본다 → 다른 세션이 쓰는 활성 계정을 바꾸지 않고 명령 단위 토큰으로 보낸다: `git -c credential.helper= -c 'credential.helper=!f() { echo username=k10k10k10-git; echo "password=$(gh auth token --user k10k10k10-git)"; }; f' push -u origin HEAD`, `GH_TOKEN=$(gh auth token --user k10k10k10-git) gh pr create …` → 앱의 Auto-fix 는 "gh 활성 계정이 연 PR"에만 켜지므로, 켤 때는 사용자 승인 뒤 `gh auth switch --hostname github.com --user k10k10k10-git` 하고 다른 세션에 되돌리는 명령을 알린다. 이 맥의 워크트리 경로는 NFD(분해형 한글)라 Write/Edit 도구가 NFC로 입력한 `…/고등부/…` 경로를 거부한다 → 셸에서 상대 경로로 파일을 쓰거나 `pwd`가 돌려준 경로를 그대로 쓴다.
+- **판단 질문**: `gh auth switch`를 먼저 하지 않았다 — 같은 맥의 다른 저장소 세션(wooriteens-web)이 그 계정으로 push 중이면 403으로 깨진다. 원격 주소나 git 전역 설정을 바꾸지 않았다. 경로 문제를 피하려고 다른 폴더에서 작업하지 않았다.
+- **재사용 규칙**: 여러 GitHub 계정이 로그인된 맥에서는 활성 계정을 공유 자원으로 보고 명령 단위 토큰을 쓰며, 전환은 사용자 승인 뒤에만 하고 되돌리는 명령을 남긴다.
