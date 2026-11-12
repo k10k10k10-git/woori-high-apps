@@ -35,7 +35,7 @@ test('파일화에서 부서별·반별·목양 연락처 파일을 내려받고
   await page.clock.setFixedTime(new Date(`${year}-03-01T12:00:00+09:00`));
   await page.goto('/files');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await expect(page.getByRole('heading', { name: '파일화', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: '관리자 메뉴', exact: true }).getByRole('link', { name: '파일화', exact: true })).toHaveAttribute('aria-current', 'page');

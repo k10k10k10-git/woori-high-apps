@@ -17,7 +17,7 @@ test.beforeEach(async ({ page, request }) => {
   } })).ok()).toBe(true);
   await page.goto('/pastoral');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await expect(page.getByRole('button', { name: '처리 완료', exact: true })).toBeVisible();
 });

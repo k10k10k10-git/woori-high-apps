@@ -22,7 +22,7 @@ async function seed(request) {
 async function login(page) {
   await page.goto(`/attendance?week=${week().key}`);
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type="submit"]').click();
   await expect(page.getByRole('button', { name: '검증 학생 출석으로 기록' })).toBeVisible();
 }
