@@ -45,19 +45,19 @@ export async function getCaptchaToken(siteKey: string = TURNSTILE_SITE_KEY): Pro
     box.setAttribute('data-login-captcha', '');
     box.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:2147483647;';
     document.body.appendChild(box);
-    let widgetId: string | undefined;
+    const widget: { id?: string } = {};
     let settled = false;
     const finish = (action: () => void) => {
       if (settled) return;
       settled = true;
       window.clearTimeout(timer);
-      try { if (widgetId) api.remove(widgetId); } catch { /* 이미 지워진 위젯 */ }
+      try { if (widget.id) api.remove(widget.id); } catch { /* 이미 지워진 위젯 */ }
       box.remove();
       action();
     };
     const fail = () => finish(() => reject(new CaptchaError('로봇 확인을 마치지 못했습니다.')));
     const timer = window.setTimeout(fail, TIMEOUT_MS);
-    widgetId = api.render(box, {
+    widget.id = api.render(box, {
       sitekey: siteKey,
       language: 'ko',
       appearance: 'interaction-only',
