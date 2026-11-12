@@ -64,7 +64,7 @@ test('관리자 상태는 업무별 의미·대비·상세 동작을 유지하�
   await page.clock.setFixedTime(new Date(`${year}-03-01T12:00:00+09:00`));
   await page.goto('/pastoral?view=friends&week=0-3');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   const backgrounds = [];
   for (const [label, tone] of [['연락 필요', 'danger'], ['출석 입력 확인', 'warning'], ['출석 흐름 확인', 'info'], ['초기 4주 출석 양호', 'success']]) {

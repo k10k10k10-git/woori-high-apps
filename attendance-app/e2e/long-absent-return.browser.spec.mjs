@@ -27,7 +27,7 @@ async function seed(request, teacher = false) {
 async function login(page, email) {
   await page.goto('/attendance');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   if (email === 'return-admin@example.test') {
     await expect(page).toHaveURL(/\/dashboard$/);

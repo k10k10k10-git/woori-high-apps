@@ -20,7 +20,7 @@ test.beforeEach(async ({ page, request }) => {
     classes: { [year]: { '1-1-1': { students: {} } } },
   } })).ok()).toBe(true);
   await page.goto('/pastoral');
-  await page.getByLabel('이메일', { exact: true }).fill(email); await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByLabel('이메일', { exact: true }).fill(email); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await page.getByRole('button', { name: '새친구', exact: true }).click();
   await expect(page.getByRole('button', { name: '합성 새친구 비고 수정' })).toBeEnabled();

@@ -28,7 +28,7 @@ test('전체 연락처 엑셀은 화면 필터·장결과 무관하고 원장을
   const before = await (await request.get(url, { headers: owner })).json();
   await page.clock.setFixedTime(new Date(`${year}-03-01T12:00:00+09:00`));
   await page.goto('/pastoral?view=absence&week=0-3');
-  await page.getByLabel('이메일', { exact: true }).fill(email); await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByLabel('이메일', { exact: true }).fill(email); await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await expect(page.getByRole('button', { name: '연속 결석 전체 연락처 엑셀 내려받기' })).toBeEnabled();
   await page.getByRole('searchbox', { name: '학생 검색' }).fill('없는 학생');

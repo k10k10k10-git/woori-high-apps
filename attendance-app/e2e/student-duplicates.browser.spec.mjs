@@ -26,7 +26,7 @@ async function seed(request) {
 async function login(page) {
   await page.goto('/manage?view=directory');
   await page.getByLabel('이메일', { exact: true }).fill(email);
-  await page.getByRole('button', { name: '비밀번호', exact: true }).click(); await page.getByLabel('비밀번호', { exact: true }).fill(password);
+  await page.getByLabel('비밀번호', { exact: true }).fill(password);
   await page.locator('button[type=submit]').click();
   await expect(page.getByRole('heading', { name: '전체 학생 명단', exact: true })).toBeVisible();
 }
