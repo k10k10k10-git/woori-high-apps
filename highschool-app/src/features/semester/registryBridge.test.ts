@@ -11,6 +11,7 @@ import {
   fetchRegistryStates,
   fetchYearLedger,
   combinedNote,
+  legacyBeforeRoster,
   parseBirth,
   registryErrorText,
   registryReadiness,
@@ -72,6 +73,16 @@ describe("buildRegistrySubmission", () => {
     expect(buildRegistrySubmission({ ...ready, assignedClassKey: "1-4-1" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
     expect(buildRegistrySubmission({ ...ready, id: "bad.id" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
     expect(buildRegistrySubmission({ ...ready, name: "가" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
+  });
+});
+
+describe("2026 등반 전 새친구(연말까지 옛 방식 등반, 2026-11-14 결정)", () => {
+  it("옛 원장 해에서 출석부 반영 전이고 '미등록'이 아니면 센다", () => {
+    expect(legacyBeforeRoster(ready, "legacy")).toBe(true);
+    expect(legacyBeforeRoster({ ...ready, decision: "미등록" }, "legacy")).toBe(false);
+    expect(legacyBeforeRoster({ ...ready, rosterSync: { studentId: "s", classKey: "1-1-3", syncedAt: "2026-11-01T00:00:00Z", syncedBy: "x" } as never }, "legacy")).toBe(false);
+    expect(legacyBeforeRoster(ready, "wooriteens")).toBe(false);
+    expect(legacyBeforeRoster(ready, undefined)).toBe(false);
   });
 });
 

@@ -56,6 +56,14 @@ export interface RegistrySubmission {
   guardianPhone: string | null;
 }
 
+/**
+ * 옛 원장 해(2026까지)의 새친구 가운데 아직 등반(출석부 반영) 전인지. 다리가 그 해를 받지 않으므로(legacy ledger year)
+ * 2026-11-14 결정(우리틴즈 DECISIONS 63)대로 연말까지 '출석부 반영'으로 등반을 마쳐야 2027 진급 때 우리틴즈로 넘어간다. '미등록'은 뺀다.
+ */
+export function legacyBeforeRoster(friend: NewFriend, ledger: YearLedger | undefined): boolean {
+  return ledger === "legacy" && !friend.rosterSync && friend.decision !== "미등록";
+}
+
 /** 우리틴즈로 보낼 수 있는지(2026-11-14): 배정 반이 있고 '미등록'이 아니면 된다. 1·2주차·등록 결정은 우리틴즈에서 이어서 한다. */
 export function registryReadiness(friend: NewFriend): string | null {
   if (friend.decision === "미등록") return "등록하지 않기로 한 새친구는 보낼 수 없습니다.";
