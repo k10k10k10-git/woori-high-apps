@@ -21,6 +21,7 @@ import {
   deriveRegistryProgress,
   fetchRegistryStates,
   fetchYearLedger,
+  legacyBeforeRoster,
   registryReadiness,
   skippedText,
   submitNewFriendToRegistry,
@@ -601,10 +602,13 @@ export default function NewFriendsTab({
     </div>;
   }
 
+  const legacyPending = friends.filter((friend) => legacyBeforeRoster(friend, ledgerFor(friend))).length;
+
   return (
     <div>
       {classError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 학생 원장 로드 오류: {classError}</div>}
       {(ledgerError || registryError) && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 우리틴즈 교적 연동 확인 오류: {[ledgerError, registryError].filter(Boolean).join(" / ")} <button type="button" className="ml-2 underline" onClick={() => { setLedgerAttempt((value) => value + 1); setRegistryAttempt((value) => value + 1); }}>다시 확인</button></div>}
+      {legacyPending > 0 && <div role="note" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">2026년 새친구 {legacyPending}명이 아직 등반(출석부 반영) 전입니다. 12월 31일까지 ‘출석부 반영’으로 등반을 마쳐 주세요. 그래야 2027년 진급 때 우리틴즈로 함께 넘어갑니다. 2027년부터 새친구는 우리틴즈에서 기록합니다.</div>}
       {Object.values(ledgers).includes("wooriteens") && <div role="note" className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">2027년부터 새친구는 우리틴즈 출석부 › 목양 관리 › 새친구에서 기록합니다(1·2주차·등록 보류·메모·등반까지). 여기에 남은 새친구는 배정 반을 고른 뒤 ‘교적에 접수’로 넘겨 주세요. 바나바 칸·메모·연락처도 함께 넘어갑니다.</div>}
       {!canEdit && <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500">조회 전용 역할입니다. 민감정보는 표시되지 않으며 새친구 기록을 수정할 수 없습니다.</div>}
 
