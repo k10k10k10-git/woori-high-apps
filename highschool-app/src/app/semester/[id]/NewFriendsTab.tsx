@@ -21,6 +21,8 @@ import {
   deriveRegistryProgress,
   fetchRegistryStates,
   fetchYearLedger,
+  registryReadiness,
+  skippedText,
   submitNewFriendToRegistry,
   type RegistryStage,
   type RegistryState,
@@ -536,6 +538,7 @@ export default function NewFriendsTab({
     if ("error" in submission) return toast(submission.error, "error");
     const confirmed = await uiConfirm([
       `${friend.name}님을 우리틴즈 교적의 새친구 접수 대기에 보냅니다(${formatClassLabel(submission.classKey)}).`,
+      "바나바 담당·인도자·신급·지인·1·2주차·비고 메모·연락처도 함께 넘어가고, 1·2주차·등록 결정은 우리틴즈 새친구 화면에서 이어서 합니다.",
       "교적 행정팀이 중복 확인 뒤 등록과 반 배정을 하고, 등록되면 이 표에 반과 첫 출석이 보입니다.",
       `출생연도 ${submission.birthYear}${submission.birthYearEstimated ? "(학년으로 짐작한 값)" : ""} · 첫 방문 ${submission.firstVisitDate}${submission.firstVisitClamped ? "(교적은 그 해 날짜만 받아 고친 값)" : ""}.`,
     ].join(" "));
@@ -544,7 +547,8 @@ export default function NewFriendsTab({
     try {
       const state = await submitNewFriendToRegistry(submission);
       setRegistryStates((current) => ({ ...current, [friend.id]: state }));
-      toast(state.existing ? "이미 교적에 접수된 새친구입니다." : "교적 새친구 접수 대기에 보냈습니다.", "success");
+      const skipped = skippedText(state.skipped);
+      toast([state.existing ? "이미 교적에 접수된 새친구라 넘긴 칸을 새 값으로 바꿨습니다." : "교적 새친구 접수 대기에 보냈습니다.", skipped].filter(Boolean).join(" "), "success");
     } catch (error) {
       toast(error instanceof Error ? error.message : "교적 접수에 실패했습니다.", "error");
     } finally {
@@ -573,7 +577,7 @@ export default function NewFriendsTab({
   function registryCell(friend: NewFriend, mobile: boolean) {
     const state = registryStates[friend.id];
     const busy = syncingId === friend.id;
-    const ready = !validateNewFriendRosterRegistration(friend);
+    const ready = !registryReadiness(friend);
     if (!state && !registryError) return <span className="text-[11px] text-slate-400">교적 확인 중…</span>;
     if (state?.stage === "registered") {
       return <div>
@@ -601,6 +605,7 @@ export default function NewFriendsTab({
     <div>
       {classError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 학생 원장 로드 오류: {classError}</div>}
       {(ledgerError || registryError) && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">⚠ 우리틴즈 교적 연동 확인 오류: {[ledgerError, registryError].filter(Boolean).join(" / ")} <button type="button" className="ml-2 underline" onClick={() => { setLedgerAttempt((value) => value + 1); setRegistryAttempt((value) => value + 1); }}>다시 확인</button></div>}
+      {Object.values(ledgers).includes("wooriteens") && <div role="note" className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800">2027년부터 새친구는 우리틴즈 출석부 › 목양 관리 › 새친구에서 기록합니다(1·2주차·등록 보류·메모·등반까지). 여기에 남은 새친구는 배정 반을 고른 뒤 ‘교적에 접수’로 넘겨 주세요. 바나바 칸·메모·연락처도 함께 넘어갑니다.</div>}
       {!canEdit && <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-500">조회 전용 역할입니다. 민감정보는 표시되지 않으며 새친구 기록을 수정할 수 없습니다.</div>}
 
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
