@@ -10,8 +10,11 @@ import {
   deriveRegistryProgress,
   fetchRegistryStates,
   fetchYearLedger,
+  combinedNote,
   parseBirth,
   registryErrorText,
+  registryReadiness,
+  skippedText,
   submitNewFriendToRegistry,
 } from "./registryBridge";
 import type { NewFriend } from "./types";
@@ -43,9 +46,12 @@ describe("parseBirth", () => {
 
 describe("buildRegistrySubmission", () => {
   it("교적 접수 값: 이름·학교를 다듬고, 생년월일이 있으면 그 연도를 쓴다", () => {
-    expect(buildRegistrySubmission(ready, { birth: "2011-05-05", phone: "010-0000-0000" }, 2027, "2027-03-20")).toEqual({
+    expect(buildRegistrySubmission({ ...ready, owner: " 가상 바나바 ", inviter: "친구", faithStep: "학습" },
+      { birth: "2011-05-05", phone: "010-0000-0000", parentPhone: "010-1111-2222", churchFriend: "가상 지인", teamMemo: "가상 비고" }, 2027, "2027-03-20")).toEqual({
       nfId: ready.id, year: 2027, classKey: "1-1-3", name: "새친구", birthYear: 2011, birthDate: "2011-05-05", gender: "여",
       school: "가상고", firstVisitDate: "2027-03-07", birthYearEstimated: false, firstVisitClamped: false,
+      barnabas: "가상 바나바", inviter: "친구", faithStep: "학습", churchFriend: "가상 지인", metFirstOn: "2027-03-07", metSecondOn: "2027-03-14",
+      note: "비고: 가상 비고", studentPhone: "010-0000-0000", guardianPhone: "010-1111-2222",
     });
   });
   it("생년월일이 없으면 학년으로 출생연도를 짐작하고 알린다(2027 고2 → 2010)", () => {
@@ -58,11 +64,28 @@ describe("buildRegistrySubmission", () => {
     expect(buildRegistrySubmission({ ...ready, registeredDate: "2027-04-01" }, {}, 2027, "2027-03-20"))
       .toMatchObject({ firstVisitDate: "2027-03-20", firstVisitClamped: true });
   });
-  it("접수 조건은 옛 출석부 반영과 같고, 보낼 수 없는 값은 이유를 돌려준다", () => {
-    expect(buildRegistrySubmission({ ...ready, decision: "보류" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
+  it("접수 조건(2026-11-14): 배정 반만 있으면 된다 — 1·2주차·등록 결정은 우리틴즈에서 이어서. '미등록'과 잘못된 값은 이유를 돌려준다", () => {
+    expect(buildRegistrySubmission({ ...ready, decision: "미정", week1Date: undefined, week2Date: undefined }, {}, 2027, "2027-03-20")).toMatchObject({ metFirstOn: null, metSecondOn: null });
+    expect(buildRegistrySubmission({ ...ready, decision: "보류" }, {}, 2027, "2027-03-20")).not.toHaveProperty("error");
+    expect(buildRegistrySubmission({ ...ready, decision: "미등록" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
+    expect(registryReadiness({ ...ready, assignedClassKey: undefined })).toMatch(/배정 반/);
     expect(buildRegistrySubmission({ ...ready, assignedClassKey: "1-4-1" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
     expect(buildRegistrySubmission({ ...ready, id: "bad.id" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
     expect(buildRegistrySubmission({ ...ready, name: "가" }, {}, 2027, "2027-03-20")).toHaveProperty("error");
+  });
+});
+
+describe("메모 합치기·옮기지 못한 칸", () => {
+  it("비고·가족사항·교역자 심방을 이름을 붙여 한 메모로, 500자를 넘으면 자른다", () => {
+    expect(combinedNote({})).toBeNull();
+    expect(combinedNote({ teamMemo: " 가상 비고 ", pastoralNotes: "가상 심방" })).toBe("비고: 가상 비고\n교역자 심방: 가상 심방");
+    const long = combinedNote({ familyNotes: "가".repeat(600) });
+    expect(long?.length).toBe(500);
+    expect(long?.endsWith("…")).toBe(true);
+  });
+  it("옮기지 못한 칸 이름을 한국어로", () => {
+    expect(skippedText([])).toBe("");
+    expect(skippedText(["guardian_phone", "faith_step"])).toMatch(/보호자 연락처, 신급/);
   });
 });
 
@@ -93,12 +116,21 @@ describe("RPC", () => {
   it("접수는 서버 인자 이름 그대로 보내고, 서버 오류를 한국어로 바꾼다", async () => {
     const input = buildRegistrySubmission(ready, {}, 2027, "2027-03-20");
     if ("error" in input) throw new Error(input.error);
-    rpc.mockResolvedValueOnce({ data: { stage: "submitted" }, error: null });
-    await expect(submitNewFriendToRegistry(input)).resolves.toEqual({ stage: "submitted" });
-    expect(rpc).toHaveBeenCalledWith("hs_newcomer_submit", {
+    const base = {
       p_nf_id: ready.id, p_year: 2027, p_class_key: "1-1-3", p_name: "새친구", p_birth_year: 2011, p_birth_date: null,
       p_gender: "여", p_school: "가상고", p_first_visit_date: "2027-03-07", p_birth_year_estimated: true,
+    };
+    rpc.mockResolvedValueOnce({ data: { stage: "submitted", skipped: [] }, error: null });
+    await expect(submitNewFriendToRegistry(input)).resolves.toEqual({ stage: "submitted", skipped: [] });
+    expect(rpc).toHaveBeenCalledWith("hs_newcomer_submit_full", {
+      ...base, p_barnabas: null, p_inviter: null, p_faith_step: null, p_church_friend: null, p_met_first_on: "2027-03-07", p_met_second_on: "2027-03-14",
+      p_note: null, p_student_phone: null, p_guardian_phone: null, p_guardian_relation: null,
     });
+    // 0093 적용 전 DB: 새 함수가 없으면 예전 함수로 기본 칸만
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function api.hs_newcomer_submit_full" } });
+    rpc.mockResolvedValueOnce({ data: { stage: "submitted" }, error: null });
+    await expect(submitNewFriendToRegistry(input)).resolves.toEqual({ stage: "submitted" });
+    expect(rpc).toHaveBeenLastCalledWith("hs_newcomer_submit", base);
     rpc.mockResolvedValueOnce({ data: null, error: { message: "class not found" } });
     await expect(submitNewFriendToRegistry(input)).rejects.toThrow(/반 편성/);
     expect(registryErrorText("unexpected")).toMatch(/실패/);
