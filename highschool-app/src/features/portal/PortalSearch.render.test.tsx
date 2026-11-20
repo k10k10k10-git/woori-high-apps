@@ -160,3 +160,26 @@ describe("인물 통합검색 기록 표시", () => {
     expect(screen.queryByText(/별도 인물로 나눴습니다/)).not.toBeInTheDocument();
   });
 });
+
+it("학생 명단 결과를 먼저 표시하고 선택한 학생의 전체 기록을 이어서 연다", () => {
+  render(<PortalSearch />);
+  fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
+  fireEvent.change(screen.getByRole("textbox", { name: "인물 이름" }), { target: { value: "가상학생" } });
+  const [, complete, , roster] = state.subscribe.mock.calls[0];
+  const initial = {
+    classes: { 2026: { "1-2-6": { students: { current: { name: "가상학생" } } } } },
+    attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+  };
+  act(() => roster?.(initial));
+  const result = screen.getByRole("button", { name: /가상학생 학생.*2026년 2학년 6반/ });
+  expect(result).not.toHaveTextContent("관련 기록");
+  expect(screen.getByRole("status")).toHaveTextContent("전체 기록을 불러오는 중");
+  fireEvent.click(result);
+  expect(screen.getByRole("status")).toHaveTextContent("연도별 기록을 불러오는 중");
+  expect(screen.queryByText("기록 없음")).not.toBeInTheDocument();
+  // 추가 근거로 프로필 ID가 바뀌어도 먼저 고른 원장 행으로 같은 학생을 연다.
+  act(() => complete({ ...initial, classes: { 2026: { "1-2-6": { students: { current: { name: "가상학생", personId: "person_student_fixed" } } } } },
+    attendance: { 2026: { "1-2-6": { current: { "2026-11-15": "O" } } } },
+  }));
+  expect(screen.getByRole("tabpanel", { name: "2026년 기록" })).toHaveTextContent("출석 1 · 결석 0");
+});
