@@ -35,7 +35,9 @@ describe("찬양 API 인증과 조회 수명", () => {
   it("15초보다 느린 조회도 포커스와 반복 조회가 취소하지 않는다", async () => {
     vi.useFakeTimers();
     let finish!: (response: Response) => void;
-    const fetcher = vi.fn((_path: string, _options: RequestInit) => new Promise<Response>((resolve) => { finish = resolve; }));
+    const fetcher = vi.fn<(path: string, options: RequestInit) => Promise<Response>>(
+      () => new Promise((resolve) => { finish = resolve; }),
+    );
     vi.stubGlobal("fetch", fetcher);
     const view = { meetings: [] }, onData = vi.fn();
     const subscription = subscribePraiseWorkspace("workspace-a", onData, vi.fn());
