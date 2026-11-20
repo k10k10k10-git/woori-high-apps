@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
-import type { subscribePeopleSearchData } from "./peopleSearchDb";
+import type { readCurrentStudentRoster, subscribePeopleSearchData } from "./peopleSearchDb";
 
 const state = vi.hoisted(() => ({
   auth: {
@@ -10,11 +10,12 @@ const state = vi.hoisted(() => ({
     roles: { semester: "leader", retreat: "none" } as MinistryRoles,
     canSearchOfficialRoster: true,
   },
+  currentRoster: vi.fn<typeof readCurrentStudentRoster>(),
   subscribe: vi.fn<typeof subscribePeopleSearchData>(() => vi.fn()),
 }));
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => state.auth }));
-vi.mock("./peopleSearchDb", () => ({ subscribePeopleSearchData: state.subscribe }));
+vi.mock("./peopleSearchDb", () => ({ subscribePeopleSearchData: state.subscribe, readCurrentStudentRoster: state.currentRoster }));
 
 import PortalSearch from "./PortalSearch";
 
@@ -23,6 +24,7 @@ beforeEach(() => {
   state.auth.roles = { semester: "leader", retreat: "none" };
   state.auth.canSearchOfficialRoster = true;
   vi.clearAllMocks();
+  state.currentRoster.mockImplementation(() => new Promise(() => {}));
 });
 afterEach(cleanup);
 
@@ -89,6 +91,7 @@ describe("인물 통합검색 권한", () => {
     expect(screen.queryByRole("button", { name: "인물 통합검색 열기" })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "k", ctrlKey: true });
     expect(state.subscribe).not.toHaveBeenCalled();
+    expect(state.currentRoster).not.toHaveBeenCalled();
   });
 
   it("검색 중 팀 연결이 생기면 구독을 해제하고 검색창을 닫는다", () => {
@@ -182,4 +185,28 @@ it("학생 명단 결과를 먼저 표시하고 선택한 학생의 전체 기�
     attendance: { 2026: { "1-2-6": { current: { "2026-11-15": "O" } } } },
   }));
   expect(screen.getByRole("tabpanel", { name: "2026년 기록" })).toHaveTextContent("출석 1 · 결석 0");
+});
+
+it("현재 연도 학생을 먼저 찾고, 창을 다시 열면 같은 계정의 결과를 잠시 재사용한다", async () => {
+  state.currentRoster.mockResolvedValueOnce({
+    classes: { 2026: { "1-2-6": { students: { current: { name: "가상학생" } } } } },
+    attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+  });
+  const view = render(<PortalSearch />);
+  const open = () => fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
+  const query = () => fireEvent.change(screen.getByRole("textbox", { name: "인물 이름" }), { target: { value: "가상학생" } });
+  open();
+  query();
+  expect(await screen.findByRole("button", { name: /가상학생 학생/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "인물 검색 닫기" }));
+  open();
+  query();
+  expect(screen.getByRole("button", { name: /가상학생 학생/ })).toBeInTheDocument();
+  expect(state.currentRoster).toHaveBeenCalledOnce();
+  state.auth.user = { uid: "different-admin" };
+  view.rerender(<PortalSearch />);
+  open();
+  query();
+  expect(screen.queryByRole("button", { name: /가상학생 학생/ })).not.toBeInTheDocument();
+  expect(state.currentRoster).toHaveBeenCalledTimes(2);
 });
