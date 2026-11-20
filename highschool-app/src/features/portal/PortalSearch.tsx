@@ -9,6 +9,8 @@ import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searc
 import { subscribePeopleSearchData } from "./peopleSearchDb";
 import styles from "./portalSearch.module.css";
 
+const EMPTY_PROFILES: PersonProfile[] = [];
+
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
   "학적·출석": "bg-blue-50 text-blue-700",
   "학기 운영": "bg-emerald-50 text-emerald-700",
@@ -24,13 +26,14 @@ export default function PortalSearch() {
 
 function PortalSearchContent() {
   const { roles, canSearchOfficialRoster } = useAuth();
-  // 인물검색은 연간 학생·출석·교사 원장 전체를 구독한다. 팀별 권한은
+  // 인물검색은 전체 학생·출석·교사 원장 읽기 권한이 필요하다. 팀별 권한은
   // 서버에서 범위를 제한하는 검색을 갖추기 전까지 여기서 열지 않는다.
   const canSearch = canSearchOfficialRoster;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [profiles, setProfiles] = useState<PersonProfile[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fullProfiles, setFullProfiles] = useState<PersonProfile[]>([]);
+  const [rosterProfiles, setRosterProfiles] = useState<PersonProfile[] | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
@@ -43,6 +46,8 @@ function PortalSearchContent() {
   const includeAttendancePrivate = searchScope(roles) === "write";
   const beginOpen = useCallback(() => {
     if (open) return;
+    setFullProfiles([]);
+    setRosterProfiles(null);
     setOpen(true);
     setLoading(true);
     setError("");
@@ -53,22 +58,31 @@ function PortalSearchContent() {
     let active = true;
     const unsubscribe = subscribePeopleSearchData(
       { includeSemester, includePrivate, includeAttendancePrivate },
-      (data) => { if (active) { setProfiles(buildPeopleProfiles(data)); setLoading(false); } },
+      (data) => {
+        if (!active) return;
+        setFullProfiles(buildPeopleProfiles(data));
+        setLoading(false);
+        setError("");
+      },
       (source, cause) => {
         if (!active) return;
         console.error(`people search subscription failed: ${source}`, cause);
         setError("인물 기록을 불러오지 못했습니다.");
         setLoading(false);
       },
+      (data) => {
+        if (!active) return;
+        setRosterProfiles(buildPeopleProfiles(data));
+      },
     );
     return () => { active = false; unsubscribe(); };
   }, [canSearch, includeAttendancePrivate, includePrivate, includeSemester, open, retry]);
 
   useEffect(() => {
-    if (!open || selectedId) return;
+    if (!open || selectedRecordId) return;
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => window.cancelAnimationFrame(frame);
-  }, [open, selectedId]);
+  }, [open, selectedRecordId]);
 
   useEffect(() => {
     if (!canSearch) return;
@@ -87,13 +101,26 @@ function PortalSearchContent() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [beginOpen, canSearch]);
 
+  const partial = loading || Boolean(error);
+  const profiles = partial ? rosterProfiles ?? EMPTY_PROFILES : fullProfiles;
+  const rosterReady = rosterProfiles !== null;
   const results = useMemo(() => searchPeople(profiles, query), [profiles, query]);
-  const selected = useMemo(() => profiles.find((profile) => profile.id === selectedId) ?? null, [profiles, selectedId]);
+  const selected = useMemo(() => selectedRecordId ? profiles.find((profile) => profile.records.some((record) => record.id === selectedRecordId)) ?? null : null, [profiles, selectedRecordId]);
+
+  function retryLoad() {
+    setError("");
+    setLoading(true);
+    setFullProfiles([]);
+    setRosterProfiles(null);
+    setRetry((value) => value + 1);
+  }
+
+  const retryButton = <button type="button" className="btn-secondary" onClick={retryLoad}>다시 불러오기</button>;
 
   function close() {
     setOpen(false);
     setQuery("");
-    setSelectedId(null);
+    setSelectedRecordId(null);
   }
 
   if (!canSearch) return null;
@@ -108,12 +135,21 @@ function PortalSearchContent() {
       {open && (
         <OverlayShell
           label="인물 통합검색"
-          onClose={selected ? () => setSelectedId(null) : close}
+          onClose={selected ? () => setSelectedRecordId(null) : close}
           variant="fullscreen-mobile"
           panelClassName={`portal-search-dialog ${styles.dialog} ${selected ? styles.detailDialog : ""}`}
         >
             {selected ? (
-              <PersonDetail profile={selected} onBack={() => setSelectedId(null)} onClose={close} />
+              <PersonDetail
+                profile={selected}
+                onBack={() => setSelectedRecordId(null)}
+                onClose={close}
+                pending={partial ? (
+                  <SearchState title={error || "연도별 기록을 불러오는 중입니다…"} description={selected.latestClass ?? ""}>
+                    {error && retryButton}
+                  </SearchState>
+                ) : undefined}
+              />
             ) : (
               <>
                 <header className={styles.searchHeader}>
@@ -132,22 +168,27 @@ function PortalSearchContent() {
                   {query && <button type="button" className={styles.clearButton} onClick={() => { setQuery(""); inputRef.current?.focus(); }} aria-label="검색어 지우기"><X aria-hidden="true" size={17} /></button>}
                   </div>
                 </header>
-                <div className={styles.results} aria-busy={loading}>
-                  {loading ? <SearchState title="고등부 인물 기록을 모으고 있습니다…" description="학적·출석, 학기 사역, 새친구, 수련회 데이터를 연결합니다." />
-                    : error ? <SearchState title={error} description="연결 상태를 확인한 뒤 다시 불러와 주세요."><button type="button" className="btn-secondary" onClick={() => { setError(""); setLoading(true); setRetry((value) => value + 1); }}>다시 불러오기</button></SearchState>
+                <div className={styles.results} aria-busy={loading && (!rosterReady || (query.trim().length >= 2 && results.length === 0))}>
+                  {rosterReady && results.length > 0 && partial && (
+                    <div className="px-3 py-2 text-xs text-slate-600" role="status">
+                      {error ? <>학생 명단 결과를 표시하고 있습니다. {retryButton}</> : "학생 명단 결과 · 전체 기록을 불러오는 중…"}
+                    </div>
+                  )}
+                  {error && results.length === 0 ? <SearchState title={error} description="연결 상태를 확인한 뒤 다시 불러와 주세요.">{retryButton}</SearchState>
+                    : loading && (!rosterReady || (query.trim().length >= 2 && results.length === 0)) ? <SearchState title="고등부 인물 기록을 모으고 있습니다…" description="학적·출석, 학기 사역, 새친구, 수련회 데이터를 연결합니다." />
                     : query.trim().length < 2 ? <SearchState title="찾고 싶은 사람의 이름을 입력하세요" description="두 글자 이상 입력하면 학생·교사·스탭의 기록을 찾습니다." />
                     : results.length > 0 ? results.map((profile) => (
-                      <button key={profile.id} type="button" onClick={() => setSelectedId(profile.id)} className={`${styles.resultRow} group`}>
+                      <button key={profile.id} type="button" onClick={() => setSelectedRecordId(profile.records[0].id)} className={`${styles.resultRow} group`}>
                         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-sm font-extrabold text-emerald-700">{profile.name.slice(0, 1)}</span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
                             <strong className="text-[15px] text-slate-900">{profile.name}</strong>
                             {profile.kinds.map((kind) => <span key={kind} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">{PERSON_KIND_LABEL[kind]}</span>)}
-                            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">동일인 확인 필요</span>}
+                            {!partial && profile.ambiguous && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">동일인 확인 필요</span>}
                           </span>
                           <span className="mt-1 block text-xs text-slate-500">
-                            {profile.latestClass ?? "학적 기록 없음"} · 관련 기록 {profile.records.length}건
-                            {profile.years.length > 0 ? ` · ${profile.years.join(", ")}` : ""}
+                            {profile.latestClass ?? "학적 기록 없음"}
+                            {!partial && ` · 관련 기록 ${profile.records.length}건${profile.years.length ? ` · ${profile.years.join(", ")}` : ""}`}
                           </span>
                         </span>
                         <ArrowRight aria-hidden="true" className="mt-2 shrink-0 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-emerald-600" size={17} weight="bold" />
@@ -176,7 +217,7 @@ function SearchState({ title, description, children }: { title: string; descript
   );
 }
 
-function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; onBack: () => void; onClose: () => void }) {
+function PersonDetail({ profile, onBack, onClose, pending }: { profile: PersonProfile; onBack: () => void; onClose: () => void; pending?: React.ReactNode }) {
   const yearGroups = useMemo(() => groupPersonRecordsByYear(profile.records), [profile.records]);
   const [selectedYear, setSelectedYear] = useState(() => yearGroups[0]?.year ?? "");
   const activeGroup = yearGroups.find((group) => group.year === selectedYear) ?? yearGroups[0];
@@ -189,13 +230,13 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-2xl">{profile.name}</h2>
             {profile.kinds.map((kind) => <span key={kind} className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold text-slate-600">{PERSON_KIND_LABEL[kind]}</span>)}
-            {profile.ambiguous && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">동일인 확인 필요</span>}
+            {!pending && profile.ambiguous && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">동일인 확인 필요</span>}
           </div>
-          <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"} · 연결된 기록 {profile.records.length}건</p>
+          <p className="mt-1 text-xs text-slate-500">{profile.latestClass ?? "학적 기록 없음"}{!pending && ` · 연결된 기록 ${profile.records.length}건`}</p>
         </div>
         <button type="button" onClick={onClose} className={styles.closeButton} aria-label="인물 검색 닫기"><X aria-hidden="true" size={20} /></button>
       </header>
-      <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
+      {pending ?? <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
         {profile.ambiguous && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
             같은 이름의 기록이 여러 묶음으로 표시됩니다. 학년·반과 연락처를 대조해 동일인 여부를 확인해 주세요.
@@ -236,10 +277,7 @@ function PersonDetail({ profile, onBack, onClose }: { profile: PersonProfile; on
         ) : (
           <p className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-xs text-slate-400">표시할 연도별 기록이 없습니다.</p>
         )}
-      </div>
-      <footer className={styles.footer}>
-        표시 내용은 검색 창을 열 때 현재 DB를 조회해 묶은 결과이며, 이 화면에서 데이터는 수정되지 않습니다.
-      </footer>
+      </div>}
     </>
   );
 }

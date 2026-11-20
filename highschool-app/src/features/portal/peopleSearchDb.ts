@@ -1,37 +1,9 @@
-import { get, onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type Unsubscribe } from "@/lib/rtdb";
+import { onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type Unsubscribe } from "@/lib/rtdb";
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { paths as semesterPaths } from "@/features/semester/paths";
 import type { PeopleSearchData } from "./peopleSearch";
 import { applyRealtimeRecordChild } from "./realtimeRecord";
-
-async function read(path: string): Promise<Record<string, unknown>> {
-  const snapshot = await get(ref(db, path));
-  return snapshot.exists() ? snapshot.val() as Record<string, unknown> : {};
-}
-
-export async function loadPeopleSearchData(options: {
-  includeSemester: boolean;
-  includePrivate: boolean;
-  includeAttendancePrivate: boolean;
-}): Promise<PeopleSearchData> {
-  const [classes, attendance, retreats, semesters, retreatsPrivate, semestersPrivate, teacherStaff, teacherSpecial, teacherExtra, teacherAdditional] = await Promise.all([
-    read(paths.classesRoot()),
-    read(paths.attendanceRoot()),
-    read(paths.retreats()),
-    options.includeSemester ? read(semesterPaths.semesters()) : Promise.resolve({}),
-    options.includePrivate ? read(paths.retreatsPrivate()) : Promise.resolve({}),
-    options.includePrivate && options.includeSemester
-      ? read(semesterPaths.semestersPrivate())
-      : Promise.resolve({}),
-    read(paths.teacherStaffRoot()),
-    read(paths.teacherSpecialRoot()),
-    read(paths.teacherExtraRoot()),
-    options.includeAttendancePrivate ? read(paths.teacherAdditionalRoot()) : Promise.resolve({}),
-  ]);
-
-  return { classes, attendance, retreats, semesters, retreatsPrivate, semestersPrivate, teacherStaff, teacherSpecial, teacherExtra, teacherAdditional };
-}
 
 type PeopleSearchSource = keyof PeopleSearchData;
 
@@ -68,6 +40,7 @@ export function subscribePeopleSearchData(
   options: { includeSemester: boolean; includePrivate: boolean; includeAttendancePrivate: boolean },
   callback: (data: PeopleSearchData) => void,
   onError?: (source: PeopleSearchSource, error: Error) => void,
+  onRosterReady?: (data: PeopleSearchData) => void,
 ): Unsubscribe {
   const data: PeopleSearchData = {
     classes: {}, attendance: {}, retreats: {}, semesters: {}, retreatsPrivate: {}, semestersPrivate: {},
@@ -85,7 +58,7 @@ export function subscribePeopleSearchData(
     emitTimer = setTimeout(() => callback({ ...data }), 50);
   };
   const unsubs: Unsubscribe[] = [];
-  const attach = (source: PeopleSearchSource, path: string, enabled = true) => {
+  const attach = (source: PeopleSearchSource, path: string, enabled = true, onReady?: () => void) => {
     if (!enabled) {
       ready.add(source);
       emit();
@@ -94,20 +67,28 @@ export function subscribePeopleSearchData(
     unsubs.push(subscribeRecordChildren(path, (value) => {
       data[source] = value;
       ready.add(source);
+      onReady?.();
       emit();
     }, (error) => onError?.(source, error)));
   };
 
-  attach("classes", paths.classesRoot());
-  attach("attendance", paths.attendanceRoot());
-  attach("retreats", paths.retreats());
-  attach("semesters", semesterPaths.semesters(), options.includeSemester);
-  attach("retreatsPrivate", paths.retreatsPrivate(), options.includePrivate);
-  attach("semestersPrivate", semesterPaths.semestersPrivate(), options.includePrivate && options.includeSemester);
-  attach("teacherStaff", paths.teacherStaffRoot());
-  attach("teacherSpecial", paths.teacherSpecialRoot());
-  attach("teacherExtra", paths.teacherExtraRoot());
-  attach("teacherAdditional", paths.teacherAdditionalRoot(), options.includeAttendancePrivate);
+  // RTDB 호환 계층은 같은 시점의 루트 읽기를 한 RPC로 묶는다.
+  // 학생 명단의 첫 응답을 받은 뒤 나머지 루트를 열어 이름 검색이 큰 자료에 막히지 않게 한다.
+  let detailsStarted = false;
+  attach("classes", paths.classesRoot(), true, () => {
+    if (detailsStarted) return;
+    detailsStarted = true;
+    onRosterReady?.({ ...data });
+    attach("attendance", paths.attendanceRoot());
+    attach("retreats", paths.retreats());
+    attach("semesters", semesterPaths.semesters(), options.includeSemester);
+    attach("retreatsPrivate", paths.retreatsPrivate(), options.includePrivate);
+    attach("semestersPrivate", semesterPaths.semestersPrivate(), options.includePrivate && options.includeSemester);
+    attach("teacherStaff", paths.teacherStaffRoot());
+    attach("teacherSpecial", paths.teacherSpecialRoot());
+    attach("teacherExtra", paths.teacherExtraRoot());
+    attach("teacherAdditional", paths.teacherAdditionalRoot(), options.includeAttendancePrivate);
+  });
 
   return () => {
     if (emitTimer) clearTimeout(emitTimer);
