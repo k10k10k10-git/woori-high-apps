@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 
 const fixture = vi.hoisted(() => ({
-  get: vi.fn(async () => ({ val: () => ({}) })),
+  get: vi.fn(async (): Promise<{ val: () => unknown }> => ({ val: () => ({}) })),
   initial: new Map<string, (snapshot?: { val: () => unknown }) => void>(),
   added: new Map<string, (snapshot: { key: string; val: () => unknown }) => void>(),
 }));
@@ -84,7 +84,7 @@ it("선택한 연도·반·학생의 출석만 읽어 구형 지각도 기존대
 
 it("늦게 도착한 최초 조회가 이미 받은 실시간 출석을 덮지 않는다", async () => {
   let resolveInitial!: (value: { val: () => unknown }) => void;
-  fixture.get.mockReturnValueOnce(new Promise((resolve) => { resolveInitial = resolve; }));
+  fixture.get.mockReturnValueOnce(new Promise<{ val: () => unknown }>((resolve) => { resolveInitial = resolve; }));
   const summary = vi.fn();
   const stop = subscribeStudentAttendance({ year: "2026", classKey: "1-2-6", studentId: "sample" }, summary, vi.fn());
   fixture.initial.get("attendance/2026/1-2-6/sample")?.({ val: () => ({ a: "X" }) });
