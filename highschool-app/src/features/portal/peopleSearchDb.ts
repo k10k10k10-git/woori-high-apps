@@ -2,14 +2,14 @@ import { get, onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type U
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { paths as semesterPaths } from "@/features/semester/paths";
-import type { PeopleSearchData } from "./peopleSearch";
+import { summarizeStudentAttendance, type PeopleSearchData, type StudentRecordSource } from "./peopleSearch";
 import { applyRealtimeRecordChild } from "./realtimeRecord";
 
 type PeopleSearchSource = keyof PeopleSearchData;
 
 function emptySearchData(): PeopleSearchData {
   return {
-    classes: {}, attendance: {}, retreats: {}, semesters: {}, retreatsPrivate: {}, semestersPrivate: {},
+    classes: {}, retreats: {}, semesters: {}, retreatsPrivate: {}, semestersPrivate: {},
     teacherStaff: {}, teacherSpecial: {}, teacherExtra: {}, teacherAdditional: {},
   };
 }
@@ -19,6 +19,30 @@ export async function readCurrentStudentRoster(): Promise<PeopleSearchData> {
   const year = new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Seoul" }).format(new Date());
   const snapshot = await get(ref(db, semesterPaths.classesByYear(year)));
   return { ...emptySearchData(), classes: { [year]: snapshot.val() ?? {} } };
+}
+
+/** 선택한 학생의 첫 출석 응답은 공용 구독 묶음을 기다리지 않는다. 이후 변경은 단건 구독으로 받는다. */
+export function subscribeStudentAttendance(
+  { year, classKey, studentId }: StudentRecordSource,
+  onSummary: (summary: string) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  const target = ref(db, semesterPaths.studentAttendance(year, classKey, studentId));
+  let active = true;
+  let liveReady = false;
+  const emit = (snapshot: { val: () => unknown }) => onSummary(summarizeStudentAttendance(snapshot.val()));
+  // 늦게 반환된 초기 조회가 구독의 최신값이나 접근 오류를 덮지 않는다.
+  void get(target).then((snapshot) => { if (active && !liveReady) emit(snapshot); }, (error) => { if (active && !liveReady) onError(error); });
+  const unsubscribe = onValue(target, (snapshot) => {
+    if (!active) return;
+    liveReady = true;
+    emit(snapshot);
+  }, (error) => {
+    if (!active) return;
+    liveReady = true;
+    onError(error);
+  });
+  return () => { active = false; unsubscribe(); };
 }
 
 /** 초기 전체값 뒤에는 최상위 child 변경분만 반영해 루트 전체 재다운로드를 피한다. */
@@ -59,7 +83,7 @@ export function subscribePeopleSearchData(
   const data = emptySearchData();
   const ready = new Set<PeopleSearchSource>();
   const sources: PeopleSearchSource[] = [
-    "classes", "attendance", "retreats", "semesters", "retreatsPrivate", "semestersPrivate",
+    "classes", "retreats", "semesters", "retreatsPrivate", "semestersPrivate",
     "teacherStaff", "teacherSpecial", "teacherExtra", "teacherAdditional",
   ];
   let emitTimer: ReturnType<typeof setTimeout> | null = null;
@@ -90,7 +114,6 @@ export function subscribePeopleSearchData(
     if (detailsStarted) return;
     detailsStarted = true;
     onRosterReady?.({ ...data });
-    attach("attendance", paths.attendanceRoot());
     attach("retreats", paths.retreats());
     attach("semesters", semesterPaths.semesters(), options.includeSemester);
     attach("retreatsPrivate", paths.retreatsPrivate(), options.includePrivate);
