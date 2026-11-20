@@ -6,10 +6,13 @@ import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, searchScope } from "./accessPolicy";
 import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
-import { subscribePeopleSearchData } from "./peopleSearchDb";
+import { readCurrentStudentRoster, subscribePeopleSearchData } from "./peopleSearchDb";
 import styles from "./portalSearch.module.css";
 
 const EMPTY_PROFILES: PersonProfile[] = [];
+const ROSTER_PREVIEW_MS = 60_000;
+
+type RosterPreview = { expiresAt: number; profiles: PersonProfile[] };
 
 const CATEGORY_STYLE: Record<PersonRecord["category"], string> = {
   "학적·출석": "bg-blue-50 text-blue-700",
@@ -38,6 +41,7 @@ function PortalSearchContent() {
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const recentRoster = useRef<RosterPreview | null>(null);
 
   const includeSemester = canAccessArea("semester", roles);
   const includePrivate = canAccessArea("retreat-admin", roles);
@@ -47,7 +51,8 @@ function PortalSearchContent() {
   const beginOpen = useCallback(() => {
     if (open) return;
     setFullProfiles([]);
-    setRosterProfiles(null);
+    const cached = recentRoster.current;
+    setRosterProfiles(cached && cached.expiresAt > Date.now() ? cached.profiles : null);
     setOpen(true);
     setLoading(true);
     setError("");
@@ -56,22 +61,41 @@ function PortalSearchContent() {
   useEffect(() => {
     if (!open || !canSearch) return;
     let active = true;
+    let entireRosterReady = false;
+    if (!recentRoster.current || recentRoster.current.expiresAt <= Date.now()) {
+      void readCurrentStudentRoster().then((data) => {
+        if (!active || entireRosterReady) return;
+        const profiles = buildPeopleProfiles(data).map((profile) => ({
+          ...profile,
+          records: profile.records.map((record) => ({ ...record, fields: [] })),
+        }));
+        recentRoster.current = { expiresAt: Date.now() + ROSTER_PREVIEW_MS, profiles };
+        setRosterProfiles(profiles);
+      }).catch(() => { /* 현재 연도 조회가 실패해도 전체 검색은 이어 간다. */ });
+    }
     const unsubscribe = subscribePeopleSearchData(
       { includeSemester, includePrivate, includeAttendancePrivate },
       (data) => {
         if (!active) return;
+        entireRosterReady = true;
         setFullProfiles(buildPeopleProfiles(data));
         setLoading(false);
         setError("");
       },
       (source, cause) => {
         if (!active) return;
+        if (source === "classes") {
+          entireRosterReady = true;
+          recentRoster.current = null;
+          setRosterProfiles(null);
+        }
         console.error(`people search subscription failed: ${source}`, cause);
         setError("인물 기록을 불러오지 못했습니다.");
         setLoading(false);
       },
       (data) => {
         if (!active) return;
+        entireRosterReady = true;
         setRosterProfiles(buildPeopleProfiles(data));
       },
     );
@@ -108,6 +132,7 @@ function PortalSearchContent() {
   const selected = useMemo(() => selectedRecordId ? profiles.find((profile) => profile.records.some((record) => record.id === selectedRecordId)) ?? null : null, [profiles, selectedRecordId]);
 
   function retryLoad() {
+    recentRoster.current = null;
     setError("");
     setLoading(true);
     setFullProfiles([]);
@@ -118,6 +143,8 @@ function PortalSearchContent() {
   const retryButton = <button type="button" className="btn-secondary" onClick={retryLoad}>다시 불러오기</button>;
 
   function close() {
+    setFullProfiles([]);
+    setRosterProfiles(null);
     setOpen(false);
     setQuery("");
     setSelectedRecordId(null);

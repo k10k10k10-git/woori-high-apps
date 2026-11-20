@@ -1,4 +1,4 @@
-import { onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type Unsubscribe } from "@/lib/rtdb";
+import { get, onChildAdded, onChildChanged, onChildRemoved, onValue, ref, type Unsubscribe } from "@/lib/rtdb";
 import { db } from "@/lib/firebase";
 import { paths } from "@/lib/paths";
 import { paths as semesterPaths } from "@/features/semester/paths";
@@ -6,6 +6,20 @@ import type { PeopleSearchData } from "./peopleSearch";
 import { applyRealtimeRecordChild } from "./realtimeRecord";
 
 type PeopleSearchSource = keyof PeopleSearchData;
+
+function emptySearchData(): PeopleSearchData {
+  return {
+    classes: {}, attendance: {}, retreats: {}, semesters: {}, retreatsPrivate: {}, semestersPrivate: {},
+    teacherStaff: {}, teacherSpecial: {}, teacherExtra: {}, teacherAdditional: {},
+  };
+}
+
+/** 일반 get은 구독 RPC에 묶이지 않아 홈 화면의 큰 조회와 별개로 응답한다. */
+export async function readCurrentStudentRoster(): Promise<PeopleSearchData> {
+  const year = new Intl.DateTimeFormat("en", { year: "numeric", timeZone: "Asia/Seoul" }).format(new Date());
+  const snapshot = await get(ref(db, semesterPaths.classesByYear(year)));
+  return { ...emptySearchData(), classes: { [year]: snapshot.val() ?? {} } };
+}
 
 /** 초기 전체값 뒤에는 최상위 child 변경분만 반영해 루트 전체 재다운로드를 피한다. */
 function subscribeRecordChildren(
@@ -42,10 +56,7 @@ export function subscribePeopleSearchData(
   onError?: (source: PeopleSearchSource, error: Error) => void,
   onRosterReady?: (data: PeopleSearchData) => void,
 ): Unsubscribe {
-  const data: PeopleSearchData = {
-    classes: {}, attendance: {}, retreats: {}, semesters: {}, retreatsPrivate: {}, semestersPrivate: {},
-    teacherStaff: {}, teacherSpecial: {}, teacherExtra: {}, teacherAdditional: {},
-  };
+  const data = emptySearchData();
   const ready = new Set<PeopleSearchSource>();
   const sources: PeopleSearchSource[] = [
     "classes", "attendance", "retreats", "semesters", "retreatsPrivate", "semestersPrivate",

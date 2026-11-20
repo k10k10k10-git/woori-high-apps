@@ -155,6 +155,10 @@ export const clearAttendance = memoryWrite("clearAttendance");
 export const updateCompletionEntry = memoryWrite("updateCompletionEntry");
 export const describeApplicant = (application: Application) => `${application.bu} ${application.grade}학년 ${application.class}반`;
 
+export async function readCurrentStudentRoster(): Promise<PeopleSearchData> {
+  return { classes: {}, attendance: {}, semesters: {}, retreats: {}, retreatsPrivate: {}, semestersPrivate: {} };
+}
+
 export function subscribePeopleSearchData(_options: unknown, callback: (data: PeopleSearchData) => void, fail?: (source: keyof PeopleSearchData, error: Error) => void) {
   return connect("peopleSearch", "", callback, {
     classes: {
