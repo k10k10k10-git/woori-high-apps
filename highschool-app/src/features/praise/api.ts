@@ -32,19 +32,19 @@ export function subscribePraiseWorkspace(workspaceId: string, onData: (view: Pra
   let paused = false;
   let sequence = 0;
   const refresh = async () => {
-    if (disposed || paused || document.visibilityState === "hidden") return;
-    controller?.abort();
-    controller = new AbortController();
+    if (disposed || paused || controller || document.visibilityState === "hidden") return;
+    const current = new AbortController();
+    controller = current;
     const requestSequence = ++sequence;
     try {
-      const view = await loadPraiseWorkspace(workspaceId, controller.signal);
+      const view = await loadPraiseWorkspace(workspaceId, current.signal);
       if (!disposed && !paused && requestSequence === sequence) onData(view);
     } catch (error) {
       if (!disposed && !paused && requestSequence === sequence && !(error instanceof Error && error.name === "AbortError")) {
         if (error instanceof PraiseApiError && error.code === "server_not_configured") paused = true;
         onError(error instanceof Error ? error : new Error("기록을 불러오지 못했습니다."));
       }
-    }
+    } finally { if (controller === current) controller = null; }
   };
   const onFocus = () => { void refresh(); };
   const timer = setInterval(onFocus, 15_000);
@@ -53,7 +53,7 @@ export function subscribePraiseWorkspace(workspaceId: string, onData: (view: Pra
   void refresh();
   return {
     refresh,
-    pause() { paused = true; sequence++; controller?.abort(); },
+    pause() { paused = true; sequence++; controller?.abort(); controller = null; },
     resume() { paused = false; },
     dispose() { disposed = true; sequence++; controller?.abort(); clearInterval(timer); window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onFocus); },
   };

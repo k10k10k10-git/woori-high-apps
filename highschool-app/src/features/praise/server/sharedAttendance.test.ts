@@ -158,6 +158,22 @@ describe("학기 공통 출석의 조회·미입력·매핑·권한", () => {
     await snapshot(); expect(memory.reads.filter(p => p === "semesters/2026-2/sessions")).toHaveLength(1);
     expect(memory.reads.filter(p => p.startsWith("semesters/2026-2/attendance/"))).toEqual(["semesters/2026-2/attendance/team/session", "semesters/2026-2/attendance/team/next"]);
   });
+  it("한 셀을 저장하기 전에는 해당 학생·회차만 읽고, 다른 회차의 중복 연결도 검증한다", async () => {
+    const state = memory.state!, scope = { meetingId: "m_20260905", personId: "student" };
+    state.meetings.next = { ...state.meetings[scope.meetingId], id: "next", date: "2026-09-12", linkedSessionId: "next" };
+    memory.rows.set(entryPath, { s: "출석" });
+    const shared = await loadSharedAttendance(state, scope);
+    expect(memory.reads.sort()).toEqual([
+      "semesters/2026-2/applications/1_student", entryPath, "semesters/2026-2/meta",
+      "semesters/2026-2/sessions/session", "semesters/2026-2/teams/praise",
+    ]);
+    expect(shared.targets[scope.meetingId].student.raw).toEqual({ s: "출석" });
+    expect(Object.keys(shared.sources[scope.meetingId])).toEqual(["student"]);
+    state.meetings.next.linkedSessionId = "session";
+    const duplicate = await loadSharedAttendance(state, scope);
+    expect(duplicate.sources[scope.meetingId].student.mapping).toBe("invalid");
+    expect(duplicate.targets[scope.meetingId]).toBeUndefined();
+  });
   it("학기 연결 손상이나 알 수 없는 원본 상태는 저장과 등단 자격을 차단한다", async () => {
     memory.state!.attendance.m_20260905.student.status = "PRESENT"; delete memory.state!.meta.teamId;
     let shared = await snapshot(); expect(overlaySharedAttendance(memory.state!, shared).attendance.m_20260905.student.status).toBeNull();

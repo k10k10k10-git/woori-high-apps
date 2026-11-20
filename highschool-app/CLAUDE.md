@@ -281,7 +281,7 @@
 
 `/sunday-ministry/praise`는 `src/features/praise`의 다섯 업무 탭을 사용한다. `src/app/api/praise`의 Node 서버가 Supabase 접근 토큰을 인증 서버에서 확인(만료·로그아웃·삭제 거절)하고 whoami 의 규칙 uid 로 현재 두 축 역할을 확인하고, 조 담당 권한·revision·작업 ID를 검사한 뒤 `praiseOps/{workspaceId}`를 갱신한다. 새 별도 Firebase 로그인 구독을 만들지 않는다. 운영 기간·탭·회차는 `workspace`·`tab`·`meeting` 쿼리로 보존한다.
 
-- `server/supabaseAdmin.ts`는 서버 전용 `SUPABASE_SERVICE_ROLE_KEY`(같은 프로젝트의 service_role 또는 `sb_secret_`)와 `https://<ref>.supabase.co` 주소만 받는다. DB 는 `api.rtdb_admin_get/cas`(규칙 없음, Firebase Admin 과 같은 뜻)로, transaction 은 hash CAS 반복으로 한다. 공개 환경변수·브라우저 번들·원본 export 도구에 키를 넣지 않는다. 서버 자격정보가 없으면 503으로 닫으며 권한 우회 fallback을 만들지 않는다. 얕은 목록(`shallow`)은 지금 전체 읽기 뒤 키만 남기므로 DB 에 얕은 조회 함수가 생기면 그 함수만 바꾼다.
+- `server/supabaseAdmin.ts`는 서버 전용 `SUPABASE_SERVICE_ROLE_KEY`(같은 프로젝트의 service_role 또는 `sb_secret_`)와 `https://<ref>.supabase.co` 주소만 받는다. 일반 읽기는 `api.rtdb_admin_get`, 키 목록은 `api.rtdb_admin_shallow`, 트랜잭션의 첫 버전 읽기는 `api.rtdb_admin_get_hashed`, 실제 변경은 `api.rtdb_admin_cas`를 사용한다. 공개 환경변수·브라우저 번들·원본 export 도구에 키를 넣지 않는다. 서버 자격정보가 없으면 503으로 닫으며 권한 우회 fallback을 만들지 않는다.
 - 찬양 운영 개설은 공통 학기·사역팀 선택을 기본으로 하고 학기에 속하지 않는 별도 기간만 명시 예외로 둔다. 새 운영 공간의 토요 모임은 날짜가 정확히 같고 유일한 학기 회차만 자동 연결한다. 사람은 `rosterLink.applicationKey`를 명시 선택해야 하며 이름·날짜 유사도로 기존 이관본을 자동 연결하지 않는다. 찬양 인물의 기존 `id`·`sourceId`·`kind`는 과거 출결·조·등단 참조이므로 유지한다.
 - `rosterLink`는 배치된 학기 신청과 공식 `classes/{year}` 또는 `teacherStaff/{year}`의 같은 `personId`가 확인된 경우만 저장한다. 이 대조에서 `semesters/{sid}/applications`·`classes`·`teacherStaff`는 읽기 전용이며, 찬양 화면이 명단을 맞추기 위해 해당 원장을 생성·수정하지 않는다. 기존 연결은 해제·교체하지 않고 누락된 동일인 필드만 보완한다.
 - 차단 항목이 남은 `shadow`에서는 관리자의 기존 팀원 `person.reconcile`만 허용한다. 출결·등단·조편성·가져오기·새 팀원 등록과 차단 항목/모드 변경은 계속 잠그며, 일반 `person.save`로 우회하지 못하게 서버가 기존 인물·shadow 상태를 재검증한다. 여러 확정 연결은 한 workspace transaction으로 인물 revision·작업 영수증·한국어 감사를 함께 저장한다.
@@ -301,6 +301,12 @@
 - **접근법**: `server/roster.ts`의 운영 조회 재현 → `teamId` 인덱스 부재 확인 → 학기 공개 신청에서 팀·배치·훈련·공식 인물키 필터링 → 같은 조회를 사용하던 `sharedAttendance.ts` 회귀 검사.
 - **판단 질문**: 명단 오류를 인증 실패로 간주하거나 Rules 변경으로 우회하지 않는다. 조회 실패와 후보 검증 실패는 다른 경계다.
 - **재사용 규칙**: 별도 승인된 배치 보완 후 공식 인물키·부·학년·회차·출결 충돌을 대조한다. 과거 자료 미확인은 `readOnlyBefore`로 보관하고 `historyReview`에 사유를 남긴다.
+
+### 찬양팀 출결의 목록·단건 저장 조회 (2026-11-21)
+
+- **접근법**: 운영 브라우저에서 운영 기간 목록과 상세 응답 시간을 각각 잰다 → 서버가 기간 키와 메타만 받도록 한다 → 저장 전 검증은 선택한 회차와 학생의 원본 셀로 한정한다.
+- **판단 질문**: 단건 응답에서도 전체 찬양팀 원장의 회차·신청 중복 검증과 저장 직전 공통 원장 검증이 남는지 확인한다. 느린 조회는 다음 폴링이 취소하면 화면에 도착할 수 없다.
+- **재사용 규칙**: 읽기 중인 동일 요청은 폴링과 포커스 갱신에서 합치고 화면 이탈과 저장 시작 시 취소한다. 전체 현황·등단과 저장 후 화면은 권한 검증을 거친 전체 결과를 사용한다.
 
 수동 조 담당은 원본과 동일하게 활동 중인 스탭 전체를 허용한다. `groupStaffCapable`은 원본 참고 정보이며 로그인 권한이 아니다. 조·등단 보드의 드래그와 키보드/터치 선택은 같은 함수를 사용하며 위치 이동·제거 후 줄별 순번을 다시 매긴다.
 

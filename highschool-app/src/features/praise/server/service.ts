@@ -52,15 +52,13 @@ export async function listPraise(actor: PraiseActor) {
   requirePraiseAccess(actor);
   const ids = await listWorkspaceIds();
   const workspaces: PraiseMeta[] = [];
-  // 학기별 원장 대신 작은 meta 노드만 조회한다.
-  for (const id of ids) {
-    let meta;
-    try {
-      meta = await getPraiseAdmin().database.get(praisePaths.metadata(id)) as PraiseMeta | null;
-    } catch {
-      throw praiseUnavailable("workspace_list_unavailable");
-    }
-    if (meta?.id === id && canAccessTeam("praise", actor.roles, actor.teamMemberships, meta.semesterId)) workspaces.push(meta);
+  // 학기별 원장 대신 작은 meta 노드만 제한 병렬로 조회한다.
+  for (let start = 0; start < ids.length; start += 6) {
+    const batch = await Promise.all(ids.slice(start, start + 6).map(async (id) => {
+      const meta = await getPraiseAdmin().database.get(praisePaths.metadata(id)) as PraiseMeta | null;
+      return meta?.id === id && canAccessTeam("praise", actor.roles, actor.teamMemberships, meta.semesterId) ? meta : null;
+    })).catch(() => { throw praiseUnavailable("workspace_list_unavailable"); });
+    workspaces.push(...batch.filter((meta) => meta !== null));
   }
   return {
     workspaces: workspaces.sort((a, b) =>
@@ -145,10 +143,10 @@ export async function executePraise(
     return { view: await resolvedPraiseView(result, actor), logPending };
   }
   if (command.type === "attendance.set" && (before.meetings[command.meetingId]?.linkedSessionId || before.operations[request.operationId]?.sharedAttendance)) {
-    const shared = await loadSharedAttendance(before);
+    const shared = await loadSharedAttendance(before, { meetingId: command.meetingId, personId: command.personId });
     const result = await executeSharedAttendance(actor, before, command, request.operationId, shared);
-    const logPending = await projectPraiseAudit(result);
-    return { view: await resolvedPraiseView(result, actor), logPending };
+    const [view, logPending] = await Promise.all([resolvedPraiseView(result, actor), projectPraiseAudit(result)]);
+    return { view, logPending };
   }
   if (command.type === "person.save" || command.type === "person.reconcile") {
     requireValue(

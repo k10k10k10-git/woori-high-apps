@@ -57,17 +57,20 @@ export type SharedAttendanceSnapshot = {
   targets: Record<string, Record<string, { semesterId: string; sessionId: string; applicationKey: string; raw: unknown; mappingProof: string; studentId: string; teamId: string; meetingDate: string }>>;
 };
 /** 학기 원장은 서버에서만 읽는다. 비공개 신청·연락처와 다른 팀의 항목은 반환하지 않는다. */
-export async function loadSharedAttendance(state: PraiseState): Promise<SharedAttendanceSnapshot> {
+export async function loadSharedAttendance(state: PraiseState, cell?: { meetingId: string; personId: string }): Promise<SharedAttendanceSnapshot> {
   const snapshot: SharedAttendanceSnapshot = { mappingRevision: sharedMappingRevision(state), overrides: {}, sources: {}, targets: {} };
-  const students = Object.values(state.people).filter(p => p.kind === "STUDENT");
-  for (const m of Object.values(state.meetings)) {
+  const students = Object.values(state.people).filter(p => p.kind === "STUDENT" && (!cell || p.id === cell.personId));
+  const meetings = Object.values(state.meetings).filter(m => !cell || m.id === cell.meetingId);
+  for (const m of meetings) {
     snapshot.sources[m.id] = Object.fromEntries(students.map(p => [p.id, {
       source: "praise", mapping: state.meta.mode === "shadow" ? "shadow" : "unlinked", writable: !m.linkedSessionId && state.meta.mode !== "shadow",
     }]));
   }
   if (state.meta.mode === "shadow") return snapshot;
-  const linked = Object.values(state.meetings).filter(m => m.linkedSessionId);
+  const linked = meetings.filter(m => m.linkedSessionId);
   if (!linked.length) return snapshot;
+  const cellKey = cell ? students[0]?.rosterLink?.applicationKey : undefined;
+  if (cell && !cellKey) return snapshot;
   const sid = state.meta.semesterId, teamId = state.meta.teamId;
   if (!sid || !teamId) {
     for (const m of linked) for (const p of students) {
@@ -80,17 +83,18 @@ export async function loadSharedAttendance(state: PraiseState): Promise<SharedAt
     return snapshot;
   }
   assertPraiseId(sid); assertPraiseId(teamId);
+  const cellSession = cell ? assertPraiseId(linked[0].linkedSessionId!) : undefined;
   const [team, applicationValue, sessionValue, meta] = await Promise.all([
     readSharedPath(paths.team(sid, teamId)),
-    getPraiseAdmin().database.get(paths.applications(sid))
-      .catch(() => { throw praiseUnavailable("shared_attendance_unavailable"); }),
-    readSharedPath(paths.sessions(sid)),
+    readSharedPath(cellKey ? paths.application(sid, assertPraiseId(cellKey)) : paths.applications(sid)),
+    readSharedPath(cellSession ? paths.session(sid, cellSession) : paths.sessions(sid)),
     readSharedPath(paths.semesterMeta(sid)),
   ]);
-  const applications = asRecord(applicationValue), sessions = asRecord(sessionValue);
+  const applications = cellKey ? { [cellKey]: applicationValue } : asRecord(applicationValue);
+  const sessions = cellSession ? { [cellSession]: sessionValue } : asRecord(sessionValue);
   const applicationCounts = new Map<string, number>(), sessionCounts = new Map<string, number>();
   for (const p of Object.values(state.people)) if (p.rosterLink?.applicationKey) applicationCounts.set(p.rosterLink.applicationKey, (applicationCounts.get(p.rosterLink.applicationKey) ?? 0) + 1);
-  for (const m of linked) sessionCounts.set(m.linkedSessionId!, (sessionCounts.get(m.linkedSessionId!) ?? 0) + 1);
+  for (const m of Object.values(state.meetings)) if (m.linkedSessionId) sessionCounts.set(m.linkedSessionId, (sessionCounts.get(m.linkedSessionId) ?? 0) + 1);
   // 회차 목록은 한 번, 필요한 출석 회차만 제한 병렬로 읽는다. 전체 학기 출석을 다운로드하지 않는다.
   for (let start = 0; start < linked.length; start += 6) await Promise.all(linked.slice(start, start + 6).map(async m => {
     const sessionId = assertPraiseId(m.linkedSessionId!);
@@ -98,7 +102,10 @@ export async function loadSharedAttendance(state: PraiseState): Promise<SharedAt
     const uniqueSession = sessionCounts.get(sessionId) === 1;
     const open = sharedSessionOpen(session);
     const rows = team && session.date === m.date && uniqueSession && open
-      ? asRecord(await readSharedPath(paths.attendanceSession(sid, "team", sessionId))) : {};
+      ? cellKey
+        ? { [cellKey]: await readSharedPath(paths.attendanceEntry(sid, "team", sessionId, cellKey)) }
+        : asRecord(await readSharedPath(paths.attendanceSession(sid, "team", sessionId)))
+      : {};
     for (const p of students) {
       const key = p.rosterLink?.applicationKey;
       if (!key) continue;
