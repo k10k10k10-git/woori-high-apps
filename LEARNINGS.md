@@ -250,3 +250,35 @@
 - **접근법**: 1→ `npm run test:platform-db` 가 실패하면 같은 시험 파일을 `origin/main` 작업 폴더에서 돌려 실패 목록을 `comm` 으로 견준다(0073 뒤 main 자체에서 15건이 이미 실패). 2→ 내 변경으로만 생긴 실패는 메시지를 읽는다: 새 keep 함수는 `platform-dbsafety-db.test.cjs` 의 `KEEP_ADDED`, 학생을 참조하는 새 표는 0053 합치기의 `core.student_reference_counts` 가 알아야 한다(모르면 외래 키를 두지 않고 `core.student_merges` 로 따라가게 했다). 3→ 시간 한도(20초) 초과는 다른 세션이 같은 서버를 쓸 때 생긴다 → 큰 가상 자료 넣기는 주일별로 나눠 넣고, 성능 단언은 넉넉한 회귀 신호로 둔다. 4→ 번호는 형제 메모에 먼저 적고 시작한다(이번에 다른 세션이 0077~0081 을 먼저 운영에 적용 → 0074 는 그 뒤 적용, 되돌리기는 뒤 번호부터).
 - **판단 질문**: main 에서도 깨지는 시험을 이 작업에서 고치지 않았다(0073 의 권한 통합 결정에 맞춰 기대값을 바꾸는 일은 그 담당의 범위). 한 번 실패한 무관 시험(attundo, 고등부 앱 렌더 4개)은 따로 다시 돌려 통과를 확인했다.
 - **재사용 규칙**: DB 시험 실패는 "main 에서도 깨지나"부터 가른다. 같은 서버를 쓰는 시험의 큰 자료는 한 문장 수천 행 이하로 나눠 넣는다.
+
+### 외부 스킬 설치와 개발 서버를 함께 다룰 때 (2026-11-10)
+- **접근법**: 1→ 안내된 `npx skills add …` 대신 GitHub 저장소를 tarball 로 격리 폴더에 받아 SKILL.md·스크립트를 끝까지 읽음 2→ 스크립트에서 `child_process`·외부 전송·지정 폴더 밖 쓰기를 grep 으로 확인 3→ 스킬 폴더만 `~/.claude/skills/<이름>` 에 복사(외부 CLI 실행 없음) 4→ 화면을 확인하는 동안에는 `next dev` 를 띄운 채 `npm run build` 를 돌리지 않는다 — 같은 `.next` 를 덮어써 dev 서버가 `Cannot find module './vendor-chunks/…'`·정적 파일 404 로 망가진다. 망가지면 서버를 끄고 `.next` 를 지운 뒤 다시 띄운다.
+- **판단 질문**: npx 설치 도구는 내려받은 코드를 바로 실행하므로 쓰지 않았다. Lucian UX/UI 요소는 대부분 340×390 크기의 시연 장면(가짜 진행 단계 포함)이라 운영 화면에 그대로 넣지 않고, 같은 토큰으로 기존 부품을 다듬었다. 상태가 있는 아이콘(업로드·검색·링크)은 메뉴처럼 실제 상태가 없는 곳에 쓰지 않았다.
+- **재사용 규칙**: 외부 스킬은 "받아서 읽고 → 실행 경로 확인 → 폴더 복사"로 설치하고, dev 서버로 확인하는 동안의 빌드는 서버를 끈 뒤에 한다.
+
+### 플랫폼 이관 PR을 병합한 뒤 자동 검사가 줄줄이 실패할 때 (2026-11-12)
+- **접근법**: 1→ `gh pr checks <번호>`와 `gh run list --branch main`으로 실패한 작업 이름을 모은다 2→ 각 실패를 `gh run view <id> --log-failed | grep -iE "error|fail"`로 첫 오류 줄까지 좁힌다 3→ 로컬에서 같은 시험 하나만 다시 돌려 재현한다(`npx playwright test --config=... -g "<시험 이름>" --project=<하나>`) 4→ 빈 화면이면 실패 결과의 `trace.zip`을 풀어 `grep -o 'pageError[^}]*'`로 브라우저 예외를 읽는다 5→ 원인별로 고치고 전체 묶음을 로컬에서 끝까지 돌린 뒤 PR에 올린다.
+- **판단 질문**: 이관 PR(#123)에서 "변경 분류" 단계가 `git diff --check`(파일 끝 빈 줄)로 실패하자 뒤따르는 품질 검사들이 **실행조차 안 돼** 다른 회귀(합성 하네스의 `process is not defined`, 활동 기록 계약의 import 허용 목록)가 가려져 있었다. 첫 실패만 고치고 끝내지 않고, 분류가 통과한 뒤 새로 드러나는 실패까지 다시 봤다. Firebase 에뮬레이터에 묶인 출석부 브라우저 하네스는 시험을 지우거나 건너뛰게 하지 않고, 실행 시간만 묶은 뒤(`timeout-minutes`) 개편을 별도 작업으로 넘겼다 — 40분 넘게 돌며 Actions 시간을 쓰던 실행 2개는 취소했다.
+- **재사용 규칙**: SDK·플랫폼을 바꾸는 PR은 병합 전에 `git diff --check origin/main`과 Vite·Node로 앱 코드를 직접 싣는 하네스(`e2e/fixtures/*/start.mjs`, `scripts/test-*-rules.mjs`)를 로컬에서 한 번씩 돌린다. Next.js가 빌드 때 바꿔 주는 `process.env.NEXT_PUBLIC_*`는 Vite 하네스에서 `define`으로 채워야 한다.
+
+### git 이 Xcode 오류로 멈췄을 때 — 다른 git 을 감싸다 원본을 덮어쓴 사고 (2026-11-12)
+- **접근법**: 1→ `/usr/bin/git` 이 `xcodebuild -find git` 단계에서 죽으면(macOS 업데이트 뒤 Xcode 와 프레임워크가 안 맞음) 명령마다 `DEVELOPER_DIR=/Library/Developer/CommandLineTools` 를 붙여 Command Line Tools 의 git 을 쓴다 2→ 사용자 터미널은 `sudo xcode-select -s /Library/Developer/CommandLineTools`(사용자가 직접) 또는 Xcode 업데이트로 고친다.
+- **판단 질문**: `ln -sf <Xcode git> ~/bin/git` 으로 링크를 만든 뒤 `cat > ~/bin/git` 로 감싸는 스크립트를 썼더니 **링크를 따라가 Xcode 안의 원본 git 바이너리가 그 스크립트로 덮였고**, 스크립트가 자기 자신을 exec 해 끝없이 돌았다(Xcode 의 libexec/git-core/git·git-upload-pack 등도 같은 파일을 가리키는 링크라 성한 사본이 없었고, Time Machine 로컬 스냅숏도 없었다). Command Line Tools git 으로 넘기는 스크립트로 바꿔 멈춤만 풀었고, 원본 복구는 Xcode 재설치·업데이트 몫으로 남았다.
+- **재사용 규칙**: 감싸는 스크립트를 쓸 자리는 `rm -f` 로 비운 뒤 새 파일로 만든다 — **기존 링크에 `>` 로 쓰지 않는다**. 시스템·앱 번들 안의 실행 파일을 바꾸는 명령은 쓰기 전에 `ls -la` 로 링크인지 확인한다.
+- **보강 (2026-11-12, 0073 작업)**: 같은 증상(`xcode-select: Failed to locate 'git'`)에서 `/Applications/Xcode.app/Contents/Developer/usr/bin/git` 을 **절대 경로로 직접** 부르면 정상 동작했다(`git version 2.50.1`). 감싸는 스크립트나 링크 없이 명령마다 `G=/Applications/Xcode.app/Contents/Developer/usr/bin/git; $G status` 처럼 변수로 쓴다.
+
+### 앱을 다시 열었더니 세션 임시 폴더가 비고, 로컬 Postgres 가 "Unix-domain socket path ... too long" 으로 안 뜰 때 (2026-11-13)
+- **접근법**: 1→ `ls <scratchpad>`로 worktree·Postgres.app·대시보드 스크립트가 모두 사라졌는지 본다(`/private/tmp` 아래라 재시작 때 지워진다. 커밋·원격 브랜치·저장소 밖 메모 폴더만 남는다). 2→ worktree 는 `git worktree add -b <새 브랜치> <scratchpad>/wt-x origin/main` + `ln -s <원래 저장소>/node_modules` 로 다시 만든다. 지워진 worktree 가 아직 그 브랜치를 잡고 있다고 나오므로 같은 브랜치 이름은 쓰지 않는다(`git worktree prune`은 다른 세션 기록까지 건드려 쓰지 않았다). 3→ Postgres.app dmg 는 내려받기 승인을 다시 받고 `codesign --verify --deep --strict` 확인 뒤 풀어서 `pg_ctl -o "-c listen_addresses=127.0.0.1 -p 5432 -c unix_socket_directories= ..."` 로 띄운다 — `-k <scratchpad 경로>`는 경로가 103바이트를 넘어 FATAL 로 꺼진다. 4→ 55445→5432 전달기(`net.createServer` 한 줄 스크립트)를 백그라운드로 다시 띄우고 `psql -p 55445` 로 확인한다. 5→ 대시보드 SQL 스크립트는 이 세션 대화 기록(jsonl)에서 이전 내용을 찾아 다시 쓴다.
+- **판단 질문**: 로컬 시험 없이 스테이징에만 확인하는 길은 기각 — 0084 DB 에 0086 만 얹는(운영과 같은 순서) 시험과 되돌리기 시험은 로컬에서만 안전하게 반복할 수 있다. 소켓 경로를 짧은 `/tmp/x` 로 옮기는 것도 기각 — 다른 세션 Postgres 와 겹칠 수 있고 TCP 만으로 시험 도구(harness.cjs)가 충분하다.
+- **재사용 규칙**: 재시작 뒤에는 "임시 폴더에 있던 것은 전부 없다"고 보고 worktree·DB·스크립트를 새로 만들고, 같은 이름 브랜치·같은 TaskSpace 이름 재사용 여부를 먼저 확인한다.
+
+### 휴대전화 맨 위 줄에서 가운데 글자를 정확히 가운데로 둘 때 — 줄바꿈되는 flex 에서 기준 폭을 박지 않기 (2026-11-19)
+- **접근법**: 1→ Playwright(WebKit `devices['iPhone 14']`·Chromium `isMobile`)로 가운데 요소 중심 − 화면 폭/2 를 재서 어긋남(17.5px)과 원인(왼쪽 테마 120px ↔ 오른쪽 로그아웃 85px)을 숫자로 잡는다 2→ 오른쪽에 `flex: 0 1 120px` 을 주자 360px 에서 로그아웃이 다음 줄로 내려갔다 — `flex-wrap` 의 줄 나누기는 줄어들기 전 기준 폭(flex-basis·min-width)으로 정한다 3→ 양옆에 `flex: 1 1 0; min-width: max-content`, 가운데에 `flex: 0 0 auto` 를 주면 줄 나누기는 내용 폭으로(예전과 같음), 남는 자리는 양옆이 똑같이 나눠 가운데가 정확히 맞는다(자리가 모자라면 한쪽이 내용 폭에 걸려 조금 벗어날 뿐 줄바꿈하지 않음) 4→ 폭 360·375·390·430 × 글자 100·150·200% 에서 겹침·화면 밖을 다시 잰다.
+- **판단 질문**: 사용자가 말한 대로 테마 아이콘을 줄이지 않았다 — 누르는 대상 40px 규칙(`tests/tap-targets.test.cjs`)에 걸린다. 3칸 격자(`1fr auto 1fr`)도 기각 — 글자가 커지면 줄바꿈을 못 해 겹치거나(예전 사고) 화면 밖으로 나간다.
+- **재사용 규칙**: 줄바꿈되는 flex 줄에서 양옆 폭을 맞출 때는 기준 폭을 박지 말고 `flex: 1 1 0` + `min-width: max-content` 로 남는 자리만 나눈다.
+- **보강(같은 날)**: 창을 열 때 제목(`tabIndex -1`)에 준 초점은 크롬에서는 `:focus-visible` 이 아니지만 아이폰 사파리는 테두리를 그린다(제목이 입력 칸처럼 보임) — 누르는 대상이 아닌 제목에만 `outline:none` 을 준다. 사용자가 말한 "옆으로 넘기면 유격"은 크롬·WebKit 어느 쪽에서도 문서 넘침으로 재현되지 않았고, 대신 구역마다 좌우 여백이 12/16/8px 로 달랐다 — 재현이 안 되면 잴 수 있는 차이(여백)를 먼저 맞추고 실제 기기 확인을 남긴다.
+
+### 셸에서 "조건이 맞을 때만 병합" 사슬이 here-doc 뒤 줄바꿈에서 끊겨 조건과 상관없이 병합됨 (2026-11-20)
+- **접근법**: 1→ `git fetch` 후 `M=$(git rev-parse --short origin/main)` 로 지금 main 을 읽는다. 2→ 검사 기준과 다르면 **그 명령에서 바로 끝낸다**: `if [ "$M" != "<검사 기준>" ]; then echo "main moved"; exit 1; fi` 를 한 줄로 두고, 병합(`gh pr merge`)은 반드시 그 뒤 **같은 셸 블록 안에서** 실행한다. 3→ 사슬 중간에 here-doc(`python3 - <<'EOF' … EOF`)이 있으면 `EOF` 줄 뒤의 다음 줄은 `&&` 로 이어지지 않는 **새 명령**이다 — 조건·here-doc·병합을 서로 다른 Bash 호출로 나누는 것이 가장 안전하다. 4→ 이미 잘못 병합됐으면 숨기지 말고 병합된 main 을 `npm run check -- <병합 전 기준>` 으로 바로 검사하고(바뀐 파일이 DB 를 건드리면 전체 검사가 돈다), 결과를 PR 본문에 "병합 뒤 기록"으로 적는다.
+- **판단 질문**: 되돌리기 PR 은 만들지 않았다 — 병합된 main 의 전체 검사(DB 451개 포함)가 통과했고, 함께 들어온 변경(#134·#145)과 바뀐 파일이 겹치지 않았기 때문. 검사가 실패했다면 OPERATIONS.md "되돌리기" 순서(이전 배포로 → 되돌리기 PR)를 따랐을 것. 브랜치를 main 위로 다시 올리는 강제 푸시는 자동 모드에서 거절되므로 `git merge origin/main` 으로 합쳐 보통 푸시로 올렸다(검사 스크립트도 이 방법을 안내한다).
+- **재사용 규칙**: 되돌리기 어려운 명령(병합·배포)의 전제 조건은 here-doc 이 없는 별도 호출에서 `exit 1` 로 멈추게 하고, 병합은 그 다음 호출에서만 한다.
