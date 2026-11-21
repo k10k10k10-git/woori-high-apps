@@ -2,7 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "./accessPolicy";
-import type { readCurrentStudentRoster, subscribePeopleSearchData } from "./peopleSearchDb";
+import type { readCurrentStudentRoster, subscribeStudentAttendance, subscribePeopleSearchData } from "./peopleSearchDb";
 
 const state = vi.hoisted(() => ({
   auth: {
@@ -11,11 +11,12 @@ const state = vi.hoisted(() => ({
     canSearchOfficialRoster: true,
   },
   currentRoster: vi.fn<typeof readCurrentStudentRoster>(),
+  studentAttendance: vi.fn<typeof subscribeStudentAttendance>(),
   subscribe: vi.fn<typeof subscribePeopleSearchData>(() => vi.fn()),
 }));
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => state.auth }));
-vi.mock("./peopleSearchDb", () => ({ subscribePeopleSearchData: state.subscribe, readCurrentStudentRoster: state.currentRoster }));
+vi.mock("./peopleSearchDb", () => ({ subscribePeopleSearchData: state.subscribe, readCurrentStudentRoster: state.currentRoster, subscribeStudentAttendance: state.studentAttendance }));
 
 import PortalSearch from "./PortalSearch";
 
@@ -25,6 +26,7 @@ beforeEach(() => {
   state.auth.canSearchOfficialRoster = true;
   vi.clearAllMocks();
   state.currentRoster.mockImplementation(() => new Promise(() => {}));
+  state.studentAttendance.mockImplementation(() => vi.fn());
 });
 afterEach(cleanup);
 
@@ -164,25 +166,31 @@ describe("인물 통합검색 기록 표시", () => {
   });
 });
 
-it("학생 명단 결과를 먼저 표시하고 선택한 학생의 전체 기록을 이어서 연다", () => {
+it("상세는 학적과 단건 출석부터 표시하고 전체 기록이 도착해도 선택을 유지한다", async () => {
+  state.studentAttendance.mockImplementationOnce((_source, onSummary) => {
+    onSummary("출석 1 · 결석 0");
+    return vi.fn();
+  });
   render(<PortalSearch />);
   fireEvent.click(screen.getByRole("button", { name: "인물 통합검색 열기" }));
   fireEvent.change(screen.getByRole("textbox", { name: "인물 이름" }), { target: { value: "가상학생" } });
   const [, complete, , roster] = state.subscribe.mock.calls[0];
   const initial = {
     classes: { 2026: { "1-2-6": { students: { current: { name: "가상학생" } } } } },
-    attendance: {}, semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
+    semesters: {}, semestersPrivate: {}, retreats: {}, retreatsPrivate: {},
   };
   act(() => roster?.(initial));
   const result = screen.getByRole("button", { name: /가상학생 학생.*2026년 2학년 6반/ });
   expect(result).not.toHaveTextContent("관련 기록");
   expect(screen.getByRole("status")).toHaveTextContent("전체 기록을 불러오는 중");
   fireEvent.click(result);
-  expect(screen.getByRole("status")).toHaveTextContent("연도별 기록을 불러오는 중");
+  expect(screen.getByRole("status")).toHaveTextContent("관련 기록을 불러오는 중");
+  expect(screen.getByRole("tabpanel", { name: "2026년 기록" })).toHaveTextContent("2학년 6반");
+  expect(await screen.findByText("출석 1 · 결석 0")).toBeInTheDocument();
+  expect(state.studentAttendance.mock.calls.map(([source]) => source)).toEqual([{ year: "2026", classKey: "1-2-6", studentId: "current" }]);
   expect(screen.queryByText("기록 없음")).not.toBeInTheDocument();
   // 추가 근거로 프로필 ID가 바뀌어도 먼저 고른 원장 행으로 같은 학생을 연다.
   act(() => complete({ ...initial, classes: { 2026: { "1-2-6": { students: { current: { name: "가상학생", personId: "person_student_fixed" } } } } },
-    attendance: { 2026: { "1-2-6": { current: { "2026-11-15": "O" } } } },
   }));
   expect(screen.getByRole("tabpanel", { name: "2026년 기록" })).toHaveTextContent("출석 1 · 결석 0");
 });

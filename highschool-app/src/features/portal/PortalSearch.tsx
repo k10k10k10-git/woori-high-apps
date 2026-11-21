@@ -5,8 +5,8 @@ import { ArrowLeft, ArrowRight, MagnifyingGlass, X } from "@phosphor-icons/react
 import OverlayShell from "@/components/OverlayShell";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessArea, searchScope } from "./accessPolicy";
-import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord } from "./peopleSearch";
-import { readCurrentStudentRoster, subscribePeopleSearchData } from "./peopleSearchDb";
+import { buildPeopleProfiles, groupPersonRecordsByYear, PERSON_KIND_LABEL, searchPeople, type PersonProfile, type PersonRecord, type StudentRecordSource } from "./peopleSearch";
+import { readCurrentStudentRoster, subscribePeopleSearchData, subscribeStudentAttendance } from "./peopleSearchDb";
 import styles from "./portalSearch.module.css";
 
 const EMPTY_PROFILES: PersonProfile[] = [];
@@ -65,11 +65,12 @@ function PortalSearchContent() {
     if (!recentRoster.current || recentRoster.current.expiresAt <= Date.now()) {
       void readCurrentStudentRoster().then((data) => {
         if (!active || entireRosterReady) return;
-        const profiles = buildPeopleProfiles(data).map((profile) => ({
+        const profiles = buildPeopleProfiles(data);
+        const preview = profiles.map((profile) => ({
           ...profile,
           records: profile.records.map((record) => ({ ...record, fields: [] })),
         }));
-        recentRoster.current = { expiresAt: Date.now() + ROSTER_PREVIEW_MS, profiles };
+        recentRoster.current = { expiresAt: Date.now() + ROSTER_PREVIEW_MS, profiles: preview };
         setRosterProfiles(profiles);
       }).catch(() => { /* 현재 연도 조회가 실패해도 전체 검색은 이어 간다. */ });
     }
@@ -172,9 +173,10 @@ function PortalSearchContent() {
                 onBack={() => setSelectedRecordId(null)}
                 onClose={close}
                 pending={partial ? (
-                  <SearchState title={error || "연도별 기록을 불러오는 중입니다…"} description={selected.latestClass ?? ""}>
+                  <div role="status" className="mb-3 flex flex-wrap items-center gap-2 px-2 text-xs text-slate-600">
+                    {error || "학기·수련회 등 관련 기록을 불러오는 중…"}
                     {error && retryButton}
-                  </SearchState>
+                  </div>
                 ) : undefined}
               />
             ) : (
@@ -263,8 +265,9 @@ function PersonDetail({ profile, onBack, onClose, pending }: { profile: PersonPr
         </div>
         <button type="button" onClick={onClose} className={styles.closeButton} aria-label="인물 검색 닫기"><X aria-hidden="true" size={20} /></button>
       </header>
-      {pending ?? <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
-        {profile.ambiguous && (
+      <div className="flex-1 overflow-y-auto bg-slate-50/70 px-3 py-4 sm:px-6 sm:py-6">
+        {pending}
+        {!pending && profile.ambiguous && (
           <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
             같은 이름의 기록이 여러 묶음으로 표시됩니다. 학년·반과 연락처를 대조해 동일인 여부를 확인해 주세요.
           </div>
@@ -304,7 +307,7 @@ function PersonDetail({ profile, onBack, onClose, pending }: { profile: PersonPr
         ) : (
           <p className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-xs text-slate-400">표시할 연도별 기록이 없습니다.</p>
         )}
-      </div>}
+      </div>
     </>
   );
 }
@@ -329,7 +332,33 @@ function RecordCard({ record }: { record: PersonRecord }) {
             </div>
           ))}
         </dl>
-      ) : <p className="px-4 py-4 text-xs text-slate-400">상세 값이 없습니다.</p>}
+      ) : !record.studentSource && <p className="px-4 py-4 text-xs text-slate-400">상세 값이 없습니다.</p>}
+      {record.studentSource && !record.fields.some((item) => item.label === "주일 출석") && (
+        <StudentAttendance key={record.id} source={record.studentSource} />
+      )}
     </article>
+  );
+}
+
+function StudentAttendance({ source }: { source: StudentRecordSource }) {
+  const { year, classKey, studentId } = source;
+  const [summary, setSummary] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [retry, setRetry] = useState(0);
+
+  useEffect(() => subscribeStudentAttendance(
+    { year, classKey, studentId },
+    (result) => { setSummary(result); setError(false); },
+    () => { setSummary(null); setError(true); },
+  ), [classKey, retry, studentId, year]);
+
+  return (
+    <dl className="border-t border-slate-100 px-4 py-3">
+      <dt className="text-[10px] font-bold text-slate-400">주일 출석</dt>
+      <dd className="mt-0.5 text-xs text-slate-800" aria-live="polite">
+        {error ? <button type="button" className="underline" onClick={() => { setError(false); setRetry((attempt) => attempt + 1); }}>출석 다시 불러오기</button>
+          : summary ?? "불러오는 중…"}
+      </dd>
+    </dl>
   );
 }

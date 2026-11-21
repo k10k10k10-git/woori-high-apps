@@ -12,6 +12,8 @@ export const PERSON_KIND_LABEL: Record<PersonKind, string> = {
   other: "기타",
 };
 
+export type StudentRecordSource = { year: string; classKey: string; studentId: string };
+
 export type PersonRecord = {
   id: string;
   category: "학적·출석" | "학기 운영" | "새친구" | "수련회";
@@ -20,6 +22,7 @@ export type PersonRecord = {
   fields: PersonField[];
   sortKey: string;
   private?: boolean;
+  studentSource?: StudentRecordSource;
 };
 
 export type PersonYearGroup = {
@@ -125,7 +128,7 @@ export type PersonProfile = {
 
 export type PeopleSearchData = {
   classes: Record<string, unknown>;
-  attendance: Record<string, unknown>;
+  attendance?: Record<string, unknown>;
   retreats: Record<string, unknown>;
   semesters: Record<string, unknown>;
   retreatsPrivate: Record<string, unknown>;
@@ -270,7 +273,7 @@ function evidence(input: {
   };
 }
 
-function attendanceCounts(value: unknown) {
+export function summarizeStudentAttendance(value: unknown): string {
   const counts = { O: 0, X: 0 };
   function walk(current: unknown) {
     if (current === "O" || current === "T") counts.O += 1;
@@ -278,7 +281,7 @@ function attendanceCounts(value: unknown) {
     else if (current && typeof current === "object") Object.values(current).forEach(walk);
   }
   walk(value);
-  return counts;
+  return counts.O + counts.X > 0 ? `출석 ${counts.O} · 결석 ${counts.X}` : "기록 없음";
 }
 
 function rosterStatus(color: unknown) {
@@ -334,7 +337,7 @@ function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
         const student = asRecord(studentValue);
         const name = text(student.name);
         if (!name) continue;
-        const counts = attendanceCounts(asRecord(asRecord(asRecord(data.attendance)[year])[classKey])[studentId]);
+        const attendance = asRecord(asRecord(asRecord(data.attendance)[year])[classKey])[studentId];
         const history = fields(
           field("부서", parsed ? `${parsed.buNum}부` : ""),
           field("학년·반", parsed ? `${parsed.grade}학년 ${parsed.classNum}반` : classKey),
@@ -342,7 +345,7 @@ function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
           field("생년월일", student.birth, true), field("학생 연락처", student.phone, true),
           field("보호자 연락처", student.pphone, true), field("주소", student.addr, true),
           field("장기결석", student.jang === true ? "예" : student.jang === false ? "아니오" : ""),
-          field("주일 출석", counts.O + counts.X > 0 ? `출석 ${counts.O} · 결석 ${counts.X}` : "기록 없음"),
+          data.attendance ? field("주일 출석", summarizeStudentAttendance(attendance)) : null,
         );
         const item = evidence({
           name, personId: student.personId, sourceId: sourceIdFor("student", year, studentId, parsed?.buNum), birth: student.birth,
@@ -350,6 +353,7 @@ function buildClassEvidence(data: PeopleSearchData, output: Evidence[]) {
           bu: parsed?.buNum, grade: parsed?.grade, contextKey: `class:${year}`, anchor: true,
           record: {
             id: `class:${year}:${classKey}:${studentId}`, category: "학적·출석", period: `${year}년`,
+            studentSource: { year, classKey, studentId },
             title: parsed ? `${parsed.grade}학년 ${parsed.classNum}반` : classKey, fields: history, sortKey: `${year}-4`,
           },
         });
