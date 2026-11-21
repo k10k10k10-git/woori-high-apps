@@ -32,4 +32,25 @@ describe("찬양 API 인증과 조회 수명", () => {
     subscription.dispose(); expect(signal?.aborted).toBe(true); window.dispatchEvent(new Event("focus")); await vi.advanceTimersByTimeAsync(30_000);
     expect(fetcher).toHaveBeenCalledTimes(1); expect(callback).not.toHaveBeenCalled();
   });
+  it("15초보다 느린 조회도 포커스와 반복 조회가 취소하지 않는다", async () => {
+    vi.useFakeTimers();
+    let finish!: (response: Response) => void;
+    const fetcher = vi.fn<(path: string, options: RequestInit) => Promise<Response>>(
+      () => new Promise((resolve) => { finish = resolve; }),
+    );
+    vi.stubGlobal("fetch", fetcher);
+    const view = { meetings: [] }, onData = vi.fn();
+    const subscription = subscribePraiseWorkspace("workspace-a", onData, vi.fn());
+    await vi.advanceTimersByTimeAsync(16_000);
+    window.dispatchEvent(new Event("focus"));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1].signal?.aborted).toBe(false);
+    finish(new Response(JSON.stringify(view)));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(onData).toHaveBeenCalledExactlyOnceWith(view);
+    window.dispatchEvent(new Event("focus"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    subscription.dispose();
+  });
 });

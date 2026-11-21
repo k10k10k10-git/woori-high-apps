@@ -99,7 +99,6 @@ const FORBIDDEN_KEY = /[.#$\[\]/\u0000-\u001f\u007f]/;
 const ARRAY_KEY = /^(0|[1-9]\d*)$/;
 const INT_KEY = /^-?(0*)\d{1,10}$/;
 /** cas 로 지금 값·hash 만 읽을 때 쓰는 값. md5 16진수와 절대 같지 않다. */
-const PROBE_HASH = "probe:never-a-hash";
 
 function adminPath(path: string): string {
   const parts = path.split("/").filter(Boolean);
@@ -167,10 +166,10 @@ function rpcFailure(error: { code?: unknown }): AdminError {
   return new AdminError(code === "42501" ? "permission_denied" : code === "23514" ? "validation_failed" : "rpc_failed");
 }
 
-function hashed(data: unknown): HashedValue & { committed: boolean } {
+function hashed(data: unknown): HashedValue {
   const record = data && typeof data === "object" && !Array.isArray(data) ? data as Record<string, unknown> : null;
-  if (!record || typeof record.committed !== "boolean" || typeof record.hash !== "string") throw new AdminError("invalid_cas_result");
-  return { committed: record.committed, value: record.value ?? null, hash: record.hash };
+  if (!record || typeof record.hash !== "string" || !Object.hasOwn(record, "value")) throw new AdminError("invalid_hashed_value");
+  return { value: record.value ?? null, hash: record.hash };
 }
 
 function createDatabase(service: SupabaseClient): PraiseAdminDatabase {
@@ -180,25 +179,21 @@ function createDatabase(service: SupabaseClient): PraiseAdminDatabase {
     return data;
   }
   async function rawCas(path: string, expected: string, value: unknown) {
-    return hashed(await rpc("rtdb_admin_cas", { p_path: adminPath(path), p_expected: expected, p_value: storageValue(value) }));
+    const result = await rpc("rtdb_admin_cas", { p_path: adminPath(path), p_expected: expected, p_value: storageValue(value) });
+    const snapshot = hashed(result);
+    const committed = (result as { committed?: unknown }).committed;
+    if (typeof committed !== "boolean") throw new AdminError("invalid_cas_result");
+    return { ...snapshot, committed };
   }
   async function readRaw(path: string) {
-    const result = await rawCas(path, PROBE_HASH, null);
-    if (result.committed) throw new AdminError("unexpected_probe_commit");
-    return result;
+    return hashed(await rpc("rtdb_admin_get_hashed", { p_path: adminPath(path) }));
   }
   return {
     async get(path) {
       return firebaseValue(await rpc("rtdb_admin_get", { p_path: adminPath(path) }));
     },
     async shallow(path) {
-      // 지금은 rtdb_admin_get 결과에서 키만 남긴다(응답에는 키만 싣지만 DB 에서 읽는 양은 전체다).
-      // DB 에 얕은 조회 함수가 생기면 이 함수만 바꾼다.
-      const raw = await rpc("rtdb_admin_get", { p_path: adminPath(path) });
-      if (raw === null || raw === undefined) return null;
-      if (typeof raw !== "object") return raw;
-      const keys = Object.entries(raw as Record<string, unknown>).filter(([, child]) => firebaseValue(child) !== null).map(([key]) => key);
-      return keys.length ? Object.fromEntries(keys.sort(compareKeys).map((key) => [key, true])) : null;
+      return rpc("rtdb_admin_shallow", { p_path: adminPath(path) });
     },
     async transaction(path, update) {
       let current = await readRaw(path);

@@ -20,6 +20,8 @@
 | `rtdb_update(p_patch jsonb)` → `jsonb` | authenticated | Firebase `update(root, patch)` 와 같다. 키는 루트 기준 경로, 값 `null` 은 지우기. 값 안의 `{".sv":"timestamp"}`·`{".sv":{"increment":n}}` 은 서버가 바꾼다. 규칙 `.write`(위에서 아래로 상속)·`.validate`(새 값의 모든 노드와 바뀐 위치의 조상)를 Firebase 와 같은 뜻으로 검사. 거부 `42501 permission_denied:<path>`, 검증 실패 `23514 validation_failed:<path>`. 반환 `{ "ok": true, "change": <id> }` |
 | `rtdb_cas(p_path text, p_expected text, p_value jsonb)` → `jsonb` | authenticated | 트랜잭션 한 번: 지금 hash 가 `p_expected` 면 `update({p_path: p_value})` 와 같은 검사로 쓰고 `{ "committed": true, "value": 새 값, "hash": … }`, 다르면 `{ "committed": false, "value": 지금 값, "hash": … }` |
 | `rtdb_admin_get / rtdb_admin_update / rtdb_admin_cas` (같은 인자) | **service_role 만** | Firebase Admin SDK 처럼 규칙 없이 읽고 쓴다(찬양팀 서버) |
+| `rtdb_admin_shallow(p_path text)` → `jsonb` | **service_role 만** | 객체면 자식 키와 `true`만, 잎이면 그 값, 없으면 `null` |
+| `rtdb_admin_get_hashed(p_path text)` → `jsonb` | **service_role 만** | 서버 트랜잭션 첫 읽기에 사용할 `{value, hash}` |
 
 - **규칙:** `attendance-app/database.rules.json`(고등부 저장소, 지금 운영 Firebase 와 같은 파일)을 **자동 변환**해 SQL 로 만든다(변환기와 생성 결과를 함께 저장소에 둔다). `root`·`data` 는 쓰기 전 값, `newData` 는 쓰기 후 값. `auth != null` 은 로그인 여부, `auth.token.email` 은 Supabase 로그인 이메일(소문자), `now` 는 서버 시각(ms). `.replace(a,b)` 는 Firebase 처럼 **모두** 바꾼다. 원본 규칙에 없는 최상위 노드(예: `praiseOps`)는 Firebase 처럼 거부(관리자 함수만).
 - **비상 정지(0056):** 새 api 함수는 `core.emergency_stop_policy` 에 분류한다(`rtdb_whoami` = keep/identity, 읽기 = stop/sensitive_read, 쓰기 = stop/registry_write, admin_* = stop/registry_write).

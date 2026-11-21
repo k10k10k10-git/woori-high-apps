@@ -88,10 +88,12 @@ describe("Firebase Admin 과 같은 값 모양", () => {
 describe("규칙 없는 서버 DB", () => {
   it("읽기는 rtdb_admin_get, 얕은 목록은 키만 돌려준다", async () => {
     const { database } = admin();
-    mocks.rpc.mockResolvedValue({ data: { b: { deep: 1 }, a: true }, error: null });
+    mocks.rpc.mockResolvedValueOnce({ data: { b: { deep: 1 }, a: true }, error: null });
     expect(await database.get("/semesters/")).toEqual({ a: true, b: { deep: 1 } });
     expect(mocks.rpc).toHaveBeenCalledWith("rtdb_admin_get", { p_path: "semesters" });
+    mocks.rpc.mockResolvedValueOnce({ data: { a: true, b: true }, error: null });
     expect(await database.shallow("semesters")).toEqual({ a: true, b: true });
+    expect(mocks.rpc).toHaveBeenLastCalledWith("rtdb_admin_shallow", { p_path: "semesters" });
     mocks.rpc.mockResolvedValue({ data: null, error: null });
     expect(await database.shallow("semesters")).toBeNull();
   });
@@ -103,24 +105,24 @@ describe("규칙 없는 서버 DB", () => {
   it("transaction 은 지금 값·hash 를 읽고 cas 로 쓰며, 충돌하면 최신 값으로 다시 계산한다", async () => {
     const { database } = admin();
     mocks.rpc
-      .mockResolvedValueOnce({ data: { committed: false, value: { n: 1 }, hash: "h1" }, error: null })
+      .mockResolvedValueOnce({ data: { value: { n: 1 }, hash: "h1" }, error: null })
       .mockResolvedValueOnce({ data: { committed: false, value: { n: 5 }, hash: "h2" }, error: null })
       .mockResolvedValueOnce({ data: { committed: true, value: { n: 6 }, hash: "h3" }, error: null });
     const seen: unknown[] = [];
     const result = await database.transaction("finance/x", (current) => { seen.push(current); return { n: (current as { n: number }).n + 1 }; });
     expect(seen).toEqual([{ n: 1 }, { n: 5 }]);
     expect(result).toEqual({ committed: true, value: { n: 6 } });
-    expect(mocks.rpc.mock.calls[0]).toEqual(["rtdb_admin_cas", { p_path: "finance/x", p_expected: "probe:never-a-hash", p_value: null }]);
+    expect(mocks.rpc.mock.calls[0]).toEqual(["rtdb_admin_get_hashed", { p_path: "finance/x" }]);
     expect(mocks.rpc.mock.calls[1]).toEqual(["rtdb_admin_cas", { p_path: "finance/x", p_expected: "h1", p_value: { n: 2 } }]);
     expect(mocks.rpc.mock.calls[2]).toEqual(["rtdb_admin_cas", { p_path: "finance/x", p_expected: "h2", p_value: { n: 6 } }]);
   });
-  it("updater 가 undefined 를 돌려주면 쓰지 않고, 확인용 읽기가 써져 버리면 오류로 멈춘다", async () => {
+  it("updater 가 undefined 를 돌려주면 조회만 하고, 잘못된 스냅샷은 거절한다", async () => {
     const { database } = admin();
-    mocks.rpc.mockResolvedValueOnce({ data: { committed: false, value: null, hash: "h0" }, error: null });
+    mocks.rpc.mockResolvedValueOnce({ data: { value: null, hash: "h0" }, error: null });
     expect(await database.transaction("a", () => undefined)).toEqual({ committed: false, value: null });
-    expect(mocks.rpc).toHaveBeenCalledOnce();
-    mocks.rpc.mockResolvedValueOnce({ data: { committed: true, value: null, hash: "h0" }, error: null });
-    await expect(database.readHashed("a")).rejects.toMatchObject({ code: "unexpected_probe_commit" });
+    expect(mocks.rpc).toHaveBeenCalledExactlyOnceWith("rtdb_admin_get_hashed", { p_path: "a" });
+    mocks.rpc.mockResolvedValueOnce({ data: { value: null }, error: null });
+    await expect(database.readHashed("a")).rejects.toMatchObject({ code: "invalid_hashed_value" });
   });
   it("서버 함수 거절은 code 만 남기고 원문을 버린다", async () => {
     const { database } = admin();
