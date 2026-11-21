@@ -737,7 +737,7 @@ test("권한 확인 중이거나 조회 오류가 있으면 이전 팀 권한이
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toEqual([]);
   await page.getByRole("button", { name: /다시/ }).click();
   await expect(page.getByRole("heading", { name: "팀 전체 현황" })).toBeVisible();
-  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toContain("applications");
+  await expect.poll(() => page.evaluate(() => window.__NEW_STAFF_QA__.subscriptions)).toContain("applications");
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.retries)).toBe(1);
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes.length)).toBe(0);
 });
