@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useId } from 'react';
 
-type Draft = { scope: 'groups' | 'stage'; dirty: boolean; busy: boolean };
+type Draft = { scope: 'groups' | 'stage' | 'attendance'; dirty: boolean; busy: boolean };
 const drafts = new Map<string, Draft>();
 /** 화면 안 초안만 추적한다. 이름·명단·편집 내용은 브라우저 저장소에 기록하지 않는다. */
 export function confirmPraiseNavigation(scope?: Draft['scope']): boolean {
@@ -10,7 +10,7 @@ export function confirmPraiseNavigation(scope?: Draft['scope']): boolean {
     window.alert('저장이 진행 중입니다. 결과를 확인한 뒤 이동해 주세요.');
     return false;
   }
-  return !affected.some(draft => draft.dirty) || window.confirm('저장하지 않은 편성이 있습니다. 변경 내용을 버리고 이동할까요? 취소하면 계속 편집할 수 있습니다.');
+  return !affected.some(draft => draft.dirty) || window.confirm('저장하지 않은 변경 사항이 있습니다. 변경 내용을 버리고 이동할까요? 취소하면 계속 편집할 수 있습니다.');
 }
 function beforeUnload(event: BeforeUnloadEvent) {
   if ([...drafts.values()].some(draft => draft.dirty || draft.busy)) { event.preventDefault(); event.returnValue = ''; }

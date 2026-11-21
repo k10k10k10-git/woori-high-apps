@@ -635,6 +635,9 @@ export function applyPraiseCommand(
           : "찬양팀 조 편성 초안 저장";
       break;
     }
+    case "attendance.batch":
+      requireValue(false, "여러 명의 출석은 회차 단위로 저장해 주세요.");
+      break;
     case "attendance.set": {
       const m = meetingOf(state, command.meetingId),
         p = state.people[command.personId];

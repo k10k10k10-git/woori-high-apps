@@ -199,6 +199,60 @@ describe("학기 공통 출석의 조회·미입력·매핑·권한", () => {
 });
 
 describe("공통 셀 저장과 감사 복구", () => {
+  async function attendanceBatch() {
+    const first = await command("PRESENT"), second = await command("ABSENT", "other");
+    return parseCommand({ operationId: "batch", command: { type: "attendance.batch", meetingId: first.meetingId, entries: [first, second] } });
+  }
+  it("여러 출결과 영수증을 한 번만 커밋하고 개인별 감사를 보존한다", async () => {
+    const request = await attendanceBatch(), schedule = vi.fn<(work: () => Promise<unknown>) => void>();
+    const before = structuredClone(memory.state!.attendance);
+    const result = await executePraise(actor, "synthetic", request, schedule);
+    expect(memory.writePaths).toEqual(["semesters/2026-2"]);
+    expect(result.view.attendance.m_20260905).toMatchObject({ student: { status: "PRESENT" }, other: { status: "ABSENT" } });
+    expect(memory.state!.attendance).toEqual(before);
+    expect(result.view.audit.filter(event => event.action === "attendance.set")).toHaveLength(2);
+    expect(schedule).toHaveBeenCalledOnce();
+    const otherPath = "semesters/2026-2/attendance/team/session/1_other";
+    store.set(otherPath, { s: "출석", by: "later" });
+    await executePraise(actor, "synthetic", request);
+    expect(store.get(otherPath)).toEqual({ s: "출석", by: "later" });
+    expect(memory.writes).toBe(1);
+    await expect(executePraise(actor, "synthetic", parseCommand({ ...request, command: { ...request.command, entries: [await command()] } })))
+      .rejects.toMatchObject({ code: "operation_conflict" });
+  });
+  it("다른 조가 섞인 요청과 저장 순간에 한 학생이 먼저 수정된 요청을 전부 막는다", async () => {
+    const request = await attendanceBatch();
+    await expect(executePraise(staff, "synthetic", request)).rejects.toMatchObject({ code: "forbidden" });
+    expect(memory.state!.operations.batch).toBeUndefined();
+    const otherPath = "semesters/2026-2/attendance/team/session/1_other";
+    memory.mutateBeforeTransaction = () => { store.set(otherPath, { s: "출석", by: "concurrent" }); };
+    await expect(executePraise(actor, "synthetic", request)).rejects.toMatchObject({ code: "revision_conflict" });
+    expect(memory.writes).toBe(0);
+    expect(store.get(entryPath)).toBeNull();
+    expect(store.get(otherPath)).toEqual({ s: "출석", by: "concurrent" });
+  });
+  it("일괄 응답이 끊겨도 다시 저장할 때 영수증으로만 성공을 복구한다", async () => {
+    const request = await attendanceBatch();
+    memory.failEntryAfterCommit = true;
+    await expect(executePraise(actor, "synthetic", request)).rejects.toMatchObject({ code: "shared_write_pending" });
+    expect(memory.writes).toBe(1);
+    const result = await executePraise(actor, "synthetic", request);
+    expect(result.view.audit.filter(event => event.action === "attendance.set")).toHaveLength(2);
+    expect(memory.writes).toBe(1);
+  });
+  it("미연결 회차의 여러 출결도 기존 원장에 함께 저장하고 삭제·중복 입력을 거절한다", async () => {
+    delete memory.state!.meetings.m_20260905.linkedSessionId;
+    const entries = [{ personId: "student", status: "PRESENT", expectedRevision: 3 }, { personId: "other", status: "ABSENT", expectedRevision: 0 }];
+    const request = { operationId: "local-batch", command: { type: "attendance.batch", meetingId: "m_20260905", entries } };
+    expect(() => parseCommand({ ...request, command: { ...request.command, entries: [entries[0], entries[0]] } })).toThrow(/중복/);
+    expect(() => parseCommand({ ...request, command: { ...request.command, entries: [{ ...entries[0], status: null }] } })).toThrow(/지우기/);
+    await executePraise(actor, "synthetic", parseCommand(request));
+    expect(memory.state!.attendance.m_20260905).toMatchObject({ student: { status: "PRESENT" }, other: { status: "ABSENT" } });
+    const revision = memory.state!.meta.revision;
+    await executePraise(actor, "synthetic", parseCommand(request));
+    expect(memory.state!.meta.revision).toBe(revision);
+    expect(memory.writes).toBe(0);
+  });
   it("원장 한 셀만 저장하고 praise 출결 복제 없이 감사·영수증을 완료한다", async () => {
     const oldAttendance = structuredClone(memory.state!.attendance), cmd = await command();
     const result = await execute(cmd);

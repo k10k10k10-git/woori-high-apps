@@ -8,4 +8,5 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 type Context = { params: Promise<{ workspaceId: string }> };
 export async function GET(request: Request, context: Context) { return praiseHttp(async () => { const actor = await authenticatePraiseRequest(request); return readPraiseView(actor, id((await context.params).workspaceId)); }); }
-export async function POST(request: Request, context: Context) { return praiseHttp(async () => { const actor = await authenticatePraiseRequest(request); return executePraise(actor, id((await context.params).workspaceId), parseCommand(await praiseJson(request))); }); }
+export async function POST(request: Request, context: Context) { return praiseHttp(async () => { const actor = await authenticatePraiseRequest(request); return executePraise(actor, id((await context.params).workspaceId), parseCommand(await praiseJson(request)), after); }); }
+import { after } from "next/server";
