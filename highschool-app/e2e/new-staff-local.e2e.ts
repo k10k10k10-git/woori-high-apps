@@ -1026,6 +1026,27 @@ test("로그인 실패는 사람에게 필요한 해결 방법을 표시하고 �
   await expectNoOverflow(page);
 });
 
+test("찬양팀 여러 명 체크는 즉시 표시되고 출석·결석을 한 요청으로 저장한다", async ({ page }) => {
+  await open(page, "attendance");
+  await page.getByRole("button", { name: "여러 명 체크" }).click();
+  await page.getByRole("button", { name: "현재 목록 미입력 1명 출석 표시" }).click();
+  const pending = page.getByRole("group", { name: "합성학생나 출결" });
+  await expect(pending.getByRole("button", { name: "출석" })).toHaveAttribute("aria-pressed", "true");
+  await pending.getByRole("button", { name: "결석" }).click();
+  await page.getByRole("group", { name: "합성학생가 출결" }).getByRole("button", { name: "결석" }).click();
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([]);
+  await page.getByRole("button", { name: "2명 출결 저장" }).click();
+  await expect(page.getByText("저장 전", { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes)).toEqual([{
+    type: "attendance.batch", meetingId: "meeting-1", entries: [
+      { personId: "student-2", status: "ABSENT", expectedRevision: 0 },
+      { personId: "student-1", status: "ABSENT", expectedRevision: 5 },
+    ],
+  }]);
+  await expect(pending.getByRole("button", { name: "결석" })).toHaveAttribute("aria-pressed", "true");
+  await expectNoOverflow(page);
+});
+
 test("출결 기록 지우기는 확인 전 저장하지 않고 키보드 취소 후 포커스를 돌려준다", async ({ page }) => {
   await open(page, "attendance");
   expect(await page.evaluate(() => window.__NEW_STAFF_QA__.writes.length)).toBe(0);

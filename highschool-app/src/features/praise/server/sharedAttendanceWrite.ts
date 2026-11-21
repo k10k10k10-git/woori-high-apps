@@ -49,23 +49,24 @@ export function sharedSemesterUpdate(raw: unknown, receipt: PraiseSharedAttendan
   }
   assertSharedSemesterMapping(raw, receipt);
   const value = sharedEntryUpdate(sharedSemesterEntry(raw, receipt), receipt, actorUid, at, key, signature);
-  const next = structuredClone(asRecord(raw));
-  const attendance = asRecord(next.attendance), team = asRecord(attendance.team), session = asRecord(team[receipt.sessionId]);
+  const attendance = asRecord(root.attendance), team = asRecord(attendance.team), session = { ...asRecord(team[receipt.sessionId]) };
   if (value === null) delete session[receipt.applicationKey]; else session[receipt.applicationKey] = value;
-  team[receipt.sessionId] = session; attendance.team = team; next.attendance = attendance;
-  next.praiseOperationReceipts = { ...asRecord(next.praiseOperationReceipts), [key]: { phase: "applied", fingerprint: signature, at } };
-  return next;
+  return { ...root, attendance: { ...attendance, team: { ...team, [receipt.sessionId]: session } },
+    praiseOperationReceipts: { ...asRecord(root.praiseOperationReceipts), [key]: { phase: "applied", fingerprint: signature, at } } };
 }
-async function writeEntry(receipt: PraiseSharedAttendanceOperation, actorUid: string, at: number, key: string, signature: string) {
+type PendingWrite = { operationId: string; key: string; signature: string; at: number; receipt: PraiseSharedAttendanceOperation };
+
+async function writeEntries(entries: PendingWrite[], actorUid: string) {
   const database = getPraiseAdmin().database;
   let callbackError: unknown;
   try {
-    const result = await database.transaction(paths.semester(receipt.semesterId), raw => {
-      try { return sharedSemesterUpdate(raw, receipt, actorUid, at, key, signature); }
+    const result = await database.transaction(paths.semester(entries[0].receipt.semesterId), raw => {
+      try { return entries.reduce((next, item) => sharedSemesterUpdate(next, item.receipt, actorUid, item.at, item.key, item.signature), raw); }
       catch (error) { callbackError = error; return undefined; }
     });
     if (callbackError) throw callbackError;
-    requireValue(result.committed && sharedAppliedProof(asRecord(asRecord(result.value).praiseOperationReceipts)[key], signature, at), pendingMessage, "shared_write_pending", 409);
+    const markers = asRecord(asRecord(result.value).praiseOperationReceipts);
+    requireValue(result.committed && entries.every(({ key, signature, at }) => sharedAppliedProof(markers[key], signature, at)), pendingMessage, "shared_write_pending", 409);
   } catch (error) {
     if (callbackError) throw callbackError;
     if (error instanceof PraiseDomainError) throw error;
@@ -80,38 +81,72 @@ function assertReceiptActor(state: PraiseState, operationId: string, actor: Prai
 }
 /** workspace 예약 → 단일 학기 셀 transaction → 감사 완료. 재시도는 확인만 하고 이미 시도한 쓰기를 재적용하지 않는다. */
 export async function executeSharedAttendance(actor: PraiseActor, before: PraiseState, command: Command, operationId: string, snapshot: SharedAttendanceSnapshot): Promise<PraiseState> {
-  const workspaceId = before.meta.id, signature = fingerprint(command), key = sharedOperationKey(workspaceId, operationId), at = Date.now();
-  const known = before.operations[operationId];
-  if (known) {
-    const operation = assertReceiptActor(before, operationId, actor, signature);
-    if (operation.sharedAttendance.phase === "complete") return before;
-    requireValue(!["failed", "closed"].includes(operation.sharedAttendance.phase), "이 작업은 충돌로 저장되지 않았습니다. 새로고침 후 다시 입력해 주세요.", "revision_conflict", 409);
-  }
-  const target = snapshot.targets[command.meetingId]?.[command.personId];
-  const meeting = before.meetings[command.meetingId];
+  return executeSharedAttendanceEntries(actor, before, [{ command, operationId }], snapshot);
+}
+
+export async function executeSharedAttendanceEntries(
+  actor: PraiseActor,
+  before: PraiseState,
+  entries: { command: Command; operationId: string }[],
+  snapshot: SharedAttendanceSnapshot,
+  batch?: { operationId: string; signature: string },
+): Promise<PraiseState> {
+  const workspaceId = before.meta.id, at = Date.now();
+  const items = entries.map(({ command, operationId }) => ({
+    command, operationId, signature: fingerprint(command), key: sharedOperationKey(workspaceId, operationId),
+  }));
+  const stored = (state: PraiseState, item: (typeof items)[number]) =>
+    assertReceiptActor(state, item.operationId, actor, item.signature);
+  const checkBatch = (state: PraiseState) => {
+    const existing = batch && state.operations[batch.operationId];
+    if (existing) requireValue(existing.actorUid === actor.uid && existing.fingerprint === batch.signature && !existing.sharedAttendance,
+      "다른 내용에 사용된 작업 번호입니다.", "operation_conflict", 409);
+    return existing;
+  };
+  const checkWritable = (state: PraiseState, command: Command) => {
+    const meeting = state.meetings[command.meetingId];
+    requireValue(meeting && canWritePraiseAttendance(actor, state, meeting, command.personId), "담당 조의 출결만 수정할 수 있습니다.", "forbidden", 403);
+    requireValue(state.meta.mode !== "shadow" && state.meta.status !== "archived" && !isPraiseHistoricalReadOnly(state.meta, meeting.date), "읽기 전용 기록입니다.", "read_only", 409);
+  };
+  const knownBatch = checkBatch(before);
   requireValue(praisePermissions(actor, before).read, "찬양팀 접근 권한이 없습니다.", "forbidden", 403);
-  if (!known || known.sharedAttendance?.phase === "prepared") {
-    requireValue(meeting && canWritePraiseAttendance(actor, before, meeting, command.personId), "담당 조의 출결만 수정할 수 있습니다.", "forbidden", 403);
-    requireValue(before.meta.mode !== "shadow" && before.meta.status !== "archived" && !isPraiseHistoricalReadOnly(before.meta, meeting.date), "읽기 전용 기록입니다.", "read_only", 409);
+  const known = items.filter(item => before.operations[item.operationId]);
+  requireValue(!batch || (knownBatch ? known.length === items.length : known.length === 0),
+    "출석 작업 번호가 충돌했습니다.", "operation_conflict", 409);
+  for (const item of known) {
+    const { phase } = stored(before, item).sharedAttendance;
+    requireValue(phase !== "failed" && phase !== "closed", "출석이 저장되지 않았습니다. 최신 기록을 불러온 뒤 다시 입력해 주세요.", "revision_conflict", 409);
+    if (phase === "prepared") checkWritable(before, item.command);
   }
-  if (!known) {
-    requireValue(target, "학기 회차와 현재 찬양팀 신청 인물을 먼저 연결해 주세요.", "attendance_mapping_required", 409);
-    requireValue(command.expectedSourceRevision === sharedRevision(target.raw), "공통 출석 기준이 변경됐습니다. 새로고침해 주세요.", "revision_conflict", 409);
+  if (known.length === items.length && known.every(item => stored(before, item).sharedAttendance.phase === "complete")) return before;
+  if (!known.length) {
     await transactWorkspace(workspaceId, current => {
       requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
-      if (current.operations[operationId]) { assertReceiptActor(current, operationId, actor, signature); return current; }
+      const currentBatch = checkBatch(current);
+      if (currentBatch || !batch && current.operations[items[0].operationId]) {
+        for (const item of items) stored(current, item);
+        return undefined;
+      }
+      requireValue(items.every(item => !current.operations[item.operationId]), "출석 작업 번호가 충돌했습니다.", "operation_conflict", 409);
       const resolved = overlaySharedAttendance(current, snapshot);
-      // 기존 권한·활성 인물·휴강·조·버전·운영 모드 검증을 그대로 통과해야 예약할 수 있다.
-      applyPraiseCommand(resolved, command, actor, at, operationId, { sharedWrite: true });
-      const group = groupVersionForMeeting(current, current.meetings[command.meetingId]);
-      requireValue(group, "확정된 조 편성이 없습니다.");
       const next = structuredClone(current);
-      next.operations[operationId] = { at, actorUid: actor.uid, fingerprint: signature, sharedAttendance: {
-        phase: "prepared", meetingId: command.meetingId, personId: command.personId,
-        semesterId: target.semesterId, sessionId: target.sessionId, applicationKey: target.applicationKey,
-        mappingProof: target.mappingProof, teamId: target.teamId, studentId: target.studentId, meetingDate: target.meetingDate,
-        groupVersionId: group.id, expectedSourceRevision: command.expectedSourceRevision!, status: command.status, beforeStatus: sharedStatus(target.raw),
-      } };
+      for (const item of items) {
+        const { command, operationId, signature } = item;
+        checkWritable(current, command);
+        const target = snapshot.targets[command.meetingId]?.[command.personId];
+        requireValue(target, "학기 회차와 현재 찬양팀 신청 인물을 먼저 연결해 주세요.", "attendance_mapping_required", 409);
+        requireValue(command.expectedSourceRevision === sharedRevision(target.raw), "공통 출석 기준이 변경됐습니다. 새로고침해 주세요.", "revision_conflict", 409);
+        applyPraiseCommand(resolved, command, actor, at, operationId, { sharedWrite: true });
+        const group = groupVersionForMeeting(current, current.meetings[command.meetingId]);
+        requireValue(group, "확정된 조 편성이 없습니다.");
+        next.operations[operationId] = { at, actorUid: actor.uid, fingerprint: signature, sharedAttendance: {
+          phase: "prepared", meetingId: command.meetingId, personId: command.personId,
+          semesterId: target.semesterId, sessionId: target.sessionId, applicationKey: target.applicationKey,
+          mappingProof: target.mappingProof, teamId: target.teamId, studentId: target.studentId, meetingDate: target.meetingDate,
+          groupVersionId: group.id, expectedSourceRevision: command.expectedSourceRevision!, status: command.status, beforeStatus: sharedStatus(target.raw),
+        } };
+      }
+      if (batch) next.operations[batch.operationId] = { at, actorUid: actor.uid, fingerprint: batch.signature };
       return next;
     });
   }
@@ -119,39 +154,55 @@ export async function executeSharedAttendance(actor: PraiseActor, before: Praise
   const reserved = await transactWorkspace(workspaceId, current => {
     attempt = false;
     requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
-    const operation = assertReceiptActor(current, operationId, actor, signature);
-    if (operation.sharedAttendance.phase !== "prepared") return current;
-    requireValue(canWritePraiseAttendance(actor, current, current.meetings[command.meetingId], command.personId), "담당 권한이 변경됐습니다.", "forbidden", 403);
+    const prepared = items.filter(item => stored(current, item).sharedAttendance.phase === "prepared");
+    if (!prepared.length) return undefined;
+    requireValue(prepared.length === items.length, pendingMessage, "shared_write_pending", 409);
     const next = structuredClone(current);
-    next.operations[operationId].sharedAttendance!.phase = "attempting";
+    for (const item of prepared) {
+      checkWritable(current, item.command);
+      next.operations[item.operationId].sharedAttendance!.phase = "attempting";
+    }
     attempt = true;
     return next;
   });
   requireValue(reserved, pendingMessage, "shared_write_pending", 409);
-  const operation = assertReceiptActor(reserved, operationId, actor, signature), receipt = operation.sharedAttendance;
-  if (receipt.phase === "complete") return reserved;
-  requireValue(receipt.phase === "attempting", pendingMessage, "shared_write_pending", 409);
+  const outstanding: PendingWrite[] = [];
+  for (const item of items) {
+    const operation = stored(reserved, item), receipt = operation.sharedAttendance;
+    if (receipt.phase === "complete") continue;
+    requireValue(receipt.phase === "attempting", pendingMessage, "shared_write_pending", 409);
+    outstanding.push({ ...item, receipt, at: operation.at });
+  }
+  if (!outstanding.length) return reserved;
   if (attempt) {
-    try { await writeEntry(receipt, actor.uid, operation.at, key, signature); }
+    try { await writeEntries(outstanding, actor.uid); }
     catch (error) {
       if (error instanceof PraiseDomainError && ["revision_conflict", "shared_mapping_conflict", "operation_conflict"].includes(error.code))
         await transactWorkspace(workspaceId, current => {
           if (!current) return undefined;
           const next = structuredClone(current);
-          const shared = assertReceiptActor(next, operationId, actor, signature).sharedAttendance;
-          if (shared.phase === "attempting") shared.phase = "failed";
+          for (const item of items) {
+            const shared = stored(next, item).sharedAttendance;
+            if (shared.phase === "attempting") shared.phase = "failed";
+          }
           return next;
         });
       throw error;
     }
   } else {
-    const proof = await readSharedPath(paths.praiseOperationReceipt(receipt.semesterId, key));
-    requireValue(sharedAppliedProof(proof, signature, operation.at), pendingMessage, "shared_write_pending", 409);
+    for (let start = 0; start < outstanding.length; start += 6) {
+      await Promise.all(outstanding.slice(start, start + 6).map(async ({ receipt, key, signature, at: requestedAt }) => {
+        const proof = await readSharedPath(paths.praiseOperationReceipt(receipt.semesterId, key));
+        requireValue(sharedAppliedProof(proof, signature, requestedAt), pendingMessage, "shared_write_pending", 409);
+      }));
+    }
   }
   const result = await transactWorkspace(workspaceId, current => {
     requireValue(current, pendingMessage, "shared_write_pending", 409);
-    assertReceiptActor(current, operationId, actor, signature);
-    return finalizeSharedState(current, operationId, actor);
+    return items.reduce((next, item) => {
+      stored(next, item);
+      return finalizeSharedState(next, item.operationId, actor);
+    }, current);
   });
   requireValue(result, pendingMessage, "shared_write_pending", 409);
   return result;

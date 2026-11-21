@@ -57,10 +57,10 @@ export type SharedAttendanceSnapshot = {
   targets: Record<string, Record<string, { semesterId: string; sessionId: string; applicationKey: string; raw: unknown; mappingProof: string; studentId: string; teamId: string; meetingDate: string }>>;
 };
 /** 학기 원장은 서버에서만 읽는다. 비공개 신청·연락처와 다른 팀의 항목은 반환하지 않는다. */
-export async function loadSharedAttendance(state: PraiseState, cell?: { meetingId: string; personId: string }): Promise<SharedAttendanceSnapshot> {
+export async function loadSharedAttendance(state: PraiseState, scope?: { meetingId: string; personId?: string }): Promise<SharedAttendanceSnapshot> {
   const snapshot: SharedAttendanceSnapshot = { mappingRevision: sharedMappingRevision(state), overrides: {}, sources: {}, targets: {} };
-  const students = Object.values(state.people).filter(p => p.kind === "STUDENT" && (!cell || p.id === cell.personId));
-  const meetings = Object.values(state.meetings).filter(m => !cell || m.id === cell.meetingId);
+  const students = Object.values(state.people).filter(p => p.kind === "STUDENT" && (!scope?.personId || p.id === scope.personId));
+  const meetings = Object.values(state.meetings).filter(m => !scope || m.id === scope.meetingId);
   for (const m of meetings) {
     snapshot.sources[m.id] = Object.fromEntries(students.map(p => [p.id, {
       source: "praise", mapping: state.meta.mode === "shadow" ? "shadow" : "unlinked", writable: !m.linkedSessionId && state.meta.mode !== "shadow",
@@ -69,8 +69,8 @@ export async function loadSharedAttendance(state: PraiseState, cell?: { meetingI
   if (state.meta.mode === "shadow") return snapshot;
   const linked = meetings.filter(m => m.linkedSessionId);
   if (!linked.length) return snapshot;
-  const cellKey = cell ? students[0]?.rosterLink?.applicationKey : undefined;
-  if (cell && !cellKey) return snapshot;
+  const cellKey = scope?.personId ? students[0]?.rosterLink?.applicationKey : undefined;
+  if (scope?.personId && !cellKey) return snapshot;
   const sid = state.meta.semesterId, teamId = state.meta.teamId;
   if (!sid || !teamId) {
     for (const m of linked) for (const p of students) {
@@ -83,7 +83,7 @@ export async function loadSharedAttendance(state: PraiseState, cell?: { meetingI
     return snapshot;
   }
   assertPraiseId(sid); assertPraiseId(teamId);
-  const cellSession = cell ? assertPraiseId(linked[0].linkedSessionId!) : undefined;
+  const cellSession = scope ? assertPraiseId(linked[0].linkedSessionId!) : undefined;
   const [team, applicationValue, sessionValue, meta] = await Promise.all([
     readSharedPath(paths.team(sid, teamId)),
     readSharedPath(cellKey ? paths.application(sid, assertPraiseId(cellKey)) : paths.applications(sid)),

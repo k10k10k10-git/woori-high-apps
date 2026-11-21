@@ -24,7 +24,7 @@ import { projectPraiseAudit } from "./projection";
 import { requireValue } from "./validation";
 import { praiseView } from "./view";
 import { assertSharedAttendanceCurrent, initialSharedSessions, loadSharedAttendance, overlaySharedAttendance } from "./sharedAttendance";
-import { executeSharedAttendance, pendingSharedAttendance, resolveSharedAttendance } from "./sharedAttendanceWrite";
+import { executeSharedAttendance, executeSharedAttendanceEntries, pendingSharedAttendance, resolveSharedAttendance } from "./sharedAttendanceWrite";
 
 export async function createPraiseReferences(actor: PraiseActor) {
   requireValue(canAdministerPraise(actor), "찬양팀 운영 공간 개설 권한이 없습니다.", "forbidden", 403);
@@ -134,9 +134,47 @@ export async function executePraise(
   actor: PraiseActor,
   workspaceId: string,
   request: PraiseCommandRequest,
+  afterResponse?: (work: () => Promise<unknown>) => void,
 ) {
   const before = await requireWorkspace(actor, workspaceId);
   const { command } = request;
+  if (command.type === "attendance.batch") {
+    const batch = { operationId: request.operationId, signature: fingerprint(command) };
+    const items = command.entries.map((entry) => ({
+      operationId: `pab_${fingerprint({ batchId: batch.operationId, personId: entry.personId })}`,
+      command: { type: "attendance.set" as const, meetingId: command.meetingId, ...entry },
+    }));
+    const linked = before.operations[batch.operationId]
+      ? before.operations[items[0].operationId]?.sharedAttendance
+      : before.meetings[command.meetingId]?.linkedSessionId;
+    const result = linked
+      ? await executeSharedAttendanceEntries(actor, before, items, await loadSharedAttendance(before, { meetingId: command.meetingId }), batch)
+      : await transactWorkspace(workspaceId, current => {
+        requireValue(current, "운영 공간이 없습니다.", "not_found", 404);
+        requireValue(praisePermissions(actor, current).read, "찬양팀 접근 권한이 없습니다.", "forbidden", 403);
+        const known = current.operations[batch.operationId];
+        if (known) {
+          requireValue(known.actorUid === actor.uid && known.fingerprint === batch.signature && !known.sharedAttendance &&
+            items.every(item => current.operations[item.operationId] && !current.operations[item.operationId].sharedAttendance),
+            "다른 내용에 사용된 작업 번호입니다.", "operation_conflict", 409);
+          return undefined;
+        }
+        requireValue(items.every(item => !current.operations[item.operationId]), "출석 작업 번호가 충돌했습니다.", "operation_conflict", 409);
+        const at = Date.now();
+        const next = items.reduce((state, item) => applyPraiseCommand(state, item.command, actor, at, item.operationId), current);
+        next.operations[batch.operationId] = { at, actorUid: actor.uid, fingerprint: batch.signature };
+        return next;
+      });
+    requireValue(result, "저장 결과를 확인하지 못했습니다. 같은 작업을 다시 시도해 주세요.", "unavailable", 503);
+    // 개인별 감사 원본은 이미 저장됐다. 공용 로그 투영을 기다리느라 다음 출석 업무를 막지 않는다.
+    if (afterResponse) {
+      const logPending = Object.values(result.audit).some(event => !event.historical && !event.projectedAt);
+      if (logPending) afterResponse(() => projectPraiseAudit(result));
+      return { view: await resolvedPraiseView(result, actor), logPending };
+    }
+    const [view, logPending] = await Promise.all([resolvedPraiseView(result, actor), projectPraiseAudit(result)]);
+    return { view, logPending };
+  }
   if (command.type === "attendance.resolve") {
     const result = await resolveSharedAttendance(actor, before, command, request.operationId);
     const logPending = await projectPraiseAudit(result);

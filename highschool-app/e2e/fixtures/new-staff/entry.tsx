@@ -65,8 +65,14 @@ function Attendance() {
   });
   async function execute(command: PraiseCommand) {
     qa.writes.push(command);
-    if (command.type === "attendance.set") {
-      setView((current) => ({ ...current, attendance: { ...current.attendance, [command.meetingId]: { ...current.attendance[command.meetingId], [command.personId]: { ...current.attendance[command.meetingId]?.[command.personId], status: command.status, revision: 6, groupVersionId: "groups-1", updatedAt: Date.now(), updatedBy: "synthetic-actor" } } } }));
+    if (command.type === "attendance.set" || command.type === "attendance.batch") {
+      const entries = command.type === "attendance.batch" ? command.entries : [command];
+      setView((current) => ({ ...current, attendance: { ...current.attendance, [command.meetingId]: {
+        ...current.attendance[command.meetingId],
+        ...Object.fromEntries(entries.map(({ personId, status, expectedRevision }) => [personId,
+          { status, revision: expectedRevision + 1, groupVersionId: "groups-1", updatedAt: Date.now(), updatedBy: "synthetic-actor" },
+        ])),
+      } } }));
     }
     return true;
   }

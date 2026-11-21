@@ -1,9 +1,38 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PraiseAttendance } from "./PraiseAttendance";
 import { praiseFixture } from "./praiseTestFixtures";
 afterEach(cleanup);
+it("현재 필터의 미입력만 표시하고 여러 출결을 서버 대기 없이 선택해 한 번에 전송한다", async () => {
+  const view = praiseFixture();
+  const stamp = { revision: 5, updatedAt: 1000, updatedBy: "actor", groupVersionId: "groups-1", status: "PRESENT" as const };
+  view.attendance = { "meeting-1": { "student-1": stamp } };
+  const execute = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} />);
+  fireEvent.click(screen.getByRole("button", { name: "여러 명 체크" }));
+  fireEvent.change(screen.getByRole("combobox", { name: "출결 조 선택" }), { target: { value: "group-a" } });
+  expect(screen.getByRole("button", { name: "현재 목록 미입력 0명 출석 표시" })).toBeDisabled();
+  fireEvent.change(screen.getByRole("combobox", { name: "출결 조 선택" }), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "현재 목록 미입력 1명 출석 표시" }));
+  const first = within(screen.getByRole("group", { name: "합성학생가 출결" }));
+  const second = within(screen.getByRole("group", { name: "합성학생나 출결" }));
+  expect(first.queryByRole("button", { name: "변경 취소" })).not.toBeInTheDocument();
+  expect(second.getByRole("button", { name: "출석" })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(second.getByRole("button", { name: "결석" }));
+  fireEvent.click(first.getByRole("button", { name: "결석" }));
+  expect(execute).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "2명 출결 저장" }));
+  const command = { type: "attendance.batch", meetingId: "meeting-1", entries: [
+    { personId: "student-2", status: "ABSENT", expectedRevision: 0 },
+    { personId: "student-1", status: "ABSENT", expectedRevision: 5 },
+  ] };
+  expect(execute).toHaveBeenCalledExactlyOnceWith(command);
+  expect(screen.getAllByText("저장 전")).toHaveLength(2);
+  fireEvent.click(screen.getByRole("button", { name: "2명 출결 저장" }));
+  expect(execute).toHaveBeenLastCalledWith(command);
+  await waitFor(() => expect(screen.queryByText("저장 전")).not.toBeInTheDocument());
+});
 describe("찬양팀 출결 권한과 명시 입력", () => {
   it("관리자는 출결 행에서 팀원 세부 편집을 열고 저장 중에는 중복 이동을 막는다", () => {
     const view = praiseFixture(); const edit = vi.fn();

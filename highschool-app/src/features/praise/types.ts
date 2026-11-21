@@ -282,6 +282,15 @@ export type PraiseStageInput = Pick<
   PraiseStageVersion,
   "config" | "services" | "overrides"
 >;
+export const PRAISE_ATTENDANCE_BATCH_LIMIT = 100;
+
+export type PraiseAttendanceInput = {
+  personId: string;
+  status: PraiseStatus | null;
+  expectedRevision: number;
+  expectedSourceRevision?: string;
+};
+
 export type PraiseCommand =
   | { type: "attendance.resolve"; pendingOperationId: string; resolution: "finalize" | "close"; expectedSourceRevision: string; acknowledge: true }
   | {
@@ -321,14 +330,8 @@ export type PraiseCommand =
       draft: PraiseGroupInput;
       acknowledgeWarnings: boolean;
     }
-  | {
-      type: "attendance.set";
-      expectedSourceRevision?: string;
-      meetingId: string;
-      personId: string;
-      status: PraiseStatus | null;
-      expectedRevision: number;
-    }
+  | ({ type: "attendance.set"; meetingId: string } & PraiseAttendanceInput)
+  | { type: "attendance.batch"; meetingId: string; entries: (PraiseAttendanceInput & { status: PraiseStatus })[] }
   | {
       type: "availability.set";
       meetingId: string;

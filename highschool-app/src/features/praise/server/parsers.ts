@@ -1,6 +1,8 @@
 import type { GroupingRule, GroupingSettings } from "../domain/grouping";
 import { stageOverrideSchema } from "../domain/stage-schema";
+import { PRAISE_ATTENDANCE_BATCH_LIMIT } from "../types";
 import type {
+  PraiseAttendanceInput,
   PraiseCommand,
   PraiseCreateRequest,
   PraiseGroupInput,
@@ -300,6 +302,17 @@ export function parseCreate(value: unknown): PraiseCreateRequest {
     },
   };
 }
+function parseAttendanceInput(p: Record<string, unknown>): PraiseAttendanceInput {
+  if (p.expectedSourceRevision !== undefined)
+    requireValue(typeof p.expectedSourceRevision === "string" && /^[a-f0-9]{64}$/.test(p.expectedSourceRevision), "공통 출석 버전을 확인해 주세요.");
+  return {
+    ...(p.expectedSourceRevision !== undefined ? { expectedSourceRevision: p.expectedSourceRevision as string } : {}),
+    personId: id(p.personId),
+    status: p.status === null ? null : choice(p.status, ["PRESENT", "ABSENT"] as const, "출결"),
+    expectedRevision: integer(p.expectedRevision, 0, Number.MAX_SAFE_INTEGER, "기록 버전"),
+  };
+}
+
 export function parseCommand(value: unknown): {
   operationId: string;
   command: PraiseCommand;
@@ -400,20 +413,18 @@ export function parseCommand(value: unknown): {
       command = { type, pendingOperationId: operationKey(p.pendingOperationId), resolution: choice(p.resolution, ["finalize", "close"] as const, "검토 처리"), expectedSourceRevision: p.expectedSourceRevision, acknowledge: true };
       break;
     case "attendance.set":
-      if (p.expectedSourceRevision !== undefined)
-        requireValue(typeof p.expectedSourceRevision === "string" && /^[a-f0-9]{64}$/.test(p.expectedSourceRevision), "공통 출석 버전을 확인해 주세요.");
-      command = {
-        type,
-        ...(p.expectedSourceRevision !== undefined ? { expectedSourceRevision: p.expectedSourceRevision as string } : {}),
-        meetingId: meetingId(),
-        personId: id(p.personId),
-        status:
-          p.status === null
-            ? null
-            : choice(p.status, ["PRESENT", "ABSENT"] as const, "출결"),
-        expectedRevision: expected(),
-      };
+      command = { type, meetingId: meetingId(), ...parseAttendanceInput(p) };
       break;
+    case "attendance.batch": {
+      const entries = list(p.entries, PRAISE_ATTENDANCE_BATCH_LIMIT, (value) => {
+        const entry = parseAttendanceInput(object(value));
+        requireValue(entry.status !== null, "기록 지우기는 학생별로 확인해 주세요.");
+        return { ...entry, status: entry.status };
+      }, "출결");
+      requireValue(entries.length && new Set(entries.map((entry) => entry.personId)).size === entries.length, "중복 없이 한 명 이상 선택해 주세요.");
+      command = { type, meetingId: meetingId(), entries };
+      break;
+    }
     case "availability.set":
       command = {
         type,
