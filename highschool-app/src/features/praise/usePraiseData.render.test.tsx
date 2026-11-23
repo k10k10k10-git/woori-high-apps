@@ -11,6 +11,22 @@ let fail: (failure: Error) => void;
 beforeEach(() => { vi.clearAllMocks(); let nextId = 0; mocks.operationId.mockImplementation(() => `operation-${++nextId}`); mocks.subscribe.mockImplementation((_id: string, onData: (view: PraiseView) => void, onError: (failure: Error) => void) => { emit = onData; fail = onError; return mocks; }); });
 afterEach(cleanup);
 describe("찬양 기록 구독과 저장", () => {
+  it("회차 전환 중 이전 기록은 저장에 쓰이지 않고 오래된 응답은 무시한다", async () => {
+    const previous = praiseFixture();
+    const { result, rerender } = renderHook(({ meeting }) => usePraiseData("workspace-a", meeting), { initialProps: { meeting: "meeting-1" } });
+    const previousResponse = emit;
+    act(() => emit(previous));
+    expect(result.current.scopeReady).toBe(true);
+    rerender({ meeting: "meeting-2" });
+    expect(result.current.scopeReady).toBe(false);
+    await act(async () => { expect(await result.current.execute({ type: "attendance.set", meetingId: "meeting-1", personId: "student-1", status: null, expectedRevision: 0 })).toBe(false); });
+    const next = praiseFixture();
+    act(() => emit(next));
+    act(() => previousResponse(previous));
+    expect(result.current.scopeReady).toBe(true);
+    expect(result.current.view).toBe(next);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
   it("응답 유실 뒤 같은 작업은 같은 번호를 재사용하고 성공·내용 변경 뒤에는 새 번호를 쓴다", async () => {
     const view = praiseFixture(); mocks.execute.mockRejectedValueOnce(new Error("응답을 받지 못했습니다.")).mockResolvedValue({ view, logPending: false });
     const { result } = renderHook(() => usePraiseData("workspace-a")); act(() => emit(view));

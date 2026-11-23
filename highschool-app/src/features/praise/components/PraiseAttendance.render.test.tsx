@@ -4,6 +4,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PraiseAttendance } from "./PraiseAttendance";
 import { praiseFixture } from "./praiseTestFixtures";
 afterEach(cleanup);
+it("빠른 입력에서는 첫 클릭부터 여러 명의 표시를 갱신하고 실패 뒤에도 새 입력을 보존한다", async () => {
+  const view = praiseFixture();
+  const execute = vi.fn().mockResolvedValue(false);
+  render(<PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} quickEntry />);
+  const first = within(screen.getByRole("group", { name: "합성학생가 출결" })).getByRole("button", { name: "출석" });
+  const second = within(screen.getByRole("group", { name: "합성학생나 출결" })).getByRole("button", { name: "결석" });
+  fireEvent.click(first);
+  fireEvent.click(second);
+  expect(first).toHaveAttribute("aria-pressed", "true");
+  expect(second).toHaveAttribute("aria-pressed", "true");
+  expect(execute).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "2명 출결 저장" }));
+  await waitFor(() => expect(execute).toHaveBeenCalledOnce());
+  expect(screen.getAllByText("저장 전")).toHaveLength(2);
+});
 it("현재 필터의 미입력만 표시하고 여러 출결을 서버 대기 없이 선택해 한 번에 전송한다", async () => {
   const view = praiseFixture();
   const stamp = { revision: 5, updatedAt: 1000, updatedBy: "actor", groupVersionId: "groups-1", status: "PRESENT" as const };

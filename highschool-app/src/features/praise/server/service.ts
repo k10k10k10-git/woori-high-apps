@@ -1,6 +1,8 @@
 import "server-only";
 import { canAccessTeam } from "@/features/teams/teamModel";
 import { canAdministerPraise, praisePermissions } from "../permissions";
+import { defaultPraiseMeeting } from "../domain/workflow";
+import { toSeoulDate } from "../domain/terms";
 import type {
   PraiseActor,
   PraiseCommandRequest,
@@ -30,14 +32,32 @@ export async function createPraiseReferences(actor: PraiseActor) {
   requireValue(canAdministerPraise(actor), "찬양팀 운영 공간 개설 권한이 없습니다.", "forbidden", 403);
   return { semesters: await praiseReferences(actor) };
 }
-export async function readPraiseView(actor: PraiseActor, workspaceId: string) {
+export async function readPraiseView(actor: PraiseActor, workspaceId: string, attendanceMeeting?: string) {
   const state = await requireWorkspace(actor, workspaceId);
-  return resolvedPraiseView(state, actor);
+  return resolvedPraiseView(state, actor, attendanceMeeting);
 }
 
-async function resolvedPraiseView(state: PraiseState, actor: PraiseActor) {
+async function resolvedPraiseView(state: PraiseState, actor: PraiseActor, attendanceMeeting?: string) {
+  if (attendanceMeeting !== undefined) {
+    const meeting = Object.values(state.meetings).find((item) => item.id === attendanceMeeting)
+      ?? defaultPraiseMeeting(Object.values(state.meetings), toSeoulDate(new Date()));
+    const shared = meeting ? await loadSharedAttendance(state, { meetingId: meeting.id }) : undefined;
+    return praiseView(shared ? overlaySharedAttendance(state, shared) : state, actor, shared?.sources, undefined, meeting?.id ?? "");
+  }
   const [shared, pending] = await Promise.all([loadSharedAttendance(state), pendingSharedAttendance(state, actor)]);
   return praiseView(overlaySharedAttendance(state, shared), actor, shared.sources, pending);
+}
+
+async function savedAttendance(state: PraiseState, actor: PraiseActor, attendanceMeeting?: string, afterResponse?: (work: () => Promise<unknown>) => void) {
+  const view = resolvedPraiseView(state, actor, attendanceMeeting);
+  if (afterResponse) {
+    // 개인별 원본 감사가 이미 저장됐다. 공용 로그 투영은 응답 뒤에 진행한다.
+    const logPending = Object.values(state.audit).some(event => !event.historical && !event.projectedAt);
+    if (logPending) afterResponse(() => projectPraiseAudit(state));
+    return { view: await view, logPending };
+  }
+  const [current, logPending] = await Promise.all([view, projectPraiseAudit(state)]);
+  return { view: current, logPending };
 }
 
 export function requirePraiseAccess(actor: PraiseActor) {
@@ -135,6 +155,7 @@ export async function executePraise(
   workspaceId: string,
   request: PraiseCommandRequest,
   afterResponse?: (work: () => Promise<unknown>) => void,
+  attendanceMeeting?: string,
 ) {
   const before = await requireWorkspace(actor, workspaceId);
   const { command } = request;
@@ -166,14 +187,7 @@ export async function executePraise(
         return next;
       });
     requireValue(result, "저장 결과를 확인하지 못했습니다. 같은 작업을 다시 시도해 주세요.", "unavailable", 503);
-    // 개인별 감사 원본은 이미 저장됐다. 공용 로그 투영을 기다리느라 다음 출석 업무를 막지 않는다.
-    if (afterResponse) {
-      const logPending = Object.values(result.audit).some(event => !event.historical && !event.projectedAt);
-      if (logPending) afterResponse(() => projectPraiseAudit(result));
-      return { view: await resolvedPraiseView(result, actor), logPending };
-    }
-    const [view, logPending] = await Promise.all([resolvedPraiseView(result, actor), projectPraiseAudit(result)]);
-    return { view, logPending };
+    return savedAttendance(result, actor, attendanceMeeting, afterResponse);
   }
   if (command.type === "attendance.resolve") {
     const result = await resolveSharedAttendance(actor, before, command, request.operationId);
@@ -183,8 +197,7 @@ export async function executePraise(
   if (command.type === "attendance.set" && (before.meetings[command.meetingId]?.linkedSessionId || before.operations[request.operationId]?.sharedAttendance)) {
     const shared = await loadSharedAttendance(before, { meetingId: command.meetingId, personId: command.personId });
     const result = await executeSharedAttendance(actor, before, command, request.operationId, shared);
-    const [view, logPending] = await Promise.all([resolvedPraiseView(result, actor), projectPraiseAudit(result)]);
-    return { view, logPending };
+    return savedAttendance(result, actor, attendanceMeeting, afterResponse);
   }
   if (command.type === "person.save" || command.type === "person.reconcile") {
     requireValue(
@@ -274,6 +287,7 @@ export async function executePraise(
     "unavailable",
     503,
   );
+  if (command.type === "attendance.set" || command.type === "availability.set") return savedAttendance(result, actor, attendanceMeeting, afterResponse);
   const logPending = await projectPraiseAudit(result);
-  return { view: await resolvedPraiseView(result, actor), logPending };
+  return { view: await resolvedPraiseView(result, actor, attendanceMeeting), logPending };
 }

@@ -1028,7 +1028,6 @@ test("로그인 실패는 사람에게 필요한 해결 방법을 표시하고 �
 
 test("찬양팀 여러 명 체크는 즉시 표시되고 출석·결석을 한 요청으로 저장한다", async ({ page }) => {
   await open(page, "attendance");
-  await page.getByRole("button", { name: "여러 명 체크" }).click();
   await page.getByRole("button", { name: "현재 목록 미입력 1명 출석 표시" }).click();
   const pending = page.getByRole("group", { name: "합성학생나 출결" });
   await expect(pending.getByRole("button", { name: "출석" })).toHaveAttribute("aria-pressed", "true");

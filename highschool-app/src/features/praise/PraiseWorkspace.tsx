@@ -13,7 +13,7 @@ import { praiseSemesterHref, selectPraiseWorkspace } from "./navigation";
 import { isPraiseHistoricalReadOnly } from "./domain/operatingBoundary";
 import { toSeoulDate } from "./domain/terms";
 import type { PraiseMeta } from "./types";
-import { PraiseAttendance } from "./components/PraiseAttendance";
+import { PraiseAttendance, type PraiseAttendanceDisplay } from "./components/PraiseAttendance";
 import { PraiseStage } from "./components/PraiseStage";
 import { PraisePeople } from "./components/PraisePeople";
 import PraiseSettings from "./components/PraiseSettings";
@@ -67,10 +67,9 @@ export default function PraiseWorkspace({ workspaceId, initialTab, embedded = fa
 }
 
 function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPersonId, initialSection, onWorkspaceMeta }: { workspaceId: string; initialTab?: string; initialMeetingId: string; initialPersonId: string; initialSection: string; onWorkspaceMeta: (meta: PraiseMeta) => void }) {
-  const { view, busy, error, errorCode, notice, execute, refresh } = usePraiseData(workspaceId);
-  useEffect(() => { if (view) onWorkspaceMeta(view.meta); }, [onWorkspaceMeta, view]);
   const [tab, setTab] = useState(() => praiseTab(initialTab));
   const [visited, setVisited] = useState(() => new Set(["week", praiseTab(initialTab)]));
+  const [attendanceDisplay, setAttendanceDisplay] = useState<PraiseAttendanceDisplay>("meeting");
   const [tabSource, setTabSource] = useState(initialTab);
   if (tabSource !== initialTab) { setTabSource(initialTab); setTab(praiseTab(initialTab)); setVisited((current) => new Set([...current, praiseTab(initialTab)])); }
   const [personId, setPersonId] = useState(initialPersonId);
@@ -80,10 +79,13 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPerso
   const [showMeetingControls, setShowMeetingControls] = useState(false);
   const [sectionSource, setSectionSource] = useState(initialSection);
   if (sectionSource !== initialSection) { setSectionSource(initialSection); setPeopleSection(initialSection); }
-  const selectTab = (target: string) => { const value = target === "groups" ? "people" : target; if (tab === "attendance" && value !== tab && !confirmPraiseNavigation("attendance")) return; const section = target === "groups" ? "groups" : peopleSection; setPeopleSection(section); const nextPerson = value === "people" ? personId : ""; setPersonId(nextPerson); setTab(value); setVisited((current) => new Set([...current, value])); updatePraiseLocation({ workspace: workspaceId, tab: value, meeting: meeting?.id ?? null, person: nextPerson || null, section: value === "people" ? section : null }); };
   const [meetingId, setMeetingId] = useState(initialMeetingId);
   const [meetingSource, setMeetingSource] = useState(initialMeetingId);
   if (meetingSource !== initialMeetingId) { setMeetingSource(initialMeetingId); setMeetingId(initialMeetingId); }
+  const scopedAttendance = tab === "week" || (tab === "attendance" && attendanceDisplay === "meeting");
+  const { view, fullView, scopeReady, busy, error, errorCode, notice, execute, refresh } = usePraiseData(workspaceId, scopedAttendance ? meetingId : undefined);
+  useEffect(() => { if (view) onWorkspaceMeta(view.meta); }, [onWorkspaceMeta, view]);
+  const selectTab = (target: string) => { const value = target === "groups" ? "people" : target; if (tab === "attendance" && value !== tab && !confirmPraiseNavigation("attendance")) return; const section = target === "groups" ? "groups" : peopleSection; setPeopleSection(section); const nextPerson = value === "people" ? personId : ""; setPersonId(nextPerson); setTab(value); setVisited((current) => new Set([...current, value])); updatePraiseLocation({ workspace: workspaceId, tab: value, meeting: meetingId || null, person: nextPerson || null, section: value === "people" ? section : null }); };
   const selectMeeting = (id: string) => { if (!confirmPraiseNavigation("stage") || activeTab === "attendance" && !confirmPraiseNavigation("attendance")) return; setMeetingId(id); setShowMeetingControls(false); updatePraiseLocation({ workspace: workspaceId, tab: activeTab, meeting: id, person: activeTab === "people" ? personId || null : null }); };
   const tabsRef = useRef<HTMLDivElement>(null);
   if (errorCode === "server_not_configured") return <ConnectionPreparing />;
@@ -91,7 +93,6 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPerso
   const meetings = [...view.meetings].sort((a, b) => a.date.localeCompare(b.date) || a.sequence - b.sequence);
   const today = toSeoulDate(new Date());
   const defaultMeeting = defaultPraiseMeeting(meetings, today);
-  if (!meetingId && defaultMeeting) setMeetingId(defaultMeeting.id);
   const meeting = meetings.find((item) => item.id === meetingId) ?? defaultMeeting ?? null;
   const canAttend = canOpenPraiseAttendance(view.permissions);
   const tabs = [{ id: "week", label: "이번 주", allowed: true }, { id: "attendance", label: "출결", allowed: canAttend }, { id: "stage", label: "등단", allowed: true }, { id: "people", label: "팀원·조", allowed: view.permissions.manage || view.permissions.stageEdit }, { id: "settings", label: "운영 설정", allowed: view.permissions.manage }];
@@ -101,7 +102,8 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPerso
   const statusLabel = view.meta.status === "archived" ? "보관됨" : view.meta.mode === "live" ? "운영 중" : view.meta.mode === "shadow" ? "원본 대조 중" : "운영 준비";
   const statusTone = view.meta.status === "archived" || view.meta.mode === "setup" ? "muted" : view.meta.mode === "shadow" ? "warning" : "live";
   const props = { view, execute: locked ? async () => false : execute, busy };
-  const peopleProps = { view, execute: praisePersonWriteLocked(view) ? async () => false : execute, busy };
+  const completeProps = fullView && { ...props, view: fullView };
+  const peopleProps = completeProps && { ...completeProps, execute: praisePersonWriteLocked(completeProps.view) ? async () => false : execute };
   const editPerson = (id: string) => { setPeopleSection("people"); setPersonId(id); setTab("people"); setVisited((current) => new Set([...current, "people"])); updatePraiseLocation({ workspace: workspaceId, tab: "people", meeting: meeting?.id ?? null, person: id, section: "people" }); };
   const closeRequestedPerson = () => { setPersonId(""); updatePraiseLocation({ workspace: workspaceId, tab: "people", meeting: meeting?.id ?? null, person: null }); };
   return <>
@@ -115,11 +117,12 @@ function WorkspaceBody({ workspaceId, initialTab, initialMeetingId, initialPerso
     <div className="praise-feedback" aria-live="polite" aria-atomic="true">{busy ? <p role="status">저장하고 있습니다…</p> : error ? <p role="alert" className="praise-error">{error} <button className="praise-text-button" onClick={() => { void refresh(); }}>최신 기록 불러오기</button></p> : notice ? <p className="praise-success">{notice}</p> : null}</div>
     {locked && <p className="praise-note">{view.meta.status === "archived" ? "보관된 운영 기간입니다. 운영 설정에서 다시 열기 전까지 읽기 전용입니다." : view.meta.mode === "shadow" ? "기존 출결·등단·조 기록은 대조가 끝날 때까지 읽기 전용입니다. 관리자는 팀원 정보와 통합 명단 연결을 정리할 수 있습니다." : "운영 책임자가 준비를 마치면 출결과 등단 편성이 열립니다."}</p>}
     {blockedTab && <div role="tabpanel" id={`praise-panel-${blockedTab.id}`} aria-labelledby={`praise-tab-${blockedTab.id}`}><WorkspaceAccessGate allowed={false} area={`찬양팀 ${blockedTab.label}`} embedded backHref="/teams/praise" backLabel="찬양팀으로">{null}</WorkspaceAccessGate></div>}
-    <div role="tabpanel" id="praise-panel-week" aria-labelledby="praise-tab-week" hidden={activeTab !== "week"}><PraiseWeek view={view} meeting={meeting} onTab={selectTab} /></div>
-    {canAttend && visited.has("attendance") && <div role="tabpanel" id="praise-panel-attendance" aria-labelledby="praise-tab-attendance" hidden={activeTab !== "attendance"}><PraiseAttendance {...props} meeting={meeting} active={activeTab === "attendance"} onSelectMeeting={selectMeeting} onEditPerson={view.permissions.manage ? editPerson : undefined} /></div>}
-    {visited.has("stage") && <div role="tabpanel" id="praise-panel-stage" aria-labelledby="praise-tab-stage" hidden={activeTab !== "stage"}><PraiseStage key={meeting?.id ?? "no-meeting"} {...props} meeting={meeting} /></div>}
-    {(view.permissions.manage || view.permissions.stageEdit) && visited.has("people") && <div role="tabpanel" id="praise-panel-people" aria-labelledby="praise-tab-people" hidden={activeTab !== "people"}><PraisePeople {...peopleProps} requestedSection={peopleSection === "import" && !view.permissions.manage ? "people" : peopleSection} onSectionChange={(section) => { setPeopleSection(section); updatePraiseLocation({ workspace: workspaceId, tab: "people", meeting: meeting?.id ?? null, section }); }} requestedPersonId={personId || undefined} onRequestedPersonClose={closeRequestedPerson} /></div>}
-    {view.permissions.manage && visited.has("settings") && <div role="tabpanel" id="praise-panel-settings" aria-labelledby="praise-tab-settings" hidden={activeTab !== "settings"}><PraiseSettings view={view} execute={execute} busy={busy} /></div>}
+    {!scopeReady && activeTab !== "attendance" && !blockedTab && !error && <p className="praise-loading" role="status">선택한 기록을 불러오는 중입니다…</p>}
+    <div role="tabpanel" id="praise-panel-week" aria-labelledby="praise-tab-week" hidden={activeTab !== "week" || !scopeReady}>{activeTab === "week" && scopeReady && <PraiseWeek view={view} meeting={meeting} onTab={selectTab} />}</div>
+    {canAttend && visited.has("attendance") && <div role="tabpanel" id="praise-panel-attendance" aria-labelledby="praise-tab-attendance" hidden={activeTab !== "attendance"}><PraiseAttendance {...props} meeting={meeting} active={activeTab === "attendance"} loading={!scopeReady} loadFailed={Boolean(error)} quickEntry display={attendanceDisplay} onDisplayChange={setAttendanceDisplay} onSelectMeeting={selectMeeting} onEditPerson={view.permissions.manage ? editPerson : undefined} /></div>}
+    {completeProps && visited.has("stage") && <div role="tabpanel" id="praise-panel-stage" aria-labelledby="praise-tab-stage" hidden={activeTab !== "stage" || !scopeReady}><PraiseStage key={meeting?.id ?? "no-meeting"} {...completeProps} meeting={meeting} /></div>}
+    {peopleProps && (view.permissions.manage || view.permissions.stageEdit) && visited.has("people") && <div role="tabpanel" id="praise-panel-people" aria-labelledby="praise-tab-people" hidden={activeTab !== "people" || !scopeReady}><PraisePeople {...peopleProps} requestedSection={peopleSection === "import" && !view.permissions.manage ? "people" : peopleSection} onSectionChange={(section) => { setPeopleSection(section); updatePraiseLocation({ workspace: workspaceId, tab: "people", meeting: meeting?.id ?? null, section }); }} requestedPersonId={personId || undefined} onRequestedPersonClose={closeRequestedPerson} /></div>}
+    {completeProps && view.permissions.manage && visited.has("settings") && <div role="tabpanel" id="praise-panel-settings" aria-labelledby="praise-tab-settings" hidden={activeTab !== "settings" || !scopeReady}><PraiseSettings {...completeProps} /></div>}
   </>;
 }
 

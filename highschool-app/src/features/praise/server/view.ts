@@ -11,7 +11,7 @@ import { stageInputRevision } from "./stageModel";
 import { requireValue } from "./validation";
 
 /** 조 담당자의 원본 출결 범위는 서버에서 제한한다. UI 필터는 보안 경계가 아니다. */
-export function praiseView(state: PraiseState, actor: PraiseActor, sources?: PraiseAttendanceSources, pendingAttendance?: PraisePendingAttendanceReview[]): PraiseView {
+export function praiseView(state: PraiseState, actor: PraiseActor, sources?: PraiseAttendanceSources, pendingAttendance?: PraisePendingAttendanceReview[], attendanceMeetingId?: string): PraiseView {
   const permissions = praisePermissions(actor, state);
   requireValue(
     permissions.read,
@@ -52,6 +52,7 @@ export function praiseView(state: PraiseState, actor: PraiseActor, sources?: Pra
   const attendance: PraiseView["attendance"] = {},
     availability: PraiseView["availability"] = {};
   for (const [meetingId, entries] of Object.entries(state.attendance)) {
+    if (attendanceMeetingId !== undefined && attendanceMeetingId !== meetingId) continue;
     const meeting = state.meetings[meetingId];
     if (!meeting) continue;
     const rows = Object.entries(entries).filter(
@@ -69,12 +70,14 @@ export function praiseView(state: PraiseState, actor: PraiseActor, sources?: Pra
     if (rows.length) attendance[meetingId] = Object.fromEntries(rows);
   }
   for (const [meetingId, entries] of Object.entries(state.availability)) {
+    if (attendanceMeetingId !== undefined && attendanceMeetingId !== meetingId) continue;
     const rows = Object.entries(entries).filter(
       ([personId]) => permissions.stageEdit || personId === groupStaff,
     );
     if (rows.length) availability[meetingId] = Object.fromEntries(rows);
   }
   const stages = Object.values(state.stageVersions)
+    .filter((v) => attendanceMeetingId === undefined || v.meetingId === attendanceMeetingId)
     .filter((v) => permissions.stageEdit || v.kind === "CONFIRMED")
     .map((v) =>
       permissions.stageEdit
@@ -116,9 +119,9 @@ export function praiseView(state: PraiseState, actor: PraiseActor, sources?: Pra
     ),
     access: permissions.manage ? Object.values(state.access) : [],
     guides: Object.values(state.guides).filter(
-      (g) => permissions.manage || g.published,
+      (g) => (attendanceMeetingId === undefined || g.meetingId === attendanceMeetingId) && (permissions.manage || g.published),
     ),
-    policy: permissions.manage
+    policy: attendanceMeetingId !== undefined ? null : permissions.manage
       ? state.policy
       : permissions.stageEdit
         ? { ...state.policy, rules: [] }
@@ -130,10 +133,10 @@ export function praiseView(state: PraiseState, actor: PraiseActor, sources?: Pra
       )
       .sort((a, b) => b.at - a.at || b.id.localeCompare(a.id))
       .slice(0, 100),
-    imports: permissions.manage ? Object.values(state.imports) : [],
+    imports: attendanceMeetingId === undefined && permissions.manage ? Object.values(state.imports) : [],
     inputRevisions: permissions.stageEdit
       ? Object.fromEntries(
-          Object.values(state.meetings).map((m) => [
+          Object.values(state.meetings).filter((m) => attendanceMeetingId === undefined || m.id === attendanceMeetingId).map((m) => [
             m.id,
             stageInputRevision(state, m),
           ]),
