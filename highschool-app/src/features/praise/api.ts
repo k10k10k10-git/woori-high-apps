@@ -18,15 +18,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 export function listPraiseWorkspaces(signal?: AbortSignal) { return request<{ workspaces: PraiseMeta[]; canCreate: boolean }>("/api/praise", { signal }); }
 export function createPraiseWorkspace(workspace: PraiseCreateRequest["workspace"], operationId = praiseOperationId()) { return request<{ workspaceId: string }>("/api/praise", { method: "POST", body: JSON.stringify({ operationId, workspace }) }); }
-export function loadPraiseWorkspace(workspaceId: string, signal?: AbortSignal) { return request<PraiseView>(`/api/praise/${encodeURIComponent(workspaceId)}`, { signal }); }
+function workspaceViewPath(workspaceId: string, attendanceMeeting?: string) {
+  const path = `/api/praise/${encodeURIComponent(workspaceId)}`;
+  return attendanceMeeting === undefined ? path : `${path}?${new URLSearchParams({ attendance: attendanceMeeting })}`;
+}
+export function loadPraiseWorkspace(workspaceId: string, signal?: AbortSignal, attendanceMeeting?: string) { return request<PraiseView>(workspaceViewPath(workspaceId, attendanceMeeting), { signal }); }
 export function listPraiseAccounts(workspaceId: string, signal?: AbortSignal) { return request<{ accounts: { uid: string; name: string; roleLabel: string; email?: string }[] }>(`/api/praise/${encodeURIComponent(workspaceId)}/accounts`, { signal }); }
 export function listPraiseReferences(workspaceId: string, signal?: AbortSignal) { return request<{ semesters: { id: string; title: string; startDate?: string; endDate?: string; teams: { id: string; name: string }[] }[] }>(`/api/praise/${encodeURIComponent(workspaceId)}/references`, { signal }); }
 export function listPraiseCreateReferences(signal?: AbortSignal) { return request<{ semesters: { id: string; title: string; startDate?: string; endDate?: string; teams: { id: string; name: string }[] }[] }>("/api/praise/references", { signal }); }
 export function listPraiseRoster(workspaceId: string, signal?: AbortSignal) { return request<{ people: { applicationKey: string; kind: "STUDENT" | "STAFF"; name: string; grade: number; department: "FIRST" | "SECOND"; rosterLink: PraiseRosterLink }[]; semesterHref: string | null }>(`/api/praise/${encodeURIComponent(workspaceId)}/roster`, { signal }); }
-export function executePraiseCommand(workspaceId: string, command: PraiseCommand, operationId = praiseOperationId()) { return request<{ view: PraiseView; logPending: boolean }>(`/api/praise/${encodeURIComponent(workspaceId)}`, { method: "POST", body: JSON.stringify({ operationId, command }) }); }
+export function executePraiseCommand(workspaceId: string, command: PraiseCommand, operationId = praiseOperationId(), attendanceMeeting?: string) { return request<{ view: PraiseView; logPending: boolean }>(workspaceViewPath(workspaceId, attendanceMeeting), { method: "POST", body: JSON.stringify({ operationId, command }) }); }
 
 /** 조회만 수행한다. 숨긴 탭에서는 멈추고, 해제·수정 시 진행 중 조회를 취소한다. */
-export function subscribePraiseWorkspace(workspaceId: string, onData: (view: PraiseView) => void, onError: (error: Error) => void) {
+export function subscribePraiseWorkspace(workspaceId: string, onData: (view: PraiseView) => void, onError: (error: Error) => void, attendanceMeeting?: string) {
   let controller: AbortController | null = null;
   let disposed = false;
   let paused = false;
@@ -37,7 +41,7 @@ export function subscribePraiseWorkspace(workspaceId: string, onData: (view: Pra
     controller = current;
     const requestSequence = ++sequence;
     try {
-      const view = await loadPraiseWorkspace(workspaceId, current.signal);
+      const view = await loadPraiseWorkspace(workspaceId, current.signal, attendanceMeeting);
       if (!disposed && !paused && requestSequence === sequence) onData(view);
     } catch (error) {
       if (!disposed && !paused && requestSequence === sequence && !(error instanceof Error && error.name === "AbortError")) {

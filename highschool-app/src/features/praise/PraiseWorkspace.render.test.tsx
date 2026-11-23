@@ -10,7 +10,7 @@ vi.mock("./components/stageExport", () => ({ exportStagePNG: mocks.png, printSta
 import PraiseWorkspace from "./PraiseWorkspace";
 import { praiseFixture } from "./components/praiseTestFixtures";
 import type { PraiseStageVersion } from "./types";
-beforeEach(() => { vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry/praise"); mocks.references.mockResolvedValue({ semesters: [] }); mocks.accounts.mockResolvedValue({ accounts: [] }); mocks.sharedReferences.mockResolvedValue({ semesters: [] }); mocks.roster.mockResolvedValue({ people: [], semesterHref: null }); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
+beforeEach(() => { vi.clearAllMocks(); window.history.replaceState(null, "", "/sunday-ministry/praise"); mocks.references.mockResolvedValue({ semesters: [] }); mocks.accounts.mockResolvedValue({ accounts: [] }); mocks.sharedReferences.mockResolvedValue({ semesters: [] }); mocks.roster.mockResolvedValue({ people: [], semesterHref: null }); const view = praiseFixture(); mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true }); mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" }); });
 afterEach(cleanup);
 describe("찬양팀 작업공간", () => {
   it("작은 화면에서 기간·모임 변경을 펼칠 수 있게 한다", async () => {
@@ -28,7 +28,7 @@ describe("찬양팀 작업공간", () => {
   });
   it("첫 계층은 학기·회차와 다음 업무이며 연결 통계는 설정에 둔다", async () => {
     const view = praiseFixture(); view.meta.semesterId = "2026-2"; view.meta.teamId = "praise-team";
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" embedded />);
     expect(await screen.findByRole("heading", { level: 2, name: "찬양팀" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "이번 모임 할 일" })).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe("찬양팀 작업공간", () => {
     const view = praiseFixture(); if (mode === "shadow") view.meta.mode = "shadow"; else view.meta.status = "archived";
     const version: PraiseStageVersion = { id: "version-1", meetingId: "meeting-1", number: 1, kind: "CONFIRMED", createdAt: 1, createdBy: "actor", inputRevision: "revision-1", worshipDate: view.meetings[0].worshipDate, config: { ...view.policy!.stage, leaderType: "STAFF", leaderId: "staff-1", staffOnly: false }, leaderName: "합성스탭가", services: [{ department: "FIRST", assignments: [] }, { department: "SECOND", assignments: [] }], candidates: [], overrides: [], warnings: [], acknowledgedWarnings: true };
     view.stages = [version, { ...version, id: "version-2", number: 2, createdAt: 2 }];
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="등단" />);
     await waitFor(() => expect(mocks.list).toHaveBeenCalled());
     const select = screen.getByLabelText("저장된 등단표"); expect(select).not.toBeDisabled();
@@ -69,7 +69,7 @@ describe("찬양팀 작업공간", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     view.groups.push({ ...structuredClone(view.groups[0]), id: "groups-2", number: 2 });
     view.meetings.push({ ...view.meetings[0], id: "meeting-2", date: "2026-09-12", worshipDate: "2026-09-13", sequence: 2, title: "두 번째 모임" });
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="팀원·조" />);
     await waitFor(() => expect(mocks.list).toHaveBeenCalled());
     expect(screen.getByRole("button", { name: "팀원 등록" })).toBeDisabled();
@@ -124,7 +124,7 @@ describe("찬양팀 작업공간", () => {
     view.meetings[0].linkedSessionId = "session-1";
     view.people[0].rosterLink = { applicationKey: "student-application", studentId: "student-source" };
     mocks.list.mockResolvedValue({ workspaces: [view.meta], canCreate: true });
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" />);
     fireEvent.click(screen.getByRole("tab", { name: "운영 설정" }));
     const connection = screen.getByRole("region", { name: "명단과 운영 연결" });
@@ -134,7 +134,7 @@ describe("찬양팀 작업공간", () => {
   });
   it("멤버도 다섯 탭을 보며 관리자 query는 선택을 유지한 채 권한 안내를 표시한다", () => {
     const view = praiseFixture(); view.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "member", staffId: "staff-1" };
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="praiseSettings" />);
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["이번 주", "출결", "등단", "팀원·조 · 권한 필요", "운영 설정 · 권한 필요"]);
     expect(screen.queryByRole("button", { name: "팀원 등록" })).not.toBeInTheDocument();
@@ -149,7 +149,7 @@ describe("찬양팀 작업공간", () => {
   ])("조회자가 %s 주소를 열어도 탭 선택을 유지하고 보호된 조회·저장을 추가하지 않는다", async (tabId, label) => {
     const view = praiseFixture();
     view.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "observer", staffId: null };
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     window.history.replaceState(null, "", `/teams/praise/ongoing?workspace=synthetic-workspace&tab=${tabId}&meeting=meeting-1&origin=team`);
     render(<PraiseWorkspace />);
     await waitFor(() => expect(mocks.list).toHaveBeenCalledOnce());
@@ -181,7 +181,7 @@ describe("찬양팀 작업공간", () => {
     fireEvent.click(screen.getByRole("tab", { name: "운영 설정" }));
     const next = structuredClone(view);
     next.permissions = { read: true, manage: false, stageEdit: false, attendanceAll: false, role: "observer", staffId: null };
-    mocks.data.mockReturnValue({ view: next, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view: next, fullView: next, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     rendered.rerender(<PraiseWorkspace workspaceId="synthetic-workspace" initialTab="운영 설정" />);
     expect(screen.getByRole("tab", { name: "운영 설정 · 권한 필요" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("heading", { name: "찬양팀 운영 설정 접근 권한이 필요합니다." })).toBeInTheDocument();
@@ -193,7 +193,7 @@ describe("찬양팀 작업공간", () => {
     const view = praiseFixture(); view.meta.semesterId = "semester-fixture"; view.meta.teamId = "praise-team";
     view.permissions = { ...view.permissions, manage: false, attendanceAll: false, role: "editor" };
     for (const person of view.people) delete person.rosterLink;
-    mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+    mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
     render(<PraiseWorkspace workspaceId="synthetic-workspace" />);
     expect(await screen.findByRole("link", { name: "학기 찬양팀 명단" })).toBeInTheDocument();
     expect(screen.queryByText(/팀원 \d+\/\d+ 연결/)).not.toBeInTheDocument();
@@ -253,7 +253,7 @@ it("개설은 공통 학기·팀을 먼저 요구하고 선택한 연결을 함�
 it("선택한 운영 기간·탭·모임을 URL에 함께 남기고 재진입 때 복원한다", async () => {
   const view = praiseFixture();
   view.meetings.push({ ...view.meetings[0], id: "meeting-2", date: "2026-09-12", worshipDate: "2026-09-13", sequence: 2, title: "다음 모임" });
-  mocks.data.mockReturnValue({ view, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
+  mocks.data.mockReturnValue({ view, fullView: view, scopeReady: true, execute: mocks.execute, refresh: mocks.refresh, busy: false, error: "", notice: "" });
   window.history.replaceState(null, "", "/sunday-ministry/praise?workspace=synthetic-workspace&tab=attendance&meeting=meeting-1&origin=team");
   const first = render(<PraiseWorkspace />);
   expect(screen.getByLabelText("모임 회차")).toHaveValue("meeting-1");
@@ -288,7 +288,7 @@ it("학기 명단에서 출결로 들어오면 해당 학기를 열고 없는 �
   mocks.list.mockResolvedValue({ workspaces: [current, matching], canCreate: true });
   const rendered = render(<PraiseWorkspace />);
   await waitFor(() => expect(screen.getByLabelText("찬양팀 운영 기간")).toHaveValue("matching"));
-  expect(mocks.data).toHaveBeenLastCalledWith("matching");
+  expect(mocks.data).toHaveBeenLastCalledWith("matching", "");
   expect(screen.getByRole("tab", { name: "출결" })).toHaveAttribute("aria-selected", "true");
   rendered.unmount();
   mocks.data.mockClear();

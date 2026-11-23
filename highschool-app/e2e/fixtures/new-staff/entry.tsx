@@ -76,7 +76,7 @@ function Attendance() {
     }
     return true;
   }
-  return <div className="praise-workspace"><PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} /></div>;
+  return <div className="praise-workspace"><PraiseAttendance view={view} meeting={view.meetings[0]} execute={execute} busy={false} quickEntry /></div>;
 }
 
 function HomeGuide() {

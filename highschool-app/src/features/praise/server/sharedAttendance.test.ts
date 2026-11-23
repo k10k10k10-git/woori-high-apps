@@ -158,6 +158,22 @@ describe("학기 공통 출석의 조회·미입력·매핑·권한", () => {
     await snapshot(); expect(memory.reads.filter(p => p === "semesters/2026-2/sessions")).toHaveLength(1);
     expect(memory.reads.filter(p => p.startsWith("semesters/2026-2/attendance/"))).toEqual(["semesters/2026-2/attendance/team/session", "semesters/2026-2/attendance/team/next"]);
   });
+  it("담당자에게 선택한 회차의 출결만 보낸 뒤 전체 표 조회에서 전체 회차를 읽는다", async () => {
+    const first = memory.state!.meetings.m_20260905;
+    memory.state!.meetings.next = { ...first, id: "next", date: "2026-09-12", worshipDate: "2026-09-13", linkedSessionId: "next" };
+    memory.rows.set("semesters/2026-2/sessions", { session: { date: first.date }, next: { date: "2026-09-12" } });
+    memory.rows.set(entryPath, { s: "출석" });
+    memory.rows.set("semesters/2026-2/attendance/team/next/1_student", { s: "결석" });
+    const view = await readPraiseView(staff, "synthetic", first.id);
+    expect(view.meetings).toHaveLength(2);
+    expect(Object.keys(view.attendance)).toEqual([first.id]);
+    expect(Object.keys(view.attendance[first.id])).toEqual(["student"]);
+    expect(view.attendance[first.id].student.status).toBe("PRESENT");
+    expect(memory.reads.filter(p => p.startsWith("semesters/2026-2/attendance/"))).toEqual(["semesters/2026-2/attendance/team/session"]);
+    const semester = await readPraiseView(staff, "synthetic");
+    expect(semester.attendance.next.student.status).toBe("ABSENT");
+    expect(memory.writes).toBe(0);
+  });
   it("한 셀을 저장하기 전에는 해당 학생·회차만 읽고, 다른 회차의 중복 연결도 검증한다", async () => {
     const state = memory.state!, scope = { meetingId: "m_20260905", personId: "student" };
     state.meetings.next = { ...state.meetings[scope.meetingId], id: "next", date: "2026-09-12", linkedSessionId: "next" };

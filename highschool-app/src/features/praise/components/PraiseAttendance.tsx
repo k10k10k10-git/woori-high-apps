@@ -7,8 +7,14 @@ import { confirmPraiseNavigation, usePraiseDraftGuard } from "../usePraiseDraftG
 import { PraiseAuditList } from "./PraiseAuditList";
 import { Empty, authorName, hasUnresolvedImportedGroup, latestGroups, praiseMeetingWriteLocked, stampTime, type PraiseMeetingProps } from "./shared";
 
+export type PraiseAttendanceDisplay = "meeting" | "semester";
 type AttendanceProps = PraiseMeetingProps & {
   active?: boolean;
+  loading?: boolean;
+  loadFailed?: boolean;
+  quickEntry?: boolean;
+  display?: PraiseAttendanceDisplay;
+  onDisplayChange?: (display: PraiseAttendanceDisplay) => void;
   onSelectMeeting?: (meetingId: string) => void;
   onEditPerson?: (personId: string) => void;
 };
@@ -16,20 +22,33 @@ type AttendanceProps = PraiseMeetingProps & {
 type BatchEntry = PraiseAttendanceInput & { status: PraiseStatus };
 type AttendanceDraft = { meetingId: string; entries: Record<string, BatchEntry> };
 
-export function PraiseAttendance({ view, meeting, execute, busy, active = true, onSelectMeeting, onEditPerson }: AttendanceProps) {
-  const [display, setDisplay] = useState<"meeting" | "semester">("meeting");
+export function PraiseAttendance({ view, meeting, execute, busy, active = true, loading = false, loadFailed = false, quickEntry = false, display: controlledDisplay, onDisplayChange, onSelectMeeting, onEditPerson }: AttendanceProps) {
+  const [localDisplay, setLocalDisplay] = useState<PraiseAttendanceDisplay>("meeting");
+  const display = controlledDisplay ?? localDisplay;
+  const setDisplay = onDisplayChange ?? setLocalDisplay;
   const [query, setQuery] = useState("");
   const [groupId, setGroupId] = useState("");
   const [selectedKind, setKind] = useState<"STUDENT" | "STAFF">("STUDENT");
   const [missingOnly, setMissingOnly] = useState(false);
   const [clearRecord, setClearRecord] = useState<{ name: string; command: PraiseCommand; meetingId: string } | null>(null);
   const [draft, setDraft] = useState<AttendanceDraft | null>(null);
+  const [singleMeeting, setSingleMeeting] = useState("");
+  const [savingStatus, setSavingStatus] = useState<{ meetingId: string; personId: string; status: PraiseStatus } | null>(null);
   const canReadStudents = canReadPraiseStudentAttendance(view.permissions);
   const kind = canReadStudents ? selectedKind : "STAFF";
-  const batch = active && kind === "STUDENT" && draft?.meetingId === meeting?.id ? draft : null;
-  if (draft && !batch) setDraft(null);
+  const batchEnabled = active && !loading && display === "meeting" && kind === "STUDENT" && meeting;
+  const defaultBatch = batchEnabled && quickEntry && singleMeeting !== meeting.id && !meeting.cancelled && !praiseMeetingWriteLocked(view, meeting);
+  const batch = batchEnabled && draft?.meetingId === meeting.id ? draft : defaultBatch ? { meetingId: meeting.id, entries: {} } : null;
+  if (draft && draft !== batch) setDraft(null);
   const draftEntries = batch ? Object.values(batch.entries) : [];
   usePraiseDraftGuard("attendance", draftEntries.length > 0, Boolean(batch && busy));
+  const dismissBatch = () => {
+    if (!confirmPraiseNavigation("attendance")) return false;
+    setDraft(null);
+    return true;
+  };
+  const displayControl = <div className="praise-segment" aria-label="출결 보기"><button type="button" aria-pressed={display === "meeting"} onClick={() => setDisplay("meeting")}>모임별 입력</button><button type="button" aria-pressed={display === "semester"} onClick={() => { if (dismissBatch()) setDisplay("semester"); }}>학기 전체 표</button></div>;
+  if (loading) return <section className="praise-section" aria-label="찬양팀 출결">{displayControl}{!loadFailed && <p className="praise-loading" role="status">{display === "semester" ? "학기 전체 출결을 불러오는 중입니다…" : "선택한 회차 출결을 불러오는 중입니다…"}</p>}</section>;
   const groupVersion = latestGroups(view, meeting);
   const unresolvedGroup = hasUnresolvedImportedGroup(view, meeting);
   if (!meeting) return <Empty>운영 설정에서 모임 회차를 추가하면 출결을 기록할 수 있습니다.</Empty>;
@@ -54,11 +73,6 @@ export function PraiseAttendance({ view, meeting, execute, busy, active = true, 
   const missing = batch ? rows.filter((person) => studentEditable(person.id) &&
     (Boolean(records[person.id]) || view.permissions.attendanceAll) &&
     records[person.id]?.status == null && !batch.entries[person.id]) : [];
-  const dismissBatch = () => {
-    if (!confirmPraiseNavigation("attendance")) return false;
-    setDraft(null);
-    return true;
-  };
   const saveBatch = async () => {
     if (!batch || !draftEntries.length || busy) return;
     if (await execute({ type: "attendance.batch", meetingId: meeting.id, entries: draftEntries })) {
@@ -67,9 +81,10 @@ export function PraiseAttendance({ view, meeting, execute, busy, active = true, 
   };
 
   const meetings = [...view.meetings].sort((a, b) => a.date.localeCompare(b.date) || a.sequence - b.sequence);
-  const usedGroupVersions = new Set([...meetings.map((item) => latestGroups(view, item)?.id), ...Object.values(view.attendance).flatMap((records) => Object.values(records).map((record) => record.groupVersionId))]);
+  const semesterVisible = active && display === "semester";
+  const usedGroupVersions = new Set(semesterVisible ? [...meetings.map((item) => latestGroups(view, item)?.id), ...Object.values(view.attendance).flatMap((records) => Object.values(records).map((record) => record.groupVersionId))] : []);
   const semesterGroups = [...new Map(view.groups.filter((version) => version.kind === "CONFIRMED" && usedGroupVersions.has(version.id)).flatMap((version) => version.groups).map((group) => [group.id, group])).values()];
-  const semesterRows = display === "semester" ? view.people.filter((person) => person.kind === kind && person.name.replaceAll(" ", "").toLocaleLowerCase().includes(query.replaceAll(" ", "").toLocaleLowerCase())).map((person) => ({ person, cells: meetings.map((item) => attendanceCell(view, item, person, groupId)) })).filter(({ cells }) => cells.some((cell) => cell.visible) && (!missingOnly || cells.some((cell) => cell.missing))) : [];
+  const semesterRows = semesterVisible ? view.people.filter((person) => person.kind === kind && person.name.replaceAll(" ", "").toLocaleLowerCase().includes(query.replaceAll(" ", "").toLocaleLowerCase())).map((person) => ({ person, cells: meetings.map((item) => attendanceCell(view, item, person, groupId)) })).filter(({ cells }) => cells.some((cell) => cell.visible) && (!missingOnly || cells.some((cell) => cell.missing))) : [];
   const openMeeting = (id: string, personId?: string) => {
     if (!onSelectMeeting || busy) return;
     const target = view.meetings.find((item) => item.id === id);
@@ -81,7 +96,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, active = true, 
   };
   return <section className="praise-section" aria-label="찬양팀 출결">
     <div className="praise-section-heading"><div><h2>{display === "meeting" ? "모임 출결" : "학기 전체 출결"}</h2><p>{display === "meeting" ? `${kind === "STUDENT" ? meeting.date : meeting.worshipDate} · ${kind === "STAFF" ? "주일 스탭 참석 · " : ""}${meeting.title}${meeting.cancelled ? " · 학생 휴강" : ""}` : `${view.meta.startDate} ~ ${view.meta.endDate} · ${meetings.length}개 회차`}</p></div><span className="praise-badge">{view.permissions.attendanceAll ? "전체 팀원" : kind === "STUDENT" ? "내 담당 조" : "스탭 참석"}</span></div>
-    <div className="praise-segment" aria-label="출결 보기"><button type="button" aria-pressed={display === "meeting"} onClick={() => setDisplay("meeting")}>모임별 입력</button><button type="button" aria-pressed={display === "semester"} onClick={() => { if (dismissBatch()) setDisplay("semester"); }}>학기 전체 표</button></div>
+    {displayControl}
     {display === "meeting" && meeting.cancelled && <p className="praise-warning">{praiseMeetingWriteLocked(view, meeting) ? "학생 모임 휴강 회차입니다. 현재 운영 기간은 읽기 전용입니다." : "학생 모임 휴강 회차입니다. 학생 출결은 잠겨 있으며 주일 스탭 참석은 기록할 수 있습니다."}</p>}
     {display === "meeting" && kind === "STUDENT" && meeting.linkedSessionId && <p className="praise-note">{view.meta.mode === "shadow"
       ? "원본 대조용 출결입니다. 학기 출석과 같은 기록의 실시간 조회와 수정은 운영 전환 후 연결을 확인한 뒤 시작됩니다."
@@ -103,7 +118,7 @@ export function PraiseAttendance({ view, meeting, execute, busy, active = true, 
         for (const person of missing) entries[person.id] = { ...studentInput(person.id, "PRESENT"), status: "PRESENT" };
         setDraft({ ...batch, entries });
       }}>현재 목록 미입력 {missing.length}명 출석 표시</button>
-        : <button type="button" className="praise-button" disabled={busy} onClick={() => setDraft({ meetingId: meeting.id, entries: {} })}>여러 명 체크</button>}
+        : <button type="button" className="praise-button" disabled={busy} onClick={() => { setSingleMeeting(""); setDraft({ meetingId: meeting.id, entries: {} }); }}>여러 명 체크</button>}
       {batch && missing.length + draftEntries.length > PRAISE_ATTENDANCE_BATCH_LIMIT && <span className="praise-note">한 번에 100명까지 저장할 수 있습니다. 조나 이름으로 범위를 좁혀 주세요.</span>}
     </div>}
     {display === "semester" ? <>
@@ -120,14 +135,19 @@ export function PraiseAttendance({ view, meeting, execute, busy, active = true, 
       const record = records[person.id]; const available = staffRecords[person.id];
       const restricted = kind === "STUDENT" && !record && !view.permissions.attendanceAll;
       const draftEntry = batch?.entries[person.id];
-      const status = kind === "STUDENT" ? draftEntry?.status ?? record?.status ?? null : available?.present != null ? available.present ? "PRESENT" : "ABSENT" : null;
+      const pending = savingStatus?.meetingId === meeting.id && savingStatus.personId === person.id ? savingStatus : null;
+      const status = pending?.status ?? (kind === "STUDENT" ? draftEntry?.status ?? record?.status ?? null : available?.present != null ? available.present ? "PRESENT" : "ABSENT" : null);
       const stamp = kind === "STUDENT" ? record && (record.updatedAt > 0 || Boolean(record.updatedBy)) ? record : undefined : available;
       const group = groupVersion?.groups.find((item) => item[kind === "STUDENT" ? "studentIds" : "staffIds"].includes(person.id));
       const statusCommand = (next: PraiseStatus | null): PraiseCommand => kind === "STUDENT"
         ? { type: "attendance.set", meetingId: meeting.id, ...studentInput(person.id, next) }
         : { type: "availability.set", meetingId: meeting.id, personId: person.id, present: next === null ? null : next === "PRESENT", role: available?.role ?? (person.singerCapable ? "SINGER" : "SESSION"), expectedRevision: available?.revision ?? 0 };
-      const setStatus = (next: PraiseStatus) => {
-        if (!batch) return execute(statusCommand(next));
+      const setStatus = async (next: PraiseStatus) => {
+        if (!batch) {
+          setSavingStatus({ meetingId: meeting.id, personId: person.id, status: next });
+          try { await execute(statusCommand(next)); } finally { setSavingStatus(null); }
+          return;
+        }
         const entries = { ...batch.entries };
         if (next === record?.status) delete entries[person.id];
         else if (draftEntry || draftEntries.length < PRAISE_ATTENDANCE_BATCH_LIMIT)
@@ -136,20 +156,21 @@ export function PraiseAttendance({ view, meeting, execute, busy, active = true, 
       };
       const rowLocked = busy || !canEdit || Boolean(batch && !draftEntry && draftEntries.length >= PRAISE_ATTENDANCE_BATCH_LIMIT);
       return <article className="praise-attendance-row" key={person.id}>
-        <div className="praise-person-heading"><div className="praise-person-title"><strong>{person.name}</strong>{view.permissions.manage && onEditPerson && <button type="button" className="praise-text-button praise-person-edit" disabled={busy || Boolean(batch)} aria-label={`${person.name} 세부 정보 수정`} onClick={() => onEditPerson(person.id)}>정보 수정</button>}</div><span>{kind === "STUDENT" ? `${person.grade}학년 · ${person.team === "SINGER" ? "싱어" : "세션"}` : "스탭"}{group ? ` · ${group.name}` : unresolvedGroup ? " · 과거 조 확인 필요" : " · 조 미배정"}</span>{record?.originalStatus === "LATE" && <small>기존 지각 기록 · 출석으로 표시</small>}{kind === "STUDENT" && meeting.linkedSessionId && <small>{view.meta.mode === "shadow" || source?.mapping === "shadow" ? "원본 대조용 기록" : source?.mapping === "linked" ? "학기 출석과 같은 기록" : invalidShared ? "학기 연결 확인 필요" : "학기 명단 연결 필요"}</small>}</div>
+        <div className="praise-person-heading"><div className="praise-person-title"><strong>{person.name}</strong>{view.permissions.manage && onEditPerson && <button type="button" className="praise-text-button praise-person-edit" disabled={busy || draftEntries.length > 0} aria-label={`${person.name} 세부 정보 수정`} onClick={() => onEditPerson(person.id)}>정보 수정</button>}</div><span>{kind === "STUDENT" ? `${person.grade}학년 · ${person.team === "SINGER" ? "싱어" : "세션"}` : "스탭"}{group ? ` · ${group.name}` : unresolvedGroup ? " · 과거 조 확인 필요" : " · 조 미배정"}</span>{record?.originalStatus === "LATE" && <small>기존 지각 기록 · 출석으로 표시</small>}{kind === "STUDENT" && meeting.linkedSessionId && <small>{view.meta.mode === "shadow" || source?.mapping === "shadow" ? "원본 대조용 기록" : source?.mapping === "linked" ? "학기 출석과 같은 기록" : invalidShared ? "학기 연결 확인 필요" : "학기 명단 연결 필요"}</small>}</div>
         <div className="praise-row-actions"><div className="praise-status-buttons" role="group" aria-label={`${person.name} 출결`}>
           <button type="button" aria-pressed={status === "PRESENT"} disabled={rowLocked || status === "PRESENT"} onClick={() => { void setStatus("PRESENT"); }}>출석</button>
           <button type="button" aria-pressed={status === "ABSENT"} disabled={rowLocked || status === "ABSENT"} onClick={() => { void setStatus("ABSENT"); }}>결석</button>
-          {batch ? draftEntry && <button type="button" disabled={busy} onClick={() => {
+          {draftEntry ? <button type="button" disabled={busy} onClick={() => {
+            if (!batch) return;
             const entries = { ...batch.entries }; delete entries[person.id]; setDraft({ ...batch, entries });
-          }}>변경 취소</button> : <button type="button" aria-label={invalidShared ? `${person.name} 학기 연결 확인 필요` : restricted ? `${person.name} 출결 확인 필요` : `${person.name} 출결 지우기`} disabled={busy || !canEdit || status === null} onClick={() => setClearRecord({ name: person.name, command: statusCommand(null), meetingId: meeting.id })}>{invalidShared ? "연결 확인 필요" : restricted ? "확인 필요" : "기록 지우기"}</button>}
+          }}>변경 취소</button> : (!batch || (quickEntry && draftEntries.length === 0)) && <button type="button" aria-label={invalidShared ? `${person.name} 학기 연결 확인 필요` : restricted ? `${person.name} 출결 확인 필요` : `${person.name} 출결 지우기`} disabled={busy || !canEdit || status === null} onClick={() => setClearRecord({ name: person.name, command: statusCommand(null), meetingId: meeting.id })}>{invalidShared ? "연결 확인 필요" : restricted ? "확인 필요" : "기록 지우기"}</button>}
         </div>
         {kind === "STAFF" && <label className="praise-field"><span className="sr-only">{person.name} 참석 역할</span><select value={available?.role ?? (person.singerCapable ? "SINGER" : "SESSION")} disabled={busy || !canEdit || !available} onChange={(event) => { if (available) void execute({ type: "availability.set", meetingId: meeting.id, personId: person.id, present: available.present, role: event.target.value as "SINGER" | "SESSION", expectedRevision: available.revision }); }}><option value="SINGER">싱어</option><option value="SESSION">세션</option></select></label>}
-        <small className="praise-stamp">{draftEntry ? "저장 전" : invalidShared ? "학기·회차·명단 연결을 확인해 주세요. 휴강·취소된 항목은 입력할 수 없습니다." : stamp ? `${stampTime(stamp.updatedAt)} · ${authorName(view, stamp.updatedBy)}` : restricted ? "확인할 기록 없음 · 이전 담당 조 기록은 확인이 필요할 수 있습니다." : "아직 입력하지 않았습니다"}</small></div>
+        <small className="praise-stamp">{pending ? "저장 중…" : draftEntry ? "저장 전" : invalidShared ? "학기·회차·명단 연결을 확인해 주세요. 휴강·취소된 항목은 입력할 수 없습니다." : stamp ? `${stampTime(stamp.updatedAt)} · ${authorName(view, stamp.updatedBy)}` : restricted ? "확인할 기록 없음 · 이전 담당 조 기록은 확인이 필요할 수 있습니다." : "아직 입력하지 않았습니다"}</small></div>
       </article>;
     })}</div>}
     {batch && display === "meeting" && <div className="praise-save-bar sticky bottom-0 z-10 bg-[var(--color-surface)] py-3">
-      <button type="button" className="praise-button" disabled={busy} onClick={dismissBatch}>여러 명 체크 닫기</button>
+      <button type="button" className="praise-button" disabled={busy} onClick={() => { if (dismissBatch()) setSingleMeeting(meeting.id); }}>{quickEntry ? "한 명씩 자동 저장" : "여러 명 체크 닫기"}</button>
       <button type="button" className="praise-button praise-button--primary" disabled={busy || !draftEntries.length} onClick={() => { void saveBatch(); }}>{busy ? "저장 중…" : `${draftEntries.length}명 출결 저장`}</button>
     </div>}
     <PraiseAuditList view={view} attendanceOnly />
