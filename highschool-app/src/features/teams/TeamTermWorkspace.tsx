@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import LoadFailureNotice from "@/components/LoadFailureNotice";
 import WorkspaceSkeleton from "@/components/WorkspaceSkeleton";
 import ReadOnlyBanner from "@/components/ReadOnlyBanner";
 import { useAuth } from "@/context/AuthContext";
-import { subscribeApplications, subscribeApplicationsPrivate, subscribeSemesterMeta, subscribeSessions, subscribeTeams, subscribeTrainingClasses } from "@/features/semester/db";
+import { getSemesterIds, refreshSemesterList, subscribeApplications, subscribeApplicationsPrivate, subscribeSemesterMeta, subscribeSemesters, subscribeSessions, subscribeTeams, subscribeTrainingClasses } from "@/features/semester/db";
 import type { Application, ApplicationPrivate, SemesterMeta, Session, Team, TrainingClass } from "@/features/semester/types";
 import { resolvedContact, type RosterContact } from "@/features/semester/rosterContact";
 import { sundayTeamOf, type SundayTeamKey } from "@/features/portal/featureCatalog";
 import { canAccessOperationsCenter, canAccessTeam, canBrowseTeam, canEditTeam, canReadSemesterPrivate, canReadTeamContacts, semesterTeamForKey } from "./teamModel";
 import { canEditArea } from "@/features/portal/accessPolicy";
-import { semesterSummaryMeta } from "@/features/semester/termPhase";
+import { isLatestRegularSemester, semesterSummaryMeta } from "@/features/semester/termPhase";
 import { praiseReturnHref } from "@/features/praise/navigation";
 import { fetchTeamRosterContacts } from "./teamContacts";
 import { TeamAccessState } from "./TeamAccessState";
@@ -61,6 +61,8 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
   const [applicationPrivates, setApplicationPrivates] = useState<Record<string, ApplicationPrivate>>({});
   const [rosterContacts, setRosterContacts] = useState<Record<string, RosterContact>>({});
   const [ready, setReady] = useState(new Set<string>());
+  const [attendanceWindow, setAttendanceWindow] = useState<"checking" | "open" | "closed" | "error">("checking");
+  const attendanceCheck = useRef<{ pending?: Promise<boolean> } | null>(null);
   const { fail: recordFailure, ok, errors, message: error } = useLoadErrors(`${teamKey}:${semesterId}`);
 
   useEffect(() => {
@@ -113,7 +115,44 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
   const displayMeta = meta ? semesterSummaryMeta(meta, Object.fromEntries(sessions.map((session) => [session.id, session]))) : null;
   const past = !!displayMeta?.endDate && displayMeta.endDate < today;
   const broadEditor = roles.semester === "superAdmin" || roles.semester === "pastor";
-  const editable = canEditTeam(teamKey, roles, teamMemberships, semesterId) && (!past || broadEditor);
+  const teamEditor = canEditTeam(teamKey, roles, teamMemberships, semesterId);
+  const editable = teamEditor && (!past || broadEditor);
+  const closingAttendance = !!user && !loading && !roleError && allowed && teamEditor && teamMemberships[teamKey]?.active && past && !broadEditor
+    && section === "attendance" && !(teamKey === "praise" && weeklyAllowed);
+  const attendanceEditable = editable || (closingAttendance && attendanceWindow === "open");
+
+  useEffect(() => {
+    if (!closingAttendance) return;
+    const check = {};
+    attendanceCheck.current = check;
+    const unsubscribe = subscribeSemesters((items) => {
+      if (attendanceCheck.current === check) setAttendanceWindow(isLatestRegularSemester(semesterId, items.map(({ id }) => id)) ? "open" : "closed");
+    }, () => {
+      if (attendanceCheck.current === check) setAttendanceWindow("error");
+    });
+    return () => {
+      attendanceCheck.current = null;
+      unsubscribe();
+    };
+  }, [closingAttendance, semesterId]);
+
+  function checkClosingAttendance(): Promise<boolean> {
+    const check = attendanceCheck.current;
+    if (!check) return Promise.resolve(false);
+    check.pending ??= getSemesterIds().then((ids) => {
+      if (attendanceCheck.current !== check) return false;
+      const open = isLatestRegularSemester(semesterId, ids);
+      if (!open) {
+        setAttendanceWindow("closed");
+        refreshSemesterList();
+      }
+      return open;
+    }).catch(() => {
+      if (attendanceCheck.current === check) setAttendanceWindow("error");
+      return false;
+    }).finally(() => { check.pending = undefined; });
+    return check.pending;
+  }
   const operationsBaseHref = canAccessOperationsCenter(roles, teamMemberships) && canEditArea("semester", roles)
     ? `/operations/semesters/${encodeURIComponent(semesterId)}` : undefined;
   const loaded = ready.size === 7;
@@ -130,11 +169,15 @@ function TeamTermWorkspaceForUser({ teamKey, semesterId, section, onRetry }: { t
     <section className="team-term-content">
       {error && <LoadFailureNotice title="일부 학기 정보를 불러오지 못했습니다." sources={Object.keys(errors)} onRetry={onRetry} />}
       {!loaded ? <WorkspaceSkeleton label="팀 학기 정보를 불러오는 중입니다." rows={7} variant="page" /> : blocked ? <div className="team-first-state">학기 명단과 회차를 확인한 뒤 기록을 열 수 있습니다. 다시 불러오기를 눌러 주세요.</div> : !team ? <div className="team-first-empty"><h2>이 학기에 연결된 팀이 없습니다</h2><p>{operationsBaseHref ? `학기 운영 설정에서 ${teamMeta.label}을 이 학기에 연결해 주세요.` : `담당 교역자 또는 행정팀에 ${teamMeta.label}의 학기 연결을 확인해 달라고 요청하세요.`}</p>{operationsBaseHref && <Link className="btn-secondary" href={`${operationsBaseHref}/settings`}>학기 운영 설정 열기</Link>}</div> : <>
-        {!editable && <ReadOnlyBanner what={`${teamMeta.label} ${semesterId} 기록`} why={past ? "지난 학기는 기본적으로 조회 전용입니다." : "조회 역할은 이 팀 기록을 수정할 수 없습니다."} />}
+        {closingAttendance && attendanceWindow === "checking" && <p className="team-context-note" role="status">다음 학기 개설 여부를 확인하는 중입니다.</p>}
+        {closingAttendance && attendanceWindow === "error" && <LoadFailureNotice title="다음 학기 개설 여부를 확인하지 못했습니다." onRetry={onRetry} />}
+        {closingAttendance && attendanceWindow === "open" && <p className="team-context-note">다음 학기가 개설되기 전까지 출석을 수정할 수 있습니다.</p>}
+        {!(section === "attendance" ? attendanceEditable : editable) && (!closingAttendance || attendanceWindow === "closed") &&
+          <ReadOnlyBanner what={`${teamMeta.label} ${semesterId} 기록`} why={closingAttendance ? "다음 학기가 개설됐습니다. 지난 학기 출석을 조회할 수 있습니다." : past ? "지난 학기는 기본적으로 조회 전용입니다." : "조회 역할은 이 팀 기록을 수정할 수 없습니다."} />}
         <SemesterEditProvider canEdit={editable}>
           {section === "overview" && <TeamTermOverview team={team} roster={roster} sessions={sessions} />}
           {section === "roster" && <TeamRoster team={team} roster={roster} applicationPrivates={privateAllowed ? applicationPrivates : {}} rosterContacts={rosterContacts} showContacts={contactAllowed} />}
-          {section === "attendance" && (teamKey === "praise" && weeklyAllowed ? <div className="team-first-empty"><h2>찬양팀 모임 출결</h2><Link className="btn-primary" href={praiseAttendanceHref}>이 학기 모임 출결 열기</Link></div> : <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedTeamId={team.id} operationsBaseHref={operationsBaseHref} />)}
+          {section === "attendance" && (teamKey === "praise" && weeklyAllowed ? <div className="team-first-empty"><h2>찬양팀 모임 출결</h2><Link className="btn-primary" href={praiseAttendanceHref}>이 학기 모임 출결 열기</Link></div> : <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedTeamId={team.id} operationsBaseHref={operationsBaseHref} canEditAttendance={attendanceEditable} beforeAttendanceChange={closingAttendance ? checkClosingAttendance : undefined} />)}
           {section === "curriculum" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} lockedTeamId={team.id} operationsBaseHref={operationsBaseHref} />}
           {section === "records" && <div><div className="team-context-note"><strong>학기 공용 자료</strong><span>{broadEditor ? "교역자와 통합관리자는 이 화면에서 공용 자료를 추가·삭제할 수 있습니다." : "팀 화면에서는 공용 자료를 조회만 합니다. 추가와 삭제는 운영센터에서 진행합니다."}</span></div><SemesterEditProvider canEdit={broadEditor}><ArchiveTab sid={semesterId} operationsBaseHref={operationsBaseHref} /></SemesterEditProvider></div>}
         </SemesterEditProvider>

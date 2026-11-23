@@ -6,7 +6,7 @@ import { auditedUpdate as update, auditedRemove as remove, auditedRunTransaction
 import { db } from "@/lib/firebase";
 import { paths } from "./paths";
 import { refreshSemesterList } from "./semesterList";
-export { getSemesters, subscribeSemesters } from "./semesterList";
+export { getSemesterIds, getSemesters, refreshSemesterList, subscribeSemesters } from "./semesterList";
 import {
   Application,
   ApplicationPrivate,

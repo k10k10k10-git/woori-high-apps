@@ -2,12 +2,12 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Application, SessionAttendance } from "@/features/semester/types";
-const mock = vi.hoisted(() => ({ mobile: true, save: vi.fn().mockResolvedValue(undefined), subscribe: vi.fn(), all: vi.fn(), listener: null as null | ((value: SessionAttendance) => void) }));
+const mock = vi.hoisted(() => ({ mobile: true, save: vi.fn().mockResolvedValue(undefined), clear: vi.fn().mockResolvedValue(undefined), subscribe: vi.fn(), all: vi.fn(), listener: null as null | ((value: SessionAttendance) => void) }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { uid: "synthetic-admin" } }) }));
 vi.mock("@/context/UIContext", () => ({ useUI: () => ({ toast: vi.fn() }) }));
 vi.mock("@/context/ViewModeContext", () => ({ useViewMode: () => ({ isMobileView: mock.mobile }) }));
 vi.mock("@/features/semester/db", () => ({
-  describeApplicant: () => "1부 · 1학년", setAttendance: mock.save, clearAttendance: vi.fn(), updateCompletionEntry: vi.fn(),
+  describeApplicant: () => "1부 · 1학년", setAttendance: mock.save, clearAttendance: mock.clear, updateCompletionEntry: vi.fn(),
   subscribeSessionAttendance: mock.subscribe,
   subscribeAllAttendance: mock.all, subscribeCompletion: vi.fn(() => () => {}),
 }));
@@ -50,6 +50,20 @@ it("모바일 회차 입력에서 지각을 별도 집계하고 저장 요청에
   fireEvent.click(screen.getByRole("button", { name: "합성 학생 지각" }));
   await waitFor(() => expect(mock.save).toHaveBeenCalledWith("2026-2", "team", "session-test", "app-test", "지각", "synthetic-admin", { subjectName: "합성 학생", date: "2026-09-12" }));
   expect(screen.getByRole("status")).toHaveTextContent("저장 완료");
+});
+
+it("보정 기간에는 출석 입력과 삭제마다 최신 학기 확인을 거친다", async () => {
+  const member: Application = { id: "app-test", studentId: "student-test", name: "합성 학생", bu: "1부", grade: 1, class: 1, status: "배치", teamId: "team-test", createdAt: "2026-09-01" };
+  const verify = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  render(<SemesterEditProvider canEdit={false}><AttendanceTab sid="2026-2" teams={[]} trainingClasses={[]} sessions={[{ id: "session-test", date: "2026-09-12", type: "정규" }]} applications={[member]} teamById={new Map()} meta={null} canEditAttendance beforeAttendanceChange={verify} /></SemesterEditProvider>);
+  const mark = screen.getByRole("button", { name: "합성 학생 출석" });
+  await act(async () => { fireEvent.click(mark); });
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "합성 학생 기록 지우기" })); });
+  expect(mock.save).not.toHaveBeenCalled();
+  expect(mock.clear).not.toHaveBeenCalled();
+  fireEvent.click(mark);
+  await waitFor(() => expect(mock.save).toHaveBeenCalledOnce());
+  expect(verify).toHaveBeenCalledTimes(3);
 });
 
 it("PC 표 보기에서도 입력 전에 자동 저장 방식을 표시한다", () => {

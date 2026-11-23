@@ -57,6 +57,8 @@ interface Props {
   lockedTeamId?: string;
   lockedScope?: SemesterRosterScope;
   operationsBaseHref?: string;
+  canEditAttendance?: boolean;
+  beforeAttendanceChange?: () => Promise<boolean>;
 }
 
 const STATUS_STYLE: Record<EditableAttendanceStatus, string> = {
@@ -74,7 +76,7 @@ function todayYMD(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId, lockedScope, operationsBaseHref }: Props) {
+export default function AttendanceTab({ sid, teams, trainingClasses, sessions, applications, teamById, meta, lockedTeamId, lockedScope, operationsBaseHref, canEditAttendance, beforeAttendanceChange }: Props) {
   const { user } = useAuth();
   const { toast } = useUI();
   const { isMobileView } = useViewMode();
@@ -125,7 +127,9 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const { errors, fail, ok } = useLoadErrors(readScope);
   const loadError = Object.keys(errors).length > 0;
   const loading = !loadError && (view === "session" ? readySession !== readScope : readyGrid !== readScope);
-  const writable = canEdit && !loadError && !loading;
+  const attendanceEditable = canEditAttendance ?? canEdit;
+  const writable = attendanceEditable && !loadError && !loading;
+  const completionWritable = canEdit && !loadError && !loading;
 
   useEffect(() => {
     if (view !== "session" || !activeSessId) return;
@@ -177,6 +181,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
 
   async function markAt(appKey: string, sessionId: string, status: EditableAttendanceStatus) {
     if (!writable) return;
+    if (beforeAttendanceChange && !await beforeAttendanceChange()) return;
     try {
       await saveFeedback.run(`${sessionId}/${appKey}`, () => setAttendance(sid, scope, sessionId, appKey, status, user?.uid, {
         subjectName: applications.find((application) => application.id === appKey)?.name,
@@ -189,6 +194,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
 
   async function clearAt(appKey: string, sessionId: string) {
     if (!writable) return;
+    if (beforeAttendanceChange && !await beforeAttendanceChange()) return;
     try {
       await saveFeedback.run(`${sessionId}/${appKey}`, () => clearAttendance(sid, scope, sessionId, appKey, {
         subjectName: applications.find((application) => application.id === appKey)?.name,
@@ -202,7 +208,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const mark = (appKey: string, status: EditableAttendanceStatus) => markAt(appKey, activeSessId, status);
 
   async function toggleCompletion(appKey: string, field: "certPrinted" | "photoChecked", value: boolean) {
-    if (!writable) return;
+    if (!completionWritable) return;
     try {
       await updateCompletionEntry(sid, appKey, { [field]: value });
     } catch {
@@ -319,7 +325,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
             </button>
           ))}
         </div>
-        {canEdit && <SaveFeedback state={saveFeedback.state} idleLabel="선택하면 자동 저장" errorLabel="저장 실패 · 원하는 출석 상태나 지우기를 다시 선택해 주세요" />}
+        {attendanceEditable && <SaveFeedback state={saveFeedback.state} idleLabel="선택하면 자동 저장" errorLabel="저장 실패 · 원하는 출석 상태나 지우기를 다시 선택해 주세요" />}
       </div>
 
       {view === "grid" ? (
@@ -330,6 +336,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
           attendanceByScope={attAllByScope}
           completionEligibleByScope={completionEligibleByScope}
           canEdit={writable}
+          canEditCompletion={completionWritable}
           completion={completion}
           completionMinRate={meta?.completionRule?.minRate ?? 0.7}
           onMark={(appKey, sessionId, status) => void markAt(appKey, sessionId, status)}
@@ -380,7 +387,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
                     {s}
                   </button>
                 ))}
-                {entry && canEdit && (
+                {entry && attendanceEditable && (
                   <button
                     onClick={() => void clearAt(m.id, activeSessId)}
                     disabled={!writable}
