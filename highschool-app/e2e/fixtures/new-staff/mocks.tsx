@@ -113,6 +113,11 @@ export function subscribeSemesters(callback: (items: unknown[]) => void, fail?: 
   ] : [current];
   return connect("semesters", "", callback, list, fail);
 }
+export async function getSemesterIds() {
+  return params.get("terms") === "multi" ? ["2026-1", "2026-2", "2027-1"] : ["2026-2"];
+}
+export function refreshSemesterList() {}
+
 export function subscribeTeams(id: string, callback: (items: unknown[]) => void, fail?: (error: Error) => void) {
   return connect("teams", id, callback, semesterTeams, fail);
 }

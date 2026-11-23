@@ -163,10 +163,15 @@ export function refreshSemesterList(): void {
   if (uid) void stores.get(uid)?.refresh();
 }
 
-export async function getSemesters(): Promise<Semester[]> {
+export async function getSemesterIds(): Promise<string[]> {
   const uid = auth.currentUser?.uid;
   if (!uid) throw new Error("로그인 후 학기 목록을 열어 주세요.");
-  const ids = await fetchIds(uid, AbortSignal.timeout(15000));
+  return fetchIds(uid, AbortSignal.timeout(15000));
+}
+
+export async function getSemesters(): Promise<Semester[]> {
+  const uid = auth.currentUser?.uid;
+  const ids = await getSemesterIds();
   const items = await Promise.all(ids.map(async (id) => {
     const meta = (await get(ref(db, paths.semesterMeta(id)))).val() as SemesterMeta | null;
     if (!meta) return null;

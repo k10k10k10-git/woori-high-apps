@@ -143,7 +143,8 @@
 - 화면 게이트는 `canAccessArea` / `canEditArea` / `iguardScopeOf` / `canManageRolesOf`와 목적별 함수(`canDestroySemester`·`canCreateRetreat`·`canSeeSensitiveRetreat` 등)만 사용합니다. 컴포넌트에서 역할 문자열을 직접 비교하지 않습니다.
 - 인증과 역할 조회는 루트 `src/context/AuthContext.tsx`에서 한 번만 수행하고 역할 판정은 `resolveMinistryRoles`(순수) 하나로 처리합니다. 삭제된 `src/features/iguard/context/AuthContext.tsx` 어댑터를 다시 만들거나 별도 인증·역할 구독을 추가하지 않습니다.
 - 역할 배정 쓰기는 `roleAssign.planRoleAssignment`(순수·테스트) → `applyRole.applyRoleSteps`(실행) 경로만 사용합니다. 부여를 먼저, 해제를 나중에 실행합니다.
-- 학기 화면의 편집 잠금은 `features/semester/EditContext`의 `useSemesterCanEdit()`으로만 판단합니다.
+- 학기 화면의 기본 편집 범위는 `features/semester/EditContext`의 `useSemesterCanEdit()`으로 판단합니다.
+- 팀 학기 출석은 담당 팀 편집 권한이 있는 사람에게 종강한 최신 정규 학기의 출석 입력·삭제를 다음 정규 학기 개설까지 열어 둡니다. 학기 목록을 읽지 못하면 보정 입력을 잠그고, 입력 직전에는 최신 학기 ID를 다시 조회합니다. 수료 확인과 커리큘럼의 편집 기간은 기존 학기 계약을 따릅니다.
 - 스탭의 학기 **조회**는 2026-08-08 Rules 보강으로 열렸습니다 — `semesters` `.read`에 `iguardMembers`가 추가됐습니다. `.write`는 계속 `admins`/`retreatAdmins`만이고, 연락처가 있는 `semestersPrivate`는 **행정 전용 그대로**입니다. 즉 스탭은 `semesters/*`(명단·팀·훈련 반·회차·출석·커리큘럼)를 읽지만 저장은 못 합니다. Rules는 학생 앱에서만 배포합니다.
 - 행정 권한과 이가드 권한의 **쓰기 경계**는 계속 분리합니다. 이가드팀은 수련회 행정 명단을 조회할 수 있지만 저장은 현장 모듈의 허용 범위에서만 합니다.
 

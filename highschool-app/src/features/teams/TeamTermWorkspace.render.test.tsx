@@ -1,17 +1,24 @@
 /** @vitest-environment jsdom */
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MinistryRoles } from "@/features/portal/accessPolicy";
+import type { Semester } from "@/features/semester/types";
+import type { TeamMemberships } from "./teamModel";
 
 const mocks = vi.hoisted(() => ({
   private: vi.fn(),
   contacts: vi.fn(),
   linked: true,
+  media: false,
+  semesters: null as ((items: Semester[]) => void) | null,
+  getSemesterIds: vi.fn(),
+  refresh: vi.fn(),
+  save: vi.fn(),
   auth: {
     user: { uid: "team-member" },
     loading: false,
     roles: { semester: "praise", retreat: "none" } as MinistryRoles,
-    teamMemberships: { praise: { role: "staff" as const, active: true } },
+    teamMemberships: { praise: { role: "staff", active: true } } as TeamMemberships,
     signIn: vi.fn(),
   },
 }));
@@ -26,21 +33,74 @@ vi.mock("./teamContacts", () => ({
   fetchTeamRosterContacts: mocks.contacts,
 }));
 
-vi.mock("@/app/semester/[id]/AttendanceTab", () => ({ default: () => null }));
+vi.mock("@/app/semester/[id]/AttendanceTab", () => ({ default: ({ canEditAttendance, beforeAttendanceChange }: { canEditAttendance: boolean; beforeAttendanceChange?: () => Promise<boolean> }) =>
+  <button disabled={!canEditAttendance} onClick={async () => {
+    if (!beforeAttendanceChange || await beforeAttendanceChange()) mocks.save();
+  }}>합성 출석 입력</button>,
+}));
 vi.mock("@/app/semester/[id]/CurriculumTab", () => ({ default: ({ operationsBaseHref }: { operationsBaseHref?: string }) => <output data-testid="curriculum-operations">{operationsBaseHref}</output> }));
 vi.mock("@/app/semester/[id]/ArchiveTab", () => ({ default: () => null }));
 
 vi.mock("@/features/semester/db", () => ({
+  subscribeSemesters: (cb: (items: Semester[]) => void) => { mocks.semesters = cb; return () => { mocks.semesters = null; }; },
+  getSemesterIds: mocks.getSemesterIds, refreshSemesterList: mocks.refresh,
   subscribeSemesterMeta: (_id: string, cb: (value: unknown) => void) => { cb({ title: "2026년 2학기", completionRule: { minRate: 0.7 }, createdAt: "2026-08-01" }); return () => {}; },
-  subscribeTeams: (_id: string, cb: (value: unknown) => void) => { cb(mocks.linked ? [{ id: "team-1", teamKey: "praise", name: "찬양팀", color: "", order: 1 }] : []); return () => {}; },
+  subscribeTeams: (_id: string, cb: (value: unknown) => void) => { cb(mocks.linked ? [{ id: "team-1", teamKey: mocks.media ? "media" : "praise", name: mocks.media ? "미디어팀" : "찬양팀", color: "", order: 1 }] : []); return () => {}; },
   subscribeTrainingClasses: (_id: string, cb: (value: unknown) => void) => { cb([]); return () => {}; },
-  subscribeSessions: (_id: string, cb: (value: unknown) => void) => { cb([]); return () => {}; },
+  subscribeSessions: (_id: string, cb: (value: unknown) => void) => { cb(mocks.media ? [{ id: "last", date: "2026-11-21", type: "정규" }] : []); return () => {}; },
   subscribeApplications: (_id: string, cb: (value: unknown) => void) => { cb([{ id: "1_student-1", studentId: "student-1", bu: "1부", grade: 1, class: 2, name: "팀원학생", status: "배치", teamId: "team-1", createdAt: "2026-08-01" }]); return () => {}; },
   subscribeApplicationsPrivate: (_id: string, cb: (value: unknown) => void) => { mocks.private(); cb({ "1_student-1": { phone: "010-9999-0000", parentPhone: "010-8888-0000" } }); return () => {}; },
 }));
 
 import TeamTermWorkspace from "./TeamTermWorkspace";
-afterEach(() => { mocks.linked = true; });
+afterEach(() => {
+  mocks.linked = true;
+  mocks.media = false;
+  mocks.auth.teamMemberships = { praise: { role: "staff", active: true } };
+});
+
+describe("종강 학기의 사역팀 출석 보정", () => {
+  const term = (id: string): Semester => ({ id, meta: { title: id, createdAt: "2026-11-01", completionRule: { minRate: 0.7 } } });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.media = true;
+    mocks.auth.roles = { semester: "leader", retreat: "none" };
+    mocks.auth.teamMemberships = { media: { role: "leader", active: true } };
+    mocks.contacts.mockResolvedValue({});
+  });
+
+  it("등록된 최신 학기의 담당 팀장에게 출석 입력을 열고 개설 이후의 클릭은 막는다", async () => {
+    render(<TeamTermWorkspace teamKey="media" semesterId="2026-2" section="attendance" />);
+    const input = await screen.findByRole("button", { name: "합성 출석 입력" });
+    expect(input).toBeDisabled();
+    act(() => mocks.semesters?.([term("2026-2"), term("2026-1")]));
+    expect(input).toBeEnabled();
+    mocks.getSemesterIds.mockResolvedValueOnce(["2026-2", "2027-sunday"]);
+    fireEvent.click(input);
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
+    mocks.getSemesterIds.mockResolvedValueOnce(["2026-2", "2027-1"]);
+    fireEvent.click(input);
+    await screen.findByText(/다음 학기가 개설됐습니다/);
+    expect(input).toBeDisabled();
+    expect(mocks.save).toHaveBeenCalledOnce();
+  });
+
+  it("시작일이 없는 다음 학기를 받는 즉시 이미 열린 입력을 잠근다", async () => {
+    render(<TeamTermWorkspace teamKey="media" semesterId="2026-2" section="attendance" />);
+    const input = await screen.findByRole("button", { name: "합성 출석 입력" });
+    act(() => mocks.semesters?.([term("2026-2")]));
+    expect(input).toBeEnabled();
+    act(() => mocks.semesters?.([term("2027-1"), term("2026-2")]));
+    expect(input).toBeDisabled();
+  });
+
+  it("조회자로 연결된 계정은 종강 이후에도 입력을 열 수 없다", async () => {
+    mocks.auth.teamMemberships = { media: { role: "viewer", active: true } };
+    render(<TeamTermWorkspace teamKey="media" semesterId="2026-2" section="attendance" />);
+    expect(await screen.findByRole("button", { name: "합성 출석 입력" })).toBeDisabled();
+    expect(mocks.semesters).toBeNull();
+  });
+});
 
 describe("TeamTermWorkspace 팀 연락처", () => {
   beforeEach(() => {

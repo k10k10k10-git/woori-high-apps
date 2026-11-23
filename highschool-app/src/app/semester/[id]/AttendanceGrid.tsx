@@ -32,6 +32,7 @@ type Props = {
   attendanceByScope: AttendanceByScope;
   completionEligibleByScope: Record<SemesterAttendanceScope, ReadonlySet<string>>;
   canEdit: boolean;
+  canEditCompletion?: boolean;
   completion: Record<string, CompletionEntry>;
   completionMinRate: number;
   onMark: (appKey: string, sessId: string, status: EditableAttendanceStatus) => void;
@@ -74,6 +75,7 @@ export default function AttendanceGrid({
   attendanceByScope,
   completionEligibleByScope,
   canEdit,
+  canEditCompletion = canEdit,
   completion,
   completionMinRate,
   onMark,
@@ -257,10 +259,10 @@ export default function AttendanceGrid({
                     );
                   })}
                   <td className="px-2 py-1.5">
-                    {!staffMember && <input type="checkbox" aria-label={`${member.name} 수료증 제작`} disabled={!canEdit} checked={check.certPrinted ?? false} onChange={(event) => onToggleCompletion(member.id, "certPrinted", event.target.checked)} />}
+                    {!staffMember && <input type="checkbox" aria-label={`${member.name} 수료증 제작`} disabled={!canEditCompletion} checked={check.certPrinted ?? false} onChange={(event) => onToggleCompletion(member.id, "certPrinted", event.target.checked)} />}
                   </td>
                   <td className="px-2 py-1.5">
-                    {!staffMember && <input type="checkbox" aria-label={`${member.name} 사진 확인`} disabled={!canEdit} checked={check.photoChecked ?? false} onChange={(event) => onToggleCompletion(member.id, "photoChecked", event.target.checked)} />}
+                    {!staffMember && <input type="checkbox" aria-label={`${member.name} 사진 확인`} disabled={!canEditCompletion} checked={check.photoChecked ?? false} onChange={(event) => onToggleCompletion(member.id, "photoChecked", event.target.checked)} />}
                   </td>
                 </tr>
                 );

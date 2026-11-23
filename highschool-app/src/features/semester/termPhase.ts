@@ -1,5 +1,11 @@
 import type { Semester, SemesterMeta, Session } from "./types";
 
+/** 정규 학기 번호로 비교한다. 연중 주일 운영 노드는 다음 학기가 아니다. */
+export function isLatestRegularSemester(semesterId: string, ids: readonly string[]): boolean {
+  const regular = /^\d{4}-[12]$/;
+  return regular.test(semesterId) && ids.includes(semesterId) && !ids.some((id) => regular.test(id) && id > semesterId);
+}
+
 /** 입력한 기간을 우선하고, 미입력 학기는 실제 등록 회차의 범위를 표시용으로만 사용한다. */
 export function semesterSummaryMeta(meta: SemesterMeta, sessions: Record<string, Session> = {}): SemesterMeta {
   const dates = Object.values(sessions).flatMap((session) => [session.date, session.endDate ?? session.date]).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)).sort();
