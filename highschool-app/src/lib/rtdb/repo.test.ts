@@ -593,6 +593,21 @@ describe("실시간 알림 두 길(postgres_changes · 비공개 broadcast rtdb:
     expect(fake.calls.slice(before)).toHaveLength(1);
   });
 
+  it("확인용 건수: 길마다 받은 수·처음 번호·상태, 두 길 중복 수(경로·값은 없음)", async () => {
+    const { fake, db } = setup({ a: 1 });
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.setRealtimeStatus("SUBSCRIBED");
+    fake.autoNotify = false;
+    fake.emitChange(["a"], 301);
+    fake.emitVia("broadcast", ["a"], 302);
+    const stats = db._repo.realtimeStats;
+    expect(stats.changes).toEqual({ status: "SUBSCRIBED", received: 1, first: 301 });
+    expect(stats.broadcast).toEqual({ status: "SUBSCRIBED", received: 2, first: 301 });
+    expect(stats.duplicates).toBe(1);
+    expect(JSON.stringify(stats)).not.toMatch(/"a"/);
+  });
+
   it("broadcast 채널을 열지 못해도 옛 길로 받는다", async () => {
     const { fake, db } = setup({ a: 1 });
     const original = fake.channel.bind(fake);

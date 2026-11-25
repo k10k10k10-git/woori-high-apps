@@ -20,6 +20,7 @@ import { DataSnapshot } from "./snapshot";
 import { deepEqual, getChild, isBranch, normalize, reconcile, setChild, type Node } from "./tree";
 import { RtdbTransport, type RealtimeChannelLike, type RpcOutcome, type SupabaseLike } from "./transport";
 import { resolveLocally, toServerJson, validateData } from "./values";
+import { countRealtime, createRealtimeStats, noteRealtimeStatus } from "./realtimeStats";
 
 export type ListenerType = "value" | "child_added" | "child_changed" | "child_removed";
 export type ListenerCallback = (snapshot: DataSnapshot, previousChildName?: string | null) => unknown;
@@ -157,6 +158,8 @@ export class Repo implements RepoHandle {
   private readonly channelEverUp = new Set<"changes" | "broadcast">();
   /** 이미 처리한 변경 번호(두 길로 같은 알림이 오면 두 번째는 버린다). */
   private readonly seenChanges = new Set<number>();
+  /** 옮기는 동안의 확인용 건수(realtimeStats.ts). */
+  readonly realtimeStats = createRealtimeStats();
   private realtimeSubscribed = false;
   private browserOnline = true;
   private networkOffline = false;
@@ -237,6 +240,7 @@ export class Repo implements RepoHandle {
       channelCounter += 1;
       const channel = client.channel(`rtdb-changes-${channelCounter}`);
       channel.on("postgres_changes", { event: "INSERT", schema: "rtdb", table: "changes" }, (payload) => {
+        countRealtime(this.realtimeStats, "changes", payload?.new, this.seenChanges);
         this.onRealtimeChange(payload?.new);
       });
       channel.subscribe((status) => this.onRealtimeStatus("changes", status));
@@ -261,6 +265,7 @@ export class Repo implements RepoHandle {
       const client = this.client();
       const channel = client.channel("rtdb:changes", { config: { private: true } });
       channel.on("broadcast", { event: "changes" }, (message) => {
+        countRealtime(this.realtimeStats, "broadcast", message?.payload, this.seenChanges);
         this.onRealtimeChange(message?.payload);
       });
       this.broadcastChannel = channel;
@@ -304,6 +309,7 @@ export class Repo implements RepoHandle {
   // ── 연결 상태 ─────────────────────────────────────────────
 
   private onRealtimeStatus(kind: "changes" | "broadcast", status: string): void {
+    noteRealtimeStatus(this.realtimeStats, kind, status);
     const wasUp = this.channelUp.get(kind) === true;
     // 다시 붙음: 전에 붙었던 길이 내려갔다 붙거나, 처음부터 거부·끊김을 알렸던 길(로그인 전 등)이 나중에 처음 붙는 경우.
     const rejoined = status === "SUBSCRIBED" && !wasUp && (this.channelEverUp.has(kind) || this.channelUp.has(kind));
