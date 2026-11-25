@@ -29,7 +29,7 @@ vi.mock("./AssignTab", () => ({ default: () => null }));
 vi.mock("./CurriculumTab", () => ({ default: () => null }));
 vi.mock("./ArchiveTab", () => ({ default: () => null }));
 vi.mock("./SettingsTab", () => ({ default: mock.settings }));
-vi.mock("./AttendanceTab", () => ({ default: ({ lockedScope }: { lockedScope?: string }) => {
+vi.mock("./AttendanceTab", () => ({ default: function MockAttendance({ lockedScope }: { lockedScope?: string }) {
   const canEdit = useSemesterCanEdit();
   return <output>{lockedScope} {canEdit ? "편집" : "조회"}</output>;
 } }));
