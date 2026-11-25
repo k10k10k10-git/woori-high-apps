@@ -8,7 +8,7 @@
 //
 // 서버와 맞추기: Realtime 으로 `rtdb.changes` INSERT(바뀐 경로)를 받으면, 겹치는 뿌리만 다시 읽는다.
 // 같은 알림을 비공개 Broadcast 채널 `rtdb:changes`(이벤트 `changes`, 내용 `{ id, paths }`)로도 받는다 — 옮겨 가는 동안 두 길이
-// 함께 오므로 같은 변경 번호는 한 번만 처리한다(DB 0131 뒤 0132 가 옛 길을 닫는다). 연결 상태는 둘 중 하나라도 붙어 있으면 연결이다.
+// 함께 오므로 같은 변경 번호는 한 번만 처리한다(DB 0131 뒤 0132 가 옛 길을 닫는다). 연결 상태는 둘 중 하나라도 붙어 있으면 연결이고, 한 길이라도 끊겼다 다시 붙으면 구독을 모두 다시 읽는다.
 // 뿌리 아래 경로가 바뀌면 그 경로만 읽어 끼워 넣는다(splice). 읽기는 한 번에 하나씩, 짧게 묶어서 보낸다
 // — 그래서 늦게 보낸 읽기가 먼저 보낸 읽기에 덮이지 않는다.
 import { getDeniedError, listenDeniedError, offlineError, rtdbError, transactionError, writeDeniedError } from "./errors";
@@ -153,6 +153,8 @@ export class Repo implements RepoHandle {
   private broadcastChannel: RealtimeChannelLike | null = null;
   /** 길마다 붙어 있는지(postgres_changes·broadcast). 하나라도 참이면 연결. */
   private readonly channelUp = new Map<"changes" | "broadcast", boolean>();
+  /** 한 번이라도 붙었던 길(그 길이 끊겼다 다시 붙으면 그 사이 알림을 놓쳤을 수 있다). */
+  private readonly channelEverUp = new Set<"changes" | "broadcast">();
   /** 이미 처리한 변경 번호(두 길로 같은 알림이 오면 두 번째는 버린다). */
   private readonly seenChanges = new Set<number>();
   private realtimeSubscribed = false;
@@ -302,11 +304,19 @@ export class Repo implements RepoHandle {
   // ── 연결 상태 ─────────────────────────────────────────────
 
   private onRealtimeStatus(kind: "changes" | "broadcast", status: string): void {
+    const wasUp = this.channelUp.get(kind) === true;
+    const rejoined = status === "SUBSCRIBED" && !wasUp && this.channelEverUp.has(kind);
     this.channelUp.set(kind, status === "SUBSCRIBED");
+    if (status === "SUBSCRIBED") this.channelEverUp.add(kind);
     const up = [...this.channelUp.values()].some(Boolean);
     if (up) {
-      // 한 길만 다시 붙은 것이면 다른 길이 그동안 알림을 받았으므로 다시 읽지 않는다.
-      if (this.realtimeSubscribed) return;
+      if (this.realtimeSubscribed) {
+        // 이미 연결 중: 한 길이 끊겼다 "다시" 붙었으면 그 길로 올 알림을 놓쳤을 수 있으니 모두 다시 읽는다
+        // (다른 길이 붙어 있어도 그 길이 알림을 싣고 있다고 장담할 수 없다 — 옛 길이 닫힌 뒤가 그렇다).
+        // 처음 붙는 두 번째 길은 다시 읽지 않는다(처음 읽기와 첫 길이 이미 맞췄다).
+        if (rejoined) this.refreshAllRoots();
+        return;
+      }
       this.realtimeSubscribed = true;
       this.setNetworkOffline(false);
       this.updateInfo();

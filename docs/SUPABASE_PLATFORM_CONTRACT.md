@@ -41,7 +41,7 @@
 - **데이터 계층이 지킬 Firebase 동작:**
   - 스냅샷 `val()` 은 Firebase 처럼 숫자 키 객체를 배열로 바꾼다(키가 모두 0 이상 정수이고 `max+1` 의 절반 넘게 채워졌을 때). `forEach`·`val()` 키 순서는 Firebase 순서(정수 키 오름차순 → 문자열 사전순).
   - 쓰기는 **즉시 화면에 반영**(로컬 덮어쓰기)하고 서버 응답을 기다린다. 네트워크가 끊기면 쓰기를 메모리에 쌓아 두고 다시 연결되면 순서대로 보낸다(약속은 그때 끝난다). 거부·검증 실패면 로컬 반영을 되돌리고 약속을 오류로 끝낸다(`error.code = 'PERMISSION_DENIED'`).
-  - 구독은 처음에 `rtdb_get`(여러 개면 `rtdb_get_many`)으로 읽고, Realtime `rtdb.changes` INSERT 또는 Broadcast `rtdb:changes` 를 받으면 바뀐 경로와 겹치는(조상·자손) 구독만 다시 읽는다(짧게 묶어서). 같은 `id` 는 한 번만 처리하고, 연결 상태는 두 길 중 하나라도 붙어 있으면 연결이다.
+  - 구독은 처음에 `rtdb_get`(여러 개면 `rtdb_get_many`)으로 읽고, Realtime `rtdb.changes` INSERT 또는 Broadcast `rtdb:changes` 를 받으면 바뀐 경로와 겹치는(조상·자손) 구독만 다시 읽는다(짧게 묶어서). 같은 `id` 는 한 번만 처리하고, 연결 상태는 두 길 중 하나라도 붙어 있으면 연결이다. 한 길이라도 끊겼다 다시 붙으면 구독을 모두 다시 읽는다. Broadcast 받기 권한은 채널에 들어올 때(와 토큰을 새로 받을 때) 보므로, 쓰는 중에 역할을 잃은 사람은 다시 들어올 때까지 알림(경로만, 값 없음)을 받을 수 있다.
   - `push()` 키는 Firebase 푸시 ID 알고리즘(시간 순 20자)을 그대로.
   - `query(...)` 는 받은 값에서 클라이언트가 거른다(`orderByChild`·`equalTo`·`limitTo*`·`startAt`·`endAt`·`endBefore`).
   - `runTransaction` 은 `rtdb_get_hashed` → 콜백 → `rtdb_cas` 를 커밋될 때까지 되풀이(최대 25번).

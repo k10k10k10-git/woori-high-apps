@@ -549,7 +549,7 @@ describe("실시간 알림 두 길(postgres_changes · 비공개 broadcast rtdb:
     await vi.waitFor(() => expect(leaf.values.at(-1)).toBe(3));
   });
 
-  it("한 길만 끊겼다 붙으면 다른 길이 받고 있었으므로 다시 읽지 않고, 둘 다 끊겼다 붙으면 모두 다시 읽는다", async () => {
+  it("두 번째 길이 처음 붙을 때는 다시 읽지 않고, 한 길이라도 끊겼다 다시 붙으면 모두 다시 읽는다(옛 길이 닫힌 뒤에도 놓치지 않게)", async () => {
     const { fake, db } = setup({ a: 1 });
     const a = watch(db, "a");
     await vi.waitFor(() => expect(a.values).toHaveLength(1));
@@ -557,16 +557,23 @@ describe("실시간 알림 두 길(postgres_changes · 비공개 broadcast rtdb:
     await vi.waitFor(() => expect(a.values).toHaveLength(1));
     await tick(20);
     let before = fake.calls.length;
+    // 옛 길(changes)은 붙어 있지만 알림을 싣지 않는 경우(0132 뒤): broadcast 가 끊긴 사이의 변경을 다시 붙을 때 읽는다
     fake.setChannelStatus("broadcast", "CHANNEL_ERROR");
+    fake.autoNotify = false;
+    fake.externalWrite({ a: 7 });
+    fake.setChannelStatus("broadcast", "SUBSCRIBED");
+    await vi.waitFor(() => expect(a.values.at(-1)).toBe(7));
+    expect(fake.calls.slice(before)).toHaveLength(1);
+    // 같은 길이 붙은 채 또 SUBSCRIBED 가 와도(끊김 없음) 다시 읽지 않는다
+    before = fake.calls.length;
     fake.setChannelStatus("broadcast", "SUBSCRIBED");
     await tick(20);
     expect(fake.calls.slice(before)).toHaveLength(0);
     fake.setRealtimeStatus("CHANNEL_ERROR");
-    fake.autoNotify = false;
     fake.externalWrite({ a: 2 });
     before = fake.calls.length;
     fake.setChannelStatus("changes", "SUBSCRIBED");
-    await vi.waitFor(() => expect(a.values).toEqual([1, 2]));
+    await vi.waitFor(() => expect(a.values).toEqual([1, 7, 2]));
     expect(fake.calls.slice(before)).toHaveLength(1);
   });
 
