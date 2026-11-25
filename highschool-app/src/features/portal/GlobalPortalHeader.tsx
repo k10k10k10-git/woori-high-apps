@@ -15,7 +15,7 @@ import MinistryIcon, { type MinistryIconName } from "@/components/MinistryIcon";
 import { useViewMode } from "@/context/ViewModeContext";
 import { canAccessArea, canAccessSundayTeam, canEditArea, canManageRolesOf } from "./accessPolicy";
 import { SUNDAY_MINISTRY_TEAMS } from "./featureCatalog";
-import { accessibleTeamKeys, canAccessOperationsCenter } from "@/features/teams/teamModel";
+import { accessibleTeamKeys, canViewSemesterOperations } from "@/features/teams/teamModel";
 import styles from "./GlobalPortalHeader.module.css";
 
 const MyPageModal = dynamic(() => import("./MyPageModal"), { ssr: false });
@@ -173,7 +173,7 @@ export default function GlobalPortalHeader() {
 
   const isMobilePreview = !isViewportMobile && mode === "mobile";
 
-  const operationsAllowed = canAccessOperationsCenter(roles, teamMemberships) || canManageRolesOf(roles);
+  const operationsAllowed = canViewSemesterOperations(roles, teamMemberships) || canManageRolesOf(roles);
   const trainingAllowed = canAccessArea("semester", roles);
   const eventsAllowed = canAccessArea("retreat-admin", roles) || canAccessArea("retreat-field", roles);
   const teamKeys = teamMemberships

@@ -8,6 +8,7 @@ import {
   canEditTeam,
   canReadSemesterPrivate,
   canReadTeamContacts,
+  canViewSemesterOperations,
   mergeTeamMemberships,
   normalizeTeamMemberships,
   ownTeamKey,
@@ -70,6 +71,18 @@ describe("teamModel", () => {
     expect(canAccessOperationsCenter(leader, memberships)).toBe(false);
     expect(canAccessOperationsCenter({ semester: "adminTeam", retreat: "none" }, memberships)).toBe(true);
     expect(canAccessOperationsCenter({ semester: "superAdmin", retreat: "none" }, memberships)).toBe(true);
+  });
+
+  it("팀장은 지정 학기의 중앙 명단과 출석만 조회할 수 있다", () => {
+    const memberships = normalizeTeamMemberships({ media: { role: "leader", active: true, semesters: { "2026-2": true } } });
+    for (const roles of [leader, { semester: "media", retreat: "none" }] as const) {
+      expect(canViewSemesterOperations(roles, memberships)).toBe(true);
+      expect(canViewSemesterOperations(roles, memberships, "2026-2")).toBe(true);
+      expect(canViewSemesterOperations(roles, memberships, "2026-1")).toBe(false);
+      expect(canAccessOperationsCenter(roles, memberships)).toBe(false);
+      expect(canReadSemesterPrivate(roles, memberships)).toBe(false);
+    }
+    expect(canViewSemesterOperations({ semester: "media", retreat: "none" }, { media: { role: "viewer", active: true } }, "2026-2")).toBe(false);
   });
 
   it("교역자·행정팀은 운영센터와 학기 비공개 연락처를 함께 읽는다", () => {

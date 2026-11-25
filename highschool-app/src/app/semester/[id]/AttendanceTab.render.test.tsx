@@ -21,6 +21,19 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); mock.mobile = true; });
 
+it("팀장 전체 명단은 모바일에서도 팀 이름과 수료를 보이고 사역팀 출석만 읽는다", () => {
+  const member: Application = { id: "app-test", studentId: "student-test", name: "합성 학생", bu: "1부", grade: 3, class: 1, status: "배치", teamId: "team-test", createdAt: "2026-09-01" };
+  const team = { id: "team-test", name: "미디어팀", order: 1, color: "bg-slate-100" };
+  mock.all.mockImplementation((_sid, _scope, receive) => { receive({ meeting: { [member.id]: { s: "출석" } } }); return () => {}; });
+  render(<SemesterEditProvider canEdit={false}><AttendanceTab sid="2026-2" teams={[team]} trainingClasses={[]} sessions={[{ id: "meeting", date: "2026-09-12", type: "정규" }]} applications={[member]} teamById={new Map([[team.id, team]])} meta={null} lockedScope="team" /></SemesterEditProvider>);
+  expect(screen.getByRole("cell", { name: /합성 학생.*미디어팀/ })).toBeInTheDocument();
+  expect(screen.getByRole("columnheader", { name: "사역팀 수료" })).toBeInTheDocument();
+  expect(screen.queryByRole("columnheader", { name: "훈련 수료" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /합성 학생.*현재 출석/ })).toBeDisabled();
+  expect(mock.all.mock.calls.map((args) => args[1])).toEqual(["team"]);
+  expect(mock.save).not.toHaveBeenCalled();
+});
+
 it.each([undefined, "/operations/semesters/2026-2"])("회차가 없으면 운영 권한에 맞는 등록 경로를 안내한다 (%s)", (operationsBaseHref) => {
   render(<AttendanceTab sid="2026-2" teams={[]} trainingClasses={[]} sessions={[]} applications={[]} teamById={new Map()} meta={null} operationsBaseHref={operationsBaseHref} />);
   if (operationsBaseHref) expect(screen.getByRole("link", { name: "학기 운영 설정 열기" })).toHaveAttribute("href", "/operations/semesters/2026-2/settings");

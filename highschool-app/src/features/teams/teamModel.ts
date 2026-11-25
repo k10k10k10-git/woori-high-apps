@@ -78,6 +78,13 @@ export function canAccessOperationsCenter(roles: MinistryRoles, memberships?: Te
   return roles.semester === "leader" && activeTeamKeys(memberships).length === 0;
 }
 
+/** 팀장 전체 명단·출석 조회에만 적용한다. 중앙 편집 권한은 기존 계약을 따른다. */
+export function canViewSemesterOperations(roles: MinistryRoles, memberships?: TeamMemberships, semesterId?: string): boolean {
+  return canAccessOperationsCenter(roles, memberships) || activeTeamKeys(memberships, semesterId).some((key) =>
+    roles.semester === "leader" || memberships?.[key]?.role === "leader",
+  );
+}
+
 /** semestersPrivate Rules와 같은 판정. 팀 화면에서 연락처를 구독하기 전에 반드시 확인한다. */
 export function canReadSemesterPrivate(roles: MinistryRoles, memberships?: TeamMemberships): boolean {
   if (["superAdmin", "pastor", "adminTeam"].includes(roles.semester)) return true;

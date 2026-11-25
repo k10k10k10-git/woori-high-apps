@@ -22,13 +22,17 @@ import type {
   CompletionEntry,
   SemesterAttendanceScope,
   Session,
+  Team,
 } from "@/features/semester/types";
 import { attendanceMenuPosition } from "./attendanceGridPosition";
 
 type Props = {
+  semesterId?: string;
   members: Application[];
   sessions: Session[];
   scope: SemesterAttendanceScope;
+  teamOverviewOnly?: boolean;
+  teamLabels?: ReadonlyMap<string, Team>;
   attendanceByScope: AttendanceByScope;
   completionEligibleByScope: Record<SemesterAttendanceScope, ReadonlySet<string>>;
   canEdit: boolean;
@@ -69,9 +73,12 @@ function memberSections(members: Application[]): { label: string | null; rows: A
 }
 
 export default function AttendanceGrid({
+  semesterId,
   members,
   sessions,
   scope,
+  teamOverviewOnly = false,
+  teamLabels,
   attendanceByScope,
   completionEligibleByScope,
   canEdit,
@@ -90,7 +97,8 @@ export default function AttendanceGrid({
   const groups = useMemo(() => monthGroups(sessions), [sessions]);
   const sections = useMemo(() => memberSections(members), [members]);
   const selectedAttendance = attendanceByScope[scope];
-  const columnCount = sessions.length + 8;
+  const columnCount = sessions.length + (teamOverviewOnly ? 5 : 8);
+  const completionScopes = teamOverviewOnly ? ["team"] as const : ["team", "training"] as const;
 
   function closeMenu() {
     setOpenCell(null);
@@ -167,9 +175,7 @@ export default function AttendanceGrid({
               scope === "team" ? "사역팀 점수" : "훈련 점수",
               scope === "team" ? "사역팀 출석률" : "훈련 출석률",
               "사역팀 수료",
-              "훈련 수료",
-              "수료증",
-              "사진",
+              ...(teamOverviewOnly ? [] : ["훈련 수료", "수료증", "사진"]),
             ] as const).map((label) => (
               <th key={label} rowSpan={2} className="min-w-20 whitespace-nowrap border-l px-2 py-2 text-xs font-semibold text-slate-500" style={{ borderColor: "var(--color-border)" }}>
                 {label}
@@ -209,15 +215,17 @@ export default function AttendanceGrid({
                   : calcScopedCompletions(member.id, sessions, attendanceByScope, completionMinRate, {
                       team: completionEligibleByScope.team.has(member.id),
                       training: completionEligibleByScope.training.has(member.id),
-                    });
+                    }, semesterId ? { semesterId, grade: member.grade } : undefined);
                 const selectedResult = results[scope];
                 const check = completion[member.id] ?? {};
+                const team = member.teamId ? teamLabels?.get(member.teamId) : undefined;
                 return (
                 <tr key={member.id} className="border-b last:border-0" style={{ borderColor: "var(--color-border)" }}>
                   <td className="sticky left-0 z-10 bg-white px-2 py-1.5 text-xs text-slate-400">{index + 1}</td>
                   <td className="attendance-name-cell sticky left-8 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left">
                     <span className="font-medium text-slate-800">{member.name}</span>
                     <span className="ml-1.5 text-[11px] text-slate-400">{describeApplicant(member)}</span>
+                    {team && <span className={`ml-1.5 rounded px-1.5 py-0.5 text-[11px] ${team.color}`}>{team.name}</span>}
                   </td>
                   {sessions.map((session) => {
                     const entry = selectedAttendance[session.id]?.[member.id];
@@ -248,7 +256,7 @@ export default function AttendanceGrid({
                     {selectedResult ? `${selectedResult.score}/${selectedResult.maxScore}` : "-"}
                   </td>
                   <td className="px-2 py-1.5 text-xs tabular-nums text-slate-600">{selectedResult ? `${Math.round(selectedResult.rate * 100)}%` : "-"}</td>
-                  {(["team", "training"] as const).map((completionScope) => {
+                  {completionScopes.map((completionScope) => {
                     const result = results[completionScope];
                     return (
                       <td key={completionScope} className="px-2 py-1.5">
@@ -258,12 +266,14 @@ export default function AttendanceGrid({
                       </td>
                     );
                   })}
+                  {!teamOverviewOnly && <>
                   <td className="px-2 py-1.5">
                     {!staffMember && <input type="checkbox" aria-label={`${member.name} 수료증 제작`} disabled={!canEditCompletion} checked={check.certPrinted ?? false} onChange={(event) => onToggleCompletion(member.id, "certPrinted", event.target.checked)} />}
                   </td>
                   <td className="px-2 py-1.5">
                     {!staffMember && <input type="checkbox" aria-label={`${member.name} 사진 확인`} disabled={!canEditCompletion} checked={check.photoChecked ?? false} onChange={(event) => onToggleCompletion(member.id, "photoChecked", event.target.checked)} />}
                   </td>
+                  </>}
                 </tr>
                 );
               })}

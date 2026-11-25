@@ -22,6 +22,7 @@ import AttendanceGrid from "./AttendanceGrid";
 import { applicantSortKey } from "@/features/semester/applicant";
 import {
   EDITABLE_ATTENDANCE_STATUSES,
+  seniorTeamCompletionMinimum,
   normalizeAttendanceStatus,
   type EditableAttendanceStatus,
 } from "@/features/semester/completion";
@@ -81,6 +82,7 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const { toast } = useUI();
   const { isMobileView } = useViewMode();
   const canEdit = useSemesterCanEdit();
+  const teamOverviewOnly = lockedScope === "team";
   const [sessId, setSessId] = useState<string>("");
   const [teamFilter, setTeamFilter] = useState<string>(lockedTeamId ?? "");
   const [teamFilterSource, setTeamFilterSource] = useState(lockedTeamId);
@@ -105,7 +107,8 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   const [retry, setRetry] = useState(0);
   const [readySession, setReadySession] = useState("");
   const [readyGrid, setReadyGrid] = useState("");
-  const view = pickedView ?? (isMobileView ? "session" : "grid");
+  const view = pickedView ?? (isMobileView && !teamOverviewOnly ? "session" : "grid");
+  const seniorMinimum = scope === "team" ? seniorTeamCompletionMinimum(sid) : undefined;
   const defaultSessId = useMemo(() => {
     if (sessions.length === 0) return "";
     const today = todayYMD();
@@ -145,19 +148,21 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   useEffect(() => {
     if (view !== "grid") return;
     let active = true;
-    const gate = createSubscriptionReadinessGate(["team", "training", "completion"], () => { if (active) setReadyGrid(readScope); });
+    const gate = createSubscriptionReadinessGate(teamOverviewOnly ? ["team"] : ["team", "training", "completion"], () => { if (active) setReadyGrid(readScope); });
     const failed = (key: string) => (error: Error) => { if (active) { fail(key)(error); gate.markReady(key); } };
     const unsubs = [
       subscribeAllAttendance(sid, "team", (values) => {
         if (active) { setAttAllByScope((current) => ({ ...current, team: values })); ok("team"); gate.markReady("team"); }
       }, failed("team")),
+    ];
+    if (!teamOverviewOnly) unsubs.push(
       subscribeAllAttendance(sid, "training", (values) => {
         if (active) { setAttAllByScope((current) => ({ ...current, training: values })); ok("training"); gate.markReady("training"); }
       }, failed("training")),
       subscribeCompletion(sid, (values) => { if (active) { setCompletion(values); ok("completion"); gate.markReady("completion"); } }, failed("completion")),
-    ];
+    );
     return () => { active = false; unsubs.forEach((unsubscribe) => unsubscribe()); };
-  }, [sid, view, retry, readScope, fail, ok]);
+  }, [sid, view, retry, readScope, fail, ok, teamOverviewOnly]);
 
   const session = sessions.find((s) => s.id === activeSessId);
   const members = useMemo(
@@ -176,8 +181,8 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
   );
   const completionEligibleByScope = useMemo(() => ({
     team: new Set(completionRoster(applications, "team").map((application) => application.id)),
-    training: new Set(completionRoster(applications, "training").map((application) => application.id)),
-  }), [applications]);
+    training: new Set(teamOverviewOnly ? [] : completionRoster(applications, "training").map((application) => application.id)),
+  }), [applications, teamOverviewOnly]);
 
   async function markAt(appKey: string, sessionId: string, status: EditableAttendanceStatus) {
     if (!writable) return;
@@ -328,11 +333,17 @@ export default function AttendanceTab({ sid, teams, trainingClasses, sessions, a
         {attendanceEditable && <SaveFeedback state={saveFeedback.state} idleLabel="선택하면 자동 저장" errorLabel="저장 실패 · 원하는 출석 상태나 지우기를 다시 선택해 주세요" />}
       </div>
 
+      {view === "grid" && seniorMinimum !== undefined && (
+        <p className="mb-2 text-xs text-slate-600">이번 학기 고3 사역팀은 정규 회차에서 출석·지각 합계 {seniorMinimum}회 이상이면 수료입니다.</p>
+      )}
       {view === "grid" ? (
         <AttendanceGrid
+          semesterId={sid}
           members={members}
           sessions={sessions}
           scope={scope}
+          teamOverviewOnly={teamOverviewOnly}
+          teamLabels={scope === "team" && !teamFilter ? teamById : undefined}
           attendanceByScope={attAllByScope}
           completionEligibleByScope={completionEligibleByScope}
           canEdit={writable}

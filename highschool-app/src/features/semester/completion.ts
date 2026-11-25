@@ -29,7 +29,7 @@ export interface CompletionResult {
   score: number; // 획득 점수
   maxScore: number; // 만점 (정규 회차 수 × 2)
   rate: number; // 0~1 (만점 0이면 0)
-  completed: boolean; // rate >= minRate
+  completed: boolean; // 학기에 적용되는 기준 충족 여부
   regularSessionCount: number;
 }
 
@@ -43,13 +43,19 @@ export function calcCompletion(
   sessions: Session[],
   attendanceBySession: Record<string, SessionAttendance>, // sessionId → (appKey → entry)
   minRate: number,
+  minimumAttended?: number,
 ): CompletionResult {
   const regs = regularSessions(sessions);
   const maxScore = regs.length * SCORE.출석;
   let score = 0;
+  let attended = 0;
   for (const sess of regs) {
     const entry = attendanceBySession[sess.id]?.[appKey];
-    if (entry) score += SCORE[normalizeAttendanceStatus(entry.s)];
+    if (entry) {
+      const status = normalizeAttendanceStatus(entry.s);
+      score += SCORE[status];
+      if (status === "출석" || status === "지각") attended++;
+    }
     // 미기록과 결석은 모두 0점이지만 원장 상태와 화면 표시는 서로 구분한다.
   }
   const rate = maxScore > 0 ? score / maxScore : 0;
@@ -57,9 +63,14 @@ export function calcCompletion(
     score,
     maxScore,
     rate,
-    completed: maxScore > 0 && rate >= minRate,
+    completed: maxScore > 0 && (minimumAttended === undefined ? rate >= minRate : attended >= minimumAttended),
     regularSessionCount: regs.length,
   };
+}
+
+/** 2026년 2학기 고3 사역팀에만 확정된 정규 회차 기준. */
+export function seniorTeamCompletionMinimum(semesterId: string): number | undefined {
+  return semesterId === "2026-2" ? 3 : undefined;
 }
 
 /** 사역팀·훈련은 같은 신청자를 공유해도 서로 다른 출석 원장으로 판정한다. */
@@ -69,10 +80,12 @@ export function calcScopedCompletions(
   attendanceByScope: AttendanceByScope,
   minRate: number,
   eligible: Record<SemesterAttendanceScope, boolean>,
+  student?: { semesterId: string; grade: number },
 ): Record<SemesterAttendanceScope, CompletionResult | null> {
   return {
     team: eligible.team
-      ? calcCompletion(appKey, sessions, attendanceByScope.team, minRate)
+      ? calcCompletion(appKey, sessions, attendanceByScope.team, minRate,
+          student?.grade === 3 ? seniorTeamCompletionMinimum(student.semesterId) : undefined)
       : null,
     training: eligible.training
       ? calcCompletion(appKey, sessions, attendanceByScope.training, minRate)
