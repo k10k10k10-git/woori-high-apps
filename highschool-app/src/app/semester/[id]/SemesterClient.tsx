@@ -27,7 +27,7 @@ import { SEMESTER_TRAINING_TABS } from "@/features/portal/featureCatalog";
 import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import LoadFailureNotice from "@/components/LoadFailureNotice";
 import { useViewMode } from "@/context/ViewModeContext";
-import { activeTeamKeys, canAccessOperationsCenter, ownTeamKey } from "@/features/teams/teamModel";
+import { activeTeamKeys, canAccessOperationsCenter, canViewSemesterOperations, ownTeamKey } from "@/features/teams/teamModel";
 import IntakeTab from "./IntakeTab";
 import AssignTab from "./AssignTab";
 import AttendanceTab from "./AttendanceTab";
@@ -98,8 +98,10 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
   const requestedTeam = query.get("team") ?? "";
   const { user, loading: authLoading, roleError, roles, teamMemberships } = useAuth();
   const { isMobileView } = useViewMode();
-  const allowed = canAccessOperationsCenter(roles, teamMemberships);
-  const canEdit = allowed && canEditArea("semester", roles);
+  const centralAccess = canAccessOperationsCenter(roles, teamMemberships);
+  const allowed = canViewSemesterOperations(roles, teamMemberships, semesterId);
+  const teamOverviewOnly = allowed && !centralAccess;
+  const canEdit = centralAccess && canEditArea("semester", roles);
   const operationsBaseHref = canEdit ? `/operations/semesters/${encodeURIComponent(semesterId)}` : undefined;
   const assignedTeam = ownTeamKey(roles, teamMemberships);
   const assignedTeams = activeTeamKeys(teamMemberships);
@@ -129,7 +131,7 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
     const scope = `${semesterId}|${user.uid}|${attempt}`;
     let alive = true;
     const readiness = createSubscriptionReadinessGate(
-      ["학기 정보", "사역팀", "훈련 반", "회차", "신청 명단"],
+      ["학기 정보", "사역팀", "회차", "신청 명단", ...(teamOverviewOnly ? [] : ["훈련 반"])],
       () => { if (alive) setLoadedScope(scope); },
     );
     const ready = (key: string) => { if (alive) { ok(key); readiness.markReady(key); } };
@@ -137,17 +139,17 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
     const unsubs = [
       subscribeSemesterMeta(semesterId, (value) => { if (!alive) return; setMeta(value); ready("학기 정보"); }, failed("학기 정보")),
       subscribeTeams(semesterId, (value) => { if (!alive) return; setTeams(value); ready("사역팀"); }, failed("사역팀")),
-      subscribeTrainingClasses(semesterId, (value) => { if (!alive) return; setTrainingClasses(value); ready("훈련 반"); }, failed("훈련 반")),
       subscribeSessions(semesterId, (value) => { if (!alive) return; setSessions(value); ready("회차"); }, failed("회차")),
       subscribeApplications(semesterId, (value) => { if (!alive) return; setApplications(value); ready("신청 명단"); }, failed("신청 명단")),
     ];
+    if (!teamOverviewOnly) unsubs.push(subscribeTrainingClasses(semesterId, (value) => { if (!alive) return; setTrainingClasses(value); ready("훈련 반"); }, failed("훈련 반")));
     return () => { alive = false; unsubs.forEach((unsubscribe) => unsubscribe()); };
-  }, [attempt, authLoading, roleError, allowed, fail, ok, semesterId, user]);
+  }, [attempt, authLoading, roleError, allowed, teamOverviewOnly, fail, ok, semesterId, user]);
 
   const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
   const visibleTabs = SEMESTER_TRAINING_TABS;
   const defaultTab = initialSemesterTab(initialTab, isMobileView);
-  const activeTab = pickedTab && visibleTabs.includes(pickedTab)
+  const activeTab = teamOverviewOnly ? "출석" : pickedTab && visibleTabs.includes(pickedTab)
     ? pickedTab
     : visibleTabs.includes(defaultTab) ? defaultTab : visibleTabs[0];
   const mobileSection = mobileSectionOf(activeTab);
@@ -200,7 +202,7 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
             </div>
           </div>
         </div>
-        <div className="workspace-tabs">
+        {!teamOverviewOnly && <div className="workspace-tabs">
           <div className="mx-auto max-w-6xl px-0 sm:px-4">
             {isMobileView ? (
               <div className="mobile-workspace-tabs" role="tablist" aria-label="학기 운영 주요 업무">
@@ -212,7 +214,7 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
               </div>
             )}
           </div>
-        </div>
+        </div>}
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
@@ -232,17 +234,17 @@ function SemesterClientContent({ semesterId, initialTab }: { semesterId: string;
             <button role="tab" aria-selected={activeTab === "설정"} onClick={() => selectTab("설정")}>학기 설정{!canEdit ? " · 권한 필요" : ""}</button>
           </div>
         )}
-        {praiseHref && <aside className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }} aria-label="찬양팀 업무 연결"><strong className="text-sm">{teamById.get(requestedTeam)?.name ?? "찬양팀"} 학기 명단</strong><Link className="btn-secondary" href={praiseHref}>찬양팀 이번 모임으로</Link></aside>}
+        {!teamOverviewOnly && praiseHref && <aside className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ borderColor: "var(--color-border)", background: "var(--color-surface)" }} aria-label="찬양팀 업무 연결"><strong className="text-sm">{teamById.get(requestedTeam)?.name ?? "찬양팀"} 학기 명단</strong><Link className="btn-secondary" href={praiseHref}>찬양팀 이번 모임으로</Link></aside>}
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div><p className="section-kicker">{tabLabel(activeTab)}</p><h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{TAB_TITLES[activeTab]}</h2></div>
-          <p className="mt-2 text-xs text-slate-400 sm:mt-0">신청 {applications.filter((item) => item.status !== "취소").length}명 · 사역팀 {teams.length}개 · 훈련 반 {trainingClasses.length}개 · 주차 {sessions.filter((session) => session.type !== "휴강").length}주{sessions.some((session) => session.type === "휴강") ? ` · 휴강 ${sessions.filter((session) => session.type === "휴강").length}일` : ""}</p>
+          <div>{!teamOverviewOnly && <p className="section-kicker">{tabLabel(activeTab)}</p>}<h2 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{teamOverviewOnly ? "사역팀 전체 명단·출석" : TAB_TITLES[activeTab]}</h2></div>
+          <p className="mt-2 text-xs text-slate-400 sm:mt-0">{!teamOverviewOnly && `신청 ${applications.filter((item) => item.status !== "취소").length}명 · `}사역팀 {teams.length}개{!teamOverviewOnly && ` · 훈련 반 ${trainingClasses.length}개`} · 주차 {sessions.filter((session) => session.type !== "휴강").length}주{sessions.some((session) => session.type === "휴강") ? ` · 휴강 ${sessions.filter((session) => session.type === "휴강").length}일` : ""}</p>
         </div>
-        <div role="tabpanel" id="tab-content-panel" className="min-h-[360px]">
-          {!canEdit && <ReadOnlyBanner what="학기 사역 자료" why="편집은 행정팀·스탭팀장·교역자·통합관리자만 가능합니다." />}
+        <div role={teamOverviewOnly ? undefined : "tabpanel"} id="tab-content-panel" className="min-h-[360px]">
+          {!canEdit && <ReadOnlyBanner what={teamOverviewOnly ? "사역팀 전체 명단과 출석·수료" : "학기 사역 자료"} why={teamOverviewOnly ? "담당 팀 출석 수정은 해당 팀의 학기 화면에서 할 수 있습니다." : "편집은 중앙 학기 운영 권한이 필요합니다."} />}
           <SemesterEditProvider canEdit={canEdit}>
             {activeTab === "신청" && <IntakeTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} />}
             {activeTab === "배치" && <AssignTab initialTeamId={requestedTeam} sid={semesterId} teams={teams} trainingClasses={trainingClasses} applications={applications} teamById={teamById} />}
-            {activeTab === "출석" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} operationsBaseHref={operationsBaseHref} />}
+            {activeTab === "출석" && <AttendanceTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} teamById={teamById} lockedScope={teamOverviewOnly ? "team" : undefined} operationsBaseHref={operationsBaseHref} />}
             {activeTab === "커리큘럼" && <CurriculumTab sid={semesterId} teams={teams} trainingClasses={trainingClasses} sessions={sessions} operationsBaseHref={operationsBaseHref} />}
             {activeTab === "아카이브" && <ArchiveTab sid={semesterId} operationsBaseHref={operationsBaseHref} />}
             {activeTab === "설정" && <WorkspaceAccessGate allowed={canEdit} area="학기 설정" embedded backHref="/operations" backLabel="운영센터 메뉴로"><SettingsTab sid={semesterId} meta={meta} teams={teams} trainingClasses={trainingClasses} sessions={sessions} applications={applications} /></WorkspaceAccessGate>}

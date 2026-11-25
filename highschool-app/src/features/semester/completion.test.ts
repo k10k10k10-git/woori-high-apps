@@ -59,6 +59,21 @@ describe("calcCompletion — 출석2/지각1/결석0, 휴강 제외", () => {
 });
 
 describe("calcScopedCompletions — 사역팀·훈련 출석 분리", () => {
+  it("2026년 2학기 고3 사역팀은 정규 출석·지각 3회부터 수료하고 다른 판정과 점수는 유지한다", () => {
+    const firstTwo = att({ s1: { a: "출석" }, s2: { a: "출석" }, s3: { a: "출석" } });
+    const allThree = { ...firstTwo, ...att({ s4: { a: "지각" } }) };
+    const eligible = { team: true, training: true };
+    const senior = { semesterId: "2026-2", grade: 3 };
+    for (const team of [{}, att({ s1: { a: "출석" } }), firstTwo]) {
+      expect(calcScopedCompletions("a", sessions, { team, training: {} }, 0, eligible, senior).team?.completed).toBe(false);
+    }
+    const attendance = { team: allThree, training: allThree };
+    expect(calcScopedCompletions("a", sessions, attendance, 0.9, eligible, senior))
+      .toMatchObject({ team: { completed: true, score: 5, maxScore: 6 }, training: { completed: false, score: 5 } });
+    for (const student of [{ ...senior, grade: 2 }, { ...senior, semesterId: "2027-1" }]) {
+      expect(calcScopedCompletions("a", sessions, attendance, 0.9, eligible, student).team?.completed).toBe(false);
+    }
+  });
   it("같은 신청자라도 각 출석 원장의 기록만으로 별도 판정한다", () => {
     const attendance: AttendanceByScope = {
       team: att({ s1: { a: "출석" }, s2: { a: "출석" }, s4: { a: "출석" } }),

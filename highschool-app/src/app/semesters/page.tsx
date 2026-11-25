@@ -13,11 +13,11 @@ import { Semester } from "@/features/semester/types";
 import WorkspaceAccessGate from "@/components/WorkspaceAccessGate";
 import LoadFailureNotice from "@/components/LoadFailureNotice";
 import OverlayShell from "@/components/OverlayShell";
-import { canAccessOperationsCenter } from "@/features/teams/teamModel";
+import { canAccessOperationsCenter, canViewSemesterOperations } from "@/features/teams/teamModel";
 
 export default function SemestersPage() {
   const { user, roles, teamMemberships } = useAuth();
-  return <WorkspaceAccessGate allowed={canAccessOperationsCenter(roles, teamMemberships)} area="학기 운영" backHref="/operations" backLabel="운영센터 메뉴로">
+  return <WorkspaceAccessGate allowed={canViewSemesterOperations(roles, teamMemberships)} area="학기 운영" backHref="/operations" backLabel="운영센터 메뉴로">
     <SemestersWorkspace key={`${user?.uid ?? "guest"}:${roles.semester}:${roles.retreat}:${JSON.stringify(teamMemberships)}`} />
   </WorkspaceAccessGate>;
 }
@@ -25,8 +25,9 @@ export default function SemestersPage() {
 function SemestersWorkspace() {
   const { user, roles, teamMemberships } = useAuth();
   const { toast } = useUI();
-  const allowed = canAccessOperationsCenter(roles, teamMemberships);
-  const canEdit = allowed && canEditArea("semester", roles);
+  const allowed = canViewSemesterOperations(roles, teamMemberships);
+  const centralAccess = canAccessOperationsCenter(roles, teamMemberships);
+  const canEdit = centralAccess && canEditArea("semester", roles);
   // 학기 삭제·아카이브는 되돌릴 수 없다 — 통합관리자·교역자만.
   const canDestroy = canDestroySemester(roles);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -51,6 +52,7 @@ function SemestersWorkspace() {
     );
     return () => { active = false; unsubscribe(); };
   }, [user, allowed, attempt]);
+  const visibleSemesters = semesters.filter((semester) => canViewSemesterOperations(roles, teamMemberships, semester.id));
 
   async function handleCreate() {
     if (creating || listLoading || loadError) return;
@@ -96,8 +98,8 @@ function SemestersWorkspace() {
       <main className="page-container max-w-5xl">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold tracking-[-0.025em] text-slate-900">훈련·사역팀</h1>
-            <p className="mt-1 text-sm text-slate-500">훈련과 사역팀의 신청부터 수료까지 한 흐름으로 관리합니다.</p>
+            <h1 className="text-2xl font-bold tracking-[-0.025em] text-slate-900">{centralAccess ? "훈련·사역팀" : "사역팀 학기 조회"}</h1>
+            <p className="mt-1 text-sm text-slate-500">{centralAccess ? "훈련과 사역팀의 신청부터 수료까지 한 흐름으로 관리합니다." : "학기를 선택해 사역팀 전체 명단과 출석·수료를 확인하세요."}</p>
           </div>
           {!canEdit && (
             <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">조회 전용</span>
@@ -110,12 +112,12 @@ function SemestersWorkspace() {
 
         <section className="mb-7 grid gap-4 sm:grid-cols-2">
           {listLoading && <p className="text-sm text-slate-400">목록 불러오는 중…</p>}
-          {!listLoading && semesters.length === 0 && !loadError && (
+          {!listLoading && visibleSemesters.length === 0 && !loadError && (
             <p className="text-sm text-slate-400">
               {canEdit ? "아직 학기가 없습니다. 아래에서 첫 학기를 만들어보세요." : "등록된 학기가 없습니다."}
             </p>
           )}
-          {semesters.map((s) => (
+          {visibleSemesters.map((s) => (
             <div key={s.id} className="card card-body relative" data-hover>
               <Link href={`/operations/semesters/${encodeURIComponent(s.id)}/overview`} className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">

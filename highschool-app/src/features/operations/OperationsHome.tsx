@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, ClockCounterClockwise, GearSix, ListChecks, UsersThree } from "@phosphor-icons/react";
 import { useAuth } from "@/context/AuthContext";
 import { canManageRolesOf, canManageSiteRequests, canViewActivityLogs } from "@/features/portal/accessPolicy";
-import { canAccessOperationsCenter } from "@/features/teams/teamModel";
+import { canAccessOperationsCenter, canViewSemesterOperations } from "@/features/teams/teamModel";
 import OperationsGate from "./OperationsGate";
 
 const ITEMS = [
@@ -16,8 +16,9 @@ const ITEMS = [
 
 export default function OperationsHome() {
   const { roles, teamMemberships } = useAuth();
-  const semesterAllowed = canAccessOperationsCenter(roles, teamMemberships);
+  const semesterAllowed = canViewSemesterOperations(roles, teamMemberships);
+  const teamOverviewOnly = semesterAllowed && !canAccessOperationsCenter(roles, teamMemberships);
   const items = ITEMS.map((item) => ({ ...item, allowed: item.show === "semester" ? semesterAllowed : item.show === "accounts" ? canManageRolesOf(roles) : item.show === "requests" ? canManageSiteRequests(roles) : canViewActivityLogs(roles) }));
   // 메뉴 목록에는 운영 데이터가 없다. 실제 업무는 각 목적지의 권한 게이트가 확인한다.
-  return <OperationsGate allowed><main className="team-first-page"><header className="team-first-page-header"><div><h1>운영센터</h1><p>팀을 가로지르는 학기 모집·배치와 계정, 요청, 변경 기록을 관리합니다. 모든 메뉴가 보이며, 내용은 담당 권한에 따라 열립니다.</p></div></header><section className="operations-grid">{items.map(({ href, label, description, Icon, allowed }) => <Link key={href} href={href} prefetch={allowed ? undefined : false} className="operations-card"><Icon size={21} aria-hidden="true" /><div><h2>{label}{!allowed && <small className="ml-2 text-xs font-medium text-[var(--color-text-muted)]">권한 필요</small>}</h2><p>{description}</p></div><ArrowRight size={16} aria-hidden="true" /></Link>)}</section></main></OperationsGate>;
+  return <OperationsGate allowed><main className="team-first-page"><header className="team-first-page-header"><div><h1>운영센터</h1><p>팀을 가로지르는 학기 모집·배치와 계정, 요청, 변경 기록을 관리합니다. 모든 메뉴가 보이며, 내용은 담당 권한에 따라 열립니다.</p></div></header><section className="operations-grid">{items.map(({ href, label, description, Icon, allowed, show }) => <Link key={href} href={href} prefetch={allowed ? undefined : false} className="operations-card"><Icon size={21} aria-hidden="true" /><div><h2>{label}{!allowed && <small className="ml-2 text-xs font-medium text-[var(--color-text-muted)]">권한 필요</small>}</h2><p>{show === "semester" && teamOverviewOnly ? "사역팀 전체 명단·출석·수료 조회" : description}</p></div><ArrowRight size={16} aria-hidden="true" /></Link>)}</section></main></OperationsGate>;
 }

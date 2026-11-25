@@ -18,6 +18,16 @@ it("방학 역할의 기존 학기 목록 조회도 유지한다", async () => {
   mocks.authenticate.mockResolvedValue({ roles: { semester: "none", retreat: "iguardTeam" } });
   expect((await GET(new Request("https://example.test/api/semester-ids"))).status).toBe(200);
 });
+it("플랫폼 역할 없는 담당 팀장은 허용된 학기 ID만 받는다", async () => {
+  mocks.ids.mockResolvedValue(["2026-1", "2026-2", "2027-1"]);
+  mocks.authenticate.mockResolvedValue({
+    roles: { semester: "none", retreat: "none" },
+    teamMemberships: { media: { role: "leader", active: true, semesters: { "2026-2": true } } },
+  });
+  const response = await GET(new Request("https://example.test/api/semester-ids"));
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ ids: ["2026-2"] });
+});
 it("비로그인·미승인 계정은 ID 탐색 전에 거부한다", async () => {
   mocks.authenticate.mockRejectedValueOnce(new PraiseRequestError(401, "로그인 필요", "unauthorized"));
   expect((await GET(new Request("https://example.test/api/semester-ids"))).status).toBe(401);
