@@ -305,7 +305,8 @@ export class Repo implements RepoHandle {
 
   private onRealtimeStatus(kind: "changes" | "broadcast", status: string): void {
     const wasUp = this.channelUp.get(kind) === true;
-    const rejoined = status === "SUBSCRIBED" && !wasUp && this.channelEverUp.has(kind);
+    // 다시 붙음: 전에 붙었던 길이 내려갔다 붙거나, 처음부터 거부·끊김을 알렸던 길(로그인 전 등)이 나중에 처음 붙는 경우.
+    const rejoined = status === "SUBSCRIBED" && !wasUp && (this.channelEverUp.has(kind) || this.channelUp.has(kind));
     this.channelUp.set(kind, status === "SUBSCRIBED");
     if (status === "SUBSCRIBED") this.channelEverUp.add(kind);
     const up = [...this.channelUp.values()].some(Boolean);

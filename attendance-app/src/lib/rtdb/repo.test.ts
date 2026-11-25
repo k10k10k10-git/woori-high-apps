@@ -577,6 +577,22 @@ describe("실시간 알림 두 길(postgres_changes · 비공개 broadcast rtdb:
     expect(fake.calls.slice(before)).toHaveLength(1);
   });
 
+  it("처음에 거부된 길(로그인 전 등)이 나중에 처음 붙어도 그 사이 변경을 위해 모두 다시 읽는다", async () => {
+    const { fake, db } = setup({ a: 1 });
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.setChannelStatus("broadcast", "CHANNEL_ERROR");
+    fake.setChannelStatus("changes", "SUBSCRIBED");
+    await vi.waitFor(() => expect(fake.calls.length).toBeGreaterThan(0));
+    await tick(20);
+    fake.autoNotify = false;
+    fake.externalWrite({ a: 4 });   // 옛 길은 붙어 있지만 알림을 싣지 않는 경우
+    const before = fake.calls.length;
+    fake.setChannelStatus("broadcast", "SUBSCRIBED");
+    await vi.waitFor(() => expect(a.values.at(-1)).toBe(4));
+    expect(fake.calls.slice(before)).toHaveLength(1);
+  });
+
   it("broadcast 채널을 열지 못해도 옛 길로 받는다", async () => {
     const { fake, db } = setup({ a: 1 });
     const original = fake.channel.bind(fake);
