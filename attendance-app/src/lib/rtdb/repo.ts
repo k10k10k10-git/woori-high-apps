@@ -7,6 +7,8 @@
 //  3) views: 같은 경로·같은 query 의 구독 묶음. 값이 바뀔 때마다 이전 값과 비교해 이벤트를 만든다.
 //
 // 서버와 맞추기: Realtime 으로 `rtdb.changes` INSERT(바뀐 경로)를 받으면, 겹치는 뿌리만 다시 읽는다.
+// 같은 알림을 비공개 Broadcast 채널 `rtdb:changes`(이벤트 `changes`, 내용 `{ id, paths }`)로도 받는다 — 옮겨 가는 동안 두 길이
+// 함께 오므로 같은 변경 번호는 한 번만 처리한다(DB 0131 뒤 0132 가 옛 길을 닫는다). 연결 상태는 둘 중 하나라도 붙어 있으면 연결이다.
 // 뿌리 아래 경로가 바뀌면 그 경로만 읽어 끼워 넣는다(splice). 읽기는 한 번에 하나씩, 짧게 묶어서 보낸다
 // — 그래서 늦게 보낸 읽기가 먼저 보낸 읽기에 덮이지 않는다.
 import { getDeniedError, listenDeniedError, offlineError, rtdbError, transactionError, writeDeniedError } from "./errors";
@@ -148,6 +150,11 @@ export class Repo implements RepoHandle {
   private started = false;
   private disposed = false;
   private channel: RealtimeChannelLike | null = null;
+  private broadcastChannel: RealtimeChannelLike | null = null;
+  /** 길마다 붙어 있는지(postgres_changes·broadcast). 하나라도 참이면 연결. */
+  private readonly channelUp = new Map<"changes" | "broadcast", boolean>();
+  /** 이미 처리한 변경 번호(두 길로 같은 알림이 오면 두 번째는 버린다). */
+  private readonly seenChanges = new Set<number>();
   private realtimeSubscribed = false;
   private browserOnline = true;
   private networkOffline = false;
@@ -230,7 +237,7 @@ export class Repo implements RepoHandle {
       channel.on("postgres_changes", { event: "INSERT", schema: "rtdb", table: "changes" }, (payload) => {
         this.onRealtimeChange(payload?.new);
       });
-      channel.subscribe((status) => this.onRealtimeStatus(status));
+      channel.subscribe((status) => this.onRealtimeStatus("changes", status));
       this.channel = channel;
       this.cleanups.push(() => {
         try {
@@ -241,6 +248,45 @@ export class Repo implements RepoHandle {
       });
     } catch (error) {
       console.warn("[rtdb] 실시간 연결을 시작하지 못했습니다.", error);
+    }
+    this.startBroadcast();
+  }
+
+  /** 같은 알림의 Broadcast 길(비공개 채널). 받을 권한은 DB 정책이 채널에 들어올 때 본다. 실패해도 옛 길은 그대로다. */
+  private startBroadcast(): void {
+    if (this.broadcastChannel) return;
+    try {
+      const client = this.client();
+      const channel = client.channel("rtdb:changes", { config: { private: true } });
+      channel.on("broadcast", { event: "changes" }, (message) => {
+        this.onRealtimeChange(message?.payload);
+      });
+      this.broadcastChannel = channel;
+      const subscribe = () => {
+        if (this.disposed) return;
+        channel.subscribe((status) => this.onRealtimeStatus("broadcast", status));
+      };
+      // 비공개 채널은 들어갈 때 로그인 토큰이 있어야 한다. setAuth 가 없거나 실패해도 들어가 본다(거부되면 옛 길로 받는다).
+      let auth: unknown;
+      try {
+        auth = client.realtime?.setAuth?.();
+      } catch {
+        auth = undefined;
+      }
+      if (auth && typeof (auth as PromiseLike<unknown>).then === "function") {
+        void Promise.resolve(auth).then(subscribe, subscribe);
+      } else {
+        subscribe();
+      }
+      this.cleanups.push(() => {
+        try {
+          client.removeChannel?.(channel);
+        } catch {
+          // 정리 중 오류는 무시한다.
+        }
+      });
+    } catch (error) {
+      console.warn("[rtdb] 실시간 알림(broadcast)을 시작하지 못했습니다.", error);
     }
   }
 
@@ -255,8 +301,12 @@ export class Repo implements RepoHandle {
 
   // ── 연결 상태 ─────────────────────────────────────────────
 
-  private onRealtimeStatus(status: string): void {
-    if (status === "SUBSCRIBED") {
+  private onRealtimeStatus(kind: "changes" | "broadcast", status: string): void {
+    this.channelUp.set(kind, status === "SUBSCRIBED");
+    const up = [...this.channelUp.values()].some(Boolean);
+    if (up) {
+      // 한 길만 다시 붙은 것이면 다른 길이 그동안 알림을 받았으므로 다시 읽지 않는다.
+      if (this.realtimeSubscribed) return;
       this.realtimeSubscribed = true;
       this.setNetworkOffline(false);
       this.updateInfo();
@@ -709,6 +759,10 @@ export class Repo implements RepoHandle {
     const record = row as { id?: unknown; paths?: unknown };
     const id = Number(record.id);
     if (Number.isFinite(id)) {
+      // 두 길(postgres_changes·broadcast)로 같은 변경이 오면 처음 것만 처리한다.
+      if (this.seenChanges.has(id)) return;
+      this.seenChanges.add(id);
+      if (this.seenChanges.size > MAX_REMEMBERED_CHANGES) this.seenChanges.delete(this.seenChanges.values().next().value as number);
       if (this.ackedChanges.delete(id)) return;
       this.remember(this.notified, id, this.nextSeq);
     }

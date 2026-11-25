@@ -12,7 +12,10 @@ export interface FakeCall {
 }
 
 interface FakeChannel extends RealtimeChannelLike {
+  /** postgres_changes 길(이름이 rtdb:changes 가 아닌 채널) 또는 broadcast 길(비공개 rtdb:changes). */
+  kind: "changes" | "broadcast";
   handlers: Array<(payload: { new?: unknown }) => void>;
+  broadcastHandlers: Array<(message: { payload?: unknown }) => void>;
   status?: (status: string, error?: Error) => void;
 }
 
@@ -84,13 +87,33 @@ export class FakeSupabase implements SupabaseLike {
     return this.recordChange(Object.keys(patch).map(normalizePath));
   }
 
+  /** 서버의 변경 알림. 옮겨 가는 동안처럼 두 길(postgres_changes·broadcast)로 같은 번호를 보낸다. */
   emitChange(paths: string[] | null, id = ++this.changeId): void {
-    for (const channel of this.channels) channel.handlers.forEach((handler) => handler({ new: { id, at: new Date().toISOString(), paths } }));
+    this.emitVia("changes", paths, id);
+    this.emitVia("broadcast", paths, id);
+  }
+
+  /** 한 길로만 알림을 보낸다(postgres_changes 는 `{ new: 줄 }`, broadcast 는 `{ type, event, payload }`). */
+  emitVia(kind: "changes" | "broadcast", paths: string[] | null, id = ++this.changeId): void {
+    for (const channel of this.channels) {
+      if (channel.kind !== kind) continue;
+      if (kind === "changes") channel.handlers.forEach((handler) => handler({ new: { id, at: new Date().toISOString(), paths } }));
+      else channel.broadcastHandlers.forEach((handler) => handler({ payload: { id, paths } }));
+    }
   }
 
   setRealtimeStatus(status: "SUBSCRIBED" | "CHANNEL_ERROR" | "CLOSED" | "TIMED_OUT"): void {
     for (const channel of this.channels) channel.status?.(status);
   }
+
+  /** 한 길의 연결 상태만 바꾼다. */
+  setChannelStatus(kind: "changes" | "broadcast", status: "SUBSCRIBED" | "CHANNEL_ERROR" | "CLOSED" | "TIMED_OUT"): void {
+    for (const channel of this.channels) if (channel.kind === kind) channel.status?.(status);
+  }
+
+  /** realtime.setAuth 가 불린 횟수(비공개 채널에 들어가기 전). */
+  realtimeAuthCalls = 0;
+  readonly realtime = { setAuth: () => { this.realtimeAuthCalls += 1; } };
 
   value(path = ""): unknown {
     return copy(getChild(this.data, normalizePath(path)));
@@ -103,14 +126,23 @@ export class FakeSupabase implements SupabaseLike {
     return { rpc: (fn: string, args: Record<string, unknown> = {}) => this.rpc(fn, args) };
   }
 
-  channel(): RealtimeChannelLike {
+  channel(name: string, options?: Record<string, unknown>): RealtimeChannelLike {
+    const isBroadcast = name === "rtdb:changes";
+    if (isBroadcast && (options?.config as { private?: unknown } | undefined)?.private !== true) throw new Error("rtdb:changes must be a private channel");
     const channel: FakeChannel = {
+      kind: isBroadcast ? "broadcast" : "changes",
       handlers: [],
-      on: (_type, filter, callback) => {
-        if (filter.schema !== "rtdb" || filter.table !== "changes" || filter.event !== "INSERT") throw new Error("unexpected realtime filter");
-        channel.handlers.push(callback);
+      broadcastHandlers: [],
+      on: ((type: string, filter: { event: string; schema?: string; table?: string }, callback: (arg: never) => void) => {
+        if (type === "broadcast") {
+          if (!isBroadcast || filter.event !== "changes") throw new Error("unexpected broadcast filter");
+          channel.broadcastHandlers.push(callback as (message: { payload?: unknown }) => void);
+          return channel;
+        }
+        if (isBroadcast || filter.schema !== "rtdb" || filter.table !== "changes" || filter.event !== "INSERT") throw new Error("unexpected realtime filter");
+        channel.handlers.push(callback as (payload: { new?: unknown }) => void);
         return channel;
-      },
+      }) as RealtimeChannelLike["on"],
       subscribe: (callback) => {
         channel.status = callback;
         return channel;

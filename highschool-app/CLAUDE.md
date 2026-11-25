@@ -228,7 +228,7 @@
 ## RTDB 데이터 계층 `@/lib/rtdb` — 2026-11-12 Supabase 이관
 
 - 앱 코드는 `firebase/database` 대신 **`@/lib/rtdb`**를 import 합니다(함수·타입 이름과 인자는 같음). 계약은 `../docs/SUPABASE_PLATFORM_CONTRACT.md`, Supabase 클라이언트는 `src/lib/supabase.ts`의 `getSupabase()` 하나뿐입니다. `activityLogWriteContract.test.ts`는 두 모듈명 모두에서 직접 쓰기를 막습니다.
-- 구독은 경로 값을 `api.rtdb_get(_many)`로 읽고, Realtime `rtdb.changes` 알림이 오면 겹치는 위치만(뿌리 아래면 바뀐 경로만) 다시 읽습니다. 쓰기는 즉시 화면에 보이고 서버 확인 때 Promise가 끝나며, 끊기면 메모리 대기열에서 순서대로 다시 보냅니다(트랜잭션도 같은 줄에 섭니다).
+- 구독은 경로 값을 `api.rtdb_get(_many)`로 읽고, Realtime `rtdb.changes` 알림(또는 같은 내용의 비공개 Broadcast `rtdb:changes`)이 오면 겹치는 위치만(뿌리 아래면 바뀐 경로만) 다시 읽습니다. 두 길로 같은 변경 번호가 오면 한 번만 처리합니다. 쓰기는 즉시 화면에 보이고 서버 확인 때 Promise가 끝나며, 끊기면 메모리 대기열에서 순서대로 다시 보냅니다(트랜잭션도 같은 줄에 섭니다).
 - ⚠ **query는 서버 색인이 아니라 클라이언트 거르기**입니다. `limitToLast(1)`이어도 그 위치 전체를 받습니다(활동 로그 등 커지는 노드 주의). 구독 콜백은 등록 직후가 아니라 한 박자(microtask) 뒤에 처음 불립니다.
 - 시험은 업무 모듈이면 `vi.mock("@/lib/rtdb")`, 모듈 자체는 `src/lib/rtdb/testing/fakeSupabase.ts`(가짜 RPC·Realtime)를 씁니다.
 

@@ -9,6 +9,7 @@
 - `rtdb.nodes(path text collate "C" primary key, value jsonb not null)` — **잎(원시값)만** 저장한다. 경로는 `/` 로 이은 Firebase 키(앞뒤 `/` 없음). 배열은 인덱스 키(`"0"`, `"1"`…)로 펼친다. 하위 트리 조회는 `path = p or (path >= p || '/' and path < p || '0')`.
 - `rtdb.uid_map(email text primary key, legacy_uid text unique not null)` — Firebase 계정 이메일 → 옛 UID. 규칙의 `auth.uid` 는 이 표에 이메일이 있으면 옛 UID, 없으면 Supabase `auth.uid()::text`.
 - `rtdb.changes(id bigint identity, at timestamptz, paths text[])` — 쓰기마다 한 줄. Supabase Realtime 으로 클라이언트에 "바뀐 경로"만 알린다(값은 싣지 않음). 하루 지난 줄은 쓰기 때 지운다.
+  - 같은 알림을 비공개 Broadcast 채널 `rtdb:changes`(이벤트 `changes`, 내용 `{ id, paths }`)로도 보낸다(우리틴즈 DB 0131). 받을 권한은 `rtdb.changes` 읽기와 같은 판정이고, 앱은 이 채널에 보낼 수 없다. 옮기는 동안 두 길이 함께 오고, 다음 단계(0132)에서 옛 길(postgres_changes)을 닫는다.
 - 앱 역할은 표에 직접 접근하지 못한다. 아래 api 함수만.
 
 | 함수 (schema `api`) | 권한 | 뜻 |
@@ -40,7 +41,7 @@
 - **데이터 계층이 지킬 Firebase 동작:**
   - 스냅샷 `val()` 은 Firebase 처럼 숫자 키 객체를 배열로 바꾼다(키가 모두 0 이상 정수이고 `max+1` 의 절반 넘게 채워졌을 때). `forEach`·`val()` 키 순서는 Firebase 순서(정수 키 오름차순 → 문자열 사전순).
   - 쓰기는 **즉시 화면에 반영**(로컬 덮어쓰기)하고 서버 응답을 기다린다. 네트워크가 끊기면 쓰기를 메모리에 쌓아 두고 다시 연결되면 순서대로 보낸다(약속은 그때 끝난다). 거부·검증 실패면 로컬 반영을 되돌리고 약속을 오류로 끝낸다(`error.code = 'PERMISSION_DENIED'`).
-  - 구독은 처음에 `rtdb_get`(여러 개면 `rtdb_get_many`)으로 읽고, Realtime `rtdb.changes` INSERT 를 받으면 바뀐 경로와 겹치는(조상·자손) 구독만 다시 읽는다(짧게 묶어서).
+  - 구독은 처음에 `rtdb_get`(여러 개면 `rtdb_get_many`)으로 읽고, Realtime `rtdb.changes` INSERT 또는 Broadcast `rtdb:changes` 를 받으면 바뀐 경로와 겹치는(조상·자손) 구독만 다시 읽는다(짧게 묶어서). 같은 `id` 는 한 번만 처리하고, 연결 상태는 두 길 중 하나라도 붙어 있으면 연결이다.
   - `push()` 키는 Firebase 푸시 ID 알고리즘(시간 순 20자)을 그대로.
   - `query(...)` 는 받은 값에서 클라이언트가 거른다(`orderByChild`·`equalTo`·`limitTo*`·`startAt`·`endAt`·`endBefore`).
   - `runTransaction` 은 `rtdb_get_hashed` → 콜백 → `rtdb_cas` 를 커밋될 때까지 되풀이(최대 25번).

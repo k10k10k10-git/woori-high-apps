@@ -20,6 +20,7 @@ export interface RpcBuilder extends PromiseLike<RpcResponse> {
 
 export interface RealtimeChannelLike {
   on(type: "postgres_changes", filter: { event: string; schema: string; table: string }, callback: (payload: { new?: unknown }) => void): RealtimeChannelLike;
+  on(type: "broadcast", filter: { event: string }, callback: (message: { payload?: unknown }) => void): RealtimeChannelLike;
   subscribe(callback?: (status: string, error?: Error) => void): unknown;
 }
 
@@ -27,6 +28,8 @@ export interface SupabaseLike {
   schema(name: string): { rpc(fn: string, args?: Record<string, unknown>): RpcBuilder };
   channel(name: string, options?: Record<string, unknown>): RealtimeChannelLike;
   removeChannel?(channel: RealtimeChannelLike): unknown;
+  /** 비공개 채널에 들어가기 전에 지금 로그인 토큰을 Realtime 에 알린다(supabase-js `realtime.setAuth`). */
+  realtime?: { setAuth?(token?: string | null): unknown };
   auth?: {
     getSession?(): Promise<{ data: { session: unknown }; error: unknown }>;
     onAuthStateChange?(callback: (event: string, session: { user?: { id?: string } } | null) => void): unknown;
