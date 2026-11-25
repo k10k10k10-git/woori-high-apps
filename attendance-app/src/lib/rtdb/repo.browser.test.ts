@@ -16,7 +16,8 @@ describe("브라우저 환경 감시", () => {
     expect(fake.channels).toHaveLength(0);
     const states: unknown[] = [];
     onValue(ref(db, ".info/connected"), (snapshot) => states.push(snapshot.val()));
-    expect(fake.channels).toHaveLength(1);
+    // 옛 postgres_changes 와 비공개 broadcast(rtdb:changes) 두 채널
+    expect(fake.channels).toHaveLength(2);
     fake.setRealtimeStatus("SUBSCRIBED");
     fake.online = false;
     let done = false;

@@ -503,3 +503,126 @@ describe("로그아웃·설정 오류", () => {
     await vi.waitFor(() => expect(errors).toHaveLength(1));
   });
 });
+
+describe("실시간 알림 두 길(postgres_changes · 비공개 broadcast rtdb:changes)", () => {
+  it("두 채널을 연다: 옛 postgres_changes 와 비공개 rtdb:changes(들어가기 전에 setAuth)", async () => {
+    const { fake, db } = setup({ a: 1 });
+    watch(db, "a");
+    await vi.waitFor(() => expect(fake.channels).toHaveLength(2));
+    expect(fake.channels.map((channel) => (channel as unknown as { kind: string }).kind).sort()).toEqual(["broadcast", "changes"]);
+    expect(fake.realtimeAuthCalls).toBe(1);
+  });
+
+  it("같은 변경 번호가 두 길로 오면 한 번만 다시 읽는다(순서가 바뀌어도)", async () => {
+    const { fake, db } = setup({ a: { x: 1 } });
+    fake.setRealtimeStatus("SUBSCRIBED");
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.autoNotify = false;
+    fake.externalWrite({ "a/x": 2 });
+    let before = fake.calls.length;
+    fake.emitVia("broadcast", ["a/x"], 101);
+    fake.emitVia("changes", ["a/x"], 101);
+    await vi.waitFor(() => expect(a.values.at(-1)).toEqual({ x: 2 }));
+    await tick(20);
+    expect(fake.calls.slice(before)).toHaveLength(1);
+    fake.externalWrite({ "a/x": 3 });
+    before = fake.calls.length;
+    fake.emitVia("changes", ["a/x"], 102);
+    fake.emitVia("broadcast", ["a/x"], 102);
+    await vi.waitFor(() => expect(a.values.at(-1)).toEqual({ x: 3 }));
+    await tick(20);
+    expect(fake.calls.slice(before)).toHaveLength(1);
+  });
+
+  it("한 길로만 와도 받는다(broadcast 만 · postgres_changes 만), 묶인 조상 경로도 다시 읽는다", async () => {
+    const { fake, db } = setup({ a: { b: { c: { x: 1 } } }, z: 1 });
+    fake.setRealtimeStatus("SUBSCRIBED");
+    const leaf = watch(db, "a/b/c/x");
+    await vi.waitFor(() => expect(leaf.values).toHaveLength(1));
+    fake.autoNotify = false;
+    fake.externalWrite({ "a/b/c/x": 2 });
+    fake.emitVia("broadcast", ["a/b/c"], 201);   // 서버가 경로를 앞 세 마디로 묶어 보낸 경우
+    await vi.waitFor(() => expect(leaf.values.at(-1)).toBe(2));
+    fake.externalWrite({ "a/b/c/x": 3 });
+    fake.emitVia("changes", ["a/b/c/x"], 202);
+    await vi.waitFor(() => expect(leaf.values.at(-1)).toBe(3));
+  });
+
+  it("두 번째 길이 처음 붙을 때는 다시 읽지 않고, 한 길이라도 끊겼다 다시 붙으면 모두 다시 읽는다(옛 길이 닫힌 뒤에도 놓치지 않게)", async () => {
+    const { fake, db } = setup({ a: 1 });
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.setRealtimeStatus("SUBSCRIBED");   // 두 채널이 생긴 뒤 둘 다 붙는다(처음 한 번 모두 다시 읽음)
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    await tick(20);
+    let before = fake.calls.length;
+    // 옛 길(changes)은 붙어 있지만 알림을 싣지 않는 경우(0132 뒤): broadcast 가 끊긴 사이의 변경을 다시 붙을 때 읽는다
+    fake.setChannelStatus("broadcast", "CHANNEL_ERROR");
+    fake.autoNotify = false;
+    fake.externalWrite({ a: 7 });
+    fake.setChannelStatus("broadcast", "SUBSCRIBED");
+    await vi.waitFor(() => expect(a.values.at(-1)).toBe(7));
+    expect(fake.calls.slice(before)).toHaveLength(1);
+    // 같은 길이 붙은 채 또 SUBSCRIBED 가 와도(끊김 없음) 다시 읽지 않는다
+    before = fake.calls.length;
+    fake.setChannelStatus("broadcast", "SUBSCRIBED");
+    await tick(20);
+    expect(fake.calls.slice(before)).toHaveLength(0);
+    fake.setRealtimeStatus("CHANNEL_ERROR");
+    fake.externalWrite({ a: 2 });
+    before = fake.calls.length;
+    fake.setChannelStatus("changes", "SUBSCRIBED");
+    await vi.waitFor(() => expect(a.values).toEqual([1, 7, 2]));
+    expect(fake.calls.slice(before)).toHaveLength(1);
+  });
+
+  it("처음에 거부된 길(로그인 전 등)이 나중에 처음 붙어도 그 사이 변경을 위해 모두 다시 읽는다", async () => {
+    const { fake, db } = setup({ a: 1 });
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.setChannelStatus("broadcast", "CHANNEL_ERROR");
+    fake.setChannelStatus("changes", "SUBSCRIBED");
+    await vi.waitFor(() => expect(fake.calls.length).toBeGreaterThan(0));
+    await tick(20);
+    fake.autoNotify = false;
+    fake.externalWrite({ a: 4 });   // 옛 길은 붙어 있지만 알림을 싣지 않는 경우
+    const before = fake.calls.length;
+    fake.setChannelStatus("broadcast", "SUBSCRIBED");
+    await vi.waitFor(() => expect(a.values.at(-1)).toBe(4));
+    expect(fake.calls.slice(before)).toHaveLength(1);
+  });
+
+  it("확인용 건수: 길마다 받은 수·처음 번호·상태, 두 길 중복 수(경로·값은 없음)", async () => {
+    const { fake, db } = setup({ a: 1 });
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.setRealtimeStatus("SUBSCRIBED");
+    fake.autoNotify = false;
+    fake.emitChange(["a"], 301);
+    fake.emitVia("broadcast", ["a"], 302);
+    const stats = db._repo.realtimeStats;
+    expect(stats.changes).toEqual({ status: "SUBSCRIBED", received: 1, first: 301 });
+    expect(stats.broadcast).toEqual({ status: "SUBSCRIBED", received: 2, first: 301 });
+    expect(stats.duplicates).toBe(1);
+    expect(JSON.stringify(stats)).not.toMatch(/"a"/);
+  });
+
+  it("broadcast 채널을 열지 못해도 옛 길로 받는다", async () => {
+    const { fake, db } = setup({ a: 1 });
+    const original = fake.channel.bind(fake);
+    fake.channel = ((name: string, options?: Record<string, unknown>) => {
+      if (name === "rtdb:changes") throw new Error("synthetic: private channel unavailable");
+      return original(name, options);
+    }) as typeof fake.channel;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fake.setRealtimeStatus("SUBSCRIBED");
+    const a = watch(db, "a");
+    await vi.waitFor(() => expect(a.values).toHaveLength(1));
+    fake.setRealtimeStatus("SUBSCRIBED");
+    fake.externalWrite({ a: 5 });
+    await vi.waitFor(() => expect(a.values.at(-1)).toBe(5));
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
