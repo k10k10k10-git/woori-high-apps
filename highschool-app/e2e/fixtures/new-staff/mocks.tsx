@@ -160,8 +160,13 @@ export const clearAttendance = memoryWrite("clearAttendance");
 export const updateCompletionEntry = memoryWrite("updateCompletionEntry");
 export const describeApplicant = (application: Application) => `${application.bu} ${application.grade}학년 ${application.class}반`;
 
+export function subscribeStudentAttendance(_source: unknown, callback: (summary: string) => void) {
+  callback("출석 2 · 결석 1");
+  return () => undefined;
+}
+
 export async function readCurrentStudentRoster(): Promise<PeopleSearchData> {
-  return { classes: {}, attendance: {}, semesters: {}, retreats: {}, retreatsPrivate: {}, semestersPrivate: {} };
+  return { classes: {}, semesters: {}, retreats: {}, retreatsPrivate: {}, semestersPrivate: {} };
 }
 
 export function subscribePeopleSearchData(_options: unknown, callback: (data: PeopleSearchData) => void, fail?: (source: keyof PeopleSearchData, error: Error) => void) {
@@ -170,6 +175,6 @@ export function subscribePeopleSearchData(_options: unknown, callback: (data: Pe
       2025: { "1-1-4": { students: { old: { name: "합성학생가", personId: "person_student_synthetic_fixed" } } } },
       2026: { "1-2-6": { students: { current: { name: "합성학생가", personId: "person_student_synthetic_fixed" } } } },
     },
-    attendance: {}, semesters: {}, retreats: {}, retreatsPrivate: {}, semestersPrivate: {},
+    semesters: {}, retreats: {}, retreatsPrivate: {}, semestersPrivate: {},
   }, (error) => fail?.("classes", error));
 }
