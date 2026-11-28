@@ -135,6 +135,18 @@ export function attendanceAverage(students: ClassAttendance | undefined, cellKey
   return counts.reduce((sum, value) => sum + value, 0) / counts.length;
 }
 
+/**
+ * 반 명단(`classes/{연도}/{반}/students`)에 있는 학생의 출석만 남긴다.
+ * 출석 기록에는 명단에서 빠진 학생의 칸(옛 출석부에서 지우거나 휴지통으로 보낸 학생, 반을 옮기기 전 자리)이
+ * 남을 수 있다 — 교적 사본은 명단에 없는 칸을 지우지 않는다. 출석부 화면들처럼 명단 기준으로 센다.
+ */
+function rosterAttendance(classNode: unknown, records: ClassAttendance | undefined): ClassAttendance | undefined {
+  if (!records) return undefined;
+  const students = classNode && typeof classNode === "object" ? (classNode as { students?: unknown }).students : undefined;
+  if (!students || typeof students !== "object") return {};
+  return Object.fromEntries(Object.keys(students).filter((id) => records[id]).map((id) => [id, records[id]]));
+}
+
 /** 예배팀 화면에는 개인별 출결 대신 반별 평균만 전달한다. */
 export function worshipSeatingSource(
   classes: Record<string, unknown>,
@@ -143,11 +155,16 @@ export function worshipSeatingSource(
   service: WorshipService,
 ) {
   const classKeys = classKeysForService(Object.keys(classes), service);
-  const cellKeys = recentAttendedSundays(attendance, classKeys, week);
+  const rostered: Record<string, ClassAttendance> = {};
+  for (const key of classKeys) {
+    const records = rosterAttendance(classes[key], attendance[key]);
+    if (records) rostered[key] = records;
+  }
+  const cellKeys = recentAttendedSundays(rostered, classKeys, week);
   return {
     classKeys,
     cellKeys,
-    averageByClass: Object.fromEntries(classKeys.map((key) => [key, attendanceAverage(attendance[key], cellKeys)])),
+    averageByClass: Object.fromEntries(classKeys.map((key) => [key, attendanceAverage(rostered[key], cellKeys)])),
   };
 }
 
