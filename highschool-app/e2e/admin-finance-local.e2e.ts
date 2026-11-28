@@ -6,7 +6,7 @@ for (const theme of ["light", "dark"]) {
     page.on("request", request => { if (!request.url().startsWith("http://127.0.0.1:4179") && !request.url().startsWith("data:")) external.push(request.url()); });
     await page.goto(`/?scenario=actualAdmin&auth=admin&theme=${theme}`);
     await expect(page.getByRole("heading", { name: "1부 1학년 1반" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /원본 출석부에서 수정/ })).toHaveAttribute("href", "https://woori-high.web.app/attendance");
+    await expect(page.getByRole("link", { name: /우리틴즈 출석부에서 수정/ })).toHaveAttribute("href", "https://attend.wooriteens.com");
     await expect(page.getByText("합성학생가", { exact: true })).toBeVisible();
     await page.getByRole("searchbox", { name: "학생 이름 검색" }).fill("없는 학생");
     await expect(page.getByText("검색 결과가 없습니다.")).toBeVisible();
