@@ -15,6 +15,7 @@ import {
   parseBirth,
   registryErrorText,
   registryReadiness,
+  keptText,
   skippedText,
   submitNewFriendToRegistry,
 } from "./registryBridge";
@@ -97,6 +98,11 @@ describe("메모 합치기·옮기지 못한 칸", () => {
   it("옮기지 못한 칸 이름을 한국어로", () => {
     expect(skippedText([])).toBe("");
     expect(skippedText(["guardian_phone", "faith_step"])).toMatch(/보호자 연락처, 신급/);
+  });
+  it("다시 보낼 때 교적에서 고쳐 그대로 둔 칸 이름을 한국어로(우리틴즈 0145)", () => {
+    expect(keptText(undefined)).toBe("");
+    expect(keptText([])).toBe("");
+    expect(keptText(["barnabas", "met_first_on", "intake_note"])).toBe("교적에서 고친 칸(바나바 담당, 1주차, 비고 메모)은 교적 값을 그대로 두었습니다.");
   });
 });
 
