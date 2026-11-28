@@ -25,7 +25,7 @@ it("연간 원본을 조회하고 주일별 미입력과 장결을 구별하며 
   expect(screen.getByText("미입력 학생 1명")).toBeInTheDocument();
   const roster = screen.getByRole("list", { name: "선택한 주일의 학생 출석" });
   expect(within(roster).getAllByText("미입력")).toHaveLength(1);
-  expect(screen.getByRole("link", { name: "원본 출석부에서 수정" })).toHaveAttribute("href", "https://woori-high.web.app/attendance");
+  expect(screen.getByRole("link", { name: "우리틴즈 출석부에서 수정" })).toHaveAttribute("href", "https://attend.wooriteens.com");
   expect(screen.queryByRole("button", { name: /저장/ })).not.toBeInTheDocument();
   fireEvent.change(screen.getByRole("searchbox", { name: "학생 이름 검색" }), { target: { value: "가상하나" } });
   expect(within(roster).getAllByRole("listitem")).toHaveLength(1);

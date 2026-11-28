@@ -94,7 +94,7 @@ function AttendanceBookContent({ year, onRetry }: { year: number; onRetry: () =>
             {classKeys.map((classKey) => <option key={classKey} value={classKey}>{classLabel(classKey)}</option>)}
           </select></label>
         </div>
-        <a className="btn-secondary btn-sm sunday-attendance-source-link" href="https://woori-high.web.app/attendance" target="_blank" rel="noreferrer">원본 출석부에서 수정 <span aria-hidden="true">↗</span></a>
+        <a className="btn-secondary btn-sm sunday-attendance-source-link" href="https://attend.wooriteens.com" target="_blank" rel="noreferrer">우리틴즈 출석부에서 수정 <span aria-hidden="true">↗</span></a>
       </div>
 
       {loadError ? <div className={styles.notice}><LoadFailureNotice title="출석부를 불러오지 못했습니다." sources={Object.keys(errors)} onRetry={onRetry} /></div>
