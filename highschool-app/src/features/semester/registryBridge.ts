@@ -30,6 +30,8 @@ export interface RegistryState {
   existing?: boolean;
   /** hs_newcomer_submit_full: 규칙에 안 맞아 옮기지 못한 칸 이름(옛 꼴 연락처 등). 접수 자체는 됐다. */
   skipped?: string[];
+  /** hs_newcomer_submit_full(우리틴즈 0137·0145): 다시 보냈을 때 교적에서 고친 값이라 그대로 둔 칸 이름. */
+  kept?: string[];
 }
 
 export interface RegistrySubmission {
@@ -266,6 +268,14 @@ const SKIPPED_LABEL: Record<string, string> = {
 export function skippedText(skipped: string[] | undefined): string {
   const names = (skipped ?? []).map((k) => SKIPPED_LABEL[k] ?? k);
   return names.length ? `옮기지 못한 칸: ${names.join(", ")}. 우리틴즈 새친구 화면에서 다시 적어 주세요.` : "";
+}
+
+const KEPT_LABEL: Record<string, string> = { ...SKIPPED_LABEL, intake_note: "비고 메모" };
+
+/** 다시 보냈을 때 교적 값을 그대로 둔 칸을 사람이 읽는 말로. 없으면 빈 글. */
+export function keptText(kept: string[] | undefined): string {
+  const names = [...new Set((kept ?? []).map((k) => KEPT_LABEL[k] ?? k))];
+  return names.length ? `교적에서 고친 칸(${names.join(", ")})은 교적 값을 그대로 두었습니다.` : "";
 }
 
 export function cancelNewFriendRegistry(nfId: string): Promise<RegistryState> {

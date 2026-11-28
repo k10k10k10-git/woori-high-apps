@@ -23,6 +23,7 @@ import {
   fetchYearLedger,
   legacyBeforeRoster,
   registryReadiness,
+  keptText,
   skippedText,
   submitNewFriendToRegistry,
   type RegistryStage,
@@ -549,7 +550,8 @@ export default function NewFriendsTab({
       const state = await submitNewFriendToRegistry(submission);
       setRegistryStates((current) => ({ ...current, [friend.id]: state }));
       const skipped = skippedText(state.skipped);
-      toast([state.existing ? "이미 교적에 접수된 새친구라 넘긴 칸을 새 값으로 바꿨습니다." : "교적 새친구 접수 대기에 보냈습니다.", skipped].filter(Boolean).join(" "), "success");
+      const kept = state.existing ? keptText(state.kept) : "";
+      toast([state.existing ? "이미 교적에 접수된 새친구라 값을 적은 칸만 새 값으로 바꿨습니다." : "교적 새친구 접수 대기에 보냈습니다.", kept, skipped].filter(Boolean).join(" "), "success");
     } catch (error) {
       toast(error instanceof Error ? error.message : "교적 접수에 실패했습니다.", "error");
     } finally {
