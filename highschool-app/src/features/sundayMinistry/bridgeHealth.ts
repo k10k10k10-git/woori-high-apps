@@ -40,7 +40,7 @@ export const BRIDGE_REASON_TEXT: Readonly<Record<string, string>> = {
 
 /** 안내 코드 → 쉬운 말. 모르는 코드는 보이지 않는다. */
 export const BRIDGE_NOTICE_TEXT: Readonly<Record<string, string>> = {
-  legacy_writes: "옛 학생 출석부에 입력한 출석이 있어요. 그 값은 곧 우리틴즈 출석으로 바뀌니, 출석은 우리틴즈 출석부에서 입력해 주세요.",
+  legacy_writes: "옛 고등부 출석부로 바꾼 값이 있어요. 그 값은 곧 우리틴즈 값으로 돌아가니, 출석·명단은 우리틴즈에서 고쳐 주세요.",
   unmanaged: "이 출석부에만 있고 우리틴즈 명단에는 없는 학생이 있어요. 개발 담당자에게 알려 주세요.",
 };
 

@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { bridgeBanner, readBridgeHealth } from "./bridgeHealth";
+import { describe, expect, it, vi } from "vitest";
+
+const rpc = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/supabase", () => ({ getSupabase: () => ({ schema: () => ({ rpc }) }) }));
+import { bridgeBanner, fetchBridgeBanner, readBridgeHealth } from "./bridgeHealth";
 
 const row = (over: Record<string, unknown> = {}) => ({ year: 2026, status: "blocked", alert: true, since: "2026-11-24T01:00:00Z", stuck_minutes: 190, checked_at: "2026-11-24T04:10:00Z", reasons: ["unmanaged_fields_lost"], notices: [], ...over });
 
@@ -19,7 +22,7 @@ describe("교적 다리 상태 배너", () => {
     const both = bridgeBanner(readBridgeHealth([row({ alert: false, status: "ok", notices: ["unmanaged", "legacy_writes"] }), row({ year: 2027, alert: false, status: "ok", notices: ["legacy_writes", "new_code"] })]));
     expect(both.alerts).toEqual([]);
     expect(both.notices).toHaveLength(2);
-    expect(both.notices[0]).toContain("우리틴즈 출석부에서 입력해 주세요");
+    expect(both.notices[0]).toMatch(/^옛 고등부 출석부로 바꾼 값이 있어요\. .*출석·명단은 우리틴즈에서 고쳐 주세요/);
     expect(both.notices[1]).toContain("우리틴즈 명단에는 없는 학생");
   });
 
@@ -28,5 +31,19 @@ describe("교적 다리 상태 배너", () => {
     expect(readBridgeHealth([{ year: 2026, alert: "yes", status: "blocked" }])).toEqual([]);
     const all = bridgeBanner(readBridgeHealth([row({ reasons: ["large_delete", "identity_change"], notices: ["legacy_writes", "unmanaged"] })]));
     for (const line of [...all.alerts, ...all.notices]) expect(line).not.toMatch(/hs_bridge|rtdb|_|[a-z]{4,}/);
+  });
+});
+
+describe("상태 읽기 실패", () => {
+  it("권한 없음·함수 없음·연결 오류면 빈 배너, 읽히면 판정한 배너", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "42501", message: "semester admin required" } });
+    await expect(fetchBridgeBanner()).resolves.toEqual({ alerts: [], notices: [] });
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "not found" } });
+    await expect(fetchBridgeBanner()).resolves.toEqual({ alerts: [], notices: [] });
+    rpc.mockRejectedValueOnce(new Error("network"));
+    await expect(fetchBridgeBanner()).resolves.toEqual({ alerts: [], notices: [] });
+    rpc.mockResolvedValueOnce({ data: [row()], error: null });
+    expect((await fetchBridgeBanner()).alerts).toHaveLength(1);
+    expect(rpc).toHaveBeenCalledWith("hs_bridge_health");
   });
 });
