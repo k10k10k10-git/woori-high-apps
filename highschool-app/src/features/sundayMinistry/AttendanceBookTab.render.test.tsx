@@ -2,18 +2,20 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ classes: vi.fn(), attendance: vi.fn(), events: vi.fn(), stopped: vi.fn() }));
+const mocks = vi.hoisted(() => ({ classes: vi.fn(), attendance: vi.fn(), events: vi.fn(), stopped: vi.fn(), bridge: vi.fn() }));
 vi.mock("@/lib/db/students", () => ({
   subscribeToClassesByYear: mocks.classes,
   subscribeToAttendanceByYear: mocks.attendance,
   subscribeToAttendanceEventsByYear: mocks.events,
 }));
+vi.mock("./bridgeHealth", async (original) => ({ ...(await original<typeof import("./bridgeHealth")>()), fetchBridgeBanner: mocks.bridge }));
 import AttendanceBookTab from "./AttendanceBookTab";
 
 beforeEach(() => {
   mocks.classes.mockImplementation((_year, cb) => { cb({ "1-1-1": { teacher: "담당 교사", students: { a: { name: "가상 하나" }, b: { name: "가상 둘" }, c: { name: "가상 장결", jang: true } } } }); return mocks.stopped; });
   mocks.attendance.mockImplementation((_year, cb) => { cb({ "1-1-1": { a: { "0-0": "O" }, c: { "0-0": "X" } } }); return mocks.stopped; });
   mocks.events.mockImplementation((_year, cb) => { cb({}); return mocks.stopped; });
+  mocks.bridge.mockResolvedValue({ alerts: [], notices: [] });
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -59,4 +61,17 @@ it("연도가 바뀌면 이전 명단을 감추고 종료된 구독의 늦은 �
   oldFailure(new Error("이전 연도 실패"));
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   expect(mocks.stopped).toHaveBeenCalledTimes(3);
+});
+
+it("우리틴즈 출석 사본이 막히면 경고, 어긋나면 조용한 안내를 맨 위에 보이고, 못 읽으면 아무것도 보이지 않는다", async () => {
+  mocks.bridge.mockResolvedValue({ alerts: ["우리틴즈 출석이 이 출석부로 3시간째 넘어오지 않고 있어요. 개발 담당자에게 알려 주세요."], notices: ["이 출석부에만 있고 우리틴즈 명단에는 없는 학생이 있어요. 개발 담당자에게 알려 주세요."] });
+  render(<AttendanceBookTab year={2026} />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("3시간째 넘어오지 않고 있어요");
+  expect(screen.getByRole("status")).toHaveTextContent("우리틴즈 명단에는 없는 학생");
+  expect(mocks.bridge).toHaveBeenCalledTimes(1);
+  cleanup();
+  mocks.bridge.mockResolvedValue({ alerts: [], notices: [] });
+  render(<AttendanceBookTab year={2026} />);
+  await Promise.resolve();
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });

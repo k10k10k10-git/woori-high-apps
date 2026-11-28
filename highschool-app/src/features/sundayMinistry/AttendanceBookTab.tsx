@@ -14,6 +14,7 @@ import {
   latestAttendanceWeek, normalizeAttendanceMark, sortedRoster, weeklyAttendanceCounts,
   type AttendanceSemester,
 } from "./attendanceBook";
+import { fetchBridgeBanner, NO_BRIDGE_BANNER, type BridgeBanner } from "./bridgeHealth";
 import styles from "./sundayAdmin.module.css";
 
 type ClassesYear = Record<string, {
@@ -45,6 +46,14 @@ function AttendanceBookContent({ year, onRetry }: { year: number; onRetry: () =>
   const [events, setEvents] = useState<Record<string, AttendanceEventRecord>>({});
   const [loaded, setLoaded] = useState<string[]>([]);
   const { fail, ok, errors, message: loadError } = useLoadErrors(`sunday-attendance|${year}`);
+  const [bridge, setBridge] = useState<BridgeBanner>(NO_BRIDGE_BANNER);
+
+  // 우리틴즈에서 넘어오는 출석 사본의 상태(관리자만 읽힌다 — 아니면 빈 배너). 화면을 열 때 한 번.
+  useEffect(() => {
+    let active = true;
+    void fetchBridgeBanner().then((value) => { if (active) setBridge(value); });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +85,8 @@ function AttendanceBookContent({ year, onRetry }: { year: number; onRetry: () =>
 
   return (
     <section className={`sunday-attendance-book surface-panel ${styles.attendanceBook}`}>
+      {bridge.alerts.length > 0 && <div className="mb-3 rounded-lg bg-red-100 p-3 text-sm text-red-800" role="alert">{bridge.alerts.map((line) => <p key={line}>{line}</p>)}</div>}
+      {bridge.notices.length > 0 && <div className="mb-3 rounded-lg bg-blue-100 p-3 text-sm text-blue-900" role="status">{bridge.notices.map((line) => <p key={line}>{line}</p>)}</div>}
       <div className="sunday-attendance-toolbar">
         <div className="sunday-attendance-filters">
           <div className="sunday-attendance-segment" role="group" aria-label="출석부 보기">
